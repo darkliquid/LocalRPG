@@ -34,6 +34,8 @@ func main() {
 		handleTTSCommand(args[1:])
 	case "image":
 		handleImageCommand(args[1:])
+	case "gui":
+		handleGUICommand(args[1:])
 	case "version":
 		fmt.Printf("LocalRPG v%s\n", Version)
 	case "help":
