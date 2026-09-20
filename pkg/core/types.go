@@ -18,11 +18,13 @@ type SystemManifest struct {
 type WorldManifest struct {
 	ID            string   `yaml:"id"`
 	Name          string   `yaml:"name"`
+	Description   string   `yaml:"description,omitempty"`
 	Genre         string   `yaml:"genre,omitempty"`
 	DefaultSystem string   `yaml:"default_system,omitempty"`
 	ArtStyle      string   `yaml:"art_style,omitempty"`
 	Tags          []string `yaml:"tags,omitempty"`
 }
+
 
 type GameManifest struct {
 	ID       string                 `yaml:"id"`

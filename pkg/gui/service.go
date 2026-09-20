@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
@@ -192,3 +193,177 @@ func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, e
 	}
 	return dtos, nil
 }
+
+func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
+	gamesDir := s.resolver.GamesDir()
+	entries, err := os.ReadDir(gamesDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []GameSummaryDTO{}, nil
+		}
+		return nil, fmt.Errorf("read games dir: %w", err)
+	}
+
+	summaries := make([]GameSummaryDTO, 0)
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		gameID := e.Name()
+		gameDir := filepath.Join(gamesDir, gameID)
+		manifestPath := filepath.Join(gameDir, "game.yaml")
+		m, err := core.LoadGameManifest(manifestPath)
+		if err != nil {
+			continue
+		}
+
+		turnCount := 0
+		historyPath := filepath.Join(gameDir, "history.jsonl")
+		logger := engine.NewHistoryLogger(historyPath)
+		if turns, err := logger.LoadHistory(); err == nil {
+			turnCount = len(turns)
+		}
+
+		lastPlayed := ""
+		if fi, err := os.Stat(manifestPath); err == nil {
+			lastPlayed = fi.ModTime().Format(time.RFC3339)
+		}
+
+		name := m.Name
+		if name == "" {
+			name = gameID
+		}
+
+		summaries = append(summaries, GameSummaryDTO{
+			ID:         gameID,
+			Name:       name,
+			SystemID:   m.SystemID,
+			WorldID:    m.WorldID,
+			PlayerName: m.Player,
+			TurnCount:  turnCount,
+			LastPlayed: lastPlayed,
+		})
+	}
+	return summaries, nil
+}
+
+func (s *Service) ListSystems(ctx context.Context) ([]SystemSummaryDTO, error) {
+	sysDir := s.resolver.SystemsDir()
+	entries, err := os.ReadDir(sysDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []SystemSummaryDTO{}, nil
+		}
+		return nil, fmt.Errorf("read systems dir: %w", err)
+	}
+
+	summaries := make([]SystemSummaryDTO, 0)
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		manifestPath := filepath.Join(sysDir, e.Name(), "system.yaml")
+		m, err := core.LoadSystemManifest(manifestPath)
+		if err != nil {
+			continue
+		}
+		summaries = append(summaries, SystemSummaryDTO{
+			ID:          m.ID,
+			Name:        m.Name,
+			Description: m.Description,
+			Version:     m.Version,
+		})
+	}
+	return summaries, nil
+}
+
+func (s *Service) ListWorlds(ctx context.Context) ([]WorldSummaryDTO, error) {
+	worldsDir := s.resolver.WorldsDir()
+	entries, err := os.ReadDir(worldsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []WorldSummaryDTO{}, nil
+		}
+		return nil, fmt.Errorf("read worlds dir: %w", err)
+	}
+
+	summaries := make([]WorldSummaryDTO, 0)
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		manifestPath := filepath.Join(worldsDir, e.Name(), "world.yaml")
+		m, err := core.LoadWorldManifest(manifestPath)
+		if err != nil {
+			continue
+		}
+		compat := make([]string, 0)
+		if m.DefaultSystem != "" {
+			compat = append(compat, m.DefaultSystem)
+		}
+		summaries = append(summaries, WorldSummaryDTO{
+			ID:                m.ID,
+			Name:              m.Name,
+			Description:       m.Description,
+			Genre:             m.Genre,
+			CompatibleSystems: compat,
+		})
+	}
+	return summaries, nil
+}
+
+func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*GameSummaryDTO, error) {
+	if req.Name == "" {
+		return nil, fmt.Errorf("campaign name is required")
+	}
+	if req.SystemID == "" {
+		return nil, fmt.Errorf("system_id is required")
+	}
+	if req.WorldID == "" {
+		return nil, fmt.Errorf("world_id is required")
+	}
+	if req.PlayerName == "" {
+		req.PlayerName = "Adventurer"
+	}
+
+	gameID := req.ID
+	if gameID == "" {
+		gameID = slugify(req.Name)
+	}
+
+	session, err := engine.InitGame(s.resolver, gameID, req.SystemID, req.WorldID, req.PlayerName)
+	if err != nil {
+		return nil, fmt.Errorf("init game: %w", err)
+	}
+	_ = session.Close()
+
+	return &GameSummaryDTO{
+		ID:         gameID,
+		Name:       req.Name,
+		SystemID:   req.SystemID,
+		WorldID:    req.WorldID,
+		PlayerName: req.PlayerName,
+		TurnCount:  0,
+		LastPlayed: time.Now().Format(time.RFC3339),
+	}, nil
+}
+
+func slugify(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var buf strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			buf.WriteRune(r)
+		} else if r == ' ' || r == '-' || r == '_' {
+			if buf.Len() > 0 && !strings.HasSuffix(buf.String(), "-") {
+				buf.WriteRune('-')
+			}
+		}
+	}
+	res := strings.Trim(buf.String(), "-")
+	if res == "" {
+		return "campaign"
+	}
+	return res
+}
+

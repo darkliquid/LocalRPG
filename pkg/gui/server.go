@@ -24,6 +24,9 @@ func NewServer(service *Service, assetHandler http.Handler) *Server {
 
 func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/game/", s.handleGameRoutes)
+	s.mux.HandleFunc("/api/games", s.handleGamesRoutes)
+	s.mux.HandleFunc("/api/systems", s.handleSystemsRoutes)
+	s.mux.HandleFunc("/api/worlds", s.handleWorldsRoutes)
 	if s.assetServer != nil {
 		s.mux.Handle("/", s.assetServer)
 	}
@@ -115,3 +118,58 @@ func writeJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(data)
 }
+
+func (s *Server) handleGamesRoutes(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		games, err := s.service.ListGames(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, games)
+	case http.MethodPost:
+		var req CreateGameRequestDTO
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		game, err := s.service.CreateGame(r.Context(), req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(game)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleSystemsRoutes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	systems, err := s.service.ListSystems(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, systems)
+}
+
+func (s *Server) handleWorldsRoutes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	worlds, err := s.service.ListWorlds(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, worlds)
+}
+

@@ -67,3 +67,38 @@ type GraphDTO struct {
 	Nodes []GraphNodeDTO `json:"nodes"`
 	Links []GraphLinkDTO `json:"links"`
 }
+
+type GameSummaryDTO struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	SystemID     string `json:"system_id"`
+	WorldID      string `json:"world_id"`
+	PlayerName   string `json:"player_name"`
+	TurnCount    int    `json:"turn_count"`
+	LastPlayed   string `json:"last_played"`
+	ThumbnailURL string `json:"thumbnail_url"`
+}
+
+type SystemSummaryDTO struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Version     string `json:"version"`
+}
+
+type WorldSummaryDTO struct {
+	ID                string   `json:"id"`
+	Name              string   `json:"name"`
+	Description       string   `json:"description"`
+	Genre             string   `json:"genre"`
+	CompatibleSystems []string `json:"compatible_systems"`
+}
+
+type CreateGameRequestDTO struct {
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name"`
+	SystemID   string `json:"system_id"`
+	WorldID    string `json:"world_id"`
+	PlayerName string `json:"player_name"`
+}
+
