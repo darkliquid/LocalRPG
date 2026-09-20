@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
 import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types';
-import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen, AlertCircle } from 'lucide-react';
+import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen, AlertCircle, Settings } from 'lucide-react';
 import { SystemsStudio } from './SystemsStudio';
 import { WorldsStudio } from './WorldsStudio';
+import { SettingsStudio } from './SettingsStudio';
 
 interface LauncherHubProps {
   onSelectGame: (gameId: string) => void;
@@ -16,7 +17,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'campaigns' | 'systems' | 'worlds'>('campaigns');
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'systems' | 'worlds' | 'settings'>('campaigns');
 
   // Wizard form state
   const [newGameName, setNewGameName] = useState('');
@@ -135,6 +136,17 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
           >
             <Globe className="w-3.5 h-3.5" />
             <span>Worlds Studio</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
+              activeTab === 'settings'
+                ? 'bg-amber-600 text-stone-950 font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Settings className="w-3.5 h-3.5" />
+            <span>Settings</span>
           </button>
         </nav>
 
@@ -298,6 +310,12 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
 
     {activeTab === 'worlds' && (
       <WorldsStudio onWorldSaved={loadData} />
+    )}
+
+    {activeTab === 'settings' && (
+      <div className="flex-1 overflow-hidden">
+        <SettingsStudio onSaved={loadData} />
+      </div>
     )}
   </main>
 

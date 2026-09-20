@@ -10,7 +10,8 @@ import { CodexDrawer } from './components/CodexDrawer';
 import { LivingWorldDrawer } from './components/LivingWorldDrawer';
 import { StoryTheater } from './components/StoryTheater';
 import { LauncherHub } from './components/LauncherHub';
-import { User, Network, BookOpen, Clock, Film, Compass } from 'lucide-react';
+import { SettingsStudio } from './components/SettingsStudio';
+import { User, Network, BookOpen, Clock, Film, Compass, Settings } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeGameID, setActiveGameID] = useState<string | null>(() => {
@@ -172,6 +173,16 @@ export const App: React.FC = () => {
                 <Film className="w-3.5 h-3.5 text-amber-400" />
                 <span className="hidden sm:inline">Theater</span>
               </button>
+              <button
+                onClick={() => setActiveDrawer('settings')}
+                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  activeDrawer === 'settings' ? 'bg-amber-600 text-stone-950 font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
+                }`}
+                title="Global Settings"
+              >
+                <Settings className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Settings</span>
+              </button>
             </div>
           </header>
 
@@ -190,13 +201,15 @@ export const App: React.FC = () => {
             title={
               activeDrawer === 'character' ? 'Character Sheet' :
               activeDrawer === 'graph' ? 'Lore Graph' :
-              activeDrawer === 'codex' ? 'Codex Markdown Editor' : 'Living World Arcs & Clocks'
+              activeDrawer === 'codex' ? 'Codex Markdown Editor' :
+              activeDrawer === 'world' ? 'Living World Arcs & Clocks' : 'Global Settings'
             }
           >
             {activeDrawer === 'character' && <CharacterSheetDrawer player={gameState?.player} />}
             {activeDrawer === 'graph' && <GraphDrawer data={graph || undefined} onSelectNode={handleOpenWikilink} />}
             {activeDrawer === 'codex' && <CodexDrawer entity={selectedEntity || undefined} onSave={handleSaveEntity} />}
             {activeDrawer === 'world' && <LivingWorldDrawer state={gameState || undefined} />}
+            {activeDrawer === 'settings' && <SettingsStudio isCompact={true} />}
           </Drawers>
 
           {/* Full-Screen Visual Novel Story Theater */}

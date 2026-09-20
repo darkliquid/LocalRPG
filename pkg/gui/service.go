@@ -28,9 +28,20 @@ type Service struct {
 }
 
 func NewService(rootDir string) *Service {
-	userHome, _ := os.UserHomeDir()
-	userPath := filepath.Join(userHome, ".config", "localrpg", "config.yaml")
+	configDir := os.Getenv("LOCALRPG_CONFIG_DIR")
+	if configDir == "" {
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			configDir = filepath.Join(xdg, "localrpg")
+		} else {
+			userHome, _ := os.UserHomeDir()
+			configDir = filepath.Join(userHome, ".config", "localrpg")
+		}
+	}
+	userPath := filepath.Join(configDir, "config.yaml")
 	localPath := filepath.Join(rootDir, "localrpg.yaml")
+	if rootDir != "" && rootDir != "." {
+		userPath = filepath.Join(rootDir, "config.yaml")
+	}
 	mgr := config.NewConfigManagerWithPaths(userPath, localPath)
 	cfg, _ := mgr.Load()
 

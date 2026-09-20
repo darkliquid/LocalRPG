@@ -18,8 +18,16 @@ type ConfigManager struct {
 }
 
 func NewConfigManager() *ConfigManager {
-	homeDir, _ := os.UserHomeDir()
-	userPath := filepath.Join(homeDir, ".config", "localrpg", "config.yaml")
+	configDir := os.Getenv("LOCALRPG_CONFIG_DIR")
+	if configDir == "" {
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			configDir = filepath.Join(xdg, "localrpg")
+		} else {
+			homeDir, _ := os.UserHomeDir()
+			configDir = filepath.Join(homeDir, ".config", "localrpg")
+		}
+	}
+	userPath := filepath.Join(configDir, "config.yaml")
 	localPath := "./localrpg.yaml"
 	return NewConfigManagerWithPaths(userPath, localPath)
 }
