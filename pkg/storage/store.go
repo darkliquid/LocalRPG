@@ -121,3 +121,21 @@ func (s *Store) GetEdgesFrom(sourceID string) ([]Edge, error) {
 	}
 	return edges, nil
 }
+
+func (s *Store) GetEdgesTo(targetID string) ([]Edge, error) {
+	rows, err := s.db.Query(`SELECT source_id, target_id, relation FROM edges WHERE target_id = ?`, targetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var edges []Edge
+	for rows.Next() {
+		var e Edge
+		if err := rows.Scan(&e.SourceID, &e.TargetID, &e.Relation); err != nil {
+			return nil, err
+		}
+		edges = append(edges, e)
+	}
+	return edges, nil
+}

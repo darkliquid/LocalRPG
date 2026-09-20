@@ -74,3 +74,17 @@ func (s *Syncer) Sync(dir string) (*SyncResult, error) {
 
 	return res, nil
 }
+
+func (s *Syncer) SyncFile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read %q: %w", path, err)
+	}
+
+	ent, err := entity.ParseMarkdownEntity(data)
+	if err != nil {
+		return fmt.Errorf("parse %q: %w", path, err)
+	}
+
+	return s.store.SaveEntity(ent)
+}
