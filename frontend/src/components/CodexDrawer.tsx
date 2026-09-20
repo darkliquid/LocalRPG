@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EntityNote } from '../types';
-import { Save } from 'lucide-react';
+import { Save, Volume2 } from 'lucide-react';
+import { DEFAULT_VOICE_PROFILES } from '../templates/providerPresets';
 
 interface CodexDrawerProps {
   entity?: EntityNote;
@@ -13,6 +14,31 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, onSave }) => {
   useEffect(() => {
     if (entity) setMarkdown(entity.markdown);
   }, [entity]);
+
+  const applyVoiceArchetype = (profileId: string) => {
+    const profile = DEFAULT_VOICE_PROFILES.find((p) => p.id === profileId);
+    if (!profile) return;
+
+    const voiceSnippet = `voice:\n  voice_id: "${profile.voice_id}"\n  pitch: ${profile.pitch}\n  speech_rate: ${profile.speech_rate}`;
+    if (markdown.startsWith('---\n')) {
+      const secondDashes = markdown.indexOf('\n---\n', 4);
+      if (secondDashes !== -1) {
+        const fm = markdown.slice(4, secondDashes);
+        const rest = markdown.slice(secondDashes + 5);
+        let newFm = fm;
+        const voiceRegex = /voice:\s*\n(\s+.*\n)*/;
+        if (voiceRegex.test(newFm)) {
+          newFm = newFm.replace(voiceRegex, voiceSnippet + '\n');
+        } else {
+          newFm = newFm.trimEnd() + '\n' + voiceSnippet + '\n';
+        }
+        setMarkdown(`---\n${newFm}---\n${rest}`);
+        return;
+      }
+    }
+
+    setMarkdown(`---\n${voiceSnippet}\n---\n\n${markdown}`);
+  };
 
   if (!entity) {
     return <div className="p-6 text-stone-500 italic">Select an entity or [[wikilink]] to view notes.</div>;
@@ -32,6 +58,30 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, onSave }) => {
           <Save className="w-3.5 h-3.5" />
           <span>Save</span>
         </button>
+      </div>
+
+      <div className="flex items-center justify-between px-1">
+        <label className="flex items-center gap-1.5 text-xs text-stone-400 font-cinzel">
+          <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+          <span>Apply Voice Archetype:</span>
+        </label>
+        <select
+          onChange={(e) => {
+            if (e.target.value) {
+              applyVoiceArchetype(e.target.value);
+              e.target.value = '';
+            }
+          }}
+          className="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1 text-xs font-mono text-amber-300 focus:outline-none cursor-pointer"
+          defaultValue=""
+        >
+          <option value="" disabled>Select Archetype...</option>
+          {DEFAULT_VOICE_PROFILES.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} ({p.voice_id})
+            </option>
+          ))}
+        </select>
       </div>
 
       <textarea

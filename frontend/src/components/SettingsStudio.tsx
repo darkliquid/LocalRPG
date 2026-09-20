@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
-import { AppConfig, AgentRoleConfig, TestProviderResponse } from '../types';
+import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile } from '../types';
 import {
   Folder,
   Cpu,
@@ -12,7 +12,19 @@ import {
   Play,
   Sparkles,
   Zap,
+  Mic,
+  Plus,
+  Trash2,
+  Users,
+  RotateCcw,
 } from 'lucide-react';
+import {
+  AGENT_PRESETS,
+  TTS_PRESETS,
+  STT_PRESETS,
+  IMAGE_PRESETS,
+  DEFAULT_VOICE_PROFILES,
+} from '../templates/providerPresets';
 
 interface SettingsStudioProps {
   isCompact?: boolean;
@@ -241,7 +253,33 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <span>AI Agents & Role Routing</span>
               </h3>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-stone-400">Configuring Role:</span>
+                <select
+                  onChange={(e) => {
+                    const key = e.target.value;
+                    if (key && AGENT_PRESETS[key]) {
+                      const preset = AGENT_PRESETS[key].config;
+                      setConfig({
+                        ...config,
+                        agents: {
+                          ...config.agents,
+                          roles: { ...config.agents.roles, [selectedRole]: { ...preset } },
+                        },
+                      });
+                      e.target.value = '';
+                    }
+                  }}
+                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg px-2 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  defaultValue=""
+                >
+                  <option value="" disabled>⚡ Load Preset...</option>
+                  {Object.entries(AGENT_PRESETS).map(([id, p]) => (
+                    <option key={id} value={id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+
+                <span className="text-xs text-stone-400">Role:</span>
                 <select
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value as any)}
@@ -390,11 +428,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
                 {currentRoleConfig.type === 'builtin' && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-cinzel uppercase text-stone-300">Builtin Engine Identifier</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. echo or embedded-wasm"
-                      value={currentRoleConfig.builtin_name || ''}
+                    <label className="text-xs font-cinzel uppercase text-stone-300">Builtin Engine</label>
+                    <select
+                      value={currentRoleConfig.builtin_name || 'narrative-oracle'}
                       onChange={(e) => {
                         const updated = { ...currentRoleConfig, builtin_name: e.target.value };
                         setConfig({
@@ -406,7 +442,10 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         });
                       }}
                       className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
-                    />
+                    >
+                      <option value="narrative-oracle">narrative-oracle (Deterministic Procedural Storyteller)</option>
+                      <option value="echo">echo (Debug Provider)</option>
+                    </select>
                   </div>
                 )}
               </div>
@@ -452,6 +491,36 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <span>Text-to-Speech (TTS) Engine</span>
               </h3>
               <div className="flex items-center gap-3">
+                <select
+                  onChange={(e) => {
+                    const key = e.target.value;
+                    if (key && TTS_PRESETS[key]) {
+                      const preset = TTS_PRESETS[key].config;
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          tts: {
+                            ...preset,
+                            auto_play: config.media.tts.auto_play,
+                            voice_profiles: config.media.tts.voice_profiles,
+                          },
+                        },
+                      });
+                      e.target.value = '';
+                    }
+                  }}
+                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg px-2.5 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  defaultValue=""
+                >
+                  <option value="" disabled>⚡ Load TTS Preset...</option>
+                  {Object.entries(TTS_PRESETS).map(([id, p]) => (
+                    <option key={id} value={id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+
                 <label className="flex items-center gap-2 text-xs text-stone-300 cursor-pointer">
                   <input
                     type="checkbox"
@@ -483,11 +552,30 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
                 >
                   <option value="disabled">Disabled</option>
-                  <option value="http">HTTP (OpenAI-compatible /v1/audio/speech, Kokoro, AllTalk)</option>
+                  <option value="http">HTTP (Kokoro-FastAPI, AllTalk, OpenAI Speech)</option>
                   <option value="cli">CLI Command (e.g. piper)</option>
-                  <option value="builtin">Builtin (Embedded WASM Kokoro / Echo)</option>
+                  <option value="builtin">Builtin (native-os / procedural audio)</option>
                 </select>
               </div>
+
+              {config.media.tts.type === 'builtin' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">Built-in Engine</label>
+                  <select
+                    value={config.media.tts.builtin_name || 'native-os'}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        media: { ...config.media, tts: { ...config.media.tts, builtin_name: e.target.value } },
+                      })
+                    }
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  >
+                    <option value="native-os">native-os (OS Speech Synthesizer / Procedural Audio)</option>
+                    <option value="echo">echo (Debug Mock)</option>
+                  </select>
+                </div>
+              )}
 
               {config.media.tts.type === 'http' && (
                 <div className="space-y-1.5">
@@ -575,6 +663,382 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 )}
               </div>
             )}
+
+            {/* Voice Profiles Library Manager */}
+            <div className="pt-4 border-t border-stone-800/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-amber-400" />
+                  <span className="font-cinzel text-xs uppercase font-bold text-stone-200">
+                    NPC Voice Profiles Library
+                  </span>
+                  <span className="text-[10px] font-mono text-stone-500">
+                    ({config.media.tts.voice_profiles?.length || 0} archetypes)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          tts: {
+                            ...config.media.tts,
+                            voice_profiles: [...DEFAULT_VOICE_PROFILES],
+                          },
+                        },
+                      });
+                    }}
+                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-300 hover:text-amber-300 transition cursor-pointer"
+                    title="Restore default fantasy archetypes"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Load Fantasy Defaults</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const currentProfiles = config.media.tts.voice_profiles || [];
+                      const newProfile: VoiceProfile = {
+                        id: `npc_voice_${currentProfiles.length + 1}`,
+                        name: 'New Archetype',
+                        voice_id: config.media.tts.default_voice || 'default',
+                        pitch: 1.0,
+                        speech_rate: 1.0,
+                        tags: ['npc'],
+                        description: 'Distinctive voice description for automatic GM matching.',
+                      };
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          tts: {
+                            ...config.media.tts,
+                            voice_profiles: [...currentProfiles, newProfile],
+                          },
+                        },
+                      });
+                    }}
+                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-amber-600/20 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 transition cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Profile</span>
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-stone-400">
+                The GM and world extractor match NPC descriptions against these voice archetypes and tags to assign unique speech parameters automatically.
+              </p>
+
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {(config.media.tts.voice_profiles || []).map((profile, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-lg bg-stone-950/70 border border-stone-800/80 space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
+                        <input
+                          type="text"
+                          placeholder="ID (e.g. elder_sage)"
+                          value={profile.id}
+                          onChange={(e) => {
+                            const updated = [...(config.media.tts.voice_profiles || [])];
+                            updated[idx] = { ...updated[idx], id: e.target.value };
+                            setConfig({
+                              ...config,
+                              media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
+                            });
+                          }}
+                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs font-mono text-amber-300 focus:outline-none"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Display Name"
+                          value={profile.name}
+                          onChange={(e) => {
+                            const updated = [...(config.media.tts.voice_profiles || [])];
+                            updated[idx] = { ...updated[idx], name: e.target.value };
+                            setConfig({
+                              ...config,
+                              media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
+                            });
+                          }}
+                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Voice ID (e.g. af_bella)"
+                          value={profile.voice_id}
+                          onChange={(e) => {
+                            const updated = [...(config.media.tts.voice_profiles || [])];
+                            updated[idx] = { ...updated[idx], voice_id: e.target.value };
+                            setConfig({
+                              ...config,
+                              media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
+                            });
+                          }}
+                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs font-mono text-stone-200 focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() =>
+                            handleTestProvider('tts', {
+                              ...config.media.tts,
+                              default_voice: profile.voice_id,
+                              pitch: profile.pitch,
+                              speech_rate: profile.speech_rate,
+                            })
+                          }
+                          className="p-1.5 rounded bg-stone-900 border border-stone-800 text-amber-400 hover:text-amber-300 hover:border-amber-500/40 cursor-pointer"
+                          title="Test Voice Profile"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const updated = (config.media.tts.voice_profiles || []).filter((_, i) => i !== idx);
+                            setConfig({
+                              ...config,
+                              media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
+                            });
+                          }}
+                          className="p-1.5 rounded bg-stone-900 border border-stone-800 text-stone-500 hover:text-red-400 hover:border-red-500/40 cursor-pointer"
+                          title="Delete Profile"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] text-stone-400">
+                          <span>Pitch</span>
+                          <span className="font-mono text-amber-400">{(profile.pitch ?? 1.0).toFixed(2)}x</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="1.5"
+                          step="0.05"
+                          value={profile.pitch ?? 1.0}
+                          onChange={(e) => {
+                            const updated = [...(config.media.tts.voice_profiles || [])];
+                            updated[idx] = { ...updated[idx], pitch: parseFloat(e.target.value) };
+                            setConfig({
+                              ...config,
+                              media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
+                            });
+                          }}
+                          className="w-full accent-amber-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] text-stone-400">
+                          <span>Speed / Speech Rate</span>
+                          <span className="font-mono text-amber-400">{(profile.speech_rate ?? 1.0).toFixed(2)}x</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="1.5"
+                          step="0.05"
+                          value={profile.speech_rate ?? 1.0}
+                          onChange={(e) => {
+                            const updated = [...(config.media.tts.voice_profiles || [])];
+                            updated[idx] = { ...updated[idx], speech_rate: parseFloat(e.target.value) };
+                            setConfig({
+                              ...config,
+                              media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
+                            });
+                          }}
+                          className="w-full accent-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <input
+                        type="text"
+                        placeholder="Tags (comma-separated, e.g. elder, male, wise)"
+                        value={profile.tags?.join(', ') || ''}
+                        onChange={(e) => {
+                          const tags = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                          const updated = [...(config.media.tts.voice_profiles || [])];
+                          updated[idx] = { ...updated[idx], tags };
+                          setConfig({
+                            ...config,
+                            media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
+                          });
+                        }}
+                        className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-300 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Description (e.g. Ancient wizards, village elders)"
+                        value={profile.description || ''}
+                        onChange={(e) => {
+                          const updated = [...(config.media.tts.voice_profiles || [])];
+                          updated[idx] = { ...updated[idx], description: e.target.value };
+                          setConfig({
+                            ...config,
+                            media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
+                          });
+                        }}
+                        className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-300 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {(!config.media.tts.voice_profiles || config.media.tts.voice_profiles.length === 0) && (
+                  <div className="p-3 text-center text-xs text-stone-500 border border-dashed border-stone-800 rounded-lg">
+                    No voice profiles defined yet. Click "Load Fantasy Defaults" to initialize standard archetypes.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Speech-to-Text (STT) Section */}
+          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+                <Mic className="w-4 h-4" />
+                <span>Speech-to-Text (STT) Engine</span>
+              </h3>
+              <div className="flex items-center gap-3">
+                <select
+                  onChange={(e) => {
+                    const key = e.target.value;
+                    if (key && STT_PRESETS[key]) {
+                      const preset = STT_PRESETS[key].config;
+                      setConfig({
+                        ...config,
+                        media: { ...config.media, stt: { ...preset } },
+                      });
+                      e.target.value = '';
+                    }
+                  }}
+                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg px-2.5 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  defaultValue=""
+                >
+                  <option value="" disabled>⚡ Load STT Preset...</option>
+                  {Object.entries(STT_PRESETS).map(([id, p]) => (
+                    <option key={id} value={id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300">STT Provider Type</label>
+                <select
+                  value={config.media.stt?.type || 'disabled'}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      media: {
+                        ...config.media,
+                        stt: { ...(config.media.stt || { type: 'disabled' }), type: e.target.value as any },
+                      },
+                    })
+                  }
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+                >
+                  <option value="disabled">Disabled</option>
+                  <option value="http">HTTP (Faster-Whisper, OpenAI Whisper)</option>
+                  <option value="cli">CLI Command (e.g. whisper-cli)</option>
+                  <option value="builtin">Builtin / Mock</option>
+                </select>
+              </div>
+
+              {config.media.stt?.type === 'http' && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-cinzel uppercase text-stone-300">Transcription Endpoint URL</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. http://localhost:8000/v1/audio/transcriptions"
+                      value={config.media.stt.endpoint || ''}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, stt: { ...config.media.stt, endpoint: e.target.value } },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-cinzel uppercase text-stone-300">Model Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. whisper-1"
+                      value={config.media.stt.model || ''}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, stt: { ...config.media.stt, model: e.target.value } },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    />
+                  </div>
+                </>
+              )}
+
+              {config.media.stt?.type === 'cli' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">Command / Binary</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. whisper-cli"
+                    value={config.media.stt.command || ''}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        media: { ...config.media, stt: { ...config.media.stt, command: e.target.value } },
+                      })
+                    }
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  />
+                </div>
+              )}
+            </div>
+
+            {config.media.stt?.type && config.media.stt.type !== 'disabled' && (
+              <div className="pt-2 flex items-center justify-between border-t border-stone-800/60">
+                <button
+                  onClick={() => handleTestProvider('stt', config.media.stt)}
+                  disabled={testingCategory === 'stt'}
+                  className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-500/30 hover:bg-stone-800 text-amber-400 transition-all cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{testingCategory === 'stt' ? 'Transcribing...' : 'Test STT Connection'}</span>
+                </button>
+
+                {testResult?.category === 'stt' && (
+                  <span
+                    className={`text-xs font-mono flex items-center gap-1 ${
+                      testResult.res.success ? 'text-emerald-400' : 'text-red-400'
+                    }`}
+                  >
+                    {testResult.res.success ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                    <span>{testResult.res.message}</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Image Generation Section */}
@@ -584,20 +1048,48 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <Sparkles className="w-4 h-4" />
                 <span>Scene Art / Image Generator</span>
               </h3>
-              <label className="flex items-center gap-2 text-xs text-stone-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.media.image.auto_generate}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      media: { ...config.media, image: { ...config.media.image, auto_generate: e.target.checked } },
-                    })
-                  }
-                  className="rounded bg-stone-950 border-stone-800 text-amber-600 focus:ring-0"
-                />
-                <span>Auto-generate Scene Art</span>
-              </label>
+              <div className="flex items-center gap-3">
+                <select
+                  onChange={(e) => {
+                    const key = e.target.value;
+                    if (key && IMAGE_PRESETS[key]) {
+                      const preset = IMAGE_PRESETS[key].config;
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          image: { ...preset, auto_generate: config.media.image.auto_generate },
+                        },
+                      });
+                      e.target.value = '';
+                    }
+                  }}
+                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg px-2.5 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  defaultValue=""
+                >
+                  <option value="" disabled>⚡ Load Image Preset...</option>
+                  {Object.entries(IMAGE_PRESETS).map(([id, p]) => (
+                    <option key={id} value={id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+
+                <label className="flex items-center gap-2 text-xs text-stone-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.media.image.auto_generate}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        media: { ...config.media, image: { ...config.media.image, auto_generate: e.target.checked } },
+                      })
+                    }
+                    className="rounded bg-stone-950 border-stone-800 text-amber-600 focus:ring-0"
+                  />
+                  <span>Auto-generate Scene Art</span>
+                </label>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -614,11 +1106,30 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
                 >
                   <option value="disabled">Disabled</option>
-                  <option value="http">HTTP (OpenAI-compatible /v1/images/generations or ComfyUI)</option>
+                  <option value="http">HTTP (ComfyUI, Automatic1111, LocalAI, DALL-E)</option>
                   <option value="cli">CLI Command (e.g. sd-cli)</option>
-                  <option value="builtin">Builtin / Mock</option>
+                  <option value="builtin">Builtin (procedural-art / mock)</option>
                 </select>
               </div>
+
+              {config.media.image.type === 'builtin' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">Built-in Art Engine</label>
+                  <select
+                    value={config.media.image.builtin_name || 'procedural-art'}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        media: { ...config.media, image: { ...config.media.image, builtin_name: e.target.value } },
+                      })
+                    }
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  >
+                    <option value="procedural-art">procedural-art (Pure-Go Vector Dark Fantasy SVG)</option>
+                    <option value="echo">echo (Debug Mock)</option>
+                  </select>
+                </div>
+              )}
 
               {config.media.image.type === 'http' && (
                 <div className="space-y-1.5">

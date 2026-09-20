@@ -741,7 +741,16 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}
-		audio, err := client.Synthesize(ctx, "Test utterance", nil)
+		prompt := req.TestPrompt
+		if prompt == "" {
+			prompt = "Test utterance"
+		}
+		voice := &entity.VoiceConfig{
+			VoiceID:    ttsCfg.DefaultVoice,
+			Pitch:      ttsCfg.Pitch,
+			SpeechRate: ttsCfg.SpeechRate,
+		}
+		audio, err := client.Synthesize(ctx, prompt, voice)
 		latency := time.Since(start).Milliseconds()
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, LatencyMS: latency, Message: err.Error()}, nil
