@@ -10,11 +10,11 @@ cd frontend && npm install
 """
 
 [tasks."build:frontend"]
-description = "Build the React 19 frontend bundle"
+description = "Build the React 19 frontend bundle into pkg/gui/dist"
 dir = "frontend"
-run = "npm run build"
+run = "npm run build && cp -r ../pkg/gui/dist ./dist 2>/dev/null || true"
 sources = ["src/**/*", "index.html", "package.json"]
-outputs = ["dist/index.html"]
+outputs = ["../pkg/gui/dist/index.html"]
 
 [tasks."build:backend"]
 description = "Build the localrpg CLI binary"
