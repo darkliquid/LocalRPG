@@ -62,6 +62,7 @@ func handlePlayCommand(args []string) {
 		"tavern",
 		manifest.Player,
 	)
+	orchestrator.LoadPrompts(paths, manifest.SystemID, manifest.WorldID)
 
 	app := tui.NewAppModel(orchestrator, 80, 24)
 	p := tea.NewProgram(app, tea.WithAltScreen())

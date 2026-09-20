@@ -66,3 +66,29 @@ func TestContextAssembler(t *testing.T) {
 		t.Errorf("missing living world arc in context")
 	}
 }
+
+func TestContextAssemblerWithRulesAndLore(t *testing.T) {
+	tempDir := t.TempDir()
+	store, err := storage.NewStore(filepath.Join(tempDir, "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	assembler := NewContextAssembler(store)
+	rulesPrompt := "Resolution: 10+ Success, 7-9 Mixed, 6- Failure."
+	lorePrompt := "Atmosphere: Cold mist and distant bells."
+
+	prompt, err := assembler.AssembleContextWithRules("loc1", "p1", "I inspect the door", rulesPrompt, lorePrompt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(prompt, "## SYSTEM RULES & RESOLUTION MECHANICS") || !strings.Contains(prompt, rulesPrompt) {
+		t.Errorf("expected rules prompt in context, got: %s", prompt)
+	}
+	if !strings.Contains(prompt, "## WORLD LORE & ATMOSPHERE") || !strings.Contains(prompt, lorePrompt) {
+		t.Errorf("expected lore prompt in context, got: %s", prompt)
+	}
+}
+

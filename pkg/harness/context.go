@@ -58,3 +58,25 @@ func (c *ContextAssembler) AssembleContext(locationID, playerID, playerAction st
 
 	return sb.String(), nil
 }
+
+func (c *ContextAssembler) AssembleContextWithRules(locationID, playerID, playerAction, rulesPrompt, lorePrompt string) (string, error) {
+	var sb strings.Builder
+
+	if strings.TrimSpace(rulesPrompt) != "" {
+		sb.WriteString("## SYSTEM RULES & RESOLUTION MECHANICS\n")
+		sb.WriteString(strings.TrimSpace(rulesPrompt) + "\n\n")
+	}
+
+	if strings.TrimSpace(lorePrompt) != "" {
+		sb.WriteString("## WORLD LORE & ATMOSPHERE\n")
+		sb.WriteString(strings.TrimSpace(lorePrompt) + "\n\n")
+	}
+
+	baseContext, err := c.AssembleContext(locationID, playerID, playerAction)
+	if err != nil {
+		return "", err
+	}
+	sb.WriteString(baseContext)
+	return sb.String(), nil
+}
+

@@ -76,4 +76,18 @@ func TestTurnOrchestrator(t *testing.T) {
 	if !strings.Contains(corrected.Output, "Correction: The door was locked") {
 		t.Errorf("expected corrected output, got %q", corrected.Output)
 	}
+
+	// 3. Test Rules and Lore prompt injection
+	orchestrator.SetPrompts("2d6 resolution ladder", "Gothic peat bogs")
+	_, err = orchestrator.ProcessAction(ctx, "Do", "I check the lock")
+	if err != nil {
+		t.Fatalf("ProcessAction with prompts failed: %v", err)
+	}
+	if !strings.Contains(model.lastPrompt, "## SYSTEM RULES & RESOLUTION MECHANICS") || !strings.Contains(model.lastPrompt, "2d6 resolution ladder") {
+		t.Errorf("expected rules prompt in GM prompt, got: %s", model.lastPrompt)
+	}
+	if !strings.Contains(model.lastPrompt, "## WORLD LORE & ATMOSPHERE") || !strings.Contains(model.lastPrompt, "Gothic peat bogs") {
+		t.Errorf("expected lore prompt in GM prompt, got: %s", model.lastPrompt)
+	}
 }
+

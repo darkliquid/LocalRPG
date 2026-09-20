@@ -3,9 +3,12 @@ package engine
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -19,6 +22,8 @@ type TurnOrchestrator struct {
 	locationID  string
 	playerID    string
 	assembler   *harness.ContextAssembler
+	rulesPrompt string
+	lorePrompt  string
 }
 
 func NewTurnOrchestrator(
@@ -37,6 +42,26 @@ func NewTurnOrchestrator(
 		locationID:  locationID,
 		playerID:    playerID,
 		assembler:   harness.NewContextAssembler(store),
+	}
+}
+
+func (o *TurnOrchestrator) SetPrompts(rulesPrompt, lorePrompt string) {
+	o.rulesPrompt = rulesPrompt
+	o.lorePrompt = lorePrompt
+}
+
+func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
+	if paths != nil {
+		if systemID != "" {
+			if data, err := os.ReadFile(filepath.Join(paths.SystemDir(systemID), "prompts", "rules.md")); err == nil {
+				o.rulesPrompt = string(data)
+			}
+		}
+		if worldID != "" {
+			if data, err := os.ReadFile(filepath.Join(paths.WorldDir(worldID), "prompts", "lore.md")); err == nil {
+				o.lorePrompt = string(data)
+			}
+		}
 	}
 }
 
@@ -93,8 +118,8 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 		}
 	}
 
-	// Assemble 4-layer context
-	contextPrompt, err := o.assembler.AssembleContext(o.locationID, o.playerID, actionInput)
+	// Assemble context with system rules and world lore prompts
+	contextPrompt, err := o.assembler.AssembleContextWithRules(o.locationID, o.playerID, actionInput, o.rulesPrompt, o.lorePrompt)
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)
 	}
