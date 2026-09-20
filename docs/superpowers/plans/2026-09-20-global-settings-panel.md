@@ -1,6 +1,6 @@
 # Global Settings Panel Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Provide a comprehensive global settings system and UI for configuring storage paths, AI agent role routing, media engines (TTS, STT, Image Gen) across builtin/http/cli/disabled types, with live provider diagnostics and dual-access frontend UI.
 
@@ -50,7 +50,7 @@
 - Create: `pkg/config/manager.go`
 - Test: `pkg/config/manager_test.go`
 
-- [ ] **Step 1: Write failing tests for ConfigManager**
+- [x] **Step 1: Write failing tests for ConfigManager**
 
 ```go
 package config_test
@@ -116,12 +116,12 @@ func TestConfigManager_HierarchicalSaveAndLoad(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/config`
 Expected: FAIL (package does not exist)
 
-- [ ] **Step 3: Implement `pkg/config/types.go` and `pkg/config/manager.go`**
+- [x] **Step 3: Implement `pkg/config/types.go` and `pkg/config/manager.go`**
 
 `pkg/config/types.go`:
 ```go
@@ -375,12 +375,12 @@ func (m *ConfigManager) Get() *Config {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/config`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/
@@ -395,7 +395,7 @@ git commit -m "feat(config): add configuration schema and hierarchical manager"
 - Modify: `pkg/core/types.go`
 - Test: `pkg/core/types_test.go`
 
-- [ ] **Step 1: Write failing test for dynamic PathResolver**
+- [x] **Step 1: Write failing test for dynamic PathResolver**
 
 Add to `pkg/core/types_test.go`:
 ```go
@@ -416,12 +416,12 @@ func TestPathResolver_CustomPaths(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/core -run TestPathResolver_CustomPaths`
 Expected: FAIL (`NewCustomPathResolver` undefined)
 
-- [ ] **Step 3: Update `pkg/core/types.go`**
+- [x] **Step 3: Update `pkg/core/types.go`**
 
 Add fields and methods to `PathResolver`:
 ```go
@@ -478,12 +478,12 @@ func (p *PathResolver) GamesDir() string {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/core`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/core/
@@ -498,7 +498,7 @@ git commit -m "feat(core): support custom dynamic paths in PathResolver"
 - Create: `pkg/media/providers.go`
 - Test: `pkg/media/providers_test.go`
 
-- [ ] **Step 1: Write failing tests for media engine providers**
+- [x] **Step 1: Write failing tests for media engine providers**
 
 `pkg/media/providers_test.go`:
 ```go
@@ -557,12 +557,12 @@ func TestMediaProviders_BuiltinEcho(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/media -run TestMediaProviders_Disabled`
 Expected: FAIL (`NewTTSClient` undefined)
 
-- [ ] **Step 3: Implement `pkg/media/providers.go`**
+- [x] **Step 3: Implement `pkg/media/providers.go`**
 
 ```go
 package media
@@ -776,12 +776,12 @@ func NewImageClient(cfg config.ImageConfig) (ImageClient, error) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/media`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/
@@ -797,7 +797,7 @@ git commit -m "feat(media): add unified TTS, STT, and Image clients for builtin,
 - Create: `pkg/harness/factory.go`
 - Test: `pkg/harness/factory_test.go`
 
-- [ ] **Step 1: Write failing test for Harness ModelProvider factory**
+- [x] **Step 1: Write failing test for Harness ModelProvider factory**
 
 `pkg/harness/factory_test.go`:
 ```go
@@ -839,12 +839,12 @@ func TestNewModelProvider(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/harness -run TestNewModelProvider`
 Expected: FAIL (`NewModelProvider` undefined)
 
-- [ ] **Step 3: Update `pkg/harness/types.go` and implement `pkg/harness/factory.go`**
+- [x] **Step 3: Update `pkg/harness/types.go` and implement `pkg/harness/factory.go`**
 
 In `pkg/harness/types.go`, add `BuiltinName`:
 ```go
@@ -897,12 +897,12 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/harness`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/
@@ -919,7 +919,7 @@ git commit -m "feat(harness): add model provider factory with disabled and built
 - Modify: `pkg/gui/server.go`
 - Test: `pkg/gui/server_test.go`
 
-- [ ] **Step 1: Write failing tests for Settings and Diagnostics API**
+- [x] **Step 1: Write failing tests for Settings and Diagnostics API**
 
 In `pkg/gui/server_test.go`:
 ```go
@@ -983,12 +983,12 @@ func TestSettingsEndpoints(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/gui -run TestSettingsEndpoints`
 Expected: FAIL (404 / undefined)
 
-- [ ] **Step 3: Update `pkg/gui/types.go`**
+- [x] **Step 3: Update `pkg/gui/types.go`**
 
 Add DTOs to `pkg/gui/types.go`:
 ```go
@@ -1016,7 +1016,7 @@ type TestProviderResponseDTO struct {
 }
 ```
 
-- [ ] **Step 4: Update `pkg/gui/service.go` and `pkg/gui/server.go`**
+- [x] **Step 4: Update `pkg/gui/service.go` and `pkg/gui/server.go`**
 
 Update `Service` in `pkg/gui/service.go`:
 - Store `configMgr *config.ConfigManager`.
@@ -1025,12 +1025,12 @@ Update `Service` in `pkg/gui/service.go`:
 Update `Server` in `pkg/gui/server.go`:
 - Register `/api/settings` and `/api/settings/test-provider`.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/gui`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/
@@ -1047,21 +1047,21 @@ git commit -m "feat(gui): implement settings endpoints, dynamic path re-binding,
 - Modify: `cmd/localrpg/gui.go`
 - Test: `cmd/localrpg/gui_test.go`, `cmd/localrpg/play_test.go`
 
-- [ ] **Step 1: Write test verifying CLI commands initialize from config**
+- [x] **Step 1: Write test verifying CLI commands initialize from config**
 
 Run: `go test -v ./cmd/localrpg`
 Ensure baseline passes.
 
-- [ ] **Step 2: Update `cmd/localrpg/play.go`, `media.go`, `gui.go` to use `config.NewConfigManager().Load()`**
+- [x] **Step 2: Update `cmd/localrpg/play.go`, `media.go`, `gui.go` to use `config.NewConfigManager().Load()`**
 
 Replace hardcoded `baseDir := "."` and default `echo` router with resolved config paths and configured agent roles.
 
-- [ ] **Step 3: Run tests to verify they pass**
+- [x] **Step 3: Run tests to verify they pass**
 
 Run: `go test -v ./cmd/localrpg`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add cmd/localrpg/
@@ -1076,7 +1076,7 @@ git commit -m "feat(cli): wire global config into play, media, and gui commands"
 - Modify: `frontend/src/types.ts`
 - Modify: `frontend/src/api/client.ts`
 
-- [ ] **Step 1: Add configuration and diagnostics types to `frontend/src/types.ts`**
+- [x] **Step 1: Add configuration and diagnostics types to `frontend/src/types.ts`**
 
 ```typescript
 export interface PathsConfig {
@@ -1181,7 +1181,7 @@ export interface TestProviderResponse {
 }
 ```
 
-- [ ] **Step 2: Add `getSettings`, `saveSettings`, `testProvider` to `frontend/src/api/client.ts`**
+- [x] **Step 2: Add `getSettings`, `saveSettings`, `testProvider` to `frontend/src/api/client.ts`**
 
 ```typescript
   static async getSettings(): Promise<SettingsResponse> {
@@ -1211,12 +1211,12 @@ export interface TestProviderResponse {
   }
 ```
 
-- [ ] **Step 3: Run typescript verification**
+- [x] **Step 3: Run typescript verification**
 
 Run: `npx --prefix frontend tsc --noEmit`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/api/client.ts
@@ -1231,7 +1231,7 @@ git commit -m "feat(frontend): add settings and provider diagnostics API types a
 - Create: `frontend/src/components/SettingsStudio.tsx`
 - Test: `npx --prefix frontend tsc --noEmit`
 
-- [ ] **Step 1: Implement `frontend/src/components/SettingsStudio.tsx`**
+- [x] **Step 1: Implement `frontend/src/components/SettingsStudio.tsx`**
 
 Build tabbed panel covering:
 1. **Paths & Storage**: editable inputs for systems, worlds, games, cache; file location badge; save button.
@@ -1239,12 +1239,12 @@ Build tabbed panel covering:
 3. **Media Engines**: sub-sections for TTS, STT, Image generation. TTS volume & speech rate controls, auto-play toggle, auto-generate scene art toggle. "Test Engine" button for each.
 4. **Preferences & Appearance**: CRT/noise toggle, font scaling, token streaming toggle, typing speed.
 
-- [ ] **Step 2: Run typescript check**
+- [x] **Step 2: Run typescript check**
 
 Run: `npx --prefix frontend tsc --noEmit`
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx
@@ -1260,11 +1260,11 @@ git commit -m "feat(frontend): add comprehensive SettingsStudio component with l
 - Modify: `frontend/src/App.tsx`
 - Test: `mise run test`
 
-- [ ] **Step 1: Add Settings tab to `LauncherHub.tsx`**
+- [x] **Step 1: Add Settings tab to `LauncherHub.tsx`**
 
 Add `Settings` to activeTab options (`'campaigns' | 'systems' | 'worlds' | 'settings'`), add tab button with `<Settings className="w-3.5 h-3.5" />` in header navigation, and render `<SettingsStudio />` when active.
 
-- [ ] **Step 2: Add Settings gear button & drawer in `App.tsx`**
+- [x] **Step 2: Add Settings gear button & drawer in `App.tsx`**
 
 Add gear button in header pill triggers:
 ```tsx
@@ -1281,12 +1281,12 @@ Add gear button in header pill triggers:
 ```
 Render `<SettingsStudio isCompact={true} />` inside `<Drawers>` when `activeDrawer === 'settings'`.
 
-- [ ] **Step 3: Run full project test suite**
+- [x] **Step 3: Run full project test suite**
 
 Run: `mise run test`
 Expected: All 12 Go packages pass and `tsc --noEmit` passes.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/LauncherHub.tsx frontend/src/App.tsx
@@ -1302,12 +1302,12 @@ git commit -m "feat(frontend): integrate SettingsStudio into LauncherHub and in-
 - Test: CLI commands `localrpg gui --help`, `localrpg play --help`
 - Modify: `README.md` (Document global settings hierarchy and configuration)
 
-- [ ] **Step 1: Run comprehensive tests**
+- [x] **Step 1: Run comprehensive tests**
 
 Run: `mise run test`
 Expected: All Go unit tests pass, TypeScript builds with 0 errors.
 
-- [ ] **Step 2: Update README.md with configuration documentation**
+- [x] **Step 2: Update README.md with configuration documentation**
 
 Add section:
 ```markdown
@@ -1317,7 +1317,7 @@ LocalRPG supports global configuration via `~/.config/localrpg/config.yaml` or a
 Configure storage paths, AI agent role routing (Ollama, vLLM, CLI binaries), and media engines (TTS, STT, Image generation) via the web GUI **Settings** tab or directly in YAML.
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add README.md
