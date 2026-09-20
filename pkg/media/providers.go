@@ -213,6 +213,9 @@ func NewImageClient(cfg config.ImageConfig) (ImageClient, error) {
 	case "disabled", "":
 		return &disabledImageClient{}, nil
 	case "builtin":
+		if cfg.BuiltinName == "procedural-art" {
+			return NewProceduralArtClient(), nil
+		}
 		return &echoImageClient{}, nil
 	case "cli":
 		return &cliImageClient{command: cfg.Command, args: cfg.Args}, nil
