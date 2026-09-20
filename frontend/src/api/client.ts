@@ -1,4 +1,18 @@
-import { GameState, Turn, EntityNote, GraphData, GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types';
+import {
+  GameState,
+  Turn,
+  EntityNote,
+  GraphData,
+  GameSummary,
+  SystemInfo,
+  WorldInfo,
+  CreateGameRequest,
+  SystemDetail,
+  CreateSystemRequest,
+  WorldDetail,
+  CreateWorldRequest,
+  WorldEntityDetail,
+} from '../types';
 
 export class APIClient {
   private gameID: string;
@@ -29,6 +43,66 @@ export class APIClient {
     });
     if (!res.ok) throw new Error(`createGame: ${res.statusText}`);
     return res.json();
+  }
+
+  static async getSystem(id: string): Promise<SystemDetail> {
+    const res = await fetch(`/api/system/${id}`);
+    if (!res.ok) throw new Error(`getSystem: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async saveSystem(req: CreateSystemRequest): Promise<SystemDetail> {
+    const isNew = !req.id;
+    const url = isNew ? '/api/systems' : `/api/system/${req.id}`;
+    const method = isNew ? 'POST' : 'PUT';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new Error(`saveSystem: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async getWorld(id: string): Promise<WorldDetail> {
+    const res = await fetch(`/api/world/${id}`);
+    if (!res.ok) throw new Error(`getWorld: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async saveWorld(req: CreateWorldRequest): Promise<WorldDetail> {
+    const isNew = !req.id;
+    const url = isNew ? '/api/worlds' : `/api/world/${req.id}`;
+    const method = isNew ? 'POST' : 'PUT';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new Error(`saveWorld: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async getWorldEntity(worldId: string, entityId: string): Promise<WorldEntityDetail> {
+    const res = await fetch(`/api/world/${worldId}/entity/${entityId}`);
+    if (!res.ok) throw new Error(`getWorldEntity: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async saveWorldEntity(worldId: string, entityId: string, markdown: string): Promise<void> {
+    const res = await fetch(`/api/world/${worldId}/entity/${entityId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'text/plain' },
+      body: markdown,
+    });
+    if (!res.ok) throw new Error(`saveWorldEntity: ${res.statusText}`);
+  }
+
+  static async deleteWorldEntity(worldId: string, entityId: string): Promise<void> {
+    const res = await fetch(`/api/world/${worldId}/entity/${entityId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`deleteWorldEntity: ${res.statusText}`);
   }
 
   constructor(gameID: string) {

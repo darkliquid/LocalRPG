@@ -85,3 +85,52 @@ export interface CreateGameRequest {
   player_name: string;
 }
 
+export interface SystemDetail {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  script: string;
+}
+
+export interface CreateSystemRequest {
+  id?: string;
+  name: string;
+  version?: string;
+  description?: string;
+  script?: string;
+}
+
+export interface WorldEntitySummary {
+  id: string;
+  name: string;
+  type: string;
+}
+
+export interface WorldDetail {
+  id: string;
+  name: string;
+  description: string;
+  genre: string;
+  default_system: string;
+  art_style: string;
+  tags: string[];
+  entities: WorldEntitySummary[];
+}
+
+export interface CreateWorldRequest {
+  id?: string;
+  name: string;
+  description?: string;
+  genre?: string;
+  default_system?: string;
+  art_style?: string;
+  tags?: string[];
+}
+
+export interface WorldEntityDetail {
+  id: string;
+  markdown: string;
+}
+
+
