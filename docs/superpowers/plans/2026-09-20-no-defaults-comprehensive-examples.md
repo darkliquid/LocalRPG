@@ -21,7 +21,7 @@
 - Modify: `pkg/gui/service.go`
 - Test: `pkg/gui/server_test.go`
 
-- [ ] **Step 1: Write failing tests for RulesPrompt and LorePrompt in `pkg/gui/server_test.go`**
+- [x] **Step 1: Write failing tests for RulesPrompt and LorePrompt in `pkg/gui/server_test.go`**
 
 Update `TestSystemAndWorldStudioCRUD` in `pkg/gui/server_test.go` to assert `rules_prompt` on system creation/retrieval and `lore_prompt` on world creation/retrieval:
 ```go
@@ -54,12 +54,12 @@ Update `TestSystemAndWorldStudioCRUD` in `pkg/gui/server_test.go` to assert `rul
 	}
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/gui -run TestSystemAndWorldStudioCRUD`  
 Expected: FAIL (compilation error: unknown field `RulesPrompt` or `LorePrompt`)
 
-- [ ] **Step 3: Update DTOs in `pkg/gui/types.go`**
+- [x] **Step 3: Update DTOs in `pkg/gui/types.go`**
 
 Add `RulesPrompt` to `SystemDetailDTO` and `CreateSystemRequestDTO`:
 ```go
@@ -108,7 +108,7 @@ type CreateWorldRequestDTO struct {
 }
 ```
 
-- [ ] **Step 4: Update `GetSystem`, `SaveSystem`, `GetWorld`, and `SaveWorld` in `pkg/gui/service.go`**
+- [x] **Step 4: Update `GetSystem`, `SaveSystem`, `GetWorld`, and `SaveWorld` in `pkg/gui/service.go`**
 
 In `GetSystem`:
 Read `filepath.Join(sysDir, "prompts", "rules.md")` if it exists and populate `RulesPrompt`.
@@ -122,12 +122,12 @@ Read `filepath.Join(worldDir, "prompts", "lore.md")` if it exists and populate `
 In `SaveWorld`:
 If `req.LorePrompt != ""`, create `filepath.Join(worldDir, "prompts")` and write to `lore.md`.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/gui -run TestSystemAndWorldStudioCRUD`  
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/server_test.go
@@ -144,7 +144,7 @@ git commit -m "feat(gui): support rules_prompt and lore_prompt in backend studio
 - Modify: `pkg/engine/orchestrator.go`
 - Modify: `pkg/engine/orchestrator_test.go`
 
-- [ ] **Step 1: Write failing tests in `pkg/harness/context_test.go`**
+- [x] **Step 1: Write failing tests in `pkg/harness/context_test.go`**
 
 Add test checking `rulesPrompt` and `lorePrompt` in assembled context:
 ```go
@@ -171,12 +171,12 @@ func TestContextAssemblerWithRulesAndLore(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/harness -run TestContextAssemblerWithRulesAndLore`  
 Expected: FAIL (`AssembleContextWithRules` undefined)
 
-- [ ] **Step 3: Implement `AssembleContextWithRules` in `pkg/harness/context.go`**
+- [x] **Step 3: Implement `AssembleContextWithRules` in `pkg/harness/context.go`**
 
 In `pkg/harness/context.go`:
 ```go
@@ -202,7 +202,7 @@ func (c *ContextAssembler) AssembleContextWithRules(locationID, playerID, player
 }
 ```
 
-- [ ] **Step 4: Update `pkg/engine/orchestrator.go` to load prompts and pass them to assembler**
+- [x] **Step 4: Update `pkg/engine/orchestrator.go` to load prompts and pass them to assembler**
 
 In `pkg/engine/orchestrator.go`:
 Store `systemDir` and `worldDir` or `paths *core.PathResolver` in `TurnOrchestrator`.
@@ -211,12 +211,12 @@ Load `filepath.Join(o.systemDir, "prompts", "rules.md")` if existing.
 Load `filepath.Join(o.worldDir, "prompts", "lore.md")` if existing.
 Call `o.assembler.AssembleContextWithRules(...)`.
 
-- [ ] **Step 5: Run tests across harness and engine**
+- [x] **Step 5: Run tests across harness and engine**
 
 Run: `go test -v ./pkg/harness ./pkg/engine`  
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/harness/context.go pkg/harness/context_test.go pkg/engine/orchestrator.go pkg/engine/orchestrator_test.go
@@ -231,7 +231,7 @@ git commit -m "feat(engine): inject system rules prompt and world lore prompt in
 - Modify: `frontend/src/types.ts`
 - Create: `frontend/src/templates/referenceTemplates.ts`
 
-- [ ] **Step 1: Update frontend types in `frontend/src/types.ts`**
+- [x] **Step 1: Update frontend types in `frontend/src/types.ts`**
 
 Add `rules_prompt` to `SystemDetail` & `CreateSystemRequest`:
 ```typescript
@@ -280,7 +280,7 @@ export interface CreateWorldRequest {
 }
 ```
 
-- [ ] **Step 2: Create `frontend/src/templates/referenceTemplates.ts`**
+- [x] **Step 2: Create `frontend/src/templates/referenceTemplates.ts`**
 
 Export:
 - `REFERENCE_SYSTEM_TEMPLATE`:
@@ -304,12 +304,12 @@ Export:
     2. `wardens_of_the_ember` (type: character)
     3. `the_creeping_miasma` (type: arc with 6-tick clock)
 
-- [ ] **Step 3: Run TypeScript compiler check**
+- [x] **Step 3: Run TypeScript compiler check**
 
 Run: `mise run test:frontend`  
 Expected: PASS with 0 errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/templates/referenceTemplates.ts
@@ -323,7 +323,7 @@ git commit -m "feat(frontend): define comprehensive reference templates for narr
 **Files:**
 - Modify: `frontend/src/components/SystemsStudio.tsx`
 
-- [ ] **Step 1: Add Rules Prompt Tab & Reference Template Integration to `SystemsStudio.tsx`**
+- [x] **Step 1: Add Rules Prompt Tab & Reference Template Integration to `SystemsStudio.tsx`**
 
 - Add state for `rulesPrompt` (`string`).
 - Add 3rd sub-tab button: "Agent Rules Prompt (`rules.md`)" next to "Manifest Info" and "Mechanics Script".
@@ -333,12 +333,12 @@ git commit -m "feat(frontend): define comprehensive reference templates for narr
 - Update `handleSaveSystem`: Include `rules_prompt: rulesPrompt` in `APIClient.saveSystem(...)`.
 - Update `loadSystemDetail`: Set `rulesPrompt` from `detail.rules_prompt || ''`.
 
-- [ ] **Step 2: Run TypeScript compiler check**
+- [x] **Step 2: Run TypeScript compiler check**
 
 Run: `mise run test:frontend`  
 Expected: PASS with 0 errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/SystemsStudio.tsx
@@ -352,7 +352,7 @@ git commit -m "feat(frontend): add rules prompt tab and reference template actio
 **Files:**
 - Modify: `frontend/src/components/WorldsStudio.tsx`
 
-- [ ] **Step 1: Add Lore Prompt Tab & Reference Template Integration to `WorldsStudio.tsx`**
+- [x] **Step 1: Add Lore Prompt Tab & Reference Template Integration to `WorldsStudio.tsx`**
 
 - Add state for `lorePrompt` (`string`).
 - Add 3rd sub-tab button: "Agent Lore Prompt (`lore.md`)".
@@ -362,12 +362,12 @@ git commit -m "feat(frontend): add rules prompt tab and reference template actio
 - Update `handleSaveWorld`: Include `lore_prompt: lorePrompt` in `APIClient.saveWorld(...)`.
 - Update `loadWorldDetail`: Set `lorePrompt` from `detail.lore_prompt || ''`.
 
-- [ ] **Step 2: Run TypeScript compiler check**
+- [x] **Step 2: Run TypeScript compiler check**
 
 Run: `mise run test:frontend`  
 Expected: PASS with 0 errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/WorldsStudio.tsx
@@ -381,7 +381,7 @@ git commit -m "feat(frontend): add lore prompt tab and reference template action
 **Files:**
 - Modify: `frontend/src/components/LauncherHub.tsx`
 
-- [ ] **Step 1: Strip hardcoded defaults and implement zero-state guidance in `LauncherHub.tsx`**
+- [x] **Step 1: Strip hardcoded defaults and implement zero-state guidance in `LauncherHub.tsx`**
 
 - Remove `'daggerheart'` and `'solitary_defiance'` hardcoded fallbacks from:
   - `payload.system_id`
@@ -397,12 +397,12 @@ git commit -m "feat(frontend): add lore prompt tab and reference template action
 - In the main empty state (when 0 games exist):
   - If `systems.length === 0 || worlds.length === 0`, display a prominent prompt inviting the player to visit the Rule Systems and Worlds Studio tabs to create or load the reference templates.
 
-- [ ] **Step 2: Test and build frontend bundle**
+- [x] **Step 2: Test and build frontend bundle**
 
 Run: `mise run test:frontend && mise run build:frontend`  
 Expected: PASS, builds cleanly into `pkg/gui/dist`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/LauncherHub.tsx
@@ -417,12 +417,12 @@ git commit -m "feat(frontend): remove hardcoded defaults and add studio onboardi
 - Verify: `mise run test`
 - Verify: `mise run build`
 
-- [ ] **Step 1: Run complete test suite across all 12 Go packages and TypeScript**
+- [x] **Step 1: Run complete test suite across all 12 Go packages and TypeScript**
 
 Run: `mise run test`  
 Expected: PASS across all packages.
 
-- [ ] **Step 2: Build binary and run E2E socket verification**
+- [x] **Step 2: Build binary and run E2E socket verification**
 
 Run `localrpg gui --socket /tmp/test-ref.sock` in the background and verify:
 1. Fresh start: `GET /api/systems` and `GET /api/worlds` return empty arrays `[]` (0 defaults).
@@ -431,7 +431,7 @@ Run `localrpg gui --socket /tmp/test-ref.sock` in the background and verify:
 4. Create game `ashen-chronicle` using `narrative_2d6` and `the_ashen_reach`.
 5. Verify game initializes with starter entities copied from `the_ashen_reach`.
 
-- [ ] **Step 3: Commit and merge**
+- [x] **Step 3: Commit and merge**
 
 ```bash
 git commit --allow-empty -m "chore: verify zero-defaults and reference templates end-to-end"
