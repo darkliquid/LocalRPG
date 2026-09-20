@@ -162,6 +162,16 @@ export interface AgentsConfig {
   fallbacks?: Record<string, string>;
 }
 
+export interface VoiceProfile {
+  id: string;
+  name: string;
+  voice_id: string;
+  pitch: number;
+  speech_rate: number;
+  tags?: string[];
+  description?: string;
+}
+
 export interface TTSConfig {
   type: 'builtin' | 'http' | 'cli' | 'disabled';
   builtin_name?: string;
@@ -175,6 +185,7 @@ export interface TTSConfig {
   speech_rate?: number;
   auto_play: boolean;
   master_volume: number;
+  voice_profiles?: VoiceProfile[];
 }
 
 export interface STTConfig {
