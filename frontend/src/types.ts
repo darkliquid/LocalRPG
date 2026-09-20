@@ -137,4 +137,105 @@ export interface WorldEntityDetail {
   markdown: string;
 }
 
+export interface PathsConfig {
+  systems: string;
+  worlds: string;
+  games: string;
+  cache: string;
+}
+
+export interface AgentRoleConfig {
+  type: 'builtin' | 'http' | 'cli' | 'disabled';
+  builtin_name?: string;
+  command?: string;
+  args?: string[];
+  endpoint?: string;
+  model?: string;
+  api_key?: string;
+  temperature?: number;
+  max_tokens?: number;
+}
+
+export interface AgentsConfig {
+  default_role: string;
+  roles: Record<string, AgentRoleConfig>;
+  fallbacks?: Record<string, string>;
+}
+
+export interface TTSConfig {
+  type: 'builtin' | 'http' | 'cli' | 'disabled';
+  builtin_name?: string;
+  command?: string;
+  args?: string[];
+  endpoint?: string;
+  model?: string;
+  api_key?: string;
+  default_voice?: string;
+  pitch?: number;
+  speech_rate?: number;
+  auto_play: boolean;
+  master_volume: number;
+}
+
+export interface STTConfig {
+  type: 'builtin' | 'http' | 'cli' | 'disabled';
+  builtin_name?: string;
+  command?: string;
+  args?: string[];
+  endpoint?: string;
+  model?: string;
+  api_key?: string;
+}
+
+export interface ImageConfig {
+  type: 'builtin' | 'http' | 'cli' | 'disabled';
+  builtin_name?: string;
+  command?: string;
+  args?: string[];
+  endpoint?: string;
+  model?: string;
+  api_key?: string;
+  auto_generate: boolean;
+}
+
+export interface MediaConfig {
+  tts: TTSConfig;
+  stt: STTConfig;
+  image: ImageConfig;
+}
+
+export interface PreferencesConfig {
+  streaming: boolean;
+  typing_speed_ms: number;
+  cinematic_effects: boolean;
+  font_scale: 'small' | 'medium' | 'large';
+}
+
+export interface AppConfig {
+  version: string;
+  paths: PathsConfig;
+  agents: AgentsConfig;
+  media: MediaConfig;
+  preferences: PreferencesConfig;
+}
+
+export interface SettingsResponse {
+  config: AppConfig;
+  config_file_path: string;
+  is_local_override: boolean;
+}
+
+export interface TestProviderRequest {
+  category: 'llm' | 'tts' | 'stt' | 'image';
+  provider: AgentRoleConfig | TTSConfig | STTConfig | ImageConfig;
+  test_prompt?: string;
+}
+
+export interface TestProviderResponse {
+  success: boolean;
+  latency_ms: number;
+  message: string;
+  preview?: string;
+}
+
 

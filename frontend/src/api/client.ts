@@ -12,6 +12,10 @@ import {
   WorldDetail,
   CreateWorldRequest,
   WorldEntityDetail,
+  AppConfig,
+  SettingsResponse,
+  TestProviderRequest,
+  TestProviderResponse,
 } from '../types';
 
 export class APIClient {
@@ -103,6 +107,32 @@ export class APIClient {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error(`deleteWorldEntity: ${res.statusText}`);
+  }
+
+  static async getSettings(): Promise<SettingsResponse> {
+    const res = await fetch('/api/settings');
+    if (!res.ok) throw new Error(`getSettings: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async saveSettings(cfg: AppConfig): Promise<SettingsResponse> {
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: cfg }),
+    });
+    if (!res.ok) throw new Error(`saveSettings: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async testProvider(req: TestProviderRequest): Promise<TestProviderResponse> {
+    const res = await fetch('/api/settings/test-provider', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new Error(`testProvider: ${res.statusText}`);
+    return res.json();
   }
 
   constructor(gameID: string) {
