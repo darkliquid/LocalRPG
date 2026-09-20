@@ -22,7 +22,7 @@
 - Modify: `pkg/gui/server.go`
 - Test: `pkg/gui/server_test.go`
 
-- [ ] **Step 1: Write failing tests for System and World CRUD in `pkg/gui/server_test.go`**
+- [x] **Step 1: Write failing tests for System and World CRUD in `pkg/gui/server_test.go`**
 
 Add `TestSystemAndWorldStudioCRUD` to `pkg/gui/server_test.go`:
 ```go
@@ -123,12 +123,12 @@ func TestSystemAndWorldStudioCRUD(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/gui -run TestSystemAndWorldStudioCRUD`  
 Expected: FAIL with compilation errors (undefined DTOs or methods)
 
-- [ ] **Step 3: Define DTOs in `pkg/gui/types.go`**
+- [x] **Step 3: Define DTOs in `pkg/gui/types.go`**
 
 Add to `pkg/gui/types.go`:
 ```go
@@ -181,7 +181,7 @@ type WorldEntityDetailDTO struct {
 }
 ```
 
-- [ ] **Step 4: Implement Service methods in `pkg/gui/service.go`**
+- [x] **Step 4: Implement Service methods in `pkg/gui/service.go`**
 
 Add:
 - `GetSystem(ctx context.Context, id string) (*SystemDetailDTO, error)`
@@ -192,7 +192,7 @@ Add:
 - `SaveWorldEntity(ctx context.Context, worldID, entityID, markdown string) error`
 - `DeleteWorldEntity(ctx context.Context, worldID, entityID string) error`
 
-- [ ] **Step 5: Register routes and handlers in `pkg/gui/server.go`**
+- [x] **Step 5: Register routes and handlers in `pkg/gui/server.go`**
 
 Register routes:
 - `/api/system/`: `handleSystemRoutes` (`GET /api/system/:id`, `PUT /api/system/:id`)
@@ -200,12 +200,12 @@ Register routes:
 - `/api/world/`: `handleWorldRoutes` (`GET /api/world/:id`, `PUT /api/world/:id`, `/api/world/:id/entity/:name`)
 - `/api/worlds`: `handleWorldsRoutes` (`GET`, `POST`)
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/gui -run TestSystemAndWorldStudioCRUD`  
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/server.go pkg/gui/server_test.go
@@ -220,11 +220,11 @@ git commit -m "feat(gui): implement backend CRUD endpoints for system and world 
 - Modify: `frontend/src/types.ts`
 - Modify: `frontend/src/api/client.ts`
 
-- [ ] **Step 1: Add studio types in `frontend/src/types.ts`**
+- [x] **Step 1: Add studio types in `frontend/src/types.ts`**
 
 Add `SystemDetail`, `CreateSystemRequest`, `WorldDetail`, `WorldEntitySummary`, `CreateWorldRequest`, `WorldEntityDetail`.
 
-- [ ] **Step 2: Add studio methods to `APIClient` in `frontend/src/api/client.ts`**
+- [x] **Step 2: Add studio methods to `APIClient` in `frontend/src/api/client.ts`**
 
 Add:
 - `APIClient.getSystem(id)`
@@ -235,12 +235,12 @@ Add:
 - `APIClient.saveWorldEntity(worldId, entityId, markdown)`
 - `APIClient.deleteWorldEntity(worldId, entityId)`
 
-- [ ] **Step 3: Run TypeScript compiler check**
+- [x] **Step 3: Run TypeScript compiler check**
 
 Run: `npx --prefix frontend tsc --noEmit`  
 Expected: PASS with 0 errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/api/client.ts
@@ -254,7 +254,7 @@ git commit -m "feat(frontend): add studio API client methods for systems and wor
 **Files:**
 - Create: `frontend/src/components/SystemsStudio.tsx`
 
-- [ ] **Step 1: Implement `SystemsStudio.tsx`**
+- [x] **Step 1: Implement `SystemsStudio.tsx`**
 
 Features:
 - Left Master Pane:
@@ -267,12 +267,12 @@ Features:
   - Save button with toast notification.
   - Callback `onSystemSaved` to refresh parent state.
 
-- [ ] **Step 2: Run TypeScript check**
+- [x] **Step 2: Run TypeScript check**
 
 Run: `npx --prefix frontend tsc --noEmit`  
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/SystemsStudio.tsx
@@ -286,7 +286,7 @@ git commit -m "feat(frontend): implement systems workshop studio component"
 **Files:**
 - Create: `frontend/src/components/WorldsStudio.tsx`
 
-- [ ] **Step 1: Implement `WorldsStudio.tsx`**
+- [x] **Step 1: Implement `WorldsStudio.tsx`**
 
 Features:
 - Left Master Pane:
@@ -302,12 +302,12 @@ Features:
   - Save World button with toast notification.
   - Callback `onWorldSaved` to refresh parent state.
 
-- [ ] **Step 2: Run TypeScript check**
+- [x] **Step 2: Run TypeScript check**
 
 Run: `npx --prefix frontend tsc --noEmit`  
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/WorldsStudio.tsx
@@ -323,7 +323,7 @@ git commit -m "feat(frontend): implement worlds studio component with entity tem
 - Verify: `mise run test`
 - Verify: `mise run build`
 
-- [ ] **Step 1: Integrate Navigation Tabs into `LauncherHub.tsx`**
+- [x] **Step 1: Integrate Navigation Tabs into `LauncherHub.tsx`**
 
 Features:
 - Add top-level tabs in header:
@@ -332,17 +332,17 @@ Features:
   - **Worlds Studio** (`<WorldsStudio />`)
 - When switching tabs, automatically refresh system and world lists so newly authored items appear in wizard dropdowns immediately.
 
-- [ ] **Step 2: Test and build frontend bundle**
+- [x] **Step 2: Test and build frontend bundle**
 
 Run: `mise run test:frontend && mise run build:frontend`  
 Expected: PASS, builds cleanly into `pkg/gui/dist`.
 
-- [ ] **Step 3: Run full automated tests across Go and TypeScript**
+- [x] **Step 3: Run full automated tests across Go and TypeScript**
 
 Run: `mise run test`  
 Expected: PASS across all 12 Go packages and TypeScript checks.
 
-- [ ] **Step 4: End-to-End Verification over Unix Domain Socket**
+- [x] **Step 4: End-to-End Verification over Unix Domain Socket**
 
 Test creating a system, world with an entity, and a game using `localrpg gui --socket`:
 ```bash
@@ -364,7 +364,7 @@ rm -f /tmp/test-studio.sock
 ```
 Expected: All requests succeed, game is created from scratch with the newly authored system and world!
 
-- [ ] **Step 5: Commit and merge**
+- [x] **Step 5: Commit and merge**
 
 ```bash
 git add frontend/src/components/LauncherHub.tsx
