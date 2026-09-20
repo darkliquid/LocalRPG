@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
 import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types';
-import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen } from 'lucide-react';
+import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen, AlertCircle } from 'lucide-react';
 import { SystemsStudio } from './SystemsStudio';
 import { WorldsStudio } from './WorldsStudio';
 
@@ -55,12 +55,20 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
     e.preventDefault();
     if (!newGameName.trim()) return;
 
+    const effectiveSystemID = newSystemID || systems[0]?.id;
+    const effectiveWorldID = newWorldID || worlds[0]?.id;
+
+    if (!effectiveSystemID || !effectiveWorldID) {
+      setError('Please create both a Rule System and a World Setting before launching a campaign.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const payload: CreateGameRequest = {
         name: newGameName.trim(),
-        system_id: newSystemID || (systems[0]?.id ?? 'daggerheart'),
-        world_id: newWorldID || (worlds[0]?.id ?? 'solitary_defiance'),
+        system_id: effectiveSystemID,
+        world_id: effectiveWorldID,
         player_name: newPlayerName.trim() || 'Adventurer',
       };
 
@@ -209,18 +217,42 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
             <div className="p-12 rounded-2xl bg-glass-card border border-stone-800/80 text-center space-y-4 shadow-xl">
               <Compass className="w-12 h-12 text-amber-500/60 mx-auto stroke-1" />
               <div className="space-y-1">
-                <h4 className="font-cinzel text-lg font-bold text-stone-200">No Chronicles Found</h4>
-                <p className="text-xs text-stone-400 max-w-sm mx-auto">
-                  Your journey has yet to begin. Create a new campaign to awaken the world and weave your first turn.
+                <h4 className="font-cinzel text-lg font-bold text-stone-200">
+                  {systems.length === 0 || worlds.length === 0 ? 'Welcome to LocalRPG' : 'No Chronicles Found'}
+                </h4>
+                <p className="text-xs text-stone-400 max-w-md mx-auto">
+                  {systems.length === 0 || worlds.length === 0
+                    ? 'LocalRPG starts completely blank with no pre-installed defaults. Visit the Rule Systems and Worlds Studio tabs to create or load the reference templates, then return here to begin!'
+                    : 'Your journey has yet to begin. Create a new campaign to awaken the world and weave your first turn.'}
                 </p>
               </div>
-              <button
-                onClick={() => setIsWizardOpen(true)}
-                className="inline-flex items-center gap-2 text-xs font-cinzel font-bold px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 transition-all cursor-pointer shadow-lg"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Begin Your Tale</span>
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                {systems.length === 0 && (
+                  <button
+                    onClick={() => setActiveTab('systems')}
+                    className="inline-flex items-center gap-1.5 text-xs font-cinzel font-bold px-4 py-2 rounded-xl bg-stone-900 border border-amber-500/40 hover:bg-stone-800 text-amber-300 transition-all cursor-pointer shadow"
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>Rule Systems</span>
+                  </button>
+                )}
+                {worlds.length === 0 && (
+                  <button
+                    onClick={() => setActiveTab('worlds')}
+                    className="inline-flex items-center gap-1.5 text-xs font-cinzel font-bold px-4 py-2 rounded-xl bg-stone-900 border border-amber-500/40 hover:bg-stone-800 text-amber-300 transition-all cursor-pointer shadow"
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>Worlds Studio</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsWizardOpen(true)}
+                  className="inline-flex items-center gap-2 text-xs font-cinzel font-bold px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 transition-all cursor-pointer shadow-lg"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Begin Your Tale</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -288,6 +320,46 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
               </button>
             </div>
 
+            {(!systems.length || !worlds.length) && (
+              <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 space-y-3 text-xs text-amber-200">
+                <div className="flex items-center gap-2 font-cinzel font-bold text-amber-400">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>Setup Required</span>
+                </div>
+                <p className="text-stone-300">
+                  LocalRPG starts with no pre-installed defaults. Before creating a campaign, please author or load a reference template in the Studios.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {systems.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsWizardOpen(false);
+                        setActiveTab('systems');
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold cursor-pointer transition-all shadow"
+                    >
+                      <Shield className="w-3.5 h-3.5" />
+                      <span>Create Rule System</span>
+                    </button>
+                  )}
+                  {worlds.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsWizardOpen(false);
+                        setActiveTab('worlds');
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold cursor-pointer transition-all shadow"
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                      <span>Create World Setting</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleCreateGame} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
@@ -312,9 +384,10 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
                   <select
                     value={newSystemID}
                     onChange={(e) => setNewSystemID(e.target.value)}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer"
+                    disabled={systems.length === 0}
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    {systems.length === 0 && <option value="daggerheart">Daggerheart (Default)</option>}
+                    {systems.length === 0 && <option value="" disabled>No rule systems available</option>}
                     {systems.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
@@ -331,9 +404,10 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
                   <select
                     value={newWorldID}
                     onChange={(e) => setNewWorldID(e.target.value)}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer"
+                    disabled={worlds.length === 0}
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    {worlds.length === 0 && <option value="solitary_defiance">Solitary Defiance</option>}
+                    {worlds.length === 0 && <option value="" disabled>No worlds available</option>}
                     {worlds.map((w) => (
                       <option key={w.id} value={w.id}>
                         {w.name}
@@ -374,7 +448,13 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !newGameName.trim() || !newPlayerName.trim()}
+                  disabled={
+                    isSubmitting ||
+                    !newGameName.trim() ||
+                    !newPlayerName.trim() ||
+                    systems.length === 0 ||
+                    worlds.length === 0
+                  }
                   className="flex items-center gap-2 text-xs font-cinzel font-bold px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-stone-950 shadow-lg transition-all cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
