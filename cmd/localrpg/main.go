@@ -36,6 +36,8 @@ func main() {
 		handleImageCommand(args[1:])
 	case "gui":
 		handleGUICommand(args[1:])
+	case "export":
+		handleExportCommand(args[1:])
 	case "version":
 		fmt.Printf("LocalRPG v%s\n", Version)
 	case "help":
