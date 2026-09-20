@@ -1,7 +1,35 @@
-import { GameState, Turn, EntityNote, GraphData } from '../types';
+import { GameState, Turn, EntityNote, GraphData, GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types';
 
 export class APIClient {
   private gameID: string;
+
+  static async listGames(): Promise<GameSummary[]> {
+    const res = await fetch('/api/games');
+    if (!res.ok) throw new Error(`listGames: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async listSystems(): Promise<SystemInfo[]> {
+    const res = await fetch('/api/systems');
+    if (!res.ok) throw new Error(`listSystems: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async listWorlds(): Promise<WorldInfo[]> {
+    const res = await fetch('/api/worlds');
+    if (!res.ok) throw new Error(`listWorlds: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async createGame(payload: CreateGameRequest): Promise<GameSummary> {
+    const res = await fetch('/api/games', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`createGame: ${res.statusText}`);
+    return res.json();
+  }
 
   constructor(gameID: string) {
     this.gameID = gameID;

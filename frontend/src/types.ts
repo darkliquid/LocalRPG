@@ -50,3 +50,38 @@ export interface GraphData {
   nodes: GraphNode[];
   links: GraphLink[];
 }
+
+export interface GameSummary {
+  id: string;
+  name: string;
+  system_id: string;
+  world_id: string;
+  player_name: string;
+  turn_count: number;
+  last_played: string;
+  thumbnail_url?: string;
+}
+
+export interface SystemInfo {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+}
+
+export interface WorldInfo {
+  id: string;
+  name: string;
+  description: string;
+  genre: string;
+  compatible_systems: string[];
+}
+
+export interface CreateGameRequest {
+  id?: string;
+  name: string;
+  system_id: string;
+  world_id: string;
+  player_name: string;
+}
+
