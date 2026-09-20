@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
@@ -15,15 +16,16 @@ import (
 )
 
 type TurnOrchestrator struct {
-	store       *storage.Store
-	history     *HistoryLogger
-	rulesEngine *rules.JSEngine
-	router      *harness.Router
-	locationID  string
-	playerID    string
-	assembler   *harness.ContextAssembler
-	rulesPrompt string
-	lorePrompt  string
+	store         *storage.Store
+	history       *HistoryLogger
+	rulesEngine   *rules.JSEngine
+	router        *harness.Router
+	locationID    string
+	playerID      string
+	assembler     *harness.ContextAssembler
+	rulesPrompt   string
+	lorePrompt    string
+	voiceProfiles []config.VoiceProfile
 }
 
 func NewTurnOrchestrator(
@@ -48,6 +50,10 @@ func NewTurnOrchestrator(
 func (o *TurnOrchestrator) SetPrompts(rulesPrompt, lorePrompt string) {
 	o.rulesPrompt = rulesPrompt
 	o.lorePrompt = lorePrompt
+}
+
+func (o *TurnOrchestrator) SetVoiceProfiles(profiles []config.VoiceProfile) {
+	o.voiceProfiles = profiles
 }
 
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
@@ -118,8 +124,8 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 		}
 	}
 
-	// Assemble context with system rules and world lore prompts
-	contextPrompt, err := o.assembler.AssembleContextWithRules(o.locationID, o.playerID, actionInput, o.rulesPrompt, o.lorePrompt)
+	// Assemble context with system rules, world lore prompts, and voice profiles
+	contextPrompt, err := o.assembler.AssembleContextWithProfiles(o.locationID, o.playerID, actionInput, o.rulesPrompt, o.lorePrompt, o.voiceProfiles)
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)
 	}

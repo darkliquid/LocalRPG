@@ -99,6 +99,22 @@ func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 		if stateData, ok := meta["state"].(map[string]interface{}); ok {
 			ent.InitState(stateData)
 		}
+		if voiceData, ok := meta["voice"]; ok && voiceData != nil {
+			voiceBytes, _ := json.Marshal(voiceData)
+			var v entity.VoiceConfig
+			if err := json.Unmarshal(voiceBytes, &v); err == nil {
+				ent.Voice = &v
+			}
+		}
+		if loc, ok := meta["location"].(string); ok {
+			ent.Location = loc
+		}
+		if fac, ok := meta["faction"].(string); ok {
+			ent.Faction = fac
+		}
+		if port, ok := meta["portrait"].(string); ok {
+			ent.Portrait = port
+		}
 	}
 
 	return &ent, nil

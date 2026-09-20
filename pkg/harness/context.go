@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
@@ -59,7 +60,24 @@ func (c *ContextAssembler) AssembleContext(locationID, playerID, playerAction st
 	return sb.String(), nil
 }
 
+func FormatVoiceProfilesCatalog(profiles []config.VoiceProfile) string {
+	if len(profiles) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("\n## AVAILABLE NPC VOICE PROFILES\n")
+	sb.WriteString("When introducing or speaking as new NPCs, assign an appropriate voice profile ID in their description:\n")
+	for _, p := range profiles {
+		sb.WriteString(fmt.Sprintf("- `%s`: %s\n", p.ID, p.Description))
+	}
+	return sb.String()
+}
+
 func (c *ContextAssembler) AssembleContextWithRules(locationID, playerID, playerAction, rulesPrompt, lorePrompt string) (string, error) {
+	return c.AssembleContextWithProfiles(locationID, playerID, playerAction, rulesPrompt, lorePrompt, nil)
+}
+
+func (c *ContextAssembler) AssembleContextWithProfiles(locationID, playerID, playerAction, rulesPrompt, lorePrompt string, profiles []config.VoiceProfile) (string, error) {
 	var sb strings.Builder
 
 	if strings.TrimSpace(rulesPrompt) != "" {
@@ -70,6 +88,10 @@ func (c *ContextAssembler) AssembleContextWithRules(locationID, playerID, player
 	if strings.TrimSpace(lorePrompt) != "" {
 		sb.WriteString("## WORLD LORE & ATMOSPHERE\n")
 		sb.WriteString(strings.TrimSpace(lorePrompt) + "\n\n")
+	}
+
+	if len(profiles) > 0 {
+		sb.WriteString(FormatVoiceProfilesCatalog(profiles) + "\n")
 	}
 
 	baseContext, err := c.AssembleContext(locationID, playerID, playerAction)

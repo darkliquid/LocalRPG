@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
@@ -89,6 +90,30 @@ func TestContextAssemblerWithRulesAndLore(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "## WORLD LORE & ATMOSPHERE") || !strings.Contains(prompt, lorePrompt) {
 		t.Errorf("expected lore prompt in context, got: %s", prompt)
+	}
+}
+
+func TestContextAssembler_WithVoiceProfiles(t *testing.T) {
+	tempDir := t.TempDir()
+	store, err := storage.NewStore(filepath.Join(tempDir, "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	assembler := NewContextAssembler(store)
+	profiles := []config.VoiceProfile{
+		{ID: "elder_sage", Description: "Ancient wizards and wise hermits"},
+		{ID: "young_scout", Description: "Agile rangers and scouts"},
+	}
+
+	prompt, err := assembler.AssembleContextWithProfiles("loc1", "p1", "I greet the elders", "", "", profiles)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(prompt, "AVAILABLE NPC VOICE PROFILES") || !strings.Contains(prompt, "elder_sage") {
+		t.Errorf("expected voice profiles section in system prompt, got: %s", prompt)
 	}
 }
 

@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
+	"regexp"
 	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
@@ -20,14 +23,97 @@ type ExtractedEntity struct {
 }
 
 type EntityExtractor struct {
-	model ModelProvider
-	store *storage.Store
+	model         ModelProvider
+	store         *storage.Store
+	voiceProfiles []config.VoiceProfile
 }
 
 func NewEntityExtractor(model ModelProvider, store *storage.Store) *EntityExtractor {
 	return &EntityExtractor{
 		model: model,
 		store: store,
+	}
+}
+
+func (e *EntityExtractor) SetVoiceProfiles(profiles []config.VoiceProfile) {
+	e.voiceProfiles = profiles
+}
+
+var wikilinkExtractorRegex = regexp.MustCompile(`\[\[([^\]\|]+)(?:\|[^\]]+)?\]\]`)
+
+func ExtractEntitiesWithProfiles(prose string, profiles []config.VoiceProfile) []*entity.Entity {
+	matches := wikilinkExtractorRegex.FindAllStringSubmatch(prose, -1)
+	var entities []*entity.Entity
+	for _, m := range matches {
+		if len(m) >= 2 {
+			name := m[1]
+			id := strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+			ent := &entity.Entity{
+				ID:   id,
+				Name: name,
+				Type: "character",
+				Body: prose,
+			}
+			AssignVoiceProfile(ent, profiles)
+			entities = append(entities, ent)
+		}
+	}
+	return entities
+}
+
+func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
+	if len(profiles) == 0 || ent == nil || ent.Type != "character" || ent.Voice != nil {
+		return
+	}
+
+	searchContent := strings.ToLower(ent.Name + " " + ent.Body)
+
+	// 1. Check direct profile ID match
+	for _, p := range profiles {
+		if strings.Contains(searchContent, strings.ToLower(p.ID)) {
+			ent.Voice = &entity.VoiceConfig{
+				VoiceID:    p.VoiceID,
+				Pitch:      p.Pitch,
+				SpeechRate: p.SpeechRate,
+			}
+			return
+		}
+	}
+
+	// 2. Score by tag matches
+	bestScore := 0
+	var bestProfile *config.VoiceProfile
+	for i := range profiles {
+		score := 0
+		for _, tag := range profiles[i].Tags {
+			if strings.Contains(searchContent, strings.ToLower(tag)) {
+				score++
+			}
+		}
+		if score > bestScore {
+			bestScore = score
+			bestProfile = &profiles[i]
+		}
+	}
+
+	if bestProfile != nil {
+		ent.Voice = &entity.VoiceConfig{
+			VoiceID:    bestProfile.VoiceID,
+			Pitch:      bestProfile.Pitch,
+			SpeechRate: bestProfile.SpeechRate,
+		}
+		return
+	}
+
+	// 3. Deterministic hash fallback
+	h := fnv.New32a()
+	h.Write([]byte(ent.ID))
+	idx := int(h.Sum32()) % len(profiles)
+	p := profiles[idx]
+	ent.Voice = &entity.VoiceConfig{
+		VoiceID:    p.VoiceID,
+		Pitch:      p.Pitch,
+		SpeechRate: p.SpeechRate,
 	}
 }
 
@@ -82,6 +168,10 @@ func (e *EntityExtractor) ExtractFromTurn(ctx context.Context, narrativeOutput s
 			Body:      raw.Body,
 			Wikilinks: make([]string, 0),
 			Hash:      fmt.Sprintf("extracted-%s", raw.ID),
+		}
+
+		if ent.Type == "character" {
+			AssignVoiceProfile(ent, e.voiceProfiles)
 		}
 
 		if err := e.store.SaveEntity(ent); err == nil {
