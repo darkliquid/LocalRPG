@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
 import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types';
 import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen } from 'lucide-react';
+import { SystemsStudio } from './SystemsStudio';
+import { WorldsStudio } from './WorldsStudio';
 
 interface LauncherHubProps {
   onSelectGame: (gameId: string) => void;
@@ -14,6 +16,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'systems' | 'worlds'>('campaigns');
 
   // Wizard form state
   const [newGameName, setNewGameName] = useState('');
@@ -74,18 +77,58 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const latestGame = games.length > 0 ? games[0] : null;
 
   return (
-    <div className="relative flex flex-col h-screen overflow-y-auto text-stone-200 p-6 md:p-10 select-none">
+    <div className="relative flex flex-col h-screen overflow-hidden text-stone-200 p-6 md:p-8 select-none">
       {/* Brand Header */}
-      <header className="relative z-10 mx-auto w-full max-w-6xl h-16 bg-glass rounded-2xl px-6 flex items-center justify-between shadow-2xl mb-8">
+      <header className="relative z-10 mx-auto w-full max-w-6xl shrink-0 h-auto sm:h-16 bg-glass rounded-2xl px-6 py-3 sm:py-0 flex flex-wrap items-center justify-between gap-4 shadow-2xl mb-6">
         <div className="flex items-center gap-3">
           <div className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-pulse" />
           <h1 className="font-cinzel text-xl font-extrabold text-amber-400 tracking-wider">
             LocalRPG
           </h1>
-          <span className="text-[10px] uppercase font-mono tracking-widest text-stone-400 bg-stone-900/60 px-2 py-0.5 rounded-full border border-stone-800">
+          <span className="text-[10px] uppercase font-mono tracking-widest text-stone-400 bg-stone-900/60 px-2 py-0.5 rounded-full border border-stone-800 hidden sm:inline">
             Chronicle Hub
           </span>
         </div>
+
+        {/* Top-Level Studio Navigation Tabs */}
+        <nav className="flex items-center gap-1 bg-stone-950/70 p-1 rounded-xl border border-stone-800">
+          <button
+            onClick={() => {
+              setActiveTab('campaigns');
+              loadData();
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
+              activeTab === 'campaigns'
+                ? 'bg-amber-600 text-stone-950 font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Campaigns</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('systems')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
+              activeTab === 'systems'
+                ? 'bg-amber-600 text-stone-950 font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>Rule Systems</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('worlds')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
+              activeTab === 'worlds'
+                ? 'bg-amber-600 text-stone-950 font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>Worlds Studio</span>
+          </button>
+        </nav>
 
         <button
           onClick={() => setIsWizardOpen(true)}
@@ -97,9 +140,9 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
       </header>
 
       {/* Main Content Area */}
-      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 flex flex-col gap-8">
+      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 min-h-0 flex flex-col">
         {error && (
-          <div className="p-4 rounded-xl bg-red-950/60 border border-red-500/40 text-red-200 text-sm flex items-center justify-between">
+          <div className="mb-4 p-4 rounded-xl bg-red-950/60 border border-red-500/40 text-red-200 text-sm flex items-center justify-between shrink-0">
             <span>{error}</span>
             <button onClick={() => setError(null)} className="text-red-400 hover:text-red-200">
               <X className="w-4 h-4" />
@@ -107,42 +150,44 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
           </div>
         )}
 
-        {/* Hero Resume Banner if a campaign exists */}
-        {latestGame && (
-          <div className="relative overflow-hidden rounded-2xl bg-glass-card border border-amber-500/20 shadow-2xl p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 backdrop-blur-md">
-            <div className="flex-1 space-y-2">
-              <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-amber-400">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Last Played Adventure</span>
-              </div>
-              <h2 className="font-cinzel text-2xl md:text-3xl font-bold text-white tracking-wide">
-                {latestGame.name}
-              </h2>
-              <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300 pt-1">
-                <div className="flex items-center gap-1.5 bg-stone-900/60 px-2.5 py-1 rounded-lg border border-stone-800">
-                  <User className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{latestGame.player_name}</span>
+        {activeTab === 'campaigns' && (
+          <div className="flex-1 overflow-y-auto space-y-8 pr-1">
+            {/* Hero Resume Banner if a campaign exists */}
+            {latestGame && (
+              <div className="relative overflow-hidden rounded-2xl bg-glass-card border border-amber-500/20 shadow-2xl p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 backdrop-blur-md">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-amber-400">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Last Played Adventure</span>
+                  </div>
+                  <h2 className="font-cinzel text-2xl md:text-3xl font-bold text-white tracking-wide">
+                    {latestGame.name}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300 pt-1">
+                    <div className="flex items-center gap-1.5 bg-stone-900/60 px-2.5 py-1 rounded-lg border border-stone-800">
+                      <User className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{latestGame.player_name}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-stone-900/60 px-2.5 py-1 rounded-lg border border-stone-800">
+                      <Globe className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{latestGame.world_id}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-stone-900/60 px-2.5 py-1 rounded-lg border border-stone-800">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Turn {latestGame.turn_count}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 bg-stone-900/60 px-2.5 py-1 rounded-lg border border-stone-800">
-                  <Globe className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{latestGame.world_id}</span>
-                </div>
-                <div className="flex items-center gap-1.5 bg-stone-900/60 px-2.5 py-1 rounded-lg border border-stone-800">
-                  <Clock className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Turn {latestGame.turn_count}</span>
-                </div>
-              </div>
-            </div>
 
-            <button
-              onClick={() => onSelectGame(latestGame.id)}
-              className="flex items-center gap-2.5 text-sm font-cinzel font-bold px-6 py-3.5 rounded-xl transition-all cursor-pointer bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-stone-950 shadow-[0_0_20px_rgba(217,119,6,0.6)] active:scale-95"
-            >
-              <Play className="w-4 h-4 fill-stone-950" />
-              <span>Resume Adventure</span>
-            </button>
-          </div>
-        )}
+                <button
+                  onClick={() => onSelectGame(latestGame.id)}
+                  className="flex items-center gap-2.5 text-sm font-cinzel font-bold px-6 py-3.5 rounded-xl transition-all cursor-pointer bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-stone-950 shadow-[0_0_20px_rgba(217,119,6,0.6)] active:scale-95"
+                >
+                  <Play className="w-4 h-4 fill-stone-950" />
+                  <span>Resume Adventure</span>
+                </button>
+              </div>
+            )}
 
         {/* Campaigns Grid */}
         <section className="space-y-4">
@@ -212,7 +257,17 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
             </div>
           )}
         </section>
-      </main>
+      </div>
+    )}
+
+    {activeTab === 'systems' && (
+      <SystemsStudio onSystemSaved={loadData} />
+    )}
+
+    {activeTab === 'worlds' && (
+      <WorldsStudio onWorldSaved={loadData} />
+    )}
+  </main>
 
       {/* New Campaign Creation Wizard Modal */}
       {isWizardOpen && (
