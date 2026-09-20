@@ -62,3 +62,16 @@ mise run test
 # Launch desktop GUI
 bin/localrpg gui
 ```
+
+---
+
+## Configuration & Global Settings
+
+LocalRPG features a unified global settings system that manages app-wide behavior regardless of active campaign, world, or rule system:
+
+- **Hierarchical Loading:** Settings are loaded from `~/.config/localrpg/config.yaml` (global user configuration) and can be overridden per workspace via `./localrpg.yaml`.
+- **Custom Storage Paths:** Configure directories for Rule Systems, Worlds, Campaigns, and Media Caches.
+- **AI Agent Role Routing:** Route `gm`, `narrator`, and `evaluator` roles across `http` (Ollama, vLLM, OpenAI), `cli` (local binaries like llama-cli), `builtin`, or `disabled`.
+- **Multimodal Engines:** Configure TTS (Piper, Kokoro, AllTalk), STT (Whisper), and Image Generation (ComfyUI, Automatic1111) with master volume, auto-play, and auto-generate art toggles.
+- **Live Provider Diagnostics:** Test model and media engine connections directly from the UI with latency and preview feedback.
+- **Dual-Access UI:** Access settings anytime from the **Settings** studio tab in Launcher Hub, or via the in-game header gear icon without leaving an active session.
