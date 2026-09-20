@@ -273,5 +273,60 @@ func TestSystemAndWorldStudioCRUD(t *testing.T) {
 	}
 }
 
+func TestSettingsEndpoints(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewService(tmpDir)
+	server := NewServer(svc, nil)
+
+	// 1. GET /api/settings
+	req := httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	w := httptest.NewRecorder()
+	server.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from GET /api/settings, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var res SettingsResponseDTO
+	if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil {
+		t.Fatalf("failed to decode settings: %v", err)
+	}
+	if res.Config.Paths.Systems == "" {
+		t.Errorf("expected non-empty systems path")
+	}
+
+	// 2. PUT /api/settings
+	newSysPath := filepath.Join(tmpDir, "new_systems")
+	res.Config.Paths.Systems = newSysPath
+	putBody, _ := json.Marshal(res)
+	req2 := httptest.NewRequest(http.MethodPut, "/api/settings", strings.NewReader(string(putBody)))
+	w2 := httptest.NewRecorder()
+	server.ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from PUT /api/settings, got %d: %s", w2.Code, w2.Body.String())
+	}
+
+	// Verify path resolver dynamically updated
+	if svc.GetResolver().SystemsDir() != newSysPath {
+		t.Errorf("expected service to dynamically update systems dir to %s, got %s", newSysPath, svc.GetResolver().SystemsDir())
+	}
+
+	// 3. POST /api/settings/test-provider
+	testReqBody := `{"category":"llm","provider":{"type":"cli","command":"echo","args":["pong"]},"test_prompt":"ping"}`
+	req3 := httptest.NewRequest(http.MethodPost, "/api/settings/test-provider", strings.NewReader(testReqBody))
+	w3 := httptest.NewRecorder()
+	server.ServeHTTP(w3, req3)
+
+	if w3.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from POST /api/settings/test-provider, got %d: %s", w3.Code, w3.Body.String())
+	}
+	var testRes TestProviderResponseDTO
+	_ = json.Unmarshal(w3.Body.Bytes(), &testRes)
+	if !testRes.Success {
+		t.Errorf("expected test provider success: %s", testRes.Message)
+	}
+}
+
 
 

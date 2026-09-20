@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/darkliquid/localrpg/pkg/config"
 )
 
 type Server struct {
@@ -30,6 +32,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/system/", s.handleSystemRoutes)
 	s.mux.HandleFunc("/api/worlds", s.handleWorldsRoutes)
 	s.mux.HandleFunc("/api/world/", s.handleWorldRoutes)
+	s.mux.HandleFunc("/api/settings", s.handleSettingsRoutes)
+	s.mux.HandleFunc("/api/settings/test-provider", s.handleTestProviderRoute)
 	if s.assetServer != nil {
 		s.mux.Handle("/", s.assetServer)
 	}
@@ -316,6 +320,56 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) handleSettingsRoutes(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		settings, err := s.service.GetSettings(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, settings)
+
+	case http.MethodPut:
+		var req struct {
+			Config config.Config `json:"config"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		res, err := s.service.SaveSettings(r.Context(), req.Config)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, res)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleTestProviderRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req TestProviderRequestDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res, err := s.service.TestProvider(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
 }
 
 

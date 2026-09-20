@@ -1,5 +1,9 @@
 package gui
 
+import (
+	"github.com/darkliquid/localrpg/pkg/config"
+)
+
 type PlayerDTO struct {
 	ID    string                 `json:"id"`
 	Name  string                 `json:"name"`
@@ -152,6 +156,25 @@ type CreateWorldRequestDTO struct {
 type WorldEntityDetailDTO struct {
 	ID       string `json:"id"`
 	Markdown string `json:"markdown"`
+}
+
+type SettingsResponseDTO struct {
+	Config          config.Config `json:"config"`
+	ConfigFilePath  string        `json:"config_file_path"`
+	IsLocalOverride bool          `json:"is_local_override"`
+}
+
+type TestProviderRequestDTO struct {
+	Category   string      `json:"category"` // "llm", "tts", "stt", "image"
+	Provider   interface{} `json:"provider"`
+	TestPrompt string      `json:"test_prompt,omitempty"`
+}
+
+type TestProviderResponseDTO struct {
+	Success   bool   `json:"success"`
+	LatencyMS int64  `json:"latency_ms"`
+	Message   string `json:"message"`
+	Preview   string `json:"preview,omitempty"`
 }
 
 

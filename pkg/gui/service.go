@@ -2,29 +2,66 @@ package gui
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"gopkg.in/yaml.v3"
 )
 
 type Service struct {
-	rootDir  string
-	resolver *core.PathResolver
+	mu        sync.RWMutex
+	rootDir   string
+	resolver  *core.PathResolver
+	configMgr *config.ConfigManager
 }
 
 func NewService(rootDir string) *Service {
-	return &Service{
-		rootDir:  rootDir,
-		resolver: core.NewPathResolver(rootDir),
+	userHome, _ := os.UserHomeDir()
+	userPath := filepath.Join(userHome, ".config", "localrpg", "config.yaml")
+	localPath := filepath.Join(rootDir, "localrpg.yaml")
+	mgr := config.NewConfigManagerWithPaths(userPath, localPath)
+	cfg, _ := mgr.Load()
+
+	sysDir := cfg.Paths.Systems
+	worldDir := cfg.Paths.Worlds
+	gameDir := cfg.Paths.Games
+	cacheDir := cfg.Paths.Cache
+	if !filepath.IsAbs(sysDir) && rootDir != "" {
+		sysDir = filepath.Join(rootDir, sysDir)
 	}
+	if !filepath.IsAbs(worldDir) && rootDir != "" {
+		worldDir = filepath.Join(rootDir, worldDir)
+	}
+	if !filepath.IsAbs(gameDir) && rootDir != "" {
+		gameDir = filepath.Join(rootDir, gameDir)
+	}
+	if !filepath.IsAbs(cacheDir) && rootDir != "" {
+		cacheDir = filepath.Join(rootDir, cacheDir)
+	}
+
+	return &Service{
+		rootDir:   rootDir,
+		resolver:  core.NewCustomPathResolver(sysDir, worldDir, gameDir, cacheDir),
+		configMgr: mgr,
+	}
+}
+
+func (s *Service) GetResolver() *core.PathResolver {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.resolver
 }
 
 func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDTO, error) {
@@ -584,6 +621,177 @@ func (s *Service) SaveWorldEntity(ctx context.Context, worldID, entityID, markdo
 func (s *Service) DeleteWorldEntity(ctx context.Context, worldID, entityID string) error {
 	path := filepath.Join(s.resolver.WorldDir(worldID), "entities", entityID+".md")
 	return os.Remove(path)
+}
+
+func (s *Service) GetSettings(ctx context.Context) (*SettingsResponseDTO, error) {
+	cfg, err := s.configMgr.Load()
+	if err != nil {
+		return nil, err
+	}
+	return &SettingsResponseDTO{
+		Config:          *cfg,
+		ConfigFilePath:  s.configMgr.ActiveFilePath(),
+		IsLocalOverride: s.configMgr.IsLocalOverride(),
+	}, nil
+}
+
+func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*SettingsResponseDTO, error) {
+	if err := s.configMgr.Save(&cfg); err != nil {
+		return nil, fmt.Errorf("save config: %w", err)
+	}
+
+	sysDir := cfg.Paths.Systems
+	worldDir := cfg.Paths.Worlds
+	gameDir := cfg.Paths.Games
+	cacheDir := cfg.Paths.Cache
+
+	if !filepath.IsAbs(sysDir) && s.rootDir != "" {
+		sysDir = filepath.Join(s.rootDir, sysDir)
+	}
+	if !filepath.IsAbs(worldDir) && s.rootDir != "" {
+		worldDir = filepath.Join(s.rootDir, worldDir)
+	}
+	if !filepath.IsAbs(gameDir) && s.rootDir != "" {
+		gameDir = filepath.Join(s.rootDir, gameDir)
+	}
+	if !filepath.IsAbs(cacheDir) && s.rootDir != "" {
+		cacheDir = filepath.Join(s.rootDir, cacheDir)
+	}
+
+	s.mu.Lock()
+	s.resolver.SetPaths(sysDir, worldDir, gameDir, cacheDir)
+	s.mu.Unlock()
+
+	_ = os.MkdirAll(sysDir, 0755)
+	_ = os.MkdirAll(worldDir, 0755)
+	_ = os.MkdirAll(gameDir, 0755)
+	_ = os.MkdirAll(cacheDir, 0755)
+
+	return &SettingsResponseDTO{
+		Config:          cfg,
+		ConfigFilePath:  s.configMgr.ActiveFilePath(),
+		IsLocalOverride: s.configMgr.IsLocalOverride(),
+	}, nil
+}
+
+func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) (*TestProviderResponseDTO, error) {
+	start := time.Now()
+
+	data, err := json.Marshal(req.Provider)
+	if err != nil {
+		return &TestProviderResponseDTO{
+			Success: false,
+			Message: fmt.Sprintf("invalid provider data: %v", err),
+		}, nil
+	}
+
+	switch req.Category {
+	case "llm":
+		var agentCfg harness.ProviderConfig
+		if err := json.Unmarshal(data, &agentCfg); err != nil {
+			return &TestProviderResponseDTO{
+				Success: false,
+				Message: fmt.Sprintf("invalid llm config: %v", err),
+			}, nil
+		}
+		p, err := harness.NewModelProvider("test", agentCfg)
+		if err != nil {
+			return &TestProviderResponseDTO{
+				Success: false,
+				Message: fmt.Sprintf("failed to create llm provider: %v", err),
+			}, nil
+		}
+		prompt := req.TestPrompt
+		if prompt == "" {
+			prompt = "ping"
+		}
+		resp, err := p.Generate(ctx, harness.GenerateRequest{Prompt: prompt})
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			return &TestProviderResponseDTO{
+				Success:   false,
+				LatencyMS: latency,
+				Message:   fmt.Sprintf("generate failed: %v", err),
+			}, nil
+		}
+		return &TestProviderResponseDTO{
+			Success:   true,
+			LatencyMS: latency,
+			Message:   "LLM provider responded successfully",
+			Preview:   resp.Text,
+		}, nil
+
+	case "tts":
+		var ttsCfg config.TTSConfig
+		if err := json.Unmarshal(data, &ttsCfg); err != nil {
+			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
+		}
+		client, err := media.NewTTSClient(ttsCfg)
+		if err != nil {
+			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
+		}
+		audio, err := client.Synthesize(ctx, "Test utterance", nil)
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			return &TestProviderResponseDTO{Success: false, LatencyMS: latency, Message: err.Error()}, nil
+		}
+		return &TestProviderResponseDTO{
+			Success:   true,
+			LatencyMS: latency,
+			Message:   fmt.Sprintf("Synthesized %d bytes of audio successfully", len(audio)),
+		}, nil
+
+	case "stt":
+		var sttCfg config.STTConfig
+		if err := json.Unmarshal(data, &sttCfg); err != nil {
+			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
+		}
+		client, err := media.NewSTTClient(sttCfg)
+		if err != nil {
+			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
+		}
+		text, err := client.Transcribe(ctx, []byte("fake-audio-header"))
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			return &TestProviderResponseDTO{Success: false, LatencyMS: latency, Message: err.Error()}, nil
+		}
+		return &TestProviderResponseDTO{
+			Success:   true,
+			LatencyMS: latency,
+			Message:   "Transcribed audio successfully",
+			Preview:   text,
+		}, nil
+
+	case "image":
+		var imgCfg config.ImageConfig
+		if err := json.Unmarshal(data, &imgCfg); err != nil {
+			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
+		}
+		client, err := media.NewImageClient(imgCfg)
+		if err != nil {
+			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
+		}
+		prompt := req.TestPrompt
+		if prompt == "" {
+			prompt = "a dark forest path"
+		}
+		imgBytes, err := client.GenerateImage(ctx, prompt)
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			return &TestProviderResponseDTO{Success: false, LatencyMS: latency, Message: err.Error()}, nil
+		}
+		return &TestProviderResponseDTO{
+			Success:   true,
+			LatencyMS: latency,
+			Message:   fmt.Sprintf("Generated %d bytes of image data successfully", len(imgBytes)),
+		}, nil
+
+	default:
+		return &TestProviderResponseDTO{
+			Success: false,
+			Message: fmt.Sprintf("unsupported test category: %s", req.Category),
+		}, nil
+	}
 }
 
 
