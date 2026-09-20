@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
 import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest } from '../types';
-import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette } from 'lucide-react';
+import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, RotateCcw, BookOpen } from 'lucide-react';
+import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
 
 interface WorldsStudioProps {
   onWorldSaved?: () => void;
@@ -21,21 +22,28 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   const [worlds, setWorlds] = useState<WorldInfo[]>([]);
   const [systems, setSystems] = useState<SystemInfo[]>([]);
   const [selectedID, setSelectedID] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'lore' | 'entities'>('lore');
+  const [activeTab, setActiveTab] = useState<'lore' | 'prompt' | 'entities'>('lore');
 
   // World form state
-  const [name, setName] = useState('');
-  const [slugID, setSlugID] = useState('');
-  const [genre, setGenre] = useState('');
-  const [defaultSystem, setDefaultSystem] = useState('');
-  const [artStyle, setArtStyle] = useState('');
-  const [tags, setTags] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState(REFERENCE_WORLD_TEMPLATE.name);
+  const [slugID, setSlugID] = useState(REFERENCE_WORLD_TEMPLATE.id);
+  const [genre, setGenre] = useState(REFERENCE_WORLD_TEMPLATE.genre);
+  const [defaultSystem, setDefaultSystem] = useState(REFERENCE_WORLD_TEMPLATE.default_system);
+  const [artStyle, setArtStyle] = useState(REFERENCE_WORLD_TEMPLATE.art_style);
+  const [tags, setTags] = useState(REFERENCE_WORLD_TEMPLATE.tags.join(', '));
+  const [description, setDescription] = useState(REFERENCE_WORLD_TEMPLATE.description);
+  const [lorePrompt, setLorePrompt] = useState(REFERENCE_WORLD_TEMPLATE.lore_prompt);
 
   // Entities state
-  const [entities, setEntities] = useState<WorldEntitySummary[]>([]);
-  const [selectedEntityID, setSelectedEntityID] = useState<string | null>(null);
-  const [entityMarkdown, setEntityMarkdown] = useState('');
+  const [entities, setEntities] = useState<WorldEntitySummary[]>(
+    REFERENCE_WORLD_TEMPLATE.entities.map((e) => ({ id: e.id, name: e.name, type: e.type }))
+  );
+  const [selectedEntityID, setSelectedEntityID] = useState<string | null>(
+    REFERENCE_WORLD_TEMPLATE.entities[0]?.id || null
+  );
+  const [entityMarkdown, setEntityMarkdown] = useState(
+    REFERENCE_WORLD_TEMPLATE.entities[0]?.markdown || ''
+  );
   const [isNewEntityModal, setIsNewEntityModal] = useState(false);
   const [newEntitySlug, setNewEntitySlug] = useState('');
 
@@ -80,6 +88,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       setArtStyle(detail.art_style || '');
       setTags(detail.tags ? detail.tags.join(', ') : '');
       setDescription(detail.description || '');
+      setLorePrompt(detail.lore_prompt || REFERENCE_WORLD_TEMPLATE.lore_prompt);
       setEntities(detail.entities || []);
 
       if (detail.entities && detail.entities.length > 0) {
@@ -105,17 +114,42 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
 
   const handleNewWorld = (sysList?: SystemInfo[]) => {
     setSelectedID(null);
-    setName('');
-    setSlugID('');
-    setGenre('');
-    setDefaultSystem(sysList && sysList.length > 0 ? sysList[0].id : systems[0]?.id ?? '');
-    setArtStyle('');
-    setTags('');
-    setDescription('');
-    setEntities([]);
-    setSelectedEntityID(null);
-    setEntityMarkdown('');
+    setName(REFERENCE_WORLD_TEMPLATE.name);
+    setSlugID(REFERENCE_WORLD_TEMPLATE.id);
+    setGenre(REFERENCE_WORLD_TEMPLATE.genre);
+    const availableSys = sysList && sysList.length > 0 ? sysList : systems;
+    const matchingSys = availableSys.find((s) => s.id === REFERENCE_WORLD_TEMPLATE.default_system);
+    setDefaultSystem(matchingSys ? matchingSys.id : (availableSys[0]?.id ?? ''));
+    setArtStyle(REFERENCE_WORLD_TEMPLATE.art_style);
+    setTags(REFERENCE_WORLD_TEMPLATE.tags.join(', '));
+    setDescription(REFERENCE_WORLD_TEMPLATE.description);
+    setLorePrompt(REFERENCE_WORLD_TEMPLATE.lore_prompt);
+    setEntities(
+      REFERENCE_WORLD_TEMPLATE.entities.map((e) => ({ id: e.id, name: e.name, type: e.type }))
+    );
+    setSelectedEntityID(REFERENCE_WORLD_TEMPLATE.entities[0].id);
+    setEntityMarkdown(REFERENCE_WORLD_TEMPLATE.entities[0].markdown);
     setActiveTab('lore');
+  };
+
+  const handleResetToReference = () => {
+    setName(REFERENCE_WORLD_TEMPLATE.name);
+    if (!selectedID) {
+      setSlugID(REFERENCE_WORLD_TEMPLATE.id);
+    }
+    setGenre(REFERENCE_WORLD_TEMPLATE.genre);
+    const matchingSys = systems.find((s) => s.id === REFERENCE_WORLD_TEMPLATE.default_system);
+    if (matchingSys) setDefaultSystem(matchingSys.id);
+    setArtStyle(REFERENCE_WORLD_TEMPLATE.art_style);
+    setTags(REFERENCE_WORLD_TEMPLATE.tags.join(', '));
+    setDescription(REFERENCE_WORLD_TEMPLATE.description);
+    setLorePrompt(REFERENCE_WORLD_TEMPLATE.lore_prompt);
+    setEntities(
+      REFERENCE_WORLD_TEMPLATE.entities.map((e) => ({ id: e.id, name: e.name, type: e.type }))
+    );
+    setSelectedEntityID(REFERENCE_WORLD_TEMPLATE.entities[0].id);
+    setEntityMarkdown(REFERENCE_WORLD_TEMPLATE.entities[0].markdown);
+    setToast({ type: 'success', message: 'Reset to The Ashen Reach Reference Template!' });
   };
 
   const handleSaveWorld = async (e: React.FormEvent) => {
@@ -141,9 +175,18 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
         default_system: defaultSystem || (systems[0]?.id ?? ''),
         art_style: artStyle.trim(),
         tags: parsedTags,
+        lore_prompt: lorePrompt.trim(),
       };
 
       const saved = await APIClient.saveWorld(payload);
+
+      // If saving a new world and we have reference template entities, save them too
+      if (!selectedID) {
+        for (const ent of REFERENCE_WORLD_TEMPLATE.entities) {
+          await APIClient.saveWorldEntity(saved.id, ent.id, ent.markdown).catch(() => {});
+        }
+      }
+
       setToast({ type: 'success', message: `World "${saved.name}" saved successfully!` });
       await loadWorlds(saved.id);
       if (onWorldSaved) onWorldSaved();
@@ -278,18 +321,39 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
               </button>
               <button
                 type="button"
+                onClick={() => setActiveTab('prompt')}
+                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  activeTab === 'prompt'
+                    ? 'bg-amber-600 text-stone-950 font-bold shadow'
+                    : 'text-stone-400 hover:text-white'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>lore.md</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveTab('entities')}
-                disabled={!selectedID}
                 className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1 rounded-lg transition-all cursor-pointer ${
                   activeTab === 'entities'
                     ? 'bg-amber-600 text-stone-950 font-bold shadow'
-                    : 'text-stone-400 hover:text-white disabled:opacity-40'
+                    : 'text-stone-400 hover:text-white'
                 }`}
               >
                 <FileText className="w-3.5 h-3.5" />
                 <span>Starter Entities ({entities.length})</span>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={handleResetToReference}
+              title="Reset current editor to the comprehensive Ashen Reach reference template"
+              className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-2 rounded-xl border border-stone-800 hover:border-amber-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-amber-400 transition-all cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Reset Template</span>
+            </button>
 
             <button
               onClick={handleSaveWorld}
@@ -436,7 +500,23 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
           </div>
         )}
 
-        {/* Tab 2: Starter Entities Manager */}
+        {/* Tab 2: Agent Lore Prompt Editor */}
+        {activeTab === 'prompt' && (
+          <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+            <div className="flex items-center justify-between text-[11px] font-mono text-stone-400 px-1">
+              <span>AI Storyteller Atmosphere Instructions (prompts/lore.md)</span>
+              <span>Injected into LLM context to guide sensory tone & faction conflicts</span>
+            </div>
+            <textarea
+              value={lorePrompt}
+              onChange={(e) => setLorePrompt(e.target.value)}
+              spellCheck={false}
+              className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-amber-500/60 transition-colors resize-none selection:bg-amber-900/60"
+            />
+          </div>
+        )}
+
+        {/* Tab 3: Starter Entities Manager */}
         {activeTab === 'entities' && (
           <div className="flex-1 flex gap-4 overflow-hidden">
             {/* Entity List */}
