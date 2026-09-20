@@ -44,7 +44,7 @@ LocalRPG/
 - Create: `pkg/export/script.go`
 - Test: `pkg/export/script_test.go`
 
-- [ ] **Step 1: Write failing test for Replay Script compiler**
+- [x] **Step 1: Write failing test for Replay Script compiler**
 
 ```go
 // pkg/export/script_test.go
@@ -116,12 +116,12 @@ player: elena
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/export/... -v`  
 Expected: FAIL (package undefined)
 
-- [ ] **Step 3: Implement Replay Script contracts and compiler**
+- [x] **Step 3: Implement Replay Script contracts and compiler**
 
 Write `pkg/export/types.go`:
 ```go
@@ -246,12 +246,12 @@ func (s *ScriptCompiler) Compile(ctx context.Context, gameID string) (*ReplayScr
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/export/... -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/export/types.go pkg/export/script.go pkg/export/script_test.go
@@ -266,7 +266,7 @@ git commit -m "feat(export): implement replay script compiler and data structure
 - Create: `pkg/export/web.go`
 - Test: `pkg/export/web_test.go`
 
-- [ ] **Step 1: Write failing test for Web Exporter**
+- [x] **Step 1: Write failing test for Web Exporter**
 
 ```go
 // pkg/export/web_test.go
@@ -321,12 +321,12 @@ player: elena
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/export/... -v -run TestExportWebBundle`  
 Expected: FAIL (NewWebExporter undefined)
 
-- [ ] **Step 3: Implement Web Bundle Exporter**
+- [x] **Step 3: Implement Web Bundle Exporter**
 
 Write `pkg/export/web.go`:
 ```go
@@ -487,12 +487,12 @@ func (w *WebExporter) Export(ctx context.Context, script *ReplayScript, outDir s
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/export/... -v -run TestExportWebBundle`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/export/web.go pkg/export/web_test.go
@@ -507,7 +507,7 @@ git commit -m "feat(export): implement standalone HTML5 web bundle generator"
 - Create: `pkg/export/video.go`
 - Test: `pkg/export/video_test.go`
 
-- [ ] **Step 1: Write failing test for Video Pipeline**
+- [x] **Step 1: Write failing test for Video Pipeline**
 
 ```go
 // pkg/export/video_test.go
@@ -560,12 +560,12 @@ func TestBuildFFmpegCommand(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/export/... -v -run TestBuildFFmpegCommand`  
 Expected: FAIL (NewVideoPipeline undefined)
 
-- [ ] **Step 3: Implement Video Pipeline**
+- [x] **Step 3: Implement Video Pipeline**
 
 Write `pkg/export/video.go`:
 ```go
@@ -626,12 +626,12 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *ReplayScript, o
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/export/... -v -run TestBuildFFmpegCommand`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/export/video.go pkg/export/video_test.go
@@ -646,7 +646,7 @@ git commit -m "feat(export): implement headless FFmpeg video rendering pipeline"
 - Create: `frontend/src/components/StoryTheater.tsx`
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Implement StoryTheater component**
+- [x] **Step 1: Implement StoryTheater component**
 
 Write `frontend/src/components/StoryTheater.tsx`:
 ```tsx
@@ -780,16 +780,16 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({ turns, isOpen, onClo
 };
 ```
 
-- [ ] **Step 2: Wire StoryTheater in App.tsx**
+- [x] **Step 2: Wire StoryTheater in App.tsx**
 
 Update `frontend/src/App.tsx` with a "Theater" button in the header that sets `isTheaterOpen(true)` and renders `<StoryTheater>`.
 
-- [ ] **Step 3: Build frontend to verify compilation**
+- [x] **Step 3: Build frontend to verify compilation**
 
 Run: `cd frontend && npm run build`  
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/StoryTheater.tsx frontend/src/App.tsx
@@ -805,7 +805,7 @@ git commit -m "feat(gui): implement in-app Story Theater replay player"
 - Modify: `cmd/localrpg/main.go`
 - Test: `cmd/localrpg/export_test.go`
 
-- [ ] **Step 1: Write integration tests for CLI export commands**
+- [x] **Step 1: Write integration tests for CLI export commands**
 
 ```go
 // cmd/localrpg/export_test.go
@@ -827,12 +827,12 @@ func TestCLIExportHelp(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./cmd/localrpg/... -v -run TestCLIExportHelp`  
 Expected: FAIL (export command not handled)
 
-- [ ] **Step 3: Implement CLI Export Handler**
+- [x] **Step 3: Implement CLI Export Handler**
 
 Write `cmd/localrpg/export.go`:
 ```go
@@ -904,12 +904,12 @@ func handleExportCommand(args []string) {
 
 Update `cmd/localrpg/main.go` to dispatch `case "export": handleExportCommand(args[1:])`.
 
-- [ ] **Step 4: Run all package tests across workspace**
+- [x] **Step 4: Run all package tests across workspace**
 
 Run: `go test -count=1 ./... -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cmd/localrpg/export.go cmd/localrpg/main.go cmd/localrpg/export_test.go
