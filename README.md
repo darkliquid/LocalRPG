@@ -72,6 +72,30 @@ LocalRPG features a unified global settings system that manages app-wide behavio
 - **Hierarchical Loading:** Settings are loaded from `~/.config/localrpg/config.yaml` (global user configuration) and can be overridden per workspace via `./localrpg.yaml`.
 - **Custom Storage Paths:** Configure directories for Rule Systems, Worlds, Campaigns, and Media Caches.
 - **AI Agent Role Routing:** Route `gm`, `narrator`, and `evaluator` roles across `http` (Ollama, vLLM, OpenAI), `cli` (local binaries like llama-cli), `builtin`, or `disabled`.
-- **Multimodal Engines:** Configure TTS (Piper, Kokoro, AllTalk), STT (Whisper), and Image Generation (ComfyUI, Automatic1111) with master volume, auto-play, and auto-generate art toggles.
+- **Multimodal Engines:** Configure TTS (Piper, Kokoro, AllTalk, native-os), STT (Whisper), and Image Generation (ComfyUI, Automatic1111, procedural-art) with master volume, auto-play, and auto-generate art toggles.
 - **Live Provider Diagnostics:** Test model and media engine connections directly from the UI with latency and preview feedback.
 - **Dual-Access UI:** Access settings anytime from the **Settings** studio tab in Launcher Hub, or via the in-game header gear icon without leaving an active session.
+
+---
+
+## Built-in Engines & Local Provider Presets
+
+LocalRPG works completely out of the box with zero external dependencies, servers, or GPU requirements, while also supporting 1-click presets for popular local inference tools:
+
+### Zero-GPU Built-in Engines
+- **`narrative-oracle` Agent:** Pure-Go deterministic procedural storyteller that evaluates player action modes and dice roll outcome tiers, generating responsive narrative prose woven with entity wikilinks.
+- **`native-os` TTS Client:** Dispatches narration to operating system speech synthesizers (`spd-say` on Linux, `/usr/bin/say` on macOS, PowerShell on Windows) with procedural audio waveform fallback.
+- **`procedural-art` Image Generator:** Pure-Go vector dark fantasy SVG generator producing multi-layered atmospheric citadels, moonlit ridgelines, and misty swamp ruins customized by scene keywords.
+
+### 1-Click Quick Presets
+Settings Studio includes 1-click loaders that instantly prefill endpoint, model, and parameter defaults:
+- **LLM / Agents:** Ollama (`localhost:11434`), LM Studio (`localhost:1234`), LocalAI (`localhost:8080`), vLLM (`localhost:8000`), `llama-cli`, `claude-cli`, `narrative-oracle`.
+- **TTS (Speech):** Kokoro-FastAPI (`localhost:8880`), AllTalk (`localhost:7851`), Piper (`piper`), `native-os`, OpenAI Audio.
+- **STT (Transcription):** Faster-Whisper (`localhost:8000`), Whisper.cpp (`whisper-cli`), OpenAI Whisper.
+- **Image Generation:** ComfyUI (`127.0.0.1:8188`), Automatic1111 (`127.0.0.1:7860`), LocalAI (`localhost:8080`), `sd-cli`, `procedural-art`, DALL-E 3.
+
+### NPC Voice Profiles Library
+- **Archetype Catalog:** Ships with default fantasy archetypes (`elder_sage`, `young_scout`, `gruff_blacksmith`, `sinister_cultist`) configuring `voice_id`, `pitch`, and `speech_rate`.
+- **Automatic GM Voice Assignment:** The GM prompt is automatically injected with the active voice profile catalog. When new NPCs are introduced, the world extractor auto-assigns matching voice profiles based on tags or deterministic hash.
+- **Per-Character Codex Overrides:** Select and inject voice profile frontmatter directly from the Codex Drawer note editor with one click.
+- **Audio Cache Separation:** Speech cache keys uniquely isolate combinations of speaker, voice ID, pitch, speech rate, and text to eliminate audio cache collisions.
