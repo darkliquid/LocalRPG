@@ -28,6 +28,8 @@ func main() {
 		handleRollCommand(args[1:])
 	case "prompt":
 		handlePromptCommand(args[1:])
+	case "play":
+		handlePlayCommand(args[1:])
 	case "version":
 		fmt.Printf("LocalRPG v%s\n", Version)
 	case "help":
