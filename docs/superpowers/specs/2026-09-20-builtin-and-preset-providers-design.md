@@ -117,10 +117,47 @@ type VoiceConfig struct {
 
 ---
 
-## 5. Testing & Verification
+## 5. Voice Profiles Library for GM NPC Creation
 
-1. Unit tests for `procedural-art` SVG output (valid SVG tags, proper XML escaping).
-2. Unit tests for `narrative-oracle` response formatting and mechanics result handling.
-3. Unit tests for `native-os` TTS execution and fallback.
+### 5.1 Voice Profile Schema (`pkg/config/types.go`)
+```go
+type VoiceProfile struct {
+    ID          string   `yaml:"id" json:"id"`
+    Name        string   `yaml:"name" json:"name"`
+    VoiceID     string   `yaml:"voice_id" json:"voice_id"`
+    Pitch       float64  `yaml:"pitch" json:"pitch"`
+    SpeechRate  float64  `yaml:"speech_rate" json:"speech_rate"`
+    Tags        []string `yaml:"tags,omitempty" json:"tags,omitempty"`
+    Description string   `yaml:"description,omitempty" json:"description,omitempty"`
+}
+```
+
+Configured in `MediaConfig.TTS.VoiceProfiles []VoiceProfile`.
+
+### 5.2 GM Prompt Context Injection (`pkg/harness/context.go`)
+When assembling the turn prompt for the GM agent, `ContextAssembler` injects the available NPC voice profiles catalog:
+```markdown
+## AVAILABLE NPC VOICE PROFILES
+When introducing new characters in dialogue, assign an appropriate voice profile ID in the entity description:
+- `elder_sage`: Ancient wizards, battle-weary commanders, village elders.
+- `young_scout`: Nimble rangers, streetwise thieves, eager apprentices.
+- `gruff_blacksmith`: Dwarven smiths, tavern bouncers, fortress wardens.
+- `sinister_cultist`: Shadow mages, deceptive nobles, oracle priestesses.
+```
+
+### 5.3 Heuristic & Deterministic Auto-Assignment (`pkg/harness/extractor.go`)
+When background entity extraction discovers a newly introduced NPC:
+1. If the GM explicitly specifies a voice profile ID, that profile's attributes (`voice_id`, `pitch`, `speech_rate`) are applied.
+2. If tags match the character description (e.g. "elderly", "ranger", "guard"), the matching profile is assigned.
+3. Otherwise, a deterministic hash of the entity ID selects an archetype from `VoiceProfiles` so every newly introduced character automatically speaks with a distinct, consistent voice.
+
+---
+
+## 6. Testing & Verification
+
+1. Unit tests for `procedural-art` SVG output (valid SVG tags, gradient/silhouette layers, XML safety).
+2. Unit tests for `narrative-oracle` response formatting, wikilink generation, and mechanics resolution.
+3. Unit tests for `native-os` TTS execution and procedural audio fallback.
 4. Unit tests for per-character voice resolution in `TTSPipeline`.
-5. Frontend TypeScript verification of preset catalog and voice selection helpers.
+5. Unit tests for voice profile prompt injection in `ContextAssembler` and auto-assignment in `EntityExtractor`.
+6. Frontend TypeScript verification of preset catalog, voice profile library editor, and diagnostics.
