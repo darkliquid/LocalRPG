@@ -24,6 +24,8 @@ func main() {
 	}
 
 	switch args[0] {
+	case "roll":
+		handleRollCommand(args[1:])
 	case "version":
 		fmt.Printf("LocalRPG v%s\n", Version)
 	case "help":
@@ -38,6 +40,7 @@ func main() {
 func printUsage() {
 	fmt.Println("Usage: localrpg <command> [arguments]")
 	fmt.Println("\nCommands:")
+	fmt.Println("  roll <notation>    Evaluate dice notation (e.g. 1d20+5, 4d6kh3, 4dF)")
 	fmt.Println("  play <game-id>     Launch terminal TUI play mode")
 	fmt.Println("  gui                Launch desktop application (Wails v3)")
 	fmt.Println("  export <format>    Export story replay (web, video)")
