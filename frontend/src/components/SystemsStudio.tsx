@@ -1,36 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
 import { SystemInfo, CreateSystemRequest } from '../types';
-import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle } from 'lucide-react';
+import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen } from 'lucide-react';
+import { REFERENCE_SYSTEM_TEMPLATE } from '../templates/referenceTemplates';
 
 interface SystemsStudioProps {
   onSystemSaved?: () => void;
 }
 
-const STARTER_SCRIPT = `// LocalRPG Rule System Engine
-// Globals available: roll(notation), state, log(msg)
-
-function evaluateRoll(stats, diceExpr) {
-  const result = roll(diceExpr || "2d6");
-  return {
-    total: result.total,
-    success: result.total >= 10,
-    rolls: result.rolls
-  };
-}
-`;
-
 export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) => {
   const [systems, setSystems] = useState<SystemInfo[]>([]);
   const [selectedID, setSelectedID] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'manifest' | 'script'>('manifest');
+  const [activeTab, setActiveTab] = useState<'manifest' | 'rules' | 'script'>('manifest');
 
   // Form state
-  const [name, setName] = useState('');
-  const [slugID, setSlugID] = useState('');
-  const [version, setVersion] = useState('1.0.0');
-  const [description, setDescription] = useState('');
-  const [script, setScript] = useState(STARTER_SCRIPT);
+  const [name, setName] = useState(REFERENCE_SYSTEM_TEMPLATE.name);
+  const [slugID, setSlugID] = useState(REFERENCE_SYSTEM_TEMPLATE.id);
+  const [version, setVersion] = useState(REFERENCE_SYSTEM_TEMPLATE.version);
+  const [description, setDescription] = useState(REFERENCE_SYSTEM_TEMPLATE.description);
+  const [rulesPrompt, setRulesPrompt] = useState(REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
+  const [script, setScript] = useState(REFERENCE_SYSTEM_TEMPLATE.script);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -66,7 +55,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
       setSlugID(detail.id);
       setVersion(detail.version || '1.0.0');
       setDescription(detail.description || '');
-      setScript(detail.script || STARTER_SCRIPT);
+      setRulesPrompt(detail.rules_prompt || REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
+      setScript(detail.script || REFERENCE_SYSTEM_TEMPLATE.script);
     } catch (err: any) {
       setToast({ type: 'error', message: err.message || 'Failed to load system details' });
     }
@@ -74,12 +64,25 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
 
   const handleNewSystem = () => {
     setSelectedID(null);
-    setName('');
-    setSlugID('');
-    setVersion('1.0.0');
-    setDescription('');
-    setScript(STARTER_SCRIPT);
+    setName(REFERENCE_SYSTEM_TEMPLATE.name);
+    setSlugID(REFERENCE_SYSTEM_TEMPLATE.id);
+    setVersion(REFERENCE_SYSTEM_TEMPLATE.version);
+    setDescription(REFERENCE_SYSTEM_TEMPLATE.description);
+    setRulesPrompt(REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
+    setScript(REFERENCE_SYSTEM_TEMPLATE.script);
     setActiveTab('manifest');
+  };
+
+  const handleResetToReference = () => {
+    setName(REFERENCE_SYSTEM_TEMPLATE.name);
+    if (!selectedID) {
+      setSlugID(REFERENCE_SYSTEM_TEMPLATE.id);
+    }
+    setVersion(REFERENCE_SYSTEM_TEMPLATE.version);
+    setDescription(REFERENCE_SYSTEM_TEMPLATE.description);
+    setRulesPrompt(REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
+    setScript(REFERENCE_SYSTEM_TEMPLATE.script);
+    setToast({ type: 'success', message: 'Reset to Narrative 2d6 Reference Template!' });
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -97,6 +100,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
         name: name.trim(),
         version: version.trim() || '1.0.0',
         description: description.trim(),
+        rules_prompt: rulesPrompt.trim(),
         script: script,
       };
 
@@ -197,6 +201,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
               </button>
               <button
                 type="button"
+                onClick={() => setActiveTab('rules')}
+                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  activeTab === 'rules'
+                    ? 'bg-amber-600 text-stone-950 font-bold shadow'
+                    : 'text-stone-400 hover:text-white'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>rules.md</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveTab('script')}
                 className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1 rounded-lg transition-all cursor-pointer ${
                   activeTab === 'script'
@@ -208,6 +224,16 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                 <span>mechanics.js</span>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={handleResetToReference}
+              title="Reset current editor to the comprehensive Narrative 2d6 reference template"
+              className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-2 rounded-xl border border-stone-800 hover:border-amber-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-amber-400 transition-all cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Reset Template</span>
+            </button>
 
             <button
               onClick={handleSave}
@@ -307,7 +333,23 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
           </div>
         )}
 
-        {/* Tab 2: Script Editor */}
+        {/* Tab 2: Agent Rules Prompt Editor */}
+        {activeTab === 'rules' && (
+          <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+            <div className="flex items-center justify-between text-[11px] font-mono text-stone-400 px-1">
+              <span>AI Storyteller Instructions (prompts/rules.md)</span>
+              <span>Injected into LLM context to guide resolution ladder & mechanics hooks</span>
+            </div>
+            <textarea
+              value={rulesPrompt}
+              onChange={(e) => setRulesPrompt(e.target.value)}
+              spellCheck={false}
+              className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-amber-500/60 transition-colors resize-none selection:bg-amber-900/60"
+            />
+          </div>
+        )}
+
+        {/* Tab 3: Script Editor */}
         {activeTab === 'script' && (
           <div className="flex-1 flex flex-col gap-2 overflow-hidden">
             <div className="flex items-center justify-between text-[11px] font-mono text-stone-400 px-1">
