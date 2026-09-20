@@ -25,19 +25,30 @@ type AgentsConfig struct {
 	Fallbacks   map[string]string          `yaml:"fallbacks,omitempty" json:"fallbacks,omitempty"`
 }
 
+type VoiceProfile struct {
+	ID          string   `yaml:"id" json:"id"`
+	Name        string   `yaml:"name" json:"name"`
+	VoiceID     string   `yaml:"voice_id" json:"voice_id"`
+	Pitch       float64  `yaml:"pitch" json:"pitch"`
+	SpeechRate  float64  `yaml:"speech_rate" json:"speech_rate"`
+	Tags        []string `yaml:"tags,omitempty" json:"tags,omitempty"`
+	Description string   `yaml:"description,omitempty" json:"description,omitempty"`
+}
+
 type TTSConfig struct {
-	Type         string   `yaml:"type" json:"type"` // "builtin", "http", "cli", "disabled"
-	BuiltinName  string   `yaml:"builtin_name,omitempty" json:"builtin_name,omitempty"`
-	Command      string   `yaml:"command,omitempty" json:"command,omitempty"`
-	Args         []string `yaml:"args,omitempty" json:"args,omitempty"`
-	Endpoint     string   `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
-	Model        string   `yaml:"model,omitempty" json:"model,omitempty"`
-	APIKey       string   `yaml:"api_key,omitempty" json:"api_key,omitempty"`
-	DefaultVoice string   `yaml:"default_voice,omitempty" json:"default_voice,omitempty"`
-	Pitch        float64  `yaml:"pitch,omitempty" json:"pitch,omitempty"`
-	SpeechRate   float64  `yaml:"speech_rate,omitempty" json:"speech_rate,omitempty"`
-	AutoPlay     bool     `yaml:"auto_play" json:"auto_play"`
-	MasterVolume float64  `yaml:"master_volume" json:"master_volume"`
+	Type          string         `yaml:"type" json:"type"` // "builtin", "http", "cli", "disabled"
+	BuiltinName   string         `yaml:"builtin_name,omitempty" json:"builtin_name,omitempty"`
+	Command       string         `yaml:"command,omitempty" json:"command,omitempty"`
+	Args          []string       `yaml:"args,omitempty" json:"args,omitempty"`
+	Endpoint      string         `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
+	Model         string         `yaml:"model,omitempty" json:"model,omitempty"`
+	APIKey        string         `yaml:"api_key,omitempty" json:"api_key,omitempty"`
+	DefaultVoice  string         `yaml:"default_voice,omitempty" json:"default_voice,omitempty"`
+	Pitch         float64        `yaml:"pitch,omitempty" json:"pitch,omitempty"`
+	SpeechRate    float64        `yaml:"speech_rate,omitempty" json:"speech_rate,omitempty"`
+	AutoPlay      bool           `yaml:"auto_play" json:"auto_play"`
+	MasterVolume  float64        `yaml:"master_volume" json:"master_volume"`
+	VoiceProfiles []VoiceProfile `yaml:"voice_profiles,omitempty" json:"voice_profiles,omitempty"`
 }
 
 type STTConfig struct {
@@ -115,6 +126,44 @@ func DefaultConfig() *Config {
 				SpeechRate:   1.0,
 				AutoPlay:     false,
 				MasterVolume: 1.0,
+				VoiceProfiles: []VoiceProfile{
+					{
+						ID:          "elder_sage",
+						Name:        "Elder Sage / Veteran",
+						VoiceID:     "bm_george",
+						Pitch:       0.85,
+						SpeechRate:  0.90,
+						Tags:        []string{"elder", "male", "wise", "gravelly", "veteran"},
+						Description: "Ancient wizards, battle-weary commanders, village elders.",
+					},
+					{
+						ID:          "young_scout",
+						Name:        "Young Scout / Rogue",
+						VoiceID:     "af_bella",
+						Pitch:       1.05,
+						SpeechRate:  1.10,
+						Tags:        []string{"young", "female", "quick", "eager", "rogue"},
+						Description: "Nimble rangers, streetwise thieves, eager apprentices.",
+					},
+					{
+						ID:          "gruff_blacksmith",
+						Name:        "Gruff Dwarf / Guard",
+						VoiceID:     "am_adam",
+						Pitch:       0.75,
+						SpeechRate:  0.95,
+						Tags:        []string{"stout", "male", "deep", "authoritative", "guard"},
+						Description: "Dwarven smiths, tavern bouncers, fortress wardens.",
+					},
+					{
+						ID:          "sinister_cultist",
+						Name:        "Hushed Mystic / Villain",
+						VoiceID:     "bf_emma",
+						Pitch:       0.90,
+						SpeechRate:  0.85,
+						Tags:        []string{"eerie", "whisper", "sinister", "cultist"},
+						Description: "Shadow mages, deceptive nobles, oracle priestesses.",
+					},
+				},
 			},
 			STT: STTConfig{
 				Type: "disabled",
