@@ -8,7 +8,8 @@ import { CharacterSheetDrawer } from './components/CharacterSheetDrawer';
 import { GraphDrawer } from './components/GraphDrawer';
 import { CodexDrawer } from './components/CodexDrawer';
 import { LivingWorldDrawer } from './components/LivingWorldDrawer';
-import { User, Network, BookOpen, Clock } from 'lucide-react';
+import { StoryTheater } from './components/StoryTheater';
+import { User, Network, BookOpen, Clock, Film } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [client] = useState(() => new APIClient('test-campaign'));
@@ -19,6 +20,7 @@ export const App: React.FC = () => {
 
   // Active drawer tab: null, 'character', 'graph', 'codex', 'world'
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
+  const [isTheaterOpen, setIsTheaterOpen] = useState(false);
 
   useEffect(() => {
     client.getGameState().then(setGameState).catch(console.error);
@@ -120,6 +122,14 @@ export const App: React.FC = () => {
             <Clock className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">World Arcs</span>
           </button>
+          <button
+            onClick={() => setIsTheaterOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-xl transition-all cursor-pointer text-stone-300 hover:text-white hover:bg-white/10"
+            title="Open Story Theater replay mode"
+          >
+            <Film className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Theater</span>
+          </button>
         </div>
       </header>
 
@@ -146,6 +156,13 @@ export const App: React.FC = () => {
         {activeDrawer === 'codex' && <CodexDrawer entity={selectedEntity || undefined} onSave={handleSaveEntity} />}
         {activeDrawer === 'world' && <LivingWorldDrawer state={gameState || undefined} />}
       </Drawers>
+
+      {/* Full-Screen Visual Novel Story Theater */}
+      <StoryTheater
+        turns={chronicle}
+        isOpen={isTheaterOpen}
+        onClose={() => setIsTheaterOpen(false)}
+      />
     </div>
   );
 };
