@@ -102,3 +102,52 @@ type CreateGameRequestDTO struct {
 	PlayerName string `json:"player_name"`
 }
 
+type SystemDetailDTO struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Description string `json:"description"`
+	Script      string `json:"script"`
+}
+
+type CreateSystemRequestDTO struct {
+	ID          string `json:"id,omitempty"`
+	Name        string `json:"name"`
+	Version     string `json:"version,omitempty"`
+	Description string `json:"description,omitempty"`
+	Script      string `json:"script,omitempty"`
+}
+
+type WorldEntitySummaryDTO struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type WorldDetailDTO struct {
+	ID            string                  `json:"id"`
+	Name          string                  `json:"name"`
+	Description   string                  `json:"description"`
+	Genre         string                  `json:"genre"`
+	DefaultSystem string                  `json:"default_system"`
+	ArtStyle      string                  `json:"art_style"`
+	Tags          []string                `json:"tags"`
+	Entities      []WorldEntitySummaryDTO `json:"entities"`
+}
+
+type CreateWorldRequestDTO struct {
+	ID            string   `json:"id,omitempty"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description,omitempty"`
+	Genre         string   `json:"genre,omitempty"`
+	DefaultSystem string   `json:"default_system,omitempty"`
+	ArtStyle      string   `json:"art_style,omitempty"`
+	Tags          []string `json:"tags,omitempty"`
+}
+
+type WorldEntityDetailDTO struct {
+	ID       string `json:"id"`
+	Markdown string `json:"markdown"`
+}
+
+

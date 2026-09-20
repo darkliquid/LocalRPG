@@ -12,6 +12,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"gopkg.in/yaml.v3"
 )
 
 type Service struct {
@@ -366,4 +367,191 @@ func slugify(s string) string {
 	}
 	return res
 }
+
+const defaultMechanicsScript = `// LocalRPG Rule System Engine
+// Globals available: roll(notation), state, log(msg)
+
+function evaluateRoll(stats, diceExpr) {
+  const result = roll(diceExpr || "2d6");
+  return {
+    total: result.total,
+    success: result.total >= 10,
+    rolls: result.rolls
+  };
+}
+`
+
+func (s *Service) GetSystem(ctx context.Context, id string) (*SystemDetailDTO, error) {
+	sysDir := s.resolver.SystemDir(id)
+	m, err := core.LoadSystemManifest(filepath.Join(sysDir, "system.yaml"))
+	if err != nil {
+		return nil, fmt.Errorf("load system manifest: %w", err)
+	}
+
+	script := ""
+	if data, err := os.ReadFile(filepath.Join(sysDir, "mechanics.js")); err == nil {
+		script = string(data)
+	}
+
+	return &SystemDetailDTO{
+		ID:          m.ID,
+		Name:        m.Name,
+		Version:     m.Version,
+		Description: m.Description,
+		Script:      script,
+	}, nil
+}
+
+func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*SystemDetailDTO, error) {
+	if req.Name == "" {
+		return nil, fmt.Errorf("system name is required")
+	}
+	id := req.ID
+	if id == "" {
+		id = slugify(req.Name)
+	}
+	if req.Version == "" {
+		req.Version = "1.0.0"
+	}
+	script := req.Script
+	if script == "" {
+		script = defaultMechanicsScript
+	}
+
+	sysDir := s.resolver.SystemDir(id)
+	if err := os.MkdirAll(sysDir, 0755); err != nil {
+		return nil, fmt.Errorf("create system dir: %w", err)
+	}
+
+	manifest := core.SystemManifest{
+		ID:          id,
+		Name:        req.Name,
+		Version:     req.Version,
+		Description: req.Description,
+	}
+	data, err := yaml.Marshal(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("marshal system manifest: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(sysDir, "system.yaml"), data, 0644); err != nil {
+		return nil, fmt.Errorf("write system.yaml: %w", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(sysDir, "mechanics.js"), []byte(script), 0644); err != nil {
+		return nil, fmt.Errorf("write mechanics.js: %w", err)
+	}
+
+	return s.GetSystem(ctx, id)
+}
+
+func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, error) {
+	worldDir := s.resolver.WorldDir(id)
+	m, err := core.LoadWorldManifest(filepath.Join(worldDir, "world.yaml"))
+	if err != nil {
+		return nil, fmt.Errorf("load world manifest: %w", err)
+	}
+
+	entitiesDir := filepath.Join(worldDir, "entities")
+	var entities []WorldEntitySummaryDTO
+	if entries, err := os.ReadDir(entitiesDir); err == nil {
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+				continue
+			}
+			entID := strings.TrimSuffix(e.Name(), ".md")
+			data, err := os.ReadFile(filepath.Join(entitiesDir, e.Name()))
+			if err != nil {
+				continue
+			}
+			ent, err := entity.ParseMarkdownEntity(data)
+			name := entID
+			entType := "concept"
+			if err == nil {
+				if ent.Name != "" {
+					name = ent.Name
+				}
+				if ent.Type != "" {
+					entType = ent.Type
+				}
+			}
+			entities = append(entities, WorldEntitySummaryDTO{
+				ID:   entID,
+				Name: name,
+				Type: entType,
+			})
+		}
+	}
+
+	return &WorldDetailDTO{
+		ID:            m.ID,
+		Name:          m.Name,
+		Description:   m.Description,
+		Genre:         m.Genre,
+		DefaultSystem: m.DefaultSystem,
+		ArtStyle:      m.ArtStyle,
+		Tags:          m.Tags,
+		Entities:      entities,
+	}, nil
+}
+
+func (s *Service) SaveWorld(ctx context.Context, req CreateWorldRequestDTO) (*WorldDetailDTO, error) {
+	if req.Name == "" {
+		return nil, fmt.Errorf("world name is required")
+	}
+	id := req.ID
+	if id == "" {
+		id = slugify(req.Name)
+	}
+
+	worldDir := s.resolver.WorldDir(id)
+	if err := os.MkdirAll(filepath.Join(worldDir, "entities"), 0755); err != nil {
+		return nil, fmt.Errorf("create world entities dir: %w", err)
+	}
+
+	manifest := core.WorldManifest{
+		ID:            id,
+		Name:          req.Name,
+		Description:   req.Description,
+		Genre:         req.Genre,
+		DefaultSystem: req.DefaultSystem,
+		ArtStyle:      req.ArtStyle,
+		Tags:          req.Tags,
+	}
+	data, err := yaml.Marshal(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("marshal world manifest: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(worldDir, "world.yaml"), data, 0644); err != nil {
+		return nil, fmt.Errorf("write world.yaml: %w", err)
+	}
+
+	return s.GetWorld(ctx, id)
+}
+
+func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) (*WorldEntityDetailDTO, error) {
+	path := filepath.Join(s.resolver.WorldDir(worldID), "entities", entityID+".md")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read world entity %s: %w", entityID, err)
+	}
+	return &WorldEntityDetailDTO{
+		ID:       entityID,
+		Markdown: string(data),
+	}, nil
+}
+
+func (s *Service) SaveWorldEntity(ctx context.Context, worldID, entityID, markdown string) error {
+	dir := filepath.Join(s.resolver.WorldDir(worldID), "entities")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("create world entities dir: %w", err)
+	}
+	path := filepath.Join(dir, entityID+".md")
+	return os.WriteFile(path, []byte(markdown), 0644)
+}
+
+func (s *Service) DeleteWorldEntity(ctx context.Context, worldID, entityID string) error {
+	path := filepath.Join(s.resolver.WorldDir(worldID), "entities", entityID+".md")
+	return os.Remove(path)
+}
+
 

@@ -169,4 +169,101 @@ func TestDiscoveryAndCreationEndpoints(t *testing.T) {
 	}
 }
 
+func TestSystemAndWorldStudioCRUD(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewService(tmpDir)
+	server := NewServer(svc, AssetHandler())
+
+	// 1. Create a new system via POST /api/systems
+	sysPayload := `{
+		"name": "Custom 2d6",
+		"version": "1.0.0",
+		"description": "Narrative two-dice resolution",
+		"script": "function evaluateRoll(stats, dice) { return { total: 12 }; }"
+	}`
+	reqSys := httptest.NewRequest("POST", "/api/systems", strings.NewReader(sysPayload))
+	recSys := httptest.NewRecorder()
+	server.ServeHTTP(recSys, reqSys)
+	if recSys.Code != http.StatusCreated {
+		t.Fatalf("POST /api/systems failed (%d): %s", recSys.Code, recSys.Body.String())
+	}
+
+	var createdSys SystemDetailDTO
+	_ = json.NewDecoder(recSys.Body).Decode(&createdSys)
+	if createdSys.ID != "custom-2d6" || createdSys.Name != "Custom 2d6" {
+		t.Errorf("unexpected created system: %+v", createdSys)
+	}
+
+	// 2. Fetch system detail via GET /api/system/custom-2d6
+	reqGetSys := httptest.NewRequest("GET", "/api/system/custom-2d6", nil)
+	recGetSys := httptest.NewRecorder()
+	server.ServeHTTP(recGetSys, reqGetSys)
+	if recGetSys.Code != http.StatusOK {
+		t.Fatalf("GET /api/system/custom-2d6 failed (%d): %s", recGetSys.Code, recGetSys.Body.String())
+	}
+	var fetchedSys SystemDetailDTO
+	_ = json.NewDecoder(recGetSys.Body).Decode(&fetchedSys)
+	if !strings.Contains(fetchedSys.Script, "evaluateRoll") {
+		t.Errorf("expected script in system detail, got: %s", fetchedSys.Script)
+	}
+
+	// 3. Create a new world via POST /api/worlds
+	worldPayload := `{
+		"name": "The Sunken Bastion",
+		"description": "An underwater gothic citadel",
+		"genre": "Aquatic Gothic",
+		"default_system": "custom-2d6",
+		"art_style": "Moody oil painting with deep teal and amber lighting",
+		"tags": ["gothic", "ocean"]
+	}`
+	reqWorld := httptest.NewRequest("POST", "/api/worlds", strings.NewReader(worldPayload))
+	recWorld := httptest.NewRecorder()
+	server.ServeHTTP(recWorld, reqWorld)
+	if recWorld.Code != http.StatusCreated {
+		t.Fatalf("POST /api/worlds failed (%d): %s", recWorld.Code, recWorld.Body.String())
+	}
+
+	var createdWorld WorldDetailDTO
+	_ = json.NewDecoder(recWorld.Body).Decode(&createdWorld)
+	if createdWorld.ID != "the-sunken-bastion" || createdWorld.DefaultSystem != "custom-2d6" {
+		t.Errorf("unexpected created world: %+v", createdWorld)
+	}
+
+	// 4. Create starter entity in world via PUT /api/world/the-sunken-bastion/entity/sunken_throne
+	entityMD := "---\nname: The Sunken Throne\ntype: location\n---\nAncient seat of forgotten sea kings."
+	reqEnt := httptest.NewRequest("PUT", "/api/world/the-sunken-bastion/entity/sunken_throne", strings.NewReader(entityMD))
+	recEnt := httptest.NewRecorder()
+	server.ServeHTTP(recEnt, reqEnt)
+	if recEnt.Code != http.StatusOK {
+		t.Fatalf("PUT world entity failed (%d): %s", recEnt.Code, recEnt.Body.String())
+	}
+
+	// 5. Fetch world detail via GET /api/world/the-sunken-bastion
+	reqGetWorld := httptest.NewRequest("GET", "/api/world/the-sunken-bastion", nil)
+	recGetWorld := httptest.NewRecorder()
+	server.ServeHTTP(recGetWorld, reqGetWorld)
+	if recGetWorld.Code != http.StatusOK {
+		t.Fatalf("GET /api/world failed: %d", recGetWorld.Code)
+	}
+	var fetchedWorld WorldDetailDTO
+	_ = json.NewDecoder(recGetWorld.Body).Decode(&fetchedWorld)
+	if len(fetchedWorld.Entities) != 1 || fetchedWorld.Entities[0].ID != "sunken_throne" {
+		t.Errorf("expected 1 entity in world detail, got %+v", fetchedWorld.Entities)
+	}
+
+	// 6. Fetch entity markdown via GET /api/world/the-sunken-bastion/entity/sunken_throne
+	reqGetEnt := httptest.NewRequest("GET", "/api/world/the-sunken-bastion/entity/sunken_throne", nil)
+	recGetEnt := httptest.NewRecorder()
+	server.ServeHTTP(recGetEnt, reqGetEnt)
+	if recGetEnt.Code != http.StatusOK {
+		t.Fatalf("GET world entity failed (%d)", recGetEnt.Code)
+	}
+	var fetchedEnt WorldEntityDetailDTO
+	_ = json.NewDecoder(recGetEnt.Body).Decode(&fetchedEnt)
+	if !strings.Contains(fetchedEnt.Markdown, "Ancient seat of forgotten sea kings") {
+		t.Errorf("unexpected entity markdown: %s", fetchedEnt.Markdown)
+	}
+}
+
+
 

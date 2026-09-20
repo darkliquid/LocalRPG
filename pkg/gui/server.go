@@ -2,6 +2,7 @@ package gui
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -26,7 +27,9 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/game/", s.handleGameRoutes)
 	s.mux.HandleFunc("/api/games", s.handleGamesRoutes)
 	s.mux.HandleFunc("/api/systems", s.handleSystemsRoutes)
+	s.mux.HandleFunc("/api/system/", s.handleSystemRoutes)
 	s.mux.HandleFunc("/api/worlds", s.handleWorldsRoutes)
+	s.mux.HandleFunc("/api/world/", s.handleWorldRoutes)
 	if s.assetServer != nil {
 		s.mux.Handle("/", s.assetServer)
 	}
@@ -148,28 +151,171 @@ func (s *Server) handleGamesRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSystemsRoutes(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
+		systems, err := s.service.ListSystems(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, systems)
+	case http.MethodPost:
+		var req CreateSystemRequestDTO
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		sys, err := s.service.SaveSystem(r.Context(), req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(sys)
+	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/system/")
+	id = strings.Trim(id, "/")
+	if id == "" {
+		http.Error(w, "missing system id", http.StatusBadRequest)
 		return
 	}
-	systems, err := s.service.ListSystems(r.Context())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+
+	switch r.Method {
+	case http.MethodGet:
+		sys, err := s.service.GetSystem(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		writeJSON(w, sys)
+	case http.MethodPut:
+		var req CreateSystemRequestDTO
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		req.ID = id
+		sys, err := s.service.SaveSystem(r.Context(), req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, sys)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
-	writeJSON(w, systems)
 }
 
 func (s *Server) handleWorldsRoutes(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
+		worlds, err := s.service.ListWorlds(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, worlds)
+	case http.MethodPost:
+		var req CreateWorldRequestDTO
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		world, err := s.service.SaveWorld(r.Context(), req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(world)
+	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
 	}
-	worlds, err := s.service.ListWorlds(r.Context())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, worlds)
 }
+
+func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/world/")
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		http.Error(w, "missing world id", http.StatusBadRequest)
+		return
+	}
+
+	worldID := parts[0]
+
+	// Check if this is an entity route: /api/world/:worldID/entity/:entityID
+	if len(parts) >= 3 && parts[1] == "entity" {
+		entityID := parts[2]
+		switch r.Method {
+		case http.MethodGet:
+			ent, err := s.service.GetWorldEntity(r.Context(), worldID, entityID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			writeJSON(w, ent)
+		case http.MethodPut:
+			data, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "read body failed", http.StatusBadRequest)
+				return
+			}
+			content := string(data)
+			var obj struct {
+				Markdown string `json:"markdown"`
+			}
+			if err := json.Unmarshal(data, &obj); err == nil && obj.Markdown != "" {
+				content = obj.Markdown
+			}
+			if err := s.service.SaveWorldEntity(r.Context(), worldID, entityID, content); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		case http.MethodDelete:
+			if err := s.service.DeleteWorldEntity(r.Context(), worldID, entityID); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
+	// World root route: /api/world/:worldID
+	switch r.Method {
+	case http.MethodGet:
+		world, err := s.service.GetWorld(r.Context(), worldID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		writeJSON(w, world)
+	case http.MethodPut:
+		var req CreateWorldRequestDTO
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		req.ID = worldID
+		world, err := s.service.SaveWorld(r.Context(), req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, world)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 
