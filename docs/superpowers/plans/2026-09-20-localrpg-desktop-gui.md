@@ -58,7 +58,7 @@ LocalRPG/
 - Create: `pkg/gui/service.go`
 - Test: `pkg/gui/service_test.go`
 
-- [ ] **Step 1: Write the failing test for GUI Service**
+- [x] **Step 1: Write the failing test for GUI Service**
 
 ```go
 // pkg/gui/service_test.go
@@ -203,12 +203,12 @@ The town watch captain, now an ally.`
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/gui/... -v`  
 Expected: FAIL (package undefined)
 
-- [ ] **Step 3: Implement GUI DTOs and Service**
+- [x] **Step 3: Implement GUI DTOs and Service**
 
 Write `pkg/gui/types.go`:
 ```go
@@ -456,12 +456,12 @@ func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, e
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/gui/... -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/service_test.go
@@ -476,7 +476,7 @@ git commit -m "feat(gui): implement backend service and data transfer objects"
 - Create: `pkg/gui/server.go`
 - Test: `pkg/gui/server_test.go`
 
-- [ ] **Step 1: Write failing test for HTTP Server**
+- [x] **Step 1: Write failing test for HTTP Server**
 
 ```go
 // pkg/gui/server_test.go
@@ -530,12 +530,12 @@ func TestGUIServerRoutes(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/gui/... -v -run TestGUIServerRoutes`  
 Expected: FAIL (NewServer undefined)
 
-- [ ] **Step 3: Implement HTTP Server**
+- [x] **Step 3: Implement HTTP Server**
 
 Write `pkg/gui/server.go`:
 ```go
@@ -658,12 +658,12 @@ func writeJSON(w http.ResponseWriter, data interface{}) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/gui/... -v -run TestGUIServerRoutes`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/server.go pkg/gui/server_test.go
@@ -683,7 +683,7 @@ git commit -m "feat(gui): implement HTTP REST API server"
 - Create: `frontend/src/index.css`
 - Create: `frontend/src/api/client.ts`
 
-- [ ] **Step 1: Create frontend configuration files**
+- [x] **Step 1: Create frontend configuration files**
 
 Write `frontend/package.json`:
 ```json
@@ -962,12 +962,12 @@ Write `frontend/src/index.css`:
 }
 ```
 
-- [ ] **Step 2: Install dependencies and build test**
+- [x] **Step 2: Install dependencies and build test**
 
 Run: `cd frontend && npm install && npm run build`  
 Expected: PASS (generates `frontend/dist/`)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/package.json frontend/tsconfig.json frontend/vite.config.ts frontend/index.html frontend/src/types.ts frontend/src/index.css frontend/src/api/client.ts
@@ -982,7 +982,7 @@ git commit -m "feat(gui): scaffold React 19 frontend project with Tailwind and A
 - Create: `frontend/src/components/ChronicleView.tsx`
 - Create: `frontend/src/components/ActionConsole.tsx`
 
-- [ ] **Step 1: Implement ChronicleView component**
+- [x] **Step 1: Implement ChronicleView component**
 
 Write `frontend/src/components/ChronicleView.tsx`:
 ```tsx
@@ -1070,7 +1070,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({ turns, onWikilinkC
 };
 ```
 
-- [ ] **Step 2: Implement ActionConsole component**
+- [x] **Step 2: Implement ActionConsole component**
 
 Write `frontend/src/components/ActionConsole.tsx`:
 ```tsx
@@ -1174,12 +1174,12 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({ onSubmit, disabled
 };
 ```
 
-- [ ] **Step 3: Build verification**
+- [x] **Step 3: Build verification**
 
 Run: `cd frontend && npm run build`  
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/ChronicleView.tsx frontend/src/components/ActionConsole.tsx
@@ -1199,7 +1199,7 @@ git commit -m "feat(gui): implement Chronicle reader and action console componen
 - Create: `frontend/src/App.tsx`
 - Create: `frontend/src/main.tsx`
 
-- [ ] **Step 1: Implement Drawers and individual panels**
+- [x] **Step 1: Implement Drawers and individual panels**
 
 Write `frontend/src/components/CharacterSheetDrawer.tsx`:
 ```tsx
@@ -1666,12 +1666,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 );
 ```
 
-- [ ] **Step 2: Build frontend distribution**
+- [x] **Step 2: Build frontend distribution**
 
 Run: `cd frontend && npm run build`  
 Expected: PASS (generates `frontend/dist/index.html` and assets)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/
@@ -1688,7 +1688,7 @@ git commit -m "feat(gui): implement Option C flyout drawers and complete React 1
 - Modify: `cmd/localrpg/main.go`
 - Test: `cmd/localrpg/gui_test.go`
 
-- [ ] **Step 1: Write integration test for CLI GUI command**
+- [x] **Step 1: Write integration test for CLI GUI command**
 
 ```go
 // cmd/localrpg/gui_test.go
@@ -1711,12 +1711,12 @@ func TestCLIGUICommandHelp(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./cmd/localrpg/... -v -run TestCLIGUICommandHelp`  
 Expected: FAIL (gui command unknown or not handled)
 
-- [ ] **Step 3: Implement Asset Embed and CLI GUI handler**
+- [x] **Step 3: Implement Asset Embed and CLI GUI handler**
 
 Write `pkg/gui/assets.go`:
 ```go
@@ -1784,12 +1784,12 @@ func handleGUICommand(args []string) {
 
 Update `cmd/localrpg/main.go` to route `case "gui": handleGUICommand(args[1:])`.
 
-- [ ] **Step 4: Run all package tests across workspace**
+- [x] **Step 4: Run all package tests across workspace**
 
 Run: `go test -count=1 ./... -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/assets.go cmd/localrpg/gui.go cmd/localrpg/main.go cmd/localrpg/gui_test.go
