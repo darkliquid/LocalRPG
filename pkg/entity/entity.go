@@ -15,9 +15,10 @@ import (
 var wikilinkRegex = regexp.MustCompile(`\[\[([^\]\|]+)(?:\|[^\]]+)?\]\]`)
 
 type VoiceConfig struct {
-	Provider string  `yaml:"provider,omitempty"`
-	VoiceID  string  `yaml:"voice_id,omitempty"`
-	Pitch    float64 `yaml:"pitch,omitempty"`
+	Provider   string  `yaml:"provider,omitempty" json:"provider,omitempty"`
+	VoiceID    string  `yaml:"voice_id,omitempty" json:"voice_id,omitempty"`
+	Pitch      float64 `yaml:"pitch,omitempty" json:"pitch,omitempty"`
+	SpeechRate float64 `yaml:"speech_rate,omitempty" json:"speech_rate,omitempty"`
 }
 
 type EntityFrontmatter struct {

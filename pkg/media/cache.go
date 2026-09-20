@@ -14,6 +14,12 @@ func ComputeAudioCacheKey(speakerID, voiceConfigHash, utteranceText string) stri
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
+func ComputeAudioCacheKeyWithRate(speakerID, voiceID string, pitch, speechRate float64, text string) string {
+	raw := fmt.Sprintf("%s:%s:%.2f:%.2f:%s", speakerID, voiceID, pitch, speechRate, text)
+	hash := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(hash[:])
+}
+
 func ComputeArtCacheKey(entityID, appearanceHash, worldStyleHash string) string {
 	hasher := sha256.New()
 	hasher.Write([]byte(entityID + ":" + appearanceHash + ":" + worldStyleHash))

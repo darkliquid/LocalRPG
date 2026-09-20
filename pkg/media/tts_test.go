@@ -68,3 +68,47 @@ func TestTTSSynthesisWithCache(t *testing.T) {
 		t.Errorf("synthesis parameters mismatch: %+v", client)
 	}
 }
+
+type testTTSClient struct {
+	onSynthesize func(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error)
+}
+
+func (t *testTTSClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
+	if t.onSynthesize != nil {
+		return t.onSynthesize(ctx, text, voice)
+	}
+	return []byte("test-wav"), nil
+}
+
+func TestTTSPipeline_PerCharacterVoiceAndSpeed(t *testing.T) {
+	tmpDir := t.TempDir()
+	cache := NewContentCache(tmpDir)
+
+	var lastSynthesizedVoice *entity.VoiceConfig
+	client := &testTTSClient{
+		onSynthesize: func(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
+			lastSynthesizedVoice = voice
+			return []byte("WAV_DATA_FOR_" + text), nil
+		},
+	}
+
+	pipeline := NewTTSPipeline(client, cache)
+
+	charVoice := &entity.VoiceConfig{
+		VoiceID:    "af_bella",
+		Pitch:      1.10,
+		SpeechRate: 0.95,
+	}
+
+	path, err := pipeline.SynthesizeUtterance(context.Background(), "elena", charVoice, "I hear footsteps.")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if path == "" {
+		t.Errorf("expected non-empty cache path")
+	}
+
+	if lastSynthesizedVoice == nil || lastSynthesizedVoice.VoiceID != "af_bella" || lastSynthesizedVoice.SpeechRate != 0.95 {
+		t.Errorf("expected character voice config with af_bella and 0.95 rate, got %+v", lastSynthesizedVoice)
+	}
+}

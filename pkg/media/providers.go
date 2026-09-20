@@ -116,11 +116,15 @@ func (h *httpTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 	if voice != nil && voice.VoiceID != "" {
 		voiceID = voice.VoiceID
 	}
-	payload, _ := json.Marshal(map[string]interface{}{
+	payloadMap := map[string]interface{}{
 		"model": h.model,
 		"input": text,
 		"voice": voiceID,
-	})
+	}
+	if voice != nil && voice.SpeechRate > 0 {
+		payloadMap["speed"] = voice.SpeechRate
+	}
+	payload, _ := json.Marshal(payloadMap)
 	req, err := http.NewRequestWithContext(ctx, "POST", h.endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
