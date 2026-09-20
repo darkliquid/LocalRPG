@@ -19,6 +19,7 @@
 * **Role-Based Model & Harness Router:** Supports running different models or external CLI harnesses for distinct sub-tasks (GM Narrator, Graph Extractor, Living World Ticker, Image/TTS generation).
 * **Multi-Voice TTS & Image Generation:** Out-of-the-box local multi-voice speech synthesis powered by Kokoro (ONNX) with pluggable providers, coupled with local ComfyUI/WebUI image generation. Includes state-aware content caching (e.g. invalidating audio when a character's voice is injured).
 * **Director Steering & Errata Correction:** Multi-tiered timeline correction allowing inline text editing, `/gm` director steering directives with automatic entity state rollback, and snapshot-based timeline branching.
+* **Visual Novel Story Replay & Multimodal Export:** Plays back campaigns from start to finish like a non-interactive visual novel (synchronized audio, text typewriter reveals, and scene transitions). Exports to in-app theater mode, standalone self-contained web player, or encoded MP4 video via FFmpeg.
 
 ---
 
@@ -304,7 +305,34 @@ models:
 
 ---
 
-## 10. Development Roadmap & Implementation Milestones
+## 10. Visual Novel Story Replay & Multimodal Export Pipeline
+
+Because campaigns log every turn chronologically into `history.jsonl`—including player choices, GM responses, spoken audio clips, and generated scene illustrations—the game maintains an exact multimodal script of the unfolding story. LocalRPG leverages this to provide a non-interactive **Visual Novel Replay Engine**.
+
+### 10.1 Chronicle Replay Engine ("Story Theater")
+* **Playback Mechanics:**
+  * **Audio-Paced Text Reveal:** Dialogue and narrative prose unfold using a typewriter effect synchronized with the audio duration of the accompanying speech clip.
+  * **Visual Staging:** Background images crossfade smoothly as the player moves between locations; speaking NPC portraits slide in or highlight with a subtle breathing/focus glow during their spoken dialogue.
+  * **Player Controls:**
+    * Play / Pause toggle (`Spacebar`).
+    * Scrubbing timeline bar with turn-by-turn tick marks.
+    * Playback speed multiplier (1x, 1.25x, 1.5x, 2x).
+    * Turn forward/backward skipping and Chapter/Location select.
+    * Auto-advance toggle (moves to next turn automatically after audio finishes).
+
+### 10.2 Export Targets
+1. **In-App Theater Mode:**
+   * Full-screen cinematic viewer directly inside the Wails v3 desktop app, as well as an auto-scrolling reader mode in the terminal TUI.
+2. **Standalone Web Player (`localrpg export web <game-id>`):**
+   * Exports the campaign into a portable, zero-dependency HTML5/JS bundle (`dist/web/index.html` + `assets/`).
+   * Can be hosted on GitHub Pages, shared as a `.zip`, or opened locally in any web browser without installing LocalRPG.
+3. **Headless Video Encoder (`localrpg export video <game-id>`):**
+   * Uses an automated headless **FFmpeg** pipeline to composite scene illustrations, animated dialogue subtitle bars, character portraits, and synthesized audio tracks.
+   * Produces a clean `.mp4` / `.webm` video file suitable for archival, Discord sharing, or YouTube uploads.
+
+---
+
+## 11. Development Roadmap & Implementation Milestones
 
 * **Milestone 1: Core Engine & Data Storage**
   * Three-tier directory structure (`systems/`, `worlds/`, `games/`).
@@ -327,3 +355,7 @@ models:
 * **Milestone 6: Wails v3 Desktop GUI**
   * React + TypeScript + Tailwind desktop application.
   * Immersive chronicle view with flyout drawers (Character Sheet, Graph Canvas, Codex Editor, Living World Arcs).
+* **Milestone 7: Story Theater & Multimodal Export**
+  * In-app Visual Novel replay player with audio-synced text pacing.
+  * Standalone web bundle exporter (`localrpg export web`).
+  * Headless FFmpeg video rendering pipeline (`localrpg export video`).
