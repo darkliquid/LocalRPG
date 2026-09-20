@@ -36,14 +36,44 @@ type GameManifest struct {
 }
 
 type PathResolver struct {
-	BaseDir string
+	BaseDir    string
+	systemsDir string
+	worldsDir  string
+	gamesDir   string
+	cacheDir   string
 }
 
 func NewPathResolver(baseDir string) *PathResolver {
-	return &PathResolver{BaseDir: baseDir}
+	return &PathResolver{
+		BaseDir:    baseDir,
+		systemsDir: filepath.Join(baseDir, "systems"),
+		worldsDir:  filepath.Join(baseDir, "worlds"),
+		gamesDir:   filepath.Join(baseDir, "games"),
+		cacheDir:   filepath.Join(baseDir, "cache"),
+	}
+}
+
+func NewCustomPathResolver(systemsDir, worldsDir, gamesDir, cacheDir string) *PathResolver {
+	return &PathResolver{
+		BaseDir:    "",
+		systemsDir: systemsDir,
+		worldsDir:  worldsDir,
+		gamesDir:   gamesDir,
+		cacheDir:   cacheDir,
+	}
+}
+
+func (p *PathResolver) SetPaths(systemsDir, worldsDir, gamesDir, cacheDir string) {
+	p.systemsDir = systemsDir
+	p.worldsDir = worldsDir
+	p.gamesDir = gamesDir
+	p.cacheDir = cacheDir
 }
 
 func (p *PathResolver) SystemsDir() string {
+	if p.systemsDir != "" {
+		return p.systemsDir
+	}
 	return filepath.Join(p.BaseDir, "systems")
 }
 
@@ -52,6 +82,9 @@ func (p *PathResolver) SystemDir(id string) string {
 }
 
 func (p *PathResolver) WorldsDir() string {
+	if p.worldsDir != "" {
+		return p.worldsDir
+	}
 	return filepath.Join(p.BaseDir, "worlds")
 }
 
@@ -60,11 +93,21 @@ func (p *PathResolver) WorldDir(id string) string {
 }
 
 func (p *PathResolver) GamesDir() string {
+	if p.gamesDir != "" {
+		return p.gamesDir
+	}
 	return filepath.Join(p.BaseDir, "games")
 }
 
 func (p *PathResolver) GameDir(id string) string {
 	return filepath.Join(p.GamesDir(), id)
+}
+
+func (p *PathResolver) CacheDir() string {
+	if p.cacheDir != "" {
+		return p.cacheDir
+	}
+	return filepath.Join(p.BaseDir, "cache")
 }
 
 func LoadSystemManifest(path string) (*SystemManifest, error) {
