@@ -272,6 +272,13 @@ models:
   $$\text{Key} = \text{SHA256}(\text{entity\_id} + \text{appearance\_hash} + \text{world\_style\_hash})$$
   * Changes to physical traits in markdown frontmatter invalidate the cached image and prompt fresh generation.
 
+### 7.3 Speech-to-Text (STT) Player Voice Input
+* **Functionality:** Provides optional push-to-talk voice dictation for players directly into the action console.
+* **Engines Supported:**
+  * **Local Engines:** Whisper via `whisper.cpp` (embedded/local binary) or `sherpa-onnx` for offline, low-latency speech recognition; Web Speech API in supported desktop webviews.
+  * **Remote Fallback:** OpenAI Whisper API or Groq Whisper (for near-instant remote transcription).
+* **Workflow:** Player holds the push-to-talk hotkey or clicks the microphone icon (🎙️), speaks their action or dialogue, and the transcribed text populates the input bar for review/submission.
+
 ---
 
 ## 8. User Interface & Interaction Design
@@ -283,7 +290,7 @@ models:
   * **Knowledge Graph Drawer:** Interactive 2D force-directed graph with nodes colored by entity type and active scene nodes highlighted.
   * **Codex / Markdown Drawer:** Built-in markdown editor for inspecting and editing entity notes on the fly.
   * **Living World Drawer:** Visualization of active background arcs, faction clocks, and rumors.
-* **Action Console:** Quick-select modes (`Do`, `Say`, `Story`, `Roll`) with `@` and `[[` autocomplete for known entities.
+* **Action Console:** Quick-select modes (`Do`, `Say`, `Story`, `Roll`), `@` and `[[` autocomplete for known entities, and a push-to-talk microphone button (🎙️) for Speech-to-Text input.
 
 ### 8.2 Terminal TUI (`bubbletea`)
 * High-contrast, keyboard-driven terminal interface.
@@ -349,9 +356,10 @@ Because campaigns log every turn chronologically into `history.jsonl`—includin
 * **Milestone 4: Headless Terminal TUI**
   * Bubbletea-based interactive terminal RPG client.
   * Turn history, roll inputs, and GM steering commands.
-* **Milestone 5: Media Pipelines (Kokoro TTS & ComfyUI)**
+* **Milestone 5: Media Pipelines (Kokoro TTS, ComfyUI & Whisper STT)**
   * Kokoro ONNX speech synthesis with dialogue attribution and state-aware caching.
   * ComfyUI / SD WebUI image generation integration.
+  * Push-to-talk Speech-to-Text (STT) player dictation via local Whisper/Sherpa-ONNX and remote APIs.
 * **Milestone 6: Wails v3 Desktop GUI**
   * React + TypeScript + Tailwind desktop application.
   * Immersive chronicle view with flyout drawers (Character Sheet, Graph Canvas, Codex Editor, Living World Arcs).
