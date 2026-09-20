@@ -185,6 +185,9 @@ func NewTTSClient(cfg config.TTSConfig) (TTSClient, error) {
 	case "disabled", "":
 		return &disabledTTSClient{}, nil
 	case "builtin":
+		if cfg.BuiltinName == "native-os" {
+			return NewNativeOSTTSClient(), nil
+		}
 		return &echoTTSClient{}, nil
 	case "cli":
 		return &cliTTSClient{command: cfg.Command, args: cfg.Args}, nil
