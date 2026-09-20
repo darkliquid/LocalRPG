@@ -43,7 +43,7 @@ LocalRPG/
 - Create: `pkg/media/cache.go`
 - Test: `pkg/media/cache_test.go`
 
-- [ ] **Step 1: Write the failing test for Content Cache**
+- [x] **Step 1: Write the failing test for Content Cache**
 
 ```go
 // pkg/media/cache_test.go
@@ -107,12 +107,12 @@ func TestContentCacheFileStorage(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/media/... -v -run TestStateAwareAudioCacheKey`  
 Expected: FAIL (package/media not defined)
 
-- [ ] **Step 3: Implement Content Cache**
+- [x] **Step 3: Implement Content Cache**
 
 Write `pkg/media/cache.go`:
 ```go
@@ -172,12 +172,12 @@ func (c *ContentCache) Get(category, filename string) ([]byte, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/media/... -v -run TestStateAware`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/cache.go pkg/media/cache_test.go
@@ -192,7 +192,7 @@ git commit -m "feat(media): implement state-aware content caching for audio and 
 - Create: `pkg/media/tts.go`
 - Test: `pkg/media/tts_test.go`
 
-- [ ] **Step 1: Write failing test for Dialogue Segmenter and TTS Engine**
+- [x] **Step 1: Write failing test for Dialogue Segmenter and TTS Engine**
 
 ```go
 // pkg/media/tts_test.go
@@ -268,12 +268,12 @@ func TestTTSSynthesisWithCache(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/media/... -v -run TestParseDialogueSegments`  
 Expected: FAIL (ParseDialogueSegments not defined)
 
-- [ ] **Step 3: Implement Dialogue Parser & TTS Pipeline**
+- [x] **Step 3: Implement Dialogue Parser & TTS Pipeline**
 
 Write `pkg/media/tts.go`:
 ```go
@@ -384,12 +384,12 @@ func filepathJoin(dir, file string) string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/media/... -v -run TestParseDialogue`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/tts.go pkg/media/tts_test.go
@@ -404,7 +404,7 @@ git commit -m "feat(media): implement multi-voice dialogue parser and TTS synthe
 - Create: `pkg/media/image.go`
 - Test: `pkg/media/image_test.go`
 
-- [ ] **Step 1: Write failing test for Image Generator**
+- [x] **Step 1: Write failing test for Image Generator**
 
 ```go
 // pkg/media/image_test.go
@@ -451,12 +451,12 @@ func TestImagePipelinePromptCompositionAndCache(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/media/... -v -run TestImagePipeline`  
 Expected: FAIL (NewImagePipeline not defined)
 
-- [ ] **Step 3: Implement Image Pipeline**
+- [x] **Step 3: Implement Image Pipeline**
 
 Write `pkg/media/image.go`:
 ```go
@@ -511,12 +511,12 @@ func (p *ImagePipeline) GenerateSceneImage(ctx context.Context, entityID, appear
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/media/... -v -run TestImagePipeline`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/image.go pkg/media/image_test.go
@@ -531,7 +531,7 @@ git commit -m "feat(media): implement image generation pipeline with prompt comp
 - Create: `pkg/media/stt.go`
 - Test: `pkg/media/stt_test.go`
 
-- [ ] **Step 1: Write failing test for STT Provider**
+- [x] **Step 1: Write failing test for STT Provider**
 
 ```go
 // pkg/media/stt_test.go
@@ -565,12 +565,12 @@ func TestSTTTranscription(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/media/... -v -run TestSTTTranscription`  
 Expected: FAIL (NewSTTProvider not defined)
 
-- [ ] **Step 3: Implement STT Provider**
+- [x] **Step 3: Implement STT Provider**
 
 Write `pkg/media/stt.go`:
 ```go
@@ -601,12 +601,12 @@ func (s *STTProvider) TranscribeAudio(ctx context.Context, audioData []byte) (st
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/media/... -v -run TestSTTTranscription`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/stt.go pkg/media/stt_test.go
@@ -622,7 +622,7 @@ git commit -m "feat(media): implement Speech-to-Text provider interface"
 - Modify: `cmd/localrpg/main.go`
 - Test: `cmd/localrpg/media_test.go`
 
-- [ ] **Step 1: Write integration tests for CLI media commands**
+- [x] **Step 1: Write integration tests for CLI media commands**
 
 ```go
 // cmd/localrpg/media_test.go
@@ -659,12 +659,12 @@ func TestCLIImageCommand(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./cmd/localrpg/... -v -run TestCLITTSCommand`  
 Expected: FAIL (tts subcommand not handled)
 
-- [ ] **Step 3: Implement CLI Media Handlers**
+- [x] **Step 3: Implement CLI Media Handlers**
 
 Write `cmd/localrpg/media.go`:
 ```go
@@ -703,12 +703,12 @@ func handleImageCommand(args []string) {
 
 Update `cmd/localrpg/main.go` to dispatch `case "tts": handleTTSCommand(args[1:])` and `case "image": handleImageCommand(args[1:])`.
 
-- [ ] **Step 4: Run all package tests across workspace**
+- [x] **Step 4: Run all package tests across workspace**
 
 Run: `go test -count=1 ./... -v`  
 Expected: All package tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cmd/localrpg/media.go cmd/localrpg/main.go cmd/localrpg/media_test.go
