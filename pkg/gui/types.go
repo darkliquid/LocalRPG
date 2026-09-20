@@ -108,6 +108,7 @@ type SystemDetailDTO struct {
 	Version     string `json:"version"`
 	Description string `json:"description"`
 	Script      string `json:"script"`
+	RulesPrompt string `json:"rules_prompt"`
 }
 
 type CreateSystemRequestDTO struct {
@@ -116,6 +117,7 @@ type CreateSystemRequestDTO struct {
 	Version     string `json:"version,omitempty"`
 	Description string `json:"description,omitempty"`
 	Script      string `json:"script,omitempty"`
+	RulesPrompt string `json:"rules_prompt,omitempty"`
 }
 
 type WorldEntitySummaryDTO struct {
@@ -132,6 +134,7 @@ type WorldDetailDTO struct {
 	DefaultSystem string                  `json:"default_system"`
 	ArtStyle      string                  `json:"art_style"`
 	Tags          []string                `json:"tags"`
+	LorePrompt    string                  `json:"lore_prompt"`
 	Entities      []WorldEntitySummaryDTO `json:"entities"`
 }
 
@@ -143,6 +146,7 @@ type CreateWorldRequestDTO struct {
 	DefaultSystem string   `json:"default_system,omitempty"`
 	ArtStyle      string   `json:"art_style,omitempty"`
 	Tags          []string `json:"tags,omitempty"`
+	LorePrompt    string   `json:"lore_prompt,omitempty"`
 }
 
 type WorldEntityDetailDTO struct {

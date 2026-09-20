@@ -393,12 +393,18 @@ func (s *Service) GetSystem(ctx context.Context, id string) (*SystemDetailDTO, e
 		script = string(data)
 	}
 
+	rulesPrompt := ""
+	if data, err := os.ReadFile(filepath.Join(sysDir, "prompts", "rules.md")); err == nil {
+		rulesPrompt = string(data)
+	}
+
 	return &SystemDetailDTO{
 		ID:          m.ID,
 		Name:        m.Name,
 		Version:     m.Version,
 		Description: m.Description,
 		Script:      script,
+		RulesPrompt: rulesPrompt,
 	}, nil
 }
 
@@ -439,6 +445,16 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 
 	if err := os.WriteFile(filepath.Join(sysDir, "mechanics.js"), []byte(script), 0644); err != nil {
 		return nil, fmt.Errorf("write mechanics.js: %w", err)
+	}
+
+	if req.RulesPrompt != "" {
+		promptDir := filepath.Join(sysDir, "prompts")
+		if err := os.MkdirAll(promptDir, 0755); err != nil {
+			return nil, fmt.Errorf("create system prompts dir: %w", err)
+		}
+		if err := os.WriteFile(filepath.Join(promptDir, "rules.md"), []byte(req.RulesPrompt), 0644); err != nil {
+			return nil, fmt.Errorf("write rules.md: %w", err)
+		}
 	}
 
 	return s.GetSystem(ctx, id)
@@ -482,6 +498,11 @@ func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, err
 		}
 	}
 
+	lorePrompt := ""
+	if data, err := os.ReadFile(filepath.Join(worldDir, "prompts", "lore.md")); err == nil {
+		lorePrompt = string(data)
+	}
+
 	return &WorldDetailDTO{
 		ID:            m.ID,
 		Name:          m.Name,
@@ -490,6 +511,7 @@ func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, err
 		DefaultSystem: m.DefaultSystem,
 		ArtStyle:      m.ArtStyle,
 		Tags:          m.Tags,
+		LorePrompt:    lorePrompt,
 		Entities:      entities,
 	}, nil
 }
@@ -523,6 +545,16 @@ func (s *Service) SaveWorld(ctx context.Context, req CreateWorldRequestDTO) (*Wo
 	}
 	if err := os.WriteFile(filepath.Join(worldDir, "world.yaml"), data, 0644); err != nil {
 		return nil, fmt.Errorf("write world.yaml: %w", err)
+	}
+
+	if req.LorePrompt != "" {
+		promptDir := filepath.Join(worldDir, "prompts")
+		if err := os.MkdirAll(promptDir, 0755); err != nil {
+			return nil, fmt.Errorf("create world prompts dir: %w", err)
+		}
+		if err := os.WriteFile(filepath.Join(promptDir, "lore.md"), []byte(req.LorePrompt), 0644); err != nil {
+			return nil, fmt.Errorf("write lore.md: %w", err)
+		}
 	}
 
 	return s.GetWorld(ctx, id)

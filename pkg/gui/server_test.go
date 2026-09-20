@@ -179,6 +179,7 @@ func TestSystemAndWorldStudioCRUD(t *testing.T) {
 		"name": "Custom 2d6",
 		"version": "1.0.0",
 		"description": "Narrative two-dice resolution",
+		"rules_prompt": "Evaluate rolls on a 2d6 ladder. 10+ is full success, 7-9 is partial success, 6- is failure.",
 		"script": "function evaluateRoll(stats, dice) { return { total: 12 }; }"
 	}`
 	reqSys := httptest.NewRequest("POST", "/api/systems", strings.NewReader(sysPayload))
@@ -206,6 +207,9 @@ func TestSystemAndWorldStudioCRUD(t *testing.T) {
 	if !strings.Contains(fetchedSys.Script, "evaluateRoll") {
 		t.Errorf("expected script in system detail, got: %s", fetchedSys.Script)
 	}
+	if !strings.Contains(fetchedSys.RulesPrompt, "2d6 ladder") {
+		t.Errorf("expected rules_prompt in system detail, got: %s", fetchedSys.RulesPrompt)
+	}
 
 	// 3. Create a new world via POST /api/worlds
 	worldPayload := `{
@@ -214,6 +218,7 @@ func TestSystemAndWorldStudioCRUD(t *testing.T) {
 		"genre": "Aquatic Gothic",
 		"default_system": "custom-2d6",
 		"art_style": "Moody oil painting with deep teal and amber lighting",
+		"lore_prompt": "The sunken citadel smells of brine and ancient kelp.",
 		"tags": ["gothic", "ocean"]
 	}`
 	reqWorld := httptest.NewRequest("POST", "/api/worlds", strings.NewReader(worldPayload))
@@ -249,6 +254,9 @@ func TestSystemAndWorldStudioCRUD(t *testing.T) {
 	_ = json.NewDecoder(recGetWorld.Body).Decode(&fetchedWorld)
 	if len(fetchedWorld.Entities) != 1 || fetchedWorld.Entities[0].ID != "sunken_throne" {
 		t.Errorf("expected 1 entity in world detail, got %+v", fetchedWorld.Entities)
+	}
+	if !strings.Contains(fetchedWorld.LorePrompt, "sunken citadel") {
+		t.Errorf("expected lore_prompt in world detail, got: %s", fetchedWorld.LorePrompt)
 	}
 
 	// 6. Fetch entity markdown via GET /api/world/the-sunken-bastion/entity/sunken_throne
