@@ -91,6 +91,7 @@ export interface SystemDetail {
   version: string;
   description: string;
   script: string;
+  rules_prompt?: string;
 }
 
 export interface CreateSystemRequest {
@@ -99,6 +100,7 @@ export interface CreateSystemRequest {
   version?: string;
   description?: string;
   script?: string;
+  rules_prompt?: string;
 }
 
 export interface WorldEntitySummary {
@@ -115,6 +117,7 @@ export interface WorldDetail {
   default_system: string;
   art_style: string;
   tags: string[];
+  lore_prompt?: string;
   entities: WorldEntitySummary[];
 }
 
@@ -126,6 +129,7 @@ export interface CreateWorldRequest {
   default_system?: string;
   art_style?: string;
   tags?: string[];
+  lore_prompt?: string;
 }
 
 export interface WorldEntityDetail {
