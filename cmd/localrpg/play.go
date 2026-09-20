@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -20,9 +21,11 @@ func handlePlayCommand(args []string) {
 		os.Exit(1)
 	}
 
+	cfgMgr := config.NewConfigManager()
+	cfg, _ := cfgMgr.Load()
+
 	gameID := args[0]
-	baseDir := "."
-	paths := core.NewPathResolver(baseDir)
+	paths := core.NewCustomPathResolver(cfg.Paths.Systems, cfg.Paths.Worlds, cfg.Paths.Games, cfg.Paths.Cache)
 	gameDir := paths.GameDir(gameID)
 
 	manifestPath := filepath.Join(gameDir, "game.yaml")
@@ -49,10 +52,34 @@ func handlePlayCommand(args []string) {
 	ruleLoader := rules.NewRuleLoader(paths, jsEngine)
 	_ = ruleLoader.LoadRules(manifest.SystemID, manifest.WorldID)
 
-	// Setup model router
+	// Setup model router from global config
 	router := harness.NewRouter()
-	router.RegisterProvider(harness.NewCLIProvider("default-echo", "echo", []string{}))
-	router.AssignRole("gm", "default-echo")
+	for role, roleCfg := range cfg.Agents.Roles {
+		p, err := harness.NewModelProvider(role, harness.ProviderConfig{
+			Type:        roleCfg.Type,
+			BuiltinName: roleCfg.BuiltinName,
+			Command:     roleCfg.Command,
+			Args:        roleCfg.Args,
+			Endpoint:    roleCfg.Endpoint,
+			Model:       roleCfg.Model,
+			APIKey:      roleCfg.APIKey,
+			Temperature: roleCfg.Temperature,
+			MaxTokens:   roleCfg.MaxTokens,
+		})
+		if err == nil {
+			router.RegisterProvider(p)
+			router.AssignRole(role, role)
+		}
+	}
+	for role, fb := range cfg.Agents.Fallbacks {
+		if fb != "" {
+			router.SetFallback(role, fb)
+		}
+	}
+	if _, err := router.GetProviderForRole("gm"); err != nil {
+		router.RegisterProvider(harness.NewCLIProvider("default-echo", "echo", []string{}))
+		router.AssignRole("gm", "default-echo")
+	}
 
 	orchestrator := engine.NewTurnOrchestrator(
 		store,
