@@ -1,0 +1,565 @@
+import React, { useState, useEffect } from 'react';
+import { APIClient } from '../api/client';
+import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest } from '../types';
+import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette } from 'lucide-react';
+
+interface WorldsStudioProps {
+  onWorldSaved?: () => void;
+}
+
+const STARTER_ENTITY_TEMPLATE = `---
+name: The Whispering Bastion
+type: location
+state:
+  danger_level: 2
+wikilinks: []
+---
+An ancient stone fortress overlooking the misty valleys. Legends say its halls whisper secrets to those who wander in twilight.
+`;
+
+export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
+  const [worlds, setWorlds] = useState<WorldInfo[]>([]);
+  const [systems, setSystems] = useState<SystemInfo[]>([]);
+  const [selectedID, setSelectedID] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'lore' | 'entities'>('lore');
+
+  // World form state
+  const [name, setName] = useState('');
+  const [slugID, setSlugID] = useState('');
+  const [genre, setGenre] = useState('');
+  const [defaultSystem, setDefaultSystem] = useState('');
+  const [artStyle, setArtStyle] = useState('');
+  const [tags, setTags] = useState('');
+  const [description, setDescription] = useState('');
+
+  // Entities state
+  const [entities, setEntities] = useState<WorldEntitySummary[]>([]);
+  const [selectedEntityID, setSelectedEntityID] = useState<string | null>(null);
+  const [entityMarkdown, setEntityMarkdown] = useState('');
+  const [isNewEntityModal, setIsNewEntityModal] = useState(false);
+  const [newEntitySlug, setNewEntitySlug] = useState('');
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  useEffect(() => {
+    loadWorlds();
+  }, []);
+
+  const loadWorlds = async (selectID?: string) => {
+    setIsLoading(true);
+    try {
+      const [wList, sList] = await Promise.all([
+        APIClient.listWorlds(),
+        APIClient.listSystems(),
+      ]);
+      setWorlds(wList);
+      setSystems(sList);
+      const target = selectID || (wList.length > 0 ? wList[0].id : null);
+      if (target) {
+        loadWorldDetail(target);
+      } else {
+        handleNewWorld(sList);
+      }
+    } catch (err: any) {
+      setToast({ type: 'error', message: err.message || 'Failed to load worlds' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadWorldDetail = async (id: string) => {
+    try {
+      const detail = await APIClient.getWorld(id);
+      setSelectedID(detail.id);
+      setName(detail.name);
+      setSlugID(detail.id);
+      setGenre(detail.genre || '');
+      setDefaultSystem(detail.default_system || (systems[0]?.id ?? ''));
+      setArtStyle(detail.art_style || '');
+      setTags(detail.tags ? detail.tags.join(', ') : '');
+      setDescription(detail.description || '');
+      setEntities(detail.entities || []);
+
+      if (detail.entities && detail.entities.length > 0) {
+        loadEntityContent(detail.id, detail.entities[0].id);
+      } else {
+        setSelectedEntityID(null);
+        setEntityMarkdown('');
+      }
+    } catch (err: any) {
+      setToast({ type: 'error', message: err.message || 'Failed to load world details' });
+    }
+  };
+
+  const loadEntityContent = async (worldId: string, entityId: string) => {
+    try {
+      const ent = await APIClient.getWorldEntity(worldId, entityId);
+      setSelectedEntityID(entityId);
+      setEntityMarkdown(ent.markdown);
+    } catch (err: any) {
+      setToast({ type: 'error', message: err.message || 'Failed to load entity markdown' });
+    }
+  };
+
+  const handleNewWorld = (sysList?: SystemInfo[]) => {
+    setSelectedID(null);
+    setName('');
+    setSlugID('');
+    setGenre('');
+    setDefaultSystem(sysList && sysList.length > 0 ? sysList[0].id : systems[0]?.id ?? '');
+    setArtStyle('');
+    setTags('');
+    setDescription('');
+    setEntities([]);
+    setSelectedEntityID(null);
+    setEntityMarkdown('');
+    setActiveTab('lore');
+  };
+
+  const handleSaveWorld = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setToast({ type: 'error', message: 'World Name is required' });
+      return;
+    }
+
+    setIsSaving(true);
+    setToast(null);
+    try {
+      const parsedTags = tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const payload: CreateWorldRequest = {
+        id: slugID.trim() || undefined,
+        name: name.trim(),
+        description: description.trim(),
+        genre: genre.trim(),
+        default_system: defaultSystem || (systems[0]?.id ?? ''),
+        art_style: artStyle.trim(),
+        tags: parsedTags,
+      };
+
+      const saved = await APIClient.saveWorld(payload);
+      setToast({ type: 'success', message: `World "${saved.name}" saved successfully!` });
+      await loadWorlds(saved.id);
+      if (onWorldSaved) onWorldSaved();
+    } catch (err: any) {
+      setToast({ type: 'error', message: err.message || 'Failed to save world' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveEntity = async () => {
+    if (!selectedID || !selectedEntityID) return;
+    try {
+      await APIClient.saveWorldEntity(selectedID, selectedEntityID, entityMarkdown);
+      setToast({ type: 'success', message: `Entity "${selectedEntityID}" saved!` });
+      await loadWorldDetail(selectedID);
+    } catch (err: any) {
+      setToast({ type: 'error', message: err.message || 'Failed to save entity' });
+    }
+  };
+
+  const handleDeleteEntity = async (entityId: string) => {
+    if (!selectedID) return;
+    try {
+      await APIClient.deleteWorldEntity(selectedID, entityId);
+      setToast({ type: 'success', message: `Entity "${entityId}" deleted!` });
+      await loadWorldDetail(selectedID);
+    } catch (err: any) {
+      setToast({ type: 'error', message: err.message || 'Failed to delete entity' });
+    }
+  };
+
+  const handleCreateNewEntity = async () => {
+    if (!selectedID || !newEntitySlug.trim()) return;
+    const slug = newEntitySlug.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+    try {
+      await APIClient.saveWorldEntity(selectedID, slug, STARTER_ENTITY_TEMPLATE);
+      setIsNewEntityModal(false);
+      setNewEntitySlug('');
+      await loadWorldDetail(selectedID);
+      loadEntityContent(selectedID, slug);
+    } catch (err: any) {
+      setToast({ type: 'error', message: err.message || 'Failed to create entity' });
+    }
+  };
+
+  return (
+    <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
+      {/* Left Master Column: Worlds List */}
+      <aside className="w-full md:w-80 bg-glass-card rounded-2xl border border-stone-800/80 p-4 flex flex-col gap-4 shadow-xl backdrop-blur-md">
+        <div className="flex items-center justify-between pb-2 border-b border-stone-800/60">
+          <div className="flex items-center gap-2">
+            <Globe className="w-4 h-4 text-amber-400" />
+            <h3 className="font-cinzel text-sm font-bold text-stone-200 uppercase tracking-wider">
+              Worlds Studio
+            </h3>
+          </div>
+          <button
+            onClick={() => handleNewWorld()}
+            className="flex items-center gap-1 text-[11px] font-cinzel font-bold px-2.5 py-1 rounded-lg bg-amber-600/80 hover:bg-amber-500 text-stone-950 transition-all cursor-pointer shadow"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New</span>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+          {isLoading && worlds.length === 0 ? (
+            <div className="text-center py-8 text-xs font-mono text-stone-500 animate-pulse">
+              Loading worlds...
+            </div>
+          ) : worlds.length === 0 ? (
+            <div className="text-center py-8 text-xs text-stone-400">
+              No worlds created yet. Craft your first setting!
+            </div>
+          ) : (
+            worlds.map((w) => (
+              <div
+                key={w.id}
+                onClick={() => loadWorldDetail(w.id)}
+                className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${
+                  selectedID === w.id
+                    ? 'bg-amber-950/40 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+                    : 'bg-stone-900/40 border-stone-800/60 hover:bg-stone-800/40 hover:border-stone-700'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <h4 className="font-cinzel text-xs font-bold text-stone-200 truncate">{w.name}</h4>
+                  {w.genre && (
+                    <span className="text-[10px] font-mono text-amber-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
+                      {w.genre}
+                    </span>
+                  )}
+                </div>
+                {w.description && (
+                  <p className="text-[11px] text-stone-400 truncate mt-1">{w.description}</p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </aside>
+
+      {/* Right Detail Column: Editor */}
+      <section className="flex-1 bg-glass-card rounded-2xl border border-stone-800/80 p-6 flex flex-col gap-5 shadow-xl backdrop-blur-md overflow-hidden">
+        {/* Top Header & Sub-Tabs */}
+        <div className="flex items-center justify-between border-b border-stone-800/80 pb-3">
+          <div className="flex items-center gap-3">
+            <h2 className="font-cinzel text-lg font-bold text-amber-400">
+              {selectedID ? name || 'Edit World' : 'Create New World'}
+            </h2>
+            {slugID && (
+              <span className="text-xs font-mono text-stone-400 bg-stone-950 px-2 py-0.5 rounded border border-stone-800">
+                worlds/{slugID}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex bg-stone-950/80 p-1 rounded-xl border border-stone-800">
+              <button
+                type="button"
+                onClick={() => setActiveTab('lore')}
+                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  activeTab === 'lore'
+                    ? 'bg-amber-600 text-stone-950 font-bold shadow'
+                    : 'text-stone-400 hover:text-white'
+                }`}
+              >
+                <Info className="w-3.5 h-3.5" />
+                <span>Lore & Atmosphere</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('entities')}
+                disabled={!selectedID}
+                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  activeTab === 'entities'
+                    ? 'bg-amber-600 text-stone-950 font-bold shadow'
+                    : 'text-stone-400 hover:text-white disabled:opacity-40'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Starter Entities ({entities.length})</span>
+              </button>
+            </div>
+
+            <button
+              onClick={handleSaveWorld}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 text-xs font-cinzel font-bold px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-stone-950 shadow-[0_0_15px_rgba(217,119,6,0.4)] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{isSaving ? 'Saving...' : 'Save World'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Toast Feedback */}
+        {toast && (
+          <div
+            className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+              toast.type === 'success'
+                ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-200'
+                : 'bg-red-950/60 border border-red-500/40 text-red-200'
+            }`}
+          >
+            {toast.type === 'success' ? (
+              <Check className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-red-400" />
+            )}
+            <span>{toast.message}</span>
+          </div>
+        )}
+
+        {/* Tab 1: Lore & Atmosphere Form */}
+        {activeTab === 'lore' && (
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
+                  World Setting Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Solitary Defiance"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (!selectedID) {
+                      setSlugID(e.target.value.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''));
+                    }
+                  }}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
+                  Genre / Setting Style
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Gothic Fantasy, Cyberpunk"
+                  value={genre}
+                  onChange={(e) => setGenre(e.target.value)}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
+                  Directory Slug ID
+                </label>
+                <input
+                  type="text"
+                  disabled={!!selectedID}
+                  placeholder="e.g. solitary_defiance"
+                  value={slugID}
+                  onChange={(e) => setSlugID(e.target.value)}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors font-mono disabled:opacity-60"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
+                  Default Rule System
+                </label>
+                <select
+                  value={defaultSystem}
+                  onChange={(e) => setDefaultSystem(e.target.value)}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer"
+                >
+                  {systems.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                <Palette className="w-3.5 h-3.5 text-amber-400" />
+                <span>Visual Art Style Prompt Guide</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Dark watercolor gothic, mist, gaslight, copper accents, muted palette"
+                value={artStyle}
+                onChange={(e) => setArtStyle(e.target.value)}
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+              />
+              <p className="text-[11px] text-stone-400">
+                Injected into image generation prompts to create consistent scene illustrations in this world.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-amber-400" />
+                <span>World Tags (Comma-separated)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. gothic, horror, city, rebellion"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
+                World Synopsis & Lore
+              </label>
+              <textarea
+                rows={4}
+                placeholder="Describe the setting, major conflicts, factions, and atmosphere..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors resize-none"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Starter Entities Manager */}
+        {activeTab === 'entities' && (
+          <div className="flex-1 flex gap-4 overflow-hidden">
+            {/* Entity List */}
+            <div className="w-56 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2">
+              <div className="flex items-center justify-between pb-2 border-b border-stone-800/60">
+                <span className="text-[11px] font-cinzel uppercase tracking-wider text-stone-400">
+                  Templates
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsNewEntityModal(true)}
+                  className="text-[10px] font-cinzel font-bold px-2 py-0.5 rounded bg-amber-600 text-stone-950 cursor-pointer hover:bg-amber-500"
+                >
+                  + Add
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                {entities.length === 0 ? (
+                  <div className="text-[11px] text-stone-500 py-6 text-center">
+                    No starter templates. Click + Add to create one!
+                  </div>
+                ) : (
+                  entities.map((e) => (
+                    <div
+                      key={e.id}
+                      onClick={() => selectedID && loadEntityContent(selectedID, e.id)}
+                      className={`group p-2 rounded-lg border text-left cursor-pointer flex items-center justify-between transition-all ${
+                        selectedEntityID === e.id
+                          ? 'bg-amber-950/50 border-amber-500/60 text-amber-300'
+                          : 'bg-stone-900/40 border-stone-800/60 text-stone-300 hover:bg-stone-800'
+                      }`}
+                    >
+                      <div className="truncate">
+                        <div className="text-xs font-bold truncate">{e.name || e.id}</div>
+                        <div className="text-[10px] text-stone-500">{e.type}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          handleDeleteEntity(e.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-red-400 p-1 transition-opacity"
+                        title="Delete entity template"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Entity Markdown Editor */}
+            <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+              {selectedEntityID ? (
+                <>
+                  <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1">
+                    <span>worlds/{selectedID}/entities/{selectedEntityID}.md</span>
+                    <button
+                      type="button"
+                      onClick={handleSaveEntity}
+                      className="flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-600/80 hover:bg-amber-500 text-stone-950 font-bold text-xs cursor-pointer shadow transition-all"
+                    >
+                      <Save className="w-3 h-3" />
+                      <span>Save Entity</span>
+                    </button>
+                  </div>
+                  <textarea
+                    value={entityMarkdown}
+                    onChange={(e) => setEntityMarkdown(e.target.value)}
+                    spellCheck={false}
+                    className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-amber-500/60 transition-colors resize-none selection:bg-amber-900/60"
+                  />
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-xs text-stone-500 font-mono">
+                  Select or create an entity template to edit its Markdown.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* New Entity Modal */}
+      {isNewEntityModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-sm rounded-2xl bg-stone-900 border border-amber-500/30 p-6 space-y-4 shadow-2xl">
+            <h3 className="font-cinzel text-sm font-bold text-amber-400">
+              New Starter Entity Template
+            </h3>
+            <div className="space-y-1">
+              <label className="text-xs text-stone-300">Entity Slug (filename without .md)</label>
+              <input
+                type="text"
+                placeholder="e.g. the_iron_bastion"
+                value={newEntitySlug}
+                onChange={(e) => setNewEntitySlug(e.target.value)}
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:border-amber-500/60"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsNewEntityModal(false)}
+                className="px-3 py-1.5 text-xs text-stone-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateNewEntity}
+                disabled={!newEntitySlug.trim()}
+                className="px-4 py-1.5 text-xs font-cinzel font-bold bg-amber-600 text-stone-950 rounded-lg disabled:opacity-50"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
