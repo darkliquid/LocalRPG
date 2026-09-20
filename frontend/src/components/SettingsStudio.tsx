@@ -1,0 +1,762 @@
+import React, { useState, useEffect } from 'react';
+import { APIClient } from '../api/client';
+import { AppConfig, AgentRoleConfig, TestProviderResponse } from '../types';
+import {
+  Folder,
+  Cpu,
+  Volume2,
+  Sliders,
+  Save,
+  CheckCircle,
+  AlertCircle,
+  Play,
+  Sparkles,
+  Zap,
+} from 'lucide-react';
+
+interface SettingsStudioProps {
+  isCompact?: boolean;
+  onSaved?: () => void;
+}
+
+export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSaved }) => {
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [activeFilePath, setActiveFilePath] = useState<string>('');
+  const [isOverride, setIsOverride] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'paths' | 'agents' | 'media' | 'preferences'>('paths');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Diagnostics test state
+  const [testingCategory, setTestingCategory] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ category: string; res: TestProviderResponse } | null>(null);
+
+  // Selected agent role for editing
+  const [selectedRole, setSelectedRole] = useState<'gm' | 'narrator' | 'evaluator'>('gm');
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    setIsLoading(true);
+    try {
+      const res = await APIClient.getSettings();
+      setConfig(res.config);
+      setActiveFilePath(res.config_file_path);
+      setIsOverride(res.is_local_override);
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message || 'Failed to load settings' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!config) return;
+    setIsSaving(true);
+    setFeedback(null);
+    try {
+      const res = await APIClient.saveSettings(config);
+      setConfig(res.config);
+      setActiveFilePath(res.config_file_path);
+      setIsOverride(res.is_local_override);
+      setFeedback({ type: 'success', message: 'Settings saved and live-reloaded successfully.' });
+      if (onSaved) onSaved();
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message || 'Failed to save settings' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTestProvider = async (category: 'llm' | 'tts' | 'stt' | 'image', provider: any) => {
+    setTestingCategory(category);
+    setTestResult(null);
+    try {
+      const res = await APIClient.testProvider({
+        category,
+        provider,
+        test_prompt: category === 'llm' ? 'Are the stars shining?' : undefined,
+      });
+      setTestResult({ category, res });
+    } catch (err: any) {
+      setTestResult({
+        category,
+        res: { success: false, latency_ms: 0, message: err.message || 'Test failed' },
+      });
+    } finally {
+      setTestingCategory(null);
+    }
+  };
+
+  if (isLoading || !config) {
+    return (
+      <div className="p-8 text-center text-stone-400 font-mono text-sm animate-pulse">
+        Loading system configuration...
+      </div>
+    );
+  }
+
+  const currentRoleConfig: AgentRoleConfig = config.agents.roles[selectedRole] || {
+    type: 'disabled',
+  };
+
+  return (
+    <div className={`flex flex-col h-full ${isCompact ? 'p-2 space-y-4' : 'space-y-6'}`}>
+      {/* Settings Navigation & Status Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800 pb-3">
+        <div className="flex items-center gap-1 bg-stone-950/70 p-1 rounded-xl border border-stone-800">
+          <button
+            onClick={() => setActiveSubTab('paths')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
+              activeSubTab === 'paths' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Folder className="w-3.5 h-3.5" />
+            <span>Paths</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('agents')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
+              activeSubTab === 'agents' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Cpu className="w-3.5 h-3.5" />
+            <span>AI Agents</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('media')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
+              activeSubTab === 'media' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Volume2 className="w-3.5 h-3.5" />
+            <span>Media Engines</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('preferences')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
+              activeSubTab === 'preferences' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Preferences</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-mono text-stone-400 bg-stone-900 px-2.5 py-1 rounded-lg border border-stone-800">
+            {isOverride ? 'Workspace Override' : 'Global User Config'}: {activeFilePath}
+          </span>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-1.5 text-xs font-cinzel font-bold px-4 py-1.5 rounded-xl transition-all cursor-pointer bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-stone-950 shadow active:scale-95"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>{isSaving ? 'Saving...' : 'Save Settings'}</span>
+          </button>
+        </div>
+      </div>
+
+      {feedback && (
+        <div
+          className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+            feedback.type === 'success'
+              ? 'bg-emerald-950/50 border border-emerald-500/40 text-emerald-200'
+              : 'bg-red-950/50 border border-red-500/40 text-red-200'
+          }`}
+        >
+          {feedback.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          <span>{feedback.message}</span>
+        </div>
+      )}
+
+      {/* Tab 1: Storage & Discovery Paths */}
+      {activeSubTab === 'paths' && (
+        <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
+            <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+              <Folder className="w-4 h-4" />
+              <span>Storage & Discovery Paths</span>
+            </h3>
+            <p className="text-xs text-stone-400">
+              Configure directories where LocalRPG looks for rule systems, world lore, saved campaigns, and generated media caches.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300">Rule Systems Directory</label>
+                <input
+                  type="text"
+                  value={config.paths.systems}
+                  onChange={(e) => setConfig({ ...config, paths: { ...config.paths, systems: e.target.value } })}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300">Worlds Directory</label>
+                <input
+                  type="text"
+                  value={config.paths.worlds}
+                  onChange={(e) => setConfig({ ...config, paths: { ...config.paths, worlds: e.target.value } })}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300">Saved Campaigns Directory</label>
+                <input
+                  type="text"
+                  value={config.paths.games}
+                  onChange={(e) => setConfig({ ...config, paths: { ...config.paths, games: e.target.value } })}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300">Media Cache Directory</label>
+                <input
+                  type="text"
+                  value={config.paths.cache}
+                  onChange={(e) => setConfig({ ...config, paths: { ...config.paths, cache: e.target.value } })}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2: AI Agents & Roles */}
+      {activeSubTab === 'agents' && (
+        <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+                <Cpu className="w-4 h-4" />
+                <span>AI Agents & Role Routing</span>
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-stone-400">Configuring Role:</span>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value as any)}
+                  className="bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1 text-xs text-amber-300 font-mono focus:outline-none"
+                >
+                  <option value="gm">Game Master (GM / Storyteller)</option>
+                  <option value="narrator">Atmospheric Narrator</option>
+                  <option value="evaluator">Mechanics Evaluator</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">Provider Type</label>
+                  <select
+                    value={currentRoleConfig.type}
+                    onChange={(e) => {
+                      const updated = { ...currentRoleConfig, type: e.target.value as any };
+                      setConfig({
+                        ...config,
+                        agents: {
+                          ...config.agents,
+                          roles: { ...config.agents.roles, [selectedRole]: updated },
+                        },
+                      });
+                    }}
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  >
+                    <option value="disabled">Disabled / Inactive</option>
+                    <option value="http">HTTP / OpenAI-Compatible (Ollama, vLLM, OpenAI)</option>
+                    <option value="cli">CLI Command (Local Binary e.g. llama-cli)</option>
+                    <option value="builtin">Builtin / Internal Engine</option>
+                  </select>
+                </div>
+
+                {currentRoleConfig.type === 'http' && (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-cinzel uppercase text-stone-300">Endpoint URL</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. http://localhost:11434/v1"
+                        value={currentRoleConfig.endpoint || ''}
+                        onChange={(e) => {
+                          const updated = { ...currentRoleConfig, endpoint: e.target.value };
+                          setConfig({
+                            ...config,
+                            agents: {
+                              ...config.agents,
+                              roles: { ...config.agents.roles, [selectedRole]: updated },
+                            },
+                          });
+                        }}
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-cinzel uppercase text-stone-300">Model Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. llama3.2 or mistral"
+                        value={currentRoleConfig.model || ''}
+                        onChange={(e) => {
+                          const updated = { ...currentRoleConfig, model: e.target.value };
+                          setConfig({
+                            ...config,
+                            agents: {
+                              ...config.agents,
+                              roles: { ...config.agents.roles, [selectedRole]: updated },
+                            },
+                          });
+                        }}
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-cinzel uppercase text-stone-300">API Key (Optional)</label>
+                      <input
+                        type="password"
+                        placeholder="Bearer token or leave empty for Ollama"
+                        value={currentRoleConfig.api_key || ''}
+                        onChange={(e) => {
+                          const updated = { ...currentRoleConfig, api_key: e.target.value };
+                          setConfig({
+                            ...config,
+                            agents: {
+                              ...config.agents,
+                              roles: { ...config.agents.roles, [selectedRole]: updated },
+                            },
+                          });
+                        }}
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {currentRoleConfig.type === 'cli' && (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-cinzel uppercase text-stone-300">CLI Command / Binary</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. echo or /usr/local/bin/llama-cli"
+                        value={currentRoleConfig.command || ''}
+                        onChange={(e) => {
+                          const updated = { ...currentRoleConfig, command: e.target.value };
+                          setConfig({
+                            ...config,
+                            agents: {
+                              ...config.agents,
+                              roles: { ...config.agents.roles, [selectedRole]: updated },
+                            },
+                          });
+                        }}
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-cinzel uppercase text-stone-300">Command Arguments (comma separated)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. --temp, 0.7, -m, model.gguf"
+                        value={(currentRoleConfig.args || []).join(', ')}
+                        onChange={(e) => {
+                          const args = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                          const updated = { ...currentRoleConfig, args };
+                          setConfig({
+                            ...config,
+                            agents: {
+                              ...config.agents,
+                              roles: { ...config.agents.roles, [selectedRole]: updated },
+                            },
+                          });
+                        }}
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {currentRoleConfig.type === 'builtin' && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-cinzel uppercase text-stone-300">Builtin Engine Identifier</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. echo or embedded-wasm"
+                      value={currentRoleConfig.builtin_name || ''}
+                      onChange={(e) => {
+                        const updated = { ...currentRoleConfig, builtin_name: e.target.value };
+                        setConfig({
+                          ...config,
+                          agents: {
+                            ...config.agents,
+                            roles: { ...config.agents.roles, [selectedRole]: updated },
+                          },
+                        });
+                      }}
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {currentRoleConfig.type !== 'disabled' && (
+                <div className="pt-2 flex items-center justify-between border-t border-stone-800/60">
+                  <button
+                    onClick={() => handleTestProvider('llm', currentRoleConfig)}
+                    disabled={testingCategory === 'llm'}
+                    className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-500/30 hover:bg-stone-800 text-amber-400 transition-all cursor-pointer"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>{testingCategory === 'llm' ? 'Testing Connection...' : 'Test Connection'}</span>
+                  </button>
+
+                  {testResult?.category === 'llm' && (
+                    <span
+                      className={`text-xs font-mono flex items-center gap-1 ${
+                        testResult.res.success ? 'text-emerald-400' : 'text-red-400'
+                      }`}
+                    >
+                      {testResult.res.success ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                      <span>
+                        {testResult.res.message} ({testResult.res.latency_ms}ms)
+                      </span>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Media Engines (TTS / STT / Image) */}
+      {activeSubTab === 'media' && (
+        <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          {/* TTS Section */}
+          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+                <Volume2 className="w-4 h-4" />
+                <span>Text-to-Speech (TTS) Engine</span>
+              </h3>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-xs text-stone-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.media.tts.auto_play}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        media: { ...config.media, tts: { ...config.media.tts, auto_play: e.target.checked } },
+                      })
+                    }
+                    className="rounded bg-stone-950 border-stone-800 text-amber-600 focus:ring-0"
+                  />
+                  <span>Auto-play Narration</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300">TTS Provider Type</label>
+                <select
+                  value={config.media.tts.type}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      media: { ...config.media, tts: { ...config.media.tts, type: e.target.value as any } },
+                    })
+                  }
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+                >
+                  <option value="disabled">Disabled</option>
+                  <option value="http">HTTP (OpenAI-compatible /v1/audio/speech, Kokoro, AllTalk)</option>
+                  <option value="cli">CLI Command (e.g. piper)</option>
+                  <option value="builtin">Builtin (Embedded WASM Kokoro / Echo)</option>
+                </select>
+              </div>
+
+              {config.media.tts.type === 'http' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">Speech Endpoint URL</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. http://localhost:8880/v1/audio/speech"
+                    value={config.media.tts.endpoint || ''}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        media: { ...config.media, tts: { ...config.media.tts, endpoint: e.target.value } },
+                      })
+                    }
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  />
+                </div>
+              )}
+
+              {config.media.tts.type === 'cli' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">Command / Binary</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. piper"
+                    value={config.media.tts.command || ''}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        media: { ...config.media, tts: { ...config.media.tts, command: e.target.value } },
+                      })
+                    }
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Master Volume</span>
+                  <span className="font-mono text-amber-400">
+                    {Math.round((config.media.tts.master_volume || 1.0) * 100)}%
+                  </span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={config.media.tts.master_volume || 1.0}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      media: {
+                        ...config.media,
+                        tts: { ...config.media.tts, master_volume: parseFloat(e.target.value) },
+                      },
+                    })
+                  }
+                  className="w-full accent-amber-500"
+                />
+              </div>
+            </div>
+
+            {config.media.tts.type !== 'disabled' && (
+              <div className="pt-2 flex items-center justify-between border-t border-stone-800/60">
+                <button
+                  onClick={() => handleTestProvider('tts', config.media.tts)}
+                  disabled={testingCategory === 'tts'}
+                  className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-500/30 hover:bg-stone-800 text-amber-400 transition-all cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>{testingCategory === 'tts' ? 'Synthesizing...' : 'Test Speech Synthesis'}</span>
+                </button>
+
+                {testResult?.category === 'tts' && (
+                  <span
+                    className={`text-xs font-mono flex items-center gap-1 ${
+                      testResult.res.success ? 'text-emerald-400' : 'text-red-400'
+                    }`}
+                  >
+                    {testResult.res.success ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                    <span>{testResult.res.message}</span>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Image Generation Section */}
+          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                <span>Scene Art / Image Generator</span>
+              </h3>
+              <label className="flex items-center gap-2 text-xs text-stone-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.media.image.auto_generate}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      media: { ...config.media, image: { ...config.media.image, auto_generate: e.target.checked } },
+                    })
+                  }
+                  className="rounded bg-stone-950 border-stone-800 text-amber-600 focus:ring-0"
+                />
+                <span>Auto-generate Scene Art</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300">Image Provider Type</label>
+                <select
+                  value={config.media.image.type}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      media: { ...config.media, image: { ...config.media.image, type: e.target.value as any } },
+                    })
+                  }
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+                >
+                  <option value="disabled">Disabled</option>
+                  <option value="http">HTTP (OpenAI-compatible /v1/images/generations or ComfyUI)</option>
+                  <option value="cli">CLI Command (e.g. sd-cli)</option>
+                  <option value="builtin">Builtin / Mock</option>
+                </select>
+              </div>
+
+              {config.media.image.type === 'http' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">Image Endpoint URL</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. http://localhost:7860/v1/images/generations"
+                    value={config.media.image.endpoint || ''}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        media: { ...config.media, image: { ...config.media.image, endpoint: e.target.value } },
+                      })
+                    }
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  />
+                </div>
+              )}
+            </div>
+
+            {config.media.image.type !== 'disabled' && (
+              <div className="pt-2 flex items-center justify-between border-t border-stone-800/60">
+                <button
+                  onClick={() => handleTestProvider('image', config.media.image)}
+                  disabled={testingCategory === 'image'}
+                  className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-500/30 hover:bg-stone-800 text-amber-400 transition-all cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{testingCategory === 'image' ? 'Generating...' : 'Test Image Generator'}</span>
+                </button>
+
+                {testResult?.category === 'image' && (
+                  <span
+                    className={`text-xs font-mono flex items-center gap-1 ${
+                      testResult.res.success ? 'text-emerald-400' : 'text-red-400'
+                    }`}
+                  >
+                    {testResult.res.success ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                    <span>{testResult.res.message}</span>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: Preferences & Appearance */}
+      {activeSubTab === 'preferences' && (
+        <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
+            <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+              <Sliders className="w-4 h-4" />
+              <span>App Preferences & Appearance</span>
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-cinzel uppercase text-stone-300">Cinematic Backdrop Overlays</label>
+                <p className="text-[11px] text-stone-400">
+                  Enable atmospheric vignette darkening and cinematic film noise textures.
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setConfig({
+                      ...config,
+                      preferences: {
+                        ...config.preferences,
+                        cinematic_effects: !config.preferences.cinematic_effects,
+                      },
+                    })
+                  }
+                  className={`px-4 py-2 rounded-xl text-xs font-cinzel font-bold transition-all cursor-pointer border ${
+                    config.preferences.cinematic_effects
+                      ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                      : 'bg-stone-900 border-stone-800 text-stone-400'
+                  }`}
+                >
+                  {config.preferences.cinematic_effects ? 'Enabled' : 'Disabled'}
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-cinzel uppercase text-stone-300">Typography Scaling</label>
+                <p className="text-[11px] text-stone-400">Select font scaling across story chronicles and dialogue.</p>
+                <div className="flex gap-2">
+                  {(['small', 'medium', 'large'] as const).map((scale) => (
+                    <button
+                      key={scale}
+                      type="button"
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          preferences: { ...config.preferences, font_scale: scale },
+                        })
+                      }
+                      className={`px-3 py-1.5 rounded-lg text-xs font-cinzel capitalize transition-all cursor-pointer border ${
+                        config.preferences.font_scale === scale
+                          ? 'bg-amber-600 text-stone-950 font-bold border-amber-500 shadow'
+                          : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      {scale}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-cinzel uppercase text-stone-300">Story Token Streaming</label>
+                <p className="text-[11px] text-stone-400">
+                  Stream narrative text word-by-word as generated by the storyteller model.
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setConfig({
+                      ...config,
+                      preferences: {
+                        ...config.preferences,
+                        streaming: !config.preferences.streaming,
+                      },
+                    })
+                  }
+                  className={`px-4 py-2 rounded-xl text-xs font-cinzel font-bold transition-all cursor-pointer border ${
+                    config.preferences.streaming
+                      ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                      : 'bg-stone-900 border-stone-800 text-stone-400'
+                  }`}
+                >
+                  {config.preferences.streaming ? 'Streaming Enabled' : 'Instant Render'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
