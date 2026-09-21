@@ -5,9 +5,25 @@ import { TurnSegments } from './TurnSegments';
 interface ChronicleViewProps {
   turns: Turn[];
   onWikilinkClick: (entityId: string) => void;
+  autoPlay?: boolean;
+  volume?: number;
 }
 
-export const ChronicleView: React.FC<ChronicleViewProps> = ({ turns, onWikilinkClick }) => {
+export const ChronicleView: React.FC<ChronicleViewProps> = ({
+  turns,
+  onWikilinkClick,
+  autoPlay = false,
+  volume = 1,
+}) => {
+  // Art is per scene, not per turn: it is shown when the party arrives somewhere
+  // new and reused while they stay.
+  let previousLocationID: string | undefined;
+  const beats = turns.map((turn) => {
+    const isSceneChange = !!turn.location_id && turn.location_id !== previousLocationID;
+    previousLocationID = turn.location_id ?? previousLocationID;
+    return { turn, isSceneChange };
+  });
+
   return (
     <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
       {turns.length === 0 ? (
@@ -15,7 +31,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({ turns, onWikilinkC
           The chronicle awaits your first action...
         </div>
       ) : (
-        turns.map((turn) => (
+        beats.map(({ turn, isSceneChange }) => (
           <div key={turn.turn_number} className="space-y-4 pb-6 border-b border-white/5 last:border-0">
             {/* Player Input Block */}
             {turn.input_text && (
@@ -24,6 +40,9 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({ turns, onWikilinkC
                   [{turn.mode || 'Action'}]
                 </span>
                 <span>{turn.input_text}</span>
+                {turn.outcome && (
+                  <span className="ml-auto text-xs font-mono text-stone-400">{turn.outcome}</span>
+                )}
               </div>
             )}
 
@@ -34,8 +53,30 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({ turns, onWikilinkC
               </div>
             )}
 
+            {/* Scene art, when the party has moved somewhere new */}
+            {turn.location_art_url && isSceneChange && (
+              <div className="my-4 rounded-xl overflow-hidden border border-white/10 shadow-2xl">
+                <img
+                  src={turn.location_art_url}
+                  alt={turn.location_name || 'Scene'}
+                  className="w-full object-cover max-h-96"
+                />
+                {turn.location_name && (
+                  <div className="px-3 py-2 text-xs font-cinzel tracking-widest text-stone-400 uppercase">
+                    {turn.location_name}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Narrated prose and attributed speech, in playback order */}
-            <TurnSegments segments={turn.segments} fallback={turn.prose} onEntityClick={onWikilinkClick} />
+            <TurnSegments
+              segments={turn.segments}
+              fallback={turn.prose}
+              onEntityClick={onWikilinkClick}
+              autoPlay={autoPlay}
+              volume={volume}
+            />
 
             {/* Entities involved in this turn */}
             {turn.entities_hit && turn.entities_hit.length > 0 && (

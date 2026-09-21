@@ -31,6 +31,17 @@ interface SettingsStudioProps {
   onSaved?: () => void;
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  gm: 'Game Master (GM / Storyteller)',
+  narrator: 'Atmospheric Narrator',
+  extractor: 'Entity Extractor (per-turn world state)',
+};
+
+// A missing role falls back to inheriting gm for the extractor, which is what
+// makes extraction work out of the box without a second configuration step.
+const defaultRoleConfig = (role: string): AgentRoleConfig =>
+  role === 'extractor' ? { type: 'inherit', inherit_from: 'gm' } : { type: 'disabled' };
+
 export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSaved }) => {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [activeFilePath, setActiveFilePath] = useState<string>('');
@@ -45,7 +56,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const [testResult, setTestResult] = useState<{ category: string; res: TestProviderResponse } | null>(null);
 
   // Selected agent role for editing
-  const [selectedRole, setSelectedRole] = useState<'gm' | 'narrator' | 'evaluator'>('gm');
+  const [selectedRole, setSelectedRole] = useState<string>('gm');
 
   useEffect(() => {
     loadSettings();
@@ -111,8 +122,18 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     );
   }
 
-  const currentRoleConfig: AgentRoleConfig = config.agents.roles[selectedRole] || {
-    type: 'disabled',
+  const currentRoleConfig: AgentRoleConfig = config.agents.roles[selectedRole] || defaultRoleConfig(selectedRole);
+
+  const roleNames = Array.from(new Set([...Object.keys(config.agents.roles), 'extractor']));
+
+  const updateRole = (updated: AgentRoleConfig) => {
+    setConfig({
+      ...config,
+      agents: {
+        ...config.agents,
+        roles: { ...config.agents.roles, [selectedRole]: updated },
+      },
+    });
   };
 
   return (
@@ -285,9 +306,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   onChange={(e) => setSelectedRole(e.target.value as any)}
                   className="bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1 text-xs text-amber-300 font-mono focus:outline-none"
                 >
-                  <option value="gm">Game Master (GM / Storyteller)</option>
-                  <option value="narrator">Atmospheric Narrator</option>
-                  <option value="evaluator">Mechanics Evaluator</option>
+                  {roleNames.map((role) => (
+                    <option key={role} value={role}>
+                      {ROLE_LABELS[role] ?? role}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -314,8 +337,33 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <option value="http">HTTP / OpenAI-Compatible (Ollama, vLLM, OpenAI)</option>
                     <option value="cli">CLI Command (Local Binary e.g. llama-cli)</option>
                     <option value="builtin">Builtin / Internal Engine</option>
+                    <option value="inherit">Inherit from another role</option>
                   </select>
                 </div>
+
+                {currentRoleConfig.type === 'inherit' && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-cinzel uppercase text-stone-300">Inherit From</label>
+                    <select
+                      value={currentRoleConfig.inherit_from || 'gm'}
+                      onChange={(e) => updateRole({ type: 'inherit', inherit_from: e.target.value })}
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono focus:outline-none"
+                    >
+                      {roleNames.map((role) => (
+                        <option key={role} value={role}>
+                          {ROLE_LABELS[role] ?? role}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-stone-500">
+                      Resolves to{' '}
+                      {config.agents.roles[currentRoleConfig.inherit_from || 'gm']?.model ||
+                        config.agents.roles[currentRoleConfig.inherit_from || 'gm']?.command ||
+                        'the default provider'}
+                      , so changing that role changes this one until you override it here.
+                    </p>
+                  </div>
+                )}
 
                 {currentRoleConfig.type === 'http' && (
                   <>

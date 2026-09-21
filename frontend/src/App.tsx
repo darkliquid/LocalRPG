@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { APIClient } from './api/client';
-import { GameState, Turn, EntityNote, GraphData } from './types';
+import { GameState, Turn, EntityNote, GraphData, AppConfig } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { ActionConsole } from './components/ActionConsole';
 import { Drawers } from './components/Drawers';
@@ -26,10 +26,19 @@ export const App: React.FC = () => {
   const [chronicle, setChronicle] = useState<Turn[]>([]);
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<EntityNote | null>(null);
+  // TTS playback preferences live in the global settings, so the chronicle and
+  // the story theater honour the same switches as the settings studio.
+  const [config, setConfig] = useState<AppConfig | null>(null);
 
   // Active drawer tab: null, 'character', 'graph', 'codex', 'world'
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
+
+  useEffect(() => {
+    APIClient.getSettings()
+      .then((res) => setConfig(res.config))
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (!client) {
@@ -189,7 +198,12 @@ export const App: React.FC = () => {
           {/* Main Floating Translucent Chronicle & Action Container */}
           <main className="relative z-10 flex-1 overflow-hidden mx-6 mb-4 flex flex-col">
             <div className="flex-1 bg-glass-card rounded-2xl flex flex-col overflow-hidden shadow-2xl">
-              <ChronicleView turns={chronicle} onWikilinkClick={handleOpenWikilink} />
+              <ChronicleView
+                turns={chronicle}
+                onWikilinkClick={handleOpenWikilink}
+                autoPlay={config?.media.tts.auto_play ?? false}
+                volume={config?.media.tts.master_volume ?? 1}
+              />
               <ActionConsole onSubmit={handleActionSubmit} />
             </div>
           </main>
@@ -217,6 +231,8 @@ export const App: React.FC = () => {
             turns={chronicle}
             isOpen={isTheaterOpen}
             onClose={() => setIsTheaterOpen(false)}
+            autoPlay={config?.media.tts.auto_play ?? false}
+            volume={config?.media.tts.master_volume ?? 1}
           />
         </>
       )}

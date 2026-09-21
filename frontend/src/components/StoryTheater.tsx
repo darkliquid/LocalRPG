@@ -7,9 +7,17 @@ interface StoryTheaterProps {
   turns: Turn[];
   isOpen: boolean;
   onClose: () => void;
+  autoPlay?: boolean;
+  volume?: number;
 }
 
-export const StoryTheater: React.FC<StoryTheaterProps> = ({ turns, isOpen, onClose }) => {
+export const StoryTheater: React.FC<StoryTheaterProps> = ({
+  turns,
+  isOpen,
+  onClose,
+  autoPlay = false,
+  volume = 1,
+}) => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [speed, setSpeed] = useState<number>(1);
@@ -62,7 +70,12 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({ turns, isOpen, onClo
       {/* Main Dialogue Card */}
       <main className="relative z-10 flex-1 flex items-center justify-center p-8">
         <div className="max-w-3xl w-full bg-glass-card rounded-2xl p-8 shadow-2xl border border-white/10 space-y-4">
-          <TurnSegments segments={currentTurn?.segments} fallback={currentTurn?.prose ?? ''} />
+          <TurnSegments
+            segments={currentTurn?.segments}
+            fallback={currentTurn?.prose ?? ''}
+            autoPlay={autoPlay}
+            volume={volume}
+          />
         </div>
       </main>
 

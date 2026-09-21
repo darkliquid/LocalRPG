@@ -19,6 +19,7 @@ export interface TurnSegment {
   speaker?: string;
   speaker_id?: string;
   text: string;
+  audio_url?: string;
 }
 
 export interface Turn {
@@ -29,6 +30,10 @@ export interface Turn {
   segments?: TurnSegment[];
   image_url?: string;
   entities_hit?: string[];
+  location_id?: string;
+  location_name?: string;
+  location_art_url?: string;
+  outcome?: string;
 }
 
 export interface EntityNote {
@@ -151,7 +156,8 @@ export interface PathsConfig {
 }
 
 export interface AgentRoleConfig {
-  type: 'builtin' | 'http' | 'cli' | 'disabled';
+  type: 'builtin' | 'http' | 'cli' | 'inherit' | 'disabled';
+  inherit_from?: string;
   builtin_name?: string;
   command?: string;
   args?: string[];
