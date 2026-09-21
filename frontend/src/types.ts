@@ -211,7 +211,7 @@ export interface TTSConfig {
 }
 
 export interface STTConfig {
-  type: 'builtin' | 'http' | 'cli' | 'disabled';
+  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'web-speech';
   builtin_name?: string;
   command?: string;
   args?: string[];
@@ -221,7 +221,7 @@ export interface STTConfig {
 }
 
 export interface ImageConfig {
-  type: 'builtin' | 'http' | 'cli' | 'disabled';
+  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'comfyui';
   builtin_name?: string;
   command?: string;
   args?: string[];

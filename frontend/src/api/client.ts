@@ -136,6 +136,23 @@ export class APIClient {
     return res.json();
   }
 
+  static async transcribeAudio(audioBlob: Blob): Promise<{ text: string }> {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'speech.webm');
+
+    const res = await fetch('/api/stt', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || `STT failed with status ${res.status}`);
+    }
+
+    return res.json();
+  }
+
   // streamTurn posts a player action and reports each NDJSON line as it arrives.
   // It must not assume the body arrives progressively: a client that buffers the
   // response produces the same events in the same order.
