@@ -1730,7 +1730,7 @@ git commit -m "feat(export): make the exported player run itself"
 - Consumes: `scene.Beat`, `scene.Scene`, `TypewriterFraction`
 - Produces: `scene.FrameRequest`, `scene.Renderer`, `scene.NewRenderer(width, height int) (*Renderer, error)`, `(*Renderer).Frame(FrameRequest) *image.RGBA`, `scene.revealText(string, float64) string`, `scene.wrapText(font.Face, string, int, int) []string`
 
-- [ ] **Step 1: Add the dependency and write the failing test**
+- [x] **Step 1: Add the dependency and write the failing test**
 
 Run: `go get golang.org/x/image@v0.46.0`
 
@@ -1866,12 +1866,12 @@ func TestWrapTextBoundsTheFrame(t *testing.T) {
 
 `"time"` is in the import block above; Task 9 adds `"image"`, `"image/draw"`, `"os"`, and `"path/filepath"` as its tests need them.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestFrame|TestRevealText|TestWrapText" -count=1 ./pkg/scene/`
 Expected: FAIL — `undefined: NewRenderer`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/scene/render.go`:
 
@@ -2061,12 +2061,12 @@ func (r *Renderer) drawCentred(img *image.RGBA, face font.Face, text string, bas
 func (r *Renderer) drawBackground(img *image.RGBA, req FrameRequest) {}
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/scene/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add go.mod go.sum pkg/scene/render.go pkg/scene/render_test.go
@@ -2083,7 +2083,7 @@ git commit -m "feat(scene): draw frames and text with bundled fonts"
 - Consumes: `AppearanceHash` output (a hex string), `image/png`, `image/jpeg`, `golang.org/x/image/webp`
 - Produces: `scene.loadArt(path string) (image.Image, error)`, `scene.proceduralBackground(seed string, width, height int) *image.RGBA`, `scene.drawCover(dst *image.RGBA, src image.Image, scale float64)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/scene/render_test.go`:
 
@@ -2169,12 +2169,12 @@ func TestDrawCoverHandlesTinyArt(t *testing.T) {
 
 Add `"image/draw"`, `"os"`, `"path/filepath"` to the test imports.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestProceduralBackground|TestLoadArt|TestFrameUsesSceneArt|TestDrawCover" -count=1 ./pkg/scene/`
 Expected: FAIL — `undefined: proceduralBackground`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Replace the `drawBackground` stub in `pkg/scene/render.go`:
 
@@ -2320,12 +2320,12 @@ import (
 )
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/scene/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/scene/render.go pkg/scene/render_test.go
@@ -2342,7 +2342,7 @@ git commit -m "feat(scene): paint scene backgrounds, decoded or drawn"
 - Consumes: `FrameRequest.PreviousArt`, `crossfadeShare`
 - Produces: a crossfade from the previous scene's art on a scene's opening beats, and card styling for `BeatSceneCard`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/scene/render_test.go`:
 
@@ -2397,12 +2397,12 @@ func TestSceneCardStandsOut(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run "TestFrameCrossfades|TestSceneCardStandsOut" -count=1 ./pkg/scene/`
 Expected: FAIL — the crossfade is ignored.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `drawBackground`, blend from the previous scene's art during the beat's opening:
 
@@ -2493,12 +2493,12 @@ Scene cards already stand out because their text is the location name with no sp
 	}
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/scene/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/scene/render.go pkg/scene/render_test.go
@@ -3486,6 +3486,9 @@ git commit -m "feat(gui): share one pacing estimate with the in-app player"
 - **The compiler still folds legacy prose into segments.** `campaignSource.Turns()` parses a turn's prose with `media.LegacySegments` when the record has no segments, which the retired compiler did and Task 3's `Compile` alone does not. Without it, every campaign recorded before segments existed would export as scene cards with no text. This lives in the source adapter rather than in `pkg/scene`, so the scene model does not depend on `pkg/media`.
 - **Bundle clips are numbered in playback order, not by beat number.** Numbering every beat leaves holes in `audio/` (the first clip lands on `beat-0003.wav` when a scene card and a narration beat precede it), so the counter advances only when a clip is written. This matches the `audio/beat-0001.wav` the plan's own assertion expects.
 - **Task 7's player template is written with Task 6.** Task 6's tests pin the payload and the asset layout independently of the player's behaviour, so writing a throwaway template first and replacing it immediately would be wasted work; Task 7's test asserts the behaviours the template already carries.
+- **`baseColour` is a variable, not a constant** (Task 8). A `color.RGBA` composite literal is not a constant expression in Go, so the plan's `const` block cannot hold it.
+- **Task 9 invalidates one of Task 8's assertions.** Task 8's `TestFrameRevealsTextOverTheBeat` checks that the frame "settles" once the typewriter window has passed, which was true only while the background was flat. Drift is continuous for the whole beat, so frames never settle pixel-for-pixel; the test now asserts the revealed text is complete instead, and the crossfade test compares two points that are both past the blend.
+- **`drawBackground` splits out `sceneArt`** (Task 10). The crossfade needs the incoming scene drawn twice, once at full opacity and once blended, so resolving art moved into its own method rather than being inlined.
 
 ### Execution notes
 
