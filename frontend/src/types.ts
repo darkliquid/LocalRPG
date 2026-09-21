@@ -39,6 +39,13 @@ export interface Turn {
   outcome?: string;
 }
 
+export interface TurnEvent {
+  type: 'chunk' | 'turn' | 'error';
+  text?: string;
+  turn?: Turn;
+  message?: string;
+}
+
 export interface EntityNote {
   id: string;
   name: string;

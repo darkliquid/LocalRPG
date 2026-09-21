@@ -1,6 +1,7 @@
 import {
   GameState,
   Turn,
+  TurnEvent,
   EntityNote,
   GraphData,
   GameSummary,
@@ -133,6 +134,52 @@ export class APIClient {
     });
     if (!res.ok) throw new Error(`testProvider: ${res.statusText}`);
     return res.json();
+  }
+
+  // streamTurn posts a player action and reports each NDJSON line as it arrives.
+  // It must not assume the body arrives progressively: a client that buffers the
+  // response produces the same events in the same order.
+  static async streamTurn(
+    gameID: string,
+    body: { mode: string; input: string },
+    onEvent: (event: TurnEvent) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const res = await fetch(`/api/game/${gameID}/turn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+
+    if (!res.ok) {
+      throw new Error(`streamTurn: ${res.status} ${await res.text()}`);
+    }
+    if (!res.body) {
+      throw new Error('streamTurn: response has no body');
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      let newline = buffer.indexOf('\n');
+      while (newline !== -1) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        if (line) onEvent(JSON.parse(line) as TurnEvent);
+        newline = buffer.indexOf('\n');
+      }
+    }
+
+    const tail = buffer.trim();
+    if (tail) onEvent(JSON.parse(tail) as TurnEvent);
   }
 
   constructor(gameID: string) {
