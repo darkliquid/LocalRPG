@@ -44,6 +44,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   const [entityMarkdown, setEntityMarkdown] = useState(
     REFERENCE_WORLD_TEMPLATE.entities[0]?.markdown || ''
   );
+  const [entityDrafts, setEntityDrafts] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    REFERENCE_WORLD_TEMPLATE.entities.forEach((e) => {
+      initial[e.id] = e.markdown;
+    });
+    return initial;
+  });
   const [isNewEntityModal, setIsNewEntityModal] = useState(false);
   const [newEntitySlug, setNewEntitySlug] = useState('');
 
@@ -92,23 +99,55 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       setEntities(detail.entities || []);
 
       if (detail.entities && detail.entities.length > 0) {
-        loadEntityContent(detail.id, detail.entities[0].id);
+        const first = detail.entities[0];
+        setSelectedEntityID(first.id);
+        try {
+          const ent = await APIClient.getWorldEntity(detail.id, first.id);
+          setEntityMarkdown(ent.markdown);
+          setEntityDrafts({ [first.id]: ent.markdown });
+        } catch {
+          setEntityMarkdown('');
+          setEntityDrafts({});
+        }
       } else {
         setSelectedEntityID(null);
         setEntityMarkdown('');
+        setEntityDrafts({});
       }
     } catch (err: any) {
       setToast({ type: 'error', message: err.message || 'Failed to load world details' });
     }
   };
 
-  const loadEntityContent = async (worldId: string, entityId: string) => {
-    try {
-      const ent = await APIClient.getWorldEntity(worldId, entityId);
-      setSelectedEntityID(entityId);
-      setEntityMarkdown(ent.markdown);
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Failed to load entity markdown' });
+  const handleSelectEntity = async (targetId: string) => {
+    if (targetId === selectedEntityID) return;
+
+    // Flush current editor content to drafts
+    const updatedDrafts = { ...entityDrafts };
+    if (selectedEntityID) {
+      updatedDrafts[selectedEntityID] = entityMarkdown;
+      setEntityDrafts(updatedDrafts);
+    }
+
+    setSelectedEntityID(targetId);
+
+    // If already in drafts, load it
+    if (updatedDrafts[targetId] !== undefined) {
+      setEntityMarkdown(updatedDrafts[targetId]);
+      return;
+    }
+
+    // Otherwise, if world is saved, fetch from API
+    if (selectedID) {
+      try {
+        const ent = await APIClient.getWorldEntity(selectedID, targetId);
+        setEntityDrafts((prev) => ({ ...prev, [targetId]: ent.markdown }));
+        setEntityMarkdown(ent.markdown);
+      } catch (err: any) {
+        setToast({ type: 'error', message: err.message || 'Failed to load entity markdown' });
+      }
+    } else {
+      setEntityMarkdown('');
     }
   };
 
@@ -129,6 +168,11 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
     );
     setSelectedEntityID(REFERENCE_WORLD_TEMPLATE.entities[0].id);
     setEntityMarkdown(REFERENCE_WORLD_TEMPLATE.entities[0].markdown);
+    const initialDrafts: Record<string, string> = {};
+    REFERENCE_WORLD_TEMPLATE.entities.forEach((e) => {
+      initialDrafts[e.id] = e.markdown;
+    });
+    setEntityDrafts(initialDrafts);
     setActiveTab('lore');
   };
 
@@ -149,6 +193,11 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
     );
     setSelectedEntityID(REFERENCE_WORLD_TEMPLATE.entities[0].id);
     setEntityMarkdown(REFERENCE_WORLD_TEMPLATE.entities[0].markdown);
+    const initialDrafts: Record<string, string> = {};
+    REFERENCE_WORLD_TEMPLATE.entities.forEach((e) => {
+      initialDrafts[e.id] = e.markdown;
+    });
+    setEntityDrafts(initialDrafts);
     setToast({ type: 'success', message: 'Reset to The Ashen Reach Reference Template!' });
   };
 
@@ -180,11 +229,15 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
 
       const saved = await APIClient.saveWorld(payload);
 
-      // If saving a new world and we have reference template entities, save them too
-      if (!selectedID) {
-        for (const ent of REFERENCE_WORLD_TEMPLATE.entities) {
-          await APIClient.saveWorldEntity(saved.id, ent.id, ent.markdown).catch(() => {});
-        }
+      // Save all entity templates (whether new world or edited world)
+      const allDrafts = { ...entityDrafts };
+      if (selectedEntityID) {
+        allDrafts[selectedEntityID] = entityMarkdown;
+      }
+
+      for (const ent of entities) {
+        const md = allDrafts[ent.id] || STARTER_ENTITY_TEMPLATE;
+        await APIClient.saveWorldEntity(saved.id, ent.id, md).catch(() => {});
       }
 
       setToast({ type: 'success', message: `World "${saved.name}" saved successfully!` });
@@ -198,7 +251,15 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   };
 
   const handleSaveEntity = async () => {
-    if (!selectedID || !selectedEntityID) return;
+    if (!selectedEntityID) return;
+
+    setEntityDrafts((prev) => ({ ...prev, [selectedEntityID]: entityMarkdown }));
+
+    if (!selectedID) {
+      setToast({ type: 'success', message: `Draft entity "${selectedEntityID}" updated! (Will be persisted when you click Save World)` });
+      return;
+    }
+
     try {
       await APIClient.saveWorldEntity(selectedID, selectedEntityID, entityMarkdown);
       setToast({ type: 'success', message: `Entity "${selectedEntityID}" saved!` });
@@ -209,7 +270,22 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   };
 
   const handleDeleteEntity = async (entityId: string) => {
-    if (!selectedID) return;
+    if (!selectedID) {
+      const remaining = entities.filter((e) => e.id !== entityId);
+      setEntities(remaining);
+      const updatedDrafts = { ...entityDrafts };
+      delete updatedDrafts[entityId];
+      setEntityDrafts(updatedDrafts);
+
+      if (selectedEntityID === entityId) {
+        const next = remaining[0];
+        setSelectedEntityID(next ? next.id : null);
+        setEntityMarkdown(next ? (updatedDrafts[next.id] || '') : '');
+      }
+      setToast({ type: 'success', message: `Entity "${entityId}" removed from draft.` });
+      return;
+    }
+
     try {
       await APIClient.deleteWorldEntity(selectedID, entityId);
       setToast({ type: 'success', message: `Entity "${entityId}" deleted!` });
@@ -220,14 +296,34 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   };
 
   const handleCreateNewEntity = async () => {
-    if (!selectedID || !newEntitySlug.trim()) return;
+    if (!newEntitySlug.trim()) return;
     const slug = newEntitySlug.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+
+    if (!selectedID) {
+      if (entities.some((e) => e.id === slug)) {
+        setToast({ type: 'error', message: `Entity "${slug}" already exists` });
+        return;
+      }
+      const newSummary: WorldEntitySummary = { id: slug, name: slug, type: 'concept' };
+      setEntities((prev) => [...prev, newSummary]);
+      setEntityDrafts((prev) => ({
+        ...prev,
+        ...(selectedEntityID ? { [selectedEntityID]: entityMarkdown } : {}),
+        [slug]: STARTER_ENTITY_TEMPLATE,
+      }));
+      setSelectedEntityID(slug);
+      setEntityMarkdown(STARTER_ENTITY_TEMPLATE);
+      setIsNewEntityModal(false);
+      setNewEntitySlug('');
+      return;
+    }
+
     try {
       await APIClient.saveWorldEntity(selectedID, slug, STARTER_ENTITY_TEMPLATE);
       setIsNewEntityModal(false);
       setNewEntitySlug('');
       await loadWorldDetail(selectedID);
-      loadEntityContent(selectedID, slug);
+      await handleSelectEntity(slug);
     } catch (err: any) {
       setToast({ type: 'error', message: err.message || 'Failed to create entity' });
     }
@@ -293,7 +389,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       {/* Right Detail Column: Editor */}
       <section className="flex-1 bg-glass-card rounded-2xl border border-stone-800/80 p-6 flex flex-col gap-5 shadow-xl backdrop-blur-md overflow-hidden">
         {/* Top Header & Sub-Tabs */}
-        <div className="flex items-center justify-between border-b border-stone-800/80 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800/80 pb-3">
           <div className="flex items-center gap-3">
             <h2 className="font-cinzel text-lg font-bold text-amber-400">
               {selectedID ? name || 'Edit World' : 'Create New World'}
@@ -305,8 +401,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex bg-stone-950/80 p-1 rounded-xl border border-stone-800">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap bg-stone-950/80 p-1 rounded-xl border border-stone-800">
               <button
                 type="button"
                 onClick={() => setActiveTab('lore')}
@@ -520,7 +616,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
         {activeTab === 'entities' && (
           <div className="flex-1 flex gap-4 overflow-hidden">
             {/* Entity List */}
-            <div className="w-56 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2">
+            <div className="w-56 shrink-0 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2">
               <div className="flex items-center justify-between pb-2 border-b border-stone-800/60">
                 <span className="text-[11px] font-cinzel uppercase tracking-wider text-stone-400">
                   Templates
@@ -543,7 +639,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                   entities.map((e) => (
                     <div
                       key={e.id}
-                      onClick={() => selectedID && loadEntityContent(selectedID, e.id)}
+                      onClick={() => handleSelectEntity(e.id)}
                       className={`group p-2 rounded-lg border text-left cursor-pointer flex items-center justify-between transition-all ${
                         selectedEntityID === e.id
                           ? 'bg-amber-950/50 border-amber-500/60 text-amber-300'
@@ -572,18 +668,18 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             </div>
 
             {/* Entity Markdown Editor */}
-            <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+            <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-hidden">
               {selectedEntityID ? (
                 <>
                   <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1">
-                    <span>worlds/{selectedID}/entities/{selectedEntityID}.md</span>
+                    <span>worlds/{selectedID || slugID || 'draft'}/entities/{selectedEntityID}.md</span>
                     <button
                       type="button"
                       onClick={handleSaveEntity}
                       className="flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-600/80 hover:bg-amber-500 text-stone-950 font-bold text-xs cursor-pointer shadow transition-all"
                     >
                       <Save className="w-3 h-3" />
-                      <span>Save Entity</span>
+                      <span>{selectedID ? 'Save Entity' : 'Update Draft'}</span>
                     </button>
                   </div>
                   <textarea
@@ -606,25 +702,29 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       {/* New Entity Modal */}
       {isNewEntityModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm rounded-2xl bg-stone-900 border border-amber-500/30 p-6 space-y-4 shadow-2xl">
-            <h3 className="font-cinzel text-sm font-bold text-amber-400">
-              New Starter Entity Template
-            </h3>
-            <div className="space-y-1">
-              <label className="text-xs text-stone-300">Entity Slug (filename without .md)</label>
-              <input
-                type="text"
-                placeholder="e.g. the_iron_bastion"
-                value={newEntitySlug}
-                onChange={(e) => setNewEntitySlug(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:border-amber-500/60"
-              />
+          <div className="w-full max-w-sm max-h-[85vh] flex flex-col rounded-2xl bg-stone-900 border border-amber-500/30 shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-stone-800 shrink-0">
+              <h3 className="font-cinzel text-sm font-bold text-amber-400">
+                New Starter Entity Template
+              </h3>
             </div>
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="p-6 space-y-4 flex-1 min-h-0 overflow-y-auto">
+              <div className="space-y-1">
+                <label className="text-xs text-stone-300">Entity Slug (filename without .md)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. the_iron_bastion"
+                  value={newEntitySlug}
+                  onChange={(e) => setNewEntitySlug(e.target.value)}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:border-amber-500/60"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-stone-800 shrink-0 bg-stone-900/80">
               <button
                 type="button"
                 onClick={() => setIsNewEntityModal(false)}
-                className="px-3 py-1.5 text-xs text-stone-400 hover:text-white"
+                className="px-3 py-1.5 text-xs text-stone-400 hover:text-white cursor-pointer"
               >
                 Cancel
               </button>
@@ -632,7 +732,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 type="button"
                 onClick={handleCreateNewEntity}
                 disabled={!newEntitySlug.trim()}
-                className="px-4 py-1.5 text-xs font-cinzel font-bold bg-amber-600 text-stone-950 rounded-lg disabled:opacity-50"
+                className="px-4 py-1.5 text-xs font-cinzel font-bold bg-amber-600 text-stone-950 rounded-lg disabled:opacity-50 cursor-pointer"
               >
                 Create
               </button>
