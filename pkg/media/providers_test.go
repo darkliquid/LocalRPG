@@ -9,9 +9,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/media"
 )
 
@@ -289,5 +291,37 @@ func TestComfyUIImageClient_GeneratesImage(t *testing.T) {
 	}
 	if !bytes.Equal(data, rawPng) {
 		t.Errorf("expected comfyui image bytes, got %v", data)
+	}
+}
+
+func TestHTTPTTSClient_AdaptsAllTalkPayload(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req["text_input"] != "Greetings, traveler." {
+			t.Errorf("expected text_input, got %v", req["text_input"])
+		}
+		if req["character_voice_gen"] != "elder_sage" {
+			t.Errorf("expected character_voice_gen elder_sage, got %v", req["character_voice_gen"])
+		}
+		w.Header().Set("Content-Type", "audio/wav")
+		_, _ = w.Write([]byte("RIFF1234WAVEfmt audio-clip"))
+	}))
+	defer ts.Close()
+
+	client, err := media.NewTTSClient(config.TTSConfig{
+		Type:     "http",
+		Endpoint: ts.URL + "/api/tts-generate",
+	})
+	if err != nil {
+		t.Fatalf("NewTTSClient failed: %v", err)
+	}
+
+	data, err := client.Synthesize(context.Background(), "Greetings, traveler.", &entity.VoiceConfig{VoiceID: "elder_sage"})
+	if err != nil {
+		t.Fatalf("Synthesize failed: %v", err)
+	}
+	if !strings.HasPrefix(string(data), "RIFF") {
+		t.Errorf("unexpected audio data: %s", string(data))
 	}
 }

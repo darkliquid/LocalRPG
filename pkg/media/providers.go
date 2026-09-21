@@ -119,15 +119,26 @@ func (h *httpTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 	if voice != nil && voice.VoiceID != "" {
 		voiceID = voice.VoiceID
 	}
-	payloadMap := map[string]interface{}{
-		"model": h.model,
-		"input": text,
-		"voice": voiceID,
+	var payload []byte
+	if strings.Contains(h.endpoint, "/api/tts-generate") || strings.Contains(h.endpoint, "alltalk") {
+		payload, _ = json.Marshal(map[string]interface{}{
+			"text_input":          text,
+			"character_voice_gen": voiceID,
+			"narrator_voice_gen":  voiceID,
+			"text_filtering":      "standard",
+			"language":            "en",
+		})
+	} else {
+		payloadMap := map[string]interface{}{
+			"model": h.model,
+			"input": text,
+			"voice": voiceID,
+		}
+		if voice != nil && voice.SpeechRate > 0 {
+			payloadMap["speed"] = voice.SpeechRate
+		}
+		payload, _ = json.Marshal(payloadMap)
 	}
-	if voice != nil && voice.SpeechRate > 0 {
-		payloadMap["speed"] = voice.SpeechRate
-	}
-	payload, _ := json.Marshal(payloadMap)
 	req, err := http.NewRequestWithContext(ctx, "POST", h.endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
