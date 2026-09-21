@@ -386,9 +386,9 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 
 	worldStyle := s.worldArtStyle(gameID)
 	providerParams := cfg.Media.Image.Type + ":" + cfg.Media.Image.Model
-	pipeline := media.NewImagePipeline(client, media.NewContentCache(s.resolver.CacheDir()))
+	store := media.NewArtStore(client, media.NewContentCache(s.resolver.CacheDir()), worldStyle, providerParams)
 
-	path, err := pipeline.GenerateLocationImage(ctx, location, worldStyle, providerParams, force)
+	path, err := store.SceneArt(ctx, location, force)
 	if err != nil {
 		return "", "", err
 	}
