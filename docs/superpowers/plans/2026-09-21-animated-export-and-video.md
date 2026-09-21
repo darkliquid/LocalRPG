@@ -2521,7 +2521,7 @@ git commit -m "feat(scene): blend scene changes and style scene cards"
 - Consumes: `scene.NewRenderer`, `scene.FramesFor`, `scene.BeatDuration`
 - Produces: `export.frameWriter`, `(*frameWriter).write(script *scene.Script) (int, error)`, `(*VideoPipeline).SetSize(w, h int)`, `SetFPS(fps int)`, `SetStill(still bool)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Replace `pkg/export/video_test.go`'s contents with a frame-rendering test plus the command assertions from Task 12:
 
@@ -2618,12 +2618,12 @@ func TestFrameWriterFollowsPacingWhenAnimating(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestFrameWriter -count=1 ./pkg/export/`
 Expected: FAIL — `undefined: frameWriter`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/export/video.go`:
 
@@ -2729,12 +2729,12 @@ func writePNG(path string, img image.Image) error {
 
 `png.BestSpeed` matters: a 1080p frame is otherwise slow to encode, and PNG size is irrelevant next to `x264`'s time.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/export/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/export/video.go pkg/export/video_test.go
@@ -2751,7 +2751,7 @@ git commit -m "feat(export): render a campaign's frames"
 - Consumes: `scene.Script.Beats()`, `Beat.AudioPath`, `Beat.Duration`
 - Produces: `(*VideoPipeline).BuildCommand(ctx context.Context, script *scene.Script, framesDir, outputFile string) (*exec.Cmd, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/export/video_test.go`:
 
@@ -2814,12 +2814,12 @@ func TestBuildCommandWithOnlySilence(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestBuildCommand -count=1 ./pkg/export/`
 Expected: FAIL — the old command has no clip inputs, no `concat`, and no frame pattern.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Replace `BuildCommand`:
 
@@ -2882,12 +2882,12 @@ func (v *VideoPipeline) BuildCommand(ctx context.Context, script *scene.Script, 
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/export/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/export/video.go pkg/export/video_test.go
@@ -2904,7 +2904,7 @@ git commit -m "feat(export): mux frames against each beat's own audio"
 - Consumes: `frameWriter`, `BuildCommand`, `exec.LookPath`
 - Produces: `(*VideoPipeline).RenderVideo(ctx context.Context, script *scene.Script, outputFile string) error` writing a complete file or nothing at all
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/export/video_test.go`:
 
@@ -2969,12 +2969,12 @@ func TestRenderVideoRequiresScenes(t *testing.T) {
 
 Add `"os/exec"` to the test imports.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestRenderVideo -count=1 ./pkg/export/`
 Expected: FAIL — `RenderVideo` still builds the old silent command.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```go
 // RenderVideo draws every frame, muxes them against the campaign's audio, and
@@ -3050,12 +3050,12 @@ func lastLines(output string, count int) string {
 
 Add `"bytes"`, `"image"`, `"image/png"`, `"os"`, `"strconv"`, and the `scene` import to `video.go`; drop the old fixed-duration code path.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/export/`
 Expected: PASS (the render tests skip without FFmpeg)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/export/video.go pkg/export/video_test.go
@@ -3489,6 +3489,8 @@ git commit -m "feat(gui): share one pacing estimate with the in-app player"
 - **`baseColour` is a variable, not a constant** (Task 8). A `color.RGBA` composite literal is not a constant expression in Go, so the plan's `const` block cannot hold it.
 - **Task 9 invalidates one of Task 8's assertions.** Task 8's `TestFrameRevealsTextOverTheBeat` checks that the frame "settles" once the typewriter window has passed, which was true only while the background was flat. Drift is continuous for the whole beat, so frames never settle pixel-for-pixel; the test now asserts the revealed text is complete instead, and the crossfade test compares two points that are both past the blend.
 - **`drawBackground` splits out `sceneArt`** (Task 10). The crossfade needs the incoming scene drawn twice, once at full opacity and once blended, so resolving art moved into its own method rather than being inlined.
+- **The staging file keeps the output's container extension** (Task 13). FFmpeg chooses its muxer from the filename, so `<out>.mp4.part` fails outright with "Unable to choose an output format". `stagingPath` inserts `.part` before the extension instead (`replay.part.mp4`), and the tests assert against `stagingPath(out)` rather than a literal `".part"` suffix, which would have been vacuous.
+- **Tasks 11, 12 and 13 are one commit.** They rewrite `BuildCommand` and `RenderVideo`, so shipping the frame writer against the retired still-image command would have meant writing an interim `BuildCommand` only to replace it in the next task.
 
 ### Execution notes
 
