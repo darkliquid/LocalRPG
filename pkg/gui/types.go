@@ -190,3 +190,17 @@ type TestProviderResponseDTO struct {
 	Message   string `json:"message"`
 	Preview   string `json:"preview,omitempty"`
 }
+
+// TurnRequest is a player action as submitted from a client.
+type TurnRequest struct {
+	Mode  string `json:"mode"`
+	Input string `json:"input"`
+}
+
+// TurnEvent is one NDJSON line sent while a turn runs.
+type TurnEvent struct {
+	Type    string   `json:"type"`              // "chunk", "turn", or "error"
+	Text    string   `json:"text,omitempty"`    // narration delta
+	Turn    *TurnDTO `json:"turn,omitempty"`    // the persisted turn
+	Message string   `json:"message,omitempty"` // failure detail
+}

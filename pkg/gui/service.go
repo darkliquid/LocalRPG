@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"gopkg.in/yaml.v3"
@@ -27,6 +29,7 @@ type Service struct {
 	resolver  *core.PathResolver
 	configMgr *config.ConfigManager
 	indexed   map[string]bool
+	locks     map[string]*sync.Mutex
 }
 
 func NewService(rootDir string) *Service {
@@ -69,6 +72,7 @@ func NewService(rootDir string) *Service {
 		resolver:  core.NewCustomPathResolver(sysDir, worldDir, gameDir, cacheDir),
 		configMgr: mgr,
 		indexed:   make(map[string]bool),
+		locks:     make(map[string]*sync.Mutex),
 	}
 }
 
@@ -363,6 +367,140 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 	}
 
 	return dto
+}
+
+// ErrTurnInFlight means another turn is already running for this campaign.
+var ErrTurnInFlight = errors.New("a turn is already in flight")
+
+// ErrCampaignNotPlayable means the campaign's files are not ready for a turn, so
+// the caller can answer before any bytes are sent.
+var ErrCampaignNotPlayable = errors.New("campaign cannot be prepared")
+
+// gameLock returns the campaign's turn lock, creating it on first use.
+func (s *Service) gameLock(gameID string) *sync.Mutex {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.locks == nil {
+		s.locks = make(map[string]*sync.Mutex)
+	}
+	if lock, ok := s.locks[gameID]; ok {
+		return lock
+	}
+
+	lock := &sync.Mutex{}
+	s.locks[gameID] = lock
+	return lock
+}
+
+// TurnSession is one prepared turn: the campaign's timeline and orchestrator,
+// wired exactly as the CLI wires them, holding the campaign's turn lock until
+// Close. Preparing up front is what lets the caller answer 409 or 503 as a status
+// code rather than as an event after streaming has begun.
+type TurnSession struct {
+	service      *Service
+	gameID       string
+	cfg          *config.Config
+	store        *storage.Store
+	timeline     *engine.Timeline
+	orchestrator *engine.TurnOrchestrator
+	release      func()
+}
+
+func (s *Service) BeginTurn(gameID string) (*TurnSession, error) {
+	lock := s.gameLock(gameID)
+	if !lock.TryLock() {
+		return nil, ErrTurnInFlight
+	}
+	release := lock.Unlock
+
+	session, err := s.prepareTurn(gameID)
+	if err != nil {
+		release()
+		// Both the sentinel and the cause are wrapped, so the route can tell an
+		// unknown game (404) from a campaign that exists but cannot be played (503).
+		return nil, fmt.Errorf("%w: %w", ErrCampaignNotPlayable, err)
+	}
+
+	session.release = release
+	return session, nil
+}
+
+// Close releases the campaign's turn lock. It is safe to call twice.
+func (t *TurnSession) Close() {
+	if t.release == nil {
+		return
+	}
+	t.release()
+	t.release = nil
+}
+
+// prepareTurn assembles everything a turn needs. It is built per turn on purpose:
+// a cached orchestrator would miss settings changes and note edits, which is a
+// failure this codebase has already produced twice.
+func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
+	s.ensureIndexed(gameID)
+
+	gameDir := s.resolver.GameDir(gameID)
+	manifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
+	if err != nil {
+		return nil, fmt.Errorf("load game manifest: %w", err)
+	}
+	if _, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml")); err != nil {
+		return nil, fmt.Errorf("load system %q: %w", manifest.SystemID, err)
+	}
+	if _, err := core.LoadWorldManifest(filepath.Join(s.resolver.WorldDir(manifest.WorldID), "world.yaml")); err != nil {
+		return nil, fmt.Errorf("load world %q: %w", manifest.WorldID, err)
+	}
+
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, fmt.Errorf("open store: %w", err)
+	}
+
+	cfg := s.configMgr.Get()
+	timeline := engine.NewTimeline(s.resolver, store, engine.NewHistoryLogger(filepath.Join(gameDir, "history.jsonl")), gameID)
+	timeline.SetVoiceProfiles(cfg.Media.TTS.VoiceProfiles)
+
+	router, err := harness.RouterFromConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("build router: %w", err)
+	}
+
+	jsEngine := rules.NewJSEngine(rules.NewHostBridge(store, timeline, manifest.Player))
+
+	startLocation := ""
+	if pinned, ok := manifest.Settings[engine.StartLocationSetting].(string); ok {
+		startLocation = pinned
+	}
+
+	orchestrator := engine.NewTurnOrchestrator(store, timeline, jsEngine, router, startLocation, manifest.Player)
+	orchestrator.SetExtractor(harness.ExtractorFromConfig(cfg, router))
+	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
+
+	return &TurnSession{
+		service:      s,
+		gameID:       gameID,
+		cfg:          cfg,
+		store:        store,
+		timeline:     timeline,
+		orchestrator: orchestrator,
+	}, nil
+}
+
+// Run plays one turn, emitting events as they happen. An emit failure cancels the
+// turn, which is how a disconnected client stops generation rather than paying for
+// a turn nobody will see.
+func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEvent) error) error {
+	turn, err := t.orchestrator.ProcessActionStream(ctx, req.Mode, req.Input, func(text string) error {
+		return emit(TurnEvent{Type: "chunk", Text: text})
+	})
+	if err != nil {
+		return err
+	}
+
+	dto := t.service.turnDTO(*turn, t.store, t.cfg, t.gameID)
+	return emit(TurnEvent{Type: "turn", Turn: &dto})
 }
 
 // GetLocationArt returns a location's scene image and its content type, drawing it
