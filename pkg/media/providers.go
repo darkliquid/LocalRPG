@@ -211,6 +211,39 @@ func NewSTTClient(cfg config.STTConfig) (STTClient, error) {
 	}
 }
 
+// fallbackImageClient covers a disabled or failing provider with the built-in
+// generator, so a scene always has art offline.
+type fallbackImageClient struct {
+	primary  ImageClient
+	fallback ImageClient
+}
+
+func (c *fallbackImageClient) GenerateImage(ctx context.Context, prompt string) ([]byte, error) {
+	data, err := c.primary.GenerateImage(ctx, prompt)
+	if err == nil {
+		return data, nil
+	}
+	return c.fallback.GenerateImage(ctx, prompt)
+}
+
+// NewSceneImageClient builds the image client used for scene art: the configured
+// provider, wrapping the built-in generator when the fallback is enabled.
+func NewSceneImageClient(cfg config.ImageConfig) (ImageClient, error) {
+	primary, err := NewImageClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if !cfg.BuiltinFallback {
+		return primary, nil
+	}
+
+	fallback, err := NewImageClient(config.ImageConfig{Type: "builtin", BuiltinName: "procedural-art"})
+	if err != nil {
+		return nil, err
+	}
+	return &fallbackImageClient{primary: primary, fallback: fallback}, nil
+}
+
 func NewImageClient(cfg config.ImageConfig) (ImageClient, error) {
 	switch cfg.Type {
 	case "disabled", "":

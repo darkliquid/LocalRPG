@@ -1,6 +1,7 @@
 package media_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -16,7 +17,7 @@ func TestMediaProviders_Disabled(t *testing.T) {
 	}
 	_, err = ttsClient.Synthesize(context.Background(), "Hello", nil)
 	if !errors.Is(err, media.ErrProviderDisabled) {
-		t.Errorf("expected ErrProviderDisabled, got %v", err)
+		t.Errorf("expected media.ErrProviderDisabled, got %v", err)
 	}
 
 	sttClient, err := media.NewSTTClient(config.STTConfig{Type: "disabled"})
@@ -25,7 +26,7 @@ func TestMediaProviders_Disabled(t *testing.T) {
 	}
 	_, err = sttClient.Transcribe(context.Background(), []byte("audio"))
 	if !errors.Is(err, media.ErrProviderDisabled) {
-		t.Errorf("expected ErrProviderDisabled, got %v", err)
+		t.Errorf("expected media.ErrProviderDisabled, got %v", err)
 	}
 
 	imgClient, err := media.NewImageClient(config.ImageConfig{Type: "disabled"})
@@ -34,7 +35,7 @@ func TestMediaProviders_Disabled(t *testing.T) {
 	}
 	_, err = imgClient.GenerateImage(context.Background(), "A dark tower")
 	if !errors.Is(err, media.ErrProviderDisabled) {
-		t.Errorf("expected ErrProviderDisabled, got %v", err)
+		t.Errorf("expected media.ErrProviderDisabled, got %v", err)
 	}
 }
 
@@ -73,5 +74,51 @@ func TestMediaProviders_BuiltinEcho(t *testing.T) {
 	}
 	if len(imgBytes) == 0 {
 		t.Errorf("expected non-empty image bytes from builtin echo")
+	}
+}
+
+func TestSceneImageClientAlwaysProducesArtByDefault(t *testing.T) {
+	// No provider configured, fallback on: the built-in generator stands in.
+	client, err := media.NewSceneImageClient(config.ImageConfig{Type: "disabled", BuiltinFallback: true})
+	if err != nil {
+		t.Fatalf("NewSceneImageClient failed: %v", err)
+	}
+
+	data, err := client.GenerateImage(context.Background(), "moonlit harbour")
+	if err != nil {
+		t.Fatalf("expected the built-in generator to stand in: %v", err)
+	}
+	if !bytes.Contains(bytes.ToLower(data), []byte("<svg")) {
+		t.Errorf("expected SVG art from the built-in generator")
+	}
+}
+
+func TestSceneImageClientRespectsAFailedProvider(t *testing.T) {
+	client, err := media.NewSceneImageClient(config.ImageConfig{
+		Type:            "http",
+		Endpoint:        "http://127.0.0.1:1/unreachable",
+		BuiltinFallback: true,
+	})
+	if err != nil {
+		t.Fatalf("NewSceneImageClient failed: %v", err)
+	}
+
+	data, err := client.GenerateImage(context.Background(), "moonlit harbour")
+	if err != nil {
+		t.Fatalf("expected the built-in generator to cover a provider failure: %v", err)
+	}
+	if !bytes.Contains(bytes.ToLower(data), []byte("<svg")) {
+		t.Errorf("expected fallback art")
+	}
+}
+
+func TestSceneImageClientWithoutFallbackStaysDisabled(t *testing.T) {
+	client, err := media.NewSceneImageClient(config.ImageConfig{Type: "disabled", BuiltinFallback: false})
+	if err != nil {
+		t.Fatalf("NewSceneImageClient failed: %v", err)
+	}
+
+	if _, err := client.GenerateImage(context.Background(), "moonlit harbour"); !errors.Is(err, media.ErrProviderDisabled) {
+		t.Errorf("expected media.ErrProviderDisabled, got %v", err)
 	}
 }

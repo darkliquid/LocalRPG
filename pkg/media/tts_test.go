@@ -164,3 +164,40 @@ func TestSynthesizeSegmentsResolvesLegacySpeakersByName(t *testing.T) {
 		t.Errorf("expected a legacy speaker name to resolve a voice, got %+v", client.lastVoice)
 	}
 }
+
+func TestSynthesizeSegmentPicksTheRightVoice(t *testing.T) {
+	client := &recordingTTSClient{}
+	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
+
+	narrator := &entity.VoiceConfig{VoiceID: "narrator-voice"}
+	voices := map[string]*entity.VoiceConfig{
+		"garrick": {VoiceID: "bm_george"},
+		"Sean":    {VoiceID: "player-voice"},
+	}
+	voiceFor := func(key string) *entity.VoiceConfig { return voices[key] }
+
+	if _, err := pipeline.SynthesizeSegment(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "The hall is quiet."}, narrator, voiceFor); err != nil {
+		t.Fatalf("SynthesizeSegment failed: %v", err)
+	}
+	if client.lastVoice == nil || client.lastVoice.VoiceID != "narrator-voice" {
+		t.Errorf("narration should use the narrator voice, got %+v", client.lastVoice)
+	}
+
+	if _, err := pipeline.SynthesizeSegment(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentSpeech, SpeakerID: "garrick", Text: "Keep walking."}, narrator, voiceFor); err != nil {
+		t.Fatalf("SynthesizeSegment failed: %v", err)
+	}
+	if client.lastVoice == nil || client.lastVoice.VoiceID != "bm_george" {
+		t.Errorf("speech should use the speaker's voice, got %+v", client.lastVoice)
+	}
+
+	// A legacy record has a name but no ID; the name still resolves a voice.
+	if _, err := pipeline.SynthesizeSegment(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentSpeech, Speaker: "Sean", Text: "Hello."}, narrator, voiceFor); err != nil {
+		t.Fatalf("SynthesizeSegment failed: %v", err)
+	}
+	if client.lastVoice == nil || client.lastVoice.VoiceID != "player-voice" {
+		t.Errorf("legacy speech should resolve by name, got %+v", client.lastVoice)
+	}
+}

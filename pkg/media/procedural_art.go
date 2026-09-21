@@ -3,6 +3,7 @@ package media
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"math/rand"
 	"strings"
 )
@@ -38,9 +39,11 @@ func (p *proceduralArtClient) GenerateImage(ctx context.Context, prompt string) 
 		accentColor = "#a855f7"
 	}
 
-	// Pseudo-random seed from prompt length for deterministic variation
-	seed := int64(len(prompt) * 31)
-	rng := rand.New(rand.NewSource(seed))
+	// Deterministic variation keyed on the prompt's content, so identical prompts
+	// produce identical art and prompts of equal length do not collide.
+	hasher := fnv.New64a()
+	hasher.Write([]byte(prompt))
+	rng := rand.New(rand.NewSource(int64(hasher.Sum64())))
 
 	// Generate stars/particles
 	var particles strings.Builder

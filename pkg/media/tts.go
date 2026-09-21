@@ -56,26 +56,7 @@ func (p *TTSPipeline) SynthesizeSegments(ctx context.Context, segments []entity.
 	clips := make([]string, 0, len(segments))
 
 	for _, segment := range segments {
-		voice := narratorVoice
-		speakerID := narratorSpeaker
-		if segment.Kind == entity.SegmentSpeech {
-			// Legacy records carry a speaker name but no entity ID, so fall back
-			// to the name when resolving a voice.
-			speakerID = segment.SpeakerID
-			if speakerID == "" {
-				speakerID = segment.Speaker
-			}
-			if speakerID == "" {
-				speakerID = narratorSpeaker
-			}
-			if voiceFor != nil {
-				if resolved := voiceFor(speakerID); resolved != nil {
-					voice = resolved
-				}
-			}
-		}
-
-		clip, err := p.SynthesizeUtterance(ctx, speakerID, voice, segment.Text)
+		clip, err := p.SynthesizeSegment(ctx, segment, narratorVoice, voiceFor)
 		if err != nil {
 			return nil, err
 		}
@@ -83,6 +64,31 @@ func (p *TTSPipeline) SynthesizeSegments(ctx context.Context, segments []entity.
 	}
 
 	return clips, nil
+}
+
+// SynthesizeSegment renders one segment: narration and unresolved speech read in
+// the narrator voice, resolved speech in the speaker's own. Legacy records carry a
+// speaker name but no entity ID, so the name is tried as a voice key too.
+func (p *TTSPipeline) SynthesizeSegment(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (string, error) {
+	voice := narratorVoice
+	speakerID := narratorSpeaker
+
+	if segment.Kind == entity.SegmentSpeech {
+		speakerID = segment.SpeakerID
+		if speakerID == "" {
+			speakerID = segment.Speaker
+		}
+		if speakerID == "" {
+			speakerID = narratorSpeaker
+		}
+		if voiceFor != nil {
+			if resolved := voiceFor(speakerID); resolved != nil {
+				voice = resolved
+			}
+		}
+	}
+
+	return p.SynthesizeUtterance(ctx, speakerID, voice, segment.Text)
 }
 
 func NewTTSPipeline(client TTSClient, cache *ContentCache) *TTSPipeline {
