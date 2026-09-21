@@ -1,6 +1,6 @@
 # Canonical Game Database, Turn Timeline, and Dialogue Attribution Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Give every campaign exactly one canonical SQLite index, record a numbered entity-linked timeline for every turn, extract entities into Markdown then sync them on every turn, and record ordered narration/speech segments so playback uses each character's own voice.
 
@@ -41,7 +41,7 @@ Phases 1 and 2 are independently shippable and reviewable on their own (Phase 1 
 - Consumes: nothing
 - Produces: `(*core.PathResolver).GameDBPath(gameID string) string`; `storage.OpenDB(path string) (*sql.DB, error)` now opens with `journal_mode=WAL`; `storage.Pool`, `storage.NewPool() *Pool`, `(*Pool).Store(path string) (*Store, error)`, `(*Pool).Close() error`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `pkg/core/gamedbpath_test.go`:
 
@@ -159,12 +159,12 @@ func TestPoolSharesStorePerPath(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -count=1 ./pkg/core/ ./pkg/storage/`
 Expected: FAIL — `paths.GameDBPath undefined`, `undefined: Pool`, and the pragma test reporting `journal_mode = "delete"`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/core/types.go`, directly after `GameDir`:
 
@@ -300,12 +300,12 @@ func TestPooledStoreIgnoresClose(t *testing.T) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/core/ ./pkg/storage/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/core/types.go pkg/core/gamedbpath_test.go pkg/storage/db.go pkg/storage/db_test.go pkg/storage/pool.go pkg/storage/pool_test.go
@@ -322,7 +322,7 @@ git commit -m "feat(storage): add a canonical database path and shared handle po
 - Consumes: `core.PathResolver.GameDBPath`, `storage.Pool`, `storage.NewStore`
 - Produces: `storage.OpenGameStore(paths *core.PathResolver, gameID string) (*Store, error)`; `storage.CloseGameStores() error`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/storage/game_test.go`:
 
@@ -382,12 +382,12 @@ func TestOpenGameStoreUsesCanonicalPathAndRetiresLegacyDB(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestOpenGameStoreUsesCanonicalPathAndRetiresLegacyDB -count=1 ./pkg/storage/`
 Expected: FAIL — `undefined: OpenGameStore`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/storage/game.go`:
 
@@ -459,12 +459,12 @@ func retireLegacyGameDB(paths *core.PathResolver, gameID string) error {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `go test -run TestOpenGameStoreUsesCanonicalPathAndRetiresLegacyDB -count=1 ./pkg/storage/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/game.go pkg/storage/game_test.go
@@ -482,7 +482,7 @@ git commit -m "feat(storage): open every game through one canonical store entry 
 - Consumes: `storage.OpenGameStore`, `core.PathResolver.GameDBPath`
 - Produces: no new exported API
 
-- [ ] **Step 1: Write the failing assertions**
+- [x] **Step 1: Write the failing assertions**
 
 Append to `TestGameInitAndLoad` in `pkg/engine/game_test.go`, before the closing brace:
 
@@ -495,12 +495,12 @@ Append to `TestGameInitAndLoad` in `pkg/engine/game_test.go`, before the closing
 	}
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestGameInitAndLoad -count=1 ./pkg/engine/`
 Expected: PASS if the current code already writes `cache/index.db`; the `game.db` assertion is the guard that no second database appears. If both assertions pass here, keep them as regression guards.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/engine/game.go`, replace the store-opening block:
 
@@ -547,12 +547,12 @@ with:
 
 Note the removed `defer store.Close()`: the store is pooled and outlives the command body. `gameCacheDir` stays in the `MkdirAll` loop in `InitGame`; `OpenGameStore` also creates the directory, so the loop entry is harmless.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/ ./cmd/localrpg/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/game.go pkg/engine/game_test.go cmd/localrpg/play.go
@@ -571,7 +571,7 @@ git commit -m "refactor(engine): open the canonical database from the engine and
 - Consumes: `storage.OpenGameStore`
 - Produces: `(*Service).store(gameID string) (*storage.Store, error)` (unexported)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `pkg/gui/service_test.go`, add:
 
@@ -594,12 +594,12 @@ func TestGetEntityReadsCanonicalDatabase(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestGetEntityReadsCanonicalDatabase -count=1 ./pkg/gui/`
 Expected: FAIL — the fixture still seeds `game.db`, so after the service switches to `cache/index.db` the backlinks are empty.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/gui/service.go`, add the helper next to `GetResolver`:
 
@@ -689,12 +689,12 @@ and add `github.com/darkliquid/localrpg/pkg/storage` to that file's imports. `Cl
 
 Also give the two fixture entities an explicit `id:` in the frontmatter (`id: player-elena`, `id: captain-kaelen`) so their indexed IDs match their filenames. Without it they are indexed under an empty ID and every edge lookup misses, which only stayed invisible while reads went through filenames.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/gui/ ./cmd/localrpg/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/service_test.go cmd/localrpg/gui.go
@@ -714,7 +714,7 @@ git commit -m "fix(gui): read and write the same database the engine indexes"
 - Consumes: `Store.db`
 - Produces: `storage.TurnRecord{Number int; Timestamp time.Time; Mode, Input, Narration, RollJSON, AudioRefsJSON string; Entities []TurnEntityRef}`, `storage.TurnEntityRef{EntityID, Mention string}`, `(*Store).SaveTurn(rec TurnRecord) error`, `(*Store).GetTurn(number int) (*TurnRecord, error)`, `(*Store).ListEntitiesForTurn(number int) ([]TurnEntityRef, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/storage/turn_test.go`:
 
@@ -796,12 +796,12 @@ func TestGetTurnMissing(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestSaveAndLoadTurn -count=1 ./pkg/storage/`
 Expected: FAIL — `undefined: TurnRecord`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Append to the `schema` constant in `pkg/storage/db.go`, after the edge indexes:
 
@@ -955,12 +955,12 @@ func emptyToNull(value string) interface{} {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/storage/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/db.go pkg/storage/turn.go pkg/storage/turn_test.go
@@ -977,7 +977,7 @@ git commit -m "feat(storage): persist turns and their entity links"
 - Consumes: `SaveTurn`
 - Produces: `(*Store).ListTurns(limit, offset int) ([]TurnRecord, error)`, `(*Store).ListTurnsForEntity(entityID string) ([]int, error)`, `(*Store).MaxTurnNumber() (int, error)`, `(*Store).CountTurns() (int, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/storage/turn_test.go`:
 
@@ -1066,12 +1066,12 @@ func TestTurnQueriesOnEmptyStore(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestTurnQueries -count=1 ./pkg/storage/`
 Expected: FAIL — `store.ListTurns undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Append to `pkg/storage/turn.go`:
 
@@ -1157,12 +1157,12 @@ func (s *Store) CountTurns() (int, error) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/storage/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/turn.go pkg/storage/turn_test.go
@@ -1179,7 +1179,7 @@ git commit -m "feat(storage): query turns by number, range, and entity"
 - Consumes: `SaveTurn`
 - Produces: `(*Store).DeleteTurnsFrom(number int) error`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/storage/turn_test.go`:
 
@@ -1244,12 +1244,12 @@ func TestDeleteTurnsFromMissingTableRowsIsSafe(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestDeleteTurnsFrom -count=1 ./pkg/storage/`
 Expected: FAIL — `store.DeleteTurnsFrom undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Append to `pkg/storage/turn.go`:
 
@@ -1274,12 +1274,12 @@ func (s *Store) DeleteTurnsFrom(number int) error {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/storage/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/turn.go pkg/storage/turn_test.go
@@ -1300,7 +1300,7 @@ git commit -m "feat(storage): delete indexed turns when the timeline is rewound"
 - Consumes: nothing
 - Produces: `entity.Mention{ID, Kind string}`, `entity.MentionPlayer`, `entity.MentionLocation`, `entity.MentionWikilink`, `entity.MentionExtracted`; `engine.Turn.Narration string`, `engine.Turn.Entities []entity.Mention`, `engine.Turn.LegacyOutput string`, `(Turn).Prose() string`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/history_test.go`:
 
@@ -1348,12 +1348,12 @@ func TestLoadHistoryNormalisesLegacyOutput(t *testing.T) {
 
 Replace `Output:` with `Narration:` in the existing `TestHistoryLogger` literals in the same file so the package still compiles.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestLoadHistoryNormalisesLegacyOutput -count=1 ./pkg/engine/`
 Expected: FAIL — `turns[0].Prose undefined` and `undefined: entity.MentionPlayer`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/entity/mention.go`:
 
@@ -1417,12 +1417,12 @@ In `loadHistoryUnlocked`, replace the unmarshal block with:
 
 Add `"strings"` and `"github.com/darkliquid/localrpg/pkg/entity"` to the file's imports.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/ ./pkg/entity/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity/mention.go pkg/engine/history.go pkg/engine/history_test.go
@@ -1439,7 +1439,7 @@ git commit -m "feat(engine): record entity involvement and the narrator rewrite 
 - Consumes: `Turn.Input`, `rules.EvaluateRoll`
 - Produces: no new exported API; `Turn.Input` is now the untouched player entry and `generationPrompt` is a local
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/orchestrator_test.go`:
 
@@ -1480,12 +1480,12 @@ func TestProcessActionPreservesRawInput(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestProcessActionPreservesRawInput -count=1 ./pkg/engine/`
 Expected: FAIL — `Input = "I rolled 1d20+5 with result N"`, the raw entry is lost.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/engine/orchestrator.go`, introduce a local prompt and stop mutating the input. Add after `var rollRes *rules.RollResult`:
 
@@ -1542,12 +1542,12 @@ Finally, in the constructed `Turn`, set both fields:
 	}
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/orchestrator_test.go
@@ -1566,7 +1566,7 @@ git commit -m "fix(engine): keep the player's own words in the turn record"
 - Consumes: `HistoryLogger.LoadHistory`, `storage.SaveTurn/DeleteTurnsFrom/CountTurns/MaxTurnNumber`
 - Produces: `engine.NewTimeline(paths *core.PathResolver, store *storage.Store, history *HistoryLogger, gameID string) *Timeline`, `(*Timeline).SyncTurns() (int, error)`, `(*Timeline).EnsureIndexed() error`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/engine/timeline_test.go`:
 
@@ -1692,12 +1692,12 @@ func TestTimelineMapsEntityMentions(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestTimeline -count=1 ./pkg/engine/`
 Expected: FAIL — `undefined: NewTimeline`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/engine/timeline.go`:
 
@@ -1858,12 +1858,12 @@ In `cmd/localrpg/play.go`, after the entity sync and before resolving the start 
 
 and move the existing `history := engine.NewHistoryLogger(historyPath)` line above it so both use one logger.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/ ./cmd/localrpg/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/timeline.go pkg/engine/timeline_test.go pkg/engine/game.go cmd/localrpg/play.go
@@ -1883,7 +1883,7 @@ git commit -m "feat(engine): rebuild the turn index from the timeline on open"
 - Consumes: `engine.Turn.Prose()`
 - Produces: no new exported API
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/export/script_test.go`:
 
@@ -1913,24 +1913,24 @@ func TestCompileReadsLegacyTurns(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestCompileReadsLegacyTurns -count=1 ./pkg/export/`
 Expected: FAIL — `script.Beats[0].Prose` is empty because `turn.Output` is now always empty.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - `pkg/export/script.go`: replace both `turn.Output` reads with `turn.Prose()`.
 - `pkg/gui/service.go` in `GetChronicle`: `Prose: turn.Prose()`.
 - `pkg/tui/app.go`: replace `turn.Output` with `turn.Prose()` in both the markdown render and the fallback write.
 - `pkg/export/script_test.go`: rename `Output:` literals to `Narration:` in the existing tests.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/export/ ./pkg/gui/ ./pkg/tui/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/tui/app.go pkg/gui/service.go pkg/export/script.go pkg/export/script_test.go
@@ -1950,7 +1950,7 @@ git commit -m "refactor(export,tui,gui): read turn prose through one accessor"
 - Consumes: nothing
 - Produces: `entity.EntityFrontmatter.History []int`, `entity.Entity.History []int`, round-tripped through `ParseMarkdownEntity`/`SerializeMarkdown` and persisted in `entities.frontmatter_json`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/entity/entity_test.go`:
 
@@ -2022,12 +2022,12 @@ func TestStoreRoundTripsEntityHistory(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestEntityHistoryRoundTrip|TestStoreRoundTripsEntityHistory" -count=1 ./pkg/entity/ ./pkg/storage/`
 Expected: FAIL — `ent.History undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/entity/entity.go`: add `History []int \`yaml:"history,omitempty" json:"history,omitempty"\`` to `EntityFrontmatter`, add `History []int` to `Entity`, set `History: fm.History` in `ParseMarkdownEntity`, and `History: e.History` in `SerializeMarkdown`'s `EntityFrontmatter` literal. Add `"strings"` to `pkg/entity/entity_test.go` imports if missing.
 
@@ -2043,12 +2043,12 @@ In `pkg/storage/store.go`: add `"history": e.History` to the `fmMeta` map in `Sa
 		}
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/entity/ ./pkg/storage/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity/entity.go pkg/entity/entity_test.go pkg/storage/store.go pkg/storage/store_test.go
@@ -2067,7 +2067,7 @@ git commit -m "feat(entity): let notes record the turns they took part in"
 - Consumes: `storage.Store.ListEntities`, `storage.Store.GetEntity`, `entity.Slugify`, `entity.WikilinkTarget`
 - Produces: `harness.Extractor`, `harness.NewExtractor(model ModelProvider) *Extractor`, `(*Extractor).SetVoiceProfiles([]config.VoiceProfile)`, `(*Extractor).Extract(ctx context.Context, narrative string) ([]ExtractedEntity, error)`, `harness.MergeExtractedEntity(existing *entity.Entity, raw *ExtractedEntity) *entity.Entity`, `harness.ResolveEntityMentions(store *storage.Store, playerID, locationID string, texts ...string) []entity.Mention`, `harness.ResolveSpeakerID(store *storage.Store, name string) string`, `entity.WikilinkTargets(text string) []string`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/harness/extractor_test.go`:
 
@@ -2159,12 +2159,12 @@ func TestWikilinkTargets(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestResolve|TestExtractorReturns|TestWikilinkTargets" -count=1 ./pkg/harness/ ./pkg/entity/`
 Expected: FAIL — `undefined: ResolveEntityMentions`, `undefined: NewExtractor`, `undefined: WikilinkTargets`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/entity/entity.go`, add next to `WikilinkTarget`:
 
@@ -2293,12 +2293,12 @@ func ResolveSpeakerID(store *storage.Store, name string) string {
 
 `EntityExtractor` is renamed, so update `pkg/harness/extractor_test.go` call sites and check nothing else references the old names: `grep -rn "EntityExtractor\|ExtractFromTurn\|ExtractEntitiesWithProfiles" --include=*.go pkg cmd` must return nothing outside this doc.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/harness/ ./pkg/entity/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity/entity.go pkg/entity/entity_test.go pkg/harness/extractor.go pkg/harness/extractor_test.go
@@ -2315,7 +2315,7 @@ git commit -m "refactor(harness): separate extraction from persistence and resol
 - Consumes: `harness.MatchExistingEntity`, `harness.MergeExtractedEntity`, `harness.AssignVoiceProfile`, `storage.Syncer.Sync`
 - Produces: `(*Timeline).SetVoiceProfiles([]config.VoiceProfile)`, `(*Timeline).RecordTurn(turn *Turn, extracted []harness.ExtractedEntity) error`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/timeline_test.go`:
 
@@ -2446,12 +2446,12 @@ func TestTimelineRecordTurnWritesNotesThenIndexes(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestTimelineRecordTurn -count=1 ./pkg/engine/`
 Expected: FAIL — `timeline.RecordTurn undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add to `pkg/engine/timeline.go` (imports gain `os`, `sort`, `strings`, `github.com/darkliquid/localrpg/pkg/config`, `github.com/darkliquid/localrpg/pkg/harness`):
 
@@ -2604,12 +2604,12 @@ func appendTurnNumber(history []int, turnNumber int) []int {
 
 Add the `voiceProfiles []config.VoiceProfile` field to the `Timeline` struct.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/timeline.go pkg/engine/timeline_test.go
@@ -2630,7 +2630,7 @@ git commit -m "feat(engine): extract entities into notes and link them to each t
 - Consumes: `Timeline.RecordTurn`, `harness.ResolveEntityMentions`, `harness.NewExtractor`
 - Produces: `engine.NewTurnOrchestrator(store *storage.Store, timeline *Timeline, rulesEngine *rules.JSEngine, router *harness.Router, locationID, playerID string) *TurnOrchestrator`, `(*TurnOrchestrator).SetExtractor(*harness.Extractor)`, `config.RoleGM`, `config.RoleNarrator`, `config.RoleExtractor`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/engine/orchestrator_test.go`:
 
@@ -2736,12 +2736,12 @@ Add to `TestGameInitAndLoad` in `pkg/engine/game_test.go`:
 	}
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestProcessActionRecordsEntitiesAndTimeline|TestProcessActionSurvivesExtractorFailure|TestGameInitAndLoad" -count=1 ./pkg/engine/`
 Expected: FAIL — `too many arguments in call to NewTurnOrchestrator`, `orchestrator.SetExtractor undefined`, and the `tavern.md` assertion.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/config/types.go`, add:
 
@@ -2892,12 +2892,12 @@ Update the remaining constructor call sites: `pkg/tui/app_test.go:42` and the ex
 	orchestrator := NewTurnOrchestrator(store, timeline, jsEngine, router, "tavern", "player")
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./... && go vet ./...`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/engine/orchestrator.go pkg/engine/game.go pkg/engine/game_test.go pkg/engine/orchestrator_test.go pkg/tui/app_test.go cmd/localrpg/play.go
@@ -2917,7 +2917,7 @@ git commit -m "feat(engine): extract and link entities on every turn"
 - Consumes: `storage.DeleteTurnsFrom`, `HistoryLogger.RewindToTurn`, `writeEntities`
 - Produces: `(*Timeline).RewindToTurn(target int) error`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/timeline_test.go`:
 
@@ -3041,12 +3041,12 @@ func TestProcessActionUndoRewindsIndex(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestTimelineRewind|TestProcessActionUndoRewindsIndex" -count=1 ./pkg/engine/`
 Expected: FAIL — `timeline.RewindToTurn undefined`; the index still holds the discarded turn.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Append to `pkg/engine/timeline.go`:
 
@@ -3120,12 +3120,12 @@ func (t *Timeline) pruneEntityHistory(affected map[string]bool, target int) erro
 
 In `pkg/engine/orchestrator.go`, replace `o.timeline.history.RewindToTurn(len(pastTurns) - 1)` with `o.timeline.RewindToTurn(len(pastTurns) - 1)`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/timeline.go pkg/engine/timeline_test.go pkg/engine/orchestrator.go pkg/engine/orchestrator_test.go
@@ -3146,7 +3146,7 @@ git commit -m "feat(engine): make undo rewind the log, the index, and entity lin
 - Consumes: `entity.WikilinkTarget`
 - Produces: `dialogue.Segment{Speaker, SpeakerID, Text string; IsSpeech bool}`, `dialogue.Parse(text string, resolve func(candidate string) (string, bool)) []Segment` (the callback returns the resolved entity ID)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/dialogue/dialogue_test.go`:
 
@@ -3203,12 +3203,12 @@ func TestParseEmptyText(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -count=1 ./pkg/dialogue/`
 Expected: FAIL — package does not exist
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/dialogue/dialogue.go`:
 
@@ -3267,12 +3267,12 @@ func Parse(text string, resolve func(candidate string) (string, bool)) []Segment
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/dialogue/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/dialogue/dialogue.go pkg/dialogue/dialogue_test.go
@@ -3294,7 +3294,7 @@ git commit -m "feat(dialogue): parse attributed speech behind an entity resoluti
 - Consumes: `dialogue.Parse`, `harness.ResolveSpeakerID`
 - Produces: `entity.TurnSegment{Kind, Speaker, SpeakerID, Text}`, `entity.SegmentNarration`, `entity.SegmentSpeech`, `entity.MentionSpeech`, `harness.Extraction{Entities, Dialogue}`, `harness.ExtractedDialogue{Speaker, Text}`, `(*Extractor).Extract(ctx, narrative) (*Extraction, error)`, `engine.Turn.Segments []entity.TurnSegment`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `pkg/engine/segments_test.go`:
 
@@ -3402,12 +3402,12 @@ func TestExtractorParsesObjectAndArrayResponses(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestBuildTurnSegments|TestSpeechMentions|TestExtractorParses" -count=1 ./pkg/engine/ ./pkg/harness/`
 Expected: FAIL — `undefined: buildTurnSegments`, `undefined: entity.SegmentSpeech`, `result.Entities undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/entity/segment.go`:
 
@@ -3662,12 +3662,12 @@ In `pkg/engine/orchestrator.go`, replace the extraction block from Task 15 with:
 	}
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./... && go vet ./...`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity/segment.go pkg/entity/mention.go pkg/engine/segments.go pkg/engine/segments_test.go pkg/engine/history.go pkg/engine/orchestrator.go pkg/harness/extractor.go pkg/harness/extractor_test.go
@@ -3685,7 +3685,7 @@ git commit -m "feat(engine): record ordered narration and speech segments per tu
 - Consumes: `entity.TurnSegment`, `dialogue.Parse`, `ContentCache`
 - Produces: `(*TTSPipeline).SynthesizeSegments(ctx context.Context, segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) ([]string, error)`, `media.LegacySegments(narration string) []entity.TurnSegment`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Replace the `ParseDialogueSegments` test in `pkg/media/tts_test.go` with:
 
@@ -3757,12 +3757,12 @@ func (c *recordingTTSClient) Synthesize(ctx context.Context, text string, voice 
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run "TestLegacySegments|TestSynthesizeSegments" -count=1 ./pkg/media/`
 Expected: FAIL — `undefined: LegacySegments`, `pipeline.SynthesizeSegments undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/media/tts.go`: delete `UtteranceSegment` and `ParseDialogueSegments` (both regexes go with them), then add:
 
@@ -3830,12 +3830,12 @@ Add `"github.com/darkliquid/localrpg/pkg/dialogue"` to the imports and define th
 const narratorSpeaker = "narrator"
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/media/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/tts.go pkg/media/tts_test.go
@@ -3855,7 +3855,7 @@ git commit -m "feat(media): render playback from recorded segments and per-speak
 - Consumes: `engine.Turn.Segments`, `media.LegacySegments`
 - Produces: `ReplayScript.Beats[].Segments []entity.TurnSegment`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Replace the speaker/dialogue assertions in `pkg/export/script_test.go` with:
 
@@ -3895,12 +3895,12 @@ func TestCompileKeepsAttributedSegments(t *testing.T) {
 
 Keep a variant of the existing legacy test: a record with only `narration` compiles into segments with the narration kind.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestCompileKeepsAttributedSegments -count=1 ./pkg/export/`
 Expected: FAIL — `script.Beats[0].Segments undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/export/types.go`, replace `Speaker` and `Dialogue` on `SceneBeat` with the recorded segments, keeping `AudioPath` as it is:
 
@@ -3958,12 +3958,12 @@ and remove the now-unused `#speaker` element from the markup.
 
 In `pkg/export/video.go`, leave the renderer as it is. It currently produces a silent still-image render (`-f lavfi color=...` plus `anullsrc`) and never reads `AudioPath`, so per-segment audio and timed frame changes are a separate piece of work owned by the story-theater export effort. Do not add speculative audio plumbing here; the segments are now on the beat for whoever picks that up.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/export/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/export/types.go pkg/export/script.go pkg/export/script_test.go pkg/export/web.go pkg/export/video.go
@@ -3984,7 +3984,7 @@ git commit -m "feat(export): replay and render turns from recorded segments"
 - Consumes: `storage.ListTurnsForEntity`, `engine.Timeline.EnsureIndexed`, `HistoryLogger.LoadHistory`
 - Produces: `gui.SegmentDTO{Kind, Speaker, SpeakerID, Text}`, `TurnDTO.EntitiesHit []string`, `TurnDTO.Segments []SegmentDTO`, `EntityDTO.History []int`, `(*Service).GetEntityTurns(ctx context.Context, gameID, entityID string) ([]TurnDTO, error)`, route `GET /api/game/{id}/entity/{eid}/turns`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/gui/service_test.go`:
 
@@ -4047,12 +4047,12 @@ func TestEntityTurnsRoute(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestGetChronicleAndEntityTurns|TestEntityTurnsRoute" -count=1 ./pkg/gui/`
 Expected: FAIL — `turns[0].EntitiesHit` is empty, `svc.GetEntityTurns undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/gui/types.go`:
 
@@ -4198,12 +4198,12 @@ In `pkg/gui/server.go`'s `handleGameRoutes` `case "entity":`, add the nested rou
 		}
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/service_test.go pkg/gui/server.go pkg/gui/server_test.go
@@ -4222,7 +4222,7 @@ git commit -m "feat(gui): expose timeline involvement and attributed segments"
 - Consumes: `Turn.segments`, `Turn.entities_hit`, `EntityNote.history`
 - Produces: `TurnSegments({ segments, fallback, onEntityClick })`, `TurnHistoryList({ turns })`
 
-- [ ] **Step 1: Update the shared types**
+- [x] **Step 1: Update the shared types**
 
 In `frontend/src/types.ts`:
 
@@ -4257,12 +4257,12 @@ export interface EntityNote {
 
 `speaker`, `dialogue`, and `audio_url` are dropped from `Turn` because the API no longer sends them; remove their usages in the same commit.
 
-- [ ] **Step 2: Run the type check to verify it fails**
+- [x] **Step 2: Run the type check to verify it fails**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: FAIL — `ChronicleView.tsx` reads `turn.speaker`, `turn.dialogue`, and `turn.audio_url`, which no longer exist on `Turn`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `frontend/src/components/TurnSegments.tsx`:
 
@@ -4395,12 +4395,12 @@ In `frontend/src/components/StoryTheater.tsx`, replace the single speaker/dialog
 
 and drop the now-unused `Volume2` import. Story Theater is read-only playback, so it passes no click handler.
 
-- [ ] **Step 4: Run the type check to verify it passes**
+- [x] **Step 4: Run the type check to verify it passes**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: PASS (no unused imports, since `noUnusedLocals` is enabled)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/TurnSegments.tsx frontend/src/components/TurnHistoryList.tsx frontend/src/components/ChronicleView.tsx frontend/src/components/CodexDrawer.tsx
@@ -4436,3 +4436,24 @@ git commit -m "feat(frontend): show attributed dialogue, entity involvement, and
 - Telling authored GM prompts to use the `Name: "…"` convention (spec §13, third open question). The extractor's `dialogue` array covers it for now; if deterministic attribution proves too weak, add the instruction to `prompt` files in a later change.
 - Per-entity roll outcomes in `turn_entities` (spec §13, second open question).
 - A Codex drawer that lists turns for an entity read straight from the API has the endpoint (`GetEntityTurns`, Task 21) but Task 22 renders the cheaper `history` list from the note itself. Wire the endpoint when the drawer needs full turn text.
+
+---
+
+## Execution Notes
+
+Implemented on top of the spec/plan and AGENTS.md doc commits: `b278da4` storage, `51f23a6` engine and playback, `e6ebf9c` frontend, then the docs alignment carrying this section. Every commit was checked out into a scratch worktree and built on its own, so each one is a usable bisect point.
+
+The first attempt at slicing this got the dependency order wrong: `pkg/export` calls `media.LegacySegments`, so committing the export changes before the media changes produced a commit that did not build. The playback work therefore ships inside the engine commit. When splitting a change like this, check each commit with `git worktree add --detach /tmp/verify <sha> && (cd /tmp/verify && go build ./...)` rather than assuming the layers are independent.
+
+Deviations from the task steps as written:
+
+- **Task 8 absorbed Task 11's read-site renames.** Renaming `Turn.Output` to `Narration` leaves `pkg/tui`, `pkg/gui`, and `pkg/export` uncompilable until they call `Prose()`, so the renames shipped with the rename itself. Task 11 kept its legacy-export test.
+- **Task 16 also routed `/undo` through `Timeline.RewindToTurn`.** Task 15 left the orchestrator calling `history.RewindToTurn`; rewinding the index is the whole point of the task, so the call moved with it.
+- **`Turn.Entities` is `[]entity.Mention`, not `[]string`.** Provenance (`turn_entities.mention`) is only rebuildable from the log if the log records it.
+- **`DialogueLine` became `entity.TurnSegment`.** A list of speech lines cannot say where in the prose each line sits, so playback would either double-read dialogue or drop prose. Segments cover narration *and* speech, in order.
+- **`media.UtteranceSegment` was deleted, not deprecated.** `entity.TurnSegment` replaces it outright; `LegacySegments` covers pre-`segments` records.
+- **`pkg/export/video.go` was left unchanged**, as the task predicted: it renders a silent still image and never reads audio. Per-segment audio remains with the story-theater export effort.
+
+Test files landed under the names below rather than the plan's single-file predictions: `pkg/engine/{timeline,record_turn,rewind,segments,startlocation}_test.go`, `pkg/engine/orchestrator_{input,timeline}_test.go`, `pkg/entity/history_test.go`, `pkg/storage/{db,pool,game,turn,entity_history}_test.go`, `pkg/export/legacy_script_test.go`, `pkg/gui/middleware_test.go`, `pkg/dialogue/dialogue_test.go`.
+
+Two defects surfaced while executing and were fixed in-flight: a pooled store that ignored `Close` was needed so `Session.Close()` could not leave a dead handle behind, and `strings.Trim(TrimSpace(x), quotes)` left a trailing space when splitting narration around attributed speech.

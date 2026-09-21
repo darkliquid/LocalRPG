@@ -6,11 +6,12 @@ A local-first, turn-based tabletop RPG client orchestrated by local and CLI LLMs
 
 ## Features
 
-- **Core Engine & Manifests:** Schema-agnostic YAML campaign manifests, path resolver, Markdown entity notes, and SQLite store.
+- **Core Engine & Manifests:** Schema-agnostic YAML campaign manifests, path resolver, Markdown entity notes, and one canonical SQLite index per campaign.
 - **Rule Extensibility:** Deterministic dice roller (`github.com/darkliquid/roll`), sandboxed JavaScript rules via Goja, and Wasm runtime via Wazero.
 - **LLM Harness Router:** CLI subprocess integration (`claude`, `codex`, `agy`), streaming HTTP Ollama, 4-layer context assembler, and background entity extraction.
+- **Campaign Timeline:** Every turn is recorded with the player's prompt, the narrator's rewrite, the entities involved, and who spoke which line — so a campaign's history is queryable rather than re-inferred from prose.
 - **Headless Terminal TUI:** Interactive Bubbletea client with Glamour Markdown rendering, dice rolling, and `/gm` steering.
-- **Multimodal Pipelines:** State-aware audio and art caching, Kokoro TTS dialogue attribution, ComfyUI image generator, and Whisper STT.
+- **Multimodal Pipelines:** State-aware audio and art caching, per-character voice playback from recorded dialogue, ComfyUI image generator, and Whisper STT.
 - **Wails v3 Desktop GUI:** Twintail Launcher inspired glassmorphic aesthetic in React 19 + TypeScript + Tailwind CSS.
 - **Story Theater & Exporter:** In-app Visual Novel replay player with audio-synced text pacing, standalone HTML5 bundle exporter, and headless FFmpeg video rendering.
 
@@ -62,6 +63,19 @@ mise run test
 # Launch desktop GUI
 bin/localrpg gui
 ```
+
+---
+
+## Campaign Timeline & Entity Memory
+
+A campaign lives in `games/<id>/` and answers "what happened, and who was involved" without re-reading prose:
+
+- **One database:** `cache/index.db` is the single canonical index, opened through one code path by both the CLI and the GUI. A pre-existing `game.db` is retired automatically on first open.
+- **Markdown is truth:** entity notes carry state, voice, and the turn numbers that touched them (`history: [3, 7]`); the index is derived and rebuilt from the notes plus `history.jsonl` whenever the two disagree.
+- **Every turn is extracted:** entities are matched against existing notes (by ID, name, then location/role), merged when they already exist and created when they do not, then written to disk and synced.
+- **Every turn is linked:** each `history.jsonl` record holds the player's raw prompt, the narrator's rewrite, and the entities involved, tagged by how (`player`, `location`, `wikilink`, `extracted`, `speech`).
+- **Dialogue carries its speaker:** turns store ordered narration and speech segments with speakers resolved to entities, so playback uses each character's own voice instead of guessing from prose.
+- **Undo is coherent:** `/undo` rewinds the log, the index, and entity turn links together. Entity prose is deliberately kept as the world's memory of what happened.
 
 ---
 
