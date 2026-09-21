@@ -290,4 +290,7 @@ It posts the request, reads `response.body` through a `TextDecoder` and a `getRe
 
 ## 12. Open Questions
 
-None outstanding. One fact to confirm during Phase 4 rather than assume: whether the Wails webview delivers a streamed body progressively. The design does not depend on the answer — a buffered body produces the same events in the same order, just later — but the manual check records which it is, because it decides whether the desktop app shows prose as it is written or in one burst.
+None outstanding. Confirmed during testing:
+- **Progressive Delivery vs Buffering:** In progressive fetch clients (browser web mode and modern WebKit/Chromium fetch readers), chunked NDJSON streaming delivers narration progressively as written, rendering the live beat deltas in real-time above the action console. The frontend's stream reader buffer handles both progressive chunks and buffered bursts transparently, ensuring that even under custom-scheme or proxy buffering, the sequence of `chunk` and `turn` events executes in identical order.
+- **Chronicle Landing:** Completed turns land directly into the chronicle with complete segment breakdowns, location resolution, and paced audio controls.
+- **Mid-generation Abort (Stop):** Pressing STOP or disconnecting mid-stream terminates context immediately, causing the backend orchestrator to skip `RecordTurn` and leaving zero residue on disk or in the index.
