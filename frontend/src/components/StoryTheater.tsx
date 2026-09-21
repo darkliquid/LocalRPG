@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Turn } from '../types';
-import { Play, Pause, SkipBack, SkipForward, X, Volume2 } from 'lucide-react';
+import { TurnSegments } from './TurnSegments';
+import { Play, Pause, SkipBack, SkipForward, X } from 'lucide-react';
 
 interface StoryTheaterProps {
   turns: Turn[];
@@ -61,22 +62,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({ turns, isOpen, onClo
       {/* Main Dialogue Card */}
       <main className="relative z-10 flex-1 flex items-center justify-center p-8">
         <div className="max-w-3xl w-full bg-glass-card rounded-2xl p-8 shadow-2xl border border-white/10 space-y-4">
-          {currentTurn?.speaker && (
-            <div className="flex items-center justify-between">
-              <span className="font-cinzel font-bold text-amber-400 text-sm tracking-widest uppercase">
-                {currentTurn.speaker}
-              </span>
-              {currentTurn.audio_url && (
-                <span className="flex items-center gap-1 text-xs text-amber-500 font-mono">
-                  <Volume2 className="w-4 h-4 animate-pulse" /> Voice Active
-                </span>
-              )}
-            </div>
-          )}
-
-          <p className="text-2xl leading-relaxed font-serif text-stone-100">
-            {currentTurn?.dialogue ? `"${currentTurn.dialogue}"` : currentTurn?.prose}
-          </p>
+          <TurnSegments segments={currentTurn?.segments} fallback={currentTurn?.prose ?? ''} />
         </div>
       </main>
 

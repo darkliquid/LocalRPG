@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { EntityNote } from '../types';
 import { Save, Volume2 } from 'lucide-react';
 import { DEFAULT_VOICE_PROFILES } from '../templates/providerPresets';
+import { TurnHistoryList } from './TurnHistoryList';
 
 interface CodexDrawerProps {
   entity?: EntityNote;
@@ -89,6 +90,8 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, onSave }) => {
         onChange={(e) => setMarkdown(e.target.value)}
         className="w-full flex-1 min-h-[320px] bg-black/50 border border-white/10 rounded-xl p-3 font-mono text-xs text-stone-200 focus:outline-none focus:border-amber-500/80 shadow-inner"
       />
+
+      <TurnHistoryList turns={entity.history} />
 
       {entity.backlinks && entity.backlinks.length > 0 && (
         <div className="pt-3 border-t border-white/10">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Turn } from '../types';
-import { Volume2 } from 'lucide-react';
+import { TurnSegments } from './TurnSegments';
 
 interface ChronicleViewProps {
   turns: Turn[];
@@ -8,26 +8,6 @@ interface ChronicleViewProps {
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({ turns, onWikilinkClick }) => {
-  const renderFormattedText = (text: string) => {
-    // Replace [[wikilinks]] with clickable buttons
-    const parts = text.split(/(\[\[[^\]]+\]\])/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('[[') && part.endsWith(']]')) {
-        const link = part.slice(2, -2);
-        return (
-          <button
-            key={i}
-            onClick={() => onWikilinkClick(link)}
-            className="text-amber-400 hover:text-amber-300 underline font-medium cursor-pointer mx-1 transition-colors"
-          >
-            {link}
-          </button>
-        );
-      }
-      return <span key={i}>{part}</span>;
-    });
-  };
-
   return (
     <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
       {turns.length === 0 ? (
@@ -54,32 +34,21 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({ turns, onWikilinkC
               </div>
             )}
 
-            {/* Dialogue with Speaker Bubble */}
-            {turn.dialogue && (
-              <div className="bg-glass-card border-l-4 border-amber-500/90 pl-4 py-3 pr-4 rounded-r-xl shadow-lg my-3 space-y-2">
-                <div className="flex items-center justify-between text-xs text-amber-400 font-cinzel font-bold tracking-widest">
-                  <span>{turn.speaker || 'UNKNOWN'}</span>
-                  {turn.audio_url && (
-                    <button
-                      onClick={() => new Audio(turn.audio_url).play()}
-                      className="flex items-center gap-1.5 hover:text-amber-300 cursor-pointer text-stone-400 transition-colors"
-                      title="Play voice clip"
-                    >
-                      <Volume2 className="w-3.5 h-3.5" />
-                      <span>Play</span>
-                    </button>
-                  )}
-                </div>
-                <p className="text-stone-100 text-lg leading-relaxed italic">
-                  "{renderFormattedText(turn.dialogue)}"
-                </p>
-              </div>
-            )}
+            {/* Narrated prose and attributed speech, in playback order */}
+            <TurnSegments segments={turn.segments} fallback={turn.prose} onEntityClick={onWikilinkClick} />
 
-            {/* Narrator Prose */}
-            {turn.prose && (
-              <div className="text-stone-200 text-xl leading-relaxed tracking-wide font-serif">
-                {renderFormattedText(turn.prose)}
+            {/* Entities involved in this turn */}
+            {turn.entities_hit && turn.entities_hit.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {turn.entities_hit.map((entityId) => (
+                  <button
+                    key={entityId}
+                    onClick={() => onWikilinkClick(entityId)}
+                    className="px-2 py-0.5 text-xs font-cinzel tracking-wider rounded-full bg-white/5 border border-white/10 text-stone-300 hover:text-amber-300 hover:border-amber-500/60 cursor-pointer transition-colors"
+                  >
+                    {entityId}
+                  </button>
+                ))}
               </div>
             )}
           </div>

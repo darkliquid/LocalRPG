@@ -14,14 +14,19 @@ export interface GameState {
   locations: string[];
 }
 
+export interface TurnSegment {
+  kind: 'narration' | 'speech';
+  speaker?: string;
+  speaker_id?: string;
+  text: string;
+}
+
 export interface Turn {
   turn_number: number;
   input_text: string;
   mode: string;
   prose: string;
-  speaker?: string;
-  dialogue?: string;
-  audio_url?: string;
+  segments?: TurnSegment[];
   image_url?: string;
   entities_hit?: string[];
 }
@@ -33,6 +38,7 @@ export interface EntityNote {
   markdown: string;
   state: Record<string, any>;
   backlinks: string[];
+  history?: number[];
 }
 
 export interface GraphNode {
