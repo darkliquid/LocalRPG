@@ -1136,7 +1136,7 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}
-		text, err := client.Transcribe(ctx, []byte("fake-audio-header"))
+		text, err := client.Transcribe(ctx, media.GenerateToneWAV(440, 0.1))
 		latency := time.Since(start).Milliseconds()
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, LatencyMS: latency, Message: err.Error()}, nil
@@ -1178,4 +1178,19 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 			Message: fmt.Sprintf("unsupported test category: %s", req.Category),
 		}, nil
 	}
+}
+
+// TranscribeAudio transcribes recorded audio data using the configured STT client.
+func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string, error) {
+	cfg := s.configMgr.Get()
+	if cfg.Media.STT.Type == "" || cfg.Media.STT.Type == "disabled" {
+		return "", fmt.Errorf("STT engine is disabled or unconfigured")
+	}
+
+	client, err := media.NewSTTClient(cfg.Media.STT)
+	if err != nil {
+		return "", fmt.Errorf("initialize STT client: %w", err)
+	}
+
+	return client.Transcribe(ctx, audioData)
 }

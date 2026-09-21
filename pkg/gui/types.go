@@ -226,3 +226,8 @@ func (r *TurnRequest) validate() error {
 	}
 	return nil
 }
+
+// STTResponse is the transcription result returned from POST /api/stt.
+type STTResponse struct {
+	Text string `json:"text"`
+}

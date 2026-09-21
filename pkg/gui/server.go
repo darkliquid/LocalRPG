@@ -39,6 +39,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/world/", s.handleWorldRoutes)
 	s.mux.HandleFunc("/api/settings", s.handleSettingsRoutes)
 	s.mux.HandleFunc("/api/settings/test-provider", s.handleTestProviderRoute)
+	s.mux.HandleFunc("/api/stt", s.handleSTTRoute)
 	if s.assetServer != nil {
 		s.mux.Handle("/", s.assetServer)
 	}
@@ -451,6 +452,59 @@ func (s *Server) handleTestProviderRoute(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, res)
+}
+
+func (s *Server) handleSTTRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 25<<20)
+
+	var audioData []byte
+	contentType := r.Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(25 << 20); err != nil {
+			http.Error(w, "failed to parse multipart form: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		file, _, err := r.FormFile("audio")
+		if err != nil {
+			file, _, err = r.FormFile("file")
+		}
+		if err != nil {
+			http.Error(w, "missing audio or file in multipart form", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+		data, err := io.ReadAll(file)
+		if err != nil {
+			http.Error(w, "failed to read audio file: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		audioData = data
+	} else {
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		audioData = data
+	}
+
+	if len(audioData) == 0 {
+		http.Error(w, "empty audio payload", http.StatusBadRequest)
+		return
+	}
+
+	text, err := s.service.TranscribeAudio(r.Context(), audioData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, STTResponse{Text: text})
 }
 
 // maxTurnBody bounds a player action so a runaway paste cannot allocate without

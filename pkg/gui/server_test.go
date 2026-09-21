@@ -2,7 +2,10 @@
 package gui
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/media"
 )
 
@@ -546,5 +550,61 @@ func TestTurnEndpointConflictsWhileATurnIsInFlight(t *testing.T) {
 	}
 	if rec.Header().Get("Retry-After") == "" {
 		t.Errorf("expected a Retry-After header")
+	}
+}
+
+func TestSTTEndpoint_TranscribesAudio(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewService(tmpDir)
+
+	cfg, _ := svc.GetSettings(context.Background())
+	cfg.Config.Media.STT = config.STTConfig{
+		Type: "builtin",
+	}
+	_, _ = svc.SaveSettings(context.Background(), cfg.Config)
+
+	server := NewServer(svc, http.NotFoundHandler())
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("audio", "speech.webm")
+	if err != nil {
+		t.Fatalf("failed to create form file: %v", err)
+	}
+	_, _ = part.Write([]byte("fake-audio-bytes"))
+	_ = writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/stt", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := httptest.NewRecorder()
+
+	server.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d (%s)", w.Code, w.Body.String())
+	}
+
+	var res map[string]string
+	_ = json.Unmarshal(w.Body.Bytes(), &res)
+	if res["text"] == "" {
+		t.Errorf("expected non-empty transcribed text")
+	}
+}
+
+func TestSTTEndpoint_RejectsWhenDisabled(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewService(tmpDir)
+
+	cfg, _ := svc.GetSettings(context.Background())
+	cfg.Config.Media.STT = config.STTConfig{Type: "disabled"}
+	_, _ = svc.SaveSettings(context.Background(), cfg.Config)
+
+	server := NewServer(svc, http.NotFoundHandler())
+	req := httptest.NewRequest(http.MethodPost, "/api/stt", bytes.NewReader([]byte("audio")))
+	req.Header.Set("Content-Type", "audio/webm")
+	w := httptest.NewRecorder()
+
+	server.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request, got %d", w.Code)
 	}
 }

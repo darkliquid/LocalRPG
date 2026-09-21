@@ -80,7 +80,7 @@ func (n *nativeOSTTSClient) Synthesize(ctx context.Context, text string, voice *
 	if voice != nil && voice.Pitch > 0 {
 		pitch = 220.0 * voice.Pitch
 	}
-	return generateToneWAV(pitch, 0.4), nil
+	return GenerateToneWAV(pitch, 0.4), nil
 }
 
 func stringsEscapePowerShell(s string) string {
@@ -95,7 +95,8 @@ func stringsEscapePowerShell(s string) string {
 	return b.String()
 }
 
-func generateToneWAV(freq float64, durationSec float64) []byte {
+// GenerateToneWAV generates a valid PCM WAV audio tone of the given frequency and duration.
+func GenerateToneWAV(freq float64, durationSec float64) []byte {
 	sampleRate := 44100
 	numSamples := int(float64(sampleRate) * durationSec)
 	dataSize := numSamples * 2 // 16-bit = 2 bytes per sample
