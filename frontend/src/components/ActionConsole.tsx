@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Send, Mic, Dices, MessageSquare, Zap, Compass, Square } from 'lucide-react';
+import { Send, Mic, Dices, MessageSquare, Zap, Compass, Square, Loader2 } from 'lucide-react';
+import { useVoiceInput } from '../hooks/useVoiceInput';
 
 interface ActionConsoleProps {
   onSubmit: (mode: string, text: string) => void;
   disabled?: boolean;
   streaming?: boolean;
   onStop?: () => void;
+  sttType?: string;
 }
 
 export const ActionConsole: React.FC<ActionConsoleProps> = ({
@@ -13,9 +15,19 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({
   disabled,
   streaming,
   onStop,
+  sttType,
 }) => {
   const [text, setText] = useState('');
   const [mode, setMode] = useState<'do' | 'say' | 'story' | 'roll'>('do');
+
+  const handleVoiceTranscribed = (transcript: string) => {
+    setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+  };
+
+  const { isRecording, isTranscribing, error: voiceError, toggleRecording } = useVoiceInput({
+    onTranscribed: handleVoiceTranscribed,
+    sttType,
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,11 +104,26 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({
         />
         <button
           type="button"
-          disabled={isInputDisabled}
-          className="shrink-0 p-2.5 rounded-xl bg-stone-900/70 border border-white/5 hover:bg-stone-800 text-stone-400 hover:text-amber-400 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          title="Speech-to-Text Voice Input"
+          onClick={toggleRecording}
+          disabled={isInputDisabled || isTranscribing}
+          className={`shrink-0 p-2.5 rounded-xl border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+            isRecording
+              ? 'bg-red-900/60 text-red-300 border-red-500/80 animate-pulse shadow-lg shadow-red-900/40'
+              : 'bg-stone-900/70 border-white/5 hover:bg-stone-800 text-stone-400 hover:text-amber-400'
+          }`}
+          title={
+            isRecording
+              ? 'Recording speech... Click to stop and transcribe'
+              : isTranscribing
+              ? 'Transcribing audio...'
+              : 'Dictate action with voice'
+          }
         >
-          <Mic className="w-5 h-5" />
+          {isTranscribing ? (
+            <Loader2 className="w-5 h-5 animate-spin text-amber-400" />
+          ) : (
+            <Mic className={`w-5 h-5 ${isRecording ? 'text-red-300' : ''}`} />
+          )}
         </button>
         {streaming ? (
           <button
@@ -118,6 +145,11 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({
           </button>
         )}
       </form>
+      {voiceError && (
+        <div className="mt-1.5 text-xs text-red-400/90 font-mono px-1">
+          {voiceError}
+        </div>
+      )}
     </div>
   );
 };

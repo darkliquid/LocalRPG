@@ -252,6 +252,7 @@ export const App: React.FC = () => {
                 onSubmit={handleActionSubmit}
                 streaming={turnInFlight}
                 onStop={handleStopTurn}
+                sttType={config?.media.stt?.type}
               />
             </div>
           </main>
