@@ -69,39 +69,10 @@ func handlePlayCommand(args []string) {
 	ruleLoader := rules.NewRuleLoader(paths, jsEngine)
 	_ = ruleLoader.LoadRules(manifest.SystemID, manifest.WorldID)
 
-	// Setup model router from global config
-	router := harness.NewRouter()
-	for role, roleCfg := range cfg.Agents.Roles {
-		// An inherited role resolves through the role it names, so it is not
-		// registered as a provider of its own.
-		if roleCfg.Type == "inherit" {
-			continue
-		}
-
-		p, err := harness.NewModelProvider(role, harness.ProviderConfig{
-			Type:        roleCfg.Type,
-			BuiltinName: roleCfg.BuiltinName,
-			Command:     roleCfg.Command,
-			Args:        roleCfg.Args,
-			Endpoint:    roleCfg.Endpoint,
-			Model:       roleCfg.Model,
-			APIKey:      roleCfg.APIKey,
-			Temperature: roleCfg.Temperature,
-			MaxTokens:   roleCfg.MaxTokens,
-		})
-		if err == nil {
-			router.RegisterProvider(p)
-			router.AssignRole(role, role)
-		}
-	}
-	for role, fb := range cfg.Agents.Fallbacks {
-		if fb != "" {
-			router.SetFallback(role, fb)
-		}
-	}
-	if _, err := router.GetProviderForRole("gm"); err != nil {
-		router.RegisterProvider(harness.NewCLIProvider("default-echo", "echo", []string{}))
-		router.AssignRole("gm", "default-echo")
+	router, err := harness.RouterFromConfig(cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error building model router: %v\n", err)
+		os.Exit(1)
 	}
 
 	orchestrator := engine.NewTurnOrchestrator(

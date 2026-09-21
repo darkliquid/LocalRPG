@@ -3,6 +3,8 @@ package harness
 import (
 	"context"
 	"fmt"
+
+	"github.com/darkliquid/localrpg/pkg/config"
 )
 
 type disabledModelProvider struct {
@@ -55,4 +57,53 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 	default:
 		return nil, fmt.Errorf("unknown model provider type: %s", cfg.Type)
 	}
+}
+
+// RouterFromConfig builds the role-routed provider registry a turn needs: one
+// provider per configured role, the configured fallbacks, and an echo default for
+// gm when nothing else is set up. Inherited roles are skipped because they resolve
+// through the role they name.
+func RouterFromConfig(cfg *config.Config) (*Router, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("build router: no config")
+	}
+
+	router := NewRouter()
+
+	for role, roleCfg := range cfg.Agents.Roles {
+		if roleCfg.Type == "inherit" {
+			continue
+		}
+
+		provider, err := NewModelProvider(role, ProviderConfig{
+			Type:        roleCfg.Type,
+			BuiltinName: roleCfg.BuiltinName,
+			Command:     roleCfg.Command,
+			Args:        roleCfg.Args,
+			Endpoint:    roleCfg.Endpoint,
+			Model:       roleCfg.Model,
+			APIKey:      roleCfg.APIKey,
+			Temperature: roleCfg.Temperature,
+			MaxTokens:   roleCfg.MaxTokens,
+		})
+		if err != nil {
+			continue
+		}
+
+		router.RegisterProvider(provider)
+		router.AssignRole(role, role)
+	}
+
+	for role, fallback := range cfg.Agents.Fallbacks {
+		if fallback != "" {
+			router.SetFallback(role, fallback)
+		}
+	}
+
+	if _, err := router.GetProviderForRole(config.RoleGM); err != nil {
+		router.RegisterProvider(NewCLIProvider("default-echo", "echo", []string{}))
+		router.AssignRole(config.RoleGM, "default-echo")
+	}
+
+	return router, nil
 }
