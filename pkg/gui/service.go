@@ -3,7 +3,6 @@ package gui
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,6 +16,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"gopkg.in/yaml.v3"
 )
@@ -166,9 +166,9 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, a
 	return dtos
 }
 
-// ErrAudioUnavailable means no TTS provider is configured, which is a normal state
-// rather than a failure: the client stays silent.
-var ErrAudioUnavailable = errors.New("audio unavailable")
+// ErrAudioUnavailable is the scene package's sentinel, kept as an alias here so
+// the route and its tests read unchanged and there is only one value to compare.
+var ErrAudioUnavailable = scene.ErrAudioUnavailable
 
 func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDTO, error) {
 	gameDir := s.resolver.GameDir(gameID)

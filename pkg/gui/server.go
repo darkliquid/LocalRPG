@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/media"
 )
 
 type Server struct {
@@ -110,8 +111,15 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		case err != nil:
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
-			w.Header().Set("Content-Type", "audio/wav")
-			http.ServeFile(w, r, path)
+			// The clip's type comes from its bytes: a provider returns whatever its
+			// engine produces, which is not necessarily what the configuration says.
+			data, err := os.ReadFile(path)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", media.AudioContentType(data))
+			_, _ = w.Write(data)
 		}
 
 	case "location":

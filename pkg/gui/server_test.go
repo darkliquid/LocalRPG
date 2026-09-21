@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/darkliquid/localrpg/pkg/media"
 )
 
 func TestGUIServerRoutes(t *testing.T) {
@@ -371,5 +373,56 @@ func TestSegmentAudioRoute(t *testing.T) {
 	}
 	if rec.Body.Len() == 0 {
 		t.Errorf("expected audio bytes")
+	}
+}
+
+func TestSegmentAudioRouteSniffsTheContentType(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/turn/1/segment/1/audio", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	// The type is read from the bytes rather than assumed, so a provider that
+	// returns MP3 is served as MP3.
+	ct := rec.Header().Get("Content-Type")
+	if want := media.AudioContentType(rec.Body.Bytes()); ct != want {
+		t.Errorf("Content-Type = %q, want %q", ct, want)
+	}
+	if !strings.HasPrefix(ct, "audio/") {
+		t.Errorf("Content-Type = %q, want an audio type", ct)
+	}
+}
+
+func TestSegmentAudioRouteReportsAnUnavailableProvider(t *testing.T) {
+	// A service whose config never enabled TTS.
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+
+	quiet := NewService(t.TempDir())
+	if err := os.MkdirAll(quiet.GetResolver().GameDir(gameID), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(quiet.GetResolver().GameDir(gameID), "history.jsonl"),
+		mustRead(t, filepath.Join(svc.GetResolver().GameDir(gameID), "history.jsonl")),
+		0644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	server := NewServer(quiet, http.NotFoundHandler())
+	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/turn/1/segment/1/audio", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected 204 when no TTS provider is configured, got %d", rec.Code)
 	}
 }

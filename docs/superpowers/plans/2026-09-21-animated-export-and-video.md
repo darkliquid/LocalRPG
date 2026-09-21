@@ -3197,7 +3197,7 @@ git commit -m "feat(cli): expose export media options and document the result"
 - Consumes: `ContentCache`
 - Produces: `media.AudioExtension(data []byte) string`, `media.AudioContentType(data []byte) string`; `gui.ErrAudioUnavailable = scene.ErrAudioUnavailable`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/media/tts_test.go`:
 
@@ -3256,12 +3256,12 @@ func TestSynthesizeUtteranceReusesALegacyWavNamedClip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestAudioExtension|TestSynthesizeUtteranceReuses" -count=1 ./pkg/media/`
 Expected: FAIL — `undefined: AudioExtension`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/media/tts.go`:
 
@@ -3373,12 +3373,12 @@ func TestSegmentAudioRouteSniffsTheContentType(t *testing.T) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/media/ ./pkg/gui/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/tts.go pkg/media/tts_test.go pkg/gui/service.go pkg/gui/server_test.go

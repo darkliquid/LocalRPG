@@ -1,6 +1,7 @@
 package media
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"path/filepath"
@@ -12,6 +13,44 @@ import (
 
 // narratorSpeaker is the cache namespace for lines read in the narrator voice.
 const narratorSpeaker = "narrator"
+
+// audioExtensions are the names a cached clip may carry, in the order they are
+// looked for. The legacy .wav name is last so a cache written before clips were
+// named honestly stays warm.
+var audioExtensions = []string{".mp3", ".ogg", ".flac", ".wav"}
+
+// AudioExtension names a clip from its bytes, because a provider returns whatever
+// its engine produces rather than what the configuration implies.
+func AudioExtension(data []byte) string {
+	switch {
+	case bytes.HasPrefix(data, []byte("RIFF")):
+		return ".wav"
+	case bytes.HasPrefix(data, []byte("ID3")):
+		return ".mp3"
+	case len(data) > 1 && data[0] == 0xFF && data[1]&0xE0 == 0xE0:
+		return ".mp3"
+	case bytes.HasPrefix(data, []byte("OggS")):
+		return ".ogg"
+	case bytes.HasPrefix(data, []byte("fLaC")):
+		return ".flac"
+	default:
+		return ".wav"
+	}
+}
+
+// AudioContentType is the MIME type for a clip's bytes.
+func AudioContentType(data []byte) string {
+	switch AudioExtension(data) {
+	case ".mp3":
+		return "audio/mpeg"
+	case ".ogg":
+		return "audio/ogg"
+	case ".flac":
+		return "audio/flac"
+	default:
+		return "audio/wav"
+	}
+}
 
 // LegacySegments parses pre-segment turns at playback time. Speaker names are
 // resolved permissively: legacy records never carried entity IDs, so any speaker
@@ -104,9 +143,9 @@ func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string,
 		voiceHash = fmt.Sprintf("%s:%s:%.2f:%.2f", voice.Provider, voice.VoiceID, voice.Pitch, voice.SpeechRate)
 	}
 
-	cacheKey := ComputeAudioCacheKey(speakerID, voiceHash, text) + ".wav"
-	if p.cache.Exists("audio", cacheKey) {
-		return filepath.Join(p.cache.Subdir("audio"), cacheKey), nil
+	base := ComputeAudioCacheKey(speakerID, voiceHash, text)
+	if path, ok := p.cachedClip(base); ok {
+		return path, nil
 	}
 
 	audioBytes, err := p.client.Synthesize(ctx, text, voice)
@@ -114,5 +153,16 @@ func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string,
 		return "", fmt.Errorf("synthesize utterance: %w", err)
 	}
 
-	return p.cache.Put("audio", cacheKey, audioBytes)
+	return p.cache.Put("audio", base+AudioExtension(audioBytes), audioBytes)
+}
+
+// cachedClip finds a clip under any known extension, so a cache written under an
+// older naming scheme is reused rather than regenerated.
+func (p *TTSPipeline) cachedClip(base string) (string, bool) {
+	for _, ext := range audioExtensions {
+		if p.cache.Exists("audio", base+ext) {
+			return filepath.Join(p.cache.Subdir("audio"), base+ext), true
+		}
+	}
+	return "", false
 }

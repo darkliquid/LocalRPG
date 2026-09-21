@@ -2,10 +2,111 @@ package media
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
+
+// formatTTSClient returns MP3 bytes, which is what a real engine may hand back
+// whatever the configuration implies.
+type formatTTSClient struct {
+	calls int
+}
+
+func (c *formatTTSClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
+	c.calls++
+	return []byte("ID3\x04\x00" + text), nil
+}
+
+func TestAudioExtensionSniffsTheBytes(t *testing.T) {
+	cases := map[string]string{
+		"RIFF....WAVEfmt ":           ".wav",
+		"ID3\x04\x00":                ".mp3",
+		"\xff\xfb\x90\x00":           ".mp3",
+		"OggS\x00\x02":               ".ogg",
+		"fLaC\x00\x00":               ".flac",
+		"surprise bytes from a host": ".wav",
+	}
+
+	for body, want := range cases {
+		if got := AudioExtension([]byte(body)); got != want {
+			t.Errorf("AudioExtension(%q) = %q, want %q", body, got, want)
+		}
+	}
+
+	if got := AudioContentType([]byte("ID3\x04\x00")); got != "audio/mpeg" {
+		t.Errorf("AudioContentType = %q, want audio/mpeg", got)
+	}
+	if got := AudioContentType([]byte("OggS\x00\x02")); got != "audio/ogg" {
+		t.Errorf("AudioContentType = %q, want audio/ogg", got)
+	}
+	if got := AudioContentType([]byte("fLaC\x00\x00")); got != "audio/flac" {
+		t.Errorf("AudioContentType = %q, want audio/flac", got)
+	}
+	if got := AudioContentType([]byte("RIFF")); got != "audio/wav" {
+		t.Errorf("AudioContentType = %q, want audio/wav", got)
+	}
+}
+
+func TestSynthesizeUtteranceReusesALegacyWavNamedClip(t *testing.T) {
+	client := &recordingTTSClient{}
+	cache := NewContentCache(t.TempDir())
+	pipeline := NewTTSPipeline(client, cache)
+
+	first, err := pipeline.SynthesizeUtterance(context.Background(), "narrator", nil, "hello")
+	if err != nil {
+		t.Fatalf("SynthesizeUtterance failed: %v", err)
+	}
+
+	// A cache written before clips were named honestly still holds a .wav, and a
+	// second run must reuse it rather than synthesising again.
+	data, err := os.ReadFile(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(first, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := pipeline.SynthesizeUtterance(context.Background(), "narrator", nil, "hello")
+	if err != nil {
+		t.Fatalf("second SynthesizeUtterance failed: %v", err)
+	}
+	if second != first {
+		t.Errorf("expected the cached clip %q, got %q", first, second)
+	}
+	if client.calls != 1 {
+		t.Errorf("expected 1 synthesis call, got %d", client.calls)
+	}
+}
+
+func TestSynthesizeUtteranceNamesAClipFromItsBytes(t *testing.T) {
+	client := &formatTTSClient{}
+	cache := NewContentCache(t.TempDir())
+	pipeline := NewTTSPipeline(client, cache)
+
+	path, err := pipeline.SynthesizeUtterance(context.Background(), "narrator", nil, "hello")
+	if err != nil {
+		t.Fatalf("SynthesizeUtterance failed: %v", err)
+	}
+	if ext := filepath.Ext(path); ext != ".mp3" {
+		t.Errorf("clip path = %q, want an .mp3 name for MP3 bytes", path)
+	}
+
+	// The honest name is found on the next run, so nothing is regenerated.
+	again, err := pipeline.SynthesizeUtterance(context.Background(), "narrator", nil, "hello")
+	if err != nil {
+		t.Fatalf("second SynthesizeUtterance failed: %v", err)
+	}
+	if again != path {
+		t.Errorf("expected the cached clip %q, got %q", path, again)
+	}
+	if client.calls != 1 {
+		t.Errorf("expected 1 synthesis call, got %d", client.calls)
+	}
+}
 
 type mockTTSClient struct {
 	lastVoice string
