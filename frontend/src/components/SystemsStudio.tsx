@@ -173,7 +173,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
       {/* Right Detail Column: Editor */}
       <section className="flex-1 bg-glass-card rounded-2xl border border-stone-800/80 p-6 flex flex-col gap-5 shadow-xl backdrop-blur-md overflow-hidden">
         {/* Top Header & Sub-Tabs */}
-        <div className="flex items-center justify-between border-b border-stone-800/80 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800/80 pb-3">
           <div className="flex items-center gap-3">
             <h2 className="font-cinzel text-lg font-bold text-amber-400">
               {selectedID ? name || 'Edit System' : 'Create New System'}
@@ -185,8 +185,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex bg-stone-950/80 p-1 rounded-xl border border-stone-800">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap bg-stone-950/80 p-1 rounded-xl border border-stone-800">
               <button
                 type="button"
                 onClick={() => setActiveTab('manifest')}

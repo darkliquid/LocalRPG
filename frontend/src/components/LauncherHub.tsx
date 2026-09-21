@@ -322,8 +322,9 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
       {/* New Campaign Creation Wizard Modal */}
       {isWizardOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="relative w-full max-w-lg rounded-2xl bg-stone-900/95 border border-amber-500/30 shadow-2xl p-6 md:p-8 space-y-6">
-            <div className="flex items-center justify-between border-b border-stone-800 pb-4">
+          <div className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-stone-900/95 border border-amber-500/30 shadow-2xl overflow-hidden">
+            {/* Fixed Header */}
+            <div className="flex items-center justify-between border-b border-stone-800 px-6 py-4 shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-400" />
                 <h3 className="font-cinzel text-lg font-bold text-amber-400">
@@ -332,131 +333,135 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
               </div>
               <button
                 onClick={() => setIsWizardOpen(false)}
-                className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition-colors"
+                className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {(!systems.length || !worlds.length) && (
-              <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 space-y-3 text-xs text-amber-200">
-                <div className="flex items-center gap-2 font-cinzel font-bold text-amber-400">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>Setup Required</span>
-                </div>
-                <p className="text-stone-300">
-                  LocalRPG starts with no pre-installed defaults. Before creating a campaign, please author or load a reference template in the Studios.
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {systems.length === 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsWizardOpen(false);
-                        setActiveTab('systems');
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold cursor-pointer transition-all shadow"
-                    >
-                      <Shield className="w-3.5 h-3.5" />
-                      <span>Create Rule System</span>
-                    </button>
-                  )}
-                  {worlds.length === 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsWizardOpen(false);
-                        setActiveTab('worlds');
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold cursor-pointer transition-all shadow"
-                    >
-                      <Globe className="w-3.5 h-3.5" />
-                      <span>Create World Setting</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleCreateGame} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
-                  Campaign Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Whispers of the High Hollow"
-                  value={newGameName}
-                  onChange={(e) => setNewGameName(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                    <Shield className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Rule System</span>
-                  </label>
-                  <select
-                    value={newSystemID}
-                    onChange={(e) => setNewSystemID(e.target.value)}
-                    disabled={systems.length === 0}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    {systems.length === 0 && <option value="" disabled>No rule systems available</option>}
-                    {systems.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            {/* Form with scrollable body and pinned footer */}
+            <form onSubmit={handleCreateGame} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {(!systems.length || !worlds.length) && (
+                  <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 space-y-3 text-xs text-amber-200">
+                    <div className="flex items-center gap-2 font-cinzel font-bold text-amber-400">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Setup Required</span>
+                    </div>
+                    <p className="text-stone-300">
+                      LocalRPG starts with no pre-installed defaults. Before creating a campaign, please author or load a reference template in the Studios.
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {systems.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsWizardOpen(false);
+                            setActiveTab('systems');
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold cursor-pointer transition-all shadow"
+                        >
+                          <Shield className="w-3.5 h-3.5" />
+                          <span>Create Rule System</span>
+                        </button>
+                      )}
+                      {worlds.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsWizardOpen(false);
+                            setActiveTab('worlds');
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold cursor-pointer transition-all shadow"
+                        >
+                          <Globe className="w-3.5 h-3.5" />
+                          <span>Create World Setting</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                    <Globe className="w-3.5 h-3.5 text-amber-400" />
-                    <span>World Setting</span>
+                  <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
+                    Campaign Title
                   </label>
-                  <select
-                    value={newWorldID}
-                    onChange={(e) => setNewWorldID(e.target.value)}
-                    disabled={worlds.length === 0}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    {worlds.length === 0 && <option value="" disabled>No worlds available</option>}
-                    {worlds.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Whispers of the High Hollow"
+                    value={newGameName}
+                    onChange={(e) => setNewGameName(e.target.value)}
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Rule System</span>
+                    </label>
+                    <select
+                      value={newSystemID}
+                      onChange={(e) => setNewSystemID(e.target.value)}
+                      disabled={systems.length === 0}
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {systems.length === 0 && <option value="" disabled>No rule systems available</option>}
+                      {systems.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-amber-400" />
+                      <span>World Setting</span>
+                    </label>
+                    <select
+                      value={newWorldID}
+                      onChange={(e) => setNewWorldID(e.target.value)}
+                      disabled={worlds.length === 0}
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {worlds.length === 0 && <option value="" disabled>No worlds available</option>}
+                      {worlds.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {selectedWorld?.description && (
+                  <p className="text-[11px] text-stone-400 italic bg-stone-950/60 p-3 rounded-xl border border-stone-800/60">
+                    "{selectedWorld.description}"
+                  </p>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Protagonist Character Name</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Elena Nightshade"
+                    value={newPlayerName}
+                    onChange={(e) => setNewPlayerName(e.target.value)}
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                  />
                 </div>
               </div>
 
-              {selectedWorld?.description && (
-                <p className="text-[11px] text-stone-400 italic bg-stone-950/60 p-3 rounded-xl border border-stone-800/60">
-                  "{selectedWorld.description}"
-                </p>
-              )}
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Protagonist Character Name</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Elena Nightshade"
-                  value={newPlayerName}
-                  onChange={(e) => setNewPlayerName(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
-                />
-              </div>
-
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-stone-800">
+              {/* Pinned Action Footer */}
+              <div className="flex items-center justify-end gap-3 border-t border-stone-800 px-6 py-4 shrink-0 bg-stone-900/90">
                 <button
                   type="button"
                   onClick={() => setIsWizardOpen(false)}
