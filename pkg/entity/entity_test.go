@@ -52,6 +52,41 @@ She wields the [[Vorpal-Dagger|dread dagger]] and answers to [[The-Iron-Pact]].
 	}
 }
 
+func TestSlugify(t *testing.T) {
+	cases := map[string]string{
+		"Lady Evelyn Vance":       "lady-evelyn-vance",
+		"  Old Market  ":          "old-market",
+		"Alden--Tavern":           "alden-tavern",
+		"iron_pact":               "iron-pact",
+		"Théâtre of Whispers":     "thtre-of-whispers",
+		"!!!":                     "",
+		"Turn 12: The Long Night": "turn-12-the-long-night",
+	}
+
+	for input, want := range cases {
+		if got := Slugify(input); got != want {
+			t.Errorf("Slugify(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestWikilinkTarget(t *testing.T) {
+	cases := map[string]string{
+		"Alden-Tavern":                "Alden-Tavern",
+		"[[Alden-Tavern]]":            "Alden-Tavern",
+		"[[Vorpal-Dagger|dagger]]":    "Vorpal-Dagger",
+		"  [[ The-Iron-Pact ]]  ":     "The-Iron-Pact",
+		"":                            "",
+		"[[Lord Vance|his lordship]]": "Lord Vance",
+	}
+
+	for input, want := range cases {
+		if got := WikilinkTarget(input); got != want {
+			t.Errorf("WikilinkTarget(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
 func TestSerializeMarkdownEntity(t *testing.T) {
 	e := &Entity{
 		ID:   "alden-tavern",

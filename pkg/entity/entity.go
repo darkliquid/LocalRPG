@@ -30,6 +30,7 @@ type EntityFrontmatter struct {
 	Portrait  string                 `yaml:"portrait,omitempty"`
 	Location  string                 `yaml:"location,omitempty"`
 	Faction   string                 `yaml:"faction,omitempty"`
+	History   []int                  `yaml:"history,omitempty" json:"history,omitempty"`
 	State     map[string]interface{} `yaml:"state,omitempty"`
 	ExtraMeta map[string]interface{} `yaml:",inline"`
 }
@@ -43,6 +44,7 @@ type Entity struct {
 	Portrait  string
 	Location  string
 	Faction   string
+	History   []int
 	State     *state.State
 	ExtraMeta map[string]interface{}
 	Body      string
@@ -114,6 +116,7 @@ func ParseMarkdownEntity(data []byte) (*Entity, error) {
 		Portrait:  fm.Portrait,
 		Location:  fm.Location,
 		Faction:   fm.Faction,
+		History:   fm.History,
 		State:     state.NewState(fm.State),
 		ExtraMeta: fm.ExtraMeta,
 		Body:      bodyRaw,
@@ -122,6 +125,49 @@ func ParseMarkdownEntity(data []byte) (*Entity, error) {
 	}
 
 	return entity, nil
+}
+
+// WikilinkTarget extracts the link target from a [[target]] or [[target|label]]
+// reference, returning the input unchanged when it is not a wikilink.
+func WikilinkTarget(ref string) string {
+	cleaned := strings.TrimSpace(ref)
+	cleaned = strings.TrimPrefix(cleaned, "[[")
+	cleaned = strings.TrimSuffix(cleaned, "]]")
+	if idx := strings.Index(cleaned, "|"); idx >= 0 {
+		cleaned = cleaned[:idx]
+	}
+	return strings.TrimSpace(cleaned)
+}
+
+// WikilinkTargets returns every link target found in text.
+func WikilinkTargets(text string) []string {
+	matches := wikilinkRegex.FindAllStringSubmatch(text, -1)
+	targets := make([]string, 0, len(matches))
+	for _, m := range matches {
+		if len(m) > 1 {
+			targets = append(targets, strings.TrimSpace(m[1]))
+		}
+	}
+	return targets
+}
+
+// Slugify converts a display name into a stable kebab-case identifier.
+func Slugify(name string) string {
+	var buf strings.Builder
+	precededBySeparator := true
+	for _, r := range strings.ToLower(strings.TrimSpace(name)) {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
+			buf.WriteRune(r)
+			precededBySeparator = false
+		case r == ' ' || r == '-' || r == '_':
+			if buf.Len() > 0 && !precededBySeparator {
+				buf.WriteRune('-')
+				precededBySeparator = true
+			}
+		}
+	}
+	return strings.TrimSuffix(buf.String(), "-")
 }
 
 func (e *Entity) SerializeMarkdown() ([]byte, error) {
@@ -134,6 +180,7 @@ func (e *Entity) SerializeMarkdown() ([]byte, error) {
 		Portrait:  e.Portrait,
 		Location:  e.Location,
 		Faction:   e.Faction,
+		History:   e.History,
 		ExtraMeta: e.ExtraMeta,
 	}
 	if e.State != nil {

@@ -25,7 +25,6 @@ type WorldManifest struct {
 	Tags          []string `yaml:"tags,omitempty"`
 }
 
-
 type GameManifest struct {
 	ID       string                 `yaml:"id"`
 	Name     string                 `yaml:"name"`
@@ -101,6 +100,11 @@ func (p *PathResolver) GamesDir() string {
 
 func (p *PathResolver) GameDir(id string) string {
 	return filepath.Join(p.GamesDir(), id)
+}
+
+// GameDBPath returns the canonical SQLite index for a campaign.
+func (p *PathResolver) GameDBPath(gameID string) string {
+	return filepath.Join(p.GameDir(gameID), "cache", "index.db")
 }
 
 func (p *PathResolver) CacheDir() string {

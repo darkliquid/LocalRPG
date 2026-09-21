@@ -15,7 +15,8 @@ type Edge struct {
 }
 
 type Store struct {
-	db *sql.DB
+	db     *sql.DB
+	shared bool
 }
 
 func NewStore(path string) (*Store, error) {
@@ -26,7 +27,12 @@ func NewStore(path string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
+// Close releases the underlying handle. A store handed out by a Pool is shared,
+// so its lifetime belongs to the pool and Close is a no-op.
 func (s *Store) Close() error {
+	if s.shared {
+		return nil
+	}
 	return s.db.Close()
 }
 
@@ -43,6 +49,7 @@ func (s *Store) SaveEntity(e *entity.Entity) error {
 		"portrait": e.Portrait,
 		"location": e.Location,
 		"faction":  e.Faction,
+		"history":  e.History,
 		"extra":    e.ExtraMeta,
 	}
 	if e.State != nil {
@@ -115,6 +122,13 @@ func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 		if port, ok := meta["portrait"].(string); ok {
 			ent.Portrait = port
 		}
+		if history, ok := meta["history"].([]interface{}); ok {
+			for _, value := range history {
+				if number, ok := value.(float64); ok {
+					ent.History = append(ent.History, int(number))
+				}
+			}
+		}
 	}
 
 	return &ent, nil
@@ -153,5 +167,50 @@ func (s *Store) GetEdgesTo(targetID string) ([]Edge, error) {
 		}
 		edges = append(edges, e)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return edges, nil
+}
+
+// EntitySummary is a lightweight projection of an indexed entity.
+type EntitySummary struct {
+	ID       string
+	Name     string
+	Type     string
+	Location string
+	Tags     []string
+}
+
+// ListEntities returns every indexed entity ordered by entity ID.
+func (s *Store) ListEntities() ([]EntitySummary, error) {
+	rows, err := s.db.Query(`SELECT id, name, type, frontmatter_json FROM entities ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	summaries := make([]EntitySummary, 0)
+	for rows.Next() {
+		var summary EntitySummary
+		var fmJSON string
+		if err := rows.Scan(&summary.ID, &summary.Name, &summary.Type, &fmJSON); err != nil {
+			return nil, err
+		}
+
+		var meta struct {
+			Location string   `json:"location"`
+			Tags     []string `json:"tags"`
+		}
+		if err := json.Unmarshal([]byte(fmJSON), &meta); err == nil {
+			summary.Location = meta.Location
+			summary.Tags = meta.Tags
+		}
+
+		summaries = append(summaries, summary)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return summaries, nil
 }

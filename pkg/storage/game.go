@@ -1,0 +1,65 @@
+package storage
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/darkliquid/localrpg/pkg/core"
+)
+
+// legacyGameDB is the pre-timeline database name. It is retired on first open.
+const legacyGameDB = "game.db"
+
+var gameStores = NewPool()
+
+// OpenGameStore returns the shared canonical store for a campaign, retiring a
+// legacy game.db first. It is the only way a game database is opened.
+func OpenGameStore(paths *core.PathResolver, gameID string) (*Store, error) {
+	if paths == nil {
+		return nil, fmt.Errorf("open game store %q: missing path resolver", gameID)
+	}
+
+	dbPath := paths.GameDBPath(gameID)
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		return nil, fmt.Errorf("create game cache dir: %w", err)
+	}
+
+	if err := retireLegacyGameDB(paths, gameID); err != nil {
+		return nil, err
+	}
+
+	store, err := gameStores.Store(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("open game store %q: %w", gameID, err)
+	}
+	return store, nil
+}
+
+// CloseGameStores releases every pooled game store.
+func CloseGameStores() error {
+	return gameStores.Close()
+}
+
+func retireLegacyGameDB(paths *core.PathResolver, gameID string) error {
+	legacy := filepath.Join(paths.GameDir(gameID), legacyGameDB)
+
+	if _, err := os.Stat(legacy); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("inspect legacy game database: %w", err)
+	}
+
+	// Walk the WAL sidecars too, so no stale bytes are left behind.
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		from := legacy + suffix
+		if _, err := os.Stat(from); err != nil {
+			continue
+		}
+		if err := os.Rename(from, from+".legacy"); err != nil {
+			return fmt.Errorf("retire legacy game database: %w", err)
+		}
+	}
+	return nil
+}

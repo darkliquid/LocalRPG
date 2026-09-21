@@ -47,3 +47,44 @@ func TestStorageOperations(t *testing.T) {
 		t.Errorf("expected edge to Eldoria, got: %+v", edges)
 	}
 }
+
+func TestListEntities(t *testing.T) {
+	tempDir := t.TempDir()
+	store, err := NewStore(filepath.Join(tempDir, "index.db"))
+	if err != nil {
+		t.Fatalf("NewStore failed: %v", err)
+	}
+	defer store.Close()
+
+	tavern := &entity.Entity{
+		ID:       "alden-tavern",
+		Name:     "Alden Tavern",
+		Type:     "location",
+		Body:     "A warm tavern.",
+		Tags:     []string{"tavern", "safehouse"},
+		Location: "[[Eldoria]]",
+		Hash:     "hash-tavern",
+	}
+	if err := store.SaveEntity(tavern); err != nil {
+		t.Fatalf("SaveEntity failed: %v", err)
+	}
+
+	summaries, err := store.ListEntities()
+	if err != nil {
+		t.Fatalf("ListEntities failed: %v", err)
+	}
+	if len(summaries) != 1 {
+		t.Fatalf("expected 1 summary, got %d", len(summaries))
+	}
+
+	got := summaries[0]
+	if got.ID != tavern.ID || got.Name != tavern.Name || got.Type != tavern.Type {
+		t.Errorf("summary mismatch: %+v", got)
+	}
+	if got.Location != tavern.Location {
+		t.Errorf("expected location %q, got %q", tavern.Location, got.Location)
+	}
+	if len(got.Tags) != 2 || got.Tags[0] != "tavern" {
+		t.Errorf("expected tags from frontmatter, got %+v", got.Tags)
+	}
+}
