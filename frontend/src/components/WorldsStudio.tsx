@@ -539,7 +539,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 <select
                   value={defaultSystem}
                   onChange={(e) => setDefaultSystem(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3.5 pr-9 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer"
                 >
                   {systems.map((s) => (
                     <option key={s.id} value={s.id}>

@@ -73,7 +73,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, onSave }) => {
               e.target.value = '';
             }
           }}
-          className="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1 text-xs font-mono text-amber-300 focus:outline-none cursor-pointer"
+          className="bg-stone-900 border border-amber-500/30 rounded-lg pl-2.5 pr-8 py-1 text-xs font-mono text-amber-300 focus:outline-none cursor-pointer"
           defaultValue=""
         >
           <option value="" disabled>Select Archetype...</option>

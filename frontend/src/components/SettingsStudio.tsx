@@ -289,7 +289,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       e.target.value = '';
                     }
                   }}
-                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg px-2 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load Preset...</option>
@@ -304,7 +304,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <select
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value as any)}
-                  className="bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1 text-xs text-amber-300 font-mono focus:outline-none"
+                  className="bg-stone-950 border border-stone-800 rounded-lg pl-2.5 pr-7 py-1 text-xs text-amber-300 font-mono focus:outline-none cursor-pointer"
                 >
                   {roleNames.map((role) => (
                     <option key={role} value={role}>
@@ -331,7 +331,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         },
                       });
                     }}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                   >
                     <option value="disabled">Disabled / Inactive</option>
                     <option value="http">HTTP / OpenAI-Compatible (Ollama, vLLM, OpenAI)</option>
@@ -347,7 +347,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <select
                       value={currentRoleConfig.inherit_from || 'gm'}
                       onChange={(e) => updateRole({ type: 'inherit', inherit_from: e.target.value })}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono focus:outline-none"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-amber-300 font-mono focus:outline-none cursor-pointer"
                     >
                       {roleNames.map((role) => (
                         <option key={role} value={role}>
@@ -489,7 +489,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           },
                         });
                       }}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                     >
                       <option value="narrative-oracle">narrative-oracle (Deterministic Procedural Storyteller)</option>
                       <option value="echo">echo (Debug Provider)</option>
@@ -558,7 +558,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       e.target.value = '';
                     }
                   }}
-                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg px-2.5 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load TTS Preset...</option>
@@ -597,7 +597,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       media: { ...config.media, tts: { ...config.media.tts, type: e.target.value as any } },
                     })
                   }
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
                   <option value="http">HTTP (Kokoro-FastAPI, AllTalk, OpenAI Speech)</option>
@@ -617,7 +617,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         media: { ...config.media, tts: { ...config.media.tts, builtin_name: e.target.value } },
                       })
                     }
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                   >
                     <option value="native-os">native-os (OS Speech Synthesizer / Procedural Audio)</option>
                     <option value="echo">echo (Debug Mock)</option>
@@ -974,7 +974,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       e.target.value = '';
                     }
                   }}
-                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg px-2.5 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load STT Preset...</option>
@@ -1001,7 +1001,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       },
                     })
                   }
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
                   <option value="http">HTTP (Faster-Whisper, OpenAI Whisper)</option>
@@ -1112,7 +1112,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       e.target.value = '';
                     }
                   }}
-                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg px-2.5 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load Image Preset...</option>
@@ -1151,7 +1151,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       media: { ...config.media, image: { ...config.media.image, type: e.target.value as any } },
                     })
                   }
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
                   <option value="http">HTTP (ComfyUI, Automatic1111, LocalAI, DALL-E)</option>
@@ -1171,7 +1171,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         media: { ...config.media, image: { ...config.media.image, builtin_name: e.target.value } },
                       })
                     }
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                   >
                     <option value="procedural-art">procedural-art (Pure-Go Vector Dark Fantasy SVG)</option>
                     <option value="echo">echo (Debug Mock)</option>

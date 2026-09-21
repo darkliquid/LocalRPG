@@ -406,7 +406,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
                       value={newSystemID}
                       onChange={(e) => setNewSystemID(e.target.value)}
                       disabled={systems.length === 0}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3.5 pr-9 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
                     >
                       {systems.length === 0 && <option value="" disabled>No rule systems available</option>}
                       {systems.map((s) => (
@@ -426,7 +426,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
                       value={newWorldID}
                       onChange={(e) => setNewWorldID(e.target.value)}
                       disabled={worlds.length === 0}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3.5 pr-9 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
                     >
                       {worlds.length === 0 && <option value="" disabled>No worlds available</option>}
                       {worlds.map((w) => (
