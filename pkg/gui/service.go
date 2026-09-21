@@ -321,37 +321,37 @@ func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, e
 	}
 
 	cfg := s.configMgr.Get()
-	artAvailable := cfg.Media.Image.BuiltinFallback || cfg.Media.Image.Type != "disabled"
-
 	store, err := s.store(gameID)
 	if err != nil {
-		store = nil // location names and art are decoration, not prerequisites
+		store = nil // location names and art URLs are decoration, not prerequisites
 	}
 
 	dtos := make([]TurnDTO, len(turns))
 	for i, turn := range turns {
-		audioAvailable := cfg.Media.TTS.Type != "" && cfg.Media.TTS.Type != "disabled"
-		dtos[i] = s.turnDTO(turn, store, cfg, gameID, artAvailable, audioAvailable)
+		dtos[i] = s.turnDTO(turn, store, cfg, gameID)
 	}
 	return dtos, nil
 }
 
-// turnDTO maps a persisted turn for the API, so a live turn and a replayed one are
-// the same shape and the client needs one rendering path.
-func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID string, artAvailable, audioAvailable bool) TurnDTO {
+// turnDTO maps a persisted turn for the API. GetChronicle and the turn endpoint
+// share it so a live turn and a replayed one are the same shape, which is what
+// lets the client render both with one code path.
+func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID string) TurnDTO {
+	audioAvailable := cfg.Media.TTS.Type != "" && cfg.Media.TTS.Type != "disabled"
+	artAvailable := cfg.Media.Image.BuiltinFallback || cfg.Media.Image.Type != "disabled"
+
 	dto := TurnDTO{
 		TurnNumber:  turn.Number,
 		InputText:   turn.Input,
 		Mode:        turn.Mode,
 		Prose:       turn.Prose(),
+		Outcome:     turn.Outcome,
 		EntitiesHit: mentionIDs(turn.Entities),
 		Segments:    segmentDTOs(turn.Segments, gameID, turn.Number, audioAvailable),
-		Outcome:     turn.Outcome,
 	}
 
 	if turn.Location != "" {
 		dto.LocationID = turn.Location
-
 		if store != nil {
 			if location, err := store.GetEntity(turn.Location); err == nil && location != nil {
 				dto.LocationName = location.Name

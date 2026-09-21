@@ -369,3 +369,34 @@ func TestChronicleReportsSegmentDurations(t *testing.T) {
 		}
 	}
 }
+
+func TestChronicleTurnsCarryLocationAndPacing(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"I look around","narration":"The harbour is quiet.","location":"aldon-harbour","outcome":"clean_look","segments":[{"kind":"narration","text":"The harbour is quiet."}],"entities":[{"id":"player-elena","mention":"player"},{"id":"aldon-harbour","mention":"location"}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(svc.GetResolver().GameDir(gameID), "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	turns, err := svc.GetChronicle(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("GetChronicle failed: %v", err)
+	}
+	if len(turns) != 1 {
+		t.Fatalf("expected 1 turn, got %d", len(turns))
+	}
+
+	turn := turns[0]
+	if turn.LocationID != "aldon-harbour" || turn.LocationName != "Aldon Harbour" {
+		t.Errorf("expected the location resolved, got %q / %q", turn.LocationID, turn.LocationName)
+	}
+	if turn.Outcome != "clean_look" {
+		t.Errorf("Outcome = %q", turn.Outcome)
+	}
+	if turn.LocationArtURL == "" {
+		t.Errorf("expected an art URL when the built-in generator is available")
+	}
+	if len(turn.Segments) != 1 || turn.Segments[0].Duration < scene.MinimumBeatDuration.Seconds() {
+		t.Errorf("expected a paced segment, got %+v", turn.Segments)
+	}
+}
