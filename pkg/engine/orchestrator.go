@@ -129,7 +129,12 @@ func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, world
 	}
 }
 
-func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput string) (*Turn, error) {
+// ProcessActionStream runs a turn, reporting narration deltas as they arrive. It
+// is the implementation; ProcessAction is the same pipeline without a listener.
+// A non-nil error from onChunk aborts before anything is recorded, which is how a
+// client that has disconnected stops generation rather than letting it finish into
+// nothing.
+func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, actionInput string, onChunk func(text string) error) (*Turn, error) {
 	pastTurns, err := o.timeline.history.LoadHistory()
 	if err != nil {
 		return nil, fmt.Errorf("load history: %w", err)
@@ -233,12 +238,7 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
 	}
 
-	// Generate story response from GM model
-	req := harness.GenerateRequest{
-		Prompt: contextPrompt,
-	}
-
-	resp, err := o.router.GenerateForRole(ctx, "gm", req)
+	narration, err := o.generate(ctx, contextPrompt, onChunk)
 	if err != nil {
 		return nil, fmt.Errorf("gm generation failed: %w", err)
 	}
@@ -249,7 +249,7 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 		Mode:      mode,
 		Input:     actionInput,
 		Roll:      rollRes,
-		Narration: resp.Text,
+		Narration: narration,
 		Location:  locationID,
 		Outcome:   outcome,
 	}
@@ -292,4 +292,42 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 	}
 
 	return &turn, nil
+}
+
+// ProcessAction runs a turn without reporting narration as it arrives.
+func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput string) (*Turn, error) {
+	return o.ProcessActionStream(ctx, mode, actionInput, nil)
+}
+
+// generate streams the GM's reply, forwarding each delta and accumulating the text.
+func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk func(string) error) (string, error) {
+	chunks := make(chan harness.StreamChunk, 32)
+
+	streamErr := make(chan error, 1)
+	go func() {
+		streamErr <- o.router.StreamForRole(ctx, "gm", harness.GenerateRequest{Prompt: prompt}, chunks)
+	}()
+
+	var sb strings.Builder
+	for chunk := range chunks {
+		if chunk.Error != nil {
+			<-streamErr
+			return "", chunk.Error
+		}
+		if chunk.Text == "" {
+			continue
+		}
+
+		sb.WriteString(chunk.Text)
+		if onChunk != nil {
+			if err := onChunk(chunk.Text); err != nil {
+				return "", err
+			}
+		}
+	}
+
+	if err := <-streamErr; err != nil {
+		return "", err
+	}
+	return sb.String(), nil
 }
