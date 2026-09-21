@@ -12,7 +12,7 @@ import { LivingWorldDrawer } from './components/LivingWorldDrawer';
 import { StoryTheater } from './components/StoryTheater';
 import { LauncherHub } from './components/LauncherHub';
 import { SettingsStudio } from './components/SettingsStudio';
-import { User, Network, BookOpen, Clock, Film, Compass, Settings } from 'lucide-react';
+import { User, Network, BookOpen, Clock, Film, Compass, Settings, X } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeGameID, setActiveGameID] = useState<string | null>(() => {
@@ -34,6 +34,7 @@ export const App: React.FC = () => {
   // Active drawer tab: null, 'character', 'graph', 'codex', 'world'
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     APIClient.getSettings()
@@ -61,6 +62,7 @@ export const App: React.FC = () => {
   const handleReturnToLauncher = () => {
     setActiveGameID(null);
     setActiveDrawer(null);
+    setIsSettingsOpen(false);
   };
 
   const handleOpenWikilink = async (entityId: string) => {
@@ -216,9 +218,9 @@ export const App: React.FC = () => {
                 <span className="hidden sm:inline">Theater</span>
               </button>
               <button
-                onClick={() => setActiveDrawer('settings')}
+                onClick={() => setIsSettingsOpen(true)}
                 className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                  activeDrawer === 'settings' ? 'bg-amber-600 text-stone-950 font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
+                  isSettingsOpen ? 'bg-amber-600 text-stone-950 font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
                 }`}
                 title="Global Settings"
               >
@@ -258,19 +260,47 @@ export const App: React.FC = () => {
           <Drawers
             isOpen={activeDrawer !== null}
             onClose={() => setActiveDrawer(null)}
+            size={activeDrawer === 'codex' || activeDrawer === 'graph' ? 'xl' : 'md'}
             title={
               activeDrawer === 'character' ? 'Character Sheet' :
               activeDrawer === 'graph' ? 'Lore Graph' :
-              activeDrawer === 'codex' ? 'Codex Markdown Editor' :
-              activeDrawer === 'world' ? 'Living World Arcs & Clocks' : 'Global Settings'
+              activeDrawer === 'codex' ? 'Codex Markdown Editor' : 'Living World Arcs & Clocks'
             }
           >
             {activeDrawer === 'character' && <CharacterSheetDrawer player={gameState?.player} />}
             {activeDrawer === 'graph' && <GraphDrawer data={graph || undefined} onSelectNode={handleOpenWikilink} />}
             {activeDrawer === 'codex' && <CodexDrawer entity={selectedEntity || undefined} onSave={handleSaveEntity} />}
             {activeDrawer === 'world' && <LivingWorldDrawer state={gameState || undefined} />}
-            {activeDrawer === 'settings' && <SettingsStudio isCompact={true} />}
           </Drawers>
+
+          {/* Global Settings Modal Dialog */}
+          {isSettingsOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in">
+              <div className="relative w-full max-w-4xl max-h-[88vh] bg-stone-900/95 border border-amber-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-amber-400" />
+                    <h2 className="font-cinzel text-lg font-bold text-amber-400">Global Configuration</h2>
+                  </div>
+                  <button
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto p-6">
+                  <SettingsStudio
+                    onSaved={() =>
+                      APIClient.getSettings()
+                        .then((res) => setConfig(res.config))
+                        .catch(console.error)
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Full-Screen Visual Novel Story Theater */}
           <StoryTheater
