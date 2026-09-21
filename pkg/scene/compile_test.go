@@ -3,6 +3,7 @@ package scene
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,5 +141,98 @@ func TestCompileTotalsDurations(t *testing.T) {
 	}
 	if script.TotalDuration != sum {
 		t.Errorf("TotalDuration = %v, want %v", script.TotalDuration, sum)
+	}
+}
+
+type fakeSpeech struct {
+	clips map[string]struct {
+		path     string
+		duration time.Duration
+	}
+	unavailable bool
+}
+
+func (f *fakeSpeech) SegmentAudio(ctx context.Context, segment entity.TurnSegment) (string, time.Duration, error) {
+	if f.unavailable {
+		return "", 0, ErrAudioUnavailable
+	}
+	if clip, ok := f.clips[segment.Text]; ok {
+		return clip.path, clip.duration, nil
+	}
+	return "", 0, ErrAudioUnavailable
+}
+
+func TestCompileResolvesAudioAndCountsSilence(t *testing.T) {
+	source := twoLocationSource()
+	compiler := NewCompiler(source)
+
+	var warnings []string
+	compiler.SetSpeechResolver(&fakeSpeech{clips: map[string]struct {
+		path     string
+		duration time.Duration
+	}{
+		"Welcome.": {path: "/cache/welcome.wav", duration: 3 * time.Second},
+	}})
+
+	script, err := compiler.Compile(context.Background(), "campaign-01", Options{
+		Audio:      true,
+		OnProgress: func(format string, args ...interface{}) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
+	})
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	beats := script.Beats()
+	var speech *Beat
+	for i := range beats {
+		if beats[i].Kind == BeatSpeech {
+			speech = &beats[i]
+		}
+	}
+	if speech == nil || speech.AudioPath != "/cache/welcome.wav" {
+		t.Fatalf("expected the clip on the speech beat, got %+v", speech)
+	}
+	if speech.Duration != 3*time.Second+BeatGap {
+		t.Errorf("speech duration = %v, want the clip length plus the gap", speech.Duration)
+	}
+
+	// Beats without a clip stay silent and are reported once.
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "silently") {
+		t.Errorf("expected one silence warning, got %v", warnings)
+	}
+}
+
+func TestCompileWithoutSpeechResolverIsSilent(t *testing.T) {
+	script, err := NewCompiler(twoLocationSource()).Compile(context.Background(), "campaign-01", Options{Audio: true})
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	for _, beat := range script.Beats() {
+		if beat.AudioPath != "" {
+			t.Errorf("expected silence without a resolver, got %+v", beat)
+		}
+	}
+}
+
+func TestCompileWarnsWhenAResolverReportsNoAudio(t *testing.T) {
+	compiler := NewCompiler(twoLocationSource())
+	compiler.SetSpeechResolver(&fakeSpeech{unavailable: true})
+
+	var warnings []string
+	script, err := compiler.Compile(context.Background(), "campaign-01", Options{
+		Audio:      true,
+		OnProgress: func(format string, args ...interface{}) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
+	})
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	for _, beat := range script.Beats() {
+		if beat.AudioPath != "" {
+			t.Errorf("expected silence when audio is unavailable, got %+v", beat)
+		}
+	}
+	if len(warnings) != 1 {
+		t.Errorf("expected exactly one silence warning, got %v", warnings)
 	}
 }
