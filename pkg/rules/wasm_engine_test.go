@@ -27,7 +27,7 @@ func TestWasmEngineExecution(t *testing.T) {
 	}
 	defer store.Close()
 
-	bridge := NewHostBridge(store)
+	bridge := NewHostBridge(store, nil, "")
 	wasmEngine, err := NewWasmEngine(ctx, bridge)
 	if err != nil {
 		t.Fatalf("NewWasmEngine failed: %v", err)

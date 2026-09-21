@@ -14,7 +14,6 @@ type SceneBeat struct {
 	Prose       string    `json:"prose"`
 	// Segments is the ordered playback script: narration and attributed speech.
 	Segments    []entity.TurnSegment `json:"segments,omitempty"`
-	AudioPath   string               `json:"audio_path,omitempty"`
 	ImagePath   string               `json:"image_path,omitempty"`
 	DurationSec float64              `json:"duration_sec"`
 }

@@ -47,11 +47,6 @@ func (s *ScriptCompiler) Compile(ctx context.Context, gameID string) (*ReplayScr
 			segments = media.LegacySegments(turn.Prose())
 		}
 
-		audioPath := ""
-		if len(turn.AudioRefs) > 0 {
-			audioPath = turn.AudioRefs[0]
-		}
-
 		// Estimate 3.5 seconds per narrated span and 4 per spoken line when audio is missing.
 		duration := 0.0
 		for _, segment := range segments {
@@ -70,7 +65,6 @@ func (s *ScriptCompiler) Compile(ctx context.Context, gameID string) (*ReplayScr
 			PlayerInput: turn.Input,
 			Prose:       turn.Prose(),
 			Segments:    segments,
-			AudioPath:   audioPath,
 			DurationSec: duration,
 		}
 	}

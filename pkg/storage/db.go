@@ -35,13 +35,15 @@ CREATE TABLE IF NOT EXISTS turns (
     input        TEXT NOT NULL,
     narration    TEXT NOT NULL,
     roll_json    TEXT,
-    audio_refs_json TEXT
+    location     TEXT,
+    outcome      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS turn_entities (
     turn_number INTEGER NOT NULL,
     entity_id   TEXT NOT NULL,
     mention     TEXT NOT NULL,
+    outcome     TEXT,
     PRIMARY KEY (turn_number, entity_id, mention)
 );
 
@@ -62,6 +64,11 @@ func OpenDB(path string) (*sql.DB, error) {
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
+	}
+
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate schema: %w", err)
 	}
 	return db, nil
 }

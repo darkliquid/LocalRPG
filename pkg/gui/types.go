@@ -40,19 +40,23 @@ type SegmentDTO struct {
 	Speaker   string `json:"speaker,omitempty"`
 	SpeakerID string `json:"speaker_id,omitempty"`
 	Text      string `json:"text"`
+	AudioURL  string `json:"audio_url,omitempty"`
 }
 
 type TurnDTO struct {
-	TurnNumber  int          `json:"turn_number"`
-	InputText   string       `json:"input_text"`
-	Mode        string       `json:"mode"`
-	Prose       string       `json:"prose"`
-	Speaker     string       `json:"speaker,omitempty"`
-	Dialogue    string       `json:"dialogue,omitempty"`
-	AudioURL    string       `json:"audio_url,omitempty"`
-	ImageURL    string       `json:"image_url,omitempty"`
-	EntitiesHit []string     `json:"entities_hit,omitempty"`
-	Segments    []SegmentDTO `json:"segments,omitempty"`
+	TurnNumber     int          `json:"turn_number"`
+	InputText      string       `json:"input_text"`
+	Mode           string       `json:"mode"`
+	Prose          string       `json:"prose"`
+	Speaker        string       `json:"speaker,omitempty"`
+	Dialogue       string       `json:"dialogue,omitempty"`
+	ImageURL       string       `json:"image_url,omitempty"`
+	EntitiesHit    []string     `json:"entities_hit,omitempty"`
+	Segments       []SegmentDTO `json:"segments,omitempty"`
+	Outcome        string       `json:"outcome,omitempty"`
+	LocationID     string       `json:"location_id,omitempty"`
+	LocationName   string       `json:"location_name,omitempty"`
+	LocationArtURL string       `json:"location_art_url,omitempty"`
 }
 
 type EntityDTO struct {

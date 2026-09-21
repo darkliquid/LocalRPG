@@ -47,7 +47,7 @@ func TestTurnOrchestrator(t *testing.T) {
 	store.SaveEntity(player)
 
 	history := NewHistoryLogger(filepath.Join(tempDir, "history.jsonl"))
-	bridge := rules.NewHostBridge(store)
+	bridge := rules.NewHostBridge(store, nil, "player")
 	jsEngine := rules.NewJSEngine(bridge)
 
 	model := &mockOrchestratorModel{response: "You step inside the warm tavern."}

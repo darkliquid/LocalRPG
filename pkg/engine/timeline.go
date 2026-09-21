@@ -163,6 +163,25 @@ func appendTurnNumber(history []int, turnNumber int) []int {
 	return append(history, turnNumber)
 }
 
+// SetPlayerLocation points a player note at a location, writing the note before the
+// index so the Markdown stays the source of truth.
+func (t *Timeline) SetPlayerLocation(playerID, locationID string) error {
+	player, err := t.store.GetEntity(playerID)
+	if err != nil || player == nil {
+		return fmt.Errorf("player %q not found: %w", playerID, err)
+	}
+
+	player.Location = "[[" + locationID + "]]"
+	return t.writeEntities(map[string]*entity.Entity{player.ID: player})
+}
+
+// SaveEntity persists one entity note and reindexes it. It lets collaborators
+// outside the engine, such as the rules host bridge, write through the same path
+// instead of inventing a second one.
+func (t *Timeline) SaveEntity(ent *entity.Entity) error {
+	return t.writeEntities(map[string]*entity.Entity{ent.ID: ent})
+}
+
 // RewindToTurn discards every turn after target from the log, the index, and each
 // entity's history list. Entity prose and state are deliberately left alone:
 // undo trims the record of what happened, not the world's memory of it.
@@ -311,6 +330,8 @@ func turnRecord(turn Turn) storage.TurnRecord {
 		Mode:      turn.Mode,
 		Input:     turn.Input,
 		Narration: turn.Prose(),
+		Location:  turn.Location,
+		Outcome:   turn.Outcome,
 	}
 
 	if turn.Roll != nil {
@@ -318,15 +339,11 @@ func turnRecord(turn Turn) storage.TurnRecord {
 			rec.RollJSON = string(data)
 		}
 	}
-	if len(turn.AudioRefs) > 0 {
-		if data, err := json.Marshal(turn.AudioRefs); err == nil {
-			rec.AudioRefsJSON = string(data)
-		}
-	}
 	for _, mention := range turn.Entities {
 		rec.Entities = append(rec.Entities, storage.TurnEntityRef{
 			EntityID: mention.ID,
 			Mention:  mention.Kind,
+			Outcome:  turn.Outcome,
 		})
 	}
 	return rec

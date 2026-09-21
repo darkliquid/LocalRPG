@@ -34,7 +34,6 @@ player: elena
 		Mode:      "Do",
 		Input:     "I step into the tavern.",
 		Narration: "The tavern is warm and loud. Evelyn looks up from her book.",
-		AudioRefs: []string{"audio/turn-1.wav"},
 	})
 
 	_ = logger.AppendTurn(engine.Turn{
@@ -43,7 +42,6 @@ player: elena
 		Mode:      "Say",
 		Input:     "Good evening, Evelyn.",
 		Narration: "Evelyn: \"You made it back in one piece.\"",
-		AudioRefs: []string{"audio/turn-2.wav"},
 	})
 
 	compiler := NewScriptCompiler(tempDir)
@@ -59,7 +57,7 @@ player: elena
 		t.Fatalf("expected 2 beats, got %d", len(script.Beats))
 	}
 
-	if script.Beats[0].TurnNumber != 1 || script.Beats[0].AudioPath != "audio/turn-1.wav" {
+	if script.Beats[0].TurnNumber != 1 {
 		t.Errorf("unexpected beat 0: %+v", script.Beats[0])
 	}
 	speech := script.Beats[1].Segments

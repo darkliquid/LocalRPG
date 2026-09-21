@@ -306,3 +306,63 @@ func TestExtractorParsesObjectAndArrayResponses(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractorReturnsAProposedPlayerLocation(t *testing.T) {
+	model := &mockProvider{
+		id: "extractor-model",
+		output: `{
+			"entities": [],
+			"dialogue": [],
+			"player_location": "[[Alden Harbour]]"
+		}`,
+	}
+
+	result, err := NewExtractor(model).Extract(context.Background(), "You walk down to the harbour.")
+	if err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+	if result.PlayerLocation != "[[Alden Harbour]]" {
+		t.Errorf("PlayerLocation = %q, want the proposed reference", result.PlayerLocation)
+	}
+
+	// The bare-array shape stays valid and carries no proposal.
+	legacy := &mockProvider{id: "extractor-model", output: `[]`}
+	result, err = NewExtractor(legacy).Extract(context.Background(), "Nothing happens.")
+	if err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+	if result.PlayerLocation != "" {
+		t.Errorf("PlayerLocation = %q, want empty for the legacy shape", result.PlayerLocation)
+	}
+}
+
+func TestMergeOnlyFillsAnEmptyAppearance(t *testing.T) {
+	existing := &entity.Entity{ID: "alden-tavern", Name: "Alden Tavern", Type: "location", Appearance: "warm and lamp-lit"}
+	raw := &ExtractedEntity{ID: "alden-tavern", Name: "Alden Tavern", Type: "location", Appearance: "gutted by fire"}
+
+	merged := MergeExtractedEntity(existing, raw)
+	if merged.Appearance != "warm and lamp-lit" {
+		t.Errorf("Appearance = %q, want the authored value kept", merged.Appearance)
+	}
+
+	empty := &entity.Entity{ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location"}
+	merged = MergeExtractedEntity(empty, raw)
+	if merged.Appearance != "gutted by fire" {
+		t.Errorf("Appearance = %q, want the extracted value applied to an empty field", merged.Appearance)
+	}
+}
+
+func TestExtractorReadsAnEntityAppearance(t *testing.T) {
+	model := &mockProvider{
+		id:     "extractor-model",
+		output: `{"entities":[{"id":"alden-tavern","name":"Alden Tavern","type":"location","appearance":"roof collapsed","body":"A ruin."}]}`,
+	}
+
+	result, err := NewExtractor(model).Extract(context.Background(), "The tavern is a burnt shell.")
+	if err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+	if len(result.Entities) != 1 || result.Entities[0].Appearance != "roof collapsed" {
+		t.Errorf("expected an extracted appearance, got %+v", result.Entities)
+	}
+}

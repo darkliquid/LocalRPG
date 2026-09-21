@@ -44,13 +44,14 @@ func (s *Store) SaveEntity(e *entity.Entity) error {
 	defer tx.Rollback()
 
 	fmMeta := map[string]interface{}{
-		"tags":     e.Tags,
-		"voice":    e.Voice,
-		"portrait": e.Portrait,
-		"location": e.Location,
-		"faction":  e.Faction,
-		"history":  e.History,
-		"extra":    e.ExtraMeta,
+		"tags":       e.Tags,
+		"voice":      e.Voice,
+		"portrait":   e.Portrait,
+		"location":   e.Location,
+		"faction":    e.Faction,
+		"appearance": e.Appearance,
+		"history":    e.History,
+		"extra":      e.ExtraMeta,
 	}
 	if e.State != nil {
 		fmMeta["state"] = e.State.Raw()
@@ -118,6 +119,9 @@ func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 		}
 		if fac, ok := meta["faction"].(string); ok {
 			ent.Faction = fac
+		}
+		if appearance, ok := meta["appearance"].(string); ok {
+			ent.Appearance = appearance
 		}
 		if port, ok := meta["portrait"].(string); ok {
 			ent.Portrait = port

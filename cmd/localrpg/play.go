@@ -63,7 +63,7 @@ func handlePlayCommand(args []string) {
 		os.Exit(1)
 	}
 
-	bridge := rules.NewHostBridge(store)
+	bridge := rules.NewHostBridge(store, timeline, manifest.Player)
 	jsEngine := rules.NewJSEngine(bridge)
 
 	ruleLoader := rules.NewRuleLoader(paths, jsEngine)
@@ -72,6 +72,12 @@ func handlePlayCommand(args []string) {
 	// Setup model router from global config
 	router := harness.NewRouter()
 	for role, roleCfg := range cfg.Agents.Roles {
+		// An inherited role resolves through the role it names, so it is not
+		// registered as a provider of its own.
+		if roleCfg.Type == "inherit" {
+			continue
+		}
+
 		p, err := harness.NewModelProvider(role, harness.ProviderConfig{
 			Type:        roleCfg.Type,
 			BuiltinName: roleCfg.BuiltinName,
@@ -118,20 +124,30 @@ func handlePlayCommand(args []string) {
 	}
 }
 
-// resolveExtractor picks the provider used for per-turn entity extraction: an
-// explicitly configured extractor role, otherwise the gm provider, and nil when
-// the role is disabled.
+// resolveExtractor picks the provider used for per-turn entity extraction. An
+// absent role still inherits gm, so configuration written before this role existed
+// keeps working; `disabled` opts out; `inherit` follows the named role, which is
+// what stops extraction silently pointing at a stale copy of gm.
 func resolveExtractor(cfg *config.Config, router *harness.Router) *harness.Extractor {
 	roleCfg, configured := cfg.Agents.Roles[config.RoleExtractor]
 	if !configured {
-		provider, err := router.GetProviderForRole(config.RoleGM)
+		roleCfg = config.AgentRoleConfig{Type: "inherit", InheritFrom: config.RoleGM}
+	}
+
+	switch roleCfg.Type {
+	case "disabled":
+		return nil
+	case "inherit", "":
+		source := roleCfg.InheritFrom
+		if source == "" {
+			source = config.RoleGM
+		}
+
+		provider, err := router.GetProviderForRole(source)
 		if err != nil {
 			return nil
 		}
 		return harness.NewExtractor(provider)
-	}
-	if roleCfg.Type == "disabled" {
-		return nil
 	}
 
 	provider, err := harness.NewModelProvider(config.RoleExtractor, harness.ProviderConfig{

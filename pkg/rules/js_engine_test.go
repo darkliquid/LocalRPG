@@ -25,7 +25,7 @@ func TestJSEngineExecution(t *testing.T) {
 	player.InitState(map[string]interface{}{"hp": 20})
 	store.SaveEntity(player)
 
-	bridge := NewHostBridge(store)
+	bridge := NewHostBridge(store, nil, "")
 	engine := NewJSEngine(bridge)
 
 	script := `
@@ -64,5 +64,44 @@ onAction("attack", function(ctx) {
 	directives := bridge.GetDirectives()
 	if len(directives) != 1 {
 		t.Errorf("expected 1 directive, got: %v", directives)
+	}
+}
+
+func TestExecuteActionReadsTheOutcomeLabel(t *testing.T) {
+	store, err := storage.NewStore(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	engine := NewJSEngine(NewHostBridge(store, nil, ""))
+	if err := engine.LoadScript(`
+		onAction("attack", (ctx) => ({ success: false, outcome: "glancing_blow", message: "A glancing blow." }));
+		onAction("parley", (ctx) => ({ outcome: "uneasy_truce" }));
+	`); err != nil {
+		t.Fatalf("LoadScript failed: %v", err)
+	}
+
+	res, err := engine.ExecuteAction("attack", map[string]interface{}{"action": "swing"})
+	if err != nil {
+		t.Fatalf("ExecuteAction failed: %v", err)
+	}
+	if res.Outcome != "glancing_blow" {
+		t.Errorf("Outcome = %q, want glancing_blow", res.Outcome)
+	}
+	if res.Success {
+		t.Errorf("expected success to stay false")
+	}
+	if _, ok := res.Data["outcome"]; ok {
+		t.Errorf("expected the reserved key to be kept out of Data, got %+v", res.Data)
+	}
+
+	// A label alone does not imply success: the engine never invents semantics.
+	truce, err := engine.ExecuteAction("parley", map[string]interface{}{"action": "talk"})
+	if err != nil {
+		t.Fatalf("ExecuteAction failed: %v", err)
+	}
+	if truce.Outcome != "uneasy_truce" || truce.Success {
+		t.Errorf("expected the label with success false, got %+v", truce)
 	}
 }

@@ -9,9 +9,16 @@ import (
 
 type ActionResult struct {
 	Success bool                   `json:"success"`
+	Outcome string                 `json:"outcome,omitempty"`
 	Message string                 `json:"message"`
 	Roll    *RollResult            `json:"roll,omitempty"`
 	Data    map[string]interface{} `json:"data,omitempty"`
+}
+
+// EntityWriter persists an entity to its Markdown note and the index. It is how
+// the host bridge writes without inventing a second write path beside the engine's.
+type EntityWriter interface {
+	SaveEntity(ent *entity.Entity) error
 }
 
 type GameHostAPI interface {
@@ -23,17 +30,26 @@ type GameHostAPI interface {
 	GetDirectives() []string
 	Log(message string)
 	GetLogs() []string
+	SetLocation(locationID string) error
+	GetLocation() (string, error)
 }
 
 type DefaultHostBridge struct {
 	store      *storage.Store
+	writer     EntityWriter
+	playerID   string
 	directives []string
 	logs       []string
 }
 
-func NewHostBridge(store *storage.Store) *DefaultHostBridge {
+// NewHostBridge builds the host API a system's scripts are given. writer persists
+// entities through the engine's own path; a nil writer falls back to the store,
+// which is only correct for tests that do not care about the Markdown note.
+func NewHostBridge(store *storage.Store, writer EntityWriter, playerID string) *DefaultHostBridge {
 	return &DefaultHostBridge{
 		store:      store,
+		writer:     writer,
+		playerID:   playerID,
 		directives: make([]string, 0),
 		logs:       make([]string, 0),
 	}
@@ -68,6 +84,55 @@ func (h *DefaultHostBridge) SetStat(entityID string, path string, value interfac
 	}
 	if err := ent.State.Set(path, value); err != nil {
 		return fmt.Errorf("set stat %q: %w", path, err)
+	}
+	return h.persist(ent)
+}
+
+// SetLocation moves the player, writing through the same path the engine uses.
+func (h *DefaultHostBridge) SetLocation(locationID string) error {
+	if h.playerID == "" {
+		return fmt.Errorf("set location: no player configured")
+	}
+
+	target, err := h.store.GetEntity(locationID)
+	if err != nil || target == nil {
+		return fmt.Errorf("set location: unknown location %q", locationID)
+	}
+	if target.Type != "location" {
+		return fmt.Errorf("set location: %q is a %s, not a location", locationID, target.Type)
+	}
+
+	player, err := h.store.GetEntity(h.playerID)
+	if err != nil || player == nil {
+		return fmt.Errorf("set location: player %q not found", h.playerID)
+	}
+
+	player.Location = "[[" + locationID + "]]"
+	return h.persist(player)
+}
+
+// GetLocation returns the player's current location ID.
+func (h *DefaultHostBridge) GetLocation() (string, error) {
+	if h.playerID == "" {
+		return "", fmt.Errorf("get location: no player configured")
+	}
+
+	player, err := h.store.GetEntity(h.playerID)
+	if err != nil || player == nil {
+		return "", fmt.Errorf("get location: player %q not found", h.playerID)
+	}
+	if player.Location == "" {
+		return "", nil
+	}
+	return entity.Slugify(entity.WikilinkTarget(player.Location)), nil
+}
+
+// persist writes an entity through the writer when one is configured. Writing
+// through the store alone would never reach the Markdown note, so the next
+// file-driven sync could revert it.
+func (h *DefaultHostBridge) persist(ent *entity.Entity) error {
+	if h.writer != nil {
+		return h.writer.SaveEntity(ent)
 	}
 	return h.store.SaveEntity(ent)
 }

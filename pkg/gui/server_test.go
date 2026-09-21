@@ -340,3 +340,36 @@ func TestEntityTurnsRoute(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestLocationArtRoute(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/location/aldon-harbour/art", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "image/svg+xml" {
+		t.Errorf("Content-Type = %q, want image/svg+xml", ct)
+	}
+}
+
+func TestSegmentAudioRoute(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/turn/1/segment/1/audio", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if rec.Body.Len() == 0 {
+		t.Errorf("expected audio bytes")
+	}
+}

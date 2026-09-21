@@ -73,6 +73,15 @@ func FormatVoiceProfilesCatalog(profiles []config.VoiceProfile) string {
 	return sb.String()
 }
 
+// speechFormattingInstruction is injected for every game. The parser needs one
+// shape it can resolve deterministically, and the last line tells the model what to
+// do when it cannot name a speaker, which is where attribution usually fails.
+const speechFormattingInstruction = `## SPEECH FORMATTING
+Write each spoken line on its own line, formatted as  Name: "the words spoken"
+Use a character's established name, or [[their note name]] to link them.
+Keep narration on its own lines with no leading name. If you cannot name the
+speaker, leave the words in the narration instead of inventing a name.`
+
 func (c *ContextAssembler) AssembleContextWithRules(locationID, playerID, playerAction, rulesPrompt, lorePrompt string) (string, error) {
 	return c.AssembleContextWithProfiles(locationID, playerID, playerAction, rulesPrompt, lorePrompt, nil)
 }
@@ -90,6 +99,8 @@ func (c *ContextAssembler) AssembleContextWithProfiles(locationID, playerID, pla
 		sb.WriteString(strings.TrimSpace(lorePrompt) + "\n\n")
 	}
 
+	sb.WriteString(speechFormattingInstruction + "\n\n")
+
 	if len(profiles) > 0 {
 		sb.WriteString(FormatVoiceProfilesCatalog(profiles) + "\n")
 	}
@@ -101,4 +112,3 @@ func (c *ContextAssembler) AssembleContextWithProfiles(locationID, playerID, pla
 	sb.WriteString(baseContext)
 	return sb.String(), nil
 }
-

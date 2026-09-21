@@ -14,12 +14,13 @@ import (
 )
 
 type ExtractedEntity struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Location string `json:"location,omitempty"`
-	Faction  string `json:"faction,omitempty"`
-	Body     string `json:"body"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Location   string `json:"location,omitempty"`
+	Faction    string `json:"faction,omitempty"`
+	Appearance string `json:"appearance,omitempty"`
+	Body       string `json:"body"`
 }
 
 // ExtractedDialogue is one utterance the model attributed to a speaker.
@@ -30,8 +31,9 @@ type ExtractedDialogue struct {
 
 // Extraction is everything one extraction pass returned for a turn.
 type Extraction struct {
-	Entities []ExtractedEntity   `json:"entities"`
-	Dialogue []ExtractedDialogue `json:"dialogue,omitempty"`
+	Entities       []ExtractedEntity   `json:"entities"`
+	Dialogue       []ExtractedDialogue `json:"dialogue,omitempty"`
+	PlayerLocation string              `json:"player_location,omitempty"`
 }
 
 type Extractor struct {
@@ -246,6 +248,9 @@ func MergeExtractedEntity(existing *entity.Entity, raw *ExtractedEntity) *entity
 	if merged.Faction == "" {
 		merged.Faction = raw.Faction
 	}
+	if merged.Appearance == "" {
+		merged.Appearance = raw.Appearance
+	}
 
 	body := strings.TrimSpace(raw.Body)
 	if body != "" && !strings.Contains(merged.Body, body) {
@@ -267,6 +272,7 @@ const extractorSystemPrompt = `You are a world-state extractor. Read the narrati
       "name": "Full Name",
       "type": "character|location|item|faction|arc",
       "location": "[[Optional-Location]]",
+      "appearance": "How this place looks right now, when it has visibly changed.",
       "body": "Description and known facts."
     }
   ],
@@ -274,7 +280,9 @@ const extractorSystemPrompt = `You are a world-state extractor. Read the narrati
     { "speaker": "Full Name", "text": "Exactly what they said." }
   ]
 }
-List every line of direct speech in "dialogue", attributed to the speaker, using the same names as the entity list. Return empty arrays when nothing new is discovered.`
+List every line of direct speech in "dialogue", attributed to the speaker, using the same names as the entity list. Return empty arrays when nothing new is discovered.
+
+If the narration moves the player to a different place, set "player_location" to a [[wikilink]] of that location; otherwise omit it.`
 
 // Extract asks the model for the entities and attributed speech a turn contains.
 // Persisting them is the caller's job.

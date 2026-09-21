@@ -61,6 +61,22 @@ func (j *JSEngine) bindHostAPI() {
 		return goja.Undefined()
 	})
 
+	j.vm.Set("getLocation", func(call goja.FunctionCall) goja.Value {
+		locationID, err := j.bridge.GetLocation()
+		if err != nil {
+			panic(j.vm.ToValue(fmt.Sprintf("getLocation error: %v", err)))
+		}
+		return j.vm.ToValue(locationID)
+	})
+
+	j.vm.Set("setLocation", func(call goja.FunctionCall) goja.Value {
+		locationID := call.Argument(0).String()
+		if err := j.bridge.SetLocation(locationID); err != nil {
+			panic(j.vm.ToValue(fmt.Sprintf("setLocation error: %v", err)))
+		}
+		return goja.Undefined()
+	})
+
 	j.vm.Set("injectGMDirection", func(call goja.FunctionCall) goja.Value {
 		dir := call.Argument(0).String()
 		j.bridge.InjectGMDirection(dir)
@@ -143,6 +159,11 @@ func (j *JSEngine) ExecuteAction(actionType string, ctx map[string]interface{}) 
 	if s, ok := m["success"].(bool); ok {
 		res.Success = s
 	}
+	if outcome, ok := m["outcome"].(string); ok {
+		// The vocabulary belongs to the system and is stored verbatim; a label alone
+		// does not imply success, because the engine never invents semantics.
+		res.Outcome = outcome
+	}
 	if msg, ok := m["message"].(string); ok {
 		res.Message = msg
 	}
@@ -156,9 +177,10 @@ func (j *JSEngine) ExecuteAction(actionType string, ctx map[string]interface{}) 
 	}
 
 	for k, v := range m {
-		if k != "success" && k != "message" && k != "roll" {
-			res.Data[k] = v
+		if k == "success" || k == "outcome" || k == "message" || k == "roll" {
+			continue
 		}
+		res.Data[k] = v
 	}
 
 	return res, nil

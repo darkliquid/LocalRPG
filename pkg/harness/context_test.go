@@ -117,3 +117,24 @@ func TestContextAssembler_WithVoiceProfiles(t *testing.T) {
 	}
 }
 
+func TestAssembleContextAlwaysAsksForAttributableSpeech(t *testing.T) {
+	store := newTestEntityStore(t)
+	assembler := NewContextAssembler(store)
+
+	// No rules prompt, no lore prompt: the instruction must not depend on a system
+	// or world shipping anything.
+	prompt, err := assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil)
+	if err != nil {
+		t.Fatalf("AssembleContextWithProfiles failed: %v", err)
+	}
+
+	if !strings.Contains(prompt, "## SPEECH FORMATTING") {
+		t.Errorf("expected the speech formatting section, got %q", prompt)
+	}
+	if !strings.Contains(prompt, `Name: "the words spoken"`) {
+		t.Errorf("expected the instruction to show the shape it wants, got %q", prompt)
+	}
+	if !strings.Contains(prompt, "leave the words in the narration") {
+		t.Errorf("expected guidance for the case the model cannot name a speaker, got %q", prompt)
+	}
+}

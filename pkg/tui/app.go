@@ -147,7 +147,11 @@ func (m *AppModel) View() string {
 	}
 
 	// Bottom Status & Action Bar
-	sb.WriteString(StatusStyle.Render(m.statusMsg) + "\n")
+	status := m.statusMsg
+	if name := m.orchestrator.CurrentLocationName(); name != "" {
+		status = fmt.Sprintf("[%s] %s", name, status)
+	}
+	sb.WriteString(StatusStyle.Render(status) + "\n")
 	modeTag := fmt.Sprintf("[%s]", m.mode)
 	sb.WriteString(PromptStyle.Render(modeTag+" > ") + m.inputBuffer)
 

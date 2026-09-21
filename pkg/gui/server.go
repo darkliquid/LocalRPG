@@ -2,8 +2,11 @@ package gui
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
@@ -79,6 +82,57 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, chronicle)
 
+	case "turn":
+		// GET /api/game/{id}/turn/{n}/segment/{i}/audio serves one beat's clip. The
+		// desktop playback work adds a POST sibling on this same case.
+		if len(parts) < 6 || parts[3] != "segment" || parts[5] != "audio" || r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+
+		turnNumber, err := strconv.Atoi(parts[2])
+		if err != nil {
+			http.Error(w, "invalid turn number", http.StatusBadRequest)
+			return
+		}
+		segmentIndex, err := strconv.Atoi(parts[4])
+		if err != nil {
+			http.Error(w, "invalid segment index", http.StatusBadRequest)
+			return
+		}
+
+		path, err := s.service.GetSegmentAudio(r.Context(), gameID, turnNumber, segmentIndex)
+		switch {
+		case errors.Is(err, ErrAudioUnavailable):
+			w.WriteHeader(http.StatusNoContent)
+		case errors.Is(err, os.ErrNotExist):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		case err != nil:
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			w.Header().Set("Content-Type", "audio/wav")
+			http.ServeFile(w, r, path)
+		}
+
+	case "location":
+		if len(parts) < 3 {
+			http.Error(w, "missing location id", http.StatusBadRequest)
+			return
+		}
+		locationID := parts[2]
+		if len(parts) < 4 || parts[3] != "art" || r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+
+		path, contentType, err := s.service.GetLocationArt(r.Context(), gameID, locationID, r.URL.Query().Get("force") == "1")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", contentType)
+		http.ServeFile(w, r, path)
+
 	case "entity":
 		if len(parts) < 3 {
 			http.Error(w, "missing entity id", http.StatusBadRequest)
@@ -107,6 +161,17 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		if len(parts) >= 4 && parts[3] == "art" && r.Method == http.MethodGet {
+			path, contentType, err := s.service.GetLocationArt(r.Context(), gameID, entityID, r.URL.Query().Get("force") == "1")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", contentType)
+			http.ServeFile(w, r, path)
 			return
 		}
 

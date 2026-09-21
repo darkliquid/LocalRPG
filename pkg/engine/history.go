@@ -22,7 +22,8 @@ type Turn struct {
 	Segments  []entity.TurnSegment `json:"segments,omitempty"`
 	Roll      *rules.RollResult    `json:"roll,omitempty"`
 	Entities  []entity.Mention     `json:"entities,omitempty"`
-	AudioRefs []string             `json:"audio_refs,omitempty"`
+	Location  string               `json:"location,omitempty"`
+	Outcome   string               `json:"outcome,omitempty"`
 
 	// LegacyOutput is only populated when reading records written before the
 	// narration rename. New records must not set it.

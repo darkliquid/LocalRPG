@@ -5,23 +5,26 @@ import (
 	"time"
 )
 
-// TurnEntityRef records how one entity was involved in a turn.
+// TurnEntityRef records how one entity was involved in a turn. Outcome is the
+// turn's system-reported outcome, copied for single-table per-entity queries.
 type TurnEntityRef struct {
 	EntityID string
 	Mention  string
+	Outcome  string
 }
 
 // TurnRecord is the row shape of one timeline entry. Timestamps are stored as
 // RFC3339 text so the value does not depend on driver time handling.
 type TurnRecord struct {
-	Number        int
-	Timestamp     time.Time
-	Mode          string
-	Input         string
-	Narration     string
-	RollJSON      string
-	AudioRefsJSON string
-	Entities      []TurnEntityRef
+	Number    int
+	Timestamp time.Time
+	Mode      string
+	Input     string
+	Narration string
+	Location  string
+	Outcome   string
+	RollJSON  string
+	Entities  []TurnEntityRef
 }
 
 // SaveTurn upserts one turn and replaces its entity links in a single transaction.
@@ -33,31 +36,32 @@ func (s *Store) SaveTurn(rec TurnRecord) error {
 	defer tx.Rollback()
 
 	const upsert = `
-	INSERT INTO turns (number, timestamp, mode, input, narration, roll_json, audio_refs_json)
-	VALUES (?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO turns (number, timestamp, mode, input, narration, roll_json, location, outcome)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(number) DO UPDATE SET
 		timestamp = excluded.timestamp,
 		mode = excluded.mode,
 		input = excluded.input,
 		narration = excluded.narration,
 		roll_json = excluded.roll_json,
-		audio_refs_json = excluded.audio_refs_json
+		location = excluded.location,
+		outcome = excluded.outcome
 	`
 	stamp := rec.Timestamp.UTC().Format(time.RFC3339Nano)
 	if _, err := tx.Exec(upsert, rec.Number, stamp, rec.Mode, rec.Input, rec.Narration,
-		emptyToNull(rec.RollJSON), emptyToNull(rec.AudioRefsJSON)); err != nil {
+		emptyToNull(rec.RollJSON), emptyToNull(rec.Location), emptyToNull(rec.Outcome)); err != nil {
 		return fmt.Errorf("upsert turn %d: %w", rec.Number, err)
 	}
 
 	if _, err := tx.Exec(`DELETE FROM turn_entities WHERE turn_number = ?`, rec.Number); err != nil {
 		return fmt.Errorf("clear turn %d links: %w", rec.Number, err)
 	}
-	const link = `INSERT OR IGNORE INTO turn_entities (turn_number, entity_id, mention) VALUES (?, ?, ?)`
+	const link = `INSERT OR IGNORE INTO turn_entities (turn_number, entity_id, mention, outcome) VALUES (?, ?, ?, ?)`
 	for _, ref := range rec.Entities {
 		if ref.EntityID == "" || ref.Mention == "" {
 			continue
 		}
-		if _, err := tx.Exec(link, rec.Number, ref.EntityID, ref.Mention); err != nil {
+		if _, err := tx.Exec(link, rec.Number, ref.EntityID, ref.Mention, emptyToNull(ref.Outcome)); err != nil {
 			return fmt.Errorf("link entity %q to turn %d: %w", ref.EntityID, rec.Number, err)
 		}
 	}
@@ -69,13 +73,13 @@ func (s *Store) SaveTurn(rec TurnRecord) error {
 func (s *Store) GetTurn(number int) (*TurnRecord, error) {
 	const query = `
 	SELECT number, timestamp, mode, input, narration,
-	       COALESCE(roll_json, ''), COALESCE(audio_refs_json, '')
+	       COALESCE(roll_json, ''), COALESCE(location, ''), COALESCE(outcome, '')
 	FROM turns WHERE number = ?`
 
 	var rec TurnRecord
 	var stamp string
 	if err := s.db.QueryRow(query, number).Scan(&rec.Number, &stamp, &rec.Mode, &rec.Input,
-		&rec.Narration, &rec.RollJSON, &rec.AudioRefsJSON); err != nil {
+		&rec.Narration, &rec.RollJSON, &rec.Location, &rec.Outcome); err != nil {
 		return nil, fmt.Errorf("get turn %d: %w", number, err)
 	}
 
@@ -95,7 +99,7 @@ func (s *Store) GetTurn(number int) (*TurnRecord, error) {
 
 // ListEntitiesForTurn returns the entity links recorded for a turn.
 func (s *Store) ListEntitiesForTurn(number int) ([]TurnEntityRef, error) {
-	const query = `SELECT entity_id, mention FROM turn_entities WHERE turn_number = ? ORDER BY entity_id, mention`
+	const query = `SELECT entity_id, mention, COALESCE(outcome, '') FROM turn_entities WHERE turn_number = ? ORDER BY entity_id, mention`
 	rows, err := s.db.Query(query, number)
 	if err != nil {
 		return nil, fmt.Errorf("list turn %d entities: %w", number, err)
@@ -105,7 +109,7 @@ func (s *Store) ListEntitiesForTurn(number int) ([]TurnEntityRef, error) {
 	refs := make([]TurnEntityRef, 0)
 	for rows.Next() {
 		var ref TurnEntityRef
-		if err := rows.Scan(&ref.EntityID, &ref.Mention); err != nil {
+		if err := rows.Scan(&ref.EntityID, &ref.Mention, &ref.Outcome); err != nil {
 			return nil, err
 		}
 		refs = append(refs, ref)
@@ -114,6 +118,32 @@ func (s *Store) ListEntitiesForTurn(number int) ([]TurnEntityRef, error) {
 		return nil, err
 	}
 	return refs, nil
+}
+
+// ListTurnEntitiesByOutcome returns the turns where an entity's link carries a
+// given system-reported outcome, which is what makes "every check this character
+// failed" a single-table query.
+func (s *Store) ListTurnEntitiesByOutcome(entityID, outcome string) ([]int, error) {
+	const query = `
+	SELECT DISTINCT turn_number FROM turn_entities
+	WHERE entity_id = ? AND outcome = ?
+	ORDER BY turn_number`
+
+	rows, err := s.db.Query(query, entityID, outcome)
+	if err != nil {
+		return nil, fmt.Errorf("list turns for entity %q with outcome %q: %w", entityID, outcome, err)
+	}
+	defer rows.Close()
+
+	numbers := make([]int, 0)
+	for rows.Next() {
+		var number int
+		if err := rows.Scan(&number); err != nil {
+			return nil, err
+		}
+		numbers = append(numbers, number)
+	}
+	return numbers, rows.Err()
 }
 
 func emptyToNull(value string) interface{} {
@@ -127,7 +157,7 @@ func emptyToNull(value string) interface{} {
 func (s *Store) ListTurns(limit, offset int) ([]TurnRecord, error) {
 	query := `
 	SELECT number, timestamp, mode, input, narration,
-	       COALESCE(roll_json, ''), COALESCE(audio_refs_json, '')
+	       COALESCE(roll_json, ''), COALESCE(location, ''), COALESCE(outcome, '')
 	FROM turns ORDER BY number`
 	args := make([]interface{}, 0, 2)
 	if limit > 0 {
@@ -146,7 +176,7 @@ func (s *Store) ListTurns(limit, offset int) ([]TurnRecord, error) {
 		var rec TurnRecord
 		var stamp string
 		if err := rows.Scan(&rec.Number, &stamp, &rec.Mode, &rec.Input, &rec.Narration,
-			&rec.RollJSON, &rec.AudioRefsJSON); err != nil {
+			&rec.RollJSON, &rec.Location, &rec.Outcome); err != nil {
 			return nil, err
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, stamp)

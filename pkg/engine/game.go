@@ -106,6 +106,12 @@ func InitGame(paths *core.PathResolver, gameID, systemID, worldID, playerName st
 	}
 	manifest.Settings[StartLocationSetting] = startLocation
 
+	// Give the campaign a player note before the manifest is written, so a failure
+	// leaves no half-built campaign.
+	if err := ensurePlayerNote(paths, store, gameID, playerName, startLocation); err != nil {
+		return nil, fmt.Errorf("create player note: %w", err)
+	}
+
 	manifestBytes, err := yaml.Marshal(manifest)
 	if err != nil {
 		return nil, fmt.Errorf("marshal game manifest: %w", err)
@@ -121,4 +127,43 @@ func InitGame(paths *core.PathResolver, gameID, systemID, worldID, playerName st
 		World:    worldManifest,
 		Store:    store,
 	}, nil
+}
+
+// ensurePlayerNote writes the campaign's player note when the file is absent,
+// linking it to the opening location. An authored note is never touched. Without
+// this, a campaign created through the GUI cannot serve its own game state, and the
+// player is silently missing from every turn's involvement list.
+func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, playerName, locationID string) error {
+	id := entity.Slugify(playerName)
+	if id == "" {
+		id = "player"
+	}
+
+	path := filepath.Join(paths.GameDir(gameID), "entities", id+".md")
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+
+	player := &entity.Entity{
+		ID:   id,
+		Name: playerName,
+		Type: "character",
+		Body: "The player character.",
+	}
+	if locationID != "" {
+		player.Location = "[[" + locationID + "]]"
+	}
+
+	data, err := player.SerializeMarkdown()
+	if err != nil {
+		return fmt.Errorf("serialize player note: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("write player note: %w", err)
+	}
+
+	if err := storage.NewSyncer(store).SyncFile(path); err != nil {
+		return fmt.Errorf("index player note: %w", err)
+	}
+	return nil
 }

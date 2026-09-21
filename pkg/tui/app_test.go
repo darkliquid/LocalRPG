@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -55,5 +56,27 @@ func TestTUIModelInitializationAndInput(t *testing.T) {
 
 	if updatedApp.mode != "Say" {
 		t.Errorf("expected mode 'Say' after Tab, got %q", updatedApp.mode)
+	}
+}
+
+func TestTUIViewShowsTheLocation(t *testing.T) {
+	tempDir := t.TempDir()
+	store, _ := storage.NewStore(filepath.Join(tempDir, "index.db"))
+	defer store.Close()
+
+	store.SaveEntity(&entity.Entity{ID: "alden-tavern", Name: "Alden Tavern", Type: "location", Body: "Quiet place.", Hash: "h1"})
+	store.SaveEntity(&entity.Entity{ID: "player", Name: "Sean", Type: "character", Location: "[[alden-tavern]]", Hash: "h2"})
+
+	history := engine.NewHistoryLogger(filepath.Join(tempDir, "history.jsonl"))
+	timeline := engine.NewTimeline(core.NewPathResolver(tempDir), store, history, "test-campaign")
+	router := harness.NewRouter()
+	router.RegisterProvider(&mockTUIModel{output: "hi"})
+	router.AssignRole("gm", "tui-mock")
+
+	orch := engine.NewTurnOrchestrator(store, timeline, nil, router, "alden-tavern", "player")
+	app := NewAppModel(orch, 80, 24)
+
+	if !strings.Contains(app.View(), "Alden Tavern") {
+		t.Errorf("expected the view to name the current location, got %q", app.View())
 	}
 }

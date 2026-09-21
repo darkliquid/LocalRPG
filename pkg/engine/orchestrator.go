@@ -9,22 +9,23 @@ import (
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/core"
+	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
 type TurnOrchestrator struct {
-	store       *storage.Store
-	timeline    *Timeline
-	rulesEngine *rules.JSEngine
-	router      *harness.Router
-	locationID  string
-	playerID    string
-	assembler   *harness.ContextAssembler
-	rulesPrompt string
-	lorePrompt  string
-	extractor   *harness.Extractor
+	store         *storage.Store
+	timeline      *Timeline
+	rulesEngine   *rules.JSEngine
+	router        *harness.Router
+	startLocation string
+	playerID      string
+	assembler     *harness.ContextAssembler
+	rulesPrompt   string
+	lorePrompt    string
+	extractor     *harness.Extractor
 }
 
 func NewTurnOrchestrator(
@@ -32,17 +33,17 @@ func NewTurnOrchestrator(
 	timeline *Timeline,
 	rulesEngine *rules.JSEngine,
 	router *harness.Router,
-	locationID string,
+	startLocation string,
 	playerID string,
 ) *TurnOrchestrator {
 	return &TurnOrchestrator{
-		store:       store,
-		timeline:    timeline,
-		rulesEngine: rulesEngine,
-		router:      router,
-		locationID:  locationID,
-		playerID:    playerID,
-		assembler:   harness.NewContextAssembler(store),
+		store:         store,
+		timeline:      timeline,
+		rulesEngine:   rulesEngine,
+		router:        router,
+		startLocation: startLocation,
+		playerID:      playerID,
+		assembler:     harness.NewContextAssembler(store),
 	}
 }
 
@@ -55,6 +56,62 @@ func (o *TurnOrchestrator) SetPrompts(rulesPrompt, lorePrompt string) {
 // deterministic mentions only.
 func (o *TurnOrchestrator) SetExtractor(extractor *harness.Extractor) {
 	o.extractor = extractor
+}
+
+// currentLocation resolves where this turn is happening. The player note wins
+// because it is the single source of truth; the last recorded turn follows, so a
+// note that points at a deleted location cannot teleport the party back to where
+// the campaign opened; the pinned start location is the bootstrap for a campaign
+// with no history at all.
+func (o *TurnOrchestrator) currentLocation() string {
+	if o.playerID != "" {
+		if player, err := o.store.GetEntity(o.playerID); err == nil && player != nil && player.Location != "" {
+			if ent := findLocationByRef(o.store, player.Location); ent != nil {
+				return ent.ID
+			}
+		}
+	}
+
+	if previous := o.previousLocation(); previous != "" {
+		return previous
+	}
+
+	if o.startLocation != "" {
+		if ent := findLocationByRef(o.store, o.startLocation); ent != nil {
+			return ent.ID
+		}
+	}
+
+	return ""
+}
+
+// CurrentLocationName returns the display name of where the party is, for
+// clients that show it without loading the entity themselves.
+func (o *TurnOrchestrator) CurrentLocationName() string {
+	id := o.currentLocation()
+	if id == "" {
+		return ""
+	}
+	if ent, err := o.store.GetEntity(id); err == nil && ent != nil && ent.Name != "" {
+		return ent.Name
+	}
+	return id
+}
+
+// previousLocation is the most recent location a turn recorded, scanning back past
+// turns that predate location tracking.
+func (o *TurnOrchestrator) previousLocation() string {
+	turns, err := o.timeline.history.LoadHistory()
+	if err != nil {
+		return ""
+	}
+
+	for i := len(turns) - 1; i >= 0; i-- {
+		if turns[i].Location != "" {
+			return turns[i].Location
+		}
+	}
+	return ""
 }
 
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
@@ -80,6 +137,7 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 	turnNum := len(pastTurns) + 1
 
 	var rollRes *rules.RollResult
+	var outcome string
 	var gmDirective string
 	generationPrompt := actionInput
 
@@ -100,6 +158,42 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 		}, nil
 	}
 
+	// Handle /go command: an explicit move, recorded as its own system turn.
+	if strings.HasPrefix(strings.TrimSpace(actionInput), "/go ") {
+		target := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(actionInput), "/go "))
+
+		ent := findLocationByRef(o.store, target)
+		if ent == nil {
+			return nil, fmt.Errorf("unknown location %q", target)
+		}
+
+		if err := o.timeline.SetPlayerLocation(o.playerID, ent.ID); err != nil {
+			return nil, fmt.Errorf("move failed: %w", err)
+		}
+
+		// The player is a party to their own move, so the move records them the way
+		// every generated turn does.
+		moveEntities := make([]entity.Mention, 0, 2)
+		if o.playerID != "" {
+			moveEntities = append(moveEntities, entity.Mention{ID: o.playerID, Kind: entity.MentionPlayer})
+		}
+		moveEntities = append(moveEntities, entity.Mention{ID: ent.ID, Kind: entity.MentionLocation})
+
+		move := Turn{
+			Number:    turnNum,
+			Timestamp: time.Now(),
+			Mode:      "System",
+			Input:     actionInput,
+			Narration: fmt.Sprintf("You make your way to %s.", ent.Name),
+			Location:  ent.ID,
+			Entities:  moveEntities,
+		}
+		if err := o.timeline.RecordTurn(&move, nil); err != nil {
+			return nil, fmt.Errorf("record move: %w", err)
+		}
+		return &move, nil
+	}
+
 	// Handle /gm director note or mode
 	isCorrection := mode == "GM" || strings.HasPrefix(actionInput, "/gm ")
 	if isCorrection {
@@ -118,14 +212,19 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 		})
 		if err == nil && res != nil {
 			rollRes = res.Roll
+			outcome = res.Outcome
 			if res.Message != "" {
 				gmDirective = fmt.Sprintf("[MECHANICS RESULT: %s]", res.Message)
 			}
 		}
 	}
 
+	// Where this turn happens: read from the player's own note, which is the single
+	// source of truth, never from a value pinned at campaign open.
+	locationID := o.currentLocation()
+
 	// Assemble context with system rules and world lore prompts
-	contextPrompt, err := o.assembler.AssembleContextWithProfiles(o.locationID, o.playerID, generationPrompt, o.rulesPrompt, o.lorePrompt, o.timeline.VoiceProfiles())
+	contextPrompt, err := o.assembler.AssembleContextWithProfiles(locationID, o.playerID, generationPrompt, o.rulesPrompt, o.lorePrompt, o.timeline.VoiceProfiles())
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)
 	}
@@ -151,9 +250,11 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 		Input:     actionInput,
 		Roll:      rollRes,
 		Narration: resp.Text,
+		Location:  locationID,
+		Outcome:   outcome,
 	}
 
-	turn.Entities = harness.ResolveEntityMentions(o.store, o.playerID, o.locationID, turn.Narration, actionInput)
+	turn.Entities = harness.ResolveEntityMentions(o.store, o.playerID, locationID, turn.Narration, actionInput)
 
 	extraction := harness.Extraction{}
 	if o.extractor != nil {
@@ -167,6 +268,17 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 	for _, mention := range speechMentions(turn.Segments) {
 		if !containsMention(turn.Entities, mention.ID) {
 			turn.Entities = append(turn.Entities, mention)
+		}
+	}
+
+	// A move proposed by extraction applies only when it resolves to a real
+	// location, and it takes effect from the next turn: this turn happened where it
+	// started, which is what keeps scenes honest.
+	if ref := strings.TrimSpace(extraction.PlayerLocation); ref != "" {
+		if ent := findLocationByRef(o.store, ref); ent != nil && ent.ID != locationID {
+			if err := o.timeline.SetPlayerLocation(o.playerID, ent.ID); err != nil {
+				return nil, fmt.Errorf("apply proposed location: %w", err)
+			}
 		}
 	}
 

@@ -39,7 +39,7 @@ onAction("inspect", function(ctx) {
 	}
 	defer store.Close()
 
-	bridge := NewHostBridge(store)
+	bridge := NewHostBridge(store, nil, "")
 	engine := NewJSEngine(bridge)
 
 	loader := NewRuleLoader(paths, engine)

@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -148,18 +149,26 @@ func mentionIDs(mentions []entity.Mention) []string {
 	return ids
 }
 
-func segmentDTOs(segments []entity.TurnSegment) []SegmentDTO {
+func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, audioAvailable bool) []SegmentDTO {
 	dtos := make([]SegmentDTO, 0, len(segments))
-	for _, segment := range segments {
-		dtos = append(dtos, SegmentDTO{
+	for i, segment := range segments {
+		dto := SegmentDTO{
 			Kind:      segment.Kind,
 			Speaker:   segment.Speaker,
 			SpeakerID: segment.SpeakerID,
 			Text:      segment.Text,
-		})
+		}
+		if audioAvailable {
+			dto.AudioURL = fmt.Sprintf("/api/game/%s/turn/%d/segment/%d/audio", gameID, turnNumber, i)
+		}
+		dtos = append(dtos, dto)
 	}
 	return dtos
 }
+
+// ErrAudioUnavailable means no TTS provider is configured, which is a normal state
+// rather than a failure: the client stays silent.
+var ErrAudioUnavailable = errors.New("audio unavailable")
 
 func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDTO, error) {
 	gameDir := s.resolver.GameDir(gameID)
@@ -308,23 +317,166 @@ func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, e
 		return []TurnDTO{}, nil
 	}
 
+	cfg := s.configMgr.Get()
+	artAvailable := cfg.Media.Image.BuiltinFallback || cfg.Media.Image.Type != "disabled"
+
+	store, err := s.store(gameID)
+	if err != nil {
+		store = nil // location names and art are decoration, not prerequisites
+	}
+
 	dtos := make([]TurnDTO, len(turns))
 	for i, turn := range turns {
-		audioURL := ""
-		if len(turn.AudioRefs) > 0 {
-			audioURL = turn.AudioRefs[0]
-		}
-		dtos[i] = TurnDTO{
-			TurnNumber:  turn.Number,
-			InputText:   turn.Input,
-			Mode:        turn.Mode,
-			Prose:       turn.Prose(),
-			AudioURL:    audioURL,
-			EntitiesHit: mentionIDs(turn.Entities),
-			Segments:    segmentDTOs(turn.Segments),
-		}
+		audioAvailable := cfg.Media.TTS.Type != "" && cfg.Media.TTS.Type != "disabled"
+		dtos[i] = s.turnDTO(turn, store, cfg, gameID, artAvailable, audioAvailable)
 	}
 	return dtos, nil
+}
+
+// turnDTO maps a persisted turn for the API, so a live turn and a replayed one are
+// the same shape and the client needs one rendering path.
+func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID string, artAvailable, audioAvailable bool) TurnDTO {
+	dto := TurnDTO{
+		TurnNumber:  turn.Number,
+		InputText:   turn.Input,
+		Mode:        turn.Mode,
+		Prose:       turn.Prose(),
+		EntitiesHit: mentionIDs(turn.Entities),
+		Segments:    segmentDTOs(turn.Segments, gameID, turn.Number, audioAvailable),
+		Outcome:     turn.Outcome,
+	}
+
+	if turn.Location != "" {
+		dto.LocationID = turn.Location
+
+		if store != nil {
+			if location, err := store.GetEntity(turn.Location); err == nil && location != nil {
+				dto.LocationName = location.Name
+			}
+		}
+		if artAvailable {
+			dto.LocationArtURL = "/api/game/" + gameID + "/location/" + turn.Location + "/art"
+		}
+	}
+
+	return dto
+}
+
+// GetLocationArt returns a location's scene image and its content type, drawing it
+// on first request and reusing it until the appearance changes.
+func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string, force bool) (string, string, error) {
+	// Read the note from disk rather than the index: appearance, tags, and state are
+	// authored content, and the index is derived from them.
+	notePath := filepath.Join(s.resolver.GameDir(gameID), "entities", locationID+".md")
+	data, err := os.ReadFile(notePath)
+	if err != nil {
+		return "", "", fmt.Errorf("location %q not found: %w", locationID, err)
+	}
+
+	location, err := entity.ParseMarkdownEntity(data)
+	if err != nil {
+		return "", "", fmt.Errorf("parse location %q: %w", locationID, err)
+	}
+
+	cfg := s.configMgr.Get()
+	client, err := media.NewSceneImageClient(cfg.Media.Image)
+	if err != nil {
+		return "", "", fmt.Errorf("build image client: %w", err)
+	}
+
+	worldStyle := s.worldArtStyle(gameID)
+	providerParams := cfg.Media.Image.Type + ":" + cfg.Media.Image.Model
+	pipeline := media.NewImagePipeline(client, media.NewContentCache(s.resolver.CacheDir()))
+
+	path, err := pipeline.GenerateLocationImage(ctx, location, worldStyle, providerParams, force)
+	if err != nil {
+		return "", "", err
+	}
+	return path, contentTypeForArt(path), nil
+}
+
+// worldArtStyle reads the art style and genre of the campaign's world, which keeps a
+// setting's imagery visually consistent.
+func (s *Service) worldArtStyle(gameID string) string {
+	manifest, err := core.LoadGameManifest(filepath.Join(s.resolver.GameDir(gameID), "game.yaml"))
+	if err != nil {
+		return ""
+	}
+
+	world, err := core.LoadWorldManifest(filepath.Join(s.resolver.WorldDir(manifest.WorldID), "world.yaml"))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(strings.Join([]string{world.ArtStyle, world.Genre}, ", "))
+}
+
+// GetSegmentAudio synthesizes one segment on demand and returns the cached clip,
+// reusing it for every later request.
+func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber, segmentIndex int) (string, error) {
+	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
+	turns, err := engine.NewHistoryLogger(historyPath).LoadHistory()
+	if err != nil {
+		return "", fmt.Errorf("load history: %w", err)
+	}
+
+	var turn *engine.Turn
+	for i := range turns {
+		if turns[i].Number == turnNumber {
+			turn = &turns[i]
+			break
+		}
+	}
+	if turn == nil {
+		return "", fmt.Errorf("turn %d not found", turnNumber)
+	}
+	if segmentIndex < 0 || segmentIndex >= len(turn.Segments) {
+		return "", fmt.Errorf("segment %d out of range for turn %d", segmentIndex, turnNumber)
+	}
+
+	cfg := s.configMgr.Get()
+	if cfg.Media.TTS.Type == "" || cfg.Media.TTS.Type == "disabled" {
+		return "", ErrAudioUnavailable
+	}
+
+	client, err := media.NewTTSClient(cfg.Media.TTS)
+	if err != nil {
+		return "", fmt.Errorf("build tts client: %w", err)
+	}
+
+	narratorVoice := &entity.VoiceConfig{
+		VoiceID:    cfg.Media.TTS.DefaultVoice,
+		Pitch:      cfg.Media.TTS.Pitch,
+		SpeechRate: cfg.Media.TTS.SpeechRate,
+	}
+
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
+	return pipeline.SynthesizeSegment(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID))
+}
+
+// voiceFor resolves a speaker entity's configured voice, if it has one.
+func (s *Service) voiceFor(gameID string) func(speakerID string) *entity.VoiceConfig {
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil
+	}
+
+	return func(speakerID string) *entity.VoiceConfig {
+		if speakerID == "" {
+			return nil
+		}
+		ent, err := store.GetEntity(speakerID)
+		if err != nil || ent == nil {
+			return nil
+		}
+		return ent.Voice
+	}
+}
+
+func contentTypeForArt(path string) string {
+	if strings.EqualFold(filepath.Ext(path), ".svg") {
+		return "image/svg+xml"
+	}
+	return "image/webp"
 }
 
 func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
