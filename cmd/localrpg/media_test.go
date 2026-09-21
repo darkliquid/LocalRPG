@@ -8,6 +8,26 @@ import (
 	"testing"
 )
 
+func TestCLIExportUsageListsMediaFlags(t *testing.T) {
+	cmd := exec.Command("go", "run", ".", "export", "--help")
+	out, _ := cmd.CombinedOutput()
+
+	for _, want := range []string{"no-art", "no-audio", "still", "fps", "size"} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("expected --%s in the export usage output:\n%s", want, out)
+		}
+	}
+}
+
+func TestCLIExportUsageForAnEmptyInvocation(t *testing.T) {
+	cmd := exec.Command("go", "run", ".", "export")
+	out, _ := cmd.CombinedOutput()
+
+	if !strings.Contains(string(out), "Usage: localrpg export") {
+		t.Errorf("expected the export usage line:\n%s", out)
+	}
+}
+
 func TestCLITTSWritesAClip(t *testing.T) {
 	configDir := t.TempDir()
 	// The cache path is pinned inside the throwaway config dir so the command

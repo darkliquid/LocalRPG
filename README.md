@@ -13,7 +13,7 @@ A local-first, turn-based tabletop RPG client orchestrated by local and CLI LLMs
 - **Headless Terminal TUI:** Interactive Bubbletea client with Glamour Markdown rendering, dice rolling, and `/gm` steering.
 - **Multimodal Pipelines:** State-aware audio and art caching, per-character voice playback from recorded dialogue, ComfyUI image generator, and Whisper STT.
 - **Wails v3 Desktop GUI:** Twintail Launcher inspired glassmorphic aesthetic in React 19 + TypeScript + Tailwind CSS.
-- **Story Theater & Exporter:** In-app Visual Novel replay player with audio-synced text pacing, standalone HTML5 bundle exporter, and headless FFmpeg video rendering.
+- **Story Theater & Exporter:** In-app Visual Novel replay player, and two exports built from one scene script — an animated web bundle that runs itself and plays each line in the speaker's voice, and a video rendered frame by frame in Go.
 
 ---
 
@@ -113,3 +113,20 @@ Settings Studio includes 1-click loaders that instantly prefill endpoint, model,
 - **Automatic GM Voice Assignment:** The GM prompt is automatically injected with the active voice profile catalog. When new NPCs are introduced, the world extractor auto-assigns matching voice profiles based on tags or deterministic hash.
 - **Per-Character Codex Overrides:** Select and inject voice profile frontmatter directly from the Codex Drawer note editor with one click.
 - **Audio Cache Separation:** Speech cache keys uniquely isolate combinations of speaker, voice ID, pitch, speech rate, and text to eliminate audio cache collisions.
+
+---
+
+## Exporting a Campaign
+
+Both exports are built from the same scene script, so they group turns by location, pace each beat by reading time (or by a clip's real length when one exists), and speak each line in the recorded speaker's own voice. Neither re-derives its own pacing or its own idea of what a scene is.
+
+```bash
+localrpg export web <game-id> [--out DIR] [--no-art] [--no-audio]
+localrpg export video <game-id> [--out FILE] [--still] [--fps N] [--size WxH] [--no-art] [--no-audio]
+```
+
+**Web bundle.** Writes a self-contained visual-novel player to `dist/<game-id>-web`. It runs itself, blending between locations, revealing each beat's text as it is read, and ducking into a click-to-play state when the browser refuses to start audio without a gesture. Art and audio are copied beside the page as sidecar assets and referenced by relative path, so the bundle works from a file:// URL with no server and no network access.
+
+**Video.** Draws every frame in Go with the bundled Go fonts, so no browser or external rasteriser is involved. Frames are muxed against each beat's own clip, with silence generated for beats that have none, so picture and sound stay in step. The result is staged and renamed into place: a failed render leaves no file behind. `--still` renders one frame per beat instead of animating, which is the fast path on a weak machine.
+
+**Requirements.** `ffmpeg` is required for video export, and `ffprobe` is used to measure clip lengths so pacing follows the audio; without `ffprobe` a beat falls back to the reading-time estimate. Both are checked at the point of use, and video export fails with a clear message rather than producing a half-written file.

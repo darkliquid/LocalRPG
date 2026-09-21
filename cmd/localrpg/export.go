@@ -5,19 +5,27 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/export"
+	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
 func handleExportCommand(args []string) {
 	fs := flag.NewFlagSet("export", flag.ExitOnError)
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: localrpg export <web|video> <game-id> [flags]")
-		fmt.Fprintln(os.Stderr, "Export story replay to web bundle or video")
+		fmt.Fprintln(os.Stderr, "Export the campaign as an animated web bundle or a video")
 		fs.PrintDefaults()
 	}
 	out := fs.String("out", "", "Output path for export")
 	dir := fs.String("dir", ".", "Root directory")
+	noArt := fs.Bool("no-art", false, "Skip scene imagery")
+	noAudio := fs.Bool("no-audio", false, "Skip speech clips, using only cached audio")
+	still := fs.Bool("still", false, "Render one frame per beat instead of animating")
+	fps := fs.Int("fps", scene.DefaultFPS, "Video frame rate")
+	size := fs.String("size", "1920x1080", "Video size as WxH")
 
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
 		fs.Usage()
@@ -34,6 +42,8 @@ func handleExportCommand(args []string) {
 	fs.Parse(args[2:])
 
 	compiler := export.NewScriptCompiler(*dir)
+	compiler.SetMedia(!*noArt, !*noAudio)
+
 	script, err := compiler.Compile(context.Background(), gameID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to compile replay script: %v\n", err)
@@ -60,8 +70,17 @@ func handleExportCommand(args []string) {
 			target = fmt.Sprintf("dist/%s.mp4", gameID)
 		}
 		pipeline := export.NewVideoPipeline(*dir)
-		err := pipeline.RenderVideo(context.Background(), script, target)
-		if err != nil {
+		pipeline.SetStill(*still)
+		pipeline.SetFPS(*fps)
+		if width, height, err := parseSize(*size); err == nil {
+			pipeline.SetSize(width, height)
+		} else {
+			// A bad geometry is not worth abandoning a long render for, so the
+			// default resolution stands and the reason is reported.
+			fmt.Fprintf(os.Stderr, "export: ignoring --size %q: %v\n", *size, err)
+		}
+
+		if err := pipeline.RenderVideo(context.Background(), script, target); err != nil {
 			fmt.Fprintf(os.Stderr, "Video render failed: %v\n", err)
 			os.Exit(1)
 		}
@@ -71,4 +90,25 @@ func handleExportCommand(args []string) {
 		fmt.Fprintf(os.Stderr, "Unknown export format: %s (supported: web, video)\n", format)
 		os.Exit(1)
 	}
+}
+
+// parseSize reads a WxH geometry.
+func parseSize(value string) (int, int, error) {
+	parts := strings.SplitN(strings.ToLower(strings.TrimSpace(value)), "x", 2)
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("expected WxH")
+	}
+
+	width, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return 0, 0, err
+	}
+	height, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return 0, 0, err
+	}
+	if width < 16 || height < 16 {
+		return 0, 0, fmt.Errorf("dimensions must be at least 16x16")
+	}
+	return width, height, nil
 }

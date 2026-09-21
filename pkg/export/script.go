@@ -83,16 +83,28 @@ type ScriptCompiler struct {
 	rootDir  string
 	resolver *core.PathResolver
 	config   *config.Config
+	art      bool
+	audio    bool
 }
 
-// NewScriptCompiler builds a compiler for one campaign root.
+// NewScriptCompiler builds a compiler for one campaign root. Imagery and speech
+// are both on by default: an export is expected to look and sound like the
+// campaign unless it is deliberately told otherwise.
 func NewScriptCompiler(rootDir string) *ScriptCompiler {
 	cfg, _ := config.NewConfigManager().Load()
 	return &ScriptCompiler{
 		rootDir:  rootDir,
 		resolver: core.NewPathResolver(rootDir),
 		config:   cfg,
+		art:      true,
+		audio:    true,
 	}
+}
+
+// SetMedia disables art or audio resolution for an export.
+func (c *ScriptCompiler) SetMedia(art, audio bool) {
+	c.art = art
+	c.audio = audio
 }
 
 // Compile resolves a campaign's turns, art and audio into a playable script.
@@ -117,7 +129,7 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 
 	compiler := scene.NewCompiler(&campaignSource{resolver: c.resolver, store: store, gameID: gameID})
 
-	if c.config.Media.Image.BuiltinFallback || c.config.Media.Image.Type != "disabled" {
+	if c.art && (c.config.Media.Image.BuiltinFallback || c.config.Media.Image.Type != "disabled") {
 		if client, err := media.NewSceneImageClient(c.config.Media.Image); err == nil {
 			cache := media.NewContentCache(c.resolver.CacheDir())
 			params := c.config.Media.Image.Type + ":" + c.config.Media.Image.Model
@@ -125,7 +137,7 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		}
 	}
 
-	if c.config.Media.TTS.Type != "" && c.config.Media.TTS.Type != "disabled" {
+	if c.audio && c.config.Media.TTS.Type != "" && c.config.Media.TTS.Type != "disabled" {
 		if client, err := media.NewTTSClient(c.config.Media.TTS); err == nil {
 			cache := media.NewContentCache(c.resolver.CacheDir())
 			compiler.SetSpeechResolver(&speechResolver{
@@ -141,8 +153,8 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 	}
 
 	script, err := compiler.Compile(ctx, gameID, scene.Options{
-		Art:            true,
-		Audio:          true,
+		Art:            c.art,
+		Audio:          c.audio,
 		WorldStyle:     worldStyle,
 		ProviderParams: c.config.Media.Image.Type + ":" + c.config.Media.Image.Model,
 		OnProgress: func(format string, args ...interface{}) {

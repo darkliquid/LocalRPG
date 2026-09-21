@@ -3077,7 +3077,7 @@ git commit -m "feat(export): render a complete video or nothing"
 - Consumes: `scene.Options`, `VideoPipeline.SetSize/SetFPS/SetStill`
 - Produces: `(*ScriptCompiler).SetMedia(art, audio bool)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `cmd/localrpg/media_test.go` (the CLI tests already shell out, so this follows their style):
 
@@ -3094,12 +3094,12 @@ func TestCLIExportUsageListsMediaFlags(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestCLIExportUsageListsMediaFlags -count=1 ./cmd/localrpg/`
 Expected: FAIL — the flags do not exist yet.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/export/script.go`:
 
@@ -3174,12 +3174,12 @@ func parseSize(value string) (int, int, error) {
 
 In `README.md`, replace the export line's claim with what it now does: an animated visual-novel web bundle (auto-running, location scenes, per-speaker audio, sidecar assets) and a video rendered from the same scene script, with the flags listed and the FFmpeg/ffprobe requirement named.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `go test -count=1 ./cmd/localrpg/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/export/script.go cmd/localrpg/export.go README.md
