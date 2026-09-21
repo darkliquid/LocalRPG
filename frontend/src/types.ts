@@ -20,6 +20,9 @@ export interface TurnSegment {
   speaker_id?: string;
   text: string;
   audio_url?: string;
+  // Seconds the backend estimates this line takes to read, which is the same
+  // estimate the exports pace with.
+  duration?: number;
 }
 
 export interface Turn {

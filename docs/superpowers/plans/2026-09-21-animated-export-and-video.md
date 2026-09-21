@@ -3396,7 +3396,7 @@ git commit -m "fix(media): name and serve speech clips by what they contain"
 - Consumes: `scene.ReadingDuration`
 - Produces: `gui.SegmentDTO.Duration float64` (seconds), `TurnSegment.duration?: number`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/service_test.go`:
 
@@ -3421,12 +3421,12 @@ func TestChronicleReportsSegmentDurations(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestChronicleReportsSegmentDurations -count=1 ./pkg/gui/`
 Expected: FAIL — `segment.Duration undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/gui/types.go`, `SegmentDTO` gains `Duration float64 \`json:"duration"\``. In `pkg/gui/service.go`, `segmentDTOs` fills it:
 
@@ -3442,12 +3442,12 @@ In `frontend/src/types.ts`, `TurnSegment` gains `duration?: number;`. In `StoryT
 
 where `segmentIndex` is the component's existing playback position; the auto-advance timer uses `segmentDurationMs > 0 ? segmentDurationMs : <existing fallback>`. The browser replaces the estimate with a clip's real length as soon as the audio element reports it, which is the same rule the video renderer applies.
 
-- [ ] **Step 4: Verify the type check and the tests**
+- [x] **Step 4: Verify the type check and the tests**
 
 Run: `go test -count=1 ./pkg/gui/ && cd frontend && npx tsc --noEmit`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui frontend/src
@@ -3491,6 +3491,7 @@ git commit -m "feat(gui): share one pacing estimate with the in-app player"
 - **`drawBackground` splits out `sceneArt`** (Task 10). The crossfade needs the incoming scene drawn twice, once at full opacity and once blended, so resolving art moved into its own method rather than being inlined.
 - **The staging file keeps the output's container extension** (Task 13). FFmpeg chooses its muxer from the filename, so `<out>.mp4.part` fails outright with "Unable to choose an output format". `stagingPath` inserts `.part` before the extension instead (`replay.part.mp4`), and the tests assert against `stagingPath(out)` rather than a literal `".part"` suffix, which would have been vacuous.
 - **Tasks 11, 12 and 13 are one commit.** They rewrite `BuildCommand` and `RenderVideo`, so shipping the frame writer against the retired still-image command would have meant writing an interim `BuildCommand` only to replace it in the next task.
+- **Story Theater advances per turn, not per segment** (Task 16). The plan's `segmentIndex` sketch assumes a segment-level playback position the component does not have: it moves a turn at a time. A turn is therefore held for the sum of its segments' reported durations, with the existing fixed span as the fallback for a turn recorded before durations existed. This keeps the component's shape and still makes one estimate serve both the app and the exports.
 
 ### Execution notes
 

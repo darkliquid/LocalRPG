@@ -157,6 +157,9 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, a
 			Speaker:   segment.Speaker,
 			SpeakerID: segment.SpeakerID,
 			Text:      segment.Text,
+			// The reading estimate is the same one the exports pace with, so the
+			// app and a rendered bundle hold a line for the same length of time.
+			Duration: scene.ReadingDuration(segment.Text).Seconds(),
 		}
 		if audioAvailable {
 			dto.AudioURL = fmt.Sprintf("/api/game/%s/turn/%d/segment/%d/audio", gameID, turnNumber, i)

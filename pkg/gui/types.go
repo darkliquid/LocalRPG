@@ -36,11 +36,12 @@ type GameStateDTO struct {
 }
 
 type SegmentDTO struct {
-	Kind      string `json:"kind"`
-	Speaker   string `json:"speaker,omitempty"`
-	SpeakerID string `json:"speaker_id,omitempty"`
-	Text      string `json:"text"`
-	AudioURL  string `json:"audio_url,omitempty"`
+	Kind      string  `json:"kind"`
+	Speaker   string  `json:"speaker,omitempty"`
+	SpeakerID string  `json:"speaker_id,omitempty"`
+	Text      string  `json:"text"`
+	AudioURL  string  `json:"audio_url,omitempty"`
+	Duration  float64 `json:"duration"`
 }
 
 type TurnDTO struct {

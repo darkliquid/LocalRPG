@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
@@ -345,5 +346,26 @@ func TestChronicleOffersAudioURLsWhenTTSIsConfigured(t *testing.T) {
 	}
 	if turns[0].Segments[0].AudioURL == "" || turns[0].Segments[1].AudioURL == "" {
 		t.Errorf("expected audio URLs on both segments, got %+v", turns[0].Segments)
+	}
+}
+
+func TestChronicleReportsSegmentDurations(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+
+	turns, err := svc.GetChronicle(context.Background(), gameID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 1 || len(turns[0].Segments) != 2 {
+		t.Fatalf("unexpected chronicle: %+v", turns)
+	}
+
+	// The reported estimate is the one the exports pace with, so the app holds a
+	// line for the same length of time a rendered bundle does.
+	for _, segment := range turns[0].Segments {
+		if segment.Duration < scene.MinimumBeatDuration.Seconds() {
+			t.Errorf("segment %q duration = %v, want at least the floor", segment.Text, segment.Duration)
+		}
 	}
 }

@@ -24,6 +24,15 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
 
   const currentTurn = turns[currentIdx];
 
+  // A turn is held for the reading time its segments report, so the in-app player
+  // and a rendered bundle hold a line for the same length of time. The fixed span
+  // remains as the fallback for a turn recorded before durations existed.
+  const reportedMs = (currentTurn?.segments ?? []).reduce(
+    (total, segment) => total + (segment.duration ?? 0) * 1000,
+    0
+  );
+  const turnDurationMs = reportedMs > 0 ? reportedMs : 4000;
+
   useEffect(() => {
     if (!isOpen || !isPlaying || turns.length === 0) return;
 
@@ -33,10 +42,10 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
       } else {
         setIsPlaying(false);
       }
-    }, 4000 / speed);
+    }, turnDurationMs / speed);
 
     return () => clearTimeout(interval);
-  }, [isOpen, isPlaying, currentIdx, turns.length, speed]);
+  }, [isOpen, isPlaying, currentIdx, turns.length, speed, turnDurationMs]);
 
   if (!isOpen || turns.length === 0) return null;
 
