@@ -15,7 +15,8 @@ const (
 )
 
 type AgentRoleConfig struct {
-	Type        string   `yaml:"type" json:"type"` // "builtin", "http", "cli", "disabled"
+	Type        string   `yaml:"type" json:"type"`                                     // "builtin", "http", "cli", "inherit", "disabled"
+	InheritFrom string   `yaml:"inherit_from,omitempty" json:"inherit_from,omitempty"` // role to inherit when type is "inherit"
 	BuiltinName string   `yaml:"builtin_name,omitempty" json:"builtin_name,omitempty"`
 	Command     string   `yaml:"command,omitempty" json:"command,omitempty"`
 	Args        []string `yaml:"args,omitempty" json:"args,omitempty"`
@@ -77,6 +78,10 @@ type ImageConfig struct {
 	Model        string   `yaml:"model,omitempty" json:"model,omitempty"`
 	APIKey       string   `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 	AutoGenerate bool     `yaml:"auto_generate" json:"auto_generate"`
+	// BuiltinFallback lets the built-in procedural generator stand in when no
+	// provider is configured or a provider call fails, so imagery always exists
+	// offline.
+	BuiltinFallback bool `yaml:"builtin_fallback" json:"builtin_fallback"`
 }
 
 type MediaConfig struct {
@@ -121,6 +126,10 @@ func DefaultConfig() *Config {
 				},
 				"narrator": {
 					Type: "disabled",
+				},
+				RoleExtractor: {
+					Type:        "inherit",
+					InheritFrom: RoleGM,
 				},
 			},
 			Fallbacks: make(map[string]string),
@@ -176,8 +185,9 @@ func DefaultConfig() *Config {
 				Type: "disabled",
 			},
 			Image: ImageConfig{
-				Type:         "disabled",
-				AutoGenerate: false,
+				Type:            "disabled",
+				AutoGenerate:    false,
+				BuiltinFallback: true,
 			},
 		},
 		Preferences: PreferencesConfig{

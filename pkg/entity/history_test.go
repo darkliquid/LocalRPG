@@ -46,3 +46,33 @@ func TestEntityWithoutHistoryOmitsFrontmatter(t *testing.T) {
 		t.Errorf("expected no history frontmatter when empty, got %s", serialized)
 	}
 }
+
+func TestEntityAppearanceRoundTrip(t *testing.T) {
+	doc := `---
+id: alden-tavern
+name: Alden Tavern
+type: location
+appearance: gutted by fire, roof collapsed
+---
+A ruin now.
+`
+	ent, err := ParseMarkdownEntity([]byte(doc))
+	if err != nil {
+		t.Fatalf("ParseMarkdownEntity failed: %v", err)
+	}
+	if ent.Appearance != "gutted by fire, roof collapsed" {
+		t.Fatalf("Appearance = %q", ent.Appearance)
+	}
+
+	serialized, err := ent.SerializeMarkdown()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reparsed, err := ParseMarkdownEntity(serialized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reparsed.Appearance != ent.Appearance {
+		t.Errorf("Appearance after round trip = %q, want %q", reparsed.Appearance, ent.Appearance)
+	}
+}

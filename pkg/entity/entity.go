@@ -22,34 +22,36 @@ type VoiceConfig struct {
 }
 
 type EntityFrontmatter struct {
-	ID        string                 `yaml:"id"`
-	Name      string                 `yaml:"name"`
-	Type      string                 `yaml:"type"`
-	Tags      []string               `yaml:"tags,omitempty"`
-	Voice     *VoiceConfig           `yaml:"voice,omitempty"`
-	Portrait  string                 `yaml:"portrait,omitempty"`
-	Location  string                 `yaml:"location,omitempty"`
-	Faction   string                 `yaml:"faction,omitempty"`
-	History   []int                  `yaml:"history,omitempty" json:"history,omitempty"`
-	State     map[string]interface{} `yaml:"state,omitempty"`
-	ExtraMeta map[string]interface{} `yaml:",inline"`
+	ID         string                 `yaml:"id"`
+	Name       string                 `yaml:"name"`
+	Type       string                 `yaml:"type"`
+	Tags       []string               `yaml:"tags,omitempty"`
+	Voice      *VoiceConfig           `yaml:"voice,omitempty"`
+	Portrait   string                 `yaml:"portrait,omitempty"`
+	Location   string                 `yaml:"location,omitempty"`
+	Appearance string                 `yaml:"appearance,omitempty" json:"appearance,omitempty"`
+	Faction    string                 `yaml:"faction,omitempty"`
+	History    []int                  `yaml:"history,omitempty" json:"history,omitempty"`
+	State      map[string]interface{} `yaml:"state,omitempty"`
+	ExtraMeta  map[string]interface{} `yaml:",inline"`
 }
 
 type Entity struct {
-	ID        string
-	Name      string
-	Type      string
-	Tags      []string
-	Voice     *VoiceConfig
-	Portrait  string
-	Location  string
-	Faction   string
-	History   []int
-	State     *state.State
-	ExtraMeta map[string]interface{}
-	Body      string
-	Wikilinks []string
-	Hash      string
+	ID         string
+	Name       string
+	Type       string
+	Tags       []string
+	Voice      *VoiceConfig
+	Portrait   string
+	Location   string
+	Faction    string
+	Appearance string
+	History    []int
+	State      *state.State
+	ExtraMeta  map[string]interface{}
+	Body       string
+	Wikilinks  []string
+	Hash       string
 }
 
 func (e *Entity) InitState(data map[string]interface{}) {
@@ -108,20 +110,21 @@ func ParseMarkdownEntity(data []byte) (*Entity, error) {
 	}
 
 	entity := &Entity{
-		ID:        fm.ID,
-		Name:      fm.Name,
-		Type:      fm.Type,
-		Tags:      fm.Tags,
-		Voice:     fm.Voice,
-		Portrait:  fm.Portrait,
-		Location:  fm.Location,
-		Faction:   fm.Faction,
-		History:   fm.History,
-		State:     state.NewState(fm.State),
-		ExtraMeta: fm.ExtraMeta,
-		Body:      bodyRaw,
-		Wikilinks: links,
-		Hash:      fileHash,
+		ID:         fm.ID,
+		Name:       fm.Name,
+		Type:       fm.Type,
+		Tags:       fm.Tags,
+		Voice:      fm.Voice,
+		Portrait:   fm.Portrait,
+		Location:   fm.Location,
+		Faction:    fm.Faction,
+		Appearance: fm.Appearance,
+		History:    fm.History,
+		State:      state.NewState(fm.State),
+		ExtraMeta:  fm.ExtraMeta,
+		Body:       bodyRaw,
+		Wikilinks:  links,
+		Hash:       fileHash,
 	}
 
 	return entity, nil
@@ -172,16 +175,17 @@ func Slugify(name string) string {
 
 func (e *Entity) SerializeMarkdown() ([]byte, error) {
 	fm := EntityFrontmatter{
-		ID:        e.ID,
-		Name:      e.Name,
-		Type:      e.Type,
-		Tags:      e.Tags,
-		Voice:     e.Voice,
-		Portrait:  e.Portrait,
-		Location:  e.Location,
-		Faction:   e.Faction,
-		History:   e.History,
-		ExtraMeta: e.ExtraMeta,
+		ID:         e.ID,
+		Name:       e.Name,
+		Type:       e.Type,
+		Tags:       e.Tags,
+		Voice:      e.Voice,
+		Portrait:   e.Portrait,
+		Location:   e.Location,
+		Faction:    e.Faction,
+		Appearance: e.Appearance,
+		History:    e.History,
+		ExtraMeta:  e.ExtraMeta,
 	}
 	if e.State != nil {
 		fm.State = e.State.Raw()

@@ -17,7 +17,12 @@ type Segment struct {
 	IsSpeech  bool
 }
 
-var attributedSpeakerRegex = regexp.MustCompile(`^([^:\n]+):\s*["“]([^"”]+)["”]`)
+// Emphasis can sit between the colon and the quote, as in `**Name:** "…"`, so the
+// separator allows whitespace and emphasis characters.
+var attributedSpeakerRegex = regexp.MustCompile(`^([^:\n]+):[\s*_]*["“]([^"”]+)["”](.*)$`)
+
+// maxSpeakerLength bounds a candidate so a sentence cannot masquerade as a name.
+const maxSpeakerLength = 64
 
 // Parse splits text into ordered narration and speech segments. resolve maps a
 // candidate speaker to an entity ID, reporting whether the speaker is known. A
@@ -32,16 +37,23 @@ func Parse(text string, resolve func(candidate string) (string, bool)) []Segment
 			continue
 		}
 
-		if match := attributedSpeakerRegex.FindStringSubmatch(line); len(match) == 3 {
-			candidate := entity.WikilinkTarget(strings.TrimSpace(match[1]))
-			if id, ok := resolve(candidate); ok {
-				segments = append(segments, Segment{
-					Speaker:   candidate,
-					SpeakerID: id,
-					Text:      strings.TrimSpace(match[2]),
-					IsSpeech:  true,
-				})
-				continue
+		if match := attributedSpeakerRegex.FindStringSubmatch(line); len(match) == 4 {
+			candidate := cleanSpeaker(match[1])
+			if candidate != "" {
+				if id, ok := resolve(candidate); ok {
+					segments = append(segments, Segment{
+						Speaker:   candidate,
+						SpeakerID: id,
+						Text:      strings.TrimSpace(match[2]),
+						IsSpeech:  true,
+					})
+
+					// Prose after the closing quote is narration, not lost.
+					if rest := strings.TrimSpace(match[3]); rest != "" {
+						segments = append(segments, Segment{Text: rest})
+					}
+					continue
+				}
 			}
 		}
 
@@ -49,4 +61,17 @@ func Parse(text string, resolve func(candidate string) (string, bool)) []Segment
 	}
 
 	return segments
+}
+
+// cleanSpeaker strips markdown emphasis and a wikilink label from a candidate,
+// returning "" when what remains cannot be a speaker name. Resolution, not
+// punctuation, is what rejects sentence fragments, so titles such as
+// "Mr. Garrick" survive.
+func cleanSpeaker(raw string) string {
+	// Wrapping emphasis and quotes are formatting, not part of the name.
+	candidate := entity.WikilinkTarget(strings.Trim(strings.TrimSpace(raw), "*_\"'“”‘’"))
+	if candidate == "" || len(candidate) > maxSpeakerLength {
+		return ""
+	}
+	return candidate
 }
