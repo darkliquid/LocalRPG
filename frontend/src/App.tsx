@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { APIClient } from './api/client';
 import { GameState, Turn, EntityNote, GraphData, AppConfig } from './types';
 import { ChronicleView } from './components/ChronicleView';
+import { TurnSegments } from './components/TurnSegments';
 import { ActionConsole } from './components/ActionConsole';
 import { Drawers } from './components/Drawers';
 import { CharacterSheetDrawer } from './components/CharacterSheetDrawer';
@@ -73,15 +74,47 @@ export const App: React.FC = () => {
     }
   };
 
+  const [turnInFlight, setTurnInFlight] = useState(false);
+  const [streamedProse, setStreamedProse] = useState('');
+  const abortRef = useRef<AbortController | null>(null);
+
   const handleActionSubmit = async (mode: string, text: string) => {
-    // Add optimistic turn
-    const nextTurn: Turn = {
-      turn_number: chronicle.length + 1,
-      input_text: text,
-      mode: mode,
-      prose: 'The storyteller ponders your directive...',
-    };
-    setChronicle((prev) => [...prev, nextTurn]);
+    if (!client || !activeGameID || turnInFlight) return;
+
+    setTurnInFlight(true);
+    setStreamedProse('');
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      await APIClient.streamTurn(
+        activeGameID,
+        { mode, input: text },
+        (event) => {
+          if (event.type === 'chunk') {
+            setStreamedProse((prev) => prev + (event.text ?? ''));
+          } else if (event.type === 'turn' && event.turn) {
+            const turn = event.turn;
+            setChronicle((prev) => [...prev, turn]);
+            setStreamedProse('');
+          } else if (event.type === 'error') {
+            console.error('turn failed:', event.message);
+          }
+        },
+        controller.signal
+      );
+    } catch (err) {
+      console.error('turn failed:', err);
+    } finally {
+      abortRef.current = null;
+      setTurnInFlight(false);
+    }
+  };
+
+  const handleStopTurn = () => {
+    abortRef.current?.abort();
+    setStreamedProse('');
   };
 
   const handleSaveEntity = async (entityId: string, markdown: string) => {
@@ -204,7 +237,20 @@ export const App: React.FC = () => {
                 autoPlay={config?.media.tts.auto_play ?? false}
                 volume={config?.media.tts.master_volume ?? 1}
               />
-              <ActionConsole onSubmit={handleActionSubmit} />
+              {streamedProse && (
+                <div className="p-4 border-t border-white/5 bg-black/20">
+                  <TurnSegments
+                    segments={[{ kind: 'narration', text: streamedProse }]}
+                    fallback={streamedProse}
+                    onEntityClick={handleOpenWikilink}
+                  />
+                </div>
+              )}
+              <ActionConsole
+                onSubmit={handleActionSubmit}
+                streaming={turnInFlight}
+                onStop={handleStopTurn}
+              />
             </div>
           </main>
 
