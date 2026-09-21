@@ -65,4 +65,3 @@ func TestParseGUIConfig(t *testing.T) {
 		})
 	}
 }
-
