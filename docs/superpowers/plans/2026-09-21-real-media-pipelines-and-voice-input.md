@@ -39,7 +39,7 @@
 - Modify: `pkg/media/providers.go`
 - Test: `pkg/media/providers_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `pkg/media/providers_test.go`, add `TestHTTPSTTClient_TranscribesMultipartAudio`:
 
@@ -94,12 +94,12 @@ func TestHTTPSTTClient_TranscribesMultipartAudio(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestHTTPSTTClient ./pkg/media`  
 Expected: FAIL (`unsupported stt provider type: http`)
 
-- [ ] **Step 3: Implement `httpSTTClient` in `pkg/media/providers.go`**
+- [x] **Step 3: Implement `httpSTTClient` in `pkg/media/providers.go`**
 
 Add `httpSTTClient`:
 ```go
@@ -175,12 +175,12 @@ And in `NewSTTClient`:
 		}, nil
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestHTTPSTTClient ./pkg/media`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/providers.go pkg/media/providers_test.go
@@ -195,7 +195,7 @@ git commit -m "feat(media): implement http STT client for OpenAI Whisper and Fas
 - Modify: `pkg/media/providers.go`
 - Test: `pkg/media/providers_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `pkg/media/providers_test.go`, add:
 1. `TestHTTPImageClient_DecodesA1111Base64`
@@ -319,12 +319,12 @@ func TestComfyUIImageClient_GeneratesImage(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run "TestHTTPImageClient|TestComfyUIImageClient" ./pkg/media`  
 Expected: FAIL
 
-- [ ] **Step 3: Implement multi-format decoding & ComfyUI adapter in `pkg/media/providers.go`**
+- [x] **Step 3: Implement multi-format decoding & ComfyUI adapter in `pkg/media/providers.go`**
 
 In `httpImageClient.GenerateImage`:
 1. Check if endpoint targets ComfyUI (`strings.Contains(h.endpoint, ":8188")` or `strings.HasSuffix(h.endpoint, "/prompt")`): delegate to `comfyUIImageClient`.
@@ -360,12 +360,12 @@ In `httpImageClient.GenerateImage`:
    - Polls `/history/{prompt_id}` until complete.
    - Fetches image from `/view?filename=...`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -run "TestHTTPImageClient|TestComfyUIImageClient" ./pkg/media`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/providers.go pkg/media/providers_test.go
@@ -380,7 +380,7 @@ git commit -m "feat(media): add multi-format image decoding for A1111, DALL-E, a
 - Modify: `pkg/media/providers.go`
 - Test: `pkg/media/providers_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `pkg/media/providers_test.go`, add `TestHTTPTTSClient_AdaptsAllTalkPayload`:
 
@@ -418,12 +418,12 @@ func TestHTTPTTSClient_AdaptsAllTalkPayload(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestHTTPTTSClient_AdaptsAllTalkPayload ./pkg/media`  
 Expected: FAIL
 
-- [ ] **Step 3: Implement AllTalk schema adapter in `httpTTSClient.Synthesize`**
+- [x] **Step 3: Implement AllTalk schema adapter in `httpTTSClient.Synthesize`**
 
 In `pkg/media/providers.go:114`:
 ```go
@@ -458,12 +458,12 @@ func (h *httpTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 ...
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestHTTPTTSClient ./pkg/media`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/providers.go pkg/media/providers_test.go
@@ -480,7 +480,7 @@ git commit -m "feat(media): add AllTalk TTS payload adapter in httpTTSClient"
 - Modify: `pkg/gui/server.go`
 - Test: `pkg/gui/server_test.go`
 
-- [ ] **Step 1: Write failing tests in `pkg/gui/server_test.go`**
+- [x] **Step 1: Write failing tests in `pkg/gui/server_test.go`**
 
 Add `TestSTTEndpoint_TranscribesAudio` and `TestSTTEndpoint_RejectsWhenDisabled`:
 
@@ -536,12 +536,12 @@ func TestSTTEndpoint_RejectsWhenDisabled(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestSTTEndpoint ./pkg/gui`  
 Expected: FAIL (`404 Not Found`)
 
-- [ ] **Step 3: Implement `TranscribeAudio` and `POST /api/stt` route**
+- [x] **Step 3: Implement `TranscribeAudio` and `POST /api/stt` route**
 
 1. In `pkg/gui/types.go`:
 ```go
@@ -585,12 +585,12 @@ Implement `handleSTTTranscribe`:
 - Calls `s.service.TranscribeAudio(r.Context(), audioData)`.
 - Writes JSON `STTResponse{Text: text}`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestSTTEndpoint ./pkg/gui`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/server.go pkg/gui/server_test.go
@@ -606,7 +606,7 @@ git commit -m "feat(gui): add POST /api/stt endpoint for speech-to-text dictatio
 - Modify: `frontend/src/types.ts`
 - Create: `frontend/src/hooks/useVoiceInput.ts`
 
-- [ ] **Step 1: Add `transcribeAudio` to `frontend/src/api/client.ts`**
+- [x] **Step 1: Add `transcribeAudio` to `frontend/src/api/client.ts`**
 
 ```typescript
   static async transcribeAudio(audioBlob: Blob): Promise<{ text: string }> {
@@ -627,7 +627,7 @@ git commit -m "feat(gui): add POST /api/stt endpoint for speech-to-text dictatio
   }
 ```
 
-- [ ] **Step 2: Update `frontend/src/types.ts`**
+- [x] **Step 2: Update `frontend/src/types.ts`**
 
 Update `STTConfig`:
 ```typescript
@@ -641,7 +641,7 @@ export interface STTConfig {
 }
 ```
 
-- [ ] **Step 3: Create `frontend/src/hooks/useVoiceInput.ts`**
+- [x] **Step 3: Create `frontend/src/hooks/useVoiceInput.ts`**
 
 Create hook that manages Web Speech API (`window.SpeechRecognition` / `webkitSpeechRecognition`) and fallback to `MediaRecorder` + `APIClient.transcribeAudio`:
 
@@ -789,12 +789,12 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
 };
 ```
 
-- [ ] **Step 4: Verify frontend type check**
+- [x] **Step 4: Verify frontend type check**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected: PASS with 0 errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/api/client.ts frontend/src/types.ts frontend/src/hooks/useVoiceInput.ts
@@ -809,7 +809,7 @@ git commit -m "feat(frontend): add transcribeAudio API and useVoiceInput hook"
 - Modify: `frontend/src/components/ActionConsole.tsx`
 - Modify: `frontend/src/App.tsx` (pass `config.media.stt.type` into `ActionConsole`)
 
-- [ ] **Step 1: Wire `useVoiceInput` into `ActionConsole.tsx`**
+- [x] **Step 1: Wire `useVoiceInput` into `ActionConsole.tsx`**
 
 Update `ActionConsoleProps`:
 ```typescript
@@ -865,12 +865,12 @@ Display `voiceError` subtly under the input box if present.
 
 In `frontend/src/App.tsx`, pass `sttType={config?.media.stt?.type}` to `<ActionConsole />`.
 
-- [ ] **Step 2: Verify frontend type check**
+- [x] **Step 2: Verify frontend type check**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected: PASS with 0 errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/ActionConsole.tsx frontend/src/App.tsx
@@ -885,7 +885,7 @@ git commit -m "feat(frontend): wire click-to-toggle microphone in ActionConsole"
 - Modify: `frontend/src/templates/providerPresets.ts`
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Add Web Speech preset to `providerPresets.ts`**
+- [x] **Step 1: Add Web Speech preset to `providerPresets.ts`**
 
 In `frontend/src/templates/providerPresets.ts`:
 ```typescript
@@ -901,7 +901,7 @@ export const STT_PRESETS: Record<string, PresetItem<STTConfig>> = {
 ...
 ```
 
-- [ ] **Step 2: Add Web Speech option to dropdown in `SettingsStudio.tsx`**
+- [x] **Step 2: Add Web Speech option to dropdown in `SettingsStudio.tsx`**
 
 In `SettingsStudio.tsx:993`:
 ```tsx
@@ -927,12 +927,12 @@ In `SettingsStudio.tsx:993`:
                 </select>
 ```
 
-- [ ] **Step 3: Verify frontend type check**
+- [x] **Step 3: Verify frontend type check**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected: PASS with 0 errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/templates/providerPresets.ts frontend/src/components/SettingsStudio.tsx
@@ -945,22 +945,22 @@ git commit -m "feat(frontend): add Web Speech API option to Settings Studio"
 
 **Files:** None (testing only)
 
-- [ ] **Step 1: Run frontend test check**
+- [x] **Step 1: Run frontend test check**
 
 Run: `mise run test:frontend`  
 Expected: PASS with 0 errors.
 
-- [ ] **Step 2: Run backend tests**
+- [x] **Step 2: Run backend tests**
 
 Run: `mise run test:backend`  
 Expected: ALL PASS.
 
-- [ ] **Step 3: Run full production build**
+- [x] **Step 3: Run full production build**
 
 Run: `mise run build`  
 Expected: PASS with binary at `bin/localrpg`.
 
-- [ ] **Step 4: Restore `.gitkeep` placeholder**
+- [x] **Step 4: Restore `.gitkeep` placeholder**
 
 Run: `git checkout pkg/gui/dist/.gitkeep`  
 Run: `git status`  
