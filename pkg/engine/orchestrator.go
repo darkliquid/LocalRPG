@@ -254,6 +254,10 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Outcome:   outcome,
 	}
 
+	if strings.TrimSpace(turn.Narration) == "" {
+		return nil, fmt.Errorf("gm returned no narration")
+	}
+
 	turn.Entities = harness.ResolveEntityMentions(o.store, o.playerID, locationID, turn.Narration, actionInput)
 
 	extraction := harness.Extraction{}
@@ -280,6 +284,12 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 				return nil, fmt.Errorf("apply proposed location: %w", err)
 			}
 		}
+	}
+
+	// Nothing is persisted for a cancelled or failed turn: the timeline only ever
+	// holds completed turns, so a disconnect is a no-op on disk.
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("turn cancelled: %w", err)
 	}
 
 	if err := o.timeline.RecordTurn(&turn, extraction.Entities); err != nil {

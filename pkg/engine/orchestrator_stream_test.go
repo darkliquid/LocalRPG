@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -159,3 +160,93 @@ func TestProcessActionStreamEmitsNothingForShortCircuitModes(t *testing.T) {
 		t.Errorf("/go produced %d chunks, want none", calls)
 	}
 }
+
+func TestCancellationRecordsNothing(t *testing.T) {
+	provider := &scriptedStreamProvider{block: true}
+	orchestrator, timeline, store := streamingOrchestrator(t, provider)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go cancel()
+
+	if _, err := orchestrator.ProcessActionStream(ctx, "Do", "I wait", nil); err == nil {
+		t.Fatalf("expected a cancelled turn to fail")
+	}
+
+	turns, err := timeline.history.LoadHistory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 0 {
+		t.Errorf("expected no recorded turn, got %+v", turns)
+	}
+
+	if count, err := store.CountTurns(); err != nil || count != 0 {
+		t.Errorf("CountTurns = %d, %v; want 0", count, err)
+	}
+
+	player, err := store.GetEntity("player")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(player.History) != 0 {
+		t.Errorf("expected no involvement recorded, got %v", player.History)
+	}
+}
+
+func TestChunkFailureAbortsBeforeRecording(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"The docks ", "reek "}}
+	orchestrator, timeline, store := streamingOrchestrator(t, provider)
+
+	clientGone := errors.New("client disconnected")
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I look", func(string) error {
+		return clientGone
+	}); !errors.Is(err, clientGone) {
+		t.Fatalf("expected the listener's error, got %v", err)
+	}
+
+	turns, err := timeline.history.LoadHistory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 0 {
+		t.Errorf("expected nothing recorded, got %+v", turns)
+	}
+	if count, _ := store.CountTurns(); count != 0 {
+		t.Errorf("CountTurns = %d, want 0", count)
+	}
+}
+
+func TestMidStreamProviderFailureRecordsNothing(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"Steel "}, err: errors.New("model exploded")}
+	orchestrator, timeline, _ := streamingOrchestrator(t, provider)
+
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I swing", nil); err == nil {
+		t.Fatalf("expected the provider failure to surface")
+	}
+
+	turns, err := timeline.history.LoadHistory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 0 {
+		t.Errorf("expected nothing recorded, got %+v", turns)
+	}
+}
+
+func TestEmptyNarrationRecordsNothing(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{""}}
+	orchestrator, timeline, _ := streamingOrchestrator(t, provider)
+
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I wait", nil); err == nil {
+		t.Fatalf("expected empty narration to fail")
+	}
+
+	turns, err := timeline.history.LoadHistory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 0 {
+		t.Errorf("expected nothing recorded, got %+v", turns)
+	}
+}
+
