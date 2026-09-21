@@ -39,7 +39,7 @@ Phases 1 and 2 are the model and compilation: nothing renders, and they are the 
 - Consumes: nothing
 - Produces: `scene.Script`, `scene.Scene`, `scene.Beat`, `scene.BeatKind`, `scene.BeatSceneCard`/`BeatNarration`/`BeatSpeech`, `scene.SceneCard(Scene) Beat`, `(Script).Beats() []Beat`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/scene/scene_test.go`:
 
@@ -112,12 +112,12 @@ func TestBeatsForAnEmptyScript(t *testing.T) {
 
 `MinimumBeatDuration` arrives in Task 2; this test is the reason the two tasks ship together in one phase.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -count=1 ./pkg/scene/`
 Expected: FAIL — package does not exist.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/scene/scene.go`:
 
@@ -207,12 +207,12 @@ func SceneCard(s Scene) Beat {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/scene/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/scene/scene.go pkg/scene/scene_test.go
@@ -228,7 +228,7 @@ git commit -m "feat(scene): define the shape every export renderer reads"
 - Consumes: `scene.Beat` (Task 1)
 - Produces: `scene.ReadingWordsPerMinute`, `ReadingCharactersPerMinute`, `MinimumBeatDuration`, `BeatGap`, `TypewriterFraction`, `DefaultFPS`, `ReadingDuration(string) time.Duration`, `BeatDuration(Beat) time.Duration`, `FramesFor(time.Duration, int) int`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/scene/timing_test.go`:
 
@@ -307,12 +307,12 @@ func TestFramesForRoundsUpToAtLeastOne(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestReadingDuration|TestBeatDuration|TestFramesFor" -count=1 ./pkg/scene/`
 Expected: FAIL — `undefined: ReadingDuration`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/scene/timing.go`:
 
@@ -391,12 +391,12 @@ func FramesFor(duration time.Duration, fps int) int {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/scene/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/scene/timing.go pkg/scene/timing_test.go
@@ -416,7 +416,7 @@ git commit -m "feat(scene): pace beats by reading time instead of fixed spans"
 - Consumes: `engine.Turn`, `entity.TurnSegment`, `entity.Mention`
 - Produces: `scene.Source`, `scene.Compiler`, `scene.NewCompiler(Source) *Compiler`, `scene.Options`, `(*Compiler).Compile(ctx context.Context, gameID string, opts Options) (*Script, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/scene/compile_test.go`:
 
@@ -568,12 +568,12 @@ func TestCompileTotalsDurations(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestCompile -count=1 ./pkg/scene/`
 Expected: FAIL — `undefined: NewCompiler`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/scene/compile.go`:
 
@@ -751,12 +751,12 @@ func beatKind(kind string) BeatKind {
 
 Note that `openScene` adds the card's duration to the scene but `Compile` adds segment durations, and the card's duration is also part of the script total; the `TestCompileTotalsDurations` test pins that arithmetic.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/scene/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/scene/compile.go pkg/scene/compile_test.go
@@ -774,7 +774,7 @@ git commit -m "feat(scene): group a campaign into location-keyed scenes"
 - Consumes: `NewImagePipeline`, `GenerateLocationImage`, `AppearanceHash`, `ContentCache`
 - Produces: `media.ArtStore`, `media.NewArtStore(client ImageClient, cache *ContentCache, worldStyle, providerParams string) *ArtStore`, `(*ArtStore).SceneArt(ctx context.Context, location *entity.Entity, force bool) (string, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/media/location_art_test.go`:
 
@@ -833,12 +833,12 @@ func TestArtStoreContextIsHonoured(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestArtStore -count=1 ./pkg/media/`
 Expected: FAIL — `undefined: NewArtStore`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/media/location_art.go`:
 
@@ -889,12 +889,12 @@ func (s *ArtStore) SceneArt(ctx context.Context, location *entity.Entity, force 
 
 In `pkg/gui/service.go`, `GetLocationArt` keeps its signature and body shape but builds `media.NewArtStore(client, media.NewContentCache(s.resolver.CacheDir()), s.worldArtStyle(gameID), providerParams)` and calls `SceneArt(ctx, location, force)`, so the GUI route and the export share one resolver.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/media/ ./pkg/gui/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/location_art.go pkg/media/location_art_test.go pkg/gui/service.go
@@ -911,7 +911,7 @@ git commit -m "feat(media): share one scene-art resolver between GUI and export"
 - Consumes: `TTSPipeline.SynthesizeSegment`
 - Produces: `media.ProbeAudioDuration(ctx context.Context, path string) (time.Duration, error)`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `pkg/media/probe_test.go`:
 
@@ -1037,12 +1037,12 @@ func TestCompileWithoutSpeechResolverIsSilent(t *testing.T) {
 
 `compile_test.go` already imports `fmt` and `strings` from Task 3.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestProbeAudio|TestCompileResolvesAudio|TestCompileWithoutSpeechResolver" -count=1 ./pkg/media/ ./pkg/scene/`
 Expected: FAIL — `undefined: ProbeAudioDuration`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/media/probe.go`:
 
@@ -1081,12 +1081,12 @@ func ProbeAudioDuration(ctx context.Context, path string) (time.Duration, error)
 
 The scene side already handles a resolver that reports silence; this task only adds the probe and the resolver-driven tests.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/media/ ./pkg/scene/`
 Expected: PASS (the ffprobe tests skip on a machine without it)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/probe.go pkg/media/probe_test.go pkg/scene/compile_test.go
@@ -1109,7 +1109,7 @@ git commit -m "feat(media): probe clip durations so pacing follows the audio"
 - Consumes: `scene.NewCompiler`, `media.NewArtStore`, `media.NewSceneImageClient`, `media.NewTTSPipeline`, `media.ProbeAudioDuration`, `storage.OpenGameStore`
 - Produces: `export.NewScriptCompiler(rootDir) *ScriptCompiler`, `(*ScriptCompiler).Compile(ctx, gameID) (*scene.Script, error)`, `(*WebExporter).Export(ctx, script *scene.Script, outDir string) (string, error)` returning the bundle directory
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/export/web_test.go`:
 
@@ -1254,12 +1254,12 @@ func TestWebExportRejectsAnEmptyScript(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestWebExport -count=1 ./pkg/export/`
 Expected: FAIL — `cannot use fixtureScript(t, dir) (value of type *scene.Script) as *ReplayScript value`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/export/script.go`, replace `ScriptCompiler` with the adapter that builds a configured `scene.Compiler`:
 
@@ -1496,12 +1496,12 @@ func copyFile(src, dst string) error {
 
 Delete `pkg/export/types.go` (`ReplayScript`, `SceneBeat`) and update `cmd/localrpg/export.go` to pass a `*scene.Script` through unchanged.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/export/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/export cmd/localrpg/export.go
@@ -1518,7 +1518,7 @@ git commit -m "feat(export): compile campaigns into scenes and write a real bund
 - Consumes: the payload from Task 6
 - Produces: `playerHTML` with `const SCRIPT = %s`, transport controls, typewriter reveal, autoplay with a gesture fallback, and reduced-motion support
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/export/web_test.go`:
 
@@ -1555,12 +1555,12 @@ func TestPlayerCarriesTheRequiredBehaviours(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestPlayerCarriesTheRequiredBehaviours -count=1 ./pkg/export/`
 Expected: FAIL — the current template still renders one beat with Previous/Next buttons.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Replace `playerHTML` in `pkg/export/web.go` with a player that walks the beats:
 
@@ -1702,12 +1702,12 @@ pause();
 
 The player holds on the first beat until the viewer clicks Play, which is both the reliable autoplay path and the accessible one. Add `"html"` to the file's imports for `html.EscapeString`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/export/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/export/web.go pkg/export/web_test.go
@@ -3482,6 +3482,10 @@ git commit -m "feat(gui): share one pacing estimate with the in-app player"
 - **`export.NewScriptCompiler` survives** as the adapter that assembles a configured `scene.Compiler`, so `cmd/localrpg/export.go` gains flags rather than being rewritten.
 - **Story Theater's timer is adjusted, not redesigned** (Task 16): it consumes the reported duration where it already has a timer, with its existing fallback intact. Any larger redesign of that component is out of scope.
 - **Deferred to the GUI turn submission spec**: submitting a turn from the desktop app, streaming the narration, and whatever the Chronicle needs to drive playback from the app rather than from a rendered bundle.
+- **Task 6 also has to port `pkg/export/video.go`, `script_test.go`, `legacy_script_test.go` and `video_test.go`.** Deleting `ReplayScript` breaks `VideoPipeline`, which takes it, and the three older tests assert the retired beat shape. The video pipeline's signatures change to `*scene.Script` here (still rendering a still-backed clip); Task 11 replaces its body, not its interface.
+- **The compiler still folds legacy prose into segments.** `campaignSource.Turns()` parses a turn's prose with `media.LegacySegments` when the record has no segments, which the retired compiler did and Task 3's `Compile` alone does not. Without it, every campaign recorded before segments existed would export as scene cards with no text. This lives in the source adapter rather than in `pkg/scene`, so the scene model does not depend on `pkg/media`.
+- **Bundle clips are numbered in playback order, not by beat number.** Numbering every beat leaves holes in `audio/` (the first clip lands on `beat-0003.wav` when a scene card and a narration beat precede it), so the counter advances only when a clip is written. This matches the `audio/beat-0001.wav` the plan's own assertion expects.
+- **Task 7's player template is written with Task 6.** Task 6's tests pin the payload and the asset layout independently of the player's behaviour, so writing a throwaway template first and replacing it immediately would be wasted work; Task 7's test asserts the behaviours the template already carries.
 
 ### Execution notes
 

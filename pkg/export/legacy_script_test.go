@@ -5,9 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
 func TestCompileReadsLegacyTurns(t *testing.T) {
+	isolateConfig(t)
+
 	root := t.TempDir()
 	gameDir := filepath.Join(root, "games", "legacy-campaign")
 	if err := os.MkdirAll(gameDir, 0755); err != nil {
@@ -28,45 +32,54 @@ func TestCompileReadsLegacyTurns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Compile failed: %v", err)
 	}
-	if len(script.Beats) != 1 {
-		t.Fatalf("expected 1 beat, got %d", len(script.Beats))
+
+	// A turn written before segments existed still produces a beat, because the
+	// compiler parses its prose rather than dropping it.
+	beats := script.Beats()
+	if len(beats) != 1 {
+		t.Fatalf("expected 1 beat, got %d: %+v", len(beats), beats)
 	}
-	if script.Beats[0].Prose != "The hall is quiet." {
-		t.Errorf("expected the legacy output to compile as prose, got %q", script.Beats[0].Prose)
+	if beats[0].Text != "The hall is quiet." {
+		t.Errorf("expected the legacy output to compile as prose, got %q", beats[0].Text)
 	}
-	if script.Beats[0].PlayerInput != "look" {
-		t.Errorf("expected the player input to compile, got %q", script.Beats[0].PlayerInput)
+	if beats[0].Kind != scene.BeatNarration {
+		t.Errorf("expected a narration beat, got %q", beats[0].Kind)
+	}
+	if beats[0].TurnNumber != 1 {
+		t.Errorf("expected the beat to remember its turn, got %d", beats[0].TurnNumber)
 	}
 }
 
-func TestCompileKeepsAttributedSegments(t *testing.T) {
+func TestCompileShapesALegacyConversationAsSpeech(t *testing.T) {
+	isolateConfig(t)
+
 	root := t.TempDir()
-	gameDir := filepath.Join(root, "games", "segmented")
+	gameDir := filepath.Join(root, "games", "legacy-talk")
 	if err := os.MkdirAll(gameDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"), []byte("id: segmented\nname: Segmented\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"), []byte("id: legacy-talk\nname: Legacy Talk\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Say","input":"Where is the ledger?","narration":"He does not look up. Garrick: \"Keep walking.\"","segments":[{"kind":"speech","speaker":"Sean","speaker_id":"player","text":"Where is the ledger?"},{"kind":"narration","text":"He does not look up."},{"kind":"speech","speaker":"Garrick","speaker_id":"garrick","text":"Keep walking."}]}` + "\n"
-	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+	legacy := `{"number":1,"timestamp":"2026-09-20T10:00:00Z","mode":"Say","input":"Hello","output":"She does not look up.\nGarrick: \"Keep walking.\""}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(legacy), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	script, err := NewScriptCompiler(root).Compile(context.Background(), "segmented")
+	script, err := NewScriptCompiler(root).Compile(context.Background(), "legacy-talk")
 	if err != nil {
 		t.Fatalf("Compile failed: %v", err)
 	}
-	if len(script.Beats) != 1 {
-		t.Fatalf("expected 1 beat, got %d", len(script.Beats))
-	}
 
-	segments := script.Beats[0].Segments
-	if len(segments) != 3 {
-		t.Fatalf("expected 3 segments, got %#v", segments)
+	beats := script.Beats()
+	if len(beats) != 2 {
+		t.Fatalf("expected the prose and the line as two beats, got %+v", beats)
 	}
-	if segments[0].SpeakerID != "player" || segments[2].SpeakerID != "garrick" {
-		t.Errorf("expected speaker IDs to survive compilation, got %#v", segments)
+	if beats[0].Kind != scene.BeatNarration {
+		t.Errorf("expected narration first, got %+v", beats[0])
+	}
+	if beats[1].Kind != scene.BeatSpeech || beats[1].Speaker != "Garrick" {
+		t.Errorf("expected an attributed speech beat, got %+v", beats[1])
 	}
 }

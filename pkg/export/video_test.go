@@ -1,4 +1,3 @@
-// pkg/export/video_test.go
 package export
 
 import (
@@ -6,32 +5,26 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
 func TestBuildFFmpegCommand(t *testing.T) {
 	tempDir := t.TempDir()
 	pipeline := NewVideoPipeline(tempDir)
 
-	script := &ReplayScript{
+	script := &scene.Script{
 		GameID:        "test-game",
 		GameName:      "Test Campaign",
-		TotalDuration: 10.0,
-		Beats: []SceneBeat{
-			{
-				TurnNumber:  1,
-				Prose:       "A lone hero approaches.",
-				DurationSec: 5.0,
+		TotalDuration: 10 * time.Second,
+		Scenes: []scene.Scene{{
+			LocationID: "tavern",
+			Beats: []scene.Beat{
+				{Kind: scene.BeatNarration, Text: "A lone hero approaches.", Duration: 5 * time.Second},
+				{Kind: scene.BeatSpeech, Speaker: "Guard", Text: "Halt!", Duration: 5 * time.Second},
 			},
-			{
-				TurnNumber: 2,
-				Segments: []entity.TurnSegment{
-					{Kind: entity.SegmentSpeech, Speaker: "Guard", Text: "Halt!"},
-				},
-				DurationSec: 5.0,
-			},
-		},
+		}},
 	}
 
 	outFile := filepath.Join(tempDir, "output.mp4")
@@ -47,5 +40,20 @@ func TestBuildFFmpegCommand(t *testing.T) {
 	argsStr := strings.Join(cmd.Args, " ")
 	if !strings.Contains(argsStr, "ffmpeg") {
 		t.Errorf("expected command to call ffmpeg, got: %s", argsStr)
+	}
+	if !strings.Contains(argsStr, "d=10.0") {
+		t.Errorf("expected the script's duration to drive the clip, got: %s", argsStr)
+	}
+}
+
+func TestBuildFFmpegCommandFallsBackToADefaultDuration(t *testing.T) {
+	pipeline := NewVideoPipeline(t.TempDir())
+
+	cmd, err := pipeline.BuildCommand(context.Background(), &scene.Script{}, "out.mp4")
+	if err != nil {
+		t.Fatalf("BuildCommand failed: %v", err)
+	}
+	if args := strings.Join(cmd.Args, " "); !strings.Contains(args, "d=5.0") {
+		t.Errorf("expected a default duration for an empty script, got: %s", args)
 	}
 }

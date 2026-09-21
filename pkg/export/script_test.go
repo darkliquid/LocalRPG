@@ -1,4 +1,3 @@
-// pkg/export/script_test.go
 package export
 
 import (
@@ -8,11 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/scene"
+	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
 func TestCompileReplayScript(t *testing.T) {
+	isolateConfig(t)
+
 	tempDir := t.TempDir()
 	gameDir := filepath.Join(tempDir, "games", "shadow-campaign")
 	_ = os.MkdirAll(gameDir, 0755)
@@ -53,15 +57,109 @@ player: elena
 	if script.GameID != "shadow-campaign" {
 		t.Errorf("expected game ID shadow-campaign, got %s", script.GameID)
 	}
-	if len(script.Beats) != 2 {
-		t.Fatalf("expected 2 beats, got %d", len(script.Beats))
+	if script.GameName != "Shadow Realm" {
+		t.Errorf("GameName = %q, want the manifest name", script.GameName)
 	}
 
-	if script.Beats[0].TurnNumber != 1 {
-		t.Errorf("unexpected beat 0: %+v", script.Beats[0])
+	// Neither turn recorded a location, so each opens its own uncarded scene.
+	if len(script.Scenes) != 2 {
+		t.Fatalf("expected 2 scenes, got %d: %+v", len(script.Scenes), script.Scenes)
 	}
-	speech := script.Beats[1].Segments
-	if len(speech) != 1 || speech[0].Kind != entity.SegmentSpeech || speech[0].Speaker != "Evelyn" {
-		t.Errorf("expected one attributed speech segment for Evelyn, got %+v", speech)
+
+	beats := script.Beats()
+	if len(beats) != 2 {
+		t.Fatalf("expected 2 beats, got %d", len(beats))
+	}
+	if beats[0].TurnNumber != 1 || beats[0].Kind != scene.BeatNarration {
+		t.Errorf("unexpected beat 0: %+v", beats[0])
+	}
+
+	// The second turn predates segments, so its prose is parsed instead: the
+	// attributed line still arrives as a speech beat.
+	speech := beats[1]
+	if speech.Kind != scene.BeatSpeech || speech.Speaker != "Evelyn" {
+		t.Errorf("expected one attributed speech beat for Evelyn, got %+v", speech)
+	}
+}
+
+func TestCompileKeepsAttributedSegments(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "segmented")
+	if err := os.MkdirAll(gameDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"), []byte("id: segmented\nname: Segmented\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Say","input":"Where is the ledger?","narration":"He does not look up. Garrick: \"Keep walking.\"","segments":[{"kind":"speech","speaker":"Sean","speaker_id":"player","text":"Where is the ledger?"},{"kind":"narration","text":"He does not look up."},{"kind":"speech","speaker":"Garrick","speaker_id":"garrick","text":"Keep walking."}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	script, err := NewScriptCompiler(root).Compile(context.Background(), "segmented")
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	beats := script.Beats()
+	if len(beats) != 3 {
+		t.Fatalf("expected 3 beats, got %d: %+v", len(beats), beats)
+	}
+	if beats[0].SpeakerID != "player" || beats[2].SpeakerID != "garrick" {
+		t.Errorf("expected speaker IDs to survive compilation, got %#v", beats)
+	}
+	if beats[1].Kind != scene.BeatNarration {
+		t.Errorf("expected the middle segment to be narration, got %+v", beats[1])
+	}
+}
+
+func TestCompileResolvesTheLocationNameFromTheIndex(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "located")
+	if err := os.MkdirAll(gameDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"), []byte("id: located\nname: Located\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"look","narration":"Warm.","location":"alden-tavern","segments":[{"kind":"narration","text":"Warm."}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Compilation reads the location from the index, which is where a synced note
+	// ends up.
+	store, err := storage.OpenGameStore(core.NewPathResolver(root), "located")
+	if err != nil {
+		t.Fatalf("open game store: %v", err)
+	}
+	if err := store.SaveEntity(&entity.Entity{ID: "alden-tavern", Name: "Alden Tavern", Type: "location", Hash: "h1"}); err != nil {
+		t.Fatal(err)
+	}
+
+	script, err := NewScriptCompiler(root).Compile(context.Background(), "located")
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	if len(script.Scenes) != 1 {
+		t.Fatalf("expected 1 scene, got %d", len(script.Scenes))
+	}
+	if script.Scenes[0].LocationName != "Alden Tavern" {
+		t.Errorf("LocationName = %q, want the entity name", script.Scenes[0].LocationName)
+	}
+
+	beats := script.Beats()
+	if len(beats) != 2 || beats[0].Kind != scene.BeatSceneCard {
+		t.Fatalf("expected a scene card then the narration, got %+v", beats)
+	}
+	if beats[1].Text != "Warm." {
+		t.Errorf("unexpected narration beat: %+v", beats[1])
 	}
 }

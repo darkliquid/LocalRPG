@@ -4,18 +4,24 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+
+	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
+// VideoPipeline renders a script to a video file. Rendering frames itself arrives
+// with the rasteriser; until then the command produces a still-backed clip.
 type VideoPipeline struct {
 	rootDir string
 }
 
+// NewVideoPipeline builds a renderer rooted at a campaign directory.
 func NewVideoPipeline(rootDir string) *VideoPipeline {
 	return &VideoPipeline{rootDir: rootDir}
 }
 
-func (v *VideoPipeline) BuildCommand(ctx context.Context, script *ReplayScript, outputFile string) (*exec.Cmd, error) {
-	duration := fmt.Sprintf("%.1f", script.TotalDuration)
+// BuildCommand assembles the ffmpeg invocation for a script.
+func (v *VideoPipeline) BuildCommand(ctx context.Context, script *scene.Script, outputFile string) (*exec.Cmd, error) {
+	duration := fmt.Sprintf("%.1f", script.TotalDuration.Seconds())
 	if script.TotalDuration <= 0 {
 		duration = "5.0"
 	}
@@ -38,7 +44,9 @@ func (v *VideoPipeline) BuildCommand(ctx context.Context, script *ReplayScript, 
 	return exec.CommandContext(ctx, "ffmpeg", args...), nil
 }
 
-func (v *VideoPipeline) RenderVideo(ctx context.Context, script *ReplayScript, outputFile string) error {
+// RenderVideo runs the assembled command and returns ffmpeg's own error output
+// when it fails, since that is where the reason a render failed usually is.
+func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, outputFile string) error {
 	cmd, err := v.BuildCommand(ctx, script, outputFile)
 	if err != nil {
 		return fmt.Errorf("build command: %w", err)
