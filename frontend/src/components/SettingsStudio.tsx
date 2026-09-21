@@ -140,7 +140,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     <div className={`flex flex-col h-full ${isCompact ? 'p-2 space-y-4' : 'space-y-6'}`}>
       {/* Settings Navigation & Status Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800 pb-3">
-        <div className="flex items-center gap-1 bg-stone-950/70 p-1 rounded-xl border border-stone-800">
+        <div className="flex flex-wrap items-center gap-1 bg-stone-950/70 p-1 rounded-xl border border-stone-800">
           <button
             onClick={() => setActiveSubTab('paths')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
@@ -179,7 +179,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-mono text-stone-400 bg-stone-900 px-2.5 py-1 rounded-lg border border-stone-800">
             {isOverride ? 'Workspace Override' : 'Global User Config'}: {activeFilePath}
           </span>
@@ -268,12 +268,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       {activeSubTab === 'agents' && (
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
                 <Cpu className="w-4 h-4" />
                 <span>AI Agents & Role Routing</span>
               </h3>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <select
                   onChange={(e) => {
                     const key = e.target.value;
@@ -533,12 +533,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
           {/* TTS Section */}
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
                 <Volume2 className="w-4 h-4" />
                 <span>Text-to-Speech (TTS) Engine</span>
               </h3>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <select
                   onChange={(e) => {
                     const key = e.target.value;
@@ -714,7 +714,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
             {/* Voice Profiles Library Manager */}
             <div className="pt-4 border-t border-stone-800/80 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-amber-400" />
                   <span className="font-cinzel text-xs uppercase font-bold text-stone-200">
@@ -724,7 +724,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     ({config.media.tts.voice_profiles?.length || 0} archetypes)
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => {
                       setConfig({
@@ -956,12 +956,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
           {/* Speech-to-Text (STT) Section */}
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
                 <Mic className="w-4 h-4" />
                 <span>Speech-to-Text (STT) Engine</span>
               </h3>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <select
                   onChange={(e) => {
                     const key = e.target.value;
@@ -1091,12 +1091,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
           {/* Image Generation Section */}
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
                 <Sparkles className="w-4 h-4" />
                 <span>Scene Art / Image Generator</span>
               </h3>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <select
                   onChange={(e) => {
                     const key = e.target.value;
