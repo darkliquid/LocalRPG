@@ -89,6 +89,9 @@ func TestRouterFromConfigSkipsInheritedRoles(t *testing.T) {
 	if _, err := router.GetProviderForRole(config.RoleExtractor); err == nil {
 		t.Errorf("expected the inherited role to have no provider of its own")
 	}
+	if ExtractorFromConfig(cfg, router) == nil {
+		t.Errorf("expected extraction to resolve through the inherited role")
+	}
 }
 
 func TestRouterFromConfigFallsBackToEchoForGM(t *testing.T) {

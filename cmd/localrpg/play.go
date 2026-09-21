@@ -83,7 +83,7 @@ func handlePlayCommand(args []string) {
 		startLocation,
 		manifest.Player,
 	)
-	orchestrator.SetExtractor(resolveExtractor(cfg, router))
+	orchestrator.SetExtractor(harness.ExtractorFromConfig(cfg, router))
 	orchestrator.LoadPrompts(paths, manifest.SystemID, manifest.WorldID)
 
 	app := tui.NewAppModel(orchestrator, 80, 24)
@@ -93,47 +93,4 @@ func handlePlayCommand(args []string) {
 		fmt.Fprintf(os.Stderr, "Error running TUI: %v\n", err)
 		os.Exit(1)
 	}
-}
-
-// resolveExtractor picks the provider used for per-turn entity extraction. An
-// absent role still inherits gm, so configuration written before this role existed
-// keeps working; `disabled` opts out; `inherit` follows the named role, which is
-// what stops extraction silently pointing at a stale copy of gm.
-func resolveExtractor(cfg *config.Config, router *harness.Router) *harness.Extractor {
-	roleCfg, configured := cfg.Agents.Roles[config.RoleExtractor]
-	if !configured {
-		roleCfg = config.AgentRoleConfig{Type: "inherit", InheritFrom: config.RoleGM}
-	}
-
-	switch roleCfg.Type {
-	case "disabled":
-		return nil
-	case "inherit", "":
-		source := roleCfg.InheritFrom
-		if source == "" {
-			source = config.RoleGM
-		}
-
-		provider, err := router.GetProviderForRole(source)
-		if err != nil {
-			return nil
-		}
-		return harness.NewExtractor(provider)
-	}
-
-	provider, err := harness.NewModelProvider(config.RoleExtractor, harness.ProviderConfig{
-		Type:        roleCfg.Type,
-		BuiltinName: roleCfg.BuiltinName,
-		Command:     roleCfg.Command,
-		Args:        roleCfg.Args,
-		Endpoint:    roleCfg.Endpoint,
-		Model:       roleCfg.Model,
-		APIKey:      roleCfg.APIKey,
-		Temperature: roleCfg.Temperature,
-		MaxTokens:   roleCfg.MaxTokens,
-	})
-	if err != nil {
-		return nil
-	}
-	return harness.NewExtractor(provider)
 }

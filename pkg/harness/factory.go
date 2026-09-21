@@ -107,3 +107,50 @@ func RouterFromConfig(cfg *config.Config) (*Router, error) {
 
 	return router, nil
 }
+
+// ExtractorFromConfig resolves the per-turn extractor role. An absent role still
+// inherits gm, so configuration written before the role existed keeps working;
+// `disabled` opts out; `inherit` follows the named role, which is what stops
+// extraction silently pointing at a stale copy of gm.
+func ExtractorFromConfig(cfg *config.Config, router *Router) *Extractor {
+	if cfg == nil || router == nil {
+		return nil
+	}
+
+	roleCfg, configured := cfg.Agents.Roles[config.RoleExtractor]
+	if !configured {
+		roleCfg = config.AgentRoleConfig{Type: "inherit", InheritFrom: config.RoleGM}
+	}
+
+	switch roleCfg.Type {
+	case "disabled":
+		return nil
+	case "inherit", "":
+		source := roleCfg.InheritFrom
+		if source == "" {
+			source = config.RoleGM
+		}
+
+		provider, err := router.GetProviderForRole(source)
+		if err != nil {
+			return nil
+		}
+		return NewExtractor(provider)
+	}
+
+	provider, err := NewModelProvider(config.RoleExtractor, ProviderConfig{
+		Type:        roleCfg.Type,
+		BuiltinName: roleCfg.BuiltinName,
+		Command:     roleCfg.Command,
+		Args:        roleCfg.Args,
+		Endpoint:    roleCfg.Endpoint,
+		Model:       roleCfg.Model,
+		APIKey:      roleCfg.APIKey,
+		Temperature: roleCfg.Temperature,
+		MaxTokens:   roleCfg.MaxTokens,
+	})
+	if err != nil {
+		return nil
+	}
+	return NewExtractor(provider)
+}
