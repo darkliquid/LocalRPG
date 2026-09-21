@@ -151,6 +151,13 @@ export const TTS_PRESETS: Record<string, PresetItem<TTSConfig>> = {
 };
 
 export const STT_PRESETS: Record<string, PresetItem<STTConfig>> = {
+  'web-speech': {
+    label: 'Web Speech API (Browser Native)',
+    description: 'Zero-setup, real-time in-browser speech recognition without a background server.',
+    config: {
+      type: 'web-speech',
+    },
+  },
   'faster-whisper': {
     label: 'Faster-Whisper (Local HTTP)',
     description: 'Local OpenAI-compatible transcription server running on port 8000.',

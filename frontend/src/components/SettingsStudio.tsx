@@ -1004,6 +1004,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
+                  <option value="web-speech">Web Speech API (Browser Native)</option>
                   <option value="http">HTTP (Faster-Whisper, OpenAI Whisper)</option>
                   <option value="cli">CLI Command (e.g. whisper-cli)</option>
                   <option value="builtin">Builtin / Mock</option>
@@ -1155,6 +1156,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 >
                   <option value="disabled">Disabled</option>
                   <option value="http">HTTP (ComfyUI, Automatic1111, LocalAI, DALL-E)</option>
+                  <option value="comfyui">ComfyUI Dedicated (Port 8188)</option>
                   <option value="cli">CLI Command (e.g. sd-cli)</option>
                   <option value="builtin">Builtin (procedural-art / mock)</option>
                 </select>
