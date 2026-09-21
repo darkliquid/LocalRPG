@@ -48,4 +48,27 @@ func TestGameInitAndLoad(t *testing.T) {
 	if loaded.Name != "Oakhaven Tavern" {
 		t.Errorf("expected Oakhaven Tavern, got %q", loaded.Name)
 	}
+
+	// The resolved opening location is recorded on the manifest and persisted
+	if got := session.Manifest.Settings[StartLocationSetting]; got != "tavern" {
+		t.Errorf("expected start location tavern, got %v", got)
+	}
+	persisted, err := core.LoadGameManifest(filepath.Join(paths.GameDir("campaign-01"), "game.yaml"))
+	if err != nil {
+		t.Fatalf("reload game manifest failed: %v", err)
+	}
+	if got := persisted.Settings[StartLocationSetting]; got != "tavern" {
+		t.Errorf("expected persisted start location tavern, got %v", got)
+	}
+
+	if _, err := os.Stat(paths.GameDBPath("campaign-01")); err != nil {
+		t.Errorf("expected the canonical game database: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(paths.GameDir("campaign-01"), "game.db")); !os.IsNotExist(err) {
+		t.Errorf("expected no legacy game.db beside the game, stat err = %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(paths.GameDir("campaign-01"), "entities", "tavern.md")); err != nil {
+		t.Errorf("expected the world template to be copied as <id>.md: %v", err)
+	}
 }

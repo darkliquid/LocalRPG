@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/engine"
+	"github.com/darkliquid/localrpg/pkg/entity"
 )
 
 func TestCompileReplayScript(t *testing.T) {
@@ -32,7 +33,7 @@ player: elena
 		Timestamp: time.Now(),
 		Mode:      "Do",
 		Input:     "I step into the tavern.",
-		Output:    "The tavern is warm and loud. Evelyn looks up from her book.",
+		Narration: "The tavern is warm and loud. Evelyn looks up from her book.",
 		AudioRefs: []string{"audio/turn-1.wav"},
 	})
 
@@ -41,7 +42,7 @@ player: elena
 		Timestamp: time.Now(),
 		Mode:      "Say",
 		Input:     "Good evening, Evelyn.",
-		Output:    "Evelyn: \"You made it back in one piece.\"",
+		Narration: "Evelyn: \"You made it back in one piece.\"",
 		AudioRefs: []string{"audio/turn-2.wav"},
 	})
 
@@ -61,7 +62,8 @@ player: elena
 	if script.Beats[0].TurnNumber != 1 || script.Beats[0].AudioPath != "audio/turn-1.wav" {
 		t.Errorf("unexpected beat 0: %+v", script.Beats[0])
 	}
-	if script.Beats[1].Speaker != "Evelyn" {
-		t.Errorf("expected speaker Evelyn, got %s", script.Beats[1].Speaker)
+	speech := script.Beats[1].Segments
+	if len(speech) != 1 || speech[0].Kind != entity.SegmentSpeech || speech[0].Speaker != "Evelyn" {
+		t.Errorf("expected one attributed speech segment for Evelyn, got %+v", speech)
 	}
 }

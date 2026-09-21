@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -39,7 +40,8 @@ func TestTUIModelInitializationAndInput(t *testing.T) {
 	router.RegisterProvider(&mockTUIModel{output: "Welcome traveler."})
 	router.AssignRole("gm", "tui-mock")
 
-	orch := engine.NewTurnOrchestrator(store, history, nil, router, "tavern", "player")
+	timeline := engine.NewTimeline(core.NewPathResolver(tempDir), store, history, "test-campaign")
+	orch := engine.NewTurnOrchestrator(store, timeline, nil, router, "tavern", "player")
 
 	app := NewAppModel(orch, 80, 24)
 	if app.mode != "Do" {

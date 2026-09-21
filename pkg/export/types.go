@@ -1,6 +1,10 @@
 package export
 
-import "time"
+import (
+	"time"
+
+	"github.com/darkliquid/localrpg/pkg/entity"
+)
 
 type SceneBeat struct {
 	TurnNumber  int       `json:"turn_number"`
@@ -8,11 +12,11 @@ type SceneBeat struct {
 	Mode        string    `json:"mode"`
 	PlayerInput string    `json:"player_input"`
 	Prose       string    `json:"prose"`
-	Speaker     string    `json:"speaker,omitempty"`
-	Dialogue    string    `json:"dialogue,omitempty"`
-	AudioPath   string    `json:"audio_path,omitempty"`
-	ImagePath   string    `json:"image_path,omitempty"`
-	DurationSec float64   `json:"duration_sec"`
+	// Segments is the ordered playback script: narration and attributed speech.
+	Segments    []entity.TurnSegment `json:"segments,omitempty"`
+	AudioPath   string               `json:"audio_path,omitempty"`
+	ImagePath   string               `json:"image_path,omitempty"`
+	DurationSec float64              `json:"duration_sec"`
 }
 
 type ReplayScript struct {

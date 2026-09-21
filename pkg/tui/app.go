@@ -134,11 +134,11 @@ func (m *AppModel) View() string {
 	// Story chronicle history
 	for _, turn := range m.history {
 		sb.WriteString(PromptStyle.Render(fmt.Sprintf("[%s] %s", turn.Mode, turn.Input)) + "\n")
-		renderedStory, err := RenderMarkdown(turn.Output, m.width-4)
+		renderedStory, err := RenderMarkdown(turn.Prose(), m.width-4)
 		if err == nil {
 			sb.WriteString(renderedStory + "\n")
 		} else {
-			sb.WriteString(turn.Output + "\n\n")
+			sb.WriteString(turn.Prose() + "\n\n")
 		}
 	}
 

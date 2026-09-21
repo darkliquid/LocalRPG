@@ -27,6 +27,7 @@ player: player-elena
 
 	// Create player entity
 	playerMD := `---
+id: player-elena
 name: Elena Nightshade
 type: character
 state:
@@ -39,6 +40,7 @@ A cunning rogue in dark leather.`
 
 	// Create NPC entity
 	npcMD := `---
+id: captain-kaelen
 name: Captain Kaelen
 type: npc
 voice:
@@ -50,7 +52,10 @@ state:
 The town watch captain. Speaks with [[player-elena]].`
 	_ = os.WriteFile(filepath.Join(entitiesDir, "captain-kaelen.md"), []byte(npcMD), 0644)
 
-	dbPath := filepath.Join(gamesDir, "game.db")
+	dbPath := filepath.Join(gamesDir, "cache", "index.db")
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		t.Fatal(err)
+	}
 	store, err := storage.NewStore(dbPath)
 	if err != nil {
 		t.Fatalf("failed to init db: %v", err)
@@ -134,5 +139,65 @@ The town watch captain, now an ally.`
 	}
 	if updated.State["attitude"] != "friendly" {
 		t.Errorf("expected attitude friendly, got %v", updated.State["attitude"])
+	}
+}
+
+func TestGetEntityReadsCanonicalDatabase(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	ent, err := svc.GetEntity(context.Background(), gameID, "player-elena")
+	if err != nil {
+		t.Fatalf("GetEntity failed: %v", err)
+	}
+	if len(ent.Backlinks) == 0 {
+		t.Errorf("expected backlinks from the canonical index, got none")
+	}
+
+	gameDir := svc.GetResolver().GameDir(gameID)
+	if _, err := os.Stat(filepath.Join(gameDir, "game.db")); !os.IsNotExist(err) {
+		t.Errorf("expected no legacy game.db, stat err = %v", err)
+	}
+	if _, err := os.Stat(svc.GetResolver().GameDBPath(gameID)); err != nil {
+		t.Errorf("expected the canonical database: %v", err)
+	}
+}
+
+func TestGetChronicleAndEntityTurnsReportInvolvement(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	gameDir := svc.GetResolver().GameDir(gameID)
+
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"I ask the captain","narration":"The captain nods.","segments":[{"kind":"narration","text":"The captain nods."}],"entities":[{"id":"player-elena","mention":"player"},{"id":"captain-kaelen","mention":"wikilink"}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	turns, err := svc.GetChronicle(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("GetChronicle failed: %v", err)
+	}
+	if len(turns) != 1 {
+		t.Fatalf("expected 1 turn, got %d", len(turns))
+	}
+	if len(turns[0].EntitiesHit) != 2 {
+		t.Errorf("expected 2 entities hit, got %+v", turns[0].EntitiesHit)
+	}
+	if len(turns[0].Segments) != 1 || turns[0].Segments[0].Kind != "narration" {
+		t.Errorf("expected segments to reach the DTO, got %+v", turns[0].Segments)
+	}
+
+	involved, err := svc.GetEntityTurns(context.Background(), gameID, "captain-kaelen")
+	if err != nil {
+		t.Fatalf("GetEntityTurns failed: %v", err)
+	}
+	if len(involved) != 1 || involved[0].TurnNumber != 1 {
+		t.Fatalf("expected turn 1 for captain-kaelen, got %+v", involved)
+	}
+
+	uninvolved, err := svc.GetEntityTurns(context.Background(), gameID, "nobody-at-all")
+	if err != nil {
+		t.Fatalf("GetEntityTurns failed: %v", err)
+	}
+	if len(uninvolved) != 0 {
+		t.Errorf("expected no turns for an uninvolved entity, got %+v", uninvolved)
 	}
 }

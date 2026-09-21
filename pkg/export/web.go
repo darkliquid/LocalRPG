@@ -105,7 +105,6 @@ func (w *WebExporter) Export(ctx context.Context, script *ReplayScript, outDir s
   </header>
   <main>
     <div class="card">
-      <div id="speaker" class="speaker"></div>
       <div id="content" class="prose"></div>
     </div>
   </main>

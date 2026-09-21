@@ -35,16 +35,33 @@ func handlePlayCommand(args []string) {
 		os.Exit(1)
 	}
 
-	dbPath := filepath.Join(gameDir, "cache", "index.db")
-	store, err := storage.NewStore(dbPath)
+	store, err := storage.OpenGameStore(paths, gameID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error opening game database %q: %v\n", dbPath, err)
+		fmt.Fprintf(os.Stderr, "Error opening game database: %v\n", err)
 		os.Exit(1)
 	}
-	defer store.Close()
+
+	// Reindex from Markdown so the session reflects any edits made outside the TUI
+	syncer := storage.NewSyncer(store)
+	if _, err := syncer.Sync(filepath.Join(gameDir, "entities")); err != nil {
+		fmt.Fprintf(os.Stderr, "Error syncing entities: %v\n", err)
+		os.Exit(1)
+	}
 
 	historyPath := filepath.Join(gameDir, "history.jsonl")
 	history := engine.NewHistoryLogger(historyPath)
+
+	timeline := engine.NewTimeline(paths, store, history, gameID)
+	if err := timeline.EnsureIndexed(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error indexing turns: %v\n", err)
+		os.Exit(1)
+	}
+
+	startLocation, err := engine.ResolveStartLocation(paths, store, manifest)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error resolving start location: %v\n", err)
+		os.Exit(1)
+	}
 
 	bridge := rules.NewHostBridge(store)
 	jsEngine := rules.NewJSEngine(bridge)
@@ -83,12 +100,13 @@ func handlePlayCommand(args []string) {
 
 	orchestrator := engine.NewTurnOrchestrator(
 		store,
-		history,
+		timeline,
 		jsEngine,
 		router,
-		"tavern",
+		startLocation,
 		manifest.Player,
 	)
+	orchestrator.SetExtractor(resolveExtractor(cfg, router))
 	orchestrator.LoadPrompts(paths, manifest.SystemID, manifest.WorldID)
 
 	app := tui.NewAppModel(orchestrator, 80, 24)
@@ -98,4 +116,37 @@ func handlePlayCommand(args []string) {
 		fmt.Fprintf(os.Stderr, "Error running TUI: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// resolveExtractor picks the provider used for per-turn entity extraction: an
+// explicitly configured extractor role, otherwise the gm provider, and nil when
+// the role is disabled.
+func resolveExtractor(cfg *config.Config, router *harness.Router) *harness.Extractor {
+	roleCfg, configured := cfg.Agents.Roles[config.RoleExtractor]
+	if !configured {
+		provider, err := router.GetProviderForRole(config.RoleGM)
+		if err != nil {
+			return nil
+		}
+		return harness.NewExtractor(provider)
+	}
+	if roleCfg.Type == "disabled" {
+		return nil
+	}
+
+	provider, err := harness.NewModelProvider(config.RoleExtractor, harness.ProviderConfig{
+		Type:        roleCfg.Type,
+		BuiltinName: roleCfg.BuiltinName,
+		Command:     roleCfg.Command,
+		Args:        roleCfg.Args,
+		Endpoint:    roleCfg.Endpoint,
+		Model:       roleCfg.Model,
+		APIKey:      roleCfg.APIKey,
+		Temperature: roleCfg.Temperature,
+		MaxTokens:   roleCfg.MaxTokens,
+	})
+	if err != nil {
+		return nil
+	}
+	return harness.NewExtractor(provider)
 }

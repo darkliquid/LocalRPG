@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/darkliquid/localrpg/pkg/gui"
+	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -57,13 +58,14 @@ func handleGUICommand(args []string) {
 	}
 
 	svc := gui.NewService(cfg.Dir)
-	server := gui.NewServer(svc, gui.AssetHandler())
+	defer func() { _ = storage.CloseGameStores() }()
+	handler := gui.ProtectCrossOrigin(gui.NewServer(svc, gui.AssetHandler()))
 
 	// 1. Explicit TCP Web Mode
 	if cfg.WebMode {
 		addr := fmt.Sprintf("127.0.0.1:%d", cfg.Port)
 		fmt.Printf("Starting LocalRPG Web GUI on http://%s\n", addr)
-		if err := http.ListenAndServe(addr, server); err != nil {
+		if err := http.ListenAndServe(addr, handler); err != nil {
 			fmt.Fprintf(os.Stderr, "Server failed: %v\n", err)
 			os.Exit(1)
 		}
@@ -101,7 +103,7 @@ func handleGUICommand(args []string) {
 		if !hasDisplay && !cfg.Headless {
 			fmt.Println("Note: No desktop display detected ($DISPLAY / $WAYLAND_DISPLAY unset).")
 		}
-		if err := http.Serve(listener, server); err != nil && err != http.ErrServerClosed {
+		if err := http.Serve(listener, handler); err != nil && err != http.ErrServerClosed {
 			fmt.Fprintf(os.Stderr, "Daemon failed: %v\n", err)
 			os.Exit(1)
 		}
@@ -113,7 +115,7 @@ func handleGUICommand(args []string) {
 		Name:        "LocalRPG",
 		Description: "Local-First LLM Tabletop RPG Client",
 		Assets: application.AssetOptions{
-			Handler: server,
+			Handler: handler,
 		},
 	})
 

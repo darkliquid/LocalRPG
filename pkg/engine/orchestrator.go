@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
@@ -16,21 +15,21 @@ import (
 )
 
 type TurnOrchestrator struct {
-	store         *storage.Store
-	history       *HistoryLogger
-	rulesEngine   *rules.JSEngine
-	router        *harness.Router
-	locationID    string
-	playerID      string
-	assembler     *harness.ContextAssembler
-	rulesPrompt   string
-	lorePrompt    string
-	voiceProfiles []config.VoiceProfile
+	store       *storage.Store
+	timeline    *Timeline
+	rulesEngine *rules.JSEngine
+	router      *harness.Router
+	locationID  string
+	playerID    string
+	assembler   *harness.ContextAssembler
+	rulesPrompt string
+	lorePrompt  string
+	extractor   *harness.Extractor
 }
 
 func NewTurnOrchestrator(
 	store *storage.Store,
-	history *HistoryLogger,
+	timeline *Timeline,
 	rulesEngine *rules.JSEngine,
 	router *harness.Router,
 	locationID string,
@@ -38,7 +37,7 @@ func NewTurnOrchestrator(
 ) *TurnOrchestrator {
 	return &TurnOrchestrator{
 		store:       store,
-		history:     history,
+		timeline:    timeline,
 		rulesEngine: rulesEngine,
 		router:      router,
 		locationID:  locationID,
@@ -52,8 +51,10 @@ func (o *TurnOrchestrator) SetPrompts(rulesPrompt, lorePrompt string) {
 	o.lorePrompt = lorePrompt
 }
 
-func (o *TurnOrchestrator) SetVoiceProfiles(profiles []config.VoiceProfile) {
-	o.voiceProfiles = profiles
+// SetExtractor enables per-turn entity extraction. A nil extractor records
+// deterministic mentions only.
+func (o *TurnOrchestrator) SetExtractor(extractor *harness.Extractor) {
+	o.extractor = extractor
 }
 
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
@@ -72,7 +73,7 @@ func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, world
 }
 
 func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput string) (*Turn, error) {
-	pastTurns, err := o.history.LoadHistory()
+	pastTurns, err := o.timeline.history.LoadHistory()
 	if err != nil {
 		return nil, fmt.Errorf("load history: %w", err)
 	}
@@ -80,13 +81,14 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 
 	var rollRes *rules.RollResult
 	var gmDirective string
+	generationPrompt := actionInput
 
 	// Handle /undo command
 	if strings.HasPrefix(strings.TrimSpace(actionInput), "/undo") {
 		if len(pastTurns) == 0 {
 			return nil, fmt.Errorf("no turns to undo")
 		}
-		if err := o.history.RewindToTurn(len(pastTurns) - 1); err != nil {
+		if err := o.timeline.RewindToTurn(len(pastTurns) - 1); err != nil {
 			return nil, fmt.Errorf("undo failed: %w", err)
 		}
 		return &Turn{
@@ -94,7 +96,7 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 			Timestamp: time.Now(),
 			Mode:      "System",
 			Input:     "/undo",
-			Output:    "Undid previous turn.",
+			Narration: "Undid previous turn.",
 		}, nil
 	}
 
@@ -104,11 +106,9 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 		directiveText := strings.TrimPrefix(actionInput, "/gm ")
 		gmDirective = fmt.Sprintf("[DIRECTOR CORRECTION DIRECTIVE: %s]", directiveText)
 	} else if strings.EqualFold(mode, "Roll") {
-		// Evaluate dice roll
-		r, err := rules.EvaluateRoll(actionInput)
-		if err == nil {
+		if r, err := rules.EvaluateRoll(actionInput); err == nil {
 			rollRes = r
-			actionInput = fmt.Sprintf("I rolled %s with result %d", r.Notation, r.Total)
+			generationPrompt = fmt.Sprintf("I rolled %s with result %d", r.Notation, r.Total)
 		}
 	} else if o.rulesEngine != nil {
 		// Run action through mechanics hook if available
@@ -124,8 +124,8 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 		}
 	}
 
-	// Assemble context with system rules, world lore prompts, and voice profiles
-	contextPrompt, err := o.assembler.AssembleContextWithProfiles(o.locationID, o.playerID, actionInput, o.rulesPrompt, o.lorePrompt, o.voiceProfiles)
+	// Assemble context with system rules and world lore prompts
+	contextPrompt, err := o.assembler.AssembleContextWithProfiles(o.locationID, o.playerID, generationPrompt, o.rulesPrompt, o.lorePrompt, o.timeline.VoiceProfiles())
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)
 	}
@@ -150,12 +150,28 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 		Mode:      mode,
 		Input:     actionInput,
 		Roll:      rollRes,
-		Output:    resp.Text,
+		Narration: resp.Text,
 	}
 
-	// Append to history
-	if err := o.history.AppendTurn(turn); err != nil {
-		return nil, fmt.Errorf("append turn: %w", err)
+	turn.Entities = harness.ResolveEntityMentions(o.store, o.playerID, o.locationID, turn.Narration, actionInput)
+
+	extraction := harness.Extraction{}
+	if o.extractor != nil {
+		// A failed extractor must not lose the turn; the mentions above still stand.
+		if result, err := o.extractor.Extract(ctx, turn.Narration); err == nil {
+			extraction = *result
+		}
+	}
+
+	turn.Segments = buildTurnSegments(o.store, mode, o.playerID, actionInput, turn.Narration, extraction.Dialogue)
+	for _, mention := range speechMentions(turn.Segments) {
+		if !containsMention(turn.Entities, mention.ID) {
+			turn.Entities = append(turn.Entities, mention)
+		}
+	}
+
+	if err := o.timeline.RecordTurn(&turn, extraction.Entities); err != nil {
+		return nil, fmt.Errorf("record turn: %w", err)
 	}
 
 	// Trigger post-turn hooks

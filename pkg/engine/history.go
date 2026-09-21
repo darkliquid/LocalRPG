@@ -5,20 +5,36 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/rules"
 )
 
 type Turn struct {
-	Number    int               `json:"number"`
-	Timestamp time.Time         `json:"timestamp"`
-	Mode      string            `json:"mode"` // "Do", "Say", "Story", "Roll", "GM", "System"
-	Input     string            `json:"input"`
-	Roll      *rules.RollResult `json:"roll,omitempty"`
-	Output    string            `json:"output"`
-	AudioRefs []string          `json:"audio_refs,omitempty"`
+	Number    int                  `json:"number"`
+	Timestamp time.Time            `json:"timestamp"`
+	Mode      string               `json:"mode"` // "Do", "Say", "Story", "Roll", "GM", "System"
+	Input     string               `json:"input"`
+	Narration string               `json:"narration"`
+	Segments  []entity.TurnSegment `json:"segments,omitempty"`
+	Roll      *rules.RollResult    `json:"roll,omitempty"`
+	Entities  []entity.Mention     `json:"entities,omitempty"`
+	AudioRefs []string             `json:"audio_refs,omitempty"`
+
+	// LegacyOutput is only populated when reading records written before the
+	// narration rename. New records must not set it.
+	LegacyOutput string `json:"output,omitempty"`
+}
+
+// Prose returns the narrator-visible text regardless of which field holds it.
+func (t Turn) Prose() string {
+	if strings.TrimSpace(t.Narration) != "" {
+		return t.Narration
+	}
+	return t.LegacyOutput
 }
 
 type HistoryLogger struct {
@@ -111,6 +127,10 @@ func (h *HistoryLogger) loadHistoryUnlocked() ([]Turn, error) {
 		}
 		var t Turn
 		if err := json.Unmarshal(line, &t); err == nil {
+			if strings.TrimSpace(t.Narration) == "" && t.LegacyOutput != "" {
+				t.Narration = t.LegacyOutput
+				t.LegacyOutput = ""
+			}
 			turns = append(turns, t)
 		}
 	}

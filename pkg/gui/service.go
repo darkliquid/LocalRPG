@@ -25,6 +25,7 @@ type Service struct {
 	rootDir   string
 	resolver  *core.PathResolver
 	configMgr *config.ConfigManager
+	indexed   map[string]bool
 }
 
 func NewService(rootDir string) *Service {
@@ -66,6 +67,7 @@ func NewService(rootDir string) *Service {
 		rootDir:   rootDir,
 		resolver:  core.NewCustomPathResolver(sysDir, worldDir, gameDir, cacheDir),
 		configMgr: mgr,
+		indexed:   make(map[string]bool),
 	}
 }
 
@@ -73,6 +75,90 @@ func (s *Service) GetResolver() *core.PathResolver {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.resolver
+}
+
+// store returns the campaign's canonical index. The store is pooled, so callers
+// must not close it.
+func (s *Service) store(gameID string) (*storage.Store, error) {
+	return storage.OpenGameStore(s.resolver, gameID)
+}
+
+// ensureIndexed repairs the campaign index the first time this process serves it,
+// so timeline queries answer from the database rather than re-reading files.
+func (s *Service) ensureIndexed(gameID string) {
+	s.mu.Lock()
+	if s.indexed[gameID] {
+		s.mu.Unlock()
+		return
+	}
+	s.indexed[gameID] = true
+	s.mu.Unlock()
+
+	gameDir := s.resolver.GameDir(gameID)
+	store, err := s.store(gameID)
+	if err != nil {
+		return
+	}
+
+	_, _ = storage.NewSyncer(store).Sync(filepath.Join(gameDir, "entities"))
+	history := engine.NewHistoryLogger(filepath.Join(gameDir, "history.jsonl"))
+	_ = engine.NewTimeline(s.resolver, store, history, gameID).EnsureIndexed()
+}
+
+// GetEntityTurns returns the turns an entity took part in.
+func (s *Service) GetEntityTurns(ctx context.Context, gameID, entityID string) ([]TurnDTO, error) {
+	s.ensureIndexed(gameID)
+
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, err
+	}
+	numbers, err := store.ListTurnsForEntity(entityID)
+	if err != nil {
+		return nil, err
+	}
+	if len(numbers) == 0 {
+		return []TurnDTO{}, nil
+	}
+
+	wanted := make(map[int]bool, len(numbers))
+	for _, number := range numbers {
+		wanted[number] = true
+	}
+
+	all, err := s.GetChronicle(ctx, gameID)
+	if err != nil {
+		return nil, err
+	}
+
+	turns := make([]TurnDTO, 0, len(numbers))
+	for _, turn := range all {
+		if wanted[turn.TurnNumber] {
+			turns = append(turns, turn)
+		}
+	}
+	return turns, nil
+}
+
+func mentionIDs(mentions []entity.Mention) []string {
+	ids := make([]string, 0, len(mentions))
+	for _, mention := range mentions {
+		ids = append(ids, mention.ID)
+	}
+	return ids
+}
+
+func segmentDTOs(segments []entity.TurnSegment) []SegmentDTO {
+	dtos := make([]SegmentDTO, 0, len(segments))
+	for _, segment := range segments {
+		dtos = append(dtos, SegmentDTO{
+			Kind:      segment.Kind,
+			Speaker:   segment.Speaker,
+			SpeakerID: segment.SpeakerID,
+			Text:      segment.Text,
+		})
+	}
+	return dtos
 }
 
 func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDTO, error) {
@@ -133,11 +219,8 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 		stateMap = ent.State.Raw()
 	}
 
-	dbPath := filepath.Join(gameDir, "game.db")
-	store, err := storage.NewStore(dbPath)
 	var backlinks []string
-	if err == nil {
-		defer store.Close()
+	if store, err := s.store(gameID); err == nil {
 		edges, _ := store.GetEdgesTo(entityID)
 		for _, e := range edges {
 			backlinks = append(backlinks, e.SourceID)
@@ -151,6 +234,7 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 		Markdown:  string(data),
 		State:     stateMap,
 		Backlinks: backlinks,
+		History:   ent.History,
 	}, nil
 }
 
@@ -161,12 +245,10 @@ func (s *Service) SaveEntity(ctx context.Context, gameID, entityID, rawMarkdown 
 		return fmt.Errorf("write entity file: %w", err)
 	}
 
-	dbPath := filepath.Join(gameDir, "game.db")
-	store, err := storage.NewStore(dbPath)
+	store, err := s.store(gameID)
 	if err != nil {
 		return nil // Non-fatal if db sync fails temporarily
 	}
-	defer store.Close()
 
 	syncer := storage.NewSyncer(store)
 	return syncer.SyncFile(path)
@@ -233,11 +315,13 @@ func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, e
 			audioURL = turn.AudioRefs[0]
 		}
 		dtos[i] = TurnDTO{
-			TurnNumber: turn.Number,
-			InputText:  turn.Input,
-			Mode:       turn.Mode,
-			Prose:      turn.Output,
-			AudioURL:   audioURL,
+			TurnNumber:  turn.Number,
+			InputText:   turn.Input,
+			Mode:        turn.Mode,
+			Prose:       turn.Prose(),
+			AudioURL:    audioURL,
+			EntitiesHit: mentionIDs(turn.Entities),
+			Segments:    segmentDTOs(turn.Segments),
 		}
 	}
 	return dtos, nil
@@ -398,22 +482,11 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 }
 
 func slugify(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	var buf strings.Builder
-	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			buf.WriteRune(r)
-		} else if r == ' ' || r == '-' || r == '_' {
-			if buf.Len() > 0 && !strings.HasSuffix(buf.String(), "-") {
-				buf.WriteRune('-')
-			}
-		}
-	}
-	res := strings.Trim(buf.String(), "-")
-	if res == "" {
+	id := entity.Slugify(s)
+	if id == "" {
 		return "campaign"
 	}
-	return res
+	return id
 }
 
 const defaultMechanicsScript = `// LocalRPG Rule System Engine
@@ -813,5 +886,3 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		}, nil
 	}
 }
-
-

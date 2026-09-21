@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
-	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
@@ -22,43 +22,29 @@ type ExtractedEntity struct {
 	Body     string `json:"body"`
 }
 
-type EntityExtractor struct {
+// ExtractedDialogue is one utterance the model attributed to a speaker.
+type ExtractedDialogue struct {
+	Speaker string `json:"speaker"`
+	Text    string `json:"text"`
+}
+
+// Extraction is everything one extraction pass returned for a turn.
+type Extraction struct {
+	Entities []ExtractedEntity   `json:"entities"`
+	Dialogue []ExtractedDialogue `json:"dialogue,omitempty"`
+}
+
+type Extractor struct {
 	model         ModelProvider
-	store         *storage.Store
 	voiceProfiles []config.VoiceProfile
 }
 
-func NewEntityExtractor(model ModelProvider, store *storage.Store) *EntityExtractor {
-	return &EntityExtractor{
-		model: model,
-		store: store,
-	}
+func NewExtractor(model ModelProvider) *Extractor {
+	return &Extractor{model: model}
 }
 
-func (e *EntityExtractor) SetVoiceProfiles(profiles []config.VoiceProfile) {
+func (e *Extractor) SetVoiceProfiles(profiles []config.VoiceProfile) {
 	e.voiceProfiles = profiles
-}
-
-var wikilinkExtractorRegex = regexp.MustCompile(`\[\[([^\]\|]+)(?:\|[^\]]+)?\]\]`)
-
-func ExtractEntitiesWithProfiles(prose string, profiles []config.VoiceProfile) []*entity.Entity {
-	matches := wikilinkExtractorRegex.FindAllStringSubmatch(prose, -1)
-	var entities []*entity.Entity
-	for _, m := range matches {
-		if len(m) >= 2 {
-			name := m[1]
-			id := strings.ToLower(strings.ReplaceAll(name, " ", "-"))
-			ent := &entity.Entity{
-				ID:   id,
-				Name: name,
-				Type: "character",
-				Body: prose,
-			}
-			AssignVoiceProfile(ent, profiles)
-			entities = append(entities, ent)
-		}
-	}
-	return entities
 }
 
 func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
@@ -117,19 +103,182 @@ func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 	}
 }
 
-const extractorSystemPrompt = `You are a world-state extractor. Read the narrative turn and return a JSON list of any newly discovered or updated characters, locations, items, factions, or plot arcs. Format:
-[
-  {
-    "id": "kebab-case-id",
-    "name": "Full Name",
-    "type": "character|location|item|faction|arc",
-    "location": "[[Optional-Location]]",
-    "body": "Description and known facts."
-  }
-]
-If nothing new is discovered, return []`
+const minSharedNameLength = 4
 
-func (e *EntityExtractor) ExtractFromTurn(ctx context.Context, narrativeOutput string) (int, error) {
+// MatchExistingEntity returns the indexed entity an extraction most likely
+// describes, or nil when it is genuinely new. Identity is resolved by ID, then
+// name, then contextual state: entity type, location, and role tags mentioned in
+// the extraction itself.
+func MatchExistingEntity(store *storage.Store, raw *ExtractedEntity) *entity.Entity {
+	if store == nil || raw == nil {
+		return nil
+	}
+
+	if raw.ID != "" {
+		if ent, err := store.GetEntity(raw.ID); err == nil && ent != nil {
+			return ent
+		}
+	}
+
+	nameKey := entity.Slugify(raw.Name)
+	if nameKey == "" {
+		return nil
+	}
+
+	summaries, err := store.ListEntities()
+	if err != nil {
+		return nil
+	}
+
+	for _, summary := range summaries {
+		if summary.ID == raw.ID || summary.ID == nameKey || entity.Slugify(summary.Name) == nameKey {
+			if ent, err := store.GetEntity(summary.ID); err == nil && ent != nil {
+				return ent
+			}
+		}
+	}
+
+	for _, summary := range summaries {
+		if sharesNameTokens(nameKey, summary.ID) || sharesNameTokens(nameKey, entity.Slugify(summary.Name)) {
+			if ent, err := store.GetEntity(summary.ID); err == nil && ent != nil {
+				return ent
+			}
+		}
+	}
+
+	return matchEntityByContext(store, summaries, raw)
+}
+
+// sharesNameTokens reports whether one kebab-case name is token-wise contained
+// in the other, so "evelyn" and "lady-evelyn" resolve to the same person.
+func sharesNameTokens(a, b string) bool {
+	if a == "" || b == "" || a == b {
+		return false
+	}
+
+	shorter, longer := a, b
+	if len(b) < len(a) {
+		shorter, longer = b, a
+	}
+	if len(shorter) < minSharedNameLength {
+		return false
+	}
+
+	longerTokens := strings.Split(longer, "-")
+	for _, token := range strings.Split(shorter, "-") {
+		if token == "" {
+			continue
+		}
+		if !slices.Contains(longerTokens, token) {
+			return false
+		}
+	}
+	return true
+}
+
+// matchEntityByContext handles renames and role descriptions: an entity of the
+// same type sharing a location and at least one role tag, or otherwise matching
+// on several role tags, is treated as the same entity.
+func matchEntityByContext(store *storage.Store, summaries []storage.EntitySummary, raw *ExtractedEntity) *entity.Entity {
+	locationKey := entity.Slugify(entity.WikilinkTarget(raw.Location))
+	if locationKey == "" {
+		locationKey = entity.Slugify(entity.WikilinkTarget(raw.Faction))
+	}
+	haystack := strings.ToLower(raw.Name + " " + raw.Body)
+
+	bestScore := 0
+	bestID := ""
+	for _, summary := range summaries {
+		if raw.Type != "" && summary.Type != raw.Type {
+			continue
+		}
+
+		roleHits := 0
+		for _, tag := range summary.Tags {
+			tagKey := strings.ToLower(strings.TrimSpace(tag))
+			if tagKey != "" && strings.Contains(haystack, tagKey) {
+				roleHits++
+			}
+		}
+		locationMatched := locationKey != "" && entity.Slugify(entity.WikilinkTarget(summary.Location)) == locationKey
+
+		switch {
+		case roleHits == 0:
+			continue
+		case !locationMatched && roleHits < 2:
+			continue
+		}
+
+		score := roleHits
+		if locationMatched {
+			score++
+		}
+		if score > bestScore {
+			bestScore = score
+			bestID = summary.ID
+		}
+	}
+
+	if bestID == "" {
+		return nil
+	}
+	if ent, err := store.GetEntity(bestID); err == nil && ent != nil {
+		return ent
+	}
+	return nil
+}
+
+// MergeExtractedEntity folds new narrative detail into an existing entity. The
+// authored identity, voice, state, and file hash are preserved so the index
+// stays in step with the Markdown entity on disk.
+func MergeExtractedEntity(existing *entity.Entity, raw *ExtractedEntity) *entity.Entity {
+	merged := *existing
+
+	if merged.Name == "" {
+		merged.Name = raw.Name
+	}
+	if merged.Type == "" {
+		merged.Type = raw.Type
+	}
+	if merged.Location == "" {
+		merged.Location = raw.Location
+	}
+	if merged.Faction == "" {
+		merged.Faction = raw.Faction
+	}
+
+	body := strings.TrimSpace(raw.Body)
+	if body != "" && !strings.Contains(merged.Body, body) {
+		if strings.TrimSpace(merged.Body) == "" {
+			merged.Body = body
+		} else {
+			merged.Body = strings.TrimSpace(merged.Body) + "\n\n" + body
+		}
+	}
+
+	return &merged
+}
+
+const extractorSystemPrompt = `You are a world-state extractor. Read the narrative turn and return a JSON object. Format:
+{
+  "entities": [
+    {
+      "id": "kebab-case-id",
+      "name": "Full Name",
+      "type": "character|location|item|faction|arc",
+      "location": "[[Optional-Location]]",
+      "body": "Description and known facts."
+    }
+  ],
+  "dialogue": [
+    { "speaker": "Full Name", "text": "Exactly what they said." }
+  ]
+}
+List every line of direct speech in "dialogue", attributed to the speaker, using the same names as the entity list. Return empty arrays when nothing new is discovered.`
+
+// Extract asks the model for the entities and attributed speech a turn contains.
+// Persisting them is the caller's job.
+func (e *Extractor) Extract(ctx context.Context, narrativeOutput string) (*Extraction, error) {
 	req := GenerateRequest{
 		System: extractorSystemPrompt,
 		Prompt: narrativeOutput,
@@ -137,47 +286,96 @@ func (e *EntityExtractor) ExtractFromTurn(ctx context.Context, narrativeOutput s
 
 	res, err := e.model.Generate(ctx, req)
 	if err != nil {
-		return 0, fmt.Errorf("extractor model failed: %w", err)
+		return nil, fmt.Errorf("extractor model failed: %w", err)
 	}
 
 	cleaned := strings.TrimSpace(res.Text)
-	if idx := strings.Index(cleaned, "["); idx != -1 {
+	if idx := strings.IndexAny(cleaned, "[{"); idx != -1 {
 		cleaned = cleaned[idx:]
 	}
-	if idx := strings.LastIndex(cleaned, "]"); idx != -1 {
+	if idx := strings.LastIndexAny(cleaned, "]}"); idx != -1 {
 		cleaned = cleaned[:idx+1]
 	}
 
-	var extracted []ExtractedEntity
-	if err := json.Unmarshal([]byte(cleaned), &extracted); err != nil {
-		return 0, fmt.Errorf("parse extracted json %q: %w", cleaned, err)
+	if strings.HasPrefix(cleaned, "{") {
+		var result Extraction
+		if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
+			return nil, fmt.Errorf("parse extracted json %q: %w", cleaned, err)
+		}
+		return &result, nil
 	}
 
-	savedCount := 0
-	for _, raw := range extracted {
-		if raw.ID == "" || raw.Name == "" {
-			continue
-		}
+	// Older prompts asked for a bare array of entities.
+	var entities []ExtractedEntity
+	if err := json.Unmarshal([]byte(cleaned), &entities); err != nil {
+		return nil, fmt.Errorf("parse extracted json %q: %w", cleaned, err)
+	}
+	return &Extraction{Entities: entities}, nil
+}
 
-		ent := &entity.Entity{
-			ID:        raw.ID,
-			Name:      raw.Name,
-			Type:      raw.Type,
-			Location:  raw.Location,
-			Faction:   raw.Faction,
-			Body:      raw.Body,
-			Wikilinks: make([]string, 0),
-			Hash:      fmt.Sprintf("extracted-%s", raw.ID),
-		}
-
-		if ent.Type == "character" {
-			AssignVoiceProfile(ent, e.voiceProfiles)
-		}
-
-		if err := e.store.SaveEntity(ent); err == nil {
-			savedCount++
-		}
+// ResolveEntityMentions returns the entities a turn touched, tagged by how. It
+// needs no model, so a zero-GPU game still records involvement.
+func ResolveEntityMentions(store *storage.Store, playerID, locationID string, texts ...string) []entity.Mention {
+	if store == nil {
+		return nil
 	}
 
-	return savedCount, nil
+	mentions := make([]entity.Mention, 0)
+	seen := make(map[string]bool, 4)
+
+	add := func(id, kind string) {
+		if id == "" || seen[id] {
+			return
+		}
+		if ent, err := store.GetEntity(id); err != nil || ent == nil {
+			return
+		}
+		seen[id] = true
+		mentions = append(mentions, entity.Mention{ID: id, Kind: kind})
+	}
+
+	add(playerID, entity.MentionPlayer)
+	add(locationID, entity.MentionLocation)
+
+	for _, text := range texts {
+		for _, target := range entity.WikilinkTargets(text) {
+			add(ResolveSpeakerID(store, target), entity.MentionWikilink)
+		}
+	}
+	return mentions
+}
+
+// ResolveSpeakerID maps a written speaker name to an entity ID using identity
+// signals only: exact ID, exact name, then partial name tokens.
+func ResolveSpeakerID(store *storage.Store, name string) string {
+	cleaned := entity.WikilinkTarget(name)
+	if store == nil || cleaned == "" {
+		return ""
+	}
+
+	slug := entity.Slugify(cleaned)
+	if slug == "" {
+		return ""
+	}
+
+	if ent, err := store.GetEntity(slug); err == nil && ent != nil {
+		return ent.ID
+	}
+
+	summaries, err := store.ListEntities()
+	if err != nil {
+		return ""
+	}
+
+	for _, summary := range summaries {
+		if entity.Slugify(summary.Name) == slug {
+			return summary.ID
+		}
+	}
+	for _, summary := range summaries {
+		if sharesNameTokens(slug, summary.ID) || sharesNameTokens(slug, entity.Slugify(summary.Name)) {
+			return summary.ID
+		}
+	}
+	return ""
 }

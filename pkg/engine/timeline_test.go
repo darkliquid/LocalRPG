@@ -1,0 +1,122 @@
+package engine
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/darkliquid/localrpg/pkg/core"
+	"github.com/darkliquid/localrpg/pkg/entity"
+)
+
+func TestTimelineEnsureIndexedReplaysHistory(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	store := newTestStore(t)
+	history := NewHistoryLogger(filepath.Join(t.TempDir(), "history.jsonl"))
+	timeline := NewTimeline(paths, store, history, "campaign-01")
+
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"look","narration":"You look around.","entities":[{"id":"hero","mention":"player"},{"id":"garrick","mention":"extracted"}]}` + "\n"
+	record += `{"number":2,"timestamp":"2026-09-21T10:05:00Z","mode":"Say","input":"hello","narration":"Garrick nods.","entities":[{"id":"garrick","mention":"wikilink"}]}` + "\n"
+
+	if err := os.WriteFile(history.path, []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := timeline.EnsureIndexed(); err != nil {
+		t.Fatalf("EnsureIndexed failed: %v", err)
+	}
+
+	count, err := store.CountTurns()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("CountTurns = %d, want 2", count)
+	}
+
+	garrick, err := store.ListTurnsForEntity("garrick")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(garrick) != 2 || garrick[0] != 1 || garrick[1] != 2 {
+		t.Errorf("expected garrick in turns 1,2, got %v", garrick)
+	}
+
+	// Second run is a no-op.
+	if err := timeline.EnsureIndexed(); err != nil {
+		t.Fatalf("second EnsureIndexed failed: %v", err)
+	}
+	if count, _ := store.CountTurns(); count != 2 {
+		t.Errorf("CountTurns = %d after a no-op reindex, want 2", count)
+	}
+
+	// A rewind that only touched the log is repaired on the next open.
+	truncated := strings.SplitAfter(record, "\n")[0]
+	if err := os.WriteFile(history.path, []byte(truncated), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := timeline.EnsureIndexed(); err != nil {
+		t.Fatalf("third EnsureIndexed failed: %v", err)
+	}
+	if count, _ := store.CountTurns(); count != 1 {
+		t.Errorf("CountTurns = %d after truncating the log, want 1", count)
+	}
+	if indexed, _ := store.MaxTurnNumber(); indexed != 1 {
+		t.Errorf("MaxTurnNumber = %d after truncating the log, want 1", indexed)
+	}
+}
+
+func TestTimelineMapsEntityMentions(t *testing.T) {
+	store := newTestStore(t)
+	history := NewHistoryLogger(filepath.Join(t.TempDir(), "history.jsonl"))
+	timeline := NewTimeline(core.NewPathResolver(t.TempDir()), store, history, "campaign-01")
+
+	turn := Turn{
+		Number:    1,
+		Mode:      "Do",
+		Input:     "look",
+		Narration: "You look around.",
+		Entities: []entity.Mention{
+			{ID: "hero", Kind: entity.MentionPlayer},
+			{ID: "garrick", Kind: entity.MentionExtracted},
+		},
+	}
+	if err := timeline.indexTurn(turn); err != nil {
+		t.Fatalf("indexTurn failed: %v", err)
+	}
+
+	rec, err := store.GetTurn(1)
+	if err != nil {
+		t.Fatalf("GetTurn failed: %v", err)
+	}
+	if len(rec.Entities) != 2 {
+		t.Fatalf("expected 2 links, got %+v", rec.Entities)
+	}
+	if rec.Narration != turn.Narration {
+		t.Errorf("Narration = %q, want %q", rec.Narration, turn.Narration)
+	}
+}
+
+func TestTimelineIndexesMinimalRecords(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	store := newTestStore(t)
+
+	historyPath := filepath.Join(t.TempDir(), "history.jsonl")
+	if err := os.WriteFile(historyPath, []byte(`{"number":1,"mode":"Do"}`+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	timeline := NewTimeline(paths, store, NewHistoryLogger(historyPath), "campaign-01")
+	indexed, err := timeline.SyncTurns()
+	if err != nil {
+		t.Fatalf("SyncTurns failed: %v", err)
+	}
+	if indexed != 1 {
+		t.Errorf("indexed = %d, want 1", indexed)
+	}
+
+	if _, err := store.GetTurn(1); err != nil {
+		t.Errorf("expected turn 1 in the index: %v", err)
+	}
+}

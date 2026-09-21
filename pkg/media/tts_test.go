@@ -20,29 +20,65 @@ func (m *mockTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 	return []byte("mock-wav-bytes"), nil
 }
 
-func TestParseDialogueSegments(t *testing.T) {
-	narrative := `The cold wind whistles through the cracks in the door.
-Lady Evelyn: "You shouldn't have come here alone, traveler."
-You reach for your sword, but she shakes her head.
-"Put that away," she whispers.`
+type recordingTTSClient struct {
+	calls     int
+	lastVoice *entity.VoiceConfig
+}
 
-	segments := ParseDialogueSegments(narrative, "Narrator")
+func (c *recordingTTSClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
+	c.calls++
+	c.lastVoice = voice
+	return []byte("RIFF" + text), nil
+}
 
-	if len(segments) != 4 {
-		t.Fatalf("expected 4 segments, got %d", len(segments))
+func TestLegacySegmentsKeepProseAndAttributeObviousSpeakers(t *testing.T) {
+	segments := LegacySegments("The hall is quiet.\nGarrick: \"Keep walking.\"")
+
+	if len(segments) != 2 {
+		t.Fatalf("expected 2 segments, got %#v", segments)
+	}
+	if segments[0].Kind != entity.SegmentNarration || segments[0].Text != "The hall is quiet." {
+		t.Errorf("unexpected first segment %#v", segments[0])
+	}
+	if segments[1].Kind != entity.SegmentSpeech || segments[1].Speaker != "Garrick" {
+		t.Errorf("unexpected second segment %#v", segments[1])
+	}
+}
+
+func TestSynthesizeSegmentsUsesPerSpeakerVoicesAndCaches(t *testing.T) {
+	client := &recordingTTSClient{}
+	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
+
+	segments := []entity.TurnSegment{
+		{Kind: entity.SegmentNarration, Text: "The hall is quiet."},
+		{Kind: entity.SegmentSpeech, Speaker: "Garrick", SpeakerID: "garrick", Text: "Keep walking."},
 	}
 
-	if segments[0].Speaker != "Narrator" || !segments[0].IsNarrator {
-		t.Errorf("expected segment 0 to be Narrator, got %+v", segments[0])
+	voices := map[string]*entity.VoiceConfig{
+		"garrick": {VoiceID: "bm_george", Pitch: 0.85, SpeechRate: 0.9},
 	}
-	if segments[1].Speaker != "Lady Evelyn" || segments[1].IsNarrator {
-		t.Errorf("expected segment 1 to be Lady Evelyn, got %+v", segments[1])
+	voiceFor := func(speakerID string) *entity.VoiceConfig { return voices[speakerID] }
+
+	first, err := pipeline.SynthesizeSegments(context.Background(), segments, nil, voiceFor)
+	if err != nil {
+		t.Fatalf("SynthesizeSegments failed: %v", err)
 	}
-	if segments[2].Speaker != "Narrator" {
-		t.Errorf("expected segment 2 to be Narrator, got %+v", segments[2])
+	if len(first) != 2 {
+		t.Fatalf("expected 2 clips, got %d", len(first))
 	}
-	if segments[3].Speaker != "Lady Evelyn" {
-		t.Errorf("expected continued dialogue to attribute to Lady Evelyn, got %+v", segments[3])
+
+	second, err := pipeline.SynthesizeSegments(context.Background(), segments, nil, voiceFor)
+	if err != nil {
+		t.Fatalf("second SynthesizeSegments failed: %v", err)
+	}
+	if first[1] != second[1] {
+		t.Errorf("expected the cached clip to be reused, got %q then %q", first[1], second[1])
+	}
+	if client.calls != 2 {
+		t.Errorf("expected 2 synthesis calls across both runs, got %d", client.calls)
+	}
+	if client.lastVoice == nil || client.lastVoice.VoiceID != "bm_george" {
+		t.Errorf("expected the speaker's voice to be used, got %+v", client.lastVoice)
 	}
 }
 
@@ -110,5 +146,21 @@ func TestTTSPipeline_PerCharacterVoiceAndSpeed(t *testing.T) {
 
 	if lastSynthesizedVoice == nil || lastSynthesizedVoice.VoiceID != "af_bella" || lastSynthesizedVoice.SpeechRate != 0.95 {
 		t.Errorf("expected character voice config with af_bella and 0.95 rate, got %+v", lastSynthesizedVoice)
+	}
+}
+
+func TestSynthesizeSegmentsResolvesLegacySpeakersByName(t *testing.T) {
+	client := &recordingTTSClient{}
+	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
+
+	segments := LegacySegments(`Garrick: "Keep walking."`)
+	voices := map[string]*entity.VoiceConfig{"Garrick": {VoiceID: "bm_george"}}
+	voiceFor := func(key string) *entity.VoiceConfig { return voices[key] }
+
+	if _, err := pipeline.SynthesizeSegments(context.Background(), segments, nil, voiceFor); err != nil {
+		t.Fatalf("SynthesizeSegments failed: %v", err)
+	}
+	if client.lastVoice == nil || client.lastVoice.VoiceID != "bm_george" {
+		t.Errorf("expected a legacy speaker name to resolve a voice, got %+v", client.lastVoice)
 	}
 }

@@ -40,14 +40,6 @@ func (s *Server) registerRoutes() {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
 	s.mux.ServeHTTP(w, r)
 }
 
@@ -93,6 +85,15 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		entityID := parts[2]
+		if len(parts) >= 4 && parts[3] == "turns" && r.Method == http.MethodGet {
+			turns, err := s.service.GetEntityTurns(r.Context(), gameID, entityID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, turns)
+			return
+		}
 		if r.Method == http.MethodPut {
 			var body struct {
 				Markdown string `json:"markdown"`
@@ -371,5 +372,3 @@ func (s *Server) handleTestProviderRoute(w http.ResponseWriter, r *http.Request)
 	}
 	writeJSON(w, res)
 }
-
-

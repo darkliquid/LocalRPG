@@ -2,11 +2,11 @@ package engine
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/darkliquid/localrpg/pkg/core"
+	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"gopkg.in/yaml.v3"
 )
@@ -56,7 +56,55 @@ func InitGame(paths *core.PathResolver, gameID, systemID, worldID, playerName st
 		SystemID: systemID,
 		WorldID:  worldID,
 		Player:   playerName,
+		Settings: make(map[string]interface{}),
 	}
+
+	// Copy initial template entities from world into game, named <id>.md so the
+	// GUI, which derives entity IDs from file names, can reach them.
+	worldEntitiesDir := filepath.Join(paths.WorldDir(worldID), "entities")
+	if entries, err := os.ReadDir(worldEntitiesDir); err == nil {
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(worldEntitiesDir, e.Name()))
+			if err != nil {
+				return nil, fmt.Errorf("read entity template %q: %w", e.Name(), err)
+			}
+			template, err := entity.ParseMarkdownEntity(data)
+			if err != nil {
+				return nil, fmt.Errorf("parse entity template %q: %w", e.Name(), err)
+			}
+			if err := os.WriteFile(filepath.Join(gameEntitiesDir, template.ID+".md"), data, 0644); err != nil {
+				return nil, fmt.Errorf("write entity template %q: %w", e.Name(), err)
+			}
+		}
+	}
+
+	// Open the canonical store and run initial sync
+	store, err := storage.OpenGameStore(paths, gameID)
+	if err != nil {
+		return nil, fmt.Errorf("init game store: %w", err)
+	}
+
+	syncer := storage.NewSyncer(store)
+	if _, err := syncer.Sync(gameEntitiesDir); err != nil {
+		return nil, fmt.Errorf("initial sync: %w", err)
+	}
+
+	// Repair the derived index when the log and the index disagree
+	timeline := NewTimeline(paths, store, NewHistoryLogger(filepath.Join(gameDir, "history.jsonl")), gameID)
+	if err := timeline.EnsureIndexed(); err != nil {
+		return nil, fmt.Errorf("index turns: %w", err)
+	}
+
+	// Pin the opening location so every later session agrees on where the
+	// campaign begins.
+	startLocation, err := ResolveStartLocation(paths, store, manifest)
+	if err != nil {
+		return nil, fmt.Errorf("resolve start location: %w", err)
+	}
+	manifest.Settings[StartLocationSetting] = startLocation
 
 	manifestBytes, err := yaml.Marshal(manifest)
 	if err != nil {
@@ -66,34 +114,6 @@ func InitGame(paths *core.PathResolver, gameID, systemID, worldID, playerName st
 		return nil, fmt.Errorf("write game.yaml: %w", err)
 	}
 
-	// Copy initial template entities from world into game
-	worldEntitiesDir := filepath.Join(paths.WorldDir(worldID), "entities")
-	if entries, err := os.ReadDir(worldEntitiesDir); err == nil {
-		for _, e := range entries {
-			if e.IsDir() {
-				continue
-			}
-			src := filepath.Join(worldEntitiesDir, e.Name())
-			dst := filepath.Join(gameEntitiesDir, e.Name())
-			if err := copyFile(src, dst); err != nil {
-				return nil, fmt.Errorf("copy entity template %q: %w", e.Name(), err)
-			}
-		}
-	}
-
-	// Open store and run initial sync
-	dbPath := filepath.Join(gameCacheDir, "index.db")
-	store, err := storage.NewStore(dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("init game store: %w", err)
-	}
-
-	syncer := storage.NewSyncer(store)
-	if _, err := syncer.Sync(gameEntitiesDir); err != nil {
-		store.Close()
-		return nil, fmt.Errorf("initial sync: %w", err)
-	}
-
 	return &Session{
 		Paths:    paths,
 		Manifest: manifest,
@@ -101,21 +121,4 @@ func InitGame(paths *core.PathResolver, gameID, systemID, worldID, playerName st
 		World:    worldManifest,
 		Store:    store,
 	}, nil
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	return err
 }

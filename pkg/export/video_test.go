@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/darkliquid/localrpg/pkg/entity"
 )
 
 func TestBuildFFmpegCommand(t *testing.T) {
@@ -23,9 +25,10 @@ func TestBuildFFmpegCommand(t *testing.T) {
 				DurationSec: 5.0,
 			},
 			{
-				TurnNumber:  2,
-				Speaker:     "Guard",
-				Dialogue:    "Halt!",
+				TurnNumber: 2,
+				Segments: []entity.TurnSegment{
+					{Kind: entity.SegmentSpeech, Speaker: "Guard", Text: "Halt!"},
+				},
 				DurationSec: 5.0,
 			},
 		},

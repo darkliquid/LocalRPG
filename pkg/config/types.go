@@ -7,6 +7,13 @@ type PathsConfig struct {
 	Cache   string `yaml:"cache" json:"cache"`
 }
 
+// Agent role names routed by the harness router.
+const (
+	RoleGM        = "gm"
+	RoleNarrator  = "narrator"
+	RoleExtractor = "extractor"
+)
+
 type AgentRoleConfig struct {
 	Type        string   `yaml:"type" json:"type"` // "builtin", "http", "cli", "disabled"
 	BuiltinName string   `yaml:"builtin_name,omitempty" json:"builtin_name,omitempty"`

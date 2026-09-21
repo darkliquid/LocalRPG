@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"regexp"
-	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
+	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/media"
 )
-
-var dialogueSpeakerRegex = regexp.MustCompile(`^([^:\n]+):\s*"([^"]+)"`)
 
 type ScriptCompiler struct {
 	rootDir  string
@@ -44,18 +42,9 @@ func (s *ScriptCompiler) Compile(ctx context.Context, gameID string) (*ReplayScr
 	totalDuration := 0.0
 
 	for i, turn := range turns {
-		speaker := ""
-		dialogue := ""
-		prose := turn.Output
-
-		lines := strings.Split(turn.Output, "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if match := dialogueSpeakerRegex.FindStringSubmatch(line); len(match) == 3 {
-				speaker = strings.TrimSpace(match[1])
-				dialogue = match[2]
-				break
-			}
+		segments := turn.Segments
+		if len(segments) == 0 {
+			segments = media.LegacySegments(turn.Prose())
 		}
 
 		audioPath := ""
@@ -63,10 +52,14 @@ func (s *ScriptCompiler) Compile(ctx context.Context, gameID string) (*ReplayScr
 			audioPath = turn.AudioRefs[0]
 		}
 
-		// Estimate 3-4 seconds per line if audio is missing
-		duration := 3.5
-		if dialogue != "" {
-			duration = 4.0
+		// Estimate 3.5 seconds per narrated span and 4 per spoken line when audio is missing.
+		duration := 0.0
+		for _, segment := range segments {
+			if segment.Kind == entity.SegmentSpeech {
+				duration += 4.0
+				continue
+			}
+			duration += 3.5
 		}
 		totalDuration += duration
 
@@ -75,9 +68,8 @@ func (s *ScriptCompiler) Compile(ctx context.Context, gameID string) (*ReplayScr
 			Timestamp:   turn.Timestamp,
 			Mode:        turn.Mode,
 			PlayerInput: turn.Input,
-			Prose:       prose,
-			Speaker:     speaker,
-			Dialogue:    dialogue,
+			Prose:       turn.Prose(),
+			Segments:    segments,
 			AudioPath:   audioPath,
 			DurationSec: duration,
 		}

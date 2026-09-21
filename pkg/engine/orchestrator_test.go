@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
@@ -54,7 +55,8 @@ func TestTurnOrchestrator(t *testing.T) {
 	router.RegisterProvider(model)
 	router.AssignRole("gm", "mock-gm")
 
-	orchestrator := NewTurnOrchestrator(store, history, jsEngine, router, "tavern", "player")
+	timeline := NewTimeline(core.NewPathResolver(tempDir), store, history, "test-campaign")
+	orchestrator := NewTurnOrchestrator(store, timeline, jsEngine, router, "tavern", "player")
 
 	// 1. Play standard turn
 	turn, err := orchestrator.ProcessAction(ctx, "Do", "I open the door")
@@ -62,7 +64,7 @@ func TestTurnOrchestrator(t *testing.T) {
 		t.Fatalf("ProcessAction failed: %v", err)
 	}
 
-	if turn.Number != 1 || turn.Output != "You step inside the warm tavern." {
+	if turn.Number != 1 || turn.Prose() != "You step inside the warm tavern." {
 		t.Errorf("unexpected turn outcome: %+v", turn)
 	}
 
@@ -73,8 +75,8 @@ func TestTurnOrchestrator(t *testing.T) {
 		t.Fatalf("ProcessAction GM steering failed: %v", err)
 	}
 
-	if !strings.Contains(corrected.Output, "Correction: The door was locked") {
-		t.Errorf("expected corrected output, got %q", corrected.Output)
+	if !strings.Contains(corrected.Prose(), "Correction: The door was locked") {
+		t.Errorf("expected corrected output, got %q", corrected.Prose())
 	}
 
 	// 3. Test Rules and Lore prompt injection
@@ -90,4 +92,3 @@ func TestTurnOrchestrator(t *testing.T) {
 		t.Errorf("expected lore prompt in GM prompt, got: %s", model.lastPrompt)
 	}
 }
-

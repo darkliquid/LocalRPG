@@ -328,5 +328,15 @@ func TestSettingsEndpoints(t *testing.T) {
 	}
 }
 
+func TestEntityTurnsRoute(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
 
+	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/entity/captain-kaelen/turns", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
 
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
