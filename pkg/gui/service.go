@@ -447,10 +447,10 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		return nil, fmt.Errorf("load game manifest: %w", err)
 	}
 	if _, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml")); err != nil {
-		return nil, fmt.Errorf("load system %q: %w", manifest.SystemID, err)
+		return nil, fmt.Errorf("load system %q: %v", manifest.SystemID, err)
 	}
 	if _, err := core.LoadWorldManifest(filepath.Join(s.resolver.WorldDir(manifest.WorldID), "world.yaml")); err != nil {
-		return nil, fmt.Errorf("load world %q: %w", manifest.WorldID, err)
+		return nil, fmt.Errorf("load world %q: %v", manifest.WorldID, err)
 	}
 
 	store, err := s.store(gameID)

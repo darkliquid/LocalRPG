@@ -426,3 +426,125 @@ func TestSegmentAudioRouteReportsAnUnavailableProvider(t *testing.T) {
 		t.Errorf("expected 204 when no TTS provider is configured, got %d", rec.Code)
 	}
 }
+
+func TestTurnEndpointStreamsNDJSON(t *testing.T) {
+	gameID, svc := turnFixture(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest("POST", "/api/game/"+gameID+"/turn", strings.NewReader(`{"mode":"do","input":"I look around"}`))
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/x-ndjson" {
+		t.Errorf("Content-Type = %q, want application/x-ndjson", ct)
+	}
+
+	var last TurnEvent
+	lines := 0
+	for _, line := range strings.Split(strings.TrimSpace(rec.Body.String()), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		lines++
+
+		var event TurnEvent
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatalf("line %d is not JSON: %v\n%s", lines, err, line)
+		}
+		last = event
+	}
+
+	if lines == 0 {
+		t.Fatalf("expected at least one event")
+	}
+	if last.Type != "turn" || last.Turn == nil {
+		t.Fatalf("expected a final turn event, got %+v", last)
+	}
+	if last.Turn.TurnNumber != 1 {
+		t.Errorf("TurnNumber = %d, want 1", last.Turn.TurnNumber)
+	}
+}
+
+func TestTurnEndpointRejectsBadRequests(t *testing.T) {
+	gameID, svc := turnFixture(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	cases := []struct {
+		name       string
+		path       string
+		body       string
+		wantStatus int
+	}{
+		{"unknown mode", "/api/game/" + gameID + "/turn", `{"mode":"dance","input":"hello"}`, http.StatusBadRequest},
+		{"empty input", "/api/game/" + gameID + "/turn", `{"mode":"do","input":"   "}`, http.StatusBadRequest},
+		{"malformed body", "/api/game/" + gameID + "/turn", `{`, http.StatusBadRequest},
+		{"unknown game", "/api/game/absent-campaign/turn", `{"mode":"do","input":"hi"}`, http.StatusNotFound},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", tc.path, strings.NewReader(tc.body))
+			rec := httptest.NewRecorder()
+			server.ServeHTTP(rec, req)
+
+			if rec.Code != tc.wantStatus {
+				t.Errorf("status = %d, want %d: %s", rec.Code, tc.wantStatus, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestTurnEndpointReportsAnUnplayableCampaign(t *testing.T) {
+	gameID, svc := turnFixture(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	// A campaign whose manifest names a system that does not exist: playable
+	// campaign files are missing, but the game itself is there.
+	brokenDir := svc.GetResolver().GameDir("broken-campaign")
+	if err := os.MkdirAll(brokenDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := "id: broken-campaign\nname: Broken\nsystem: ghost-system\nworld: harbour-realm\nplayer: sean\n"
+	if err := os.WriteFile(filepath.Join(brokenDir, "game.yaml"), []byte(manifest), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/api/game/broken-campaign/turn", strings.NewReader(`{"mode":"do","input":"hello"}`))
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "ghost-system") {
+		t.Errorf("expected the missing system named in the error, got %s", rec.Body.String())
+	}
+
+	_ = gameID
+}
+
+func TestTurnEndpointConflictsWhileATurnIsInFlight(t *testing.T) {
+	gameID, svc := turnFixture(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	// Hold the campaign's lock the way an in-flight turn would.
+	session, err := svc.BeginTurn(gameID)
+	if err != nil {
+		t.Fatalf("BeginTurn failed: %v", err)
+	}
+	defer session.Close()
+
+	req := httptest.NewRequest("POST", "/api/game/"+gameID+"/turn", strings.NewReader(`{"mode":"do","input":"I wait"}`))
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Retry-After") == "" {
+		t.Errorf("expected a Retry-After header")
+	}
+}

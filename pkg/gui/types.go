@@ -1,6 +1,9 @@
 package gui
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/darkliquid/localrpg/pkg/config"
 )
 
@@ -203,4 +206,23 @@ type TurnEvent struct {
 	Text    string   `json:"text,omitempty"`    // narration delta
 	Turn    *TurnDTO `json:"turn,omitempty"`    // the persisted turn
 	Message string   `json:"message,omitempty"` // failure detail
+}
+
+// turnModes maps the mode names a client may send to the engine's casing.
+var turnModes = map[string]string{
+	"do": "Do", "say": "Say", "story": "Story", "roll": "Roll", "gm": "GM", "system": "System",
+}
+
+// validate normalises a submitted turn and rejects one the engine cannot run.
+func (r *TurnRequest) validate() error {
+	mode, ok := turnModes[strings.ToLower(strings.TrimSpace(r.Mode))]
+	if !ok {
+		return fmt.Errorf("unknown mode %q", r.Mode)
+	}
+	r.Mode = mode
+
+	if strings.TrimSpace(r.Input) == "" {
+		return fmt.Errorf("input is required")
+	}
+	return nil
 }

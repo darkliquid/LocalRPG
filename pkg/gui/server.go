@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"strconv"
@@ -84,8 +85,14 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, chronicle)
 
 	case "turn":
-		// GET /api/game/{id}/turn/{n}/segment/{i}/audio serves one beat's clip. The
-		// desktop playback work adds a POST sibling on this same case.
+		// POST /api/game/{id}/turn submits a turn. GET
+		// /api/game/{id}/turn/{n}/segment/{i}/audio serves one beat's clip; both
+		// hang off a turn, so they share this case.
+		if r.Method == http.MethodPost && len(parts) == 2 {
+			s.handleTurnSubmit(w, r, gameID)
+			return
+		}
+
 		if len(parts) < 6 || parts[3] != "segment" || parts[5] != "audio" || r.Method != http.MethodGet {
 			http.NotFound(w, r)
 			return
@@ -444,4 +451,62 @@ func (s *Server) handleTestProviderRoute(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, res)
+}
+
+// maxTurnBody bounds a player action so a runaway paste cannot allocate without
+// limit. It is far above any plausible action.
+const maxTurnBody = 64 << 10
+
+// handleTurnSubmit streams a turn as newline-delimited JSON. Status codes can only
+// be chosen before the first byte, so the campaign is prepared first: 409 for a
+// turn already in flight, 503 for a campaign that cannot be played, and an `error`
+// event for anything that happens once streaming has begun.
+func (s *Server) handleTurnSubmit(w http.ResponseWriter, r *http.Request, gameID string) {
+	var req TurnRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if err := req.validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	session, err := s.service.BeginTurn(gameID)
+	switch {
+	case errors.Is(err, ErrTurnInFlight):
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	case errors.Is(err, fs.ErrNotExist):
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	case err != nil:
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer session.Close()
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming is not supported by this client", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	encoder := json.NewEncoder(w)
+	writeEvent := func(event TurnEvent) error {
+		if err := encoder.Encode(event); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+
+	if err := session.Run(r.Context(), req, writeEvent); err != nil {
+		_ = writeEvent(TurnEvent{Type: "error", Message: err.Error()})
+	}
 }
