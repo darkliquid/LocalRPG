@@ -114,6 +114,11 @@ func (s *Service) GetModelsStatus() []models.ModelStatus {
 }
 
 func (s *Service) DownloadModel(ctx context.Context, id string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	} else {
+		ctx = context.WithoutCancel(ctx)
+	}
 	_, err := s.modelsManager.Download(ctx, id)
 	return err
 }

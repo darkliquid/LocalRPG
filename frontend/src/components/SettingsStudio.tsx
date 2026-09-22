@@ -1110,7 +1110,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   ) : (
                     <span className="flex items-center gap-1 text-amber-400/90 font-mono text-[11px] bg-amber-950/40 border border-amber-800/40 px-2 py-0.5 rounded-md">
                       <AlertCircle className="w-3.5 h-3.5" />
-                      <span>Not Installed (~86 MB)</span>
+                      <span>Not Installed (~320 MB)</span>
                     </span>
                   )}
                 </div>
@@ -1122,7 +1122,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       setMissingModelPrompt({
                         id: 'kokoro-tts',
                         name: 'Kokoro Voice Pack',
-                        sizeBytes: 90177536,
+                        sizeBytes: 319625534,
                       })
                     }
                     className="flex items-center gap-1.5 px-3 py-1 bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold rounded-lg transition shadow text-xs cursor-pointer disabled:opacity-50"

@@ -45,11 +45,12 @@ type ModelStatus struct {
 }
 
 type Manager struct {
-	cacheDir  string
-	mu        sync.RWMutex
-	specs     map[string]ModelSpec
-	active    map[string]*downloadSession
-	listeners map[chan ModelStatus]struct{}
+	cacheDir   string
+	mu         sync.RWMutex
+	specs      map[string]ModelSpec
+	active     map[string]*downloadSession
+	lastErrors map[string]string
+	listeners  map[chan ModelStatus]struct{}
 }
 
 type downloadSession struct {
@@ -60,10 +61,11 @@ type downloadSession struct {
 
 func NewManager(cacheDir string) *Manager {
 	m := &Manager{
-		cacheDir:  cacheDir,
-		specs:     make(map[string]ModelSpec),
-		active:    make(map[string]*downloadSession),
-		listeners: make(map[chan ModelStatus]struct{}),
+		cacheDir:   cacheDir,
+		specs:      make(map[string]ModelSpec),
+		active:     make(map[string]*downloadSession),
+		lastErrors: make(map[string]string),
+		listeners:  make(map[chan ModelStatus]struct{}),
 	}
 	m.registerDefaultSpecs()
 	return m
@@ -74,8 +76,8 @@ func (m *Manager) registerDefaultSpecs() {
 		ID:          "kokoro-tts",
 		Name:        "Kokoro Voice Pack",
 		URL:         "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-en-v0_19.tar.bz2",
-		SHA256:      "a3d3c82e666c0d0a2dbe5429399432d67786440dbd06b539bf58778f654b50c0",
-		SizeBytes:   90177536,
+		SHA256:      "912804855a04745fa77a30be545b3f9a5d15c4d66db00b88cbcd4921df605ac7",
+		SizeBytes:   319625534,
 		ArchiveType: "tar.bz2",
 		Subdir:      filepath.Join("tts", "kokoro"),
 		RequiredFiles: []string{
@@ -122,7 +124,19 @@ func (m *Manager) Status(modelID string) ModelStatus {
 		Name:       spec.Name,
 		Installed:  installed,
 		TotalBytes: spec.SizeBytes,
+		Error:      m.lastErrors[spec.ID],
 	}
+}
+
+func (m *Manager) Cancel(modelID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sess, ok := m.active[modelID]
+	if !ok {
+		return false
+	}
+	sess.cancel()
+	return true
 }
 
 func (m *Manager) ListStatuses() []ModelStatus {
@@ -139,6 +153,7 @@ func (m *Manager) ListStatuses() []ModelStatus {
 				Name:       spec.Name,
 				Installed:  m.isInstalledLocked(spec),
 				TotalBytes: spec.SizeBytes,
+				Error:      m.lastErrors[spec.ID],
 			})
 		}
 	}
@@ -206,6 +221,7 @@ func (m *Manager) Download(ctx context.Context, modelID string) (<-chan ModelSta
 		cancel:   cancel,
 		channels: []chan ModelStatus{statusCh},
 	}
+	delete(m.lastErrors, modelID)
 	m.active[modelID] = session
 	m.mu.Unlock()
 
@@ -234,11 +250,13 @@ func (m *Manager) runDownload(ctx context.Context, spec ModelSpec, session *down
 		if err != nil {
 			session.status.Downloading = false
 			session.status.Error = err.Error()
+			m.lastErrors[spec.ID] = err.Error()
 		} else {
 			session.status.Downloading = false
 			session.status.Installed = true
 			session.status.Progress = 1.0
 			session.status.Error = ""
+			delete(m.lastErrors, spec.ID)
 		}
 		finalStatus := session.status
 		for _, ch := range session.channels {

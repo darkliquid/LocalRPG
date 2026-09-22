@@ -2,9 +2,13 @@
 package gui
 
 import (
+	"archive/tar"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -12,9 +16,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/models"
 )
 
 func TestGUIServerRoutes(t *testing.T) {
@@ -871,4 +877,79 @@ func TestModelManagementEndpoints(t *testing.T) {
 		t.Fatalf("expected at least 1 registered model, got 0")
 	}
 }
+
+func TestModelDownloadEndpointOutlivesRequestCancellation(t *testing.T) {
+	_, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	// Build mock tar
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	content := "fake weights"
+	_ = tw.WriteHeader(&tar.Header{Name: "model.onnx", Mode: 0644, Size: int64(len(content))})
+	_, _ = tw.Write([]byte(content))
+	_ = tw.Close()
+	tarData := buf.Bytes()
+	sum := sha256.Sum256(tarData)
+	checksum := hex.EncodeToString(sum[:])
+
+	mockHTTP := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(30 * time.Millisecond) // ensure download is still running when request finishes
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(tarData)))
+		_, _ = w.Write(tarData)
+	}))
+	defer mockHTTP.Close()
+
+	svc.modelsManager.RegisterSpec(models.ModelSpec{
+		ID:            "test-outlive",
+		Name:          "Test Outlive",
+		URL:           mockHTTP.URL,
+		SHA256:        checksum,
+		SizeBytes:     int64(len(tarData)),
+		ArchiveType:   "tar",
+		Subdir:        "test-outlive",
+		RequiredFiles: []string{"model.onnx"},
+	})
+
+	reqCtx, cancelReq := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodPost, "/api/models/test-outlive/download", nil).WithContext(reqCtx)
+	rec := httptest.NewRecorder()
+
+	events := svc.SubscribeModelEvents()
+	defer svc.UnsubscribeModelEvents(events)
+
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202 Accepted, got %d", rec.Code)
+	}
+
+	// Immediately cancel request context to simulate net/http request termination
+	cancelReq()
+
+	// Wait for download to finish
+	var finalStatus models.ModelStatus
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			if ev.ID == "test-outlive" {
+				finalStatus = ev
+				if !ev.Downloading {
+					goto finished
+				}
+			}
+		case <-timeout:
+			t.Fatal("download did not finish within deadline")
+		}
+	}
+finished:
+
+	if finalStatus.Error != "" {
+		t.Fatalf("expected download to succeed without cancellation error, got: %s", finalStatus.Error)
+	}
+	if !finalStatus.Installed {
+		t.Fatalf("expected model to be installed")
+	}
+}
+
 

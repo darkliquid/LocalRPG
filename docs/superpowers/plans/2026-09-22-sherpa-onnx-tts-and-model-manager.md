@@ -575,8 +575,8 @@ func (m *Manager) registerDefaultSpecs() {
 		ID:          "kokoro-tts",
 		Name:        "Kokoro Voice Pack",
 		URL:         "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-en-v0_19.tar.bz2",
-		SHA256:      "a3d3c82e666c0d0a2dbe5429399432d67786440dbd06b539bf58778f654b50c0",
-		SizeBytes:   90177536,
+		SHA256:      "912804855a04745fa77a30be545b3f9a5d15c4d66db00b88cbcd4921df605ac7",
+		SizeBytes:   319625534,
 		ArchiveType: "tar.bz2",
 		Subdir:      filepath.Join("tts", "kokoro"),
 		RequiredFiles: []string{

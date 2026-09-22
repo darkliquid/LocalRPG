@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -827,7 +828,7 @@ func (s *Server) handleModelsRoutes(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(path, "/")
 	if len(parts) == 2 && parts[1] == "download" && r.Method == http.MethodPost {
 		modelID := parts[0]
-		if err := s.service.DownloadModel(r.Context(), modelID); err != nil {
+		if err := s.service.DownloadModel(context.WithoutCancel(r.Context()), modelID); err != nil {
 			if errors.Is(err, models.ErrDownloadActive) {
 				http.Error(w, err.Error(), http.StatusConflict)
 				return
