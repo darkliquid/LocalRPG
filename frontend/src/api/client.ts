@@ -50,6 +50,26 @@ export class APIClient {
     return res.json();
   }
 
+  static async deleteGame(gameID: string): Promise<void> {
+    const res = await fetch(`/api/game/${gameID}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`deleteGame: ${res.statusText}`);
+  }
+
+  static async restartGame(gameID: string): Promise<GameSummary> {
+    const res = await fetch(`/api/game/${gameID}/restart`, { method: 'POST' });
+    if (!res.ok) throw new Error(`restartGame: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async updateGameSettings(gameID: string, patch: { opening_prompt?: string }): Promise<void> {
+    const res = await fetch(`/api/game/${gameID}/settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) throw new Error(`updateGameSettings: ${res.statusText}`);
+  }
+
   static async getSystem(id: string): Promise<SystemDetail> {
     const res = await fetch(`/api/system/${id}`);
     if (!res.ok) throw new Error(`getSystem: ${res.statusText}`);

@@ -91,6 +91,7 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({
       {/* Input Bar with STT and Submit */}
       <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <input
+          id="action-console-input"
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}

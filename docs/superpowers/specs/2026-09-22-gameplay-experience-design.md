@@ -63,6 +63,8 @@ The goal is not a feature list. It is that a first-time player can press **New C
 | Player identity | The manifest stores the **entity ID**; a display name lives on the note. A resolver tolerates legacy display-name values |
 | Character presence | Creation always writes a player note with a description; the Characters drawer offers a recovery action if it cannot be resolved |
 | Streaming preference | `preferences.streaming` becomes real: off means one blocking request behind a spinner |
+| Delete | Permanently removes `games/<id>/`. Confirmed inline before it runs; refused with `409` while a turn is in flight |
+| Restart | Discards history, the index, and entities created during play, then re-creates the campaign from its system, world, protagonist, opening prompt, and pinned start location. The generated media cache is left alone |
 
 ---
 
@@ -548,3 +550,43 @@ Manual verification: create a campaign with an opening prompt and a spaced prota
 3. **Prose and speech** — `MarkdownProse`, prompt changes, sanitizer, parser, playback.
 4. **Draft UX** — stop/retry/continue, status events, elapsed timer, streaming preference.
 5. **Polish** — character recovery, latest-first resume, advanced voice view, TUI parity.
+
+Shipped so far: increment 1 in full; increment 2's opening turn, settings patch, and Prologue screen (the creation-wizard fields are still outstanding); plus the campaign lifecycle below, which was not in the original increment list.
+
+---
+
+## 16. Campaign Lifecycle
+
+A campaign began but could never be removed or started over, which left a bad opening with no recovery short of editing the filesystem.
+
+### 16.1 Delete
+
+`DELETE /api/game/{id}` removes `games/<id>/` and returns `204`. It takes the campaign's turn lock with a non-blocking `TryLock` so a turn in flight is refused with `409` rather than having its directory deleted underneath it, then evicts the pooled database handle before removing the files.
+
+The launcher confirms inline, naming the campaign and stating that history, characters, and generated scenes go with it. There is no trash or undo; the media cache under `cache/` is shared and is left in place.
+
+### 16.2 Restart
+
+`POST /api/game/{id}/restart` returns the campaign to its opening state and replies with the same `GameSummaryDTO` the list route uses. It:
+
+1. takes the turn lock,
+2. reads the manifest, the resolved protagonist's display name and note body, the pinned `start_location`, and `opening_prompt`,
+3. evicts the pooled handle and removes the campaign directory,
+4. re-creates the campaign through `engine.InitGame`, and
+5. restores the pinned start location and opening prompt through the settings patch path.
+
+The result is a campaign with an empty chronicle, the world's templates freshly copied, a regenerated opening scene, and the same title, system, world, protagonist, and prompt. The launcher confirms inline before running it.
+
+### 16.3 Why re-create rather than truncate
+
+Deleting and re-initialising reuses the one code path that is already tested for campaign creation, so restart cannot drift from a fresh campaign. Truncating in place would need its own entity-pruning, index-reset, and note-rewriting logic, and would have to stay correct as those layers change.
+
+### 16.4 Endpoints
+
+| Method | Path | Result |
+| --- | --- | --- |
+| `DELETE` | `/api/game/{id}` | `204`, or `404` when absent, or `409` while a turn is in flight |
+| `POST` | `/api/game/{id}/restart` | `200` with the campaign summary |
+| `PATCH` | `/api/game/{id}/settings` | `204`; currently accepts `opening_prompt` |
+
+---

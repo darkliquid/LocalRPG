@@ -12,6 +12,8 @@ export interface GameState {
   arcs: Array<{ id: string; name: string; progress: number; max_progress: number; status: string }>;
   clocks: Array<{ faction: string; name: string; ticks: number; max_ticks: number }>;
   locations: string[];
+  // The player's own instruction for the campaign's opening scene, when set.
+  opening_prompt?: string;
 }
 
 export interface TurnSegment {

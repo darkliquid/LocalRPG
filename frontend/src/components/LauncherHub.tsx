@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
 import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types';
-import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen, AlertCircle, Settings } from 'lucide-react';
+import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen, AlertCircle, Settings, RotateCcw, Trash2 } from 'lucide-react';
 import { SystemsStudio } from './SystemsStudio';
 import { WorldsStudio } from './WorldsStudio';
 import { SettingsStudio } from './SettingsStudio';
@@ -25,6 +25,10 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const [newWorldID, setNewWorldID] = useState('');
   const [newPlayerName, setNewPlayerName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // A destructive campaign action is confirmed inline rather than with a browser
+  // dialog, so the launcher keeps its own styling and stays usable inside Wails.
+  const [pendingAction, setPendingAction] = useState<{ type: 'restart' | 'delete'; id: string } | null>(null);
+  const [busyGameID, setBusyGameID] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -84,6 +88,28 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
 
   const selectedWorld = worlds.find((w) => w.id === newWorldID);
   const latestGame = games.length > 0 ? games[0] : null;
+
+  const runPendingAction = async () => {
+    if (!pendingAction) return;
+    const { type, id } = pendingAction;
+    setBusyGameID(id);
+    setError(null);
+    try {
+      if (type === 'delete') {
+        await APIClient.deleteGame(id);
+      } else {
+        await APIClient.restartGame(id);
+      }
+      setPendingAction(null);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || `Failed to ${type} campaign`);
+    } finally {
+      setBusyGameID(null);
+    }
+  };
+
+  const pendingGame = pendingAction ? games.find((g) => g.id === pendingAction.id) : null;
 
   return (
     <div className="relative flex flex-col h-screen overflow-hidden text-stone-200 p-6 md:p-8 select-none">
@@ -291,9 +317,33 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
                       <User className="w-3.5 h-3.5 text-stone-500 group-hover:text-amber-400 transition-colors" />
                       <span className="font-sans truncate max-w-[120px]">{g.player_name}</span>
                     </div>
-                    <div className="flex items-center gap-1 text-[11px] text-amber-500/80 group-hover:text-amber-400">
-                      <span>Launch</span>
-                      <Play className="w-3 h-3 fill-current" />
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPendingAction({ type: 'restart', id: g.id });
+                        }}
+                        disabled={busyGameID === g.id}
+                        title="Restart this campaign from its opening scene"
+                        className="p-1.5 rounded-lg text-stone-400 hover:text-amber-300 hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-40"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPendingAction({ type: 'delete', id: g.id });
+                        }}
+                        disabled={busyGameID === g.id}
+                        title="Delete this campaign"
+                        className="p-1.5 rounded-lg text-stone-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-40"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="flex items-center gap-1 text-[11px] text-amber-500/80 group-hover:text-amber-400 ml-1">
+                        <span>Launch</span>
+                        <Play className="w-3 h-3 fill-current" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -318,6 +368,58 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
       </div>
     )}
   </main>
+
+      {/* Destructive Campaign Action Confirmation */}
+      {pendingAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-stone-900/95 border border-red-500/40 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-2 font-cinzel font-bold text-red-400">
+              <AlertCircle className="w-5 h-5" />
+              <span>{pendingAction.type === 'delete' ? 'Delete Campaign' : 'Restart Campaign'}</span>
+            </div>
+            <p className="text-sm text-stone-300">
+              {pendingAction.type === 'delete' ? (
+                <>
+                  This permanently deletes{' '}
+                  <span className="text-amber-300 font-semibold">{pendingGame?.name || pendingAction.id}</span>, including its
+                  history, characters, and generated scenes. This cannot be undone.
+                </>
+              ) : (
+                <>
+                  This rewinds{' '}
+                  <span className="text-amber-300 font-semibold">{pendingGame?.name || pendingAction.id}</span> to its opening
+                  scene. Its history, characters created during play, and generated scenes are discarded. The world, rule
+                  system, protagonist, and opening prompt are kept.
+                </>
+              )}
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                onClick={() => setPendingAction(null)}
+                disabled={busyGameID === pendingAction.id}
+                className="text-xs font-cinzel px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={runPendingAction}
+                disabled={busyGameID === pendingAction.id}
+                className={`text-xs font-cinzel font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer disabled:opacity-50 ${
+                  pendingAction.type === 'delete'
+                    ? 'bg-red-700 hover:bg-red-600 text-white'
+                    : 'bg-amber-600 hover:bg-amber-500 text-stone-950'
+                }`}
+              >
+                {busyGameID === pendingAction.id
+                  ? 'Working...'
+                  : pendingAction.type === 'delete'
+                  ? 'Delete Campaign'
+                  : 'Restart Campaign'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Campaign Creation Wizard Modal */}
       {isWizardOpen && (

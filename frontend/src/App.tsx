@@ -12,6 +12,7 @@ import { LivingWorldDrawer } from './components/LivingWorldDrawer';
 import { StoryTheater } from './components/StoryTheater';
 import { LauncherHub } from './components/LauncherHub';
 import { SettingsStudio } from './components/SettingsStudio';
+import { ProloguePanel } from './components/ProloguePanel';
 import { User, Network, BookOpen, Clock, Film, Compass, Settings, X } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -117,6 +118,24 @@ export const App: React.FC = () => {
   const handleStopTurn = () => {
     abortRef.current?.abort();
     setStreamedProse('');
+  };
+
+  // Beginning the story saves the player's opening prompt and then runs the
+  // campaign's first turn in the reserved Opening mode, so the GM establishes
+  // the scene before the player is asked for anything.
+  const handleBeginStory = async (prompt: string) => {
+    if (!client || !activeGameID || turnInFlight) return;
+    try {
+      await APIClient.updateGameSettings(activeGameID, { opening_prompt: prompt });
+      setGameState((prev) => (prev ? { ...prev, opening_prompt: prompt } : prev));
+    } catch (err) {
+      console.error('save opening prompt:', err);
+    }
+    await handleActionSubmit('Opening', '');
+  };
+
+  const handleBeginWithAction = () => {
+    document.getElementById('action-console-input')?.focus();
   };
 
   const handleSaveEntity = async (entityId: string, markdown: string) => {
@@ -233,20 +252,50 @@ export const App: React.FC = () => {
           {/* Main Floating Translucent Chronicle & Action Container */}
           <main className="relative z-10 flex-1 overflow-hidden mx-6 mb-4 flex flex-col">
             <div className="flex-1 bg-glass-card rounded-2xl flex flex-col overflow-hidden shadow-2xl">
-              <ChronicleView
-                turns={chronicle}
-                onWikilinkClick={handleOpenWikilink}
-                autoPlay={config?.media.tts.auto_play ?? false}
-                volume={config?.media.tts.master_volume ?? 1}
-              />
-              {streamedProse && (
-                <div className="p-4 border-t border-white/5 bg-black/20">
-                  <TurnSegments
-                    segments={[{ kind: 'narration', text: streamedProse }]}
-                    fallback={streamedProse}
-                    onEntityClick={handleOpenWikilink}
+              {chronicle.length === 0 ? (
+                gameState ? (
+                  streamedProse ? (
+                    <div className="flex-1 overflow-y-auto px-8 py-6">
+                      <TurnSegments
+                        segments={[{ kind: 'narration', text: streamedProse }]}
+                        fallback={streamedProse}
+                        onEntityClick={handleOpenWikilink}
+                      />
+                    </div>
+                  ) : (
+                    <ProloguePanel
+                      key={activeGameID ?? 'prologue'}
+                      gameName={gameState.game_name || activeGameID || ''}
+                      playerName={gameState.player?.name}
+                      initialPrompt={gameState.opening_prompt || ''}
+                      busy={turnInFlight}
+                      onBeginStory={handleBeginStory}
+                      onBeginWithAction={handleBeginWithAction}
+                    />
+                  )
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-stone-500 font-mono text-sm animate-pulse">
+                    Opening the chronicle...
+                  </div>
+                )
+              ) : (
+                <>
+                  <ChronicleView
+                    turns={chronicle}
+                    onWikilinkClick={handleOpenWikilink}
+                    autoPlay={config?.media.tts.auto_play ?? false}
+                    volume={config?.media.tts.master_volume ?? 1}
                   />
-                </div>
+                  {streamedProse && (
+                    <div className="p-4 border-t border-white/5 bg-black/20">
+                      <TurnSegments
+                        segments={[{ kind: 'narration', text: streamedProse }]}
+                        fallback={streamedProse}
+                        onEntityClick={handleOpenWikilink}
+                      />
+                    </div>
+                  )}
+                </>
               )}
               <ActionConsole
                 onSubmit={handleActionSubmit}
