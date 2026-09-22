@@ -291,7 +291,8 @@ Every event is a name plus structured fields. Values are typed; payloads are tru
 | `generation.complete` | narration_chars, finish_reason, truncated |
 | `segment.build` | count, kinds[], speakers[], unresolved[] |
 | `extraction.request` | role, prompt (full only) |
-| `extraction.result` | entities[], dialogue[], player_location, matched[], created[] |
+| `extraction.result` | entities[], dialogue[], player_location |
+| `extraction.reconcile` | matched[], created[] |
 | `continuity.check` | findings[] |
 | `provider.wire` | role, direction, line, truncated (full only; bounded by the payload cap) |
 | `record.turn` | number, location, entities, outcome, bytes |

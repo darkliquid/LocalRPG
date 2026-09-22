@@ -14,6 +14,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 // ErrGenerationStalled reports that the gm provider stopped sending deltas for
@@ -69,6 +70,7 @@ type TurnOrchestrator struct {
 	extractor     *harness.Extractor
 	chunkTimeout  time.Duration
 	openingPrompt string
+	logger        trace.Logger
 }
 
 func NewTurnOrchestrator(
@@ -108,6 +110,13 @@ func (o *TurnOrchestrator) SetChunkTimeout(timeout time.Duration) {
 		timeout = defaultChunkTimeout
 	}
 	o.chunkTimeout = timeout
+}
+
+// SetLogger attaches a trace sink. A nil logger records nothing. The assembler is
+// told too, because it emits context.assembled from inside itself.
+func (o *TurnOrchestrator) SetLogger(logger trace.Logger) {
+	o.logger = trace.OrNil(logger)
+	o.assembler.SetLogger(o.logger)
 }
 
 // SetContextLimits applies the configured prompt budget and recall window.
@@ -203,6 +212,13 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		return nil, fmt.Errorf("load history: %w", err)
 	}
 	turnNum := len(pastTurns) + 1
+
+	o.logger = trace.OrNil(o.logger)
+	o.logger.Event("turn.begin", map[string]interface{}{
+		"number":      turnNum,
+		"mode":        mode,
+		"input_chars": len([]rune(actionInput)),
+	})
 
 	var rollRes *rules.RollResult
 	var outcome string
@@ -333,6 +349,12 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		return nil, fmt.Errorf("gm generation failed: %w", err)
 	}
 
+	o.logger.Event("generation.complete", map[string]interface{}{
+		"narration_chars": len([]rune(narration)),
+		"finish_reason":   finishReason,
+		"truncated":       finishReason == "length",
+	})
+
 	turn := Turn{
 		Number:       turnNum,
 		Timestamp:    time.Now(),
@@ -361,6 +383,12 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
+	o.logger.Event("segment.build", map[string]interface{}{
+		"count":      len(turn.Segments),
+		"kinds":      segmentKinds(turn.Segments),
+		"speakers":   segmentSpeakers(turn.Segments),
+		"unresolved": unresolvedSpeakers(turn.Segments),
+	})
 	for _, mention := range speechMentions(turn.Segments) {
 		if !containsMention(turn.Entities, mention.ID) {
 			turn.Entities = append(turn.Entities, mention)
@@ -384,9 +412,38 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		return nil, fmt.Errorf("turn cancelled: %w", err)
 	}
 
+	// MatchExistingEntity answers whether a note already exists, so a turn's trace
+	// can say which beings it introduced rather than only which it mentioned.
+	matched := make([]string, 0, len(extraction.Entities))
+	created := make([]string, 0, len(extraction.Entities))
+	for i := range extraction.Entities {
+		proposed := extraction.Entities[i]
+		if existing := harness.MatchExistingEntity(o.store, &proposed); existing != nil {
+			matched = append(matched, existing.ID)
+			continue
+		}
+		id := proposed.ID
+		if id == "" {
+			id = entity.Slugify(proposed.Name)
+		}
+		created = append(created, id)
+	}
+	o.logger.Event("extraction.reconcile", map[string]interface{}{
+		"matched": matched,
+		"created": created,
+	})
+
 	if err := o.timeline.RecordTurn(&turn, extraction.Entities); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
 	}
+
+	o.logger.Event("record.turn", map[string]interface{}{
+		"number":          turn.Number,
+		"location":        turn.Location,
+		"entities":        len(turn.Entities),
+		"outcome":         turn.Outcome,
+		"narration_chars": len([]rune(turn.Narration)),
+	})
 
 	// Trigger post-turn hooks
 	if o.rulesEngine != nil {
@@ -474,4 +531,32 @@ func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk 
 			}
 		}
 	}
+}
+
+func segmentKinds(segments []entity.TurnSegment) []string {
+	kinds := make([]string, 0, len(segments))
+	for _, segment := range segments {
+		kinds = append(kinds, segment.Kind)
+	}
+	return kinds
+}
+
+func segmentSpeakers(segments []entity.TurnSegment) []string {
+	speakers := make([]string, 0, len(segments))
+	for _, segment := range segments {
+		if segment.Speaker != "" {
+			speakers = append(speakers, segment.Speaker)
+		}
+	}
+	return speakers
+}
+
+func unresolvedSpeakers(segments []entity.TurnSegment) []string {
+	unresolved := make([]string, 0)
+	for _, segment := range segments {
+		if segment.Kind == entity.SegmentSpeech && segment.SpeakerID == "" {
+			unresolved = append(unresolved, segment.Speaker)
+		}
+	}
+	return unresolved
 }

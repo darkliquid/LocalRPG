@@ -100,14 +100,17 @@ func (m *Memory) Enabled(level Level) bool {
 	return m.level != LevelOff && level <= m.level
 }
 
+// Event behaves like a real sink apart from the disk: nothing is recorded when
+// tracing is off, and payloads are dropped below full. Tests therefore assert the
+// same filtering a written trace would have.
 func (m *Memory) Event(name string, fields map[string]interface{}) {
-	if m == nil {
+	if m == nil || m.level == LevelOff {
 		return
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	stamped := fields
+	stamped := Sanitize(fields, m.level, defaultPayloadChars)
 	if m.game != "" {
 		stamped = make(map[string]interface{}, len(fields)+1)
 		for key, value := range fields {

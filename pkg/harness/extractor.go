@@ -300,8 +300,16 @@ func (e *Extractor) Extract(ctx context.Context, narrativeOutput string) (*Extra
 		Prompt: narrativeOutput,
 	}
 
+	e.logger = trace.OrNil(e.logger)
+	e.logger.Event("extraction.request", map[string]interface{}{
+		"role":         e.id,
+		"prompt":       narrativeOutput,
+		"prompt_chars": len([]rune(narrativeOutput)),
+	})
+
 	res, err := e.model.Generate(ctx, req)
 	if err != nil {
+		e.logger.Event("provider.error", map[string]interface{}{"role": e.id, "error": err.Error()})
 		return nil, fmt.Errorf("extractor model failed: %w", err)
 	}
 
@@ -318,6 +326,12 @@ func (e *Extractor) Extract(ctx context.Context, narrativeOutput string) (*Extra
 		if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
 			return nil, fmt.Errorf("parse extracted json %q: %w", cleaned, err)
 		}
+		e.logger.Event("extraction.result", map[string]interface{}{
+			"role":            e.id,
+			"entities":        len(result.Entities),
+			"dialogue":        len(result.Dialogue),
+			"player_location": result.PlayerLocation,
+		})
 		return &result, nil
 	}
 

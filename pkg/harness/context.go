@@ -6,6 +6,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 // ContextLimits bounds what an assembled prompt may contain. A budget is what
@@ -51,6 +52,7 @@ type AssembleResult struct {
 type ContextAssembler struct {
 	store  *storage.Store
 	limits ContextLimits
+	logger trace.Logger
 }
 
 func NewContextAssembler(store *storage.Store) *ContextAssembler {
@@ -60,6 +62,11 @@ func NewContextAssembler(store *storage.Store) *ContextAssembler {
 // SetLimits applies the campaign's context budget to every later assembly.
 func (c *ContextAssembler) SetLimits(limits ContextLimits) {
 	c.limits = limits
+}
+
+// SetLogger attaches a trace sink. A nil logger records nothing.
+func (c *ContextAssembler) SetLogger(logger trace.Logger) {
+	c.logger = trace.OrNil(logger)
 }
 
 func (c *ContextAssembler) AssembleContext(locationID, playerID, playerAction string) (string, error) {
@@ -223,11 +230,24 @@ func (c *ContextAssembler) AssembleContextWithProfiles(locationID, playerID, pla
 	}
 
 	prompt := head.String() + catalog + recall + base
-	return AssembleResult{
+	result := AssembleResult{
 		Prompt:          prompt,
 		EstimatedTokens: estimateTokens(prompt),
 		Trimmed:         trimmed,
-	}, nil
+	}
+
+	// The prompt is recorded here and nowhere else. Everything downstream refers
+	// to it by hash, so the trace holds one copy rather than one per call site.
+	c.logger = trace.OrNil(c.logger)
+	c.logger.Event("context.assembled", map[string]interface{}{
+		"estimated_tokens": result.EstimatedTokens,
+		"budget":           c.limits.TokenBudget,
+		"trimmed":          trimmed,
+		"recall_turns":     len(turns),
+		"prompt":           prompt,
+	})
+
+	return result, nil
 }
 
 // formatRecentTurns renders the tail of the timeline for the narrator. It is a

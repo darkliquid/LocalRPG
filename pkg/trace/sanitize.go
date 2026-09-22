@@ -5,6 +5,10 @@ import (
 	"strings"
 )
 
+// defaultPayloadChars caps a recorded string when a sink is built without a
+// configured limit.
+const defaultPayloadChars = 20000
+
 // payloadFields hold the substance of an event: the things whose content is the
 // reason to look. They are recorded at full only, so summary stays a genuine
 // "what happened and how fast" level.
@@ -38,7 +42,7 @@ var secretFields = map[string]bool{
 // careless call site cannot leak a key.
 func Sanitize(fields map[string]interface{}, level Level, payloadChars int) map[string]interface{} {
 	if payloadChars <= 0 {
-		payloadChars = 20000
+		payloadChars = defaultPayloadChars
 	}
 	return sanitizeMap(fields, level, payloadChars)
 }
