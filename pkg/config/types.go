@@ -68,6 +68,11 @@ type AgentsConfig struct {
 	// Zero disables summarisation, so a campaign can opt out entirely.
 	SummaryEvery     int `yaml:"summary_every" json:"summary_every"`
 	SummaryCharLimit int `yaml:"summary_char_limit" json:"summary_char_limit"`
+	// ThreadIdleTurns is when the UI nudges about a thread. It is presentation only:
+	// the prompt always lists unresolved threads, however long they have been quiet.
+	ThreadIdleTurns int `yaml:"thread_idle_turns" json:"thread_idle_turns"`
+	// ThreadsMax caps the open-threads block, most stale first.
+	ThreadsMax int `yaml:"threads_max" json:"threads_max"`
 }
 
 type VoiceProfile struct {
@@ -388,4 +393,20 @@ func (c *Config) SummaryCharLimit() int {
 		return 2000
 	}
 	return c.Agents.SummaryCharLimit
+}
+
+// ThreadIdleTurns is when the UI nudges about an unresolved thread.
+func (c *Config) ThreadIdleTurns() int {
+	if c.Agents.ThreadIdleTurns <= 0 {
+		return 10
+	}
+	return c.Agents.ThreadIdleTurns
+}
+
+// ThreadsMax caps how many open threads the prompt carries.
+func (c *Config) ThreadsMax() int {
+	if c.Agents.ThreadsMax <= 0 {
+		return 8
+	}
+	return c.Agents.ThreadsMax
 }

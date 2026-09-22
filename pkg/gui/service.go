@@ -1002,6 +1002,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		RetrievalChars:    cfg.RetrievalChars(),
 		RetrievalHalflife: cfg.RetrievalHalfLifeTurns(),
 	})
+	orchestrator.SetThreadsMax(cfg.ThreadsMax())
 
 	return &TurnSession{
 		service:      s,

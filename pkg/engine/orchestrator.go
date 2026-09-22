@@ -31,6 +31,9 @@ const OpeningMode = "Opening"
 // defaultChunkTimeout is the silence tolerated between deltas when a caller sets none.
 const defaultChunkTimeout = 60 * time.Second
 
+// defaultThreadsMax caps how many open threads the prompt carries when unset.
+const defaultThreadsMax = 8
+
 // OpeningPrompt reads a campaign's configured opening instruction, or "" when
 // the GM should invent the scene.
 func OpeningPrompt(manifest *core.GameManifest) string {
@@ -72,6 +75,7 @@ type TurnOrchestrator struct {
 	openingPrompt string
 	logger        trace.Logger
 	chronicler    *Chronicler
+	threadsMax    int
 }
 
 func NewTurnOrchestrator(
@@ -150,6 +154,19 @@ func (o *TurnOrchestrator) SetContextLimits(limits harness.ContextLimits) {
 // campaign's first turn runs in OpeningMode.
 func (o *TurnOrchestrator) SetOpeningPrompt(prompt string) {
 	o.openingPrompt = prompt
+}
+
+// SetThreadsMax caps how many open threads the prompt carries.
+func (o *TurnOrchestrator) SetThreadsMax(max int) {
+	o.threadsMax = max
+}
+
+// threadsCap is the configured cap, or a sane one when nothing set it.
+func (o *TurnOrchestrator) threadsCap() int {
+	if o.threadsMax <= 0 {
+		return defaultThreadsMax
+	}
+	return o.threadsMax
 }
 
 // currentLocation resolves where this turn is happening. The player note wins
@@ -392,6 +409,19 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 
+	// Open threads are canon, so they are built whether or not anything in the scene
+	// touches them: a thread the party has walked away from is the one most likely to
+	// be forgotten.
+	threads := make([]string, 0)
+	if open, err := OpenThreads(o.store, turnNum); err == nil {
+		for index, thread := range open {
+			if index == o.threadsCap() {
+				break
+			}
+			threads = append(threads, fmt.Sprintf("%s (%s, last advanced %d turns ago)", thread.Name, thread.Status, thread.Idle))
+		}
+	}
+
 	assembly, err := o.assembler.Assemble(harness.ContextRequest{
 		LocationID:  locationID,
 		PlayerID:    o.playerID,
@@ -402,6 +432,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Recent:      recent,
 		TurnNumber:  turnNum,
 		Summary:     summary,
+		Threads:     threads,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)

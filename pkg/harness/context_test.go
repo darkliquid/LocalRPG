@@ -743,3 +743,27 @@ func TestEstablishedNamesListAliases(t *testing.T) {
 		t.Errorf("expected the alias in the established names:\n%s", result.Prompt)
 	}
 }
+
+func TestOpenThreadsAreAlwaysInThePrompt(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+
+	result, err := assembler.Assemble(ContextRequest{
+		Action: "I ask about the fog",
+		// Canon is never trimmed, so an idle thread reaches the narrator even under
+		// a budget that is far too small for the rest.
+		Threads: []string{"The Creeping Miasma (open, last advanced 7 turns ago)"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(result.Prompt, "OPEN THREADS") || !strings.Contains(result.Prompt, "Creeping Miasma") {
+		t.Fatalf("expected the thread in canon:\n%s", result.Prompt)
+	}
+
+	for _, section := range result.Sections {
+		if section.Name == "canon" && !section.Included {
+			t.Errorf("canon was trimmed, which must never happen")
+		}
+	}
+}

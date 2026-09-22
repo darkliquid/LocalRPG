@@ -69,6 +69,10 @@ type ContextRequest struct {
 	// Summary is the campaign's recollection of everything older than the recall
 	// window. It is lossy, so it is stated as subordinate to canon.
 	Summary string
+	// Threads are the unresolved arcs, already rendered with their idle counts. They
+	// are canon, so they are never trimmed: a thread goes quiet precisely when the
+	// narrator should be prompted to return to it.
+	Threads []string
 }
 
 // SectionStat reports one section's cost so a trace can explain the prompt.
@@ -224,6 +228,13 @@ func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, error) {
 
 	if names := c.establishedNames(req); names != "" {
 		sb.WriteString("\n" + names)
+	}
+
+	if len(req.Threads) > 0 {
+		sb.WriteString("\n## OPEN THREADS\n")
+		for _, thread := range req.Threads {
+			sb.WriteString("- " + thread + "\n")
+		}
 	}
 
 	return sb.String(), nil
