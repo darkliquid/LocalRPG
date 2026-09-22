@@ -18,6 +18,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/darkliquid/localrpg/pkg/trace"
 	"github.com/darkliquid/mago"
 	"github.com/gopxl/beep"
 	beepmp3 "github.com/gopxl/beep/mp3"
@@ -60,6 +61,7 @@ type Player struct {
 	gain     float64
 	scratch  [][2]float64
 	closeErr error
+	logger   trace.Logger
 	// generation identifies the current queue. Streamer values hold functions
 	// and are not comparable, so a queue is identified by a counter instead.
 	generation uint64
@@ -122,6 +124,16 @@ func openWith(volume float64, backends []mago.Backend) (*Player, error) {
 	}
 
 	return player, nil
+}
+
+// SetLogger attaches a trace sink. A nil logger records nothing.
+func (p *Player) SetLogger(logger trace.Logger) {
+	if p == nil {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.logger = trace.OrNil(logger)
 }
 
 // Available reports whether a device is open.
@@ -188,7 +200,14 @@ func (p *Player) PlayFiles(paths []string) error {
 	p.streamer = queue
 	p.closers = closers
 	p.playing = true
+	logger := trace.OrNil(p.logger)
+	gain := p.gain
 	p.mu.Unlock()
+
+	logger.Event("audio.play", map[string]interface{}{
+		"clips":  len(streamers),
+		"volume": gain,
+	})
 
 	go closeAll(previous)
 	return nil

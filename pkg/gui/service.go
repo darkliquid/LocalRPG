@@ -25,6 +25,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/trace"
 	"gopkg.in/yaml.v3"
 )
 
@@ -40,6 +41,12 @@ type Service struct {
 	// requests never need it.
 	playerOnce sync.Once
 	player     *playback.Player
+	logger     trace.Logger
+}
+
+// SetLogger attaches a trace sink to the service and to every turn it prepares.
+func (s *Service) SetLogger(logger trace.Logger) {
+	s.logger = trace.OrNil(logger)
 }
 
 func NewService(rootDir string) *Service {
@@ -804,10 +811,27 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 	providerParams := cfg.Media.Image.Type + ":" + cfg.Media.Image.Model
 	store := media.NewArtStore(client, media.NewContentCache(s.resolver.CacheDir()), worldStyle, providerParams)
 
+	start := time.Now()
+	s.logger = trace.OrNil(s.logger)
+	s.logger.Event("media.image.request", map[string]interface{}{
+		"location": locationID,
+		"provider": providerParams,
+		"force":    force,
+	})
+
 	path, err := store.SceneArt(ctx, location, force)
 	if err != nil {
+		s.logger.Event("provider.error", map[string]interface{}{"role": "image", "error": err.Error()})
 		return "", "", err
 	}
+
+	if data, err := os.ReadFile(path); err == nil {
+		s.logger.Event("media.image.result", map[string]interface{}{
+			"bytes":       len(data),
+			"duration_ms": time.Since(start).Milliseconds(),
+		})
+	}
+
 	return path, contentTypeForArt(path), nil
 }
 
@@ -1738,5 +1762,22 @@ func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string
 		return "", fmt.Errorf("initialize STT client: %w", err)
 	}
 
-	return client.Transcribe(ctx, audioData)
+	start := time.Now()
+	s.logger = trace.OrNil(s.logger)
+	s.logger.Event("media.stt.request", map[string]interface{}{
+		"provider": cfg.Media.STT.Type,
+		"bytes":    len(audioData),
+	})
+
+	text, err := client.Transcribe(ctx, audioData)
+	if err != nil {
+		s.logger.Event("provider.error", map[string]interface{}{"role": "stt", "error": err.Error()})
+		return "", err
+	}
+
+	s.logger.Event("media.stt.result", map[string]interface{}{
+		"chars":       len([]rune(text)),
+		"duration_ms": time.Since(start).Milliseconds(),
+	})
+	return text, nil
 }

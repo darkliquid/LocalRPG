@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/dialogue"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 // narratorSpeaker is the cache namespace for lines read in the narrator voice.
@@ -85,6 +87,12 @@ type TTSClient interface {
 type TTSPipeline struct {
 	client TTSClient
 	cache  *ContentCache
+	logger trace.Logger
+}
+
+// SetLogger attaches a trace sink. A nil logger records nothing.
+func (p *TTSPipeline) SetLogger(logger trace.Logger) {
+	p.logger = trace.OrNil(logger)
 }
 
 // SynthesizeSegments renders every segment with its speaker's voice, falling back
@@ -144,7 +152,27 @@ func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string,
 	}
 
 	base := ComputeAudioCacheKey(speakerID, voiceHash, text)
+	start := time.Now()
+
+	voiceID, pitch, rate := "", 0.0, 0.0
+	if voice != nil {
+		voiceID, pitch, rate = voice.VoiceID, voice.Pitch, voice.SpeechRate
+	}
+	p.logger = trace.OrNil(p.logger)
+	p.logger.Event("media.tts.request", map[string]interface{}{
+		"speaker":   speakerID,
+		"voice_id":  voiceID,
+		"pitch":     pitch,
+		"rate":      rate,
+		"chars":     len([]rune(text)),
+		"cache_key": base,
+	})
+
 	if path, ok := p.cachedClip(base); ok {
+		p.logger.Event("media.tts.result", map[string]interface{}{
+			"cache_hit":   true,
+			"duration_ms": time.Since(start).Milliseconds(),
+		})
 		return path, nil
 	}
 
@@ -152,6 +180,13 @@ func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string,
 	if err != nil {
 		return "", fmt.Errorf("synthesize utterance: %w", err)
 	}
+
+	p.logger.Event("media.tts.result", map[string]interface{}{
+		"cache_hit":    false,
+		"bytes":        len(audioBytes),
+		"content_type": AudioContentType(audioBytes),
+		"duration_ms":  time.Since(start).Milliseconds(),
+	})
 
 	return p.cache.Put("audio", base+AudioExtension(audioBytes), audioBytes)
 }

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/trace"
 	"github.com/darkliquid/mago"
 )
 
@@ -157,5 +158,32 @@ func TestPlayerWithoutADeviceReportsUnavailable(t *testing.T) {
 	}
 	if err := player.PlayFiles(nil); !errors.Is(err, ErrUnavailable) {
 		t.Errorf("expected ErrUnavailable, got %v", err)
+	}
+}
+
+func TestPlayerTracesWhatItPlayed(t *testing.T) {
+	player, err := OpenWithBackends(0.5, []mago.Backend{mago.BackendNull})
+	if err != nil {
+		t.Fatalf("open player: %v", err)
+	}
+	defer func() { _ = player.Close() }()
+
+	memory := trace.NewMemory(trace.LevelSummary)
+	player.SetLogger(memory)
+
+	path := writeToneWAV(t, t.TempDir(), "clip.wav", deviceSampleRate, 30*time.Millisecond)
+	if err := player.PlayFiles([]string{path}); err != nil {
+		t.Fatalf("PlayFiles failed: %v", err)
+	}
+
+	event, ok := memory.Find("audio.play")
+	if !ok {
+		t.Fatalf("expected an audio.play event, got %v", memory.Names())
+	}
+	if event.Fields["clips"] != 1 {
+		t.Errorf("clips = %v, want 1", event.Fields["clips"])
+	}
+	if event.Fields["volume"] != 0.5 {
+		t.Errorf("volume = %v, want the configured gain", event.Fields["volume"])
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 // formatTTSClient returns MP3 bytes, which is what a real engine may hand back
@@ -300,5 +301,48 @@ func TestSynthesizeSegmentPicksTheRightVoice(t *testing.T) {
 	}
 	if client.lastVoice == nil || client.lastVoice.VoiceID != "player-voice" {
 		t.Errorf("legacy speech should resolve by name, got %+v", client.lastVoice)
+	}
+}
+
+func TestTTSPipelineTracesCacheHitsAndMisses(t *testing.T) {
+	dir := t.TempDir()
+	memory := trace.NewMemory(trace.LevelFull)
+	client := &mockTTSClient{}
+	pipeline := NewTTSPipeline(client, NewContentCache(dir))
+	pipeline.SetLogger(memory)
+
+	voice := &entity.VoiceConfig{Provider: "kokoro", VoiceID: "af_bella", Pitch: 1, SpeechRate: 1}
+	if _, err := pipeline.SynthesizeUtterance(context.Background(), "elena", voice, "Hello."); err != nil {
+		t.Fatalf("SynthesizeUtterance failed: %v", err)
+	}
+	if _, err := pipeline.SynthesizeUtterance(context.Background(), "elena", voice, "Hello."); err != nil {
+		t.Fatalf("second SynthesizeUtterance failed: %v", err)
+	}
+
+	results := make([]trace.Event, 0)
+	for _, event := range memory.Events() {
+		if event.Name == "media.tts.result" {
+			results = append(results, event)
+		}
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected two TTS results, got %d", len(results))
+	}
+	if results[0].Fields["cache_hit"] != false {
+		t.Errorf("first synthesis should be a miss, got %+v", results[0].Fields)
+	}
+	if results[1].Fields["cache_hit"] != true {
+		t.Errorf("second synthesis should be a hit, got %+v", results[1].Fields)
+	}
+
+	request, ok := memory.Find("media.tts.request")
+	if !ok {
+		t.Fatalf("expected a TTS request event, got %v", memory.Names())
+	}
+	if request.Fields["voice_id"] != "af_bella" || request.Fields["chars"] != 6 {
+		t.Errorf("unexpected request fields: %+v", request.Fields)
+	}
+	if request.Fields["cache_key"] == nil {
+		t.Errorf("expected the cache key so a clip can be found, got %+v", request.Fields)
 	}
 }
