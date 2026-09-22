@@ -40,7 +40,7 @@
 - Modify: `pkg/media/playback/player.go`
 - Modify: `pkg/media/playback/player_test.go`
 
-- [ ] **Step 1: Update Go dependencies to add `oto/v3` and remove `mago`**
+- [x] **Step 1: Update Go dependencies to add `oto/v3` and remove `mago`**
 
 Run:
 ```bash
@@ -48,7 +48,7 @@ go get github.com/ebitengine/oto/v3@v3.1.0
 go mod tidy
 ```
 
-- [ ] **Step 2: Write failing unit test for `oto/v3` playback player in `pkg/media/playback/player_test.go`**
+- [x] **Step 2: Write failing unit test for `oto/v3` playback player in `pkg/media/playback/player_test.go`**
 
 Replace `pkg/media/playback/player_test.go`:
 ```go
@@ -147,12 +147,12 @@ func TestPlayerLifecycle(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run the test to confirm failure before implementation**
+- [x] **Step 3: Run the test to confirm failure before implementation**
 
 Run: `go test -v -run TestPlayerLifecycle ./pkg/media/playback/`
 Expected: Compilation failure due to unresolved `mago` or missing methods in `player.go`.
 
-- [ ] **Step 4: Implement `pkg/media/playback/player.go` using `ebitengine/oto/v3`**
+- [x] **Step 4: Implement `pkg/media/playback/player.go` using `ebitengine/oto/v3`**
 
 Rewrite `pkg/media/playback/player.go`:
 ```go
@@ -362,12 +362,12 @@ func (sr *streamerReader) Read(p []byte) (int, error) {
 }
 ```
 
-- [ ] **Step 5: Run tests to verify audio player passes**
+- [x] **Step 5: Run tests to verify audio player passes**
 
 Run: `go test -v -count=1 ./pkg/media/playback/`
 Expected: PASS (or SKIP on machines with no sound device).
 
-- [ ] **Step 6: Commit audio player migration**
+- [x] **Step 6: Commit audio player migration**
 
 ```bash
 git add go.mod go.sum pkg/media/playback/
@@ -382,7 +382,7 @@ git commit -m "feat(media): migrate playback device backend from mago to oto v3"
 - Create: `pkg/models/manager.go`
 - Create: `pkg/models/manager_test.go`
 
-- [ ] **Step 1: Write failing unit test for `pkg/models/manager_test.go`**
+- [x] **Step 1: Write failing unit test for `pkg/models/manager_test.go`**
 
 Create `pkg/models/manager_test.go`:
 ```go
@@ -490,12 +490,12 @@ func TestManagerDownloadAndVerify(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestManagerDownloadAndVerify ./pkg/models/`
 Expected: FAIL with "cannot find package or undefined NewManager".
 
-- [ ] **Step 3: Implement `pkg/models/manager.go`**
+- [x] **Step 3: Implement `pkg/models/manager.go`**
 
 Create `pkg/models/manager.go`:
 ```go
@@ -945,12 +945,12 @@ func (m *Manager) extractArchive(archivePath, archiveType, destDir string) error
 }
 ```
 
-- [ ] **Step 4: Run unit tests to verify `pkg/models` passes**
+- [x] **Step 4: Run unit tests to verify `pkg/models` passes**
 
 Run: `go test -v -count=1 ./pkg/models/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit `pkg/models` manager**
+- [x] **Step 5: Commit `pkg/models` manager**
 
 ```bash
 git add pkg/models/
@@ -966,7 +966,7 @@ git commit -m "feat(models): add model download manager with sha256 check and at
 - Create: `pkg/media/sherpa_tts_test.go`
 - Modify: `pkg/media/providers.go`
 
-- [ ] **Step 1: Install `sherpa-onnx-go` dependency**
+- [x] **Step 1: Install `sherpa-onnx-go` dependency**
 
 Run:
 ```bash
@@ -974,7 +974,7 @@ go get github.com/k2-fsa/sherpa-onnx-go@v1.13.8
 go mod tidy
 ```
 
-- [ ] **Step 2: Write failing unit test for `pkg/media/sherpa_tts_test.go`**
+- [x] **Step 2: Write failing unit test for `pkg/media/sherpa_tts_test.go`**
 
 Create `pkg/media/sherpa_tts_test.go`:
 ```go
@@ -1047,12 +1047,12 @@ func TestSherpaTTSMissingModelReturnsError(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `go test -v -run TestKokoroVoiceMapping ./pkg/media/`
 Expected: FAIL with undefined `ResolveKokoroSpeakerID`.
 
-- [ ] **Step 4: Implement `pkg/media/sherpa_tts.go`**
+- [x] **Step 4: Implement `pkg/media/sherpa_tts.go`**
 
 Create `pkg/media/sherpa_tts.go`:
 ```go
@@ -1256,7 +1256,7 @@ func EncodePCMFloatToWAV(samples []float32, sampleRate int) ([]byte, error) {
 }
 ```
 
-- [ ] **Step 5: Wire `sherpa-onnx` into `pkg/media/providers.go`**
+- [x] **Step 5: Wire `sherpa-onnx` into `pkg/media/providers.go`**
 
 In `pkg/media/providers.go`, update `NewTTSClient`:
 ```go
@@ -1275,12 +1275,12 @@ In `pkg/media/providers.go`, update `NewTTSClient`:
 		}
 ```
 
-- [ ] **Step 6: Run tests to verify `pkg/media` passes**
+- [x] **Step 6: Run tests to verify `pkg/media` passes**
 
 Run: `go test -v -count=1 ./pkg/media/`
 Expected: PASS.
 
-- [ ] **Step 7: Commit `sherpa_tts` client**
+- [x] **Step 7: Commit `sherpa_tts` client**
 
 ```bash
 git add pkg/media/
@@ -1296,7 +1296,7 @@ git commit -m "feat(media): implement sherpa-onnx tts client with kokoro voice m
 - Modify: `pkg/config/presets.go`
 - Modify: `pkg/config/types_test.go`
 
-- [ ] **Step 1: Write test for new preset in `pkg/config/presets_test.go`**
+- [x] **Step 1: Write test for new preset in `pkg/config/presets_test.go`**
 
 Add to `pkg/config/presets_test.go`:
 ```go
@@ -1311,12 +1311,12 @@ func TestSherpaTTSPreset(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
 
 Run: `go test -v -run TestSherpaTTSPreset ./pkg/config/`
 Expected: FAIL.
 
-- [ ] **Step 3: Update `pkg/config/presets.go` and `pkg/config/types.go`**
+- [x] **Step 3: Update `pkg/config/presets.go` and `pkg/config/types.go`**
 
 In `pkg/config/types.go`, add `ModelPath` to `TTSConfig`:
 ```go
@@ -1349,12 +1349,12 @@ In `pkg/config/presets.go`, add preset:
 	},
 ```
 
-- [ ] **Step 4: Run tests to verify config passes**
+- [x] **Step 4: Run tests to verify config passes**
 
 Run: `go test -v -count=1 ./pkg/config/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit config changes**
+- [x] **Step 5: Commit config changes**
 
 ```bash
 git add pkg/config/
@@ -1370,7 +1370,7 @@ git commit -m "feat(config): add sherpa-onnx tts preset and ModelPath field"
 - Modify: `pkg/gui/server.go`
 - Modify: `pkg/gui/server_test.go`
 
-- [ ] **Step 1: Write failing HTTP endpoint tests in `pkg/gui/server_test.go`**
+- [x] **Step 1: Write failing HTTP endpoint tests in `pkg/gui/server_test.go`**
 
 Add to `pkg/gui/server_test.go`:
 ```go
@@ -1399,12 +1399,12 @@ func TestModelManagementEndpoints(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestModelManagementEndpoints ./pkg/gui/`
 Expected: FAIL with 404 or compilation failure.
 
-- [ ] **Step 3: Update `pkg/gui/service.go` and `pkg/gui/server.go`**
+- [x] **Step 3: Update `pkg/gui/service.go` and `pkg/gui/server.go`**
 
 In `pkg/gui/service.go`:
 1. Embed `modelsManager *models.Manager` in `Service`.
@@ -1493,12 +1493,12 @@ func (s *Server) handleModelEvents(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify API endpoints pass**
+- [x] **Step 4: Run tests to verify API endpoints pass**
 
 Run: `go test -v -count=1 ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit API endpoints**
+- [x] **Step 5: Commit API endpoints**
 
 ```bash
 git add pkg/gui/
@@ -1512,11 +1512,11 @@ git commit -m "feat(gui): add /api/models status, download, and SSE event stream
 **Files:**
 - Modify: `pkg/gui/service.go`
 
-- [ ] **Step 1: Write test for missing model detection in turn stream**
+- [x] **Step 1: Write test for missing model detection in turn stream**
 
 Add a test in `pkg/gui/service_test.go` verifying that playing a turn with built-in TTS enabled but Kokoro missing emits a `model_missing` event chunk and finishes normally.
 
-- [ ] **Step 2: Update `PlayTurnStream` in `pkg/gui/service.go`**
+- [x] **Step 2: Update `PlayTurnStream` in `pkg/gui/service.go`**
 
 In `PlayTurnStream`:
 Check if TTS is configured as `builtin` (`sherpa-onnx` or `kokoro`):
@@ -1537,12 +1537,12 @@ Check if TTS is configured as `builtin` (`sherpa-onnx` or `kokoro`):
 	}
 ```
 
-- [ ] **Step 3: Run backend tests to verify**
+- [x] **Step 3: Run backend tests to verify**
 
 Run: `go test -v -count=1 ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 4: Commit turn stream update**
+- [x] **Step 4: Commit turn stream update**
 
 ```bash
 git add pkg/gui/service.go
@@ -1559,7 +1559,7 @@ git commit -m "feat(gui): emit model_missing turn event when builtin tts model i
 - Create: `frontend/src/components/turn/ModelDownloadModal.tsx`
 - Modify: `frontend/src/components/turn/ActionConsole.tsx`
 
-- [ ] **Step 1: Update `frontend/src/types.ts`**
+- [x] **Step 1: Update `frontend/src/types.ts`**
 
 Add `ModelStatus` interface and update `TurnStreamChunk`:
 ```typescript
@@ -1582,7 +1582,7 @@ export type TurnStreamChunk =
   | { type: 'model_missing'; payload: { model_id: string; name: string; size_bytes: number } };
 ```
 
-- [ ] **Step 2: Add API methods to `frontend/src/api/client.ts`**
+- [x] **Step 2: Add API methods to `frontend/src/api/client.ts`**
 
 ```typescript
   async getModels(): Promise<ModelStatus[]> {
@@ -1612,7 +1612,7 @@ export type TurnStreamChunk =
   },
 ```
 
-- [ ] **Step 3: Create `frontend/src/components/turn/ModelDownloadModal.tsx`**
+- [x] **Step 3: Create `frontend/src/components/turn/ModelDownloadModal.tsx`**
 
 Create `frontend/src/components/turn/ModelDownloadModal.tsx`:
 ```tsx
@@ -1761,7 +1761,7 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
 };
 ```
 
-- [ ] **Step 4: Wire Modal into `frontend/src/components/turn/ActionConsole.tsx`**
+- [x] **Step 4: Wire Modal into `frontend/src/components/turn/ActionConsole.tsx`**
 
 When turn stream receives `model_missing`, set state:
 ```tsx
@@ -1771,12 +1771,12 @@ const [dismissedThisSession, setDismissedThisSession] = useState(false);
 If chunk is `model_missing` and `!dismissedThisSession`, set `missingModel`.
 Render `<ModelDownloadModal>` conditionally.
 
-- [ ] **Step 5: Run frontend type checks**
+- [x] **Step 5: Run frontend type checks**
 
 Run: `mise run test:frontend`
 Expected: Clean exit with code 0 (`tsc --noEmit` passes).
 
-- [ ] **Step 6: Commit frontend components**
+- [x] **Step 6: Commit frontend components**
 
 ```bash
 git add frontend/
@@ -1790,22 +1790,22 @@ git commit -m "feat(frontend): add model download modal and stream event handlin
 **Files:**
 - Verification only
 
-- [ ] **Step 1: Run backend tests**
+- [x] **Step 1: Run backend tests**
 
 Run: `mise run test:backend`
 Expected: All Go unit and integration tests pass.
 
-- [ ] **Step 2: Run frontend type check**
+- [x] **Step 2: Run frontend type check**
 
 Run: `mise run test:frontend`
 Expected: `tsc --noEmit` passes with 0 errors.
 
-- [ ] **Step 3: Run backend linter**
+- [x] **Step 3: Run backend linter**
 
 Run: `mise run lint`
 Expected: `go vet ./...` clean with 0 warnings.
 
-- [ ] **Step 4: Build entire binary (frontend + backend)**
+- [x] **Step 4: Build entire binary (frontend + backend)**
 
 Run: `mise run build`
 Expected: Build succeeds and outputs `bin/localrpg`.
