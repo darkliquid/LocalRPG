@@ -561,7 +561,7 @@ Also shipped from increment 3, driven by playtesting:
 - **Link resolution** (§7.5, extended). Segment text is rewritten so a `[[Display Name]]` becomes `[[entity-id|Display Name]]` for the client, and an unresolvable link degrades to plain text instead of a button that goes nowhere. The graph and character view refresh after each turn, so characters introduced mid-turn appear without a reload.
 - **No duplicated player line.** The player's own utterance is no longer emitted as a speech segment; the chronicle already shows the submitted action.
 
-Still outstanding from increments 3 and 4: the voice-metadata sanitizer has prompt-level defence but no code-level stripper; narration playback depends on TTS being configured and `auto_play`; targeted speech prefetch; the status, warning, and draft events; and the streaming preference.
+Still outstanding from increments 3 and 4: the voice-metadata sanitizer has prompt-level defence but no code-level stripper; targeted speech prefetch; the status, warning, and draft events; and the streaming preference. Playback itself is now application-owned (section 17) rather than gesture-gated.
 
 ---
 
@@ -598,5 +598,58 @@ Deleting and re-initialising reuses the one code path that is already tested for
 | `DELETE` | `/api/game/{id}` | `204`, or `404` when absent, or `409` while a turn is in flight |
 | `POST` | `/api/game/{id}/restart` | `200` with the campaign summary |
 | `PATCH` | `/api/game/{id}/settings` | `204`; currently accepts `opening_prompt` |
+
+---
+
+## 17. Application-Owned Playback
+
+### 17.1 Why the browser could not do it
+
+A browser refuses to start audio without a user gesture. The first version
+therefore relied on autoplay and silently lost every rejected `play()`, which is
+why narration was never heard. A gesture-gated design can only ever narrate a
+turn *after* the player clicks something, which is the opposite of automatic.
+
+The application runs on the same machine as the player, so it can own the audio
+device and be free of that restriction.
+
+### 17.2 Decision
+
+Playback moves into the process, in `pkg/media/playback`, built on
+`github.com/darkliquid/mago` (a CGO-free `purego` wrapper around miniaudio, with
+the native library embedded and extracted at runtime) and
+`github.com/hajimehoshi/go-mp3` for decoding.
+
+- `auto_play` on means the server narrates a turn itself, right after the turn is
+  recorded and detached from the request, so a slow synthesis never holds the
+  stream open.
+- The client asks `GET /api/audio/status`; when the application can play, the
+  browser stays silent, which removes both the gesture gate and the risk of two
+  narrators talking over each other.
+- When no device is present (a headless server, or a browser reaching the
+  process over `--port`), the client falls back to the existing browser
+  playback, gesture and all.
+
+### 17.3 Format handling
+
+`mago`'s mixer decodes WAV only, and the cache already holds MP3 from kokoro.
+`ToWAV` therefore passes WAV through and converts MP3 to 16-bit stereo PCM
+wrapped in a WAV header. A clip in an unknown container is skipped rather than
+silencing the rest of the turn.
+
+### 17.4 Cost
+
+The dependency embeds a native library per platform, which grows the binary by
+roughly 3 MB and extracts to the user cache on first run. This is accepted: it is
+the price of narration that works without asking the player to click.
+
+### 17.5 Endpoints
+
+| Method | Path | Result |
+| --- | --- | --- |
+| `GET` | `/api/audio/status` | `200` with `{available, playing}` |
+| `POST` | `/api/audio/stop` | `204` |
+| `POST` | `/api/game/{id}/turn/{n}/play` | `204`, plays the whole turn |
+| `POST` | `/api/game/{id}/turn/{n}/segment/{i}/play` | `204`, plays one beat |
 
 ---
