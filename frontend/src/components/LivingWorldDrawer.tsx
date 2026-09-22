@@ -1,17 +1,50 @@
 import React from 'react';
-import { GameState } from '../types';
-import { Clock, BookOpen } from 'lucide-react';
+import { GameState, Recap } from '../types';
+import { Clock, BookOpen, ScrollText } from 'lucide-react';
 
 // A clock with no maximum would divide by zero, so progress is clamped.
 const percent = (value: number, max: number) => `${max > 0 ? Math.min(100, (value / max) * 100) : 0}%`;
 
 interface LivingWorldDrawerProps {
   state?: GameState;
+  recap?: Recap;
+  onRefreshRecap?: () => void;
 }
 
-export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({ state }) => {
+export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({ state, recap, onRefreshRecap }) => {
   return (
     <div className="space-y-6">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-cinzel text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+            <ScrollText className="w-4 h-4" />
+            <span>Story So Far</span>
+          </h3>
+          {recap?.enabled && onRefreshRecap && (
+            <button
+              onClick={onRefreshRecap}
+              className="text-[11px] font-cinzel px-2 py-1 rounded-lg bg-stone-900 border border-stone-700 text-stone-300 hover:text-amber-300 cursor-pointer transition-colors"
+            >
+              Refresh
+            </button>
+          )}
+        </div>
+        {recap?.summary ? (
+          <>
+            <p className="text-xs text-stone-300 leading-relaxed whitespace-pre-wrap bg-black/30 p-3 rounded-xl border border-white/5">
+              {recap.summary}
+            </p>
+            <p className="text-[11px] font-mono text-stone-500">Through turn {recap.through_turn}</p>
+          </>
+        ) : (
+          <p className="text-stone-500 text-xs italic bg-black/30 p-3 rounded-xl border border-white/5">
+            {recap?.enabled === false
+              ? 'Summaries are switched off in Settings.'
+              : 'The story has not turned far enough to be summarised yet.'}
+          </p>
+        )}
+      </div>
+
       <div className="space-y-3">
         <h3 className="text-sm font-cinzel text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
           <BookOpen className="w-4 h-4" />

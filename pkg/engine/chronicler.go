@@ -3,9 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
-	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/trace"
@@ -15,15 +13,17 @@ import (
 // regeneration itself, and the note it writes. It is a separate type from the
 // orchestrator because its work is detached from any turn.
 type Chronicler struct {
-	paths      *core.PathResolver
+	// The timeline is the campaign's log, so the chronicler reads the same one the
+	// turn pipeline writes rather than deriving a path of its own.
+	timeline   *Timeline
 	store      *storage.Store
 	summariser *harness.Summariser
 	every      int
 	logger     trace.Logger
 }
 
-func NewChronicler(paths *core.PathResolver, store *storage.Store, summariser *harness.Summariser) *Chronicler {
-	return &Chronicler{paths: paths, store: store, summariser: summariser}
+func NewChronicler(timeline *Timeline, store *storage.Store, summariser *harness.Summariser) *Chronicler {
+	return &Chronicler{timeline: timeline, store: store, summariser: summariser}
 }
 
 // SetEvery sets the cadence. Zero disables summarisation.
@@ -126,17 +126,20 @@ func (c *Chronicler) Regenerate(ctx context.Context, gameID string) (bool, error
 }
 
 func (c *Chronicler) loadHistory(gameID string) ([]Turn, error) {
-	turns, err := NewHistoryLogger(c.historyPath(gameID)).LoadHistory()
+	if c.timeline == nil {
+		return nil, fmt.Errorf("load history: no timeline")
+	}
+
+	turns, err := c.timeline.history.LoadHistory()
 	if err != nil {
 		return nil, fmt.Errorf("load history: %w", err)
 	}
 	return turns, nil
 }
 
-func (c *Chronicler) historyPath(gameID string) string {
-	return filepath.Join(c.paths.GameDir(gameID), "history.jsonl")
-}
-
 func (c *Chronicler) entitiesDir(gameID string) string {
-	return filepath.Join(c.paths.GameDir(gameID), "entities")
+	if c.timeline == nil {
+		return ""
+	}
+	return c.timeline.EntitiesDir()
 }

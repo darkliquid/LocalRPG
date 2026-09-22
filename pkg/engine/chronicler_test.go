@@ -35,7 +35,7 @@ func chroniclerFixture(t *testing.T, every int) (*Chronicler, *Timeline, *script
 	}
 
 	provider := &scriptedStreamProvider{chunks: []string{"The party reached the harbour."}}
-	chronicler := NewChronicler(paths, store, harness.NewSummariser(provider))
+	chronicler := NewChronicler(timeline, store, harness.NewSummariser(provider))
 	chronicler.SetEvery(every)
 	return chronicler, timeline, provider, store
 }

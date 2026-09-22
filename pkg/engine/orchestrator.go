@@ -264,6 +264,36 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}, nil
 	}
 
+	// /recap answers "where were we?". A stale summary is brought up to date first,
+	// because asking for a recap is asking about the present tense and a summary can
+	// be a cadence behind. The regeneration is the same path a turn uses, so a
+	// failure leaves the old summary in place rather than failing the command.
+	if strings.HasPrefix(strings.TrimSpace(actionInput), "/recap") {
+		chronicle := Chronicle{}
+		if o.chronicler != nil {
+			if due, err := o.chronicler.Due(o.gameID()); err == nil && due {
+				if _, err := o.chronicler.Regenerate(ctx, o.gameID()); err != nil {
+					o.logger = trace.OrNil(o.logger)
+					o.logger.Event("provider.error", map[string]interface{}{"role": "summariser", "error": err.Error()})
+				}
+			}
+			chronicle, _ = o.chronicler.Recap(o.gameID())
+		}
+
+		narration := "This campaign has not turned far enough for a recap yet."
+		if strings.TrimSpace(chronicle.Summary) != "" {
+			narration = fmt.Sprintf("## Story So Far (through turn %d)\n\n%s", chronicle.ThroughTurn, chronicle.Summary)
+		}
+
+		return &Turn{
+			Number:    turnNum,
+			Timestamp: time.Now(),
+			Mode:      "System",
+			Input:     "/recap",
+			Narration: narration,
+		}, nil
+	}
+
 	// Handle /go command: an explicit move, recorded as its own system turn.
 	if strings.HasPrefix(strings.TrimSpace(actionInput), "/go ") {
 		target := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(actionInput), "/go "))

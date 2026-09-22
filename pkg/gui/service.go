@@ -765,7 +765,8 @@ func (s *Service) chronicler(gameID string) *engine.Chronicler {
 		return nil
 	}
 
-	chronicler := engine.NewChronicler(s.resolver, store, harness.SummariserFromConfig(cfg, router, s.logger))
+	timeline := engine.NewTimeline(s.resolver, store, engine.NewHistoryLogger(filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")), gameID)
+	chronicler := engine.NewChronicler(timeline, store, harness.SummariserFromConfig(cfg, router, s.logger))
 	chronicler.SetEvery(cfg.SummaryEvery())
 	chronicler.SetLogger(s.logger)
 	return chronicler
@@ -838,7 +839,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		startLocation = pinned
 	}
 
-	chronicler := engine.NewChronicler(s.resolver, store, harness.SummariserFromConfig(cfg, router, logger))
+	chronicler := engine.NewChronicler(timeline, store, harness.SummariserFromConfig(cfg, router, logger))
 	chronicler.SetEvery(cfg.SummaryEvery())
 	chronicler.SetLogger(logger)
 

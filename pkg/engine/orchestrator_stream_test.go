@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -62,7 +63,13 @@ func streamingOrchestrator(t *testing.T, provider harness.ModelProvider) (*TurnO
 
 	tempDir := t.TempDir()
 	store := newTestStore(t)
-	timeline := NewTimeline(core.NewPathResolver(tempDir), store, NewHistoryLogger(filepath.Join(tempDir, "history.jsonl")), "campaign-01")
+	paths := core.NewPathResolver(tempDir)
+	// The log lives where the resolver says it does, so anything that reads a
+	// campaign's history from disk sees the turns this fixture records.
+	if err := os.MkdirAll(paths.GameDir("campaign-01"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	timeline := NewTimeline(paths, store, NewHistoryLogger(filepath.Join(paths.GameDir("campaign-01"), "history.jsonl")), "campaign-01")
 
 	entitiesDir := timeline.EntitiesDir()
 	writeTestEntityNote(t, entitiesDir, &entity.Entity{ID: "alden-tavern", Name: "Alden Tavern", Type: "location", Body: "Warm."})

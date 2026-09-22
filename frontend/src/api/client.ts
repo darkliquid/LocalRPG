@@ -6,6 +6,7 @@ import {
   GraphData,
   GameSummary,
   EntitySummary,
+  Recap,
   SystemInfo,
   WorldInfo,
   CreateGameRequest,
@@ -268,6 +269,12 @@ export class APIClient {
   async getChronicle(): Promise<Turn[]> {
     const res = await fetch(`/api/game/${this.gameID}/chronicle`);
     if (!res.ok) throw new Error(`getChronicle: ${res.statusText}`);
+    return res.json();
+  }
+
+  async getRecap(): Promise<Recap> {
+    const res = await fetch(`/api/game/${this.gameID}/recap`);
+    if (!res.ok) throw new Error(`getRecap: ${res.statusText}`);
     return res.json();
   }
 

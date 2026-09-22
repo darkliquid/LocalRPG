@@ -52,6 +52,12 @@ export interface TurnEvent {
   message?: string;
 }
 
+export interface Recap {
+  summary?: string;
+  through_turn: number;
+  enabled: boolean;
+}
+
 export interface EntitySummary {
   id: string;
   name: string;

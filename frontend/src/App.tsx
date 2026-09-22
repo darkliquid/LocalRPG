@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { APIClient } from './api/client';
-import { GameState, Turn, EntityNote, EntitySummary, GraphData, AppConfig } from './types';
+import { GameState, Turn, EntityNote, EntitySummary, Recap, GraphData, AppConfig } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { ActionConsole } from './components/ActionConsole';
@@ -30,6 +30,9 @@ export const App: React.FC = () => {
   // The campaign's notes, as the codex lists them. It grows as turns create
   // entities, so it is refetched rather than held from first load.
   const [entities, setEntities] = useState<EntitySummary[]>([]);
+  // A campaign's long memory, read with the rest of the corpus so the panel shows
+  // it without a model call of its own.
+  const [recap, setRecap] = useState<Recap | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<EntityNote | null>(null);
   // TTS playback preferences live in the global settings, so the chronicle and
   // the story theater honour the same switches as the settings studio.
@@ -60,6 +63,7 @@ export const App: React.FC = () => {
     client.getGameState().then(setGameState).catch(console.error);
     client.getGraph().then(setGraph).catch(console.error);
     client.listEntities().then(setEntities).catch(console.error);
+    client.getRecap().then(setRecap).catch(console.error);
   }, [client]);
 
   useEffect(() => {
@@ -68,6 +72,7 @@ export const App: React.FC = () => {
       setChronicle([]);
       setGraph(null);
       setEntities([]);
+      setRecap(null);
       return;
     }
     client.getChronicle().then(setChronicle).catch(console.error);
@@ -370,7 +375,15 @@ export const App: React.FC = () => {
                 onSave={handleSaveEntity}
               />
             )}
-            {activeDrawer === 'world' && <LivingWorldDrawer state={gameState || undefined} />}
+            {activeDrawer === 'world' && (
+              <LivingWorldDrawer
+                state={gameState || undefined}
+                recap={recap || undefined}
+                onRefreshRecap={() => {
+                  client?.getRecap().then(setRecap).catch(console.error);
+                }}
+              />
+            )}
           </Drawers>
 
           {/* Global Settings Modal Dialog */}

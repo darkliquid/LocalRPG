@@ -11,6 +11,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"time"
 )
 
 type mockOrchestratorModel struct {
@@ -90,5 +91,77 @@ func TestTurnOrchestrator(t *testing.T) {
 	}
 	if !strings.Contains(model.lastPrompt, "## WORLD LORE & ATMOSPHERE") || !strings.Contains(model.lastPrompt, "Gothic peat bogs") {
 		t.Errorf("expected lore prompt in GM prompt, got: %s", model.lastPrompt)
+	}
+}
+
+func TestRecapCommandPrintsTheCurrentSummary(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"A generated scene."}}
+	orchestrator, timeline, store := streamingOrchestrator(t, provider)
+
+	// A chronicler with summarisation switched off answers from the note, so this
+	// asserts the printing path without a second model call.
+	chronicler := NewChronicler(timeline, store, nil)
+	chronicler.SetEvery(0)
+	orchestrator.SetChronicler(chronicler)
+
+	if err := WriteChronicle(store, timeline.EntitiesDir(), Chronicle{
+		Summary:     "The party reached the harbour.",
+		ThroughTurn: 4,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "System", "/recap", nil)
+	if err != nil {
+		t.Fatalf("/recap failed: %v", err)
+	}
+	if !strings.Contains(turn.Narration, "The party reached the harbour.") {
+		t.Errorf("expected the recap as the reply, got %q", turn.Narration)
+	}
+	if strings.Contains(turn.Narration, "A generated scene.") {
+		t.Errorf("/recap must not narrate a scene")
+	}
+
+	// A command is not a turn: nothing is recorded for it.
+	turns, err := timeline.history.LoadHistory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 0 {
+		t.Errorf("expected /recap to record nothing, got %d turns", len(turns))
+	}
+}
+
+func TestRecapCommandRegeneratesAStaleSummary(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"Kael guards the harbour gate."}}
+	orchestrator, timeline, store := streamingOrchestrator(t, provider)
+
+	chronicler := NewChronicler(timeline, store, harness.NewSummariser(provider))
+	chronicler.SetEvery(1)
+	orchestrator.SetChronicler(chronicler)
+
+	// The chronicler reads the campaign's log, which the fixture writes where the
+	// resolver says it is.
+	recordTurnForRecap(t, timeline, 1, "The party reached the harbour.")
+	recordTurnForRecap(t, timeline, 2, "Kael mentioned the oil was low.")
+	if err := WriteChronicle(store, timeline.EntitiesDir(), Chronicle{Summary: "They left the tavern.", ThroughTurn: 0}); err != nil {
+		t.Fatal(err)
+	}
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "System", "/recap", nil)
+	if err != nil {
+		t.Fatalf("/recap failed: %v", err)
+	}
+	if !strings.Contains(turn.Narration, "Kael guards the harbour gate.") {
+		t.Errorf("expected a regenerated recap, got %q", turn.Narration)
+	}
+}
+
+func recordTurnForRecap(t *testing.T, timeline *Timeline, number int, narration string) {
+	t.Helper()
+
+	turn := Turn{Number: number, Timestamp: time.Now(), Mode: "Do", Input: "I look around", Narration: narration}
+	if err := timeline.RecordTurn(&turn, nil); err != nil {
+		t.Fatalf("record turn %d: %v", number, err)
 	}
 }
