@@ -107,7 +107,8 @@ func TestContextAssembler_WithVoiceProfiles(t *testing.T) {
 		{ID: "young_scout", Description: "Agile rangers and scouts"},
 	}
 
-	prompt, err := assembler.AssembleContextWithProfiles("loc1", "p1", "I greet the elders", "", "", profiles, "")
+	result, err := assembler.AssembleContextWithProfiles("loc1", "p1", "I greet the elders", "", "", profiles, nil)
+	prompt := result.Prompt
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -123,7 +124,8 @@ func TestAssembleContextAlwaysAsksForAttributableSpeech(t *testing.T) {
 
 	// No rules prompt, no lore prompt: the instruction must not depend on a system
 	// or world shipping anything.
-	prompt, err := assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil, "")
+	result, err := assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil, nil)
+	prompt := result.Prompt
 	if err != nil {
 		t.Fatalf("AssembleContextWithProfiles failed: %v", err)
 	}
@@ -136,5 +138,113 @@ func TestAssembleContextAlwaysAsksForAttributableSpeech(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "leave the words in the narration") {
 		t.Errorf("expected guidance for the case the model cannot name a speaker, got %q", prompt)
+	}
+}
+
+func TestRecentTurnsAreRecalledWithinTheWindow(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+
+	recent := []RecentTurn{
+		{Number: 1, Mode: "Opening", Narration: "Rain hammers the market."},
+		{Number: 2, Mode: "Say", Input: "Late for what?", Narration: "The bell tolls once."},
+	}
+
+	result, err := assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil, recent)
+	if err != nil {
+		t.Fatalf("AssembleContextWithProfiles failed: %v", err)
+	}
+	if !strings.Contains(result.Prompt, "Late for what?") || !strings.Contains(result.Prompt, "Rain hammers the market.") {
+		t.Errorf("recall lost a prior turn: %q", result.Prompt)
+	}
+
+	assembler.SetLimits(ContextLimits{RecentTurns: 1})
+	result, err = assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil, recent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(result.Prompt, "Rain hammers the market.") {
+		t.Errorf("window of 1 should drop the older turn, got %q", result.Prompt)
+	}
+	if !strings.Contains(result.Prompt, "Late for what?") {
+		t.Errorf("window of 1 should keep the newest turn, got %q", result.Prompt)
+	}
+}
+
+func TestContextBudgetTrimDropsRecallBeforeRules(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+
+	longNarration := strings.Repeat("the mist rolls in over the drowned cathedral ", 200)
+	recent := []RecentTurn{
+		{Number: 1, Mode: "Do", Narration: longNarration},
+		{Number: 2, Mode: "Do", Narration: longNarration},
+		{Number: 3, Mode: "Do", Narration: longNarration},
+	}
+
+	unbounded, err := assembler.AssembleContextWithProfiles("", "", "I listen", "RULES", "LORE", nil, recent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assembler.SetLimits(ContextLimits{TokenBudget: 400})
+	trimmed, err := assembler.AssembleContextWithProfiles("", "", "I listen", "RULES", "LORE", nil, recent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if trimmed.EstimatedTokens >= unbounded.EstimatedTokens {
+		t.Errorf("expected trimming to shrink the prompt: %d vs %d", trimmed.EstimatedTokens, unbounded.EstimatedTokens)
+	}
+	if len(trimmed.Trimmed) == 0 {
+		t.Errorf("expected the trim to be reported")
+	}
+
+	// What must survive: the rules, the lore, the scene, and the actual request.
+	for _, required := range []string{"SYSTEM RULES", "WORLD LORE", "IMMEDIATE SCENE", "PLAYER ACTION", "I listen"} {
+		if !strings.Contains(trimmed.Prompt, required) {
+			t.Errorf("trimming dropped %q, which is never expendable", required)
+		}
+	}
+}
+
+func TestTrimmingIsDrivenByTheBudgetNotTheCharCap(t *testing.T) {
+	// Trailing space trimmed, because recall trims each turn's text.
+	longNarration := strings.TrimSpace(strings.Repeat("the mist rolls in ", 500))
+	recent := []RecentTurn{{Number: 1, Mode: "Do", Narration: longNarration}}
+
+	// An unbounded budget with a generous cap keeps everything, and reports no
+	// trimming: the two limits are independent, and only the budget trims.
+	assembler := NewContextAssembler(newTestEntityStore(t))
+	assembler.SetLimits(ContextLimits{TokenBudget: 0, RecentTurnChars: 1 << 20})
+	result, err := assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil, recent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Trimmed) != 0 {
+		t.Errorf("expected an unbounded budget to trim nothing, got %v", result.Trimmed)
+	}
+	if !strings.Contains(result.Prompt, longNarration) {
+		t.Errorf("expected the whole narration to survive a generous cap")
+	}
+
+	// The default cap shortens one turn without being a budget decision.
+	capped := NewContextAssembler(newTestEntityStore(t))
+	cappedResult, err := capped.AssembleContextWithProfiles("", "", "I listen", "", "", nil, recent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cappedResult.Trimmed) != 0 {
+		t.Errorf("a configured cap is not trimming, got %v", cappedResult.Trimmed)
+	}
+	if strings.Contains(cappedResult.Prompt, longNarration) {
+		t.Errorf("expected the default char cap to shorten a very long turn")
+	}
+}
+
+func TestTruncateRunesMarksWhatItCut(t *testing.T) {
+	if got := TruncateRunes("abcdef", 3); got != "abc..." {
+		t.Errorf("TruncateRunes = %q, want abc...", got)
+	}
+	if got := TruncateRunes("abc", 3); got != "abc" {
+		t.Errorf("TruncateRunes left a short string alone? got %q", got)
 	}
 }

@@ -91,7 +91,14 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
 
             {turn.truncated && (
               <div className="text-xs font-mono text-amber-400/80 pt-1">
-                The narrator was cut off by the model's token limit. Raise max_tokens for the gm role in Settings.
+                The narrator was cut off by the model's token limit. Raise the response limit for the gm role in Settings.
+              </div>
+            )}
+
+            {turn.context_notes && turn.context_notes.length > 0 && (
+              <div className="text-xs font-mono text-stone-500 pt-1">
+                Context trimmed to fit the prompt budget: {turn.context_notes.join(', ')}. Raise the context budget in
+                Settings to keep more.
               </div>
             )}
 

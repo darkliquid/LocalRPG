@@ -534,6 +534,59 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
 
               {currentRoleConfig.type !== 'disabled' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                      <span>Response Limit (max tokens)</span>
+                      <span className="font-mono text-amber-400">{currentRoleConfig.max_tokens ?? 1024}</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={64}
+                      step={64}
+                      value={currentRoleConfig.max_tokens ?? 1024}
+                      onChange={(e) => {
+                        const max_tokens = parseInt(e.target.value, 10);
+                        const updated = { ...currentRoleConfig, max_tokens: Number.isNaN(max_tokens) ? undefined : max_tokens };
+                        setConfig({
+                          ...config,
+                          agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
+                        });
+                      }}
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    />
+                    <p className="text-[11px] text-stone-500">
+                      How long a single reply may be. Raise it for longer scenes; the reply is marked as cut off when it
+                      hits this.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                      <span>Temperature</span>
+                      <span className="font-mono text-amber-400">{(currentRoleConfig.temperature ?? 0.7).toFixed(2)}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1.5"
+                      step="0.05"
+                      value={currentRoleConfig.temperature ?? 0.7}
+                      onChange={(e) => {
+                        const updated = { ...currentRoleConfig, temperature: parseFloat(e.target.value) };
+                        setConfig({
+                          ...config,
+                          agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
+                        });
+                      }}
+                      className="w-full accent-amber-500"
+                    />
+                    <p className="text-[11px] text-stone-500">Lower is steadier, which helps long-run continuity.</p>
+                  </div>
+                </div>
+              )}
+
+              {currentRoleConfig.type !== 'disabled' && (
                 <div className="pt-2 flex items-center justify-between border-t border-stone-800/60">
                   <button
                     onClick={() => handleTestProvider('llm', currentRoleConfig)}
@@ -558,6 +611,140 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   )}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Context budget and timing: what the narrator is sent, and how long it may take */}
+          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
+            <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+              <Sliders className="w-4 h-4" />
+              <span>Context &amp; Response Limits</span>
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Context Budget (tokens)</span>
+                  <span className="font-mono text-amber-400">
+                    {(config.agents.context_token_budget ?? 0) === 0 ? 'unbounded' : config.agents.context_token_budget}
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={config.agents.context_token_budget ?? 0}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setConfig({
+                      ...config,
+                      agents: { ...config.agents, context_token_budget: Number.isNaN(parsed) ? 0 : parsed },
+                    });
+                  }}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">
+                  Estimated ceiling for the assembled prompt. 0 sends everything. When it is exceeded, the voice
+                  catalogue and the oldest remembered turns are dropped first; rules, lore, the scene, and your action
+                  are never dropped.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Remembered Turns</span>
+                  <span className="font-mono text-amber-400">{config.agents.recent_turn_window ?? 6}</span>
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={config.agents.recent_turn_window ?? 6}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setConfig({
+                      ...config,
+                      agents: { ...config.agents, recent_turn_window: Number.isNaN(parsed) ? 6 : parsed },
+                    });
+                  }}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">
+                  How many prior turns are replayed to the narrator. A larger window means better continuity and a
+                  larger prompt.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Excerpt Length (characters)</span>
+                  <span className="font-mono text-amber-400">{config.agents.recent_turn_char_limit ?? 1200}</span>
+                </label>
+                <input
+                  type="number"
+                  min={200}
+                  step={100}
+                  value={config.agents.recent_turn_char_limit ?? 1200}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setConfig({
+                      ...config,
+                      agents: { ...config.agents, recent_turn_char_limit: Number.isNaN(parsed) ? 1200 : parsed },
+                    });
+                  }}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">Cap on the text recalled from any one prior turn.</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Turn Timeout (seconds)</span>
+                  <span className="font-mono text-amber-400">{config.agents.turn_timeout_seconds ?? 300}</span>
+                </label>
+                <input
+                  type="number"
+                  min={10}
+                  step={10}
+                  value={config.agents.turn_timeout_seconds ?? 300}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setConfig({
+                      ...config,
+                      agents: { ...config.agents, turn_timeout_seconds: Number.isNaN(parsed) ? 300 : parsed },
+                    });
+                  }}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">
+                  Wall clock for a whole turn. Raise it for slower local models and long contexts.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Silence Timeout (seconds)</span>
+                  <span className="font-mono text-amber-400">{config.agents.chunk_timeout_seconds ?? 60}</span>
+                </label>
+                <input
+                  type="number"
+                  min={5}
+                  step={5}
+                  value={config.agents.chunk_timeout_seconds ?? 60}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setConfig({
+                      ...config,
+                      agents: { ...config.agents, chunk_timeout_seconds: Number.isNaN(parsed) ? 60 : parsed },
+                    });
+                  }}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">
+                  How long the narrator may go quiet between chunks before the turn fails.
+                </p>
+              </div>
             </div>
           </div>
         </div>

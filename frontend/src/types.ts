@@ -41,6 +41,8 @@ export interface Turn {
   outcome?: string;
   // Set when the model hit its token limit mid-reply.
   truncated?: boolean;
+  // Anything the prompt budget left out, so a thinner reply can be explained.
+  context_notes?: string[];
 }
 
 export interface TurnEvent {
@@ -195,6 +197,14 @@ export interface AgentsConfig {
   default_role: string;
   roles: Record<string, AgentRoleConfig>;
   fallbacks?: Record<string, string>;
+  // A turn's wall clock and the silence tolerated between narration deltas.
+  turn_timeout_seconds?: number;
+  chunk_timeout_seconds?: number;
+  // The assembled prompt's estimated token ceiling. 0 means unbounded.
+  context_token_budget?: number;
+  // How far back the narrator is reminded, and how much of each turn.
+  recent_turn_window?: number;
+  recent_turn_char_limit?: number;
 }
 
 export interface VoiceProfile {

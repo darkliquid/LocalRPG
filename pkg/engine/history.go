@@ -27,6 +27,9 @@ type Turn struct {
 	// Truncated records that the model hit its token limit mid-reply, so the
 	// client can say so instead of presenting a cut-off scene as a complete one.
 	Truncated bool `json:"truncated,omitempty"`
+	// ContextNotes records anything the prompt budget left out, so a thinner reply
+	// can be explained rather than looking like drift.
+	ContextNotes []string `json:"context_notes,omitempty"`
 
 	// LegacyOutput is only populated when reading records written before the
 	// narration rename. New records must not set it.

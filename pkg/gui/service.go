@@ -587,13 +587,14 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 	artAvailable := cfg.Media.Image.BuiltinFallback || cfg.Media.Image.Type != "disabled"
 
 	dto := TurnDTO{
-		TurnNumber:  turn.Number,
-		InputText:   turn.Input,
-		Mode:        turn.Mode,
-		Prose:       turn.Prose(),
-		Outcome:     turn.Outcome,
-		Truncated:   turn.Truncated,
-		EntitiesHit: mentionIDs(turn.Entities),
+		TurnNumber:   turn.Number,
+		InputText:    turn.Input,
+		Mode:         turn.Mode,
+		Prose:        turn.Prose(),
+		Outcome:      turn.Outcome,
+		Truncated:    turn.Truncated,
+		ContextNotes: turn.ContextNotes,
+		EntitiesHit:  mentionIDs(turn.Entities),
 		Segments: segmentDTOs(turn.Segments, gameID, turn.Number, audioAvailable, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
 		}),
@@ -731,6 +732,11 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
+	orchestrator.SetContextLimits(harness.ContextLimits{
+		TokenBudget:     cfg.ContextBudget(),
+		RecentTurns:     cfg.RecentTurns(),
+		RecentTurnChars: cfg.RecentTurnChars(),
+	})
 
 	return &TurnSession{
 		service:      s,

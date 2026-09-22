@@ -40,51 +40,6 @@ func OpeningPrompt(manifest *core.GameManifest) string {
 	return strings.TrimSpace(prompt)
 }
 
-// recentEventWindow is how many prior turns the narrator is reminded of. Enough
-// to hold a conversation, small enough to keep the prompt bounded.
-const recentEventWindow = 6
-
-// recentNarrationLimit truncates each remembered narration so one long scene
-// cannot crowd out the rules, the lore, and the current action.
-const recentNarrationLimit = 1200
-
-// recentEventsPrompt renders the tail of the timeline for the narrator. It is a
-// transcript rather than a summary, because summarising is what loses the details
-// a player expects the GM to remember.
-func recentEventsPrompt(turns []Turn, limit int) string {
-	if len(turns) == 0 || limit <= 0 {
-		return ""
-	}
-	start := len(turns) - limit
-	if start < 0 {
-		start = 0
-	}
-
-	var sb strings.Builder
-	for _, turn := range turns[start:] {
-		if input := strings.TrimSpace(turn.Input); input != "" {
-			fmt.Fprintf(&sb, "Turn %d - Player [%s]: %s\n", turn.Number, turn.Mode, truncateRunes(input, recentNarrationLimit))
-		} else {
-			fmt.Fprintf(&sb, "Turn %d - [%s]\n", turn.Number, turn.Mode)
-		}
-		if narration := strings.TrimSpace(turn.Narration); narration != "" {
-			fmt.Fprintf(&sb, "Narrator: %s\n\n", truncateRunes(narration, recentNarrationLimit))
-		}
-	}
-	return sb.String()
-}
-
-func truncateRunes(value string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	runes := []rune(value)
-	if len(runes) <= max {
-		return value
-	}
-	return string(runes[:max]) + "..."
-}
-
 // openingDirective is the instruction the GM receives as the campaign's first
 // turn. It establishes the scene without deciding the protagonist's own actions,
 // which is the one thing a narrator must not take away from a player.
@@ -153,6 +108,11 @@ func (o *TurnOrchestrator) SetChunkTimeout(timeout time.Duration) {
 		timeout = defaultChunkTimeout
 	}
 	o.chunkTimeout = timeout
+}
+
+// SetContextLimits applies the configured prompt budget and recall window.
+func (o *TurnOrchestrator) SetContextLimits(limits harness.ContextLimits) {
+	o.assembler.SetLimits(limits)
 }
 
 // SetOpeningPrompt supplies the player's own opening instruction, used when the
@@ -345,7 +305,21 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	// Assemble context with system rules, world lore prompts, and a window of
 	// recent turns, which is what keeps the narrator in the same conversation.
-	contextPrompt, err := o.assembler.AssembleContextWithProfiles(locationID, o.playerID, generationPrompt, o.rulesPrompt, o.lorePrompt, o.timeline.VoiceProfiles(), recentEventsPrompt(pastTurns, recentEventWindow))
+	recent := make([]harness.RecentTurn, 0, len(pastTurns))
+	for _, turn := range pastTurns {
+		recent = append(recent, harness.RecentTurn{
+			Number:    turn.Number,
+			Mode:      turn.Mode,
+			Input:     turn.Input,
+			Narration: turn.Narration,
+		})
+	}
+
+	assembly, err := o.assembler.AssembleContextWithProfiles(locationID, o.playerID, generationPrompt, o.rulesPrompt, o.lorePrompt, o.timeline.VoiceProfiles(), recent)
+	if err != nil {
+		return nil, fmt.Errorf("assemble context: %w", err)
+	}
+	contextPrompt := assembly.Prompt
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)
 	}
@@ -360,15 +334,16 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	turn := Turn{
-		Number:    turnNum,
-		Timestamp: time.Now(),
-		Mode:      mode,
-		Input:     actionInput,
-		Roll:      rollRes,
-		Narration: narration,
-		Location:  locationID,
-		Outcome:   outcome,
-		Truncated: finishReason == "length",
+		Number:       turnNum,
+		Timestamp:    time.Now(),
+		Mode:         mode,
+		Input:        actionInput,
+		Roll:         rollRes,
+		Narration:    narration,
+		Location:     locationID,
+		Outcome:      outcome,
+		Truncated:    finishReason == "length",
+		ContextNotes: assembly.Trimmed,
 	}
 
 	if strings.TrimSpace(turn.Narration) == "" {

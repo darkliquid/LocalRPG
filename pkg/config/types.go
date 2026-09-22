@@ -38,6 +38,14 @@ type AgentsConfig struct {
 	// so configuration written before these keys existed keeps working.
 	TurnTimeoutSeconds  int `yaml:"turn_timeout_seconds" json:"turn_timeout_seconds"`
 	ChunkTimeoutSeconds int `yaml:"chunk_timeout_seconds" json:"chunk_timeout_seconds"`
+	// ContextTokenBudget bounds the assembled prompt, in estimated tokens. Zero
+	// means unbounded, which is the behaviour for configuration written before
+	// this key existed.
+	ContextTokenBudget int `yaml:"context_token_budget" json:"context_token_budget"`
+	// RecentTurnWindow is how many prior turns the narrator is reminded of.
+	RecentTurnWindow int `yaml:"recent_turn_window" json:"recent_turn_window"`
+	// RecentTurnCharLimit caps the text recalled from any one prior turn.
+	RecentTurnCharLimit int `yaml:"recent_turn_char_limit" json:"recent_turn_char_limit"`
 }
 
 type VoiceProfile struct {
@@ -125,6 +133,8 @@ func DefaultConfig() *Config {
 			DefaultRole:         "gm",
 			TurnTimeoutSeconds:  300,
 			ChunkTimeoutSeconds: 60,
+			RecentTurnWindow:    6,
+			RecentTurnCharLimit: 1200,
 			Roles: map[string]AgentRoleConfig{
 				"gm": {
 					Type:        "cli",
@@ -215,6 +225,29 @@ func (c *Config) TurnTimeout() time.Duration {
 		seconds = 300
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+// RecentTurns is how many prior turns the narrator is reminded of.
+func (c *Config) RecentTurns() int {
+	if c.Agents.RecentTurnWindow <= 0 {
+		return 6
+	}
+	return c.Agents.RecentTurnWindow
+}
+
+// RecentTurnChars caps the text recalled from any one prior turn, so a single
+// long scene cannot crowd out everything else.
+func (c *Config) RecentTurnChars() int {
+	if c.Agents.RecentTurnCharLimit <= 0 {
+		return 1200
+	}
+	return c.Agents.RecentTurnCharLimit
+}
+
+// ContextBudget is the estimated token ceiling for an assembled prompt. Zero
+// means unbounded.
+func (c *Config) ContextBudget() int {
+	return c.Agents.ContextTokenBudget
 }
 
 // ChunkTimeout is the silence tolerated between narration deltas.
