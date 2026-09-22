@@ -107,3 +107,23 @@ func TestTraceSettingsHaveDefaults(t *testing.T) {
 		t.Errorf("TraceChunkLimit() = %d, want 20", got)
 	}
 }
+
+func TestRecallSettingsHaveDefaults(t *testing.T) {
+	empty := &Config{}
+
+	if got := empty.SceneRecallTurns(); got != 4 {
+		t.Errorf("SceneRecallTurns() = %d, want 4", got)
+	}
+	if got := empty.SceneRecallChars(); got != 800 {
+		t.Errorf("SceneRecallChars() = %d, want 800", got)
+	}
+	if got := empty.RetrievalTurns(); got != 3 {
+		t.Errorf("RetrievalTurns() = %d, want 3", got)
+	}
+	if got := empty.RetrievalChars(); got != 800 {
+		t.Errorf("RetrievalChars() = %d, want 800", got)
+	}
+	if got := empty.RetrievalHalfLifeTurns(); got != 12 {
+		t.Errorf("RetrievalHalfLifeTurns() = %d, want 12", got)
+	}
+}

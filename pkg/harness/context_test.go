@@ -391,3 +391,63 @@ func TestEstablishedNamesListsWhatIsInPlay(t *testing.T) {
 		t.Errorf("an entity that is neither present nor mentioned must not be named")
 	}
 }
+
+func TestSceneRecallRemembersThisLocationOnly(t *testing.T) {
+	store := newTestEntityStore(t)
+	saveEntity(t, store, &entity.Entity{ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Hash: "h1"})
+	saveEntity(t, store, &entity.Entity{ID: "oakhaven-tavern", Name: "Oakhaven Tavern", Type: "location", Hash: "h2"})
+	for _, turn := range []storage.TurnRecord{
+		{Number: 1, Timestamp: time.Now(), Mode: "Do", Narration: "The brazier guttered.", Location: "aldon-harbour"},
+		{Number: 2, Timestamp: time.Now(), Mode: "Do", Narration: "Ale and noise.", Location: "oakhaven-tavern"},
+		{Number: 3, Timestamp: time.Now(), Mode: "Do", Narration: "Kael refused the gate.", Location: "aldon-harbour"},
+	} {
+		if err := store.SaveTurn(turn); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	assembler := NewContextAssembler(store)
+	result, err := assembler.Assemble(ContextRequest{
+		LocationID: "aldon-harbour",
+		Action:     "I approach",
+		TurnNumber: 4,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(result.Prompt, "WHAT HAPPENED HERE") {
+		t.Fatalf("expected a scene recall section:\n%s", result.Prompt)
+	}
+	if !strings.Contains(result.Prompt, "The brazier guttered.") || !strings.Contains(result.Prompt, "Kael refused the gate.") {
+		t.Errorf("expected both turns at this location:\n%s", result.Prompt)
+	}
+	if strings.Contains(result.Prompt, "Ale and noise.") {
+		t.Errorf("a turn at another location must not be recalled here")
+	}
+}
+
+func TestSceneRecallExcludesTurnsAlreadyInTheWindow(t *testing.T) {
+	store := newTestEntityStore(t)
+	saveEntity(t, store, &entity.Entity{ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Hash: "h1"})
+	if err := store.SaveTurn(storage.TurnRecord{
+		Number: 1, Timestamp: time.Now(), Mode: "Do", Narration: "The bell tolled.", Location: "aldon-harbour",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	assembler := NewContextAssembler(store)
+	result, err := assembler.Assemble(ContextRequest{
+		LocationID: "aldon-harbour",
+		Action:     "I wait",
+		Recent:     []RecentTurn{{Number: 1, Mode: "Do", Narration: "The bell tolled."}},
+		TurnNumber: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Count(result.Prompt, "The bell tolled.") != 1 {
+		t.Errorf("a turn in the window must not be recalled twice:\n%s", result.Prompt)
+	}
+}

@@ -21,11 +21,19 @@ type ContextLimits struct {
 	RecentTurns int
 	// RecentTurnChars caps one prior turn's text. Zero uses the default.
 	RecentTurnChars int
+	// Recall bounds. Zero uses the documented defaults.
+	SceneRecallTurns  int
+	SceneRecallChars  int
+	RetrievalTurns    int
+	RetrievalChars    int
+	RetrievalHalflife int
 }
 
 const (
-	defaultRecentTurns     = 6
-	defaultRecentTurnChars = 1200
+	defaultRecentTurns      = 6
+	defaultRecentTurnChars  = 1200
+	defaultSceneRecallTurns = 4
+	defaultRecallChars      = 800
 	// minRecentTurnChars is the floor a turn's excerpt can be shortened to before
 	// the recall section is dropped instead.
 	minRecentTurnChars = 200
@@ -137,6 +145,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 		{name: "instructions", text: speechFormattingInstruction + "\n\n"},
 		{name: "canon", text: canon},
 		{name: "recent", text: c.recentSection(req), droppable: true, rank: 4},
+		{name: "recall", text: c.sceneRecall(req), droppable: true, rank: 3},
 		{name: "catalogue", text: catalogue, droppable: true, rank: 1},
 		{name: "action", text: "\n## PLAYER ACTION\n" + req.Action + "\n"},
 	}, nil
@@ -229,6 +238,65 @@ func (c *ContextAssembler) recentSection(req ContextRequest) string {
 		turns = turns[len(turns)-window:]
 	}
 	return formatRecentTurns(turns, charLimit)
+}
+
+// sceneRecall renders what happened where the party is standing. A place feels
+// continuous only if returning to it is not the same as arriving.
+func (c *ContextAssembler) sceneRecall(req ContextRequest) string {
+	if c.store == nil || req.LocationID == "" {
+		return ""
+	}
+
+	limit := c.limits.SceneRecallTurns
+	if limit <= 0 {
+		limit = defaultSceneRecallTurns
+	}
+	charLimit := c.limits.SceneRecallChars
+	if charLimit <= 0 {
+		charLimit = defaultRecallChars
+	}
+
+	// Turns already replayed in the window are not repeated here.
+	inWindow := make(map[int]bool, len(req.Recent))
+	for _, turn := range req.Recent {
+		inWindow[turn.Number] = true
+	}
+
+	before := req.TurnNumber
+	if before <= 0 {
+		before = 1 << 30
+	}
+
+	// Ask for extra, because some are filtered out as already in the window.
+	turns, err := c.store.TurnsAtLocation(req.LocationID, before, limit+len(inWindow))
+	if err != nil {
+		return ""
+	}
+
+	lines := make([]string, 0, limit)
+	for _, turn := range turns {
+		if inWindow[turn.Number] {
+			continue
+		}
+		if len(lines) == limit {
+			break
+		}
+		narrated := TruncateRunes(strings.TrimSpace(turn.Narration), charLimit)
+		if narrated == "" {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("Turn %d: %s", turn.Number, narrated))
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n## WHAT HAPPENED HERE\n")
+	for _, line := range lines {
+		sb.WriteString(line + "\n")
+	}
+	return sb.String()
 }
 
 // fitToBudget drops optional sections in rank order until the prompt fits, then

@@ -57,6 +57,13 @@ type AgentsConfig struct {
 	TraceMaxFiles     int   `yaml:"trace_max_files" json:"trace_max_files"`
 	TraceRotateCheck  int   `yaml:"trace_rotate_check" json:"trace_rotate_check"`
 	TraceChunkLimit   int   `yaml:"trace_chunk_limit" json:"trace_chunk_limit"`
+	// Recall bounds. Scene recall covers the current location; retrieval covers the
+	// turns that share entities with what is in play.
+	SceneRecallTurns       int `yaml:"scene_recall_turns" json:"scene_recall_turns"`
+	SceneRecallChars       int `yaml:"scene_recall_chars" json:"scene_recall_chars"`
+	RetrievalTurns         int `yaml:"retrieval_turns" json:"retrieval_turns"`
+	RetrievalChars         int `yaml:"retrieval_chars" json:"retrieval_chars"`
+	RetrievalHalfLifeTurns int `yaml:"retrieval_halflife_turns" json:"retrieval_halflife_turns"`
 }
 
 type VoiceProfile struct {
@@ -319,4 +326,46 @@ func (c *Config) TraceChunkLimit() int {
 		return 500
 	}
 	return c.Agents.TraceChunkLimit
+}
+
+// SceneRecallTurns is how many prior turns at the current location are recalled.
+func (c *Config) SceneRecallTurns() int {
+	if c.Agents.SceneRecallTurns <= 0 {
+		return 4
+	}
+	return c.Agents.SceneRecallTurns
+}
+
+// SceneRecallChars caps the excerpt taken from one recalled turn.
+func (c *Config) SceneRecallChars() int {
+	if c.Agents.SceneRecallChars <= 0 {
+		return 800
+	}
+	return c.Agents.SceneRecallChars
+}
+
+// RetrievalTurns is how many turns are retrieved by entity overlap.
+func (c *Config) RetrievalTurns() int {
+	if c.Agents.RetrievalTurns <= 0 {
+		return 3
+	}
+	return c.Agents.RetrievalTurns
+}
+
+// RetrievalChars caps the excerpt taken from one retrieved turn.
+func (c *Config) RetrievalChars() int {
+	if c.Agents.RetrievalChars <= 0 {
+		return 800
+	}
+	return c.Agents.RetrievalChars
+}
+
+// RetrievalHalfLifeTurns is the age at which a retrieved turn's recency weight
+// halves. A linear weight reaching zero at the window edge would make retrieval
+// useless for exactly the cases it exists for.
+func (c *Config) RetrievalHalfLifeTurns() int {
+	if c.Agents.RetrievalHalfLifeTurns <= 0 {
+		return 12
+	}
+	return c.Agents.RetrievalHalfLifeTurns
 }
