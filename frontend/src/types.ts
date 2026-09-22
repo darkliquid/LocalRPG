@@ -348,6 +348,8 @@ export interface TestProviderResponse {
   message: string;
   preview?: string;
   audio_data_uri?: string;
+  model_missing?: boolean;
+  model_id?: string;
 }
 
 export interface AddressedFinding {
