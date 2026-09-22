@@ -8,10 +8,16 @@ const percent = (value: number, max: number) => `${max > 0 ? Math.min(100, (valu
 interface LivingWorldDrawerProps {
   state?: GameState;
   recap?: Recap;
+  idleTurns?: number;
   onRefreshRecap?: () => void;
 }
 
-export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({ state, recap, onRefreshRecap }) => {
+export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({
+  state,
+  recap,
+  idleTurns = 10,
+  onRefreshRecap,
+}) => {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -36,14 +42,44 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({ state, rec
             </p>
             <p className="text-[11px] font-mono text-stone-500">Through turn {recap.through_turn}</p>
           </>
-        ) : (
+        ) : (!recap?.threads || recap.threads.length === 0) ? (
           <p className="text-stone-500 text-xs italic bg-black/30 p-3 rounded-xl border border-white/5">
             {recap?.enabled === false
               ? 'Summaries are switched off in Settings.'
               : 'The story has not turned far enough to be summarised yet.'}
           </p>
-        )}
+        ) : null}
       </div>
+
+      {recap?.threads && recap.threads.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-cinzel text-amber-400 font-bold uppercase tracking-wider">Open Threads</h3>
+          {recap.threads.map((thread) => {
+            // A quiet thread is the one most likely to be forgotten, so it is the one
+            // the player is nudged about. The narrator sees them all either way.
+            const stale = thread.idle >= idleTurns;
+            return (
+              <div
+                key={thread.id}
+                className={`text-xs rounded-xl border p-2.5 space-y-1 ${
+                  stale ? 'bg-amber-950/30 border-amber-500/40' : 'bg-black/30 border-white/5'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-stone-200">{thread.name}</span>
+                  <span className="font-mono text-[11px] text-stone-400">{thread.status}</span>
+                </div>
+                <div className="text-[11px] font-mono text-stone-500">
+                  {thread.last_advanced > 0
+                    ? `Last advanced at turn ${thread.last_advanced} (${thread.idle} turns ago)`
+                    : 'Not advanced yet'}
+                  {stale && ' - worth returning to'}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="space-y-3">
         <h3 className="text-sm font-cinzel text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">

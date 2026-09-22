@@ -143,13 +143,23 @@ type EntitySummaryDTO struct {
 	Tags     []string `json:"tags,omitempty"`
 }
 
+// ThreadDTO is one unresolved arc as the client sees it.
+type ThreadDTO struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Status       string `json:"status"`
+	LastAdvanced int    `json:"last_advanced"`
+	Idle         int    `json:"idle"`
+}
+
 // RecapDTO is a campaign's long memory as the client reads it.
 type RecapDTO struct {
-	Summary     string `json:"summary,omitempty"`
-	ThroughTurn int    `json:"through_turn"`
+	Summary     string      `json:"summary,omitempty"`
+	ThroughTurn int         `json:"through_turn"`
 	// Enabled is false when summarisation is off, so a client can offer the panel
 	// without offering a refresh that would do nothing.
-	Enabled bool `json:"enabled"`
+	Enabled bool        `json:"enabled"`
+	Threads []ThreadDTO `json:"threads,omitempty"`
 }
 
 // GameSettingsPatchDTO is a partial update of a campaign's settings. An absent

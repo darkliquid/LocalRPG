@@ -53,10 +53,19 @@ export interface TurnEvent {
   message?: string;
 }
 
+export interface Thread {
+  id: string;
+  name: string;
+  status: string;
+  last_advanced: number;
+  idle: number;
+}
+
 export interface Recap {
   summary?: string;
   through_turn: number;
   enabled: boolean;
+  threads?: Thread[];
 }
 
 export interface EntitySummary {
@@ -224,6 +233,9 @@ export interface AgentsConfig {
   trace_max_files?: number;
   trace_rotate_check?: number;
   trace_chunk_limit?: number;
+  thread_idle_turns?: number;
+  threads_max?: number;
+  continuity_checks?: boolean;
 }
 
 export interface VoiceProfile {

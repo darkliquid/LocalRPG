@@ -797,3 +797,40 @@ func TestAddressingAFindingSurvivesAReload(t *testing.T) {
 		t.Errorf("expected a sidecar on disk: %v", err)
 	}
 }
+
+func TestRecapCarriesTheOpenThreads(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	if err := svc.SaveEntity(context.Background(), gameID, "the-miasma",
+		"---\nid: the-miasma\nname: The Creeping Miasma\ntype: arc\n---\nA creeping fog.\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	recap, err := svc.GetRecap(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("GetRecap failed: %v", err)
+	}
+	if len(recap.Threads) != 1 {
+		t.Fatalf("expected one open thread, got %+v", recap.Threads)
+	}
+	if recap.Threads[0].ID != "the-miasma" || recap.Threads[0].Status != "open" {
+		t.Errorf("unexpected thread: %+v", recap.Threads[0])
+	}
+}
+
+func TestResolvedThreadsAreNotOpen(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	if err := svc.SaveEntity(context.Background(), gameID, "the-siege",
+		"---\nid: the-siege\nname: The Iron Siege\ntype: arc\nstate:\n  status: resolved\n---\nThe siege broke.\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	recap, err := svc.GetRecap(context.Background(), gameID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recap.Threads) != 0 {
+		t.Errorf("expected no open threads, got %+v", recap.Threads)
+	}
+}

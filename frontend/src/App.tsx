@@ -416,6 +416,7 @@ export const App: React.FC = () => {
               <LivingWorldDrawer
                 state={gameState || undefined}
                 recap={recap || undefined}
+                idleTurns={config?.agents.thread_idle_turns ?? 10}
                 onRefreshRecap={() => {
                   client?.getRecap().then(setRecap).catch(console.error);
                 }}

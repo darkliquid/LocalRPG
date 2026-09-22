@@ -926,10 +926,31 @@ func (s *Service) GetRecap(ctx context.Context, gameID string) (*RecapDTO, error
 	if err != nil {
 		return nil, fmt.Errorf("read chronicle: %w", err)
 	}
+
+	latest := 0
+	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
+	if turns, err := engine.NewHistoryLogger(historyPath).LoadHistory(); err == nil && len(turns) > 0 {
+		latest = turns[len(turns)-1].Number
+	}
+
+	threads := make([]ThreadDTO, 0)
+	if open, err := engine.OpenThreads(s.storeOrNil(gameID), latest); err == nil {
+		for _, thread := range open {
+			threads = append(threads, ThreadDTO{
+				ID:           thread.ID,
+				Name:         thread.Name,
+				Status:       thread.Status,
+				LastAdvanced: thread.LastAdvanced,
+				Idle:         thread.Idle,
+			})
+		}
+	}
+
 	return &RecapDTO{
 		Summary:     chronicle.Summary,
 		ThroughTurn: chronicle.ThroughTurn,
 		Enabled:     s.configMgr.Get().SummaryEvery() > 0,
+		Threads:     threads,
 	}, nil
 }
 
