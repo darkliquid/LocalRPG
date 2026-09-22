@@ -9,9 +9,10 @@ interface CodexDrawerProps {
   entities?: EntitySummary[];
   onSelect: (entityId: string) => void;
   onSave: (entityId: string, markdown: string) => void;
+  onMerge?: (sourceID: string, intoID: string) => void;
 }
 
-export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, onSelect, onSave }) => {
+export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, onSelect, onSave, onMerge }) => {
   const [markdown, setMarkdown] = useState('');
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -151,13 +152,36 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, onSe
                 <h2 className="text-xl font-cinzel text-amber-400 font-bold">{entity.name}</h2>
                 <span className="text-xs font-mono uppercase text-stone-400">{entity.type}</span>
               </div>
-              <button
-                onClick={() => onSave(entity.id, markdown)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold text-xs shadow-md transition-all cursor-pointer"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>Save</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {onMerge && (entities?.length ?? 0) > 1 && (
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value && entity) {
+                        onMerge(entity.id, e.target.value);
+                        e.target.value = '';
+                      }
+                    }}
+                    className="bg-stone-900 border border-stone-700 rounded-lg pl-2.5 pr-8 py-1.5 text-xs font-mono text-stone-300 focus:outline-none cursor-pointer"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Merge into...</option>
+                    {(entities ?? [])
+                      .filter((candidate) => candidate.id !== entity.id)
+                      .map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {candidate.name}
+                        </option>
+                      ))}
+                  </select>
+                )}
+                <button
+                  onClick={() => onSave(entity.id, markdown)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold text-xs shadow-md transition-all cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center justify-between px-1">

@@ -188,6 +188,25 @@ export const App: React.FC = () => {
     refreshCorpus();
   };
 
+  const handleMergeEntity = async (sourceID: string, intoID: string) => {
+    if (!client || !activeGameID) return;
+
+    const sourceName = entities.find((candidate) => candidate.id === sourceID)?.name ?? sourceID;
+    const targetName = entities.find((candidate) => candidate.id === intoID)?.name ?? intoID;
+    const confirmed = window.confirm(
+      `Merge "${sourceName}" into "${targetName}"? Its prose, tags, aliases, and turn history move across, and the note is removed.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const merged = await client.mergeEntity(sourceID, intoID);
+      setSelectedEntity(merged);
+      refreshCorpus();
+    } catch (err) {
+      console.error('merge failed:', err);
+    }
+  };
+
   // Find latest scene image for full-window atmospheric background
   const activeBgImage = chronicle.slice().reverse().find((t) => t.image_url)?.image_url;
 
@@ -373,6 +392,7 @@ export const App: React.FC = () => {
                 entities={entities}
                 onSelect={handleOpenWikilink}
                 onSave={handleSaveEntity}
+                onMerge={handleMergeEntity}
               />
             )}
             {activeDrawer === 'world' && (

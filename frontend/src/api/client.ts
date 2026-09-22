@@ -304,4 +304,14 @@ export class APIClient {
     });
     if (!res.ok) throw new Error(`saveEntity: ${res.statusText}`);
   }
+
+  async mergeEntity(sourceID: string, intoID: string): Promise<EntityNote> {
+    const res = await fetch(`/api/game/${this.gameID}/entity/${sourceID}/merge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ into: intoID }),
+    });
+    if (!res.ok) throw new Error(`mergeEntity: ${res.statusText}`);
+    return res.json();
+  }
 }
