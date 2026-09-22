@@ -846,3 +846,29 @@ func TestFindingsRouteRecordsAndReturns(t *testing.T) {
 		t.Errorf("expected 1 addressed finding, got %+v", found)
 	}
 }
+
+func TestModelManagementEndpoints(t *testing.T) {
+	_, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	// GET /api/models
+	req := httptest.NewRequest(http.MethodGet, "/api/models", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var statuses []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &statuses); err != nil {
+		t.Fatalf("decode models: %v", err)
+	}
+	if len(statuses) == 0 {
+		t.Fatalf("expected at least 1 registered model, got 0")
+	}
+}
+

@@ -23,6 +23,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/media/playback"
+	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -37,6 +38,7 @@ type Service struct {
 	configMgr *config.ConfigManager
 	indexed   map[string]bool
 	locks     map[string]*sync.Mutex
+	modelsManager *models.Manager
 	// Audio playback belongs to the process so narration never depends on a
 	// browser's autoplay policy. It is opened once, on first use, because most
 	// requests never need it.
@@ -102,8 +104,26 @@ func NewService(rootDir string) *Service {
 		configMgr:      mgr,
 		indexed:        make(map[string]bool),
 		locks:          make(map[string]*sync.Mutex),
+		modelsManager:  models.NewManager(cacheDir),
 		summaryPending: make(map[string]bool),
 	}
+}
+
+func (s *Service) GetModelsStatus() []models.ModelStatus {
+	return s.modelsManager.ListStatuses()
+}
+
+func (s *Service) DownloadModel(ctx context.Context, id string) error {
+	_, err := s.modelsManager.Download(ctx, id)
+	return err
+}
+
+func (s *Service) SubscribeModelEvents() chan models.ModelStatus {
+	return s.modelsManager.Subscribe()
+}
+
+func (s *Service) UnsubscribeModelEvents(ch chan models.ModelStatus) {
+	s.modelsManager.Unsubscribe(ch)
 }
 
 func (s *Service) GetResolver() *core.PathResolver {

@@ -3,6 +3,7 @@ package gui
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/models"
 )
 
 type Server struct {
@@ -43,6 +45,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/audio/", s.handleAudioRoutes)
 	s.mux.HandleFunc("/api/stt", s.handleSTTRoute)
 	s.mux.HandleFunc("/api/trace", s.handleTraceRoute)
+	s.mux.HandleFunc("/api/models", s.handleModelsRoutes)
+	s.mux.HandleFunc("/api/models/", s.handleModelsRoutes)
 	if s.assetServer != nil {
 		s.mux.Handle("/", s.assetServer)
 	}
@@ -779,3 +783,63 @@ func (s *Server) handleTurnSubmit(w http.ResponseWriter, r *http.Request, gameID
 		_ = writeEvent(TurnEvent{Type: "error", Message: err.Error()})
 	}
 }
+
+func (s *Server) handleModelsRoutes(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/models")
+	path = strings.TrimPrefix(path, "/")
+
+	if path == "" && r.Method == http.MethodGet {
+		statuses := s.service.GetModelsStatus()
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(statuses)
+		return
+	}
+
+	if path == "events" && r.Method == http.MethodGet {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		ch := s.service.SubscribeModelEvents()
+		defer s.service.UnsubscribeModelEvents(ch)
+
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case status, ok := <-ch:
+				if !ok {
+					return
+				}
+				data, _ := json.Marshal(status)
+				_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
+				flusher.Flush()
+			}
+		}
+	}
+
+	parts := strings.Split(path, "/")
+	if len(parts) == 2 && parts[1] == "download" && r.Method == http.MethodPost {
+		modelID := parts[0]
+		if err := s.service.DownloadModel(r.Context(), modelID); err != nil {
+			if errors.Is(err, models.ErrDownloadActive) {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "downloading"})
+		return
+	}
+
+	http.NotFound(w, r)
+}
+
