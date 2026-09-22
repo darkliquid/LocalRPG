@@ -713,3 +713,33 @@ func TestSummaryIsTheLastSectionSurrendered(t *testing.T) {
 		}
 	}
 }
+
+func TestEstablishedNamesListAliases(t *testing.T) {
+	store := newTestEntityStore(t)
+	saveEntity(t, store, &entity.Entity{ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Hash: "h1"})
+	saveEntity(t, store, &entity.Entity{
+		ID: "guard-kael", Name: "Guard Kael", Type: "character", Hash: "h2",
+		Aliases: []string{"The Ember Warden"},
+	})
+	if err := store.SaveTurn(storage.TurnRecord{
+		Number: 1, Timestamp: time.Now(), Mode: "Do", Input: "x", Narration: "y",
+		Entities: []storage.TurnEntityRef{{EntityID: "guard-kael", Mention: "wikilink"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	assembler := NewContextAssembler(store)
+	result, err := assembler.Assemble(ContextRequest{
+		LocationID: "aldon-harbour",
+		Action:     "I wait",
+		Recent:     []RecentTurn{{Number: 1, Mode: "Do", Narration: "y"}},
+		TurnNumber: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(result.Prompt, "also known as") || !strings.Contains(result.Prompt, "The Ember Warden") {
+		t.Errorf("expected the alias in the established names:\n%s", result.Prompt)
+	}
+}

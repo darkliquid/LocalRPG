@@ -761,6 +761,10 @@ func (c *ContextAssembler) establishedNames(req ContextRequest) string {
 			return
 		}
 		seen[id] = true
+		if len(ent.Aliases) > 0 {
+			names = append(names, fmt.Sprintf("%s (also known as %s)", ent.Name, strings.Join(ent.Aliases, ", ")))
+			return
+		}
 		names = append(names, ent.Name)
 	}
 

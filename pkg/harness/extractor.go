@@ -115,6 +115,22 @@ func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 
 const minSharedNameLength = 4
 
+// aliasMatches reports whether a candidate names an entity through one of its
+// aliases. Aliases are matched after IDs and names, never before: a note's own name
+// is always the stronger signal.
+func aliasMatches(candidate string, aliases []string) bool {
+	slug := entity.Slugify(entity.WikilinkTarget(candidate))
+	if slug == "" {
+		return false
+	}
+	for _, alias := range aliases {
+		if entity.Slugify(alias) == slug {
+			return true
+		}
+	}
+	return false
+}
+
 // MatchExistingEntity returns the indexed entity an extraction most likely
 // describes, or nil when it is genuinely new. Identity is resolved by ID, then
 // name, then contextual state: entity type, location, and role tags mentioned in
@@ -142,6 +158,11 @@ func MatchExistingEntity(store *storage.Store, raw *ExtractedEntity) *entity.Ent
 
 	for _, summary := range summaries {
 		if summary.ID == raw.ID || summary.ID == nameKey || entity.Slugify(summary.Name) == nameKey {
+			if ent, err := store.GetEntity(summary.ID); err == nil && ent != nil {
+				return ent
+			}
+		}
+		if aliasMatches(raw.Name, summary.Aliases) {
 			if ent, err := store.GetEntity(summary.ID); err == nil && ent != nil {
 				return ent
 			}
@@ -398,7 +419,7 @@ func ResolveSpeakerID(store *storage.Store, name string) string {
 	}
 
 	for _, summary := range summaries {
-		if entity.Slugify(summary.Name) == slug {
+		if entity.Slugify(summary.Name) == slug || aliasMatches(cleaned, summary.Aliases) {
 			return summary.ID
 		}
 	}

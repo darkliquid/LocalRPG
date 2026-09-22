@@ -412,3 +412,27 @@ func TestResolveProseMentionsIgnoresDescriptionsAndPartialWords(t *testing.T) {
 		t.Errorf("expected no mentions, got %+v", mentions)
 	}
 }
+
+func TestResolveSpeakerIDAndMatchingKnowAliases(t *testing.T) {
+	store := newTestEntityStore(t)
+	if err := store.SaveEntity(&entity.Entity{
+		ID: "guard-kael", Name: "Guard Kael", Type: "character", Body: "A warden.",
+		Aliases: []string{"The Ember Warden"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := ResolveSpeakerID(store, "The Ember Warden"); got != "guard-kael" {
+		t.Errorf("ResolveSpeakerID(alias) = %q, want guard-kael", got)
+	}
+
+	matched := MatchExistingEntity(store, &ExtractedEntity{Name: "The Ember Warden", Type: "character"})
+	if matched == nil || matched.ID != "guard-kael" {
+		t.Errorf("expected the alias to match the existing entity, got %+v", matched)
+	}
+
+	// An alias does not invent an entity: an unknown name still matches nothing.
+	if MatchExistingEntity(store, &ExtractedEntity{Name: "Someone Else", Type: "character"}) != nil {
+		t.Errorf("expected an unrelated name not to match")
+	}
+}
