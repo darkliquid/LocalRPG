@@ -1,31 +1,15 @@
 import React from 'react';
 import { TurnSegment } from '../types';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
+import { MarkdownProse } from './MarkdownProse';
 
 interface TurnSegmentsProps {
   segments?: TurnSegment[];
   fallback: string;
-  onEntityClick?: (name: string) => void;
+  onEntityClick?: (entityId: string) => void;
   autoPlay?: boolean;
   volume?: number;
 }
-
-const renderWithLinks = (text: string, onEntityClick?: (name: string) => void) =>
-  text.split(/(\[\[[^\]]+\]\])/g).map((part, i) => {
-    if (part.startsWith('[[') && part.endsWith(']]')) {
-      const link = part.slice(2, -2);
-      return (
-        <button
-          key={i}
-          onClick={() => onEntityClick?.(link)}
-          className="text-amber-400 hover:text-amber-300 underline font-medium cursor-pointer mx-1 transition-colors"
-        >
-          {link}
-        </button>
-      );
-    }
-    return <span key={i}>{part}</span>;
-  });
 
 export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   segments,
@@ -58,14 +42,19 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
                 {segment.speaker || 'UNKNOWN'}
               </div>
             )}
-            <p className="text-stone-100 text-lg leading-relaxed italic">
-              &ldquo;{renderWithLinks(segment.text, onEntityClick)}&rdquo;
-            </p>
+            <MarkdownProse
+              text={`\u201c${segment.text}\u201d`}
+              onEntityClick={onEntityClick}
+              className="text-stone-100 text-lg leading-relaxed italic space-y-2"
+            />
           </div>
         ) : (
-          <div key={i} className="text-stone-200 text-xl leading-relaxed tracking-wide font-serif">
-            {renderWithLinks(segment.text, onEntityClick)}
-          </div>
+          <MarkdownProse
+            key={i}
+            text={segment.text}
+            onEntityClick={onEntityClick}
+            className="text-stone-200 text-xl leading-relaxed tracking-wide font-serif space-y-4"
+          />
         )
       )}
       {hasAudio && (

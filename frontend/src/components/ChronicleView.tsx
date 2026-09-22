@@ -78,6 +78,12 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               volume={volume}
             />
 
+            {turn.truncated && (
+              <div className="text-xs font-mono text-amber-400/80 pt-1">
+                The narrator was cut off by the model's token limit. Raise max_tokens for the gm role in Settings.
+              </div>
+            )}
+
             {/* Entities involved in this turn */}
             {turn.entities_hit && turn.entities_hit.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 pt-1">

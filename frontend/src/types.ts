@@ -39,6 +39,8 @@ export interface Turn {
   location_name?: string;
   location_art_url?: string;
   outcome?: string;
+  // Set when the model hit its token limit mid-reply.
+  truncated?: boolean;
 }
 
 export interface TurnEvent {

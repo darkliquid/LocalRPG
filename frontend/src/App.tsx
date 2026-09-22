@@ -101,6 +101,10 @@ export const App: React.FC = () => {
             const turn = event.turn;
             setChronicle((prev) => [...prev, turn]);
             setStreamedProse('');
+            // A turn can introduce characters, so the graph and the character
+            // view are refreshed rather than left showing the state before it.
+            client.getGraph().then(setGraph).catch(console.error);
+            client.getGameState().then(setGameState).catch(console.error);
           } else if (event.type === 'error') {
             console.error('turn failed:', event.message);
           }
