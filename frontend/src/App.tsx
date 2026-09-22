@@ -13,6 +13,7 @@ import { StoryTheater } from './components/StoryTheater';
 import { LauncherHub } from './components/LauncherHub';
 import { SettingsStudio } from './components/SettingsStudio';
 import { ProloguePanel } from './components/ProloguePanel';
+import { AddEntityModal } from './components/AddEntityModal';
 import { User, Network, BookOpen, Clock, Film, Compass, Settings, X } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [addressed, setAddressed] = useState<Set<number>>(new Set());
+  const [modalEntity, setModalEntity] = useState<{ name: string; turnNumber: number } | null>(null);
 
   useEffect(() => {
     APIClient.getSettings()
@@ -216,8 +218,57 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleCorrect = (note: string) => {
-    void handleActionSubmit('GM', `/gm ${note}`);
+  const parseMissingEntityName = (note: string): string | null => {
+    const match = note.match(/"([^"]+)" (?:speaks but has no note|is named but has no note|speaks but is not a known character)/i);
+    return match ? match[1] : null;
+  };
+
+  const handleCorrect = (note: string, turnNumber?: number) => {
+    const entityName = parseMissingEntityName(note);
+    if (entityName && turnNumber !== undefined) {
+      setModalEntity({ name: entityName, turnNumber });
+    } else {
+      const input = document.getElementById('action-console-input') as HTMLInputElement | null;
+      if (input) {
+        input.value = `/gm ${note}`;
+        input.focus();
+      }
+    }
+  };
+
+  const handleQuickCreateEntity = async (name: string, type: string) => {
+    if (!client || !modalEntity) return;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const template = `---\nid: ${slug}\nname: ${name}\ntype: ${type}\n---\n\n`;
+    try {
+      await client.saveEntity(slug, template);
+      await client.addressFinding(modalEntity.turnNumber, 'continuity');
+      setAddressed((prev) => new Set(prev).add(modalEntity.turnNumber));
+      refreshCorpus();
+    } catch (err) {
+      console.error('quick create entity failed:', err);
+    } finally {
+      setModalEntity(null);
+    }
+  };
+
+  const handleEditInCodexEntity = async (name: string, type: string) => {
+    if (!client || !modalEntity) return;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const template = `---\nid: ${slug}\nname: ${name}\ntype: ${type}\n---\n\n`;
+    try {
+      await client.saveEntity(slug, template);
+      await client.addressFinding(modalEntity.turnNumber, 'continuity');
+      setAddressed((prev) => new Set(prev).add(modalEntity.turnNumber));
+      refreshCorpus();
+      const entity = await client.getEntity(slug);
+      setSelectedEntity(entity);
+      setActiveDrawer('codex');
+    } catch (err) {
+      console.error('edit in codex entity failed:', err);
+    } finally {
+      setModalEntity(null);
+    }
   };
 
   const handleAddress = (turnNumber: number) => {
@@ -458,6 +509,15 @@ export const App: React.FC = () => {
             onClose={() => setIsTheaterOpen(false)}
             autoPlay={serverAudio ? false : config?.media.tts.auto_play ?? false}
             volume={config?.media.tts.master_volume ?? 1}
+          />
+
+          {/* Add Entity Modal */}
+          <AddEntityModal
+            isOpen={modalEntity !== null}
+            entityName={modalEntity?.name ?? ''}
+            onQuickCreate={handleQuickCreateEntity}
+            onEditInCodex={handleEditInCodexEntity}
+            onClose={() => setModalEntity(null)}
           />
         </>
       )}
