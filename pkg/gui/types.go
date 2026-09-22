@@ -250,10 +250,13 @@ type TurnRequest struct {
 
 // TurnEvent is one NDJSON line sent while a turn runs.
 type TurnEvent struct {
-	Type    string   `json:"type"`              // "chunk", "turn", or "error"
-	Text    string   `json:"text,omitempty"`    // narration delta
-	Turn    *TurnDTO `json:"turn,omitempty"`    // the persisted turn
-	Message string   `json:"message,omitempty"` // failure detail
+	Type    string   `json:"type"`                 // "chunk", "turn", "error", or "model_missing"
+	Text    string   `json:"text,omitempty"`       // narration delta
+	Turn    *TurnDTO `json:"turn,omitempty"`       // the persisted turn
+	Message string   `json:"message,omitempty"`    // failure detail
+	ModelID string   `json:"model_id,omitempty"`   // missing model ID
+	Name    string   `json:"name,omitempty"`       // friendly model name
+	Size    int64    `json:"size_bytes,omitempty"` // model size in bytes
 }
 
 // turnModes maps the mode names a client may send to the engine's casing.

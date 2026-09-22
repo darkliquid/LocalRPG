@@ -1077,6 +1077,20 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		return err
 	}
 
+	// When built-in TTS is configured and model weights are missing, inform the client
+	// so the user can be prompted to download the voice pack.
+	if t.cfg.Media.TTS.Type == "builtin" && (t.cfg.Media.TTS.BuiltinName == "sherpa-onnx" || t.cfg.Media.TTS.BuiltinName == "kokoro") {
+		status := t.service.modelsManager.Status("kokoro-tts")
+		if !status.Installed {
+			_ = emit(TurnEvent{
+				Type:    "model_missing",
+				ModelID: "kokoro-tts",
+				Name:    status.Name,
+				Size:    status.TotalBytes,
+			})
+		}
+	}
+
 	// Narration is the application's own responsibility, detached from the
 	// request: the turn is already recorded, and a slow synthesis must not hold
 	// the stream open.

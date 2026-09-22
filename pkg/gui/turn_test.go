@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
@@ -313,3 +314,41 @@ func TestAServiceTracesTheTurnsItRuns(t *testing.T) {
 		t.Errorf("expected the assembled prompt at full level:\n%s", text)
 	}
 }
+
+func TestTurnSessionEmitsModelMissingWhenTTSMissing(t *testing.T) {
+	gameID, svc := turnFixture(t)
+
+	// Configure built-in sherpa-onnx TTS
+	cfg := svc.Config()
+	cfg.Media.TTS = config.TTSConfig{
+		Type:        "builtin",
+		BuiltinName: "sherpa-onnx",
+	}
+
+	session, err := svc.BeginTurn(gameID)
+	if err != nil {
+		t.Fatalf("BeginTurn failed: %v", err)
+	}
+	defer session.Close()
+
+	var emittedMissing bool
+	var modelID string
+	err = session.Run(context.Background(), TurnRequest{Mode: "Do", Input: "I check the doorway"}, func(event TurnEvent) error {
+		if event.Type == "model_missing" {
+			emittedMissing = true
+			modelID = event.ModelID
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("turn run failed: %v", err)
+	}
+
+	if !emittedMissing {
+		t.Errorf("expected model_missing event to be emitted")
+	}
+	if modelID != "kokoro-tts" {
+		t.Errorf("expected modelID = kokoro-tts, got %q", modelID)
+	}
+}
+
