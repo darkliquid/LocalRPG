@@ -233,13 +233,15 @@ type TestProviderRequestDTO struct {
 }
 
 type TestProviderResponseDTO struct {
-	Success   bool   `json:"success"`
-	LatencyMS int64  `json:"latency_ms"`
-	Message   string `json:"message"`
-	Preview   string `json:"preview,omitempty"`
+	Success      bool   `json:"success"`
+	LatencyMS    int64  `json:"latency_ms"`
+	Message      string `json:"message"`
+	Preview      string `json:"preview,omitempty"`
 	// AudioDataURI carries synthesized speech as an inline data URI so a client
 	// can play the exact clip a probe produced instead of only reporting it.
 	AudioDataURI string `json:"audio_data_uri,omitempty"`
+	ModelMissing bool   `json:"model_missing,omitempty"`
+	ModelID      string `json:"model_id,omitempty"`
 }
 
 // TurnRequest is a player action as submitted from a client.

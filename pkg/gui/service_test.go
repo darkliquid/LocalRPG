@@ -422,6 +422,31 @@ func TestTestProviderTTSReturnsPlayableAudio(t *testing.T) {
 	}
 }
 
+func TestTestProviderSherpaTTSMissingModelReturnsStructuredMissing(t *testing.T) {
+	svc := NewService(t.TempDir())
+	res, err := svc.TestProvider(context.Background(), TestProviderRequestDTO{
+		Category: "tts",
+		Provider: config.TTSConfig{
+			Type:        "builtin",
+			BuiltinName: "sherpa-onnx",
+		},
+		TestPrompt: "Testing speech",
+	})
+	if err != nil {
+		t.Fatalf("TestProvider failed: %v", err)
+	}
+	if res.Success {
+		t.Errorf("expected failure for uninstalled kokoro model")
+	}
+	if !res.ModelMissing {
+		t.Errorf("expected ModelMissing to be true")
+	}
+	if res.ModelID != "kokoro-tts" {
+		t.Errorf("expected ModelID 'kokoro-tts', got %q", res.ModelID)
+	}
+}
+
+
 func TestGetGameStateFindsALegacyDisplayNamePlayer(t *testing.T) {
 	gameID, svc := setupTestGame(t)
 

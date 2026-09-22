@@ -2099,6 +2099,22 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		if err := json.Unmarshal(data, &ttsCfg); err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}
+		if ttsCfg.Type == "builtin" && (ttsCfg.BuiltinName == "sherpa-onnx" || ttsCfg.BuiltinName == "kokoro") {
+			if ttsCfg.ModelPath == "" && s.modelsManager != nil {
+				ttsCfg.ModelPath = s.modelsManager.ModelDir("kokoro-tts")
+			}
+			if s.modelsManager != nil {
+				status := s.modelsManager.Status("kokoro-tts")
+				if !status.Installed {
+					return &TestProviderResponseDTO{
+						Success:      false,
+						ModelMissing: true,
+						ModelID:      "kokoro-tts",
+						Message:      "Kokoro voice pack is not installed; download required",
+					}, nil
+				}
+			}
+		}
 		client, err := media.NewTTSClient(ttsCfg)
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil

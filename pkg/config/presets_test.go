@@ -55,3 +55,23 @@ func TestDefaultVoiceProfiles(t *testing.T) {
 		t.Errorf("expected elder_sage archetype in default voice profiles")
 	}
 }
+
+func TestKokoroVoiceProfilesPreset(t *testing.T) {
+	if len(config.KokoroVoiceProfiles) != 27 {
+		t.Fatalf("expected 27 Kokoro voice profiles, got %d", len(config.KokoroVoiceProfiles))
+	}
+	for _, p := range config.KokoroVoiceProfiles {
+		if p.ID == "" || p.VoiceID == "" || len(p.Tags) == 0 {
+			t.Errorf("invalid profile: %+v", p)
+		}
+	}
+
+	preset, ok := config.GetTTSPreset("sherpa-onnx")
+	if !ok {
+		t.Fatal("missing sherpa-onnx preset")
+	}
+	if len(preset.VoiceProfiles) != 27 {
+		t.Errorf("expected sherpa-onnx preset to have 27 voice profiles, got %d", len(preset.VoiceProfiles))
+	}
+}
+
