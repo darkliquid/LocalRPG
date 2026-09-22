@@ -488,10 +488,18 @@ func NewTTSClient(cfg config.TTSConfig) (TTSClient, error) {
 	case "disabled", "":
 		return &disabledTTSClient{}, nil
 	case "builtin":
-		if cfg.BuiltinName == "native-os" {
+		switch cfg.BuiltinName {
+		case "sherpa-onnx", "kokoro":
+			modelDir := cfg.ModelPath
+			if modelDir == "" {
+				modelDir = "./cache/models/tts/kokoro"
+			}
+			return NewSherpaTTSClient(modelDir), nil
+		case "native-os":
 			return NewNativeOSTTSClient(), nil
+		default:
+			return &echoTTSClient{}, nil
 		}
-		return &echoTTSClient{}, nil
 	case "cli":
 		return &cliTTSClient{command: cfg.Command, args: cfg.Args}, nil
 	case "http":

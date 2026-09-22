@@ -91,6 +91,7 @@ type VoiceProfile struct {
 type TTSConfig struct {
 	Type          string         `yaml:"type" json:"type"` // "builtin", "http", "cli", "disabled"
 	BuiltinName   string         `yaml:"builtin_name,omitempty" json:"builtin_name,omitempty"`
+	ModelPath     string         `yaml:"model_path,omitempty" json:"model_path,omitempty"`
 	Command       string         `yaml:"command,omitempty" json:"command,omitempty"`
 	Args          []string       `yaml:"args,omitempty" json:"args,omitempty"`
 	Endpoint      string         `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
