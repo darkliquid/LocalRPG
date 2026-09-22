@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
@@ -555,5 +556,53 @@ func TestArcProgressReadsBothConventions(t *testing.T) {
 	// A missing clock must not produce a zero maximum, which would divide by zero.
 	if _, maxTicks := arcProgress(map[string]interface{}{"clock_ticks": 1}); maxTicks < 1 {
 		t.Errorf("maxTicks = %d, want at least 1", maxTicks)
+	}
+}
+
+func TestPrepareTurnAppliesTheRecallLimits(t *testing.T) {
+	root := t.TempDir()
+	configYAML := "agents:\n  roles:\n    gm:\n      type: builtin\n  scene_recall_turns: 9\n  retrieval_halflife_turns: 30\n"
+	if err := os.WriteFile(filepath.Join(root, "config.yaml"), []byte(configYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := NewService(root)
+	paths := svc.GetResolver()
+	sysDir := paths.SystemDir("freeform")
+	if err := os.MkdirAll(sysDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sysDir, "system.yaml"), []byte("id: freeform\nname: Freeform\nversion: 1.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	worldDir := paths.WorldDir("harbour-realm")
+	if err := os.MkdirAll(worldDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(worldDir, "world.yaml"), []byte("id: harbour-realm\nname: Harbour Realm\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engine.InitGame(paths, engine.InitOptions{
+		GameID: "campaign-01", SystemID: "freeform", WorldID: "harbour-realm", PlayerName: "Sean",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	session, err := svc.BeginTurn("campaign-01")
+	if err != nil {
+		t.Fatalf("BeginTurn failed: %v", err)
+	}
+	defer session.Close()
+
+	limits := session.ContextLimits()
+	if limits.SceneRecallTurns != 9 {
+		t.Errorf("SceneRecallTurns = %d, want the configured 9", limits.SceneRecallTurns)
+	}
+	if limits.RetrievalHalflife != 30 {
+		t.Errorf("RetrievalHalflife = %d, want the configured 30", limits.RetrievalHalflife)
+	}
+	// Unset keys must still carry their defaults rather than zero.
+	if limits.RetrievalTurns != 3 {
+		t.Errorf("RetrievalTurns = %d, want the default 3", limits.RetrievalTurns)
 	}
 }

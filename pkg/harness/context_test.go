@@ -521,3 +521,61 @@ func TestRelevantHistoryExcludesTheLocationAndThePlayer(t *testing.T) {
 		}
 	}
 }
+
+func TestContextBudgetDropsSectionsInRankOrder(t *testing.T) {
+	store := newTestEntityStore(t)
+	saveEntity(t, store, &entity.Entity{ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Body: "Salt.", Hash: "h1"})
+	saveEntity(t, store, &entity.Entity{ID: "guard-kael", Name: "Guard Kael", Type: "character", Body: "A warden.", Hash: "h2"})
+
+	if err := store.SaveTurn(storage.TurnRecord{
+		Number: 1, Timestamp: time.Now(), Mode: "Do", Narration: strings.Repeat("the mist rolls in ", 60),
+		Location: "aldon-harbour",
+		Entities: []storage.TurnEntityRef{{EntityID: "guard-kael", Mention: "wikilink"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	request := ContextRequest{
+		LocationID:  "aldon-harbour",
+		PlayerID:    "player",
+		Action:      "I listen",
+		RulesPrompt: "RULES",
+		LorePrompt:  "LORE",
+		Profiles:    []config.VoiceProfile{{ID: "elder_sage", Description: "Ancient wizards"}},
+		Recent:      []RecentTurn{{Number: 1, Mode: "Do", Narration: strings.Repeat("the mist rolls in ", 60)}},
+		TurnNumber:  2,
+	}
+
+	assembler := NewContextAssembler(store)
+	generous, err := assembler.Assemble(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A budget that forces trimming, but leaves room for canon and the action.
+	assembler.SetLimits(ContextLimits{TokenBudget: generous.EstimatedTokens / 2})
+	tight, err := assembler.Assemble(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dropped := make(map[string]bool)
+	for _, section := range tight.Sections {
+		if !section.Included {
+			dropped[section.Name] = true
+		}
+	}
+
+	// The catalogue goes before retrieval, which goes before scene recall.
+	if !dropped["catalogue"] {
+		t.Errorf("expected the catalogue to be dropped first, got %v", dropped)
+	}
+	for _, never := range []string{"rules", "lore", "instructions", "canon", "action"} {
+		if dropped[never] {
+			t.Errorf("section %q must never be trimmed", never)
+		}
+	}
+	if len(tight.Trimmed) == 0 {
+		t.Errorf("expected the trimming to be reported")
+	}
+}

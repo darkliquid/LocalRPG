@@ -711,6 +711,120 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
               <div className="space-y-1.5">
                 <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Turns Recalled At This Location</span>
+                  <span className="font-mono text-amber-400">{config.agents.scene_recall_turns ?? 4}</span>
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={config.agents.scene_recall_turns ?? 4}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setConfig({
+                      ...config,
+                      agents: { ...config.agents, scene_recall_turns: Number.isNaN(parsed) ? 4 : parsed },
+                    });
+                  }}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">What happened where the party is standing.</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Recalled Excerpt Length</span>
+                  <span className="font-mono text-amber-400">{config.agents.scene_recall_chars ?? 800}</span>
+                </label>
+                <input
+                  type="number"
+                  min={100}
+                  step={100}
+                  value={config.agents.scene_recall_chars ?? 800}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setConfig({
+                      ...config,
+                      agents: { ...config.agents, scene_recall_chars: Number.isNaN(parsed) ? 800 : parsed },
+                    });
+                  }}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">Cap on the excerpt taken from one recalled turn.</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Turns Retrieved By Entity</span>
+                  <span className="font-mono text-amber-400">{config.agents.retrieval_turns ?? 3}</span>
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={config.agents.retrieval_turns ?? 3}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setConfig({
+                      ...config,
+                      agents: { ...config.agents, retrieval_turns: Number.isNaN(parsed) ? 3 : parsed },
+                    });
+                  }}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">
+                  Past turns that share characters with the ones in play, wherever they happened.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Retrieved Excerpt Length</span>
+                  <span className="font-mono text-amber-400">{config.agents.retrieval_chars ?? 800}</span>
+                </label>
+                <input
+                  type="number"
+                  min={100}
+                  step={100}
+                  value={config.agents.retrieval_chars ?? 800}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setConfig({
+                      ...config,
+                      agents: { ...config.agents, retrieval_chars: Number.isNaN(parsed) ? 800 : parsed },
+                    });
+                  }}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">Cap on the excerpt taken from one retrieved turn.</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Retrieval Recency Half-Life</span>
+                  <span className="font-mono text-amber-400">{config.agents.retrieval_halflife_turns ?? 12}</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={200}
+                  value={config.agents.retrieval_halflife_turns ?? 12}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setConfig({
+                      ...config,
+                      agents: { ...config.agents, retrieval_halflife_turns: Number.isNaN(parsed) ? 12 : parsed },
+                    });
+                  }}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">
+                  Turns after which a retrieved turn's recency weight halves. Lower favours the recent.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
                   <span>Turn Timeout (seconds)</span>
                   <span className="font-mono text-amber-400">{config.agents.turn_timeout_seconds ?? 300}</span>
                 </label>

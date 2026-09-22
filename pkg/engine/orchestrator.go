@@ -119,6 +119,12 @@ func (o *TurnOrchestrator) SetLogger(logger trace.Logger) {
 	o.assembler.SetLogger(o.logger)
 }
 
+// ContextLimits reports the limits the assembler is using, so a caller can prove
+// configuration reached it rather than assuming it did.
+func (o *TurnOrchestrator) ContextLimits() harness.ContextLimits {
+	return o.assembler.Limits()
+}
+
 // SetContextLimits applies the configured prompt budget and recall window.
 func (o *TurnOrchestrator) SetContextLimits(limits harness.ContextLimits) {
 	o.assembler.SetLimits(limits)

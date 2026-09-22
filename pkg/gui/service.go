@@ -686,6 +686,11 @@ func (s *Service) BeginTurn(gameID string) (*TurnSession, error) {
 	return session, nil
 }
 
+// ContextLimits reports the limits the session's orchestrator was built with.
+func (t *TurnSession) ContextLimits() harness.ContextLimits {
+	return t.orchestrator.ContextLimits()
+}
+
 // Close releases the campaign's turn lock. It is safe to call twice.
 func (t *TurnSession) Close() {
 	if t.release == nil {
@@ -751,9 +756,14 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
 	orchestrator.SetContextLimits(harness.ContextLimits{
-		TokenBudget:     cfg.ContextBudget(),
-		RecentTurns:     cfg.RecentTurns(),
-		RecentTurnChars: cfg.RecentTurnChars(),
+		TokenBudget:       cfg.ContextBudget(),
+		RecentTurns:       cfg.RecentTurns(),
+		RecentTurnChars:   cfg.RecentTurnChars(),
+		SceneRecallTurns:  cfg.SceneRecallTurns(),
+		SceneRecallChars:  cfg.SceneRecallChars(),
+		RetrievalTurns:    cfg.RetrievalTurns(),
+		RetrievalChars:    cfg.RetrievalChars(),
+		RetrievalHalflife: cfg.RetrievalHalfLifeTurns(),
 	})
 
 	return &TurnSession{

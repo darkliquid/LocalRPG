@@ -205,6 +205,12 @@ export interface AgentsConfig {
   // How far back the narrator is reminded, and how much of each turn.
   recent_turn_window?: number;
   recent_turn_char_limit?: number;
+  // Recall bounds.
+  scene_recall_turns?: number;
+  scene_recall_chars?: number;
+  retrieval_turns?: number;
+  retrieval_chars?: number;
+  retrieval_halflife_turns?: number;
   // Tracing is opt-in, so these bound a debug session rather than normal play.
   trace_payload_chars?: number;
   trace_max_bytes?: number;
