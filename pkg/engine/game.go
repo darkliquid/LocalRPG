@@ -37,6 +37,7 @@ type InitOptions struct {
 	WorldID       string
 	PlayerName    string
 	PlayerDetails string
+	OpeningPrompt string
 }
 
 func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
@@ -88,6 +89,9 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 		Player:     playerID,
 		PlayerName: opts.PlayerName,
 		Settings:   make(map[string]interface{}),
+	}
+	if prompt := strings.TrimSpace(opts.OpeningPrompt); prompt != "" {
+		manifest.Settings[OpeningPromptSetting] = prompt
 	}
 
 	// Copy initial template entities from world into game, named <id>.md so the

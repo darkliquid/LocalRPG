@@ -460,10 +460,11 @@ func TestCampaignTitleIsPersistedAndLatestIsFirst(t *testing.T) {
 	}
 
 	if _, err := svc.CreateGame(context.Background(), CreateGameRequestDTO{
-		Name:       "The Salt Road",
-		SystemID:   "freeform",
-		WorldID:    "harbour-realm",
-		PlayerName: "Elena Nightshade",
+		Name:          "The Salt Road",
+		SystemID:      "freeform",
+		WorldID:       "harbour-realm",
+		PlayerName:    "Elena Nightshade",
+		OpeningPrompt: "Begin at dusk on the salt road.",
 	}); err != nil {
 		t.Fatalf("CreateGame failed: %v", err)
 	}
@@ -480,5 +481,13 @@ func TestCampaignTitleIsPersistedAndLatestIsFirst(t *testing.T) {
 	}
 	if games[0].PlayerName != "Elena Nightshade" {
 		t.Errorf("PlayerName = %q, want the display name", games[0].PlayerName)
+	}
+
+	state, err := svc.GetGameState(context.Background(), games[0].ID)
+	if err != nil {
+		t.Fatalf("GetGameState failed: %v", err)
+	}
+	if state.OpeningPrompt != "Begin at dusk on the salt road." {
+		t.Errorf("OpeningPrompt = %q, want the prompt captured at creation", state.OpeningPrompt)
 	}
 }

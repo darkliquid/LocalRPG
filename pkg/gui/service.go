@@ -799,11 +799,12 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 	}
 
 	session, err := engine.InitGame(s.resolver, engine.InitOptions{
-		GameID:     gameID,
-		Name:       req.Name,
-		SystemID:   req.SystemID,
-		WorldID:    req.WorldID,
-		PlayerName: req.PlayerName,
+		GameID:        gameID,
+		Name:          req.Name,
+		SystemID:      req.SystemID,
+		WorldID:       req.WorldID,
+		PlayerName:    req.PlayerName,
+		OpeningPrompt: req.OpeningPrompt,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("init game: %w", err)

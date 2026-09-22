@@ -24,6 +24,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const [newSystemID, setNewSystemID] = useState('');
   const [newWorldID, setNewWorldID] = useState('');
   const [newPlayerName, setNewPlayerName] = useState('');
+  const [newOpeningPrompt, setNewOpeningPrompt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   // A destructive campaign action is confirmed inline rather than with a browser
   // dialog, so the launcher keeps its own styling and stays usable inside Wails.
@@ -75,6 +76,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         system_id: effectiveSystemID,
         world_id: effectiveWorldID,
         player_name: newPlayerName.trim() || 'Adventurer',
+        opening_prompt: newOpeningPrompt.trim() || undefined,
       };
 
       const created = await APIClient.createGame(payload);
@@ -559,6 +561,23 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
                     onChange={(e) => setNewPlayerName(e.target.value)}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Opening Prompt <span className="text-stone-500 normal-case">(optional)</span></span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Where should the story begin? Leave blank and the GM invents the opening scene."
+                    value={newOpeningPrompt}
+                    onChange={(e) => setNewOpeningPrompt(e.target.value)}
+                    className="w-full resize-none bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                  />
+                  <p className="text-[11px] text-stone-500">
+                    Used when you press Begin the story on the campaign's prologue screen.
+                  </p>
                 </div>
               </div>
 

@@ -106,6 +106,7 @@ export interface CreateGameRequest {
   system_id: string;
   world_id: string;
   player_name: string;
+  opening_prompt?: string;
 }
 
 export interface SystemDetail {

@@ -118,11 +118,12 @@ type WorldSummaryDTO struct {
 }
 
 type CreateGameRequestDTO struct {
-	ID         string `json:"id,omitempty"`
-	Name       string `json:"name"`
-	SystemID   string `json:"system_id"`
-	WorldID    string `json:"world_id"`
-	PlayerName string `json:"player_name"`
+	ID            string `json:"id,omitempty"`
+	Name          string `json:"name"`
+	SystemID      string `json:"system_id"`
+	WorldID       string `json:"world_id"`
+	PlayerName    string `json:"player_name"`
+	OpeningPrompt string `json:"opening_prompt,omitempty"`
 }
 
 // GameSettingsPatchDTO is a partial update of a campaign's settings. An absent
