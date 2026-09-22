@@ -579,3 +579,71 @@ func TestContextBudgetDropsSectionsInRankOrder(t *testing.T) {
 		t.Errorf("expected the trimming to be reported")
 	}
 }
+
+func TestRelevantHistoryCountsAnEntityOncePerTurn(t *testing.T) {
+	store := newTestEntityStore(t)
+	saveEntity(t, store, &entity.Entity{ID: "guard-kael", Name: "Guard Kael", Type: "character", Hash: "h1"})
+	saveEntity(t, store, &entity.Entity{ID: "sera-vane", Name: "Sera Vane", Type: "character", Hash: "h2"})
+	saveEntity(t, store, &entity.Entity{ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Hash: "h3"})
+	saveEntity(t, store, &entity.Entity{ID: "oakhaven-tavern", Name: "Oakhaven Tavern", Type: "location", Hash: "h4"})
+
+	// Turn 1 names one character, twice over: the schema allows an entity several
+	// mention kinds, which is what an extracted and wikilinked turn produces.
+	if err := store.SaveTurn(storage.TurnRecord{
+		Number: 1, Timestamp: time.Now(), Mode: "Do", Narration: "Kael waited.", Location: "oakhaven-tavern",
+		Entities: []storage.TurnEntityRef{
+			{EntityID: "guard-kael", Mention: "wikilink"},
+			{EntityID: "guard-kael", Mention: "extracted"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Turn 2 names one character, once, and is the newer of the two.
+	if err := store.SaveTurn(storage.TurnRecord{
+		Number: 2, Timestamp: time.Now(), Mode: "Do", Narration: "Sera waited.", Location: "oakhaven-tavern",
+		Entities: []storage.TurnEntityRef{{EntityID: "sera-vane", Mention: "wikilink"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The window names both, which is what puts them in play.
+	if err := store.SaveTurn(storage.TurnRecord{
+		Number: 3, Timestamp: time.Now(), Mode: "Do", Narration: "Kael: \"She was here.\"\nSera: \"I was.\"",
+		Location: "aldon-harbour",
+		Entities: []storage.TurnEntityRef{
+			{EntityID: "guard-kael", Mention: "speech"},
+			{EntityID: "sera-vane", Mention: "speech"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	assembler := NewContextAssembler(store)
+	result, err := assembler.Assemble(ContextRequest{
+		LocationID: "aldon-harbour",
+		PlayerID:   "player",
+		Action:     "I wait",
+		Recent:     []RecentTurn{{Number: 3, Mode: "Do", Narration: "Kael: \"She was here.\"\nSera: \"I was.\""}},
+		TurnNumber: 4,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(result.Prompt, "RELEVANT HISTORY") {
+		t.Fatalf("expected retrieval to fire:\n%s", result.Prompt)
+	}
+
+	// Counted per row, turn 1 scores two and wins. Counted per entity, both score
+	// one and recency puts turn 2 first.
+	history := result.Prompt[strings.Index(result.Prompt, "RELEVANT HISTORY"):]
+	turnOneAt := strings.Index(history, "Turn 1")
+	turnTwoAt := strings.Index(history, "Turn 2")
+	if turnOneAt == -1 || turnTwoAt == -1 {
+		t.Fatalf("expected both turns retrieved:\n%s", history)
+	}
+	if turnTwoAt > turnOneAt {
+		t.Errorf("expected turn 2 to rank first once mentions are deduplicated:\n%s", history)
+	}
+}

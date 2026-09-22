@@ -420,19 +420,22 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) string {
 			continue
 		}
 
-		// Overlap is per candidate: how many of the query entities this turn names.
-		// The store returns candidates ordered by the same count, but the weighting
-		// below needs the number itself.
+		// Overlap is per candidate: how many of the query entities this turn names,
+		// counted once each. One entity can hold several mention rows, because the
+		// table's key includes the kind, and counting rows would weight an entity who
+		// is both wikilinked and extracted twice.
 		mentions, err := c.store.ListEntitiesForTurn(candidate.Number)
 		if err != nil {
 			continue
 		}
-		overlap := 0
+		named := make(map[string]bool, len(mentions))
 		for _, mention := range mentions {
-			for _, id := range query {
-				if mention.EntityID == id {
-					overlap++
-				}
+			named[mention.EntityID] = true
+		}
+		overlap := 0
+		for _, id := range query {
+			if named[id] {
+				overlap++
 			}
 		}
 		if overlap == 0 {
