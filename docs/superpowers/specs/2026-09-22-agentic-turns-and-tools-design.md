@@ -58,6 +58,12 @@ Settled across two review rounds.
 | Streaming | A `{"type":"tool"}` event while a call runs |
 | Watchdog | Every tool event resets the idle watchdog, server and client |
 | Index | An FTS5 virtual table over `entities` and `turns`, with triggers, backfilled from the content tables |
+| Tool-call assembly | In the provider. `StreamChunk` never carries partial fragments, so no vendor's wire format reaches the engine |
+| Multiple calls per message | Executed sequentially, because local reads are microseconds and ordering makes the trace and tests reproducible |
+| Roles with tools | `gm` only, and the opening turn is included |
+| Tool surface | A permanent ceiling: read-only, internal, four tools, and no write tool at any point |
+| Trace detail | `summary` records name, outcome, size, and duration; arguments and results are `full`, like prompts |
+| Embeddings | Deferred to their own spec, with the `search_semantic` interface fixed now so the model's contract does not change later |
 
 ---
 
@@ -95,7 +101,7 @@ Properties that matter:
 
 - **The loop always terminates.** Round count is bounded, and once the rounds are spent or the budget is reached, tools are withdrawn and the model is told in the prompt that it must answer now. A model that keeps asking cannot loop forever.
 - **The last assistant message with no tool calls is the turn.** Everything downstream, segmentation, mention resolution, extraction, recording, is unchanged.
-- **Tool rounds are sequential, not parallel** (open: round eight). Ordering is preserved so the trace reads in the order the model asked.
+- **Tool rounds are sequential.** Local reads are microseconds, so concurrency buys nothing, and ordering keeps results, trace, and tests reproducible.
 - **`overBudget` counts the live conversation**, not the assembled prompt. The prompt was already trimmed to fit; each tool result grows the conversation, and the check is what stops that growth from exceeding the model's real window.
 
 ## 5. Provider Contract
@@ -142,7 +148,7 @@ type StreamChunk struct {
 
 `Messages` is authoritative. `Prompt` is kept and synthesised for providers that take a single string, so the CLI provider and the built-in oracle keep working unchanged. That is the whole compatibility story: a provider that ignores tools and messages behaves exactly as it does today.
 
-The HTTP provider gains the OpenAI-compatible `tools` field on the request and accumulates streamed `tool_calls` deltas (which arrive fragmented by index, with the name in one delta and the arguments split across many). **Where that accumulation lives is open (round eight)**: in the provider, keeping the orchestrator provider-agnostic, or in the orchestrator, keeping the provider dumb.
+The HTTP provider gains the OpenAI-compatible `tools` field and **accumulates the streamed `tool_calls` deltas itself** (they arrive fragmented by index, with the name in one delta and the arguments split across many). Accumulation lives in the provider so `StreamChunk.ToolCalls` only ever carries whole calls: partial fragments would leak one vendor's wire format into the engine and make every future provider responsible for the same reassembly.
 
 ## 6. Capability
 
@@ -152,7 +158,9 @@ The HTTP provider gains the OpenAI-compatible `tools` field on the request and a
 - `yes` — force the attempt, for an endpoint whose type does not imply tool support.
 - `no` — suppress it, for a server known to mishandle the `tools` field.
 
-Inference alone is wrong in both directions: some OpenAI-compatible servers accept `tools` and ignore it, returning a plain completion, which is harmless; others reject the field outright with a 400. A rejection is handled as a turn-level degradation: the provider is retried once without tools, the trace records why, and the turn continues with pre-injected context. Which roles may call tools is open (round eight); the intent is `gm` only.
+Inference alone is wrong in both directions: some OpenAI-compatible servers accept `tools` and ignore it, returning a plain completion, which is harmless; others reject the field outright with a 400. A rejection is handled as a turn-level degradation: the provider is retried once without tools, the trace records why, and the turn continues with pre-injected context.
+
+Only `gm` calls tools, and **the opening turn is included**. The opening turn is the most world-knowledge-hungry turn there is, and excluding it would make the campaign's most context-dependent turn the only one that cannot look anything up. The summariser and extractor stay tool-free: their work is bounded, and giving the summariser search would let it become a second, unbounded agent.
 
 ## 7. Tools v1
 
@@ -172,6 +180,7 @@ Rules:
 - A tool error is returned as the result text (`"error: no entity matching \"Kael\""`), never as a failure of the turn.
 - An unknown or hallucinated tool name returns a readable error listing the available tools.
 - The parameter schemas are generated from one table in Go, so the tool list, its documentation, and its dispatch cannot drift apart.
+- The surface is a **permanent ceiling**, not a v1 convenience: read-only, internal, and never a filesystem, shell, network, or code-execution tool. There is also no write tool, at any point, because canon changes belong to the extractor, where they are proposed rather than asserted.
 
 ## 8. Retrieval Stack
 
@@ -179,7 +188,7 @@ Rules:
 
 Migration follows the index's existing promise: created idempotently on open, and **backfilled from the content tables** rather than by rescanning Markdown, so opening an old campaign does not re-read every note. If the virtual table is missing or out of step, it is dropped and rebuilt from the tables.
 
-**Later: embeddings.** Deliberately out of scope for v1, and deliberately designed for: `search_semantic` is a fifth tool with the same shape, so the model's contract does not change when it arrives. The seam covers a provider axis for embedding, storage for vectors, and a re-embed trigger driven by the file hash the index already tracks. Whether that seam is defined now or left entirely to a later spec is open (round eight).
+**Later: embeddings.** Out of scope for v1, and deliberately designed for. `search_semantic` will be a fifth tool with the same shape, so the model's contract does not change when it arrives. Its **interface is fixed now** (name, arguments, result format), while the provider axis, the vector storage, and the re-embed trigger get their own spec. The trigger is nearly free when it comes: the index already tracks a file hash per note, which is exactly the signal that a note's vector is stale. Coupling this spec to an embedding design would delay tools that need no new dependency at all.
 
 ## 9. Bounds and Failure Modes
 
@@ -243,14 +252,18 @@ Both are exposed in the Settings Studio beside the other limits, and both are me
 
 ## 15. Open Questions
 
-1. **Embeddings seam.** Define the provider axis, storage, and re-embed trigger now so `search_semantic` is a drop-in, or defer all of it to a later spec.
-2. **Accumulation.** Are streamed tool-call fragments reassembled in the provider or in the orchestrator.
-3. **Parallel calls.** Sequential is assumed; is there a case for executing several calls from one message concurrently.
-4. **Which roles.** `gm` only is assumed. Does the summariser or extractor ever warrant read tools.
-5. **Tool surface boundary.** Read-only and internal-only is assumed; confirm that no filesystem, shell, or network tool is ever in scope.
-6. **Trace detail.** Do tool arguments and results belong at `summary` level, or payload-gated like prompts.
-7. **The opening turn.** Should the GM have tools while establishing the first scene, where world knowledge matters most.
-8. **Cumulative spend.** Rounds bound calls implicitly; is an explicit per-turn output-token ceiling wanted on paid providers.
+Settled in review:
+
+- **Round 6** (shape): this spec is separate and lands after trace and canon; tools complement pre-injection; capability is declared per provider; FTS5 and graph before embeddings; bounds are four rounds, 4000 characters per result, and the turn budget.
+- **Round 7**: the transcript is in-memory and traced, never in `history.jsonl`; four read-only tools; a `tool` stream event resets the idle watchdog on both sides; `supports_tools: auto|yes|no`; FTS5 as a virtual table with triggers, backfilled from the content tables.
+- **Round 8**: the embeddings provider and storage are deferred to their own spec while the tool's interface is fixed now; streamed tool calls are reassembled in the provider; calls execute sequentially; `gm` only, and the opening turn is included; the read-only internal surface is a permanent ceiling; trace records name, outcome, size and duration at `summary`, and arguments and results at `full`.
+
+Queued for the ninth round:
+
+1. **FTS5 query handling.** Pass the model's words to `MATCH` directly, or build a sanitised term query.
+2. **Tokenizer.** The default `unicode61`, or `porter` stemming.
+3. **Provenance.** Does a replayed turn show that tools were used, and how much.
+4. **A misbehaving last round.** What happens when the model asks for a tool in the round where tools were withdrawn.
 
 ## 16. File Map
 
