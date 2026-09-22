@@ -555,7 +555,9 @@ Shipped so far: increment 1 in full; increment 2's opening turn, settings patch,
 
 The narrative-coherence counterpart to this spec is
 `docs/superpowers/specs/2026-09-22-narrative-coherence-and-trace-design.md`; it
-assumes the budget and recall window this one introduced.
+assumes the budget and recall window this one introduced. Its first two plans are
+`docs/superpowers/plans/2026-09-22-trace-and-debug-view.md` (shipped) and
+`docs/superpowers/plans/2026-09-22-canon-and-recall.md`.
 
 Also shipped from increment 3, driven by playtesting:
 
