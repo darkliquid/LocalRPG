@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/engine"
@@ -604,5 +605,114 @@ func TestPrepareTurnAppliesTheRecallLimits(t *testing.T) {
 	// Unset keys must still carry their defaults rather than zero.
 	if limits.RetrievalTurns != 3 {
 		t.Errorf("RetrievalTurns = %d, want the default 3", limits.RetrievalTurns)
+	}
+}
+
+func TestAServiceRegeneratesTheSummaryBehindTheTurn(t *testing.T) {
+	root := t.TempDir()
+	// A cadence of one, so the very first turn makes a regeneration due.
+	configYAML := "agents:\n  roles:\n    gm:\n      type: builtin\n  summary_every: 1\n"
+	if err := os.WriteFile(filepath.Join(root, "config.yaml"), []byte(configYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := NewService(root)
+	paths := svc.GetResolver()
+	sysDir := paths.SystemDir("freeform")
+	if err := os.MkdirAll(sysDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sysDir, "system.yaml"), []byte("id: freeform\nname: Freeform\nversion: 1.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	worldDir := paths.WorldDir("harbour-realm")
+	if err := os.MkdirAll(worldDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(worldDir, "world.yaml"), []byte("id: harbour-realm\nname: Harbour Realm\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engine.InitGame(paths, engine.InitOptions{
+		GameID: "campaign-01", SystemID: "freeform", WorldID: "harbour-realm", PlayerName: "Sean",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	session, err := svc.BeginTurn("campaign-01")
+	if err != nil {
+		t.Fatalf("BeginTurn failed: %v", err)
+	}
+	if err := session.Run(context.Background(), TurnRequest{Mode: "Do", Input: "I look around"}, func(TurnEvent) error {
+		return nil
+	}); err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	session.Close()
+
+	// The regeneration is detached, so the test waits for it rather than assuming
+	// it finished before Run returned.
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if !svc.SummaryPending("campaign-01") {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	recap, err := svc.GetRecap(context.Background(), "campaign-01")
+	if err != nil {
+		t.Fatalf("GetRecap failed: %v", err)
+	}
+	if !recap.Enabled {
+		t.Errorf("expected summaries to be reported as enabled")
+	}
+	if recap.ThroughTurn != 1 {
+		t.Errorf("ThroughTurn = %d, want 1: the summary must cover the turn that triggered it", recap.ThroughTurn)
+	}
+	if strings.TrimSpace(recap.Summary) == "" {
+		t.Errorf("expected a summary")
+	}
+}
+
+func TestRecapIsDisabledWhenSummariesAreOff(t *testing.T) {
+	root := t.TempDir()
+	// An omitted key inherits the shipped default of ten turns, so switching
+	// summaries off is explicit.
+	configYAML := "agents:\n  roles:\n    gm:\n      type: builtin\n  summary_every: 0\n"
+	if err := os.WriteFile(filepath.Join(root, "config.yaml"), []byte(configYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := NewService(root)
+	paths := svc.GetResolver()
+	sysDir := paths.SystemDir("freeform")
+	if err := os.MkdirAll(sysDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sysDir, "system.yaml"), []byte("id: freeform\nname: Freeform\nversion: 1.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	worldDir := paths.WorldDir("harbour-realm")
+	if err := os.MkdirAll(worldDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(worldDir, "world.yaml"), []byte("id: harbour-realm\nname: Harbour Realm\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engine.InitGame(paths, engine.InitOptions{
+		GameID: "campaign-01", SystemID: "freeform", WorldID: "harbour-realm", PlayerName: "Sean",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	recap, err := svc.GetRecap(context.Background(), "campaign-01")
+	if err != nil {
+		t.Fatalf("GetRecap failed: %v", err)
+	}
+	if recap.Enabled {
+		t.Errorf("expected summaries to be off when the cadence is zero")
+	}
+	if recap.Summary != "" {
+		t.Errorf("expected no summary, got %q", recap.Summary)
 	}
 }

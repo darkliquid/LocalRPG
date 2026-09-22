@@ -139,6 +139,14 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, entities)
 
+	case "recap":
+		recap, err := s.service.GetRecap(r.Context(), gameID)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, recap)
+
 	case "graph":
 		graph, err := s.service.GetGraph(r.Context(), gameID)
 		if err != nil {

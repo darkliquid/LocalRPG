@@ -43,6 +43,11 @@ type Service struct {
 	playerOnce sync.Once
 	player     *playback.Player
 	logger     trace.Logger
+	// A regeneration is detached and coalesced: the flag records that one is in
+	// flight, so a player turning quickly triggers a catch-up run rather than a
+	// queue of overlapping ones.
+	summaryMu      sync.Mutex
+	summaryPending map[string]bool
 }
 
 // Config returns the configuration the service is running with, so a command can
@@ -92,11 +97,12 @@ func NewService(rootDir string) *Service {
 	}
 
 	return &Service{
-		rootDir:   rootDir,
-		resolver:  core.NewCustomPathResolver(sysDir, worldDir, gameDir, cacheDir),
-		configMgr: mgr,
-		indexed:   make(map[string]bool),
-		locks:     make(map[string]*sync.Mutex),
+		rootDir:        rootDir,
+		resolver:       core.NewCustomPathResolver(sysDir, worldDir, gameDir, cacheDir),
+		configMgr:      mgr,
+		indexed:        make(map[string]bool),
+		locks:          make(map[string]*sync.Mutex),
+		summaryPending: make(map[string]bool),
 	}
 }
 
@@ -664,6 +670,7 @@ type TurnSession struct {
 	store        *storage.Store
 	timeline     *engine.Timeline
 	orchestrator *engine.TurnOrchestrator
+	chronicler   *engine.Chronicler
 	release      func()
 }
 
@@ -698,6 +705,88 @@ func (t *TurnSession) Close() {
 	}
 	t.release()
 	t.release = nil
+}
+
+// SummaryPending reports whether a regeneration is in flight for a campaign.
+func (s *Service) SummaryPending(gameID string) bool {
+	s.summaryMu.Lock()
+	defer s.summaryMu.Unlock()
+	return s.summaryPending[gameID]
+}
+
+// summariseBehind regenerates a campaign's story so far without delaying the turn
+// that triggered it. A second model call must never be something a player waits on,
+// and the turn that triggers one must not use its own summary.
+func (s *Service) summariseBehind(gameID string, chronicler *engine.Chronicler) {
+	if chronicler == nil {
+		return
+	}
+
+	due, err := chronicler.Due(gameID)
+	if err != nil || !due {
+		return
+	}
+
+	// One pending regeneration per campaign, never a queue: a run in flight is
+	// never restarted, and the next turn triggers a catch-up pass if one is missed.
+	s.summaryMu.Lock()
+	if s.summaryPending[gameID] {
+		s.summaryMu.Unlock()
+		return
+	}
+	s.summaryPending[gameID] = true
+	s.summaryMu.Unlock()
+
+	go func() {
+		defer func() {
+			s.summaryMu.Lock()
+			delete(s.summaryPending, gameID)
+			s.summaryMu.Unlock()
+		}()
+
+		if _, err := chronicler.Regenerate(context.Background(), gameID); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not update the story so far: %v\n", err)
+		}
+	}()
+}
+
+// chronicler builds a campaign's chronicler from the current configuration, for a
+// caller that is not a turn. It is per call like a turn's wiring, so a settings
+// change takes effect without a restart.
+func (s *Service) chronicler(gameID string) *engine.Chronicler {
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil
+	}
+
+	cfg := s.configMgr.Get()
+	router, err := harness.RouterFromConfigWithLogger(cfg, s.logger)
+	if err != nil {
+		return nil
+	}
+
+	chronicler := engine.NewChronicler(s.resolver, store, harness.SummariserFromConfig(cfg, router, s.logger))
+	chronicler.SetEvery(cfg.SummaryEvery())
+	chronicler.SetLogger(s.logger)
+	return chronicler
+}
+
+// GetRecap returns the campaign's story so far.
+func (s *Service) GetRecap(ctx context.Context, gameID string) (*RecapDTO, error) {
+	chronicler := s.chronicler(gameID)
+	if chronicler == nil {
+		return &RecapDTO{}, nil
+	}
+
+	chronicle, err := chronicler.Recap(gameID)
+	if err != nil {
+		return nil, fmt.Errorf("read chronicle: %w", err)
+	}
+	return &RecapDTO{
+		Summary:     chronicle.Summary,
+		ThroughTurn: chronicle.ThroughTurn,
+		Enabled:     s.configMgr.Get().SummaryEvery() > 0,
+	}, nil
 }
 
 // prepareTurn assembles everything a turn needs. It is built per turn on purpose:
@@ -749,8 +838,13 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		startLocation = pinned
 	}
 
+	chronicler := engine.NewChronicler(s.resolver, store, harness.SummariserFromConfig(cfg, router, logger))
+	chronicler.SetEvery(cfg.SummaryEvery())
+	chronicler.SetLogger(logger)
+
 	orchestrator := engine.NewTurnOrchestrator(store, timeline, jsEngine, router, startLocation, playerID)
 	orchestrator.SetLogger(logger)
+	orchestrator.SetChronicler(chronicler)
 	orchestrator.SetExtractor(harness.ExtractorFromConfigWithLogger(cfg, router, logger))
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
@@ -773,6 +867,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		store:        store,
 		timeline:     timeline,
 		orchestrator: orchestrator,
+		chronicler:   chronicler,
 	}, nil
 }
 
@@ -803,6 +898,10 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 			_ = t.service.PlayTurnAudio(context.Background(), t.gameID, turn.Number)
 		}()
 	}
+
+	// Memory is repaired behind the turn, on the same principle as playback: the
+	// reply is already recorded, so nothing about it should wait for a second call.
+	t.service.summariseBehind(t.gameID, t.chronicler)
 	return nil
 }
 

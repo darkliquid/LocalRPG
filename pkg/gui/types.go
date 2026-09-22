@@ -137,6 +137,15 @@ type EntitySummaryDTO struct {
 	Tags     []string `json:"tags,omitempty"`
 }
 
+// RecapDTO is a campaign's long memory as the client reads it.
+type RecapDTO struct {
+	Summary     string `json:"summary,omitempty"`
+	ThroughTurn int    `json:"through_turn"`
+	// Enabled is false when summarisation is off, so a client can offer the panel
+	// without offering a refresh that would do nothing.
+	Enabled bool `json:"enabled"`
+}
+
 // GameSettingsPatchDTO is a partial update of a campaign's settings. An absent
 // field is left alone, which is what makes it a patch rather than a replace.
 type GameSettingsPatchDTO struct {
