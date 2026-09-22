@@ -45,6 +45,12 @@ type Service struct {
 	logger     trace.Logger
 }
 
+// Config returns the configuration the service is running with, so a command can
+// build shared infrastructure, such as a trace sink, from the same values.
+func (s *Service) Config() *config.Config {
+	return s.configMgr.Get()
+}
+
 // SetLogger attaches a trace sink to the service and to every turn it prepares.
 func (s *Service) SetLogger(logger trace.Logger) {
 	s.logger = trace.OrNil(logger)
@@ -713,6 +719,9 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	}
 
 	cfg := s.configMgr.Get()
+	logger := trace.OrNil(s.logger)
+	logger.SetGame(gameID)
+
 	timeline := engine.NewTimeline(s.resolver, store, engine.NewHistoryLogger(filepath.Join(gameDir, "history.jsonl")), gameID)
 	timeline.SetVoiceProfiles(cfg.Media.TTS.VoiceProfiles)
 
@@ -723,7 +732,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		playerID = resolved
 	}
 
-	router, err := harness.RouterFromConfig(cfg)
+	router, err := harness.RouterFromConfigWithLogger(cfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("build router: %w", err)
 	}
@@ -736,7 +745,8 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	}
 
 	orchestrator := engine.NewTurnOrchestrator(store, timeline, jsEngine, router, startLocation, playerID)
-	orchestrator.SetExtractor(harness.ExtractorFromConfig(cfg, router))
+	orchestrator.SetLogger(logger)
+	orchestrator.SetExtractor(harness.ExtractorFromConfigWithLogger(cfg, router, logger))
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))

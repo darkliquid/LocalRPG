@@ -58,6 +58,9 @@ func handleGUICommand(args []string) {
 	}
 
 	svc := gui.NewService(cfg.Dir)
+	// The resolver owns where caches live, so the sink follows it rather than
+	// duplicating the relative-path resolution the service already did.
+	svc.SetLogger(buildTraceLogger(svc.Config(), os.Args, svc.GetResolver().CacheDir()))
 	defer func() { _ = storage.CloseGameStores() }()
 	handler := gui.ProtectCrossOrigin(gui.NewServer(svc, gui.AssetHandler()))
 

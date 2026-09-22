@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/engine"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 // turnFixture builds a playable campaign: a config whose gm provider is the
@@ -266,5 +267,49 @@ func TestGameSettingsRoundTrip(t *testing.T) {
 	}
 	if state.OpeningPrompt != "Begin in the rain." {
 		t.Errorf("OpeningPrompt = %q, want the saved prompt", state.OpeningPrompt)
+	}
+}
+
+func TestAServiceTracesTheTurnsItRuns(t *testing.T) {
+	gameID, svc := turnFixture(t)
+
+	tracePath := filepath.Join(svc.GetResolver().CacheDir(), "trace", "trace.jsonl")
+	sink, err := trace.NewFileSink(tracePath, trace.FileOptions{Level: trace.LevelFull, MaxBytes: 1 << 20, MaxFiles: 3})
+	if err != nil {
+		t.Fatalf("NewFileSink failed: %v", err)
+	}
+	defer func() { _ = sink.Close() }()
+	svc.SetLogger(sink)
+
+	session, err := svc.BeginTurn(gameID)
+	if err != nil {
+		t.Fatalf("BeginTurn failed: %v", err)
+	}
+	defer session.Close()
+
+	if err := session.Run(context.Background(), TurnRequest{Mode: "Do", Input: "I look around"}, func(TurnEvent) error {
+		return nil
+	}); err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+
+	data, err := os.ReadFile(tracePath)
+	if err != nil {
+		t.Fatalf("expected a trace file: %v", err)
+	}
+	text := string(data)
+
+	for _, wanted := range []string{`"event":"turn.begin"`, `"event":"context.assembled"`, `"event":"record.turn"`} {
+		if !strings.Contains(text, wanted) {
+			t.Errorf("trace is missing %s:\n%s", wanted, text)
+		}
+	}
+	// prepareTurn stamps the campaign, so one appended trace stays filterable.
+	if !strings.Contains(text, `"game":"`+gameID+`"`) {
+		t.Errorf("expected the campaign stamped on the trace:\n%s", text)
+	}
+	// The prompt is recorded once, with the payload only at full.
+	if !strings.Contains(text, `"prompt":`) {
+		t.Errorf("expected the assembled prompt at full level:\n%s", text)
 	}
 }

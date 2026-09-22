@@ -78,7 +78,10 @@ func handlePlayCommand(args []string) {
 	ruleLoader := rules.NewRuleLoader(paths, jsEngine)
 	_ = ruleLoader.LoadRules(manifest.SystemID, manifest.WorldID)
 
-	router, err := harness.RouterFromConfig(cfg)
+	logger := buildTraceLogger(cfg, os.Args, paths.CacheDir())
+	logger.SetGame(gameID)
+
+	router, err := harness.RouterFromConfigWithLogger(cfg, logger)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error building model router: %v\n", err)
 		os.Exit(1)
@@ -92,7 +95,8 @@ func handlePlayCommand(args []string) {
 		startLocation,
 		playerID,
 	)
-	orchestrator.SetExtractor(harness.ExtractorFromConfig(cfg, router))
+	orchestrator.SetLogger(logger)
+	orchestrator.SetExtractor(harness.ExtractorFromConfigWithLogger(cfg, router, logger))
 	orchestrator.LoadPrompts(paths, manifest.SystemID, manifest.WorldID)
 
 	app := tui.NewAppModel(orchestrator, 80, 24)
