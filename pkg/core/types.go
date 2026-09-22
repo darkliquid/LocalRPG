@@ -35,6 +35,19 @@ type GameManifest struct {
 	Settings   map[string]interface{} `yaml:"settings,omitempty"`
 }
 
+// SaveGameManifest writes a campaign manifest. It creates no directories, so a
+// caller that is replacing a manifest leaves nothing half-built behind.
+func SaveGameManifest(path string, manifest *GameManifest) error {
+	data, err := yaml.Marshal(manifest)
+	if err != nil {
+		return fmt.Errorf("marshal game manifest: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("write game manifest: %w", err)
+	}
+	return nil
+}
+
 type PathResolver struct {
 	BaseDir    string
 	systemsDir string

@@ -229,9 +229,10 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 			Type:  ent.Type,
 			State: stateMap,
 		},
-		Arcs:      []NarrativeArcDTO{},
-		Clocks:    []FactionClockDTO{},
-		Locations: []string{},
+		Arcs:          []NarrativeArcDTO{},
+		Clocks:        []FactionClockDTO{},
+		Locations:     []string{},
+		OpeningPrompt: engine.OpeningPrompt(gameManifest),
 	}, nil
 }
 
@@ -503,6 +504,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator.SetExtractor(harness.ExtractorFromConfig(cfg, router))
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
+	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
 
 	return &TurnSession{
 		service:      s,
@@ -817,6 +819,151 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 		TurnCount:  0,
 		LastPlayed: time.Now().Format(time.RFC3339),
 	}, nil
+}
+
+// UpdateGameSettings merges a patch into a campaign's settings and writes the
+// manifest. The caller supplies whole values; nothing is inferred or coerced.
+func (s *Service) UpdateGameSettings(ctx context.Context, gameID string, patch map[string]interface{}) error {
+	path := filepath.Join(s.resolver.GameDir(gameID), "game.yaml")
+	manifest, err := core.LoadGameManifest(path)
+	if err != nil {
+		return fmt.Errorf("load game manifest: %w", err)
+	}
+	if manifest.Settings == nil {
+		manifest.Settings = map[string]interface{}{}
+	}
+	for key, value := range patch {
+		manifest.Settings[key] = value
+	}
+	if err := core.SaveGameManifest(path, manifest); err != nil {
+		return fmt.Errorf("save game settings: %w", err)
+	}
+	return nil
+}
+
+// DeleteGame removes a campaign and everything it generated. The turn lock is
+// taken first so a turn in flight finishes or is refused rather than writing into
+// a directory that is being deleted.
+func (s *Service) DeleteGame(ctx context.Context, gameID string) error {
+	lock := s.gameLock(gameID)
+	if !lock.TryLock() {
+		return ErrTurnInFlight
+	}
+	defer lock.Unlock()
+
+	gameDir := s.resolver.GameDir(gameID)
+	if _, err := os.Stat(filepath.Join(gameDir, "game.yaml")); err != nil {
+		return fmt.Errorf("campaign %q: %w", gameID, err)
+	}
+
+	if err := storage.CloseGameStore(s.resolver, gameID); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(gameDir); err != nil {
+		return fmt.Errorf("remove campaign: %w", err)
+	}
+	s.forgetGame(gameID)
+	return nil
+}
+
+// RestartGame returns a campaign to its opening state: history, the derived index,
+// and every entity created during play are discarded, while the campaign's
+// identity, system, world, protagonist, opening prompt, and pinned start location
+// are carried across.
+func (s *Service) RestartGame(ctx context.Context, gameID string) (*GameSummaryDTO, error) {
+	lock := s.gameLock(gameID)
+	if !lock.TryLock() {
+		return nil, ErrTurnInFlight
+	}
+	defer lock.Unlock()
+
+	gameDir := s.resolver.GameDir(gameID)
+	manifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
+	if err != nil {
+		return nil, fmt.Errorf("load game manifest: %w", err)
+	}
+
+	playerName := manifest.PlayerName
+	details := ""
+	if store, err := s.store(gameID); err == nil {
+		if playerID, err := engine.ResolvePlayerID(store, manifest); err == nil && playerID != "" {
+			if data, err := os.ReadFile(filepath.Join(gameDir, "entities", playerID+".md")); err == nil {
+				if ent, err := entity.ParseMarkdownEntity(data); err == nil {
+					if playerName == "" {
+						playerName = ent.Name
+					}
+					details = strings.TrimSpace(ent.Body)
+				}
+			}
+		}
+	}
+
+	startLocation := ""
+	if pinned, ok := manifest.Settings[engine.StartLocationSetting].(string); ok {
+		startLocation = pinned
+	}
+	openingPrompt := engine.OpeningPrompt(manifest)
+
+	if err := storage.CloseGameStore(s.resolver, gameID); err != nil {
+		return nil, err
+	}
+	if err := os.RemoveAll(gameDir); err != nil {
+		return nil, fmt.Errorf("remove campaign: %w", err)
+	}
+	s.forgetGame(gameID)
+
+	if strings.TrimSpace(playerName) == "" {
+		playerName = "Adventurer"
+	}
+
+	session, err := engine.InitGame(s.resolver, engine.InitOptions{
+		GameID:        gameID,
+		Name:          manifest.Name,
+		SystemID:      manifest.SystemID,
+		WorldID:       manifest.WorldID,
+		PlayerName:    playerName,
+		PlayerDetails: details,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("recreate campaign: %w", err)
+	}
+	_ = session.Close()
+
+	settings := map[string]interface{}{}
+	if startLocation != "" {
+		settings[engine.StartLocationSetting] = startLocation
+	}
+	if openingPrompt != "" {
+		settings[engine.OpeningPromptSetting] = openingPrompt
+	}
+	if len(settings) > 0 {
+		if err := s.UpdateGameSettings(ctx, gameID, settings); err != nil {
+			return nil, err
+		}
+	}
+
+	name := manifest.Name
+	if name == "" {
+		name = gameID
+	}
+
+	return &GameSummaryDTO{
+		ID:         gameID,
+		Name:       name,
+		SystemID:   manifest.SystemID,
+		WorldID:    manifest.WorldID,
+		PlayerName: playerName,
+		TurnCount:  0,
+		LastPlayed: time.Now().Format(time.RFC3339),
+	}, nil
+}
+
+// forgetGame clears the one-time index repair marker so a recreated campaign is
+// indexed again rather than trusting the deleted database.
+func (s *Service) forgetGame(gameID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.indexed, gameID)
 }
 
 func slugify(s string) string {

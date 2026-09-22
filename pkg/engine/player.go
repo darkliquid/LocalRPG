@@ -2,14 +2,12 @@ package engine
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/storage"
-	"gopkg.in/yaml.v3"
 )
 
 // ResolvePlayerID finds the protagonist's entity ID. A manifest's Player field
@@ -69,12 +67,8 @@ func RepairPlayerIdentity(paths *core.PathResolver, store *storage.Store, manife
 	}
 	manifest.Player = id
 
-	data, err := yaml.Marshal(manifest)
-	if err != nil {
-		return "", fmt.Errorf("marshal game manifest: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(paths.GameDir(manifest.ID), "game.yaml"), data, 0644); err != nil {
-		return "", fmt.Errorf("write game.yaml: %w", err)
+	if err := core.SaveGameManifest(filepath.Join(paths.GameDir(manifest.ID), "game.yaml"), manifest); err != nil {
+		return "", fmt.Errorf("save game manifest: %w", err)
 	}
 	return id, nil
 }

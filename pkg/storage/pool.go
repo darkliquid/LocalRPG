@@ -50,3 +50,24 @@ func (p *Pool) Close() error {
 	}
 	return firstErr
 }
+
+// Evict closes and forgets the shared Store for path so the database file can be
+// removed or replaced. A shared store's Close is a deliberate no-op, so the pool
+// clears the flag itself: it owns this handle's lifetime, and the caller is about
+// to delete the file out from under it.
+func (p *Pool) Evict(path string) error {
+	key := filepath.Clean(path)
+
+	p.mu.Lock()
+	store, ok := p.stores[key]
+	if ok {
+		delete(p.stores, key)
+	}
+	p.mu.Unlock()
+
+	if !ok {
+		return nil
+	}
+	store.shared = false
+	return store.Close()
+}

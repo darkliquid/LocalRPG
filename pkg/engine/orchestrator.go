@@ -20,8 +20,41 @@ import (
 // longer than the configured chunk timeout.
 var ErrGenerationStalled = errors.New("gm generation stalled")
 
+// OpeningPromptSetting is the campaign setting holding the player's own opening
+// instruction. Absent means the GM invents the scene, which is the default.
+const OpeningPromptSetting = "opening_prompt"
+
+// OpeningMode is the reserved mode of a campaign's first turn.
+const OpeningMode = "Opening"
+
 // defaultChunkTimeout is the silence tolerated between deltas when a caller sets none.
 const defaultChunkTimeout = 60 * time.Second
+
+// OpeningPrompt reads a campaign's configured opening instruction, or "" when
+// the GM should invent the scene.
+func OpeningPrompt(manifest *core.GameManifest) string {
+	if manifest == nil || manifest.Settings == nil {
+		return ""
+	}
+	prompt, _ := manifest.Settings[OpeningPromptSetting].(string)
+	return strings.TrimSpace(prompt)
+}
+
+// openingDirective is the instruction the GM receives as the campaign's first
+// turn. It establishes the scene without deciding the protagonist's own actions,
+// which is the one thing a narrator must not take away from a player.
+func openingDirective(prompt string) string {
+	var sb strings.Builder
+	sb.WriteString("[OPENING SCENE]\n")
+	sb.WriteString("Establish the opening of this campaign.\n")
+	sb.WriteString("Describe where the protagonist is, what they can perceive, and one thing that invites action.\n")
+	sb.WriteString("Introduce at most one present character, using their established name.\n")
+	sb.WriteString("Do not decide the protagonist's actions, thoughts, or feelings.\n")
+	if trimmed := strings.TrimSpace(prompt); trimmed != "" {
+		sb.WriteString("\n" + trimmed + "\n")
+	}
+	return sb.String()
+}
 
 type TurnOrchestrator struct {
 	store         *storage.Store
@@ -35,6 +68,7 @@ type TurnOrchestrator struct {
 	lorePrompt    string
 	extractor     *harness.Extractor
 	chunkTimeout  time.Duration
+	openingPrompt string
 }
 
 func NewTurnOrchestrator(
@@ -74,6 +108,12 @@ func (o *TurnOrchestrator) SetChunkTimeout(timeout time.Duration) {
 		timeout = defaultChunkTimeout
 	}
 	o.chunkTimeout = timeout
+}
+
+// SetOpeningPrompt supplies the player's own opening instruction, used when the
+// campaign's first turn runs in OpeningMode.
+func (o *TurnOrchestrator) SetOpeningPrompt(prompt string) {
+	o.openingPrompt = prompt
 }
 
 // currentLocation resolves where this turn is happening. The player note wins
@@ -217,17 +257,29 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		return &move, nil
 	}
 
+	// The opening turn establishes the campaign before the player acts. It is only
+	// meaningful as turn one, so a later attempt is refused rather than silently
+	// rewriting the scene the party is already standing in.
+	isOpening := strings.EqualFold(mode, OpeningMode)
+	if isOpening {
+		if len(pastTurns) > 0 {
+			return nil, fmt.Errorf("the campaign has already begun")
+		}
+		mode = OpeningMode
+		generationPrompt = openingDirective(o.openingPrompt)
+	}
+
 	// Handle /gm director note or mode
-	isCorrection := mode == "GM" || strings.HasPrefix(actionInput, "/gm ")
+	isCorrection := !isOpening && (mode == "GM" || strings.HasPrefix(actionInput, "/gm "))
 	if isCorrection {
 		directiveText := strings.TrimPrefix(actionInput, "/gm ")
 		gmDirective = fmt.Sprintf("[DIRECTOR CORRECTION DIRECTIVE: %s]", directiveText)
-	} else if strings.EqualFold(mode, "Roll") {
+	} else if !isOpening && strings.EqualFold(mode, "Roll") {
 		if r, err := rules.EvaluateRoll(actionInput); err == nil {
 			rollRes = r
 			generationPrompt = fmt.Sprintf("I rolled %s with result %d", r.Notation, r.Total)
 		}
-	} else if o.rulesEngine != nil {
+	} else if !isOpening && o.rulesEngine != nil {
 		// Run action through mechanics hook if available
 		res, err := o.rulesEngine.ExecuteAction(strings.ToLower(mode), map[string]interface{}{
 			"action": actionInput,

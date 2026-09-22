@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/engine"
 )
 
 type PlayerDTO struct {
@@ -30,12 +31,13 @@ type FactionClockDTO struct {
 }
 
 type GameStateDTO struct {
-	GameID    string            `json:"game_id"`
-	GameName  string            `json:"game_name"`
-	Player    PlayerDTO         `json:"player"`
-	Arcs      []NarrativeArcDTO `json:"arcs"`
-	Clocks    []FactionClockDTO `json:"clocks"`
-	Locations []string          `json:"locations"`
+	GameID        string            `json:"game_id"`
+	GameName      string            `json:"game_name"`
+	Player        PlayerDTO         `json:"player"`
+	Arcs          []NarrativeArcDTO `json:"arcs"`
+	Clocks        []FactionClockDTO `json:"clocks"`
+	Locations     []string          `json:"locations"`
+	OpeningPrompt string            `json:"opening_prompt,omitempty"`
 }
 
 type SegmentDTO struct {
@@ -121,6 +123,12 @@ type CreateGameRequestDTO struct {
 	SystemID   string `json:"system_id"`
 	WorldID    string `json:"world_id"`
 	PlayerName string `json:"player_name"`
+}
+
+// GameSettingsPatchDTO is a partial update of a campaign's settings. An absent
+// field is left alone, which is what makes it a patch rather than a replace.
+type GameSettingsPatchDTO struct {
+	OpeningPrompt *string `json:"opening_prompt,omitempty"`
 }
 
 type SystemDetailDTO struct {
@@ -214,6 +222,7 @@ type TurnEvent struct {
 // turnModes maps the mode names a client may send to the engine's casing.
 var turnModes = map[string]string{
 	"do": "Do", "say": "Say", "story": "Story", "roll": "Roll", "gm": "GM", "system": "System",
+	"opening": engine.OpeningMode,
 }
 
 // validate normalises a submitted turn and rejects one the engine cannot run.
@@ -224,7 +233,9 @@ func (r *TurnRequest) validate() error {
 	}
 	r.Mode = mode
 
-	if strings.TrimSpace(r.Input) == "" {
+	// The opening turn carries no player action: its instruction is the campaign's
+	// opening prompt, so an empty input is correct rather than a mistake.
+	if strings.TrimSpace(r.Input) == "" && mode != engine.OpeningMode {
 		return fmt.Errorf("input is required")
 	}
 	return nil

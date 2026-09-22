@@ -608,3 +608,56 @@ func TestSTTEndpoint_RejectsWhenDisabled(t *testing.T) {
 		t.Fatalf("expected 400 Bad Request, got %d", w.Code)
 	}
 }
+func TestCampaignLifecycleRoutes(t *testing.T) {
+	gameID, svc := turnFixture(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	// Restart clears the campaign and returns its summary.
+	req := httptest.NewRequest(http.MethodPost, "/api/game/"+gameID+"/restart", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("restart: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var summary GameSummaryDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &summary); err != nil {
+		t.Fatalf("decode restart summary: %v", err)
+	}
+	if summary.ID != gameID {
+		t.Errorf("restart summary ID = %q, want %q", summary.ID, gameID)
+	}
+
+	// A settings patch round-trips into the state route.
+	req = httptest.NewRequest(http.MethodPatch, "/api/game/"+gameID+"/settings", strings.NewReader(`{"opening_prompt":"Begin at dusk."}`))
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("settings: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/game/"+gameID+"/state", nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	var state GameStateDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &state); err != nil {
+		t.Fatalf("decode state: %v", err)
+	}
+	if state.OpeningPrompt != "Begin at dusk." {
+		t.Errorf("OpeningPrompt = %q, want the saved prompt", state.OpeningPrompt)
+	}
+
+	// Delete removes the campaign; a second delete is a 404.
+	req = httptest.NewRequest(http.MethodDelete, "/api/game/"+gameID, nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/api/game/"+gameID, nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("delete absent: expected 404, got %d", rec.Code)
+	}
+}

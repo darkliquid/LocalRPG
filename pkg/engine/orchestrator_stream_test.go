@@ -273,3 +273,32 @@ func TestGenerationStallsWhenNoChunkArrives(t *testing.T) {
 	}
 }
 
+func TestOpeningModeEstablishesTheFirstTurnOnly(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"Rain hammers the market."}}
+	orchestrator, timeline, _ := streamingOrchestrator(t, provider)
+	orchestrator.SetOpeningPrompt("Begin at dusk in the market.")
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Opening", "", nil)
+	if err != nil {
+		t.Fatalf("opening turn failed: %v", err)
+	}
+	if turn.Mode != OpeningMode {
+		t.Errorf("Mode = %q, want %q", turn.Mode, OpeningMode)
+	}
+	if turn.Number != 1 {
+		t.Errorf("Number = %d, want 1", turn.Number)
+	}
+
+	turns, err := timeline.history.LoadHistory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 1 {
+		t.Fatalf("expected one recorded turn, got %d", len(turns))
+	}
+
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Opening", "", nil); err == nil {
+		t.Errorf("expected a second opening turn to be refused")
+	}
+}
+

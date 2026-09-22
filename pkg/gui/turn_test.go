@@ -162,3 +162,109 @@ func TestTurnSessionRecordsNothingWhenEmitFails(t *testing.T) {
 		t.Errorf("expected nothing recorded, got %+v", chronicle)
 	}
 }
+
+func TestTurnSessionRunsAnOpeningTurn(t *testing.T) {
+	gameID, svc := turnFixture(t)
+
+	session, err := svc.BeginTurn(gameID)
+	if err != nil {
+		t.Fatalf("BeginTurn failed: %v", err)
+	}
+	defer session.Close()
+
+	var final *TurnDTO
+	if err := session.Run(context.Background(), TurnRequest{Mode: "Opening", Input: ""}, func(event TurnEvent) error {
+		if event.Type == "turn" {
+			final = event.Turn
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("opening turn failed: %v", err)
+	}
+	if final == nil {
+		t.Fatal("expected the opening turn to be recorded")
+	}
+	if final.TurnNumber != 1 || final.Mode != engine.OpeningMode {
+		t.Errorf("unexpected opening turn: number %d, mode %q", final.TurnNumber, final.Mode)
+	}
+}
+
+func TestRestartGameClearsHistoryAndKeepsTheCampaign(t *testing.T) {
+	gameID, svc := turnFixture(t)
+
+	session, err := svc.BeginTurn(gameID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.Run(context.Background(), TurnRequest{Mode: "Do", Input: "I look around"}, func(TurnEvent) error {
+		return nil
+	}); err != nil {
+		t.Fatalf("turn failed: %v", err)
+	}
+	session.Close()
+
+	restarted, err := svc.RestartGame(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("RestartGame failed: %v", err)
+	}
+	if restarted.TurnCount != 0 {
+		t.Errorf("TurnCount = %d, want 0", restarted.TurnCount)
+	}
+
+	chronicle, err := svc.GetChronicle(context.Background(), gameID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chronicle) != 0 {
+		t.Errorf("expected an empty chronicle after a restart, got %d turns", len(chronicle))
+	}
+
+	state, err := svc.GetGameState(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("GetGameState failed after a restart: %v", err)
+	}
+	if state.Player.Name != "Sean" {
+		t.Errorf("Player.Name = %q, want the protagonist preserved", state.Player.Name)
+	}
+}
+
+func TestDeleteGameRemovesTheCampaign(t *testing.T) {
+	gameID, svc := turnFixture(t)
+
+	if err := svc.DeleteGame(context.Background(), gameID); err != nil {
+		t.Fatalf("DeleteGame failed: %v", err)
+	}
+
+	games, err := svc.ListGames(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(games) != 0 {
+		t.Errorf("expected no campaigns, got %+v", games)
+	}
+	if _, err := os.Stat(svc.GetResolver().GameDir(gameID)); !os.IsNotExist(err) {
+		t.Errorf("expected the campaign directory to be gone, stat err = %v", err)
+	}
+
+	if err := svc.DeleteGame(context.Background(), gameID); err == nil {
+		t.Errorf("expected deleting an absent campaign to fail")
+	}
+}
+
+func TestGameSettingsRoundTrip(t *testing.T) {
+	gameID, svc := turnFixture(t)
+
+	if err := svc.UpdateGameSettings(context.Background(), gameID, map[string]interface{}{
+		engine.OpeningPromptSetting: "Begin in the rain.",
+	}); err != nil {
+		t.Fatalf("UpdateGameSettings failed: %v", err)
+	}
+
+	state, err := svc.GetGameState(context.Background(), gameID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.OpeningPrompt != "Begin in the rain." {
+		t.Errorf("OpeningPrompt = %q, want the saved prompt", state.OpeningPrompt)
+	}
+}

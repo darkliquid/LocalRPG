@@ -41,6 +41,18 @@ func CloseGameStores() error {
 	return gameStores.Close()
 }
 
+// CloseGameStore releases the pooled handle for one campaign so its directory can
+// be removed or rebuilt. Closing it is safe even when it was never opened.
+func CloseGameStore(paths *core.PathResolver, gameID string) error {
+	if paths == nil {
+		return nil
+	}
+	if err := gameStores.Evict(paths.GameDBPath(gameID)); err != nil {
+		return fmt.Errorf("close game store %q: %w", gameID, err)
+	}
+	return nil
+}
+
 func retireLegacyGameDB(paths *core.PathResolver, gameID string) error {
 	legacy := filepath.Join(paths.GameDir(gameID), legacyGameDB)
 

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/media"
 )
 
@@ -49,9 +50,36 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
+// writeGameError maps a campaign-lifecycle failure to a status. A turn in flight
+// is a conflict, a missing campaign is a 404, and anything else is a server
+// fault, which keeps the client from retrying a request that cannot succeed.
+func writeGameError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, ErrTurnInFlight):
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, err.Error(), http.StatusConflict)
+	case errors.Is(err, fs.ErrNotExist), errors.Is(err, os.ErrNotExist):
+		http.Error(w, err.Error(), http.StatusNotFound)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/game/")
 	parts := strings.Split(path, "/")
+
+	// DELETE /api/game/{id} has no sub-action, so it is matched before the
+	// two-part requirement every other game route satisfies.
+	if len(parts) == 1 && r.Method == http.MethodDelete {
+		if err := s.service.DeleteGame(r.Context(), parts[0]); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	if len(parts) < 2 {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
@@ -61,6 +89,38 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	action := parts[1]
 
 	switch action {
+	case "restart":
+		if r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		game, err := s.service.RestartGame(r.Context(), gameID)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, game)
+
+	case "settings":
+		if r.Method != http.MethodPatch {
+			http.NotFound(w, r)
+			return
+		}
+		var patch GameSettingsPatchDTO
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&patch); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		values := map[string]interface{}{}
+		if patch.OpeningPrompt != nil {
+			values[engine.OpeningPromptSetting] = strings.TrimSpace(*patch.OpeningPrompt)
+		}
+		if err := s.service.UpdateGameSettings(r.Context(), gameID, values); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
 	case "state":
 		state, err := s.service.GetGameState(r.Context(), gameID)
 		if err != nil {
