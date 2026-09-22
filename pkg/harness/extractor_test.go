@@ -366,3 +366,49 @@ func TestExtractorReadsAnEntityAppearance(t *testing.T) {
 		t.Errorf("expected an extracted appearance, got %+v", result.Entities)
 	}
 }
+
+func TestResolveProseMentionsFindsNamesInProse(t *testing.T) {
+	store := newTestEntityStore(t)
+	if err := store.SaveEntity(&entity.Entity{ID: "guard-kael", Name: "Guard Kael", Type: "character", Body: "A warden."}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveEntity(&entity.Entity{ID: "sera-vane", Name: "Sera Vane", Type: "character", Body: "A smuggler."}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveEntity(&entity.Entity{ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Body: "Salt."}); err != nil {
+		t.Fatal(err)
+	}
+
+	mentions := ResolveProseMentions(store, "Kael waits by the water.", "I ask after Sera Vane.")
+
+	byID := make(map[string]string, len(mentions))
+	for _, mention := range mentions {
+		byID[mention.ID] = mention.Kind
+	}
+	if byID["guard-kael"] != entity.MentionProse {
+		t.Errorf("expected Kael's bare surname to resolve, got %+v", mentions)
+	}
+	if byID["sera-vane"] != entity.MentionProse {
+		t.Errorf("expected Sera Vane's full name to resolve, got %+v", mentions)
+	}
+	if _, present := byID["aldon-harbour"]; present {
+		t.Errorf("a location named in passing should not be a prose mention")
+	}
+}
+
+func TestResolveProseMentionsIgnoresDescriptionsAndPartialWords(t *testing.T) {
+	store := newTestEntityStore(t)
+	if err := store.SaveEntity(&entity.Entity{ID: "the-woman", Name: "The Woman", Type: "character", Body: "Unnamed."}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveEntity(&entity.Entity{ID: "kaeldrin", Name: "Kaeldrin", Type: "character", Body: "Another."}); err != nil {
+		t.Fatal(err)
+	}
+
+	// A description is not a name, and a name is not a fragment of a longer one.
+	// Neither text names either entity: "The woman" is a description rather than the
+	// written name, and "Kael" is a fragment of a longer name, not the name itself.
+	if mentions := ResolveProseMentions(store, "The woman said nothing at all.", "Kael watched the water."); len(mentions) != 0 {
+		t.Errorf("expected no mentions, got %+v", mentions)
+	}
+}

@@ -409,3 +409,119 @@ func ResolveSpeakerID(store *storage.Store, name string) string {
 	}
 	return ""
 }
+
+const (
+	// proseNameMinRunes is the shortest whole name worth searching for.
+	proseNameMinRunes = 4
+	// proseWordMinRunes is the shortest single word of a name worth searching for on
+	// its own, which is how "Guard Kael" is found when the prose says only "Kael".
+	proseWordMinRunes = 4
+)
+
+// ResolveProseMentions finds known characters the given texts name in prose. It is
+// how a turn records involvement when extraction is disabled, when extraction
+// misses someone, or when the character neither spoke nor was linked.
+//
+// Names are matched as they are written, because prose capitalises proper nouns and
+// a description is not a name: "Kael waits by the water" finds Guard Kael, while
+// "The woman said nothing" does not find a character called The Woman. It is
+// deterministic on purpose: no model call, so it is cheap enough for every turn.
+func ResolveProseMentions(store *storage.Store, texts ...string) []entity.Mention {
+	if store == nil || len(texts) == 0 {
+		return nil
+	}
+
+	joined := strings.Join(texts, "\n")
+	if strings.TrimSpace(joined) == "" {
+		return nil
+	}
+
+	summaries, err := store.ListEntities()
+	if err != nil {
+		return nil
+	}
+
+	mentions := make([]entity.Mention, 0)
+	for _, summary := range summaries {
+		if summary.Type != "character" {
+			continue
+		}
+
+		if name := strings.TrimSpace(summary.Name); len([]rune(name)) >= proseNameMinRunes {
+			if containsWord(joined, name) {
+				mentions = append(mentions, entity.Mention{ID: summary.ID, Kind: entity.MentionProse})
+				continue
+			}
+		}
+
+		// A titled name is also known by its own words: Guard Kael is called Kael far
+		// more often than he is called by his title. Only the last word and the
+		// longest are tried, because trying every word would match a title used
+		// generically, and "the guard waits" is not evidence that Kael is present.
+		for _, word := range nameWords(summary.Name) {
+			if containsWord(joined, word) {
+				mentions = append(mentions, entity.Mention{ID: summary.ID, Kind: entity.MentionProse})
+				break
+			}
+		}
+	}
+	return mentions
+}
+
+// containsWord reports whether the text contains the word with boundaries, so
+// "Kael" does not match "Kaeldrin". The comparison is case-sensitive, so a name is
+// only found where it is used as one.
+func containsWord(text, word string) bool {
+	index := 0
+	for {
+		found := strings.Index(text[index:], word)
+		if found == -1 {
+			return false
+		}
+		found += index
+
+		beforeOK := found == 0 || !isNameRune(rune(text[found-1]))
+		after := found + len(word)
+		afterOK := after >= len(text) || !isNameRune(rune(text[after]))
+		if beforeOK && afterOK {
+			return true
+		}
+		index = found + len(word)
+	}
+}
+
+// isNameRune reports whether a rune can be part of a name, which is what makes the
+// boundary check meaningful. Case is deliberately not folded here.
+func isNameRune(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '\'' || r == '-'
+}
+
+// nameWords returns the words of a name that could stand for it alone, most
+// distinctive first: the last word, then the longest. Capitalisation is preserved,
+// because a name is matched as it is written.
+func nameWords(name string) []string {
+	words := make([]string, 0, 2)
+	for _, word := range strings.FieldsFunc(name, func(r rune) bool {
+		return !isNameRune(r)
+	}) {
+		if len([]rune(word)) < proseWordMinRunes {
+			continue
+		}
+		words = append(words, word)
+	}
+	if len(words) == 0 {
+		return nil
+	}
+
+	last := words[len(words)-1]
+	longest := words[0]
+	for _, word := range words {
+		if len([]rune(word)) > len([]rune(longest)) {
+			longest = word
+		}
+	}
+	if longest == last {
+		return []string{last}
+	}
+	return []string{last, longest}
+}
