@@ -123,7 +123,7 @@ func (p *Player) Playing() bool {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.playing && p.otoPlayer != nil && p.otoPlayer.IsPlaying()
+	return p.playing && p.otoPlayer != nil
 }
 
 // SetVolume sets the gain applied to every clip in the queue.
@@ -187,19 +187,6 @@ func (p *Player) PlayFiles(paths []string) error {
 
 	reader := &streamerReader{
 		streamer: queue,
-		onEOF: func() {
-			p.mu.Lock()
-			if p.generation == gen {
-				p.playing = false
-				activeClosers := p.closers
-				p.closers = nil
-				p.streamer = nil
-				p.mu.Unlock()
-				go closeAll(activeClosers)
-				return
-			}
-			p.mu.Unlock()
-		},
 	}
 
 	otoPlayer := p.otoCtx.NewPlayer(reader)
@@ -217,6 +204,28 @@ func (p *Player) PlayFiles(paths []string) error {
 
 	go closeAll(previousClosers)
 	otoPlayer.Play()
+
+	go func(player *oto.Player, gen uint64, closers []io.Closer, r *streamerReader) {
+		for {
+			time.Sleep(20 * time.Millisecond)
+			p.mu.Lock()
+			if p.generation != gen || p.otoPlayer != player {
+				p.mu.Unlock()
+				return
+			}
+			if !player.IsPlaying() || (r.isDrained() && player.BufferedSize() == 0) {
+				p.playing = false
+				p.streamer = nil
+				p.closers = nil
+				p.otoPlayer = nil
+				p.mu.Unlock()
+				_ = player.Close()
+				closeAll(closers)
+				return
+			}
+			p.mu.Unlock()
+		}
+	}(otoPlayer, gen, closers, reader)
 
 	return nil
 }
@@ -258,10 +267,15 @@ func (p *Player) Close() error {
 
 type streamerReader struct {
 	streamer beep.Streamer
-	onEOF    func()
 	buf      [][2]float64
-	calledEOF bool
+	drained  bool
 	mu       sync.Mutex
+}
+
+func (sr *streamerReader) isDrained() bool {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	return sr.drained
 }
 
 func (sr *streamerReader) Read(p []byte) (int, error) {
@@ -292,10 +306,7 @@ func (sr *streamerReader) Read(p []byte) (int, error) {
 	}
 
 	if !ok || n == 0 {
-		if !sr.calledEOF && sr.onEOF != nil {
-			sr.calledEOF = true
-			sr.onEOF()
-		}
+		sr.drained = true
 		return n * 4, io.EOF
 	}
 
