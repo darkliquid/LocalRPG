@@ -20,11 +20,18 @@ type scriptedStreamProvider struct {
 	chunks []string
 	err    error
 	block  bool
+	// onRequest is called with each request the provider is given, so a test can
+	// assert what it was asked rather than only what it replied.
+	onRequest func(harness.GenerateRequest)
 }
 
 func (p *scriptedStreamProvider) ID() string { return "scripted" }
 
 func (p *scriptedStreamProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
+	if p.onRequest != nil {
+		p.onRequest(req)
+	}
+
 	var sb strings.Builder
 	for _, chunk := range p.chunks {
 		sb.WriteString(chunk)
