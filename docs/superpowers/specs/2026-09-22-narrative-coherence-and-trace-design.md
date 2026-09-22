@@ -381,6 +381,8 @@ Settings Studio gains, under Preferences: trace level, payload cap, and retentio
 | Change | Shape |
 | --- | --- |
 | `Turn.ContinuityNotes` | `[]string`, persisted like `ContextNotes` |
+| Mention kinds | `prose` joins `player`, `location`, `wikilink`, `extracted`, and `speech`. A turn's prose names are recorded by a deterministic scan, so recall does not depend on extraction having run |
+| `chronicle.md` | `type: chronicle`, with `state.through_turn` recording how far the summary reaches |
 | `Turn.ContextNotes` | already shipped; gains the new section names |
 | Arc state | `status`, `last_advanced` |
 | Entity frontmatter | `aliases: []` |
@@ -489,7 +491,9 @@ The work is planned as **three plans**, not one:
 
 1. `docs/superpowers/plans/2026-09-22-trace-and-debug-view.md` (shipped) - the instrument. Additive, and it touches many packages shallowly.
 2. `docs/superpowers/plans/2026-09-22-canon-and-recall.md` - increments 2 and 3. It changes what the model is sent, which is behaviour judged by playing, so it is kept apart from the work that adds new mechanisms.
-3. A later plan for increments 4 to 6 - the chronicle and its summariser, aliases and merging, the continuity checks, and the player-facing recap. That adds a subsystem rather than extending the prompt, and its continuity rules read the canon facts plan 2 puts in place.
+3. `docs/superpowers/plans/2026-09-22-prose-mentions.md` - the gap that made retrieval depend on the extractor. A turn's mentions came from wikilinks and speech, plus whatever extraction recorded, so a character who was only ever described was invisible to recall when extraction was off, failed, or missed them. A deterministic prose scan closes it, and its backfill is the one operation that rewrites `history.jsonl`.
+4. `docs/superpowers/plans/2026-09-22-memory-and-recap.md` - increment 4. The chronicle note and its summariser, the cadence, detached regeneration, injection as a recollection, and the recap.
+5. A later plan for increments 5 and 6 - aliases and merging, then the continuity checks, open threads, and the idle nudge. That adds a repair mechanism and a verification pass rather than extending memory.
 
 Trace-first is not a preference: it is the instrument used to verify that canon reaches the prompt at all, and to tune the budget against real prompts.
 
