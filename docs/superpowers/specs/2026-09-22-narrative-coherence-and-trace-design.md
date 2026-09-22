@@ -74,6 +74,13 @@ The second half of this spec is the reason the first half is hard to debug: ther
 | Trace levels | `off`, `summary` (decisions and sizes), `full` (payloads and per-chunk detail) |
 | Redaction | A deny-list of field names; secrets are never written, at any level |
 | Trace UI | A Debug drawer reading the file, polled while a turn is in flight; no new streaming protocol |
+| Chronicle note | A normal entity (`type: chronicle`), player-visible and editable, excluded from canon, recall, retrieval, and edge scanning by type |
+| Summary cadence | Every N turns, plus a location change; never on an idle thread |
+| Summary authority | Stated as recollection, explicitly subordinate to canon and the notes |
+| Continuity findings | On by default, display-only, with a one-click correction offered on the finding |
+| Retrieval query set | Recent speech speakers and recently mentioned characters, **excluding the player and the location**, which other sections already cover |
+| Summary in the budget | Summoned last, and only for campaigns whose history exceeds the recall window |
+| Trace cost model | Opt-in: `off` by default, so retention bounds guard against a debug session left running, not against normal play |
 
 ---
 
@@ -301,7 +308,9 @@ Config: `preferences.trace_level`. A CLI flag `--trace <level>` overrides it for
 
 Rotation: when the file passes `agents.trace_max_bytes`, it is renamed to `trace.jsonl.1` (shifting older files), and the newest `agents.trace_max_files` are kept. Rotation is checked on open and every `agents.trace_rotate_check` events, not on every write, so the hot path stays a buffer append. An appended file has no natural age, so size is the only honest bound.
 
-At `full`, the assembled prompt is recorded **once**, on `context.assembled`. `provider.request` carries its hash and length rather than a second copy, which is roughly half the per-turn cost.
+At `full`, the assembled prompt is recorded **once**, on `context.assembled`; `provider.request` carries its hash, its length, and the envelope that actually went on the wire. This is about diagnostic redundancy rather than size: two copies of the same text add no information, and give a reviewer two records that can disagree.
+
+Tracing is opt-in. `off` is the default and writes nothing, so the bounds below exist to stop a debug session left enabled for days from filling a disk, not to ration normal play. They can afford to be generous, and a user who wants a week of traces should raise them without guilt.
 
 A single `trace.Logger` interface is passed down explicitly rather than reached for globally:
 
@@ -400,16 +409,17 @@ All defaulted, so existing configuration is unchanged. Every key is also exposed
 
 ## 14. Open Questions
 
-Settled in review: the summary is written by the **extractor** role, and the trace is a **single appended file**. The remainder are still open; several were put to the reviewer as a grilling round and their outcomes are recorded here as they land.
+Settled in the first review round: the summary provider is the **extractor** role; the trace is a **single appended file**; the chronicle is an entity; cadence includes a location change; the summary is subordinate; continuity checks are on by default and display-only plus a correction; retrieval excludes the player and the location; the summary surrenders last and only past the window.
 
-1. **Summary note shape.** `chronicle.md` as a normal entity, or a file outside `entities/`? It affects whether the chronicle appears in the Codex and graph.
-2. **Cadence.** Default 10 turns. Should it also trigger on location change or an idle thread?
-3. **Summary authority.** Is the summary advisory context, or stated as authoritative fact? A summary that contradicts a note is a second source of truth.
-4. **Continuity findings.** Display-only, or offered as one-click `/gm` corrections? And are the checks on by default?
-5. **Retrieval query set.** Current location, recent speakers, and recent mentions are proposed. Is that the right set of "entities in play"?
-6. **Retrieval ranking.** Overlap count then recency is proposed. Is recency-weighted overlap worth the complexity?
-7. **Budget priority.** Is the compressed summary really the last section to surrender, given it is lossy?
-8. **Export.** Should a rendered story bundle carry its provenance trace? Proposal: no, keep exports clean.
+Still open, queued for the second round:
+
+1. **Retrieval ranking.** Overlap count then recency, or recency-weighted overlap?
+2. **Chronicle visibility.** Should the chronicle appear as a node in the knowledge graph, where it has no links and would sit isolated?
+3. **Summary timing.** Is regeneration part of the turn (adding latency to it) or detached like playback?
+4. **Correction feedback.** Does a corrected finding get cleared, and do corrections feed the next summary?
+5. **Untrimmed prompt.** When the budget trims, should the trace record what would have been sent?
+6. **Wire fidelity.** Raw provider bytes, or the parsed chunks we already understand?
+7. **Trace defaults.** Given opt-in tracing, how generous should rotation be, and what does `--trace` default to?
 
 ## 15. File Map
 
