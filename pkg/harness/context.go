@@ -2,6 +2,7 @@ package harness
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -30,10 +31,12 @@ type ContextLimits struct {
 }
 
 const (
-	defaultRecentTurns      = 6
-	defaultRecentTurnChars  = 1200
-	defaultSceneRecallTurns = 4
-	defaultRecallChars      = 800
+	defaultRecentTurns       = 6
+	defaultRecentTurnChars   = 1200
+	defaultSceneRecallTurns  = 4
+	defaultRecallChars       = 800
+	defaultRetrievalTurns    = 3
+	defaultRetrievalHalflife = 12
 	// minRecentTurnChars is the floor a turn's excerpt can be shortened to before
 	// the recall section is dropped instead.
 	minRecentTurnChars = 200
@@ -146,6 +149,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 		{name: "canon", text: canon},
 		{name: "recent", text: c.recentSection(req), droppable: true, rank: 4},
 		{name: "recall", text: c.sceneRecall(req), droppable: true, rank: 3},
+		{name: "retrieval", text: c.relevantHistory(req), droppable: true, rank: 2},
 		{name: "catalogue", text: catalogue, droppable: true, rank: 1},
 		{name: "action", text: "\n## PLAYER ACTION\n" + req.Action + "\n"},
 	}, nil
@@ -293,6 +297,156 @@ func (c *ContextAssembler) sceneRecall(req ContextRequest) string {
 
 	var sb strings.Builder
 	sb.WriteString("\n## WHAT HAPPENED HERE\n")
+	for _, line := range lines {
+		sb.WriteString(line + "\n")
+	}
+	return sb.String()
+}
+
+// TurnRecordView is the part of a past turn recall needs. It keeps the assembler
+// from depending on the storage projection for a ranking that only reads two
+// fields.
+type TurnRecordView struct {
+	Number    int
+	Narration string
+}
+
+// relevantHistory retrieves turns that share entities with the ones in play. It
+// does only what scene recall cannot: it finds the turn where a promise was made or
+// a secret was told, wherever it happened and however long ago.
+//
+// The query set excludes the player and the location. The player is mentioned by
+// every turn ever recorded, so including it would rank noise first, and the
+// location is what scene recall already covers.
+func (c *ContextAssembler) relevantHistory(req ContextRequest) string {
+	if c.store == nil || len(req.Recent) == 0 {
+		return ""
+	}
+
+	limit := c.limits.RetrievalTurns
+	if limit <= 0 {
+		limit = defaultRetrievalTurns
+	}
+	charLimit := c.limits.RetrievalChars
+	if charLimit <= 0 {
+		charLimit = defaultRecallChars
+	}
+	halfLife := c.limits.RetrievalHalflife
+	if halfLife <= 0 {
+		halfLife = defaultRetrievalHalflife
+	}
+
+	numbers := make([]int, 0, len(req.Recent))
+	for _, turn := range req.Recent {
+		numbers = append(numbers, turn.Number)
+	}
+
+	mentioned, err := c.store.EntitiesInTurns(numbers)
+	if err != nil {
+		return ""
+	}
+
+	// Only characters are queried: the location is scene recall's job, and arcs are
+	// always in the prompt already.
+	query := make([]string, 0, len(mentioned))
+	for _, id := range mentioned {
+		if id == req.PlayerID || id == req.LocationID {
+			continue
+		}
+		ent, err := c.store.GetEntity(id)
+		if err != nil || ent == nil || ent.Type != "character" {
+			continue
+		}
+		query = append(query, id)
+	}
+	if len(query) == 0 {
+		return ""
+	}
+
+	before := req.TurnNumber
+	if before <= 0 {
+		before = 1 << 30
+	}
+
+	// Over-fetch, then drop what the window or scene recall already carries.
+	candidates, err := c.store.TurnsMentioningEntities(query, before, limit*4)
+	if err != nil {
+		return ""
+	}
+
+	excluded := make(map[int]bool, len(req.Recent))
+	for _, turn := range req.Recent {
+		excluded[turn.Number] = true
+	}
+	if recalled, err := c.store.TurnsAtLocation(req.LocationID, before, limit*4); err == nil {
+		for _, turn := range recalled {
+			excluded[turn.Number] = true
+		}
+	}
+
+	type scored struct {
+		record TurnRecordView
+		score  float64
+	}
+	ranked := make([]scored, 0, len(candidates))
+	for _, candidate := range candidates {
+		if excluded[candidate.Number] {
+			continue
+		}
+
+		// Overlap is per candidate: how many of the query entities this turn names.
+		// The store returns candidates ordered by the same count, but the weighting
+		// below needs the number itself.
+		mentions, err := c.store.ListEntitiesForTurn(candidate.Number)
+		if err != nil {
+			continue
+		}
+		overlap := 0
+		for _, mention := range mentions {
+			for _, id := range query {
+				if mention.EntityID == id {
+					overlap++
+				}
+			}
+		}
+		if overlap == 0 {
+			continue
+		}
+
+		age := before - candidate.Number
+		if age < 0 {
+			age = 0
+		}
+		weight := math.Pow(0.5, float64(age)/float64(halfLife))
+		ranked = append(ranked, scored{
+			record: TurnRecordView{Number: candidate.Number, Narration: candidate.Narration},
+			score:  float64(overlap) * weight,
+		})
+	}
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].score == ranked[j].score {
+			return ranked[i].record.Number > ranked[j].record.Number
+		}
+		return ranked[i].score > ranked[j].score
+	})
+	if len(ranked) > limit {
+		ranked = ranked[:limit]
+	}
+
+	lines := make([]string, 0, len(ranked))
+	for _, entry := range ranked {
+		narration := TruncateRunes(strings.TrimSpace(entry.record.Narration), charLimit)
+		if narration == "" {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("Turn %d: %s", entry.record.Number, narration))
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n## RELEVANT HISTORY\n")
 	for _, line := range lines {
 		sb.WriteString(line + "\n")
 	}

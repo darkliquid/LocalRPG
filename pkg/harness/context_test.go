@@ -451,3 +451,73 @@ func TestSceneRecallExcludesTurnsAlreadyInTheWindow(t *testing.T) {
 		t.Errorf("a turn in the window must not be recalled twice:\n%s", result.Prompt)
 	}
 }
+
+func TestRelevantHistoryFindsTheTurnOutsideTheWindow(t *testing.T) {
+	store := newTestEntityStore(t)
+	saveEntity(t, store, &entity.Entity{ID: "guard-kael", Name: "Guard Kael", Type: "character", Hash: "h1"})
+	saveEntity(t, store, &entity.Entity{ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Hash: "h2"})
+
+	// The promise is made in turn 1, long before the recall window.
+	for _, turn := range []storage.TurnRecord{
+		{Number: 1, Timestamp: time.Now(), Mode: "Do", Narration: "Kael mentioned the oil was low.", Location: "oakhaven-tavern",
+			Entities: []storage.TurnEntityRef{{EntityID: "guard-kael", Mention: "wikilink"}}},
+		// Turn 2 mentions him too, which is what puts him in play, but it is already
+		// in the window so it cannot be the answer.
+		{Number: 2, Timestamp: time.Now(), Mode: "Do", Narration: "Kael: \"Ask me again.\"", Location: "aldon-harbour",
+			Entities: []storage.TurnEntityRef{{EntityID: "guard-kael", Mention: "speech"}}},
+	} {
+		if err := store.SaveTurn(turn); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	assembler := NewContextAssembler(store)
+	result, err := assembler.Assemble(ContextRequest{
+		LocationID: "aldon-harbour",
+		Action:     "I ask Kael about supplies",
+		// Turn 2 is in the window, and it does not mention him. Turn 1 is the one
+		// the window has lost, and the mention of him is the thread back to it.
+		Recent:     []RecentTurn{{Number: 2, Mode: "Do", Narration: "Kael: \"Ask me again.\""}},
+		TurnNumber: 3,
+		PlayerID:   "player",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(result.Prompt, "RELEVANT HISTORY") {
+		t.Fatalf("expected a retrieval section:\n%s", result.Prompt)
+	}
+	if !strings.Contains(result.Prompt, "the oil was low") {
+		t.Errorf("retrieval must recover the turn the window lost:\n%s", result.Prompt)
+	}
+}
+
+func TestRelevantHistoryExcludesTheLocationAndThePlayer(t *testing.T) {
+	store := newTestEntityStore(t)
+	saveEntity(t, store, &entity.Entity{ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Hash: "h1"})
+
+	if err := store.SaveTurn(storage.TurnRecord{
+		Number: 1, Timestamp: time.Now(), Mode: "Do", Narration: "The harbour at dawn.", Location: "aldon-harbour",
+		Entities: []storage.TurnEntityRef{{EntityID: "aldon-harbour", Mention: "location"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	assembler := NewContextAssembler(store)
+	result, err := assembler.Assemble(ContextRequest{
+		LocationID: "aldon-harbour",
+		Action:     "I listen",
+		Recent:     []RecentTurn{{Number: 2, Mode: "Do", Narration: "I listen."}},
+		TurnNumber: 3,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, section := range result.Sections {
+		if section.Name == "retrieval" && section.Included {
+			t.Errorf("the location alone must not trigger retrieval, since scene recall covers it")
+		}
+	}
+}
