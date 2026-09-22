@@ -21,7 +21,7 @@
 - Modify: `pkg/gui/service.go`
 - Modify: `pkg/gui/service_test.go`
 
-- [ ] **Step 1: Write unit test for `KokoroVoiceProfiles` in `pkg/config/presets_test.go`**
+- [x] **Step 1: Write unit test for `KokoroVoiceProfiles` in `pkg/config/presets_test.go`**
 
 Add test checking that `KokoroVoiceProfiles` has all 25 voices and tags include gender and accent:
 ```go
@@ -45,12 +45,12 @@ func TestKokoroVoiceProfilesPreset(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
 
 Run: `go test -v -run TestKokoroVoiceProfilesPreset ./pkg/config/`
 Expected: FAIL with undefined `KokoroVoiceProfiles`.
 
-- [ ] **Step 3: Implement `KokoroVoiceProfiles` in `pkg/config/presets.go`**
+- [x] **Step 3: Implement `KokoroVoiceProfiles` in `pkg/config/presets.go`**
 
 Add all 25 Kokoro profiles with derived gender and accent tags and descriptions:
 ```go
@@ -97,7 +97,7 @@ Update `TTSPresets["sherpa-onnx"]`:
 	},
 ```
 
-- [ ] **Step 4: Update `TestProviderResponseDTO` in `pkg/gui/types.go`**
+- [x] **Step 4: Update `TestProviderResponseDTO` in `pkg/gui/types.go`**
 
 Add `ModelMissing` and `ModelID`:
 ```go
@@ -112,7 +112,7 @@ type TestProviderResponseDTO struct {
 }
 ```
 
-- [ ] **Step 5: Write unit test in `pkg/gui/service_test.go` for missing model probe**
+- [x] **Step 5: Write unit test in `pkg/gui/service_test.go` for missing model probe**
 
 Add to `pkg/gui/service_test.go`:
 ```go
@@ -141,7 +141,7 @@ func TestTestProviderSherpaTTSMissingModelReturnsStructuredMissing(t *testing.T)
 }
 ```
 
-- [ ] **Step 6: Update `Service.TestProvider` in `pkg/gui/service.go`**
+- [x] **Step 6: Update `Service.TestProvider` in `pkg/gui/service.go`**
 
 In `case "tts"`:
 ```go
@@ -163,12 +163,12 @@ In `case "tts"`:
 		}
 ```
 
-- [ ] **Step 7: Run tests to verify `pkg/config` and `pkg/gui` pass**
+- [x] **Step 7: Run tests to verify `pkg/config` and `pkg/gui` pass**
 
 Run: `go test -v -count=1 ./pkg/config/ ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 8: Commit backend changes**
+- [x] **Step 8: Commit backend changes**
 
 ```bash
 git add pkg/config/ pkg/gui/
@@ -183,7 +183,7 @@ git commit -m "feat(config,gui): add KokoroVoiceProfiles and structured model_mi
 - Modify: `frontend/src/types.ts`
 - Modify: `frontend/src/templates/providerPresets.ts`
 
-- [ ] **Step 1: Update `TestProviderResponse` in `frontend/src/types.ts`**
+- [x] **Step 1: Update `TestProviderResponse` in `frontend/src/types.ts`**
 
 In `frontend/src/types.ts`:
 ```typescript
@@ -198,7 +198,7 @@ export interface TestProviderResponse {
 }
 ```
 
-- [ ] **Step 2: Add `KOKORO_VOICE_PROFILES` and `sherpa-onnx` preset to `frontend/src/templates/providerPresets.ts`**
+- [x] **Step 2: Add `KOKORO_VOICE_PROFILES` and `sherpa-onnx` preset to `frontend/src/templates/providerPresets.ts`**
 
 In `frontend/src/templates/providerPresets.ts`:
 1. Define `KOKORO_VOICE_PROFILES: VoiceProfile[]` matching the 25 profiles.
@@ -227,12 +227,12 @@ In `frontend/src/templates/providerPresets.ts`:
 ...
 ```
 
-- [ ] **Step 3: Run frontend type checks**
+- [x] **Step 3: Run frontend type checks**
 
 Run: `mise run test:frontend`
 Expected: PASS (`tsc --noEmit` exits with 0).
 
-- [ ] **Step 4: Commit frontend types and presets**
+- [x] **Step 4: Commit frontend types and presets**
 
 ```bash
 git add frontend/src/types.ts frontend/src/templates/providerPresets.ts
@@ -246,7 +246,7 @@ git commit -m "feat(frontend): add KOKORO_VOICE_PROFILES and sherpa-onnx preset"
 **Files:**
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Flatten TTS provider selector in `SettingsStudio.tsx`**
+- [x] **Step 1: Flatten TTS provider selector in `SettingsStudio.tsx`**
 
 Replace the nested builtin select with a clean top-level value mapping:
 ```tsx
@@ -287,7 +287,7 @@ Replace the nested builtin select with a clean top-level value mapping:
 </select>
 ```
 
-- [ ] **Step 2: Add Kokoro Autofill button in Voice Profiles Library header**
+- [x] **Step 2: Add Kokoro Autofill button in Voice Profiles Library header**
 
 In the Voice Profiles Library section header:
 Import `KOKORO_VOICE_PROFILES` from `../templates/providerPresets`.
@@ -317,12 +317,12 @@ Render:
 ```
 Where `isKokoro = config.media.tts.type === 'builtin' && (config.media.tts.builtin_name === 'sherpa-onnx' || config.media.tts.builtin_name === 'kokoro');`.
 
-- [ ] **Step 3: Run frontend type checks**
+- [x] **Step 3: Run frontend type checks**
 
 Run: `mise run test:frontend`
 Expected: PASS.
 
-- [ ] **Step 4: Commit selector and autofill changes**
+- [x] **Step 4: Commit selector and autofill changes**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx
@@ -336,7 +336,7 @@ git commit -m "feat(frontend): flatten TTS provider selector and add Kokoro voic
 **Files:**
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Add model state and SSE subscription in `SettingsStudio.tsx`**
+- [x] **Step 1: Add model state and SSE subscription in `SettingsStudio.tsx`**
 
 Import `ModelDownloadModal` from `./ModelDownloadModal` and `ModelStatus` from `../types`.
 Add state hooks:
@@ -366,7 +366,7 @@ const unsubscribe = APIClient.subscribeModelEvents((status) => {
 return () => unsubscribe();
 ```
 
-- [ ] **Step 2: Render live model status card for Kokoro**
+- [x] **Step 2: Render live model status card for Kokoro**
 
 When `isKokoro`:
 Find `kokoroStatus = models.find((m) => m.id === 'kokoro-tts')`.
@@ -379,7 +379,7 @@ Render an inline status card beneath the TTS Provider Type:
   Card with warning and `[Download Model (~86 MB)]` button that calls:
   `setMissingModelPrompt({ id: 'kokoro-tts', name: 'Kokoro Voice Pack', sizeBytes: 90177536 })`.
 
-- [ ] **Step 3: Intercept `handleTestProvider` and archetype preview buttons**
+- [x] **Step 3: Intercept `handleTestProvider` and archetype preview buttons**
 
 In `handleTestProvider`:
 ```tsx
@@ -409,7 +409,7 @@ if (res.model_missing) {
 }
 ```
 
-- [ ] **Step 4: Mount `<ModelDownloadModal>` in `SettingsStudio.tsx`**
+- [x] **Step 4: Mount `<ModelDownloadModal>` in `SettingsStudio.tsx`**
 
 At the end of `SettingsStudio.tsx` return JSX:
 ```tsx
@@ -423,12 +423,12 @@ At the end of `SettingsStudio.tsx` return JSX:
 )}
 ```
 
-- [ ] **Step 5: Run frontend type checks**
+- [x] **Step 5: Run frontend type checks**
 
 Run: `mise run test:frontend`
 Expected: PASS.
 
-- [ ] **Step 6: Commit model status and modal interception**
+- [x] **Step 6: Commit model status and modal interception**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx
@@ -442,22 +442,22 @@ git commit -m "feat(frontend): add live Kokoro model status and preview download
 **Files:**
 - Verification only
 
-- [ ] **Step 1: Run backend tests**
+- [x] **Step 1: Run backend tests**
 
 Run: `mise run test:backend`
 Expected: All unit and integration tests pass.
 
-- [ ] **Step 2: Run frontend type check**
+- [x] **Step 2: Run frontend type check**
 
 Run: `mise run test:frontend`
 Expected: `tsc --noEmit` passes with 0 errors.
 
-- [ ] **Step 3: Run backend linter**
+- [x] **Step 3: Run backend linter**
 
 Run: `mise run lint`
 Expected: `go vet ./...` clean with 0 warnings.
 
-- [ ] **Step 4: Build entire binary (frontend + backend)**
+- [x] **Step 4: Build entire binary (frontend + backend)**
 
 Run: `mise run build`
 Expected: Production build succeeds and outputs `bin/localrpg`.
