@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -250,4 +251,152 @@ func (s *Store) DeleteTurnsFrom(number int) error {
 	}
 
 	return tx.Commit()
+}
+
+// turnColumns is the projection every recall query shares, in the order scanTurn
+// expects.
+const turnColumns = "turns.number, turns.timestamp, turns.mode, turns.input, turns.narration, COALESCE(turns.roll_json, ''), COALESCE(turns.location, ''), COALESCE(turns.outcome, '')"
+
+// scanTurn reads one projected turn. Entity links are loaded separately, because a
+// recall excerpt never needs them.
+func scanTurn(scanner interface{ Scan(...interface{}) error }) (TurnRecord, error) {
+	var record TurnRecord
+	var timestamp string
+	if err := scanner.Scan(
+		&record.Number,
+		&timestamp,
+		&record.Mode,
+		&record.Input,
+		&record.Narration,
+		&record.RollJSON,
+		&record.Location,
+		&record.Outcome,
+	); err != nil {
+		return TurnRecord{}, err
+	}
+	if parsed, err := time.Parse(time.RFC3339, timestamp); err == nil {
+		record.Timestamp = parsed
+	}
+	return record, nil
+}
+
+// TurnsAtLocation returns turns recorded at a location before the given turn,
+// oldest first, so a scene can be reminded of what happened where it stands.
+func (s *Store) TurnsAtLocation(locationID string, beforeTurn, limit int) ([]TurnRecord, error) {
+	if locationID == "" || limit <= 0 {
+		return nil, nil
+	}
+
+	query := `SELECT ` + turnColumns + ` FROM turns WHERE location = ? AND number < ? ORDER BY number DESC LIMIT ?`
+	rows, err := s.db.Query(query, locationID, beforeTurn, limit)
+	if err != nil {
+		return nil, fmt.Errorf("turns at location %q: %w", locationID, err)
+	}
+	defer rows.Close()
+
+	turnRecords := make([]TurnRecord, 0, limit)
+	for rows.Next() {
+		record, err := scanTurn(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan turn: %w", err)
+		}
+		turnRecords = append(turnRecords, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("turns at location %q: %w", locationID, err)
+	}
+
+	// The query walks backwards to take the newest, and the caller renders forwards.
+	for i, j := 0, len(turnRecords)-1; i < j; i, j = i+1, j-1 {
+		turnRecords[i], turnRecords[j] = turnRecords[j], turnRecords[i]
+	}
+	return turnRecords, nil
+}
+
+// TurnsMentioningEntities returns turns that mention any of the given entities,
+// ranked by how many of them they mention and then by recency. This is what
+// recovers the turn where a promise was made, which no fixed window can do.
+func (s *Store) TurnsMentioningEntities(entityIDs []string, excludeFromTurn, limit int) ([]TurnRecord, error) {
+	if len(entityIDs) == 0 || limit <= 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]string, 0, len(entityIDs))
+	args := make([]interface{}, 0, len(entityIDs)+2)
+	for _, id := range entityIDs {
+		placeholders = append(placeholders, "?")
+		args = append(args, id)
+	}
+	args = append(args, excludeFromTurn, limit)
+
+	query := `SELECT ` + turnColumns + `, COUNT(*) AS hits
+		FROM turns JOIN turn_entities ON turn_entities.turn_number = turns.number
+		WHERE turn_entities.entity_id IN (` + strings.Join(placeholders, ",") + `) AND turns.number < ?
+		GROUP BY turns.number
+		ORDER BY hits DESC, turns.number DESC
+		LIMIT ?`
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("turns mentioning entities: %w", err)
+	}
+	defer rows.Close()
+
+	turnRecords := make([]TurnRecord, 0, limit)
+	for rows.Next() {
+		var record TurnRecord
+		var timestamp string
+		var hits int
+		if err := rows.Scan(
+			&record.Number, &timestamp, &record.Mode, &record.Input, &record.Narration,
+			&record.RollJSON, &record.Location, &record.Outcome, &hits,
+		); err != nil {
+			return nil, fmt.Errorf("scan turn: %w", err)
+		}
+		if parsed, err := time.Parse(time.RFC3339, timestamp); err == nil {
+			record.Timestamp = parsed
+		}
+		turnRecords = append(turnRecords, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("turns mentioning entities: %w", err)
+	}
+	return turnRecords, nil
+}
+
+// EntitiesInTurns returns the distinct entities mentioned by the given turns,
+// which is how "who is in play" is known without a second index.
+func (s *Store) EntitiesInTurns(turnNumbers []int) ([]string, error) {
+	if len(turnNumbers) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]string, 0, len(turnNumbers))
+	args := make([]interface{}, 0, len(turnNumbers))
+	for _, number := range turnNumbers {
+		placeholders = append(placeholders, "?")
+		args = append(args, number)
+	}
+
+	query := `SELECT DISTINCT entity_id FROM turn_entities WHERE turn_number IN (` +
+		strings.Join(placeholders, ",") + `) ORDER BY entity_id`
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("entities in turns: %w", err)
+	}
+	defer rows.Close()
+
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan entity id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("entities in turns: %w", err)
+	}
+	return ids, nil
 }
