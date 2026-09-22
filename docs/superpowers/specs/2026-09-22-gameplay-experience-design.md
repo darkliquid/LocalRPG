@@ -553,6 +553,10 @@ Manual verification: create a campaign with an opening prompt and a spaced prota
 
 Shipped so far: increment 1 in full; increment 2's opening turn, settings patch, and Prologue screen (the creation-wizard fields are still outstanding); plus the campaign lifecycle below, which was not in the original increment list.
 
+The narrative-coherence counterpart to this spec is
+`docs/superpowers/specs/2026-09-22-narrative-coherence-and-trace-design.md`; it
+assumes the budget and recall window this one introduced.
+
 Also shipped from increment 3, driven by playtesting:
 
 - **Live formatting** (§6.3). `frontend/src/components/MarkdownProse.tsx` renders the constrained subset and preserves soft line breaks, and the same component draws streamed prose and replayed prose, so nothing "pops" into shape at the end. Increment 3's prompt changes (§6.2) and the speech/continuity instructions shipped with it.
