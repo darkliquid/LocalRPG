@@ -4,23 +4,54 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 type HTTPProvider struct {
-	id       string
-	endpoint string
-	model    string
-	apiKey   string
-	opts     GenerationOptions
-	client   *http.Client
+	id                 string
+	endpoint           string
+	model              string
+	apiKey             string
+	opts               GenerationOptions
+	client             *http.Client
+	logger             trace.Logger
+	chunkLimitOverride int
 }
 
 func NewHTTPProvider(id, endpoint, model, apiKey string) *HTTPProvider {
 	return NewHTTPProviderWithOptions(id, endpoint, model, apiKey, GenerationOptions{})
+}
+
+// NewHTTPProviderWithLogger is NewHTTPProviderWithOptions with a trace sink.
+func NewHTTPProviderWithLogger(id, endpoint, model, apiKey string, opts GenerationOptions, logger trace.Logger) *HTTPProvider {
+	provider := NewHTTPProviderWithOptions(id, endpoint, model, apiKey, opts)
+	provider.SetLogger(logger)
+	return provider
+}
+
+// SetLogger attaches a trace sink. A nil logger records nothing.
+func (h *HTTPProvider) SetLogger(logger trace.Logger) {
+	h.logger = trace.OrNil(logger)
+}
+
+// SetChunkLimit bounds how many wire events one call records.
+func (h *HTTPProvider) SetChunkLimit(limit int) {
+	h.chunkLimitOverride = limit
+}
+
+func (h *HTTPProvider) chunkLimit() int {
+	if h.chunkLimitOverride <= 0 {
+		return 500
+	}
+	return h.chunkLimitOverride
 }
 
 func NewHTTPProviderWithOptions(id, endpoint, model, apiKey string, opts GenerationOptions) *HTTPProvider {
@@ -116,6 +147,28 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
+	start := time.Now()
+	var firstToken time.Duration
+	chunkCount := 0
+	byteCount := 0
+	wireLines := 0
+
+	// The prompt is recorded once, on context.assembled; the hash and length here
+	// let a reader tie the two together without a second copy of the text.
+	h.logger = trace.OrNil(h.logger)
+	h.logger.Event("provider.request", map[string]interface{}{
+		"role":          h.id,
+		"kind":          "http",
+		"model":         h.model,
+		"endpoint":      h.endpoint,
+		"temperature":   temperature,
+		"max_tokens":    maxTokens,
+		"stream":        true,
+		"auth_set":      h.apiKey != "",
+		"prompt_sha256": hashPrompt(req.Prompt),
+		"prompt_chars":  len([]rune(req.Prompt)),
+	})
+
 	url := h.endpoint
 	if !strings.HasSuffix(url, "/chat/completions") && !strings.HasSuffix(url, "/v1") {
 		url = url + "/v1/chat/completions"
@@ -134,11 +187,17 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 
 	resp, err := h.client.Do(httpReq)
 	if err != nil {
+		h.logger.Event("provider.error", map[string]interface{}{"role": h.id, "error": err.Error()})
 		return fmt.Errorf("http request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		h.logger.Event("provider.error", map[string]interface{}{
+			"role":   h.id,
+			"status": resp.Status,
+			"url":    url,
+		})
 		return fmt.Errorf("http error %s from %s", resp.Status, url)
 	}
 
@@ -146,6 +205,16 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
+
+		if h.logger.Enabled(trace.LevelFull) && wireLines < h.chunkLimit() {
+			wireLines++
+			h.logger.Event("provider.wire", map[string]interface{}{
+				"role":      h.id,
+				"direction": "recv",
+				"line":      line,
+			})
+		}
+
 		if !strings.HasPrefix(line, "data: ") {
 			continue
 		}
@@ -160,6 +229,11 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 		}
 		if len(chunk.Choices) > 0 {
 			if chunk.Choices[0].Delta.Content != "" {
+				if firstToken == 0 {
+					firstToken = time.Since(start)
+				}
+				chunkCount++
+				byteCount += len(chunk.Choices[0].Delta.Content)
 				out <- StreamChunk{Text: chunk.Choices[0].Delta.Content}
 			}
 			if chunk.Choices[0].FinishReason != "" {
@@ -169,11 +243,27 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 	}
 
 	if err := scanner.Err(); err != nil {
+		h.logger.Event("provider.error", map[string]interface{}{"role": h.id, "error": err.Error()})
 		return err
 	}
 	if finishReason == "" {
 		finishReason = "stop"
 	}
+	h.logger.Event("provider.response", map[string]interface{}{
+		"role":           h.id,
+		"finish_reason":  finishReason,
+		"first_token_ms": firstToken.Milliseconds(),
+		"total_ms":       time.Since(start).Milliseconds(),
+		"chunks":         chunkCount,
+		"bytes":          byteCount,
+	})
 	out <- StreamChunk{Done: true, FinishReason: finishReason}
 	return nil
+}
+
+// hashPrompt identifies a prompt without recording it twice. The prompt itself is
+// recorded once, on context.assembled.
+func hashPrompt(prompt string) string {
+	sum := sha256.Sum256([]byte(prompt))
+	return hex.EncodeToString(sum[:])
 }

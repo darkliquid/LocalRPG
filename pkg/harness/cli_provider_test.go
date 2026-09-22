@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 func TestCLIProviderExecution(t *testing.T) {
@@ -96,5 +98,43 @@ func TestCLIProviderReportsCompletionAndExposesOptions(t *testing.T) {
 	}
 	if got := received.String(); got != "512-0.5" {
 		t.Errorf("options did not reach the process, got %q", got)
+	}
+}
+
+func TestCLIProviderTracesTheCommandWithoutItsPromptArgument(t *testing.T) {
+	memory := trace.NewMemory(trace.LevelFull)
+	provider := NewCLIProviderWithLogger("gm", "sh", []string{"-c", "printf 'done'", "--"}, GenerationOptions{}, memory)
+
+	out := make(chan StreamChunk, 10)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- provider.Stream(context.Background(), GenerateRequest{Prompt: "a secret prompt"}, out)
+	}()
+	for range out {
+	}
+	if err := <-errCh; err != nil {
+		t.Fatalf("Stream failed: %v", err)
+	}
+
+	request, ok := memory.Find("provider.request")
+	if !ok {
+		t.Fatalf("expected a provider.request event, got %v", memory.Names())
+	}
+	if request.Fields["arg_count"] != 4 {
+		t.Errorf("arg_count = %v, want the command's arguments plus the prompt", request.Fields["arg_count"])
+	}
+	if _, present := request.Fields["prompt"]; present {
+		t.Errorf("the prompt is recorded once, on context.assembled, not here")
+	}
+	if request.Fields["prompt_chars"] != len([]rune("a secret prompt")) {
+		t.Errorf("prompt_chars = %v, want its length", request.Fields["prompt_chars"])
+	}
+
+	response, ok := memory.Find("provider.response")
+	if !ok {
+		t.Fatalf("expected a provider.response event, got %v", memory.Names())
+	}
+	if response.Fields["exit_code"] != 0 || response.Fields["finish_reason"] != "stop" {
+		t.Errorf("unexpected response fields: %+v", response.Fields)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 type ExtractedEntity struct {
@@ -39,10 +40,17 @@ type Extraction struct {
 type Extractor struct {
 	model         ModelProvider
 	voiceProfiles []config.VoiceProfile
+	id            string
+	logger        trace.Logger
 }
 
 func NewExtractor(model ModelProvider) *Extractor {
-	return &Extractor{model: model}
+	return &Extractor{model: model, id: model.ID()}
+}
+
+// SetLogger attaches a trace sink. A nil logger records nothing.
+func (e *Extractor) SetLogger(logger trace.Logger) {
+	e.logger = trace.OrNil(logger)
 }
 
 func (e *Extractor) SetVoiceProfiles(profiles []config.VoiceProfile) {

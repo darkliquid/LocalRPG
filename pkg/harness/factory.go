@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 type disabledModelProvider struct {
@@ -68,11 +69,45 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 	}
 }
 
+// NewModelProviderWithLogger is NewModelProvider with a trace sink attached, so a
+// caller that has one does not have to know which provider types accept it.
+func NewModelProviderWithLogger(id string, cfg ProviderConfig, logger trace.Logger) (ModelProvider, error) {
+	provider, err := NewModelProvider(id, cfg)
+	if err != nil {
+		return nil, err
+	}
+	setProviderLogger(provider, logger)
+	return provider, nil
+}
+
+// setProviderLogger attaches a logger to any provider that accepts one. Providers
+// that do not are left alone rather than requiring the interface to grow.
+func setProviderLogger(provider ModelProvider, logger trace.Logger) {
+	if aware, ok := provider.(interface{ SetLogger(trace.Logger) }); ok {
+		aware.SetLogger(logger)
+	}
+}
+
+// setProviderChunkLimit caps wire events for providers that record them.
+func setProviderChunkLimit(provider ModelProvider, limit int) {
+	if aware, ok := provider.(interface{ SetChunkLimit(int) }); ok {
+		aware.SetChunkLimit(limit)
+	}
+}
+
 // RouterFromConfig builds the role-routed provider registry a turn needs: one
 // provider per configured role, the configured fallbacks, and an echo default for
 // gm when nothing else is set up. Inherited roles are skipped because they resolve
 // through the role they name.
 func RouterFromConfig(cfg *config.Config) (*Router, error) {
+	return RouterFromConfigWithLogger(cfg, trace.Nop())
+}
+
+// RouterFromConfigWithLogger is RouterFromConfig with a trace sink attached to
+// every provider it registers. It applies the configured chunk limit here because
+// the router owns the providers, and a caller that reaches into them afterwards
+// would be reaching into objects it did not build.
+func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Router, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("build router: no config")
 	}
@@ -84,7 +119,7 @@ func RouterFromConfig(cfg *config.Config) (*Router, error) {
 			continue
 		}
 
-		provider, err := NewModelProvider(role, ProviderConfig{
+		provider, err := NewModelProviderWithLogger(role, ProviderConfig{
 			Type:        roleCfg.Type,
 			BuiltinName: roleCfg.BuiltinName,
 			Command:     roleCfg.Command,
@@ -94,10 +129,11 @@ func RouterFromConfig(cfg *config.Config) (*Router, error) {
 			APIKey:      roleCfg.APIKey,
 			Temperature: roleCfg.Temperature,
 			MaxTokens:   roleCfg.MaxTokens,
-		})
+		}, logger)
 		if err != nil {
 			continue
 		}
+		setProviderChunkLimit(provider, cfg.TraceChunkLimit())
 
 		router.RegisterProvider(provider)
 		router.AssignRole(role, role)
@@ -110,18 +146,23 @@ func RouterFromConfig(cfg *config.Config) (*Router, error) {
 	}
 
 	if _, err := router.GetProviderForRole(config.RoleGM); err != nil {
-		router.RegisterProvider(NewCLIProvider("default-echo", "echo", []string{}))
+		router.RegisterProvider(NewCLIProviderWithLogger("default-echo", "echo", []string{}, GenerationOptions{}, logger))
 		router.AssignRole(config.RoleGM, "default-echo")
 	}
 
 	return router, nil
 }
 
-// ExtractorFromConfig resolves the per-turn extractor role. An absent role still
-// inherits gm, so configuration written before the role existed keeps working;
-// `disabled` opts out; `inherit` follows the named role, which is what stops
-// extraction silently pointing at a stale copy of gm.
+// ExtractorFromConfig resolves the per-turn extractor role without a trace sink.
 func ExtractorFromConfig(cfg *config.Config, router *Router) *Extractor {
+	return ExtractorFromConfigWithLogger(cfg, router, trace.Nop())
+}
+
+// ExtractorFromConfigWithLogger resolves the per-turn extractor role. An absent
+// role still inherits gm, so configuration written before the role existed keeps
+// working; `disabled` opts out; `inherit` follows the named role, which is what
+// stops extraction silently pointing at a stale copy of gm.
+func ExtractorFromConfigWithLogger(cfg *config.Config, router *Router, logger trace.Logger) *Extractor {
 	if cfg == nil || router == nil {
 		return nil
 	}
@@ -144,10 +185,12 @@ func ExtractorFromConfig(cfg *config.Config, router *Router) *Extractor {
 		if err != nil {
 			return nil
 		}
-		return NewExtractor(provider)
+		extractor := NewExtractor(provider)
+		extractor.SetLogger(logger)
+		return extractor
 	}
 
-	provider, err := NewModelProvider(config.RoleExtractor, ProviderConfig{
+	provider, err := NewModelProviderWithLogger(config.RoleExtractor, ProviderConfig{
 		Type:        roleCfg.Type,
 		BuiltinName: roleCfg.BuiltinName,
 		Command:     roleCfg.Command,
@@ -157,9 +200,11 @@ func ExtractorFromConfig(cfg *config.Config, router *Router) *Extractor {
 		APIKey:      roleCfg.APIKey,
 		Temperature: roleCfg.Temperature,
 		MaxTokens:   roleCfg.MaxTokens,
-	})
+	}, logger)
 	if err != nil {
 		return nil
 	}
-	return NewExtractor(provider)
+	extractor := NewExtractor(provider)
+	extractor.SetLogger(logger)
+	return extractor
 }

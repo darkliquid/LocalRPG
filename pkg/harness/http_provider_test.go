@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 func TestHTTPProviderStreaming(t *testing.T) {
@@ -108,5 +110,137 @@ func TestHTTPProviderSendsGenerationOptionsAndReportsFinish(t *testing.T) {
 	}
 	if finishReason != "length" {
 		t.Errorf("finish reason = %q, want length", finishReason)
+	}
+}
+
+func TestHTTPProviderTracesTheEnvelopeButNeverThePromptAtSummary(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"},\"finish_reason\":null}]}\n\n")
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+	}))
+	defer server.Close()
+
+	const prompt = "the whole prompt"
+	memory := trace.NewMemory(trace.LevelSummary)
+	provider := NewHTTPProviderWithLogger("gm", server.URL, "gemma", "sk-secret-key", GenerationOptions{MaxTokens: 256}, memory)
+
+	out := make(chan StreamChunk, 10)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- provider.Stream(context.Background(), GenerateRequest{Prompt: prompt}, out)
+	}()
+	for range out {
+	}
+	if err := <-errCh; err != nil {
+		t.Fatalf("Stream failed: %v", err)
+	}
+
+	request, ok := memory.Find("provider.request")
+	if !ok {
+		t.Fatalf("expected a provider.request event, got %v", memory.Names())
+	}
+	if _, present := request.Fields["prompt"]; present {
+		t.Errorf("summary level must not carry the prompt")
+	}
+	if request.Fields["prompt_sha256"] == nil || request.Fields["prompt_chars"] != len([]rune(prompt)) {
+		t.Errorf("expected a prompt hash and length, got %+v", request.Fields)
+	}
+	if request.Fields["auth_set"] != true {
+		t.Errorf("expected auth_set to record that a key was used, got %+v", request.Fields)
+	}
+	if request.Fields["max_tokens"] != 256 {
+		t.Errorf("expected the envelope's max_tokens, got %+v", request.Fields)
+	}
+
+	// The key itself must not appear anywhere, at any level.
+	for _, event := range memory.Events() {
+		for key, value := range event.Fields {
+			if text, ok := value.(string); ok && strings.Contains(text, "sk-secret-key") {
+				t.Errorf("event %s field %s leaked the API key", event.Name, key)
+			}
+		}
+	}
+
+	response, ok := memory.Find("provider.response")
+	if !ok {
+		t.Fatalf("expected a provider.response event, got %v", memory.Names())
+	}
+	if response.Fields["finish_reason"] != "stop" || response.Fields["chunks"] != 1 {
+		t.Errorf("unexpected response fields: %+v", response.Fields)
+	}
+}
+
+func TestHTTPProviderRecordsRawWireLinesOnlyAtFull(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"},\"finish_reason\":null}]}\n\n")
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+	}))
+	defer server.Close()
+
+	names := func(level trace.Level) []string {
+		memory := trace.NewMemory(level)
+		provider := NewHTTPProviderWithLogger("gm", server.URL, "gemma", "", GenerationOptions{}, memory)
+		out := make(chan StreamChunk, 10)
+		errCh := make(chan error, 1)
+		go func() { errCh <- provider.Stream(context.Background(), GenerateRequest{Prompt: "hi"}, out) }()
+		for range out {
+		}
+		if err := <-errCh; err != nil {
+			t.Fatalf("Stream failed: %v", err)
+		}
+		return memory.Names()
+	}
+
+	full := names(trace.LevelFull)
+	found := false
+	for _, name := range full {
+		if name == "provider.wire" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected provider.wire at full level, got %v", full)
+	}
+
+	for _, name := range names(trace.LevelSummary) {
+		if name == "provider.wire" {
+			t.Errorf("did not expect provider.wire at summary level")
+		}
+	}
+}
+
+func TestHTTPProviderHonoursTheChunkLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		for i := 0; i < 10; i++ {
+			fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"x\"},\"finish_reason\":null}]}\n\n")
+		}
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+	}))
+	defer server.Close()
+
+	memory := trace.NewMemory(trace.LevelFull)
+	provider := NewHTTPProviderWithLogger("gm", server.URL, "gemma", "", GenerationOptions{}, memory)
+	provider.SetChunkLimit(3)
+
+	out := make(chan StreamChunk, 20)
+	errCh := make(chan error, 1)
+	go func() { errCh <- provider.Stream(context.Background(), GenerateRequest{Prompt: "hi"}, out) }()
+	for range out {
+	}
+	if err := <-errCh; err != nil {
+		t.Fatal(err)
+	}
+
+	wire := 0
+	for _, name := range memory.Names() {
+		if name == "provider.wire" {
+			wire++
+		}
+	}
+	if wire != 3 {
+		t.Errorf("wire events = %d, want the configured limit of 3", wire)
 	}
 }

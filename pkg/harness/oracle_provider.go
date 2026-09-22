@@ -6,29 +6,55 @@ import (
 	"math/rand"
 	"regexp"
 	"strings"
+	"time"
+
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 var mechanicsResultRegex = regexp.MustCompile(`\[MECHANICS RESULT:.*?Tier=([a-zA-Z]+)`)
 var wikilinkPattern = regexp.MustCompile(`\[\[([^\]\|]+)(?:\|[^\]]+)?\]\]`)
 
 type narrativeOracleProvider struct {
-	id string
+	id     string
+	logger trace.Logger
 }
 
 func NewNarrativeOracleProvider(id string) ModelProvider {
 	return &narrativeOracleProvider{id: id}
 }
 
+// SetLogger attaches a trace sink, so a deterministic provider is visible in the
+// trace as the thing that answered.
+func (n *narrativeOracleProvider) SetLogger(logger trace.Logger) {
+	n.logger = trace.OrNil(logger)
+}
+
+// logResponse records the crafted reply's size and that no model was called.
+func (n *narrativeOracleProvider) logResponse(text string, start time.Time) {
+	n.logger = trace.OrNil(n.logger)
+	n.logger.Event("provider.response", map[string]interface{}{
+		"role":          n.id,
+		"kind":          "oracle",
+		"finish_reason": "stop",
+		"bytes":         len(text),
+		"total_ms":      time.Since(start).Milliseconds(),
+	})
+}
+
 func (n *narrativeOracleProvider) ID() string { return n.id }
 
 func (n *narrativeOracleProvider) Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
+	start := time.Now()
 	text := n.craftProse(req.Prompt)
+	n.logResponse(text, start)
 	return &GenerateResponse{Text: text}, nil
 }
 
 func (n *narrativeOracleProvider) Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error {
 	defer close(out)
+	start := time.Now()
 	text := n.craftProse(req.Prompt)
+	n.logResponse(text, start)
 	out <- StreamChunk{Text: text, Done: true}
 	return nil
 }
