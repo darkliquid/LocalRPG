@@ -225,23 +225,73 @@ func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, error) {
 	return sb.String(), nil
 }
 
-// recentSection renders the tail of the timeline, bounded by the configured window
-// and excerpt length.
-func (c *ContextAssembler) recentSection(req ContextRequest) string {
+// windowTurns is the part of the timeline actually replayed. The caller passes the
+// whole timeline and the limit is applied here, so every section that reasons about
+// "already in the window" agrees on what the window is.
+func (c *ContextAssembler) windowTurns(req ContextRequest) []RecentTurn {
 	window := c.limits.RecentTurns
 	if window <= 0 {
 		window = defaultRecentTurns
 	}
-	charLimit := c.limits.RecentTurnChars
-	if charLimit <= 0 {
-		charLimit = defaultRecentTurnChars
-	}
-
 	turns := req.Recent
 	if len(turns) > window {
 		turns = turns[len(turns)-window:]
 	}
-	return formatRecentTurns(turns, charLimit)
+	return turns
+}
+
+// recentSection renders the tail of the timeline, bounded by the configured window
+// and excerpt length.
+func (c *ContextAssembler) recentSection(req ContextRequest) string {
+	charLimit := c.limits.RecentTurnChars
+	if charLimit <= 0 {
+		charLimit = defaultRecentTurnChars
+	}
+	return formatRecentTurns(c.windowTurns(req), charLimit)
+}
+
+// recalledTurns returns the turns scene recall will render: the newest at this
+// location, oldest first, excluding anything the window already replays. Retrieval
+// shares it so it excludes exactly what was shown, rather than everything that
+// happens to be at this location.
+func (c *ContextAssembler) recalledTurns(req ContextRequest) []storage.TurnRecord {
+	if c.store == nil || req.LocationID == "" {
+		return nil
+	}
+
+	limit := c.limits.SceneRecallTurns
+	if limit <= 0 {
+		limit = defaultSceneRecallTurns
+	}
+
+	window := c.windowTurns(req)
+	inWindow := make(map[int]bool, len(window))
+	for _, turn := range window {
+		inWindow[turn.Number] = true
+	}
+
+	before := req.TurnNumber
+	if before <= 0 {
+		before = 1 << 30
+	}
+
+	// Ask for extra, because some are filtered out as already in the window.
+	turns, err := c.store.TurnsAtLocation(req.LocationID, before, limit+len(inWindow))
+	if err != nil {
+		return nil
+	}
+
+	selected := make([]storage.TurnRecord, 0, limit)
+	for _, turn := range turns {
+		if inWindow[turn.Number] {
+			continue
+		}
+		if len(selected) == limit {
+			break
+		}
+		selected = append(selected, turn)
+	}
+	return selected
 }
 
 // sceneRecall renders what happened where the party is standing. A place feels
@@ -260,31 +310,8 @@ func (c *ContextAssembler) sceneRecall(req ContextRequest) string {
 		charLimit = defaultRecallChars
 	}
 
-	// Turns already replayed in the window are not repeated here.
-	inWindow := make(map[int]bool, len(req.Recent))
-	for _, turn := range req.Recent {
-		inWindow[turn.Number] = true
-	}
-
-	before := req.TurnNumber
-	if before <= 0 {
-		before = 1 << 30
-	}
-
-	// Ask for extra, because some are filtered out as already in the window.
-	turns, err := c.store.TurnsAtLocation(req.LocationID, before, limit+len(inWindow))
-	if err != nil {
-		return ""
-	}
-
 	lines := make([]string, 0, limit)
-	for _, turn := range turns {
-		if inWindow[turn.Number] {
-			continue
-		}
-		if len(lines) == limit {
-			break
-		}
+	for _, turn := range c.recalledTurns(req) {
 		narrated := TruncateRunes(strings.TrimSpace(turn.Narration), charLimit)
 		if narrated == "" {
 			continue
@@ -319,7 +346,8 @@ type TurnRecordView struct {
 // every turn ever recorded, so including it would rank noise first, and the
 // location is what scene recall already covers.
 func (c *ContextAssembler) relevantHistory(req ContextRequest) string {
-	if c.store == nil || len(req.Recent) == 0 {
+	window := c.windowTurns(req)
+	if c.store == nil || len(window) == 0 {
 		return ""
 	}
 
@@ -336,8 +364,8 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) string {
 		halfLife = defaultRetrievalHalflife
 	}
 
-	numbers := make([]int, 0, len(req.Recent))
-	for _, turn := range req.Recent {
+	numbers := make([]int, 0, len(window))
+	for _, turn := range window {
 		numbers = append(numbers, turn.Number)
 	}
 
@@ -374,14 +402,12 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) string {
 		return ""
 	}
 
-	excluded := make(map[int]bool, len(req.Recent))
-	for _, turn := range req.Recent {
+	excluded := make(map[int]bool, len(window))
+	for _, turn := range window {
 		excluded[turn.Number] = true
 	}
-	if recalled, err := c.store.TurnsAtLocation(req.LocationID, before, limit*4); err == nil {
-		for _, turn := range recalled {
-			excluded[turn.Number] = true
-		}
+	for _, turn := range c.recalledTurns(req) {
+		excluded[turn.Number] = true
 	}
 
 	type scored struct {
@@ -520,7 +546,7 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 		"estimated_tokens": result.EstimatedTokens,
 		"budget":           budget,
 		"trimmed":          trimmed,
-		"recall_turns":     len(req.Recent),
+		"recall_turns":     len(c.windowTurns(req)),
 		"sections":         stats,
 		"prompt":           result.Prompt,
 	})
