@@ -553,6 +553,16 @@ Manual verification: create a campaign with an opening prompt and a spaced prota
 
 Shipped so far: increment 1 in full; increment 2's opening turn, settings patch, and Prologue screen (the creation-wizard fields are still outstanding); plus the campaign lifecycle below, which was not in the original increment list.
 
+Also shipped from increment 3, driven by playtesting:
+
+- **Live formatting** (§6.3). `frontend/src/components/MarkdownProse.tsx` renders the constrained subset and preserves soft line breaks, and the same component draws streamed prose and replayed prose, so nothing "pops" into shape at the end. Increment 3's prompt changes (§6.2) and the speech/continuity instructions shipped with it.
+- **Speech resolution for new characters** (§7.3). `buildTurnSegments` resolves a speaker against the entities the extractor is about to create, not only the index, which is what stopped a newly introduced NPC's first line from falling back to narration. Duplicate entity creation for one being under two different names is mitigated by the prompt's continuity instruction but is not solved structurally.
+- **Continuity** (§5.4, extended). The prompt now carries a rolling window of the last six turns, because the assembler previously sent none and every call was a cold start. `Turn.Truncated` records a reply cut off by the token limit, and the chronicle says so rather than presenting it as complete.
+- **Link resolution** (§7.5, extended). Segment text is rewritten so a `[[Display Name]]` becomes `[[entity-id|Display Name]]` for the client, and an unresolvable link degrades to plain text instead of a button that goes nowhere. The graph and character view refresh after each turn, so characters introduced mid-turn appear without a reload.
+- **No duplicated player line.** The player's own utterance is no longer emitted as a speech segment; the chronicle already shows the submitted action.
+
+Still outstanding from increments 3 and 4: the voice-metadata sanitizer has prompt-level defence but no code-level stripper; narration playback depends on TTS being configured and `auto_play`; targeted speech prefetch; the status, warning, and draft events; and the streaming preference.
+
 ---
 
 ## 16. Campaign Lifecycle
