@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type PathsConfig struct {
 	Systems string `yaml:"systems" json:"systems"`
@@ -46,6 +49,14 @@ type AgentsConfig struct {
 	RecentTurnWindow int `yaml:"recent_turn_window" json:"recent_turn_window"`
 	// RecentTurnCharLimit caps the text recalled from any one prior turn.
 	RecentTurnCharLimit int `yaml:"recent_turn_char_limit" json:"recent_turn_char_limit"`
+	// Tracing bounds. Tracing is opt-in, so these guard against a debug session
+	// left running rather than rationing normal play, and they can afford to be
+	// generous.
+	TracePayloadChars int   `yaml:"trace_payload_chars" json:"trace_payload_chars"`
+	TraceMaxBytes     int64 `yaml:"trace_max_bytes" json:"trace_max_bytes"`
+	TraceMaxFiles     int   `yaml:"trace_max_files" json:"trace_max_files"`
+	TraceRotateCheck  int   `yaml:"trace_rotate_check" json:"trace_rotate_check"`
+	TraceChunkLimit   int   `yaml:"trace_chunk_limit" json:"trace_chunk_limit"`
 }
 
 type VoiceProfile struct {
@@ -110,6 +121,9 @@ type PreferencesConfig struct {
 	TypingSpeedMS    int    `yaml:"typing_speed_ms" json:"typing_speed_ms"`
 	CinematicEffects bool   `yaml:"cinematic_effects" json:"cinematic_effects"`
 	FontScale        string `yaml:"font_scale" json:"font_scale"`
+	// TraceLevel is "off", "summary", or "full". Off is the default so normal
+	// play writes nothing.
+	TraceLevel string `yaml:"trace_level" json:"trace_level"`
 }
 
 type Config struct {
@@ -257,4 +271,52 @@ func (c *Config) ChunkTimeout() time.Duration {
 		seconds = 60
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+// TraceLevel is the configured trace detail, defaulting to off.
+func (c *Config) TraceLevel() string {
+	if strings.TrimSpace(c.Preferences.TraceLevel) == "" {
+		return "off"
+	}
+	return c.Preferences.TraceLevel
+}
+
+// TracePayloadChars caps any single recorded string.
+func (c *Config) TracePayloadChars() int {
+	if c.Agents.TracePayloadChars <= 0 {
+		return 20000
+	}
+	return c.Agents.TracePayloadChars
+}
+
+// TraceMaxBytes is the size at which the trace rotates.
+func (c *Config) TraceMaxBytes() int64 {
+	if c.Agents.TraceMaxBytes <= 0 {
+		return 268435456
+	}
+	return c.Agents.TraceMaxBytes
+}
+
+// TraceMaxFiles is how many rotated trace files are kept.
+func (c *Config) TraceMaxFiles() int {
+	if c.Agents.TraceMaxFiles <= 0 {
+		return 3
+	}
+	return c.Agents.TraceMaxFiles
+}
+
+// TraceRotateCheck is how many events pass between rotation checks.
+func (c *Config) TraceRotateCheck() int {
+	if c.Agents.TraceRotateCheck <= 0 {
+		return 200
+	}
+	return c.Agents.TraceRotateCheck
+}
+
+// TraceChunkLimit bounds how many wire or chunk events one provider call records.
+func (c *Config) TraceChunkLimit() int {
+	if c.Agents.TraceChunkLimit <= 0 {
+		return 500
+	}
+	return c.Agents.TraceChunkLimit
 }

@@ -405,6 +405,7 @@ Settings Studio gains, under Preferences: trace level, payload cap, and retentio
 | `agents.trace_payload_chars` | 20000 | Per-event payload cap |
 | `agents.trace_max_bytes` | 268435456 | Rotate the trace at this size |
 | `agents.trace_max_files` | 3 | Rotated trace files retained |
+| `agents.trace_chunk_limit` | 500 | Wire or chunk events recorded per provider call |
 | `agents.trace_rotate_check` | 200 | Events between rotation checks |
 
 All defaulted, so existing configuration is unchanged. Every key is also exposed in the Settings Studio.
