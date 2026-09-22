@@ -5,6 +5,7 @@ import {
   EntityNote,
   GraphData,
   GameSummary,
+  EntitySummary,
   SystemInfo,
   WorldInfo,
   CreateGameRequest,
@@ -253,6 +254,12 @@ export class APIClient {
   async getChronicle(): Promise<Turn[]> {
     const res = await fetch(`/api/game/${this.gameID}/chronicle`);
     if (!res.ok) throw new Error(`getChronicle: ${res.statusText}`);
+    return res.json();
+  }
+
+  async listEntities(): Promise<EntitySummary[]> {
+    const res = await fetch(`/api/game/${this.gameID}/entities`);
+    if (!res.ok) throw new Error(`listEntities: ${res.statusText}`);
     return res.json();
   }
 

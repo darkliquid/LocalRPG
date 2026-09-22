@@ -508,3 +508,52 @@ func TestResolveWikilinksPointsAtEntityIDs(t *testing.T) {
 		t.Errorf("resolveWikilinks() = %q, want %q", got, want)
 	}
 }
+
+func TestGameStateSurfacesTheLivingWorld(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	arc := "---\nid: the-creeping-miasma\nname: The Creeping Miasma\ntype: arc\nstate:\n  clock_ticks: 2\n  clock_max: 6\n---\nA creeping fog."
+	if err := svc.SaveEntity(context.Background(), gameID, "the-creeping-miasma", arc); err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := svc.GetGameState(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("GetGameState failed: %v", err)
+	}
+
+	foundLocation := false
+	for _, location := range state.Locations {
+		if location == "Aldon Harbour" {
+			foundLocation = true
+		}
+	}
+	if !foundLocation {
+		t.Errorf("expected the campaign's location in state, got %v", state.Locations)
+	}
+
+	if len(state.Arcs) != 1 {
+		t.Fatalf("expected one arc, got %+v", state.Arcs)
+	}
+	if state.Arcs[0].Progress != 2 || state.Arcs[0].MaxProgress != 6 {
+		t.Errorf("arc clock = %d/%d, want 2/6", state.Arcs[0].Progress, state.Arcs[0].MaxProgress)
+	}
+}
+
+func TestArcProgressReadsBothConventions(t *testing.T) {
+	ticks, maxTicks := arcProgress(map[string]interface{}{"progress": "3/6"})
+	if ticks != 3 || maxTicks != 6 {
+		t.Errorf(`progress "3/6" = %d/%d, want 3/6`, ticks, maxTicks)
+	}
+
+	// YAML and JSON disagree on numeric types, so both must coerce.
+	ticks, maxTicks = arcProgress(map[string]interface{}{"clock_ticks": float64(4), "clock_max": 8})
+	if ticks != 4 || maxTicks != 8 {
+		t.Errorf("clock_ticks/clock_max = %d/%d, want 4/8", ticks, maxTicks)
+	}
+
+	// A missing clock must not produce a zero maximum, which would divide by zero.
+	if _, maxTicks := arcProgress(map[string]interface{}{"clock_ticks": 1}); maxTicks < 1 {
+		t.Errorf("maxTicks = %d, want at least 1", maxTicks)
+	}
+}

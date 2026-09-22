@@ -50,6 +50,14 @@ export interface TurnEvent {
   message?: string;
 }
 
+export interface EntitySummary {
+  id: string;
+  name: string;
+  type: string;
+  location?: string;
+  tags?: string[];
+}
+
 export interface EntityNote {
   id: string;
   name: string;

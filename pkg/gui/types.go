@@ -127,6 +127,15 @@ type CreateGameRequestDTO struct {
 	OpeningPrompt string `json:"opening_prompt,omitempty"`
 }
 
+// EntitySummaryDTO is one note as the codex browser lists it.
+type EntitySummaryDTO struct {
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Type     string   `json:"type"`
+	Location string   `json:"location,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+}
+
 // GameSettingsPatchDTO is a partial update of a campaign's settings. An absent
 // field is left alone, which is what makes it a patch rather than a replace.
 type GameSettingsPatchDTO struct {

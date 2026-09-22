@@ -694,3 +694,31 @@ func TestAudioRoutesReportStatusAndStop(t *testing.T) {
 		t.Errorf("unknown audio action: expected 404, got %d", rec.Code)
 	}
 }
+
+func TestListEntitiesRouteReturnsTheCorpus(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/game/"+gameID+"/entities", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("entities: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var entities []EntitySummaryDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &entities); err != nil {
+		t.Fatalf("decode entities: %v", err)
+	}
+
+	byID := make(map[string]EntitySummaryDTO, len(entities))
+	for _, entity := range entities {
+		byID[entity.ID] = entity
+	}
+	if _, ok := byID["aldon-harbour"]; !ok {
+		t.Errorf("expected the location note in the listing, got %+v", entities)
+	}
+	if byID["aldon-harbour"].Type != "location" {
+		t.Errorf("aldon-harbour type = %q, want location", byID["aldon-harbour"].Type)
+	}
+}

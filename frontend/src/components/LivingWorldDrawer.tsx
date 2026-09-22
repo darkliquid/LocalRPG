@@ -2,6 +2,9 @@ import React from 'react';
 import { GameState } from '../types';
 import { Clock, BookOpen } from 'lucide-react';
 
+// A clock with no maximum would divide by zero, so progress is clamped.
+const percent = (value: number, max: number) => `${max > 0 ? Math.min(100, (value / max) * 100) : 0}%`;
+
 interface LivingWorldDrawerProps {
   state?: GameState;
 }
@@ -28,7 +31,7 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({ state }) =
               <div className="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-amber-500"
-                  style={{ width: `${(arc.progress / arc.max_progress) * 100}%` }}
+                  style={{ width: percent(arc.progress, arc.max_progress) }}
                 />
               </div>
             </div>
@@ -55,7 +58,7 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({ state }) =
               <div className="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-red-600"
-                  style={{ width: `${(clock.ticks / clock.max_ticks) * 100}%` }}
+                  style={{ width: percent(clock.ticks, clock.max_ticks) }}
                 />
               </div>
             </div>

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -253,6 +254,8 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		stateMap = ent.State.Raw()
 	}
 
+	arcs, clocks, locations := s.gameCorpus(gameID)
+
 	return &GameStateDTO{
 		GameID:   gameID,
 		GameName: gameManifest.Name,
@@ -262,11 +265,198 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 			Type:  ent.Type,
 			State: stateMap,
 		},
-		Arcs:          []NarrativeArcDTO{},
-		Clocks:        []FactionClockDTO{},
-		Locations:     []string{},
+		Arcs:          arcs,
+		Clocks:        clocks,
+		Locations:     locations,
 		OpeningPrompt: engine.OpeningPrompt(gameManifest),
 	}, nil
+}
+
+// gameCorpus reads the campaign's living world from the index: the locations it
+// can visit, the arcs running in the background, and any faction clocks. It is
+// derived rather than stored, so a note edited by hand appears immediately.
+func (s *Service) gameCorpus(gameID string) ([]NarrativeArcDTO, []FactionClockDTO, []string) {
+	arcs := make([]NarrativeArcDTO, 0)
+	clocks := make([]FactionClockDTO, 0)
+	locations := make([]string, 0)
+
+	store := s.storeOrNil(gameID)
+	if store == nil {
+		return arcs, clocks, locations
+	}
+
+	summaries, err := store.ListEntities()
+	if err != nil {
+		return arcs, clocks, locations
+	}
+
+	for _, summary := range summaries {
+		switch summary.Type {
+		case "location":
+			locations = append(locations, summary.Name)
+		case "arc":
+			raw := s.entityState(store, summary.ID)
+			progress, maxProgress := arcProgress(raw)
+			arcs = append(arcs, NarrativeArcDTO{
+				ID:          summary.ID,
+				Name:        summary.Name,
+				Progress:    progress,
+				MaxProgress: maxProgress,
+				Status:      stateString(raw, "status"),
+			})
+		case "clock", "faction":
+			raw := s.entityState(store, summary.ID)
+			ticks, maxTicks := clockTicks(raw)
+			clocks = append(clocks, FactionClockDTO{
+				Faction:  summary.Name,
+				Name:     summary.Name,
+				Ticks:    ticks,
+				MaxTicks: maxTicks,
+			})
+		}
+	}
+
+	return arcs, clocks, locations
+}
+
+func (s *Service) entityState(store *storage.Store, entityID string) map[string]interface{} {
+	entity, err := store.GetEntity(entityID)
+	if err != nil || entity == nil || entity.State == nil {
+		return nil
+	}
+	return entity.State.Raw()
+}
+
+// arcProgress reads an arc's clock. A note may express it as `progress: 3/6` or
+// as separate `clock_ticks`/`clock_max` fields, and both are honoured.
+func arcProgress(raw map[string]interface{}) (int, int) {
+	if ticks, maxTicks, ok := stateFraction(raw, "progress"); ok {
+		return ticks, maxTicks
+	}
+	ticks := stateNumber(raw, "clock_ticks", "ticks", "progress")
+	maxTicks := stateNumber(raw, "clock_max", "max_ticks", "max", "max_progress")
+	return ticks, maxInt(maxTicks, 1)
+}
+
+func clockTicks(raw map[string]interface{}) (int, int) {
+	ticks := stateNumber(raw, "clock_ticks", "ticks")
+	maxTicks := stateNumber(raw, "clock_max", "max_ticks", "max")
+	return ticks, maxInt(maxTicks, 1)
+}
+
+// stateFraction reads an "a/b" style value.
+func stateFraction(raw map[string]interface{}, key string) (int, int, bool) {
+	value, ok := raw[key]
+	if !ok {
+		return 0, 0, false
+	}
+	text, ok := value.(string)
+	if !ok {
+		return 0, 0, false
+	}
+	parts := strings.SplitN(text, "/", 2)
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	ticks, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return 0, 0, false
+	}
+	maxTicks, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return 0, 0, false
+	}
+	return ticks, maxInt(maxTicks, 1), true
+}
+
+// stateNumber coerces the first present key to an int. YAML and JSON disagree on
+// numeric types, so every plausible one is accepted.
+func stateNumber(raw map[string]interface{}, keys ...string) int {
+	for _, key := range keys {
+		value, ok := raw[key]
+		if !ok {
+			continue
+		}
+		switch typed := value.(type) {
+		case int:
+			return typed
+		case int64:
+			return int(typed)
+		case float64:
+			return int(typed)
+		case string:
+			text := typed
+			if index := strings.Index(text, "/"); index > 0 {
+				text = text[:index]
+			}
+			if parsed, err := strconv.Atoi(strings.TrimSpace(text)); err == nil {
+				return parsed
+			}
+		}
+	}
+	return 0
+}
+
+func stateString(raw map[string]interface{}, key string) string {
+	if raw == nil {
+		return ""
+	}
+	if value, ok := raw[key].(string); ok {
+		return value
+	}
+	return ""
+}
+
+func maxInt(value, floor int) int {
+	if value < floor {
+		return floor
+	}
+	return value
+}
+
+// ListEntities returns every note in a campaign, ordered by name, which is what
+// the codex browser draws. It reads the notes themselves rather than the index so
+// a note that has not been synced yet still appears, and so the browser can never
+// disagree with the graph about what exists.
+func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySummaryDTO, error) {
+	entitiesDir := filepath.Join(s.resolver.GameDir(gameID), "entities")
+	entries, err := os.ReadDir(entitiesDir)
+	if err != nil {
+		return nil, fmt.Errorf("read entities dir: %w", err)
+	}
+
+	summaries := make([]EntitySummaryDTO, 0, len(entries))
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(entitiesDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		parsed, err := entity.ParseMarkdownEntity(data)
+		if err != nil {
+			continue
+		}
+
+		name := parsed.Name
+		if name == "" {
+			name = strings.TrimSuffix(entry.Name(), ".md")
+		}
+
+		summaries = append(summaries, EntitySummaryDTO{
+			ID:       strings.TrimSuffix(entry.Name(), ".md"),
+			Name:     name,
+			Type:     parsed.Type,
+			Location: parsed.Location,
+			Tags:     parsed.Tags,
+		})
+	}
+
+	sort.SliceStable(summaries, func(i, j int) bool {
+		return strings.ToLower(summaries[i].Name) < strings.ToLower(summaries[j].Name)
+	})
+	return summaries, nil
 }
 
 func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*EntityDTO, error) {

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { APIClient } from './api/client';
-import { GameState, Turn, EntityNote, GraphData, AppConfig } from './types';
+import { GameState, Turn, EntityNote, EntitySummary, GraphData, AppConfig } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { ActionConsole } from './components/ActionConsole';
@@ -27,6 +27,9 @@ export const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [chronicle, setChronicle] = useState<Turn[]>([]);
   const [graph, setGraph] = useState<GraphData | null>(null);
+  // The campaign's notes, as the codex lists them. It grows as turns create
+  // entities, so it is refetched rather than held from first load.
+  const [entities, setEntities] = useState<EntitySummary[]>([]);
   const [selectedEntity, setSelectedEntity] = useState<EntityNote | null>(null);
   // TTS playback preferences live in the global settings, so the chronicle and
   // the story theater honour the same switches as the settings studio.
@@ -50,17 +53,26 @@ export const App: React.FC = () => {
       .catch(() => setServerAudio(false));
   }, []);
 
+  // Everything the drawers read is refetched together, so no panel can show a
+  // corpus that is older than another's.
+  const refreshCorpus = useCallback(() => {
+    if (!client) return;
+    client.getGameState().then(setGameState).catch(console.error);
+    client.getGraph().then(setGraph).catch(console.error);
+    client.listEntities().then(setEntities).catch(console.error);
+  }, [client]);
+
   useEffect(() => {
     if (!client) {
       setGameState(null);
       setChronicle([]);
       setGraph(null);
+      setEntities([]);
       return;
     }
-    client.getGameState().then(setGameState).catch(console.error);
     client.getChronicle().then(setChronicle).catch(console.error);
-    client.getGraph().then(setGraph).catch(console.error);
-  }, [client]);
+    refreshCorpus();
+  }, [client, refreshCorpus]);
 
   const handleSelectGame = (gameId: string) => {
     localStorage.setItem('localrpg_active_game', gameId);
@@ -110,8 +122,7 @@ export const App: React.FC = () => {
             setStreamedProse('');
             // A turn can introduce characters, so the graph and the character
             // view are refreshed rather than left showing the state before it.
-            client.getGraph().then(setGraph).catch(console.error);
-            client.getGameState().then(setGameState).catch(console.error);
+            refreshCorpus();
           } else if (event.type === 'error') {
             console.error('turn failed:', event.message);
           }
@@ -167,6 +178,9 @@ export const App: React.FC = () => {
     await client.saveEntity(entityId, markdown);
     const updated = await client.getEntity(entityId);
     setSelectedEntity(updated);
+    // A saved note can change its own type, links, or name, so the graph and the
+    // codex listing follow it rather than going stale.
+    refreshCorpus();
   };
 
   // Find latest scene image for full-window atmospheric background
@@ -348,7 +362,14 @@ export const App: React.FC = () => {
           >
             {activeDrawer === 'character' && <CharacterSheetDrawer player={gameState?.player} />}
             {activeDrawer === 'graph' && <GraphDrawer data={graph || undefined} onSelectNode={handleOpenWikilink} />}
-            {activeDrawer === 'codex' && <CodexDrawer entity={selectedEntity || undefined} onSave={handleSaveEntity} />}
+            {activeDrawer === 'codex' && (
+              <CodexDrawer
+                entity={selectedEntity || undefined}
+                entities={entities}
+                onSelect={handleOpenWikilink}
+                onSave={handleSaveEntity}
+              />
+            )}
             {activeDrawer === 'world' && <LivingWorldDrawer state={gameState || undefined} />}
           </Drawers>
 
