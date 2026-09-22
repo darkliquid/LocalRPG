@@ -630,12 +630,22 @@ the native library embedded and extracted at runtime) and
   process over `--port`), the client falls back to the existing browser
   playback, gesture and all.
 
-### 17.3 Format handling
+### 17.3 Format handling and streaming
 
-`mago`'s mixer decodes WAV only, and the cache already holds MP3 from kokoro.
-`ToWAV` therefore passes WAV through and converts MP3 to 16-bit stereo PCM
-wrapped in a WAV header. A clip in an unknown container is skipped rather than
-silencing the rest of the turn.
+Narration is decoded on demand, a block at a time, on the audio device's
+callback. Nothing is materialised twice: the cache keeps its small MP3s, and an
+MP3 or WAV clip is decoded straight into the output buffer as it is consumed.
+
+This replaced a first implementation that was correct but wasteful: it decoded
+the whole MP3 into PCM, wrapped that in a WAV container in memory, and handed it
+to a mixer that decoded it again into float32. Three full-size buffers per beat,
+none of them necessary.
+
+The mixer runs at 48 kHz stereo in F32; a source at any rate or channel count is
+resampled as it is pulled. Decoding and resampling come from `gopxl/beep`
+(`beep/mp3`, `beep/wav`, `beep.Resample`), so no decoding or DSP is hand-rolled.
+A clip in an unknown container is skipped rather than silencing the rest of the
+turn.
 
 ### 17.4 Cost
 
