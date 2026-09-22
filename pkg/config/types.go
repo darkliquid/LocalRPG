@@ -64,6 +64,10 @@ type AgentsConfig struct {
 	RetrievalTurns         int `yaml:"retrieval_turns" json:"retrieval_turns"`
 	RetrievalChars         int `yaml:"retrieval_chars" json:"retrieval_chars"`
 	RetrievalHalfLifeTurns int `yaml:"retrieval_halflife_turns" json:"retrieval_halflife_turns"`
+	// SummaryEvery is how many turns pass between regenerations of the story so far.
+	// Zero disables summarisation, so a campaign can opt out entirely.
+	SummaryEvery     int `yaml:"summary_every" json:"summary_every"`
+	SummaryCharLimit int `yaml:"summary_char_limit" json:"summary_char_limit"`
 }
 
 type VoiceProfile struct {
@@ -156,6 +160,8 @@ func DefaultConfig() *Config {
 			ChunkTimeoutSeconds: 60,
 			RecentTurnWindow:    6,
 			RecentTurnCharLimit: 1200,
+			SummaryEvery:        10,
+			SummaryCharLimit:    2000,
 			Roles: map[string]AgentRoleConfig{
 				"gm": {
 					Type:        "cli",
@@ -368,4 +374,18 @@ func (c *Config) RetrievalHalfLifeTurns() int {
 		return 12
 	}
 	return c.Agents.RetrievalHalfLifeTurns
+}
+
+// SummaryEvery is how many turns pass between regenerations of the story so far.
+// Zero disables summarisation.
+func (c *Config) SummaryEvery() int {
+	return c.Agents.SummaryEvery
+}
+
+// SummaryCharLimit caps the injected summary.
+func (c *Config) SummaryCharLimit() int {
+	if c.Agents.SummaryCharLimit <= 0 {
+		return 2000
+	}
+	return c.Agents.SummaryCharLimit
 }

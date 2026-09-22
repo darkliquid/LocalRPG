@@ -127,3 +127,31 @@ func TestRecallSettingsHaveDefaults(t *testing.T) {
 		t.Errorf("RetrievalHalfLifeTurns() = %d, want 12", got)
 	}
 }
+
+func TestSummarySettingsHaveDefaults(t *testing.T) {
+	empty := &Config{}
+
+	// Zero means disabled, so the default must not be zero.
+	if got := empty.SummaryEvery(); got != 0 {
+		t.Errorf("SummaryEvery() on an empty config = %d, want 0 (disabled unless configured)", got)
+	}
+	if got := empty.SummaryCharLimit(); got != 2000 {
+		t.Errorf("SummaryCharLimit() = %d, want 2000", got)
+	}
+
+	configured := &Config{Agents: AgentsConfig{SummaryEvery: 5, SummaryCharLimit: 500}}
+	if got := configured.SummaryEvery(); got != 5 {
+		t.Errorf("SummaryEvery() = %d, want 5", got)
+	}
+	if got := configured.SummaryCharLimit(); got != 500 {
+		t.Errorf("SummaryCharLimit() = %d, want 500", got)
+	}
+
+	// The shipped defaults turn summarisation on at a cadence.
+	if got := DefaultConfig().SummaryEvery(); got != 10 {
+		t.Errorf("DefaultConfig().SummaryEvery() = %d, want 10", got)
+	}
+	if got := DefaultConfig().SummaryCharLimit(); got != 2000 {
+		t.Errorf("DefaultConfig().SummaryCharLimit() = %d, want 2000", got)
+	}
+}
