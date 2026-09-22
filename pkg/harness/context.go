@@ -2,9 +2,11 @@ package harness
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
@@ -162,7 +164,13 @@ func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, error) {
 
 	sb.WriteString("## IMMEDIATE SCENE\n")
 	if loc, err := c.store.GetEntity(req.LocationID); err == nil && loc != nil {
-		sb.WriteString(fmt.Sprintf("**Current Location:** %s\n%s\n\n", loc.Name, loc.Body))
+		sb.WriteString(fmt.Sprintf("**Current Location:** %s\n%s\n", loc.Name, strings.TrimSpace(loc.Body)))
+		if loc.State != nil {
+			if rendered := RenderState(loc.State.Raw()); rendered != "" {
+				sb.WriteString("State: " + rendered + "\n")
+			}
+		}
+		sb.WriteString("\n")
 	}
 
 	if player, err := c.store.GetEntity(req.PlayerID); err == nil && player != nil {
@@ -177,7 +185,13 @@ func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, error) {
 	if err == nil {
 		for _, edge := range edges {
 			if ent, err := c.store.GetEntity(edge.TargetID); err == nil && ent != nil && ent.Type == "arc" {
-				sb.WriteString(fmt.Sprintf("### Arc: %s\n%s\n\n", ent.Name, ent.Body))
+				sb.WriteString(fmt.Sprintf("### Arc: %s\n%s\n", ent.Name, strings.TrimSpace(ent.Body)))
+				if ent.State != nil {
+					if rendered := RenderState(ent.State.Raw()); rendered != "" {
+						sb.WriteString("State: " + rendered + "\n")
+					}
+				}
+				sb.WriteString("\n")
 			}
 		}
 	}
@@ -186,9 +200,13 @@ func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, error) {
 	if err == nil {
 		for _, edge := range edges {
 			if ent, err := c.store.GetEntity(edge.TargetID); err == nil && ent != nil && ent.Type == "character" {
-				sb.WriteString(fmt.Sprintf("- **%s**: %s\n", ent.Name, ent.Body))
+				sb.WriteString(canonEntity(ent) + "\n")
 			}
 		}
+	}
+
+	if names := c.establishedNames(req); names != "" {
+		sb.WriteString("\n" + names)
 	}
 
 	return sb.String(), nil
@@ -410,4 +428,97 @@ func estimateTokens(text string) int {
 		return 0
 	}
 	return len([]rune(text))/runesPerToken + 1
+}
+
+// RenderState prints an entity's state in a stable order, so the same note always
+// produces the same prompt. It is exported because the continuity checks compare
+// narration against the same rendering.
+func RenderState(raw map[string]interface{}) string {
+	if len(raw) == 0 {
+		return ""
+	}
+
+	keys := make([]string, 0, len(raw))
+	for key := range raw {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%v", key, raw[key]))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// canonEntity renders one entity as a fact line: its name, its type, its prose, and
+// the state the engine is tracking. Without the state, a guttering brazier or a
+// dwindling reserve is invisible to the narrator.
+func canonEntity(ent *entity.Entity) string {
+	line := fmt.Sprintf("- **%s** (%s): %s", ent.Name, ent.Type, strings.TrimSpace(ent.Body))
+	if ent.State != nil {
+		if rendered := RenderState(ent.State.Raw()); rendered != "" {
+			line += "\n  State: " + rendered
+		}
+	}
+	return line
+}
+
+// establishedNames lists the names in play, so the model reuses them instead of
+// inventing new ones for beings it has already met. It covers what is present and
+// what the recall window mentions, and nothing else: the wider cast belongs to a
+// summary, because a roster of every note would be thousands of characters that
+// could never be trimmed.
+func (c *ContextAssembler) establishedNames(req ContextRequest) string {
+	seen := make(map[string]bool)
+	names := make([]string, 0)
+
+	add := func(id string) {
+		if id == "" || id == req.PlayerID || seen[id] {
+			return
+		}
+		ent, err := c.store.GetEntity(id)
+		if err != nil || ent == nil || ent.Name == "" {
+			return
+		}
+		switch ent.Type {
+		case "character", "location", "arc":
+		default:
+			return
+		}
+		seen[id] = true
+		names = append(names, ent.Name)
+	}
+
+	if edges, err := c.store.GetEdgesFrom(req.LocationID); err == nil {
+		for _, edge := range edges {
+			add(edge.TargetID)
+		}
+	}
+	if len(req.Recent) > 0 {
+		numbers := make([]int, 0, len(req.Recent))
+		for _, turn := range req.Recent {
+			numbers = append(numbers, turn.Number)
+		}
+		if ids, err := c.store.EntitiesInTurns(numbers); err == nil {
+			for _, id := range ids {
+				add(id)
+			}
+		}
+	}
+
+	if len(names) == 0 {
+		return ""
+	}
+	sort.SliceStable(names, func(i, j int) bool {
+		return strings.ToLower(names[i]) < strings.ToLower(names[j])
+	})
+
+	var sb strings.Builder
+	sb.WriteString("## ESTABLISHED NAMES\n")
+	sb.WriteString("Reuse these names exactly; never rename a being who has already appeared.\n")
+	for _, name := range names {
+		sb.WriteString("- " + name + "\n")
+	}
+	return sb.String()
 }

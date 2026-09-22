@@ -4,9 +4,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/state"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
@@ -315,5 +317,77 @@ func saveEntity(t *testing.T, store *storage.Store, ent *entity.Entity) {
 	t.Helper()
 	if err := store.SaveEntity(ent); err != nil {
 		t.Fatalf("save entity %s: %v", ent.ID, err)
+	}
+}
+
+func TestRenderStateIsDeterministic(t *testing.T) {
+	raw := map[string]interface{}{"brazier_lit": true, "danger_level": float64(2), "name": "The Ashen Bastion"}
+
+	first := RenderState(raw)
+	second := RenderState(raw)
+	if first != second {
+		t.Errorf("RenderState must be stable, got %q then %q", first, second)
+	}
+	if first != "brazier_lit=true, danger_level=2, name=The Ashen Bastion" {
+		t.Errorf("unexpected rendering: %q", first)
+	}
+	if RenderState(nil) != "" {
+		t.Errorf("expected an empty rendering for no state")
+	}
+}
+
+func TestCanonRendersStateAndKeepsItWhenTiny(t *testing.T) {
+	store := newTestEntityStore(t)
+	saveEntity(t, store, &entity.Entity{
+		ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Body: "Salt air.",
+		State: state.NewState(map[string]interface{}{"danger_level": float64(2), "brazier_lit": true}),
+		Hash:  "h1",
+	})
+
+	assembler := NewContextAssembler(store)
+	assembler.SetLimits(ContextLimits{TokenBudget: 5})
+	result, err := assembler.Assemble(ContextRequest{LocationID: "aldon-harbour", Action: "I look around", TurnNumber: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(result.Prompt, "danger_level=2") || !strings.Contains(result.Prompt, "brazier_lit=true") {
+		t.Errorf("canon state must reach the prompt:\n%s", result.Prompt)
+	}
+	for _, section := range result.Sections {
+		if section.Name == "canon" && !section.Included {
+			t.Errorf("canon was trimmed, which must never happen")
+		}
+	}
+}
+
+func TestEstablishedNamesListsWhatIsInPlay(t *testing.T) {
+	store := newTestEntityStore(t)
+	saveEntity(t, store, &entity.Entity{ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Hash: "h1"})
+	saveEntity(t, store, &entity.Entity{ID: "guard-kael", Name: "Guard Kael", Type: "character", Hash: "h2"})
+	saveEntity(t, store, &entity.Entity{ID: "distant-city", Name: "Distant City", Type: "location", Hash: "h3"})
+	if err := store.SaveTurn(storage.TurnRecord{
+		Number: 1, Timestamp: time.Now(), Mode: "Do", Input: "x", Narration: "y",
+		Entities: []storage.TurnEntityRef{{EntityID: "guard-kael", Mention: "wikilink"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	assembler := NewContextAssembler(store)
+	result, err := assembler.Assemble(ContextRequest{
+		LocationID: "aldon-harbour",
+		Action:     "I wait",
+		Recent:     []RecentTurn{{Number: 1, Mode: "Do", Narration: "y"}},
+		TurnNumber: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(result.Prompt, "Guard Kael") {
+		t.Errorf("a character mentioned in the recall window must be named:\n%s", result.Prompt)
+	}
+	if strings.Contains(result.Prompt, "Distant City") {
+		t.Errorf("an entity that is neither present nor mentioned must not be named")
 	}
 }
