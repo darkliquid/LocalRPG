@@ -2,6 +2,7 @@ import React from 'react';
 import { TurnSegment } from '../types';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { MarkdownProse } from './MarkdownProse';
+import { Play, Square } from 'lucide-react';
 
 interface TurnSegmentsProps {
   segments?: TurnSegment[];
@@ -20,7 +21,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
 }) => {
   const ordered = segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: fallback }];
   const hasAudio = (segments ?? []).some((segment) => !!segment.audio_url);
-  const { playing, play, playFrom, stop } = useSegmentPlayback(segments, autoPlay && hasAudio, volume);
+  const { playing, blocked, play, playFrom, stop } = useSegmentPlayback(segments, autoPlay && hasAudio, volume);
 
   return (
     <div className="space-y-3">
@@ -58,10 +59,27 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
         )
       )}
       {hasAudio && (
-        <div className="flex items-center gap-2 text-xs text-stone-400">
-          <button onClick={playing ? stop : play} className="hover:text-amber-300 cursor-pointer">
-            {playing ? 'Pause' : 'Play turn'}
-          </button>
+        <div className="flex items-center gap-2 text-xs">
+          {blocked && !playing ? (
+            <>
+              <button
+                onClick={play}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold cursor-pointer transition-colors"
+              >
+                <Play className="w-3.5 h-3.5 fill-stone-950" />
+                <span>Play narration</span>
+              </button>
+              <span className="text-stone-500">The browser needs a click before it will play audio.</span>
+            </>
+          ) : (
+            <button
+              onClick={playing ? stop : play}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900/70 border border-stone-700 text-stone-300 hover:text-amber-300 hover:border-amber-500/40 cursor-pointer transition-colors"
+            >
+              {playing ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+              <span>{playing ? 'Pause' : 'Play turn'}</span>
+            </button>
+          )}
         </div>
       )}
     </div>

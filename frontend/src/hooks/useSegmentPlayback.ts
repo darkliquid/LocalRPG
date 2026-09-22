@@ -4,6 +4,10 @@ import { TurnSegment } from '../types';
 // useSegmentPlayback plays a turn's segments in order, skipping any without a
 // clip. It is the one playback implementation, shared by the chronicle and the
 // story theater so pacing and controls cannot drift between them.
+//
+// Browsers refuse to start audio without a user gesture, so an autoplay attempt
+// that is rejected is reported as `blocked` rather than swallowed: the caller can
+// then offer a Play control, and that click is the gesture that starts playback.
 export const useSegmentPlayback = (
   segments: TurnSegment[] | undefined,
   autoPlay: boolean,
@@ -11,6 +15,7 @@ export const useSegmentPlayback = (
 ) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [blocked, setBlocked] = useState(false);
 
   const stop = useCallback(() => {
     audioRef.current?.pause();
@@ -27,12 +32,21 @@ export const useSegmentPlayback = (
         return;
       }
 
+      audioRef.current?.pause();
+
       const audio = new Audio(urls[next] as string);
       audio.volume = volume;
       audio.onended = () => playFrom(next + 1);
       audioRef.current = audio;
       setPlaying(true);
-      void audio.play();
+
+      audio
+        .play()
+        .then(() => setBlocked(false))
+        .catch(() => {
+          setPlaying(false);
+          setBlocked(true);
+        });
     },
     [segments, stop, volume]
   );
@@ -43,5 +57,10 @@ export const useSegmentPlayback = (
     return stop;
   }, [autoPlay, playFrom, stop]);
 
-  return { playing, play: () => playFrom(0), playFrom, stop };
+  const play = useCallback(() => {
+    setBlocked(false);
+    playFrom(0);
+  }, [playFrom]);
+
+  return { playing, blocked, play, playFrom, stop };
 };

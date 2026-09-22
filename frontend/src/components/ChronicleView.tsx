@@ -31,7 +31,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
           The chronicle awaits your first action...
         </div>
       ) : (
-        beats.map(({ turn, isSceneChange }) => (
+        beats.map(({ turn, isSceneChange }, index) => (
           <div key={turn.turn_number} className="space-y-4 pb-6 border-b border-white/5 last:border-0">
             {/* Player Input Block */}
             {turn.input_text && (
@@ -74,7 +74,9 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               segments={turn.segments}
               fallback={turn.prose}
               onEntityClick={onWikilinkClick}
-              autoPlay={autoPlay}
+              // Only the newest turn narrates itself: autoplaying every turn would
+              // start them all at once on load.
+              autoPlay={autoPlay && index === beats.length - 1}
               volume={volume}
             />
 
