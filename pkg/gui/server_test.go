@@ -781,3 +781,38 @@ func TestTraceRouteReturnsTheMostRecentEvents(t *testing.T) {
 		t.Errorf("expected the trace to be empty after delete, got %d", len(after))
 	}
 }
+
+func TestMergeRouteFoldsOneNoteIntoAnother(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	if err := svc.SaveEntity(context.Background(), gameID, "the-ember-warden",
+		"---\nid: the-ember-warden\nname: The Ember Warden\ntype: character\n---\nStands vigil.\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	body := `{"into":"captain-kaelen"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/game/"+gameID+"/entity/the-ember-warden/merge", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("merge: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var merged EntityDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &merged); err != nil {
+		t.Fatalf("decode merged entity: %v", err)
+	}
+	if merged.ID != "captain-kaelen" {
+		t.Errorf("merged into %q, want captain-kaelen", merged.ID)
+	}
+
+	// A merge with no target is a malformed request, not a silent no-op.
+	req = httptest.NewRequest(http.MethodPost, "/api/game/"+gameID+"/entity/captain-kaelen/merge", strings.NewReader(`{}`))
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for a missing target, got %d", rec.Code)
+	}
+}

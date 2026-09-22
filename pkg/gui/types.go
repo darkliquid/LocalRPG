@@ -77,6 +77,11 @@ type EntityDTO struct {
 	History   []int                  `json:"history,omitempty"`
 }
 
+// MergeEntityRequestDTO names the note that should survive a merge.
+type MergeEntityRequestDTO struct {
+	Into string `json:"into"`
+}
+
 type GraphNodeDTO struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`

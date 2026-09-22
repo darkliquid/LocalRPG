@@ -305,6 +305,27 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// POST /api/game/{id}/entity/{source}/merge folds one note into another.
+		if r.Method == http.MethodPost && len(parts) >= 4 && parts[3] == "merge" {
+			var req MergeEntityRequestDTO
+			if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			if strings.TrimSpace(req.Into) == "" {
+				http.Error(w, "a merge needs a note to merge into", http.StatusBadRequest)
+				return
+			}
+
+			merged, err := s.service.MergeEntities(r.Context(), gameID, parts[2], req.Into)
+			if err != nil {
+				writeGameError(w, err)
+				return
+			}
+			writeJSON(w, merged)
+			return
+		}
+
 		ent, err := s.service.GetEntity(r.Context(), gameID, entityID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
