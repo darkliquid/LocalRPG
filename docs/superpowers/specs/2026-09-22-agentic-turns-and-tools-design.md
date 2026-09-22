@@ -69,6 +69,9 @@ Settled across two review rounds.
 | Tokenizer | `porter`, because the corpus is English prose and inflection is the common case |
 | Provenance | A compact `Turn.ToolCalls` record of name and result size, rendered as one quiet line, keeping arguments and results in the trace |
 | A stray final call | Text is kept and calls ignored; no narration still fails the turn as it does today, and the trace records the stray call |
+| Cumulative spend | Recorded and exposed in the trace, with `agents.turn_output_tokens` defaulting to unenforced. Rounds already bound a turn to five calls |
+| Prose in a tool round | Discarded and traced. Anything before a lookup is the model thinking out loud, and its order relative to the result is undefined |
+| Repeated calls | Re-executed rather than cached. Microsecond reads do not justify state, invalidation, and a within-turn correctness question |
 
 ---
 
@@ -207,7 +210,11 @@ Migration follows the index's existing promise: created idempotently on open, an
 | `agents.tool_rounds` | 4 | Tool rounds per turn, so at most five generations |
 | `agents.tool_result_chars` | 4000 | Per tool result, truncating with a marker that says so |
 | `context_token_budget` | unbounded | The whole conversation. Once reached, tools are withdrawn and the model is told to answer |
+| `agents.turn_output_tokens` | 0 | Unenforced by default; see the note below |
 | `turn_timeout_seconds` | 300 | Wall clock for the whole loop, unchanged |
+| `agents.turn_output_tokens` | 0 | Cumulative output ceiling for a turn. Unenforced by default |
+
+Cumulative output is summed across the turn's calls and carried on the `provider.response` events, so a trace answers "what did this turn actually cost" without a second mechanism. The ceiling exists but ships unenforced on purpose: rounds already bound a turn to five calls, and an enforced second limit mostly adds a way to cut a legitimate scene short. It should be turned on because a trace showed a cost problem, which is another argument for building the trace first.
 
 The withdrawal message is a **tool result**, not a silent stop, because a model whose tool call vanishes will simply try the same call again until the round limit is spent. Withdrawal is also the last thing that happens: the next generation is sent without a `tools` field at all, so a well-behaved model cannot ask a question that will not be answered.
 
@@ -268,12 +275,9 @@ Settled in review:
 - **Round 7**: the transcript is in-memory and traced, never in `history.jsonl`; four read-only tools; a `tool` stream event resets the idle watchdog on both sides; `supports_tools: auto|yes|no`; FTS5 as a virtual table with triggers, backfilled from the content tables.
 - **Round 8**: the embeddings provider and storage are deferred to their own spec while the tool's interface is fixed now; streamed tool calls are reassembled in the provider; calls execute sequentially; `gm` only, and the opening turn is included; the read-only internal surface is a permanent ceiling; trace records name, outcome, size and duration at `summary`, and arguments and results at `full`.
 - **Round 9**: queries are built from words rather than passed to `MATCH`, with raw expressions available explicitly; the tokenizer is `porter`; provenance is a compact `Turn.ToolCalls` record; a stray call in the withdrawn round is dropped while its text is kept.
+- **Round 10**: cumulative output is tracked and traced with an unenforced ceiling; prose in a tool round is discarded and traced; repeated calls are re-executed rather than cached.
 
-Queued for the tenth round:
-
-1. **Cumulative spend.** Rounds bound calls to five, but each carries its own `max_tokens`. Does a paid provider need an explicit per-turn output ceiling?
-2. **Text alongside a call.** Confirmed above as discarded; confirm the discard is acceptable when a model narrates usefully before calling.
-3. **Repeated calls.** Confirmed above as re-executed rather than cached; confirm no cache is wanted.
+**The frontier is empty.** Every decision this design needed has been put to review and answered. What remains is planning: task decomposition, increment boundaries, and the order in which the three plans are executed.
 
 ## 16. File Map
 
@@ -300,7 +304,9 @@ Queued for the tenth round:
 
 ## 17. Delivery Increments
 
-1. **Contract** — messages, tools, tool calls, HTTP accumulation, capability, and the trace rows. Shippable with no tools defined, and it makes every later step observable.
+1. **Contract** — messages, tools, tool calls, HTTP accumulation, capability, and the trace rows.
 2. **Search** — FTS5 plus the four tools, testable entirely through tool unit tests with no model involved.
-3. **The loop** — rounds, bounds, withdrawal, `tool` stream events, watchdog resets, and the console activity line.
+3. **The loop** — rounds, bounds, withdrawal, `tool` stream events, watchdog resets, the console activity line, and provenance on the turn.
 4. **Embeddings** — `search_semantic` behind the existing tool interface, if it warrants its own spec.
+
+Increments 1 and 2 are testable but not user-visible: a contract with no tools, and tools with no caller. Where the plan draws the boundary between them and increment 3 is a planning decision rather than a design one, and merging them into one shippable slice is a legitimate outcome. Only increment 4 needs anything that does not exist today.

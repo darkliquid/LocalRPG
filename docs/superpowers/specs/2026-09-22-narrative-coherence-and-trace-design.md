@@ -489,7 +489,8 @@ The work is planned as **two plans** rather than one. The trace is additive and 
 ## 17. Related Work
 
 **Agentic turns and internal tools** are specified separately in
-`docs/superpowers/specs/2026-09-22-agentic-turns-and-tools-design.md`. That work
+`docs/superpowers/specs/2026-09-22-agentic-turns-and-tools-design.md`, whose own
+review rounds are complete. That work
 changes the provider contract so a turn can make more than one model call and let
 the GM search its own world mid-turn. It lands after the trace and canon
 increments here, for a specific reason: before it, the GM can only know what it
