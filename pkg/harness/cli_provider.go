@@ -14,13 +14,19 @@ type CLIProvider struct {
 	id      string
 	command string
 	args    []string
+	opts    GenerationOptions
 }
 
 func NewCLIProvider(id, command string, args []string) *CLIProvider {
+	return NewCLIProviderWithOptions(id, command, args, GenerationOptions{})
+}
+
+func NewCLIProviderWithOptions(id, command string, args []string, opts GenerationOptions) *CLIProvider {
 	return &CLIProvider{
 		id:      id,
 		command: command,
 		args:    args,
+		opts:    opts,
 	}
 }
 
@@ -33,9 +39,19 @@ func (c *CLIProvider) buildCmd(ctx context.Context, req GenerateRequest) *exec.C
 	args = append(args, req.Prompt)
 
 	cmd := exec.CommandContext(ctx, c.command, args...)
+
+	env := cmd.Environ()
 	if req.System != "" {
-		cmd.Env = append(cmd.Environ(), "SYSTEM_PROMPT="+req.System)
+		env = append(env, "SYSTEM_PROMPT="+req.System)
 	}
+	if c.opts.MaxTokens > 0 {
+		env = append(env, fmt.Sprintf("LOCALRPG_MAX_TOKENS=%d", c.opts.MaxTokens))
+	}
+	if c.opts.Temperature > 0 {
+		env = append(env, fmt.Sprintf("LOCALRPG_TEMPERATURE=%g", c.opts.Temperature))
+	}
+	cmd.Env = env
+
 	return cmd
 }
 
@@ -88,6 +104,6 @@ func (c *CLIProvider) Stream(ctx context.Context, req GenerateRequest, out chan<
 		return fmt.Errorf("cli process finished with error: %w (stderr: %s)", err, stderr.String())
 	}
 
-	out <- StreamChunk{Done: true}
+	out <- StreamChunk{Done: true, FinishReason: "stop"}
 	return nil
 }

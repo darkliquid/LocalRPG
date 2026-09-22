@@ -5,9 +5,19 @@ import (
 )
 
 type StreamChunk struct {
-	Text  string
-	Done  bool
-	Error error
+	Text         string
+	Done         bool
+	FinishReason string
+	Error        error
+}
+
+// GenerationOptions are the sampling parameters a provider applies to a call.
+// They come from the role's configuration and are merged with any per-request
+// values, which win.
+type GenerationOptions struct {
+	Temperature float64
+	MaxTokens   int
+	Stop        []string
 }
 
 type GenerateRequest struct {

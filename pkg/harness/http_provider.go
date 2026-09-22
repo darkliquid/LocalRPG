@@ -15,15 +15,21 @@ type HTTPProvider struct {
 	endpoint string
 	model    string
 	apiKey   string
+	opts     GenerationOptions
 	client   *http.Client
 }
 
 func NewHTTPProvider(id, endpoint, model, apiKey string) *HTTPProvider {
+	return NewHTTPProviderWithOptions(id, endpoint, model, apiKey, GenerationOptions{})
+}
+
+func NewHTTPProviderWithOptions(id, endpoint, model, apiKey string, opts GenerationOptions) *HTTPProvider {
 	return &HTTPProvider{
 		id:       id,
 		endpoint: strings.TrimRight(endpoint, "/"),
 		model:    model,
 		apiKey:   apiKey,
+		opts:     opts,
 		client:   &http.Client{},
 	}
 }
@@ -33,9 +39,12 @@ func (h *HTTPProvider) ID() string {
 }
 
 type openAIChatRequest struct {
-	Model    string          `json:"model"`
-	Messages []openAIMessage `json:"messages"`
-	Stream   bool            `json:"stream"`
+	Model       string          `json:"model"`
+	Messages    []openAIMessage `json:"messages"`
+	Stream      bool            `json:"stream"`
+	Temperature float64         `json:"temperature,omitempty"`
+	MaxTokens   int             `json:"max_tokens,omitempty"`
+	Stop        []string        `json:"stop,omitempty"`
 }
 
 type openAIMessage struct {
@@ -48,6 +57,7 @@ type openAIChatChunk struct {
 		Delta struct {
 			Content string `json:"content"`
 		} `json:"delta"`
+		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
 }
 
@@ -83,10 +93,22 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 	}
 	messages = append(messages, openAIMessage{Role: "user", Content: req.Prompt})
 
+	temperature := req.Temperature
+	if temperature == 0 {
+		temperature = h.opts.Temperature
+	}
+	maxTokens := req.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = h.opts.MaxTokens
+	}
+
 	payload := openAIChatRequest{
-		Model:    h.model,
-		Messages: messages,
-		Stream:   true,
+		Model:       h.model,
+		Messages:    messages,
+		Stream:      true,
+		Temperature: temperature,
+		MaxTokens:   maxTokens,
+		Stop:        h.opts.Stop,
 	}
 
 	data, err := json.Marshal(payload)
@@ -120,6 +142,7 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 		return fmt.Errorf("http error %s from %s", resp.Status, url)
 	}
 
+	var finishReason string
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -135,11 +158,22 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 		if err := json.Unmarshal([]byte(eventData), &chunk); err != nil {
 			continue
 		}
-		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-			out <- StreamChunk{Text: chunk.Choices[0].Delta.Content}
+		if len(chunk.Choices) > 0 {
+			if chunk.Choices[0].Delta.Content != "" {
+				out <- StreamChunk{Text: chunk.Choices[0].Delta.Content}
+			}
+			if chunk.Choices[0].FinishReason != "" {
+				finishReason = chunk.Choices[0].FinishReason
+			}
 		}
 	}
 
-	out <- StreamChunk{Done: true}
-	return scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	if finishReason == "" {
+		finishReason = "stop"
+	}
+	out <- StreamChunk{Done: true, FinishReason: finishReason}
+	return nil
 }

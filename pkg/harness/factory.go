@@ -43,15 +43,24 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 	case "disabled":
 		return &disabledModelProvider{id: id}, nil
 	case "cli":
-		return NewCLIProvider(id, cfg.Command, cfg.Args), nil
+		return NewCLIProviderWithOptions(id, cfg.Command, cfg.Args, GenerationOptions{
+			Temperature: cfg.Temperature,
+			MaxTokens:   cfg.MaxTokens,
+		}), nil
 	case "http":
-		return NewHTTPProvider(id, cfg.Endpoint, cfg.Model, cfg.APIKey), nil
+		return NewHTTPProviderWithOptions(id, cfg.Endpoint, cfg.Model, cfg.APIKey, GenerationOptions{
+			Temperature: cfg.Temperature,
+			MaxTokens:   cfg.MaxTokens,
+		}), nil
 	case "builtin", "mock", "":
 		if cfg.BuiltinName == "narrative-oracle" {
 			return NewNarrativeOracleProvider(id), nil
 		}
 		if cfg.Command != "" {
-			return NewCLIProvider(id, cfg.Command, cfg.Args), nil
+			return NewCLIProviderWithOptions(id, cfg.Command, cfg.Args, GenerationOptions{
+				Temperature: cfg.Temperature,
+				MaxTokens:   cfg.MaxTokens,
+			}), nil
 		}
 		return &builtinEchoModelProvider{id: id}, nil
 	default:

@@ -61,3 +61,40 @@ func TestCLIProviderStreaming(t *testing.T) {
 		t.Errorf("expected 'Line1 Line2', got %q", full)
 	}
 }
+
+func TestCLIProviderReportsCompletionAndExposesOptions(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	provider := NewCLIProviderWithOptions("stream-cli", "sh",
+		[]string{"-c", "printf '%s-%s' \"$LOCALRPG_MAX_TOKENS\" \"$LOCALRPG_TEMPERATURE\"", "--"},
+		GenerationOptions{Temperature: 0.5, MaxTokens: 512})
+
+	out := make(chan StreamChunk, 10)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- provider.Stream(ctx, GenerateRequest{Prompt: "x"}, out)
+	}()
+
+	var received strings.Builder
+	var done bool
+	var finishReason string
+	for chunk := range out {
+		received.WriteString(chunk.Text)
+		if chunk.Done {
+			done = true
+		}
+		if chunk.FinishReason != "" {
+			finishReason = chunk.FinishReason
+		}
+	}
+	if err := <-errCh; err != nil {
+		t.Fatalf("Stream failed: %v", err)
+	}
+	if !done || finishReason != "stop" {
+		t.Errorf("done = %v, finish reason = %q; want true and stop", done, finishReason)
+	}
+	if got := received.String(); got != "512-0.5" {
+		t.Errorf("options did not reach the process, got %q", got)
+	}
+}
