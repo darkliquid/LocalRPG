@@ -431,6 +431,7 @@ All defaulted, so existing configuration is unchanged. Every key is also exposed
 - `aliases` is optional metadata; notes without it behave as now.
 - The immediate-scene layer renders identically for notes with no state, so existing prompts stay recognisable.
 - Trace files live under the disposable cache directory; deleting them costs nothing.
+- **No migration is provided for any of this.** The project is pre-release and has no general usage, so a change to what a turn records or how a prompt is built applies from the next turn onwards, and an existing campaign is simply replayed or restarted. Nothing here should grow a backfill path: the alternative to migrating data is creating a new campaign, and that is cheaper than the machinery.
 - `TurnDTO` additions are additive; a client that ignores them is unaffected.
 
 ## 14. Open Questions
@@ -491,7 +492,7 @@ The work is planned as **three plans**, not one:
 
 1. `docs/superpowers/plans/2026-09-22-trace-and-debug-view.md` (shipped) - the instrument. Additive, and it touches many packages shallowly.
 2. `docs/superpowers/plans/2026-09-22-canon-and-recall.md` - increments 2 and 3. It changes what the model is sent, which is behaviour judged by playing, so it is kept apart from the work that adds new mechanisms.
-3. `docs/superpowers/plans/2026-09-22-prose-mentions.md` - the gap that made retrieval depend on the extractor. A turn's mentions came from wikilinks and speech, plus whatever extraction recorded, so a character who was only ever described was invisible to recall when extraction was off, failed, or missed them. A deterministic prose scan closes it, and its backfill is the one operation that rewrites `history.jsonl`.
+3. `docs/superpowers/plans/2026-09-22-prose-mentions.md` - the gap that made retrieval depend on the extractor. A turn's mentions came from wikilinks and speech, plus whatever extraction recorded, so a character who was only ever described was invisible to recall when extraction was off, failed, or missed them. A deterministic prose scan closes it, for turns recorded from then on.
 4. `docs/superpowers/plans/2026-09-22-memory-and-recap.md` - increment 4. The chronicle note and its summariser, the cadence, detached regeneration, injection as a recollection, and the recap.
 5. A later plan for increments 5 and 6 - aliases and merging, then the continuity checks, open threads, and the idle nudge. That adds a repair mechanism and a verification pass rather than extending memory.
 

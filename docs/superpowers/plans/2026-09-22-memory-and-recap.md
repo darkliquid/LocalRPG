@@ -1387,7 +1387,8 @@ git commit -m "feat(gui): regenerate the story so far behind the turn"
 - Modify: `frontend/src/types.ts`, `frontend/src/api/client.ts`, `frontend/src/components/LivingWorldDrawer.tsx`, `frontend/src/App.tsx`
 
 **Interfaces:**
-- Produces: `/recap` as an engine command, recognised in `ProcessActionStream`
+- Consumes: `(*Chronicler).Due` and `(*Chronicler).Regenerate` (Task 3)
+- Produces: `/recap` as an engine command, recognised in `ProcessActionStream`, which regenerates a stale summary before printing it
 - Produces: `APIClient.getRecap()`, and a "Story so far" block in the Living World drawer with a refresh
 
 - [ ] **Step 1: Write the failing test**
@@ -1395,9 +1396,13 @@ git commit -m "feat(gui): regenerate the story so far behind the turn"
 Append to `pkg/engine/orchestrator_test.go`:
 
 ```go
-func TestRecapCommandPrintsTheSummaryWithoutGenerating(t *testing.T) {
+func TestRecapCommandPrintsTheCurrentSummary(t *testing.T) {
 	provider := &scriptedStreamProvider{chunks: []string{"A generated scene."}}
 	orchestrator, timeline, store := streamingOrchestrator(t, provider)
+
+	chronicler := NewChronicler(core.NewPathResolver(t.TempDir()), store, nil)
+	chronicler.SetEvery(0)
+	orchestrator.SetChronicler(chronicler)
 
 	if err := WriteChronicle(store, timeline.EntitiesDir(), Chronicle{
 		Summary:     "The party reached the harbour.",
@@ -1414,7 +1419,7 @@ func TestRecapCommandPrintsTheSummaryWithoutGenerating(t *testing.T) {
 		t.Errorf("expected the recap as the reply, got %q", turn.Narration)
 	}
 	if strings.Contains(turn.Narration, "A generated scene.") {
-		t.Errorf("/recap must not call the model when the summary exists")
+		t.Errorf("/recap must not narrate a scene")
 	}
 
 	// A command is not a turn: nothing is recorded for it.
@@ -1424,6 +1429,40 @@ func TestRecapCommandPrintsTheSummaryWithoutGenerating(t *testing.T) {
 	}
 	if len(turns) != 0 {
 		t.Errorf("expected /recap to record nothing, got %d turns", len(turns))
+	}
+}
+
+func TestRecapCommandRegeneratesAStaleSummary(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"Kael guards the harbour gate."}}
+	orchestrator, timeline, store := streamingOrchestrator(t, provider)
+
+	chronicler := NewChronicler(core.NewPathResolver(t.TempDir()), store, harness.NewSummariser(provider))
+	chronicler.SetEvery(1)
+	orchestrator.SetChronicler(chronicler)
+
+	// Two turns recorded, and a summary covering neither of them.
+	recordTurn(t, timeline, 1, "The party reached the harbour.")
+	recordTurn(t, timeline, 2, "Kael mentioned the oil was low.")
+	if err := WriteChronicle(store, timeline.EntitiesDir(), Chronicle{Summary: "They left the tavern.", ThroughTurn: 0}); err != nil {
+		t.Fatal(err)
+	}
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "System", "/recap", nil)
+	if err != nil {
+		t.Fatalf("/recap failed: %v", err)
+	}
+	// Asking for a recap is asking about the present tense, so a stale summary is
+	// brought up to date first.
+	if !strings.Contains(turn.Narration, "Kael guards the harbour gate.") {
+		t.Errorf("expected a regenerated recap, got %q", turn.Narration)
+	}
+
+	chronicle, err := chronicler.Recap("campaign-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chronicle.ThroughTurn != 2 {
+		t.Errorf("ThroughTurn = %d, want 2 after the regeneration", chronicle.ThroughTurn)
 	}
 }
 
@@ -1451,12 +1490,19 @@ Expected: FAIL — `/recap` falls through to the model.
 In `pkg/engine/orchestrator.go`, beside the `/undo` and `/go` handlers, before anything that touches the model:
 
 ```go
-	// /recap answers "where were we?" from the campaign's own memory. It never calls
-	// the model: a summary is what the summariser already wrote, and a player asking
-	// to read it should not pay for another one.
+	// /recap answers "where were we?". A stale summary is brought up to date first,
+	// because asking for a recap is asking about the present tense, and a summary
+	// can be up to a cadence behind. The regeneration is the same path a turn uses,
+	// so a failure here leaves the old summary in place rather than failing the
+	// command.
 	if strings.HasPrefix(strings.TrimSpace(actionInput), "/recap") {
 		chronicle := Chronicle{}
 		if o.chronicler != nil {
+			if due, err := o.chronicler.Due(o.gameID()); err == nil && due {
+				if _, err := o.chronicler.Regenerate(ctx, o.gameID()); err != nil {
+					o.logger.Event("provider.error", map[string]interface{}{"role": "summariser", "error": err.Error()})
+				}
+			}
 			chronicle, _ = o.chronicler.Recap(o.gameID())
 		}
 
@@ -1593,12 +1639,12 @@ git commit -m "feat(engine): add /recap and show the story so far"
 | Injected compactly and capped | 2, 4 |
 | Subordinate to canon and the notes | 4 |
 | Surrendered last when the budget bites | 4 |
-| `/recap` regenerates when stale, then prints | 6 (prints; see the note below) |
+| `/recap` regenerates when stale, then prints | 6 |
 | Excluded from exports | Already true: exports render turns and segments, and a chronicle note is neither |
 | Recap panel in the GUI | 6 |
 | Deferred to the next plan: aliases, merge, continuity, open threads | stated in Scope |
 
-**Deliberate deviation:** the spec says `/recap` regenerates a stale summary before printing. This plan makes it print and never call the model, because a command that silently spends a model call is a surprise, and because regeneration already happens behind every Nth turn. If a stale recap proves annoying in use, the change is to call `Regenerate` in that branch when the chronicler says it is due, which is a three-line change to Task 6 and already has a test to extend.
+**On `/recap` costing a model call:** it regenerates when the summary is stale, which is what the spec asks for and what the reviewer chose. It is worth being deliberate about: the command is the one place a player can trigger a summariser call directly, and it only does so when the chronicler reports the summary behind. A campaign whose summary is current answers from the note with no call at all, which the first test asserts.
 
 **Placeholder scan:** no "TBD", no "similar to Task N". Task 3's two path helpers are given in a corrected form immediately after the draft that used string concatenation, so the reader is not left choosing.
 
