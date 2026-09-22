@@ -81,6 +81,13 @@ The second half of this spec is the reason the first half is hard to debug: ther
 | Retrieval query set | Recent speech speakers and recently mentioned characters, **excluding the player and the location**, which other sections already cover |
 | Summary in the budget | Summoned last, and only for campaigns whose history exceeds the recall window |
 | Trace cost model | Opt-in: `off` by default, so retention bounds guard against a debug session left running, not against normal play |
+| Retrieval ranking | Overlap weighted by recency decay, then turn number as a tie-break |
+| Chronicle in the graph | Hidden. The Codex is where it is edited; an isolated node is furniture |
+| Summary timing | Detached from the turn that triggered it, deliberately not used by that turn, so it can never add latency or damage a turn |
+| Findings on record | `history.jsonl` stays append-only; addressed findings are marked in a per-campaign sidecar |
+| Corrections feed the summary | A correction is the player stating a fact, which is what the summary is for |
+| Untrimmed prompt | Recorded at `full` whenever the budget trimmed, because "what did I lose" is the likeliest reason to be tracing |
+| Wire fidelity | Both: parsed chunks as consumed, plus raw provider lines under `provider.wire`, so a parse bug is distinguishable from a model bug |
 
 ---
 
@@ -158,6 +165,7 @@ Stored as a normal note, so it is readable, editable, and exportable: `games/<id
 
 - **Regeneration trigger**: `turnNum - through_turn >= agents.summary_every` (default 10).
 - **Input**: the previous summary body plus the turns `through_turn+1..turnNum`.
+- **Timing**: regenerated **detached** from the turn that triggered it, and never used by that turn. The turn records and returns; the summary updates behind it and the next turn sees it. This keeps a second model call off the critical path and means a failed summary can never damage a turn. Regenerations coalesce: a pending regeneration is a flag, not a queue, so a player turning quickly triggers one catch-up run, not several.
 - **Provider**: the **extractor** role (settled). It is already configured, already cheap, and already reads turns. It falls back to `gm` through the existing `inherit` mechanism, and setting `agents.roles.extractor: disabled` disables summaries along with extraction.
 - **Instruction**: preserve names, places, promises, unresolved threads, and state changes; drop verbatim dialogue; never invent.
 - **Injection**: `## STORY SO FAR`, capped at `agents.summary_char_limit` (default 2000 characters).
@@ -242,6 +250,8 @@ After generation and before recording, deterministic rules run over the narratio
 
 Findings become `Turn.ContinuityNotes []string`, rendered under the turn like `ContextNotes`, with a **Correct** action that submits the finding as a `/gm` directive on the next turn. Nothing is auto-rewritten.
 
+Because `history.jsonl` is append-only, addressing a finding does not edit the turn. `games/<id>/findings.json` records `{turn, rule}` pairs the player has addressed, so the UI can render them as handled while the record itself stays intact. Dismissing is per finding, never per rule, so a rule that becomes noisy is tuned rather than muted. The correction turn is ordinary history, so it reaches the next summary without special handling.
+
 Deliberately deferred: an advisory model pass that reads the notes and the narration and reports contradictions in prose. It costs a call per turn and its output is harder to trust; if it is added later it belongs behind its own config flag.
 
 ---
@@ -266,7 +276,7 @@ Every event is a name plus structured fields. Values are typed; payloads are tru
 | --- | --- |
 | `config.load` | path, local_override, keys_present |
 | `turn.begin` | game, number, mode, input_chars |
-| `context.assembled` | estimated_tokens, budget, sections[{name, tokens, included}], trimmed[], recall_turns, retrieval_turns |
+| `context.assembled` | estimated_tokens, budget, sections[{name, tokens, included}], trimmed[], recall_turns, retrieval_turns, untrimmed_prompt (full only, and only when trimming occurred) |
 | `provider.request` | role, provider_id, kind, model, temperature, max_tokens, endpoint, prompt_chars, prompt (full only) |
 | `provider.response` | role, finish_reason, first_token_ms, total_ms, chunks, bytes, usage{prompt_tokens, completion_tokens} when the provider reports it |
 | `provider.error` | role, error |
@@ -275,6 +285,7 @@ Every event is a name plus structured fields. Values are typed; payloads are tru
 | `extraction.request` | role, prompt (full only) |
 | `extraction.result` | entities[], dialogue[], player_location, matched[], created[] |
 | `continuity.check` | findings[] |
+| `provider.wire` | role, direction, line, truncated (full only; bounded by the payload cap) |
 | `record.turn` | number, location, entities, outcome, bytes |
 | `summary.regenerate` | from_turn, to_turn, provider, chars, duration_ms |
 | `media.tts.request` | speaker, voice_id, pitch, rate, chars, cache_key |
@@ -336,7 +347,7 @@ Providers, the assembler, the orchestrator, the timeline, and the media clients 
 
 - A deny-list of field names (`api_key`, `authorization`, `token`, `secret`, `password`) is replaced with `[redacted]` before writing, at every level. The HTTP provider logs `auth_set: true`, never the header value.
 - Prompts and generated prose **are** captured at `full`, because that is the point. They are the player's own story, they stay in the local cache directory, and the file is `0600`.
-- Retention: rotate at `agents.trace_max_bytes` (default 8 MiB, about 320 turns at `full`) and keep `agents.trace_max_files` (default 3), so the ceiling is 24 MiB.
+- Retention: rotate at `agents.trace_max_bytes` (default 256 MiB, roughly 10 000 turns at `full`) and keep `agents.trace_max_files` (default 3), so the ceiling is 768 MiB. These are deliberately generous: tracing is opt-in, and a ceiling nobody reaches costs nothing.
 - A per-event payload cap (`agents.trace_payload_chars`, default 20000) truncates with a marker, so one runaway prompt cannot fill the disk.
 - Tracing failure is never fatal: a trace that cannot be written is dropped, and the turn continues.
 
@@ -379,9 +390,9 @@ Settings Studio gains, under Preferences: trace level, payload cap, and retentio
 | `agents.summary_char_limit` | 2000 | Injected summary cap |
 | `agents.thread_idle_turns` | 10 | When an open thread is considered idle |
 | `agents.continuity_checks` | `true` | Run the deterministic checks |
-| `preferences.trace_level` | `off` | `off`, `summary`, or `full` |
+| `preferences.trace_level` | `off` | `off`, `summary`, or `full`; `--trace` defaults to `full` |
 | `agents.trace_payload_chars` | 20000 | Per-event payload cap |
-| `agents.trace_max_bytes` | 8388608 | Rotate the trace at this size |
+| `agents.trace_max_bytes` | 268435456 | Rotate the trace at this size |
 | `agents.trace_max_files` | 3 | Rotated trace files retained |
 | `agents.trace_rotate_check` | 200 | Events between rotation checks |
 
@@ -409,17 +420,18 @@ All defaulted, so existing configuration is unchanged. Every key is also exposed
 
 ## 14. Open Questions
 
-Settled in the first review round: the summary provider is the **extractor** role; the trace is a **single appended file**; the chronicle is an entity; cadence includes a location change; the summary is subordinate; continuity checks are on by default and display-only plus a correction; retrieval excludes the player and the location; the summary surrenders last and only past the window.
+Settled in review:
 
-Still open, queued for the second round:
+- **First round**: summary provider is the extractor; the trace is a single appended file; the chronicle is an entity; cadence includes a location change; the summary is subordinate; continuity checks are on by default, display-only plus a correction; retrieval excludes the player and the location; the summary surrenders last and only past the window.
+- **Second round**: retrieval ranks by recency-weighted overlap; the chronicle is hidden from the graph; summary regeneration is detached and never used by its triggering turn; addressed findings live in a per-campaign sidecar; corrections feed the summary; the untrimmed prompt is recorded when trimming occurs; raw provider lines are recorded alongside parsed chunks; trace rotation is 256 MiB across 3 files and `--trace` means `full`.
 
-1. **Retrieval ranking.** Overlap count then recency, or recency-weighted overlap?
-2. **Chronicle visibility.** Should the chronicle appear as a node in the knowledge graph, where it has no links and would sit isolated?
-3. **Summary timing.** Is regeneration part of the turn (adding latency to it) or detached like playback?
-4. **Correction feedback.** Does a corrected finding get cleared, and do corrections feed the next summary?
-5. **Untrimmed prompt.** When the budget trims, should the trace record what would have been sent?
-6. **Wire fidelity.** Raw provider bytes, or the parsed chunks we already understand?
-7. **Trace defaults.** Given opt-in tracing, how generous should rotation be, and what does `--trace` default to?
+Queued for the third round:
+
+1. **Finding dismissal scope.** Per finding, or a per-rule mute, and where the sidecar lives.
+2. **Debug drawer shape.** Interleaved wire lines, or a separate panel, and how their volume is bounded in the UI.
+3. **Graph filter.** Hide `chronicle` only, or arcs too.
+4. **Recency decay shape.** Linear, or a half-life knob, and its default.
+5. **Coalescing.** Confirm one pending regeneration rather than a queue.
 
 ## 15. File Map
 
