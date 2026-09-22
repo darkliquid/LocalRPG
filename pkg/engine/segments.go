@@ -9,24 +9,23 @@ import (
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
-// buildTurnSegments resolves the ordered playback script for a turn: the player's
-// own utterance in Say mode, then the narration split into narration and speech,
-// with extractor attributions applied where the prose parse found none.
-func buildTurnSegments(store *storage.Store, mode, playerID, input, narration string, attributions []harness.ExtractedDialogue) []entity.TurnSegment {
+// buildTurnSegments resolves the ordered playback script for a turn: the
+// narration split into narration and speech, with extractor attributions applied
+// where the prose parse found none. The player's own line is not a segment
+// because the chronicle already shows their submitted action, and repeating it
+// reads as a duplicate.
+func buildTurnSegments(store *storage.Store, narration string, extraction harness.Extraction) []entity.TurnSegment {
 	segments := make([]entity.TurnSegment, 0)
 
-	if strings.EqualFold(mode, "Say") && strings.TrimSpace(input) != "" {
-		segments = append(segments, entity.TurnSegment{
-			Kind:      entity.SegmentSpeech,
-			Speaker:   entityName(store, playerID),
-			SpeakerID: playerID,
-			Text:      strings.TrimSpace(input),
-		})
-	}
-
+	// A character introduced in this very turn is not in the index yet: extraction
+	// is persisted by RecordTurn, after segments are built. Resolving against the
+	// proposed entities too is what lets a new NPC's first line be attributed
+	// instead of falling back to narration.
 	resolve := func(candidate string) (string, bool) {
-		id := harness.ResolveSpeakerID(store, candidate)
-		return id, id != ""
+		if id := harness.ResolveSpeakerID(store, candidate); id != "" {
+			return id, true
+		}
+		return proposedSpeakerID(extraction.Entities, candidate)
 	}
 
 	for _, segment := range dialogue.Parse(narration, resolve) {
@@ -42,7 +41,29 @@ func buildTurnSegments(store *storage.Store, mode, playerID, input, narration st
 		})
 	}
 
-	return mergeAttributions(segments, attributions, resolve)
+	return mergeAttributions(segments, extraction.Dialogue, resolve)
+}
+
+// proposedSpeakerID resolves a speaker against entities the extractor is about to
+// create.
+func proposedSpeakerID(entities []harness.ExtractedEntity, candidate string) (string, bool) {
+	slug := entity.Slugify(entity.WikilinkTarget(candidate))
+	if slug == "" {
+		return "", false
+	}
+	for i := range entities {
+		proposed := entities[i]
+		if proposed.ID != slug && entity.Slugify(proposed.Name) != slug {
+			continue
+		}
+		if proposed.ID != "" {
+			return proposed.ID, true
+		}
+		if id := entity.Slugify(proposed.Name); id != "" {
+			return id, true
+		}
+	}
+	return "", false
 }
 
 // mergeAttributions splits narration spans so model-attributed speech is recorded
@@ -106,14 +127,4 @@ func speechMentions(segments []entity.TurnSegment) []entity.Mention {
 		mentions = append(mentions, entity.Mention{ID: segment.SpeakerID, Kind: entity.MentionSpeech})
 	}
 	return mentions
-}
-
-func entityName(store *storage.Store, id string) string {
-	if id == "" || store == nil {
-		return ""
-	}
-	if ent, err := store.GetEntity(id); err == nil && ent != nil {
-		return ent.Name
-	}
-	return id
 }

@@ -491,3 +491,20 @@ func TestCampaignTitleIsPersistedAndLatestIsFirst(t *testing.T) {
 		t.Errorf("OpeningPrompt = %q, want the prompt captured at creation", state.OpeningPrompt)
 	}
 }
+
+func TestResolveWikilinksPointsAtEntityIDs(t *testing.T) {
+	resolve := func(name string) string {
+		switch strings.ToLower(strings.TrimSpace(name)) {
+		case "guard kael", "guard-kael":
+			return "guard-kael"
+		default:
+			return ""
+		}
+	}
+
+	got := resolveWikilinks(`[[Guard Kael]] says: [[guard-kael|the warden]] sees [[Nobody]].`, resolve)
+	want := `[[guard-kael|Guard Kael]] says: [[guard-kael|the warden]] sees Nobody.`
+	if got != want {
+		t.Errorf("resolveWikilinks() = %q, want %q", got, want)
+	}
+}

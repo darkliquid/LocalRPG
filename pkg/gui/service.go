@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -155,17 +156,43 @@ func mentionIDs(mentions []entity.Mention) []string {
 	return ids
 }
 
-func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, audioAvailable bool) []SegmentDTO {
+// wikilinkPattern matches [[Target]] and [[Target|Label]].
+var wikilinkPattern = regexp.MustCompile(`\[\[([^\]|]+)(?:\|([^\]]+))?\]\]`)
+
+// resolveWikilinks rewrites a note's links so the target is an entity ID the
+// client can open, keeping the author's display label. A link whose target is
+// unknown degrades to plain text, because a button that goes nowhere is worse
+// than no button at all.
+func resolveWikilinks(text string, resolve func(string) string) string {
+	if resolve == nil || !strings.Contains(text, "[[") {
+		return text
+	}
+	return wikilinkPattern.ReplaceAllStringFunc(text, func(match string) string {
+		groups := wikilinkPattern.FindStringSubmatch(match)
+		target := strings.TrimSpace(groups[1])
+		label := strings.TrimSpace(groups[2])
+		if label == "" {
+			label = target
+		}
+		if id := resolve(target); id != "" {
+			return "[[" + id + "|" + label + "]]"
+		}
+		return label
+	})
+}
+
+func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, audioAvailable bool, resolve func(string) string) []SegmentDTO {
 	dtos := make([]SegmentDTO, 0, len(segments))
 	for i, segment := range segments {
+		text := resolveWikilinks(segment.Text, resolve)
 		dto := SegmentDTO{
 			Kind:      segment.Kind,
 			Speaker:   segment.Speaker,
 			SpeakerID: segment.SpeakerID,
-			Text:      segment.Text,
+			Text:      text,
 			// The reading estimate is the same one the exports pace with, so the
 			// app and a rendered bundle hold a line for the same length of time.
-			Duration: scene.ReadingDuration(segment.Text).Seconds(),
+			Duration: scene.ReadingDuration(text).Seconds(),
 		}
 		if audioAvailable {
 			dto.AudioURL = fmt.Sprintf("/api/game/%s/turn/%d/segment/%d/audio", gameID, turnNumber, i)
@@ -369,8 +396,11 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		Mode:        turn.Mode,
 		Prose:       turn.Prose(),
 		Outcome:     turn.Outcome,
+		Truncated:   turn.Truncated,
 		EntitiesHit: mentionIDs(turn.Entities),
-		Segments:    segmentDTOs(turn.Segments, gameID, turn.Number, audioAvailable),
+		Segments: segmentDTOs(turn.Segments, gameID, turn.Number, audioAvailable, func(name string) string {
+			return harness.ResolveSpeakerID(store, name)
+		}),
 	}
 
 	if turn.Location != "" {

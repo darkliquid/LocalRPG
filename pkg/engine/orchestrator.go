@@ -40,6 +40,51 @@ func OpeningPrompt(manifest *core.GameManifest) string {
 	return strings.TrimSpace(prompt)
 }
 
+// recentEventWindow is how many prior turns the narrator is reminded of. Enough
+// to hold a conversation, small enough to keep the prompt bounded.
+const recentEventWindow = 6
+
+// recentNarrationLimit truncates each remembered narration so one long scene
+// cannot crowd out the rules, the lore, and the current action.
+const recentNarrationLimit = 1200
+
+// recentEventsPrompt renders the tail of the timeline for the narrator. It is a
+// transcript rather than a summary, because summarising is what loses the details
+// a player expects the GM to remember.
+func recentEventsPrompt(turns []Turn, limit int) string {
+	if len(turns) == 0 || limit <= 0 {
+		return ""
+	}
+	start := len(turns) - limit
+	if start < 0 {
+		start = 0
+	}
+
+	var sb strings.Builder
+	for _, turn := range turns[start:] {
+		if input := strings.TrimSpace(turn.Input); input != "" {
+			fmt.Fprintf(&sb, "Turn %d - Player [%s]: %s\n", turn.Number, turn.Mode, truncateRunes(input, recentNarrationLimit))
+		} else {
+			fmt.Fprintf(&sb, "Turn %d - [%s]\n", turn.Number, turn.Mode)
+		}
+		if narration := strings.TrimSpace(turn.Narration); narration != "" {
+			fmt.Fprintf(&sb, "Narrator: %s\n\n", truncateRunes(narration, recentNarrationLimit))
+		}
+	}
+	return sb.String()
+}
+
+func truncateRunes(value string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	runes := []rune(value)
+	if len(runes) <= max {
+		return value
+	}
+	return string(runes[:max]) + "..."
+}
+
 // openingDirective is the instruction the GM receives as the campaign's first
 // turn. It establishes the scene without deciding the protagonist's own actions,
 // which is the one thing a narrator must not take away from a player.
@@ -298,8 +343,9 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// source of truth, never from a value pinned at campaign open.
 	locationID := o.currentLocation()
 
-	// Assemble context with system rules and world lore prompts
-	contextPrompt, err := o.assembler.AssembleContextWithProfiles(locationID, o.playerID, generationPrompt, o.rulesPrompt, o.lorePrompt, o.timeline.VoiceProfiles())
+	// Assemble context with system rules, world lore prompts, and a window of
+	// recent turns, which is what keeps the narrator in the same conversation.
+	contextPrompt, err := o.assembler.AssembleContextWithProfiles(locationID, o.playerID, generationPrompt, o.rulesPrompt, o.lorePrompt, o.timeline.VoiceProfiles(), recentEventsPrompt(pastTurns, recentEventWindow))
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)
 	}
@@ -308,7 +354,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
 	}
 
-	narration, err := o.generate(ctx, contextPrompt, onChunk)
+	narration, finishReason, err := o.generate(ctx, contextPrompt, onChunk)
 	if err != nil {
 		return nil, fmt.Errorf("gm generation failed: %w", err)
 	}
@@ -322,6 +368,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Narration: narration,
 		Location:  locationID,
 		Outcome:   outcome,
+		Truncated: finishReason == "length",
 	}
 
 	if strings.TrimSpace(turn.Narration) == "" {
@@ -338,7 +385,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 
-	turn.Segments = buildTurnSegments(o.store, mode, o.playerID, actionInput, turn.Narration, extraction.Dialogue)
+	turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
 	for _, mention := range speechMentions(turn.Segments) {
 		if !containsMention(turn.Entities, mention.ID) {
 			turn.Entities = append(turn.Entities, mention)
@@ -380,11 +427,13 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 }
 
 // generate streams the GM's reply, forwarding each delta and accumulating the text.
-// A provider that goes silent for longer than the chunk timeout is abandoned: the
+// It returns the provider's finish reason alongside the text, so a reply cut off by
+// a token limit can be marked as truncated rather than presented as complete. A
+// provider that goes silent for longer than the chunk timeout is abandoned: the
 // stream context is cancelled, the provider's goroutines are drained, and the turn
 // fails without being recorded, which is what keeps a hung model from holding the
 // campaign forever.
-func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk func(string) error) (string, error) {
+func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk func(string) error) (string, string, error) {
 	timeout := o.chunkTimeout
 	if timeout <= 0 {
 		timeout = defaultChunkTimeout
@@ -403,6 +452,7 @@ func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk 
 	defer idle.Stop()
 
 	var sb strings.Builder
+	finishReason := ""
 	for {
 		select {
 		case <-idle.C:
@@ -414,18 +464,21 @@ func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk 
 				}
 			}()
 			<-streamErr
-			return "", fmt.Errorf("%w after %s", ErrGenerationStalled, timeout)
+			return "", "", fmt.Errorf("%w after %s", ErrGenerationStalled, timeout)
 
 		case chunk, ok := <-chunks:
 			if !ok {
 				if err := <-streamErr; err != nil {
-					return "", err
+					return "", "", err
 				}
-				return sb.String(), nil
+				return sb.String(), finishReason, nil
 			}
 			if chunk.Error != nil {
 				<-streamErr
-				return "", chunk.Error
+				return "", "", chunk.Error
+			}
+			if chunk.FinishReason != "" {
+				finishReason = chunk.FinishReason
 			}
 			if !idle.Stop() {
 				select {
@@ -441,7 +494,7 @@ func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk 
 			sb.WriteString(chunk.Text)
 			if onChunk != nil {
 				if err := onChunk(chunk.Text); err != nil {
-					return "", err
+					return "", "", err
 				}
 			}
 		}

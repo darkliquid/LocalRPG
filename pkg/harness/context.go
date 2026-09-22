@@ -80,13 +80,24 @@ const speechFormattingInstruction = `## SPEECH FORMATTING
 Write each spoken line on its own line, formatted as  Name: "the words spoken"
 Use a character's established name, or [[their note name]] to link them.
 Keep narration on its own lines with no leading name. If you cannot name the
-speaker, leave the words in the narration instead of inventing a name.`
+speaker, leave the words in the narration instead of inventing a name.
+
+## PROSE FORMATTING
+Separate narration beats with blank lines, one beat per paragraph.
+Use plain prose. Do not emit headings, tables, or code fences in narration.
+You may use *single asterisks* for emphasis and --- for a scene break.
+
+## CONTINUITY
+Never rename a character who has already appeared. Once someone is introduced,
+reuse exactly the same name, and link them with [[that name]] every time.
+Continue the conversation the player is having; do not restart the scene.
+Do not write voice IDs, voice tags, or profile names into the narration.`
 
 func (c *ContextAssembler) AssembleContextWithRules(locationID, playerID, playerAction, rulesPrompt, lorePrompt string) (string, error) {
-	return c.AssembleContextWithProfiles(locationID, playerID, playerAction, rulesPrompt, lorePrompt, nil)
+	return c.AssembleContextWithProfiles(locationID, playerID, playerAction, rulesPrompt, lorePrompt, nil, "")
 }
 
-func (c *ContextAssembler) AssembleContextWithProfiles(locationID, playerID, playerAction, rulesPrompt, lorePrompt string, profiles []config.VoiceProfile) (string, error) {
+func (c *ContextAssembler) AssembleContextWithProfiles(locationID, playerID, playerAction, rulesPrompt, lorePrompt string, profiles []config.VoiceProfile, recentEvents string) (string, error) {
 	var sb strings.Builder
 
 	if strings.TrimSpace(rulesPrompt) != "" {
@@ -103,6 +114,13 @@ func (c *ContextAssembler) AssembleContextWithProfiles(locationID, playerID, pla
 
 	if len(profiles) > 0 {
 		sb.WriteString(FormatVoiceProfilesCatalog(profiles) + "\n")
+	}
+
+	// Prior turns are what give the narrator a memory. Without them every call is
+	// a cold start and the model reintroduces the same scene from scratch.
+	if strings.TrimSpace(recentEvents) != "" {
+		sb.WriteString("\n## RECENT EVENTS (oldest first, most recent last)\n")
+		sb.WriteString(strings.TrimSpace(recentEvents) + "\n")
 	}
 
 	baseContext, err := c.AssembleContext(locationID, playerID, playerAction)

@@ -8,22 +8,39 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
-func TestBuildTurnSegmentsAttributesSayModePlayerAndResolvedSpeakers(t *testing.T) {
+func TestBuildTurnSegmentsResolvesSpeakers(t *testing.T) {
 	store := newTestStore(t)
-	saveTestEntity(t, store, &entity.Entity{ID: "player", Name: "Sean", Type: "character", Hash: "h1"})
 	saveTestEntity(t, store, &entity.Entity{ID: "garrick-the-fence", Name: "Garrick the Fence", Type: "character", Hash: "h2"})
 
 	narration := "The docks are quiet.\nGarrick the Fence: \"You didn't see me here.\"\nAs you declare: \"I draw my blade.\""
-	segments := buildTurnSegments(store, "Say", "player", "Where is the ledger?", narration, nil)
+	segments := buildTurnSegments(store, narration, harness.Extraction{})
 
 	want := []entity.TurnSegment{
-		{Kind: entity.SegmentSpeech, Speaker: "Sean", SpeakerID: "player", Text: "Where is the ledger?"},
 		{Kind: entity.SegmentNarration, Text: "The docks are quiet."},
 		{Kind: entity.SegmentSpeech, Speaker: "Garrick the Fence", SpeakerID: "garrick-the-fence", Text: "You didn't see me here."},
 		{Kind: entity.SegmentNarration, Text: `As you declare: "I draw my blade."`},
 	}
 	if !reflect.DeepEqual(segments, want) {
 		t.Fatalf("buildTurnSegments() = %#v, want %#v", segments, want)
+	}
+}
+
+func TestBuildTurnSegmentsAttributesEntitiesIntroducedThisTurn(t *testing.T) {
+	// The extractor proposes the character; nothing is indexed yet. A wikilinked
+	// speaker must still resolve so their first line is spoken, not narrated.
+	store := newTestStore(t)
+	narration := "A warden stands vigil.\n[[Guard Kael]]: \"The mist thickens.\""
+
+	extraction := harness.Extraction{
+		Entities: []harness.ExtractedEntity{{ID: "guard-kael", Name: "Guard Kael", Type: "character", Body: "A warden."}},
+	}
+	segments := buildTurnSegments(store, narration, extraction)
+
+	if len(segments) != 2 {
+		t.Fatalf("buildTurnSegments() = %#v, want narration then speech", segments)
+	}
+	if segments[1].Kind != entity.SegmentSpeech || segments[1].SpeakerID != "guard-kael" {
+		t.Errorf("second segment = %+v, want speech by guard-kael", segments[1])
 	}
 }
 
@@ -36,7 +53,7 @@ func TestBuildTurnSegmentsAppliesExtractorAttribution(t *testing.T) {
 		{Speaker: "Lady Evelyn Vance", Text: "You made it back in one piece."},
 	}
 
-	segments := buildTurnSegments(store, "Do", "player", "I enter", narration, attributions)
+	segments := buildTurnSegments(store, narration, harness.Extraction{Dialogue: attributions})
 
 	want := []entity.TurnSegment{
 		{Kind: entity.SegmentNarration, Text: "Vance looks up. She says"},

@@ -60,6 +60,7 @@ type TurnDTO struct {
 	EntitiesHit    []string     `json:"entities_hit,omitempty"`
 	Segments       []SegmentDTO `json:"segments,omitempty"`
 	Outcome        string       `json:"outcome,omitempty"`
+	Truncated      bool         `json:"truncated,omitempty"`
 	LocationID     string       `json:"location_id,omitempty"`
 	LocationName   string       `json:"location_name,omitempty"`
 	LocationArtURL string       `json:"location_art_url,omitempty"`

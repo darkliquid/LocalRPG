@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -302,3 +303,33 @@ func TestOpeningModeEstablishesTheFirstTurnOnly(t *testing.T) {
 	}
 }
 
+func TestRecentEventsPromptCarriesPriorTurns(t *testing.T) {
+	turns := []Turn{
+		{Number: 1, Mode: OpeningMode, Narration: "Rain hammers the market."},
+		{Number: 2, Mode: "Say", Input: "Late for what?", Narration: "The bell tolls once."},
+	}
+
+	prompt := recentEventsPrompt(turns, recentEventWindow)
+	if !strings.Contains(prompt, "Late for what?") || !strings.Contains(prompt, "Rain hammers the market.") {
+		t.Errorf("recentEventsPrompt lost a prior turn: %q", prompt)
+	}
+
+	if got := recentEventsPrompt(nil, recentEventWindow); got != "" {
+		t.Errorf("expected an empty prompt for a fresh campaign, got %q", got)
+	}
+}
+
+func TestRecentEventsPromptHonoursTheWindow(t *testing.T) {
+	turns := make([]Turn, 0, 10)
+	for i := 1; i <= 10; i++ {
+		turns = append(turns, Turn{Number: i, Mode: "Do", Input: fmt.Sprintf("action %d", i), Narration: "Something happens."})
+	}
+
+	prompt := recentEventsPrompt(turns, 2)
+	if strings.Contains(prompt, "action 1\n") {
+		t.Errorf("expected only the newest turns, got %q", prompt)
+	}
+	if !strings.Contains(prompt, "action 10") || !strings.Contains(prompt, "action 9") {
+		t.Errorf("expected the newest turns kept, got %q", prompt)
+	}
+}

@@ -24,6 +24,9 @@ type Turn struct {
 	Entities  []entity.Mention     `json:"entities,omitempty"`
 	Location  string               `json:"location,omitempty"`
 	Outcome   string               `json:"outcome,omitempty"`
+	// Truncated records that the model hit its token limit mid-reply, so the
+	// client can say so instead of presenting a cut-off scene as a complete one.
+	Truncated bool `json:"truncated,omitempty"`
 
 	// LegacyOutput is only populated when reading records written before the
 	// narration rename. New records must not set it.

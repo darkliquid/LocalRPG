@@ -107,7 +107,7 @@ func TestContextAssembler_WithVoiceProfiles(t *testing.T) {
 		{ID: "young_scout", Description: "Agile rangers and scouts"},
 	}
 
-	prompt, err := assembler.AssembleContextWithProfiles("loc1", "p1", "I greet the elders", "", "", profiles)
+	prompt, err := assembler.AssembleContextWithProfiles("loc1", "p1", "I greet the elders", "", "", profiles, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestAssembleContextAlwaysAsksForAttributableSpeech(t *testing.T) {
 
 	// No rules prompt, no lore prompt: the instruction must not depend on a system
 	// or world shipping anything.
-	prompt, err := assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil)
+	prompt, err := assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil, "")
 	if err != nil {
 		t.Fatalf("AssembleContextWithProfiles failed: %v", err)
 	}
