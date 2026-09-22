@@ -439,8 +439,9 @@ Settled in review, across six rounds:
 - **Round 4**: arc status is a closed set written by the extractor; `last_advanced` is derived from mentions; open threads are always in the prompt and the idle threshold is presentation-only; `/recap` regenerates when stale and summaries stay out of exports; cadence is 10 from the opening turn inclusive; all five continuity rules stay, with "unknown entity" scoped to claim-stating constructions.
 - **Round 5**: `## ESTABLISHED NAMES` covers names in play only, and stays small by widening recall rather than growing; delivered as two plans, trace first; the Debug view is a Settings tab; `/recap` is an engine command.
 - **Round 6**: agentic turns get their own spec and land after trace and canon; tools complement pre-injection rather than replace it; function calling is declared per provider; FTS5 and graph tools come before embeddings; bounds are four tool rounds, 4000 characters per result, and the turn budget.
+- **Round 7**: the tool transcript is in-memory and traced, never written to `history.jsonl`; the tool set is four read-only tools; a `tool` stream event resets the idle watchdog on both sides; capability is `supports_tools: auto|yes|no`; FTS5 arrives as a virtual table with triggers, backfilled from the content tables.
 
-The coherence spec's own frontier is now empty. The agentic branch continues in its own document.
+This spec's own frontier is empty. Every decision above is settled, and the plans that follow implement it.
 
 ## 15. File Map
 
@@ -482,3 +483,20 @@ The coherence spec's own frontier is now empty. The agentic branch continues in 
 Each increment is independently testable and leaves a coherent product: increment 1 pays for itself immediately, 2 and 3 sharpen what is already sent, 4 extends the horizon, 5 and 6 keep it healthy.
 
 The work is planned as **two plans** rather than one. The trace is additive and touches many packages shallowly; coherence changes what the model is sent, which is behaviour judged by playing. Trace-first is not a preference: it is the instrument used to verify that canon reaches the prompt at all, and to tune the budget against real prompts.
+
+---
+
+## 17. Related Work
+
+**Agentic turns and internal tools** are specified separately in
+`docs/superpowers/specs/2026-09-22-agentic-turns-and-tools-design.md`. That work
+changes the provider contract so a turn can make more than one model call and let
+the GM search its own world mid-turn. It lands after the trace and canon
+increments here, for a specific reason: before it, the GM can only know what it
+was told, and after it, the question becomes whether tools or the prompt fixed a
+reply. The trace is what tells them apart.
+
+One hazard crosses the boundary. A tool round produces no narration, and the idle
+watchdog introduced in section 5.5 fails a turn that goes silent for longer than
+`chunk_timeout_seconds`, so tool events must reset it. That is specified in the
+agentic document, and noted here because the watchdog is defined here.
