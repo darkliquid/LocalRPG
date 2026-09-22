@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -247,6 +248,28 @@ func TestEmptyNarrationRecordsNothing(t *testing.T) {
 	}
 	if len(turns) != 0 {
 		t.Errorf("expected nothing recorded, got %+v", turns)
+	}
+}
+
+func TestGenerationStallsWhenNoChunkArrives(t *testing.T) {
+	provider := &scriptedStreamProvider{block: true}
+	orchestrator, timeline, store := streamingOrchestrator(t, provider)
+	orchestrator.SetChunkTimeout(20 * time.Millisecond)
+
+	_, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I wait", nil)
+	if !errors.Is(err, ErrGenerationStalled) {
+		t.Fatalf("expected ErrGenerationStalled, got %v", err)
+	}
+
+	turns, err := timeline.history.LoadHistory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 0 {
+		t.Errorf("expected no recorded turn, got %+v", turns)
+	}
+	if count, err := store.CountTurns(); err != nil || count != 0 {
+		t.Errorf("CountTurns = %d, %v; want 0", count, err)
 	}
 }
 

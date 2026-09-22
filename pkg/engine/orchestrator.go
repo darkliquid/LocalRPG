@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,13 @@ import (
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
+// ErrGenerationStalled reports that the gm provider stopped sending deltas for
+// longer than the configured chunk timeout.
+var ErrGenerationStalled = errors.New("gm generation stalled")
+
+// defaultChunkTimeout is the silence tolerated between deltas when a caller sets none.
+const defaultChunkTimeout = 60 * time.Second
+
 type TurnOrchestrator struct {
 	store         *storage.Store
 	timeline      *Timeline
@@ -26,6 +34,7 @@ type TurnOrchestrator struct {
 	rulesPrompt   string
 	lorePrompt    string
 	extractor     *harness.Extractor
+	chunkTimeout  time.Duration
 }
 
 func NewTurnOrchestrator(
@@ -56,6 +65,15 @@ func (o *TurnOrchestrator) SetPrompts(rulesPrompt, lorePrompt string) {
 // deterministic mentions only.
 func (o *TurnOrchestrator) SetExtractor(extractor *harness.Extractor) {
 	o.extractor = extractor
+}
+
+// SetChunkTimeout bounds the silence tolerated between narration deltas. Zero
+// restores the default, so a misconfigured value cannot disable the watchdog.
+func (o *TurnOrchestrator) SetChunkTimeout(timeout time.Duration) {
+	if timeout <= 0 {
+		timeout = defaultChunkTimeout
+	}
+	o.chunkTimeout = timeout
 }
 
 // currentLocation resolves where this turn is happening. The player note wins
@@ -310,34 +328,70 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 }
 
 // generate streams the GM's reply, forwarding each delta and accumulating the text.
+// A provider that goes silent for longer than the chunk timeout is abandoned: the
+// stream context is cancelled, the provider's goroutines are drained, and the turn
+// fails without being recorded, which is what keeps a hung model from holding the
+// campaign forever.
 func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk func(string) error) (string, error) {
-	chunks := make(chan harness.StreamChunk, 32)
+	timeout := o.chunkTimeout
+	if timeout <= 0 {
+		timeout = defaultChunkTimeout
+	}
 
+	streamCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	chunks := make(chan harness.StreamChunk, 32)
 	streamErr := make(chan error, 1)
 	go func() {
-		streamErr <- o.router.StreamForRole(ctx, "gm", harness.GenerateRequest{Prompt: prompt}, chunks)
+		streamErr <- o.router.StreamForRole(streamCtx, "gm", harness.GenerateRequest{Prompt: prompt}, chunks)
 	}()
 
-	var sb strings.Builder
-	for chunk := range chunks {
-		if chunk.Error != nil {
-			<-streamErr
-			return "", chunk.Error
-		}
-		if chunk.Text == "" {
-			continue
-		}
+	idle := time.NewTimer(timeout)
+	defer idle.Stop()
 
-		sb.WriteString(chunk.Text)
-		if onChunk != nil {
-			if err := onChunk(chunk.Text); err != nil {
-				return "", err
+	var sb strings.Builder
+	for {
+		select {
+		case <-idle.C:
+			cancel()
+			// Draining until the provider closes lets its goroutines exit rather
+			// than block forever on a channel nobody reads.
+			go func() {
+				for range chunks {
+				}
+			}()
+			<-streamErr
+			return "", fmt.Errorf("%w after %s", ErrGenerationStalled, timeout)
+
+		case chunk, ok := <-chunks:
+			if !ok {
+				if err := <-streamErr; err != nil {
+					return "", err
+				}
+				return sb.String(), nil
+			}
+			if chunk.Error != nil {
+				<-streamErr
+				return "", chunk.Error
+			}
+			if !idle.Stop() {
+				select {
+				case <-idle.C:
+				default:
+				}
+			}
+			idle.Reset(timeout)
+
+			if chunk.Text == "" {
+				continue
+			}
+			sb.WriteString(chunk.Text)
+			if onChunk != nil {
+				if err := onChunk(chunk.Text); err != nil {
+					return "", err
+				}
 			}
 		}
 	}
-
-	if err := <-streamErr; err != nil {
-		return "", err
-	}
-	return sb.String(), nil
 }

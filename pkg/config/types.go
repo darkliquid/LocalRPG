@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 type PathsConfig struct {
 	Systems string `yaml:"systems" json:"systems"`
 	Worlds  string `yaml:"worlds" json:"worlds"`
@@ -31,6 +33,11 @@ type AgentsConfig struct {
 	DefaultRole string                     `yaml:"default_role" json:"default_role"`
 	Roles       map[string]AgentRoleConfig `yaml:"roles" json:"roles"`
 	Fallbacks   map[string]string          `yaml:"fallbacks,omitempty" json:"fallbacks,omitempty"`
+	// TurnTimeoutSeconds bounds a whole turn; ChunkTimeoutSeconds bounds the
+	// silence tolerated between narration deltas. Zero means "use the default",
+	// so configuration written before these keys existed keeps working.
+	TurnTimeoutSeconds  int `yaml:"turn_timeout_seconds" json:"turn_timeout_seconds"`
+	ChunkTimeoutSeconds int `yaml:"chunk_timeout_seconds" json:"chunk_timeout_seconds"`
 }
 
 type VoiceProfile struct {
@@ -115,7 +122,9 @@ func DefaultConfig() *Config {
 			Cache:   "./cache",
 		},
 		Agents: AgentsConfig{
-			DefaultRole: "gm",
+			DefaultRole:         "gm",
+			TurnTimeoutSeconds:  300,
+			ChunkTimeoutSeconds: 60,
 			Roles: map[string]AgentRoleConfig{
 				"gm": {
 					Type:        "cli",
@@ -197,4 +206,22 @@ func DefaultConfig() *Config {
 			FontScale:        "medium",
 		},
 	}
+}
+
+// TurnTimeout is the wall-clock budget for one turn.
+func (c *Config) TurnTimeout() time.Duration {
+	seconds := c.Agents.TurnTimeoutSeconds
+	if seconds <= 0 {
+		seconds = 300
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+// ChunkTimeout is the silence tolerated between narration deltas.
+func (c *Config) ChunkTimeout() time.Duration {
+	seconds := c.Agents.ChunkTimeoutSeconds
+	if seconds <= 0 {
+		seconds = 60
+	}
+	return time.Duration(seconds) * time.Second
 }

@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -477,6 +478,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator := engine.NewTurnOrchestrator(store, timeline, jsEngine, router, startLocation, manifest.Player)
 	orchestrator.SetExtractor(harness.ExtractorFromConfig(cfg, router))
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
+	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 
 	return &TurnSession{
 		service:      s,
@@ -492,7 +494,10 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 // turn, which is how a disconnected client stops generation rather than paying for
 // a turn nobody will see.
 func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEvent) error) error {
-	turn, err := t.orchestrator.ProcessActionStream(ctx, req.Mode, req.Input, func(text string) error {
+	runCtx, cancel := context.WithTimeout(ctx, t.cfg.TurnTimeout())
+	defer cancel()
+
+	turn, err := t.orchestrator.ProcessActionStream(runCtx, req.Mode, req.Input, func(text string) error {
 		return emit(TurnEvent{Type: "chunk", Text: text})
 	})
 	if err != nil {
@@ -1051,6 +1056,10 @@ func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*Setting
 	}, nil
 }
 
+// defaultTTSPreviewText is long enough to expose cadence, pitch, and pacing
+// differences between voice profiles during a probe.
+const defaultTTSPreviewText = "Local RPG can use a wide range of voices to bring life to your characters, NPCs, and story narration."
+
 func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) (*TestProviderResponseDTO, error) {
 	start := time.Now()
 
@@ -1109,7 +1118,7 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		}
 		prompt := req.TestPrompt
 		if prompt == "" {
-			prompt = "Test utterance"
+			prompt = defaultTTSPreviewText
 		}
 		voice := &entity.VoiceConfig{
 			VoiceID:    ttsCfg.DefaultVoice,
@@ -1121,10 +1130,18 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, LatencyMS: latency, Message: err.Error()}, nil
 		}
+		if len(audio) == 0 {
+			return &TestProviderResponseDTO{
+				Success:   false,
+				LatencyMS: latency,
+				Message:   "Synthesis returned no audio; check the provider endpoint and voice ID",
+			}, nil
+		}
 		return &TestProviderResponseDTO{
-			Success:   true,
-			LatencyMS: latency,
-			Message:   fmt.Sprintf("Synthesized %d bytes of audio successfully", len(audio)),
+			Success:      true,
+			LatencyMS:    latency,
+			Message:      fmt.Sprintf("Synthesized %d bytes of audio successfully", len(audio)),
+			AudioDataURI: fmt.Sprintf("data:%s;base64,%s", media.AudioContentType(audio), base64.StdEncoding.EncodeToString(audio)),
 		}, nil
 
 	case "stt":
