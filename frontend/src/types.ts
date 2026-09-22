@@ -47,10 +47,24 @@ export interface Turn {
 }
 
 export interface TurnEvent {
-  type: 'chunk' | 'turn' | 'error';
+  type: 'chunk' | 'turn' | 'error' | 'model_missing';
   text?: string;
   turn?: Turn;
   message?: string;
+  model_id?: string;
+  name?: string;
+  size_bytes?: number;
+}
+
+export interface ModelStatus {
+  id: string;
+  name: string;
+  installed: boolean;
+  downloading: boolean;
+  progress: number;
+  bytes_downloaded: number;
+  total_bytes: number;
+  error?: string;
 }
 
 export interface Thread {
@@ -251,6 +265,7 @@ export interface VoiceProfile {
 export interface TTSConfig {
   type: 'builtin' | 'http' | 'cli' | 'disabled';
   builtin_name?: string;
+  model_path?: string;
   command?: string;
   args?: string[];
   endpoint?: string;

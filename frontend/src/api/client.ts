@@ -21,10 +21,37 @@ import {
   TestProviderResponse,
   TraceEvent,
   AddressedFinding,
+  ModelStatus,
 } from '../types';
 
 export class APIClient {
   private gameID: string;
+
+  static async getModels(): Promise<ModelStatus[]> {
+    const res = await fetch('/api/models');
+    if (!res.ok) throw new Error(`getModels: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async downloadModel(id: string): Promise<void> {
+    const res = await fetch(`/api/models/${id}/download`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error(`downloadModel: ${res.statusText}`);
+  }
+
+  static subscribeModelEvents(onEvent: (status: ModelStatus) => void): () => void {
+    const eventSource = new EventSource('/api/models/events');
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as ModelStatus;
+        onEvent(data);
+      } catch (err) {
+        console.error('Failed to parse model event:', err);
+      }
+    };
+    return () => eventSource.close();
+  }
 
   static async listGames(): Promise<GameSummary[]> {
     const res = await fetch('/api/games');

@@ -14,6 +14,7 @@ import { LauncherHub } from './components/LauncherHub';
 import { SettingsStudio } from './components/SettingsStudio';
 import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
+import { ModelDownloadModal } from './components/ModelDownloadModal';
 import { User, Network, BookOpen, Clock, Film, Compass, Settings, X } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -49,6 +50,8 @@ export const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [addressed, setAddressed] = useState<Set<number>>(new Set());
   const [modalEntity, setModalEntity] = useState<{ name: string; turnNumber: number } | null>(null);
+  const [missingModel, setMissingModel] = useState<{ id: string; name: string; sizeBytes: number } | null>(null);
+  const [dismissedModelPrompt, setDismissedModelPrompt] = useState(false);
 
   useEffect(() => {
     APIClient.getSettings()
@@ -137,6 +140,14 @@ export const App: React.FC = () => {
             // A turn can introduce characters, so the graph and the character
             // view are refreshed rather than left showing the state before it.
             refreshCorpus();
+          } else if (event.type === 'model_missing') {
+            if (!dismissedModelPrompt) {
+              setMissingModel({
+                id: event.model_id || 'kokoro-tts',
+                name: event.name || 'Kokoro Voice Pack',
+                sizeBytes: event.size_bytes || 90177536,
+              });
+            }
           } else if (event.type === 'error') {
             console.error('turn failed:', event.message);
           }
@@ -519,6 +530,19 @@ export const App: React.FC = () => {
             onEditInCodex={handleEditInCodexEntity}
             onClose={() => setModalEntity(null)}
           />
+
+          {/* Model Download Modal */}
+          {missingModel && (
+            <ModelDownloadModal
+              modelId={missingModel.id}
+              modelName={missingModel.name}
+              sizeBytes={missingModel.sizeBytes}
+              onClose={() => {
+                setMissingModel(null);
+                setDismissedModelPrompt(true);
+              }}
+            />
+          )}
         </>
       )}
     </div>
