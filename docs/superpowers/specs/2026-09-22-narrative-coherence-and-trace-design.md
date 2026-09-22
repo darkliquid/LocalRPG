@@ -439,7 +439,7 @@ Settled in review, across six rounds:
 - **Round 2**: retrieval ranks by recency-weighted overlap; the chronicle is hidden from the graph; summary regeneration is detached and never used by its triggering turn; addressed findings live in a per-campaign sidecar; corrections feed the summary; the untrimmed prompt is recorded when trimming occurs; raw provider lines are recorded alongside parsed chunks; trace rotation is 256 MiB across 3 files and `--trace` means `full`.
 - **Round 3**: findings are dismissed individually, never by muting a rule, in `games/<id>/findings.json`; wire lines get a separate collapsible panel while the file keeps everything; only `chronicle` is filtered from the graph; recency uses a half-life defaulting to 12 turns; one pending summary regeneration rather than a queue, and a run in flight is never restarted.
 - **Round 4**: arc status is a closed set written by the extractor; `last_advanced` is derived from mentions; open threads are always in the prompt and the idle threshold is presentation-only; `/recap` regenerates when stale and summaries stay out of exports; cadence is 10 from the opening turn inclusive; all five continuity rules stay, with "unknown entity" scoped to claim-stating constructions.
-- **Round 5**: `## ESTABLISHED NAMES` covers names in play only, and stays small by widening recall rather than growing; delivered as two plans, trace first; the Debug view is a Settings tab; `/recap` is an engine command.
+- **Round 5**: `## ESTABLISHED NAMES` covers names in play only, and stays small by widening recall rather than growing; delivered as a sequence of plans, trace first; the Debug view is a Settings tab; `/recap` is an engine command.
 - **Round 6**: agentic turns get their own spec and land after trace and canon; tools complement pre-injection rather than replace it; function calling is declared per provider; FTS5 and graph tools come before embeddings; bounds are four tool rounds, 4000 characters per result, and the turn budget.
 - **Round 7**: the tool transcript is in-memory and traced, never written to `history.jsonl`; the tool set is four read-only tools; a `tool` stream event resets the idle watchdog on both sides; capability is `supports_tools: auto|yes|no`; FTS5 arrives as a virtual table with triggers, backfilled from the content tables.
 
@@ -455,7 +455,8 @@ This spec's own frontier is empty. Every decision above is settled, and the plan
 - `pkg/engine/summary.go` (+ test) — summary regeneration and the `chronicle` note
 - `frontend/src/components/DebugDrawer.tsx` — the trace timeline
 - `frontend/src/components/RecapPanel.tsx` — story so far and open threads
-- `docs/superpowers/plans/2026-09-22-narrative-coherence.md` — the task plan
+- `docs/superpowers/plans/2026-09-22-trace-and-debug-view.md` - the trace plan (shipped)
+- `docs/superpowers/plans/2026-09-22-canon-and-recall.md` - the canon and recall plan
 
 **Modify**
 
@@ -484,7 +485,13 @@ This spec's own frontier is empty. Every decision above is settled, and the plan
 
 Each increment is independently testable and leaves a coherent product: increment 1 pays for itself immediately, 2 and 3 sharpen what is already sent, 4 extends the horizon, 5 and 6 keep it healthy.
 
-The work is planned as **two plans** rather than one. The trace is additive and touches many packages shallowly; coherence changes what the model is sent, which is behaviour judged by playing. Trace-first is not a preference: it is the instrument used to verify that canon reaches the prompt at all, and to tune the budget against real prompts.
+The work is planned as **three plans**, not one:
+
+1. `docs/superpowers/plans/2026-09-22-trace-and-debug-view.md` (shipped) - the instrument. Additive, and it touches many packages shallowly.
+2. `docs/superpowers/plans/2026-09-22-canon-and-recall.md` - increments 2 and 3. It changes what the model is sent, which is behaviour judged by playing, so it is kept apart from the work that adds new mechanisms.
+3. A later plan for increments 4 to 6 - the chronicle and its summariser, aliases and merging, the continuity checks, and the player-facing recap. That adds a subsystem rather than extending the prompt, and its continuity rules read the canon facts plan 2 puts in place.
+
+Trace-first is not a preference: it is the instrument used to verify that canon reaches the prompt at all, and to tune the budget against real prompts.
 
 ---
 
