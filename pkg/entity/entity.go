@@ -30,6 +30,7 @@ type EntityFrontmatter struct {
 	Portrait   string                 `yaml:"portrait,omitempty"`
 	Location   string                 `yaml:"location,omitempty"`
 	Appearance string                 `yaml:"appearance,omitempty" json:"appearance,omitempty"`
+	Aliases    []string               `yaml:"aliases,omitempty" json:"aliases,omitempty"`
 	Faction    string                 `yaml:"faction,omitempty"`
 	History    []int                  `yaml:"history,omitempty" json:"history,omitempty"`
 	State      map[string]interface{} `yaml:"state,omitempty"`
@@ -46,12 +47,16 @@ type Entity struct {
 	Location   string
 	Faction    string
 	Appearance string
-	History    []int
-	State      *state.State
-	ExtraMeta  map[string]interface{}
-	Body       string
-	Wikilinks  []string
-	Hash       string
+	// Aliases are other names the same being is known by. They exist because a
+	// model will rename a character, and the alternative to recording both names is
+	// a second entity losing the first one's history.
+	Aliases   []string
+	History   []int
+	State     *state.State
+	ExtraMeta map[string]interface{}
+	Body      string
+	Wikilinks []string
+	Hash      string
 }
 
 func (e *Entity) InitState(data map[string]interface{}) {
@@ -119,6 +124,7 @@ func ParseMarkdownEntity(data []byte) (*Entity, error) {
 		Location:   fm.Location,
 		Faction:    fm.Faction,
 		Appearance: fm.Appearance,
+		Aliases:    fm.Aliases,
 		History:    fm.History,
 		State:      state.NewState(fm.State),
 		ExtraMeta:  fm.ExtraMeta,
@@ -184,6 +190,7 @@ func (e *Entity) SerializeMarkdown() ([]byte, error) {
 		Location:   e.Location,
 		Faction:    e.Faction,
 		Appearance: e.Appearance,
+		Aliases:    e.Aliases,
 		History:    e.History,
 		ExtraMeta:  e.ExtraMeta,
 	}

@@ -110,3 +110,39 @@ func TestSerializeMarkdownEntity(t *testing.T) {
 		t.Errorf("mismatch after serialization: got %+v", reparsed)
 	}
 }
+
+func TestAliasesRoundTripThroughMarkdown(t *testing.T) {
+	original := &Entity{
+		ID:      "guard-kael",
+		Name:    "Guard Kael",
+		Type:    "character",
+		Body:    "A warden of the ember.",
+		Aliases: []string{"The Ember Warden", "Kael"},
+	}
+
+	data, err := original.SerializeMarkdown()
+	if err != nil {
+		t.Fatalf("SerializeMarkdown failed: %v", err)
+	}
+
+	parsed, err := ParseMarkdownEntity(data)
+	if err != nil {
+		t.Fatalf("ParseMarkdownEntity failed: %v", err)
+	}
+	if len(parsed.Aliases) != 2 {
+		t.Fatalf("Aliases = %v, want two", parsed.Aliases)
+	}
+	if parsed.Aliases[0] != "The Ember Warden" || parsed.Aliases[1] != "Kael" {
+		t.Errorf("aliases did not round-trip: %v", parsed.Aliases)
+	}
+}
+
+func TestAnEntityWithoutAliasesHasNone(t *testing.T) {
+	parsed, err := ParseMarkdownEntity([]byte("---\nid: sera\nname: Sera\ntype: character\n---\nBody.\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parsed.Aliases) != 0 {
+		t.Errorf("expected no aliases, got %v", parsed.Aliases)
+	}
+}

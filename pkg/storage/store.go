@@ -50,6 +50,7 @@ func (s *Store) SaveEntity(e *entity.Entity) error {
 		"location":   e.Location,
 		"faction":    e.Faction,
 		"appearance": e.Appearance,
+		"aliases":    e.Aliases,
 		"history":    e.History,
 		"extra":      e.ExtraMeta,
 	}
@@ -126,6 +127,13 @@ func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 		if port, ok := meta["portrait"].(string); ok {
 			ent.Portrait = port
 		}
+		if aliases, ok := meta["aliases"].([]interface{}); ok {
+			for _, value := range aliases {
+				if alias, ok := value.(string); ok {
+					ent.Aliases = append(ent.Aliases, alias)
+				}
+			}
+		}
 		if history, ok := meta["history"].([]interface{}); ok {
 			for _, value := range history {
 				if number, ok := value.(float64); ok {
@@ -184,6 +192,7 @@ type EntitySummary struct {
 	Type     string
 	Location string
 	Tags     []string
+	Aliases  []string
 }
 
 // ListEntities returns every indexed entity ordered by entity ID.
@@ -205,10 +214,12 @@ func (s *Store) ListEntities() ([]EntitySummary, error) {
 		var meta struct {
 			Location string   `json:"location"`
 			Tags     []string `json:"tags"`
+			Aliases  []string `json:"aliases"`
 		}
 		if err := json.Unmarshal([]byte(fmJSON), &meta); err == nil {
 			summary.Location = meta.Location
 			summary.Tags = meta.Tags
+			summary.Aliases = meta.Aliases
 		}
 
 		summaries = append(summaries, summary)

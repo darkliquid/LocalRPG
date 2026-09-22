@@ -88,3 +88,29 @@ func TestListEntities(t *testing.T) {
 		t.Errorf("expected tags from frontmatter, got %+v", got.Tags)
 	}
 }
+
+func TestListEntitiesCarriesAliases(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if err := store.SaveEntity(&entity.Entity{
+		ID: "guard-kael", Name: "Guard Kael", Type: "character", Body: "A warden.",
+		Aliases: []string{"The Ember Warden"}, Hash: "h1",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	summaries, err := store.ListEntities()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summaries) != 1 {
+		t.Fatalf("expected one summary, got %d", len(summaries))
+	}
+	if len(summaries[0].Aliases) != 1 || summaries[0].Aliases[0] != "The Ember Warden" {
+		t.Errorf("Aliases = %v, want the note's alias", summaries[0].Aliases)
+	}
+}
