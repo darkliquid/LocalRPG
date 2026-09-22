@@ -431,40 +431,16 @@ All defaulted, so existing configuration is unchanged. Every key is also exposed
 
 ## 14. Open Questions
 
-Settled in review, across five rounds:
+Settled in review, across six rounds:
 
 - **Round 1**: summary provider is the extractor; the trace is a single appended file; the chronicle is an entity; cadence includes a location change; the summary is subordinate; continuity checks are on by default, display-only plus a correction; retrieval excludes the player and the location; the summary surrenders last and only past the window.
 - **Round 2**: retrieval ranks by recency-weighted overlap; the chronicle is hidden from the graph; summary regeneration is detached and never used by its triggering turn; addressed findings live in a per-campaign sidecar; corrections feed the summary; the untrimmed prompt is recorded when trimming occurs; raw provider lines are recorded alongside parsed chunks; trace rotation is 256 MiB across 3 files and `--trace` means `full`.
 - **Round 3**: findings are dismissed individually, never by muting a rule, in `games/<id>/findings.json`; wire lines get a separate collapsible panel while the file keeps everything; only `chronicle` is filtered from the graph; recency uses a half-life defaulting to 12 turns; one pending summary regeneration rather than a queue, and a run in flight is never restarted.
 - **Round 4**: arc status is a closed set written by the extractor; `last_advanced` is derived from mentions; open threads are always in the prompt and the idle threshold is presentation-only; `/recap` regenerates when stale and summaries stay out of exports; cadence is 10 from the opening turn inclusive; all five continuity rules stay, with "unknown entity" scoped to claim-stating constructions.
 - **Round 5**: `## ESTABLISHED NAMES` covers names in play only, and stays small by widening recall rather than growing; delivered as two plans, trace first; the Debug view is a Settings tab; `/recap` is an engine command.
+- **Round 6**: agentic turns get their own spec and land after trace and canon; tools complement pre-injection rather than replace it; function calling is declared per provider; FTS5 and graph tools come before embeddings; bounds are four tool rounds, 4000 characters per result, and the turn budget.
 
-### Agentic turns (raised after round 5)
-
-A turn may need more than one model call. The GM should be able to call internal tools mid-turn: search for a reference, look up an entity, walk the graph, query the timeline, and eventually perform vector retrieval, in order to build a coherent reply rather than being handed everything up front.
-
-This is a new branch on the tree and changes the turn pipeline and the provider contract, so it is **not** folded into the increments above. `pkg/harness` today has no notion of tools at all:
-
-```go
-type ModelProvider interface {
-	ID() string
-	Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error)
-	Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error
-}
-type GenerateRequest struct{ Prompt, System string; Temperature float64; MaxTokens int; Extra map[string]interface{} }
-type StreamChunk struct{ Text string; Done bool; FinishReason string; Error error }
-```
-
-There is a single `Prompt` field, so a tool round cannot be represented, and no way to return a tool call. The index has **no full-text search** (`no FTS5, no MATCH, no LIKE`) and the codebase has **no embeddings** of any kind, so the retrieval the request implies does not exist yet either.
-
-Round six puts the shape questions to review before this becomes its own spec:
-
-1. **Where it lives.** A separate spec, or a section added here.
-2. **Sequencing.** Before or after the coherence increments.
-3. **Recall and tools.** Does the pre-injected context stay, or do tools replace it.
-4. **Tool availability.** Function calling where supported and something else where not, or tools only for capable providers.
-5. **Retrieval stack.** Lexical and graph tools first, embeddings later, or embeddings from the start.
-6. **Bounds.** Tool rounds per turn, tool result size, and the ceiling on a turn's whole conversation.
+The coherence spec's own frontier is now empty. The agentic branch continues in its own document.
 
 ## 15. File Map
 
