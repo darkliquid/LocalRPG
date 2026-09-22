@@ -7,6 +7,9 @@ interface ChronicleViewProps {
   onWikilinkClick: (entityId: string) => void;
   autoPlay?: boolean;
   volume?: number;
+  serverPlayback?: boolean;
+  onPlayTurnAudio?: (turnNumber: number, segmentIndex?: number) => void;
+  onStopAudio?: () => void;
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
@@ -14,6 +17,9 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   onWikilinkClick,
   autoPlay = false,
   volume = 1,
+  serverPlayback = false,
+  onPlayTurnAudio,
+  onStopAudio,
 }) => {
   // Art is per scene, not per turn: it is shown when the party arrives somewhere
   // new and reused while they stay.
@@ -78,6 +84,9 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               // start them all at once on load.
               autoPlay={autoPlay && index === beats.length - 1}
               volume={volume}
+              serverPlayback={serverPlayback}
+              onPlayTurn={onPlayTurnAudio ? (segmentIndex) => onPlayTurnAudio(turn.turn_number, segmentIndex) : undefined}
+              onStopTurn={onStopAudio}
             />
 
             {turn.truncated && (

@@ -61,6 +61,27 @@ export class APIClient {
     return res.json();
   }
 
+  static async audioStatus(): Promise<{ available: boolean; playing: boolean }> {
+    const res = await fetch('/api/audio/status');
+    if (!res.ok) throw new Error(`audioStatus: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async stopAudio(): Promise<void> {
+    const res = await fetch('/api/audio/stop', { method: 'POST' });
+    if (!res.ok) throw new Error(`stopAudio: ${res.statusText}`);
+  }
+
+  static async playTurnAudio(gameID: string, turnNumber: number): Promise<void> {
+    const res = await fetch(`/api/game/${gameID}/turn/${turnNumber}/play`, { method: 'POST' });
+    if (!res.ok) throw new Error(`playTurnAudio: ${res.statusText}`);
+  }
+
+  static async playSegmentAudio(gameID: string, turnNumber: number, segmentIndex: number): Promise<void> {
+    const res = await fetch(`/api/game/${gameID}/turn/${turnNumber}/segment/${segmentIndex}/play`, { method: 'POST' });
+    if (!res.ok) throw new Error(`playSegmentAudio: ${res.statusText}`);
+  }
+
   static async updateGameSettings(gameID: string, patch: { opening_prompt?: string }): Promise<void> {
     const res = await fetch(`/api/game/${gameID}/settings`, {
       method: 'PATCH',

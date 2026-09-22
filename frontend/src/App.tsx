@@ -33,6 +33,10 @@ export const App: React.FC = () => {
   const [config, setConfig] = useState<AppConfig | null>(null);
 
   // Active drawer tab: null, 'character', 'graph', 'codex', 'world'
+  // The application plays audio itself when it can, which is the only way to
+  // narrate a turn without a browser autoplay gesture.
+  const [serverAudio, setServerAudio] = useState(false);
+
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -41,6 +45,9 @@ export const App: React.FC = () => {
     APIClient.getSettings()
       .then((res) => setConfig(res.config))
       .catch(console.error);
+    APIClient.audioStatus()
+      .then((status) => setServerAudio(status.available))
+      .catch(() => setServerAudio(false));
   }, []);
 
   useEffect(() => {
@@ -140,6 +147,19 @@ export const App: React.FC = () => {
 
   const handleBeginWithAction = () => {
     document.getElementById('action-console-input')?.focus();
+  };
+
+  const handlePlayTurnAudio = (turnNumber: number, segmentIndex?: number) => {
+    if (!activeGameID) return;
+    if (segmentIndex === undefined) {
+      APIClient.playTurnAudio(activeGameID, turnNumber).catch(console.error);
+    } else {
+      APIClient.playSegmentAudio(activeGameID, turnNumber, segmentIndex).catch(console.error);
+    }
+  };
+
+  const handleStopAudio = () => {
+    APIClient.stopAudio().catch(console.error);
   };
 
   const handleSaveEntity = async (entityId: string, markdown: string) => {
@@ -287,8 +307,13 @@ export const App: React.FC = () => {
                   <ChronicleView
                     turns={chronicle}
                     onWikilinkClick={handleOpenWikilink}
-                    autoPlay={config?.media.tts.auto_play ?? false}
+                    // With application playback the browser must stay silent, so
+                    // it never competes with the narrator or hits autoplay limits.
+                    autoPlay={serverAudio ? false : config?.media.tts.auto_play ?? false}
                     volume={config?.media.tts.master_volume ?? 1}
+                    serverPlayback={serverAudio}
+                    onPlayTurnAudio={handlePlayTurnAudio}
+                    onStopAudio={handleStopAudio}
                   />
                   {streamedProse && (
                     <div className="p-4 border-t border-white/5 bg-black/20">
@@ -361,7 +386,7 @@ export const App: React.FC = () => {
             turns={chronicle}
             isOpen={isTheaterOpen}
             onClose={() => setIsTheaterOpen(false)}
-            autoPlay={config?.media.tts.auto_play ?? false}
+            autoPlay={serverAudio ? false : config?.media.tts.auto_play ?? false}
             volume={config?.media.tts.master_volume ?? 1}
           />
         </>

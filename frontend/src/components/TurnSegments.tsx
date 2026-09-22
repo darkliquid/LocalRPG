@@ -10,6 +10,11 @@ interface TurnSegmentsProps {
   onEntityClick?: (entityId: string) => void;
   autoPlay?: boolean;
   volume?: number;
+  // When set, playback is the application's job: the browser never starts audio,
+  // so nothing depends on an autoplay gesture.
+  serverPlayback?: boolean;
+  onPlayTurn?: (segmentIndex?: number) => void;
+  onStopTurn?: () => void;
 }
 
 export const TurnSegments: React.FC<TurnSegmentsProps> = ({
@@ -18,10 +23,20 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   onEntityClick,
   autoPlay = false,
   volume = 1,
+  serverPlayback = false,
+  onPlayTurn,
+  onStopTurn,
 }) => {
   const ordered = segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: fallback }];
   const hasAudio = (segments ?? []).some((segment) => !!segment.audio_url);
-  const { playing, blocked, play, playFrom, stop } = useSegmentPlayback(segments, autoPlay && hasAudio, volume);
+  const { playing, blocked, play, playFrom, stop } = useSegmentPlayback(
+    segments,
+    autoPlay && hasAudio && !serverPlayback,
+    volume
+  );
+
+  const startServerPlayback = (segmentIndex?: number) => onPlayTurn?.(segmentIndex);
+  const stopServerPlayback = () => onStopTurn?.();
 
   return (
     <div className="space-y-3">
@@ -31,9 +46,9 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             key={i}
             className="bg-glass-card border-l-4 border-amber-500/90 pl-4 py-3 pr-4 rounded-r-xl shadow-lg space-y-2"
           >
-            {segment.audio_url ? (
+            {hasAudio ? (
               <button
-                onClick={() => playFrom(i)}
+                onClick={() => (serverPlayback ? startServerPlayback(i) : playFrom(i))}
                 className="text-xs text-amber-400 font-cinzel font-bold tracking-widest hover:text-amber-300 cursor-pointer"
               >
                 {segment.speaker || 'UNKNOWN'}
@@ -58,7 +73,25 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
           />
         )
       )}
-      {hasAudio && (
+      {hasAudio && serverPlayback && (
+        <div className="flex items-center gap-2 text-xs">
+          <button
+            onClick={() => startServerPlayback()}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900/70 border border-stone-700 text-stone-300 hover:text-amber-300 hover:border-amber-500/40 cursor-pointer transition-colors"
+          >
+            <Play className="w-3 h-3" />
+            <span>Play turn</span>
+          </button>
+          <button
+            onClick={stopServerPlayback}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900/70 border border-stone-700 text-stone-300 hover:text-red-300 hover:border-red-500/40 cursor-pointer transition-colors"
+          >
+            <Square className="w-3 h-3" />
+            <span>Stop</span>
+          </button>
+        </div>
+      )}
+      {hasAudio && !serverPlayback && (
         <div className="flex items-center gap-2 text-xs">
           {blocked && !playing ? (
             <>

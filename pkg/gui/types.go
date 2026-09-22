@@ -243,6 +243,14 @@ func (r *TurnRequest) validate() error {
 	return nil
 }
 
+// AudioStatusDTO reports whether the application can play audio itself and
+// whether narration is currently running. A client uses it to choose between
+// application playback and a browser audio element.
+type AudioStatusDTO struct {
+	Available bool `json:"available"`
+	Playing   bool `json:"playing"`
+}
+
 // STTResponse is the transcription result returned from POST /api/stt.
 type STTResponse struct {
 	Text string `json:"text"`

@@ -20,6 +20,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/media/playback"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -33,6 +34,11 @@ type Service struct {
 	configMgr *config.ConfigManager
 	indexed   map[string]bool
 	locks     map[string]*sync.Mutex
+	// Audio playback belongs to the process so narration never depends on a
+	// browser's autoplay policy. It is opened once, on first use, because most
+	// requests never need it.
+	playerOnce sync.Once
+	player     *playback.Player
 }
 
 func NewService(rootDir string) *Service {
@@ -561,7 +567,19 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	}
 
 	dto := t.service.turnDTO(*turn, t.store, t.cfg, t.gameID)
-	return emit(TurnEvent{Type: "turn", Turn: &dto})
+	if err := emit(TurnEvent{Type: "turn", Turn: &dto}); err != nil {
+		return err
+	}
+
+	// Narration is the application's own responsibility, detached from the
+	// request: the turn is already recorded, and a slow synthesis must not hold
+	// the stream open.
+	if t.cfg.Media.TTS.AutoPlay {
+		go func() {
+			_ = t.service.PlayTurnAudio(context.Background(), t.gameID, turn.Number)
+		}()
+	}
+	return nil
 }
 
 // GetLocationArt returns a location's scene image and its content type, drawing it
@@ -653,6 +671,103 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	return pipeline.SynthesizeSegment(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID))
+}
+
+// audioPlayer opens the process-wide player on first use. A host with no audio
+// device leaves it nil, and callers fall back to client-side playback.
+func (s *Service) audioPlayer() *playback.Player {
+	s.playerOnce.Do(func() {
+		player, err := playback.Open(s.configMgr.Get().Media.TTS.MasterVolume)
+		if err != nil {
+			return
+		}
+		s.player = player
+	})
+	return s.player
+}
+
+// AudioAvailable reports whether this process can play audio itself, which is
+// what decides between application playback and a browser audio element.
+func (s *Service) AudioAvailable() bool {
+	return s.audioPlayer().Available()
+}
+
+// AudioPlaying reports whether a narration queue is running.
+func (s *Service) AudioPlaying() bool {
+	player := s.audioPlayer()
+	if player == nil {
+		return false
+	}
+	return player.Playing()
+}
+
+// StopAudio cancels the current narration queue.
+func (s *Service) StopAudio() {
+	if player := s.audioPlayer(); player != nil {
+		player.Stop()
+	}
+}
+
+// findTurn reads one turn from the canonical log.
+func (s *Service) findTurn(gameID string, turnNumber int) (*engine.Turn, error) {
+	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
+	turns, err := engine.NewHistoryLogger(historyPath).LoadHistory()
+	if err != nil {
+		return nil, fmt.Errorf("load history: %w", err)
+	}
+	for i := range turns {
+		if turns[i].Number == turnNumber {
+			return &turns[i], nil
+		}
+	}
+	return nil, fmt.Errorf("turn %d not found", turnNumber)
+}
+
+// PlayTurnAudio synthesizes any beat the turn has not already cached and plays
+// the whole turn in order. Clips are content-addressed, so a replay is instant.
+func (s *Service) PlayTurnAudio(ctx context.Context, gameID string, turnNumber int) error {
+	player := s.audioPlayer()
+	if player == nil || !player.Available() {
+		return playback.ErrUnavailable
+	}
+
+	turn, err := s.findTurn(gameID, turnNumber)
+	if err != nil {
+		return err
+	}
+
+	paths := make([]string, 0, len(turn.Segments))
+	for i := range turn.Segments {
+		path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, i)
+		if err != nil {
+			// A beat that cannot be synthesized is skipped so one failure does
+			// not silence the rest of the turn.
+			continue
+		}
+		paths = append(paths, path)
+	}
+	if len(paths) == 0 {
+		return scene.ErrAudioUnavailable
+	}
+
+	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
+	return player.PlayFiles(paths)
+}
+
+// PlaySegmentAudio plays one beat, which is what a speaker chip triggers.
+func (s *Service) PlaySegmentAudio(ctx context.Context, gameID string, turnNumber, segmentIndex int) error {
+	player := s.audioPlayer()
+	if player == nil || !player.Available() {
+		return playback.ErrUnavailable
+	}
+
+	path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, segmentIndex)
+	if err != nil {
+		return err
+	}
+
+	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
+	return player.PlayFiles([]string{path})
 }
 
 // voiceFor resolves a speaker entity's configured voice, if it has one.

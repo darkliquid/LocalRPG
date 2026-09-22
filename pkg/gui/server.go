@@ -40,6 +40,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/world/", s.handleWorldRoutes)
 	s.mux.HandleFunc("/api/settings", s.handleSettingsRoutes)
 	s.mux.HandleFunc("/api/settings/test-provider", s.handleTestProviderRoute)
+	s.mux.HandleFunc("/api/audio/", s.handleAudioRoutes)
 	s.mux.HandleFunc("/api/stt", s.handleSTTRoute)
 	if s.assetServer != nil {
 		s.mux.Handle("/", s.assetServer)
@@ -151,6 +152,42 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		// hang off a turn, so they share this case.
 		if r.Method == http.MethodPost && len(parts) == 2 {
 			s.handleTurnSubmit(w, r, gameID)
+			return
+		}
+
+		// POST /api/game/{id}/turn/{n}/play plays the whole turn through the
+		// application's audio device.
+		if r.Method == http.MethodPost && len(parts) == 4 && parts[3] == "play" {
+			turnNumber, err := strconv.Atoi(parts[2])
+			if err != nil {
+				http.Error(w, "invalid turn number", http.StatusBadRequest)
+				return
+			}
+			if err := s.service.PlayTurnAudio(r.Context(), gameID, turnNumber); err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		// POST /api/game/{id}/turn/{n}/segment/{i}/play plays one beat.
+		if r.Method == http.MethodPost && len(parts) == 6 && parts[3] == "segment" && parts[5] == "play" {
+			turnNumber, err := strconv.Atoi(parts[2])
+			if err != nil {
+				http.Error(w, "invalid turn number", http.StatusBadRequest)
+				return
+			}
+			segmentIndex, err := strconv.Atoi(parts[4])
+			if err != nil {
+				http.Error(w, "invalid segment index", http.StatusBadRequest)
+				return
+			}
+			if err := s.service.PlaySegmentAudio(r.Context(), gameID, turnNumber, segmentIndex); err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 
@@ -565,6 +602,35 @@ func (s *Server) handleSTTRoute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, STTResponse{Text: text})
+}
+
+// handleAudioRoutes reports and controls application-side playback. It is what
+// lets a client stop depending on a browser's autoplay policy.
+func (s *Server) handleAudioRoutes(w http.ResponseWriter, r *http.Request) {
+	action := strings.TrimPrefix(r.URL.Path, "/api/audio/")
+
+	switch action {
+	case "status":
+		if r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, AudioStatusDTO{
+			Available: s.service.AudioAvailable(),
+			Playing:   s.service.AudioPlaying(),
+		})
+
+	case "stop":
+		if r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		s.service.StopAudio()
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 // maxTurnBody bounds a player action so a runaway paste cannot allocate without

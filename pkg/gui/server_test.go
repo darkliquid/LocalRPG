@@ -661,3 +661,36 @@ func TestCampaignLifecycleRoutes(t *testing.T) {
 		t.Errorf("delete absent: expected 404, got %d", rec.Code)
 	}
 }
+func TestAudioRoutesReportStatusAndStop(t *testing.T) {
+	_, svc := turnFixture(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/audio/status", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var status AudioStatusDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	if status.Playing {
+		t.Errorf("expected nothing to be playing on a fresh service")
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/audio/stop", nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("stop: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/audio/nonsense", nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("unknown audio action: expected 404, got %d", rec.Code)
+	}
+}
