@@ -532,6 +532,148 @@ func (s *Service) SaveEntity(ctx context.Context, gameID, entityID, rawMarkdown 
 	return syncer.SyncFile(path)
 }
 
+// MergeEntities folds one note into another: the survivor keeps its identity and
+// gains the source's prose, tags, aliases, and turn history, every note that linked
+// to the source is rewritten to point at the survivor, and the source is removed.
+//
+// It is deliberately explicit. Deciding that two names are one being is a judgement
+// the engine cannot make, but it can carry the decision out once a player makes it.
+func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID string) (*EntityDTO, error) {
+	if sourceID == targetID {
+		return nil, fmt.Errorf("cannot merge %q into itself", sourceID)
+	}
+
+	gameDir := s.resolver.GameDir(gameID)
+	sourceData, err := os.ReadFile(filepath.Join(gameDir, "entities", sourceID+".md"))
+	if err != nil {
+		return nil, fmt.Errorf("read source %q: %w", sourceID, err)
+	}
+	targetPath := filepath.Join(gameDir, "entities", targetID+".md")
+	targetData, err := os.ReadFile(targetPath)
+	if err != nil {
+		return nil, fmt.Errorf("read target %q: %w", targetID, err)
+	}
+
+	source, err := entity.ParseMarkdownEntity(sourceData)
+	if err != nil {
+		return nil, fmt.Errorf("parse source %q: %w", sourceID, err)
+	}
+	target, err := entity.ParseMarkdownEntity(targetData)
+	if err != nil {
+		return nil, fmt.Errorf("parse target %q: %w", targetID, err)
+	}
+
+	// The survivor keeps its name and gains what the source knew.
+	if body := strings.TrimSpace(source.Body); body != "" {
+		target.Body = strings.TrimSpace(target.Body) + "\n\n" + body
+	}
+	target.Aliases = appendUnique(target.Aliases, source.Name)
+	target.Aliases = appendUnique(target.Aliases, source.Aliases...)
+	target.Tags = appendUnique(target.Tags, source.Tags...)
+	for _, number := range source.History {
+		already := false
+		for _, known := range target.History {
+			if known == number {
+				already = true
+				break
+			}
+		}
+		if !already {
+			target.History = append(target.History, number)
+		}
+	}
+
+	merged, err := target.SerializeMarkdown()
+	if err != nil {
+		return nil, fmt.Errorf("serialize merged note: %w", err)
+	}
+
+	// Write the survivor first: a failure after this point leaves both notes rather
+	// than losing the source's content.
+	if err := os.WriteFile(targetPath, merged, 0644); err != nil {
+		return nil, fmt.Errorf("write merged note: %w", err)
+	}
+
+	if err := s.rewriteInboundLinks(gameDir, sourceID, targetID); err != nil {
+		return nil, err
+	}
+
+	if err := os.Remove(filepath.Join(gameDir, "entities", sourceID+".md")); err != nil {
+		return nil, fmt.Errorf("remove source note: %w", err)
+	}
+
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, fmt.Errorf("open store: %w", err)
+	}
+	if err := store.DeleteEntity(sourceID); err != nil {
+		return nil, fmt.Errorf("remove source from the index: %w", err)
+	}
+
+	syncer := storage.NewSyncer(store)
+	for _, id := range []string{targetID, sourceID} {
+		_ = syncer.SyncFile(filepath.Join(gameDir, "entities", id+".md"))
+	}
+
+	return s.GetEntity(ctx, gameID, targetID)
+}
+
+// rewriteInboundLinks points every note that linked to the source at the survivor,
+// so no note is left pointing at an entity that no longer exists.
+func (s *Service) rewriteInboundLinks(gameDir, sourceID, targetID string) error {
+	entitiesDir := filepath.Join(gameDir, "entities")
+	entries, err := os.ReadDir(entitiesDir)
+	if err != nil {
+		return fmt.Errorf("read entities dir: %w", err)
+	}
+
+	pattern := regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(sourceID) + `(\s*\|[^\]]*)?\]\]`)
+	replacement := "[[" + targetID + "$1]]"
+
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".md") || strings.TrimSuffix(entry.Name(), ".md") == sourceID {
+			continue
+		}
+
+		path := filepath.Join(entitiesDir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		if !pattern.Match(data) {
+			continue
+		}
+
+		updated := pattern.ReplaceAll(data, []byte(replacement))
+		if err := os.WriteFile(path, updated, 0644); err != nil {
+			return fmt.Errorf("rewrite links in %s: %w", entry.Name(), err)
+		}
+	}
+	return nil
+}
+
+// appendUnique adds values that are not already present, preserving order.
+func appendUnique(existing []string, values ...string) []string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+
+		found := false
+		for _, candidate := range existing {
+			if strings.EqualFold(candidate, trimmed) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			existing = append(existing, trimmed)
+		}
+	}
+	return existing
+}
+
 func (s *Service) GetGraph(ctx context.Context, gameID string) (*GraphDTO, error) {
 	gameDir := s.resolver.GameDir(gameID)
 	entitiesDir := filepath.Join(gameDir, "entities")

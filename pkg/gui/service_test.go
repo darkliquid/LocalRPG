@@ -716,3 +716,47 @@ func TestRecapIsDisabledWhenSummariesAreOff(t *testing.T) {
 		t.Errorf("expected no summary, got %q", recap.Summary)
 	}
 }
+
+func TestMergeFoldsANoteIntoAnother(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	// A duplicate: the same being under the name the model invented for him.
+	if err := svc.SaveEntity(context.Background(), gameID, "the-ember-warden",
+		"---\nid: the-ember-warden\nname: The Ember Warden\ntype: character\ntags: [warden]\naliases: [Kael]\n---\nStands vigil by the brazier.\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Another note links to the duplicate, so the merge has a link to rewrite.
+	captain := "---\nid: captain-kaelen\nname: Captain Kaelen\ntype: npc\n---\nReports to [[the-ember-warden]] each dawn.\n"
+	if err := svc.SaveEntity(context.Background(), gameID, "captain-kaelen", captain); err != nil {
+		t.Fatal(err)
+	}
+
+	merged, err := svc.MergeEntities(context.Background(), gameID, "the-ember-warden", "captain-kaelen")
+	if err != nil {
+		t.Fatalf("MergeEntities failed: %v", err)
+	}
+	if merged.ID != "captain-kaelen" {
+		t.Errorf("merged into %q, want captain-kaelen", merged.ID)
+	}
+	if !strings.Contains(merged.Markdown, "Stands vigil by the brazier.") {
+		t.Errorf("expected the source body folded in:\n%s", merged.Markdown)
+	}
+	if !strings.Contains(merged.Markdown, "Kael") {
+		t.Errorf("expected the source aliases folded in:\n%s", merged.Markdown)
+	}
+
+	// The source note is gone, from disk and from the index.
+	if _, err := svc.GetEntity(context.Background(), gameID, "the-ember-warden"); err == nil {
+		t.Errorf("expected the source note to be removed")
+	}
+
+	// Inbound links now point at the survivor rather than at a note that is gone.
+	note, err := svc.GetEntity(context.Background(), gameID, "captain-kaelen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(note.Markdown, "[[the-ember-warden]]") {
+		t.Errorf("expected the inbound link rewritten:\n%s", note.Markdown)
+	}
+}

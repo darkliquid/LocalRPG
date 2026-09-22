@@ -185,6 +185,24 @@ func (s *Store) GetEdgesTo(targetID string) ([]Edge, error) {
 	return edges, nil
 }
 
+// DeleteEntity removes an entity and its edges from the index. The note on disk is
+// the caller's business: the index is derived, and a merge deletes both.
+func (s *Store) DeleteEntity(id string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM edges WHERE source_id = ? OR target_id = ?`, id, id); err != nil {
+		return fmt.Errorf("clear edges: %w", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM entities WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("delete entity: %w", err)
+	}
+	return tx.Commit()
+}
+
 // EntitySummary is a lightweight projection of an indexed entity.
 type EntitySummary struct {
 	ID       string
