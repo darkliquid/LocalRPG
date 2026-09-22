@@ -70,7 +70,7 @@ The second half of this spec is the reason the first half is hard to debug: ther
 | Aliases | `aliases: []` frontmatter, honoured by matching and by the prompt |
 | Merge | An explicit player action that folds one note into another and rewrites inbound links |
 | Continuity check | Deterministic rules only in v1; no extra model call |
-| Trace | Structured JSONL to the cache dir, off by default, with levels; file is the source of truth |
+| Trace | Structured JSONL in a **single appended file** in the cache dir, off by default, with levels; the file is the source of truth |
 | Trace levels | `off`, `summary` (decisions and sizes), `full` (payloads and per-chunk detail) |
 | Redaction | A deny-list of field names; secrets are never written, at any level |
 | Trace UI | A Debug drawer reading the file, polled while a turn is in flight; no new streaming protocol |
@@ -151,7 +151,7 @@ Stored as a normal note, so it is readable, editable, and exportable: `games/<id
 
 - **Regeneration trigger**: `turnNum - through_turn >= agents.summary_every` (default 10).
 - **Input**: the previous summary body plus the turns `through_turn+1..turnNum`.
-- **Provider**: the extractor role, because it is already configured, already cheap, and already reads turns. It falls back to `gm` through the existing `inherit` mechanism.
+- **Provider**: the **extractor** role (settled). It is already configured, already cheap, and already reads turns. It falls back to `gm` through the existing `inherit` mechanism, and setting `agents.roles.extractor: disabled` disables summaries along with extraction.
 - **Instruction**: preserve names, places, promises, unresolved threads, and state changes; drop verbatim dialogue; never invent.
 - **Injection**: `## STORY SO FAR`, capped at `agents.summary_char_limit` (default 2000 characters).
 - **Failure policy**: a failed summarisation never loses a turn. The note is left alone, `through_turn` is not advanced, and the turn proceeds. The next trigger retries.
@@ -289,9 +289,19 @@ Config: `preferences.trace_level`. A CLI flag `--trace <level>` overrides it for
 
 ### 9.3 Sinks
 
-1. **File** (canonical): `<cache>/trace/<game>-<yyyymmdd-hhmmss>.jsonl`, mode `0600`, one JSON object per line. Written through a buffered writer flushed per event so a crash keeps what was seen.
+1. **File** (canonical): `<cache>/trace/trace.jsonl`, mode `0600`, one JSON object per line, appended across sessions so `tail -f` works without hunting timestamps. Every line carries its own identity, because the file is no longer per-session:
+
+```json
+{"ts":"2026-09-22T09:14:03.221Z","event":"context.assembled","run":"9f3c1a","game":"test-campaign","level":"full","tokens":2610,"budget":0,"sections":[…]}
+```
+
+   `run` is a per-process identifier, so one process's events can be separated without a second file. A buffered writer is flushed per event, so a crash keeps what was seen.
 2. **stderr** when `--trace` is passed to a CLI command.
 3. **GUI** reads the file; nothing is streamed over the turn protocol.
+
+Rotation: when the file passes `agents.trace_max_bytes`, it is renamed to `trace.jsonl.1` (shifting older files), and the newest `agents.trace_max_files` are kept. Rotation is checked on open and every `agents.trace_rotate_check` events, not on every write, so the hot path stays a buffer append. An appended file has no natural age, so size is the only honest bound.
+
+At `full`, the assembled prompt is recorded **once**, on `context.assembled`. `provider.request` carries its hash and length rather than a second copy, which is roughly half the per-turn cost.
 
 A single `trace.Logger` interface is passed down explicitly rather than reached for globally:
 
@@ -317,7 +327,7 @@ Providers, the assembler, the orchestrator, the timeline, and the media clients 
 
 - A deny-list of field names (`api_key`, `authorization`, `token`, `secret`, `password`) is replaced with `[redacted]` before writing, at every level. The HTTP provider logs `auth_set: true`, never the header value.
 - Prompts and generated prose **are** captured at `full`, because that is the point. They are the player's own story, they stay in the local cache directory, and the file is `0600`.
-- Retention: keep the newest `agents.trace_max_files` (default 20) files or `agents.trace_max_age_days` (default 14), whichever is smaller.
+- Retention: rotate at `agents.trace_max_bytes` (default 8 MiB, about 320 turns at `full`) and keep `agents.trace_max_files` (default 3), so the ceiling is 24 MiB.
 - A per-event payload cap (`agents.trace_payload_chars`, default 20000) truncates with a marker, so one runaway prompt cannot fill the disk.
 - Tracing failure is never fatal: a trace that cannot be written is dropped, and the turn continues.
 
@@ -326,7 +336,7 @@ Providers, the assembler, the orchestrator, the timeline, and the media clients 
 | Method | Path | Result |
 | --- | --- | --- |
 | `GET` | `/api/trace` | `?limit=N&game=id&level=` recent events, newest last |
-| `DELETE` | `/api/trace` | clears the trace files for a campaign |
+| `DELETE` | `/api/trace` | clears the trace, optionally filtered to one campaign by rewrite |
 | `GET` | `/api/game/{id}/recap` | story so far and open threads |
 
 A **Debug** drawer shows the most recent turn's events as a timeline: context sections and their token cost, the prompt (collapsible, copyable), the provider request and timings, the raw generation next to the parsed segments, the extraction result, continuity findings, and media calls. It polls `/api/trace` once a second while a turn is in flight and otherwise reads on open.
@@ -362,8 +372,9 @@ Settings Studio gains, under Preferences: trace level, payload cap, and retentio
 | `agents.continuity_checks` | `true` | Run the deterministic checks |
 | `preferences.trace_level` | `off` | `off`, `summary`, or `full` |
 | `agents.trace_payload_chars` | 20000 | Per-event payload cap |
-| `agents.trace_max_files` | 20 | Trace files retained |
-| `agents.trace_max_age_days` | 14 | Trace age retained |
+| `agents.trace_max_bytes` | 8388608 | Rotate the trace at this size |
+| `agents.trace_max_files` | 3 | Rotated trace files retained |
+| `agents.trace_rotate_check` | 200 | Events between rotation checks |
 
 All defaulted, so existing configuration is unchanged. Every key is also exposed in the Settings Studio.
 
@@ -389,12 +400,16 @@ All defaulted, so existing configuration is unchanged. Every key is also exposed
 
 ## 14. Open Questions
 
-1. **Summary ownership.** The extractor role is proposed because it is already configured and cheap. Should it instead be `gm`, or its own configurable role (`agents.roles.summariser`)?
+Settled in review: the summary is written by the **extractor** role, and the trace is a **single appended file**. The remainder are still open; several were put to the reviewer as a grilling round and their outcomes are recorded here as they land.
+
+1. **Summary note shape.** `chronicle.md` as a normal entity, or a file outside `entities/`? It affects whether the chronicle appears in the Codex and graph.
 2. **Cadence.** Default 10 turns. Should it also trigger on location change or an idle thread?
-3. **Continuity cadence.** Deterministic checks every turn are cheap; should findings also be offered as one-click `/gm` corrections, or only displayed?
-4. **Trace retention.** Files or size, and should a single `trace.jsonl` be appended instead so `tail -f` works without hunting timestamps?
-5. **Export.** Should a rendered story bundle carry its provenance trace? Proposal: no, keep exports clean.
+3. **Summary authority.** Is the summary advisory context, or stated as authoritative fact? A summary that contradicts a note is a second source of truth.
+4. **Continuity findings.** Display-only, or offered as one-click `/gm` corrections? And are the checks on by default?
+5. **Retrieval query set.** Current location, recent speakers, and recent mentions are proposed. Is that the right set of "entities in play"?
 6. **Retrieval ranking.** Overlap count then recency is proposed. Is recency-weighted overlap worth the complexity?
+7. **Budget priority.** Is the compressed summary really the last section to surrender, given it is lossy?
+8. **Export.** Should a rendered story bundle carry its provenance trace? Proposal: no, keep exports clean.
 
 ## 15. File Map
 
