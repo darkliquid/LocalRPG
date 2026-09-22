@@ -6,9 +6,9 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/glamour v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
-	github.com/darkliquid/mago v0.2.0
 	github.com/darkliquid/roll v0.0.0-20260807212350-599376e6fde8
 	github.com/dop251/goja v0.0.0-20260917113740-793a2a65c13b
+	github.com/ebitengine/oto/v3 v3.1.0
 	github.com/gopxl/beep v1.4.1
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/wailsapp/wails/v3 v3.0.0-beta.24

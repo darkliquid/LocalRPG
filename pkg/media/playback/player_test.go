@@ -7,11 +7,11 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/trace"
-	"github.com/darkliquid/mago"
 )
 
 // writeToneWAV lays down a mono 16-bit WAV, which is the shape the decoder reads.
@@ -62,23 +62,46 @@ func wrapPCMAsWAV(pcm []byte, channels, sampleRate, bitsPerSample int) []byte {
 	return buf.Bytes()
 }
 
-func nullBackendPlayer(t *testing.T) *Player {
+var (
+	testPlayerInitOnce sync.Once
+	testPlayerInstance *Player
+	testPlayerErr      error
+)
+
+func getTestPlayer(t *testing.T) *Player {
 	t.Helper()
 
-	player, err := OpenWithBackends(0.5, []mago.Backend{mago.BackendNull})
-	if err != nil {
-		t.Fatalf("open player: %v", err)
+	testPlayerInitOnce.Do(func() {
+		testPlayerInstance, testPlayerErr = Open(0.5)
+	})
+
+	if testPlayerErr != nil {
+		if errors.Is(testPlayerErr, ErrUnavailable) {
+			t.Skip("audio hardware unavailable on host; skipping device test")
+		}
+		t.Fatalf("open player: %v", testPlayerErr)
 	}
-	t.Cleanup(func() { _ = player.Close() })
-	return player
+
+	testPlayerInstance.Stop()
+	testPlayerInstance.SetVolume(0.5)
+	return testPlayerInstance
 }
 
-func TestPlayerPlaysAQueueOnTheNullBackend(t *testing.T) {
-	player := nullBackendPlayer(t)
+func TestPlayerWithoutADeviceReportsUnavailable(t *testing.T) {
+	player := &Player{}
+
+	if player.Available() {
+		t.Errorf("expected a bare player to be unavailable")
+	}
+	if err := player.PlayFiles(nil); !errors.Is(err, ErrUnavailable) {
+		t.Errorf("expected ErrUnavailable, got %v", err)
+	}
+}
+
+func TestPlayerPlaysAQueue(t *testing.T) {
+	player := getTestPlayer(t)
 
 	dir := t.TempDir()
-	// Two clips at different rates, so the queue exercises resampling too. Kokoro
-	// narrates at 24 kHz while the device runs at 48 kHz.
 	first := writeToneWAV(t, dir, "first.wav", deviceSampleRate, 40*time.Millisecond)
 	second := writeToneWAV(t, dir, "second.wav", 24000, 40*time.Millisecond)
 
@@ -89,7 +112,7 @@ func TestPlayerPlaysAQueueOnTheNullBackend(t *testing.T) {
 		t.Fatalf("expected playback to be reported as running")
 	}
 
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for player.Playing() && time.Now().Before(deadline) {
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -99,7 +122,7 @@ func TestPlayerPlaysAQueueOnTheNullBackend(t *testing.T) {
 }
 
 func TestPlayerStopEndsTheQueueEarly(t *testing.T) {
-	player := nullBackendPlayer(t)
+	player := getTestPlayer(t)
 
 	path := writeToneWAV(t, t.TempDir(), "long.wav", deviceSampleRate, 5*time.Second)
 	if err := player.PlayFiles([]string{path}); err != nil {
@@ -114,7 +137,7 @@ func TestPlayerStopEndsTheQueueEarly(t *testing.T) {
 }
 
 func TestPlayFilesSkipsUndecodableClips(t *testing.T) {
-	player := nullBackendPlayer(t)
+	player := getTestPlayer(t)
 
 	dir := t.TempDir()
 	junk := filepath.Join(dir, "junk.bin")
@@ -128,7 +151,7 @@ func TestPlayFilesSkipsUndecodableClips(t *testing.T) {
 }
 
 func TestPlayFilesPlaysTheGoodClipsWhenOneIsBad(t *testing.T) {
-	player := nullBackendPlayer(t)
+	player := getTestPlayer(t)
 
 	dir := t.TempDir()
 	good := writeToneWAV(t, dir, "good.wav", deviceSampleRate, 30*time.Millisecond)
@@ -141,7 +164,7 @@ func TestPlayFilesPlaysTheGoodClipsWhenOneIsBad(t *testing.T) {
 		t.Fatalf("expected the playable clip to be queued: %v", err)
 	}
 
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for player.Playing() && time.Now().Before(deadline) {
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -150,23 +173,8 @@ func TestPlayFilesPlaysTheGoodClipsWhenOneIsBad(t *testing.T) {
 	}
 }
 
-func TestPlayerWithoutADeviceReportsUnavailable(t *testing.T) {
-	player := &Player{}
-
-	if player.Available() {
-		t.Errorf("expected a bare player to be unavailable")
-	}
-	if err := player.PlayFiles(nil); !errors.Is(err, ErrUnavailable) {
-		t.Errorf("expected ErrUnavailable, got %v", err)
-	}
-}
-
 func TestPlayerTracesWhatItPlayed(t *testing.T) {
-	player, err := OpenWithBackends(0.5, []mago.Backend{mago.BackendNull})
-	if err != nil {
-		t.Fatalf("open player: %v", err)
-	}
-	defer func() { _ = player.Close() }()
+	player := getTestPlayer(t)
 
 	memory := trace.NewMemory(trace.LevelSummary)
 	player.SetLogger(memory)

@@ -11,15 +11,17 @@
 package playback
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"sync"
-	"unsafe"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/trace"
-	"github.com/darkliquid/mago"
+	"github.com/ebitengine/oto/v3"
 	"github.com/gopxl/beep"
 	beepmp3 "github.com/gopxl/beep/mp3"
 	beepwav "github.com/gopxl/beep/wav"
@@ -37,93 +39,66 @@ const (
 	// at any rate or channel count are resampled and folded into it on the fly.
 	deviceChannels   = 2
 	deviceSampleRate = 48000
-	// periodFrames is the callback block size. Small enough to stay responsive,
-	// large enough that the decoder is not woken excessively.
-	periodFrames = 512
-	// resampleQuality trades CPU for fidelity; 4 is beep's "on-the-fly, good".
-	resampleQuality = 4
+	resampleQuality  = 4
+	bufferDuration   = 100 * time.Millisecond
 )
 
 // Player owns the process-wide audio device and plays one clip queue at a time.
 // A new queue replaces the current one, so a second turn or a manual replay
 // interrupts rather than overlaps.
 type Player struct {
-	lib    *mago.Library
-	ctx    *mago.Context
-	device *mago.Device
+	otoCtx   *oto.Context
+	otoReady chan struct{}
 
-	// mu guards the queue. The audio thread takes it only to read the current
-	// streamer and gain, so swapping a queue never blocks a callback for long.
-	mu       sync.Mutex
-	streamer beep.Streamer
-	closers  []io.Closer
-	playing  bool
-	gain     float64
-	scratch  [][2]float64
-	closeErr error
-	logger   trace.Logger
-	// generation identifies the current queue. Streamer values hold functions
-	// and are not comparable, so a queue is identified by a counter instead.
+	mu         sync.Mutex
+	otoPlayer  *oto.Player
+	streamer   beep.Streamer
+	closers    []io.Closer
+	gain       float64
+	playing    bool
+	logger     trace.Logger
 	generation uint64
+	closed     bool
 }
 
 // Open starts the application's audio device. It returns ErrUnavailable when the
 // host has no audio backend, which is expected on a headless server.
 func Open(volume float64) (*Player, error) {
-	return openWith(volume, nil)
-}
-
-// OpenWithBackends starts the player against an explicit backend list. Tests use
-// the null backend so the queue logic runs without audio hardware.
-func OpenWithBackends(volume float64, backends []mago.Backend) (*Player, error) {
-	if len(backends) == 0 {
-		return nil, ErrUnavailable
-	}
-	return openWith(volume, backends)
-}
-
-func openWith(volume float64, backends []mago.Backend) (*Player, error) {
 	if volume <= 0 {
-		volume = 1
+		volume = 1.0
 	}
 
-	lib, err := mago.Open()
+	readyChan := make(chan struct{})
+	options := &oto.NewContextOptions{
+		SampleRate:   deviceSampleRate,
+		ChannelCount: deviceChannels,
+		Format:       oto.FormatSignedInt16LE,
+		BufferSize:   bufferDuration,
+	}
+
+	otoCtx, ready, err := oto.NewContext(options)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}
 
-	player := &Player{lib: lib, gain: volume}
-
-	config := mago.DefaultPlaybackDeviceConfig()
-	config.Format = mago.FormatF32
-	config.Channels = deviceChannels
-	config.SampleRate = deviceSampleRate
-	config.PeriodSizeInFrames = periodFrames
-	config.DataCallback = player.onData
-
-	var ctx *mago.Context
-	if len(backends) > 0 {
-		ctx, err = lib.NewContext(backends...)
-		if err != nil {
-			_ = lib.Close()
-			return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
-		}
-		player.ctx = ctx
+	p := &Player{
+		otoCtx:   otoCtx,
+		otoReady: readyChan,
+		gain:     volume,
 	}
 
-	device, err := lib.NewPlaybackDevice(ctx, config)
-	if err != nil {
-		_ = player.closeResources()
-		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
-	}
-	player.device = device
+	go func() {
+		<-ready
+		close(readyChan)
+	}()
 
-	if err := device.Start(); err != nil {
-		_ = player.closeResources()
-		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
+	select {
+	case <-readyChan:
+	case <-time.After(2 * time.Second):
+		// Context took too long to become ready
 	}
 
-	return player, nil
+	return p, nil
 }
 
 // SetLogger attaches a trace sink. A nil logger records nothing.
@@ -138,7 +113,7 @@ func (p *Player) SetLogger(logger trace.Logger) {
 
 // Available reports whether a device is open.
 func (p *Player) Available() bool {
-	return p != nil && p.device != nil
+	return p != nil && p.otoCtx != nil && !p.closed
 }
 
 // Playing reports whether a queue is currently running.
@@ -148,7 +123,7 @@ func (p *Player) Playing() bool {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.playing
+	return p.playing && p.otoPlayer != nil && p.otoPlayer.IsPlaying()
 }
 
 // SetVolume sets the gain applied to every clip in the queue.
@@ -162,6 +137,9 @@ func (p *Player) SetVolume(volume float64) {
 		volume = 1
 	}
 	p.gain = volume
+	if p.otoPlayer != nil {
+		p.otoPlayer.SetVolume(p.gain)
+	}
 }
 
 // PlayFiles replaces the current queue with the given clips, which are decoded
@@ -195,11 +173,39 @@ func (p *Player) PlayFiles(paths []string) error {
 	}
 
 	p.mu.Lock()
-	previous := p.closers
+	previousClosers := p.closers
+	if p.otoPlayer != nil {
+		_ = p.otoPlayer.Close()
+		p.otoPlayer = nil
+	}
+
 	p.generation++
+	gen := p.generation
 	p.streamer = queue
 	p.closers = closers
 	p.playing = true
+
+	reader := &streamerReader{
+		streamer: queue,
+		onEOF: func() {
+			p.mu.Lock()
+			if p.generation == gen {
+				p.playing = false
+				activeClosers := p.closers
+				p.closers = nil
+				p.streamer = nil
+				p.mu.Unlock()
+				go closeAll(activeClosers)
+				return
+			}
+			p.mu.Unlock()
+		},
+	}
+
+	otoPlayer := p.otoCtx.NewPlayer(reader)
+	otoPlayer.SetVolume(p.gain)
+	p.otoPlayer = otoPlayer
+
 	logger := trace.OrNil(p.logger)
 	gain := p.gain
 	p.mu.Unlock()
@@ -209,12 +215,13 @@ func (p *Player) PlayFiles(paths []string) error {
 		"volume": gain,
 	})
 
-	go closeAll(previous)
+	go closeAll(previousClosers)
+	otoPlayer.Play()
+
 	return nil
 }
 
-// Stop ends the current queue. The device keeps running and emits silence, which
-// keeps a replay free of the device-open latency.
+// Stop ends the current queue.
 func (p *Player) Stop() {
 	if !p.Available() {
 		return
@@ -226,6 +233,10 @@ func (p *Player) Stop() {
 	p.closers = nil
 	p.streamer = nil
 	p.playing = false
+	if p.otoPlayer != nil {
+		_ = p.otoPlayer.Close()
+		p.otoPlayer = nil
+	}
 	p.mu.Unlock()
 
 	go closeAll(closers)
@@ -239,93 +250,56 @@ func (p *Player) Close() error {
 	p.Stop()
 
 	p.mu.Lock()
-	if p.closeErr != nil {
-		err := p.closeErr
-		p.mu.Unlock()
-		return err
-	}
-	p.closeErr = errors.New("closed")
-	p.mu.Unlock()
-
-	err := p.closeResources()
-	if err == nil {
-		err = nil
-	}
-	return err
+	defer p.mu.Unlock()
+	p.closed = true
+	p.otoCtx = nil
+	return nil
 }
 
-func (p *Player) closeResources() error {
-	var firstErr error
-	if p.device != nil {
-		if err := p.device.Close(); err != nil && firstErr == nil {
-			firstErr = err
-		}
-		p.device = nil
-	}
-	if p.ctx != nil {
-		if err := p.ctx.Close(); err != nil && firstErr == nil {
-			firstErr = err
-		}
-		p.ctx = nil
-	}
-	if p.lib != nil {
-		if err := p.lib.Close(); err != nil && firstErr == nil {
-			firstErr = err
-		}
-		p.lib = nil
-	}
-	return firstErr
+type streamerReader struct {
+	streamer beep.Streamer
+	onEOF    func()
+	buf      [][2]float64
+	calledEOF bool
+	mu       sync.Mutex
 }
 
-// onData is the audio thread. It pulls exactly one block from the current
-// streamer, applies gain, and reports completion, which is what advances a queue
-// without any buffering of its own.
-func (p *Player) onData(device *mago.Device, output unsafe.Pointer, input unsafe.Pointer, frameCount uint32) {
-	frames := int(frameCount)
-	samples := unsafe.Slice((*float32)(output), frames*deviceChannels)
-
-	p.mu.Lock()
-	streamer := p.streamer
-	gain := p.gain
-	playing := p.playing
-	generation := p.generation
-	if !playing || streamer == nil {
-		p.mu.Unlock()
-		for i := range samples {
-			samples[i] = 0
-		}
-		return
+func (sr *streamerReader) Read(p []byte) (int, error) {
+	framesWanted := len(p) / (deviceChannels * 2) // 4 bytes per stereo 16-bit frame
+	if framesWanted == 0 {
+		return 0, nil
 	}
-	if cap(p.scratch) < frames {
-		p.scratch = make([][2]float64, frames)
+
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+
+	if cap(sr.buf) < framesWanted {
+		sr.buf = make([][2]float64, framesWanted)
 	}
-	buf := p.scratch[:frames]
-	p.mu.Unlock()
+	buf := sr.buf[:framesWanted]
 
-	n, ok := streamer.Stream(buf)
-
+	n, ok := sr.streamer.Stream(buf)
 	for i := 0; i < n; i++ {
-		samples[i*2] = float32(buf[i][0] * gain)
-		samples[i*2+1] = float32(buf[i][1] * gain)
-	}
-	for i := n * deviceChannels; i < len(samples); i++ {
-		samples[i] = 0
+		left := math.Max(-1.0, math.Min(1.0, buf[i][0]))
+		right := math.Max(-1.0, math.Min(1.0, buf[i][1]))
+
+		leftInt := int16(left * 32767)
+		rightInt := int16(right * 32767)
+
+		offset := i * 4
+		binary.LittleEndian.PutUint16(p[offset:], uint16(leftInt))
+		binary.LittleEndian.PutUint16(p[offset+2:], uint16(rightInt))
 	}
 
-	if !ok {
-		p.mu.Lock()
-		var closers []io.Closer
-		if p.generation == generation {
-			p.playing = false
-			p.streamer = nil
-			closers = p.closers
-			p.closers = nil
+	if !ok || n == 0 {
+		if !sr.calledEOF && sr.onEOF != nil {
+			sr.calledEOF = true
+			sr.onEOF()
 		}
-		p.mu.Unlock()
-
-		// Closing files must not happen on the mixing thread.
-		go closeAll(closers)
+		return n * 4, io.EOF
 	}
+
+	return n * 4, nil
 }
 
 // decodeFile opens a clip and returns a streamer that decodes it lazily. The
@@ -336,13 +310,14 @@ func decodeFile(path string) (beep.Streamer, io.Closer, error) {
 		return nil, nil, err
 	}
 
-	format, isMP3, err := sniff(file)
+	_, isMP3, err := sniff(file)
 	if err != nil {
 		_ = file.Close()
 		return nil, nil, err
 	}
 
 	var decoded beep.StreamSeekCloser
+	var format beep.Format
 	if isMP3 {
 		decoded, format, err = beepmp3.Decode(file)
 	} else {
