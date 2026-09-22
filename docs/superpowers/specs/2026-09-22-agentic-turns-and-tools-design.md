@@ -55,6 +55,7 @@ Settled across two review rounds.
 | Transcript | In memory for the turn, recorded in the **trace**, never in `history.jsonl` |
 | Tool set | `search_entities`, `get_entity`, `graph_neighbours`, `search_timeline`, all read-only |
 | Tool failure | Returned to the model as an error result it can read and adapt to |
+| Session provenance | `Turn.ToolCalls` records the name and result size of each call; arguments and results stay in the trace |
 | Streaming | A `{"type":"tool"}` event while a call runs |
 | Watchdog | Every tool event resets the idle watchdog, server and client |
 | Index | An FTS5 virtual table over `entities` and `turns`, with triggers, backfilled from the content tables |
@@ -64,6 +65,10 @@ Settled across two review rounds.
 | Tool surface | A permanent ceiling: read-only, internal, four tools, and no write tool at any point |
 | Trace detail | `summary` records name, outcome, size, and duration; arguments and results are `full`, like prompts |
 | Embeddings | Deferred to their own spec, with the `search_semantic` interface fixed now so the model's contract does not change later |
+| FTS queries | Built from the model's words (terms quoted, joined with AND, prefix on the last), with raw `MATCH` available as an explicit parameter |
+| Tokenizer | `porter`, because the corpus is English prose and inflection is the common case |
+| Provenance | A compact `Turn.ToolCalls` record of name and result size, rendered as one quiet line, keeping arguments and results in the trace |
+| A stray final call | Text is kept and calls ignored; no narration still fails the turn as it does today, and the trace records the stray call |
 
 ---
 
@@ -99,6 +104,9 @@ for round := 0; round <= limits.ToolRounds; round++ {
 
 Properties that matter:
 
+- **A round that contains tool calls contributes no prose.** A model may emit text and a call together (usually a preamble such as "let me check"), and that text is discarded rather than concatenated: it is not narration, and keeping it would leave the reader with prose whose order relative to the tool result is undefined. It is recorded in the trace so the discard is visible.
+- **A stray call in the withdrawn round is ignored.** The final round is sent without a `tools` field; a model that calls one anyway has its text kept and its calls dropped. If there is no narration the turn fails as it does today, and the trace records the stray call so the quirk is diagnosable. Spending an extra round would make the bound a lie, and discarding usable text over a protocol quirk serves nobody.
+- **Repeated calls are re-executed, not cached.** The tools are local reads measured in microseconds, so a cache would add state and staleness for no measurable gain.
 - **The loop always terminates.** Round count is bounded, and once the rounds are spent or the budget is reached, tools are withdrawn and the model is told in the prompt that it must answer now. A model that keeps asking cannot loop forever.
 - **The last assistant message with no tool calls is the turn.** Everything downstream, segmentation, mention resolution, extraction, recording, is unchanged.
 - **Tool rounds are sequential.** Local reads are microseconds, so concurrency buys nothing, and ordering keeps results, trace, and tests reproducible.
@@ -184,7 +192,9 @@ Rules:
 
 ## 8. Retrieval Stack
 
-**v1: FTS5 and the graph.** A virtual table over `entities` (name, body, tags) and `turns` (input, narration), with triggers on insert, update, and delete so search follows the tables. Because `entities` has a text primary key and `turns` an integer one, both use their implicit `rowid` as the external content rowid.
+**v1: FTS5 and the graph.** A virtual table over `entities` (name, body, tags) and `turns` (input, narration), with triggers on insert, update, and delete so search follows the tables. Because `entities` has a text primary key and `turns` an integer one, both use their implicit `rowid` as the external content rowid. The tokenizer is `porter`, so `wardens` finds `Warden` and `guttered` finds `guttering`; inflection is the common case in model-written prose, and an over-match is the right error to make in retrieval.
+
+**Queries are built, not passed through.** FTS5's `MATCH` has its own grammar, and raw model words break it: `kael's oath` and `guard AND` are both syntax errors, and `NEAR(` is a parse failure the model can neither see nor fix. The tool therefore splits the query into words, strips FTS punctuation, quotes each term, joins them with `AND`, and prefixes the final term so `guard kae` finds `Guard Kael`. A raw expression is still reachable through an explicit `query` parameter, because someone who knows the grammar should not be blocked, but the ordinary path cannot fail on punctuation.
 
 Migration follows the index's existing promise: created idempotently on open, and **backfilled from the content tables** rather than by rescanning Markdown, so opening an old campaign does not re-read every note. If the virtual table is missing or out of step, it is dropped and rebuilt from the tables.
 
@@ -205,7 +215,7 @@ The withdrawal message is a **tool result**, not a silent stop, because a model 
 
 A tool round can take seconds during which no narration is produced. Two consequences:
 
-1. A new `{"type":"tool"}` stream event carries the tool name, a summary of its arguments, and its status. The console renders a small activity line (`looking up Guard Kael…`) so the turn reads as thinking rather than stalled.
+1. A new `{"type":"tool"}` stream event carries the tool name, a summary of its arguments, its status, and a short result summary (`3 matches`) so the console can render an activity line that resolves (`found 3 references`) rather than a spinner that vanishes.
 2. **Every tool event resets the idle watchdog**, server-side in `pkg/engine` and client-side in the inactivity guard. Without this, any tool round slower than `agents.chunk_timeout_seconds` is killed as a stall, which would make the feature unusable on exactly the local models most likely to need it.
 
 The existing `TurnEvent` framing carries the new event type; no new transport is introduced.
@@ -257,13 +267,13 @@ Settled in review:
 - **Round 6** (shape): this spec is separate and lands after trace and canon; tools complement pre-injection; capability is declared per provider; FTS5 and graph before embeddings; bounds are four rounds, 4000 characters per result, and the turn budget.
 - **Round 7**: the transcript is in-memory and traced, never in `history.jsonl`; four read-only tools; a `tool` stream event resets the idle watchdog on both sides; `supports_tools: auto|yes|no`; FTS5 as a virtual table with triggers, backfilled from the content tables.
 - **Round 8**: the embeddings provider and storage are deferred to their own spec while the tool's interface is fixed now; streamed tool calls are reassembled in the provider; calls execute sequentially; `gm` only, and the opening turn is included; the read-only internal surface is a permanent ceiling; trace records name, outcome, size and duration at `summary`, and arguments and results at `full`.
+- **Round 9**: queries are built from words rather than passed to `MATCH`, with raw expressions available explicitly; the tokenizer is `porter`; provenance is a compact `Turn.ToolCalls` record; a stray call in the withdrawn round is dropped while its text is kept.
 
-Queued for the ninth round:
+Queued for the tenth round:
 
-1. **FTS5 query handling.** Pass the model's words to `MATCH` directly, or build a sanitised term query.
-2. **Tokenizer.** The default `unicode61`, or `porter` stemming.
-3. **Provenance.** Does a replayed turn show that tools were used, and how much.
-4. **A misbehaving last round.** What happens when the model asks for a tool in the round where tools were withdrawn.
+1. **Cumulative spend.** Rounds bound calls to five, but each carries its own `max_tokens`. Does a paid provider need an explicit per-turn output ceiling?
+2. **Text alongside a call.** Confirmed above as discarded; confirm the discard is acceptable when a model narrates usefully before calling.
+3. **Repeated calls.** Confirmed above as re-executed rather than cached; confirm no cache is wanted.
 
 ## 16. File Map
 
@@ -281,6 +291,8 @@ Queued for the ninth round:
 - `pkg/harness/cli_provider.go`, `oracle_provider.go` — synthesise `Prompt` from `Messages`, ignore tools
 - `pkg/harness/factory.go` — carry `supports_tools`
 - `pkg/engine/orchestrator.go` — the loop, bounds, withdrawal, watchdog resets
+- `pkg/engine/history.go` — `Turn.ToolCalls`
+- `frontend/src/components/ChronicleView.tsx` — the quiet provenance line
 - `pkg/gui/service.go`, `server.go`, `types.go` — the `tool` stream event
 - `pkg/config/types.go` — the new keys
 - `frontend/src/components/ActionConsole.tsx` — the activity line
