@@ -73,6 +73,9 @@ type AgentsConfig struct {
 	ThreadIdleTurns int `yaml:"thread_idle_turns" json:"thread_idle_turns"`
 	// ThreadsMax caps the open-threads block, most stale first.
 	ThreadsMax int `yaml:"threads_max" json:"threads_max"`
+	// ContinuityChecks runs the deterministic drift pass. A pointer distinguishes
+	// "not configured" from "switched off", because the default is on.
+	ContinuityChecks *bool `yaml:"continuity_checks" json:"continuity_checks,omitempty"`
 }
 
 type VoiceProfile struct {
@@ -409,4 +412,9 @@ func (c *Config) ThreadsMax() int {
 		return 8
 	}
 	return c.Agents.ThreadsMax
+}
+
+// ContinuityChecks runs the deterministic drift pass unless it is switched off.
+func (c *Config) ContinuityChecks() bool {
+	return c.Agents.ContinuityChecks == nil || *c.Agents.ContinuityChecks
 }

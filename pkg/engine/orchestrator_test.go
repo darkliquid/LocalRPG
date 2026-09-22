@@ -165,3 +165,49 @@ func recordTurnForRecap(t *testing.T, timeline *Timeline, number int, narration 
 		t.Fatalf("record turn %d: %v", number, err)
 	}
 }
+
+func TestATurnRecordsWhatItsProseContradicts(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"She remembers Oakhaven Tavern fondly."}}
+	orchestrator, timeline, store := streamingOrchestrator(t, provider)
+	orchestrator.SetContinuityChecks(true)
+	orchestrator.SetChronicler(nil)
+
+	if err := store.SaveEntity(&entity.Entity{ID: "oakhaven-tavern", Name: "Oakhaven Tavern", Type: "location", Body: "Ale."}); err != nil {
+		t.Fatal(err)
+	}
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I look around", nil)
+	if err != nil {
+		t.Fatalf("turn failed: %v", err)
+	}
+	if len(turn.ContinuityNotes) == 0 {
+		t.Fatalf("expected a continuity note about the named location")
+	}
+
+	// The note is persisted with the turn, so a reader sees it later.
+	turns, err := timeline.history.LoadHistory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 1 || len(turns[0].ContinuityNotes) == 0 {
+		t.Errorf("expected the note recorded, got %+v", turns)
+	}
+}
+
+func TestContinuityChecksCanBeSwitchedOff(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"She remembers Oakhaven Tavern fondly."}}
+	orchestrator, _, store := streamingOrchestrator(t, provider)
+	orchestrator.SetContinuityChecks(false)
+
+	if err := store.SaveEntity(&entity.Entity{ID: "oakhaven-tavern", Name: "Oakhaven Tavern", Type: "location", Body: "Ale."}); err != nil {
+		t.Fatal(err)
+	}
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I look around", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turn.ContinuityNotes) != 0 {
+		t.Errorf("expected no notes when the checks are off, got %v", turn.ContinuityNotes)
+	}
+}

@@ -30,6 +30,9 @@ type Turn struct {
 	// ContextNotes records anything the prompt budget left out, so a thinner reply
 	// can be explained rather than looking like drift.
 	ContextNotes []string `json:"context_notes,omitempty"`
+	// ContinuityNotes record prose that contradicts what the campaign knows. They are
+	// advisory: nothing is rewritten, and a correction is the player's to send.
+	ContinuityNotes []string `json:"continuity_notes,omitempty"`
 
 	// LegacyOutput is only populated when reading records written before the
 	// narration rename. New records must not set it.

@@ -73,9 +73,10 @@ type TurnOrchestrator struct {
 	extractor     *harness.Extractor
 	chunkTimeout  time.Duration
 	openingPrompt string
-	logger        trace.Logger
-	chronicler    *Chronicler
-	threadsMax    int
+	logger           trace.Logger
+	chronicler       *Chronicler
+	threadsMax       int
+	continuityChecks *bool
 }
 
 func NewTurnOrchestrator(
@@ -167,6 +168,17 @@ func (o *TurnOrchestrator) threadsCap() int {
 		return defaultThreadsMax
 	}
 	return o.threadsMax
+}
+
+// SetContinuityChecks turns the deterministic continuity pass on or off. A nil value
+// is the default, which is on.
+func (o *TurnOrchestrator) SetContinuityChecks(enabled bool) {
+	o.continuityChecks = &enabled
+}
+
+// continuityEnabled reports whether the pass should run.
+func (o *TurnOrchestrator) continuityEnabled() bool {
+	return o.continuityChecks == nil || *o.continuityChecks
 }
 
 // currentLocation resolves where this turn is happening. The player note wins
@@ -491,6 +503,12 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	for _, mention := range speechMentions(turn.Segments) {
 		if !containsMention(turn.Entities, mention.ID) {
 			turn.Entities = append(turn.Entities, mention)
+		}
+	}
+
+	if o.continuityEnabled() {
+		for _, finding := range CheckContinuity(o.store, &turn, locationID, o.playerID) {
+			turn.ContinuityNotes = append(turn.ContinuityNotes, finding.Note)
 		}
 	}
 

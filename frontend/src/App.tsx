@@ -207,6 +207,10 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleCorrect = (note: string) => {
+    void handleActionSubmit('GM', `/gm ${note}`);
+  };
+
   // Find latest scene image for full-window atmospheric background
   const activeBgImage = chronicle.slice().reverse().find((t) => t.image_url)?.image_url;
 
@@ -352,6 +356,7 @@ export const App: React.FC = () => {
                     serverPlayback={serverAudio}
                     onPlayTurnAudio={handlePlayTurnAudio}
                     onStopAudio={handleStopAudio}
+                    onCorrect={handleCorrect}
                   />
                   {streamedProse && (
                     <div className="p-4 border-t border-white/5 bg-black/20">

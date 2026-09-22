@@ -43,6 +43,7 @@ export interface Turn {
   truncated?: boolean;
   // Anything the prompt budget left out, so a thinner reply can be explained.
   context_notes?: string[];
+  continuity_notes?: string[];
 }
 
 export interface TurnEvent {

@@ -10,6 +10,7 @@ interface ChronicleViewProps {
   serverPlayback?: boolean;
   onPlayTurnAudio?: (turnNumber: number, segmentIndex?: number) => void;
   onStopAudio?: () => void;
+  onCorrect?: (note: string) => void;
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
@@ -20,6 +21,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   serverPlayback = false,
   onPlayTurnAudio,
   onStopAudio,
+  onCorrect,
 }) => {
   // Art is per scene, not per turn: it is shown when the party arrives somewhere
   // new and reused while they stay.
@@ -99,6 +101,23 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               <div className="text-xs font-mono text-stone-500 pt-1">
                 Context trimmed to fit the prompt budget: {turn.context_notes.join(', ')}. Raise the context budget in
                 Settings to keep more.
+              </div>
+            )}
+
+            {turn.continuity_notes && turn.continuity_notes.length > 0 && (
+              <div className="text-xs font-mono text-amber-400/90 pt-1 space-y-1">
+                {turn.continuity_notes.map((note, index) => (
+                  <div key={index} className="flex items-start gap-2">
+                    <span>{note}</span>
+                    <button
+                      onClick={() => onCorrect?.(note)}
+                      className="shrink-0 px-1.5 py-0.5 rounded border border-amber-500/40 hover:bg-amber-600/20 cursor-pointer transition-colors"
+                      title="Send this as a correction to the GM"
+                    >
+                      Correct
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 
