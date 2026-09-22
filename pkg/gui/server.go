@@ -147,6 +147,32 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, recap)
 
+	case "findings":
+		switch r.Method {
+		case http.MethodGet:
+			found, err := s.service.Findings(gameID)
+			if err != nil {
+				writeGameError(w, err)
+				return
+			}
+			writeJSON(w, found)
+
+		case http.MethodPost:
+			var req AddressedFinding
+			if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			if err := s.service.AddressFinding(gameID, req.Turn, req.Rule); err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+
+		default:
+			http.NotFound(w, r)
+		}
+
 	case "graph":
 		graph, err := s.service.GetGraph(r.Context(), gameID)
 		if err != nil {

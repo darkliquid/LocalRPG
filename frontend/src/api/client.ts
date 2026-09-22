@@ -20,6 +20,7 @@ import {
   TestProviderRequest,
   TestProviderResponse,
   TraceEvent,
+  AddressedFinding,
 } from '../types';
 
 export class APIClient {
@@ -313,5 +314,20 @@ export class APIClient {
     });
     if (!res.ok) throw new Error(`mergeEntity: ${res.statusText}`);
     return res.json();
+  }
+
+  async getFindings(): Promise<{ addressed: AddressedFinding[] }> {
+    const res = await fetch(`/api/game/${this.gameID}/findings`);
+    if (!res.ok) throw new Error(`getFindings: ${res.statusText}`);
+    return res.json();
+  }
+
+  async addressFinding(turn: number, rule: string): Promise<void> {
+    const res = await fetch(`/api/game/${this.gameID}/findings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ turn, rule }),
+    });
+    if (!res.ok) throw new Error(`addressFinding: ${res.statusText}`);
   }
 }

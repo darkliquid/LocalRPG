@@ -323,4 +323,9 @@ export interface TestProviderResponse {
   audio_data_uri?: string;
 }
 
+export interface AddressedFinding {
+  turn: number;
+  rule: string;
+}
+
 

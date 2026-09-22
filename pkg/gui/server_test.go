@@ -816,3 +816,33 @@ func TestMergeRouteFoldsOneNoteIntoAnother(t *testing.T) {
 		t.Errorf("expected 400 for a missing target, got %d", rec.Code)
 	}
 }
+
+func TestFindingsRouteRecordsAndReturns(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/game/"+gameID+"/findings", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	postReq := httptest.NewRequest(http.MethodPost, "/api/game/"+gameID+"/findings", strings.NewReader(`{"turn":2,"rule":"unknown-entity"}`))
+	postRec := httptest.NewRecorder()
+	server.ServeHTTP(postRec, postReq)
+	if postRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", postRec.Code)
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "/api/game/"+gameID+"/findings", nil)
+	rec2 := httptest.NewRecorder()
+	server.ServeHTTP(rec2, req2)
+	var found FindingsDTO
+	if err := json.Unmarshal(rec2.Body.Bytes(), &found); err != nil {
+		t.Fatal(err)
+	}
+	if len(found.Addressed) != 1 || found.Addressed[0].Turn != 2 {
+		t.Errorf("expected 1 addressed finding, got %+v", found)
+	}
+}

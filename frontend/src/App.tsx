@@ -46,6 +46,7 @@ export const App: React.FC = () => {
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [addressed, setAddressed] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     APIClient.getSettings()
@@ -73,9 +74,13 @@ export const App: React.FC = () => {
       setGraph(null);
       setEntities([]);
       setRecap(null);
+      setAddressed(new Set());
       return;
     }
     client.getChronicle().then(setChronicle).catch(console.error);
+    client.getFindings().then((res) => {
+      setAddressed(new Set(res.addressed.map((a) => a.turn)));
+    }).catch(console.error);
     refreshCorpus();
   }, [client, refreshCorpus]);
 
@@ -209,6 +214,11 @@ export const App: React.FC = () => {
 
   const handleCorrect = (note: string) => {
     void handleActionSubmit('GM', `/gm ${note}`);
+  };
+
+  const handleAddress = (turnNumber: number) => {
+    client?.addressFinding(turnNumber, 'continuity').catch(console.error);
+    setAddressed((prev) => new Set(prev).add(turnNumber));
   };
 
   // Find latest scene image for full-window atmospheric background
@@ -357,6 +367,8 @@ export const App: React.FC = () => {
                     onPlayTurnAudio={handlePlayTurnAudio}
                     onStopAudio={handleStopAudio}
                     onCorrect={handleCorrect}
+                    addressedTurns={addressed}
+                    onAddress={handleAddress}
                   />
                   {streamedProse && (
                     <div className="p-4 border-t border-white/5 bg-black/20">

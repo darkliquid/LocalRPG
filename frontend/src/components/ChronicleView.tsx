@@ -11,6 +11,8 @@ interface ChronicleViewProps {
   onPlayTurnAudio?: (turnNumber: number, segmentIndex?: number) => void;
   onStopAudio?: () => void;
   onCorrect?: (note: string) => void;
+  addressedTurns?: Set<number>;
+  onAddress?: (turnNumber: number) => void;
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
@@ -22,6 +24,8 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   onPlayTurnAudio,
   onStopAudio,
   onCorrect,
+  addressedTurns,
+  onAddress,
 }) => {
   // Art is per scene, not per turn: it is shown when the party arrives somewhere
   // new and reused while they stay.
@@ -105,17 +109,38 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
             )}
 
             {turn.continuity_notes && turn.continuity_notes.length > 0 && (
-              <div className="text-xs font-mono text-amber-400/90 pt-1 space-y-1">
+              <div
+                className={`text-xs font-mono pt-1 space-y-1 ${
+                  addressedTurns?.has(turn.turn_number) ? 'text-stone-500 opacity-60' : 'text-amber-400/90'
+                }`}
+              >
                 {turn.continuity_notes.map((note, index) => (
                   <div key={index} className="flex items-start gap-2">
                     <span>{note}</span>
-                    <button
-                      onClick={() => onCorrect?.(note)}
-                      className="shrink-0 px-1.5 py-0.5 rounded border border-amber-500/40 hover:bg-amber-600/20 cursor-pointer transition-colors"
-                      title="Send this as a correction to the GM"
-                    >
-                      Correct
-                    </button>
+                    {addressedTurns?.has(turn.turn_number) ? (
+                      <span className="shrink-0 px-1.5 py-0.5 rounded border border-stone-700 text-stone-500 text-[10px]">
+                        Addressed
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => onCorrect?.(note)}
+                          className="px-1.5 py-0.5 rounded border border-amber-500/40 hover:bg-amber-600/20 cursor-pointer transition-colors"
+                          title="Send this as a correction to the GM"
+                        >
+                          Correct
+                        </button>
+                        {onAddress && (
+                          <button
+                            onClick={() => onAddress(turn.turn_number)}
+                            className="px-1.5 py-0.5 rounded border border-stone-600 hover:bg-stone-800 text-stone-400 cursor-pointer transition-colors text-[10px]"
+                            title="Mark this finding as addressed"
+                          >
+                            Dismiss
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

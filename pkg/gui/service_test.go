@@ -760,3 +760,40 @@ func TestMergeFoldsANoteIntoAnother(t *testing.T) {
 		t.Errorf("expected the inbound link rewritten:\n%s", note.Markdown)
 	}
 }
+
+func TestAddressingAFindingSurvivesAReload(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	before, err := svc.Findings(gameID)
+	if err != nil {
+		t.Fatalf("Findings failed: %v", err)
+	}
+	if len(before.Addressed) != 0 {
+		t.Fatalf("expected nothing addressed, got %+v", before)
+	}
+
+	if err := svc.AddressFinding(gameID, 3, "unknown-entity"); err != nil {
+		t.Fatalf("AddressFinding failed: %v", err)
+	}
+	// Addressing the same finding twice is not an error and not a duplicate.
+	if err := svc.AddressFinding(gameID, 3, "unknown-entity"); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := svc.Findings(gameID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after.Addressed) != 1 {
+		t.Fatalf("expected one addressed finding, got %+v", after.Addressed)
+	}
+	if after.Addressed[0].Turn != 3 || after.Addressed[0].Rule != "unknown-entity" {
+		t.Errorf("unexpected record: %+v", after.Addressed[0])
+	}
+
+	// The sidecar is how this survives, because the timeline is append-only.
+	path := filepath.Join(svc.GetResolver().GameDir(gameID), "findings.json")
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("expected a sidecar on disk: %v", err)
+	}
+}
