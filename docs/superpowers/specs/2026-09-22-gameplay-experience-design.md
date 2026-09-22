@@ -664,6 +664,12 @@ no backend or device selection. Owning the callback is what lets the tests run
 against mago's null backend and lets a user pick a device; the browser remains
 the fallback wherever a device is unavailable.
 
+`mago/speaker` is the closer of the two to usable: it only lacks a backend list,
+and everything else about it is already configurable. That gap is raised upstream
+as [darkliquid/mago#16](https://github.com/darkliquid/mago/issues/16) ("speaker:
+add backend selection so it can run headless"). If it lands, this package's device
+callback can be deleted in favour of `mago/speaker` with no loss.
+
 ### 17.5 Endpoints
 
 | Method | Path | Result |
