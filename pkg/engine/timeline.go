@@ -43,6 +43,16 @@ func (t *Timeline) VoiceProfiles() []config.VoiceProfile {
 // turn record, and the index row. Notes are written before the turn is appended,
 // so the record never points at a note that does not exist.
 func (t *Timeline) RecordTurn(turn *Turn, extracted []harness.ExtractedEntity) error {
+	// A turn's mentions are what later recall reasons about, so the names its prose
+	// contains are recorded here rather than left to whichever writer remembered to
+	// resolve them. Extraction records its own, and a link or a spoken line is
+	// already recorded, so this only adds what none of them saw.
+	for _, mention := range harness.ResolveProseMentions(t.store, turn.Narration, turn.Input) {
+		if !containsMention(turn.Entities, mention.ID) {
+			turn.Entities = append(turn.Entities, mention)
+		}
+	}
+
 	pending, err := t.stageEntities(turn, extracted)
 	if err != nil {
 		return err

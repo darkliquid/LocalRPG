@@ -5,9 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
 func TestTimelineEnsureIndexedReplaysHistory(t *testing.T) {
@@ -118,5 +120,47 @@ func TestTimelineIndexesMinimalRecords(t *testing.T) {
 
 	if _, err := store.GetTurn(1); err != nil {
 		t.Errorf("expected turn 1 in the index: %v", err)
+	}
+}
+
+func TestRecordTurnRecordsProseMentions(t *testing.T) {
+	tempDir := t.TempDir()
+	store := newTestStore(t)
+	timeline := NewTimeline(core.NewPathResolver(tempDir), store, NewHistoryLogger(filepath.Join(tempDir, "history.jsonl")), "campaign-01")
+
+	entitiesDir := timeline.EntitiesDir()
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{ID: "guard-kael", Name: "Guard Kael", Type: "character", Body: "A warden."})
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{ID: "sera-vane", Name: "Sera Vane", Type: "character", Body: "A smuggler."})
+	if _, err := storage.NewSyncer(store).Sync(entitiesDir); err != nil {
+		t.Fatal(err)
+	}
+
+	turn := Turn{
+		Number:    1,
+		Timestamp: time.Now(),
+		Mode:      "Do",
+		Input:     "I ask after Sera Vane",
+		Narration: "Kael says nothing, and the water keeps moving.",
+		Entities:  []entity.Mention{{ID: "guard-kael", Kind: entity.MentionWikilink}},
+	}
+	if err := timeline.RecordTurn(&turn, nil); err != nil {
+		t.Fatalf("RecordTurn failed: %v", err)
+	}
+
+	refs, err := store.ListEntitiesForTurn(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kinds := make(map[string][]string)
+	for _, ref := range refs {
+		kinds[ref.EntityID] = append(kinds[ref.EntityID], ref.Mention)
+	}
+	if len(kinds["sera-vane"]) != 1 || kinds["sera-vane"][0] != entity.MentionProse {
+		t.Errorf("expected Sera Vane recorded from the prose, got %+v", kinds["sera-vane"])
+	}
+	// Kael was already linked, so the scan must not add a second row for him.
+	if len(kinds["guard-kael"]) != 1 || kinds["guard-kael"][0] != entity.MentionWikilink {
+		t.Errorf("expected Kael recorded once as a wikilink, got %+v", kinds["guard-kael"])
 	}
 }
