@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DebugPanel } from './DebugPanel';
 import { APIClient } from '../api/client';
-import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile } from '../types';
+import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile, ModelStatus } from '../types';
+import { ModelDownloadModal } from './ModelDownloadModal';
 import {
   Folder,
   Cpu,
@@ -26,6 +27,7 @@ import {
   STT_PRESETS,
   IMAGE_PRESETS,
   DEFAULT_VOICE_PROFILES,
+  KOKORO_VOICE_PROFILES,
 } from '../templates/providerPresets';
 
 interface SettingsStudioProps {
@@ -67,8 +69,30 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   // Selected agent role for editing
   const [selectedRole, setSelectedRole] = useState<string>('gm');
 
+  // Model status state
+  const [models, setModels] = useState<ModelStatus[]>([]);
+  const [missingModelPrompt, setMissingModelPrompt] = useState<{
+    id: string;
+    name: string;
+    sizeBytes: number;
+  } | null>(null);
+
   useEffect(() => {
     loadSettings();
+    APIClient.getModels().then(setModels).catch(console.error);
+    const unsubscribe = APIClient.subscribeModelEvents((status) => {
+      setModels((prev) => {
+        const next = [...prev];
+        const idx = next.findIndex((m) => m.id === status.id);
+        if (idx >= 0) {
+          next[idx] = status;
+        } else {
+          next.push(status);
+        }
+        return next;
+      });
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(
@@ -129,6 +153,21 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   };
 
   const handleTestProvider = async (category: 'llm' | 'tts' | 'stt' | 'image', provider: any, testPrompt?: string) => {
+    if (category === 'tts') {
+      const isTargetKokoro =
+        provider?.type === 'builtin' &&
+        (provider?.builtin_name === 'sherpa-onnx' || provider?.builtin_name === 'kokoro');
+      const kokoroInstalled = models.find((m) => m.id === 'kokoro-tts')?.installed;
+      if (isTargetKokoro && !kokoroInstalled) {
+        setMissingModelPrompt({
+          id: 'kokoro-tts',
+          name: 'Kokoro Voice Pack',
+          sizeBytes: 90177536,
+        });
+        return;
+      }
+    }
+
     setTestingCategory(category);
     setTestResult(null);
     try {
@@ -138,6 +177,13 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
         test_prompt: testPrompt ?? (category === 'llm' ? 'Are the stars shining?' : undefined),
       });
       setTestResult({ category, res });
+      if (res.model_missing) {
+        setMissingModelPrompt({
+          id: res.model_id || 'kokoro-tts',
+          name: 'Kokoro Voice Pack',
+          sizeBytes: 90177536,
+        });
+      }
       if (category === 'tts' && res.success && res.audio_data_uri) {
         playVoicePreview(res.audio_data_uri, (provider as { master_volume?: number })?.master_volume ?? 1);
       }
@@ -162,6 +208,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const currentRoleConfig: AgentRoleConfig = config.agents.roles[selectedRole] || defaultRoleConfig(selectedRole);
 
   const roleNames = Array.from(new Set([...Object.keys(config.agents.roles), 'extractor']));
+
+  const isKokoro =
+    config.media.tts.type === 'builtin' &&
+    (config.media.tts.builtin_name === 'sherpa-onnx' || config.media.tts.builtin_name === 'kokoro');
+  const kokoroStatus = models.find((m) => m.id === 'kokoro-tts');
 
   const updateRole = (updated: AgentRoleConfig) => {
     setConfig({
@@ -935,42 +986,43 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300">TTS Provider Type</label>
+                <label className="text-xs font-cinzel uppercase text-stone-300">TTS Engine</label>
                 <select
-                  value={config.media.tts.type}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      media: { ...config.media, tts: { ...config.media.tts, type: e.target.value as any } },
-                    })
+                  value={
+                    config.media.tts.type === 'builtin'
+                      ? `builtin:${config.media.tts.builtin_name || 'native-os'}`
+                      : config.media.tts.type
                   }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.startsWith('builtin:')) {
+                      const builtinName = val.split(':')[1];
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          tts: { ...config.media.tts, type: 'builtin', builtin_name: builtinName },
+                        },
+                      });
+                    } else {
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          tts: { ...config.media.tts, type: val as any, builtin_name: undefined },
+                        },
+                      });
+                    }
+                  }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
-                  <option value="http">HTTP (Kokoro-FastAPI, AllTalk, OpenAI Speech)</option>
+                  <option value="builtin:sherpa-onnx">Built-in: Sherpa-ONNX (Kokoro Neural Voice)</option>
+                  <option value="builtin:native-os">Built-in: Native OS Speech (spd-say / SAPI / procedural)</option>
+                  <option value="http">HTTP Endpoint (Kokoro-FastAPI, AllTalk, OpenAI Speech)</option>
                   <option value="cli">CLI Command (e.g. piper)</option>
-                  <option value="builtin">Builtin (native-os / procedural audio)</option>
                 </select>
               </div>
-
-              {config.media.tts.type === 'builtin' && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">Built-in Engine</label>
-                  <select
-                    value={config.media.tts.builtin_name || 'native-os'}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        media: { ...config.media, tts: { ...config.media.tts, builtin_name: e.target.value } },
-                      })
-                    }
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
-                  >
-                    <option value="native-os">native-os (OS Speech Synthesizer / Procedural Audio)</option>
-                    <option value="echo">echo (Debug Mock)</option>
-                  </select>
-                </div>
-              )}
 
               {config.media.tts.type === 'http' && (
                 <div className="space-y-1.5">
@@ -1035,6 +1087,52 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             </div>
 
+            {isKokoro && (
+              <div className="p-3 bg-stone-950/80 border border-stone-800 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-amber-400" />
+                  <span className="font-medium text-stone-200">Kokoro Model:</span>
+                  {kokoroStatus?.installed ? (
+                    <span className="flex items-center gap-1 text-emerald-400 font-mono text-[11px] bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Installed</span>
+                    </span>
+                  ) : kokoroStatus?.downloading ? (
+                    <div className="flex items-center gap-2 text-amber-400 font-mono text-[11px]">
+                      <span>Downloading {Math.round(kokoroStatus.progress * 100)}%</span>
+                      <div className="w-20 h-1.5 bg-stone-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-amber-500"
+                          style={{ width: `${Math.round(kokoroStatus.progress * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="flex items-center gap-1 text-amber-400/90 font-mono text-[11px] bg-amber-950/40 border border-amber-800/40 px-2 py-0.5 rounded-md">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>Not Installed (~86 MB)</span>
+                    </span>
+                  )}
+                </div>
+
+                {!kokoroStatus?.installed && (
+                  <button
+                    disabled={kokoroStatus?.downloading}
+                    onClick={() =>
+                      setMissingModelPrompt({
+                        id: 'kokoro-tts',
+                        name: 'Kokoro Voice Pack',
+                        sizeBytes: 90177536,
+                      })
+                    }
+                    className="flex items-center gap-1.5 px-3 py-1 bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold rounded-lg transition shadow text-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <span>{kokoroStatus?.downloading ? 'Downloading...' : 'Download Model'}</span>
+                  </button>
+                )}
+              </div>
+            )}
+
             {config.media.tts.type !== 'disabled' && (
               <div className="pt-2 space-y-2 border-t border-stone-800/60">
                 <div className="space-y-1.5">
@@ -1087,6 +1185,28 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  {isKokoro && (
+                    <button
+                      onClick={() => {
+                        setConfig({
+                          ...config,
+                          media: {
+                            ...config.media,
+                            tts: {
+                              ...config.media.tts,
+                              voice_profiles: [...KOKORO_VOICE_PROFILES],
+                            },
+                          },
+                        });
+                      }}
+                      className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-amber-600/20 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 transition cursor-pointer"
+                      title="Autofill all 27 Kokoro voice profiles with gender and accent tags"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Load Kokoro Voices (27 Profiles)</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => {
                       setConfig({
@@ -1687,6 +1807,15 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
       {/* Tab 5: Debug (developer view over the trace) */}
       {activeSubTab === 'debug' && <DebugPanel config={config} setConfig={setConfig} />}
+
+      {missingModelPrompt && (
+        <ModelDownloadModal
+          modelId={missingModelPrompt.id}
+          modelName={missingModelPrompt.name}
+          sizeBytes={missingModelPrompt.sizeBytes}
+          onClose={() => setMissingModelPrompt(null)}
+        />
+      )}
     </div>
   );
 };
