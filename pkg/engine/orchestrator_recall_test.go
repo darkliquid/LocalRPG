@@ -137,3 +137,85 @@ func movePlayerTo(t *testing.T, entitiesDir string, store *storage.Store, locati
 		t.Fatal(err)
 	}
 }
+
+// proseNamingProvider answers with a description rather than a wikilink or a spoken
+// line, which is the case the extractor would normally cover.
+type proseNamingProvider struct {
+	mu        sync.Mutex
+	calls     int
+	onRequest func(harness.GenerateRequest)
+}
+
+func (p *proseNamingProvider) ID() string { return "prose-naming" }
+
+func (p *proseNamingProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
+	return &harness.GenerateResponse{Text: "The gate stays shut."}, nil
+}
+
+func (p *proseNamingProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
+	defer close(out)
+
+	if p.onRequest != nil {
+		p.onRequest(req)
+	}
+
+	p.mu.Lock()
+	p.calls++
+	call := p.calls
+	p.mu.Unlock()
+
+	// No wikilink and no speech: the name is only ever narrated. The extractor is
+	// off in this fixture, so only the prose scan can see it.
+	text := "Garrick keeps his own counsel."
+	if call == 1 {
+		text = "Garrick mentioned the oil was low."
+	}
+	out <- harness.StreamChunk{Text: text, Done: true}
+	return nil
+}
+
+func TestRetrievalWorksWithoutTheExtractor(t *testing.T) {
+	var prompts []string
+	provider := &proseNamingProvider{
+		onRequest: func(req harness.GenerateRequest) {
+			prompts = append(prompts, req.Prompt)
+		},
+	}
+
+	orchestrator, timeline, store := streamingOrchestrator(t, provider)
+	// No extractor is set, which is the gap this plan closes.
+
+	entitiesDir := timeline.EntitiesDir()
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{
+		ID: "garrick", Name: "Garrick", Type: "character", Body: "A fence with a long memory.",
+	})
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{
+		ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Body: "Salt air and gulls.",
+	})
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{
+		ID: "alden-tavern", Name: "Alden Tavern", Type: "location", Body: "Warm and low.",
+	})
+	if _, err := storage.NewSyncer(store).Sync(entitiesDir); err != nil {
+		t.Fatal(err)
+	}
+	movePlayerTo(t, entitiesDir, store, "aldon-harbour")
+
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I look around", nil); err != nil {
+		t.Fatalf("turn 1 failed: %v", err)
+	}
+
+	movePlayerTo(t, entitiesDir, store, "alden-tavern")
+	for i := 0; i < 8; i++ {
+		if _, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I wait", nil); err != nil {
+			t.Fatalf("turn %d failed: %v", i+2, err)
+		}
+	}
+
+	last := prompts[len(prompts)-1]
+	if !strings.Contains(last, "RELEVANT HISTORY") {
+		t.Fatalf("expected retrieval to fire from prose mentions alone:\n%s", last)
+	}
+	if !strings.Contains(last, "the oil was low") {
+		t.Errorf("expected the harbour turn retrieved:\n%s", last)
+	}
+}
