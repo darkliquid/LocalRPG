@@ -269,6 +269,7 @@ export interface TestProviderResponse {
   latency_ms: number;
   message: string;
   preview?: string;
+  audio_data_uri?: string;
 }
 
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { APIClient } from '../api/client';
 import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile } from '../types';
 import {
@@ -37,6 +37,11 @@ const ROLE_LABELS: Record<string, string> = {
   extractor: 'Entity Extractor (per-turn world state)',
 };
 
+// Long enough to expose cadence, pitch, and pacing differences between voice
+// profiles. Mirrors defaultTTSPreviewText on the server.
+const DEFAULT_TTS_PREVIEW_TEXT =
+  'Local RPG can use a wide range of voices to bring life to your characters, NPCs, and story narration.';
+
 // A missing role falls back to inheriting gm for the extractor, which is what
 // makes extraction work out of the box without a second configuration step.
 const defaultRoleConfig = (role: string): AgentRoleConfig =>
@@ -54,6 +59,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   // Diagnostics test state
   const [testingCategory, setTestingCategory] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ category: string; res: TestProviderResponse } | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [ttsPreviewText, setTtsPreviewText] = useState<string>(DEFAULT_TTS_PREVIEW_TEXT);
 
   // Selected agent role for editing
   const [selectedRole, setSelectedRole] = useState<string>('gm');
@@ -61,6 +68,31 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   useEffect(() => {
     loadSettings();
   }, []);
+
+  useEffect(
+    () => () => {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current = null;
+      }
+    },
+    []
+  );
+
+  const playVoicePreview = (dataURI: string, volume: number) => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+    }
+    const audio = new Audio(dataURI);
+    audio.volume = Math.min(1, Math.max(0, volume));
+    previewAudioRef.current = audio;
+    audio.play().catch(() => {
+      setFeedback({
+        type: 'error',
+        message: 'Audio generated, but the browser blocked playback. Click the page and retry.',
+      });
+    });
+  };
 
   const loadSettings = async () => {
     setIsLoading(true);
@@ -94,16 +126,19 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     }
   };
 
-  const handleTestProvider = async (category: 'llm' | 'tts' | 'stt' | 'image', provider: any) => {
+  const handleTestProvider = async (category: 'llm' | 'tts' | 'stt' | 'image', provider: any, testPrompt?: string) => {
     setTestingCategory(category);
     setTestResult(null);
     try {
       const res = await APIClient.testProvider({
         category,
         provider,
-        test_prompt: category === 'llm' ? 'Are the stars shining?' : undefined,
+        test_prompt: testPrompt ?? (category === 'llm' ? 'Are the stars shining?' : undefined),
       });
       setTestResult({ category, res });
+      if (category === 'tts' && res.success && res.audio_data_uri) {
+        playVoicePreview(res.audio_data_uri, (provider as { master_volume?: number })?.master_volume ?? 1);
+      }
     } catch (err: any) {
       setTestResult({
         category,
@@ -689,26 +724,41 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             </div>
 
             {config.media.tts.type !== 'disabled' && (
-              <div className="pt-2 flex items-center justify-between border-t border-stone-800/60">
-                <button
-                  onClick={() => handleTestProvider('tts', config.media.tts)}
-                  disabled={testingCategory === 'tts'}
-                  className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-500/30 hover:bg-stone-800 text-amber-400 transition-all cursor-pointer"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  <span>{testingCategory === 'tts' ? 'Synthesizing...' : 'Test Speech Synthesis'}</span>
-                </button>
+              <div className="pt-2 space-y-2 border-t border-stone-800/60">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">
+                    Preview Phrase
+                  </label>
+                  <input
+                    type="text"
+                    value={ttsPreviewText}
+                    onChange={(e) => setTtsPreviewText(e.target.value)}
+                    placeholder={DEFAULT_TTS_PREVIEW_TEXT}
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  />
+                </div>
 
-                {testResult?.category === 'tts' && (
-                  <span
-                    className={`text-xs font-mono flex items-center gap-1 ${
-                      testResult.res.success ? 'text-emerald-400' : 'text-red-400'
-                    }`}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => handleTestProvider('tts', config.media.tts, ttsPreviewText)}
+                    disabled={testingCategory === 'tts'}
+                    className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-500/30 hover:bg-stone-800 text-amber-400 transition-all cursor-pointer"
                   >
-                    {testResult.res.success ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-                    <span>{testResult.res.message}</span>
-                  </span>
-                )}
+                    <Play className="w-3.5 h-3.5" />
+                    <span>{testingCategory === 'tts' ? 'Synthesizing...' : 'Test Speech Synthesis'}</span>
+                  </button>
+
+                  {testResult?.category === 'tts' && (
+                    <span
+                      className={`text-xs font-mono flex items-center gap-1 ${
+                        testResult.res.success ? 'text-emerald-400' : 'text-red-400'
+                      }`}
+                    >
+                      {testResult.res.success ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                      <span>{testResult.res.message}</span>
+                    </span>
+                  )}
+                </div>
               </div>
             )}
 
@@ -835,12 +885,16 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() =>
-                            handleTestProvider('tts', {
-                              ...config.media.tts,
-                              default_voice: profile.voice_id,
-                              pitch: profile.pitch,
-                              speech_rate: profile.speech_rate,
-                            })
+                            handleTestProvider(
+                              'tts',
+                              {
+                                ...config.media.tts,
+                                default_voice: profile.voice_id,
+                                pitch: profile.pitch,
+                                speech_rate: profile.speech_rate,
+                              },
+                              ttsPreviewText
+                            )
                           }
                           className="p-1.5 rounded bg-stone-900 border border-stone-800 text-amber-400 hover:text-amber-300 hover:border-amber-500/40 cursor-pointer"
                           title="Test Voice Profile"
