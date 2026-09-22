@@ -80,6 +80,14 @@ var TTSPresets = map[string]TTSConfig{
 		SpeechRate:   1.0,
 		MasterVolume: 1.0,
 	},
+	"sherpa-onnx": {
+		Type:         "builtin",
+		BuiltinName:  "sherpa-onnx",
+		DefaultVoice: "af_bella",
+		Pitch:        1.0,
+		SpeechRate:   1.0,
+		MasterVolume: 1.0,
+	},
 	"openai-speech": {
 		Type:         "http",
 		Endpoint:     "https://api.openai.com/v1/audio/speech",

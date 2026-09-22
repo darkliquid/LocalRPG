@@ -24,6 +24,11 @@ func TestPresetsCatalog(t *testing.T) {
 		t.Errorf("expected valid native-os preset, got %+v", nativeOSPreset)
 	}
 
+	sherpaPreset, ok := config.GetTTSPreset("sherpa-onnx")
+	if !ok || sherpaPreset.Type != "builtin" || sherpaPreset.BuiltinName != "sherpa-onnx" {
+		t.Errorf("expected valid sherpa-onnx preset, got %+v", sherpaPreset)
+	}
+
 	// 3. Image Presets
 	artPreset, ok := config.GetImagePreset("procedural-art")
 	if !ok || artPreset.Type != "builtin" || artPreset.BuiltinName != "procedural-art" {
