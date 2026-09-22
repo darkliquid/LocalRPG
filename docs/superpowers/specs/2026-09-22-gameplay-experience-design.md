@@ -643,15 +643,26 @@ none of them necessary.
 
 The mixer runs at 48 kHz stereo in F32; a source at any rate or channel count is
 resampled as it is pulled. Decoding and resampling come from `gopxl/beep`
-(`beep/mp3`, `beep/wav`, `beep.Resample`), so no decoding or DSP is hand-rolled.
+(`beep/mp3`, `beep/wav`, `beep.Resample`), so no decoding or DSP is hand-rolled;
+mago is only the device, which is all it should be.
 A clip in an unknown container is skipped rather than silencing the rest of the
 turn.
 
-### 17.4 Cost
+### 17.4 Why mago and not oto
 
-The dependency embeds a native library per platform, which grows the binary by
-roughly 3 MB and extracts to the user cache on first run. This is accepted: it is
-the price of narration that works without asking the player to click.
+`oto` v3 needs CGO: its `driver_unix.go` links ALSA directly. Adopting it would
+require `libasound2-dev` to build, break `CGO_ENABLED=0`, and end cross-compilation
+of the single binary, which is the shape this project ships. `mago` needs no
+compiler and no system library; its cost is roughly 3 MB of embedded native code,
+extracted to the user cache on first run. That is the accepted price of narration
+that works without asking the player to click.
+
+`beep` v1.4.1 already depends on `oto`, so a future switch would be small: it
+would mean deleting the device callback in favour of `beep/speaker`. It was not
+taken, and `mago/speaker` was not taken either, because both open a device with
+no backend or device selection. Owning the callback is what lets the tests run
+against mago's null backend and lets a user pick a device; the browser remains
+the fallback wherever a device is unavailable.
 
 ### 17.5 Endpoints
 
