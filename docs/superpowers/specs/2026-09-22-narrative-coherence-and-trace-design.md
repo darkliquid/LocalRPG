@@ -243,6 +243,8 @@ This is an explicit player action with no automatic equivalent, because deciding
 
 After generation and before recording, deterministic rules run over the narration and the segments. No model call: the value is in being cheap enough to run every turn and predictable enough to trust.
 
+Every rule is scoped to statements that actually claim canon. In particular, "unknown entity" does **not** fire on capitalised nouns in general: it fires on a name appearing with a speech line or a character/location-stating construction, which keeps the stop-word list to a handful of common words instead of a corpus that would rot.
+
 | Rule | Detection | Note |
 | --- | --- | --- |
 | Unknown entity | A capitalised multi-word proper noun matching no entity, alias, or stop-word list | "The Ashen Bastion" introduced with a different name |
@@ -261,11 +263,13 @@ Deliberately deferred: an advisory model pass that reads the notes and the narra
 
 ## 8. Threads and Recaps
 
-- Arc notes gain `state.status` (`open`, `complicated`, `resolved`) and `state.last_advanced` (a turn number).
-- `## OPEN THREADS` lists unresolved arcs with how long they have been idle, so a dropped thread is visible to the model as an omission rather than being silently forgotten.
-- The extractor reports which arcs a turn advanced, and the timeline writes `last_advanced`.
-- `GET /api/game/{id}/recap` returns the story-so-far text plus open threads; the GUI shows it in a panel, and `/recap` prints it in the TUI.
-- A campaign that has an arc idle for more than `agents.thread_idle_turns` (default 10) shows it as a nudge in the UI, not in the prompt.
+- Arc notes gain `state.status` and `state.last_advanced`. Status is a closed set: `open`, `complicated`, `resolved`. The extractor writes it as part of its normal pass, the player can edit it in the Codex, and anything outside the set is treated as `open` rather than rejected, so a typo degrades instead of breaking the section.
+- `last_advanced` is **derived from mentions**, not reported. An arc mentioned in a turn is an arc that turn touched, and `turn_entities` already records mentions with an index on `entity_id`. No schema change, no extractor prompt change, no extra failure mode, and it is deterministic. The cost is precision: an arc mentioned in passing counts as advanced. If that proves too loose, the rule can require a non-location mention, but starting loose and measuring beats starting clever.
+- `## OPEN THREADS` lists unresolved arcs with how long they have been idle, so a dropped thread is visible to the model as an omission rather than being silently forgotten. This is unconditional: a thread goes quiet precisely when the model should be prompted to return to it.
+- `agents.thread_idle_turns` (default 10) drives a **presentation-only** nudge in the UI. It never changes what the model is told, so a cosmetic threshold cannot alter the prompt.
+- `GET /api/game/{id}/recap` returns the story-so-far text plus open threads; the GUI shows it in a panel, and `/recap` prints it.
+- `/recap` **regenerates when the summary is stale**, then prints, because someone asking for a recap is asking about the present tense and not a snapshot up to ten turns old. The panel reads whatever exists and offers a refresh button.
+- The summary is **excluded from exports**. An export is a curated narrative artefact; the GM's own note about what it remembers is not part of the story.
 
 ---
 
@@ -390,9 +394,9 @@ Settings Studio gains, under Preferences: trace level, payload cap, and retentio
 | `agents.retrieval_turns` | 3 | Turns retrieved by entity overlap |
 | `agents.retrieval_halflife_turns` | 12 | Turns after which a retrieved turn's recency weight halves |
 | `agents.retrieval_chars` | 800 | Excerpt cap for one retrieved turn |
-| `agents.summary_every` | 10 | Turns between summary regenerations |
+| `agents.summary_every` | 10 | Turns between summary regenerations, counted from the opening turn |
+| `agents.thread_idle_turns` | 10 | Idle turns after which the UI nudges about a thread (presentation only) |
 | `agents.summary_char_limit` | 2000 | Injected summary cap |
-| `agents.thread_idle_turns` | 10 | When an open thread is considered idle |
 | `agents.continuity_checks` | `true` | Run the deterministic checks |
 | `preferences.trace_level` | `off` | `off`, `summary`, or `full`; `--trace` defaults to `full` |
 | `agents.trace_payload_chars` | 20000 | Per-event payload cap |
@@ -424,22 +428,19 @@ All defaulted, so existing configuration is unchanged. Every key is also exposed
 
 ## 14. Open Questions
 
-Settled in review:
+Settled in review, across four rounds:
 
-- **First round**: summary provider is the extractor; the trace is a single appended file; the chronicle is an entity; cadence includes a location change; the summary is subordinate; continuity checks are on by default, display-only plus a correction; retrieval excludes the player and the location; the summary surrenders last and only past the window.
-- **Second round**: retrieval ranks by recency-weighted overlap; the chronicle is hidden from the graph; summary regeneration is detached and never used by its triggering turn; addressed findings live in a per-campaign sidecar; corrections feed the summary; the untrimmed prompt is recorded when trimming occurs; raw provider lines are recorded alongside parsed chunks; trace rotation is 256 MiB across 3 files and `--trace` means `full`.
-- **Third round**: findings are dismissed individually, never by muting a rule, in `games/<id>/findings.json`; wire lines get a separate collapsible panel while the file keeps everything; only `chronicle` is filtered from the graph; recency uses a half-life defaulting to 12 turns; one pending summary regeneration rather than a queue, and a run in flight is never restarted.
+- **Round 1**: summary provider is the extractor; the trace is a single appended file; the chronicle is an entity; cadence includes a location change; the summary is subordinate; continuity checks are on by default, display-only plus a correction; retrieval excludes the player and the location; the summary surrenders last and only past the window.
+- **Round 2**: retrieval ranks by recency-weighted overlap; the chronicle is hidden from the graph; summary regeneration is detached and never used by its triggering turn; addressed findings live in a per-campaign sidecar; corrections feed the summary; the untrimmed prompt is recorded when trimming occurs; raw provider lines are recorded alongside parsed chunks; trace rotation is 256 MiB across 3 files and `--trace` means `full`.
+- **Round 3**: findings are dismissed individually, never by muting a rule, in `games/<id>/findings.json`; wire lines get a separate collapsible panel while the file keeps everything; only `chronicle` is filtered from the graph; recency uses a half-life defaulting to 12 turns; one pending summary regeneration rather than a queue, and a run in flight is never restarted.
+- **Round 4**: arc status is a closed set written by the extractor; `last_advanced` is derived from mentions; open threads are always in the prompt and the idle threshold is presentation-only; `/recap` regenerates when stale and summaries stay out of exports; cadence is 10 from the opening turn inclusive; all five continuity rules stay, with "unknown entity" scoped to claim-stating constructions.
 
-Section 8 (threads and recaps) has not been through a round yet, and Section 8 contains an ambiguity of mine: it lists open threads with their idle time in the prompt *and* says idle arcs are nudged in the UI and "not in the prompt". Round four covers that alongside the rest of Section 8.
+Queued for the fifth round:
 
-Queued for the fourth round:
-
-1. **Arc status.** Which values, and who writes them.
-2. **Arc advance tracking.** Derived from mentions, or reported by the extractor.
-3. **Thread visibility.** What the prompt always sees versus what the player is nudged about.
-4. **Recap scope and refresh.** Which surfaces exist, and whether `/recap` regenerates a stale summary.
-5. **Cadence number.** Confirm every 10 turns, and whether the opening turn is summarised.
-6. **Continuity rules.** Confirm the five proposed rules and their stop-word list.
+1. **Established names scope.** Every entity, or only those relevant to the scene, and is it genuinely untrimmable?
+2. **Delivery split.** One plan for the whole spec, or one for the trace and one for coherence?
+3. **Debug drawer placement.** A header drawer beside Character, Graph, and Codex, or a Settings tab?
+4. **`/recap` scope.** An engine command available from every client, or TUI-only?
 
 ## 15. File Map
 
