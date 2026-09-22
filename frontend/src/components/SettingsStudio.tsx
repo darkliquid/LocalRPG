@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { DebugPanel } from './DebugPanel';
 import { APIClient } from '../api/client';
 import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile } from '../types';
 import {
@@ -17,6 +18,7 @@ import {
   Trash2,
   Users,
   RotateCcw,
+  Bug,
 } from 'lucide-react';
 import {
   AGENT_PRESETS,
@@ -51,7 +53,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [activeFilePath, setActiveFilePath] = useState<string>('');
   const [isOverride, setIsOverride] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'paths' | 'agents' | 'media' | 'preferences'>('paths');
+  const [activeSubTab, setActiveSubTab] = useState<'paths' | 'agents' | 'media' | 'preferences' | 'debug'>('paths');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -211,6 +213,15 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           >
             <Sliders className="w-3.5 h-3.5" />
             <span>Preferences</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('debug')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
+              activeSubTab === 'debug' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Bug className="w-3.5 h-3.5" />
+            <span>Debug</span>
           </button>
         </div>
 
@@ -1559,6 +1570,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           </div>
         </div>
       )}
+
+      {/* Tab 5: Debug (developer view over the trace) */}
+      {activeSubTab === 'debug' && <DebugPanel config={config} setConfig={setConfig} />}
     </div>
   );
 };

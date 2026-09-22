@@ -18,6 +18,7 @@ import {
   SettingsResponse,
   TestProviderRequest,
   TestProviderResponse,
+  TraceEvent,
 } from '../types';
 
 export class APIClient {
@@ -81,6 +82,19 @@ export class APIClient {
   static async playSegmentAudio(gameID: string, turnNumber: number, segmentIndex: number): Promise<void> {
     const res = await fetch(`/api/game/${gameID}/turn/${turnNumber}/segment/${segmentIndex}/play`, { method: 'POST' });
     if (!res.ok) throw new Error(`playSegmentAudio: ${res.statusText}`);
+  }
+
+  static async traceEvents(limit = 200, gameID?: string): Promise<TraceEvent[]> {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (gameID) query.set('game', gameID);
+    const res = await fetch(`/api/trace?${query.toString()}`);
+    if (!res.ok) throw new Error(`traceEvents: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async clearTrace(): Promise<void> {
+    const res = await fetch('/api/trace', { method: 'DELETE' });
+    if (!res.ok) throw new Error(`clearTrace: ${res.statusText}`);
   }
 
   static async updateGameSettings(gameID: string, patch: { opening_prompt?: string }): Promise<void> {

@@ -205,6 +205,12 @@ export interface AgentsConfig {
   // How far back the narrator is reminded, and how much of each turn.
   recent_turn_window?: number;
   recent_turn_char_limit?: number;
+  // Tracing is opt-in, so these bound a debug session rather than normal play.
+  trace_payload_chars?: number;
+  trace_max_bytes?: number;
+  trace_max_files?: number;
+  trace_rotate_check?: number;
+  trace_chunk_limit?: number;
 }
 
 export interface VoiceProfile {
@@ -265,6 +271,15 @@ export interface PreferencesConfig {
   typing_speed_ms: number;
   cinematic_effects: boolean;
   font_scale: 'small' | 'medium' | 'large';
+  // "off", "summary", or "full". Off writes nothing, so normal play costs nothing.
+  trace_level?: string;
+}
+
+export interface TraceEvent {
+  ts: string;
+  event: string;
+  level: string;
+  fields?: Record<string, unknown>;
 }
 
 export interface AppConfig {
