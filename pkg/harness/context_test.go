@@ -51,10 +51,15 @@ func TestContextAssembler(t *testing.T) {
 	store.SaveEntity(arc)
 
 	assembler := NewContextAssembler(store)
-	ctxPrompt, err := assembler.AssembleContext("alden-tavern", "player", "I speak with Evelyn")
+	assembled, err := assembler.Assemble(ContextRequest{
+		LocationID: "alden-tavern",
+		PlayerID:   "player",
+		Action:     "I speak with Evelyn",
+	})
 	if err != nil {
-		t.Fatalf("AssembleContext failed: %v", err)
+		t.Fatalf("Assemble failed: %v", err)
 	}
+	ctxPrompt := assembled.Prompt
 
 	// Verify all layers are assembled
 	if !strings.Contains(ctxPrompt, "Alden Tavern") {
@@ -80,7 +85,14 @@ func TestContextAssemblerWithRulesAndLore(t *testing.T) {
 	rulesPrompt := "Resolution: 10+ Success, 7-9 Mixed, 6- Failure."
 	lorePrompt := "Atmosphere: Cold mist and distant bells."
 
-	prompt, err := assembler.AssembleContextWithRules("loc1", "p1", "I inspect the door", rulesPrompt, lorePrompt)
+	result, err := assembler.Assemble(ContextRequest{
+		LocationID:  "loc1",
+		PlayerID:    "p1",
+		Action:      "I inspect the door",
+		RulesPrompt: rulesPrompt,
+		LorePrompt:  lorePrompt,
+	})
+	prompt := result.Prompt
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -107,7 +119,12 @@ func TestContextAssembler_WithVoiceProfiles(t *testing.T) {
 		{ID: "young_scout", Description: "Agile rangers and scouts"},
 	}
 
-	result, err := assembler.AssembleContextWithProfiles("loc1", "p1", "I greet the elders", "", "", profiles, nil)
+	result, err := assembler.Assemble(ContextRequest{
+		LocationID: "loc1",
+		PlayerID:   "p1",
+		Action:     "I greet the elders",
+		Profiles:   profiles,
+	})
 	prompt := result.Prompt
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -124,10 +141,10 @@ func TestAssembleContextAlwaysAsksForAttributableSpeech(t *testing.T) {
 
 	// No rules prompt, no lore prompt: the instruction must not depend on a system
 	// or world shipping anything.
-	result, err := assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil, nil)
+	result, err := assembler.Assemble(ContextRequest{Action: "I listen"})
 	prompt := result.Prompt
 	if err != nil {
-		t.Fatalf("AssembleContextWithProfiles failed: %v", err)
+		t.Fatalf("Assemble failed: %v", err)
 	}
 
 	if !strings.Contains(prompt, "## SPEECH FORMATTING") {
@@ -149,16 +166,16 @@ func TestRecentTurnsAreRecalledWithinTheWindow(t *testing.T) {
 		{Number: 2, Mode: "Say", Input: "Late for what?", Narration: "The bell tolls once."},
 	}
 
-	result, err := assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil, recent)
+	result, err := assembler.Assemble(ContextRequest{Action: "I listen", Recent: recent})
 	if err != nil {
-		t.Fatalf("AssembleContextWithProfiles failed: %v", err)
+		t.Fatalf("Assemble failed: %v", err)
 	}
 	if !strings.Contains(result.Prompt, "Late for what?") || !strings.Contains(result.Prompt, "Rain hammers the market.") {
 		t.Errorf("recall lost a prior turn: %q", result.Prompt)
 	}
 
 	assembler.SetLimits(ContextLimits{RecentTurns: 1})
-	result, err = assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil, recent)
+	result, err = assembler.Assemble(ContextRequest{Action: "I listen", Recent: recent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,13 +197,13 @@ func TestContextBudgetTrimDropsRecallBeforeRules(t *testing.T) {
 		{Number: 3, Mode: "Do", Narration: longNarration},
 	}
 
-	unbounded, err := assembler.AssembleContextWithProfiles("", "", "I listen", "RULES", "LORE", nil, recent)
+	unbounded, err := assembler.Assemble(ContextRequest{Action: "I listen", RulesPrompt: "RULES", LorePrompt: "LORE", Recent: recent})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assembler.SetLimits(ContextLimits{TokenBudget: 400})
-	trimmed, err := assembler.AssembleContextWithProfiles("", "", "I listen", "RULES", "LORE", nil, recent)
+	trimmed, err := assembler.Assemble(ContextRequest{Action: "I listen", RulesPrompt: "RULES", LorePrompt: "LORE", Recent: recent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +232,7 @@ func TestTrimmingIsDrivenByTheBudgetNotTheCharCap(t *testing.T) {
 	// trimming: the two limits are independent, and only the budget trims.
 	assembler := NewContextAssembler(newTestEntityStore(t))
 	assembler.SetLimits(ContextLimits{TokenBudget: 0, RecentTurnChars: 1 << 20})
-	result, err := assembler.AssembleContextWithProfiles("", "", "I listen", "", "", nil, recent)
+	result, err := assembler.Assemble(ContextRequest{Action: "I listen", Recent: recent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +245,7 @@ func TestTrimmingIsDrivenByTheBudgetNotTheCharCap(t *testing.T) {
 
 	// The default cap shortens one turn without being a budget decision.
 	capped := NewContextAssembler(newTestEntityStore(t))
-	cappedResult, err := capped.AssembleContextWithProfiles("", "", "I listen", "", "", nil, recent)
+	cappedResult, err := capped.Assemble(ContextRequest{Action: "I listen", Recent: recent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,5 +263,57 @@ func TestTruncateRunesMarksWhatItCut(t *testing.T) {
 	}
 	if got := TruncateRunes("abc", 3); got != "abc" {
 		t.Errorf("TruncateRunes left a short string alone? got %q", got)
+	}
+}
+
+func TestAssembleReportsEverySectionAndKeepsTheActionLast(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+
+	result, err := assembler.Assemble(ContextRequest{
+		Action:      "I listen at the door",
+		RulesPrompt: "RULES",
+		LorePrompt:  "LORE",
+		TurnNumber:  4,
+	})
+	if err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+
+	// The action is the request the model answers; everything above is context.
+	if !strings.HasSuffix(result.Prompt, "I listen at the door\n") {
+		t.Errorf("the action must be last in the prompt")
+	}
+	if !strings.Contains(result.Prompt, "## PLAYER ACTION") {
+		t.Errorf("expected a player action section")
+	}
+
+	names := make([]string, 0, len(result.Sections))
+	for _, section := range result.Sections {
+		names = append(names, section.Name)
+		if !section.Included && section.Tokens != 0 {
+			t.Errorf("section %s is excluded but reports tokens", section.Name)
+		}
+	}
+	for _, wanted := range []string{"rules", "lore", "instructions", "canon", "recent", "action"} {
+		if !containsString(names, wanted) {
+			t.Errorf("expected a %q section, got %v", wanted, names)
+		}
+	}
+}
+
+func containsString(values []string, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+// saveEntity indexes a note the way the syncer does, without a file on disk.
+func saveEntity(t *testing.T, store *storage.Store, ent *entity.Entity) {
+	t.Helper()
+	if err := store.SaveEntity(ent); err != nil {
+		t.Fatalf("save entity %s: %v", ent.ID, err)
 	}
 }

@@ -331,14 +331,20 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		})
 	}
 
-	assembly, err := o.assembler.AssembleContextWithProfiles(locationID, o.playerID, generationPrompt, o.rulesPrompt, o.lorePrompt, o.timeline.VoiceProfiles(), recent)
+	assembly, err := o.assembler.Assemble(harness.ContextRequest{
+		LocationID:  locationID,
+		PlayerID:    o.playerID,
+		Action:      generationPrompt,
+		RulesPrompt: o.rulesPrompt,
+		LorePrompt:  o.lorePrompt,
+		Profiles:    o.timeline.VoiceProfiles(),
+		Recent:      recent,
+		TurnNumber:  turnNum,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)
 	}
 	contextPrompt := assembly.Prompt
-	if err != nil {
-		return nil, fmt.Errorf("assemble context: %w", err)
-	}
 
 	if gmDirective != "" {
 		contextPrompt = gmDirective + "\n\n" + contextPrompt

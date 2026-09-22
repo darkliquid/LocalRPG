@@ -41,12 +41,43 @@ type RecentTurn struct {
 	Narration string
 }
 
+// ContextRequest is everything one assembly needs. It replaced a positional
+// parameter list because recall needs the turn number, and a summary and more will
+// follow, at which point the list stops being readable.
+type ContextRequest struct {
+	LocationID  string
+	PlayerID    string
+	Action      string
+	RulesPrompt string
+	LorePrompt  string
+	Profiles    []config.VoiceProfile
+	Recent      []RecentTurn
+	TurnNumber  int
+}
+
+// SectionStat reports one section's cost so a trace can explain the prompt.
+type SectionStat struct {
+	Name     string
+	Tokens   int
+	Included bool
+}
+
 // AssembleResult is a prompt plus a note of what was left out, so a caller can
 // report trimming rather than losing context silently.
 type AssembleResult struct {
 	Prompt          string
 	EstimatedTokens int
 	Trimmed         []string
+	Sections        []SectionStat
+}
+
+// section is one block of the prompt. Its place in the slice is its place in the
+// prompt; rank is the order it is surrendered when the budget bites, lowest first.
+type section struct {
+	name      string
+	text      string
+	droppable bool
+	rank      int
 }
 
 type ContextAssembler struct {
@@ -64,30 +95,85 @@ func (c *ContextAssembler) SetLimits(limits ContextLimits) {
 	c.limits = limits
 }
 
+// Limits reports the limits in force, so a caller can prove configuration reached
+// the assembler rather than assuming it.
+func (c *ContextAssembler) Limits() ContextLimits {
+	return c.limits
+}
+
 // SetLogger attaches a trace sink. A nil logger records nothing.
 func (c *ContextAssembler) SetLogger(logger trace.Logger) {
 	c.logger = trace.OrNil(logger)
 }
 
-func (c *ContextAssembler) AssembleContext(locationID, playerID, playerAction string) (string, error) {
+// Assemble builds the prompt and trims it to the configured budget. Trimming is
+// ordered by what the narrator can best do without, defined by each section's rank.
+func (c *ContextAssembler) Assemble(req ContextRequest) (AssembleResult, error) {
+	sections, err := c.buildSections(req)
+	if err != nil {
+		return AssembleResult{}, err
+	}
+	return c.fitToBudget(req, sections), nil
+}
+
+// buildSections composes the prompt in order. Everything a section needs is read
+// here, so trimming never re-reads the store.
+func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) {
+	canon, err := c.assembleCanon(req)
+	if err != nil {
+		return nil, err
+	}
+
+	catalogue := ""
+	if len(req.Profiles) > 0 {
+		catalogue = FormatVoiceProfilesCatalog(req.Profiles) + "\n"
+	}
+
+	return []section{
+		{name: "rules", text: rulesSection(req.RulesPrompt)},
+		{name: "lore", text: loreSection(req.LorePrompt)},
+		{name: "instructions", text: speechFormattingInstruction + "\n\n"},
+		{name: "canon", text: canon},
+		{name: "recent", text: c.recentSection(req), droppable: true, rank: 4},
+		{name: "catalogue", text: catalogue, droppable: true, rank: 1},
+		{name: "action", text: "\n## PLAYER ACTION\n" + req.Action + "\n"},
+	}, nil
+}
+
+func rulesSection(prompt string) string {
+	if strings.TrimSpace(prompt) == "" {
+		return ""
+	}
+	return "## SYSTEM RULES & RESOLUTION MECHANICS\n" + strings.TrimSpace(prompt) + "\n\n"
+}
+
+func loreSection(prompt string) string {
+	if strings.TrimSpace(prompt) == "" {
+		return ""
+	}
+	return "## WORLD LORE & ATMOSPHERE\n" + strings.TrimSpace(prompt) + "\n\n"
+}
+
+// assembleCanon renders what is true: the scene, the player, the world's arcs, and
+// who is present. It is never trimmed, because every line of it is a constraint the
+// model would otherwise have to guess.
+func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, error) {
 	var sb strings.Builder
 
-	// Layer 1: Immediate Scene Scope
 	sb.WriteString("## IMMEDIATE SCENE\n")
-	if loc, err := c.store.GetEntity(locationID); err == nil && loc != nil {
+	if loc, err := c.store.GetEntity(req.LocationID); err == nil && loc != nil {
 		sb.WriteString(fmt.Sprintf("**Current Location:** %s\n%s\n\n", loc.Name, loc.Body))
 	}
 
-	if player, err := c.store.GetEntity(playerID); err == nil && player != nil {
+	if player, err := c.store.GetEntity(req.PlayerID); err == nil && player != nil {
 		sb.WriteString(fmt.Sprintf("**Player Character:** %s\n", player.Name))
 		if player.State != nil {
 			sb.WriteString(fmt.Sprintf("State: %+v\n\n", player.State.Raw()))
 		}
 	}
 
-	// Layer 2: Living World Arcs & Background Agendas
 	sb.WriteString("## LIVING WORLD & BACKGROUND ARCS\n")
-	edges, err := c.store.GetEdgesFrom(locationID)
+	edges, err := c.store.GetEdgesFrom(req.LocationID)
 	if err == nil {
 		for _, edge := range edges {
 			if ent, err := c.store.GetEntity(edge.TargetID); err == nil && ent != nil && ent.Type == "arc" {
@@ -96,7 +182,6 @@ func (c *ContextAssembler) AssembleContext(locationID, playerID, playerAction st
 		}
 	}
 
-	// Layer 3: Present Actors
 	sb.WriteString("## PRESENT CHARACTERS & NOTABLE BEINGS\n")
 	if err == nil {
 		for _, edge := range edges {
@@ -106,11 +191,144 @@ func (c *ContextAssembler) AssembleContext(locationID, playerID, playerAction st
 		}
 	}
 
-	// Layer 4: Player Action
-	sb.WriteString("\n## PLAYER ACTION\n")
-	sb.WriteString(playerAction + "\n")
-
 	return sb.String(), nil
+}
+
+// recentSection renders the tail of the timeline, bounded by the configured window
+// and excerpt length.
+func (c *ContextAssembler) recentSection(req ContextRequest) string {
+	window := c.limits.RecentTurns
+	if window <= 0 {
+		window = defaultRecentTurns
+	}
+	charLimit := c.limits.RecentTurnChars
+	if charLimit <= 0 {
+		charLimit = defaultRecentTurnChars
+	}
+
+	turns := req.Recent
+	if len(turns) > window {
+		turns = turns[len(turns)-window:]
+	}
+	return formatRecentTurns(turns, charLimit)
+}
+
+// fitToBudget drops optional sections in rank order until the prompt fits, then
+// records every section's cost so a trace can explain the result.
+func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) AssembleResult {
+	trimmed := make([]string, 0)
+	budget := c.limits.TokenBudget
+
+	total := func() int {
+		sum := 0
+		for _, candidate := range sections {
+			sum += estimateTokens(candidate.text)
+		}
+		return sum
+	}
+
+	for budget > 0 && total() > budget {
+		dropped := false
+		for _, rank := range []int{1, 2, 3, 4} {
+			for index := range sections {
+				if sections[index].droppable && sections[index].rank == rank && sections[index].text != "" {
+					sections[index].text = ""
+					trimmed = append(trimmed, sectionDescription(sections[index].name))
+					dropped = true
+					break
+				}
+			}
+			if dropped {
+				break
+			}
+		}
+		if dropped {
+			continue
+		}
+		// Nothing left that may be dropped as a whole, so the recall window is
+		// shortened rather than removed.
+		if !c.shortenRecent(req, sections) {
+			break
+		}
+		trimmed = append(trimmed, "shorter excerpts of recent turns")
+	}
+
+	var prompt strings.Builder
+	stats := make([]SectionStat, 0, len(sections))
+	for _, candidate := range sections {
+		if candidate.text != "" {
+			prompt.WriteString(candidate.text)
+		}
+		stats = append(stats, SectionStat{
+			Name:     candidate.name,
+			Tokens:   estimateTokens(candidate.text),
+			Included: candidate.text != "",
+		})
+	}
+
+	result := AssembleResult{
+		Prompt:          prompt.String(),
+		EstimatedTokens: estimateTokens(prompt.String()),
+		Trimmed:         trimmed,
+		Sections:        stats,
+	}
+
+	// The prompt is recorded here and nowhere else. Everything downstream refers
+	// to it by hash, so the trace holds one copy rather than one per call site.
+	c.logger = trace.OrNil(c.logger)
+	c.logger.Event("context.assembled", map[string]interface{}{
+		"estimated_tokens": result.EstimatedTokens,
+		"budget":           budget,
+		"trimmed":          trimmed,
+		"recall_turns":     len(req.Recent),
+		"sections":         stats,
+		"prompt":           result.Prompt,
+	})
+
+	return result
+}
+
+// shortenRecent halves the excerpt cap, which is the last thing surrendered before
+// recall disappears entirely.
+func (c *ContextAssembler) shortenRecent(req ContextRequest, sections []section) bool {
+	for index := range sections {
+		if sections[index].name != "recent" || sections[index].text == "" {
+			continue
+		}
+
+		limit := c.limits.RecentTurnChars
+		if limit <= 0 {
+			limit = defaultRecentTurnChars
+		}
+		if limit <= minRecentTurnChars {
+			sections[index].text = ""
+			return true
+		}
+
+		limit /= 2
+		if limit < minRecentTurnChars {
+			limit = minRecentTurnChars
+		}
+		c.limits.RecentTurnChars = limit
+		sections[index].text = c.recentSection(req)
+		return true
+	}
+	return false
+}
+
+func sectionDescription(name string) string {
+	switch name {
+	case "catalogue":
+		return "the voice profile catalogue"
+	case "retrieval":
+		return "relevant history"
+	case "recall":
+		return "what happened here"
+	case "recent":
+		return "all recent events"
+	default:
+		return name
+	}
 }
 
 // FormatVoiceProfilesCatalog describes the voices available for NPCs. It asks for
@@ -150,105 +368,6 @@ Never rename a character who has already appeared. Once someone is introduced,
 reuse exactly the same name, and link them with [[that name]] every time.
 Continue the conversation the player is having; do not restart the scene.
 Do not write voice IDs, voice tags, or profile names into the narration.`
-
-func (c *ContextAssembler) AssembleContextWithRules(locationID, playerID, playerAction, rulesPrompt, lorePrompt string) (string, error) {
-	result, err := c.AssembleContextWithProfiles(locationID, playerID, playerAction, rulesPrompt, lorePrompt, nil, nil)
-	if err != nil {
-		return "", err
-	}
-	return result.Prompt, nil
-}
-
-// AssembleContextWithProfiles builds the prompt and trims it to the configured
-// budget. Trimming is ordered by what the narrator can best do without: the voice
-// catalogue, then the oldest recalled turns, then recall entirely. Rules, lore,
-// the scene, and the player's action are never dropped, because a prompt without
-// them is not a smaller prompt, it is a broken one.
-func (c *ContextAssembler) AssembleContextWithProfiles(locationID, playerID, playerAction, rulesPrompt, lorePrompt string, profiles []config.VoiceProfile, recent []RecentTurn) (AssembleResult, error) {
-	base, err := c.AssembleContext(locationID, playerID, playerAction)
-	if err != nil {
-		return AssembleResult{}, err
-	}
-
-	var head strings.Builder
-	if strings.TrimSpace(rulesPrompt) != "" {
-		head.WriteString("## SYSTEM RULES & RESOLUTION MECHANICS\n")
-		head.WriteString(strings.TrimSpace(rulesPrompt) + "\n\n")
-	}
-	if strings.TrimSpace(lorePrompt) != "" {
-		head.WriteString("## WORLD LORE & ATMOSPHERE\n")
-		head.WriteString(strings.TrimSpace(lorePrompt) + "\n\n")
-	}
-	head.WriteString(speechFormattingInstruction + "\n\n")
-
-	catalog := ""
-	if len(profiles) > 0 {
-		catalog = FormatVoiceProfilesCatalog(profiles) + "\n"
-	}
-
-	window := c.limits.RecentTurns
-	if window <= 0 {
-		window = defaultRecentTurns
-	}
-	charLimit := c.limits.RecentTurnChars
-	if charLimit <= 0 {
-		charLimit = defaultRecentTurnChars
-	}
-
-	turns := recent
-	if len(turns) > window {
-		turns = turns[len(turns)-window:]
-	}
-	recall := formatRecentTurns(turns, charLimit)
-
-	trimmed := make([]string, 0)
-	budget := c.limits.TokenBudget
-	overBudget := func() bool {
-		return budget > 0 && estimateTokens(head.String()+catalog+recall+base) > budget
-	}
-
-	if overBudget() && catalog != "" {
-		catalog = ""
-		trimmed = append(trimmed, "the voice profile catalogue")
-	}
-
-	for overBudget() && len(turns) > 0 {
-		turns = turns[1:]
-		recall = formatRecentTurns(turns, charLimit)
-		trimmed = append(trimmed, "the oldest remembered turn")
-	}
-
-	if overBudget() && recall != "" && charLimit > minRecentTurnChars {
-		charLimit = minRecentTurnChars
-		recall = formatRecentTurns(turns, charLimit)
-		trimmed = append(trimmed, "shorter excerpts of recent turns")
-	}
-
-	if overBudget() && recall != "" {
-		recall = ""
-		trimmed = append(trimmed, "all recent events")
-	}
-
-	prompt := head.String() + catalog + recall + base
-	result := AssembleResult{
-		Prompt:          prompt,
-		EstimatedTokens: estimateTokens(prompt),
-		Trimmed:         trimmed,
-	}
-
-	// The prompt is recorded here and nowhere else. Everything downstream refers
-	// to it by hash, so the trace holds one copy rather than one per call site.
-	c.logger = trace.OrNil(c.logger)
-	c.logger.Event("context.assembled", map[string]interface{}{
-		"estimated_tokens": result.EstimatedTokens,
-		"budget":           c.limits.TokenBudget,
-		"trimmed":          trimmed,
-		"recall_turns":     len(turns),
-		"prompt":           prompt,
-	})
-
-	return result, nil
-}
 
 // formatRecentTurns renders the tail of the timeline for the narrator. It is a
 // transcript rather than a summary, because summarising is what loses the details
