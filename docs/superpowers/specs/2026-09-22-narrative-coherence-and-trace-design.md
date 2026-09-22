@@ -81,13 +81,16 @@ The second half of this spec is the reason the first half is hard to debug: ther
 | Retrieval query set | Recent speech speakers and recently mentioned characters, **excluding the player and the location**, which other sections already cover |
 | Summary in the budget | Summoned last, and only for campaigns whose history exceeds the recall window |
 | Trace cost model | Opt-in: `off` by default, so retention bounds guard against a debug session left running, not against normal play |
-| Retrieval ranking | Overlap weighted by recency decay, then turn number as a tie-break |
+| Retrieval ranking | Overlap weighted by a recency half-life (`agents.retrieval_halflife_turns`, default 12), then turn number as a tie-break |
 | Chronicle in the graph | Hidden. The Codex is where it is edited; an isolated node is furniture |
 | Summary timing | Detached from the turn that triggered it, deliberately not used by that turn, so it can never add latency or damage a turn |
-| Findings on record | `history.jsonl` stays append-only; addressed findings are marked in a per-campaign sidecar |
+| Findings on record | `history.jsonl` stays append-only; addressed findings are marked in `games/<id>/findings.json` |
 | Corrections feed the summary | A correction is the player stating a fact, which is what the summary is for |
 | Untrimmed prompt | Recorded at `full` whenever the budget trimmed, because "what did I lose" is the likeliest reason to be tracing |
 | Wire fidelity | Both: parsed chunks as consumed, plus raw provider lines under `provider.wire`, so a parse bug is distinguishable from a model bug |
+| Finding dismissal scope | Per finding, never a per-rule mute, because a mute is how a useful check dies quietly |
+| Debug drawer | Wire lines live in a separate collapsible panel, closed by default; the file keeps everything, the UI bounds what it shows |
+| Graph filter | `chronicle` only. Arcs link, and are among the most informative nodes |
 
 ---
 
@@ -250,7 +253,7 @@ After generation and before recording, deterministic rules run over the narratio
 
 Findings become `Turn.ContinuityNotes []string`, rendered under the turn like `ContextNotes`, with a **Correct** action that submits the finding as a `/gm` directive on the next turn. Nothing is auto-rewritten.
 
-Because `history.jsonl` is append-only, addressing a finding does not edit the turn. `games/<id>/findings.json` records `{turn, rule}` pairs the player has addressed, so the UI can render them as handled while the record itself stays intact. Dismissing is per finding, never per rule, so a rule that becomes noisy is tuned rather than muted. The correction turn is ordinary history, so it reaches the next summary without special handling.
+Because `history.jsonl` is append-only, addressing a finding does not edit the turn. `games/<id>/findings.json` records `{turn, rule}` pairs the player has addressed, so the UI can render them as handled while the record itself stays intact. The file is plain and user-visible rather than a hidden column: it holds a decision the player made, so it should survive an index rebuild and be inspectable. Dismissing is per finding, never per rule, so a rule that becomes noisy is tuned rather than muted. It stays out of `entities/` because it is bookkeeping, not lore. The correction turn is ordinary history, so it reaches the next summary without special handling.
 
 Deliberately deferred: an advisory model pass that reads the notes and the narration and reports contradictions in prose. It costs a call per turn and its output is harder to trust; if it is added later it belongs behind its own config flag.
 
@@ -385,6 +388,7 @@ Settings Studio gains, under Preferences: trace level, payload cap, and retentio
 | `agents.scene_recall_turns` | 4 | Turns recalled at the current location |
 | `agents.scene_recall_chars` | 800 | Excerpt cap for one recalled turn |
 | `agents.retrieval_turns` | 3 | Turns retrieved by entity overlap |
+| `agents.retrieval_halflife_turns` | 12 | Turns after which a retrieved turn's recency weight halves |
 | `agents.retrieval_chars` | 800 | Excerpt cap for one retrieved turn |
 | `agents.summary_every` | 10 | Turns between summary regenerations |
 | `agents.summary_char_limit` | 2000 | Injected summary cap |
@@ -424,14 +428,18 @@ Settled in review:
 
 - **First round**: summary provider is the extractor; the trace is a single appended file; the chronicle is an entity; cadence includes a location change; the summary is subordinate; continuity checks are on by default, display-only plus a correction; retrieval excludes the player and the location; the summary surrenders last and only past the window.
 - **Second round**: retrieval ranks by recency-weighted overlap; the chronicle is hidden from the graph; summary regeneration is detached and never used by its triggering turn; addressed findings live in a per-campaign sidecar; corrections feed the summary; the untrimmed prompt is recorded when trimming occurs; raw provider lines are recorded alongside parsed chunks; trace rotation is 256 MiB across 3 files and `--trace` means `full`.
+- **Third round**: findings are dismissed individually, never by muting a rule, in `games/<id>/findings.json`; wire lines get a separate collapsible panel while the file keeps everything; only `chronicle` is filtered from the graph; recency uses a half-life defaulting to 12 turns; one pending summary regeneration rather than a queue, and a run in flight is never restarted.
 
-Queued for the third round:
+Section 8 (threads and recaps) has not been through a round yet, and Section 8 contains an ambiguity of mine: it lists open threads with their idle time in the prompt *and* says idle arcs are nudged in the UI and "not in the prompt". Round four covers that alongside the rest of Section 8.
 
-1. **Finding dismissal scope.** Per finding, or a per-rule mute, and where the sidecar lives.
-2. **Debug drawer shape.** Interleaved wire lines, or a separate panel, and how their volume is bounded in the UI.
-3. **Graph filter.** Hide `chronicle` only, or arcs too.
-4. **Recency decay shape.** Linear, or a half-life knob, and its default.
-5. **Coalescing.** Confirm one pending regeneration rather than a queue.
+Queued for the fourth round:
+
+1. **Arc status.** Which values, and who writes them.
+2. **Arc advance tracking.** Derived from mentions, or reported by the extractor.
+3. **Thread visibility.** What the prompt always sees versus what the player is nudged about.
+4. **Recap scope and refresh.** Which surfaces exist, and whether `/recap` regenerates a stale summary.
+5. **Cadence number.** Confirm every 10 turns, and whether the opening turn is summarised.
+6. **Continuity rules.** Confirm the five proposed rules and their stop-word list.
 
 ## 15. File Map
 
