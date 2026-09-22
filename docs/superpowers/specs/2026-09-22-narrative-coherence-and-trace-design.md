@@ -141,7 +141,7 @@ State: danger_level=2, brazier_lit=true
 
 Present characters and arcs gain the same treatment, and the arc's clock is stated in words (`Clock: 2/6`), because a bare `{clock_ticks: 2}` in the prompt is what the model ignores.
 
-A new `## ESTABLISHED NAMES` block lists every character, location, and arc by canonical name plus any alias, so the model has a vocabulary to reuse instead of inventing one.
+A new `## ESTABLISHED NAMES` block lists the names **in play**: the entities the scene edges already produce, plus anyone mentioned in the recall window. It exists so the model reuses existing names for the scene it is writing, not so it knows the whole dramatis personae; the summary carries the wider cast. Sending the full roster would be thousands of characters that can never be dropped, which defeats the budget, so above roughly forty names the answer is a wider recall window rather than a longer roster.
 
 Rules:
 
@@ -268,6 +268,7 @@ Deliberately deferred: an advisory model pass that reads the notes and the narra
 - `## OPEN THREADS` lists unresolved arcs with how long they have been idle, so a dropped thread is visible to the model as an omission rather than being silently forgotten. This is unconditional: a thread goes quiet precisely when the model should be prompted to return to it.
 - `agents.thread_idle_turns` (default 10) drives a **presentation-only** nudge in the UI. It never changes what the model is told, so a cosmetic threshold cannot alter the prompt.
 - `GET /api/game/{id}/recap` returns the story-so-far text plus open threads; the GUI shows it in a panel, and `/recap` prints it.
+- `/recap` is an **engine command** in `ProcessActionStream`, beside `/undo`, `/go`, and `/gm`, so it short-circuits before generation and works from every client. A TUI-only implementation would leave the GUI console unable to answer "where were we?".
 - `/recap` **regenerates when the summary is stale**, then prints, because someone asking for a recap is asking about the present tense and not a snapshot up to ten turns old. The panel reads whatever exists and offers a refresh button.
 - The summary is **excluded from exports**. An export is a curated narrative artefact; the GM's own note about what it remembers is not part of the story.
 
@@ -366,7 +367,9 @@ Providers, the assembler, the orchestrator, the timeline, and the media clients 
 | `DELETE` | `/api/trace` | clears the trace, optionally filtered to one campaign by rewrite |
 | `GET` | `/api/game/{id}/recap` | story so far and open threads |
 
-A **Debug** drawer shows the most recent turn's events as a timeline: context sections and their token cost, the prompt (collapsible, copyable), the provider request and timings, the raw generation next to the parsed segments, the extraction result, continuity findings, and media calls. It polls `/api/trace` once a second while a turn is in flight and otherwise reads on open.
+The Debug view lives at **Settings → Debug**, next to the switch that enables tracing, and deliberately not as a fifth header pill. The header is about the story; the trace is a developer view showing prompts, raw provider bytes, and model metadata, and it is the one panel that is useless during normal play.
+
+It shows the most recent turn's events as a timeline: context sections and their token cost, the prompt (collapsible, copyable), the provider request and timings, the raw generation next to the parsed segments, the extraction result, continuity findings, and media calls. It polls `/api/trace` once a second while a turn is in flight and otherwise reads on open.
 
 Settings Studio gains, under Preferences: trace level, payload cap, and retention.
 
@@ -428,19 +431,40 @@ All defaulted, so existing configuration is unchanged. Every key is also exposed
 
 ## 14. Open Questions
 
-Settled in review, across four rounds:
+Settled in review, across five rounds:
 
 - **Round 1**: summary provider is the extractor; the trace is a single appended file; the chronicle is an entity; cadence includes a location change; the summary is subordinate; continuity checks are on by default, display-only plus a correction; retrieval excludes the player and the location; the summary surrenders last and only past the window.
 - **Round 2**: retrieval ranks by recency-weighted overlap; the chronicle is hidden from the graph; summary regeneration is detached and never used by its triggering turn; addressed findings live in a per-campaign sidecar; corrections feed the summary; the untrimmed prompt is recorded when trimming occurs; raw provider lines are recorded alongside parsed chunks; trace rotation is 256 MiB across 3 files and `--trace` means `full`.
 - **Round 3**: findings are dismissed individually, never by muting a rule, in `games/<id>/findings.json`; wire lines get a separate collapsible panel while the file keeps everything; only `chronicle` is filtered from the graph; recency uses a half-life defaulting to 12 turns; one pending summary regeneration rather than a queue, and a run in flight is never restarted.
 - **Round 4**: arc status is a closed set written by the extractor; `last_advanced` is derived from mentions; open threads are always in the prompt and the idle threshold is presentation-only; `/recap` regenerates when stale and summaries stay out of exports; cadence is 10 from the opening turn inclusive; all five continuity rules stay, with "unknown entity" scoped to claim-stating constructions.
+- **Round 5**: `## ESTABLISHED NAMES` covers names in play only, and stays small by widening recall rather than growing; delivered as two plans, trace first; the Debug view is a Settings tab; `/recap` is an engine command.
 
-Queued for the fifth round:
+### Agentic turns (raised after round 5)
 
-1. **Established names scope.** Every entity, or only those relevant to the scene, and is it genuinely untrimmable?
-2. **Delivery split.** One plan for the whole spec, or one for the trace and one for coherence?
-3. **Debug drawer placement.** A header drawer beside Character, Graph, and Codex, or a Settings tab?
-4. **`/recap` scope.** An engine command available from every client, or TUI-only?
+A turn may need more than one model call. The GM should be able to call internal tools mid-turn: search for a reference, look up an entity, walk the graph, query the timeline, and eventually perform vector retrieval, in order to build a coherent reply rather than being handed everything up front.
+
+This is a new branch on the tree and changes the turn pipeline and the provider contract, so it is **not** folded into the increments above. `pkg/harness` today has no notion of tools at all:
+
+```go
+type ModelProvider interface {
+	ID() string
+	Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error)
+	Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error
+}
+type GenerateRequest struct{ Prompt, System string; Temperature float64; MaxTokens int; Extra map[string]interface{} }
+type StreamChunk struct{ Text string; Done bool; FinishReason string; Error error }
+```
+
+There is a single `Prompt` field, so a tool round cannot be represented, and no way to return a tool call. The index has **no full-text search** (`no FTS5, no MATCH, no LIKE`) and the codebase has **no embeddings** of any kind, so the retrieval the request implies does not exist yet either.
+
+Round six puts the shape questions to review before this becomes its own spec:
+
+1. **Where it lives.** A separate spec, or a section added here.
+2. **Sequencing.** Before or after the coherence increments.
+3. **Recall and tools.** Does the pre-injected context stay, or do tools replace it.
+4. **Tool availability.** Function calling where supported and something else where not, or tools only for capable providers.
+5. **Retrieval stack.** Lexical and graph tools first, embeddings later, or embeddings from the start.
+6. **Bounds.** Tool rounds per turn, tool result size, and the ceiling on a turn's whole conversation.
 
 ## 15. File Map
 
@@ -472,7 +496,7 @@ Queued for the fifth round:
 
 ## 16. Delivery Increments
 
-1. **Trace** — `pkg/trace`, providers, assembler, orchestrator, media, file sink, `--trace`, Debug drawer. First because it makes every later increment diagnosable.
+1. **Trace** — `pkg/trace`, providers, assembler, orchestrator, media, file sink, `--trace`, Debug view. First because it makes every later increment diagnosable.
 2. **Canon** — state rendering, established names, `SectionStat` and the budget interaction.
 3. **Recall** — scene recall and retrieval, with their store queries and config.
 4. **Summary** — the `chronicle` note, cadence, `/recap`, recap panel.
@@ -480,3 +504,5 @@ Queued for the fifth round:
 6. **Verification** — continuity rules and their UI; open threads and idle nudges.
 
 Each increment is independently testable and leaves a coherent product: increment 1 pays for itself immediately, 2 and 3 sharpen what is already sent, 4 extends the horizon, 5 and 6 keep it healthy.
+
+The work is planned as **two plans** rather than one. The trace is additive and touches many packages shallowly; coherence changes what the model is sent, which is behaviour judged by playing. Trace-first is not a preference: it is the instrument used to verify that canon reaches the prompt at all, and to tune the budget against real prompts.
