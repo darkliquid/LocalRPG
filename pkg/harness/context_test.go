@@ -647,3 +647,69 @@ func TestRelevantHistoryCountsAnEntityOncePerTurn(t *testing.T) {
 		t.Errorf("expected turn 2 to rank first once mentions are deduplicated:\n%s", history)
 	}
 }
+
+func TestSummaryIsInjectedAsASubordinateRecollection(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+
+	result, err := assembler.Assemble(ContextRequest{
+		Action:  "I ask about the oil",
+		Summary: "The party reached the harbour and learnt the oil was low.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(result.Prompt, "STORY SO FAR") {
+		t.Fatalf("expected a summary section:\n%s", result.Prompt)
+	}
+	if !strings.Contains(result.Prompt, "oil was low") {
+		t.Errorf("expected the summary text:\n%s", result.Prompt)
+	}
+	// It is a recollection, and says so, because it is lossy and model-written.
+	lowered := strings.ToLower(result.Prompt)
+	if !strings.Contains(lowered, "recollection") || !strings.Contains(lowered, "not authoritative") {
+		t.Errorf("the summary must be marked as subordinate to canon:\n%s", result.Prompt)
+	}
+}
+
+func TestSummaryIsTheLastSectionSurrendered(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+	// A budget that trims every droppable section, so the reported order is the
+	// whole order rather than whichever one happened to fit.
+	assembler.SetLimits(ContextLimits{TokenBudget: 1, SceneRecallTurns: 0, RetrievalTurns: 0})
+
+	result, err := assembler.Assemble(ContextRequest{
+		Action:      "I listen",
+		RulesPrompt: "RULES",
+		LorePrompt:  "LORE",
+		Summary:     strings.Repeat("the mist rolls in ", 40),
+		Profiles:    []config.VoiceProfile{{ID: "elder_sage", Description: "Ancient wizards"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	catalogueAt, summaryAt := -1, -1
+	for i, name := range result.Trimmed {
+		if strings.Contains(name, "catalogue") {
+			catalogueAt = i
+		}
+		if strings.Contains(name, "story so far") {
+			summaryAt = i
+		}
+	}
+	if catalogueAt == -1 || summaryAt == -1 {
+		t.Fatalf("expected both to be trimmed, got %v", result.Trimmed)
+	}
+	// The compressed memory is the cheapest continuity per token, so it is the last
+	// thing given up.
+	if catalogueAt > summaryAt {
+		t.Errorf("the catalogue must go before the summary, got %v", result.Trimmed)
+	}
+
+	for _, section := range result.Sections {
+		if section.Name == "summary" && section.Included {
+			t.Errorf("expected the summary to be dropped under a one-token budget")
+		}
+	}
+}

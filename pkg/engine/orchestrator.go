@@ -71,6 +71,7 @@ type TurnOrchestrator struct {
 	chunkTimeout  time.Duration
 	openingPrompt string
 	logger        trace.Logger
+	chronicler    *Chronicler
 }
 
 func NewTurnOrchestrator(
@@ -123,6 +124,21 @@ func (o *TurnOrchestrator) SetLogger(logger trace.Logger) {
 // configuration reached it rather than assuming it did.
 func (o *TurnOrchestrator) ContextLimits() harness.ContextLimits {
 	return o.assembler.Limits()
+}
+
+// SetChronicler gives the orchestrator the campaign's long memory. The summary is
+// read at assembly time rather than cached, because the chronicle is written by
+// another goroutine and a turn must use whatever was current when it started.
+func (o *TurnOrchestrator) SetChronicler(chronicler *Chronicler) {
+	o.chronicler = chronicler
+}
+
+// gameID is the campaign this orchestrator plays, which the chronicle belongs to.
+func (o *TurnOrchestrator) gameID() string {
+	if o.timeline == nil {
+		return ""
+	}
+	return o.timeline.GameID()
 }
 
 // SetContextLimits applies the configured prompt budget and recall window.
@@ -337,6 +353,15 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		})
 	}
 
+	// Long memory is a recollection, not canon, so it is injected as one and canon
+	// wins wherever they disagree.
+	summary := ""
+	if o.chronicler != nil {
+		if chronicle, err := o.chronicler.Recap(o.gameID()); err == nil {
+			summary = chronicle.Summary
+		}
+	}
+
 	assembly, err := o.assembler.Assemble(harness.ContextRequest{
 		LocationID:  locationID,
 		PlayerID:    o.playerID,
@@ -346,6 +371,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Profiles:    o.timeline.VoiceProfiles(),
 		Recent:      recent,
 		TurnNumber:  turnNum,
+		Summary:     summary,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)

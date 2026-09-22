@@ -66,6 +66,9 @@ type ContextRequest struct {
 	Profiles    []config.VoiceProfile
 	Recent      []RecentTurn
 	TurnNumber  int
+	// Summary is the campaign's recollection of everything older than the recall
+	// window. It is lossy, so it is stated as subordinate to canon.
+	Summary string
 }
 
 // SectionStat reports one section's cost so a trace can explain the prompt.
@@ -147,6 +150,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 		{name: "lore", text: loreSection(req.LorePrompt)},
 		{name: "instructions", text: speechFormattingInstruction + "\n\n"},
 		{name: "canon", text: canon},
+		{name: "summary", text: summarySection(req.Summary), droppable: true, rank: 6},
 		{name: "recent", text: c.recentSection(req), droppable: true, rank: 4},
 		{name: "recall", text: c.sceneRecall(req), droppable: true, rank: 3},
 		{name: "retrieval", text: c.relevantHistory(req), droppable: true, rank: 2},
@@ -238,6 +242,20 @@ func (c *ContextAssembler) windowTurns(req ContextRequest) []RecentTurn {
 		turns = turns[len(turns)-window:]
 	}
 	return turns
+}
+
+// summarySection renders the campaign's long memory. It is explicitly a
+// recollection: it is model-written and lossy, and canon wins wherever they differ.
+func summarySection(summary string) string {
+	if strings.TrimSpace(summary) == "" {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n## STORY SO FAR (a recollection, not authoritative)\n")
+	sb.WriteString("Where this differs from the state and notes above, they are correct and this is not.\n")
+	sb.WriteString(strings.TrimSpace(summary) + "\n")
+	return sb.String()
 }
 
 // recentSection renders the tail of the timeline, bounded by the configured window
@@ -498,7 +516,10 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 
 	for budget > 0 && total() > budget {
 		dropped := false
-		for _, rank := range []int{1, 2, 3, 4} {
+		// Rank 5 is deliberately unused: it was reserved for shortening the recall
+		// excerpts, which happens after every whole section has been dropped. Rank 6
+		// is the summary, which is surrendered last.
+		for _, rank := range []int{1, 2, 3, 4, 6} {
 			for index := range sections {
 				if sections[index].droppable && sections[index].rank == rank && sections[index].text != "" {
 					sections[index].text = ""
@@ -593,6 +614,8 @@ func sectionDescription(name string) string {
 		return "relevant history"
 	case "recall":
 		return "what happened here"
+	case "summary":
+		return "the story so far"
 	case "recent":
 		return "all recent events"
 	default:

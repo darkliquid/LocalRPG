@@ -29,6 +29,11 @@ func NewTimeline(paths *core.PathResolver, store *storage.Store, history *Histor
 	return &Timeline{paths: paths, store: store, history: history, gameID: gameID}
 }
 
+// GameID is the campaign this timeline records.
+func (t *Timeline) GameID() string {
+	return t.gameID
+}
+
 // SetVoiceProfiles provides the archetypes assigned to newly discovered characters.
 func (t *Timeline) SetVoiceProfiles(profiles []config.VoiceProfile) {
 	t.voiceProfiles = profiles
