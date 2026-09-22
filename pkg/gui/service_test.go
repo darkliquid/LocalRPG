@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
@@ -398,5 +399,43 @@ func TestChronicleTurnsCarryLocationAndPacing(t *testing.T) {
 	}
 	if len(turn.Segments) != 1 || turn.Segments[0].Duration < scene.MinimumBeatDuration.Seconds() {
 		t.Errorf("expected a paced segment, got %+v", turn.Segments)
+	}
+}
+
+func TestTestProviderTTSReturnsPlayableAudio(t *testing.T) {
+	_, svc := setupTestGame(t)
+
+	res, err := svc.TestProvider(context.Background(), TestProviderRequestDTO{
+		Category: "tts",
+		Provider: config.TTSConfig{Type: "builtin", BuiltinName: "echo", DefaultVoice: "narrator"},
+	})
+	if err != nil {
+		t.Fatalf("TestProvider failed: %v", err)
+	}
+	if !res.Success {
+		t.Fatalf("expected a successful TTS probe, got %q", res.Message)
+	}
+	if !strings.HasPrefix(res.AudioDataURI, "data:audio/wav;base64,") {
+		t.Fatalf("expected an inline wav data URI for playback, got %q", res.AudioDataURI)
+	}
+}
+
+func TestGetGameStateFindsALegacyDisplayNamePlayer(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	// Rewrite the manifest the way a pre-player_name build wrote it: the display
+	// name in player:, the note still named by its slug.
+	manifestPath := filepath.Join(svc.GetResolver().GameDir(gameID), "game.yaml")
+	legacy := "id: test-campaign\nname: Test Campaign\nsystem: core-d20\nworld: shadow-realm\nplayer: Elena Nightshade\n"
+	if err := os.WriteFile(manifestPath, []byte(legacy), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := svc.GetGameState(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("GetGameState failed for a legacy manifest: %v", err)
+	}
+	if state.Player.Name != "Elena Nightshade" {
+		t.Errorf("Player.Name = %q, want Elena Nightshade", state.Player.Name)
 	}
 }

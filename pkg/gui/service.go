@@ -178,6 +178,16 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, a
 // the route and its tests read unchanged and there is only one value to compare.
 var ErrAudioUnavailable = scene.ErrAudioUnavailable
 
+// storeOrNil opens a campaign's index, returning nil rather than an error so a
+// caller that can fall back does not have to branch on the error value.
+func (s *Service) storeOrNil(gameID string) *storage.Store {
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil
+	}
+	return store
+}
+
 func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDTO, error) {
 	gameDir := s.resolver.GameDir(gameID)
 	manifestPath := filepath.Join(gameDir, "game.yaml")
@@ -186,7 +196,13 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		return nil, fmt.Errorf("read game manifest: %w", err)
 	}
 
-	playerID := gameManifest.Player
+	playerID, err := engine.ResolvePlayerID(s.storeOrNil(gameID), gameManifest)
+	if err != nil {
+		return nil, fmt.Errorf("resolve player: %w", err)
+	}
+	if playerID == "" {
+		return nil, fmt.Errorf("campaign %q has no player note", gameID)
+	}
 	playerFile := filepath.Join(gameDir, "entities", playerID+".md")
 	data, err := os.ReadFile(playerFile)
 	if err != nil {
@@ -463,19 +479,26 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	timeline := engine.NewTimeline(s.resolver, store, engine.NewHistoryLogger(filepath.Join(gameDir, "history.jsonl")), gameID)
 	timeline.SetVoiceProfiles(cfg.Media.TTS.VoiceProfiles)
 
+	// A campaign written before player_name existed holds a display name in
+	// player:, which is repaired once here so every later read is exact.
+	playerID := manifest.Player
+	if resolved, err := engine.RepairPlayerIdentity(s.resolver, store, manifest); err == nil && resolved != "" {
+		playerID = resolved
+	}
+
 	router, err := harness.RouterFromConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("build router: %w", err)
 	}
 
-	jsEngine := rules.NewJSEngine(rules.NewHostBridge(store, timeline, manifest.Player))
+	jsEngine := rules.NewJSEngine(rules.NewHostBridge(store, timeline, playerID))
 
 	startLocation := ""
 	if pinned, ok := manifest.Settings[engine.StartLocationSetting].(string); ok {
 		startLocation = pinned
 	}
 
-	orchestrator := engine.NewTurnOrchestrator(store, timeline, jsEngine, router, startLocation, manifest.Player)
+	orchestrator := engine.NewTurnOrchestrator(store, timeline, jsEngine, router, startLocation, playerID)
 	orchestrator.SetExtractor(harness.ExtractorFromConfig(cfg, router))
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
@@ -762,7 +785,12 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 		gameID = slugify(req.Name)
 	}
 
-	session, err := engine.InitGame(s.resolver, gameID, req.SystemID, req.WorldID, req.PlayerName)
+	session, err := engine.InitGame(s.resolver, engine.InitOptions{
+		GameID:     gameID,
+		SystemID:   req.SystemID,
+		WorldID:    req.WorldID,
+		PlayerName: req.PlayerName,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("init game: %w", err)
 	}

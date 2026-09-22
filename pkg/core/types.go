@@ -26,12 +26,13 @@ type WorldManifest struct {
 }
 
 type GameManifest struct {
-	ID       string                 `yaml:"id"`
-	Name     string                 `yaml:"name"`
-	SystemID string                 `yaml:"system"`
-	WorldID  string                 `yaml:"world"`
-	Player   string                 `yaml:"player"`
-	Settings map[string]interface{} `yaml:"settings,omitempty"`
+	ID         string                 `yaml:"id"`
+	Name       string                 `yaml:"name"`
+	SystemID   string                 `yaml:"system"`
+	WorldID    string                 `yaml:"world"`
+	Player     string                 `yaml:"player"`
+	PlayerName string                 `yaml:"player_name,omitempty"`
+	Settings   map[string]interface{} `yaml:"settings,omitempty"`
 }
 
 type PathResolver struct {

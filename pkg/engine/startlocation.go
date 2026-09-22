@@ -40,8 +40,8 @@ func ResolveStartLocation(paths *core.PathResolver, store *storage.Store, manife
 		}
 	}
 
-	if manifest.Player != "" {
-		if player, err := store.GetEntity(manifest.Player); err == nil && player != nil {
+	if id, err := ResolvePlayerID(store, manifest); err == nil && id != "" {
+		if player, err := store.GetEntity(id); err == nil && player != nil {
 			for _, ref := range playerLocationRefs(player) {
 				if ent := findLocationByRef(store, ref); ent != nil {
 					return ent.ID, nil

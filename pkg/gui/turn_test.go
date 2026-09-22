@@ -41,7 +41,12 @@ func turnFixture(t *testing.T) (string, *Service) {
 		t.Fatal(err)
 	}
 
-	session, err := engine.InitGame(paths, "campaign-01", "freeform", "harbour-realm", "Sean")
+	session, err := engine.InitGame(paths, engine.InitOptions{
+		GameID:     "campaign-01",
+		SystemID:   "freeform",
+		WorldID:    "harbour-realm",
+		PlayerName: "Sean",
+	})
 	if err != nil {
 		t.Fatalf("InitGame failed: %v", err)
 	}

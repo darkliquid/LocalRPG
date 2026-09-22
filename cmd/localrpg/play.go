@@ -57,13 +57,22 @@ func handlePlayCommand(args []string) {
 		os.Exit(1)
 	}
 
+	// A campaign written before player_name existed holds a display name in
+	// player:, which is repaired once here so the turn pipeline uses the real ID.
+	playerID := manifest.Player
+	if resolved, err := engine.RepairPlayerIdentity(paths, store, manifest); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not reconcile player identity: %v\n", err)
+	} else if resolved != "" {
+		playerID = resolved
+	}
+
 	startLocation, err := engine.ResolveStartLocation(paths, store, manifest)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error resolving start location: %v\n", err)
 		os.Exit(1)
 	}
 
-	bridge := rules.NewHostBridge(store, timeline, manifest.Player)
+	bridge := rules.NewHostBridge(store, timeline, playerID)
 	jsEngine := rules.NewJSEngine(bridge)
 
 	ruleLoader := rules.NewRuleLoader(paths, jsEngine)
@@ -81,7 +90,7 @@ func handlePlayCommand(args []string) {
 		jsEngine,
 		router,
 		startLocation,
-		manifest.Player,
+		playerID,
 	)
 	orchestrator.SetExtractor(harness.ExtractorFromConfig(cfg, router))
 	orchestrator.LoadPrompts(paths, manifest.SystemID, manifest.WorldID)

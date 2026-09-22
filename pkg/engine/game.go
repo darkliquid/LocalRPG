@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -26,7 +27,22 @@ func (s *Session) Close() error {
 	return nil
 }
 
-func InitGame(paths *core.PathResolver, gameID, systemID, worldID, playerName string) (*Session, error) {
+// InitOptions describes a campaign to create. It is a struct rather than a
+// parameter list because campaign creation grows new optional fields, and a
+// positional signature would break every caller each time one is added.
+type InitOptions struct {
+	GameID        string
+	SystemID      string
+	WorldID       string
+	PlayerName    string
+	PlayerDetails string
+}
+
+func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
+	gameID := opts.GameID
+	systemID := opts.SystemID
+	worldID := opts.WorldID
+
 	// Verify system & world exist
 	sysManifest, err := core.LoadSystemManifest(filepath.Join(paths.SystemDir(systemID), "system.yaml"))
 	if err != nil {
@@ -50,13 +66,22 @@ func InitGame(paths *core.PathResolver, gameID, systemID, worldID, playerName st
 	}
 
 	// Create game manifest
+	// The player is stored as an entity ID, with the entered name kept beside it
+	// for display. Writing the slug is what keeps the orchestrator, the JS bridge,
+	// and the GUI state route agreeing on one identifier for the protagonist.
+	playerID := entity.Slugify(opts.PlayerName)
+	if playerID == "" {
+		playerID = "player"
+	}
+
 	manifest := &core.GameManifest{
-		ID:       gameID,
-		Name:     gameID,
-		SystemID: systemID,
-		WorldID:  worldID,
-		Player:   playerName,
-		Settings: make(map[string]interface{}),
+		ID:         gameID,
+		Name:       gameID,
+		SystemID:   systemID,
+		WorldID:    worldID,
+		Player:     playerID,
+		PlayerName: opts.PlayerName,
+		Settings:   make(map[string]interface{}),
 	}
 
 	// Copy initial template entities from world into game, named <id>.md so the
@@ -108,7 +133,7 @@ func InitGame(paths *core.PathResolver, gameID, systemID, worldID, playerName st
 
 	// Give the campaign a player note before the manifest is written, so a failure
 	// leaves no half-built campaign.
-	if err := ensurePlayerNote(paths, store, gameID, playerName, startLocation); err != nil {
+	if err := ensurePlayerNote(paths, store, gameID, opts.PlayerName, opts.PlayerDetails, startLocation); err != nil {
 		return nil, fmt.Errorf("create player note: %w", err)
 	}
 
@@ -133,7 +158,7 @@ func InitGame(paths *core.PathResolver, gameID, systemID, worldID, playerName st
 // linking it to the opening location. An authored note is never touched. Without
 // this, a campaign created through the GUI cannot serve its own game state, and the
 // player is silently missing from every turn's involvement list.
-func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, playerName, locationID string) error {
+func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, playerName, details, locationID string) error {
 	id := entity.Slugify(playerName)
 	if id == "" {
 		id = "player"
@@ -144,11 +169,16 @@ func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, pl
 		return nil
 	}
 
+	body := strings.TrimSpace(details)
+	if body == "" {
+		body = "The player character."
+	}
+
 	player := &entity.Entity{
 		ID:   id,
 		Name: playerName,
 		Type: "character",
-		Body: "The player character.",
+		Body: body,
 	}
 	if locationID != "" {
 		player.Location = "[[" + locationID + "]]"

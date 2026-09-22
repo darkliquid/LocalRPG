@@ -32,14 +32,22 @@ func TestGameInitAndLoad(t *testing.T) {
 	os.WriteFile(filepath.Join(worldEntities, "Tavern.md"), []byte(tavernDoc), 0644)
 
 	// 3. Initialize game
-	session, err := InitGame(paths, "campaign-01", "d20-test", "fantasy-realm", "Sean")
+	session, err := InitGame(paths, InitOptions{
+		GameID:     "campaign-01",
+		SystemID:   "d20-test",
+		WorldID:    "fantasy-realm",
+		PlayerName: "Sean",
+	})
 	if err != nil {
 		t.Fatalf("InitGame failed: %v", err)
 	}
 	defer session.Close()
 
-	if session.Manifest.Player != "Sean" {
-		t.Errorf("expected player Sean, got %q", session.Manifest.Player)
+	if session.Manifest.Player != "sean" {
+		t.Errorf("expected the player entity ID sean, got %q", session.Manifest.Player)
+	}
+	if session.Manifest.PlayerName != "Sean" {
+		t.Errorf("expected the player display name Sean, got %q", session.Manifest.PlayerName)
 	}
 
 	// Verify base entity was copied and indexed into game
@@ -116,7 +124,12 @@ func writeTestCampaignScaffold(t *testing.T, tempDir string, worldEntities map[s
 func TestInitGameCreatesThePlayerNote(t *testing.T) {
 	paths := writeTestCampaignScaffold(t, t.TempDir(), nil)
 
-	session, err := InitGame(paths, "campaign-02", "d20-test", "fantasy-realm", "Sean O'Neill")
+	session, err := InitGame(paths, InitOptions{
+		GameID:     "campaign-02",
+		SystemID:   "d20-test",
+		WorldID:    "fantasy-realm",
+		PlayerName: "Sean O'Neill",
+	})
 	if err != nil {
 		t.Fatalf("InitGame failed: %v", err)
 	}
@@ -155,7 +168,12 @@ func TestInitGameLeavesAnAuthoredPlayerNoteAlone(t *testing.T) {
 	authored := "---\nid: sean\nname: Sean\ntype: character\n---\nHand written.\n"
 	paths := writeTestCampaignScaffold(t, t.TempDir(), map[string]string{"sean.md": authored})
 
-	session, err := InitGame(paths, "campaign-03", "d20-test", "fantasy-realm", "Sean")
+	session, err := InitGame(paths, InitOptions{
+		GameID:     "campaign-03",
+		SystemID:   "d20-test",
+		WorldID:    "fantasy-realm",
+		PlayerName: "Sean",
+	})
 	if err != nil {
 		t.Fatalf("InitGame failed: %v", err)
 	}
