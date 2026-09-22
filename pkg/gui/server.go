@@ -42,6 +42,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/settings/test-provider", s.handleTestProviderRoute)
 	s.mux.HandleFunc("/api/audio/", s.handleAudioRoutes)
 	s.mux.HandleFunc("/api/stt", s.handleSTTRoute)
+	s.mux.HandleFunc("/api/trace", s.handleTraceRoute)
 	if s.assetServer != nil {
 		s.mux.Handle("/", s.assetServer)
 	}
@@ -634,6 +635,31 @@ func (s *Server) handleAudioRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.service.StopAudio()
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+// handleTraceRoute serves the recorded trace. It is a developer view, so it can be
+// read and cleared and nothing else.
+func (s *Server) handleTraceRoute(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		events, err := s.service.TraceEvents(limit, r.URL.Query().Get("game"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, events)
+
+	case http.MethodDelete:
+		if err := s.service.ClearTrace(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.WriteHeader(http.StatusNoContent)
 
 	default:

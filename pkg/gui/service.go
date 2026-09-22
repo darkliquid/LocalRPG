@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -848,6 +849,119 @@ func (s *Service) worldArtStyle(gameID string) string {
 		return ""
 	}
 	return strings.TrimSpace(strings.Join([]string{world.ArtStyle, world.Genre}, ", "))
+}
+
+// tracePath is where the sink appends, matching what the composition root builds.
+func (s *Service) tracePath() string {
+	return filepath.Join(s.resolver.CacheDir(), "trace", "trace.jsonl")
+}
+
+// TraceEvents returns the newest trace events, oldest first. Only the tail of the
+// file is read: a full trace is tens of megabytes, and a viewer never needs all
+// of it.
+func (s *Service) TraceEvents(limit int, gameID string) ([]TraceEventDTO, error) {
+	if limit <= 0 || limit > 2000 {
+		limit = 200
+	}
+
+	lines, err := tailLines(s.tracePath(), limit*4)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []TraceEventDTO{}, nil
+		}
+		return nil, fmt.Errorf("read trace: %w", err)
+	}
+
+	events := make([]TraceEventDTO, 0, len(lines))
+	for _, line := range lines {
+		var raw map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &raw); err != nil {
+			continue // a torn final line is not a failure
+		}
+		if gameID != "" {
+			if game, ok := raw["game"].(string); ok && game != gameID {
+				continue
+			}
+		}
+
+		dto := TraceEventDTO{}
+		if text, ok := raw["ts"].(string); ok {
+			dto.Time = text
+		}
+		if text, ok := raw["event"].(string); ok {
+			dto.Event = text
+		}
+		if text, ok := raw["level"].(string); ok {
+			dto.Level = text
+		}
+		delete(raw, "ts")
+		delete(raw, "event")
+		delete(raw, "level")
+		if len(raw) > 0 {
+			dto.Fields = raw
+		}
+		events = append(events, dto)
+	}
+
+	if len(events) > limit {
+		events = events[len(events)-limit:]
+	}
+	return events, nil
+}
+
+// ClearTrace removes the trace and its rotations.
+func (s *Service) ClearTrace() error {
+	base := s.tracePath()
+	_ = os.Remove(base)
+	for index := 1; index <= 32; index++ {
+		_ = os.Remove(fmt.Sprintf("%s.%d", base, index))
+	}
+	return nil
+}
+
+// tailLines returns up to want lines from the end of a file, oldest first. It reads
+// backwards in blocks so a large trace is never loaded to show its last page.
+func tailLines(path string, want int) ([]string, error) {
+	if want <= 0 {
+		return nil, nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	const block = 64 * 1024
+	remaining := info.Size()
+	buffer := make([]byte, 0, block)
+	newlines := 0
+
+	for remaining > 0 && newlines <= want {
+		readSize := int64(block)
+		if remaining < readSize {
+			readSize = remaining
+		}
+		remaining -= readSize
+
+		chunk := make([]byte, readSize)
+		if _, err := file.ReadAt(chunk, remaining); err != nil {
+			return nil, err
+		}
+		buffer = append(chunk, buffer...)
+		newlines = bytes.Count(buffer, []byte{'\n'})
+	}
+
+	lines := strings.Split(strings.TrimRight(string(buffer), "\n"), "\n")
+	if len(lines) > want {
+		lines = lines[len(lines)-want:]
+	}
+	return lines, nil
 }
 
 // GetSegmentAudio synthesizes one segment on demand and returns the cached clip,

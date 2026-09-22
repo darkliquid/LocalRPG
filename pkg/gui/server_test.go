@@ -722,3 +722,62 @@ func TestListEntitiesRouteReturnsTheCorpus(t *testing.T) {
 		t.Errorf("aldon-harbour type = %q, want location", byID["aldon-harbour"].Type)
 	}
 }
+func TestTraceRouteReturnsTheMostRecentEvents(t *testing.T) {
+	_, svc := turnFixture(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	tracePath := filepath.Join(svc.GetResolver().CacheDir(), "trace", "trace.jsonl")
+	if err := os.MkdirAll(filepath.Dir(tracePath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	lines := `{"ts":"2026-09-22T09:00:00.000Z","event":"turn.begin","level":"summary","game":"other","number":1}
+{"ts":"2026-09-22T09:00:01.000Z","event":"context.assembled","level":"summary","game":"campaign-01","tokens":100}
+{"ts":"2026-09-22T09:00:02.000Z","event":"record.turn","level":"summary","game":"campaign-01","number":1}
+`
+	if err := os.WriteFile(tracePath, []byte(lines), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/trace?limit=2&game=campaign-01", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("trace: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var events []TraceEventDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &events); err != nil {
+		t.Fatalf("decode trace: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("expected 2 filtered events, got %d: %+v", len(events), events)
+	}
+	if events[0].Event != "context.assembled" || events[1].Event != "record.turn" {
+		t.Errorf("unexpected ordering: %+v", events)
+	}
+	if events[1].Fields["number"] != float64(1) {
+		t.Errorf("fields must survive the mapping: %+v", events[1].Fields)
+	}
+	if events[1].Time == "" || events[1].Level != "summary" {
+		t.Errorf("the envelope must survive: %+v", events[1])
+	}
+
+	// Deleting clears what the view reads.
+	req = httptest.NewRequest(http.MethodDelete, "/api/trace", nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete: expected 204, got %d", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/trace", nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	var after []TraceEventDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &after); err != nil {
+		t.Fatal(err)
+	}
+	if len(after) != 0 {
+		t.Errorf("expected the trace to be empty after delete, got %d", len(after))
+	}
+}

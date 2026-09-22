@@ -261,6 +261,15 @@ type AudioStatusDTO struct {
 	Playing   bool `json:"playing"`
 }
 
+// TraceEventDTO is one traced event. The event's own fields are nested rather
+// than flattened so the envelope stays stable as the catalogue grows.
+type TraceEventDTO struct {
+	Time   string                 `json:"ts"`
+	Event  string                 `json:"event"`
+	Level  string                 `json:"level"`
+	Fields map[string]interface{} `json:"fields,omitempty"`
+}
+
 // STTResponse is the transcription result returned from POST /api/stt.
 type STTResponse struct {
 	Text string `json:"text"`
