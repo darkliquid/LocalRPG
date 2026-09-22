@@ -107,6 +107,7 @@ export const App: React.FC = () => {
   };
 
   const [turnInFlight, setTurnInFlight] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ mode: string; text: string } | null>(null);
   const [streamedProse, setStreamedProse] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
@@ -114,6 +115,7 @@ export const App: React.FC = () => {
     if (!client || !activeGameID || turnInFlight) return;
 
     setTurnInFlight(true);
+    setPendingAction({ mode, text });
     setStreamedProse('');
 
     const controller = new AbortController();
@@ -144,12 +146,14 @@ export const App: React.FC = () => {
     } finally {
       abortRef.current = null;
       setTurnInFlight(false);
+      setPendingAction(null);
     }
   };
 
   const handleStopTurn = () => {
     abortRef.current?.abort();
     setStreamedProse('');
+    setPendingAction(null);
   };
 
   // Beginning the story saves the player's opening prompt and then runs the
@@ -369,16 +373,10 @@ export const App: React.FC = () => {
                     onCorrect={handleCorrect}
                     addressedTurns={addressed}
                     onAddress={handleAddress}
+                    turnInFlight={turnInFlight}
+                    pendingAction={pendingAction}
+                    streamedProse={streamedProse}
                   />
-                  {streamedProse && (
-                    <div className="p-4 border-t border-white/5 bg-black/20">
-                      <TurnSegments
-                        segments={[{ kind: 'narration', text: streamedProse }]}
-                        fallback={streamedProse}
-                        onEntityClick={handleOpenWikilink}
-                      />
-                    </div>
-                  )}
                 </>
               )}
               <ActionConsole

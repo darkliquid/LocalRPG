@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Turn } from '../types';
 import { TurnSegments } from './TurnSegments';
+import { Sparkles } from 'lucide-react';
+
+interface PendingAction {
+  mode: string;
+  text: string;
+}
 
 interface ChronicleViewProps {
   turns: Turn[];
@@ -10,9 +16,12 @@ interface ChronicleViewProps {
   serverPlayback?: boolean;
   onPlayTurnAudio?: (turnNumber: number, segmentIndex?: number) => void;
   onStopAudio?: () => void;
-  onCorrect?: (note: string) => void;
+  onCorrect?: (note: string, turnNumber?: number) => void;
   addressedTurns?: Set<number>;
   onAddress?: (turnNumber: number) => void;
+  turnInFlight?: boolean;
+  pendingAction?: PendingAction | null;
+  streamedProse?: string;
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
@@ -26,7 +35,19 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   onCorrect,
   addressedTurns,
   onAddress,
+  turnInFlight,
+  pendingAction,
+  streamedProse,
 }) => {
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll when a new turn is added, turn starts, or prose streams in
+  useEffect(() => {
+    if (turnInFlight || streamedProse) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [turnInFlight, streamedProse, turns.length]);
+
   // Art is per scene, not per turn: it is shown when the party arrives somewhere
   // new and reused while they stay.
   let previousLocationID: string | undefined;
@@ -38,7 +59,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
-      {turns.length === 0 ? (
+      {turns.length === 0 && !pendingAction ? (
         <div className="h-full flex items-center justify-center text-stone-500 font-cinzel tracking-wider text-sm italic">
           The chronicle awaits your first action...
         </div>
@@ -124,9 +145,9 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                     ) : (
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
-                          onClick={() => onCorrect?.(note)}
+                          onClick={() => onCorrect?.(note, turn.turn_number)}
                           className="px-1.5 py-0.5 rounded border border-amber-500/40 hover:bg-amber-600/20 cursor-pointer transition-colors"
-                          title="Send this as a correction to the GM"
+                          title="Review or correct this finding"
                         >
                           Correct
                         </button>
@@ -163,6 +184,46 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
           </div>
         ))
       )}
+
+      {/* Pending Turn in Flight */}
+      {turnInFlight && pendingAction && (
+        <div className="space-y-4 pb-6 animate-fade-in">
+          {/* Immediate Action Bubble */}
+          {pendingAction.text && (
+            <div className="flex items-start gap-3 text-stone-300 text-sm font-sans italic bg-black/40 p-3.5 rounded-xl border border-amber-500/20 shadow-inner">
+              <span className="text-amber-400 font-semibold uppercase tracking-wider text-xs font-cinzel">
+                [{pendingAction.mode || 'Action'}]
+              </span>
+              <span>{pendingAction.text}</span>
+            </div>
+          )}
+
+          {/* Drafting feedback card or streaming prose */}
+          {streamedProse ? (
+            <TurnSegments
+              segments={[{ kind: 'narration', text: streamedProse }]}
+              fallback={streamedProse}
+              onEntityClick={onWikilinkClick}
+            />
+          ) : (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 text-stone-300 text-sm animate-pulse">
+              <div className="p-2 rounded-lg bg-amber-600/20 text-amber-400">
+                <Sparkles className="w-4 h-4 animate-spin" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="font-cinzel text-xs font-bold text-amber-400 uppercase tracking-wider">
+                  The narrator is drafting the scene...
+                </div>
+                <div className="text-xs text-stone-400 font-sans">
+                  Weaving your action into the chronicle.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div ref={bottomRef} />
     </div>
   );
 };
