@@ -439,3 +439,46 @@ func TestGetGameStateFindsALegacyDisplayNamePlayer(t *testing.T) {
 		t.Errorf("Player.Name = %q, want Elena Nightshade", state.Player.Name)
 	}
 }
+
+func TestCampaignTitleIsPersistedAndLatestIsFirst(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewService(tmpDir)
+
+	sysDir := svc.GetResolver().SystemDir("freeform")
+	if err := os.MkdirAll(sysDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sysDir, "system.yaml"), []byte("id: freeform\nname: Freeform\nversion: 1.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	worldDir := svc.GetResolver().WorldDir("harbour-realm")
+	if err := os.MkdirAll(worldDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(worldDir, "world.yaml"), []byte("id: harbour-realm\nname: Harbour Realm\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.CreateGame(context.Background(), CreateGameRequestDTO{
+		Name:       "The Salt Road",
+		SystemID:   "freeform",
+		WorldID:    "harbour-realm",
+		PlayerName: "Elena Nightshade",
+	}); err != nil {
+		t.Fatalf("CreateGame failed: %v", err)
+	}
+
+	games, err := svc.ListGames(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(games) != 1 {
+		t.Fatalf("expected 1 campaign, got %d", len(games))
+	}
+	if games[0].Name != "The Salt Road" {
+		t.Errorf("Name = %q, want the entered title", games[0].Name)
+	}
+	if games[0].PlayerName != "Elena Nightshade" {
+		t.Errorf("PlayerName = %q, want the display name", games[0].PlayerName)
+	}
+}

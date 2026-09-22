@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -688,16 +689,26 @@ func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 			name = gameID
 		}
 
+		playerName := m.PlayerName
+		if playerName == "" {
+			playerName = m.Player
+		}
+
 		summaries = append(summaries, GameSummaryDTO{
 			ID:         gameID,
 			Name:       name,
 			SystemID:   m.SystemID,
 			WorldID:    m.WorldID,
-			PlayerName: m.Player,
+			PlayerName: playerName,
 			TurnCount:  turnCount,
 			LastPlayed: lastPlayed,
 		})
 	}
+
+	// Most recently played first, so "Resume" is the campaign the player left.
+	sort.SliceStable(summaries, func(i, j int) bool {
+		return summaries[i].LastPlayed > summaries[j].LastPlayed
+	})
 	return summaries, nil
 }
 
@@ -787,6 +798,7 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 
 	session, err := engine.InitGame(s.resolver, engine.InitOptions{
 		GameID:     gameID,
+		Name:       req.Name,
 		SystemID:   req.SystemID,
 		WorldID:    req.WorldID,
 		PlayerName: req.PlayerName,

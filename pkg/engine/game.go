@@ -32,6 +32,7 @@ func (s *Session) Close() error {
 // positional signature would break every caller each time one is added.
 type InitOptions struct {
 	GameID        string
+	Name          string
 	SystemID      string
 	WorldID       string
 	PlayerName    string
@@ -74,9 +75,14 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 		playerID = "player"
 	}
 
+	name := strings.TrimSpace(opts.Name)
+	if name == "" {
+		name = gameID
+	}
+
 	manifest := &core.GameManifest{
 		ID:         gameID,
-		Name:       gameID,
+		Name:       name,
 		SystemID:   systemID,
 		WorldID:    worldID,
 		Player:     playerID,
