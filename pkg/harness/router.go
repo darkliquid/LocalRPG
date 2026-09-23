@@ -39,6 +39,19 @@ func (r *Router) SetFallback(role, fallbackProviderID string) {
 	r.fallbacks[role] = fallbackProviderID
 }
 
+// FallbackForRole reports the provider a role falls back to, if one is set.
+func (r *Router) FallbackForRole(role string) (ModelProvider, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	id, ok := r.fallbacks[role]
+	if !ok {
+		return nil, false
+	}
+	provider, ok := r.providers[id]
+	return provider, ok
+}
+
 func (r *Router) GetProviderForRole(role string) (ModelProvider, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

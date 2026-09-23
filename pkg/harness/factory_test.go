@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 func TestNewModelProvider(t *testing.T) {
@@ -109,5 +110,37 @@ func TestRouterFromConfigFallsBackToEchoForGM(t *testing.T) {
 	}
 	if provider.ID() != "default-echo" {
 		t.Errorf("provider = %q, want default-echo", provider.ID())
+	}
+}
+
+func TestCompletionResolvesThroughTheInheritedRole(t *testing.T) {
+	cfg := config.DefaultConfig()
+	router, err := RouterFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("RouterFromConfig: %v", err)
+	}
+
+	provider := CompletionFromConfig(cfg, router, trace.Nop())
+	if provider == nil {
+		t.Fatalf("expected completion to inherit the gm provider")
+	}
+	gm, err := router.GetProviderForRole(config.RoleGM)
+	if err != nil {
+		t.Fatalf("GetProviderForRole: %v", err)
+	}
+	if provider.ID() != gm.ID() {
+		t.Errorf("completion provider = %q, want the gm provider %q", provider.ID(), gm.ID())
+	}
+}
+
+func TestCompletionDisabledReturnsNil(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Agents.Roles[config.RoleCompletion] = config.AgentRoleConfig{Type: "disabled"}
+	router, err := RouterFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("RouterFromConfig: %v", err)
+	}
+	if provider := CompletionFromConfig(cfg, router, trace.Nop()); provider != nil {
+		t.Errorf("expected a disabled completion role to resolve to nil, got %q", provider.ID())
 	}
 }

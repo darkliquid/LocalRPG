@@ -208,3 +208,49 @@ func ExtractorFromConfigWithLogger(cfg *config.Config, router *Router, logger tr
 	extractor.SetLogger(logger)
 	return extractor
 }
+
+// CompletionFromConfig resolves the role that finishes a cut-off reply. It
+// inherits gm unless configured otherwise, and a nil result disables the
+// continuation half of recovery, leaving trimming.
+func CompletionFromConfig(cfg *config.Config, router *Router, logger trace.Logger) ModelProvider {
+	if cfg == nil || router == nil {
+		return nil
+	}
+
+	roleCfg, configured := cfg.Agents.Roles[config.RoleCompletion]
+	if !configured {
+		roleCfg = config.AgentRoleConfig{Type: "inherit", InheritFrom: config.RoleGM}
+	}
+
+	switch roleCfg.Type {
+	case "disabled":
+		return nil
+	case "inherit", "":
+		source := roleCfg.InheritFrom
+		if source == "" {
+			source = config.RoleGM
+		}
+		provider, err := router.GetProviderForRole(source)
+		if err != nil {
+			return nil
+		}
+		return provider
+	}
+
+	provider, err := NewModelProviderWithLogger(config.RoleCompletion, ProviderConfig{
+		Type:        roleCfg.Type,
+		BuiltinName: roleCfg.BuiltinName,
+		Command:     roleCfg.Command,
+		Args:        roleCfg.Args,
+		Endpoint:    roleCfg.Endpoint,
+		Model:       roleCfg.Model,
+		APIKey:      roleCfg.APIKey,
+		Temperature: roleCfg.Temperature,
+		MaxTokens:   roleCfg.MaxTokens,
+	}, logger)
+	if err != nil {
+		return nil
+	}
+	setProviderChunkLimit(provider, cfg.TraceChunkLimit())
+	return provider
+}
