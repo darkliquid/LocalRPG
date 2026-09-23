@@ -335,14 +335,14 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       <aside className="w-full md:w-80 bg-glass-card rounded-2xl border border-stone-800/80 p-4 flex flex-col gap-4 shadow-xl backdrop-blur-md">
         <div className="flex items-center justify-between pb-2 border-b border-stone-800/60">
           <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-amber-400" />
-            <h3 className="font-cinzel text-sm font-bold text-stone-200 uppercase tracking-wider">
+            <Globe className="w-4 h-4 text-purple-400" />
+            <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">
               Worlds Studio
             </h3>
           </div>
           <button
             onClick={() => handleNewWorld()}
-            className="flex items-center gap-1 text-[11px] font-cinzel font-bold px-2.5 py-1 rounded-lg bg-amber-600/80 hover:bg-amber-500 text-stone-950 transition-all cursor-pointer shadow"
+            className="flex items-center gap-1 text-[11px] font-sans font-bold px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New</span>
@@ -365,14 +365,14 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 onClick={() => loadWorldDetail(w.id)}
                 className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${
                   selectedID === w.id
-                    ? 'bg-amber-950/40 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+                    ? 'bg-purple-950/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
                     : 'bg-stone-900/40 border-stone-800/60 hover:bg-stone-800/40 hover:border-stone-700'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <h4 className="font-cinzel text-xs font-bold text-stone-200 truncate">{w.name}</h4>
+                  <h4 className="font-sans text-xs font-bold text-stone-200 truncate">{w.name}</h4>
                   {w.genre && (
-                    <span className="text-[10px] font-mono text-amber-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
+                    <span className="text-[10px] font-mono text-purple-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
                       {w.genre}
                     </span>
                   )}
@@ -391,7 +391,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
         {/* Top Header & Sub-Tabs */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800/80 pb-3">
           <div className="flex items-center gap-3">
-            <h2 className="font-cinzel text-lg font-bold text-amber-400">
+            <h2 className="font-sans text-lg font-bold text-purple-400">
               {selectedID ? name || 'Edit World' : 'Create New World'}
             </h2>
             {slugID && (
@@ -406,9 +406,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
               <button
                 type="button"
                 onClick={() => setActiveTab('lore')}
-                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
                   activeTab === 'lore'
-                    ? 'bg-amber-600 text-stone-950 font-bold shadow'
+                    ? 'bg-purple-600 text-white font-bold shadow'
                     : 'text-stone-400 hover:text-white'
                 }`}
               >
@@ -418,9 +418,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
               <button
                 type="button"
                 onClick={() => setActiveTab('prompt')}
-                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
                   activeTab === 'prompt'
-                    ? 'bg-amber-600 text-stone-950 font-bold shadow'
+                    ? 'bg-purple-600 text-white font-bold shadow'
                     : 'text-stone-400 hover:text-white'
                 }`}
               >
@@ -430,9 +430,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
               <button
                 type="button"
                 onClick={() => setActiveTab('entities')}
-                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
                   activeTab === 'entities'
-                    ? 'bg-amber-600 text-stone-950 font-bold shadow'
+                    ? 'bg-purple-600 text-white font-bold shadow'
                     : 'text-stone-400 hover:text-white'
                 }`}
               >
@@ -445,7 +445,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
               type="button"
               onClick={handleResetToReference}
               title="Reset current editor to the comprehensive Ashen Reach reference template"
-              className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-2 rounded-xl border border-stone-800 hover:border-amber-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-amber-400 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-stone-800 hover:border-purple-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-purple-400 transition-all cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Reset Template</span>
@@ -454,7 +454,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             <button
               onClick={handleSaveWorld}
               disabled={isSaving}
-              className="flex items-center gap-1.5 text-xs font-cinzel font-bold px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-stone-950 shadow-[0_0_15px_rgba(217,119,6,0.4)] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 text-xs font-sans font-bold px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.35)] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
               <span>{isSaving ? 'Saving...' : 'Save World'}</span>
@@ -485,7 +485,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
+                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
                   World Setting Name
                 </label>
                 <input
@@ -499,12 +499,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                       setSlugID(e.target.value.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''));
                     }
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
+                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
                   Genre / Setting Style
                 </label>
                 <input
@@ -512,14 +512,14 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                   placeholder="e.g. Gothic Fantasy, Cyberpunk"
                   value={genre}
                   onChange={(e) => setGenre(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
+                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
                   Directory Slug ID
                 </label>
                 <input
@@ -528,18 +528,18 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                   placeholder="e.g. solitary_defiance"
                   value={slugID}
                   onChange={(e) => setSlugID(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors font-mono disabled:opacity-60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors font-mono disabled:opacity-60"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
+                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
                   Default Rule System
                 </label>
                 <select
                   value={defaultSystem}
                   onChange={(e) => setDefaultSystem(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3.5 pr-9 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3.5 pr-9 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-purple-500/50 transition-colors cursor-pointer"
                 >
                   {systems.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -551,8 +551,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                <Palette className="w-3.5 h-3.5 text-amber-400" />
+              <label className="text-xs font-sans uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                <Palette className="w-3.5 h-3.5 text-purple-400" />
                 <span>Visual Art Style Prompt Guide</span>
               </label>
               <input
@@ -560,7 +560,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 placeholder="e.g. Dark watercolor gothic, mist, gaslight, copper accents, muted palette"
                 value={artStyle}
                 onChange={(e) => setArtStyle(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
               />
               <p className="text-[11px] text-stone-400">
                 Injected into image generation prompts to create consistent scene illustrations in this world.
@@ -568,8 +568,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-amber-400" />
+              <label className="text-xs font-sans uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-purple-400" />
                 <span>World Tags (Comma-separated)</span>
               </label>
               <input
@@ -577,12 +577,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 placeholder="e.g. gothic, horror, city, rebellion"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
+              <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
                 World Synopsis & Lore
               </label>
               <textarea
@@ -590,7 +590,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 placeholder="Describe the setting, major conflicts, factions, and atmosphere..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors resize-none"
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors resize-none"
               />
             </div>
           </div>
@@ -607,7 +607,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
               value={lorePrompt}
               onChange={(e) => setLorePrompt(e.target.value)}
               spellCheck={false}
-              className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-amber-500/60 transition-colors resize-none selection:bg-amber-900/60"
+              className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
             />
           </div>
         )}
@@ -618,13 +618,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             {/* Entity List */}
             <div className="w-56 shrink-0 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2">
               <div className="flex items-center justify-between pb-2 border-b border-stone-800/60">
-                <span className="text-[11px] font-cinzel uppercase tracking-wider text-stone-400">
+                <span className="text-[11px] font-sans uppercase tracking-wider text-stone-400">
                   Templates
                 </span>
                 <button
                   type="button"
                   onClick={() => setIsNewEntityModal(true)}
-                  className="text-[10px] font-cinzel font-bold px-2 py-0.5 rounded bg-amber-600 text-stone-950 cursor-pointer hover:bg-amber-500"
+                  className="text-[10px] font-sans font-bold px-2 py-0.5 rounded bg-purple-600 text-white cursor-pointer hover:bg-purple-500"
                 >
                   + Add
                 </button>
@@ -642,7 +642,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                       onClick={() => handleSelectEntity(e.id)}
                       className={`group p-2 rounded-lg border text-left cursor-pointer flex items-center justify-between transition-all ${
                         selectedEntityID === e.id
-                          ? 'bg-amber-950/50 border-amber-500/60 text-amber-300'
+                          ? 'bg-purple-950/40 border-purple-500/50 text-purple-300'
                           : 'bg-stone-900/40 border-stone-800/60 text-stone-300 hover:bg-stone-800'
                       }`}
                     >
@@ -676,7 +676,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                     <button
                       type="button"
                       onClick={handleSaveEntity}
-                      className="flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-600/80 hover:bg-amber-500 text-stone-950 font-bold text-xs cursor-pointer shadow transition-all"
+                      className="flex items-center gap-1 px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs cursor-pointer shadow transition-all"
                     >
                       <Save className="w-3 h-3" />
                       <span>{selectedID ? 'Save Entity' : 'Update Draft'}</span>
@@ -686,7 +686,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                     value={entityMarkdown}
                     onChange={(e) => setEntityMarkdown(e.target.value)}
                     spellCheck={false}
-                    className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-amber-500/60 transition-colors resize-none selection:bg-amber-900/60"
+                    className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
                   />
                 </>
               ) : (
@@ -702,9 +702,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       {/* New Entity Modal */}
       {isNewEntityModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm max-h-[85vh] flex flex-col rounded-2xl bg-stone-900 border border-amber-500/30 shadow-2xl overflow-hidden">
+          <div className="w-full max-w-sm max-h-[85vh] flex flex-col rounded-2xl bg-stone-900 border border-purple-500/30 shadow-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-stone-800 shrink-0">
-              <h3 className="font-cinzel text-sm font-bold text-amber-400">
+              <h3 className="font-sans text-sm font-bold text-purple-400">
                 New Starter Entity Template
               </h3>
             </div>
@@ -716,7 +716,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                   placeholder="e.g. the_iron_bastion"
                   value={newEntitySlug}
                   onChange={(e) => setNewEntitySlug(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:border-purple-500/50"
                 />
               </div>
             </div>
@@ -732,7 +732,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 type="button"
                 onClick={handleCreateNewEntity}
                 disabled={!newEntitySlug.trim()}
-                className="px-4 py-1.5 text-xs font-cinzel font-bold bg-amber-600 text-stone-950 rounded-lg disabled:opacity-50 cursor-pointer"
+                className="px-4 py-1.5 text-xs font-sans font-bold bg-purple-600 text-white rounded-lg disabled:opacity-50 cursor-pointer"
               >
                 Create
               </button>

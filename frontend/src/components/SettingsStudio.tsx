@@ -245,8 +245,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
         <div className="flex flex-wrap items-center gap-1 bg-stone-950/70 p-1 rounded-xl border border-stone-800">
           <button
             onClick={() => setActiveSubTab('paths')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
-              activeSubTab === 'paths' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
+              activeSubTab === 'paths' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Folder className="w-3.5 h-3.5" />
@@ -254,8 +254,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           </button>
           <button
             onClick={() => setActiveSubTab('providers')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
-              activeSubTab === 'providers' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
+              activeSubTab === 'providers' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Cloud className="w-3.5 h-3.5" />
@@ -263,8 +263,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           </button>
           <button
             onClick={() => setActiveSubTab('agents')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
-              activeSubTab === 'agents' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
+              activeSubTab === 'agents' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />
@@ -272,8 +272,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           </button>
           <button
             onClick={() => setActiveSubTab('media')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
-              activeSubTab === 'media' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
+              activeSubTab === 'media' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Volume2 className="w-3.5 h-3.5" />
@@ -281,8 +281,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           </button>
           <button
             onClick={() => setActiveSubTab('preferences')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
-              activeSubTab === 'preferences' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
+              activeSubTab === 'preferences' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
@@ -290,8 +290,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           </button>
           <button
             onClick={() => setActiveSubTab('debug')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
-              activeSubTab === 'debug' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
+              activeSubTab === 'debug' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Bug className="w-3.5 h-3.5" />
@@ -306,7 +306,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-1.5 text-xs font-cinzel font-bold px-4 py-1.5 rounded-xl transition-all cursor-pointer bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-stone-950 shadow active:scale-95"
+            className="flex items-center gap-1.5 text-xs font-sans font-bold px-4 py-1.5 rounded-xl transition-all cursor-pointer bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white shadow active:scale-95"
           >
             <Save className="w-3.5 h-3.5" />
             <span>{isSaving ? 'Saving...' : 'Save Settings'}</span>
@@ -331,7 +331,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       {activeSubTab === 'paths' && (
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+            <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
               <Folder className="w-4 h-4" />
               <span>Storage & Discovery Paths</span>
             </h3>
@@ -341,42 +341,42 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300">Rule Systems Directory</label>
+                <label className="text-xs font-sans uppercase text-stone-300">Rule Systems Directory</label>
                 <input
                   type="text"
                   value={config.paths.systems}
                   onChange={(e) => setConfig({ ...config, paths: { ...config.paths, systems: e.target.value } })}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300">Worlds Directory</label>
+                <label className="text-xs font-sans uppercase text-stone-300">Worlds Directory</label>
                 <input
                   type="text"
                   value={config.paths.worlds}
                   onChange={(e) => setConfig({ ...config, paths: { ...config.paths, worlds: e.target.value } })}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300">Saved Campaigns Directory</label>
+                <label className="text-xs font-sans uppercase text-stone-300">Saved Campaigns Directory</label>
                 <input
                   type="text"
                   value={config.paths.games}
                   onChange={(e) => setConfig({ ...config, paths: { ...config.paths, games: e.target.value } })}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300">Media Cache Directory</label>
+                <label className="text-xs font-sans uppercase text-stone-300">Media Cache Directory</label>
                 <input
                   type="text"
                   value={config.paths.cache}
                   onChange={(e) => setConfig({ ...config, paths: { ...config.paths, cache: e.target.value } })}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
               </div>
             </div>
@@ -388,7 +388,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       {activeSubTab === 'providers' && (
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+            <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
               <Cloud className="w-4 h-4" />
               <span>Cloud & Ecosystem Providers</span>
             </h3>
@@ -400,11 +400,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             <div className="p-4 bg-stone-950/80 border border-stone-800/90 rounded-xl space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800/60 pb-3">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                  <div className="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-400">
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-cinzel font-bold text-stone-200">Google Gemini (GenAI)</h4>
+                    <h4 className="text-xs font-sans font-bold text-stone-200">Google Gemini (GenAI)</h4>
                     <p className="text-[11px] text-stone-400">Multi-modal intelligence: text reasoning, image creation, and vocal performance.</p>
                   </div>
                 </div>
@@ -423,7 +423,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Shared Gemini API Key</span>
                   <span className="text-[10px] text-stone-500 font-mono">
                     {config.providers?.gemini?.api_key ? '✓ Custom Key Saved' : 'Optional if GEMINI_API_KEY is set'}
@@ -445,7 +445,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       },
                     });
                   }}
-                  className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">
                   Automatically inherited by Gemini LLM agents, Gemini/Imagen image generators, and Gemini TTS voice synthesis. Individual roles and media engines can still provide an override key.
@@ -453,18 +453,18 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
 
               <div className="pt-2 border-t border-stone-800/50">
-                <div className="text-[11px] font-cinzel uppercase text-stone-400 font-semibold mb-2">Connected Subsystems</div>
+                <div className="text-[11px] font-sans uppercase text-stone-400 font-semibold mb-2">Connected Subsystems</div>
                 <div className="flex flex-wrap gap-2">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-[11px] text-stone-300 font-mono">
-                    <Cpu className="w-3 h-3 text-amber-400" />
+                    <Cpu className="w-3 h-3 text-purple-400" />
                     <span>AI Agents (GM, Narrator, Extractor)</span>
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-[11px] text-stone-300 font-mono">
-                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    <Sparkles className="w-3 h-3 text-purple-400" />
                     <span>Image Generation (Imagen 3, Nano Banana)</span>
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-[11px] text-stone-300 font-mono">
-                    <Volume2 className="w-3 h-3 text-amber-400" />
+                    <Volume2 className="w-3 h-3 text-purple-400" />
                     <span>Voice Synthesis (Gemini 3.1 & 2.5 Flash/Pro TTS)</span>
                   </span>
                 </div>
@@ -479,7 +479,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+              <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
                 <Cpu className="w-4 h-4" />
                 <span>AI Agents & Role Routing</span>
               </h3>
@@ -499,7 +499,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       e.target.value = '';
                     }
                   }}
-                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load Preset...</option>
@@ -514,7 +514,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <select
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value as any)}
-                  className="bg-stone-950 border border-stone-800 rounded-lg pl-2.5 pr-7 py-1 text-xs text-amber-300 font-mono focus:outline-none cursor-pointer"
+                  className="bg-stone-950 border border-stone-800 rounded-lg pl-2.5 pr-7 py-1 text-xs text-purple-300 font-mono focus:outline-none cursor-pointer"
                 >
                   {roleNames.map((role) => (
                     <option key={role} value={role}>
@@ -528,7 +528,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">Provider Type</label>
+                  <label className="text-xs font-sans uppercase text-stone-300">Provider Type</label>
                   <select
                     value={currentRoleConfig.type}
                     onChange={(e) => {
@@ -541,7 +541,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         },
                       });
                     }}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                   >
                     <option value="disabled">Disabled / Inactive</option>
                     <option value="http">HTTP / OpenAI-Compatible (Ollama, vLLM, OpenAI)</option>
@@ -554,11 +554,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
                 {currentRoleConfig.type === 'inherit' && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-cinzel uppercase text-stone-300">Inherit From</label>
+                    <label className="text-xs font-sans uppercase text-stone-300">Inherit From</label>
                     <select
                       value={currentRoleConfig.inherit_from || 'gm'}
                       onChange={(e) => updateRole({ type: 'inherit', inherit_from: e.target.value })}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-amber-300 font-mono focus:outline-none cursor-pointer"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-purple-300 font-mono focus:outline-none cursor-pointer"
                     >
                       {roleNames.map((role) => (
                         <option key={role} value={role}>
@@ -579,7 +579,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 {currentRoleConfig.type === 'http' && (
                   <>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-cinzel uppercase text-stone-300">Endpoint URL</label>
+                      <label className="text-xs font-sans uppercase text-stone-300">Endpoint URL</label>
                       <input
                         type="text"
                         placeholder="e.g. http://localhost:11434/v1"
@@ -594,12 +594,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             },
                           });
                         }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-cinzel uppercase text-stone-300">Model Name</label>
+                      <label className="text-xs font-sans uppercase text-stone-300">Model Name</label>
                       <input
                         type="text"
                         placeholder="e.g. llama3.2 or mistral"
@@ -614,12 +614,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             },
                           });
                         }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-cinzel uppercase text-stone-300">API Key (Optional)</label>
+                      <label className="text-xs font-sans uppercase text-stone-300">API Key (Optional)</label>
                       <input
                         type="password"
                         placeholder="Bearer token or leave empty for Ollama"
@@ -634,7 +634,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             },
                           });
                         }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                       />
                     </div>
                   </>
@@ -643,7 +643,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 {currentRoleConfig.type === 'cli' && (
                   <>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-cinzel uppercase text-stone-300">CLI Command / Binary</label>
+                      <label className="text-xs font-sans uppercase text-stone-300">CLI Command / Binary</label>
                       <input
                         type="text"
                         placeholder="e.g. echo or /usr/local/bin/llama-cli"
@@ -658,12 +658,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             },
                           });
                         }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-cinzel uppercase text-stone-300">Command Arguments (comma separated)</label>
+                      <label className="text-xs font-sans uppercase text-stone-300">Command Arguments (comma separated)</label>
                       <input
                         type="text"
                         placeholder="e.g. --temp, 0.7, -m, model.gguf"
@@ -679,7 +679,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             },
                           });
                         }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                       />
                     </div>
                   </>
@@ -687,7 +687,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
                 {currentRoleConfig.type === 'builtin' && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-cinzel uppercase text-stone-300">Builtin Engine</label>
+                    <label className="text-xs font-sans uppercase text-stone-300">Builtin Engine</label>
                     <select
                       value={currentRoleConfig.builtin_name || 'narrative-oracle'}
                       onChange={(e) => {
@@ -700,7 +700,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           },
                         });
                       }}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                     >
                       <option value="narrative-oracle">narrative-oracle (Deterministic Procedural Storyteller)</option>
                       <option value="gemini">gemini (Google Gemini Generative AI)</option>
@@ -712,7 +712,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 {(currentRoleConfig.type === 'gemini' || (currentRoleConfig.type === 'builtin' && currentRoleConfig.builtin_name === 'gemini')) && (
                   <>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-cinzel uppercase text-stone-300">Gemini Model</label>
+                      <label className="text-xs font-sans uppercase text-stone-300">Gemini Model</label>
                       <input
                         type="text"
                         placeholder="e.g. gemini-2.5-flash"
@@ -727,7 +727,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             },
                           });
                         }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                       />
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         {['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'].map((m) => (
@@ -746,7 +746,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             }}
                             className={`px-2 py-0.5 text-[10px] font-mono rounded border transition-colors cursor-pointer ${
                               (currentRoleConfig.model || 'gemini-2.5-flash') === m
-                                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                                ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
                                 : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200'
                             }`}
                           >
@@ -757,7 +757,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                         <span>Role API Key Override</span>
                         {config.providers?.gemini?.api_key && (
                           <span className="text-[10px] text-emerald-400 font-mono">Shared key active (from Providers tab)</span>
@@ -777,14 +777,14 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             },
                           });
                         }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                       />
                     </div>
 
                     <div className="space-y-1.5 col-span-1 md:col-span-2">
-                      <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                         <span>Thinking / Reasoning Budget</span>
-                        <span className="font-mono text-amber-400">
+                        <span className="font-mono text-purple-400">
                           {currentRoleConfig.thinking_budget === undefined
                             ? 'Default'
                             : currentRoleConfig.thinking_budget === 0
@@ -822,7 +822,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                               },
                             });
                           }}
-                          className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                          className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                         >
                           <option value="0">Disabled (0 — Instant Narration)</option>
                           <option value="-1">Dynamic (-1 — Model Decides)</option>
@@ -846,7 +846,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                                 },
                               });
                             }}
-                            className="w-32 bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                            className="w-32 bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                           />
                         )}
                       </div>
@@ -856,9 +856,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                         <span>Top-P</span>
-                        <span className="font-mono text-amber-400">{(currentRoleConfig.top_p ?? 0.95).toFixed(2)}</span>
+                        <span className="font-mono text-purple-400">{(currentRoleConfig.top_p ?? 0.95).toFixed(2)}</span>
                       </label>
                       <input
                         type="number"
@@ -877,14 +877,14 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             },
                           });
                         }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                         <span>Top-K</span>
-                        <span className="font-mono text-amber-400">{currentRoleConfig.top_k ?? 40}</span>
+                        <span className="font-mono text-purple-400">{currentRoleConfig.top_k ?? 40}</span>
                       </label>
                       <input
                         type="number"
@@ -903,7 +903,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             },
                           });
                         }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                       />
                     </div>
                   </>
@@ -913,9 +913,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               {currentRoleConfig.type !== 'disabled' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                    <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                       <span>Response Limit (max tokens)</span>
-                      <span className="font-mono text-amber-400">{currentRoleConfig.max_tokens ?? 1024}</span>
+                      <span className="font-mono text-purple-400">{currentRoleConfig.max_tokens ?? 1024}</span>
                     </label>
                     <input
                       type="number"
@@ -930,7 +930,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
                         });
                       }}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                     />
                     <p className="text-[11px] text-stone-500">
                       How long a single reply may be. Raise it for longer scenes; the reply is marked as cut off when it
@@ -939,9 +939,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                    <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                       <span>Temperature</span>
-                      <span className="font-mono text-amber-400">{(currentRoleConfig.temperature ?? 0.7).toFixed(2)}</span>
+                      <span className="font-mono text-purple-400">{(currentRoleConfig.temperature ?? 0.7).toFixed(2)}</span>
                     </label>
                     <input
                       type="range"
@@ -956,7 +956,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
                         });
                       }}
-                      className="w-full accent-amber-500"
+                      className="w-full accent-purple-500"
                     />
                     <p className="text-[11px] text-stone-500">Lower is steadier, which helps long-run continuity.</p>
                   </div>
@@ -965,7 +965,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
               {currentRoleConfig.type !== 'inherit' && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">Tool Calling</label>
+                  <label className="text-xs font-sans uppercase text-stone-300">Tool Calling</label>
                   <select
                     value={currentRoleConfig.supports_tools ?? 'auto'}
                     onChange={(e) => {
@@ -975,7 +975,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
                       });
                     }}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                   >
                     <option value="auto">Auto (HTTP providers only)</option>
                     <option value="yes">Yes (force tools)</option>
@@ -992,7 +992,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   <button
                     onClick={() => handleTestProvider('llm', currentRoleConfig)}
                     disabled={testingCategory === 'llm'}
-                    className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-500/30 hover:bg-stone-800 text-amber-400 transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-lg bg-stone-900 border border-purple-500/30 hover:bg-stone-800 text-purple-400 transition-all cursor-pointer"
                   >
                     <Zap className="w-3.5 h-3.5" />
                     <span>{testingCategory === 'llm' ? 'Testing Connection...' : 'Test Connection'}</span>
@@ -1017,16 +1017,16 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
           {/* Context budget and timing: what the narrator is sent, and how long it may take */}
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+            <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
               <Sliders className="w-4 h-4" />
               <span>Context &amp; Response Limits</span>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Context Budget (tokens)</span>
-                  <span className="font-mono text-amber-400">
+                  <span className="font-mono text-purple-400">
                     {(config.agents.context_token_budget ?? 0) === 0 ? 'unbounded' : config.agents.context_token_budget}
                   </span>
                 </label>
@@ -1042,7 +1042,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       agents: { ...config.agents, context_token_budget: Number.isNaN(parsed) ? 0 : parsed },
                     });
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">
                   Estimated ceiling for the assembled prompt. 0 sends everything. When it is exceeded, the voice
@@ -1052,9 +1052,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Remembered Turns</span>
-                  <span className="font-mono text-amber-400">{config.agents.recent_turn_window ?? 6}</span>
+                  <span className="font-mono text-purple-400">{config.agents.recent_turn_window ?? 6}</span>
                 </label>
                 <input
                   type="number"
@@ -1069,7 +1069,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       agents: { ...config.agents, recent_turn_window: Number.isNaN(parsed) ? 6 : parsed },
                     });
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">
                   How many prior turns are replayed to the narrator. A larger window means better continuity and a
@@ -1078,9 +1078,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Excerpt Length (characters)</span>
-                  <span className="font-mono text-amber-400">{config.agents.recent_turn_char_limit ?? 1200}</span>
+                  <span className="font-mono text-purple-400">{config.agents.recent_turn_char_limit ?? 1200}</span>
                 </label>
                 <input
                   type="number"
@@ -1094,15 +1094,15 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       agents: { ...config.agents, recent_turn_char_limit: Number.isNaN(parsed) ? 1200 : parsed },
                     });
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">Cap on the text recalled from any one prior turn.</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Turns Recalled At This Location</span>
-                  <span className="font-mono text-amber-400">{config.agents.scene_recall_turns ?? 4}</span>
+                  <span className="font-mono text-purple-400">{config.agents.scene_recall_turns ?? 4}</span>
                 </label>
                 <input
                   type="number"
@@ -1116,15 +1116,15 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       agents: { ...config.agents, scene_recall_turns: Number.isNaN(parsed) ? 4 : parsed },
                     });
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">What happened where the party is standing.</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Recalled Excerpt Length</span>
-                  <span className="font-mono text-amber-400">{config.agents.scene_recall_chars ?? 800}</span>
+                  <span className="font-mono text-purple-400">{config.agents.scene_recall_chars ?? 800}</span>
                 </label>
                 <input
                   type="number"
@@ -1138,15 +1138,15 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       agents: { ...config.agents, scene_recall_chars: Number.isNaN(parsed) ? 800 : parsed },
                     });
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">Cap on the excerpt taken from one recalled turn.</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Turns Retrieved By Entity</span>
-                  <span className="font-mono text-amber-400">{config.agents.retrieval_turns ?? 3}</span>
+                  <span className="font-mono text-purple-400">{config.agents.retrieval_turns ?? 3}</span>
                 </label>
                 <input
                   type="number"
@@ -1160,7 +1160,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       agents: { ...config.agents, retrieval_turns: Number.isNaN(parsed) ? 3 : parsed },
                     });
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">
                   Past turns that share characters with the ones in play, wherever they happened.
@@ -1168,9 +1168,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Retrieved Excerpt Length</span>
-                  <span className="font-mono text-amber-400">{config.agents.retrieval_chars ?? 800}</span>
+                  <span className="font-mono text-purple-400">{config.agents.retrieval_chars ?? 800}</span>
                 </label>
                 <input
                   type="number"
@@ -1184,15 +1184,15 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       agents: { ...config.agents, retrieval_chars: Number.isNaN(parsed) ? 800 : parsed },
                     });
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">Cap on the excerpt taken from one retrieved turn.</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Retrieval Recency Half-Life</span>
-                  <span className="font-mono text-amber-400">{config.agents.retrieval_halflife_turns ?? 12}</span>
+                  <span className="font-mono text-purple-400">{config.agents.retrieval_halflife_turns ?? 12}</span>
                 </label>
                 <input
                   type="number"
@@ -1206,7 +1206,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       agents: { ...config.agents, retrieval_halflife_turns: Number.isNaN(parsed) ? 12 : parsed },
                     });
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">
                   Turns after which a retrieved turn's recency weight halves. Lower favours the recent.
@@ -1214,9 +1214,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Turn Timeout (seconds)</span>
-                  <span className="font-mono text-amber-400">{config.agents.turn_timeout_seconds ?? 300}</span>
+                  <span className="font-mono text-purple-400">{config.agents.turn_timeout_seconds ?? 300}</span>
                 </label>
                 <input
                   type="number"
@@ -1230,7 +1230,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       agents: { ...config.agents, turn_timeout_seconds: Number.isNaN(parsed) ? 300 : parsed },
                     });
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">
                   Wall clock for a whole turn. Raise it for slower local models and long contexts.
@@ -1238,9 +1238,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Silence Timeout (seconds)</span>
-                  <span className="font-mono text-amber-400">{config.agents.chunk_timeout_seconds ?? 60}</span>
+                  <span className="font-mono text-purple-400">{config.agents.chunk_timeout_seconds ?? 60}</span>
                 </label>
                 <input
                   type="number"
@@ -1254,7 +1254,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       agents: { ...config.agents, chunk_timeout_seconds: Number.isNaN(parsed) ? 60 : parsed },
                     });
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">
                   How long the narrator may go quiet between chunks before the turn fails.
@@ -1263,7 +1263,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">Tool Rounds / Turn</label>
+                  <label className="text-xs font-sans uppercase text-stone-300">Tool Rounds / Turn</label>
                   <input
                     type="number"
                     min={0}
@@ -1276,13 +1276,13 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         agents: { ...config.agents, tool_rounds: Number.isNaN(parsed) ? 4 : parsed },
                       });
                     }}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                   />
                   <p className="text-[11px] text-stone-500">How many times a turn may look something up before answering.</p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">Tool Result Characters</label>
+                  <label className="text-xs font-sans uppercase text-stone-300">Tool Result Characters</label>
                   <input
                     type="number"
                     min={0}
@@ -1296,7 +1296,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         agents: { ...config.agents, tool_result_chars: Number.isNaN(parsed) ? 4000 : parsed },
                       });
                     }}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                   />
                   <p className="text-[11px] text-stone-500">The most of one lookup the model is shown at once.</p>
                 </div>
@@ -1312,7 +1312,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           {/* TTS Section */}
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+              <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
                 <Volume2 className="w-4 h-4" />
                 <span>Text-to-Speech (TTS) Engine</span>
               </h3>
@@ -1336,7 +1336,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       e.target.value = '';
                     }
                   }}
-                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load TTS Preset...</option>
@@ -1357,7 +1357,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         media: { ...config.media, tts: { ...config.media.tts, auto_play: e.target.checked } },
                       })
                     }
-                    className="rounded bg-stone-950 border-stone-800 text-amber-600 focus:ring-0"
+                    className="rounded bg-stone-950 border-stone-800 text-purple-600 focus:ring-0"
                   />
                   <span>Auto-play Narration</span>
                 </label>
@@ -1365,7 +1365,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-cinzel uppercase text-stone-300">Narration Markdown</label>
+              <label className="text-xs font-sans uppercase text-stone-300">Narration Markdown</label>
               <select
                 value={config.media.tts.markdown || 'auto'}
                 onChange={(e) =>
@@ -1377,7 +1377,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     },
                   })
                 }
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60"
               >
                 <option value="auto">Auto - reduce formatting unless the provider understands it</option>
                 <option value="strip">Always reduce formatting to plain speech</option>
@@ -1390,7 +1390,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300">TTS Engine</label>
+                <label className="text-xs font-sans uppercase text-stone-300">TTS Engine</label>
                 <select
                   value={
                     config.media.tts.type === 'builtin'
@@ -1446,7 +1446,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       });
                     }
                   }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
                   <option value="gemini">Google Gemini TTS (Cloud, metered)</option>
@@ -1461,7 +1461,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
               {config.media.tts.type === 'http' && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">Speech Endpoint URL</label>
+                  <label className="text-xs font-sans uppercase text-stone-300">Speech Endpoint URL</label>
                   <input
                     type="text"
                     placeholder="e.g. http://localhost:8880/v1/audio/speech"
@@ -1472,14 +1472,14 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         media: { ...config.media, tts: { ...config.media.tts, endpoint: e.target.value } },
                       })
                     }
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                   />
                 </div>
               )}
 
               {config.media.tts.type === 'cli' && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">Command / Binary</label>
+                  <label className="text-xs font-sans uppercase text-stone-300">Command / Binary</label>
                   <input
                     type="text"
                     placeholder="e.g. piper"
@@ -1490,15 +1490,15 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         media: { ...config.media, tts: { ...config.media.tts, command: e.target.value } },
                       })
                     }
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                   />
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Master Volume</span>
-                  <span className="font-mono text-amber-400">
+                  <span className="font-mono text-purple-400">
                     {Math.round((config.media.tts.master_volume || 1.0) * 100)}%
                   </span>
                 </label>
@@ -1517,7 +1517,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       },
                     })
                   }
-                  className="w-full accent-amber-500"
+                  className="w-full accent-purple-500"
                 />
               </div>
             </div>
@@ -1525,7 +1525,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             {isKokoro && (
               <div className="p-3 bg-stone-950/80 border border-stone-800 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2">
-                  <Volume2 className="w-4 h-4 text-amber-400" />
+                  <Volume2 className="w-4 h-4 text-purple-400" />
                   <span className="font-medium text-stone-200">Kokoro Model:</span>
                   {kokoroStatus?.installed ? (
                     <span className="flex items-center gap-1 text-emerald-400 font-mono text-[11px] bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
@@ -1533,17 +1533,17 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       <span>Installed</span>
                     </span>
                   ) : kokoroStatus?.downloading ? (
-                    <div className="flex items-center gap-2 text-amber-400 font-mono text-[11px]">
+                    <div className="flex items-center gap-2 text-purple-400 font-mono text-[11px]">
                       <span>Downloading {Math.round(kokoroStatus.progress * 100)}%</span>
                       <div className="w-20 h-1.5 bg-stone-800 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-amber-500"
+                          className="h-full bg-purple-500"
                           style={{ width: `${Math.round(kokoroStatus.progress * 100)}%` }}
                         />
                       </div>
                     </div>
                   ) : (
-                    <span className="flex items-center gap-1 text-amber-400/90 font-mono text-[11px] bg-amber-950/40 border border-amber-800/40 px-2 py-0.5 rounded-md">
+                    <span className="flex items-center gap-1 text-purple-400/90 font-mono text-[11px] bg-purple-950/40 border border-purple-800/40 px-2 py-0.5 rounded-md">
                       <AlertCircle className="w-3.5 h-3.5" />
                       <span>Not Installed (~320 MB)</span>
                     </span>
@@ -1560,7 +1560,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         sizeBytes: 319625534,
                       })
                     }
-                    className="flex items-center gap-1.5 px-3 py-1 bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold rounded-lg transition shadow text-xs cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-stone-950 font-sans font-bold rounded-lg transition shadow text-xs cursor-pointer disabled:opacity-50"
                   >
                     <span>{kokoroStatus?.downloading ? 'Downloading...' : 'Download Model'}</span>
                   </button>
@@ -1570,7 +1570,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
             {isGeminiTTS && (
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300">Gemini TTS Model</label>
+                <label className="text-xs font-sans uppercase text-stone-300">Gemini TTS Model</label>
                 <input
                   type="text"
                   placeholder="e.g. gemini-3.8-flash-tts"
@@ -1581,7 +1581,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       media: { ...config.media, tts: { ...config.media.tts, model: e.target.value } },
                     })
                   }
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {[
@@ -1602,7 +1602,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       }
                       className={`text-[11px] px-2.5 py-1 rounded-lg border font-mono transition cursor-pointer ${
                         (config.media.tts.model || 'gemini-3.8-flash-tts') === m.id
-                          ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
+                          ? 'bg-purple-500/20 border-purple-500/60 text-purple-300'
                           : 'bg-stone-900/60 border-stone-800 text-stone-400 hover:text-stone-200'
                       }`}
                     >
@@ -1614,8 +1614,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             )}
 
             {inspect?.metered && (
-              <div className="flex items-center gap-2 text-[11px] font-mono text-amber-400/90">
-                <span className="px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10">METERED</span>
+              <div className="flex items-center gap-2 text-[11px] font-mono text-purple-400/90">
+                <span className="px-1.5 py-0.5 rounded border border-purple-500/40 bg-purple-500/10">METERED</span>
                 <span>This provider charges per request. Cached clips are reused.</span>
               </div>
             )}
@@ -1630,7 +1630,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
             {inspect?.key_required && (
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>API Key</span>
                   {isGeminiTTS && config.providers?.gemini?.api_key && !config.media.tts.api_key && (
                     <span className="text-[11px] text-emerald-400 font-mono">Using shared Gemini key</span>
@@ -1650,7 +1650,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       media: { ...config.media, tts: { ...config.media.tts, api_key: e.target.value } },
                     })
                   }
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
                 <p className="text-[11px] text-stone-500">
                   {isGeminiTTS
@@ -1662,7 +1662,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
             {inspect && inspect.options && inspect.options.length > 0 && (
               <div className="p-3 rounded-lg bg-stone-950/70 border border-stone-800/80 space-y-2">
-                <label className="text-xs font-cinzel uppercase text-stone-300">Provider Tuning</label>
+                <label className="text-xs font-sans uppercase text-stone-300">Provider Tuning</label>
                 <VoiceOptionsControl
                   schema={inspect.options}
                   values={config.media.tts.options ?? {}}
@@ -1692,7 +1692,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   type="button"
                   onClick={refreshInspect}
                   disabled={inspecting}
-                  className="px-2 py-1 rounded bg-stone-900 border border-stone-800 text-amber-400 hover:text-amber-300 hover:border-amber-500/40 cursor-pointer disabled:opacity-50"
+                  className="px-2 py-1 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 hover:border-purple-500/40 cursor-pointer disabled:opacity-50"
                 >
                   {inspecting ? 'Refreshing...' : 'Refresh Catalog'}
                 </button>
@@ -1707,7 +1707,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
             {config.media.tts.type !== 'disabled' && (
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300">Default Voice</label>
+                <label className="text-xs font-sans uppercase text-stone-300">Default Voice</label>
                 <VoiceCombobox
                   value={config.media.tts.default_voice || ''}
                   onChange={(voiceID) =>
@@ -1732,7 +1732,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               <div className="space-y-3 p-4 rounded-xl bg-stone-900/40 border border-stone-800">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <div className="text-xs font-cinzel font-bold text-stone-200">
+                    <div className="text-xs font-sans font-bold text-stone-200">
                       Speech Steering & Acting Cues
                     </div>
                     <div className="text-[11px] text-stone-400">
@@ -1757,7 +1757,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         },
                       })
                     }
-                    className="w-4 h-4 rounded border-stone-700 bg-stone-900 text-amber-500 focus:ring-amber-500/40 cursor-pointer"
+                    className="w-4 h-4 rounded border-stone-700 bg-stone-900 text-purple-500 focus:ring-purple-500/40 cursor-pointer"
                   />
                 </div>
 
@@ -1765,7 +1765,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   <div className="text-[11px] p-2.5 rounded-lg bg-stone-950/60 border border-stone-800/80 text-stone-400">
                     <span className="font-semibold text-stone-300">Provider Capabilities: </span>
                     {inspect.speech_cues.audio_tags ? (
-                      <span className="text-amber-400">
+                      <span className="text-purple-400">
                         Supports bracketed vocal cues ({inspect.speech_cues.supported_tags?.slice(0, 5).map(t => `[${t}]`).join(', ')}...)
                       </span>
                     ) : inspect.speech_cues.markdown_emphasis ? (
@@ -1778,7 +1778,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
                 {(config.media.tts.speech_cues?.enabled ?? true) && (
                   <div className="space-y-1.5 pt-1">
-                    <label className="text-xs font-cinzel uppercase text-stone-300">
+                    <label className="text-xs font-sans uppercase text-stone-300">
                       Transcript Display Mode
                     </label>
                     <select
@@ -1799,7 +1799,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           },
                         })
                       }
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                     >
                       <option value="stage_directions">Stage Directions (styled tags in transcript)</option>
                       <option value="hidden">Hidden (acted out in audio, hidden in transcript)</option>
@@ -1813,7 +1813,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             {config.media.tts.type !== 'disabled' && (
               <div className="pt-2 space-y-2 border-t border-stone-800/60">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">
+                  <label className="text-xs font-sans uppercase text-stone-300">
                     Preview Phrase
                   </label>
                   <input
@@ -1821,7 +1821,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     value={ttsPreviewText}
                     onChange={(e) => setTtsPreviewText(e.target.value)}
                     placeholder={DEFAULT_TTS_PREVIEW_TEXT}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60"
                   />
                 </div>
 
@@ -1829,7 +1829,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   <button
                     onClick={() => handleTestProvider('tts', config.media.tts, ttsPreviewText)}
                     disabled={testingCategory === 'tts'}
-                    className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-500/30 hover:bg-stone-800 text-amber-400 transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-lg bg-stone-900 border border-purple-500/30 hover:bg-stone-800 text-purple-400 transition-all cursor-pointer"
                   >
                     <Play className="w-3.5 h-3.5" />
                     <span>{testingCategory === 'tts' ? 'Synthesizing...' : 'Test Speech Synthesis'}</span>
@@ -1853,8 +1853,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             <div className="pt-4 border-t border-stone-800/80 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-amber-400" />
-                  <span className="font-cinzel text-xs uppercase font-bold text-stone-200">
+                  <Users className="w-4 h-4 text-purple-400" />
+                  <span className="font-sans text-xs uppercase font-bold text-stone-200">
                     NPC Voice Profiles Library
                   </span>
                   <span className="text-[10px] font-mono text-stone-500">
@@ -1876,7 +1876,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           },
                         });
                       }}
-                      className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-amber-600/20 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 transition cursor-pointer"
+                      className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 transition cursor-pointer"
                       title="Autofill all 11 Kokoro voice profiles with gender and accent tags"
                     >
                       <Sparkles className="w-3 h-3" />
@@ -1897,7 +1897,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         },
                       });
                     }}
-                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-300 hover:text-amber-300 transition cursor-pointer"
+                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-300 hover:text-purple-300 transition cursor-pointer"
                     title="Restore default fantasy archetypes"
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -1908,7 +1908,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <button
                       type="button"
                       onClick={() => setIsCatalogModalOpen(true)}
-                      className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-stone-900 border border-amber-500/40 text-amber-300 hover:bg-stone-800 transition cursor-pointer"
+                      className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-stone-900 border border-purple-500/40 text-purple-300 hover:bg-stone-800 transition cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Import from Catalog</span>
@@ -1938,7 +1938,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         },
                       });
                     }}
-                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-amber-600/20 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 transition cursor-pointer"
+                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 transition cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
                     <span>Add Profile</span>
@@ -1970,7 +1970,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                               media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
                             });
                           }}
-                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs font-mono text-amber-300 focus:outline-none"
+                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs font-mono text-purple-300 focus:outline-none"
                         />
                         <input
                           type="text"
@@ -2016,7 +2016,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                               ttsPreviewText
                             )
                           }
-                          className="p-1.5 rounded bg-stone-900 border border-stone-800 text-amber-400 hover:text-amber-300 hover:border-amber-500/40 cursor-pointer"
+                          className="p-1.5 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 hover:border-purple-500/40 cursor-pointer"
                           title="Test Voice Profile"
                         >
                           <Play className="w-3.5 h-3.5" />
@@ -2041,7 +2041,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       <div className="space-y-1">
                         <div className="flex justify-between text-[11px] text-stone-400">
                           <span>Pitch</span>
-                          <span className="font-mono text-amber-400">{(profile.pitch ?? 1.0).toFixed(2)}x</span>
+                          <span className="font-mono text-purple-400">{(profile.pitch ?? 1.0).toFixed(2)}x</span>
                         </div>
                         <input
                           type="range"
@@ -2057,14 +2057,14 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                               media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
                             });
                           }}
-                          className="w-full accent-amber-500"
+                          className="w-full accent-purple-500"
                         />
                       </div>
 
                       <div className="space-y-1">
                         <div className="flex justify-between text-[11px] text-stone-400">
                           <span>Speed / Speech Rate</span>
-                          <span className="font-mono text-amber-400">{(profile.speech_rate ?? 1.0).toFixed(2)}x</span>
+                          <span className="font-mono text-purple-400">{(profile.speech_rate ?? 1.0).toFixed(2)}x</span>
                         </div>
                         <input
                           type="range"
@@ -2080,7 +2080,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                               media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
                             });
                           }}
-                          className="w-full accent-amber-500"
+                          className="w-full accent-purple-500"
                         />
                       </div>
                     </div>
@@ -2119,7 +2119,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
                     {inspect && inspect.options && inspect.options.length > 0 && (
                       <details className="text-xs">
-                        <summary className="cursor-pointer text-[11px] font-cinzel uppercase text-stone-400">
+                        <summary className="cursor-pointer text-[11px] font-sans uppercase text-stone-400">
                           Provider Options
                         </summary>
                         <div className="pt-2">
@@ -2156,7 +2156,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           {/* Speech-to-Text (STT) Section */}
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+              <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
                 <Mic className="w-4 h-4" />
                 <span>Speech-to-Text (STT) Engine</span>
               </h3>
@@ -2173,7 +2173,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       e.target.value = '';
                     }
                   }}
-                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load STT Preset...</option>
@@ -2188,7 +2188,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300">STT Provider Type</label>
+                <label className="text-xs font-sans uppercase text-stone-300">STT Provider Type</label>
                 <select
                   value={config.media.stt?.type || 'disabled'}
                   onChange={(e) =>
@@ -2200,7 +2200,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       },
                     })
                   }
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
                   <option value="web-speech">Web Speech API (Browser Native)</option>
@@ -2213,7 +2213,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               {config.media.stt?.type === 'http' && (
                 <>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-cinzel uppercase text-stone-300">Transcription Endpoint URL</label>
+                    <label className="text-xs font-sans uppercase text-stone-300">Transcription Endpoint URL</label>
                     <input
                       type="text"
                       placeholder="e.g. http://localhost:8000/v1/audio/transcriptions"
@@ -2224,11 +2224,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           media: { ...config.media, stt: { ...config.media.stt, endpoint: e.target.value } },
                         })
                       }
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-cinzel uppercase text-stone-300">Model Name</label>
+                    <label className="text-xs font-sans uppercase text-stone-300">Model Name</label>
                     <input
                       type="text"
                       placeholder="e.g. whisper-1"
@@ -2239,7 +2239,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           media: { ...config.media, stt: { ...config.media.stt, model: e.target.value } },
                         })
                       }
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                     />
                   </div>
                 </>
@@ -2247,7 +2247,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
               {config.media.stt?.type === 'cli' && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">Command / Binary</label>
+                  <label className="text-xs font-sans uppercase text-stone-300">Command / Binary</label>
                   <input
                     type="text"
                     placeholder="e.g. whisper-cli"
@@ -2258,7 +2258,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         media: { ...config.media, stt: { ...config.media.stt, command: e.target.value } },
                       })
                     }
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                   />
                 </div>
               )}
@@ -2269,7 +2269,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <button
                   onClick={() => handleTestProvider('stt', config.media.stt)}
                   disabled={testingCategory === 'stt'}
-                  className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-500/30 hover:bg-stone-800 text-amber-400 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-lg bg-stone-900 border border-purple-500/30 hover:bg-stone-800 text-purple-400 transition-all cursor-pointer"
                 >
                   <Zap className="w-3.5 h-3.5" />
                   <span>{testingCategory === 'stt' ? 'Transcribing...' : 'Test STT Connection'}</span>
@@ -2292,7 +2292,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           {/* Image Generation Section */}
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+              <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
                 <Sparkles className="w-4 h-4" />
                 <span>Scene Art / Image Generator</span>
               </h3>
@@ -2312,7 +2312,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       e.target.value = '';
                     }
                   }}
-                  className="bg-stone-900 border border-amber-500/30 text-amber-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                  className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load Image Preset...</option>
@@ -2333,7 +2333,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         media: { ...config.media, image: { ...config.media.image, auto_generate: e.target.checked } },
                       })
                     }
-                    className="rounded bg-stone-950 border-stone-800 text-amber-600 focus:ring-0"
+                    className="rounded bg-stone-950 border-stone-800 text-purple-600 focus:ring-0"
                   />
                   <span>Auto-generate Scene Art</span>
                 </label>
@@ -2348,7 +2348,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         media: { ...config.media, image: { ...config.media.image, builtin_fallback: e.target.checked } },
                       })
                     }
-                    className="rounded bg-stone-950 border-stone-800 text-amber-600 focus:ring-0"
+                    className="rounded bg-stone-950 border-stone-800 text-purple-600 focus:ring-0"
                   />
                   <span>Fallback to Procedural Art</span>
                 </label>
@@ -2357,7 +2357,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-cinzel uppercase text-stone-300">Image Provider Type</label>
+                <label className="text-xs font-sans uppercase text-stone-300">Image Provider Type</label>
                 <select
                   value={config.media.image.type}
                   onChange={(e) =>
@@ -2366,7 +2366,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       media: { ...config.media, image: { ...config.media.image, type: e.target.value as any } },
                     })
                   }
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
                   <option value="gemini">Google Gemini / Imagen (GenAI Cloud)</option>
@@ -2379,7 +2379,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
               {config.media.image.type === 'builtin' && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">Built-in Art Engine</label>
+                  <label className="text-xs font-sans uppercase text-stone-300">Built-in Art Engine</label>
                   <select
                     value={config.media.image.builtin_name || 'procedural-art'}
                     onChange={(e) =>
@@ -2388,7 +2388,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         media: { ...config.media, image: { ...config.media.image, builtin_name: e.target.value } },
                       })
                     }
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                   >
                     <option value="procedural-art">procedural-art (Pure-Go Vector Dark Fantasy SVG)</option>
                     <option value="gemini">gemini (Google Imagen 3 / Nano Banana)</option>
@@ -2399,7 +2399,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
               {config.media.image.type === 'http' && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">Image Endpoint URL</label>
+                  <label className="text-xs font-sans uppercase text-stone-300">Image Endpoint URL</label>
                   <input
                     type="text"
                     placeholder="e.g. http://localhost:7860/v1/images/generations"
@@ -2410,7 +2410,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         media: { ...config.media, image: { ...config.media.image, endpoint: e.target.value } },
                       })
                     }
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                   />
                 </div>
               )}
@@ -2419,7 +2419,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 (config.media.image.type === 'builtin' && config.media.image.builtin_name === 'gemini')) && (
                 <>
                   <div className="space-y-1.5 col-span-1 md:col-span-2">
-                    <label className="text-xs font-cinzel uppercase text-stone-300">Gemini / Imagen Model</label>
+                    <label className="text-xs font-sans uppercase text-stone-300">Gemini / Imagen Model</label>
                     <input
                       type="text"
                       placeholder="e.g. imagen-3.0-generate-002 or gemini-3.1-flash-image"
@@ -2430,7 +2430,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           media: { ...config.media, image: { ...config.media.image, model: e.target.value } },
                         })
                       }
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                     />
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {[
@@ -2452,7 +2452,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           }
                           className={`px-2 py-0.5 text-[10px] font-mono rounded border transition-colors cursor-pointer ${
                             (config.media.image.model || 'imagen-3.0-generate-002') === m.id
-                              ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                              ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
                               : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200'
                           }`}
                         >
@@ -2463,7 +2463,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-cinzel uppercase text-stone-300">Aspect Ratio</label>
+                    <label className="text-xs font-sans uppercase text-stone-300">Aspect Ratio</label>
                     <select
                       value={config.media.image.aspect_ratio || '16:9'}
                       onChange={(e) =>
@@ -2472,7 +2472,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           media: { ...config.media, image: { ...config.media.image, aspect_ratio: e.target.value } },
                         })
                       }
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                     >
                       <option value="16:9">16:9 (Cinematic Widescreen - Default)</option>
                       <option value="1:1">1:1 (Square)</option>
@@ -2484,7 +2484,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-cinzel uppercase text-stone-300">Person Generation</label>
+                    <label className="text-xs font-sans uppercase text-stone-300">Person Generation</label>
                     <select
                       value={config.media.image.person_generation || 'ALLOW_ADULT'}
                       onChange={(e) =>
@@ -2493,7 +2493,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           media: { ...config.media, image: { ...config.media.image, person_generation: e.target.value } },
                         })
                       }
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                     >
                       <option value="ALLOW_ADULT">ALLOW_ADULT (Default — Adults, NPCs, Guards)</option>
                       <option value="ALLOW_ALL">ALLOW_ALL (All Characters & Children)</option>
@@ -2502,7 +2502,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   </div>
 
                   <div className="space-y-1.5 col-span-1 md:col-span-2">
-                    <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                    <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                       <span>API Key Override</span>
                       {config.providers?.gemini?.api_key && (
                         <span className="text-[10px] text-emerald-400 font-mono">Shared key active</span>
@@ -2518,7 +2518,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           media: { ...config.media, image: { ...config.media.image, api_key: e.target.value } },
                         })
                       }
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                     />
                   </div>
                 </>
@@ -2530,7 +2530,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <button
                   onClick={() => handleTestProvider('image', config.media.image)}
                   disabled={testingCategory === 'image'}
-                  className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg bg-stone-900 border border-amber-500/30 hover:bg-stone-800 text-amber-400 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-lg bg-stone-900 border border-purple-500/30 hover:bg-stone-800 text-purple-400 transition-all cursor-pointer"
                 >
                   <Zap className="w-3.5 h-3.5" />
                   <span>{testingCategory === 'image' ? 'Generating...' : 'Test Image Generator'}</span>
@@ -2556,14 +2556,14 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       {activeSubTab === 'preferences' && (
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+            <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
               <Sliders className="w-4 h-4" />
               <span>App Preferences & Appearance</span>
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-cinzel uppercase text-stone-300">Cinematic Backdrop Overlays</label>
+                <label className="text-xs font-sans uppercase text-stone-300">Cinematic Backdrop Overlays</label>
                 <p className="text-[11px] text-stone-400">
                   Enable atmospheric vignette darkening and cinematic film noise textures.
                 </p>
@@ -2578,9 +2578,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       },
                     })
                   }
-                  className={`px-4 py-2 rounded-xl text-xs font-cinzel font-bold transition-all cursor-pointer border ${
+                  className={`px-4 py-2 rounded-xl text-xs font-sans font-bold transition-all cursor-pointer border ${
                     config.preferences.cinematic_effects
-                      ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                      ? 'bg-purple-600/30 border-purple-500 text-purple-300'
                       : 'bg-stone-900 border-stone-800 text-stone-400'
                   }`}
                 >
@@ -2589,7 +2589,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-cinzel uppercase text-stone-300">Typography Scaling</label>
+                <label className="text-xs font-sans uppercase text-stone-300">Typography Scaling</label>
                 <p className="text-[11px] text-stone-400">Select font scaling across story chronicles and dialogue.</p>
                 <div className="flex gap-2">
                   {(['small', 'medium', 'large'] as const).map((scale) => (
@@ -2602,9 +2602,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           preferences: { ...config.preferences, font_scale: scale },
                         })
                       }
-                      className={`px-3 py-1.5 rounded-lg text-xs font-cinzel capitalize transition-all cursor-pointer border ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-sans capitalize transition-all cursor-pointer border ${
                         config.preferences.font_scale === scale
-                          ? 'bg-amber-600 text-stone-950 font-bold border-amber-500 shadow'
+                          ? 'bg-purple-600 text-white font-bold border-purple-500 shadow'
                           : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-stone-200'
                       }`}
                     >
@@ -2615,7 +2615,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-cinzel uppercase text-stone-300">Story Token Streaming</label>
+                <label className="text-xs font-sans uppercase text-stone-300">Story Token Streaming</label>
                 <p className="text-[11px] text-stone-400">
                   Stream narrative text word-by-word as generated by the storyteller model.
                 </p>
@@ -2630,9 +2630,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       },
                     })
                   }
-                  className={`px-4 py-2 rounded-xl text-xs font-cinzel font-bold transition-all cursor-pointer border ${
+                  className={`px-4 py-2 rounded-xl text-xs font-sans font-bold transition-all cursor-pointer border ${
                     config.preferences.streaming
-                      ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                      ? 'bg-purple-600/30 border-purple-500 text-purple-300'
                       : 'bg-stone-900 border-stone-800 text-stone-400'
                   }`}
                 >
