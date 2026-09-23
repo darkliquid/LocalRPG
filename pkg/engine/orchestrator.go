@@ -65,22 +65,24 @@ func openingDirective(prompt string) string {
 }
 
 type TurnOrchestrator struct {
-	store         *storage.Store
-	timeline      *Timeline
-	rulesEngine   *rules.JSEngine
-	router        *harness.Router
-	startLocation string
-	playerID      string
-	assembler     *harness.ContextAssembler
-	rulesPrompt   string
-	lorePrompt    string
-	extractor     *harness.Extractor
-	chunkTimeout  time.Duration
-	openingPrompt string
+	store            *storage.Store
+	timeline         *Timeline
+	rulesEngine      *rules.JSEngine
+	router           *harness.Router
+	startLocation    string
+	playerID         string
+	assembler        *harness.ContextAssembler
+	rulesPrompt      string
+	lorePrompt       string
+	extractor        *harness.Extractor
+	chunkTimeout     time.Duration
+	openingPrompt    string
 	logger           trace.Logger
 	chronicler       *Chronicler
 	threadsMax       int
 	continuityChecks *bool
+	completion       harness.ModelProvider
+	completionPolicy CompletionPolicy
 }
 
 func NewTurnOrchestrator(
@@ -464,16 +466,18 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		return nil, fmt.Errorf("gm generation failed: %w", err)
 	}
 
-	narration := result.Text
-	finishReason := result.FinishReason
-	// A reply is incomplete when the stream was cut short or the prose does not
-	// end at a natural boundary, not only when the provider declared a token cap.
-	truncated := finishReason == "length" || result.Interrupted != nil || !harness.ProseComplete(narration)
+	cause := o.classifyCut(result)
+	narration, recovery, stillIncomplete := o.recoverReply(ctx, result.Text, cause, onChunk)
+	if strings.TrimSpace(narration) == "" {
+		return nil, fmt.Errorf("gm returned no narration")
+	}
 
 	o.logger.Event("generation.complete", map[string]interface{}{
 		"narration_chars": len([]rune(narration)),
-		"finish_reason":   finishReason,
-		"truncated":       truncated,
+		"finish_reason":   result.FinishReason,
+		"cause":           cause.String(),
+		"recovery":        string(recovery),
+		"truncated":       stillIncomplete,
 	})
 
 	turn := Turn{
@@ -485,12 +489,9 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Narration:    narration,
 		Location:     locationID,
 		Outcome:      outcome,
-		Truncated:    truncated,
+		Truncated:    stillIncomplete,
+		Recovery:     string(recovery),
 		ContextNotes: assembly.Trimmed,
-	}
-
-	if strings.TrimSpace(turn.Narration) == "" {
-		return nil, fmt.Errorf("gm returned no narration")
 	}
 
 	turn.Entities = harness.ResolveEntityMentions(o.store, o.playerID, locationID, turn.Narration, actionInput)

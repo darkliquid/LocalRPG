@@ -27,6 +27,12 @@ type Turn struct {
 	// Truncated records that the model hit its token limit mid-reply, so the
 	// client can say so instead of presenting a cut-off scene as a complete one.
 	Truncated bool `json:"truncated,omitempty"`
+	// Recovery records how a reply that stopped mid-thought was repaired:
+	// "continued" (a second call finished it), "trimmed" (the unfinished tail
+	// was dropped), "kept" (recovery was skipped or failed), or empty (nothing
+	// was wrong). Truncated is true only when the recorded prose is still
+	// incomplete.
+	Recovery string `json:"recovery,omitempty"`
 	// ContextNotes records anything the prompt budget left out, so a thinner reply
 	// can be explained rather than looking like drift.
 	ContextNotes []string `json:"context_notes,omitempty"`
