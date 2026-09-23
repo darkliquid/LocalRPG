@@ -39,6 +39,9 @@ type Service struct {
 	indexed   map[string]bool
 	locks     map[string]*sync.Mutex
 	modelsManager *models.Manager
+	// newTTSClient builds a TTS client from configuration. It is a field so a test
+	// can describe a provider without a network, and nil means the real factory.
+	newTTSClient func(config.TTSConfig) (media.TTSClient, error)
 	// Audio playback belongs to the process so narration never depends on a
 	// browser's autoplay policy. It is opened once, on first use, because most
 	// requests never need it.
@@ -2288,8 +2291,12 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		if strings.TrimSpace(spoken) == "" {
 			return &TestProviderResponseDTO{Success: false, Message: "The test phrase reduced to no speakable text"}, nil
 		}
+		voiceID := ttsCfg.DefaultVoice
+		if req.VoiceID != "" {
+			voiceID = req.VoiceID
+		}
 		voice := &entity.VoiceConfig{
-			VoiceID:    ttsCfg.DefaultVoice,
+			VoiceID:    voiceID,
 			Pitch:      ttsCfg.Pitch,
 			SpeechRate: ttsCfg.SpeechRate,
 		}

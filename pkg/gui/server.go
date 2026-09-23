@@ -44,6 +44,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/world/", s.handleWorldRoutes)
 	s.mux.HandleFunc("/api/settings", s.handleSettingsRoutes)
 	s.mux.HandleFunc("/api/settings/test-provider", s.handleTestProviderRoute)
+	s.mux.HandleFunc("/api/tts/inspect", s.handleTTSInspectRoute)
 	s.mux.HandleFunc("/api/audio/", s.handleAudioRoutes)
 	s.mux.HandleFunc("/api/stt", s.handleSTTRoute)
 	s.mux.HandleFunc("/api/trace", s.handleTraceRoute)
@@ -622,6 +623,26 @@ func (s *Server) handleTestProviderRoute(w http.ResponseWriter, r *http.Request)
 	}
 
 	res, err := s.service.TestProvider(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
+func (s *Server) handleTTSInspectRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req TTSInspectRequestDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res, err := s.service.InspectTTS(r.Context(), req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

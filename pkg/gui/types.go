@@ -3,10 +3,12 @@ package gui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
+	"github.com/darkliquid/localrpg/pkg/media"
 )
 
 type PlayerDTO struct {
@@ -55,23 +57,23 @@ type SegmentDTO struct {
 }
 
 type TurnDTO struct {
-	TurnNumber     int          `json:"turn_number"`
-	InputText      string       `json:"input_text"`
-	Mode           string       `json:"mode"`
-	Prose          string       `json:"prose"`
-	Speaker        string       `json:"speaker,omitempty"`
-	Dialogue       string       `json:"dialogue,omitempty"`
-	ImageURL       string       `json:"image_url,omitempty"`
-	EntitiesHit    []string     `json:"entities_hit,omitempty"`
-	Segments       []SegmentDTO `json:"segments,omitempty"`
-	Outcome        string       `json:"outcome,omitempty"`
+	TurnNumber      int          `json:"turn_number"`
+	InputText       string       `json:"input_text"`
+	Mode            string       `json:"mode"`
+	Prose           string       `json:"prose"`
+	Speaker         string       `json:"speaker,omitempty"`
+	Dialogue        string       `json:"dialogue,omitempty"`
+	ImageURL        string       `json:"image_url,omitempty"`
+	EntitiesHit     []string     `json:"entities_hit,omitempty"`
+	Segments        []SegmentDTO `json:"segments,omitempty"`
+	Outcome         string       `json:"outcome,omitempty"`
 	Truncated       bool         `json:"truncated,omitempty"`
 	Recovery        string       `json:"recovery,omitempty"`
 	ContextNotes    []string     `json:"context_notes,omitempty"`
 	ContinuityNotes []string     `json:"continuity_notes,omitempty"`
 	LocationID      string       `json:"location_id,omitempty"`
-	LocationName   string       `json:"location_name,omitempty"`
-	LocationArtURL string       `json:"location_art_url,omitempty"`
+	LocationName    string       `json:"location_name,omitempty"`
+	LocationArtURL  string       `json:"location_art_url,omitempty"`
 }
 
 type EntityDTO struct {
@@ -177,8 +179,8 @@ type ThreadDTO struct {
 
 // RecapDTO is a campaign's long memory as the client reads it.
 type RecapDTO struct {
-	Summary     string      `json:"summary,omitempty"`
-	ThroughTurn int         `json:"through_turn"`
+	Summary     string `json:"summary,omitempty"`
+	ThroughTurn int    `json:"through_turn"`
 	// Enabled is false when summarisation is off, so a client can offer the panel
 	// without offering a refresh that would do nothing.
 	Enabled bool        `json:"enabled"`
@@ -192,22 +194,22 @@ type GameSettingsPatchDTO struct {
 }
 
 type SystemDetailDTO struct {
-	ID                string                      `json:"id"`
-	Name              string                      `json:"name"`
-	Version           string                      `json:"version"`
-	Description       string                      `json:"description"`
-	Script            string                      `json:"script"`
-	RulesPrompt       string                      `json:"rules_prompt"`
+	ID                string                     `json:"id"`
+	Name              string                     `json:"name"`
+	Version           string                     `json:"version"`
+	Description       string                     `json:"description"`
+	Script            string                     `json:"script"`
+	RulesPrompt       string                     `json:"rules_prompt"`
 	CharacterCreation core.CharacterCreationSpec `json:"character_creation"`
 }
 
 type CreateSystemRequestDTO struct {
-	ID                string                      `json:"id,omitempty"`
-	Name              string                      `json:"name"`
-	Version           string                      `json:"version,omitempty"`
-	Description       string                      `json:"description,omitempty"`
-	Script            string                      `json:"script,omitempty"`
-	RulesPrompt       string                      `json:"rules_prompt,omitempty"`
+	ID                string                     `json:"id,omitempty"`
+	Name              string                     `json:"name"`
+	Version           string                     `json:"version,omitempty"`
+	Description       string                     `json:"description,omitempty"`
+	Script            string                     `json:"script,omitempty"`
+	RulesPrompt       string                     `json:"rules_prompt,omitempty"`
 	CharacterCreation core.CharacterCreationSpec `json:"character_creation,omitempty"`
 }
 
@@ -255,13 +257,42 @@ type TestProviderRequestDTO struct {
 	Category   string      `json:"category"` // "llm", "tts", "stt", "image"
 	Provider   interface{} `json:"provider"`
 	TestPrompt string      `json:"test_prompt,omitempty"`
+	// VoiceID lets a probe audition a catalog voice that has not been saved yet.
+	VoiceID string `json:"voice_id,omitempty"`
+}
+
+// TTSInspectRequestDTO asks what a TTS configuration can do. The config may be
+// unsaved, which is what lets the editor describe a provider before it is applied.
+type TTSInspectRequestDTO struct {
+	Config  config.TTSConfig `json:"config"`
+	Refresh bool             `json:"refresh,omitempty"`
+}
+
+// VoiceCatalogDTO is a provider's voices plus whether the provider can enumerate
+// at all, so the UI can explain instead of offering a dead button.
+type VoiceCatalogDTO struct {
+	Available bool                  `json:"available"`
+	FetchedAt time.Time             `json:"fetched_at,omitempty"`
+	Stale     bool                  `json:"stale"`
+	Voices    []media.ProviderVoice `json:"voices"`
+}
+
+// TTSInspectResponseDTO is everything the speech editor needs about one
+// configuration. It never carries the configuration's API key.
+type TTSInspectResponseDTO struct {
+	ProviderKey string              `json:"provider_key"`
+	Metered     bool                `json:"metered"`
+	Options     []media.VoiceOption `json:"options,omitempty"`
+	Catalog     VoiceCatalogDTO     `json:"catalog"`
+	// Error is a non-fatal catalog failure, so the editor still renders options.
+	Error string `json:"error,omitempty"`
 }
 
 type TestProviderResponseDTO struct {
-	Success      bool   `json:"success"`
-	LatencyMS    int64  `json:"latency_ms"`
-	Message      string `json:"message"`
-	Preview      string `json:"preview,omitempty"`
+	Success   bool   `json:"success"`
+	LatencyMS int64  `json:"latency_ms"`
+	Message   string `json:"message"`
+	Preview   string `json:"preview,omitempty"`
 	// AudioDataURI carries synthesized speech as an inline data URI so a client
 	// can play the exact clip a probe produced instead of only reporting it.
 	AudioDataURI string `json:"audio_data_uri,omitempty"`
