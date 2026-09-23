@@ -384,6 +384,96 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
         </div>
       )}
 
+      {/* Tab: Ecosystem Providers */}
+      {activeSubTab === 'providers' && (
+        <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
+            <h3 className="font-cinzel text-sm font-bold text-amber-400 flex items-center gap-2">
+              <Cloud className="w-4 h-4" />
+              <span>Cloud & Ecosystem Providers</span>
+            </h3>
+            <p className="text-xs text-stone-400">
+              Configure shared credentials and master keys for external AI and media providers that power multiple capabilities across LocalRPG.
+            </p>
+
+            {/* Google Gemini Provider Card */}
+            <div className="p-4 bg-stone-950/80 border border-stone-800/90 rounded-xl space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800/60 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-cinzel font-bold text-stone-200">Google Gemini (GenAI)</h4>
+                    <p className="text-[11px] text-stone-400">Multi-modal intelligence: text reasoning, image creation, and vocal performance.</p>
+                  </div>
+                </div>
+                <div>
+                  {config.providers?.gemini?.api_key ? (
+                    <span className="flex items-center gap-1 text-emerald-400 font-mono text-[11px] bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Configured in Settings</span>
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-mono text-stone-500 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded-md">
+                      Using env or unconfigured
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>Shared Gemini API Key</span>
+                  <span className="text-[10px] text-stone-500 font-mono">
+                    {config.providers?.gemini?.api_key ? '✓ Custom Key Saved' : 'Optional if GEMINI_API_KEY is set'}
+                  </span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="AIzaSy... or leave blank for GEMINI_API_KEY / GOOGLE_API_KEY env var"
+                  value={config.providers?.gemini?.api_key || ''}
+                  onChange={(e) => {
+                    setConfig({
+                      ...config,
+                      providers: {
+                        ...config.providers,
+                        gemini: {
+                          ...config.providers?.gemini,
+                          api_key: e.target.value,
+                        },
+                      },
+                    });
+                  }}
+                  className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">
+                  Automatically inherited by Gemini LLM agents, Gemini/Imagen image generators, and Gemini TTS voice synthesis. Individual roles and media engines can still provide an override key.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-stone-800/50">
+                <div className="text-[11px] font-cinzel uppercase text-stone-400 font-semibold mb-2">Connected Subsystems</div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-[11px] text-stone-300 font-mono">
+                    <Cpu className="w-3 h-3 text-amber-400" />
+                    <span>AI Agents (GM, Narrator, Extractor)</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-[11px] text-stone-300 font-mono">
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    <span>Image Generation (Imagen 3, Nano Banana)</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-[11px] text-stone-300 font-mono">
+                    <Volume2 className="w-3 h-3 text-amber-400" />
+                    <span>Voice Synthesis (Gemini 3.1 & 2.5 Flash/Pro TTS)</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tab 2: AI Agents & Roles */}
       {activeSubTab === 'agents' && (
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
