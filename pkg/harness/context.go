@@ -54,6 +54,14 @@ type RecentTurn struct {
 	Narration string
 }
 
+// SpeechCueContext describes the vocal steering hints allowed in generation.
+type SpeechCueContext struct {
+	AudioTags        bool
+	MarkdownEmphasis bool
+	SampleTags       []string
+	CustomGuidance   string
+}
+
 // ContextRequest is everything one assembly needs. It replaced a positional
 // parameter list because recall needs the turn number, and a summary and more will
 // follow, at which point the list stops being readable.
@@ -73,6 +81,8 @@ type ContextRequest struct {
 	// are canon, so they are never trimmed: a thread goes quiet precisely when the
 	// narrator should be prompted to return to it.
 	Threads []string
+	// SpeechCues specifies the vocal steering hints the active TTS engine supports.
+	SpeechCues SpeechCueContext
 }
 
 // SectionStat reports one section's cost so a trace can explain the prompt.
@@ -152,7 +162,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 	return []section{
 		{name: "rules", text: rulesSection(req.RulesPrompt)},
 		{name: "lore", text: loreSection(req.LorePrompt)},
-		{name: "instructions", text: speechFormattingInstruction + "\n\n"},
+		{name: "instructions", text: FormatSpeechFormattingInstructions(req.SpeechCues) + "\n\n"},
 		{name: "canon", text: canon},
 		{name: "summary", text: summarySection(req.Summary), droppable: true, rank: 6},
 		{name: "recent", text: c.recentSection(req), droppable: true, rank: 4},
@@ -652,9 +662,7 @@ func FormatVoiceProfilesCatalog(profiles []config.VoiceProfile) string {
 	return sb.String()
 }
 
-// speechFormattingInstruction is injected for every game. The parser needs one
-// shape it can resolve deterministically, and the last line tells the model what to
-// do when it cannot name a speaker, which is where attribution usually fails.
+// speechFormattingInstruction is the default instructions block kept for backwards compatibility.
 const speechFormattingInstruction = `## SPEECH FORMATTING
 Write each spoken line on its own line, formatted as  Name: "the words spoken"
 Use a character's established name, or [[their note name]] to link them.
@@ -671,6 +679,53 @@ Never rename a character who has already appeared. Once someone is introduced,
 reuse exactly the same name, and link them with [[that name]] every time.
 Continue the conversation the player is having; do not restart the scene.
 Do not write voice IDs, voice tags, or profile names into the narration.`
+
+// FormatSpeechFormattingInstructions builds the speech and prose formatting prompt
+// tailored to the active engine's speech steering capabilities.
+func FormatSpeechFormattingInstructions(cues SpeechCueContext) string {
+	var sb strings.Builder
+	sb.WriteString("## SPEECH FORMATTING\n")
+	sb.WriteString("Write each spoken line on its own line, formatted as  Name: \"the words spoken\"\n")
+	sb.WriteString("Use a character's established name, or [[their note name]] to link them.\n")
+	sb.WriteString("Keep narration on its own lines with no leading name. If you cannot name the\n")
+	sb.WriteString("speaker, leave the words in the narration instead of inventing a name.\n\n")
+
+	sb.WriteString("## PROSE FORMATTING\n")
+	sb.WriteString("Separate narration beats with blank lines, one beat per paragraph.\n")
+	sb.WriteString("Use plain prose. Do not emit headings, tables, or code fences in narration.\n")
+	if cues.MarkdownEmphasis {
+		sb.WriteString("You may use *single asterisks* for vocal emphasis and --- for a scene break.\n\n")
+	} else {
+		sb.WriteString("You may use *single asterisks* for emphasis and --- for a scene break.\n\n")
+	}
+
+	if cues.AudioTags {
+		sb.WriteString("## VOICE ACTING & SPEECH STEERING\n")
+		sb.WriteString("You may steer the vocal delivery of spoken lines and narration beats using bracketed\n")
+		sb.WriteString("performance tags immediately before dialogue or delivery. Common supported cues:\n")
+		if len(cues.SampleTags) > 0 {
+			sb.WriteString("- Supported cues: " + strings.Join(cues.SampleTags, ", ") + "\n")
+		} else {
+			sb.WriteString("- Delivery/Volume: `[whispers]`, `[softly]`, `[shouts]`, `[loudly]`\n")
+			sb.WriteString("- Reactions: `[sighs]`, `[laughs]`, `[chuckles]`, `[gasp]`, `[clears throat]`\n")
+			sb.WriteString("- Moods: `[excited]`, `[angry]`, `[sad]`, `[nervous]`, `[playful]`, `[tired]`\n")
+		}
+		sb.WriteString("Example: Garrick: \"[whispers] Keep your head down.\"\n")
+		sb.WriteString("Example: [sighs] It has been a long winter in the northern reaches.\n")
+		sb.WriteString("Use cues purposefully to enhance drama; do not clutter every sentence.\n\n")
+	}
+
+	sb.WriteString("## CONTINUITY\n")
+	sb.WriteString("Never rename a character who has already appeared. Once someone is introduced,\n")
+	sb.WriteString("reuse exactly the same name, and link them with [[that name]] every time.\n")
+	sb.WriteString("Continue the conversation the player is having; do not restart the scene.\n")
+	if cues.AudioTags {
+		sb.WriteString("Do not write voice IDs or profile names into the narration.")
+	} else {
+		sb.WriteString("Do not write stage directions, voice tags, brackets, or profile names into the narration or dialogue (e.g. do not write [whispers]), as the voice synthesizer will mispronounce them.")
+	}
+	return sb.String()
+}
 
 // formatRecentTurns renders the tail of the timeline for the narrator. It is a
 // transcript rather than a summary, because summarising is what loses the details

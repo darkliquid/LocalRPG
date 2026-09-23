@@ -87,6 +87,12 @@ type TurnOrchestrator struct {
 	toolCapability   string
 	toolRounds       int
 	toolObserver     func(ToolActivity)
+	speechCues       harness.SpeechCueContext
+}
+
+// SetSpeechCues sets the vocal steering hints passed to the GM prompt.
+func (o *TurnOrchestrator) SetSpeechCues(cues harness.SpeechCueContext) {
+	o.speechCues = cues
 }
 
 // ToolExecutor runs one tool call and returns the text a model will read. A
@@ -514,6 +520,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		TurnNumber:  turnNum,
 		Summary:     summary,
 		Threads:     threads,
+		SpeechCues:  o.speechCues,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)
