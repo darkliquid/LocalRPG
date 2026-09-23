@@ -1384,6 +1384,7 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 		VoiceID:    cfg.Media.TTS.DefaultVoice,
 		Pitch:      cfg.Media.TTS.Pitch,
 		SpeechRate: cfg.Media.TTS.SpeechRate,
+		Options:    cfg.Media.TTS.Options,
 	}
 
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
@@ -2302,6 +2303,7 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 			VoiceID:    voiceID,
 			Pitch:      ttsCfg.Pitch,
 			SpeechRate: ttsCfg.SpeechRate,
+			Options:    ttsCfg.Options,
 		}
 		audio, err := client.Synthesize(ctx, spoken, voice)
 		latency := time.Since(start).Milliseconds()

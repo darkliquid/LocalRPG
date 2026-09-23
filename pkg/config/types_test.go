@@ -263,3 +263,26 @@ func TestVoiceProfileOptionsAndMeteredRoundTrip(t *testing.T) {
 		t.Errorf("an unset metered must be omitted, got %s", plain)
 	}
 }
+
+func TestTTSConfigOptionsRoundTrip(t *testing.T) {
+	cfg := TTSConfig{Options: map[string]interface{}{"stability": 0.4, "model": "eleven_multilingual_v2"}}
+	encoded, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded TTSConfig
+	if err := yaml.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if decoded.Options["stability"] != 0.4 || decoded.Options["model"] != "eleven_multilingual_v2" {
+		t.Errorf("options did not round-trip: %v", decoded.Options)
+	}
+
+	plain, err := yaml.Marshal(TTSConfig{})
+	if err != nil {
+		t.Fatalf("marshal plain: %v", err)
+	}
+	if strings.Contains(string(plain), "options") {
+		t.Errorf("an unset options map must be omitted, got %s", plain)
+	}
+}

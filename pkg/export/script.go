@@ -143,6 +143,7 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 					VoiceID:    c.config.Media.TTS.DefaultVoice,
 					Pitch:      c.config.Media.TTS.Pitch,
 					SpeechRate: c.config.Media.TTS.SpeechRate,
+					Options:    c.config.Media.TTS.Options,
 				},
 			})
 		}

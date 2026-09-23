@@ -134,6 +134,9 @@ type TTSConfig struct {
 	// Metered marks a provider that charges per request. It overrides the
 	// provider's own declaration, so an operator can flag a proxied endpoint.
 	Metered *bool `yaml:"metered,omitempty" json:"metered,omitempty"`
+	// Options holds provider-declared tunables for the default voice, keyed by
+	// VoiceOption.Key. Absent means the provider's own defaults.
+	Options map[string]interface{} `yaml:"options,omitempty" json:"options,omitempty"`
 }
 
 type STTConfig struct {

@@ -44,6 +44,7 @@ func handleTTSCommand(args []string) {
 		VoiceID:    cfg.Media.TTS.DefaultVoice,
 		Pitch:      cfg.Media.TTS.Pitch,
 		SpeechRate: cfg.Media.TTS.SpeechRate,
+		Options:    cfg.Media.TTS.Options,
 	}
 	if *voice != "" {
 		voiceCfg.VoiceID = *voice
