@@ -24,6 +24,8 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
   onOpenSystemsStudio,
   onOpenSettings,
 }) => {
+  const [hoveredGame, setHoveredGame] = React.useState<{ game: GameSummary; top: number } | null>(null);
+
   return (
     <aside className="w-[72px] h-full flex flex-col items-center py-4 bg-stone-950/90 backdrop-blur-2xl border-r border-white/10 z-30 select-none flex-shrink-0">
       {/* Add Campaign Button (+) */}
@@ -51,7 +53,10 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
       <div className="w-8 h-[1px] bg-white/10 mb-3" />
 
       {/* Campaigns List (Scrollable) */}
-      <div className="flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col items-center gap-3 no-scrollbar py-1">
+      <div
+        className="flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col items-center gap-3 no-scrollbar py-1"
+        onScroll={() => setHoveredGame(null)}
+      >
         {games.map((game) => {
           const isActive = game.id === activeGameID;
           return (
@@ -62,7 +67,15 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
               )}
 
               <button
-                onClick={() => onSelectGame(game.id)}
+                onClick={() => {
+                  setHoveredGame(null);
+                  onSelectGame(game.id);
+                }}
+                onMouseEnter={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setHoveredGame({ game, top: rect.top + rect.height / 2 });
+                }}
+                onMouseLeave={() => setHoveredGame(null)}
                 className={`relative w-[46px] h-[46px] rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer ${
                   isActive
                     ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-stone-950 shadow-[0_0_16px_rgba(168,85,247,0.45)] scale-105'
@@ -76,12 +89,6 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
                   <ProceduralIcon id={game.id} name={game.name} size={46} className="w-full h-full rounded-none" />
                 )}
               </button>
-
-              {/* Tooltip */}
-              <div className="pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-stone-900/95 border border-white/15 rounded-lg text-xs font-sans text-stone-100 whitespace-nowrap shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity z-50">
-                <div className="font-semibold text-white">{game.name}</div>
-                <div className="text-[11px] text-stone-400 mt-0.5">{game.turn_count} turns</div>
-              </div>
             </div>
           );
         })}
@@ -131,6 +138,19 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Floating Campaign Tooltip */}
+      {!isFlyoutOpen && hoveredGame && (
+        <div
+          style={{ top: `${hoveredGame.top}px` }}
+          className="pointer-events-none fixed left-[76px] -translate-y-1/2 px-2.5 py-1.5 bg-stone-900/95 border border-white/15 rounded-lg text-xs font-sans text-stone-100 whitespace-nowrap shadow-2xl z-50 animate-in fade-in duration-150"
+        >
+          <div className="font-semibold text-white">{hoveredGame.game.name}</div>
+          <div className="text-[11px] text-stone-400 mt-0.5">
+            {hoveredGame.game.turn_count} {hoveredGame.game.turn_count === 1 ? 'turn' : 'turns'}
+          </div>
+        </div>
+      )}
     </aside>
   );
 };
