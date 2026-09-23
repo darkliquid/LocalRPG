@@ -37,7 +37,7 @@
 - Modify: `pkg/config/presets.go:1-50`
 - Test: `pkg/config/presets_test.go`
 
-- [ ] **Step 1: Write failing tests for configuration and presets**
+- [x] **Step 1: Write failing tests for configuration and presets**
 
 In `pkg/config/types_test.go`, add:
 ```go
@@ -102,12 +102,12 @@ func TestGetGeminiAgentPresets(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run "TestConfigParsesGeminiProviderAndRoleTunables|TestGetGeminiAgentPresets" ./pkg/config/`  
 Expected: FAIL compilation errors (`ThinkingBudget undefined`, `Providers undefined`).
 
-- [ ] **Step 3: Implement config schema and presets**
+- [x] **Step 3: Implement config schema and presets**
 
 In `pkg/config/types.go`:
 Add `ProvidersConfig` and `GeminiProviderConfig`:
@@ -198,12 +198,12 @@ func floatPtr(f float64) *float64 { return &f }
 	},
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v -run "TestConfigParsesGeminiProviderAndRoleTunables|TestGetGeminiAgentPresets" ./pkg/config/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/
@@ -218,7 +218,7 @@ git commit -m "feat(config): add Gemini provider schema, role tunables, and pres
 - Create: `pkg/harness/gemini_provider.go`
 - Create: `pkg/harness/gemini_provider_test.go`
 
-- [ ] **Step 1: Write failing tests for credential resolution**
+- [x] **Step 1: Write failing tests for credential resolution**
 
 In `pkg/harness/gemini_provider_test.go`:
 ```go
@@ -268,12 +268,12 @@ func TestResolveGeminiAPIKeyPriority(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestResolveGeminiAPIKeyPriority ./pkg/harness/`  
 Expected: FAIL (`undefined: harness.ResolveGeminiAPIKey`)
 
-- [ ] **Step 3: Implement credential resolution and provider types**
+- [x] **Step 3: Implement credential resolution and provider types**
 
 In `pkg/harness/gemini_provider.go`:
 ```go
@@ -384,12 +384,12 @@ func (g *GeminiProvider) SetChunkLimit(limit int) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestResolveGeminiAPIKeyPriority ./pkg/harness/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/gemini_provider.go pkg/harness/gemini_provider_test.go
@@ -404,7 +404,7 @@ git commit -m "feat(harness): implement Gemini credential resolution and provide
 - Modify: `pkg/harness/gemini_provider.go`
 - Test: `pkg/harness/gemini_provider_test.go`
 
-- [ ] **Step 1: Write failing test for Generate and request translation**
+- [x] **Step 1: Write failing test for Generate and request translation**
 
 In `pkg/harness/gemini_provider_test.go`, add:
 ```go
@@ -482,12 +482,12 @@ func TestGeminiProviderGenerate(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestGeminiProviderGenerate ./pkg/harness/`  
 Expected: FAIL (`provider.Generate undefined`)
 
-- [ ] **Step 3: Implement request mapping, Generate(), and tool conversion**
+- [x] **Step 3: Implement request mapping, Generate(), and tool conversion**
 
 In `pkg/harness/gemini_provider.go`:
 ```go
@@ -658,12 +658,12 @@ func (g *GeminiProvider) Generate(ctx context.Context, req GenerateRequest) (*Ge
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestGeminiProviderGenerate ./pkg/harness/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/gemini_provider.go pkg/harness/gemini_provider_test.go
@@ -678,7 +678,7 @@ git commit -m "feat(harness): implement Gemini request conversion and Generate m
 - Modify: `pkg/harness/gemini_provider.go`
 - Test: `pkg/harness/gemini_provider_test.go`
 
-- [ ] **Step 1: Write failing test for Stream with thought filtering and tool calling**
+- [x] **Step 1: Write failing test for Stream with thought filtering and tool calling**
 
 In `pkg/harness/gemini_provider_test.go`, add:
 ```go
@@ -809,12 +809,12 @@ func TestGeminiProviderStreamSeparatesThoughtsAndEmitsTools(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestGeminiProviderStreamSeparatesThoughtsAndEmitsTools ./pkg/harness/`  
 Expected: FAIL (`provider.Stream undefined`)
 
-- [ ] **Step 3: Implement Stream with thought filtering and function calling**
+- [x] **Step 3: Implement Stream with thought filtering and function calling**
 
 In `pkg/harness/gemini_provider.go`:
 ```go
@@ -882,12 +882,12 @@ func (g *GeminiProvider) Stream(ctx context.Context, req GenerateRequest, out ch
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestGeminiProviderStreamSeparatesThoughtsAndEmitsTools ./pkg/harness/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/gemini_provider.go pkg/harness/gemini_provider_test.go
@@ -904,7 +904,7 @@ git commit -m "feat(harness): implement Gemini streaming with thought filtering 
 - Test: `pkg/harness/factory_test.go`
 - Test: `pkg/harness/gemini_provider_test.go`
 
-- [ ] **Step 1: Write failing test for factory and error mapping**
+- [x] **Step 1: Write failing test for factory and error mapping**
 
 In `pkg/harness/gemini_provider_test.go`:
 ```go
@@ -945,12 +945,12 @@ func TestNewModelProviderBuildsGemini(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run "TestGeminiErrorMapping|TestNewModelProviderBuildsGemini" ./pkg/harness/`  
 Expected: FAIL (`MapGeminiErrorForTest undefined`, `unknown model provider`)
 
-- [ ] **Step 3: Implement error mapping and factory support**
+- [x] **Step 3: Implement error mapping and factory support**
 
 In `pkg/harness/gemini_provider.go`:
 ```go
@@ -1017,12 +1017,12 @@ And in `switch cfg.Type`:
 		})
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v -run "TestGeminiErrorMapping|TestNewModelProviderBuildsGemini" ./pkg/harness/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/gemini_provider.go pkg/harness/gemini_provider_test.go pkg/harness/factory.go pkg/harness/factory_test.go
@@ -1038,7 +1038,7 @@ git commit -m "feat(harness): wire Gemini provider into harness factory and erro
 - Modify: `frontend/src/templates/providerPresets.ts:80-95`
 - Modify: `frontend/src/components/SettingsStudio.tsx:430-680`
 
-- [ ] **Step 1: Update frontend types**
+- [x] **Step 1: Update frontend types**
 
 In `frontend/src/types.ts`:
 Update `AgentRoleConfig`:
@@ -1079,7 +1079,7 @@ export interface AppConfig {
 }
 ```
 
-- [ ] **Step 2: Add Gemini presets in providerPresets.ts**
+- [x] **Step 2: Add Gemini presets in providerPresets.ts**
 
 In `frontend/src/templates/providerPresets.ts`:
 Add to `AGENT_PRESETS`:
@@ -1114,7 +1114,7 @@ Add to `AGENT_PRESETS`:
   },
 ```
 
-- [ ] **Step 3: Update SettingsStudio.tsx with Gemini controls**
+- [x] **Step 3: Update SettingsStudio.tsx with Gemini controls**
 
 In `frontend/src/components/SettingsStudio.tsx`:
 1. Add `gemini` to Builtin Engine options:
@@ -1129,12 +1129,12 @@ In `frontend/src/components/SettingsStudio.tsx`:
 3. In Global Settings or Providers section:
 - Add an input for `config.providers?.gemini?.api_key` so users can configure a single API key for all Gemini features.
 
-- [ ] **Step 4: Run frontend TypeScript verification**
+- [x] **Step 4: Run frontend TypeScript verification**
 
 Run: `mise run test:frontend` (in `frontend/`, `npx tsc --noEmit`)  
 Expected: PASS with 0 type errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/templates/providerPresets.ts frontend/src/components/SettingsStudio.tsx
@@ -1148,22 +1148,22 @@ git commit -m "feat(frontend): add Gemini controls, presets, and thinking budget
 **Files:**
 - All touched files
 
-- [ ] **Step 1: Run complete backend test suite**
+- [x] **Step 1: Run complete backend test suite**
 
 Run: `mise run test:backend`  
 Expected: PASS (all packages `./...` exit code 0)
 
-- [ ] **Step 2: Run linter**
+- [x] **Step 2: Run linter**
 
 Run: `mise run lint`  
 Expected: PASS (`go vet ./...` clean)
 
-- [ ] **Step 3: Run complete frontend build**
+- [x] **Step 3: Run complete frontend build**
 
 Run: `mise run build:frontend`  
 Expected: PASS (Vite bundles successfully into `pkg/gui/dist`)
 
-- [ ] **Step 4: Commit any cleanup or final test adjustments**
+- [x] **Step 4: Commit any cleanup or final test adjustments**
 
 ```bash
 git commit --allow-empty -m "chore(harness): verify Gemini LLM provider test and build gates"
