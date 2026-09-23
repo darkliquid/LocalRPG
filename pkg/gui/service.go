@@ -1621,6 +1621,18 @@ func contentTypeForArt(path string) string {
 	}
 }
 
+func findAssetFile(dir string, name string) (string, string) {
+	assetsDir := filepath.Join(dir, "assets")
+	exts := []string{".png", ".webp", ".jpg", ".jpeg", ".svg"}
+	for _, ext := range exts {
+		path := filepath.Join(assetsDir, name+ext)
+		if fi, err := os.Stat(path); err == nil && !fi.IsDir() {
+			return path, ext
+		}
+	}
+	return "", ""
+}
+
 func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 	gamesDir := s.resolver.GamesDir()
 	entries, err := os.ReadDir(gamesDir)
@@ -1666,14 +1678,25 @@ func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 			playerName = m.Player
 		}
 
+		var bannerURL, iconURL string
+		if p, _ := findAssetFile(gameDir, "banner"); p != "" {
+			bannerURL = fmt.Sprintf("/api/game/%s/banner", gameID)
+		}
+		if p, _ := findAssetFile(gameDir, "icon"); p != "" {
+			iconURL = fmt.Sprintf("/api/game/%s/icon", gameID)
+		}
+
 		summaries = append(summaries, GameSummaryDTO{
-			ID:         gameID,
-			Name:       name,
-			SystemID:   m.SystemID,
-			WorldID:    m.WorldID,
-			PlayerName: playerName,
-			TurnCount:  turnCount,
-			LastPlayed: lastPlayed,
+			ID:              gameID,
+			Name:            name,
+			SystemID:        m.SystemID,
+			WorldID:         m.WorldID,
+			PlayerName:      playerName,
+			TurnCount:       turnCount,
+			LastPlayed:      lastPlayed,
+			BannerURL:       bannerURL,
+			IconURL:         iconURL,
+			PlayTimeSeconds: int64(turnCount * 120),
 		})
 	}
 
@@ -1738,12 +1761,23 @@ func (s *Service) ListWorlds(ctx context.Context) ([]WorldSummaryDTO, error) {
 		if m.DefaultSystem != "" {
 			compat = append(compat, m.DefaultSystem)
 		}
+		var bannerURL, iconURL string
+		worldDir := filepath.Join(worldsDir, e.Name())
+		if p, _ := findAssetFile(worldDir, "banner"); p != "" {
+			bannerURL = fmt.Sprintf("/api/world/%s/banner", m.ID)
+		}
+		if p, _ := findAssetFile(worldDir, "icon"); p != "" {
+			iconURL = fmt.Sprintf("/api/world/%s/icon", m.ID)
+		}
+
 		summaries = append(summaries, WorldSummaryDTO{
 			ID:                m.ID,
 			Name:              m.Name,
 			Description:       m.Description,
 			Genre:             m.Genre,
 			CompatibleSystems: compat,
+			BannerURL:         bannerURL,
+			IconURL:           iconURL,
 		})
 	}
 	return summaries, nil
@@ -2515,4 +2549,158 @@ func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string
 		"duration_ms": time.Since(start).Milliseconds(),
 	})
 	return text, nil
+}
+
+func (s *Service) GetGameAsset(gameID, assetKind string) (string, string, error) {
+	gameDir := s.resolver.GameDir(gameID)
+	if _, err := os.Stat(gameDir); err != nil {
+		return "", "", os.ErrNotExist
+	}
+	p, ext := findAssetFile(gameDir, assetKind)
+	if p == "" {
+		return "", "", os.ErrNotExist
+	}
+	return p, contentTypeForArt(ext), nil
+}
+
+func (s *Service) GetWorldAsset(worldID, assetKind string) (string, string, error) {
+	worldDir := s.resolver.WorldDir(worldID)
+	if _, err := os.Stat(worldDir); err != nil {
+		return "", "", os.ErrNotExist
+	}
+	p, ext := findAssetFile(worldDir, assetKind)
+	if p == "" {
+		return "", "", os.ErrNotExist
+	}
+	return p, contentTypeForArt(ext), nil
+}
+
+func (s *Service) SaveGameAsset(gameID, assetKind string, data []byte, ext string) (string, error) {
+	gameDir := s.resolver.GameDir(gameID)
+	if _, err := os.Stat(gameDir); err != nil {
+		return "", fmt.Errorf("game not found: %w", err)
+	}
+	assetsDir := filepath.Join(gameDir, "assets")
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		return "", fmt.Errorf("create assets dir: %w", err)
+	}
+	exts := []string{".png", ".webp", ".jpg", ".jpeg", ".svg"}
+	for _, e := range exts {
+		_ = os.Remove(filepath.Join(assetsDir, assetKind+e))
+	}
+	if ext == "" {
+		ext = ".png"
+	}
+	if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+	targetPath := filepath.Join(assetsDir, assetKind+ext)
+	if err := os.WriteFile(targetPath, data, 0644); err != nil {
+		return "", fmt.Errorf("write asset: %w", err)
+	}
+	return fmt.Sprintf("/api/game/%s/%s", gameID, assetKind), nil
+}
+
+func (s *Service) SaveWorldAsset(worldID, assetKind string, data []byte, ext string) (string, error) {
+	worldDir := s.resolver.WorldDir(worldID)
+	if _, err := os.Stat(worldDir); err != nil {
+		return "", fmt.Errorf("world not found: %w", err)
+	}
+	assetsDir := filepath.Join(worldDir, "assets")
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		return "", fmt.Errorf("create assets dir: %w", err)
+	}
+	exts := []string{".png", ".webp", ".jpg", ".jpeg", ".svg"}
+	for _, e := range exts {
+		_ = os.Remove(filepath.Join(assetsDir, assetKind+e))
+	}
+	if ext == "" {
+		ext = ".png"
+	}
+	if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+	targetPath := filepath.Join(assetsDir, assetKind+ext)
+	if err := os.WriteFile(targetPath, data, 0644); err != nil {
+		return "", fmt.Errorf("write asset: %w", err)
+	}
+	return fmt.Sprintf("/api/world/%s/%s", worldID, assetKind), nil
+}
+
+type GenerateAssetRequestDTO struct {
+	Kind   string `json:"kind"`
+	Prompt string `json:"prompt,omitempty"`
+}
+
+func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req GenerateAssetRequestDTO) (string, error) {
+	cfg := s.configMgr.Get()
+	client, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
+	if err != nil {
+		return "", fmt.Errorf("image provider: %w", err)
+	}
+	prompt := req.Prompt
+	if prompt == "" {
+		gameDir := s.resolver.GameDir(gameID)
+		manifest, _ := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
+		gameName := gameID
+		worldName := ""
+		artStyle := ""
+		if manifest != nil {
+			if manifest.Name != "" {
+				gameName = manifest.Name
+			}
+			worldDir := s.resolver.WorldDir(manifest.WorldID)
+			if wm, err := core.LoadWorldManifest(filepath.Join(worldDir, "world.yaml")); err == nil {
+				worldName = wm.Name
+				artStyle = wm.ArtStyle
+			}
+		}
+		if req.Kind == "icon" {
+			prompt = fmt.Sprintf("%s game app icon emblem for %s in %s, high contrast vector emblem, centered dark backdrop", artStyle, gameName, worldName)
+		} else {
+			prompt = fmt.Sprintf("%s widescreen cinematic concept art landscape for %s in %s, highly detailed masterpiece environment", artStyle, gameName, worldName)
+		}
+	}
+	imgBytes, err := client.GenerateImage(ctx, prompt)
+	if err != nil {
+		return "", fmt.Errorf("generate image: %w", err)
+	}
+	ext := media.ArtExtension(imgBytes)
+	return s.SaveGameAsset(gameID, req.Kind, imgBytes, ext)
+}
+
+func (s *Service) GenerateWorldAsset(ctx context.Context, worldID string, req GenerateAssetRequestDTO) (string, error) {
+	cfg := s.configMgr.Get()
+	client, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
+	if err != nil {
+		return "", fmt.Errorf("image provider: %w", err)
+	}
+	prompt := req.Prompt
+	if prompt == "" {
+		worldDir := s.resolver.WorldDir(worldID)
+		wm, _ := core.LoadWorldManifest(filepath.Join(worldDir, "world.yaml"))
+		worldName := worldID
+		artStyle := ""
+		genre := ""
+		desc := ""
+		if wm != nil {
+			if wm.Name != "" {
+				worldName = wm.Name
+			}
+			artStyle = wm.ArtStyle
+			genre = wm.Genre
+			desc = wm.Description
+		}
+		if req.Kind == "icon" {
+			prompt = fmt.Sprintf("%s emblem icon badge for world %s (%s), %s, clean centered icon", artStyle, worldName, genre, desc)
+		} else {
+			prompt = fmt.Sprintf("%s widescreen landscape banner concept art for world %s (%s), %s, atmospheric panoramic background", artStyle, worldName, genre, desc)
+		}
+	}
+	imgBytes, err := client.GenerateImage(ctx, prompt)
+	if err != nil {
+		return "", fmt.Errorf("generate image: %w", err)
+	}
+	ext := media.ArtExtension(imgBytes)
+	return s.SaveWorldAsset(worldID, req.Kind, imgBytes, ext)
 }

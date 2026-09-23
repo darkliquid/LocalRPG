@@ -110,9 +110,9 @@ func BuildLocationPrompt(ent *entity.Entity, worldStyle string) string {
 	return strings.Join(parts, ", ")
 }
 
-// artExtension picks the cache file's extension from the bytes, because the
+// ArtExtension picks the file's extension from the bytes, because the
 // built-in generator returns SVG while providers return raster data.
-func artExtension(data []byte) string {
+func ArtExtension(data []byte) string {
 	head := data
 	if len(head) > 512 {
 		head = head[:512]
@@ -127,4 +127,8 @@ func artExtension(data []byte) string {
 		return ".jpg"
 	}
 	return ".webp"
+}
+
+func artExtension(data []byte) string {
+	return ArtExtension(data)
 }

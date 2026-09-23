@@ -120,14 +120,17 @@ type GraphDTO struct {
 }
 
 type GameSummaryDTO struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	SystemID     string `json:"system_id"`
-	WorldID      string `json:"world_id"`
-	PlayerName   string `json:"player_name"`
-	TurnCount    int    `json:"turn_count"`
-	LastPlayed   string `json:"last_played"`
-	ThumbnailURL string `json:"thumbnail_url"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	SystemID        string `json:"system_id"`
+	WorldID         string `json:"world_id"`
+	PlayerName      string `json:"player_name"`
+	TurnCount       int    `json:"turn_count"`
+	LastPlayed      string `json:"last_played"`
+	ThumbnailURL    string `json:"thumbnail_url"`
+	BannerURL       string `json:"banner_url,omitempty"`
+	IconURL         string `json:"icon_url,omitempty"`
+	PlayTimeSeconds int64  `json:"play_time_seconds,omitempty"`
 }
 
 type SystemSummaryDTO struct {
@@ -143,6 +146,8 @@ type WorldSummaryDTO struct {
 	Description       string   `json:"description"`
 	Genre             string   `json:"genre"`
 	CompatibleSystems []string `json:"compatible_systems"`
+	BannerURL         string   `json:"banner_url,omitempty"`
+	IconURL           string   `json:"icon_url,omitempty"`
 }
 
 type CreateGameRequestDTO struct {

@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -98,6 +99,58 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	action := parts[1]
 
 	switch action {
+	case "banner", "icon":
+		if r.Method == http.MethodGet {
+			filePath, contentType, err := s.service.GetGameAsset(gameID, action)
+			if err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.Header().Set("Content-Type", contentType)
+			http.ServeFile(w, r, filePath)
+			return
+		} else if r.Method == http.MethodPost {
+			file, header, err := r.FormFile("file")
+			if err != nil {
+				http.Error(w, "missing file in form data", http.StatusBadRequest)
+				return
+			}
+			defer file.Close()
+			data, err := io.ReadAll(http.MaxBytesReader(w, file, 15*1024*1024))
+			if err != nil {
+				http.Error(w, "file too large or read failed", http.StatusBadRequest)
+				return
+			}
+			ext := filepath.Ext(header.Filename)
+			url, err := s.service.SaveGameAsset(gameID, action, data, ext)
+			if err != nil {
+				writeGameError(w, err)
+				return
+			}
+			writeJSON(w, map[string]string{"url": url})
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+
+	case "generate-asset":
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req GenerateAssetRequestDTO
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024)).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		url, err := s.service.GenerateGameAsset(r.Context(), gameID, req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]string{"url": url})
+		return
+
 	case "tts":
 		if len(parts) < 3 || parts[2] != "uncached" || r.Method != http.MethodGet {
 			http.NotFound(w, r)
@@ -562,6 +615,61 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
+		return
+	}
+
+	if len(parts) >= 2 && (parts[1] == "banner" || parts[1] == "icon") {
+		action := parts[1]
+		if r.Method == http.MethodGet {
+			filePath, contentType, err := s.service.GetWorldAsset(worldID, action)
+			if err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.Header().Set("Content-Type", contentType)
+			http.ServeFile(w, r, filePath)
+			return
+		} else if r.Method == http.MethodPost {
+			file, header, err := r.FormFile("file")
+			if err != nil {
+				http.Error(w, "missing file in form data", http.StatusBadRequest)
+				return
+			}
+			defer file.Close()
+			data, err := io.ReadAll(http.MaxBytesReader(w, file, 15*1024*1024))
+			if err != nil {
+				http.Error(w, "file too large or read failed", http.StatusBadRequest)
+				return
+			}
+			ext := filepath.Ext(header.Filename)
+			url, err := s.service.SaveWorldAsset(worldID, action, data, ext)
+			if err != nil {
+				writeGameError(w, err)
+				return
+			}
+			writeJSON(w, map[string]string{"url": url})
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if len(parts) >= 2 && parts[1] == "generate-asset" {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req GenerateAssetRequestDTO
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024)).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		url, err := s.service.GenerateWorldAsset(r.Context(), worldID, req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]string{"url": url})
 		return
 	}
 
