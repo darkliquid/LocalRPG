@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { WorldInfo, SystemInfo, CreateGameRequest } from '../../types';
+import { WorldInfo, SystemInfo, CreateGameRequest, VoiceProfile } from '../../types';
+import { APIClient } from '../../api/client';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
-import { X, Upload, Check } from 'lucide-react';
+import { X, Upload, Check, Volume2, MapPin, Sparkles, User } from 'lucide-react';
 
 interface NewCampaignModalProps {
   isOpen: boolean;
@@ -23,7 +24,17 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   const [campaignName, setCampaignName] = useState('');
   const [selectedSystemID, setSelectedSystemID] = useState('');
   const [playerName, setPlayerName] = useState('');
+  const [playerAppearance, setPlayerAppearance] = useState('');
+  const [playerAge, setPlayerAge] = useState('');
+  const [playerGender, setPlayerGender] = useState('');
+  const [playerPronouns, setPlayerPronouns] = useState('');
+  const [playerBackground, setPlayerBackground] = useState('');
+  const [playerVoiceID, setPlayerVoiceID] = useState('');
+  const [narratorVoice, setNarratorVoice] = useState('');
   const [openingPrompt, setOpeningPrompt] = useState('');
+  const [startLocation, setStartLocation] = useState('');
+
+  const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
@@ -33,10 +44,28 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   const iconInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    APIClient.getSettings()
+      .then((res) => {
+        setVoiceProfiles(res.config.media.tts.voice_profiles || []);
+      })
+      .catch((err) => console.error('Failed to load voice profiles', err));
+  }, []);
+
+  useEffect(() => {
     if (world) {
       setCampaignName(`Chronicles of ${world.name}`);
       const compatible = systems.find((s) => world.compatible_systems?.includes(s.id));
       setSelectedSystemID(compatible ? compatible.id : systems[0]?.id || '');
+      setPlayerName('');
+      setPlayerAppearance('');
+      setPlayerAge('');
+      setPlayerGender('');
+      setPlayerPronouns('');
+      setPlayerBackground('');
+      setPlayerVoiceID('');
+      setNarratorVoice('');
+      setOpeningPrompt('');
+      setStartLocation('');
       setBannerFile(null);
       setIconFile(null);
       setBannerPreview(null);
@@ -72,7 +101,17 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
         system_id: selectedSystemID,
         world_id: world.id,
         player_name: playerName.trim(),
+        narrator_voice: narratorVoice.trim() || undefined,
+        start_location: startLocation.trim() || undefined,
         opening_prompt: openingPrompt.trim() || undefined,
+        player: {
+          appearance: playerAppearance.trim() || undefined,
+          age: playerAge.trim() || undefined,
+          gender: playerGender.trim() || undefined,
+          pronouns: playerPronouns.trim() || undefined,
+          background: playerBackground.trim() || undefined,
+          voice: voiceProfiles.find((p) => p.voice_id === playerVoiceID),
+        },
       },
       bannerFile || undefined,
       iconFile || undefined
@@ -82,52 +121,55 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md select-none animate-in fade-in duration-200">
       <div className="relative w-full max-w-2xl bg-stone-900/95 border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-        {/* Modal Banner Header */}
-        <div className="relative h-44 w-full overflow-hidden flex items-end p-6 border-b border-white/10">
-          {world.banner_url ? (
-            <img src={world.banner_url} alt={world.name} className="absolute inset-0 w-full h-full object-cover" />
-          ) : (
-            <ProceduralBanner id={world.id} name={world.name} className="absolute inset-0" />
-          )}
+        {/* Modal Banner Header - Absolute Background Layer */}
+        <div className="relative h-44 w-full overflow-hidden border-b border-white/10 select-none shrink-0">
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            {world.banner_url ? (
+              <img src={world.banner_url} alt={world.name} className="w-full h-full object-cover" />
+            ) : (
+              <ProceduralBanner id={world.id} name={world.name} className="w-full h-full" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/60 to-black/30" />
+          </div>
 
-          <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/40 to-transparent" />
+          {/* Floating Header Content */}
+          <div className="relative z-10 h-full flex items-end p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 shrink-0">
+                {world.icon_url ? (
+                  <img src={world.icon_url} alt={world.name} className="w-full h-full object-cover" />
+                ) : (
+                  <ProceduralIcon id={world.id} name={world.name} genre={world.genre} size={64} className="w-full h-full rounded-none" />
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-sans font-extrabold text-white tracking-tight">
+                    New Campaign
+                  </h2>
+                  <span className="text-[11px] font-sans font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
+                    {world.name}
+                  </span>
+                </div>
+                <p className="text-xs font-sans text-stone-300 mt-1 line-clamp-2 max-w-lg">
+                  {world.description || 'Explore uncharted territory and shape the fate of this realm.'}
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition-all cursor-pointer z-10"
+            className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition-all cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
-
-          {/* World Info Row */}
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 flex-shrink-0">
-              {world.icon_url ? (
-                <img src={world.icon_url} alt={world.name} className="w-full h-full object-cover" />
-              ) : (
-                <ProceduralIcon id={world.id} name={world.name} genre={world.genre} size={64} className="w-full h-full rounded-none" />
-              )}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-sans font-extrabold text-white tracking-tight">
-                  New Campaign
-                </h2>
-                <span className="text-[11px] font-sans font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
-                  {world.name}
-                </span>
-              </div>
-              <p className="text-xs font-sans text-stone-300 mt-1 line-clamp-2 max-w-lg">
-                {world.description || 'Explore uncharted territory and shape the fate of this realm.'}
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
-          {/* Campaign Name */}
+          {/* Campaign Title */}
           <div className="space-y-1.5">
             <label className="text-xs font-sans font-semibold text-stone-300 uppercase tracking-wider">
               Campaign Title
@@ -182,43 +224,172 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
             </div>
           </div>
 
-          {/* Protagonist Name */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-sans font-semibold text-stone-300 uppercase tracking-wider">
-              Protagonist Name
-            </label>
-            <input
-              type="text"
-              required
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="e.g. Valen Duskwarden"
-              className="w-full bg-stone-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm font-sans text-white focus:outline-none focus:border-purple-500 transition-colors"
-            />
+          {/* Voices Section */}
+          <div className="p-3.5 bg-stone-950/70 border border-white/10 rounded-2xl space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-sans font-bold uppercase tracking-wider text-purple-400">
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>Voice & Narration</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Narrator Voice */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-sans text-stone-300">
+                  Narrator Voice
+                </label>
+                <select
+                  value={narratorVoice}
+                  onChange={(e) => setNarratorVoice(e.target.value)}
+                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500 cursor-pointer"
+                >
+                  <option value="">Default (Provider Setting)</option>
+                  {voiceProfiles.map((p) => (
+                    <option key={p.id} value={p.voice_id}>
+                      {p.name} ({p.voice_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Character Voice */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-sans text-stone-300">
+                  Protagonist Voice
+                </label>
+                <select
+                  value={playerVoiceID}
+                  onChange={(e) => setPlayerVoiceID(e.target.value)}
+                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500 cursor-pointer"
+                >
+                  <option value="">Auto-Assign from Character</option>
+                  {voiceProfiles.map((p) => (
+                    <option key={p.id} value={p.voice_id}>
+                      {p.name} ({p.voice_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
-          {/* Opening Prompt Directive */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-sans font-semibold text-stone-300 uppercase tracking-wider">
-              Opening Scene Prompt (Optional)
-            </label>
-            <textarea
-              rows={2}
-              value={openingPrompt}
-              onChange={(e) => setOpeningPrompt(e.target.value)}
-              placeholder="Custom starting scenario (e.g. You awaken in the hold of a smuggler's ship during a tempest...)"
-              className="w-full bg-stone-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-sans text-stone-200 focus:outline-none focus:border-purple-500 transition-colors resize-none"
-            />
+          {/* Protagonist Section */}
+          <div className="p-3.5 bg-stone-950/70 border border-white/10 rounded-2xl space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-sans font-bold uppercase tracking-wider text-purple-400">
+              <User className="w-3.5 h-3.5" />
+              <span>Protagonist Setup</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-sans text-stone-300">
+                Character Name <span className="text-purple-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                placeholder="e.g. Valen Duskwarden"
+                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-sans text-white focus:outline-none focus:border-purple-500 transition-colors"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="space-y-1">
+                <label className="text-[11px] font-sans text-stone-400">Age</label>
+                <input
+                  type="text"
+                  value={playerAge}
+                  onChange={(e) => setPlayerAge(e.target.value)}
+                  placeholder="e.g. 28"
+                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-sans text-stone-400">Gender</label>
+                <input
+                  type="text"
+                  value={playerGender}
+                  onChange={(e) => setPlayerGender(e.target.value)}
+                  placeholder="e.g. Male / Non-binary"
+                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-sans text-stone-400">Pronouns</label>
+                <input
+                  type="text"
+                  value={playerPronouns}
+                  onChange={(e) => setPlayerPronouns(e.target.value)}
+                  placeholder="e.g. they/them"
+                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-sans text-stone-400">Appearance</label>
+              <input
+                type="text"
+                value={playerAppearance}
+                onChange={(e) => setPlayerAppearance(e.target.value)}
+                placeholder="e.g. Tall, cloaked in charcoal wool, weathered silver eyes"
+                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-sans text-stone-400">Background / Origin</label>
+              <textarea
+                rows={2}
+                value={playerBackground}
+                onChange={(e) => setPlayerBackground(e.target.value)}
+                placeholder="e.g. Disgraced royal archivist searching for forbidden relics"
+                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
+              />
+            </div>
+          </div>
+
+          {/* Story Directive & Start Location */}
+          <div className="p-3.5 bg-stone-950/70 border border-white/10 rounded-2xl space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-sans font-bold uppercase tracking-wider text-purple-400">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Story & World Seed</span>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-sans text-stone-300 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-stone-400" />
+                <span>Start Location (Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={startLocation}
+                onChange={(e) => setStartLocation(e.target.value)}
+                placeholder="e.g. Old Harbour District (leave blank to let GM choose)"
+                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-200 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-sans text-stone-300">
+                Opening Scene Directive (Optional)
+              </label>
+              <textarea
+                rows={2}
+                value={openingPrompt}
+                onChange={(e) => setOpeningPrompt(e.target.value)}
+                placeholder="Where should the story begin? (e.g. You awaken in the hold of a smuggler's ship during a tempest...)"
+                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
+              />
+            </div>
           </div>
 
           {/* Custom Artwork (Banner & Icon Uploads) */}
-          <div className="p-3.5 bg-stone-950 border border-white/10 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs font-sans font-bold text-white">Custom Campaign Artwork</div>
-                <div className="text-[11px] font-sans text-stone-400">
-                  Optional. A procedural theme is automatically generated if omitted.
-                </div>
+          <div className="p-3.5 bg-stone-950/70 border border-white/10 rounded-2xl space-y-3">
+            <div>
+              <div className="text-xs font-sans font-bold text-white">Custom Campaign Artwork (Optional)</div>
+              <div className="text-[11px] font-sans text-stone-400">
+                A procedural gradient theme will be generated if omitted.
               </div>
             </div>
 
