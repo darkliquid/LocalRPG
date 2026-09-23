@@ -44,19 +44,58 @@ func TextPolicyFromConfig(cfg config.TTSConfig) TextPolicy {
 	}
 }
 
-// SpeakableTextFor applies a policy to one segment's text.
+// SpeakableTextFor applies a policy to one segment's text, preserving or stripping
+// Markdown and performance audio tags according to client capabilities and policy.
 func SpeakableTextFor(policy TextPolicy, client TTSClient, text string) string {
+	var processed string
 	switch policy {
 	case TextPolicyKeep:
-		return text
+		processed = text
 	case TextPolicyStrip:
-		return SpeakableText(text)
+		processed = SpeakableText(text)
 	default:
 		if aware, ok := client.(MarkdownAware); ok && aware.SupportsMarkdown() {
-			return text
+			processed = text
+		} else {
+			processed = SpeakableText(text)
 		}
-		return SpeakableText(text)
 	}
+
+	if !ClientSupportsAudioTags(client) {
+		processed = StripAudioTags(processed)
+	}
+
+	return strings.TrimSpace(processed)
+}
+
+// ClientSupportsAudioTags reports whether a client declares AudioTags support.
+func ClientSupportsAudioTags(client TTSClient) bool {
+	if client == nil {
+		return false
+	}
+	if adv, ok := client.(SpeechCueAdvertiser); ok {
+		return adv.SpeechCueCapabilities().AudioTags
+	}
+	return false
+}
+
+var (
+	wikilinkOrAudioTagRe = regexp.MustCompile(`(\[\[[^\]]+\]\])|(\[[a-zA-Z][a-zA-Z\s_-]{1,28}\])`)
+)
+
+// StripAudioTags removes bracketed performance tags and normalizes whitespace,
+// while preserving double-bracket wikilinks.
+func StripAudioTags(text string) string {
+	if text == "" {
+		return ""
+	}
+	replaced := wikilinkOrAudioTagRe.ReplaceAllStringFunc(text, func(m string) string {
+		if strings.HasPrefix(m, "[[") {
+			return m
+		}
+		return " "
+	})
+	return strings.TrimSpace(strings.Join(strings.Fields(replaced), " "))
 }
 
 var (
