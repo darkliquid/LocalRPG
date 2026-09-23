@@ -24,6 +24,8 @@ import {
   TraceEvent,
   AddressedFinding,
   ModelStatus,
+  TTSInspectRequest,
+  TTSInspectResponse,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -243,6 +245,22 @@ export class APIClient {
       body: JSON.stringify(req),
     });
     if (!res.ok) throw new Error(`testProvider: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async inspectTTS(req: TTSInspectRequest): Promise<TTSInspectResponse> {
+    const res = await fetch('/api/tts/inspect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new Error(`inspectTTS: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async uncachedBeats(gameID: string): Promise<{ cached: number; uncached: number }> {
+    const res = await fetch(`/api/game/${gameID}/tts/uncached`);
+    if (!res.ok) throw new Error(`uncachedBeats: ${res.statusText}`);
     return res.json();
   }
 

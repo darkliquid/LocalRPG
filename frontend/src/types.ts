@@ -315,6 +315,55 @@ export interface VoiceProfile {
   speech_rate: number;
   tags?: string[];
   description?: string;
+  // Provider-declared tunables keyed by VoiceOption.key. Omitted means the
+  // provider's own defaults.
+  options?: Record<string, unknown>;
+}
+
+export interface VoiceOption {
+  key: string;
+  label: string;
+  kind: 'float' | 'int' | 'bool' | 'string' | 'enum';
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: string[];
+  default?: unknown;
+  help?: string;
+}
+
+export interface ProviderVoice {
+  id: string;
+  name: string;
+  language?: string;
+  gender?: string;
+  accent?: string;
+  categories?: string[];
+  tags?: string[];
+  description?: string;
+  preview_url?: string;
+  defaults?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+export interface VoiceCatalog {
+  available: boolean;
+  fetched_at?: string;
+  stale: boolean;
+  voices: ProviderVoice[];
+}
+
+export interface TTSInspectRequest {
+  config: TTSConfig;
+  refresh?: boolean;
+}
+
+export interface TTSInspectResponse {
+  provider_key: string;
+  metered: boolean;
+  options?: VoiceOption[];
+  catalog: VoiceCatalog;
+  error?: string;
 }
 
 export interface TTSConfig {
@@ -334,6 +383,10 @@ export interface TTSConfig {
   voice_profiles?: VoiceProfile[];
   // How narration Markdown is treated before synthesis. Omitted means auto.
   markdown?: 'auto' | 'strip' | 'keep';
+  // Provider-declared tunables for the default voice.
+  options?: Record<string, unknown>;
+  // Overrides a provider's own metered declaration when set.
+  metered?: boolean;
 }
 
 export interface STTConfig {
@@ -397,6 +450,7 @@ export interface TestProviderRequest {
   category: 'llm' | 'tts' | 'stt' | 'image';
   provider: AgentRoleConfig | TTSConfig | STTConfig | ImageConfig;
   test_prompt?: string;
+  voice_id?: string;
 }
 
 export interface TestProviderResponse {
