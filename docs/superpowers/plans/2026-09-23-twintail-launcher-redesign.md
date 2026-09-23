@@ -38,7 +38,7 @@
 - Modify: `pkg/gui/server.go:60-120`
 - Create: `pkg/gui/assets_endpoint_test.go`
 
-- [ ] **Step 1: Write failing test in `pkg/gui/assets_endpoint_test.go`**
+- [x] **Step 1: Write failing test in `pkg/gui/assets_endpoint_test.go`**
 
 Create `pkg/gui/assets_endpoint_test.go` testing asset retrieval, upload, and DTO population:
 
@@ -158,12 +158,12 @@ func TestAssetEndpointsAndSummary(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestAssetEndpointsAndSummary ./pkg/gui/`
 Expected: FAIL (`BannerURL undefined` or compilation error)
 
-- [ ] **Step 3: Update `pkg/gui/types.go`**
+- [x] **Step 3: Update `pkg/gui/types.go`**
 
 Update `GameSummaryDTO` and `WorldSummaryDTO` in `pkg/gui/types.go`:
 
@@ -193,7 +193,7 @@ type WorldSummaryDTO struct {
 }
 ```
 
-- [ ] **Step 4: Implement asset helpers, DTO population & handlers in `pkg/gui/service.go` and `pkg/gui/server.go`**
+- [x] **Step 4: Implement asset helpers, DTO population & handlers in `pkg/gui/service.go` and `pkg/gui/server.go`**
 
 In `pkg/gui/service.go`:
 Add asset resolution helpers:
@@ -251,13 +251,13 @@ Mount routes:
 	mux.HandleFunc("POST /api/world/{id}/generate-asset", s.handleGenerateWorldAsset)
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -v -run TestAssetEndpointsAndSummary ./pkg/gui/`
 Run: `go test -v ./pkg/gui/`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/server.go pkg/gui/assets_endpoint_test.go
@@ -272,7 +272,7 @@ git commit -m "feat(gui): add campaign and world banner and icon endpoints"
 - Modify: `frontend/src/types.ts:140-170`
 - Modify: `frontend/src/api/client.ts:300-360`
 
-- [ ] **Step 1: Update `frontend/src/types.ts`**
+- [x] **Step 1: Update `frontend/src/types.ts`**
 
 Update `GameSummary` and `WorldInfo`:
 ```typescript
@@ -301,7 +301,7 @@ export interface WorldInfo {
 }
 ```
 
-- [ ] **Step 2: Add asset upload & generate methods to `frontend/src/api/client.ts`**
+- [x] **Step 2: Add asset upload & generate methods to `frontend/src/api/client.ts`**
 
 Add static methods to `APIClient`:
 ```typescript
@@ -336,12 +336,12 @@ Add static methods to `APIClient`:
   }
 ```
 
-- [ ] **Step 3: Run frontend typecheck**
+- [x] **Step 3: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/api/client.ts
@@ -355,7 +355,7 @@ git commit -m "feat(frontend): add asset types and API client upload and generat
 **Files:**
 - Create: `frontend/src/components/launcher/ProceduralAsset.tsx`
 
-- [ ] **Step 1: Implement `ProceduralAsset.tsx`**
+- [x] **Step 1: Implement `ProceduralAsset.tsx`**
 
 Implement deterministic hashing, themed gradient palettes, `ProceduralBanner`, and `ProceduralIcon`:
 
@@ -483,12 +483,12 @@ export const ProceduralIcon: React.FC<{
 };
 ```
 
-- [ ] **Step 2: Run frontend typecheck**
+- [x] **Step 2: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/launcher/ProceduralAsset.tsx
@@ -503,7 +503,7 @@ git commit -m "feat(frontend): add ProceduralAsset component for banners and ico
 - Create: `frontend/src/components/launcher/LauncherDock.tsx`
 - Create: `frontend/src/components/launcher/WorldFlyout.tsx`
 
-- [ ] **Step 1: Implement `LauncherDock.tsx`**
+- [x] **Step 1: Implement `LauncherDock.tsx`**
 
 Build the `72px` left navigation rail:
 - `+` button at top with active toggle state.
@@ -512,7 +512,7 @@ Build the `72px` left navigation rail:
 - Tooltip on hover showing campaign name and last played timestamp.
 - Bottom utility icons: `Globe` (Worlds Studio), `BookOpen` (Systems Studio), `Settings` (Global Settings).
 
-- [ ] **Step 2: Implement `WorldFlyout.tsx`**
+- [x] **Step 2: Implement `WorldFlyout.tsx`**
 
 Build the horizontal expandable world flyout:
 - Anchored to the right of the `+` button.
@@ -521,12 +521,12 @@ Build the horizontal expandable world flyout:
 - Trailing `+ Create World` tile linking to Worlds Studio.
 - Clicking a world calls `onSelectWorld(worldId)`.
 
-- [ ] **Step 3: Run frontend typecheck**
+- [x] **Step 3: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/launcher/LauncherDock.tsx frontend/src/components/launcher/WorldFlyout.tsx
@@ -542,7 +542,7 @@ git commit -m "feat(frontend): add LauncherDock and WorldFlyout components"
 - Create: `frontend/src/components/launcher/NewCampaignModal.tsx`
 - Create: `frontend/src/components/launcher/CampaignSettingsModal.tsx`
 
-- [ ] **Step 1: Implement `CampaignHeroStage.tsx`**
+- [x] **Step 1: Implement `CampaignHeroStage.tsx`**
 
 Build the main hero presentation:
 - Background: `ProceduralBanner` or `img` tag if `banner_url` present, with vignette overlays.
@@ -553,26 +553,26 @@ Build the main hero presentation:
   - If no campaigns exist, but worlds exist: display atmospheric prompt to choose a world, automatically keeping flyout open.
   - If no campaigns AND no worlds exist: display prominent onboarding card to create first world or browse systems.
 
-- [ ] **Step 2: Implement `NewCampaignModal.tsx`**
+- [x] **Step 2: Implement `NewCampaignModal.tsx`**
 
 Build the centered new campaign creation dialog:
 - Header: World banner image (or `ProceduralBanner`), world icon badge, world title, description snippet, close button.
 - Body: Campaign name input, compatible systems selector pills, character fields (name, appearance, background, voice), art buttons (Upload / Generate AI).
 - Footer: Cancel and "Create Campaign" action buttons.
 
-- [ ] **Step 3: Implement `CampaignSettingsModal.tsx`**
+- [x] **Step 3: Implement `CampaignSettingsModal.tsx`**
 
 Build the centered campaign settings modal:
 - Artwork card: Banner and Icon previews, Upload button (file picker), Generate AI button.
 - General info: Campaign name, protagonist name.
 - Danger zone: Inline Restart Campaign and Delete Campaign actions with confirmation.
 
-- [ ] **Step 4: Run frontend typecheck**
+- [x] **Step 4: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/launcher/CampaignHeroStage.tsx frontend/src/components/launcher/NewCampaignModal.tsx frontend/src/components/launcher/CampaignSettingsModal.tsx
@@ -586,7 +586,7 @@ git commit -m "feat(frontend): add CampaignHeroStage, NewCampaignModal, and Camp
 **Files:**
 - Modify: `frontend/src/components/LauncherHub.tsx`
 
-- [ ] **Step 1: Refactor `LauncherHub.tsx`**
+- [x] **Step 1: Refactor `LauncherHub.tsx`**
 
 Integrate the new components:
 - Replace old tab-based layout with:
@@ -598,17 +598,17 @@ Integrate the new components:
   - `SettingsStudio` shown as a centered modal when clicking ⚙️ in the dock.
   - `WorldsStudio` and `SystemsStudio` rendered as full-window overlays with a prominent "← Back to Launcher" top button when activated from the dock.
 
-- [ ] **Step 2: Run frontend typecheck**
+- [x] **Step 2: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 3: Run backend and frontend tests**
+- [x] **Step 3: Run backend and frontend tests**
 
 Run: `mise run test`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/LauncherHub.tsx
@@ -619,23 +619,23 @@ git commit -m "feat(frontend): integrate Twintail-inspired launcher layout into 
 
 ### Task 7: Full Verification & Build
 
-- [ ] **Step 1: Run complete test suite**
+- [x] **Step 1: Run complete test suite**
 
 Run: `mise run test`
 Expected: PASS
 
-- [ ] **Step 2: Run production build**
+- [x] **Step 2: Run production build**
 
 Run: `mise run build`
 Expected: SUCCESS
 
-- [ ] **Step 3: Restore `.gitkeep` and check git status**
+- [x] **Step 3: Restore `.gitkeep` and check git status**
 
 Run: `git checkout pkg/gui/dist/.gitkeep`
 Run: `git status`
 Expected: Clean working tree
 
-- [ ] **Step 4: Mark plan complete and commit**
+- [x] **Step 4: Mark plan complete and commit**
 
 ```bash
 git add docs/superpowers/plans/2026-09-23-twintail-launcher-redesign.md
