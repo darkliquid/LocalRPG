@@ -123,3 +123,30 @@ func TestGetGeminiImagePresets(t *testing.T) {
 	}
 }
 
+func TestGetGeminiTTSPresets(t *testing.T) {
+	expected := []struct {
+		id    string
+		model string
+	}{
+		{"gemini-3.1-flash-tts", "gemini-3.1-flash-tts-preview"},
+		{"gemini-2.5-flash-tts", "gemini-2.5-flash-preview-tts"},
+		{"gemini-2.5-pro-tts", "gemini-2.5-pro-preview-tts"},
+	}
+
+	for _, tc := range expected {
+		p, ok := config.GetTTSPreset(tc.id)
+		if !ok {
+			t.Fatalf("expected preset %q to exist in TTSPresets", tc.id)
+		}
+		if p.Type != "gemini" {
+			t.Errorf("preset %q: expected Type 'gemini', got %q", tc.id, p.Type)
+		}
+		if p.Model != tc.model {
+			t.Errorf("preset %q: expected Model %q, got %q", tc.id, tc.model, p.Model)
+		}
+		if p.DefaultVoice != "Aoede" {
+			t.Errorf("preset %q: expected DefaultVoice 'Aoede', got %q", tc.id, p.DefaultVoice)
+		}
+	}
+}
+
