@@ -104,7 +104,7 @@ func NewGeminiTTSClient(cfg config.TTSConfig, sharedKey string) (*GeminiTTSClien
 func NewGeminiTTSClientWithClient(client *genai.Client, cfg config.TTSConfig) (*GeminiTTSClient, error) {
 	model := strings.TrimSpace(cfg.Model)
 	if model == "" {
-		model = "gemini-3.1-flash-tts-preview"
+		model = "gemini-3.8-flash-tts"
 	}
 
 	defaultVoice := strings.TrimSpace(cfg.DefaultVoice)
@@ -122,7 +122,7 @@ func NewGeminiTTSClientWithClient(client *genai.Client, cfg config.TTSConfig) (*
 // NewGeminiTTSClientOffline creates a client without a network connection (used for inspecting voices).
 func NewGeminiTTSClientOffline(model, defaultVoice string) *GeminiTTSClient {
 	if model == "" {
-		model = "gemini-3.1-flash-tts-preview"
+		model = "gemini-3.8-flash-tts"
 	}
 	if defaultVoice == "" {
 		defaultVoice = "Aoede"
