@@ -574,6 +574,21 @@ export const App: React.FC = () => {
                 entity={selectedEntity || undefined}
                 entities={entities}
                 voiceProfiles={config?.media.tts.voice_profiles ?? []}
+                ttsConfig={config?.media.tts}
+                onAddProfile={(profile) => {
+                  if (!config) return;
+                  const existing = config.media.tts.voice_profiles ?? [];
+                  if (existing.some((p) => p.id === profile.id)) return;
+                  const next = {
+                    ...config,
+                    media: {
+                      ...config.media,
+                      tts: { ...config.media.tts, voice_profiles: [...existing, profile] },
+                    },
+                  };
+                  setConfig(next);
+                  APIClient.saveSettings(next).catch(() => undefined);
+                }}
                 onSelect={handleOpenWikilink}
                 onSave={handleSaveEntity}
                 onMerge={handleMergeEntity}

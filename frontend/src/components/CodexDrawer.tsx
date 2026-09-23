@@ -1,18 +1,38 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EntityNote, EntitySummary, VoiceProfile } from '../types';
+import { EntityNote, EntitySummary, TTSConfig, VoiceProfile } from '../types';
 import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X } from 'lucide-react';
 import { TurnHistoryList } from './TurnHistoryList';
+import { VoiceCatalogPicker } from './VoiceCatalogPicker';
 
 interface CodexDrawerProps {
   entity?: EntityNote;
   entities?: EntitySummary[];
   voiceProfiles?: VoiceProfile[];
+  ttsConfig?: TTSConfig;
+  activeProvider?: string;
+  onAddProfile?: (profile: VoiceProfile) => void;
   onSelect: (entityId: string) => void;
   onSave: (entityId: string, markdown: string) => Promise<void> | void;
   onMerge?: (sourceID: string, intoID: string) => void;
 }
 
-export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, voiceProfiles, onSelect, onSave, onMerge }) => {
+// inlineYaml renders a canonical option value so an imported profile's tunables
+// survive into the character's frontmatter.
+function inlineYaml(value: unknown): string {
+  return typeof value === 'string' ? JSON.stringify(value) : String(value);
+}
+
+export const CodexDrawer: React.FC<CodexDrawerProps> = ({
+  entity,
+  entities,
+  voiceProfiles,
+  ttsConfig,
+  activeProvider,
+  onAddProfile,
+  onSelect,
+  onSave,
+  onMerge,
+}) => {
   const [markdown, setMarkdown] = useState('');
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -63,6 +83,10 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, voic
     if (profile.provider) lines.push(`provider: "${profile.provider}"`);
     lines.push(`pitch: ${profile.pitch}`);
     lines.push(`speech_rate: ${profile.speech_rate}`);
+    if (profile.options && Object.keys(profile.options).length > 0) {
+      const entries = Object.entries(profile.options).map(([key, value]) => `${key}: ${inlineYaml(value)}`);
+      lines.push(`options:\n    ${entries.join('\n    ')}`);
+    }
     const voiceSnippet = `voice:\n  ${lines.join('\n  ')}`;
     if (markdown.startsWith('---\n')) {
       const secondDashes = markdown.indexOf('\n---\n', 4);
@@ -262,11 +286,15 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, voic
                 </option>
                 {profiles.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} ({p.voice_id})
+                    {p.name} ({p.voice_id}){p.provider && p.provider !== activeProvider ? ` - belongs to ${p.provider}` : ''}
                   </option>
                 ))}
               </select>
             </div>
+
+            {ttsConfig && onAddProfile && (
+              <VoiceCatalogPicker ttsConfig={ttsConfig} onAddProfile={onAddProfile} />
+            )}
 
             <textarea
               value={markdown}
