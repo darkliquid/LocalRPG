@@ -555,6 +555,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Truncated:    stillIncomplete,
 		Recovery:     string(recovery),
 		ContextNotes: assembly.Trimmed,
+		ToolCalls:    result.Provenance,
 	}
 
 	turn.Entities = harness.ResolveEntityMentions(o.store, o.playerID, locationID, turn.Narration, actionInput)

@@ -107,3 +107,30 @@ func TestLoadHistoryNormalisesLegacyOutput(t *testing.T) {
 		t.Errorf("expected rewrites to emit narration, got %s", rewritten)
 	}
 }
+
+func TestTurnToolCallsRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	logger := NewHistoryLogger(filepath.Join(dir, "history.jsonl"))
+	turn := Turn{
+		Number:    1,
+		Timestamp: time.Now(),
+		Mode:      "Do",
+		Input:     "look",
+		Narration: "You look.",
+		ToolCalls: []ToolCallRecord{{Name: "search_entities", ResultChars: 42}},
+	}
+	if err := logger.AppendTurn(turn); err != nil {
+		t.Fatalf("AppendTurn: %v", err)
+	}
+
+	turns, err := logger.LoadHistory()
+	if err != nil {
+		t.Fatalf("LoadHistory: %v", err)
+	}
+	if len(turns) != 1 || len(turns[0].ToolCalls) != 1 {
+		t.Fatalf("turns = %+v", turns)
+	}
+	if turns[0].ToolCalls[0].Name != "search_entities" || turns[0].ToolCalls[0].ResultChars != 42 {
+		t.Errorf("provenance = %+v", turns[0].ToolCalls)
+	}
+}

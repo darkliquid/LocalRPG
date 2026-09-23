@@ -123,6 +123,9 @@ func TestToolLoopRunsACallThenAnswers(t *testing.T) {
 	if len(executor.calls) != 1 || executor.calls[0].Name != "search_entities" {
 		t.Errorf("executor calls = %+v", executor.calls)
 	}
+	if len(turn.ToolCalls) != 1 || turn.ToolCalls[0].Name != "search_entities" {
+		t.Errorf("turn provenance = %+v", turn.ToolCalls)
+	}
 
 	// The second call must carry the tool result as a tool message.
 	provider.mu.Lock()
