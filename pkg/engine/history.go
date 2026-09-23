@@ -58,6 +58,13 @@ type HistoryLogger struct {
 	path string
 }
 
+// ToolCallRecord is one tool a turn called, kept compact on purpose: the
+// arguments and the result live in the trace, not in the campaign's history.
+type ToolCallRecord struct {
+	Name        string `json:"name"`
+	ResultChars int    `json:"result_chars"`
+}
+
 func NewHistoryLogger(path string) *HistoryLogger {
 	return &HistoryLogger{path: path}
 }

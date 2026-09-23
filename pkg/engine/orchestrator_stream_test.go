@@ -18,9 +18,10 @@ import (
 // scriptedStreamProvider streams a fixed set of chunks, optionally failing or
 // blocking, so the orchestrator's streaming behaviour is testable without a model.
 type scriptedStreamProvider struct {
-	chunks []string
-	err    error
-	block  bool
+	chunks    []string
+	toolCalls []harness.ToolCall
+	err       error
+	block     bool
 	// onRequest is called with each request the provider is given, so a test can
 	// assert what it was asked rather than only what it replied.
 	onRequest func(harness.GenerateRequest)
@@ -55,6 +56,7 @@ func (p *scriptedStreamProvider) Stream(ctx context.Context, req harness.Generat
 		case out <- harness.StreamChunk{Text: chunk}:
 		}
 	}
+	out <- harness.StreamChunk{Done: true, ToolCalls: p.toolCalls}
 	return p.err
 }
 
@@ -337,5 +339,23 @@ func TestOpeningModeEstablishesTheFirstTurnOnly(t *testing.T) {
 
 	if _, err := orchestrator.ProcessActionStream(context.Background(), "Opening", "", nil); err == nil {
 		t.Errorf("expected a second opening turn to be refused")
+	}
+}
+
+func TestStreamSurfacesToolCalls(t *testing.T) {
+	provider := &scriptedStreamProvider{
+		chunks:    []string{"let me check"},
+		toolCalls: []harness.ToolCall{{ID: "1", Name: "search_entities", Arguments: `{"query":"warden"}`}},
+	}
+	orchestrator, _, _ := streamingOrchestrator(t, provider)
+
+	result, err := orchestrator.generateRequest(context.Background(), harness.GenerateRequest{
+		Messages: []harness.Message{{Role: "user", Content: "who is the warden?"}},
+	}, nil)
+	if err != nil {
+		t.Fatalf("generateRequest: %v", err)
+	}
+	if len(result.ToolCalls) != 1 || result.ToolCalls[0].Name != "search_entities" {
+		t.Errorf("ToolCalls = %+v, want the stream's call", result.ToolCalls)
 	}
 }

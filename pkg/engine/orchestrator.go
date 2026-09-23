@@ -611,6 +611,10 @@ type streamResult struct {
 	Text         string
 	FinishReason string
 	Interrupted  error
+	ToolCalls    []harness.ToolCall
+	// Provenance is what the turn looked up, compactly: name and result size.
+	// Arguments and results live in the trace, not in the campaign's history.
+	Provenance []ToolCallRecord
 }
 
 // stream pumps one provider stream, forwarding each delta to onChunk and
@@ -637,6 +641,7 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 
 	var sb strings.Builder
 	finishReason := ""
+	var toolCalls []harness.ToolCall
 	sawText := false
 	interrupted := func(err error) (streamResult, error) {
 		if !sawText {
@@ -668,11 +673,14 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 					}
 					return interrupted(err)
 				}
-				return streamResult{Text: sb.String(), FinishReason: finishReason}, nil
+				return streamResult{Text: sb.String(), FinishReason: finishReason, ToolCalls: toolCalls}, nil
 			}
 			if chunk.Error != nil {
 				<-streamErr
 				return interrupted(chunk.Error)
+			}
+			if len(chunk.ToolCalls) > 0 {
+				toolCalls = chunk.ToolCalls
 			}
 			if chunk.FinishReason != "" {
 				finishReason = chunk.FinishReason
@@ -702,17 +710,23 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 // generate streams the gm reply through stream, falling back to the configured
 // fallback provider when the primary fails before producing any text.
 func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk func(string) error) (streamResult, error) {
+	return o.generateRequest(ctx, harness.GenerateRequest{Prompt: prompt}, onChunk)
+}
+
+// generateRequest streams one request through the gm role, falling back to the
+// configured fallback provider when the primary fails before producing any text.
+func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.GenerateRequest, onChunk func(string) error) (streamResult, error) {
 	provider, err := o.router.GetProviderForRole("gm")
 	if err != nil {
 		return streamResult{}, err
 	}
 
-	result, err := o.stream(ctx, provider, harness.GenerateRequest{Prompt: prompt}, onChunk)
+	result, err := o.stream(ctx, provider, req, onChunk)
 	if err == nil || errors.Is(err, errStreamListener) || ctx.Err() != nil {
 		return result, err
 	}
 	if fallback, ok := o.router.FallbackForRole("gm"); ok {
-		return o.stream(ctx, fallback, harness.GenerateRequest{Prompt: prompt}, onChunk)
+		return o.stream(ctx, fallback, req, onChunk)
 	}
 	return result, err
 }
