@@ -3,7 +3,44 @@ package trace
 import (
 	"fmt"
 	"strings"
+	"sync"
 )
+
+// registeredSecrets are values, not field names, that must never be recorded. A
+// provider registers its key at construction, so a payload that embeds the key
+// in an unexpected field is still redacted.
+var (
+	secretMu          sync.RWMutex
+	registeredSecrets []string
+)
+
+// RegisterSecret adds a value to the redaction set. Empty values are ignored,
+// because replacing every occurrence of "" would destroy the record.
+func RegisterSecret(value string) {
+	if value == "" {
+		return
+	}
+	secretMu.Lock()
+	defer secretMu.Unlock()
+	for _, existing := range registeredSecrets {
+		if existing == value {
+			return
+		}
+	}
+	registeredSecrets = append(registeredSecrets, value)
+}
+
+// redactSecrets replaces every registered value in text.
+func redactSecrets(text string) string {
+	secretMu.RLock()
+	defer secretMu.RUnlock()
+	for _, secret := range registeredSecrets {
+		if secret != "" && strings.Contains(text, secret) {
+			text = strings.ReplaceAll(text, secret, "[redacted]")
+		}
+	}
+	return text
+}
 
 // defaultPayloadChars caps a recorded string when a sink is built without a
 // configured limit.
@@ -68,7 +105,7 @@ func sanitizeMap(fields map[string]interface{}, level Level, payloadChars int) m
 func sanitizeValue(value interface{}, level Level, payloadChars int) interface{} {
 	switch typed := value.(type) {
 	case string:
-		return truncate(typed, payloadChars)
+		return truncate(redactSecrets(typed), payloadChars)
 	case map[string]interface{}:
 		return sanitizeMap(typed, level, payloadChars)
 	case []interface{}:
