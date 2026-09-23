@@ -159,6 +159,14 @@ func (h *httpTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 	return io.ReadAll(resp.Body)
 }
 
+// SpeechCueCapabilities advertises Markdown emphasis support for HTTP TTS endpoints.
+func (h *httpTTSClient) SpeechCueCapabilities() SpeechCueCapabilities {
+	return SpeechCueCapabilities{
+		AudioTags:        false,
+		MarkdownEmphasis: true,
+	}
+}
+
 func isComfyUI(endpoint string) bool {
 	return strings.Contains(endpoint, ":8188") || strings.HasSuffix(endpoint, "/prompt")
 }

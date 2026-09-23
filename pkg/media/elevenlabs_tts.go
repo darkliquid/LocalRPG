@@ -400,3 +400,17 @@ func mapElevenLabsVoice(voice elevenLabsVoice) ProviderVoice {
 	}
 	return mapped
 }
+
+// SpeechCueCapabilities advertises ElevenLabs' support for bracketed audio tags.
+func (c *ElevenLabsTTSClient) SpeechCueCapabilities() SpeechCueCapabilities {
+	return SpeechCueCapabilities{
+		AudioTags:        true,
+		MarkdownEmphasis: false,
+		SupportedTags: []string{
+			"whispers", "sighs", "laughs", "gasp", "clears throat",
+			"chuckles", "softly", "loudly", "excited", "angry",
+			"nervous", "sad", "playful", "tired",
+		},
+		PromptGuidance: "Use bracketed tags immediately before dialogue or delivery beats to steer voice acting.",
+	}
+}

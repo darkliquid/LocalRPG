@@ -85,6 +85,20 @@ type TTSClient interface {
 	Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error)
 }
 
+// SpeechCueCapabilities describes the steering hints a TTS engine can interpret.
+type SpeechCueCapabilities struct {
+	AudioTags        bool     `json:"audio_tags"`
+	MarkdownEmphasis bool     `json:"markdown_emphasis"`
+	SupportedTags    []string `json:"supported_tags,omitempty"`
+	PromptGuidance   string   `json:"prompt_guidance,omitempty"`
+}
+
+// SpeechCueAdvertiser is an optional interface implemented by TTS clients that
+// declare vocal steering and performance cue capabilities.
+type SpeechCueAdvertiser interface {
+	SpeechCueCapabilities() SpeechCueCapabilities
+}
+
 type TTSPipeline struct {
 	client TTSClient
 	cache  *ContentCache

@@ -163,6 +163,14 @@ func (s *SherpaTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, erro
 	return voices, nil
 }
 
+// SpeechCueCapabilities advertises that SherpaTTSClient supports plain text only.
+func (s *SherpaTTSClient) SpeechCueCapabilities() SpeechCueCapabilities {
+	return SpeechCueCapabilities{
+		AudioTags:        false,
+		MarkdownEmphasis: false,
+	}
+}
+
 // EncodePCMFloatToWAV serializes 32-bit float audio samples to a 16-bit mono WAV container.
 func EncodePCMFloatToWAV(samples []float32, sampleRate int) ([]byte, error) {
 	numChannels := uint16(1)
