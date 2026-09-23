@@ -48,3 +48,44 @@ func TestKeyPresent(t *testing.T) {
 		t.Errorf("an unrelated provider must not read the ElevenLabs environment key")
 	}
 }
+
+func TestGeminiTTSProviderKeyAndKeyPresent(t *testing.T) {
+	// ProviderKey test
+	geminiCfg := config.TTSConfig{Type: "gemini"}
+	if key := ProviderKey(geminiCfg); key != "gemini:tts" {
+		t.Errorf("expected ProviderKey 'gemini:tts', got %q", key)
+	}
+
+	builtinGeminiCfg := config.TTSConfig{Type: "builtin", BuiltinName: "gemini"}
+	if key := ProviderKey(builtinGeminiCfg); key != "builtin:gemini" {
+		t.Errorf("expected ProviderKey 'builtin:gemini', got %q", key)
+	}
+
+	// KeyPresentWithSharedKey test
+	t.Setenv("GEMINI_API_KEY", "")
+	t.Setenv("GOOGLE_API_KEY", "")
+
+	if KeyPresentWithSharedKey(geminiCfg, "") {
+		t.Errorf("expected false when no key set")
+	}
+
+	if !KeyPresentWithSharedKey(geminiCfg, "shared-secret") {
+		t.Errorf("expected true when shared key provided")
+	}
+
+	geminiCfgWithKey := config.TTSConfig{Type: "gemini", APIKey: "own-key"}
+	if !KeyPresentWithSharedKey(geminiCfgWithKey, "") {
+		t.Errorf("expected true when config has APIKey")
+	}
+
+	t.Setenv("GEMINI_API_KEY", "env-key")
+	if !KeyPresentWithSharedKey(geminiCfg, "") {
+		t.Errorf("expected true when GEMINI_API_KEY set")
+	}
+
+	t.Setenv("GEMINI_API_KEY", "")
+	t.Setenv("GOOGLE_API_KEY", "env-google-key")
+	if !KeyPresentWithSharedKey(builtinGeminiCfg, "") {
+		t.Errorf("expected true when GOOGLE_API_KEY set for builtin:gemini")
+	}
+}
