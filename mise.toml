@@ -12,7 +12,7 @@ cd frontend && npm install
 [tasks."build:frontend"]
 description = "Build the React 19 frontend bundle into pkg/gui/dist"
 dir = "frontend"
-run = "npm run build && cp -r ../pkg/gui/dist ./dist 2>/dev/null || true"
+run = "npm run build && touch ../pkg/gui/dist/.gitkeep && (cp -r ../pkg/gui/dist ./dist 2>/dev/null || true)"
 sources = ["src/**/*", "index.html", "package.json"]
 outputs = ["../pkg/gui/dist/index.html"]
 

@@ -26,7 +26,7 @@ CLI surface (`localrpg <cmd>`): `roll <notation>`, `prompt`, `play <game-id>`, `
 
 ## Build gotcha: the frontend is embedded in the Go binary
 
-`pkg/gui/assets.go` declares `//go:embed all:dist`, so **`go build` fails if `pkg/gui/dist/` does not exist**. It is gitignored except for a tracked `.gitkeep` placeholder. Vite writes straight into `pkg/gui/dist` (`frontend/vite.config.ts` sets `outDir: ../pkg/gui/dist`, `emptyOutDir: true`), which deletes that `.gitkeep`. A frontend build therefore shows a spurious `D .. pkg/gui/dist/.gitkeep` in `git status` — do not commit that deletion.
+`pkg/gui/assets.go` declares `//go:embed all:dist`, so **`go build` fails if `pkg/gui/dist/` does not exist**. It is gitignored except for a tracked `.gitkeep` placeholder. Vite writes straight into `pkg/gui/dist` (`frontend/vite.config.ts` sets `outDir: ../pkg/gui/dist`, `emptyOutDir: true`), which would delete that `.gitkeep`; the build tasks in `mise.toml` and `frontend/package.json` automatically touch `.gitkeep` immediately after building so `git status` stays clean.
 
 Always build the frontend before the backend, or use `mise run build`, which enforces the ordering. `pkg/gui/assets.go` also falls back to `frontend/dist/` and `pkg/gui/dist/` on local disk, then to a placeholder HTML page, for backend-only development.
 
