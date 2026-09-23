@@ -12,6 +12,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/tools"
 	"github.com/darkliquid/localrpg/pkg/tui"
 )
 
@@ -105,6 +106,8 @@ func handlePlayCommand(args []string) {
 		MinChars:    cfg.CompletionMinChars(),
 		Timeout:     cfg.CompletionTimeout(),
 	})
+	orchestrator.SetTools(tools.NewExecutor(store, cfg.ToolResultChars()), cfg.RoleSupportsTools("gm"))
+	orchestrator.SetToolRounds(cfg.ToolRounds())
 	orchestrator.LoadPrompts(paths, manifest.SystemID, manifest.WorldID)
 
 	app := tui.NewAppModel(orchestrator, 80, 24)

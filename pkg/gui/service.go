@@ -27,6 +27,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/tools"
 	"github.com/darkliquid/localrpg/pkg/trace"
 	"gopkg.in/yaml.v3"
 )
@@ -1117,6 +1118,8 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		MinChars:    cfg.CompletionMinChars(),
 		Timeout:     cfg.CompletionTimeout(),
 	})
+	orchestrator.SetTools(tools.NewExecutor(store, cfg.ToolResultChars()), cfg.RoleSupportsTools("gm"))
+	orchestrator.SetToolRounds(cfg.ToolRounds())
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
