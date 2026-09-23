@@ -6,3 +6,13 @@ bin/
 frontend/dist/
 pkg/gui/dist/*
 !pkg/gui/dist/.gitkeep
+
+# Local campaign content and caches, created through the studios or by hand.
+/systems/
+/worlds/
+/games/
+/cache/
+
+# Secrets and scratch notes.
+*.key
+todo.txt
