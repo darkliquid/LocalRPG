@@ -1413,16 +1413,34 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 		return "", fmt.Errorf("build tts client: %w", err)
 	}
 
-	narratorVoice := &entity.VoiceConfig{
-		VoiceID:    cfg.Media.TTS.DefaultVoice,
-		Pitch:      cfg.Media.TTS.Pitch,
-		SpeechRate: cfg.Media.TTS.SpeechRate,
-		Options:    cfg.Media.TTS.Options,
-	}
+	narratorVoice := s.narratorVoiceFor(gameID, cfg)
 
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	return pipeline.SynthesizeSegment(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID))
+}
+
+// narratorVoiceFor resolves the narrator voice for a campaign, preferring any
+// campaign-level setting in game.yaml and falling back to media.tts.default_voice.
+func (s *Service) narratorVoiceFor(gameID string, cfg *config.Config) *entity.VoiceConfig {
+	voiceID := ""
+	if cfg != nil {
+		voiceID = cfg.Media.TTS.DefaultVoice
+	}
+	if manifest, err := core.LoadGameManifest(filepath.Join(s.resolver.GameDir(gameID), "game.yaml")); err == nil && manifest != nil && manifest.Settings != nil {
+		if nv, ok := manifest.Settings["narrator_voice"].(string); ok && strings.TrimSpace(nv) != "" {
+			voiceID = strings.TrimSpace(nv)
+		}
+	}
+	res := &entity.VoiceConfig{
+		VoiceID: voiceID,
+	}
+	if cfg != nil {
+		res.Pitch = cfg.Media.TTS.Pitch
+		res.SpeechRate = cfg.Media.TTS.SpeechRate
+		res.Options = cfg.Media.TTS.Options
+	}
+	return res
 }
 
 // audioPlayer opens the process-wide player on first use. A host with no audio
@@ -1475,12 +1493,7 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 		return 0, 0, fmt.Errorf("load history: %w", err)
 	}
 
-	narratorVoice := &entity.VoiceConfig{
-		VoiceID:    cfg.Media.TTS.DefaultVoice,
-		Pitch:      cfg.Media.TTS.Pitch,
-		SpeechRate: cfg.Media.TTS.SpeechRate,
-		Options:    cfg.Media.TTS.Options,
-	}
+	narratorVoice := s.narratorVoiceFor(gameID, cfg)
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 
@@ -1806,6 +1819,12 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 		return nil, fmt.Errorf("init game: %w", err)
 	}
 	_ = session.Close()
+
+	if strings.TrimSpace(req.NarratorVoice) != "" {
+		_ = s.UpdateGameSettings(ctx, gameID, map[string]interface{}{
+			"narrator_voice": strings.TrimSpace(req.NarratorVoice),
+		})
+	}
 
 	// A voice the player did not choose is chosen from their description, so the
 	// protagonist can speak in their own voice from the first turn.

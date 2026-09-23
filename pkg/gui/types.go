@@ -153,6 +153,7 @@ type CreateGameRequestDTO struct {
 	PlayerName    string             `json:"player_name"`
 	Player        PlayerCharacterDTO `json:"player,omitempty"`
 	OpeningPrompt string             `json:"opening_prompt,omitempty"`
+	NarratorVoice string             `json:"narrator_voice,omitempty"`
 }
 
 // PlayerCharacterDTO is the authored protagonist gathered at campaign creation.

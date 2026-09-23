@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/scene"
@@ -685,6 +686,33 @@ func TestCreateGameRequiresCharacterAppearance(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "appearance") {
 		t.Fatalf("expected appearance to be required, got %v", err)
+	}
+}
+
+func TestCreateGamePersistsNarratorVoice(t *testing.T) {
+	svc := NewService(t.TempDir())
+	setupFreeformSystem(t, svc)
+
+	game, err := svc.CreateGame(context.Background(), CreateGameRequestDTO{
+		Name:          "Narrator Campaign",
+		SystemID:      "freeform",
+		WorldID:       "harbour-realm",
+		PlayerName:    "Hero",
+		NarratorVoice: "custom_narrator_voice",
+		Player: PlayerCharacterDTO{
+			Appearance: "Tall and dark",
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateGame: %v", err)
+	}
+
+	manifest, err := core.LoadGameManifest(filepath.Join(svc.resolver.GameDir(game.ID), "game.yaml"))
+	if err != nil {
+		t.Fatalf("LoadGameManifest: %v", err)
+	}
+	if manifest.Settings["narrator_voice"] != "custom_narrator_voice" {
+		t.Errorf("expected narrator_voice 'custom_narrator_voice', got %v", manifest.Settings["narrator_voice"])
 	}
 }
 
