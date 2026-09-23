@@ -1501,8 +1501,8 @@ func TestToolResultsAreCapped(t *testing.T) {
 	if !ok {
 		t.Fatalf("Execute reported failure: %s", result)
 	}
-	if len([]rune(result)) > 240 {
-		t.Errorf("result is %d runes, want it capped near 200", len([]rune(result)))
+	if len([]rune(result)) > 280 {
+		t.Errorf("result is %d runes, want it capped near 200 plus the marker", len([]rune(result)))
 	}
 	if !strings.Contains(result, "truncated") {
 		t.Errorf("a cap that bites must say so: %s", result)
