@@ -341,3 +341,31 @@ func TestNewTTSClientBuildsElevenLabs(t *testing.T) {
 		t.Errorf("client = %T, want *media.ElevenLabsTTSClient", client)
 	}
 }
+
+func TestNewImageClientBuildsGemini(t *testing.T) {
+	t.Setenv("GEMINI_API_KEY", "test-key")
+
+	client, err := media.NewImageClient(config.ImageConfig{
+		Type:  "gemini",
+		Model: "imagen-3.0-generate-002",
+	})
+	if err != nil {
+		t.Fatalf("NewImageClient failed for gemini: %v", err)
+	}
+	if client == nil {
+		t.Fatalf("expected non-nil image client")
+	}
+
+	builtinClient, err := media.NewImageClient(config.ImageConfig{
+		Type:        "builtin",
+		BuiltinName: "gemini",
+		Model:       "gemini-3.1-flash-image",
+	})
+	if err != nil {
+		t.Fatalf("NewImageClient failed for builtin gemini: %v", err)
+	}
+	if builtinClient == nil {
+		t.Fatalf("expected non-nil builtin gemini image client")
+	}
+}
+

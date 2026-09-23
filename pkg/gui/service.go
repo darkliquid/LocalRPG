@@ -1228,7 +1228,7 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 	}
 
 	cfg := s.configMgr.Get()
-	client, err := media.NewSceneImageClient(cfg.Media.Image)
+	client, err := media.NewSceneImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
 	if err != nil {
 		return "", "", fmt.Errorf("build image client: %w", err)
 	}
@@ -2456,7 +2456,8 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		if err := json.Unmarshal(data, &imgCfg); err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}
-		client, err := media.NewImageClient(imgCfg)
+		cfg := s.configMgr.Get()
+		client, err := media.NewImageClientWithSharedKey(imgCfg, cfg.Providers.Gemini.APIKey)
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}

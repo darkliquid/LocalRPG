@@ -617,7 +617,11 @@ func (c *fallbackImageClient) GenerateImage(ctx context.Context, prompt string) 
 // NewSceneImageClient builds the image client used for scene art: the configured
 // provider, wrapping the built-in generator when the fallback is enabled.
 func NewSceneImageClient(cfg config.ImageConfig) (ImageClient, error) {
-	primary, err := NewImageClient(cfg)
+	return NewSceneImageClientWithSharedKey(cfg, "")
+}
+
+func NewSceneImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string) (ImageClient, error) {
+	primary, err := NewImageClientWithSharedKey(cfg, sharedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -633,6 +637,10 @@ func NewSceneImageClient(cfg config.ImageConfig) (ImageClient, error) {
 }
 
 func NewImageClient(cfg config.ImageConfig) (ImageClient, error) {
+	return NewImageClientWithSharedKey(cfg, "")
+}
+
+func NewImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string) (ImageClient, error) {
 	switch cfg.Type {
 	case "disabled", "":
 		return &disabledImageClient{}, nil
@@ -640,7 +648,12 @@ func NewImageClient(cfg config.ImageConfig) (ImageClient, error) {
 		if cfg.BuiltinName == "procedural-art" {
 			return NewProceduralArtClient(), nil
 		}
+		if cfg.BuiltinName == "gemini" {
+			return NewGeminiImageClient(cfg, sharedKey)
+		}
 		return &echoImageClient{}, nil
+	case "gemini":
+		return NewGeminiImageClient(cfg, sharedKey)
 	case "cli":
 		return &cliImageClient{command: cfg.Command, args: cfg.Args}, nil
 	case "comfyui":
@@ -660,3 +673,4 @@ func NewImageClient(cfg config.ImageConfig) (ImageClient, error) {
 		return nil, fmt.Errorf("unsupported image provider type: %s", cfg.Type)
 	}
 }
+
