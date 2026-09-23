@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/media"
@@ -21,6 +22,8 @@ func (s *Service) InspectTTS(ctx context.Context, req TTSInspectRequestDTO) (*TT
 
 	response := &TTSInspectResponseDTO{
 		ProviderKey: media.ProviderKey(cfg),
+		KeyPresent:  media.KeyPresent(cfg),
+		KeyRequired: strings.EqualFold(strings.TrimSpace(cfg.BuiltinName), "elevenlabs"),
 		Catalog:     VoiceCatalogDTO{Voices: []media.ProviderVoice{}},
 	}
 

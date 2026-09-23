@@ -363,6 +363,8 @@ export interface TTSInspectResponse {
   metered: boolean;
   options?: VoiceOption[];
   catalog: VoiceCatalog;
+  key_present: boolean;
+  key_required: boolean;
   error?: string;
 }
 

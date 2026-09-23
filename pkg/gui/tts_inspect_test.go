@@ -127,3 +127,42 @@ func TestInspectTTSRoute(t *testing.T) {
 		t.Errorf("body = %s", rec.Body.String())
 	}
 }
+
+func TestInspectTTSReportsKeyPresenceWithoutTheKey(t *testing.T) {
+	t.Setenv("ELEVENLABS_API_KEY", "")
+	svc := NewService(t.TempDir())
+	svc.newTTSClient = func(config.TTSConfig) (media.TTSClient, error) {
+		return &bareClient{}, nil
+	}
+
+	without, err := svc.InspectTTS(context.Background(), TTSInspectRequestDTO{
+		Config: config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs"},
+	})
+	if err != nil {
+		t.Fatalf("InspectTTS: %v", err)
+	}
+	if without.KeyPresent {
+		t.Errorf("expected key_present false with no key configured")
+	}
+	if !without.KeyRequired {
+		t.Errorf("expected key_required true for a keyed provider")
+	}
+
+	with, err := svc.InspectTTS(context.Background(), TTSInspectRequestDTO{
+		Config: config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs", APIKey: "secret"},
+	})
+	if err != nil {
+		t.Fatalf("InspectTTS: %v", err)
+	}
+	if !with.KeyPresent {
+		t.Errorf("expected key_present true with a configured key")
+	}
+
+	encoded, err := json.Marshal(with)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(encoded), "secret") {
+		t.Errorf("inspect response leaked the key: %s", encoded)
+	}
+}

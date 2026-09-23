@@ -1171,6 +1171,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             )}
 
+            {inspect?.key_required && !inspect.key_present && (
+              <div className="text-[11px] font-mono text-stone-400">
+                No API key configured. Enter one below, or set ELEVENLABS_API_KEY in the environment.
+              </div>
+            )}
+
             {inspect && inspect.options && inspect.options.length > 0 && (
               <div className="p-3 rounded-lg bg-stone-950/70 border border-stone-800/80 space-y-2">
                 <label className="text-xs font-cinzel uppercase text-stone-300">Provider Tuning</label>

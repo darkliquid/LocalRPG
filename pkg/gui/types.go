@@ -284,6 +284,12 @@ type TTSInspectResponseDTO struct {
 	Metered     bool                `json:"metered"`
 	Options     []media.VoiceOption `json:"options,omitempty"`
 	Catalog     VoiceCatalogDTO     `json:"catalog"`
+	// KeyPresent reports whether a credential is configured. The key itself is
+	// never included.
+	KeyPresent bool `json:"key_present"`
+	// KeyRequired reports whether this provider needs a credential at all, so the
+	// editor can explain a missing key instead of showing one to every provider.
+	KeyRequired bool `json:"key_required"`
 	// Error is a non-fatal catalog failure, so the editor still renders options.
 	Error string `json:"error,omitempty"`
 }
