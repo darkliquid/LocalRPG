@@ -506,3 +506,167 @@ func TestHTTPTTSClientSynthesizeKokoro(t *testing.T) {
 	}
 }
 
+func TestHTTPTTSClientListVoices(t *testing.T) {
+	t.Run("kokoro fastapi voices response object", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/v1/audio/voices" {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"voices": [
+					{
+						"id": "af_heart",
+						"name": "af_heart",
+						"target_quality": "A",
+						"overall_grade": "A"
+					},
+					{
+						"id": "bm_george",
+						"name": "bm_george",
+						"target_quality": "B",
+						"overall_grade": "C"
+					},
+					{
+						"id": "zf_xiaobei",
+						"name": "zf_xiaobei"
+					}
+				],
+				"default_voice": "af_heart"
+			}`))
+		}))
+		defer server.Close()
+
+		client, err := media.NewTTSClient(config.TTSConfig{
+			Type:     "http",
+			Endpoint: server.URL,
+			Model:    "kokoro",
+		})
+		if err != nil {
+			t.Fatalf("NewTTSClient: %v", err)
+		}
+
+		catalog, ok := client.(media.VoiceCatalog)
+		if !ok {
+			t.Fatalf("client does not implement media.VoiceCatalog")
+		}
+
+		voices, err := catalog.ListVoices(context.Background())
+		if err != nil {
+			t.Fatalf("ListVoices failed: %v", err)
+		}
+
+		if len(voices) != 3 {
+			t.Fatalf("got %d voices, want 3", len(voices))
+		}
+
+		// Check af_heart
+		heart := voices[0]
+		if heart.ID != "af_heart" {
+			t.Errorf("ID = %q, want af_heart", heart.ID)
+		}
+		if heart.Name != "Heart (American Female)" {
+			t.Errorf("Name = %q, want Heart (American Female)", heart.Name)
+		}
+		if heart.Gender != "female" {
+			t.Errorf("Gender = %q, want female", heart.Gender)
+		}
+		if heart.Language != "en-US" {
+			t.Errorf("Language = %q, want en-US", heart.Language)
+		}
+		if heart.Accent != "American" {
+			t.Errorf("Accent = %q, want American", heart.Accent)
+		}
+
+		// Check bm_george
+		george := voices[1]
+		if george.ID != "bm_george" {
+			t.Errorf("ID = %q, want bm_george", george.ID)
+		}
+		if george.Name != "George (British Male)" {
+			t.Errorf("Name = %q, want George (British Male)", george.Name)
+		}
+		if george.Gender != "male" {
+			t.Errorf("Gender = %q, want male", george.Gender)
+		}
+		if george.Language != "en-GB" {
+			t.Errorf("Language = %q, want en-GB", george.Language)
+		}
+		if george.Accent != "British" {
+			t.Errorf("Accent = %q, want British", george.Accent)
+		}
+
+		// Check zf_xiaobei
+		xiaobei := voices[2]
+		if xiaobei.ID != "zf_xiaobei" {
+			t.Errorf("ID = %q, want zf_xiaobei", xiaobei.ID)
+		}
+		if xiaobei.Name != "Xiaobei (Chinese Female)" {
+			t.Errorf("Name = %q, want Xiaobei (Chinese Female)", xiaobei.Name)
+		}
+		if xiaobei.Language != "zh" {
+			t.Errorf("Language = %q, want zh", xiaobei.Language)
+		}
+	})
+
+	t.Run("bare array response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[
+				{"id": "af_bella", "name": "af_bella"},
+				{"id": "am_adam", "name": "am_adam"}
+			]`))
+		}))
+		defer server.Close()
+
+		client, err := media.NewTTSClient(config.TTSConfig{
+			Type:     "http",
+			Endpoint: server.URL,
+		})
+		if err != nil {
+			t.Fatalf("NewTTSClient: %v", err)
+		}
+
+		catalog, ok := client.(media.VoiceCatalog)
+		if !ok {
+			t.Fatalf("client does not implement media.VoiceCatalog")
+		}
+
+		voices, err := catalog.ListVoices(context.Background())
+		if err != nil {
+			t.Fatalf("ListVoices failed: %v", err)
+		}
+
+		if len(voices) != 2 {
+			t.Fatalf("got %d voices, want 2", len(voices))
+		}
+		if voices[0].ID != "af_bella" || voices[0].Name != "Bella (American Female)" {
+			t.Errorf("unexpected voice 0: %+v", voices[0])
+		}
+	})
+
+	t.Run("unsupported endpoint returns empty with no error", func(t *testing.T) {
+		client, err := media.NewTTSClient(config.TTSConfig{
+			Type:     "http",
+			Endpoint: "http://localhost:7851/api/tts-generate",
+		})
+		if err != nil {
+			t.Fatalf("NewTTSClient: %v", err)
+		}
+
+		catalog, ok := client.(media.VoiceCatalog)
+		if !ok {
+			t.Fatalf("client does not implement media.VoiceCatalog")
+		}
+
+		voices, err := catalog.ListVoices(context.Background())
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+		if len(voices) != 0 {
+			t.Errorf("expected 0 voices, got %d", len(voices))
+		}
+	})
+}
+
