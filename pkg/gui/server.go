@@ -189,6 +189,12 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		if patch.OpeningPrompt != nil {
 			values[engine.OpeningPromptSetting] = strings.TrimSpace(*patch.OpeningPrompt)
 		}
+		if patch.NarratorVoice != nil {
+			values["narrator_voice"] = strings.TrimSpace(*patch.NarratorVoice)
+		}
+		if patch.StartLocation != nil {
+			values[engine.StartLocationSetting] = strings.TrimSpace(*patch.StartLocation)
+		}
 		if err := s.service.UpdateGameSettings(r.Context(), gameID, values); err != nil {
 			writeGameError(w, err)
 			return

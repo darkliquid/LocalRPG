@@ -342,6 +342,16 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 
 	arcs, clocks, locations := s.gameCorpus(gameID)
 
+	var narratorVoice, startLocation string
+	if gameManifest.Settings != nil {
+		if nv, ok := gameManifest.Settings["narrator_voice"].(string); ok {
+			narratorVoice = nv
+		}
+		if sl, ok := gameManifest.Settings[engine.StartLocationSetting].(string); ok {
+			startLocation = sl
+		}
+	}
+
 	return &GameStateDTO{
 		GameID:   gameID,
 		GameName: gameManifest.Name,
@@ -357,6 +367,8 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		Clocks:        clocks,
 		Locations:     locations,
 		OpeningPrompt: engine.OpeningPrompt(gameManifest),
+		NarratorVoice: narratorVoice,
+		StartLocation: startLocation,
 	}, nil
 }
 
@@ -1872,6 +1884,11 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 	if strings.TrimSpace(req.NarratorVoice) != "" {
 		_ = s.UpdateGameSettings(ctx, gameID, map[string]interface{}{
 			"narrator_voice": strings.TrimSpace(req.NarratorVoice),
+		})
+	}
+	if strings.TrimSpace(req.StartLocation) != "" {
+		_ = s.UpdateGameSettings(ctx, gameID, map[string]interface{}{
+			engine.StartLocationSetting: strings.TrimSpace(req.StartLocation),
 		})
 	}
 

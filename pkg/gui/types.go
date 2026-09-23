@@ -43,6 +43,8 @@ type GameStateDTO struct {
 	Clocks        []FactionClockDTO `json:"clocks"`
 	Locations     []string          `json:"locations"`
 	OpeningPrompt string            `json:"opening_prompt,omitempty"`
+	NarratorVoice string            `json:"narrator_voice,omitempty"`
+	StartLocation string            `json:"start_location,omitempty"`
 }
 
 type SegmentDTO struct {
@@ -159,6 +161,7 @@ type CreateGameRequestDTO struct {
 	Player        PlayerCharacterDTO `json:"player,omitempty"`
 	OpeningPrompt string             `json:"opening_prompt,omitempty"`
 	NarratorVoice string             `json:"narrator_voice,omitempty"`
+	StartLocation string             `json:"start_location,omitempty"`
 }
 
 // PlayerCharacterDTO is the authored protagonist gathered at campaign creation.
@@ -205,6 +208,8 @@ type RecapDTO struct {
 // field is left alone, which is what makes it a patch rather than a replace.
 type GameSettingsPatchDTO struct {
 	OpeningPrompt *string `json:"opening_prompt,omitempty"`
+	NarratorVoice *string `json:"narrator_voice,omitempty"`
+	StartLocation *string `json:"start_location,omitempty"`
 }
 
 type SystemDetailDTO struct {
