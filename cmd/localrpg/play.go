@@ -97,6 +97,14 @@ func handlePlayCommand(args []string) {
 	)
 	orchestrator.SetLogger(logger)
 	orchestrator.SetExtractor(harness.ExtractorFromConfigWithLogger(cfg, router, logger))
+	orchestrator.SetCompletionProvider(harness.CompletionFromConfig(cfg, router, logger))
+	orchestrator.SetCompletionPolicy(engine.CompletionPolicy{
+		Mode:        cfg.CompletionMode(),
+		MaxAttempts: cfg.CompletionAttempts(),
+		TailChars:   cfg.CompletionTailChars(),
+		MinChars:    cfg.CompletionMinChars(),
+		Timeout:     cfg.CompletionTimeout(),
+	})
 	orchestrator.LoadPrompts(paths, manifest.SystemID, manifest.WorldID)
 
 	app := tui.NewAppModel(orchestrator, 80, 24)

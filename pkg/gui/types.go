@@ -66,6 +66,7 @@ type TurnDTO struct {
 	Segments       []SegmentDTO `json:"segments,omitempty"`
 	Outcome        string       `json:"outcome,omitempty"`
 	Truncated       bool         `json:"truncated,omitempty"`
+	Recovery        string       `json:"recovery,omitempty"`
 	ContextNotes    []string     `json:"context_notes,omitempty"`
 	ContinuityNotes []string     `json:"continuity_notes,omitempty"`
 	LocationID      string       `json:"location_id,omitempty"`

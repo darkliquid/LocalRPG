@@ -826,6 +826,7 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		Prose:        turn.Prose(),
 		Outcome:      turn.Outcome,
 		Truncated:       turn.Truncated,
+		Recovery:        turn.Recovery,
 		ContextNotes:    turn.ContextNotes,
 		ContinuityNotes: turn.ContinuityNotes,
 		EntitiesHit:     mentionIDs(turn.Entities),
@@ -1084,6 +1085,14 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator.SetLogger(logger)
 	orchestrator.SetChronicler(chronicler)
 	orchestrator.SetExtractor(harness.ExtractorFromConfigWithLogger(cfg, router, logger))
+	orchestrator.SetCompletionProvider(harness.CompletionFromConfig(cfg, router, logger))
+	orchestrator.SetCompletionPolicy(engine.CompletionPolicy{
+		Mode:        cfg.CompletionMode(),
+		MaxAttempts: cfg.CompletionAttempts(),
+		TailChars:   cfg.CompletionTailChars(),
+		MinChars:    cfg.CompletionMinChars(),
+		Timeout:     cfg.CompletionTimeout(),
+	})
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
