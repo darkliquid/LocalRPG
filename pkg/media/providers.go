@@ -497,6 +497,8 @@ func NewTTSClient(cfg config.TTSConfig) (TTSClient, error) {
 			return NewSherpaTTSClient(modelDir), nil
 		case "native-os":
 			return NewNativeOSTTSClient(), nil
+		case "elevenlabs":
+			return NewElevenLabsTTSClient(cfg)
 		default:
 			return &echoTTSClient{}, nil
 		}

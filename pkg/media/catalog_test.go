@@ -29,3 +29,22 @@ func TestProviderKey(t *testing.T) {
 		})
 	}
 }
+
+func TestKeyPresent(t *testing.T) {
+	t.Setenv("ELEVENLABS_API_KEY", "")
+
+	if KeyPresent(config.TTSConfig{}) {
+		t.Errorf("an unconfigured provider has no key")
+	}
+	if !KeyPresent(config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs", APIKey: "abc"}) {
+		t.Errorf("a configured key must report present")
+	}
+
+	t.Setenv("ELEVENLABS_API_KEY", "from-env")
+	if !KeyPresent(config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs"}) {
+		t.Errorf("the environment key must count as present")
+	}
+	if KeyPresent(config.TTSConfig{Type: "http", Endpoint: "http://localhost:8880"}) {
+		t.Errorf("an unrelated provider must not read the ElevenLabs environment key")
+	}
+}

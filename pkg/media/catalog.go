@@ -3,6 +3,7 @@ package media
 import (
 	"context"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -111,4 +112,17 @@ func sanitiseKey(value string) string {
 		}
 	}
 	return strings.Trim(sb.String(), "-")
+}
+
+// KeyPresent reports whether a configuration has a usable credential, either in
+// the config or from the provider's documented environment variable. It exists so
+// the inspect endpoint can answer without echoing the key.
+func KeyPresent(cfg config.TTSConfig) bool {
+	if strings.TrimSpace(cfg.APIKey) != "" {
+		return true
+	}
+	if strings.EqualFold(strings.TrimSpace(cfg.BuiltinName), "elevenlabs") {
+		return strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")) != ""
+	}
+	return false
 }

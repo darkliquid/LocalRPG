@@ -325,3 +325,19 @@ func TestHTTPTTSClient_AdaptsAllTalkPayload(t *testing.T) {
 		t.Errorf("unexpected audio data: %s", string(data))
 	}
 }
+
+func TestNewTTSClientBuildsElevenLabs(t *testing.T) {
+	t.Setenv("ELEVENLABS_API_KEY", "")
+	_, err := media.NewTTSClient(config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs"})
+	if !errors.Is(err, media.ErrMissingAPIKey) {
+		t.Fatalf("err = %v, want ErrMissingAPIKey when no key is set", err)
+	}
+
+	client, err := media.NewTTSClient(config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs", APIKey: "abc"})
+	if err != nil {
+		t.Fatalf("NewTTSClient: %v", err)
+	}
+	if _, ok := client.(*media.ElevenLabsTTSClient); !ok {
+		t.Errorf("client = %T, want *media.ElevenLabsTTSClient", client)
+	}
+}
