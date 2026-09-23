@@ -369,6 +369,20 @@ export interface VoiceCatalog {
   voices: ProviderVoice[];
 }
 
+export interface SpeechCueCapabilities {
+  audio_tags: boolean;
+  markdown_emphasis: boolean;
+  supported_tags?: string[];
+  prompt_guidance?: string;
+}
+
+export interface SpeechCuesConfig {
+  enabled: boolean;
+  audio_tags?: boolean;
+  markdown_emphasis?: boolean;
+  display_mode?: 'stage_directions' | 'hidden' | 'raw';
+}
+
 export interface TTSInspectRequest {
   config: TTSConfig;
   refresh?: boolean;
@@ -382,6 +396,7 @@ export interface TTSInspectResponse {
   key_present: boolean;
   key_required: boolean;
   error?: string;
+  speech_cues?: SpeechCueCapabilities;
 }
 
 export interface TTSConfig {
@@ -405,6 +420,8 @@ export interface TTSConfig {
   options?: Record<string, unknown>;
   // Overrides a provider's own metered declaration when set.
   metered?: boolean;
+  // Vocal performance steering tags and transcript display.
+  speech_cues?: SpeechCuesConfig;
 }
 
 export interface STTConfig {

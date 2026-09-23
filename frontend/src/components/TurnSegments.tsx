@@ -15,6 +15,7 @@ interface TurnSegmentsProps {
   serverPlayback?: boolean;
   onPlayTurn?: (segmentIndex?: number) => void;
   onStopTurn?: () => void;
+  displayMode?: 'stage_directions' | 'hidden' | 'raw';
 }
 
 export const TurnSegments: React.FC<TurnSegmentsProps> = ({
@@ -26,6 +27,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   serverPlayback = false,
   onPlayTurn,
   onStopTurn,
+  displayMode = 'stage_directions',
 }) => {
   const ordered = segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: fallback }];
   const hasAudio = (segments ?? []).some((segment) => !!segment.audio_url);
@@ -71,6 +73,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             <MarkdownProse
               text={`\u201c${segment.text}\u201d`}
               onEntityClick={onEntityClick}
+              displayMode={displayMode}
               className="text-stone-100 text-lg leading-relaxed italic space-y-2"
             />
           </div>
@@ -79,6 +82,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             key={i}
             text={segment.text}
             onEntityClick={onEntityClick}
+            displayMode={displayMode}
             className="text-stone-200 text-xl leading-relaxed tracking-wide font-serif space-y-4"
           />
         )

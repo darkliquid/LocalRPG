@@ -494,6 +494,7 @@ export const App: React.FC = () => {
                         segments={[{ kind: 'narration', text: streamedProse }]}
                         fallback={streamedProse}
                         onEntityClick={handleOpenWikilink}
+                        displayMode={config?.media.tts.speech_cues?.display_mode}
                       />
                     </div>
                   ) : (
@@ -554,6 +555,7 @@ export const App: React.FC = () => {
                     turnInFlight={turnInFlight}
                     pendingAction={pendingAction}
                     streamedProse={streamedProse}
+                    displayMode={config?.media.tts.speech_cues?.display_mode}
                   />
                 </>
               )}

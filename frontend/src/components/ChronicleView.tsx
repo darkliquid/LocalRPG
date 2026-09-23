@@ -22,6 +22,7 @@ interface ChronicleViewProps {
   turnInFlight?: boolean;
   pendingAction?: PendingAction | null;
   streamedProse?: string;
+  displayMode?: 'stage_directions' | 'hidden' | 'raw';
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
@@ -38,6 +39,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   turnInFlight,
   pendingAction,
   streamedProse,
+  displayMode,
 }) => {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -108,6 +110,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               segments={turn.segments}
               fallback={turn.prose}
               onEntityClick={onWikilinkClick}
+              displayMode={displayMode}
               // Only the newest turn narrates itself: autoplaying every turn would
               // start them all at once on load.
               autoPlay={autoPlay && index === beats.length - 1}
@@ -218,6 +221,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               segments={[{ kind: 'narration', text: streamedProse }]}
               fallback={streamedProse}
               onEntityClick={onWikilinkClick}
+              displayMode={displayMode}
             />
           ) : (
             <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 text-stone-300 text-sm animate-pulse">
