@@ -527,11 +527,12 @@ func TestToolLoopWithdrawsToolsUnderBudget(t *testing.T) {
 		{tools: []harness.ToolCall{{ID: "1", Name: "search_entities", Arguments: `{"query":"warden"}`}}},
 		{text: "Answering from what I have."},
 	}}
-	executor := &fakeExecutor{results: []string{"a result long enough to matter"}}
+	executor := &fakeExecutor{results: []string{strings.Repeat("x", 500000)}}
 	orchestrator, _ := toolLoopOrchestrator(t, provider)
 	orchestrator.SetTools(executor, "yes")
-	// A tiny budget is crossed by the tool result, so the next round withdraws.
-	orchestrator.SetContextLimits(harness.ContextLimits{TokenBudget: 1})
+	// The prompt fits, but the oversized tool result crosses the budget, so the
+	// next round withdraws tools.
+	orchestrator.SetContextLimits(harness.ContextLimits{TokenBudget: 100000})
 
 	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "who guards the gate?", nil)
 	if err != nil {
@@ -625,7 +626,11 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, contextPrompt,
 	for round := 0; round <= o.toolRoundCap(); round++ {
 		offerTools := canCallTools && round < o.toolRoundCap() && !withdrawn && !o.overBudget(messages)
 
-		request := harness.GenerateRequest{Messages: messages}
+		// Prompt is kept for a caller or provider that only reads a string: it is
+		// the assembled context, exactly as the single-prompt path sent it, so
+		// existing behaviour and tests are unchanged. A provider that can call
+		// tools reads Messages instead.
+		request := harness.GenerateRequest{Messages: messages, Prompt: contextPrompt}
 		if offerTools {
 			request.Tools = harness.ToolSpecs()
 		}

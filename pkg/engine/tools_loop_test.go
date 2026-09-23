@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -100,5 +101,115 @@ func TestToolCapabilityResolution(t *testing.T) {
 				t.Errorf("offersTools = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestToolLoopRunsACallThenAnswers(t *testing.T) {
+	provider := &toolScriptProvider{replies: []toolReply{
+		{text: "let me check", tools: []harness.ToolCall{{ID: "1", Name: "search_entities", Arguments: `{"query":"warden"}`}}},
+		{text: "The Warden keeps the eastern gate."},
+	}}
+	executor := &fakeExecutor{results: []string{"The Warden (character, id warden): a grim guard."}}
+	orchestrator, timeline := toolLoopOrchestrator(t, provider)
+	orchestrator.SetTools(executor, "yes")
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "who guards the gate?", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+	if turn.Narration != "The Warden keeps the eastern gate." {
+		t.Errorf("Narration = %q", turn.Narration)
+	}
+	if len(executor.calls) != 1 || executor.calls[0].Name != "search_entities" {
+		t.Errorf("executor calls = %+v", executor.calls)
+	}
+
+	// The second call must carry the tool result as a tool message.
+	provider.mu.Lock()
+	last := provider.requests[len(provider.requests)-1]
+	provider.mu.Unlock()
+	found := false
+	for _, message := range last.Messages {
+		if message.Role == "tool" && message.ToolCallID == "1" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the second request did not carry the tool result: %+v", last.Messages)
+	}
+
+	if turns, err := timeline.history.LoadHistory(); err != nil || len(turns) != 1 {
+		t.Errorf("recorded turns = %d, err = %v", len(turns), err)
+	}
+}
+
+func TestToolLoopStopsAtTheRoundLimit(t *testing.T) {
+	always := make([]toolReply, 0, 8)
+	for i := 0; i < 8; i++ {
+		always = append(always, toolReply{tools: []harness.ToolCall{{ID: "1", Name: "search_entities", Arguments: `{}`}}})
+	}
+	provider := &toolScriptProvider{replies: always}
+	executor := &fakeExecutor{}
+	orchestrator, _ := toolLoopOrchestrator(t, provider)
+	orchestrator.SetTools(executor, "yes")
+	orchestrator.SetToolRounds(2)
+
+	// Every round asks for a tool, so the loop runs out and the turn fails for
+	// want of narration rather than looping forever.
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Do", "keep looking", nil); err == nil {
+		t.Fatalf("expected the turn to fail when no narration was ever produced")
+	}
+	if len(executor.calls) != 2 {
+		t.Errorf("executed %d calls, want the round cap of 2", len(executor.calls))
+	}
+}
+
+func TestToolLoopWithdrawsToolsUnderBudget(t *testing.T) {
+	provider := &toolScriptProvider{replies: []toolReply{
+		{tools: []harness.ToolCall{{ID: "1", Name: "search_entities", Arguments: `{"query":"warden"}`}}},
+		{text: "Answering from what I have."},
+	}}
+	executor := &fakeExecutor{results: []string{strings.Repeat("x", 500000)}}
+	orchestrator, _ := toolLoopOrchestrator(t, provider)
+	orchestrator.SetTools(executor, "yes")
+	// The prompt fits, but the oversized tool result crosses the budget, so the
+	// next round withdraws tools.
+	orchestrator.SetContextLimits(harness.ContextLimits{TokenBudget: 100000})
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "who guards the gate?", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+	if turn.Narration == "" {
+		t.Errorf("expected an answer from what the model had")
+	}
+
+	provider.mu.Lock()
+	last := provider.requests[len(provider.requests)-1]
+	provider.mu.Unlock()
+	if len(last.Tools) != 0 {
+		t.Errorf("the withdrawn round must be sent without tools")
+	}
+	withdrawn := false
+	for _, message := range last.Messages {
+		if message.Role == "tool" && len(message.Content) > 0 && message.ToolCallID == "" {
+			withdrawn = true
+		}
+	}
+	if !withdrawn {
+		t.Errorf("the refusal must be a readable tool result: %+v", last.Messages)
+	}
+}
+
+func TestToolLoopWithoutToolsIsUnchanged(t *testing.T) {
+	provider := &toolScriptProvider{replies: []toolReply{{text: "The gate stands open."}}}
+	orchestrator, _ := toolLoopOrchestrator(t, provider)
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I look", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+	if turn.Narration != "The gate stands open." {
+		t.Errorf("Narration = %q", turn.Narration)
 	}
 }

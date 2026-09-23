@@ -524,7 +524,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
 	}
 
-	result, err := o.generate(ctx, contextPrompt, onChunk)
+	result, err := o.runGenerationLoop(ctx, contextPrompt, onChunk)
 	if err != nil {
 		return nil, fmt.Errorf("gm generation failed: %w", err)
 	}
@@ -792,6 +792,157 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 		return o.stream(ctx, fallback, req, onChunk)
 	}
 	return result, err
+}
+
+// runGenerationLoop runs the turn as a bounded conversation. It offers tools only
+// while the role can call them, the rounds are not spent, and the conversation is
+// within budget; otherwise the model is told tools are unavailable and asked to
+// answer. The result is the last reply that carried no tool calls. With no
+// executor attached the loop makes exactly one call, shaped as it was before
+// tools existed, so nothing changes for a provider that cannot call them.
+func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, contextPrompt string, onChunk func(string) error) (streamResult, error) {
+	// One user turn carrying the assembled context keeps the request identical to
+	// the single-prompt path for a provider that ignores messages.
+	messages := []harness.Message{{Role: "user", Content: contextPrompt}}
+
+	provider, err := o.router.GetProviderForRole("gm")
+	if err != nil {
+		return streamResult{}, err
+	}
+	isCaller := false
+	if caller, ok := provider.(harness.ToolCaller); ok {
+		isCaller = caller.ToolCallerCapable()
+	}
+	canCallTools := o.offersTools(isCaller)
+
+	var provenance []ToolCallRecord
+	withdrawn := false
+
+	for round := 0; round <= o.toolRoundCap(); round++ {
+		offerTools := canCallTools && round < o.toolRoundCap() && !withdrawn && !o.overBudget(messages)
+
+		// Prompt is kept for a caller or provider that only reads a string: it is
+		// the assembled context, exactly as the single-prompt path sent it, so
+		// existing behaviour and tests are unchanged. A provider that can call
+		// tools reads Messages instead.
+		request := harness.GenerateRequest{Messages: messages, Prompt: contextPrompt}
+		if offerTools {
+			request.Tools = harness.ToolSpecs()
+		}
+		o.logger.Event("tool.round", map[string]interface{}{
+			"round":               round,
+			"offered":             offerTools,
+			"conversation_tokens": conversationTokens(messages),
+			"budget":              o.contextBudget(),
+		})
+
+		result, err := o.generateRequest(ctx, request, onChunk)
+		if err != nil {
+			return streamResult{}, err
+		}
+
+		// A reply carrying calls while tools were not offered is a protocol quirk:
+		// its text is the answer, and the calls are dropped and traced.
+		if len(result.ToolCalls) > 0 && !offerTools {
+			o.logger.Event("tool.stray", map[string]interface{}{"round": round, "calls": len(result.ToolCalls)})
+			result.ToolCalls = nil
+			result.Provenance = provenance
+			return result, nil
+		}
+		if len(result.ToolCalls) == 0 {
+			result.Provenance = provenance
+			return result, nil
+		}
+
+		// Prose in a tool round is the model thinking out loud, and its order
+		// relative to the result is undefined, so it is discarded and traced.
+		if strings.TrimSpace(result.Text) != "" {
+			o.logger.Event("tool.prose_discarded", map[string]interface{}{
+				"round": round,
+				"chars": len([]rune(result.Text)),
+			})
+		}
+
+		messages = append(messages, harness.Message{Role: "assistant", ToolCalls: result.ToolCalls})
+		for _, call := range result.ToolCalls {
+			o.logger.Event("tool.call", map[string]interface{}{
+				"round":           round,
+				"name":            call.Name,
+				"arguments":       call.Arguments,
+				"arguments_chars": len([]rune(call.Arguments)),
+			})
+			o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "running"})
+
+			started := time.Now()
+			output, ok := o.toolExecutor.Execute(ctx, call)
+			o.logger.Event("tool.result", map[string]interface{}{
+				"name":        call.Name,
+				"ok":          ok,
+				"bytes":       len(output),
+				"duration_ms": time.Since(started).Milliseconds(),
+				"result":      output,
+			})
+			o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "done", Summary: toolSummary(ok, output)})
+
+			provenance = append(provenance, ToolCallRecord{Name: call.Name, ResultChars: len([]rune(output))})
+			messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: output})
+		}
+
+		// After the final allowed round, or once the budget is crossed, tools are
+		// withdrawn and the model is told so as a readable result rather than a
+		// silent stop it would retry.
+		if round+1 > o.toolRoundCap() || o.overBudget(messages) {
+			withdrawn = true
+			messages = append(messages, harness.Message{
+				Role:    "tool",
+				Content: "Tools are no longer available for this turn. Answer now with what you already know.",
+			})
+		}
+	}
+
+	return streamResult{}, fmt.Errorf("tool loop ended without an answer")
+}
+
+// notifyTool reports activity if a client asked to see it.
+func (o *TurnOrchestrator) notifyTool(activity ToolActivity) {
+	if o.toolObserver != nil {
+		o.toolObserver(activity)
+	}
+}
+
+// toolSummary is the short human line a client renders.
+func toolSummary(ok bool, output string) string {
+	if !ok {
+		return "failed"
+	}
+	if len(output) == 0 {
+		return "no result"
+	}
+	return fmt.Sprintf("%d characters", len([]rune(output)))
+}
+
+// conversationTokens estimates the live conversation's size. Four runes per token
+// is deliberately crude: the budget is a guardrail, not an accounting ledger.
+func conversationTokens(messages []harness.Message) int {
+	runes := 0
+	for _, message := range messages {
+		runes += len([]rune(message.Content))
+	}
+	return runes / 4
+}
+
+// contextBudget is the configured token ceiling, or 0 for unbounded.
+func (o *TurnOrchestrator) contextBudget() int {
+	return o.assembler.Limits().TokenBudget
+}
+
+// overBudget reports whether the live conversation has crossed the budget.
+func (o *TurnOrchestrator) overBudget(messages []harness.Message) bool {
+	budget := o.contextBudget()
+	if budget <= 0 {
+		return false
+	}
+	return conversationTokens(messages) > budget
 }
 
 func segmentKinds(segments []entity.TurnSegment) []string {
