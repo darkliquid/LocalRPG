@@ -98,6 +98,18 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	action := parts[1]
 
 	switch action {
+	case "tts":
+		if len(parts) < 3 || parts[2] != "uncached" || r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		cached, uncached, err := s.service.CountUncachedBeats(gameID)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, map[string]int{"cached": cached, "uncached": uncached})
+
 	case "restart":
 		if r.Method != http.MethodPost {
 			http.NotFound(w, r)

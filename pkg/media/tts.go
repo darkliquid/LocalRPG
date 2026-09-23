@@ -125,24 +125,13 @@ func (p *TTSPipeline) SynthesizeSegments(ctx context.Context, segments []entity.
 	return clips, nil
 }
 
-// SynthesizeSegment renders one segment: narration and unresolved speech read in
-// the narrator voice, resolved speech in the speaker's own. Legacy records carry a
-// speaker name but no entity ID, so the name is tried as a voice key too.
-func (p *TTSPipeline) SynthesizeSegment(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (string, error) {
-	spoken := SpeakableTextFor(p.policy, p.client, segment.Text)
-	if strings.TrimSpace(spoken) == "" {
-		return "", ErrNoSpeakableText
-	}
-	if spoken != segment.Text {
-		p.logger = trace.OrNil(p.logger)
-		p.logger.Event("media.tts.reduced", map[string]interface{}{
-			"chars_raw":    len([]rune(segment.Text)),
-			"chars_spoken": len([]rune(spoken)),
-		})
-	}
-
-	voice := narratorVoice
-	speakerID := narratorSpeaker
+// prepareSegment resolves who reads a segment and in what voice, without
+// synthesising. Both synthesis and the uncached count use it, so the two can
+// never disagree about which clip a segment needs.
+func (p *TTSPipeline) prepareSegment(segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (speakerID string, voice *entity.VoiceConfig, spoken string) {
+	spoken = SpeakableTextFor(p.policy, p.client, segment.Text)
+	voice = narratorVoice
+	speakerID = narratorSpeaker
 
 	if segment.Kind == entity.SegmentSpeech {
 		speakerID = segment.SpeakerID
@@ -158,8 +147,43 @@ func (p *TTSPipeline) SynthesizeSegment(ctx context.Context, segment entity.Turn
 			}
 		}
 	}
+	return speakerID, voice, spoken
+}
 
+// SynthesizeSegment renders one segment: narration and unresolved speech read in
+// the narrator voice, resolved speech in the speaker's own. Legacy records carry a
+// speaker name but no entity ID, so the name is tried as a voice key too.
+func (p *TTSPipeline) SynthesizeSegment(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (string, error) {
+	speakerID, voice, spoken := p.prepareSegment(segment, narratorVoice, voiceFor)
+	if strings.TrimSpace(spoken) == "" {
+		return "", ErrNoSpeakableText
+	}
+	if spoken != segment.Text {
+		p.logger = trace.OrNil(p.logger)
+		p.logger.Event("media.tts.reduced", map[string]interface{}{
+			"chars_raw":    len([]rune(segment.Text)),
+			"chars_spoken": len([]rune(spoken)),
+		})
+	}
 	return p.SynthesizeUtterance(ctx, speakerID, voice, spoken)
+}
+
+// CountUncached reports how many speakable segments already have a clip and how
+// many would need synthesis, so a bulk operation can warn before spending money
+// on a metered provider. It mutates nothing.
+func (p *TTSPipeline) CountUncached(segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (cached, uncached int) {
+	for _, segment := range segments {
+		speakerID, voice, spoken := p.prepareSegment(segment, narratorVoice, voiceFor)
+		if strings.TrimSpace(spoken) == "" {
+			continue
+		}
+		if _, ok := p.cachedClip(ComputeAudioCacheKeyForVoice(speakerID, voice, spoken)); ok {
+			cached++
+		} else {
+			uncached++
+		}
+	}
+	return cached, uncached
 }
 
 func NewTTSPipeline(client TTSClient, cache *ContentCache) *TTSPipeline {

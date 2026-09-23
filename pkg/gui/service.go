@@ -1427,6 +1427,42 @@ func (s *Service) StopAudio() {
 	}
 }
 
+// CountUncachedBeats reports how much of a campaign's speech is already cached,
+// so a bulk synthesis can warn before spending money on a metered provider.
+func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err error) {
+	cfg := s.configMgr.Get()
+	client, err := s.ttsClientFor(cfg.Media.TTS)
+	if err != nil {
+		return 0, 0, fmt.Errorf("build tts client: %w", err)
+	}
+
+	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
+	turns, err := engine.NewHistoryLogger(historyPath).LoadHistory()
+	if err != nil {
+		return 0, 0, fmt.Errorf("load history: %w", err)
+	}
+
+	narratorVoice := &entity.VoiceConfig{
+		VoiceID:    cfg.Media.TTS.DefaultVoice,
+		Pitch:      cfg.Media.TTS.Pitch,
+		SpeechRate: cfg.Media.TTS.SpeechRate,
+		Options:    cfg.Media.TTS.Options,
+	}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
+	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
+
+	voiceFor := s.voiceFor(gameID)
+	for _, turn := range turns {
+		if len(turn.Segments) == 0 {
+			continue
+		}
+		turnCached, turnUncached := pipeline.CountUncached(turn.Segments, narratorVoice, voiceFor)
+		cached += turnCached
+		uncached += turnUncached
+	}
+	return cached, uncached, nil
+}
+
 // findTurn reads one turn from the canonical log.
 func (s *Service) findTurn(gameID string, turnNumber int) (*engine.Turn, error) {
 	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
