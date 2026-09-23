@@ -223,6 +223,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     config.media.tts.type === 'builtin' &&
     (config.media.tts.builtin_name === 'sherpa-onnx' || config.media.tts.builtin_name === 'kokoro');
   const kokoroStatus = models.find((m) => m.id === 'kokoro-tts');
+  const isGeminiTTS =
+    config.media.tts.type === 'gemini' ||
+    (config.media.tts.type === 'builtin' && config.media.tts.builtin_name === 'gemini');
 
   const updateRole = (updated: AgentRoleConfig) => {
     setConfig({
@@ -1340,12 +1343,31 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                               model: config.media.tts.model || 'eleven_multilingual_v2',
                               default_voice: config.media.tts.default_voice || 'EXAVITQu4vr4xnSDxMaL',
                             }
+                          : builtinName === 'gemini'
+                          ? {
+                              model: config.media.tts.model || 'gemini-3.1-flash-tts-preview',
+                              default_voice: config.media.tts.default_voice || 'Aoede',
+                            }
                           : {};
                       setConfig({
                         ...config,
                         media: {
                           ...config.media,
                           tts: { ...config.media.tts, ...builtinDefaults, type: 'builtin', builtin_name: builtinName },
+                        },
+                      });
+                    } else if (val === 'gemini') {
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          tts: {
+                            ...config.media.tts,
+                            type: 'gemini',
+                            builtin_name: undefined,
+                            model: config.media.tts.model || 'gemini-3.1-flash-tts-preview',
+                            default_voice: config.media.tts.default_voice || 'Aoede',
+                          },
                         },
                       });
                     } else {
@@ -1361,6 +1383,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
+                  <option value="gemini">Google Gemini TTS (Cloud, metered)</option>
+                  <option value="builtin:gemini">Built-in: Google Gemini TTS (Cloud, metered)</option>
                   <option value="builtin:sherpa-onnx">Built-in: Sherpa-ONNX (Kokoro Neural Voice)</option>
                   <option value="builtin:native-os">Built-in: Native OS Speech (spd-say / SAPI / procedural)</option>
                   <option value="builtin:elevenlabs">Built-in: ElevenLabs (Cloud, metered)</option>
@@ -1478,6 +1502,49 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             )}
 
+            {isGeminiTTS && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300">Gemini TTS Model</label>
+                <input
+                  type="text"
+                  placeholder="e.g. gemini-3.1-flash-tts-preview"
+                  value={config.media.tts.model || 'gemini-3.1-flash-tts-preview'}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      media: { ...config.media, tts: { ...config.media.tts, model: e.target.value } },
+                    })
+                  }
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[
+                    { id: 'gemini-3.1-flash-tts-preview', label: '3.1 Flash TTS' },
+                    { id: 'gemini-2.5-flash-preview-tts', label: '2.5 Flash TTS' },
+                    { id: 'gemini-2.5-pro-preview-tts', label: '2.5 Pro TTS' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, tts: { ...config.media.tts, model: m.id } },
+                        })
+                      }
+                      className={`text-[11px] px-2.5 py-1 rounded-lg border font-mono transition cursor-pointer ${
+                        (config.media.tts.model || 'gemini-3.1-flash-tts-preview') === m.id
+                          ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
+                          : 'bg-stone-900/60 border-stone-800 text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {inspect?.metered && (
               <div className="flex items-center gap-2 text-[11px] font-mono text-amber-400/90">
                 <span className="px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10">METERED</span>
@@ -1487,30 +1554,43 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
             {inspect?.key_required && !inspect.key_present && (
               <div className="text-[11px] font-mono text-stone-400">
-                No API key configured. Enter one below, or set ELEVENLABS_API_KEY in the environment.
+                {isGeminiTTS
+                  ? 'No Gemini API key configured. Enter one below, or set GEMINI_API_KEY / GOOGLE_API_KEY in the environment.'
+                  : 'No API key configured. Enter one below, or set ELEVENLABS_API_KEY in the environment.'}
               </div>
             )}
 
-              {inspect?.key_required && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase text-stone-300">API Key</label>
-                  <input
-                    type="password"
-                    placeholder="Leave empty to use the provider's environment variable"
-                    value={config.media.tts.api_key || ''}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        media: { ...config.media, tts: { ...config.media.tts, api_key: e.target.value } },
-                      })
-                    }
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
-                  />
-                  <p className="text-[11px] text-stone-500">
-                    Stored in your configuration file. Set ELEVENLABS_API_KEY instead to keep it off disk.
-                  </p>
-                </div>
-              )}
+            {inspect?.key_required && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                  <span>API Key</span>
+                  {isGeminiTTS && config.providers?.gemini?.api_key && !config.media.tts.api_key && (
+                    <span className="text-[11px] text-emerald-400 font-mono">Using shared Gemini key</span>
+                  )}
+                </label>
+                <input
+                  type="password"
+                  placeholder={
+                    isGeminiTTS && config.providers?.gemini?.api_key
+                      ? 'Using shared key from providers.gemini.api_key'
+                      : "Leave empty to use the provider's environment variable"
+                  }
+                  value={config.media.tts.api_key || ''}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      media: { ...config.media, tts: { ...config.media.tts, api_key: e.target.value } },
+                    })
+                  }
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                />
+                <p className="text-[11px] text-stone-500">
+                  {isGeminiTTS
+                    ? 'Stored in your configuration file. Set GEMINI_API_KEY instead to keep it off disk.'
+                    : 'Stored in your configuration file. Set ELEVENLABS_API_KEY instead to keep it off disk.'}
+                </p>
+              </div>
+            )}
 
             {inspect && inspect.options && inspect.options.length > 0 && (
               <div className="p-3 rounded-lg bg-stone-950/70 border border-stone-800/80 space-y-2">
