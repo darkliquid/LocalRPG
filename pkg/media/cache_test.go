@@ -1,6 +1,7 @@
 package media
 
 import (
+	"context"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -100,4 +101,25 @@ func TestComputeAudioCacheKeyForVoice(t *testing.T) {
 			t.Errorf("expected the provider to separate the keys")
 		}
 	})
+}
+
+func TestPipelineKeyFollowsVoiceOptions(t *testing.T) {
+	cache := NewContentCache(t.TempDir())
+	pipeline := NewTTSPipeline(&echoTTSClient{}, cache)
+
+	low := &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]interface{}{"stability": 0.35}}
+	high := &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]interface{}{"stability": 0.8}}
+
+	lowKey := ComputeAudioCacheKeyForVoice("speaker", low, "hello")
+	highKey := ComputeAudioCacheKeyForVoice("speaker", high, "hello")
+
+	if _, err := pipeline.SynthesizeUtterance(context.Background(), "speaker", low, "hello"); err != nil {
+		t.Fatalf("SynthesizeUtterance: %v", err)
+	}
+	if !cache.Exists("audio", lowKey+".wav") && !cache.Exists("audio", lowKey+".mp3") {
+		t.Errorf("expected a clip stored under the low-options key %q", lowKey)
+	}
+	if cache.Exists("audio", highKey+".wav") || cache.Exists("audio", highKey+".mp3") {
+		t.Errorf("a second options set must not share the first clip")
+	}
 }

@@ -250,19 +250,17 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, a
 		if audioAvailable {
 			// The ref is what the synthesis pipeline uses to find a voice, so the
 			// same value is used here to derive a voice-sensitive version token. A
-			// changed voice changes the URL, which keeps the browser from serving a
-			// clip read in the previous voice.
+			// changed voice or provider option changes the URL, which keeps the
+			// browser from serving a clip read under the previous tuning.
 			ref := segment.SpeakerID
 			if ref == "" {
 				ref = segment.Speaker
 			}
-			voiceID, pitch, rate := "", 0.0, 0.0
+			var voice *entity.VoiceConfig
 			if voiceFor != nil {
-				if v := voiceFor(ref); v != nil {
-					voiceID, pitch, rate = v.VoiceID, v.Pitch, v.SpeechRate
-				}
+				voice = voiceFor(ref)
 			}
-			key := media.ComputeAudioCacheKeyWithRate(ref, voiceID, pitch, rate, segment.Text)
+			key := media.ComputeAudioCacheKeyForVoice(ref, voice, segment.Text)
 			dto.AudioKey = key
 			dto.AudioURL = fmt.Sprintf("/api/game/%s/turn/%d/segment/%d/audio?v=%s", gameID, turnNumber, i, key[:12])
 		}

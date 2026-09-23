@@ -170,12 +170,7 @@ func NewTTSPipeline(client TTSClient, cache *ContentCache) *TTSPipeline {
 }
 
 func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string, voice *entity.VoiceConfig, text string) (string, error) {
-	voiceHash := "default"
-	if voice != nil {
-		voiceHash = fmt.Sprintf("%s:%s:%.2f:%.2f", voice.Provider, voice.VoiceID, voice.Pitch, voice.SpeechRate)
-	}
-
-	base := ComputeAudioCacheKey(speakerID, voiceHash, text)
+	base := ComputeAudioCacheKeyForVoice(speakerID, voice, text)
 	start := time.Now()
 
 	voiceID, pitch, rate := "", 0.0, 0.0

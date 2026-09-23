@@ -1028,3 +1028,23 @@ func TestResolvedThreadsAreNotOpen(t *testing.T) {
 		t.Errorf("expected no open threads, got %+v", recap.Threads)
 	}
 }
+
+func TestSegmentDTOKeysFollowVoiceOptions(t *testing.T) {
+	voices := map[string]*entity.VoiceConfig{
+		"aldric": {VoiceID: "af_bella", Options: map[string]interface{}{"stability": 0.35}},
+	}
+	voiceFor := func(ref string) *entity.VoiceConfig { return voices[ref] }
+
+	segments := []entity.TurnSegment{{Kind: entity.SegmentSpeech, SpeakerID: "aldric", Text: "Hello there."}}
+	before := segmentDTOs(segments, "campaign", 1, true, func(name string) string { return name }, voiceFor)
+
+	voices["aldric"] = &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]interface{}{"stability": 0.8}}
+	after := segmentDTOs(segments, "campaign", 1, true, func(name string) string { return name }, voiceFor)
+
+	if before[0].AudioKey == after[0].AudioKey {
+		t.Errorf("expected a changed option to change the value token")
+	}
+	if before[0].AudioURL == after[0].AudioURL {
+		t.Errorf("expected a changed option to change the audio URL")
+	}
+}
