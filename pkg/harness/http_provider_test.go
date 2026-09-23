@@ -244,3 +244,105 @@ func TestHTTPProviderHonoursTheChunkLimit(t *testing.T) {
 		t.Errorf("wire events = %d, want the configured limit of 3", wire)
 	}
 }
+
+func TestHTTPProviderAccumulatesStreamedToolCalls(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if _, ok := body["tools"]; !ok {
+			t.Errorf("expected a tools field, got %v", body)
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		frames := []string{
+			`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"search_entities","arguments":"{\"que"}}]}}]}`,
+			`{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"ry\":\"Kae"}}]}}]}`,
+			`{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"l\"}"}}]},"finish_reason":"tool_calls"}]}`,
+		}
+		for _, frame := range frames {
+			fmt.Fprintf(w, "data: %s\n\n", frame)
+		}
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	t.Cleanup(server.Close)
+
+	provider := NewHTTPProvider("gm", server.URL, "test", "")
+	provider.logger = trace.Nop()
+
+	out := make(chan StreamChunk, 20)
+	var calls []ToolCall
+	done := make(chan struct{})
+	go func() {
+		for chunk := range out {
+			if len(chunk.ToolCalls) > 0 {
+				calls = chunk.ToolCalls
+			}
+		}
+		close(done)
+	}()
+
+	req := GenerateRequest{
+		Messages: []Message{{Role: "user", Content: "who is Kael?"}},
+		Tools:    []ToolSpec{{Name: "search_entities", Description: "search", Parameters: map[string]interface{}{"type": "object"}}},
+	}
+	if err := provider.Stream(context.Background(), req, out); err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	<-done
+
+	if len(calls) != 1 {
+		t.Fatalf("calls = %+v, want one assembled call", calls)
+	}
+	if calls[0].ID != "call_1" || calls[0].Name != "search_entities" {
+		t.Errorf("call = %+v", calls[0])
+	}
+	if calls[0].Arguments != `{"query":"Kael"}` {
+		t.Errorf("arguments = %q, want the reassembled JSON", calls[0].Arguments)
+	}
+}
+
+func TestHTTPProviderDegradesOnceWhenToolsAreRejected(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if _, ok := body["tools"]; ok {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, `{"error":"unknown field tools"}`)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Fine.\"},\"finish_reason\":\"stop\"}]}\n\n")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	t.Cleanup(server.Close)
+
+	provider := NewHTTPProvider("gm", server.URL, "test", "")
+	memory := trace.NewMemory(trace.LevelFull)
+	provider.SetLogger(memory)
+
+	out := make(chan StreamChunk, 20)
+	go func() {
+		for range out {
+		}
+	}()
+
+	req := GenerateRequest{
+		Messages: []Message{{Role: "user", Content: "hello"}},
+		Tools:    []ToolSpec{{Name: "search_entities"}},
+	}
+	if err := provider.Stream(context.Background(), req, out); err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	if attempts != 2 {
+		t.Errorf("attempts = %d, want one retry without tools", attempts)
+	}
+	event, ok := memory.Find("provider.tools")
+	if !ok {
+		t.Fatalf("expected a provider.tools trace event")
+	}
+	if event.Fields["rejected"] != true {
+		t.Errorf("rejected = %v, want true", event.Fields["rejected"])
+	}
+}

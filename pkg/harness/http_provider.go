@@ -70,26 +70,97 @@ func (h *HTTPProvider) ID() string {
 }
 
 type openAIChatRequest struct {
-	Model       string          `json:"model"`
-	Messages    []openAIMessage `json:"messages"`
-	Stream      bool            `json:"stream"`
-	Temperature float64         `json:"temperature,omitempty"`
-	MaxTokens   int             `json:"max_tokens,omitempty"`
-	Stop        []string        `json:"stop,omitempty"`
+	Model       string           `json:"model"`
+	Messages    []openAIMessage  `json:"messages"`
+	Stream      bool             `json:"stream"`
+	Temperature float64          `json:"temperature,omitempty"`
+	MaxTokens   int              `json:"max_tokens,omitempty"`
+	Stop        []string         `json:"stop,omitempty"`
+	Tools       []openAIToolSpec `json:"tools,omitempty"`
+}
+
+type openAIToolSpec struct {
+	Type     string             `json:"type"`
+	Function openAIFunctionSpec `json:"function"`
+}
+
+type openAIFunctionSpec struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Parameters  map[string]interface{} `json:"parameters,omitempty"`
 }
 
 type openAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string           `json:"role"`
+	Content    string           `json:"content,omitempty"`
+	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string           `json:"tool_call_id,omitempty"`
+}
+
+type openAIToolCall struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
 }
 
 type openAIChatChunk struct {
 	Choices []struct {
 		Delta struct {
-			Content string `json:"content"`
+			Content   string `json:"content"`
+			ToolCalls []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id"`
+				Type     string `json:"type"`
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
 		} `json:"delta"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
+}
+
+// toolCallAccumulator reassembles streamed tool calls. Arguments arrive split
+// across frames and are identified only by index, so the engine is handed whole
+// calls and never a vendor's fragment format.
+type toolCallAccumulator struct {
+	order []int
+	calls map[int]*ToolCall
+}
+
+func newToolCallAccumulator() *toolCallAccumulator {
+	return &toolCallAccumulator{calls: make(map[int]*ToolCall)}
+}
+
+func (a *toolCallAccumulator) add(index int, id, name, arguments string) {
+	call, ok := a.calls[index]
+	if !ok {
+		call = &ToolCall{}
+		a.calls[index] = call
+		a.order = append(a.order, index)
+	}
+	if id != "" {
+		call.ID = id
+	}
+	if name != "" {
+		call.Name = name
+	}
+	call.Arguments += arguments
+}
+
+func (a *toolCallAccumulator) result() []ToolCall {
+	if len(a.order) == 0 {
+		return nil
+	}
+	calls := make([]ToolCall, 0, len(a.order))
+	for _, index := range a.order {
+		calls = append(calls, *a.calls[index])
+	}
+	return calls
 }
 
 func (h *HTTPProvider) Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
@@ -117,12 +188,16 @@ func (h *HTTPProvider) Generate(ctx context.Context, req GenerateRequest) (*Gene
 
 func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error {
 	defer close(out)
+	return h.streamOnce(ctx, req, out, true)
+}
 
-	messages := make([]openAIMessage, 0, 2)
-	if req.System != "" {
-		messages = append(messages, openAIMessage{Role: "system", Content: req.System})
-	}
-	messages = append(messages, openAIMessage{Role: "user", Content: req.Prompt})
+// streamOnce sends one request. When a server rejects the tools field it is
+// retried once without it, because a rejection is a provider limitation rather
+// than a turn failure; the trace records why. The channel is closed by Stream, so
+// a retry cannot close it twice.
+func (h *HTTPProvider) streamOnce(ctx context.Context, req GenerateRequest, out chan<- StreamChunk, allowTools bool) error {
+	messages := h.buildMessages(req)
+	tools := h.buildTools(req, allowTools)
 
 	temperature := req.Temperature
 	if temperature == 0 {
@@ -140,6 +215,7 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 		Temperature: temperature,
 		MaxTokens:   maxTokens,
 		Stop:        h.opts.Stop,
+		Tools:       tools,
 	}
 
 	data, err := json.Marshal(payload)
@@ -165,8 +241,9 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 		"max_tokens":    maxTokens,
 		"stream":        true,
 		"auth_set":      h.apiKey != "",
-		"prompt_sha256": hashPrompt(req.Prompt),
-		"prompt_chars":  len([]rune(req.Prompt)),
+		"prompt_sha256": hashPrompt(req.PromptText()),
+		"prompt_chars":  len([]rune(req.PromptText())),
+		"tools":         len(tools),
 	})
 
 	url := h.endpoint
@@ -198,10 +275,21 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 			"status": resp.Status,
 			"url":    url,
 		})
+		if allowTools && len(req.Tools) > 0 && resp.StatusCode == http.StatusBadRequest {
+			resp.Body.Close()
+			h.logger.Event("provider.tools", map[string]interface{}{
+				"role":     h.id,
+				"offered":  len(req.Tools),
+				"rejected": true,
+				"reason":   "the provider rejected the tools field",
+			})
+			return h.streamOnce(ctx, req, out, false)
+		}
 		return fmt.Errorf("http error %s from %s", resp.Status, url)
 	}
 
 	var finishReason string
+	accumulator := newToolCallAccumulator()
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -228,6 +316,9 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 			continue
 		}
 		if len(chunk.Choices) > 0 {
+			for _, call := range chunk.Choices[0].Delta.ToolCalls {
+				accumulator.add(call.Index, call.ID, call.Function.Name, call.Function.Arguments)
+			}
 			if chunk.Choices[0].Delta.Content != "" {
 				if firstToken == 0 {
 					firstToken = time.Since(start)
@@ -257,8 +348,51 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 		"chunks":         chunkCount,
 		"bytes":          byteCount,
 	})
-	out <- StreamChunk{Done: true, FinishReason: finishReason}
+	out <- StreamChunk{Done: true, FinishReason: finishReason, ToolCalls: accumulator.result()}
 	return nil
+}
+
+// buildMessages maps a request onto the wire's message shape. Messages win when
+// set; otherwise the request's Prompt is sent as one user turn, which is what
+// every caller did before the contract grew a conversation.
+func (h *HTTPProvider) buildMessages(req GenerateRequest) []openAIMessage {
+	if len(req.Messages) == 0 {
+		messages := make([]openAIMessage, 0, 2)
+		if req.System != "" {
+			messages = append(messages, openAIMessage{Role: "system", Content: req.System})
+		}
+		messages = append(messages, openAIMessage{Role: "user", Content: req.PromptText()})
+		return messages
+	}
+
+	messages := make([]openAIMessage, 0, len(req.Messages))
+	for _, message := range req.Messages {
+		mapped := openAIMessage{Role: message.Role, Content: message.Content, ToolCallID: message.ToolCallID}
+		for _, call := range message.ToolCalls {
+			wire := openAIToolCall{ID: call.ID, Type: "function"}
+			wire.Function.Name = call.Name
+			wire.Function.Arguments = call.Arguments
+			mapped.ToolCalls = append(mapped.ToolCalls, wire)
+		}
+		messages = append(messages, mapped)
+	}
+	return messages
+}
+
+// buildTools maps the offered tools, or returns none when tools are not allowed.
+func (h *HTTPProvider) buildTools(req GenerateRequest, allowTools bool) []openAIToolSpec {
+	if !allowTools || len(req.Tools) == 0 {
+		return nil
+	}
+	tools := make([]openAIToolSpec, 0, len(req.Tools))
+	for _, spec := range req.Tools {
+		wire := openAIToolSpec{Type: "function"}
+		wire.Function.Name = spec.Name
+		wire.Function.Description = spec.Description
+		wire.Function.Parameters = spec.Parameters
+		tools = append(tools, wire)
+	}
+	return tools
 }
 
 // hashPrompt identifies a prompt without recording it twice. The prompt itself is
