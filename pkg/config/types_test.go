@@ -155,3 +155,66 @@ func TestSummarySettingsHaveDefaults(t *testing.T) {
 		t.Errorf("DefaultConfig().SummaryCharLimit() = %d, want 2000", got)
 	}
 }
+
+func TestCompletionSettingsHaveDefaults(t *testing.T) {
+	empty := &Config{}
+
+	if got := empty.CompletionMode(); got != "auto" {
+		t.Errorf("CompletionMode() = %q, want auto for an omitted setting", got)
+	}
+	if got := empty.CompletionAttempts(); got != 1 {
+		t.Errorf("CompletionAttempts() = %d, want 1", got)
+	}
+	if got := empty.CompletionTailChars(); got != 1500 {
+		t.Errorf("CompletionTailChars() = %d, want 1500", got)
+	}
+	if got := empty.CompletionMinChars(); got != 24 {
+		t.Errorf("CompletionMinChars() = %d, want 24", got)
+	}
+	if got := empty.CompletionTimeout(); got != 45*time.Second {
+		t.Errorf("CompletionTimeout() = %v, want 45s", got)
+	}
+
+	configured := &Config{Agents: AgentsConfig{Completion: CompletionConfig{
+		Mode:               "trim",
+		MaxAttempts:        3,
+		TailChars:          800,
+		MinIncompleteChars: 40,
+		TimeoutSeconds:     10,
+	}}}
+	if got := configured.CompletionMode(); got != "trim" {
+		t.Errorf("CompletionMode() = %q, want trim", got)
+	}
+	if got := configured.CompletionAttempts(); got != 3 {
+		t.Errorf("CompletionAttempts() = %d, want 3", got)
+	}
+	if got := configured.CompletionTailChars(); got != 800 {
+		t.Errorf("CompletionTailChars() = %d, want 800", got)
+	}
+	if got := configured.CompletionMinChars(); got != 40 {
+		t.Errorf("CompletionMinChars() = %d, want 40", got)
+	}
+	if got := configured.CompletionTimeout(); got != 10*time.Second {
+		t.Errorf("CompletionTimeout() = %v, want 10s", got)
+	}
+
+	// An unrecognised mode falls back to auto rather than silently disabling.
+	unknown := &Config{Agents: AgentsConfig{Completion: CompletionConfig{Mode: "banana"}}}
+	if got := unknown.CompletionMode(); got != "auto" {
+		t.Errorf("CompletionMode() = %q, want auto for an unknown mode", got)
+	}
+}
+
+func TestDefaultConfigCarriesCompletionKnobs(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Agents.Completion.Mode != "auto" {
+		t.Errorf("default completion mode = %q, want auto", cfg.Agents.Completion.Mode)
+	}
+	role, ok := cfg.Agents.Roles[RoleCompletion]
+	if !ok {
+		t.Fatalf("default config has no %q role", RoleCompletion)
+	}
+	if role.Type != "inherit" || role.InheritFrom != RoleGM {
+		t.Errorf("completion role = %+v, want inherit gm", role)
+	}
+}

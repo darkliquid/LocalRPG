@@ -14,9 +14,10 @@ type PathsConfig struct {
 
 // Agent role names routed by the harness router.
 const (
-	RoleGM        = "gm"
-	RoleNarrator  = "narrator"
-	RoleExtractor = "extractor"
+	RoleGM         = "gm"
+	RoleNarrator   = "narrator"
+	RoleExtractor  = "extractor"
+	RoleCompletion = "completion"
 )
 
 type AgentRoleConfig struct {
@@ -76,6 +77,24 @@ type AgentsConfig struct {
 	// ContinuityChecks runs the deterministic drift pass. A pointer distinguishes
 	// "not configured" from "switched off", because the default is on.
 	ContinuityChecks *bool `yaml:"continuity_checks" json:"continuity_checks,omitempty"`
+	// Completion governs how a narrator reply that stops mid-thought is repaired.
+	Completion CompletionConfig `yaml:"completion" json:"completion"`
+}
+
+// CompletionConfig governs how a narrator reply that stops mid-thought is
+// repaired. The zero value means "auto" with the documented defaults, so a
+// configuration written before these keys existed keeps working.
+type CompletionConfig struct {
+	// Mode is "auto", "continue", "trim", or "off". Empty means "auto".
+	Mode string `yaml:"mode,omitempty" json:"mode,omitempty"`
+	// MaxAttempts caps continuation calls per turn. Zero means one.
+	MaxAttempts int `yaml:"max_attempts,omitempty" json:"max_attempts,omitempty"`
+	// TailChars is how much of the partial reply the continuation call sees.
+	TailChars int `yaml:"tail_chars,omitempty" json:"tail_chars,omitempty"`
+	// MinIncompleteChars skips recovery for replies shorter than this.
+	MinIncompleteChars int `yaml:"min_incomplete_chars,omitempty" json:"min_incomplete_chars"`
+	// TimeoutSeconds bounds one continuation call.
+	TimeoutSeconds int `yaml:"timeout_seconds,omitempty" json:"timeout_seconds"`
 }
 
 type VoiceProfile struct {
@@ -176,6 +195,13 @@ func DefaultConfig() *Config {
 			RecentTurnCharLimit: 1200,
 			SummaryEvery:        10,
 			SummaryCharLimit:    2000,
+			Completion: CompletionConfig{
+				Mode:               "auto",
+				MaxAttempts:        1,
+				TailChars:          1500,
+				MinIncompleteChars: 24,
+				TimeoutSeconds:     45,
+			},
 			Roles: map[string]AgentRoleConfig{
 				"gm": {
 					Type:        "cli",
@@ -188,6 +214,10 @@ func DefaultConfig() *Config {
 					Type: "disabled",
 				},
 				RoleExtractor: {
+					Type:        "inherit",
+					InheritFrom: RoleGM,
+				},
+				RoleCompletion: {
 					Type:        "inherit",
 					InheritFrom: RoleGM,
 				},
@@ -423,4 +453,48 @@ func (c *Config) ThreadsMax() int {
 // ContinuityChecks runs the deterministic drift pass unless it is switched off.
 func (c *Config) ContinuityChecks() bool {
 	return c.Agents.ContinuityChecks == nil || *c.Agents.ContinuityChecks
+}
+
+// CompletionMode is the recovery policy: "auto", "continue", "trim", or "off".
+func (c *Config) CompletionMode() string {
+	mode := strings.ToLower(strings.TrimSpace(c.Agents.Completion.Mode))
+	switch mode {
+	case "auto", "continue", "trim", "off":
+		return mode
+	default:
+		return "auto"
+	}
+}
+
+// CompletionAttempts caps continuation calls per turn.
+func (c *Config) CompletionAttempts() int {
+	if c.Agents.Completion.MaxAttempts <= 0 {
+		return 1
+	}
+	return c.Agents.Completion.MaxAttempts
+}
+
+// CompletionTailChars is how much of the partial reply the continuation call sees.
+func (c *Config) CompletionTailChars() int {
+	if c.Agents.Completion.TailChars <= 0 {
+		return 1500
+	}
+	return c.Agents.Completion.TailChars
+}
+
+// CompletionMinChars is the shortest incomplete reply worth recovering.
+func (c *Config) CompletionMinChars() int {
+	if c.Agents.Completion.MinIncompleteChars <= 0 {
+		return 24
+	}
+	return c.Agents.Completion.MinIncompleteChars
+}
+
+// CompletionTimeout bounds one continuation call.
+func (c *Config) CompletionTimeout() time.Duration {
+	seconds := c.Agents.Completion.TimeoutSeconds
+	if seconds <= 0 {
+		seconds = 45
+	}
+	return time.Duration(seconds) * time.Second
 }
