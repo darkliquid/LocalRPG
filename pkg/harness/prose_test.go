@@ -68,3 +68,68 @@ func TestTrimToLastSentence(t *testing.T) {
 		t.Errorf("expected no trim, got %q", got)
 	}
 }
+
+func TestStitchContinuation(t *testing.T) {
+	cases := []struct {
+		name         string
+		existing     string
+		continuation string
+		want         string
+	}{
+		{
+			name:         "mid word cut resumes the word",
+			existing:     "The old hinge",
+			continuation: "s groan in the wind.",
+			want:         "The old hinges groan in the wind.",
+		},
+		{
+			name:         "trailing space is not doubled",
+			existing:     "The gate stands open, and the hinges groan ",
+			continuation: "in the rising wind.",
+			want:         "The gate stands open, and the hinges groan in the rising wind.",
+		},
+		{
+			name:         "sentence end joins with one space",
+			existing:     "The gate stands open.",
+			continuation: "Its hinges groan.",
+			want:         "The gate stands open. Its hinges groan.",
+		},
+		{
+			name:         "leading punctuation attaches directly",
+			existing:     "The gate stands open",
+			continuation: ", and the hinges groan.",
+			want:         "The gate stands open, and the hinges groan.",
+		},
+		{
+			name:         "overlap is removed",
+			existing:     "The gate stands open before us all and the hinges",
+			continuation: "and the hinges groan in the wind.",
+			want:         "The gate stands open before us all and the hinges groan in the wind.",
+		},
+		{
+			name:         "short overlap is ignored",
+			existing:     "The gate stands open",
+			continuation: "en and the hinges groan.",
+			want:         "The gate stands openen and the hinges groan.",
+		},
+		{
+			name:         "preamble label is dropped",
+			existing:     "The gate stands open, ",
+			continuation: "Continuation: and the hinges groan.",
+			want:         "The gate stands open, and the hinges groan.",
+		},
+		{
+			name:         "empty continuation changes nothing",
+			existing:     "The gate stands open",
+			continuation: "   ",
+			want:         "The gate stands open",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := StitchContinuation(tc.existing, tc.continuation); got != tc.want {
+				t.Errorf("StitchContinuation(%q, %q) = %q, want %q", tc.existing, tc.continuation, got, tc.want)
+			}
+		})
+	}
+}

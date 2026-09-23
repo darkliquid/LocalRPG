@@ -301,3 +301,121 @@ func isAbbreviation(prefix []rune) bool {
 	}
 	return abbreviations[token]
 }
+
+// StitchContinuation joins a continuation onto the text it resumes, removing a
+// repeated overlap and repairing the seam. It is the only place the two halves
+// are combined, so the seam rules live in one test.
+func StitchContinuation(existing, continuation string) string {
+	cont := stripContinuationPreamble(continuation)
+	if strings.TrimSpace(cont) == "" {
+		return existing
+	}
+	cont = removeOverlap(existing, cont)
+	if strings.TrimSpace(cont) == "" {
+		return existing
+	}
+	if strings.TrimSpace(existing) == "" {
+		return collapseNewlines(cont)
+	}
+
+	switch {
+	case endsWithSpace(existing):
+		return collapseNewlines(existing + strings.TrimLeft(cont, " \t\r\n"))
+	case startsWithPunctuation(cont):
+		return collapseNewlines(strings.TrimRight(existing, " \t\r\n") + cont)
+	case endsAlphanumeric(existing) && startsAlphanumeric(cont):
+		return collapseNewlines(existing + cont)
+	default:
+		return collapseNewlines(existing + " " + strings.TrimLeft(cont, " \t\r\n"))
+	}
+}
+
+// stripContinuationPreamble removes a leading artifact or label a model may add
+// even when told to output only the continuation.
+func stripContinuationPreamble(text string) string {
+	trimmed := strings.TrimLeft(text, " \t\r\n")
+	if strings.HasPrefix(trimmed, "[") {
+		if end := strings.Index(trimmed, "]"); end >= 0 {
+			trimmed = strings.TrimLeft(trimmed[end+1:], " \t\r\n")
+		}
+	}
+	for _, label := range []string{"Continuation:", "Continuing:", "Continue:"} {
+		if strings.HasPrefix(trimmed, label) {
+			return strings.TrimLeft(trimmed[len(label):], " \t\r\n")
+		}
+	}
+	return trimmed
+}
+
+// removeOverlap drops the longest suffix of existing that also prefixes the
+// continuation, when that overlap is at least eight runes. Shorter candidates
+// match too readily and are ignored.
+func removeOverlap(existing, continuation string) string {
+	existingRunes := []rune(existing)
+	contRunes := []rune(continuation)
+	limit := len(existingRunes)
+	if len(contRunes) < limit {
+		limit = len(contRunes)
+	}
+	for length := limit; length >= 8; length-- {
+		if string(existingRunes[len(existingRunes)-length:]) == string(contRunes[:length]) {
+			return string(contRunes[length:])
+		}
+	}
+	return continuation
+}
+
+// collapseNewlines bounds a run of blank lines at one, which is what a stitched
+// seam should look like.
+func collapseNewlines(text string) string {
+	var sb strings.Builder
+	newlines := 0
+	for _, r := range text {
+		if r == '\n' {
+			newlines++
+			if newlines > 2 {
+				continue
+			}
+		} else {
+			newlines = 0
+		}
+		sb.WriteRune(r)
+	}
+	return sb.String()
+}
+
+func endsWithSpace(text string) bool {
+	if text == "" {
+		return false
+	}
+	runes := []rune(text)
+	return unicode.IsSpace(runes[len(runes)-1])
+}
+
+func endsAlphanumeric(text string) bool {
+	if text == "" {
+		return false
+	}
+	runes := []rune(text)
+	return unicode.IsLetter(runes[len(runes)-1]) || unicode.IsDigit(runes[len(runes)-1])
+}
+
+func startsAlphanumeric(text string) bool {
+	if text == "" {
+		return false
+	}
+	r := []rune(text)[0]
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+func startsWithPunctuation(text string) bool {
+	if text == "" {
+		return false
+	}
+	switch []rune(text)[0] {
+	case ',', '.', ';', ':', '!', '?':
+		return true
+	default:
+		return false
+	}
+}
