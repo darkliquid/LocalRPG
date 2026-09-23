@@ -57,23 +57,31 @@ type SegmentDTO struct {
 }
 
 type TurnDTO struct {
-	TurnNumber      int          `json:"turn_number"`
-	InputText       string       `json:"input_text"`
-	Mode            string       `json:"mode"`
-	Prose           string       `json:"prose"`
-	Speaker         string       `json:"speaker,omitempty"`
-	Dialogue        string       `json:"dialogue,omitempty"`
-	ImageURL        string       `json:"image_url,omitempty"`
-	EntitiesHit     []string     `json:"entities_hit,omitempty"`
-	Segments        []SegmentDTO `json:"segments,omitempty"`
-	Outcome         string       `json:"outcome,omitempty"`
-	Truncated       bool         `json:"truncated,omitempty"`
-	Recovery        string       `json:"recovery,omitempty"`
-	ContextNotes    []string     `json:"context_notes,omitempty"`
-	ContinuityNotes []string     `json:"continuity_notes,omitempty"`
-	LocationID      string       `json:"location_id,omitempty"`
-	LocationName    string       `json:"location_name,omitempty"`
-	LocationArtURL  string       `json:"location_art_url,omitempty"`
+	TurnNumber      int           `json:"turn_number"`
+	InputText       string        `json:"input_text"`
+	Mode            string        `json:"mode"`
+	Prose           string        `json:"prose"`
+	Speaker         string        `json:"speaker,omitempty"`
+	Dialogue        string        `json:"dialogue,omitempty"`
+	ImageURL        string        `json:"image_url,omitempty"`
+	EntitiesHit     []string      `json:"entities_hit,omitempty"`
+	Segments        []SegmentDTO  `json:"segments,omitempty"`
+	Outcome         string        `json:"outcome,omitempty"`
+	Truncated       bool          `json:"truncated,omitempty"`
+	Recovery        string        `json:"recovery,omitempty"`
+	ToolCalls       []ToolCallDTO `json:"tool_calls,omitempty"`
+	ContextNotes    []string      `json:"context_notes,omitempty"`
+	ContinuityNotes []string      `json:"continuity_notes,omitempty"`
+	LocationID      string        `json:"location_id,omitempty"`
+	LocationName    string        `json:"location_name,omitempty"`
+	LocationArtURL  string        `json:"location_art_url,omitempty"`
+}
+
+// ToolCallDTO is one tool a turn called, with only its name and result size: the
+// arguments and results live in the trace.
+type ToolCallDTO struct {
+	Name        string `json:"name"`
+	ResultChars int    `json:"result_chars"`
 }
 
 type EntityDTO struct {
@@ -314,13 +322,17 @@ type TurnRequest struct {
 
 // TurnEvent is one NDJSON line sent while a turn runs.
 type TurnEvent struct {
-	Type    string   `json:"type"`                 // "chunk", "turn", "error", or "model_missing"
+	Type    string   `json:"type"`                 // "chunk", "turn", "tool", "error", or "model_missing"
 	Text    string   `json:"text,omitempty"`       // narration delta
 	Turn    *TurnDTO `json:"turn,omitempty"`       // the persisted turn
 	Message string   `json:"message,omitempty"`    // failure detail
 	ModelID string   `json:"model_id,omitempty"`   // missing model ID
 	Name    string   `json:"name,omitempty"`       // friendly model name
 	Size    int64    `json:"size_bytes,omitempty"` // model size in bytes
+	// Tool activity, present when Type is "tool".
+	ToolName    string `json:"tool_name,omitempty"`
+	ToolStatus  string `json:"tool_status,omitempty"`
+	ToolSummary string `json:"tool_summary,omitempty"`
 }
 
 // turnModes maps the mode names a client may send to the engine's casing.

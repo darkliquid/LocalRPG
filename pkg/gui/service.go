@@ -32,12 +32,12 @@ import (
 )
 
 type Service struct {
-	mu        sync.RWMutex
-	rootDir   string
-	resolver  *core.PathResolver
-	configMgr *config.ConfigManager
-	indexed   map[string]bool
-	locks     map[string]*sync.Mutex
+	mu            sync.RWMutex
+	rootDir       string
+	resolver      *core.PathResolver
+	configMgr     *config.ConfigManager
+	indexed       map[string]bool
+	locks         map[string]*sync.Mutex
 	modelsManager *models.Manager
 	// newTTSClient builds a TTS client from configuration. It is a field so a test
 	// can describe a provider without a network, and nil means the real factory.
@@ -272,8 +272,30 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, a
 	return dtos
 }
 
-// ErrAudioUnavailable is the scene package's sentinel, kept as an alias here so
-// the route and its tests read unchanged and there is only one value to compare.
+// turnToolCallDTOs renders a turn's provenance for a client.
+func turnToolCallDTOs(records []engine.ToolCallRecord) []ToolCallDTO {
+	if len(records) == 0 {
+		return nil
+	}
+	dtos := make([]ToolCallDTO, 0, len(records))
+	for _, record := range records {
+		dtos = append(dtos, ToolCallDTO{Name: record.Name, ResultChars: record.ResultChars})
+	}
+	return dtos
+}
+
+// toolEvent maps engine tool activity onto the stream's event framing, so a
+// client can render an activity line that resolves rather than a silent wait.
+func toolEvent(activity engine.ToolActivity) TurnEvent {
+	return TurnEvent{
+		Type:        "tool",
+		ToolName:    activity.Name,
+		ToolStatus:  activity.Status,
+		ToolSummary: activity.Summary,
+	}
+}
+
+// ErrAudioUnavailable is the scene package's sentinel, kept as an alias here so// the route and its tests read unchanged and there is only one value to compare.
 var ErrAudioUnavailable = scene.ErrAudioUnavailable
 
 // storeOrNil opens a campaign's index, returning nil rather than an error so a
@@ -821,13 +843,14 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 	artAvailable := cfg.Media.Image.BuiltinFallback || cfg.Media.Image.Type != "disabled"
 
 	dto := TurnDTO{
-		TurnNumber:   turn.Number,
-		InputText:    turn.Input,
-		Mode:         turn.Mode,
-		Prose:        turn.Prose(),
-		Outcome:      turn.Outcome,
+		TurnNumber:      turn.Number,
+		InputText:       turn.Input,
+		Mode:            turn.Mode,
+		Prose:           turn.Prose(),
+		Outcome:         turn.Outcome,
 		Truncated:       turn.Truncated,
 		Recovery:        turn.Recovery,
+		ToolCalls:       turnToolCallDTOs(turn.ToolCalls),
 		ContextNotes:    turn.ContextNotes,
 		ContinuityNotes: turn.ContinuityNotes,
 		EntitiesHit:     mentionIDs(turn.Entities),
@@ -1127,6 +1150,13 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEvent) error) error {
 	runCtx, cancel := context.WithTimeout(ctx, t.cfg.TurnTimeout())
 	defer cancel()
+
+	// Tool activity is streamed as it happens, so a lookup reads as progress
+	// rather than as a stall. A failed emit is ignored: the turn still records,
+	// and a disconnected client is handled by the chunk listener below.
+	t.orchestrator.SetToolObserver(func(activity engine.ToolActivity) {
+		_ = emit(toolEvent(activity))
+	})
 
 	turn, err := t.orchestrator.ProcessActionStream(runCtx, req.Mode, req.Input, func(text string) error {
 		return emit(TurnEvent{Type: "chunk", Text: text})
