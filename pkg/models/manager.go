@@ -31,7 +31,14 @@ type ModelSpec struct {
 	ArchiveType   string   `json:"archive_type"` // "tar", "tar.gz", "tar.bz2"
 	Subdir        string   `json:"subdir"`
 	RequiredFiles []string `json:"required_files"`
+	// Variant names the speaker layout a model uses, so a changed model cannot
+	// silently inherit the previous one's voice-to-speaker ids.
+	Variant string `json:"variant,omitempty"`
 }
+
+// KokoroTTSVariant is the speaker layout of the pinned Kokoro model. It must
+// match media.KokoroModelV019.
+const KokoroTTSVariant = "kokoro-en-v0_19"
 
 type ModelStatus struct {
 	ID              string  `json:"id"`
@@ -80,6 +87,7 @@ func (m *Manager) registerDefaultSpecs() {
 		SizeBytes:   319625534,
 		ArchiveType: "tar.bz2",
 		Subdir:      filepath.Join("tts", "kokoro"),
+		Variant:     KokoroTTSVariant,
 		RequiredFiles: []string{
 			"model.onnx",
 			"voices.bin",

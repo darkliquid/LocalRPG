@@ -66,8 +66,9 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
       ) : (
         beats.map(({ turn, isSceneChange }, index) => (
           <div key={turn.turn_number} className="space-y-4 pb-6 border-b border-white/5 last:border-0">
-            {/* Player Input Block */}
-            {turn.input_text && (
+            {/* Player Input Block. A spoken line is rendered as speech below, so
+                the input block is skipped for it to avoid printing it twice. */}
+            {turn.input_text && !(turn.segments ?? []).some((segment) => segment.player) && (
               <div className="flex items-start gap-3 text-stone-300 text-sm font-sans italic bg-black/40 p-3.5 rounded-xl border border-white/5 shadow-inner">
                 <span className="text-amber-400 font-semibold uppercase tracking-wider text-xs font-cinzel">
                   [{turn.mode || 'Action'}]

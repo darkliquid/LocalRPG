@@ -31,13 +31,14 @@ func (s *Session) Close() error {
 // parameter list because campaign creation grows new optional fields, and a
 // positional signature would break every caller each time one is added.
 type InitOptions struct {
-	GameID        string
-	Name          string
-	SystemID      string
-	WorldID       string
-	PlayerName    string
-	PlayerDetails string
-	OpeningPrompt string
+	GameID          string
+	Name            string
+	SystemID        string
+	WorldID         string
+	PlayerName      string
+	PlayerDetails   string
+	PlayerCharacter PlayerCharacter
+	OpeningPrompt   string
 }
 
 func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
@@ -143,7 +144,7 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 
 	// Give the campaign a player note before the manifest is written, so a failure
 	// leaves no half-built campaign.
-	if err := ensurePlayerNote(paths, store, gameID, opts.PlayerName, opts.PlayerDetails, startLocation); err != nil {
+	if err := ensurePlayerNote(paths, store, gameID, opts.PlayerName, opts.PlayerDetails, opts.PlayerCharacter, startLocation); err != nil {
 		return nil, fmt.Errorf("create player note: %w", err)
 	}
 
@@ -168,7 +169,7 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 // linking it to the opening location. An authored note is never touched. Without
 // this, a campaign created through the GUI cannot serve its own game state, and the
 // player is silently missing from every turn's involvement list.
-func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, playerName, details, locationID string) error {
+func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, playerName, details string, pc PlayerCharacter, locationID string) error {
 	id := entity.Slugify(playerName)
 	if id == "" {
 		id = "player"
@@ -181,14 +182,31 @@ func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, pl
 
 	body := strings.TrimSpace(details)
 	if body == "" {
+		body = strings.TrimSpace(pc.Background)
+	}
+	if body == "" {
 		body = "The player character."
 	}
 
 	player := &entity.Entity{
-		ID:   id,
-		Name: playerName,
-		Type: "character",
-		Body: body,
+		ID:         id,
+		Name:       playerName,
+		Type:       "character",
+		Appearance: pc.Appearance,
+		Body:       body,
+		Voice:      pc.Voice,
+		ExtraMeta:  map[string]interface{}{},
+	}
+	for key, value := range pc.Extra {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		player.ExtraMeta[key] = value
+	}
+	for key, value := range map[string]string{"age": pc.Age, "gender": pc.Gender, "pronouns": pc.Pronouns} {
+		if strings.TrimSpace(value) != "" {
+			player.ExtraMeta[key] = value
+		}
 	}
 	if locationID != "" {
 		player.Location = "[[" + locationID + "]]"

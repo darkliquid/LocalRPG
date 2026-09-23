@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
-import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types';
-import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen, AlertCircle, Settings, RotateCcw, Trash2 } from 'lucide-react';
+import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest, CharacterCreationField, VoiceProfile } from '../types';
+import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen, AlertCircle, Settings, RotateCcw, Trash2, Wand2 } from 'lucide-react';
 import { SystemsStudio } from './SystemsStudio';
 import { WorldsStudio } from './WorldsStudio';
 import { SettingsStudio } from './SettingsStudio';
@@ -9,6 +9,19 @@ import { SettingsStudio } from './SettingsStudio';
 interface LauncherHubProps {
   onSelectGame: (gameId: string) => void;
 }
+
+// The prompts a system falls back to when it defines none, mirroring the engine's
+// default character fields.
+const DEFAULT_CHARACTER_FIELDS: CharacterCreationField[] = [
+  { id: 'appearance', label: 'Appearance', prompt: 'How does your character look?', kind: 'long', required: true, generatable: true },
+  { id: 'age', label: 'Age', kind: 'text', generatable: true },
+  { id: 'gender', label: 'Gender', kind: 'text', generatable: true },
+  { id: 'pronouns', label: 'Pronouns', kind: 'text' },
+  { id: 'background', label: 'Background', prompt: 'Where do they come from?', kind: 'long', generatable: true },
+  { id: 'voice', label: 'Voice', kind: 'voice' },
+];
+
+const CORE_PLAYER_ANSWER_IDS = ['appearance', 'age', 'gender', 'pronouns', 'background', 'voice'];
 
 export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const [games, setGames] = useState<GameSummary[]>([]);
@@ -26,6 +39,13 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newOpeningPrompt, setNewOpeningPrompt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Character creation: the fields come from the chosen rules system, and the
+  // voice list from the global settings, so both stay in one place.
+  const [creationFields, setCreationFields] = useState<CharacterCreationField[]>(DEFAULT_CHARACTER_FIELDS);
+  const [playerAnswers, setPlayerAnswers] = useState<Record<string, string>>({});
+  const [playerVoiceID, setPlayerVoiceID] = useState('');
+  const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
   // A destructive campaign action is confirmed inline rather than with a browser
   // dialog, so the launcher keeps its own styling and stays usable inside Wails.
   const [pendingAction, setPendingAction] = useState<{ type: 'restart' | 'delete'; id: string } | null>(null);
@@ -34,6 +54,26 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // The selected system decides which prompts a character answers.
+  useEffect(() => {
+    if (!newSystemID) return;
+    let cancelled = false;
+    APIClient.getSystem(newSystemID)
+      .then((detail) => {
+        if (cancelled) return;
+        const fields = detail.character_creation?.fields?.length
+          ? detail.character_creation.fields
+          : DEFAULT_CHARACTER_FIELDS;
+        setCreationFields(fields);
+      })
+      .catch(() => {
+        if (!cancelled) setCreationFields(DEFAULT_CHARACTER_FIELDS);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [newSystemID]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -50,10 +90,41 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
 
       if (sList.length > 0 && !newSystemID) setNewSystemID(sList[0].id);
       if (wList.length > 0 && !newWorldID) setNewWorldID(wList[0].id);
+
+      const settings = await APIClient.getSettings().catch(() => null);
+      const profiles = settings?.config?.media?.tts?.voice_profiles;
+      if (profiles) setVoiceProfiles(profiles);
     } catch (err: any) {
       setError(err.message || 'Failed to load campaigns');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const generateCharacterFields = async (only?: string) => {
+    const targets = creationFields.filter(
+      (field) => field.kind !== 'voice' && field.generatable && (!only || field.id === only)
+    );
+    if (targets.length === 0) return;
+
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const res = await APIClient.generateCharacter({
+        system_id: newSystemID,
+        world_id: newWorldID,
+        name: newPlayerName.trim() || undefined,
+        fields: targets,
+      });
+      if (Object.keys(res.values).length === 0) {
+        setError('No model is configured to invent character details; fill them in yourself.');
+        return;
+      }
+      setPlayerAnswers((prev) => ({ ...prev, ...res.values }));
+    } catch (err: any) {
+      setError(err.message || 'Character generation failed');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -71,11 +142,27 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
 
     setIsSubmitting(true);
     try {
+      const extra: Record<string, string> = {};
+      for (const [key, value] of Object.entries(playerAnswers)) {
+        if (!CORE_PLAYER_ANSWER_IDS.includes(key) && value.trim()) {
+          extra[key] = value.trim();
+        }
+      }
+
       const payload: CreateGameRequest = {
         name: newGameName.trim(),
         system_id: effectiveSystemID,
         world_id: effectiveWorldID,
         player_name: newPlayerName.trim() || 'Adventurer',
+        player: {
+          appearance: playerAnswers.appearance?.trim() || undefined,
+          age: playerAnswers.age?.trim() || undefined,
+          gender: playerAnswers.gender?.trim() || undefined,
+          pronouns: playerAnswers.pronouns?.trim() || undefined,
+          background: playerAnswers.background?.trim() || undefined,
+          voice: playerVoiceID ? voiceProfiles.find((v) => v.id === playerVoiceID) : undefined,
+          extra: Object.keys(extra).length > 0 ? extra : undefined,
+        },
         opening_prompt: newOpeningPrompt.trim() || undefined,
       };
 
@@ -101,6 +188,9 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         await APIClient.deleteGame(id);
       } else {
         await APIClient.restartGame(id);
+      }
+      if (type === 'delete' && localStorage.getItem('localrpg_active_game') === id) {
+        localStorage.removeItem('localrpg_active_game');
       }
       setPendingAction(null);
       await loadData();
@@ -561,6 +651,89 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
                     onChange={(e) => setNewPlayerName(e.target.value)}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
                   />
+                </div>
+
+                <div className="space-y-3 rounded-xl border border-stone-800/60 bg-stone-950/40 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-cinzel uppercase tracking-wider text-stone-300">
+                      <User className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Character</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => generateCharacterFields()}
+                      disabled={isGenerating || creationFields.every((f) => !f.generatable)}
+                      className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-amber-600/20 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 disabled:opacity-50 transition cursor-pointer"
+                    >
+                      <Wand2 className="w-3 h-3" />
+                      <span>{isGenerating ? 'Inventing...' : 'Generate all'}</span>
+                    </button>
+                  </div>
+
+                  {creationFields.map((field) => (
+                    <div key={field.id} className="space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-[11px] font-cinzel uppercase tracking-wider text-stone-400">
+                          {field.label}
+                          {field.required && <span className="text-amber-400"> *</span>}
+                        </label>
+                        {field.generatable && field.kind !== 'voice' && (
+                          <button
+                            type="button"
+                            onClick={() => generateCharacterFields(field.id)}
+                            disabled={isGenerating}
+                            className="text-[10px] text-amber-400/80 hover:text-amber-300 disabled:opacity-50 cursor-pointer"
+                          >
+                            Generate
+                          </button>
+                        )}
+                      </div>
+                      {field.kind === 'voice' ? (
+                        <select
+                          value={playerVoiceID}
+                          onChange={(e) => setPlayerVoiceID(e.target.value)}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                        >
+                          <option value="">Auto-assign from the description</option>
+                          {voiceProfiles.map((profile) => (
+                            <option key={profile.id} value={profile.id}>
+                              {profile.name} ({profile.voice_id})
+                            </option>
+                          ))}
+                        </select>
+                      ) : field.kind === 'select' && field.options?.length ? (
+                        <select
+                          value={playerAnswers[field.id] || field.default || ''}
+                          onChange={(e) => setPlayerAnswers((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                        >
+                          <option value="">Unset</option>
+                          {field.options.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      ) : field.kind === 'long' ? (
+                        <textarea
+                          rows={3}
+                          placeholder={field.prompt || ''}
+                          value={playerAnswers[field.id] || ''}
+                          onChange={(e) => setPlayerAnswers((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                          className="w-full resize-none bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder={field.prompt || ''}
+                          value={playerAnswers[field.id] || ''}
+                          onChange={(e) => setPlayerAnswers((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                        />
+                      )}
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-stone-500">
+                    Fields marked * are required. Generate fills a starter value you can edit.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">

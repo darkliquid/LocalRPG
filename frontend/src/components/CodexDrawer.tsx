@@ -1,22 +1,27 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EntityNote, EntitySummary } from '../types';
-import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft } from 'lucide-react';
-import { DEFAULT_VOICE_PROFILES } from '../templates/providerPresets';
+import { EntityNote, EntitySummary, VoiceProfile } from '../types';
+import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X } from 'lucide-react';
 import { TurnHistoryList } from './TurnHistoryList';
 
 interface CodexDrawerProps {
   entity?: EntityNote;
   entities?: EntitySummary[];
+  voiceProfiles?: VoiceProfile[];
   onSelect: (entityId: string) => void;
-  onSave: (entityId: string, markdown: string) => void;
+  onSave: (entityId: string, markdown: string) => Promise<void> | void;
   onMerge?: (sourceID: string, intoID: string) => void;
 }
 
-export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, onSelect, onSave, onMerge }) => {
+export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, voiceProfiles, onSelect, onSave, onMerge }) => {
   const [markdown, setMarkdown] = useState('');
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [isSidebarOpen, setIsSidebarOpen] = useState(!entity);
+  const [isMergeOpen, setIsMergeOpen] = useState(false);
+  const [mergeTarget, setMergeTarget] = useState('');
+  const [saveError, setSaveError] = useState('');
+
+  const profiles = voiceProfiles ?? [];
 
   useEffect(() => {
     if (entity) {
@@ -51,10 +56,14 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, onSe
   }, [entities, query, typeFilter]);
 
   const applyVoiceArchetype = (profileId: string) => {
-    const profile = DEFAULT_VOICE_PROFILES.find((p) => p.id === profileId);
+    const profile = profiles.find((p) => p.id === profileId);
     if (!profile) return;
 
-    const voiceSnippet = `voice:\n  voice_id: "${profile.voice_id}"\n  pitch: ${profile.pitch}\n  speech_rate: ${profile.speech_rate}`;
+    const lines = [`voice_id: "${profile.voice_id}"`];
+    if (profile.provider) lines.push(`provider: "${profile.provider}"`);
+    lines.push(`pitch: ${profile.pitch}`);
+    lines.push(`speech_rate: ${profile.speech_rate}`);
+    const voiceSnippet = `voice:\n  ${lines.join('\n  ')}`;
     if (markdown.startsWith('---\n')) {
       const secondDashes = markdown.indexOf('\n---\n', 4);
       if (secondDashes !== -1) {
@@ -74,6 +83,18 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, onSe
 
     setMarkdown(`---\n${voiceSnippet}\n---\n\n${markdown}`);
   };
+
+  const handleSave = async () => {
+    if (!entity) return;
+    setSaveError('');
+    try {
+      await onSave(entity.id, markdown);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const mergeCandidates = (entities ?? []).filter((candidate) => candidate.id !== entity?.id);
 
   return (
     <div className="flex flex-col md:flex-row gap-4 h-full min-h-0 overflow-x-hidden">
@@ -189,29 +210,21 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, onSe
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {onMerge && (entities?.length ?? 0) > 1 && (
-                  <select
-                    onChange={(e) => {
-                      if (e.target.value && entity) {
-                        onMerge(entity.id, e.target.value);
-                        e.target.value = '';
-                      }
+                {onMerge && mergeCandidates.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setMergeTarget('');
+                      setIsMergeOpen(true);
                     }}
-                    className="bg-stone-900 border border-stone-700 rounded-lg pl-2.5 pr-8 py-1.5 text-xs font-mono text-stone-300 focus:outline-none cursor-pointer"
-                    defaultValue=""
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 border border-stone-700 hover:border-red-500/50 hover:text-red-300 text-stone-300 text-xs font-cinzel cursor-pointer transition-colors"
+                    title="Fold this note into another"
                   >
-                    <option value="" disabled>Merge into...</option>
-                    {(entities ?? [])
-                      .filter((candidate) => candidate.id !== entity.id)
-                      .map((candidate) => (
-                        <option key={candidate.id} value={candidate.id}>
-                          {candidate.name}
-                        </option>
-                      ))}
-                  </select>
+                    <GitMerge className="w-3.5 h-3.5" />
+                    <span>Merge note…</span>
+                  </button>
                 )}
                 <button
-                  onClick={() => onSave(entity.id, markdown)}
+                  onClick={handleSave}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold text-xs shadow-md transition-all cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
@@ -219,6 +232,14 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, onSe
                 </button>
               </div>
             </div>
+
+            {(saveError || entity.parse_error) && (
+              <div className="text-xs rounded-lg border border-red-500/40 bg-red-950/40 text-red-200 px-3 py-2">
+                {saveError
+                  ? `Save failed: ${saveError}`
+                  : 'This note could not be parsed. Fix its frontmatter, then save to restore it.'}
+              </div>
+            )}
 
             <div className="flex flex-wrap items-center justify-between gap-2 px-1">
               <label className="flex items-center gap-1.5 text-xs text-stone-400 font-cinzel shrink-0">
@@ -232,11 +253,14 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, onSe
                     e.target.value = '';
                   }
                 }}
-                className="bg-stone-900 border border-amber-500/30 rounded-lg pl-2.5 pr-8 py-1 text-xs font-mono text-amber-300 focus:outline-none cursor-pointer"
+                disabled={profiles.length === 0}
+                className="bg-stone-900 border border-amber-500/30 rounded-lg pl-2.5 pr-8 py-1 text-xs font-mono text-amber-300 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 defaultValue=""
               >
-                <option value="" disabled>Select Archetype...</option>
-                {DEFAULT_VOICE_PROFILES.map((p) => (
+                <option value="" disabled>
+                  {profiles.length === 0 ? 'Configure voices in Settings' : 'Select Archetype...'}
+                </option>
+                {profiles.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} ({p.voice_id})
                   </option>
@@ -271,6 +295,69 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, onSe
           </div>
         )}
       </div>
+
+      {isMergeOpen && entity && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-md bg-stone-900 border border-red-500/40 rounded-2xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
+              <div className="flex items-center gap-2">
+                <GitMerge className="w-5 h-5 text-red-400" />
+                <h3 className="font-cinzel text-base font-bold text-red-300">Merge Note</h3>
+              </div>
+              <button
+                onClick={() => setIsMergeOpen(false)}
+                className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-stone-300 leading-relaxed">
+              <span className="font-bold text-amber-300">{entity.name}</span> will be folded into the note you choose.
+              Its prose, tags, aliases, and turn history move across, and{' '}
+              <span className="font-bold text-red-300">{entity.name}</span> is then deleted.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-cinzel text-stone-400 uppercase tracking-wider block">Merge into</label>
+              <select
+                value={mergeTarget}
+                onChange={(e) => setMergeTarget(e.target.value)}
+                className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-2 text-xs font-mono text-stone-200 focus:outline-none"
+              >
+                <option value="" disabled>Choose a note…</option>
+                {mergeCandidates.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsMergeOpen(false)}
+                className="px-3 py-1.5 rounded-xl border border-stone-700 text-stone-400 hover:bg-stone-800 text-xs font-cinzel cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!mergeTarget}
+                onClick={() => {
+                  if (!mergeTarget) return;
+                  onMerge?.(entity.id, mergeTarget);
+                  setIsMergeOpen(false);
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-red-700 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-cinzel font-bold shadow-lg cursor-pointer transition-colors"
+              >
+                Merge and delete "{entity.name}"
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

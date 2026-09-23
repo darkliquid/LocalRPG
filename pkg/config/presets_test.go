@@ -57,8 +57,8 @@ func TestDefaultVoiceProfiles(t *testing.T) {
 }
 
 func TestKokoroVoiceProfilesPreset(t *testing.T) {
-	if len(config.KokoroVoiceProfiles) != 27 {
-		t.Fatalf("expected 27 Kokoro voice profiles, got %d", len(config.KokoroVoiceProfiles))
+	if len(config.KokoroVoiceProfiles) != 11 {
+		t.Fatalf("expected 11 Kokoro voice profiles, got %d", len(config.KokoroVoiceProfiles))
 	}
 	for _, p := range config.KokoroVoiceProfiles {
 		if p.ID == "" || p.VoiceID == "" || len(p.Tags) == 0 {
@@ -70,8 +70,8 @@ func TestKokoroVoiceProfilesPreset(t *testing.T) {
 	if !ok {
 		t.Fatal("missing sherpa-onnx preset")
 	}
-	if len(preset.VoiceProfiles) != 27 {
-		t.Errorf("expected sherpa-onnx preset to have 27 voice profiles, got %d", len(preset.VoiceProfiles))
+	if len(preset.VoiceProfiles) != 11 {
+		t.Errorf("expected sherpa-onnx preset to have 11 voice profiles, got %d", len(preset.VoiceProfiles))
 	}
 }
 

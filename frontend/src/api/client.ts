@@ -10,6 +10,8 @@ import {
   SystemInfo,
   WorldInfo,
   CreateGameRequest,
+  GenerateCharacterRequest,
+  GenerateCharacterResponse,
   SystemDetail,
   CreateSystemRequest,
   WorldDetail,
@@ -23,6 +25,17 @@ import {
   AddressedFinding,
   ModelStatus,
 } from '../types';
+
+// HTTPError carries the status of a failed request so callers can tell a missing
+// campaign apart from a transient failure.
+export class HTTPError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'HTTPError';
+    this.status = status;
+  }
+}
 
 export class APIClient {
   private gameID: string;
@@ -78,6 +91,18 @@ export class APIClient {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`createGame: ${res.statusText}`);
+    return res.json();
+  }
+
+  // generateCharacter asks the backend for starter values for a system's
+  // character creation prompts. It creates nothing.
+  static async generateCharacter(payload: GenerateCharacterRequest): Promise<GenerateCharacterResponse> {
+    const res = await fetch('/api/character/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`generateCharacter: ${res.statusText}`);
     return res.json();
   }
 
@@ -290,7 +315,7 @@ export class APIClient {
 
   async getGameState(): Promise<GameState> {
     const res = await fetch(`/api/game/${this.gameID}/state`);
-    if (!res.ok) throw new Error(`getGameState: ${res.statusText}`);
+    if (!res.ok) throw new HTTPError(res.status, `getGameState: ${res.statusText}`);
     return res.json();
   }
 
@@ -337,7 +362,7 @@ export class APIClient {
     const res = await fetch(`/api/game/${this.gameID}/entity/${sourceID}/merge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ into: intoID }),
+      body: JSON.stringify({ into: intoID, confirm: true }),
     });
     if (!res.ok) throw new Error(`mergeEntity: ${res.statusText}`);
     return res.json();

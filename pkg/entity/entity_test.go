@@ -146,3 +146,16 @@ func TestAnEntityWithoutAliasesHasNone(t *testing.T) {
 		t.Errorf("expected no aliases, got %v", parsed.Aliases)
 	}
 }
+
+func TestIsCharacterType(t *testing.T) {
+	for _, want := range []string{"character", "Character", "npc", "NPC", "person", " creature "} {
+		if !IsCharacterType(want) {
+			t.Errorf("IsCharacterType(%q) = false, want true", want)
+		}
+	}
+	for _, got := range []string{"location", "item", "faction", "arc", ""} {
+		if IsCharacterType(got) {
+			t.Errorf("IsCharacterType(%q) = true, want false", got)
+		}
+	}
+}

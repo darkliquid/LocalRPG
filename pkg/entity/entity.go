@@ -179,6 +179,16 @@ func Slugify(name string) string {
 	return strings.TrimSuffix(buf.String(), "-")
 }
 
+// IsCharacterType reports whether a type names a speaking being. Content authors,
+// extractor models, and the graph all use different spellings for the same idea.
+func IsCharacterType(t string) bool {
+	switch strings.ToLower(strings.TrimSpace(t)) {
+	case "character", "npc", "person", "creature":
+		return true
+	}
+	return false
+}
+
 func (e *Entity) SerializeMarkdown() ([]byte, error) {
 	fm := EntityFrontmatter{
 		ID:         e.ID,

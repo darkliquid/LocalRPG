@@ -14,16 +14,20 @@ func TestKokoroVoiceMapping(t *testing.T) {
 		voiceID string
 		wantSid int
 	}{
-		{"af_bella", 2},
-		{"am_adam", 11},
-		{"bm_george", 25},
-		{"bf_emma", 20},
+		{"af", 0},
+		{"af_bella", 1},
+		{"af_nicole", 2},
+		{"am_adam", 5},
+		{"am_michael", 6},
+		{"bf_emma", 7},
+		{"bm_george", 9},
+		{"bm_lewis", 10},
 		{"unknown_voice", 0}, // fallback
 		{"", 0},
 	}
 
 	for _, tt := range tests {
-		got := ResolveKokoroSpeakerID(tt.voiceID)
+		got := ResolveKokoroSpeakerID(KokoroModelV019, tt.voiceID)
 		if got != tt.wantSid {
 			t.Errorf("ResolveKokoroSpeakerID(%q) = %d; want %d", tt.voiceID, got, tt.wantSid)
 		}

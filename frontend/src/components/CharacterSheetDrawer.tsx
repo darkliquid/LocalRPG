@@ -34,6 +34,19 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ play
         </div>
       </div>
 
+      {/* Authored description, when the campaign was created with character creation. */}
+      {(player.appearance || player.voice) && (
+        <div className="space-y-3 bg-black/40 p-4 rounded-xl border border-white/5 shadow-inner">
+          <span className="text-xs uppercase text-stone-400 tracking-wider block font-cinzel">Description</span>
+          {player.appearance && <p className="text-sm text-stone-200 leading-relaxed">{player.appearance}</p>}
+          {player.voice && (
+            <p className="text-xs font-mono text-amber-300">
+              Voice: {player.voice.name || player.voice.voice_id} ({player.voice.voice_id})
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Dynamic Attributes Grid */}
       <div className="grid grid-cols-2 gap-3">
         {Object.entries(player.state || {}).map(([key, val]) => {

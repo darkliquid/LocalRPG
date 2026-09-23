@@ -3,6 +3,8 @@ export interface PlayerState {
   name: string;
   type: string;
   state: Record<string, any>;
+  appearance?: string;
+  voice?: VoiceProfile;
 }
 
 export interface GameState {
@@ -22,6 +24,11 @@ export interface TurnSegment {
   speaker_id?: string;
   text: string;
   audio_url?: string;
+  // Version token for the clip, which changes when the speaker's voice changes.
+  audio_key?: string;
+  // True for the protagonist's own line, which renders as speech but suppresses
+  // the duplicate action block for the turn.
+  player?: boolean;
   // Seconds the backend estimates this line takes to read, which is the same
   // estimate the exports pace with.
   duration?: number;
@@ -88,6 +95,7 @@ export interface EntitySummary {
   type: string;
   location?: string;
   tags?: string[];
+  parse_error?: boolean;
 }
 
 export interface EntityNote {
@@ -98,6 +106,7 @@ export interface EntityNote {
   state: Record<string, any>;
   backlinks: string[];
   history?: number[];
+  parse_error?: boolean;
 }
 
 export interface GraphNode {
@@ -148,7 +157,47 @@ export interface CreateGameRequest {
   system_id: string;
   world_id: string;
   player_name: string;
+  player?: PlayerCharacter;
   opening_prompt?: string;
+}
+
+export interface CharacterCreationField {
+  id: string;
+  label: string;
+  prompt?: string;
+  kind?: 'text' | 'long' | 'number' | 'select' | 'voice';
+  required?: boolean;
+  generatable?: boolean;
+  options?: string[];
+  default?: string;
+}
+
+export interface CharacterCreationSpec {
+  preamble?: string;
+  fields?: CharacterCreationField[];
+}
+
+export interface PlayerCharacter {
+  appearance?: string;
+  age?: string;
+  gender?: string;
+  pronouns?: string;
+  background?: string;
+  voice?: VoiceProfile;
+  extra?: Record<string, string>;
+}
+
+export interface GenerateCharacterRequest {
+  system_id?: string;
+  world_id?: string;
+  name?: string;
+  fields: CharacterCreationField[];
+  seed?: Record<string, string>;
+}
+
+export interface GenerateCharacterResponse {
+  values: Record<string, string>;
+  generated_by: string;
 }
 
 export interface SystemDetail {
@@ -158,6 +207,7 @@ export interface SystemDetail {
   description: string;
   script: string;
   rules_prompt?: string;
+  character_creation?: CharacterCreationSpec;
 }
 
 export interface CreateSystemRequest {
@@ -167,6 +217,7 @@ export interface CreateSystemRequest {
   description?: string;
   script?: string;
   rules_prompt?: string;
+  character_creation?: CharacterCreationSpec;
 }
 
 export interface WorldEntitySummary {
@@ -256,6 +307,7 @@ export interface VoiceProfile {
   id: string;
   name: string;
   voice_id: string;
+  provider?: string;
   pitch: number;
   speech_rate: number;
   tags?: string[];
@@ -277,6 +329,8 @@ export interface TTSConfig {
   auto_play: boolean;
   master_volume: number;
   voice_profiles?: VoiceProfile[];
+  // How narration Markdown is treated before synthesis. Omitted means auto.
+  markdown?: 'auto' | 'strip' | 'keep';
 }
 
 export interface STTConfig {

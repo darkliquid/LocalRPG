@@ -44,18 +44,28 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
         segment.kind === 'speech' ? (
           <div
             key={i}
-            className="bg-glass-card border-l-4 border-amber-500/90 pl-4 py-3 pr-4 rounded-r-xl shadow-lg space-y-2"
+            className={`bg-glass-card border-l-4 pl-4 py-3 pr-4 rounded-r-xl shadow-lg space-y-2 ${
+              segment.player ? 'border-sky-400/90' : 'border-amber-500/90'
+            }`}
           >
             {hasAudio ? (
               <button
                 onClick={() => (serverPlayback ? startServerPlayback(i) : playFrom(i))}
-                className="text-xs text-amber-400 font-cinzel font-bold tracking-widest hover:text-amber-300 cursor-pointer"
+                className={`text-xs font-cinzel font-bold tracking-widest hover:opacity-80 cursor-pointer ${
+                  segment.player ? 'text-sky-300' : 'text-amber-400'
+                }`}
               >
                 {segment.speaker || 'UNKNOWN'}
+                {segment.player && <span className="ml-2 text-stone-400 normal-case">(you)</span>}
               </button>
             ) : (
-              <div className="text-xs text-amber-400 font-cinzel font-bold tracking-widest">
+              <div
+                className={`text-xs font-cinzel font-bold tracking-widest ${
+                  segment.player ? 'text-sky-300' : 'text-amber-400'
+                }`}
+              >
                 {segment.speaker || 'UNKNOWN'}
+                {segment.player && <span className="ml-2 text-stone-400 normal-case">(you)</span>}
               </div>
             )}
             <MarkdownProse

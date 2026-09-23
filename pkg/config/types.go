@@ -82,6 +82,7 @@ type VoiceProfile struct {
 	ID          string   `yaml:"id" json:"id"`
 	Name        string   `yaml:"name" json:"name"`
 	VoiceID     string   `yaml:"voice_id" json:"voice_id"`
+	Provider    string   `yaml:"provider,omitempty" json:"provider,omitempty"`
 	Pitch       float64  `yaml:"pitch" json:"pitch"`
 	SpeechRate  float64  `yaml:"speech_rate" json:"speech_rate"`
 	Tags        []string `yaml:"tags,omitempty" json:"tags,omitempty"`
@@ -103,6 +104,10 @@ type TTSConfig struct {
 	AutoPlay      bool           `yaml:"auto_play" json:"auto_play"`
 	MasterVolume  float64        `yaml:"master_volume" json:"master_volume"`
 	VoiceProfiles []VoiceProfile `yaml:"voice_profiles,omitempty" json:"voice_profiles,omitempty"`
+	// Markdown selects how narration Markdown is treated before synthesis:
+	// "auto" (default) reduces it unless the provider is Markdown-aware, "strip"
+	// always reduces it, and "keep" sends it unchanged.
+	Markdown string `yaml:"markdown,omitempty" json:"markdown,omitempty"`
 }
 
 type STTConfig struct {

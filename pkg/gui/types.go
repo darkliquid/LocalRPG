@@ -5,14 +5,17 @@ import (
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 )
 
 type PlayerDTO struct {
-	ID    string                 `json:"id"`
-	Name  string                 `json:"name"`
-	Type  string                 `json:"type"`
-	State map[string]interface{} `json:"state"`
+	ID         string                 `json:"id"`
+	Name       string                 `json:"name"`
+	Type       string                 `json:"type"`
+	State      map[string]interface{} `json:"state"`
+	Appearance string                 `json:"appearance,omitempty"`
+	Voice      *config.VoiceProfile   `json:"voice,omitempty"`
 }
 
 type NarrativeArcDTO struct {
@@ -46,6 +49,8 @@ type SegmentDTO struct {
 	SpeakerID string  `json:"speaker_id,omitempty"`
 	Text      string  `json:"text"`
 	AudioURL  string  `json:"audio_url,omitempty"`
+	AudioKey  string  `json:"audio_key,omitempty"`
+	Player    bool    `json:"player,omitempty"`
 	Duration  float64 `json:"duration"`
 }
 
@@ -69,18 +74,22 @@ type TurnDTO struct {
 }
 
 type EntityDTO struct {
-	ID        string                 `json:"id"`
-	Name      string                 `json:"name"`
-	Type      string                 `json:"type"`
-	Markdown  string                 `json:"markdown"`
-	State     map[string]interface{} `json:"state"`
-	Backlinks []string               `json:"backlinks"`
-	History   []int                  `json:"history,omitempty"`
+	ID         string                 `json:"id"`
+	Name       string                 `json:"name"`
+	Type       string                 `json:"type"`
+	Markdown   string                 `json:"markdown"`
+	State      map[string]interface{} `json:"state"`
+	Backlinks  []string               `json:"backlinks"`
+	History    []int                  `json:"history,omitempty"`
+	ParseError bool                   `json:"parse_error,omitempty"`
 }
 
 // MergeEntityRequestDTO names the note that should survive a merge.
 type MergeEntityRequestDTO struct {
 	Into string `json:"into"`
+	// Confirm must be true. Folding two notes into one is destructive, so a
+	// stray POST without an explicit confirmation is refused.
+	Confirm bool `json:"confirm"`
 }
 
 type GraphNodeDTO struct {
@@ -126,21 +135,34 @@ type WorldSummaryDTO struct {
 }
 
 type CreateGameRequestDTO struct {
-	ID            string `json:"id,omitempty"`
-	Name          string `json:"name"`
-	SystemID      string `json:"system_id"`
-	WorldID       string `json:"world_id"`
-	PlayerName    string `json:"player_name"`
-	OpeningPrompt string `json:"opening_prompt,omitempty"`
+	ID            string             `json:"id,omitempty"`
+	Name          string             `json:"name"`
+	SystemID      string             `json:"system_id"`
+	WorldID       string             `json:"world_id"`
+	PlayerName    string             `json:"player_name"`
+	Player        PlayerCharacterDTO `json:"player,omitempty"`
+	OpeningPrompt string             `json:"opening_prompt,omitempty"`
+}
+
+// PlayerCharacterDTO is the authored protagonist gathered at campaign creation.
+type PlayerCharacterDTO struct {
+	Appearance string               `json:"appearance,omitempty"`
+	Age        string               `json:"age,omitempty"`
+	Gender     string               `json:"gender,omitempty"`
+	Pronouns   string               `json:"pronouns,omitempty"`
+	Background string               `json:"background,omitempty"`
+	Voice      *config.VoiceProfile `json:"voice,omitempty"`
+	Extra      map[string]string    `json:"extra,omitempty"`
 }
 
 // EntitySummaryDTO is one note as the codex browser lists it.
 type EntitySummaryDTO struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	Type     string   `json:"type"`
-	Location string   `json:"location,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Type       string   `json:"type"`
+	Location   string   `json:"location,omitempty"`
+	Tags       []string `json:"tags,omitempty"`
+	ParseError bool     `json:"parse_error,omitempty"`
 }
 
 // ThreadDTO is one unresolved arc as the client sees it.
@@ -169,21 +191,23 @@ type GameSettingsPatchDTO struct {
 }
 
 type SystemDetailDTO struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Version     string `json:"version"`
-	Description string `json:"description"`
-	Script      string `json:"script"`
-	RulesPrompt string `json:"rules_prompt"`
+	ID                string                      `json:"id"`
+	Name              string                      `json:"name"`
+	Version           string                      `json:"version"`
+	Description       string                      `json:"description"`
+	Script            string                      `json:"script"`
+	RulesPrompt       string                      `json:"rules_prompt"`
+	CharacterCreation core.CharacterCreationSpec `json:"character_creation"`
 }
 
 type CreateSystemRequestDTO struct {
-	ID          string `json:"id,omitempty"`
-	Name        string `json:"name"`
-	Version     string `json:"version,omitempty"`
-	Description string `json:"description,omitempty"`
-	Script      string `json:"script,omitempty"`
-	RulesPrompt string `json:"rules_prompt,omitempty"`
+	ID                string                      `json:"id,omitempty"`
+	Name              string                      `json:"name"`
+	Version           string                      `json:"version,omitempty"`
+	Description       string                      `json:"description,omitempty"`
+	Script            string                      `json:"script,omitempty"`
+	RulesPrompt       string                      `json:"rules_prompt,omitempty"`
+	CharacterCreation core.CharacterCreationSpec `json:"character_creation,omitempty"`
 }
 
 type WorldEntitySummaryDTO struct {

@@ -119,7 +119,7 @@ func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity
 			}
 		}
 
-		if ent.Type == "character" {
+		if entity.IsCharacterType(ent.Type) {
 			harness.AssignVoiceProfile(ent, t.voiceProfiles)
 		}
 

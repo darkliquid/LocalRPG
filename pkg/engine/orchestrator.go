@@ -494,6 +494,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
+
+	// The player's own spoken line leads the turn, so it is heard in their voice
+	// before the narrator answers. It is a normal speech beat; the chronicle uses
+	// its flag to avoid printing the input a second time.
+	if beat := playerSegment(mode, actionInput, o.playerID, o.playerDisplayName()); beat != nil {
+		turn.Segments = append([]entity.TurnSegment{*beat}, turn.Segments...)
+	}
+
 	o.logger.Event("segment.build", map[string]interface{}{
 		"count":      len(turn.Segments),
 		"kinds":      segmentKinds(turn.Segments),
@@ -550,6 +558,9 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		"created": created,
 	})
 
+	// RecordTurn creates and voices the entities the turn introduced. Synthesis
+	// must not begin until this returns, or a character invented in this turn
+	// would be read in the narrator's voice.
 	if err := o.timeline.RecordTurn(&turn, extraction.Entities); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
 	}

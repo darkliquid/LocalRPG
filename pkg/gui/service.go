@@ -233,7 +233,7 @@ func resolveWikilinks(text string, resolve func(string) string) string {
 	})
 }
 
-func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, audioAvailable bool, resolve func(string) string) []SegmentDTO {
+func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, audioAvailable bool, resolve func(string) string, voiceFor func(string) *entity.VoiceConfig) []SegmentDTO {
 	dtos := make([]SegmentDTO, 0, len(segments))
 	for i, segment := range segments {
 		text := resolveWikilinks(segment.Text, resolve)
@@ -242,12 +242,29 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, a
 			Speaker:   segment.Speaker,
 			SpeakerID: segment.SpeakerID,
 			Text:      text,
+			Player:    segment.Player,
 			// The reading estimate is the same one the exports pace with, so the
 			// app and a rendered bundle hold a line for the same length of time.
 			Duration: scene.ReadingDuration(text).Seconds(),
 		}
 		if audioAvailable {
-			dto.AudioURL = fmt.Sprintf("/api/game/%s/turn/%d/segment/%d/audio", gameID, turnNumber, i)
+			// The ref is what the synthesis pipeline uses to find a voice, so the
+			// same value is used here to derive a voice-sensitive version token. A
+			// changed voice changes the URL, which keeps the browser from serving a
+			// clip read in the previous voice.
+			ref := segment.SpeakerID
+			if ref == "" {
+				ref = segment.Speaker
+			}
+			voiceID, pitch, rate := "", 0.0, 0.0
+			if voiceFor != nil {
+				if v := voiceFor(ref); v != nil {
+					voiceID, pitch, rate = v.VoiceID, v.Pitch, v.SpeechRate
+				}
+			}
+			key := media.ComputeAudioCacheKeyWithRate(ref, voiceID, pitch, rate, segment.Text)
+			dto.AudioKey = key
+			dto.AudioURL = fmt.Sprintf("/api/game/%s/turn/%d/segment/%d/audio?v=%s", gameID, turnNumber, i, key[:12])
 		}
 		dtos = append(dtos, dto)
 	}
@@ -305,10 +322,12 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		GameID:   gameID,
 		GameName: gameManifest.Name,
 		Player: PlayerDTO{
-			ID:    playerID,
-			Name:  ent.Name,
-			Type:  ent.Type,
-			State: stateMap,
+			ID:         playerID,
+			Name:       ent.Name,
+			Type:       ent.Type,
+			State:      stateMap,
+			Appearance: ent.Appearance,
+			Voice:      voiceProfileDTO(ent.Voice),
 		},
 		Arcs:          arcs,
 		Clocks:        clocks,
@@ -475,22 +494,30 @@ func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySumm
 		if !strings.HasSuffix(entry.Name(), ".md") {
 			continue
 		}
+		id := strings.TrimSuffix(entry.Name(), ".md")
 		data, err := os.ReadFile(filepath.Join(entitiesDir, entry.Name()))
 		if err != nil {
 			continue
 		}
 		parsed, err := entity.ParseMarkdownEntity(data)
 		if err != nil {
+			// A note that fails to parse is still a note the player wrote. Show
+			// it so it can be repaired instead of silently vanishing.
+			summaries = append(summaries, EntitySummaryDTO{
+				ID:         id,
+				Name:       id,
+				ParseError: true,
+			})
 			continue
 		}
 
 		name := parsed.Name
 		if name == "" {
-			name = strings.TrimSuffix(entry.Name(), ".md")
+			name = id
 		}
 
 		summaries = append(summaries, EntitySummaryDTO{
-			ID:       strings.TrimSuffix(entry.Name(), ".md"),
+			ID:       id,
 			Name:     name,
 			Type:     parsed.Type,
 			Location: parsed.Location,
@@ -514,7 +541,14 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 
 	ent, err := entity.ParseMarkdownEntity(data)
 	if err != nil {
-		return nil, fmt.Errorf("parse entity: %w", err)
+		// Return the raw note so the codex can still open and repair it, rather
+		// than failing the read outright.
+		return &EntityDTO{
+			ID:         entityID,
+			Name:       entityID,
+			Markdown:   string(data),
+			ParseError: true,
+		}, nil
 	}
 
 	var stateMap map[string]interface{}
@@ -542,9 +576,21 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 }
 
 func (s *Service) SaveEntity(ctx context.Context, gameID, entityID, rawMarkdown string) error {
+	ent, err := entity.ParseMarkdownEntity([]byte(rawMarkdown))
+	if err != nil {
+		return fmt.Errorf("save entity %q: %w", entityID, err)
+	}
+	// The file name is the note's identity. Normalise the frontmatter id so a
+	// hand-edited or copied id can never index a note under another note's key.
+	ent.ID = entityID
+	normalised, err := ent.SerializeMarkdown()
+	if err != nil {
+		return fmt.Errorf("normalise entity %q: %w", entityID, err)
+	}
+
 	gameDir := s.resolver.GameDir(gameID)
 	path := filepath.Join(gameDir, "entities", entityID+".md")
-	if err := os.WriteFile(path, []byte(rawMarkdown), 0644); err != nil {
+	if err := os.WriteFile(path, normalised, 0644); err != nil {
 		return fmt.Errorf("write entity file: %w", err)
 	}
 
@@ -785,6 +831,8 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		EntitiesHit:     mentionIDs(turn.Entities),
 		Segments: segmentDTOs(turn.Segments, gameID, turn.Number, audioAvailable, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
+		}, func(ref string) *entity.VoiceConfig {
+			return harness.ResolveSpeakerVoice(store, ref)
 		}),
 	}
 
@@ -1097,8 +1145,8 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	}
 
 	// Narration is the application's own responsibility, detached from the
-	// request: the turn is already recorded, and a slow synthesis must not hold
-	// the stream open.
+	// request: the turn is already recorded - and its entities, with their voices,
+	// persisted - so a slow synthesis must not hold the stream open.
 	if t.cfg.Media.TTS.AutoPlay {
 		go func() {
 			_ = t.service.PlayTurnAudio(context.Background(), t.gameID, turn.Number)
@@ -1329,6 +1377,7 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 	}
 
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
+	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	return pipeline.SynthesizeSegment(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID))
 }
 
@@ -1437,14 +1486,23 @@ func (s *Service) voiceFor(gameID string) func(speakerID string) *entity.VoiceCo
 	}
 
 	return func(speakerID string) *entity.VoiceConfig {
-		if speakerID == "" {
-			return nil
-		}
-		ent, err := store.GetEntity(speakerID)
-		if err != nil || ent == nil {
-			return nil
-		}
-		return ent.Voice
+		return harness.ResolveSpeakerVoice(store, speakerID)
+	}
+}
+
+// voiceProfileDTO presents an entity's voice as the config-shaped profile the
+// client edits, so the sheet can show how a character sounds.
+func voiceProfileDTO(voice *entity.VoiceConfig) *config.VoiceProfile {
+	if voice == nil || strings.TrimSpace(voice.VoiceID) == "" {
+		return nil
+	}
+	return &config.VoiceProfile{
+		ID:         voice.VoiceID,
+		Name:       voice.VoiceID,
+		VoiceID:    voice.VoiceID,
+		Provider:   voice.Provider,
+		Pitch:      voice.Pitch,
+		SpeechRate: voice.SpeechRate,
 	}
 }
 
@@ -1602,18 +1660,78 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 		gameID = slugify(req.Name)
 	}
 
+	// The system decides which prompts a character must answer, falling back to
+	// the engine's defaults when it defines none.
+	sysManifest, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(req.SystemID), "system.yaml"))
+	if err != nil {
+		return nil, fmt.Errorf("load system %q: %w", req.SystemID, err)
+	}
+	fields := engine.CharacterFields(sysManifest)
+	answers := map[string]string{
+		"appearance": req.Player.Appearance,
+		"age":        req.Player.Age,
+		"gender":     req.Player.Gender,
+		"pronouns":   req.Player.Pronouns,
+		"background": req.Player.Background,
+	}
+	for key, value := range req.Player.Extra {
+		answers[key] = value
+	}
+	// Required prompts are enforced only when the caller is doing character
+	// creation. A programmatic or legacy create with no player object keeps
+	// working and simply leaves the protagonist lightly described.
+	playerProvided := strings.TrimSpace(req.Player.Appearance) != "" ||
+		strings.TrimSpace(req.Player.Background) != "" ||
+		strings.TrimSpace(req.Player.Age) != "" ||
+		strings.TrimSpace(req.Player.Gender) != "" ||
+		strings.TrimSpace(req.Player.Pronouns) != "" ||
+		len(req.Player.Extra) > 0 ||
+		req.Player.Voice != nil
+	if playerProvided {
+		for _, id := range engine.RequiredCharacterFields(fields) {
+			if strings.TrimSpace(answers[id]) == "" {
+				return nil, fmt.Errorf("character field %q is required", id)
+			}
+		}
+	}
+
+	var voice *entity.VoiceConfig
+	if req.Player.Voice != nil && strings.TrimSpace(req.Player.Voice.VoiceID) != "" {
+		voice = &entity.VoiceConfig{
+			Provider:   req.Player.Voice.Provider,
+			VoiceID:    req.Player.Voice.VoiceID,
+			Pitch:      req.Player.Voice.Pitch,
+			SpeechRate: req.Player.Voice.SpeechRate,
+		}
+	}
+
 	session, err := engine.InitGame(s.resolver, engine.InitOptions{
-		GameID:        gameID,
-		Name:          req.Name,
-		SystemID:      req.SystemID,
-		WorldID:       req.WorldID,
-		PlayerName:    req.PlayerName,
+		GameID:     gameID,
+		Name:       req.Name,
+		SystemID:   req.SystemID,
+		WorldID:    req.WorldID,
+		PlayerName: req.PlayerName,
+		PlayerCharacter: engine.PlayerCharacter{
+			Appearance: req.Player.Appearance,
+			Age:        req.Player.Age,
+			Gender:     req.Player.Gender,
+			Pronouns:   req.Player.Pronouns,
+			Background: req.Player.Background,
+			Voice:      voice,
+			Extra:      req.Player.Extra,
+		},
 		OpeningPrompt: req.OpeningPrompt,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("init game: %w", err)
 	}
 	_ = session.Close()
+
+	// A voice the player did not choose is chosen from their description, so the
+	// protagonist can speak in their own voice from the first turn.
+	if voice == nil {
+		_ = s.assignPlayerVoice(gameID, req.PlayerName)
+	}
 
 	return &GameSummaryDTO{
 		ID:         gameID,
@@ -1624,6 +1742,35 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 		TurnCount:  0,
 		LastPlayed: time.Now().Format(time.RFC3339),
 	}, nil
+}
+
+// assignPlayerVoice gives the player note a voice profile matched from its
+// description when the player did not choose one. A failure is not fatal: an
+// unvoiced player simply reads in the narrator voice.
+func (s *Service) assignPlayerVoice(gameID, playerName string) error {
+	store, err := s.store(gameID)
+	if err != nil {
+		return err
+	}
+
+	id := entity.Slugify(playerName)
+	if id == "" {
+		id = "player"
+	}
+
+	ent, err := store.GetEntity(id)
+	if err != nil || ent == nil || ent.Voice != nil {
+		return err
+	}
+
+	harness.AssignVoiceProfile(ent, s.configMgr.Get().Media.TTS.VoiceProfiles)
+	if ent.Voice == nil {
+		return nil
+	}
+
+	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
+	timeline := engine.NewTimeline(s.resolver, store, engine.NewHistoryLogger(historyPath), gameID)
+	return timeline.SaveEntity(ent)
 }
 
 // UpdateGameSettings merges a patch into a campaign's settings and writes the
@@ -1810,12 +1957,13 @@ func (s *Service) GetSystem(ctx context.Context, id string) (*SystemDetailDTO, e
 	}
 
 	return &SystemDetailDTO{
-		ID:          m.ID,
-		Name:        m.Name,
-		Version:     m.Version,
-		Description: m.Description,
-		Script:      script,
-		RulesPrompt: rulesPrompt,
+		ID:                m.ID,
+		Name:              m.Name,
+		Version:           m.Version,
+		Description:       m.Description,
+		Script:            script,
+		RulesPrompt:       rulesPrompt,
+		CharacterCreation: m.CharacterCreation,
 	}, nil
 }
 
@@ -1841,10 +1989,11 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 	}
 
 	manifest := core.SystemManifest{
-		ID:          id,
-		Name:        req.Name,
-		Version:     req.Version,
-		Description: req.Description,
+		ID:                id,
+		Name:              req.Name,
+		Version:           req.Version,
+		Description:       req.Description,
+		CharacterCreation: req.CharacterCreation,
 	}
 	data, err := yaml.Marshal(manifest)
 	if err != nil {
@@ -2128,12 +2277,16 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		if prompt == "" {
 			prompt = defaultTTSPreviewText
 		}
+		spoken := media.SpeakableTextFor(media.TextPolicyFromConfig(ttsCfg), client, prompt)
+		if strings.TrimSpace(spoken) == "" {
+			return &TestProviderResponseDTO{Success: false, Message: "The test phrase reduced to no speakable text"}, nil
+		}
 		voice := &entity.VoiceConfig{
 			VoiceID:    ttsCfg.DefaultVoice,
 			Pitch:      ttsCfg.Pitch,
 			SpeechRate: ttsCfg.SpeechRate,
 		}
-		audio, err := client.Synthesize(ctx, prompt, voice)
+		audio, err := client.Synthesize(ctx, spoken, voice)
 		latency := time.Since(start).Milliseconds()
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, LatencyMS: latency, Message: err.Error()}, nil

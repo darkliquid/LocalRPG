@@ -436,3 +436,54 @@ func TestResolveSpeakerIDAndMatchingKnowAliases(t *testing.T) {
 		t.Errorf("expected an unrelated name not to match")
 	}
 }
+
+func TestAssignVoiceProfileUsesAppearance(t *testing.T) {
+	profiles := []config.VoiceProfile{
+		{ID: "gruff", Name: "Gruff", VoiceID: "am_adam", Tags: []string{"deep", "gravelly"}},
+		{ID: "soft", Name: "Soft", VoiceID: "bf_emma", Tags: []string{"gentle", "soft"}},
+	}
+	ent := &entity.Entity{ID: "sera", Name: "Sera", Type: "npc", Appearance: "A deep, gravelly voice; broad shouldered."}
+	AssignVoiceProfile(ent, profiles)
+	if ent.Voice == nil || ent.Voice.VoiceID != "am_adam" {
+		t.Fatalf("expected appearance to select am_adam, got %+v", ent.Voice)
+	}
+}
+
+func TestAssignVoiceProfileAcceptsNPCStyleType(t *testing.T) {
+	profiles := []config.VoiceProfile{{ID: "p", Name: "P", VoiceID: "af_bella", Tags: []string{"female"}}}
+	ent := &entity.Entity{ID: "x", Name: "X", Type: "npc", Body: "A female guard."}
+	AssignVoiceProfile(ent, profiles)
+	if ent.Voice == nil {
+		t.Fatal("expected an npc-typed character to receive a voice")
+	}
+}
+
+func TestAssignVoiceProfileNeverOverwrites(t *testing.T) {
+	profiles := []config.VoiceProfile{{ID: "p", Name: "P", VoiceID: "af_bella"}}
+	authored := &entity.VoiceConfig{VoiceID: "bm_lewis"}
+	ent := &entity.Entity{ID: "x", Name: "X", Type: "npc", Voice: authored}
+	AssignVoiceProfile(ent, profiles)
+	if ent.Voice != authored {
+		t.Fatalf("authored voice was replaced: %+v", ent.Voice)
+	}
+}
+
+func TestResolveSpeakerVoiceByDisplayName(t *testing.T) {
+	store := newTestEntityStore(t)
+	if err := store.SaveEntity(&entity.Entity{
+		ID: "lady-evelyn", Name: "Lady Evelyn", Type: "character",
+		Voice: &entity.VoiceConfig{VoiceID: "af_bella"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := ResolveSpeakerVoice(store, "Lady Evelyn"); got == nil || got.VoiceID != "af_bella" {
+		t.Fatalf("expected Lady Evelyn's voice, got %+v", got)
+	}
+	if got := ResolveSpeakerVoice(store, "lady-evelyn"); got == nil || got.VoiceID != "af_bella" {
+		t.Fatalf("expected the entity id to resolve, got %+v", got)
+	}
+	if got := ResolveSpeakerVoice(store, "Nobody At All"); got != nil {
+		t.Fatalf("expected no voice for an unknown speaker, got %+v", got)
+	}
+}

@@ -19,52 +19,16 @@ import (
 
 var ErrModelNotLoaded = errors.New("sherpa-onnx model weights are not loaded")
 
-var kokoroSpeakerMap = map[string]int{
-	"af_alloy":    0,
-	"af_aoede":    1,
-	"af_bella":    2,
-	"af_heart":    3,
-	"af_jessica":  4,
-	"af_kore":     5,
-	"af_nicole":   6,
-	"af_nova":     7,
-	"af_river":    8,
-	"af_sarah":    9,
-	"af_sky":      10,
-	"am_adam":     11,
-	"am_echo":     12,
-	"am_eric":     13,
-	"am_fenrir":   14,
-	"am_liam":     15,
-	"am_michael":  16,
-	"am_onyx":     17,
-	"am_puck":     18,
-	"bf_alice":    19,
-	"bf_emma":     20,
-	"bf_isabella": 21,
-	"bf_lily":     22,
-	"bm_daniel":   23,
-	"bm_fable":    24,
-	"bm_george":   25,
-	"bm_lewis":    26,
-}
-
-func ResolveKokoroSpeakerID(voiceID string) int {
-	if sid, ok := kokoroSpeakerMap[voiceID]; ok {
-		return sid
-	}
-	return 0
-}
-
 type SherpaTTSClient struct {
 	modelDir string
+	modelID  string
 	tts      *sherpa.OfflineTts
 	mu       sync.Mutex
 	logger   trace.Logger
 }
 
 func NewSherpaTTSClient(modelDir string) *SherpaTTSClient {
-	return &SherpaTTSClient{modelDir: modelDir}
+	return &SherpaTTSClient{modelDir: modelDir, modelID: KokoroModelV019}
 }
 
 func (s *SherpaTTSClient) SetLogger(logger trace.Logger) {
@@ -117,7 +81,7 @@ func (s *SherpaTTSClient) Synthesize(ctx context.Context, text string, voice *en
 	sid := 0
 	speed := float32(1.0)
 	if voice != nil {
-		sid = ResolveKokoroSpeakerID(voice.VoiceID)
+		sid = ResolveKokoroSpeakerID(s.modelID, voice.VoiceID)
 		if voice.SpeechRate > 0 {
 			speed = float32(voice.SpeechRate)
 		}

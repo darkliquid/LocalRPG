@@ -12,6 +12,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/engine"
+	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
@@ -163,6 +164,108 @@ The town watch captain, now an ally.`
 	}
 	if updated.State["attitude"] != "friendly" {
 		t.Errorf("expected attitude friendly, got %v", updated.State["attitude"])
+	}
+}
+
+func TestSaveEntityRejectsMalformedMarkdown(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	path := filepath.Join(svc.resolver.GameDir(gameID), "entities", "captain-kaelen.md")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := svc.SaveEntity(context.Background(), gameID, "captain-kaelen", "no frontmatter here at all"); err == nil {
+		t.Fatal("expected SaveEntity to reject malformed markdown")
+	}
+
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Errorf("a rejected save changed the file on disk")
+	}
+}
+
+func TestSaveEntityForcesFrontmatterIDToFileName(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	md := `---
+id: someone-else
+name: Captain Kaelen
+type: npc
+---
+Still the watch captain.`
+	if err := svc.SaveEntity(context.Background(), gameID, "captain-kaelen", md); err != nil {
+		t.Fatalf("SaveEntity failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(svc.resolver.GameDir(gameID), "entities", "captain-kaelen.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "id: captain-kaelen") {
+		t.Errorf("expected frontmatter id forced to the file name, got:\n%s", string(data))
+	}
+}
+
+func TestListEntitiesIncludesMalformedNote(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	path := filepath.Join(svc.resolver.GameDir(gameID), "entities", "broken-note.md")
+	if err := os.WriteFile(path, []byte("---\nname: [unterminated\n---\nbody"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	summaries, err := svc.ListEntities(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("ListEntities failed: %v", err)
+	}
+	found := false
+	for _, s := range summaries {
+		if s.ID == "broken-note" {
+			found = true
+			if !s.ParseError {
+				t.Errorf("expected broken-note to be flagged as a parse error")
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected the malformed note to remain listed")
+	}
+}
+
+func TestVoiceForResolvesDisplayName(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	if err := svc.SaveEntity(context.Background(), gameID, "captain-kaelen",
+		"---\nid: captain-kaelen\nname: Captain Kaelen\ntype: npc\nvoice:\n  voice_id: af_bella\n---\nWatch.\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	got := svc.voiceFor(gameID)("Captain Kaelen")
+	if got == nil || got.VoiceID != "af_bella" {
+		t.Fatalf("expected Captain Kaelen's voice, got %+v", got)
+	}
+}
+
+func TestSegmentAudioURLChangesWithVoice(t *testing.T) {
+	segments := []entity.TurnSegment{{
+		Kind: entity.SegmentSpeech, Speaker: "Captain Kaelen", SpeakerID: "captain-kaelen", Text: "Halt!",
+	}}
+
+	first := segmentDTOs(segments, "game", 1, true, func(string) string { return "" },
+		func(string) *entity.VoiceConfig { return &entity.VoiceConfig{VoiceID: "af_bella"} })
+	second := segmentDTOs(segments, "game", 1, true, func(string) string { return "" },
+		func(string) *entity.VoiceConfig { return &entity.VoiceConfig{VoiceID: "am_adam"} })
+
+	if first[0].AudioURL == second[0].AudioURL {
+		t.Fatalf("audio url did not change with the voice: %q", first[0].AudioURL)
+	}
+	if !strings.Contains(first[0].AudioURL, "?v=") {
+		t.Errorf("expected a version query, got %q", first[0].AudioURL)
+	}
+	if first[0].AudioKey == second[0].AudioKey {
+		t.Errorf("audio key did not change with the voice")
 	}
 }
 
@@ -516,6 +619,72 @@ func TestCampaignTitleIsPersistedAndLatestIsFirst(t *testing.T) {
 	}
 	if state.OpeningPrompt != "Begin at dusk on the salt road." {
 		t.Errorf("OpeningPrompt = %q, want the prompt captured at creation", state.OpeningPrompt)
+	}
+}
+
+func setupFreeformSystem(t *testing.T, svc *Service) {
+	t.Helper()
+
+	sysDir := svc.GetResolver().SystemDir("freeform")
+	if err := os.MkdirAll(sysDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sysDir, "system.yaml"), []byte("id: freeform\nname: Freeform\nversion: 1.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	worldDir := svc.GetResolver().WorldDir("harbour-realm")
+	if err := os.MkdirAll(worldDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(worldDir, "world.yaml"), []byte("id: harbour-realm\nname: Harbour Realm\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateGamePersistsPlayerCharacter(t *testing.T) {
+	svc := NewService(t.TempDir())
+	setupFreeformSystem(t, svc)
+
+	game, err := svc.CreateGame(context.Background(), CreateGameRequestDTO{
+		Name:       "The Salt Road",
+		SystemID:   "freeform",
+		WorldID:    "harbour-realm",
+		PlayerName: "Elena Nightshade",
+		Player: PlayerCharacterDTO{
+			Appearance: "Tall, salt-bitten, grey eyes.",
+			Age:        "34",
+			Background: "A smuggler turned cartographer.",
+			Voice:      &config.VoiceProfile{ID: "af_bella", VoiceID: "af_bella", Pitch: 1, SpeechRate: 1},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateGame failed: %v", err)
+	}
+
+	ent, err := svc.GetEntity(context.Background(), game.ID, "elena-nightshade")
+	if err != nil {
+		t.Fatalf("GetEntity failed: %v", err)
+	}
+	for _, want := range []string{"Tall, salt-bitten, grey eyes.", "af_bella", "A smuggler turned cartographer."} {
+		if !strings.Contains(ent.Markdown, want) {
+			t.Errorf("player note is missing %q:\n%s", want, ent.Markdown)
+		}
+	}
+}
+
+func TestCreateGameRequiresCharacterAppearance(t *testing.T) {
+	svc := NewService(t.TempDir())
+	setupFreeformSystem(t, svc)
+
+	_, err := svc.CreateGame(context.Background(), CreateGameRequestDTO{
+		Name:       "The Salt Road",
+		SystemID:   "freeform",
+		WorldID:    "harbour-realm",
+		PlayerName: "Elena Nightshade",
+		Player:     PlayerCharacterDTO{Background: "A smuggler."},
+	})
+	if err == nil || !strings.Contains(err.Error(), "appearance") {
+		t.Fatalf("expected appearance to be required, got %v", err)
 	}
 }
 

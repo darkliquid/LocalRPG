@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { APIClient } from './api/client';
+import { APIClient, HTTPError } from './api/client';
 import { GameState, Turn, EntityNote, EntitySummary, Recap, GraphData, AppConfig } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
@@ -16,6 +16,25 @@ import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
 import { User, Network, BookOpen, Clock, Film, Compass, Settings, X } from 'lucide-react';
+
+// Mirrors entity.Slugify in the Go backend: lowercase, [a-z0-9] kept, runs of
+// spaces/hyphens/underscores collapse to a single hyphen, trailing hyphen trimmed.
+const slugify = (name: string): string => {
+  let out = '';
+  let precededBySeparator = true;
+  for (const ch of name.toLowerCase().trim()) {
+    if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) {
+      out += ch;
+      precededBySeparator = false;
+    } else if (ch === ' ' || ch === '-' || ch === '_') {
+      if (out.length > 0 && !precededBySeparator) {
+        out += '-';
+        precededBySeparator = true;
+      }
+    }
+  }
+  return out.endsWith('-') ? out.slice(0, -1) : out;
+};
 
 export const App: React.FC = () => {
   const [activeGameID, setActiveGameID] = useState<string | null>(() => {
@@ -52,6 +71,10 @@ export const App: React.FC = () => {
   const [modalEntity, setModalEntity] = useState<{ name: string; turnNumber: number } | null>(null);
   const [missingModel, setMissingModel] = useState<{ id: string; name: string; sizeBytes: number } | null>(null);
   const [dismissedModelPrompt, setDismissedModelPrompt] = useState(false);
+  // The remembered campaign is only a hint until it is verified against the
+  // campaign list, so the play shell can tell "loading" from "gone".
+  const [campaignStatus, setCampaignStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
+  const [campaignError, setCampaignError] = useState<string | null>(null);
 
   useEffect(() => {
     APIClient.getSettings()
@@ -62,15 +85,65 @@ export const App: React.FC = () => {
       .catch(() => setServerAudio(false));
   }, []);
 
+  const handleGameStateFailure = useCallback((err: unknown) => {
+    if (err instanceof HTTPError && err.status === 404) {
+      // The campaign is definitively gone: forget it and return to the launcher.
+      localStorage.removeItem('localrpg_active_game');
+      setActiveGameID(null);
+      setCampaignStatus('idle');
+      setCampaignError(null);
+      return;
+    }
+    // A transient failure must not erase where the player was.
+    setCampaignStatus('unavailable');
+    setCampaignError(err instanceof Error ? err.message : String(err));
+  }, []);
+
   // Everything the drawers read is refetched together, so no panel can show a
   // corpus that is older than another's.
   const refreshCorpus = useCallback(() => {
     if (!client) return;
-    client.getGameState().then(setGameState).catch(console.error);
+    client.getGameState()
+      .then((state) => {
+        setGameState(state);
+        setCampaignStatus('ready');
+      })
+      .catch(handleGameStateFailure);
     client.getGraph().then(setGraph).catch(console.error);
     client.listEntities().then(setEntities).catch(console.error);
     client.getRecap().then(setRecap).catch(console.error);
-  }, [client]);
+  }, [client, handleGameStateFailure]);
+
+  // A campaign deletion, or a change of --dir, leaves a dangling id in storage.
+  // It is verified against the campaign list before it is trusted; a list that
+  // cannot be fetched leaves the selection alone and offers a retry instead.
+  useEffect(() => {
+    if (!activeGameID) {
+      setCampaignStatus('idle');
+      return;
+    }
+    let cancelled = false;
+    setCampaignStatus('loading');
+    setCampaignError(null);
+    APIClient.listGames()
+      .then((games) => {
+        if (cancelled) return;
+        if (games.some((game) => game.id === activeGameID)) {
+          return;
+        }
+        localStorage.removeItem('localrpg_active_game');
+        setActiveGameID(null);
+        setCampaignStatus('idle');
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setCampaignStatus('unavailable');
+        setCampaignError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeGameID]);
 
   useEffect(() => {
     if (!client) {
@@ -98,6 +171,8 @@ export const App: React.FC = () => {
     setActiveGameID(null);
     setActiveDrawer(null);
     setIsSettingsOpen(false);
+    setCampaignStatus('idle');
+    setCampaignError(null);
   };
 
   const handleOpenWikilink = async (entityId: string) => {
@@ -204,7 +279,9 @@ export const App: React.FC = () => {
     if (!client) return;
     await client.saveEntity(entityId, markdown);
     const updated = await client.getEntity(entityId);
-    setSelectedEntity(updated);
+    // Only reselect when the player is still looking at the note that was saved;
+    // a late response must not yank them onto a different note.
+    setSelectedEntity((current) => (current && current.id === entityId ? updated : current));
     // A saved note can change its own type, links, or name, so the graph and the
     // codex listing follow it rather than going stale.
     refreshCorpus();
@@ -212,13 +289,6 @@ export const App: React.FC = () => {
 
   const handleMergeEntity = async (sourceID: string, intoID: string) => {
     if (!client || !activeGameID) return;
-
-    const sourceName = entities.find((candidate) => candidate.id === sourceID)?.name ?? sourceID;
-    const targetName = entities.find((candidate) => candidate.id === intoID)?.name ?? intoID;
-    const confirmed = window.confirm(
-      `Merge "${sourceName}" into "${targetName}"? Its prose, tags, aliases, and turn history move across, and the note is removed.`
-    );
-    if (!confirmed) return;
 
     try {
       const merged = await client.mergeEntity(sourceID, intoID);
@@ -249,13 +319,22 @@ export const App: React.FC = () => {
 
   const handleQuickCreateEntity = async (name: string, type: string) => {
     if (!client || !modalEntity) return;
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const template = `---\nid: ${slug}\nname: ${name}\ntype: ${type}\n---\n\n`;
+    const slug = slugify(name);
     try {
-      await client.saveEntity(slug, template);
-      await client.addressFinding(modalEntity.turnNumber, 'continuity');
-      setAddressed((prev) => new Set(prev).add(modalEntity.turnNumber));
-      refreshCorpus();
+      const existing = entities.find((candidate) => candidate.id === slug);
+      if (existing) {
+        // Never overwrite a note that already exists; open it instead.
+        await client.addressFinding(modalEntity.turnNumber, 'continuity');
+        setAddressed((prev) => new Set(prev).add(modalEntity.turnNumber));
+        const entity = await client.getEntity(slug);
+        setSelectedEntity(entity);
+      } else {
+        const template = `---\nid: ${slug}\nname: ${name}\ntype: ${type}\n---\n\n`;
+        await client.saveEntity(slug, template);
+        await client.addressFinding(modalEntity.turnNumber, 'continuity');
+        setAddressed((prev) => new Set(prev).add(modalEntity.turnNumber));
+        refreshCorpus();
+      }
     } catch (err) {
       console.error('quick create entity failed:', err);
     } finally {
@@ -265,10 +344,13 @@ export const App: React.FC = () => {
 
   const handleEditInCodexEntity = async (name: string, type: string) => {
     if (!client || !modalEntity) return;
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const template = `---\nid: ${slug}\nname: ${name}\ntype: ${type}\n---\n\n`;
+    const slug = slugify(name);
     try {
-      await client.saveEntity(slug, template);
+      const existing = entities.find((candidate) => candidate.id === slug);
+      if (!existing) {
+        const template = `---\nid: ${slug}\nname: ${name}\ntype: ${type}\n---\n\n`;
+        await client.saveEntity(slug, template);
+      }
       await client.addressFinding(modalEntity.turnNumber, 'continuity');
       setAddressed((prev) => new Set(prev).add(modalEntity.turnNumber));
       refreshCorpus();
@@ -415,6 +497,30 @@ export const App: React.FC = () => {
                       onBeginWithAction={handleBeginWithAction}
                     />
                   )
+                ) : campaignStatus === 'unavailable' ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                    <Compass className="w-8 h-8 text-amber-500/50" />
+                    <div className="space-y-1">
+                      <p className="font-cinzel text-sm text-amber-300 font-bold">This campaign could not be opened</p>
+                      <p className="text-xs text-stone-400 font-mono max-w-md">
+                        {campaignError ?? `"${activeGameID}" is unavailable.`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={handleReturnToLauncher}
+                        className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold text-xs shadow-md transition-all cursor-pointer"
+                      >
+                        Return to Campaigns
+                      </button>
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="px-3.5 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-300 hover:text-amber-300 hover:border-amber-500/40 font-cinzel text-xs transition-colors cursor-pointer"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="flex-1 flex items-center justify-center text-stone-500 font-mono text-sm animate-pulse">
                     Opening the chronicle...
@@ -467,6 +573,7 @@ export const App: React.FC = () => {
               <CodexDrawer
                 entity={selectedEntity || undefined}
                 entities={entities}
+                voiceProfiles={config?.media.tts.voice_profiles ?? []}
                 onSelect={handleOpenWikilink}
                 onSave={handleSaveEntity}
                 onMerge={handleMergeEntity}

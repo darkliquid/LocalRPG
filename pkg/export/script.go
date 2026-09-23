@@ -12,6 +12,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -68,14 +69,7 @@ func (r *speechResolver) SegmentAudio(ctx context.Context, segment entity.TurnSe
 }
 
 func (r *speechResolver) voiceFor(speakerID string) *entity.VoiceConfig {
-	if speakerID == "" {
-		return nil
-	}
-	ent, err := r.store.GetEntity(speakerID)
-	if err != nil || ent == nil {
-		return nil
-	}
-	return ent.Voice
+	return harness.ResolveSpeakerVoice(r.store, speakerID)
 }
 
 // ScriptCompiler builds a scene script for a campaign.
@@ -140,8 +134,10 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 	if c.audio && c.config.Media.TTS.Type != "" && c.config.Media.TTS.Type != "disabled" {
 		if client, err := media.NewTTSClient(c.config.Media.TTS); err == nil {
 			cache := media.NewContentCache(c.resolver.CacheDir())
+			pipeline := media.NewTTSPipeline(client, cache)
+			pipeline.SetTextPolicy(media.TextPolicyFromConfig(c.config.Media.TTS))
 			compiler.SetSpeechResolver(&speechResolver{
-				pipeline: media.NewTTSPipeline(client, cache),
+				pipeline: pipeline,
 				store:    store,
 				narrator: &entity.VoiceConfig{
 					VoiceID:    c.config.Media.TTS.DefaultVoice,

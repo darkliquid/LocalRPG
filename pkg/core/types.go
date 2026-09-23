@@ -13,6 +13,27 @@ type SystemManifest struct {
 	Name        string `yaml:"name"`
 	Version     string `yaml:"version"`
 	Description string `yaml:"description,omitempty"`
+	// CharacterCreation describes the prompts a player answers when starting a
+	// campaign with this system. An empty spec falls back to the engine default.
+	CharacterCreation CharacterCreationSpec `yaml:"character_creation,omitempty"`
+}
+
+// CharacterCreationField is one prompt in a system's character creation.
+type CharacterCreationField struct {
+	ID          string   `yaml:"id" json:"id"`
+	Label       string   `yaml:"label" json:"label"`
+	Prompt      string   `yaml:"prompt,omitempty" json:"prompt,omitempty"`
+	Kind        string   `yaml:"kind,omitempty" json:"kind,omitempty"` // text | long | number | select | voice
+	Required    bool     `yaml:"required,omitempty" json:"required,omitempty"`
+	Generatable bool     `yaml:"generatable,omitempty" json:"generatable,omitempty"`
+	Options     []string `yaml:"options,omitempty" json:"options,omitempty"`
+	Default     string   `yaml:"default,omitempty" json:"default,omitempty"`
+}
+
+// CharacterCreationSpec is a system's set of character creation prompts.
+type CharacterCreationSpec struct {
+	Preamble string                   `yaml:"preamble,omitempty" json:"preamble,omitempty"`
+	Fields   []CharacterCreationField `yaml:"fields,omitempty" json:"fields,omitempty"`
 }
 
 type WorldManifest struct {

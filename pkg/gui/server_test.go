@@ -410,6 +410,20 @@ func TestSegmentAudioRouteSniffsTheContentType(t *testing.T) {
 	}
 }
 
+func TestSegmentAudioRouteIsNotCached(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/turn/1/segment/1/audio", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q, want no-store", got)
+	}
+}
+
 func TestSegmentAudioRouteReportsAnUnavailableProvider(t *testing.T) {
 	// A service whose config never enabled TTS.
 	gameID, svc := setupTestGame(t)
@@ -797,7 +811,7 @@ func TestMergeRouteFoldsOneNoteIntoAnother(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	body := `{"into":"captain-kaelen"}`
+	body := `{"into":"captain-kaelen","confirm":true}`
 	req := httptest.NewRequest(http.MethodPost, "/api/game/"+gameID+"/entity/the-ember-warden/merge", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
@@ -812,6 +826,21 @@ func TestMergeRouteFoldsOneNoteIntoAnother(t *testing.T) {
 	}
 	if merged.ID != "captain-kaelen" {
 		t.Errorf("merged into %q, want captain-kaelen", merged.ID)
+	}
+
+	// A merge without an explicit confirmation must not fold anything.
+	if err := svc.SaveEntity(context.Background(), gameID, "the-ember-warden",
+		"---\nid: the-ember-warden\nname: The Ember Warden\ntype: character\n---\nStands vigil.\n"); err != nil {
+		t.Fatal(err)
+	}
+	req = httptest.NewRequest(http.MethodPost, "/api/game/"+gameID+"/entity/the-ember-warden/merge", strings.NewReader(`{"into":"captain-kaelen"}`))
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for an unconfirmed merge, got %d", rec.Code)
+	}
+	if _, err := os.Stat(filepath.Join(svc.resolver.GameDir(gameID), "entities", "the-ember-warden.md")); err != nil {
+		t.Errorf("unconfirmed merge removed the source note: %v", err)
 	}
 
 	// A merge with no target is a malformed request, not a silent no-op.

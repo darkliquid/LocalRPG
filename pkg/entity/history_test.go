@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -74,5 +75,20 @@ A ruin now.
 	}
 	if reparsed.Appearance != ent.Appearance {
 		t.Errorf("Appearance after round trip = %q, want %q", reparsed.Appearance, ent.Appearance)
+	}
+}
+
+func TestTurnSegmentPlayerRoundTrip(t *testing.T) {
+	segment := TurnSegment{Kind: SegmentSpeech, Speaker: "Sean", SpeakerID: "sean", Text: "Hello.", Player: true}
+	data, err := json.Marshal(segment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out TurnSegment
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !out.Player {
+		t.Fatal("player marker lost in round trip")
 	}
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
-import { SystemInfo, CreateSystemRequest } from '../types';
-import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen } from 'lucide-react';
+import { SystemInfo, CreateSystemRequest, CharacterCreationField } from '../types';
+import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2 } from 'lucide-react';
 import { REFERENCE_SYSTEM_TEMPLATE } from '../templates/referenceTemplates';
 
 interface SystemsStudioProps {
@@ -20,6 +20,9 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
   const [description, setDescription] = useState(REFERENCE_SYSTEM_TEMPLATE.description);
   const [rulesPrompt, setRulesPrompt] = useState(REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
   const [script, setScript] = useState(REFERENCE_SYSTEM_TEMPLATE.script);
+  // Character creation prompts a player answers when starting with this system.
+  const [creationPreamble, setCreationPreamble] = useState('');
+  const [creationFields, setCreationFields] = useState<CharacterCreationField[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -57,6 +60,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
       setDescription(detail.description || '');
       setRulesPrompt(detail.rules_prompt || REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
       setScript(detail.script || REFERENCE_SYSTEM_TEMPLATE.script);
+      setCreationPreamble(detail.character_creation?.preamble || '');
+      setCreationFields(detail.character_creation?.fields || []);
     } catch (err: any) {
       setToast({ type: 'error', message: err.message || 'Failed to load system details' });
     }
@@ -70,6 +75,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
     setDescription(REFERENCE_SYSTEM_TEMPLATE.description);
     setRulesPrompt(REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
     setScript(REFERENCE_SYSTEM_TEMPLATE.script);
+    setCreationPreamble('');
+    setCreationFields([]);
     setActiveTab('manifest');
   };
 
@@ -82,6 +89,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
     setDescription(REFERENCE_SYSTEM_TEMPLATE.description);
     setRulesPrompt(REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
     setScript(REFERENCE_SYSTEM_TEMPLATE.script);
+    setCreationPreamble('');
+    setCreationFields([]);
     setToast({ type: 'success', message: 'Reset to Narrative 2d6 Reference Template!' });
   };
 
@@ -102,6 +111,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
         description: description.trim(),
         rules_prompt: rulesPrompt.trim(),
         script: script,
+        character_creation: {
+          preamble: creationPreamble.trim() || undefined,
+          fields: creationFields,
+        },
       };
 
       const saved = await APIClient.saveSystem(payload);
@@ -329,6 +342,137 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors resize-none"
               />
+            </div>
+
+            <div className="space-y-3 pt-2 border-t border-stone-800/70">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-amber-400" />
+                  <span className="font-cinzel text-xs uppercase font-bold text-stone-200">
+                    Character Creation Prompts
+                  </span>
+                  <span className="text-[10px] font-mono text-stone-500">({creationFields.length})</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCreationFields((prev) => [
+                      ...prev,
+                      { id: `prompt_${prev.length + 1}`, label: 'New Prompt', kind: 'text', generatable: true },
+                    ])
+                  }
+                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-amber-600/20 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 transition cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Add Prompt</span>
+                </button>
+              </div>
+
+              <input
+                type="text"
+                placeholder="Preamble shown above the prompts (optional)"
+                value={creationPreamble}
+                onChange={(e) => setCreationPreamble(e.target.value)}
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-xs text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+              />
+
+              {creationFields.length === 0 ? (
+                <p className="text-[11px] text-stone-500">
+                  With no prompts defined, the studio falls back to appearance, age, gender, pronouns, background and voice.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {creationFields.map((field, index) => (
+                    <div key={index} className="rounded-lg bg-stone-950/70 border border-stone-800/80 p-2.5 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="id"
+                          value={field.id}
+                          onChange={(e) => {
+                            const updated = [...creationFields];
+                            updated[index] = { ...updated[index], id: e.target.value };
+                            setCreationFields(updated);
+                          }}
+                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs font-mono text-amber-300 focus:outline-none"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Label"
+                          value={field.label}
+                          onChange={(e) => {
+                            const updated = [...creationFields];
+                            updated[index] = { ...updated[index], label: e.target.value };
+                            setCreationFields(updated);
+                          }}
+                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Prompt shown to the player"
+                        value={field.prompt || ''}
+                        onChange={(e) => {
+                          const updated = [...creationFields];
+                          updated[index] = { ...updated[index], prompt: e.target.value };
+                          setCreationFields(updated);
+                        }}
+                        className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
+                      />
+                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-stone-400">
+                        <select
+                          value={field.kind || 'text'}
+                          onChange={(e) => {
+                            const updated = [...creationFields];
+                            updated[index] = { ...updated[index], kind: e.target.value as CharacterCreationField['kind'] };
+                            setCreationFields(updated);
+                          }}
+                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none cursor-pointer"
+                        >
+                          {['text', 'long', 'number', 'select', 'voice'].map((kind) => (
+                            <option key={kind} value={kind}>{kind}</option>
+                          ))}
+                        </select>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!field.required}
+                            onChange={(e) => {
+                              const updated = [...creationFields];
+                              updated[index] = { ...updated[index], required: e.target.checked };
+                              setCreationFields(updated);
+                            }}
+                            className="rounded bg-stone-950 border-stone-800 text-amber-600 focus:ring-0"
+                          />
+                          <span>Required</span>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!field.generatable}
+                            disabled={field.kind === 'voice'}
+                            onChange={(e) => {
+                              const updated = [...creationFields];
+                              updated[index] = { ...updated[index], generatable: e.target.checked };
+                              setCreationFields(updated);
+                            }}
+                            className="rounded bg-stone-950 border-stone-800 text-amber-600 focus:ring-0 disabled:opacity-40"
+                          />
+                          <span>Generatable</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setCreationFields((prev) => prev.filter((_, i) => i !== index))}
+                          className="ml-auto flex items-center gap-1 text-red-400/80 hover:text-red-300 cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

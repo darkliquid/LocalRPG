@@ -37,6 +37,7 @@ func NewServer(service *Service, assetHandler http.Handler) *Server {
 func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/game/", s.handleGameRoutes)
 	s.mux.HandleFunc("/api/games", s.handleGamesRoutes)
+	s.mux.HandleFunc("/api/character/generate", s.handleCharacterGenerateRoute)
 	s.mux.HandleFunc("/api/systems", s.handleSystemsRoutes)
 	s.mux.HandleFunc("/api/system/", s.handleSystemRoutes)
 	s.mux.HandleFunc("/api/worlds", s.handleWorldsRoutes)
@@ -271,6 +272,10 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			// A segment's URL is stable across a voice change, so the browser must
+			// not reuse a clip read in the previous voice. The server's own content
+			// cache keeps repeat synthesis instant.
+			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Content-Type", media.AudioContentType(data))
 			_, _ = w.Write(data)
 		}
@@ -318,7 +323,7 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if err := s.service.SaveEntity(r.Context(), gameID, entityID, body.Markdown); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 			w.WriteHeader(http.StatusOK)
@@ -345,6 +350,10 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			}
 			if strings.TrimSpace(req.Into) == "" {
 				http.Error(w, "a merge needs a note to merge into", http.StatusBadRequest)
+				return
+			}
+			if !req.Confirm {
+				http.Error(w, "a merge must be explicitly confirmed", http.StatusBadRequest)
 				return
 			}
 

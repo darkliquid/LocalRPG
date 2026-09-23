@@ -12,4 +12,8 @@ type TurnSegment struct {
 	Speaker   string `json:"speaker,omitempty"`
 	SpeakerID string `json:"speaker_id,omitempty"`
 	Text      string `json:"text"`
+	// Player marks the utterance as the protagonist's own line. It renders and
+	// plays exactly like any other speech beat; the flag lets the chronicle skip
+	// the duplicate action block that would otherwise print the same words.
+	Player bool `json:"player,omitempty"`
 }

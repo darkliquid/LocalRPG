@@ -984,6 +984,30 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             </div>
 
+            <div className="space-y-1.5">
+              <label className="text-xs font-cinzel uppercase text-stone-300">Narration Markdown</label>
+              <select
+                value={config.media.tts.markdown || 'auto'}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    media: {
+                      ...config.media,
+                      tts: { ...config.media.tts, markdown: e.target.value as 'auto' | 'strip' | 'keep' },
+                    },
+                  })
+                }
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+              >
+                <option value="auto">Auto - reduce formatting unless the provider understands it</option>
+                <option value="strip">Always reduce formatting to plain speech</option>
+                <option value="keep">Keep formatting as written</option>
+              </select>
+              <p className="text-[11px] text-stone-500">
+                Markdown emphasis, headings, lists and wikilinks are otherwise read aloud by engines that do not interpret them.
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-cinzel uppercase text-stone-300">TTS Engine</label>
@@ -1200,10 +1224,10 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         });
                       }}
                       className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-amber-600/20 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 transition cursor-pointer"
-                      title="Autofill all 27 Kokoro voice profiles with gender and accent tags"
+                      title="Autofill all 11 Kokoro voice profiles with gender and accent tags"
                     >
                       <Sparkles className="w-3 h-3" />
-                      <span>Load Kokoro Voices (27 Profiles)</span>
+                      <span>Load Kokoro Voices (11 Profiles)</span>
                     </button>
                   )}
 

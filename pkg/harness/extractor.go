@@ -58,16 +58,22 @@ func (e *Extractor) SetVoiceProfiles(profiles []config.VoiceProfile) {
 }
 
 func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
-	if len(profiles) == 0 || ent == nil || ent.Type != "character" || ent.Voice != nil {
+	if len(profiles) == 0 || ent == nil || !entity.IsCharacterType(ent.Type) || ent.Voice != nil {
 		return
 	}
 
-	searchContent := strings.ToLower(ent.Name + " " + ent.Body)
+	searchContent := strings.ToLower(strings.Join([]string{
+		ent.Name,
+		ent.Body,
+		ent.Appearance,
+		strings.Join(ent.Aliases, " "),
+	}, " "))
 
 	// 1. Check direct profile ID match
 	for _, p := range profiles {
 		if strings.Contains(searchContent, strings.ToLower(p.ID)) {
 			ent.Voice = &entity.VoiceConfig{
+				Provider:   p.Provider,
 				VoiceID:    p.VoiceID,
 				Pitch:      p.Pitch,
 				SpeechRate: p.SpeechRate,
@@ -94,6 +100,7 @@ func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 
 	if bestProfile != nil {
 		ent.Voice = &entity.VoiceConfig{
+			Provider:   bestProfile.Provider,
 			VoiceID:    bestProfile.VoiceID,
 			Pitch:      bestProfile.Pitch,
 			SpeechRate: bestProfile.SpeechRate,
@@ -107,6 +114,7 @@ func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 	idx := int(h.Sum32()) % len(profiles)
 	p := profiles[idx]
 	ent.Voice = &entity.VoiceConfig{
+		Provider:   p.Provider,
 		VoiceID:    p.VoiceID,
 		Pitch:      p.Pitch,
 		SpeechRate: p.SpeechRate,
@@ -429,6 +437,24 @@ func ResolveSpeakerID(store *storage.Store, name string) string {
 		}
 	}
 	return ""
+}
+
+// ResolveSpeakerVoice finds the configured voice for a speaker reference, which
+// may be an entity ID or a written display name. It returns nil when no entity or
+// no voice matches, so callers fall back to the narrator voice.
+func ResolveSpeakerVoice(store *storage.Store, speakerRef string) *entity.VoiceConfig {
+	if store == nil || strings.TrimSpace(speakerRef) == "" {
+		return nil
+	}
+	if ent, err := store.GetEntity(speakerRef); err == nil && ent != nil {
+		return ent.Voice
+	}
+	if id := ResolveSpeakerID(store, speakerRef); id != "" {
+		if ent, err := store.GetEntity(id); err == nil && ent != nil {
+			return ent.Voice
+		}
+	}
+	return nil
 }
 
 const (

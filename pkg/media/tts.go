@@ -3,6 +3,7 @@ package media
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -88,6 +89,7 @@ type TTSPipeline struct {
 	client TTSClient
 	cache  *ContentCache
 	logger trace.Logger
+	policy TextPolicy
 }
 
 // SetLogger attaches a trace sink. A nil logger records nothing.
@@ -95,15 +97,25 @@ func (p *TTSPipeline) SetLogger(logger trace.Logger) {
 	p.logger = trace.OrNil(logger)
 }
 
+// SetTextPolicy selects how narration Markdown is treated before synthesis. The
+// zero value reduces Markdown unless the client is MarkdownAware.
+func (p *TTSPipeline) SetTextPolicy(policy TextPolicy) {
+	p.policy = policy
+}
+
 // SynthesizeSegments renders every segment with its speaker's voice, falling back
 // to the narrator voice for narration and unresolved speech. Cached clips are
 // reused; audio references stay out of the turn record because the cache key is a
-// pure function of speaker, voice, prosody, and text.
+// pure function of speaker, voice, prosody, and text. A segment that reduces to no
+// speakable text is skipped rather than treated as a failure.
 func (p *TTSPipeline) SynthesizeSegments(ctx context.Context, segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) ([]string, error) {
 	clips := make([]string, 0, len(segments))
 
 	for _, segment := range segments {
 		clip, err := p.SynthesizeSegment(ctx, segment, narratorVoice, voiceFor)
+		if errors.Is(err, ErrNoSpeakableText) {
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -117,6 +129,18 @@ func (p *TTSPipeline) SynthesizeSegments(ctx context.Context, segments []entity.
 // the narrator voice, resolved speech in the speaker's own. Legacy records carry a
 // speaker name but no entity ID, so the name is tried as a voice key too.
 func (p *TTSPipeline) SynthesizeSegment(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (string, error) {
+	spoken := SpeakableTextFor(p.policy, p.client, segment.Text)
+	if strings.TrimSpace(spoken) == "" {
+		return "", ErrNoSpeakableText
+	}
+	if spoken != segment.Text {
+		p.logger = trace.OrNil(p.logger)
+		p.logger.Event("media.tts.reduced", map[string]interface{}{
+			"chars_raw":    len([]rune(segment.Text)),
+			"chars_spoken": len([]rune(spoken)),
+		})
+	}
+
 	voice := narratorVoice
 	speakerID := narratorSpeaker
 
@@ -135,7 +159,7 @@ func (p *TTSPipeline) SynthesizeSegment(ctx context.Context, segment entity.Turn
 		}
 	}
 
-	return p.SynthesizeUtterance(ctx, speakerID, voice, segment.Text)
+	return p.SynthesizeUtterance(ctx, speakerID, voice, spoken)
 }
 
 func NewTTSPipeline(client TTSClient, cache *ContentCache) *TTSPipeline {
