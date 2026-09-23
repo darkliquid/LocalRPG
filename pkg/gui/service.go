@@ -2173,6 +2173,9 @@ func (s *Service) GetSettings(ctx context.Context) (*SettingsResponseDTO, error)
 }
 
 func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*SettingsResponseDTO, error) {
+	if err := s.validateVoiceOptionsInConfig(&cfg); err != nil {
+		return nil, fmt.Errorf("validate tts options: %w", err)
+	}
 	if err := s.configMgr.Save(&cfg); err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
 	}
