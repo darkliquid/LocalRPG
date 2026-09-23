@@ -78,8 +78,8 @@ func TestLocationImageRasterAndForce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateLocationImage failed: %v", err)
 	}
-	if filepath.Ext(path) != ".webp" {
-		t.Errorf("path = %q, want a .webp extension for raster bytes", path)
+	if filepath.Ext(path) != ".png" {
+		t.Errorf("path = %q, want a .png extension for PNG bytes", path)
 	}
 
 	if _, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", true); err != nil {
@@ -203,3 +203,54 @@ func TestGeneratedArtIsWritableAndDecodable(t *testing.T) {
 		t.Errorf("expected decodable PNG bytes, got %v", err)
 	}
 }
+
+func TestArtExtensionDetectsMagicBytes(t *testing.T) {
+	cases := []struct {
+		name     string
+		data     []byte
+		expected string
+	}{
+		{"svg", []byte("<svg viewBox='0 0 100 100'></svg>"), ".svg"},
+		{"png", []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"), ".png"},
+		{"jpeg", []byte("\xff\xd8\xff\xe0\x00\x10JFIF"), ".jpg"},
+		{"webp", []byte("RIFF\x00\x00\x00\x00WEBPVP8 "), ".webp"},
+		{"unknown fallback", []byte("raw data"), ".webp"},
+	}
+
+	for _, tc := range cases {
+		ext := artExtension(tc.data)
+		if ext != tc.expected {
+			t.Errorf("%s: expected %q, got %q", tc.name, tc.expected, ext)
+		}
+	}
+}
+
+func TestGenerateLocationImageCachesJPEG(t *testing.T) {
+	cache := NewContentCache(t.TempDir())
+	jpegBytes := []byte("\xff\xd8\xff\xe0\x00\x10JFIFdummy-jpeg-data")
+	client := &stubImageClient{body: jpegBytes}
+	pipeline := NewImagePipeline(client, cache)
+
+	location := locationFixture()
+	path, err := pipeline.GenerateLocationImage(context.Background(), location, "dark fantasy", "gemini:imagen-3", false)
+	if err != nil {
+		t.Fatalf("GenerateLocationImage failed: %v", err)
+	}
+	if filepath.Ext(path) != ".jpg" {
+		t.Errorf("expected .jpg extension, got %q", filepath.Ext(path))
+	}
+
+	// Second call should return cached path without re-generating
+	client.calls = 0
+	cachedPath, err := pipeline.GenerateLocationImage(context.Background(), location, "dark fantasy", "gemini:imagen-3", false)
+	if err != nil {
+		t.Fatalf("second call failed: %v", err)
+	}
+	if cachedPath != path {
+		t.Errorf("expected cached path %q, got %q", path, cachedPath)
+	}
+	if client.calls != 0 {
+		t.Errorf("expected 0 calls on cache hit, got %d", client.calls)
+	}
+}
+

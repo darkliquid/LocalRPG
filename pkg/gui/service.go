@@ -1609,10 +1609,16 @@ func voiceProfileDTO(voice *entity.VoiceConfig) *config.VoiceProfile {
 }
 
 func contentTypeForArt(path string) string {
-	if strings.EqualFold(filepath.Ext(path), ".svg") {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".svg":
 		return "image/svg+xml"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	default:
+		return "image/webp"
 	}
-	return "image/webp"
 }
 
 func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {

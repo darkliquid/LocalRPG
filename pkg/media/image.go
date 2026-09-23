@@ -37,7 +37,7 @@ func (p *ImagePipeline) GenerateLocationImage(ctx context.Context, location *ent
 	base := ComputeArtCacheKey(location.ID, AppearanceHash(location, providerParams), worldStyle)
 
 	if !force {
-		for _, ext := range []string{".svg", ".webp"} {
+		for _, ext := range []string{".svg", ".webp", ".jpg", ".jpeg", ".png"} {
 			if p.cache.Exists("images", base+ext) {
 				return filepath.Join(p.cache.Subdir("images"), base+ext), nil
 			}
@@ -119,6 +119,12 @@ func artExtension(data []byte) string {
 	}
 	if bytes.Contains(bytes.ToLower(head), []byte("<svg")) {
 		return ".svg"
+	}
+	if bytes.HasPrefix(head, []byte("\x89PNG")) {
+		return ".png"
+	}
+	if bytes.HasPrefix(head, []byte("\xff\xd8\xff")) {
+		return ".jpg"
 	}
 	return ".webp"
 }
