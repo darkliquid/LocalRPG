@@ -1401,6 +1401,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                                 default_voice: profile.voice_id,
                                 pitch: profile.pitch,
                                 speech_rate: profile.speech_rate,
+                                options: profile.options,
                               },
                               ttsPreviewText
                             )
@@ -1505,6 +1506,31 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-300 focus:outline-none"
                       />
                     </div>
+
+                    {inspect && inspect.options && inspect.options.length > 0 && (
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-[11px] font-cinzel uppercase text-stone-400">
+                          Provider Options
+                        </summary>
+                        <div className="pt-2">
+                          <VoiceOptionsControl
+                            schema={inspect.options}
+                            values={profile.options ?? {}}
+                            onChange={(key, value) => {
+                              const updated = [...(config.media.tts.voice_profiles || [])];
+                              updated[idx] = {
+                                ...updated[idx],
+                                options: { ...(updated[idx].options ?? {}), [key]: value },
+                              };
+                              setConfig({
+                                ...config,
+                                media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
+                              });
+                            }}
+                          />
+                        </div>
+                      </details>
+                    )}
                   </div>
                 ))}
 
