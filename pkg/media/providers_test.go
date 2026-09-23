@@ -670,3 +670,87 @@ func TestHTTPTTSClientListVoices(t *testing.T) {
 	})
 }
 
+func TestLiveKokoroFastAPI(t *testing.T) {
+	resp, err := http.Get("http://localhost:8880/health")
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Skip("skipping live Kokoro-FastAPI test: server not reachable on http://localhost:8880")
+	}
+	resp.Body.Close()
+
+	// Test 1: Base URL
+	client, err := media.NewTTSClient(config.TTSConfig{
+		Type:     "http",
+		Endpoint: "http://localhost:8880",
+		Model:    "kokoro",
+	})
+	if err != nil {
+		t.Fatalf("NewTTSClient failed: %v", err)
+	}
+
+	catalog, ok := client.(media.VoiceCatalog)
+	if !ok {
+		t.Fatalf("client does not implement media.VoiceCatalog")
+	}
+
+	voices, err := catalog.ListVoices(context.Background())
+	if err != nil {
+		t.Fatalf("ListVoices failed: %v", err)
+	}
+	if len(voices) < 10 {
+		t.Fatalf("expected at least 10 voices from live Kokoro-FastAPI, got %d", len(voices))
+	}
+
+	// Verify af_heart is present and parsed with metadata
+	var foundHeart bool
+	for _, v := range voices {
+		if v.ID == "af_heart" {
+			foundHeart = true
+			if v.Gender != "female" {
+				t.Errorf("af_heart gender = %q, want female", v.Gender)
+			}
+			if v.Language != "en-US" {
+				t.Errorf("af_heart language = %q, want en-US", v.Language)
+			}
+			if v.Accent != "American" {
+				t.Errorf("af_heart accent = %q, want American", v.Accent)
+			}
+			break
+		}
+	}
+	if !foundHeart {
+		t.Errorf("af_heart voice not found in live voices list")
+	}
+
+	// Test 2: Synthesis with base URL
+	audio, err := client.Synthesize(context.Background(), "Live Kokoro test.", &entity.VoiceConfig{
+		VoiceID: "af_heart",
+	})
+	if err != nil {
+		t.Fatalf("Synthesize failed: %v", err)
+	}
+	if len(audio) < 100 {
+		t.Fatalf("expected audio bytes, got %d bytes", len(audio))
+	}
+
+	// Test 3: Legacy URL with /v1/audio/speech
+	clientLegacy, err := media.NewTTSClient(config.TTSConfig{
+		Type:     "http",
+		Endpoint: "http://localhost:8880/v1/audio/speech",
+		Model:    "kokoro",
+	})
+	if err != nil {
+		t.Fatalf("NewTTSClient (legacy) failed: %v", err)
+	}
+	catalogLegacy, ok := clientLegacy.(media.VoiceCatalog)
+	if !ok {
+		t.Fatalf("legacy client does not implement media.VoiceCatalog")
+	}
+	legacyVoices, err := catalogLegacy.ListVoices(context.Background())
+	if err != nil {
+		t.Fatalf("ListVoices (legacy) failed: %v", err)
+	}
+	if len(legacyVoices) != len(voices) {
+		t.Errorf("legacy voice count = %d, want %d", len(legacyVoices), len(voices))
+	}
+}
+

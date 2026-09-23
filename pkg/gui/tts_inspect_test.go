@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -186,6 +187,36 @@ func TestInspectTTSHTTPDoesNotRequireKey(t *testing.T) {
 	}
 	if res.KeyRequired {
 		t.Errorf("expected KeyRequired false for http tts provider, got true")
+	}
+}
+
+func TestInspectTTSKokoroHTTP(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/audio/voices" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"voices":[{"id":"af_bella","name":"af_bella"}]}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	svc := NewService(t.TempDir())
+	res, err := svc.InspectTTS(context.Background(), TTSInspectRequestDTO{
+		Config: config.TTSConfig{
+			Type:     "http",
+			Endpoint: server.URL,
+			Model:    "kokoro",
+		},
+	})
+	if err != nil {
+		t.Fatalf("InspectTTS: %v", err)
+	}
+	if !res.Catalog.Available {
+		t.Errorf("Catalog.Available = false, want true")
+	}
+	if len(res.Catalog.Voices) != 1 || res.Catalog.Voices[0].ID != "af_bella" {
+		t.Errorf("unexpected voices: %+v", res.Catalog.Voices)
 	}
 }
 
