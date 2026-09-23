@@ -16,6 +16,8 @@ export interface GameState {
   locations: string[];
   // The player's own instruction for the campaign's opening scene, when set.
   opening_prompt?: string;
+  narrator_voice?: string;
+  start_location?: string;
 }
 
 export interface TurnSegment {
@@ -178,6 +180,13 @@ export interface CreateGameRequest {
   player?: PlayerCharacter;
   opening_prompt?: string;
   narrator_voice?: string;
+  start_location?: string;
+}
+
+export interface GameSettingsPatch {
+  opening_prompt?: string;
+  narrator_voice?: string;
+  start_location?: string;
 }
 
 export interface CharacterCreationField {

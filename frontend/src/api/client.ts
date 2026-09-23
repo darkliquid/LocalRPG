@@ -10,6 +10,7 @@ import {
   SystemInfo,
   WorldInfo,
   CreateGameRequest,
+  GameSettingsPatch,
   GenerateCharacterRequest,
   GenerateCharacterResponse,
   SystemDetail,
@@ -195,7 +196,11 @@ export class APIClient {
     if (!res.ok) throw new Error(`clearTrace: ${res.statusText}`);
   }
 
-  static async updateGameSettings(gameID: string, patch: { opening_prompt?: string }): Promise<void> {
+  async updateGameSettings(patch: GameSettingsPatch): Promise<void> {
+    return APIClient.updateGameSettings(this.gameID, patch);
+  }
+
+  static async updateGameSettings(gameID: string, patch: GameSettingsPatch): Promise<void> {
     const res = await fetch(`/api/game/${gameID}/settings`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
