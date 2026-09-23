@@ -172,6 +172,7 @@ export interface CreateGameRequest {
   player_name: string;
   player?: PlayerCharacter;
   opening_prompt?: string;
+  narrator_voice?: string;
 }
 
 export interface CharacterCreationField {
