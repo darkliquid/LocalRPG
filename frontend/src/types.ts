@@ -48,6 +48,9 @@ export interface Turn {
   outcome?: string;
   // Set when the model hit its token limit mid-reply.
   truncated?: boolean;
+  // How a reply that stopped mid-thought was repaired: 'continued', 'trimmed',
+  // or 'kept'. Absent when nothing was wrong.
+  recovery?: string;
   // Anything the prompt budget left out, so a thinner reply can be explained.
   context_notes?: string[];
   continuity_notes?: string[];

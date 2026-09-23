@@ -117,9 +117,16 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               onStopTurn={onStopAudio}
             />
 
+            {turn.recovery === 'trimmed' && (
+              <div className="text-xs font-mono text-amber-400/80 pt-1">
+                The narrator's reply ended mid-thought; the unfinished tail was dropped.
+              </div>
+            )}
+
             {turn.truncated && (
               <div className="text-xs font-mono text-amber-400/80 pt-1">
-                The narrator was cut off by the model's token limit. Raise the response limit for the gm role in Settings.
+                The narrator's reply could not be completed. Raise the response limit for the gm role in Settings, or
+                check the provider.
               </div>
             )}
 
