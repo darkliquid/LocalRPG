@@ -1,6 +1,6 @@
 # Dedicated Providers Tab in Settings Studio Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Relocate the shared Google Gemini master credentials into a dedicated "Providers" tab within Settings Studio, providing a clean and extensible central interface for multi-service providers.
 
@@ -23,7 +23,7 @@
 **Files:**
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Update imports and subtab state**
+- [x] **Step 1: Update imports and subtab state**
 
 Ensure `Cloud` is imported from `lucide-react` in `frontend/src/components/SettingsStudio.tsx`:
 ```typescript
@@ -49,7 +49,7 @@ const [activeSubTab, setActiveSubTab] = useState<
 >('paths');
 ```
 
-- [ ] **Step 2: Add Providers tab button to the navigation bar**
+- [x] **Step 2: Add Providers tab button to the navigation bar**
 
 In `SettingsStudio.tsx`, insert the Providers button right after Paths:
 ```tsx
@@ -73,12 +73,12 @@ In `SettingsStudio.tsx`, insert the Providers button right after Paths:
           </button>
 ```
 
-- [ ] **Step 3: Verify TypeScript compiles**
+- [x] **Step 3: Verify TypeScript compiles**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx
@@ -92,7 +92,7 @@ git commit -m "feat(frontend): add Providers navigation tab to SettingsStudio"
 **Files:**
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Add Providers tab rendering block**
+- [x] **Step 1: Add Providers tab rendering block**
 
 Right after `{activeSubTab === 'paths' && ( ... )}` in `frontend/src/components/SettingsStudio.tsx`, add:
 
@@ -188,12 +188,12 @@ Right after `{activeSubTab === 'paths' && ( ... )}` in `frontend/src/components/
       )}
 ```
 
-- [ ] **Step 2: Verify TypeScript compiles**
+- [x] **Step 2: Verify TypeScript compiles**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx
@@ -207,7 +207,7 @@ git commit -m "feat(frontend): implement Ecosystem Providers panel in SettingsSt
 **Files:**
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Remove duplicate shared key box from AI Agents tab**
+- [x] **Step 1: Remove duplicate shared key box from AI Agents tab**
 
 In `SettingsStudio.tsx`, remove the block:
 ```tsx
@@ -218,7 +218,7 @@ In `SettingsStudio.tsx`, remove the block:
 ```
 which was located directly above `<div className="space-y-4 pt-2">` in the `activeSubTab === 'agents'` section.
 
-- [ ] **Step 2: Update the Role API Key Override hint in AI Agents tab**
+- [x] **Step 2: Update the Role API Key Override hint in AI Agents tab**
 
 Update the hint and placeholder for the per-role API key override:
 ```tsx
@@ -246,12 +246,12 @@ Update the hint and placeholder for the per-role API key override:
                       />
 ```
 
-- [ ] **Step 3: Verify TypeScript compiles**
+- [x] **Step 3: Verify TypeScript compiles**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx
@@ -262,22 +262,22 @@ git commit -m "refactor(frontend): remove duplicate shared key from AI Agents ta
 
 ### Task 4: Full Verification and Build
 
-- [ ] **Step 1: Run all tests**
+- [x] **Step 1: Run all tests**
 
 Run: `mise run test`
 Expected: All backend tests pass and TypeScript check passes.
 
-- [ ] **Step 2: Run frontend and backend builds**
+- [x] **Step 2: Run frontend and backend builds**
 
 Run: `mise run build`
 Expected: Vite builds bundle cleanly into `pkg/gui/dist` and Go binary compiles to `bin/localrpg`.
 
-- [ ] **Step 3: Verify git status (restore dist/.gitkeep if needed)**
+- [x] **Step 3: Verify git status (restore dist/.gitkeep if needed)**
 
 Run: `git status`
 Expected: Clean working tree.
 
-- [ ] **Step 4: Mark plan complete and commit**
+- [x] **Step 4: Mark plan complete and commit**
 
 ```bash
 git add docs/superpowers/plans/2026-09-23-settings-providers-tab.md
