@@ -525,40 +525,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             </div>
 
-            {/* Shared Gemini Credentials */}
-            <div className="p-3 bg-stone-900/60 border border-stone-800 rounded-xl space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-cinzel uppercase text-amber-400 font-bold flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Shared Google Gemini API Key</span>
-                </label>
-                <span className="text-[10px] text-stone-500 font-mono">
-                  {config.providers?.gemini?.api_key ? '✓ Configured' : 'Using env or unconfigured'}
-                </span>
-              </div>
-              <input
-                type="password"
-                placeholder="AIzaSy... or leave blank for GEMINI_API_KEY env var"
-                value={config.providers?.gemini?.api_key || ''}
-                onChange={(e) => {
-                  setConfig({
-                    ...config,
-                    providers: {
-                      ...config.providers,
-                      gemini: {
-                        ...config.providers?.gemini,
-                        api_key: e.target.value,
-                      },
-                    },
-                  });
-                }}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
-              />
-              <p className="text-[11px] text-stone-500">
-                Shared across all Gemini agent roles (and future image / voice generation). Can still be overridden per role below.
-              </p>
-            </div>
-
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -794,12 +760,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
                         <span>Role API Key Override</span>
                         {config.providers?.gemini?.api_key && (
-                          <span className="text-[10px] text-emerald-400 font-mono">Shared key active</span>
+                          <span className="text-[10px] text-emerald-400 font-mono">Shared key active (from Providers tab)</span>
                         )}
                       </label>
                       <input
                         type="password"
-                        placeholder={config.providers?.gemini?.api_key ? 'Using shared key (leave blank)' : 'Optional override or GEMINI_API_KEY env'}
+                        placeholder={config.providers?.gemini?.api_key ? 'Using shared key from Providers tab (leave blank)' : 'Optional override or GEMINI_API_KEY env'}
                         value={currentRoleConfig.api_key || ''}
                         onChange={(e) => {
                           const updated = { ...currentRoleConfig, api_key: e.target.value };
