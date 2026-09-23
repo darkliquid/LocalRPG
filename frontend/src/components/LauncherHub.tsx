@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
 import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest, CharacterCreationField, VoiceProfile } from '../types';
-import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen, AlertCircle, Settings, RotateCcw, Trash2, Wand2 } from 'lucide-react';
+import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen, AlertCircle, Settings, RotateCcw, Trash2, Wand2, Volume2 } from 'lucide-react';
 import { SystemsStudio } from './SystemsStudio';
 import { WorldsStudio } from './WorldsStudio';
 import { SettingsStudio } from './SettingsStudio';
@@ -44,8 +44,14 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const [creationFields, setCreationFields] = useState<CharacterCreationField[]>(DEFAULT_CHARACTER_FIELDS);
   const [playerAnswers, setPlayerAnswers] = useState<Record<string, string>>({});
   const [playerVoiceID, setPlayerVoiceID] = useState('');
+  const [narratorVoiceID, setNarratorVoiceID] = useState<string>('');
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const openNewGameWizard = () => {
+    setNarratorVoiceID('');
+    setIsWizardOpen(true);
+  };
   // A destructive campaign action is confirmed inline rather than with a browser
   // dialog, so the launcher keeps its own styling and stays usable inside Wails.
   const [pendingAction, setPendingAction] = useState<{ type: 'restart' | 'delete'; id: string } | null>(null);
@@ -154,6 +160,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         system_id: effectiveSystemID,
         world_id: effectiveWorldID,
         player_name: newPlayerName.trim() || 'Adventurer',
+        narrator_voice: narratorVoiceID.trim() || undefined,
         player: {
           appearance: playerAnswers.appearance?.trim() || undefined,
           age: playerAnswers.age?.trim() || undefined,
@@ -269,7 +276,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         </nav>
 
         <button
-          onClick={() => setIsWizardOpen(true)}
+          onClick={openNewGameWizard}
           className="flex items-center gap-2 text-xs font-cinzel font-bold px-4 py-2 rounded-xl transition-all cursor-pointer bg-amber-600 hover:bg-amber-500 text-stone-950 shadow-[0_0_15px_rgba(217,119,6,0.5)] active:scale-95"
         >
           <Plus className="w-4 h-4" />
@@ -376,7 +383,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
                   </button>
                 )}
                 <button
-                  onClick={() => setIsWizardOpen(true)}
+                  onClick={openNewGameWizard}
                   className="inline-flex items-center gap-2 text-xs font-cinzel font-bold px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 transition-all cursor-pointer shadow-lg"
                 >
                   <Plus className="w-4 h-4" />
@@ -733,6 +740,28 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
                   ))}
                   <p className="text-[11px] text-stone-500">
                     Fields marked * are required. Generate fills a starter value you can edit.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                    <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Narrator Voice</span>
+                  </label>
+                  <select
+                    value={narratorVoiceID}
+                    onChange={(e) => setNarratorVoiceID(e.target.value)}
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                  >
+                    <option value="">Default (Provider Setting)</option>
+                    {voiceProfiles.map((profile) => (
+                      <option key={profile.id} value={profile.voice_id}>
+                        {profile.name} ({profile.voice_id})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-stone-500">
+                    The voice used to narrate scenes, GM responses, and descriptions in this campaign.
                   </p>
                 </div>
 
