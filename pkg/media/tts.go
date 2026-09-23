@@ -198,13 +198,20 @@ func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string,
 	start := time.Now()
 
 	voiceID, pitch, rate := "", 0.0, 0.0
+	provider, model := "", ""
 	if voice != nil {
 		voiceID, pitch, rate = voice.VoiceID, voice.Pitch, voice.SpeechRate
+		provider = voice.Provider
+		if value, ok := voice.Options["model"].(string); ok {
+			model = value
+		}
 	}
 	p.logger = trace.OrNil(p.logger)
 	p.logger.Event("media.tts.request", map[string]interface{}{
 		"speaker":   speakerID,
 		"voice_id":  voiceID,
+		"provider":  provider,
+		"model":     model,
 		"pitch":     pitch,
 		"rate":      rate,
 		"chars":     len([]rune(text)),

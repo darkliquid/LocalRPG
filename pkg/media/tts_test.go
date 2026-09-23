@@ -346,3 +346,29 @@ func TestTTSPipelineTracesCacheHitsAndMisses(t *testing.T) {
 		t.Errorf("expected the cache key so a clip can be found, got %+v", request.Fields)
 	}
 }
+
+func TestTTSPipelineNamesTheProviderInTheTrace(t *testing.T) {
+	pipeline := NewTTSPipeline(&mockTTSClient{}, NewContentCache(t.TempDir()))
+	memory := trace.NewMemory(trace.LevelFull)
+	pipeline.SetLogger(memory)
+
+	voice := &entity.VoiceConfig{
+		Provider: "builtin:elevenlabs",
+		VoiceID:  "v1",
+		Options:  map[string]interface{}{"model": "eleven_turbo_v2_5"},
+	}
+	if _, err := pipeline.SynthesizeUtterance(context.Background(), "elena", voice, "Hello."); err != nil {
+		t.Fatalf("SynthesizeUtterance: %v", err)
+	}
+
+	event, ok := memory.Find("media.tts.request")
+	if !ok {
+		t.Fatalf("no media.tts.request event recorded")
+	}
+	if event.Fields["provider"] != "builtin:elevenlabs" {
+		t.Errorf("provider = %v", event.Fields["provider"])
+	}
+	if event.Fields["model"] != "eleven_turbo_v2_5" {
+		t.Errorf("model = %v", event.Fields["model"])
+	}
+}
