@@ -10,8 +10,11 @@
     color: #e7e5e4;
     overflow: hidden;
   }
-  h1, h2, h3, h4, .font-cinzel {
-    font-family: 'Cinzel', serif;
+  h1, h2, h3, h4 {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .font-cinzel {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
@@ -36,7 +39,7 @@
   }
   select option:checked {
     background-color: #292524;
-    color: #fbbf24;
+    color: #c084fc;
   }
 }
 
@@ -100,4 +103,13 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(168, 162, 158, 0.6);
+}
+
+/* Cross-browser scrollbar hiding utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
