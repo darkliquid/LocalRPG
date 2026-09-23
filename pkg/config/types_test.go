@@ -286,3 +286,37 @@ func TestTTSConfigOptionsRoundTrip(t *testing.T) {
 		t.Errorf("an unset options map must be omitted, got %s", plain)
 	}
 }
+
+func TestToolCapabilityAndBounds(t *testing.T) {
+	empty := &Config{}
+
+	if got := empty.RoleSupportsTools("gm"); got != "auto" {
+		t.Errorf("RoleSupportsTools = %q, want auto", got)
+	}
+	if got := empty.ToolRounds(); got != 4 {
+		t.Errorf("ToolRounds = %d, want 4", got)
+	}
+	if got := empty.ToolResultChars(); got != 4000 {
+		t.Errorf("ToolResultChars = %d, want 4000", got)
+	}
+
+	configured := &Config{Agents: AgentsConfig{
+		Roles: map[string]AgentRoleConfig{"gm": {Type: "http", SupportsTools: "no"}},
+	}}
+	if got := configured.RoleSupportsTools("gm"); got != "no" {
+		t.Errorf("RoleSupportsTools = %q, want the configured no", got)
+	}
+
+	unknown := &Config{Agents: AgentsConfig{Roles: map[string]AgentRoleConfig{"gm": {SupportsTools: "banana"}}}}
+	if got := unknown.RoleSupportsTools("gm"); got != "auto" {
+		t.Errorf("RoleSupportsTools = %q, want auto for an unknown value", got)
+	}
+
+	bounded := &Config{Agents: AgentsConfig{ToolRounds: 2, ToolResultChars: 500}}
+	if got := bounded.ToolRounds(); got != 2 {
+		t.Errorf("ToolRounds = %d, want 2", got)
+	}
+	if got := bounded.ToolResultChars(); got != 500 {
+		t.Errorf("ToolResultChars = %d, want 500", got)
+	}
+}

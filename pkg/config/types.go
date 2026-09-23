@@ -31,6 +31,9 @@ type AgentRoleConfig struct {
 	APIKey      string   `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 	Temperature float64  `yaml:"temperature,omitempty" json:"temperature,omitempty"`
 	MaxTokens   int      `yaml:"max_tokens,omitempty" json:"max_tokens,omitempty"`
+	// SupportsTools is "auto", "yes", or "no". Empty means auto: an HTTP provider
+	// gets tools and every other type does not.
+	SupportsTools string `yaml:"supports_tools,omitempty" json:"supports_tools,omitempty"`
 }
 
 type AgentsConfig struct {
@@ -79,6 +82,11 @@ type AgentsConfig struct {
 	ContinuityChecks *bool `yaml:"continuity_checks" json:"continuity_checks,omitempty"`
 	// Completion governs how a narrator reply that stops mid-thought is repaired.
 	Completion CompletionConfig `yaml:"completion" json:"completion"`
+	// ToolRounds caps how many times a turn may call tools before tools are
+	// withdrawn. Zero means the default of four.
+	ToolRounds int `yaml:"tool_rounds" json:"tool_rounds"`
+	// ToolResultChars caps one tool result. Zero means the default of 4000.
+	ToolResultChars int `yaml:"tool_result_chars" json:"tool_result_chars"`
 }
 
 // CompletionConfig governs how a narrator reply that stops mid-thought is
@@ -212,6 +220,8 @@ func DefaultConfig() *Config {
 				MinIncompleteChars: 24,
 				TimeoutSeconds:     45,
 			},
+			ToolRounds:      4,
+			ToolResultChars: 4000,
 			Roles: map[string]AgentRoleConfig{
 				"gm": {
 					Type:        "cli",
@@ -507,4 +517,31 @@ func (c *Config) CompletionTimeout() time.Duration {
 		seconds = 45
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+// RoleSupportsTools is the tool capability for a role: "auto", "yes", or "no".
+func (c *Config) RoleSupportsTools(role string) string {
+	value := strings.ToLower(strings.TrimSpace(c.Agents.Roles[role].SupportsTools))
+	switch value {
+	case "yes", "no", "auto":
+		return value
+	default:
+		return "auto"
+	}
+}
+
+// ToolRounds caps how many times a turn may call tools.
+func (c *Config) ToolRounds() int {
+	if c.Agents.ToolRounds <= 0 {
+		return 4
+	}
+	return c.Agents.ToolRounds
+}
+
+// ToolResultChars caps one tool result, so a broad query cannot flood the prompt.
+func (c *Config) ToolResultChars() int {
+	if c.Agents.ToolResultChars <= 0 {
+		return 4000
+	}
+	return c.Agents.ToolResultChars
 }
