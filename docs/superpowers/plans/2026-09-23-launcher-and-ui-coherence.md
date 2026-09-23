@@ -49,7 +49,7 @@
 - Modify: `pkg/gui/service.go:340-365, 1870-1885`
 - Create: `pkg/gui/settings_endpoint_test.go`
 
-- [ ] **Step 1: Write failing test in `pkg/gui/settings_endpoint_test.go`**
+- [x] **Step 1: Write failing test in `pkg/gui/settings_endpoint_test.go`**
 
 ```go
 package gui
@@ -131,12 +131,12 @@ func TestGameSettingsPatchAndState(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestGameSettingsPatchAndState ./pkg/gui/`
 Expected: FAIL (`NarratorVoice undefined` or compilation error)
 
-- [ ] **Step 3: Update `pkg/gui/types.go`**
+- [x] **Step 3: Update `pkg/gui/types.go`**
 
 Update `GameStateDTO`, `GameSettingsPatchDTO`, and `CreateGameRequestDTO` in `pkg/gui/types.go`:
 ```go
@@ -170,7 +170,7 @@ type CreateGameRequestDTO struct {
 }
 ```
 
-- [ ] **Step 4: Update `pkg/gui/service.go` and `pkg/gui/server.go`**
+- [x] **Step 4: Update `pkg/gui/service.go` and `pkg/gui/server.go`**
 
 In `pkg/gui/service.go` inside `GetGameState`:
 ```go
@@ -225,13 +225,13 @@ In `pkg/gui/server.go` inside `case "settings":`:
 		w.WriteHeader(http.StatusNoContent)
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -v -run TestGameSettingsPatchAndState ./pkg/gui/`
 Run: `go test -v ./pkg/gui/`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/server.go pkg/gui/settings_endpoint_test.go
@@ -246,7 +246,7 @@ git commit -m "feat(gui): expand campaign settings with narrator_voice and start
 - Modify: `frontend/src/types.ts:60-90, 160-190`
 - Modify: `frontend/src/api/client.ts:310-340`
 
-- [ ] **Step 1: Update `frontend/src/types.ts`**
+- [x] **Step 1: Update `frontend/src/types.ts`**
 
 Update `GameState`, `CreateGameRequest`, and `GameSettingsPatch`:
 ```typescript
@@ -288,7 +288,7 @@ export interface CreateGameRequest {
 }
 ```
 
-- [ ] **Step 2: Add `updateGameSettings` to `frontend/src/api/client.ts`**
+- [x] **Step 2: Add `updateGameSettings` to `frontend/src/api/client.ts`**
 
 ```typescript
   async updateGameSettings(patch: GameSettingsPatch): Promise<void> {
@@ -314,12 +314,12 @@ export interface CreateGameRequest {
   }
 ```
 
-- [ ] **Step 3: Run frontend typecheck**
+- [x] **Step 3: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/api/client.ts
@@ -334,7 +334,7 @@ git commit -m "feat(frontend): add narrator_voice and start_location to types an
 - Modify: `frontend/src/index.css`
 - Modify: `frontend/src/components/launcher/WorldFlyout.tsx`
 
-- [ ] **Step 1: Add `.no-scrollbar` to `frontend/src/index.css`**
+- [x] **Step 1: Add `.no-scrollbar` to `frontend/src/index.css`**
 
 Add cross-browser scrollbar hiding rules to `frontend/src/index.css`:
 ```css
@@ -347,7 +347,7 @@ Add cross-browser scrollbar hiding rules to `frontend/src/index.css`:
 }
 ```
 
-- [ ] **Step 2: Update `frontend/src/components/launcher/WorldFlyout.tsx`**
+- [x] **Step 2: Update `frontend/src/components/launcher/WorldFlyout.tsx`**
 
 Refactor `WorldFlyout.tsx`:
 - Apply `.no-scrollbar` and horizontal wheel listener (`onWheel={(e) => { e.currentTarget.scrollLeft += e.deltaY; }}`).
@@ -355,12 +355,12 @@ Refactor `WorldFlyout.tsx`:
 - Position the tooltips safely with `pointer-events-none absolute left-1/2 -translate-x-1/2 top-full mt-2.5 ... z-50`.
 - Use `max-w-[min(720px,calc(100vw-140px))]`.
 
-- [ ] **Step 3: Run frontend typecheck**
+- [x] **Step 3: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/index.css frontend/src/components/launcher/WorldFlyout.tsx
@@ -374,7 +374,7 @@ git commit -m "fix(frontend): remove forced scrollbars and add smooth wheel scro
 **Files:**
 - Modify: `frontend/src/components/launcher/NewCampaignModal.tsx`
 
-- [ ] **Step 1: Restructure Modal Header in `NewCampaignModal.tsx`**
+- [x] **Step 1: Restructure Modal Header in `NewCampaignModal.tsx`**
 
 Replace header layout with absolute background banner layer and floating content layer:
 ```tsx
@@ -427,7 +427,7 @@ Replace header layout with absolute background banner layer and floating content
         </div>
 ```
 
-- [ ] **Step 2: Add Voice Catalog & Character Fields to Form**
+- [x] **Step 2: Add Voice Catalog & Character Fields to Form**
 
 - Fetch voice profiles using `APIClient.getSettings()` or pass voice profiles prop.
 - Add Narrator Voice selector:
@@ -455,12 +455,12 @@ Replace header layout with absolute background banner layer and floating content
 - Add Start Location input (optional).
 - Wire all values into `onCreateGame` call.
 
-- [ ] **Step 3: Run frontend typecheck**
+- [x] **Step 3: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/launcher/NewCampaignModal.tsx
@@ -474,7 +474,7 @@ git commit -m "feat(frontend): fix NewCampaignModal header layout and add narrat
 **Files:**
 - Modify: `frontend/src/components/launcher/CampaignSettingsModal.tsx`
 
-- [ ] **Step 1: Load and Edit Settings in `CampaignSettingsModal.tsx`**
+- [x] **Step 1: Load and Edit Settings in `CampaignSettingsModal.tsx`**
 
 - On open, call `APIClient.getGameState(game.id)` and `APIClient.getSettings()` to load current `narrator_voice`, `opening_prompt`, `start_location`, and voice profiles.
 - Add structured tabs or sections:
@@ -488,12 +488,12 @@ git commit -m "feat(frontend): fix NewCampaignModal header layout and add narrat
   3. **Danger Zone**:
      - Restart Campaign and Delete Campaign.
 
-- [ ] **Step 2: Run frontend typecheck**
+- [x] **Step 2: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/launcher/CampaignSettingsModal.tsx
@@ -509,7 +509,7 @@ git commit -m "feat(frontend): expand CampaignSettingsModal with narrator voice,
 - Modify: `frontend/src/components/SystemsStudio.tsx`
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Migrate `WorldsStudio.tsx`**
+- [x] **Step 1: Migrate `WorldsStudio.tsx`**
 
 - Replace all `font-cinzel` with `font-sans font-bold`.
 - Replace amber accents with purple:
@@ -519,7 +519,7 @@ git commit -m "feat(frontend): expand CampaignSettingsModal with narrator voice,
   - Selected world card: `bg-purple-950/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]`
   - Tab active state: `bg-purple-600 text-white font-bold`
 
-- [ ] **Step 2: Migrate `SystemsStudio.tsx`**
+- [x] **Step 2: Migrate `SystemsStudio.tsx`**
 
 - Replace all `font-cinzel` with `font-sans font-bold`.
 - Replace amber accents with purple:
@@ -528,17 +528,17 @@ git commit -m "feat(frontend): expand CampaignSettingsModal with narrator voice,
   - Selected system card: `bg-purple-950/30 border-purple-500/50`
   - Tab active state: `bg-purple-600 text-white font-bold`
 
-- [ ] **Step 3: Migrate `SettingsStudio.tsx`**
+- [x] **Step 3: Migrate `SettingsStudio.tsx`**
 
 - Replace amber save buttons and active indicators with `bg-purple-600 hover:bg-purple-500 text-white shadow-md`.
 - Replace `border-amber-*` and `text-amber-400` with `border-purple-500/40` and `text-purple-400`.
 
-- [ ] **Step 4: Run frontend typecheck**
+- [x] **Step 4: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/WorldsStudio.tsx frontend/src/components/SystemsStudio.tsx frontend/src/components/SettingsStudio.tsx
@@ -561,29 +561,29 @@ git commit -m "feat(frontend): migrate Studios from Cinzel and amber to sans-ser
 - Modify: `frontend/src/components/Drawers.tsx`
 - Modify: `frontend/src/components/AddEntityModal.tsx`
 
-- [ ] **Step 1: Migrate `App.tsx` header and controls**
+- [x] **Step 1: Migrate `App.tsx` header and controls**
 
 - Change `font-cinzel` in header to `font-sans font-bold`.
 - Change Campaigns button: `bg-white/5 hover:bg-white/10 text-stone-200 border border-white/10`.
 - Change active game dot: `bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]`.
 - Change drawer pills active state: `bg-purple-600 text-white font-bold shadow-md`.
 
-- [ ] **Step 2: Migrate Drawers (`CodexDrawer.tsx`, `CharacterSheetDrawer.tsx`, `LivingWorldDrawer.tsx`, `Drawers.tsx`)**
+- [x] **Step 2: Migrate Drawers (`CodexDrawer.tsx`, `CharacterSheetDrawer.tsx`, `LivingWorldDrawer.tsx`, `Drawers.tsx`)**
 
 - Replace `font-cinzel` with `font-sans`.
 - Replace `text-amber-400` / `bg-amber-600` with `text-purple-400` / `bg-purple-600`.
 
-- [ ] **Step 3: Migrate Action Console, Chronicle & Views (`ActionConsole.tsx`, `ChronicleView.tsx`, `ProloguePanel.tsx`, `StoryTheater.tsx`, `AddEntityModal.tsx`)**
+- [x] **Step 3: Migrate Action Console, Chronicle & Views (`ActionConsole.tsx`, `ChronicleView.tsx`, `ProloguePanel.tsx`, `StoryTheater.tsx`, `AddEntityModal.tsx`)**
 
 - Replace `font-cinzel` with `font-sans`.
 - Replace `text-amber-400` / `bg-amber-600` with `text-purple-400` / `bg-purple-600`.
 
-- [ ] **Step 4: Run frontend typecheck**
+- [x] **Step 4: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/App.tsx frontend/src/components/ActionConsole.tsx frontend/src/components/ChronicleView.tsx frontend/src/components/CodexDrawer.tsx frontend/src/components/CharacterSheetDrawer.tsx frontend/src/components/LivingWorldDrawer.tsx frontend/src/components/ProloguePanel.tsx frontend/src/components/StoryTheater.tsx frontend/src/components/Drawers.tsx frontend/src/components/AddEntityModal.tsx
@@ -594,23 +594,23 @@ git commit -m "feat(frontend): migrate Tabletop gameplay shell and drawers to sa
 
 ### Task 8: Full Verification & Build
 
-- [ ] **Step 1: Run complete test suite**
+- [x] **Step 1: Run complete test suite**
 
 Run: `mise run test`
 Expected: PASS
 
-- [ ] **Step 2: Run production build**
+- [x] **Step 2: Run production build**
 
 Run: `mise run build`
 Expected: SUCCESS
 
-- [ ] **Step 3: Restore `.gitkeep` and check git status**
+- [x] **Step 3: Restore `.gitkeep` and check git status**
 
 Run: `git checkout pkg/gui/dist/.gitkeep`
 Run: `git status`
 Expected: Clean working tree
 
-- [ ] **Step 4: Mark plan complete and commit**
+- [x] **Step 4: Mark plan complete and commit**
 
 ```bash
 git add docs/superpowers/plans/2026-09-23-launcher-and-ui-coherence.md
