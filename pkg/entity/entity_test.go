@@ -159,3 +159,33 @@ func TestIsCharacterType(t *testing.T) {
 		}
 	}
 }
+
+func TestVoiceOptionsRoundTripThroughFrontmatter(t *testing.T) {
+	original := &Entity{
+		ID:   "aldric",
+		Name: "Aldric",
+		Type: "character",
+		Body: "A guarded mercenary.",
+		Voice: &VoiceConfig{
+			Provider:   "builtin:elevenlabs",
+			VoiceID:    "EXAVITQu4vr4xnSDxMaL",
+			SpeechRate: 1,
+			Options:    map[string]interface{}{"stability": 0.35, "similarity_boost": 0.8},
+		},
+	}
+
+	data, err := original.SerializeMarkdown()
+	if err != nil {
+		t.Fatalf("SerializeMarkdown: %v", err)
+	}
+	parsed, err := ParseMarkdownEntity(data)
+	if err != nil {
+		t.Fatalf("ParseMarkdownEntity: %v", err)
+	}
+	if parsed.Voice == nil {
+		t.Fatalf("voice did not round-trip")
+	}
+	if parsed.Voice.Options["stability"] != 0.35 || parsed.Voice.Options["similarity_boost"] != 0.8 {
+		t.Errorf("options = %v", parsed.Voice.Options)
+	}
+}

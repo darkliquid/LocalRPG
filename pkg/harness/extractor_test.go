@@ -487,3 +487,21 @@ func TestResolveSpeakerVoiceByDisplayName(t *testing.T) {
 		t.Fatalf("expected no voice for an unknown speaker, got %+v", got)
 	}
 }
+
+func TestAssignVoiceProfileCopiesOptions(t *testing.T) {
+	ent := &entity.Entity{ID: "aldric", Name: "Aldric the Gruff", Type: "character", Body: "A mercenary."}
+	profiles := []config.VoiceProfile{{
+		ID:      "gruff",
+		VoiceID: "am_adam",
+		Tags:    []string{"gruff", "mercenary"},
+		Options: map[string]interface{}{"stability": 0.2},
+	}}
+
+	AssignVoiceProfile(ent, profiles)
+	if ent.Voice == nil {
+		t.Fatalf("expected a voice assigned")
+	}
+	if ent.Voice.Options["stability"] != 0.2 {
+		t.Errorf("options = %v, want the profile's", ent.Voice.Options)
+	}
+}

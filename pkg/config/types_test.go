@@ -1,8 +1,11 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestTurnAndChunkTimeoutsHaveDefaults(t *testing.T) {
@@ -216,5 +219,47 @@ func TestDefaultConfigCarriesCompletionKnobs(t *testing.T) {
 	}
 	if role.Type != "inherit" || role.InheritFrom != RoleGM {
 		t.Errorf("completion role = %+v, want inherit gm", role)
+	}
+}
+
+func TestVoiceProfileOptionsAndMeteredRoundTrip(t *testing.T) {
+	profile := VoiceProfile{
+		ID:      "hushed",
+		VoiceID: "bf_emma",
+		Options: map[string]interface{}{"stability": 0.35, "model": "eleven_multilingual_v2"},
+	}
+	encoded, err := yaml.Marshal(profile)
+	if err != nil {
+		t.Fatalf("marshal profile: %v", err)
+	}
+	var decoded VoiceProfile
+	if err := yaml.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal profile: %v", err)
+	}
+	if decoded.Options["stability"] != 0.35 || decoded.Options["model"] != "eleven_multilingual_v2" {
+		t.Errorf("options did not round-trip: %v", decoded.Options)
+	}
+
+	off := false
+	cfg := TTSConfig{Metered: &off}
+	encoded, err = yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal tts config: %v", err)
+	}
+	var decodedCfg TTSConfig
+	if err := yaml.Unmarshal(encoded, &decodedCfg); err != nil {
+		t.Fatalf("unmarshal tts config: %v", err)
+	}
+	if decodedCfg.Metered == nil || *decodedCfg.Metered {
+		t.Errorf("metered did not round-trip: %v", decodedCfg.Metered)
+	}
+
+	// A config that never set the pointer omits it entirely.
+	plain, err := yaml.Marshal(TTSConfig{})
+	if err != nil {
+		t.Fatalf("marshal plain config: %v", err)
+	}
+	if strings.Contains(string(plain), "metered") {
+		t.Errorf("an unset metered must be omitted, got %s", plain)
 	}
 }

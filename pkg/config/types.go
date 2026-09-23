@@ -106,6 +106,10 @@ type VoiceProfile struct {
 	SpeechRate  float64  `yaml:"speech_rate" json:"speech_rate"`
 	Tags        []string `yaml:"tags,omitempty" json:"tags,omitempty"`
 	Description string   `yaml:"description,omitempty" json:"description,omitempty"`
+	// Options holds provider-declared tunables, keyed by VoiceOption.Key. It is
+	// opaque to the engine the same way entity State is: only the provider
+	// interprets it, and an empty map is omitted.
+	Options map[string]interface{} `yaml:"options,omitempty" json:"options,omitempty"`
 }
 
 type TTSConfig struct {
@@ -127,6 +131,9 @@ type TTSConfig struct {
 	// "auto" (default) reduces it unless the provider is Markdown-aware, "strip"
 	// always reduces it, and "keep" sends it unchanged.
 	Markdown string `yaml:"markdown,omitempty" json:"markdown,omitempty"`
+	// Metered marks a provider that charges per request. It overrides the
+	// provider's own declaration, so an operator can flag a proxied endpoint.
+	Metered *bool `yaml:"metered,omitempty" json:"metered,omitempty"`
 }
 
 type STTConfig struct {

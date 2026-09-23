@@ -72,12 +72,7 @@ func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 	// 1. Check direct profile ID match
 	for _, p := range profiles {
 		if strings.Contains(searchContent, strings.ToLower(p.ID)) {
-			ent.Voice = &entity.VoiceConfig{
-				Provider:   p.Provider,
-				VoiceID:    p.VoiceID,
-				Pitch:      p.Pitch,
-				SpeechRate: p.SpeechRate,
-			}
+			ent.Voice = voiceFromProfile(p)
 			return
 		}
 	}
@@ -99,12 +94,7 @@ func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 	}
 
 	if bestProfile != nil {
-		ent.Voice = &entity.VoiceConfig{
-			Provider:   bestProfile.Provider,
-			VoiceID:    bestProfile.VoiceID,
-			Pitch:      bestProfile.Pitch,
-			SpeechRate: bestProfile.SpeechRate,
-		}
+		ent.Voice = voiceFromProfile(*bestProfile)
 		return
 	}
 
@@ -113,11 +103,18 @@ func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 	h.Write([]byte(ent.ID))
 	idx := int(h.Sum32()) % len(profiles)
 	p := profiles[idx]
-	ent.Voice = &entity.VoiceConfig{
-		Provider:   p.Provider,
-		VoiceID:    p.VoiceID,
-		Pitch:      p.Pitch,
-		SpeechRate: p.SpeechRate,
+	ent.Voice = voiceFromProfile(p)
+}
+
+// voiceFromProfile is the one place a profile becomes a voice, so a provider
+// tunable an operator authored travels with the character.
+func voiceFromProfile(profile config.VoiceProfile) *entity.VoiceConfig {
+	return &entity.VoiceConfig{
+		Provider:   profile.Provider,
+		VoiceID:    profile.VoiceID,
+		Pitch:      profile.Pitch,
+		SpeechRate: profile.SpeechRate,
+		Options:    profile.Options,
 	}
 }
 

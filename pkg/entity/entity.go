@@ -19,6 +19,9 @@ type VoiceConfig struct {
 	VoiceID    string  `yaml:"voice_id,omitempty" json:"voice_id,omitempty"`
 	Pitch      float64 `yaml:"pitch,omitempty" json:"pitch,omitempty"`
 	SpeechRate float64 `yaml:"speech_rate,omitempty" json:"speech_rate,omitempty"`
+	// Options carries provider-declared tunables for this voice, keyed by the
+	// provider's VoiceOption.Key. Absent means the provider's own defaults.
+	Options map[string]interface{} `yaml:"options,omitempty" json:"options,omitempty"`
 }
 
 type EntityFrontmatter struct {
