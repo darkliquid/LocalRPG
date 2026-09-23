@@ -184,7 +184,11 @@ type ImageConfig struct {
 	// provider is configured or a provider call fails, so imagery always exists
 	// offline.
 	BuiltinFallback bool `yaml:"builtin_fallback" json:"builtin_fallback"`
+
+	AspectRatio      string `yaml:"aspect_ratio,omitempty" json:"aspect_ratio,omitempty"`
+	PersonGeneration string `yaml:"person_generation,omitempty" json:"person_generation,omitempty"`
 }
+
 
 type MediaConfig struct {
 	TTS   TTSConfig   `yaml:"tts" json:"tts"`

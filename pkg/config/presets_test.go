@@ -96,3 +96,30 @@ func TestGetGeminiAgentPresets(t *testing.T) {
 	}
 }
 
+func TestGetGeminiImagePresets(t *testing.T) {
+	presetIDs := []string{
+		"imagen-3",
+		"imagen-3-fast",
+		"nano-banana-2",
+		"nano-banana-2-lite",
+		"nano-banana-pro",
+		"nano-banana",
+	}
+
+	for _, id := range presetIDs {
+		preset, ok := config.GetImagePreset(id)
+		if !ok {
+			t.Fatalf("expected preset %q to exist", id)
+		}
+		if preset.Type != "gemini" {
+			t.Errorf("preset %q expected type gemini, got %q", id, preset.Type)
+		}
+		if preset.AspectRatio != "16:9" {
+			t.Errorf("preset %q expected aspect_ratio 16:9, got %q", id, preset.AspectRatio)
+		}
+		if preset.PersonGeneration != "ALLOW_ADULT" {
+			t.Errorf("preset %q expected person_generation ALLOW_ADULT, got %q", id, preset.PersonGeneration)
+		}
+	}
+}
+

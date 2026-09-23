@@ -198,7 +198,44 @@ var ImagePresets = map[string]ImageConfig{
 		Endpoint: "https://api.openai.com/v1/images/generations",
 		Model:    "dall-e-3",
 	},
+	"imagen-3": {
+		Type:             "gemini",
+		Model:            "imagen-3.0-generate-002",
+		AspectRatio:      "16:9",
+		PersonGeneration: "ALLOW_ADULT",
+	},
+	"imagen-3-fast": {
+		Type:             "gemini",
+		Model:            "imagen-3.0-fast-generate-001",
+		AspectRatio:      "16:9",
+		PersonGeneration: "ALLOW_ADULT",
+	},
+	"nano-banana-2": {
+		Type:             "gemini",
+		Model:            "gemini-3.1-flash-image",
+		AspectRatio:      "16:9",
+		PersonGeneration: "ALLOW_ADULT",
+	},
+	"nano-banana-2-lite": {
+		Type:             "gemini",
+		Model:            "gemini-3.1-flash-lite-image",
+		AspectRatio:      "16:9",
+		PersonGeneration: "ALLOW_ADULT",
+	},
+	"nano-banana-pro": {
+		Type:             "gemini",
+		Model:            "gemini-3-pro-image",
+		AspectRatio:      "16:9",
+		PersonGeneration: "ALLOW_ADULT",
+	},
+	"nano-banana": {
+		Type:             "gemini",
+		Model:            "gemini-2.5-flash-image",
+		AspectRatio:      "16:9",
+		PersonGeneration: "ALLOW_ADULT",
+	},
 }
+
 
 var KokoroVoiceProfiles = []VoiceProfile{
 	{ID: "af", Name: "Default (American Female)", VoiceID: "af", Pitch: 1.0, SpeechRate: 1.0, Tags: []string{"american", "female", "default", "neutral"}, Description: "The model's stock American female voice."},

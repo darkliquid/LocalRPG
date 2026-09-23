@@ -356,3 +356,32 @@ agents:
 		t.Errorf("expected top_k 40, got %v", role.TopK)
 	}
 }
+
+func TestConfigParsesImageTunables(t *testing.T) {
+	yamlData := `
+version: "1"
+paths:
+  systems: "./systems"
+  worlds: "./worlds"
+  games: "./games"
+  cache: "./cache"
+media:
+  image:
+    type: "gemini"
+    model: "imagen-3.0-generate-002"
+    aspect_ratio: "16:9"
+    person_generation: "ALLOW_ADULT"
+`
+	var cfg Config
+	if err := yaml.Unmarshal([]byte(yamlData), &cfg); err != nil {
+		t.Fatalf("unmarshal yaml: %v", err)
+	}
+
+	if cfg.Media.Image.AspectRatio != "16:9" {
+		t.Errorf("expected aspect_ratio 16:9, got %q", cfg.Media.Image.AspectRatio)
+	}
+	if cfg.Media.Image.PersonGeneration != "ALLOW_ADULT" {
+		t.Errorf("expected person_generation ALLOW_ADULT, got %q", cfg.Media.Image.PersonGeneration)
+	}
+}
+
