@@ -145,6 +145,16 @@ type TTSConfig struct {
 	// Options holds provider-declared tunables for the default voice, keyed by
 	// VoiceOption.Key. Absent means the provider's own defaults.
 	Options map[string]interface{} `yaml:"options,omitempty" json:"options,omitempty"`
+	// SpeechCues configures vocal performance steering tags and transcript display.
+	SpeechCues SpeechCuesConfig `yaml:"speech_cues,omitempty" json:"speech_cues,omitempty"`
+}
+
+// SpeechCuesConfig controls how vocal acting and steering hints are used and rendered.
+type SpeechCuesConfig struct {
+	Enabled          bool   `yaml:"enabled" json:"enabled"`
+	AudioTags        *bool  `yaml:"audio_tags,omitempty" json:"audio_tags,omitempty"`
+	MarkdownEmphasis *bool  `yaml:"markdown_emphasis,omitempty" json:"markdown_emphasis,omitempty"`
+	DisplayMode      string `yaml:"display_mode,omitempty" json:"display_mode,omitempty"`
 }
 
 type STTConfig struct {

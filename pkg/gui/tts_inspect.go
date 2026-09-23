@@ -59,6 +59,8 @@ func (s *Service) InspectTTS(ctx context.Context, req TTSInspectRequestDTO) (*TT
 		}
 	}
 
+	response.SpeechCues = media.ResolveSpeechCueCapabilities(cfg, client)
+
 	return response, nil
 }
 

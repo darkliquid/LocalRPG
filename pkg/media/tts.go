@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/dialogue"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/trace"
@@ -97,6 +98,30 @@ type SpeechCueCapabilities struct {
 // declare vocal steering and performance cue capabilities.
 type SpeechCueAdvertiser interface {
 	SpeechCueCapabilities() SpeechCueCapabilities
+}
+
+// ResolveSpeechCueCapabilities resolves effective speech cue capabilities by combining
+// provider-advertised capabilities with user configuration overrides.
+func ResolveSpeechCueCapabilities(cfg config.TTSConfig, client TTSClient) SpeechCueCapabilities {
+	var caps SpeechCueCapabilities
+	if adv, ok := client.(SpeechCueAdvertiser); ok {
+		caps = adv.SpeechCueCapabilities()
+	} else if aware, ok := client.(MarkdownAware); ok && aware.SupportsMarkdown() {
+		caps.MarkdownEmphasis = true
+	}
+
+	if !cfg.SpeechCues.Enabled && cfg.SpeechCues.AudioTags == nil && cfg.SpeechCues.MarkdownEmphasis == nil {
+		caps.AudioTags = false
+		caps.MarkdownEmphasis = false
+	} else {
+		if cfg.SpeechCues.AudioTags != nil {
+			caps.AudioTags = *cfg.SpeechCues.AudioTags
+		}
+		if cfg.SpeechCues.MarkdownEmphasis != nil {
+			caps.MarkdownEmphasis = *cfg.SpeechCues.MarkdownEmphasis
+		}
+	}
+	return caps
 }
 
 type TTSPipeline struct {

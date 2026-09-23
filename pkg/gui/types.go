@@ -301,6 +301,8 @@ type TTSInspectResponseDTO struct {
 	KeyRequired bool `json:"key_required"`
 	// Error is a non-fatal catalog failure, so the editor still renders options.
 	Error string `json:"error,omitempty"`
+	// SpeechCues describes vocal acting and performance steering capabilities.
+	SpeechCues media.SpeechCueCapabilities `json:"speech_cues"`
 }
 
 type TestProviderResponseDTO struct {

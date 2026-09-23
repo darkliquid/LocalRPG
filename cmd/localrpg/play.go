@@ -10,6 +10,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/tools"
@@ -109,6 +110,16 @@ func handlePlayCommand(args []string) {
 	orchestrator.SetTools(tools.NewExecutor(store, cfg.ToolResultChars()), cfg.RoleSupportsTools("gm"))
 	orchestrator.SetToolRounds(cfg.ToolRounds())
 	orchestrator.LoadPrompts(paths, manifest.SystemID, manifest.WorldID)
+
+	if ttsCli, err := media.NewTTSClient(cfg.Media.TTS); err == nil {
+		cueCaps := media.ResolveSpeechCueCapabilities(cfg.Media.TTS, ttsCli)
+		orchestrator.SetSpeechCues(harness.SpeechCueContext{
+			AudioTags:        cueCaps.AudioTags,
+			MarkdownEmphasis: cueCaps.MarkdownEmphasis,
+			SampleTags:       cueCaps.SupportedTags,
+			CustomGuidance:   cueCaps.PromptGuidance,
+		})
+	}
 
 	app := tui.NewAppModel(orchestrator, 80, 24)
 	p := tea.NewProgram(app, tea.WithAltScreen())

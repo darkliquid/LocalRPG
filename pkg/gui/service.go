@@ -1136,6 +1136,15 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator.SetThreadsMax(cfg.ThreadsMax())
 	orchestrator.SetContinuityChecks(cfg.ContinuityChecks())
 
+	ttsClient, _ := s.ttsClientFor(cfg.Media.TTS)
+	cueCaps := media.ResolveSpeechCueCapabilities(cfg.Media.TTS, ttsClient)
+	orchestrator.SetSpeechCues(harness.SpeechCueContext{
+		AudioTags:        cueCaps.AudioTags,
+		MarkdownEmphasis: cueCaps.MarkdownEmphasis,
+		SampleTags:       cueCaps.SupportedTags,
+		CustomGuidance:   cueCaps.PromptGuidance,
+	})
+
 	return &TurnSession{
 		service:      s,
 		gameID:       gameID,
