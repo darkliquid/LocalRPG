@@ -45,7 +45,7 @@ func (n *narrativeOracleProvider) ID() string { return n.id }
 
 func (n *narrativeOracleProvider) Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
 	start := time.Now()
-	text := n.craftProse(req.Prompt)
+	text := n.craftProse(req.PromptText())
 	n.logResponse(text, start)
 	return &GenerateResponse{Text: text}, nil
 }
@@ -53,7 +53,7 @@ func (n *narrativeOracleProvider) Generate(ctx context.Context, req GenerateRequ
 func (n *narrativeOracleProvider) Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error {
 	defer close(out)
 	start := time.Now()
-	text := n.craftProse(req.Prompt)
+	text := n.craftProse(req.PromptText())
 	n.logResponse(text, start)
 	out <- StreamChunk{Text: text, Done: true}
 	return nil

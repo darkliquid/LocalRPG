@@ -52,7 +52,7 @@ func (c *CLIProvider) ID() string {
 
 func (c *CLIProvider) buildCmd(ctx context.Context, req GenerateRequest) *exec.Cmd {
 	args := append([]string{}, c.args...)
-	args = append(args, req.Prompt)
+	args = append(args, req.PromptText())
 
 	cmd := exec.CommandContext(ctx, c.command, args...)
 
@@ -157,6 +157,6 @@ func (c *CLIProvider) logRequest(req GenerateRequest, call string) {
 		"command":      c.command,
 		"arg_count":    len(c.args) + 1,
 		"system_set":   req.System != "",
-		"prompt_chars": len([]rune(req.Prompt)),
+		"prompt_chars": len([]rune(req.PromptText())),
 	})
 }

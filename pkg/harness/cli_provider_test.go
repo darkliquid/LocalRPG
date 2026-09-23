@@ -138,3 +138,21 @@ func TestCLIProviderTracesTheCommandWithoutItsPromptArgument(t *testing.T) {
 		t.Errorf("unexpected response fields: %+v", response.Fields)
 	}
 }
+
+func TestCLIProviderUsesMessagesAsAPrompt(t *testing.T) {
+	provider := NewCLIProvider("gm", "sh", []string{"-c", "echo $1", "--"})
+	out := make(chan StreamChunk, 20)
+
+	req := GenerateRequest{Messages: []Message{{Role: "user", Content: "hello from messages"}}}
+	if err := provider.Stream(context.Background(), req, out); err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+
+	var text strings.Builder
+	for chunk := range out {
+		text.WriteString(chunk.Text)
+	}
+	if !strings.Contains(text.String(), "hello from messages") {
+		t.Errorf("output = %q, want the flattened conversation", text.String())
+	}
+}

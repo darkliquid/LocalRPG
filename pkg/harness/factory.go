@@ -30,12 +30,12 @@ type builtinEchoModelProvider struct {
 func (b *builtinEchoModelProvider) ID() string { return b.id }
 
 func (b *builtinEchoModelProvider) Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
-	return &GenerateResponse{Text: "Echo: " + req.Prompt}, nil
+	return &GenerateResponse{Text: "Echo: " + req.PromptText()}, nil
 }
 
 func (b *builtinEchoModelProvider) Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error {
 	defer close(out)
-	out <- StreamChunk{Text: "Echo: " + req.Prompt, Done: true}
+	out <- StreamChunk{Text: "Echo: " + req.PromptText(), Done: true}
 	return nil
 }
 
