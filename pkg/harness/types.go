@@ -2,13 +2,68 @@ package harness
 
 import (
 	"context"
+	"strings"
 )
 
 type StreamChunk struct {
 	Text         string
+	ToolCalls    []ToolCall
 	Done         bool
 	FinishReason string
 	Error        error
+}
+
+// Message is one turn of the conversation a tool-capable provider is given.
+// Role is "system", "user", "assistant", or "tool".
+type Message struct {
+	Role       string     `json:"role"`
+	Content    string     `json:"content,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`   // assistant messages only
+	ToolCallID string     `json:"tool_call_id,omitempty"` // tool messages only
+}
+
+// ToolSpec is one tool offered to a model, with its JSON Schema parameters.
+type ToolSpec struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Parameters  map[string]interface{} `json:"parameters"`
+}
+
+// ToolCall is a model's request to run a tool. Arguments is the raw JSON the
+// model produced, because a malformed payload is the model's to fix, not ours.
+type ToolCall struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
+// MessagesPrompt renders a conversation as one prompt for a provider that only
+// accepts a string. Roles are labelled so a tool result is never mistaken for
+// narration.
+func MessagesPrompt(messages []Message) string {
+	var sb strings.Builder
+	for _, message := range messages {
+		switch message.Role {
+		case "system":
+			sb.WriteString(message.Content)
+			sb.WriteString("\n\n")
+		case "user":
+			sb.WriteString("Player: ")
+			sb.WriteString(message.Content)
+			sb.WriteString("\n")
+		case "assistant":
+			if strings.TrimSpace(message.Content) != "" {
+				sb.WriteString("Narrator: ")
+				sb.WriteString(message.Content)
+				sb.WriteString("\n")
+			}
+		case "tool":
+			sb.WriteString("Tool result:\n")
+			sb.WriteString(message.Content)
+			sb.WriteString("\n")
+		}
+	}
+	return strings.TrimSpace(sb.String())
 }
 
 // GenerationOptions are the sampling parameters a provider applies to a call.
@@ -26,6 +81,20 @@ type GenerateRequest struct {
 	Temperature float64                `json:"temperature,omitempty"`
 	MaxTokens   int                    `json:"max_tokens,omitempty"`
 	Extra       map[string]interface{} `json:"extra,omitempty"`
+	// Messages is authoritative when set. Prompt remains for providers that only
+	// accept a single string.
+	Messages []Message  `json:"messages,omitempty"`
+	Tools    []ToolSpec `json:"tools,omitempty"`
+}
+
+// PromptText is the request as a single string: the explicit Prompt when a caller
+// set one, otherwise the conversation flattened for a provider that cannot take
+// messages.
+func (r GenerateRequest) PromptText() string {
+	if strings.TrimSpace(r.Prompt) != "" {
+		return r.Prompt
+	}
+	return MessagesPrompt(r.Messages)
 }
 
 type GenerateResponse struct {
