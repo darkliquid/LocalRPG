@@ -271,6 +271,66 @@ func (g *GeminiProvider) Generate(ctx context.Context, req GenerateRequest) (*Ge
 	return &GenerateResponse{Text: sb.String()}, nil
 }
 
+func (g *GeminiProvider) Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error {
+	defer close(out)
+
+	cfg := g.buildGenerateConfig(req)
+	contents := g.buildContents(req)
+
+	iter := g.client.Models.GenerateContentStream(ctx, g.model, contents, cfg)
+
+	for resp, err := range iter {
+		if err != nil {
+			mappedErr := mapGeminiError(err)
+			out <- StreamChunk{Error: mappedErr, Done: true}
+			return mappedErr
+		}
+
+		for _, cand := range resp.Candidates {
+			if cand.Content == nil {
+				continue
+			}
+
+			var toolCalls []ToolCall
+			var textParts []string
+
+			for _, part := range cand.Content.Parts {
+				if part.Thought {
+					if g.logger != nil && part.Text != "" {
+						g.logger.Event("gemini_thought", map[string]interface{}{
+							"text": part.Text,
+						})
+					}
+					continue
+				}
+
+				if part.Text != "" {
+					textParts = append(textParts, part.Text)
+				}
+
+				if part.FunctionCall != nil {
+					argsBytes, _ := json.Marshal(part.FunctionCall.Args)
+					toolCalls = append(toolCalls, ToolCall{
+						ID:        part.FunctionCall.ID,
+						Name:      part.FunctionCall.Name,
+						Arguments: string(argsBytes),
+					})
+				}
+			}
+
+			if len(textParts) > 0 || len(toolCalls) > 0 {
+				out <- StreamChunk{
+					Text:      strings.Join(textParts, ""),
+					ToolCalls: toolCalls,
+				}
+			}
+		}
+	}
+
+	out <- StreamChunk{Done: true}
+	return nil
+}
+
 func mapGeminiError(err error) error {
 	if err == nil {
 		return nil
