@@ -1345,6 +1345,88 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             )}
 
             {config.media.tts.type !== 'disabled' && (
+              <div className="space-y-3 p-4 rounded-xl bg-stone-900/40 border border-stone-800">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-cinzel font-bold text-stone-200">
+                      Speech Steering & Acting Cues
+                    </div>
+                    <div className="text-[11px] text-stone-400">
+                      Instruct the GM to use emotive directions (e.g. [whispers], [sighs]) when supported.
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={config.media.tts.speech_cues?.enabled ?? true}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          tts: {
+                            ...config.media.tts,
+                            speech_cues: {
+                              ...config.media.tts.speech_cues,
+                              enabled: e.target.checked,
+                            },
+                          },
+                        },
+                      })
+                    }
+                    className="w-4 h-4 rounded border-stone-700 bg-stone-900 text-amber-500 focus:ring-amber-500/40 cursor-pointer"
+                  />
+                </div>
+
+                {inspect?.speech_cues && (
+                  <div className="text-[11px] p-2.5 rounded-lg bg-stone-950/60 border border-stone-800/80 text-stone-400">
+                    <span className="font-semibold text-stone-300">Provider Capabilities: </span>
+                    {inspect.speech_cues.audio_tags ? (
+                      <span className="text-amber-400">
+                        Supports bracketed vocal cues ({inspect.speech_cues.supported_tags?.slice(0, 5).map(t => `[${t}]`).join(', ')}...)
+                      </span>
+                    ) : inspect.speech_cues.markdown_emphasis ? (
+                      <span className="text-stone-300">Supports Markdown emphasis (*emphasis*)</span>
+                    ) : (
+                      <span className="text-stone-500">Plain text only; vocal tags are stripped before synthesis.</span>
+                    )}
+                  </div>
+                )}
+
+                {(config.media.tts.speech_cues?.enabled ?? true) && (
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-xs font-cinzel uppercase text-stone-300">
+                      Transcript Display Mode
+                    </label>
+                    <select
+                      value={config.media.tts.speech_cues?.display_mode || 'stage_directions'}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: {
+                            ...config.media,
+                            tts: {
+                              ...config.media.tts,
+                              speech_cues: {
+                                ...config.media.tts.speech_cues,
+                                enabled: config.media.tts.speech_cues?.enabled ?? true,
+                                display_mode: e.target.value as any,
+                              },
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                    >
+                      <option value="stage_directions">Stage Directions (styled tags in transcript)</option>
+                      <option value="hidden">Hidden (acted out in audio, hidden in transcript)</option>
+                      <option value="raw">Raw text (unmodified brackets)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {config.media.tts.type !== 'disabled' && (
               <div className="pt-2 space-y-2 border-t border-stone-800/60">
                 <div className="space-y-1.5">
                   <label className="text-xs font-cinzel uppercase text-stone-300">
