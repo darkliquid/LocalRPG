@@ -1546,10 +1546,10 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               {config.media.tts.type === 'http' && (
                 <>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-sans uppercase text-stone-300">Speech Endpoint URL</label>
+                    <label className="text-xs font-sans uppercase text-stone-300">Endpoint URL</label>
                     <input
                       type="text"
-                      placeholder="e.g. http://localhost:8880/v1/audio/speech"
+                      placeholder="e.g. http://localhost:8880"
                       value={config.media.tts.endpoint || ''}
                       onChange={(e) =>
                         setConfig({
@@ -1559,6 +1559,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       }
                       className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                     />
+                    <p className="text-[11px] text-stone-500">
+                      Accepts either the base server URL (e.g. http://localhost:8880) or the full /v1/audio/speech endpoint.
+                    </p>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-sans uppercase text-stone-300">Model Name</label>

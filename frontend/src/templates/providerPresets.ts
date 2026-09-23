@@ -169,7 +169,7 @@ export const TTS_PRESETS: Record<string, PresetItem<TTSConfig>> = {
     description: 'High quality 82M open-weights TTS running via local FastAPI server on port 8880.',
     config: {
       type: 'http',
-      endpoint: 'http://localhost:8880/v1/audio/speech',
+      endpoint: 'http://localhost:8880',
       model: 'kokoro',
       default_voice: 'af_bella',
       pitch: 1.0,

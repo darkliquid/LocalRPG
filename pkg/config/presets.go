@@ -91,7 +91,7 @@ func floatPtr(f float64) *float64 { return &f }
 var TTSPresets = map[string]TTSConfig{
 	"kokoro-fastapi": {
 		Type:          "http",
-		Endpoint:      "http://localhost:8880/v1/audio/speech",
+		Endpoint:      "http://localhost:8880",
 		Model:         "kokoro",
 		DefaultVoice:  "af_bella",
 		Pitch:         1.0,
