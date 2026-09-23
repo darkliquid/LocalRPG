@@ -54,16 +54,26 @@ export interface Turn {
   // Anything the prompt budget left out, so a thinner reply can be explained.
   context_notes?: string[];
   continuity_notes?: string[];
+  // What the turn looked up: the name and result size of each tool call.
+  tool_calls?: ToolCall[];
+}
+
+export interface ToolCall {
+  name: string;
+  result_chars: number;
 }
 
 export interface TurnEvent {
-  type: 'chunk' | 'turn' | 'error' | 'model_missing';
+  type: 'chunk' | 'turn' | 'tool' | 'error' | 'model_missing';
   text?: string;
   turn?: Turn;
   message?: string;
   model_id?: string;
   name?: string;
   size_bytes?: number;
+  tool_name?: string;
+  tool_status?: 'running' | 'done';
+  tool_summary?: string;
 }
 
 export interface ModelStatus {

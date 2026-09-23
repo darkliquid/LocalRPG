@@ -123,6 +123,12 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               </div>
             )}
 
+            {turn.tool_calls && turn.tool_calls.length > 0 && (
+              <div className="text-[11px] font-mono text-stone-500 pt-1">
+                Looked up: {turn.tool_calls.map((call) => `${call.name} (${call.result_chars})`).join(', ')}
+              </div>
+            )}
+
             {turn.truncated && (
               <div className="text-xs font-mono text-amber-400/80 pt-1">
                 The narrator's reply could not be completed. Raise the response limit for the gm role in Settings, or

@@ -189,6 +189,7 @@ export const App: React.FC = () => {
   const [turnInFlight, setTurnInFlight] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ mode: string; text: string } | null>(null);
   const [streamedProse, setStreamedProse] = useState('');
+  const [toolActivity, setToolActivity] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const handleActionSubmit = async (mode: string, text: string) => {
@@ -197,6 +198,7 @@ export const App: React.FC = () => {
     setTurnInFlight(true);
     setPendingAction({ mode, text });
     setStreamedProse('');
+    setToolActivity(null);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -207,7 +209,14 @@ export const App: React.FC = () => {
         { mode, input: text },
         (event) => {
           if (event.type === 'chunk') {
+            setToolActivity(null);
             setStreamedProse((prev) => prev + (event.text ?? ''));
+          } else if (event.type === 'tool') {
+            setToolActivity(
+              event.tool_status === 'running'
+                ? `${event.tool_name}...`
+                : `${event.tool_name}: ${event.tool_summary ?? 'done'}`,
+            );
           } else if (event.type === 'turn' && event.turn) {
             const turn = event.turn;
             setChronicle((prev) => [...prev, turn]);
@@ -235,6 +244,7 @@ export const App: React.FC = () => {
       abortRef.current = null;
       setTurnInFlight(false);
       setPendingAction(null);
+      setToolActivity(null);
     }
   };
 
@@ -546,6 +556,9 @@ export const App: React.FC = () => {
                     streamedProse={streamedProse}
                   />
                 </>
+              )}
+              {toolActivity && (
+                <div className="text-xs font-mono text-amber-400/80 px-4 pb-1">{toolActivity}</div>
               )}
               <ActionConsole
                 onSubmit={handleActionSubmit}
