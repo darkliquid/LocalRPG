@@ -492,11 +492,20 @@ func (h *httpImageClient) GenerateImage(ctx context.Context, prompt string) ([]b
 
 // Factory Constructors
 func NewTTSClient(cfg config.TTSConfig) (TTSClient, error) {
+	return NewTTSClientWithSharedKey(cfg, "")
+}
+
+// NewTTSClientWithSharedKey builds a TTSClient from configuration and an optional shared key.
+func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClient, error) {
 	switch cfg.Type {
 	case "disabled", "":
 		return &disabledTTSClient{}, nil
+	case "gemini":
+		return NewGeminiTTSClient(cfg, sharedKey)
 	case "builtin":
 		switch cfg.BuiltinName {
+		case "gemini":
+			return NewGeminiTTSClient(cfg, sharedKey)
 		case "sherpa-onnx", "kokoro":
 			modelDir := cfg.ModelPath
 			if modelDir == "" {

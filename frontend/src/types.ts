@@ -403,7 +403,7 @@ export interface TTSInspectResponse {
 }
 
 export interface TTSConfig {
-  type: 'builtin' | 'http' | 'cli' | 'disabled';
+  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'gemini';
   builtin_name?: string;
   model_path?: string;
   command?: string;

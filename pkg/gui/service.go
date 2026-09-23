@@ -1417,7 +1417,7 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 		return "", ErrAudioUnavailable
 	}
 
-	client, err := media.NewTTSClient(cfg.Media.TTS)
+	client, err := s.ttsClientFor(cfg.Media.TTS)
 	if err != nil {
 		return "", fmt.Errorf("build tts client: %w", err)
 	}
@@ -2389,7 +2389,8 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 				}
 			}
 		}
-		client, err := media.NewTTSClient(ttsCfg)
+		cfg := s.configMgr.Get()
+		client, err := media.NewTTSClientWithSharedKey(ttsCfg, cfg.Providers.Gemini.APIKey)
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}

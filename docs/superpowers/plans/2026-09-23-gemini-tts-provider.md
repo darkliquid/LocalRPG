@@ -1,6 +1,6 @@
 # Google Gemini TTS Provider Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Implement a Google Gemini text-to-speech (TTS) provider in `pkg/media` using the `google.golang.org/genai` SDK, supporting preview models (`gemini-3.1-flash-tts-preview`, `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`), 30 prebuilt voices, audio tags, and seamless integration with the existing LocalRPG TTS pipeline and settings GUI.
 
@@ -36,7 +36,7 @@
 - Modify: `pkg/config/presets.go:150-155`
 - Modify: `pkg/config/presets_test.go:40-60`
 
-- [ ] **Step 1: Write failing test for Gemini TTS presets**
+- [x] **Step 1: Write failing test for Gemini TTS presets**
 
 Add `TestGetGeminiTTSPresets` in `pkg/config/presets_test.go`:
 
@@ -69,12 +69,12 @@ func TestGetGeminiTTSPresets(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestGetGeminiTTSPresets ./pkg/config/`
 Expected: FAIL (`expected preset "gemini-3.1-flash-tts" to exist in TTSPresets`)
 
-- [ ] **Step 3: Add presets to `TTSPresets`**
+- [x] **Step 3: Add presets to `TTSPresets`**
 
 In `pkg/config/presets.go`, add to `TTSPresets`:
 
@@ -105,12 +105,12 @@ In `pkg/config/presets.go`, add to `TTSPresets`:
 	},
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestGetGeminiTTSPresets ./pkg/config/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/presets.go pkg/config/presets_test.go
@@ -125,7 +125,7 @@ git commit -m "feat(config): add Google Gemini TTS presets"
 - Modify: `pkg/media/catalog.go:62-130`
 - Modify: `pkg/media/catalog_test.go` (or add unit test in `pkg/media/` test suite)
 
-- [ ] **Step 1: Write failing tests for ProviderKey and KeyPresent with Gemini**
+- [x] **Step 1: Write failing tests for ProviderKey and KeyPresent with Gemini**
 
 Create or update test in `pkg/media/catalog_test.go`:
 
@@ -166,12 +166,12 @@ func TestGeminiTTSProviderKeyAndKeyPresent(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestGeminiTTSProviderKeyAndKeyPresent ./pkg/media/`
 Expected: FAIL (`undefined: KeyPresentWithSharedKey` or `expected ProviderKey 'gemini:tts'`)
 
-- [ ] **Step 3: Update `ProviderKey`, `KeyPresent`, and add `KeyPresentWithSharedKey`**
+- [x] **Step 3: Update `ProviderKey`, `KeyPresent`, and add `KeyPresentWithSharedKey`**
 
 In `pkg/media/catalog.go`:
 In `ProviderKey(cfg config.TTSConfig)`:
@@ -209,12 +209,12 @@ func KeyPresentWithSharedKey(cfg config.TTSConfig, sharedKey string) bool {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestGeminiTTSProviderKeyAndKeyPresent ./pkg/media/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/catalog.go pkg/media/catalog_test.go
@@ -229,7 +229,7 @@ git commit -m "feat(media): add Gemini TTS support to ProviderKey and KeyPresent
 - Create: `pkg/media/gemini_tts.go`
 - Create: `pkg/media/gemini_tts_test.go`
 
-- [ ] **Step 1: Write failing offline tests for `GeminiTTSClient`**
+- [x] **Step 1: Write failing offline tests for `GeminiTTSClient`**
 
 Create `pkg/media/gemini_tts_test.go`:
 
@@ -391,12 +391,12 @@ func TestGeminiTTSSynthesize(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestResolveGeminiTTSAPIKey ./pkg/media/`
 Expected: FAIL (`undefined: media.ResolveGeminiTTSAPIKey`)
 
-- [ ] **Step 3: Implement `pkg/media/gemini_tts.go`**
+- [x] **Step 3: Implement `pkg/media/gemini_tts.go`**
 
 Create `pkg/media/gemini_tts.go`:
 - Define `ErrGeminiTTSAPIKeyRequired = errors.New("gemini: an API key is required for speech synthesis; set media.tts.api_key, providers.gemini.api_key, or GEMINI_API_KEY")`
@@ -441,12 +441,12 @@ Create `pkg/media/gemini_tts.go`:
   - `NewGeminiTTSClientWithClient(client *genai.Client, cfg config.TTSConfig) (*GeminiTTSClient, error)`
   - `NewGeminiTTSClient(cfg config.TTSConfig, sharedKey string) (*GeminiTTSClient, error)`
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v -run "TestGeminiTTS" ./pkg/media/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/gemini_tts.go pkg/media/gemini_tts_test.go
@@ -463,7 +463,7 @@ git commit -m "feat(media): implement Google Gemini TTS client"
 - Modify: `pkg/gui/tts_inspect.go`
 - Modify: `pkg/gui/service.go`
 
-- [ ] **Step 1: Write failing factory test**
+- [x] **Step 1: Write failing factory test**
 
 In `pkg/media/providers_test.go`:
 
@@ -496,12 +496,12 @@ func TestNewTTSClientBuildsGemini(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestNewTTSClientBuildsGemini ./pkg/media/`
 Expected: FAIL (`undefined: media.NewTTSClientWithSharedKey`)
 
-- [ ] **Step 3: Implement `NewTTSClientWithSharedKey` in `providers.go`**
+- [x] **Step 3: Implement `NewTTSClientWithSharedKey` in `providers.go`**
 
 In `pkg/media/providers.go`:
 ```go
@@ -542,7 +542,7 @@ func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClien
 }
 ```
 
-- [ ] **Step 4: Update `pkg/gui/tts_inspect.go` and `pkg/gui/service.go`**
+- [x] **Step 4: Update `pkg/gui/tts_inspect.go` and `pkg/gui/service.go`**
 
 In `pkg/gui/tts_inspect.go`:
 - Update `InspectTTS`:
@@ -577,13 +577,13 @@ In `pkg/gui/service.go`:
 - In `SynthesizeSegment` (line ~1420): replace `media.NewTTSClient(cfg.Media.TTS)` with `s.ttsClientFor(cfg.Media.TTS)`.
 - In `TestProvider` for `"tts"` (line ~2392): replace `media.NewTTSClient(ttsCfg)` with `media.NewTTSClientWithSharedKey(ttsCfg, cfg.Providers.Gemini.APIKey)`.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -v -run TestNewTTSClientBuildsGemini ./pkg/media/`
 Run: `go test -v ./pkg/gui/`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/media/providers.go pkg/media/providers_test.go pkg/gui/tts_inspect.go pkg/gui/service.go
@@ -599,7 +599,7 @@ git commit -m "feat(media): wire Gemini TTS client into factory and gui service"
 - Modify: `frontend/src/templates/providerPresets.ts`
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Update `frontend/src/types.ts`**
+- [x] **Step 1: Update `frontend/src/types.ts`**
 
 In `frontend/src/types.ts:406`:
 ```typescript
@@ -609,7 +609,7 @@ export interface TTSConfig {
   // ...
 ```
 
-- [ ] **Step 2: Add presets to `frontend/src/templates/providerPresets.ts`**
+- [x] **Step 2: Add presets to `frontend/src/templates/providerPresets.ts`**
 
 In `frontend/src/templates/providerPresets.ts`, add to `TTS_PRESETS`:
 ```typescript
@@ -654,7 +654,7 @@ In `frontend/src/templates/providerPresets.ts`, add to `TTS_PRESETS`:
   },
 ```
 
-- [ ] **Step 3: Update `SettingsStudio.tsx`**
+- [x] **Step 3: Update `SettingsStudio.tsx`**
 
 In `frontend/src/components/SettingsStudio.tsx`:
 1. In the `TTS Engine` select options:
@@ -671,12 +671,12 @@ In `frontend/src/components/SettingsStudio.tsx`:
    - API key notice explaining it uses `providers.gemini.api_key` if configured, or `media.tts.api_key`, or `GEMINI_API_KEY`.
 4. In the `inspect?.key_required` block, update helper text if it's Gemini TTS to mention `providers.gemini.api_key` and `GEMINI_API_KEY`.
 
-- [ ] **Step 4: Run frontend typecheck**
+- [x] **Step 4: Run frontend typecheck**
 
 Run: `mise run test:frontend` (or `cd frontend && npx tsc --noEmit`)
 Expected: PASS (0 errors)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/templates/providerPresets.ts frontend/src/components/SettingsStudio.tsx
@@ -687,22 +687,22 @@ git commit -m "feat(frontend): add Google Gemini TTS support to SettingsStudio"
 
 ### Task 6: Full Verification and Build
 
-- [ ] **Step 1: Run all Go tests**
+- [x] **Step 1: Run all Go tests**
 
 Run: `go test -v -count=1 ./...`
 Expected: PASS (all tests pass)
 
-- [ ] **Step 2: Run frontend build**
+- [x] **Step 2: Run frontend build**
 
 Run: `mise run build:frontend`
 Expected: SUCCESS
 
-- [ ] **Step 3: Verify clean git status (restore dist/.gitkeep if removed)**
+- [x] **Step 3: Verify clean git status (restore dist/.gitkeep if removed)**
 
 Run: `git status`
 Expected: Working tree clean (restore `pkg/gui/dist/.gitkeep` if vite deleted it).
 
-- [ ] **Step 4: Commit and update plan**
+- [x] **Step 4: Commit and update plan**
 
 ```bash
 git add docs/superpowers/plans/2026-09-23-gemini-tts-provider.md

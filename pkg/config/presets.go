@@ -150,6 +150,31 @@ var TTSPresets = map[string]TTSConfig{
 		SpeechRate:   1.0,
 		MasterVolume: 1.0,
 	},
+
+	"gemini-3.1-flash-tts": {
+		Type:         "gemini",
+		Model:        "gemini-3.1-flash-tts-preview",
+		DefaultVoice: "Aoede",
+		Pitch:        1.0,
+		SpeechRate:   1.0,
+		MasterVolume: 1.0,
+	},
+	"gemini-2.5-flash-tts": {
+		Type:         "gemini",
+		Model:        "gemini-2.5-flash-preview-tts",
+		DefaultVoice: "Aoede",
+		Pitch:        1.0,
+		SpeechRate:   1.0,
+		MasterVolume: 1.0,
+	},
+	"gemini-2.5-pro-tts": {
+		Type:         "gemini",
+		Model:        "gemini-2.5-pro-preview-tts",
+		DefaultVoice: "Aoede",
+		Pitch:        1.0,
+		SpeechRate:   1.0,
+		MasterVolume: 1.0,
+	},
 }
 
 var STTPresets = map[string]STTConfig{

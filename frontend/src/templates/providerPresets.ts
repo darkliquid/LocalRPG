@@ -244,6 +244,45 @@ export const TTS_PRESETS: Record<string, PresetItem<TTSConfig>> = {
       master_volume: 1.0,
     },
   },
+  'gemini-3.1-flash-tts': {
+    label: 'Google Gemini 3.1 Flash TTS (Preview)',
+    description: 'Fast, natural cloud TTS with 30 prebuilt voices and audio tags support.',
+    config: {
+      type: 'gemini',
+      model: 'gemini-3.1-flash-tts-preview',
+      default_voice: 'Aoede',
+      pitch: 1.0,
+      speech_rate: 1.0,
+      auto_play: true,
+      master_volume: 1.0,
+    },
+  },
+  'gemini-2.5-flash-tts': {
+    label: 'Google Gemini 2.5 Flash TTS (Preview)',
+    description: 'Lightweight cloud TTS with natural prosody and voice acting cues.',
+    config: {
+      type: 'gemini',
+      model: 'gemini-2.5-flash-preview-tts',
+      default_voice: 'Aoede',
+      pitch: 1.0,
+      speech_rate: 1.0,
+      auto_play: true,
+      master_volume: 1.0,
+    },
+  },
+  'gemini-2.5-pro-tts': {
+    label: 'Google Gemini 2.5 Pro TTS (Preview)',
+    description: 'Highest quality expressive cloud TTS for nuanced storytelling.',
+    config: {
+      type: 'gemini',
+      model: 'gemini-2.5-pro-preview-tts',
+      default_voice: 'Aoede',
+      pitch: 1.0,
+      speech_rate: 1.0,
+      auto_play: true,
+      master_volume: 1.0,
+    },
+  },
 };
 
 export const STT_PRESETS: Record<string, PresetItem<STTConfig>> = {

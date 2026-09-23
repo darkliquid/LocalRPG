@@ -66,6 +66,8 @@ func ProviderKey(cfg config.TTSConfig) string {
 	switch strings.ToLower(strings.TrimSpace(cfg.Type)) {
 	case "", "disabled":
 		return "disabled"
+	case "gemini":
+		return "gemini:tts"
 	case "builtin":
 		name := strings.ToLower(strings.TrimSpace(cfg.BuiltinName))
 		if name == "" {
@@ -114,15 +116,25 @@ func sanitiseKey(value string) string {
 	return strings.Trim(sb.String(), "-")
 }
 
-// KeyPresent reports whether a configuration has a usable credential, either in
-// the config or from the provider's documented environment variable. It exists so
-// the inspect endpoint can answer without echoing the key.
+// KeyPresent reports whether a configuration has a usable credential.
 func KeyPresent(cfg config.TTSConfig) bool {
+	return KeyPresentWithSharedKey(cfg, "")
+}
+
+// KeyPresentWithSharedKey reports whether a configuration has a usable credential,
+// either in config, through the shared provider key, or via documented environment variables.
+func KeyPresentWithSharedKey(cfg config.TTSConfig, sharedKey string) bool {
 	if strings.TrimSpace(cfg.APIKey) != "" {
+		return true
+	}
+	if strings.TrimSpace(sharedKey) != "" {
 		return true
 	}
 	if strings.EqualFold(strings.TrimSpace(cfg.BuiltinName), "elevenlabs") {
 		return strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")) != ""
+	}
+	if strings.EqualFold(strings.TrimSpace(cfg.Type), "gemini") || strings.EqualFold(strings.TrimSpace(cfg.BuiltinName), "gemini") {
+		return strings.TrimSpace(os.Getenv("GEMINI_API_KEY")) != "" || strings.TrimSpace(os.Getenv("GOOGLE_API_KEY")) != ""
 	}
 	return false
 }
