@@ -2189,6 +2189,21 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   />
                   <span>Auto-generate Scene Art</span>
                 </label>
+
+                <label className="flex items-center gap-2 text-xs text-stone-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.media.image.builtin_fallback !== false}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        media: { ...config.media, image: { ...config.media.image, builtin_fallback: e.target.checked } },
+                      })
+                    }
+                    className="rounded bg-stone-950 border-stone-800 text-amber-600 focus:ring-0"
+                  />
+                  <span>Fallback to Procedural Art</span>
+                </label>
               </div>
             </div>
 
@@ -2206,10 +2221,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
+                  <option value="gemini">Google Gemini / Imagen (GenAI Cloud)</option>
                   <option value="http">HTTP (ComfyUI, Automatic1111, LocalAI, DALL-E)</option>
                   <option value="comfyui">ComfyUI Dedicated (Port 8188)</option>
                   <option value="cli">CLI Command (e.g. sd-cli)</option>
-                  <option value="builtin">Builtin (procedural-art / mock)</option>
+                  <option value="builtin">Builtin (procedural-art / mock / gemini)</option>
                 </select>
               </div>
 
@@ -2227,6 +2243,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                   >
                     <option value="procedural-art">procedural-art (Pure-Go Vector Dark Fantasy SVG)</option>
+                    <option value="gemini">gemini (Google Imagen 3 / Nano Banana)</option>
                     <option value="echo">echo (Debug Mock)</option>
                   </select>
                 </div>
@@ -2248,6 +2265,115 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
                   />
                 </div>
+              )}
+
+              {(config.media.image.type === 'gemini' ||
+                (config.media.image.type === 'builtin' && config.media.image.builtin_name === 'gemini')) && (
+                <>
+                  <div className="space-y-1.5 col-span-1 md:col-span-2">
+                    <label className="text-xs font-cinzel uppercase text-stone-300">Gemini / Imagen Model</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. imagen-3.0-generate-002 or gemini-3.1-flash-image"
+                      value={config.media.image.model || 'imagen-3.0-generate-002'}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, image: { ...config.media.image, model: e.target.value } },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    />
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {[
+                        { id: 'imagen-3.0-generate-002', label: 'Imagen 3' },
+                        { id: 'imagen-3.0-fast-generate-001', label: 'Imagen 3 Fast' },
+                        { id: 'gemini-3.1-flash-image', label: 'Nano Banana 2' },
+                        { id: 'gemini-3.1-flash-lite-image', label: 'Nano Banana 2 Lite' },
+                        { id: 'gemini-3-pro-image', label: 'Nano Banana Pro' },
+                        { id: 'gemini-2.5-flash-image', label: 'Nano Banana Original' },
+                      ].map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() =>
+                            setConfig({
+                              ...config,
+                              media: { ...config.media, image: { ...config.media.image, model: m.id } },
+                            })
+                          }
+                          className={`px-2 py-0.5 text-[10px] font-mono rounded border transition-colors cursor-pointer ${
+                            (config.media.image.model || 'imagen-3.0-generate-002') === m.id
+                              ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                              : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200'
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-cinzel uppercase text-stone-300">Aspect Ratio</label>
+                    <select
+                      value={config.media.image.aspect_ratio || '16:9'}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, image: { ...config.media.image, aspect_ratio: e.target.value } },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                    >
+                      <option value="16:9">16:9 (Cinematic Widescreen - Default)</option>
+                      <option value="1:1">1:1 (Square)</option>
+                      <option value="4:3">4:3 (Landscape)</option>
+                      <option value="3:4">3:4 (Portrait)</option>
+                      <option value="9:16">9:16 (Vertical)</option>
+                      <option value="21:9">21:9 (Ultrawide)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-cinzel uppercase text-stone-300">Person Generation</label>
+                    <select
+                      value={config.media.image.person_generation || 'ALLOW_ADULT'}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, image: { ...config.media.image, person_generation: e.target.value } },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                    >
+                      <option value="ALLOW_ADULT">ALLOW_ADULT (Default — Adults, NPCs, Guards)</option>
+                      <option value="ALLOW_ALL">ALLOW_ALL (All Characters & Children)</option>
+                      <option value="DONT_ALLOW">DONT_ALLOW (No Characters / Landscapes Only)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5 col-span-1 md:col-span-2">
+                    <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                      <span>API Key Override</span>
+                      {config.providers?.gemini?.api_key && (
+                        <span className="text-[10px] text-emerald-400 font-mono">Shared key active</span>
+                      )}
+                    </label>
+                    <input
+                      type="password"
+                      placeholder={config.providers?.gemini?.api_key ? 'Using shared key (leave blank)' : 'Optional override or GEMINI_API_KEY env'}
+                      value={config.media.image.api_key || ''}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, image: { ...config.media.image, api_key: e.target.value } },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                    />
+                  </div>
+                </>
               )}
             </div>
 

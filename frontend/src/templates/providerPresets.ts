@@ -341,6 +341,72 @@ export const IMAGE_PRESETS: Record<string, PresetItem<ImageConfig>> = {
       auto_generate: false,
     },
   },
+  'imagen-3': {
+    label: 'Google Imagen 3 (Cloud API)',
+    description: 'High-fidelity cinematic and dark fantasy illustration via Google Imagen 3.0.',
+    config: {
+      type: 'gemini',
+      model: 'imagen-3.0-generate-002',
+      aspect_ratio: '16:9',
+      person_generation: 'ALLOW_ADULT',
+      auto_generate: false,
+    },
+  },
+  'imagen-3-fast': {
+    label: 'Google Imagen 3 Fast (Cloud API)',
+    description: 'Rapid turnaround low-latency generation for turn-by-turn scene updates.',
+    config: {
+      type: 'gemini',
+      model: 'imagen-3.0-fast-generate-001',
+      aspect_ratio: '16:9',
+      person_generation: 'ALLOW_ADULT',
+      auto_generate: false,
+    },
+  },
+  'nano-banana-2': {
+    label: 'Google Nano Banana 2 (Gemini 3.1 Flash Image)',
+    description: 'Generalist native Gemini image model balancing speed, 4K rendering, and scene consistency.',
+    config: {
+      type: 'gemini',
+      model: 'gemini-3.1-flash-image',
+      aspect_ratio: '16:9',
+      person_generation: 'ALLOW_ADULT',
+      auto_generate: false,
+    },
+  },
+  'nano-banana-2-lite': {
+    label: 'Google Nano Banana 2 Lite (Gemini 3.1 Flash-Lite Image)',
+    description: 'Fastest and most lightweight native Gemini image generator.',
+    config: {
+      type: 'gemini',
+      model: 'gemini-3.1-flash-lite-image',
+      aspect_ratio: '16:9',
+      person_generation: 'ALLOW_ADULT',
+      auto_generate: false,
+    },
+  },
+  'nano-banana-pro': {
+    label: 'Google Nano Banana Pro (Gemini 3 Pro Image)',
+    description: 'Complex visual composition, deep world knowledge, and fine creative steering.',
+    config: {
+      type: 'gemini',
+      model: 'gemini-3-pro-image',
+      aspect_ratio: '16:9',
+      person_generation: 'ALLOW_ADULT',
+      auto_generate: false,
+    },
+  },
+  'nano-banana': {
+    label: 'Google Nano Banana Original (Gemini 2.5 Flash Image)',
+    description: 'Original high-volume low-latency Gemini image generator.',
+    config: {
+      type: 'gemini',
+      model: 'gemini-2.5-flash-image',
+      aspect_ratio: '16:9',
+      person_generation: 'ALLOW_ADULT',
+      auto_generate: false,
+    },
+  },
 };
 
 export const DEFAULT_VOICE_PROFILES: VoiceProfile[] = [

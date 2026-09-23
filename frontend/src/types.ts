@@ -438,7 +438,7 @@ export interface STTConfig {
 }
 
 export interface ImageConfig {
-  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'comfyui';
+  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'comfyui' | 'gemini';
   builtin_name?: string;
   command?: string;
   args?: string[];
@@ -446,6 +446,9 @@ export interface ImageConfig {
   model?: string;
   api_key?: string;
   auto_generate: boolean;
+  builtin_fallback?: boolean;
+  aspect_ratio?: string;
+  person_generation?: string;
 }
 
 export interface MediaConfig {
