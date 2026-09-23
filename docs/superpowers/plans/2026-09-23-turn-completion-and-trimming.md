@@ -1248,14 +1248,34 @@ Update the call site in `ProcessActionStream` (currently lines 458-461) to the n
 	if err != nil {
 		return nil, fmt.Errorf("gm generation failed: %w", err)
 	}
+
 	narration := result.Text
 	finishReason := result.FinishReason
-	if strings.TrimSpace(narration) == "" {
-		return nil, fmt.Errorf("gm returned no narration")
+	// A reply is incomplete when the stream was cut short or the prose does not
+	// end at a natural boundary, not only when the provider declared a token cap.
+	truncated := finishReason == "length" || result.Interrupted != nil || !harness.ProseComplete(narration)
+
+	o.logger.Event("generation.complete", map[string]interface{}{
+		"narration_chars": len([]rune(narration)),
+		"finish_reason":   finishReason,
+		"truncated":       truncated,
+	})
+
+	turn := Turn{
+		Number:       turnNum,
+		Timestamp:    time.Now(),
+		Mode:         mode,
+		Input:        actionInput,
+		Roll:         rollRes,
+		Narration:    narration,
+		Location:     locationID,
+		Outcome:      outcome,
+		Truncated:    truncated,
+		ContextNotes: assembly.Trimmed,
 	}
 ```
 
-The generic `map[string]interface{}` lines are unchanged.
+The recovery pass in Task 7 replaces the `truncated` computation with its own `stillIncomplete` result. The generic `map[string]interface{}` lines elsewhere are unchanged.
 
 - [ ] **Step 4: Run test to verify it passes**
 

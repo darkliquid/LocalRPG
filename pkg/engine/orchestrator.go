@@ -21,6 +21,10 @@ import (
 // longer than the configured chunk timeout.
 var ErrGenerationStalled = errors.New("gm generation stalled")
 
+// errStreamListener marks a failure caused by the caller's onChunk listener, so
+// a fallback provider is never tried on top of a disconnected client.
+var errStreamListener = errors.New("stream listener failed")
+
 // OpeningPromptSetting is the campaign setting holding the player's own opening
 // instruction. Absent means the GM invents the scene, which is the default.
 const OpeningPromptSetting = "opening_prompt"
@@ -455,15 +459,21 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
 	}
 
-	narration, finishReason, err := o.generate(ctx, contextPrompt, onChunk)
+	result, err := o.generate(ctx, contextPrompt, onChunk)
 	if err != nil {
 		return nil, fmt.Errorf("gm generation failed: %w", err)
 	}
 
+	narration := result.Text
+	finishReason := result.FinishReason
+	// A reply is incomplete when the stream was cut short or the prose does not
+	// end at a natural boundary, not only when the provider declared a token cap.
+	truncated := finishReason == "length" || result.Interrupted != nil || !harness.ProseComplete(narration)
+
 	o.logger.Event("generation.complete", map[string]interface{}{
 		"narration_chars": len([]rune(narration)),
 		"finish_reason":   finishReason,
-		"truncated":       finishReason == "length",
+		"truncated":       truncated,
 	})
 
 	turn := Turn{
@@ -475,7 +485,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Narration:    narration,
 		Location:     locationID,
 		Outcome:      outcome,
-		Truncated:    finishReason == "length",
+		Truncated:    truncated,
 		ContextNotes: assembly.Trimmed,
 	}
 
@@ -593,7 +603,20 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 // stream context is cancelled, the provider's goroutines are drained, and the turn
 // fails without being recorded, which is what keeps a hung model from holding the
 // campaign forever.
-func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk func(string) error) (string, string, error) {
+// streamResult is what one provider stream produced: its accumulated text, the
+// provider's finish reason when it reported one, and the failure that stopped it
+// after some text had already arrived.
+type streamResult struct {
+	Text         string
+	FinishReason string
+	Interrupted  error
+}
+
+// stream pumps one provider stream, forwarding each delta to onChunk and
+// accumulating the text. A failure after text has arrived is returned as
+// Interrupted with the text intact, so a turn can be repaired rather than lost;
+// a failure before any text is a hard failure, as is a listener error.
+func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelProvider, req harness.GenerateRequest, onChunk func(string) error) (streamResult, error) {
 	timeout := o.chunkTimeout
 	if timeout <= 0 {
 		timeout = defaultChunkTimeout
@@ -605,7 +628,7 @@ func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk 
 	chunks := make(chan harness.StreamChunk, 32)
 	streamErr := make(chan error, 1)
 	go func() {
-		streamErr <- o.router.StreamForRole(streamCtx, "gm", harness.GenerateRequest{Prompt: prompt}, chunks)
+		streamErr <- provider.Stream(streamCtx, req, chunks)
 	}()
 
 	idle := time.NewTimer(timeout)
@@ -613,6 +636,14 @@ func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk 
 
 	var sb strings.Builder
 	finishReason := ""
+	sawText := false
+	interrupted := func(err error) (streamResult, error) {
+		if !sawText {
+			return streamResult{}, err
+		}
+		return streamResult{Text: sb.String(), FinishReason: finishReason, Interrupted: err}, nil
+	}
+
 	for {
 		select {
 		case <-idle.C:
@@ -624,18 +655,23 @@ func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk 
 				}
 			}()
 			<-streamErr
-			return "", "", fmt.Errorf("%w after %s", ErrGenerationStalled, timeout)
+			return interrupted(fmt.Errorf("%w after %s", ErrGenerationStalled, timeout))
 
 		case chunk, ok := <-chunks:
 			if !ok {
 				if err := <-streamErr; err != nil {
-					return "", "", err
+					// A cancelled client is final: the turn will be discarded, so
+					// there is no point keeping text nobody is waiting for.
+					if errors.Is(err, context.Canceled) {
+						return streamResult{}, err
+					}
+					return interrupted(err)
 				}
-				return sb.String(), finishReason, nil
+				return streamResult{Text: sb.String(), FinishReason: finishReason}, nil
 			}
 			if chunk.Error != nil {
 				<-streamErr
-				return "", "", chunk.Error
+				return interrupted(chunk.Error)
 			}
 			if chunk.FinishReason != "" {
 				finishReason = chunk.FinishReason
@@ -652,13 +688,32 @@ func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk 
 				continue
 			}
 			sb.WriteString(chunk.Text)
+			sawText = true
 			if onChunk != nil {
 				if err := onChunk(chunk.Text); err != nil {
-					return "", "", err
+					return streamResult{}, fmt.Errorf("%w: %w", errStreamListener, err)
 				}
 			}
 		}
 	}
+}
+
+// generate streams the gm reply through stream, falling back to the configured
+// fallback provider when the primary fails before producing any text.
+func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk func(string) error) (streamResult, error) {
+	provider, err := o.router.GetProviderForRole("gm")
+	if err != nil {
+		return streamResult{}, err
+	}
+
+	result, err := o.stream(ctx, provider, harness.GenerateRequest{Prompt: prompt}, onChunk)
+	if err == nil || errors.Is(err, errStreamListener) || ctx.Err() != nil {
+		return result, err
+	}
+	if fallback, ok := o.router.FallbackForRole("gm"); ok {
+		return o.stream(ctx, fallback, harness.GenerateRequest{Prompt: prompt}, onChunk)
+	}
+	return result, err
 }
 
 func segmentKinds(segments []entity.TurnSegment) []string {

@@ -231,12 +231,36 @@ func TestChunkFailureAbortsBeforeRecording(t *testing.T) {
 	}
 }
 
-func TestMidStreamProviderFailureRecordsNothing(t *testing.T) {
-	provider := &scriptedStreamProvider{chunks: []string{"Steel "}, err: errors.New("model exploded")}
+func TestMidStreamProviderFailureKeepsPartialText(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"Steel rings, "}, err: errors.New("model exploded")}
+	orchestrator, timeline, _ := streamingOrchestrator(t, provider)
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I swing", nil)
+	if err != nil {
+		t.Fatalf("expected the partial reply to survive, got %v", err)
+	}
+	if turn.Narration != "Steel rings, " {
+		t.Errorf("Narration = %q, want the text that arrived", turn.Narration)
+	}
+	if !turn.Truncated {
+		t.Errorf("expected the unrepaired reply to be marked incomplete")
+	}
+
+	turns, err := timeline.history.LoadHistory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 1 {
+		t.Errorf("expected the partial turn recorded, got %+v", turns)
+	}
+}
+
+func TestProviderFailureBeforeAnyTextRecordsNothing(t *testing.T) {
+	provider := &scriptedStreamProvider{err: errors.New("model exploded")}
 	orchestrator, timeline, _ := streamingOrchestrator(t, provider)
 
 	if _, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I swing", nil); err == nil {
-		t.Fatalf("expected the provider failure to surface")
+		t.Fatalf("expected a failure with no text to surface")
 	}
 
 	turns, err := timeline.history.LoadHistory()
