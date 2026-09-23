@@ -1,6 +1,6 @@
 # Google Gemini & Imagen Image Generation Provider Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Implement Phase 2 of the Google Gemini integration: a native Go image generation client supporting both the Imagen 3 and native Gemini Image ("Nano Banana") suites for location and scene art.
 
@@ -18,7 +18,7 @@
 - Test: `pkg/config/types_test.go`
 - Test: `pkg/config/presets_test.go`
 
-- [ ] **Step 1: Write failing tests for image configuration and presets**
+- [x] **Step 1: Write failing tests for image configuration and presets**
 
 In `pkg/config/types_test.go`, add:
 ```go
@@ -81,12 +81,12 @@ func TestGetGeminiImagePresets(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run "TestConfigParsesImageTunables|TestGetGeminiImagePresets" ./pkg/config/`  
 Expected: FAIL compilation errors (`AspectRatio undefined`, `preset not found`).
 
-- [ ] **Step 3: Implement image config fields and presets**
+- [x] **Step 3: Implement image config fields and presets**
 
 In `pkg/config/types.go`, update `ImageConfig`:
 ```go
@@ -145,12 +145,12 @@ In `pkg/config/presets.go`, add inside `ImagePresets`:
 	},
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run "TestConfigParsesImageTunables|TestGetGeminiImagePresets" ./pkg/config/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/config/presets.go pkg/config/types_test.go pkg/config/presets_test.go
@@ -166,7 +166,7 @@ git commit -m "feat(config): add image aspect ratio, person generation, and Gemi
 - Modify: `pkg/gui/service.go:1611-1617`
 - Test: `pkg/media/image_test.go`
 
-- [ ] **Step 1: Write failing tests for image extension detection and caching**
+- [x] **Step 1: Write failing tests for image extension detection and caching**
 
 In `pkg/media/image_test.go`, add:
 ```go
@@ -221,12 +221,12 @@ func TestGenerateLocationImageCachesJPEG(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run "TestArtExtensionDetectsMagicBytes|TestGenerateLocationImageCachesJPEG" ./pkg/media/`  
 Expected: FAIL (`.jpg` expected but got `.webp`).
 
-- [ ] **Step 3: Implement magic byte detection and cache lookup expansion**
+- [x] **Step 3: Implement magic byte detection and cache lookup expansion**
 
 In `pkg/media/image.go`:
 Update `artExtension`:
@@ -277,12 +277,12 @@ func contentTypeForArt(path string) string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run "TestArtExtensionDetectsMagicBytes|TestGenerateLocationImageCachesJPEG" ./pkg/media/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/image.go pkg/media/image_test.go pkg/gui/service.go
@@ -297,7 +297,7 @@ git commit -m "feat(media): detect image magic bytes and support JPEG and PNG in
 - Create: `pkg/media/gemini_image.go`
 - Create: `pkg/media/gemini_image_test.go`
 
-- [ ] **Step 1: Write failing tests for GeminiImageClient (Credential Resolution, Imagen routing, Gemini Nano Banana routing)**
+- [x] **Step 1: Write failing tests for GeminiImageClient (Credential Resolution, Imagen routing, Gemini Nano Banana routing)**
 
 In `pkg/media/gemini_image_test.go`:
 ```go
@@ -487,12 +487,12 @@ func TestGeminiImageClientNanoBananaGeneratesImage(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run "TestResolveGeminiImageAPIKey|TestGeminiImageClientImagenGeneratesJPEG|TestGeminiImageClientNanoBananaGeneratesImage" ./pkg/media/`  
 Expected: FAIL (`undefined: media.ResolveGeminiImageAPIKey`, `undefined: media.NewGeminiImageClientWithClient`).
 
-- [ ] **Step 3: Implement `pkg/media/gemini_image.go`**
+- [x] **Step 3: Implement `pkg/media/gemini_image.go`**
 
 Create `pkg/media/gemini_image.go`:
 ```go
@@ -663,12 +663,12 @@ func mapGeminiImageError(err error) error {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run "TestResolveGeminiImageAPIKey|TestGeminiImageClientImagenGeneratesJPEG|TestGeminiImageClientNanoBananaGeneratesImage" ./pkg/media/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/gemini_image.go pkg/media/gemini_image_test.go
@@ -684,7 +684,7 @@ git commit -m "feat(media): implement GeminiImageClient supporting Imagen 3 and 
 - Modify: `pkg/gui/service.go:1230-1235` and `pkg/gui/service.go:2453-2457`
 - Test: `pkg/media/providers_test.go`
 
-- [ ] **Step 1: Write failing test for NewImageClient with Gemini provider**
+- [x] **Step 1: Write failing test for NewImageClient with Gemini provider**
 
 In `pkg/media/providers_test.go`, add:
 ```go
@@ -716,12 +716,12 @@ func TestNewImageClientBuildsGemini(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestNewImageClientBuildsGemini ./pkg/media/`  
 Expected: FAIL (`unsupported image provider type: gemini`).
 
-- [ ] **Step 3: Update `pkg/media/providers.go` and `pkg/gui/service.go`**
+- [x] **Step 3: Update `pkg/media/providers.go` and `pkg/gui/service.go`**
 
 In `pkg/media/providers.go`:
 Update `NewImageClient`:
@@ -809,12 +809,12 @@ In `TestProvider` (around line 2450):
 		}
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestNewImageClientBuildsGemini ./pkg/media/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/providers.go pkg/media/providers_test.go pkg/gui/service.go
@@ -830,7 +830,7 @@ git commit -m "feat(media): wire GeminiImageClient into NewImageClient factory w
 - Modify: `frontend/src/templates/providerPresets.ts`
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Update frontend types**
+- [x] **Step 1: Update frontend types**
 
 In `frontend/src/types.ts`:
 Update `ImageConfig`:
@@ -850,7 +850,7 @@ export interface ImageConfig {
 }
 ```
 
-- [ ] **Step 2: Add Gemini & Nano Banana presets in providerPresets.ts**
+- [x] **Step 2: Add Gemini & Nano Banana presets in providerPresets.ts**
 
 In `frontend/src/templates/providerPresets.ts`:
 Add to `IMAGE_PRESETS`:
@@ -923,7 +923,7 @@ Add to `IMAGE_PRESETS`:
   },
 ```
 
-- [ ] **Step 3: Update SettingsStudio.tsx with Gemini/Imagen UI controls**
+- [x] **Step 3: Update SettingsStudio.tsx with Gemini/Imagen UI controls**
 
 In `frontend/src/components/SettingsStudio.tsx`:
 1. In the `Image Provider Type` `<select>`:
@@ -967,12 +967,12 @@ In `frontend/src/components/SettingsStudio.tsx`:
      ```
    - API Key override field with helper text pointing to `config.providers.gemini.api_key`.
 
-- [ ] **Step 4: Run frontend TypeScript verification**
+- [x] **Step 4: Run frontend TypeScript verification**
 
 Run: `mise run test:frontend`  
 Expected: PASS with 0 type errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/templates/providerPresets.ts frontend/src/components/SettingsStudio.tsx
@@ -986,26 +986,26 @@ git commit -m "feat(frontend): add Gemini Imagen and Nano Banana image presets a
 **Files:**
 - All touched files
 
-- [ ] **Step 1: Run complete backend test suite**
+- [x] **Step 1: Run complete backend test suite**
 
 Run: `mise run test:backend`  
 Expected: PASS (all packages `./...` exit code 0)
 
-- [ ] **Step 2: Run linter**
+- [x] **Step 2: Run linter**
 
 Run: `mise run lint`  
 Expected: PASS (`go vet ./...` clean)
 
-- [ ] **Step 3: Run complete frontend build**
+- [x] **Step 3: Run complete frontend build**
 
 Run: `mise run build:frontend`  
 Expected: PASS (Vite bundles successfully into `pkg/gui/dist`)
 
-- [ ] **Step 4: Restore `.gitkeep` if removed by Vite build**
+- [x] **Step 4: Restore `.gitkeep` if removed by Vite build**
 
 Run: `git checkout pkg/gui/dist/.gitkeep 2>/dev/null || true`
 
-- [ ] **Step 5: Run full binary build**
+- [x] **Step 5: Run full binary build**
 
 Run: `mise run build:backend`  
 Expected: PASS (`bin/localrpg` built)
