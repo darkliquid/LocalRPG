@@ -452,8 +452,8 @@ func voiceOptions(voice *entity.VoiceConfig) map[string]interface{} {
 }
 
 // voiceSettings maps the declared options onto ElevenLabs' voice_settings. It
-// returns an empty map when nothing was declared, so the voice's stored
-// server-side settings apply unchanged.
+// returns an empty map when nothing was tuned, so the voice's stored server-side
+// settings apply unchanged.
 func voiceSettings(voice *entity.VoiceConfig, options map[string]interface{}) map[string]interface{} {
 	settings := make(map[string]interface{})
 	for _, key := range []string{"stability", "similarity_boost", "style", "use_speaker_boost"} {
@@ -462,16 +462,10 @@ func voiceSettings(voice *entity.VoiceConfig, options map[string]interface{}) ma
 		}
 	}
 
-	speed := 1.0
-	if voice != nil && voice.SpeechRate > 0 {
-		speed = voice.SpeechRate
-	}
-	settings["speed"] = speed
-
-	// A stock voice with no declared tuning keeps its own defaults, so only speed
-	// (which is never declared in the schema) would remain; omit in that case.
-	if len(options) == 0 {
-		return map[string]interface{}{}
+	// Speed is only sent when it was deliberately set away from the provider's
+	// default, because a stock voice must keep its own server-side settings.
+	if voice != nil && voice.SpeechRate > 0 && voice.SpeechRate != 1.0 {
+		settings["speed"] = voice.SpeechRate
 	}
 	return settings
 }
