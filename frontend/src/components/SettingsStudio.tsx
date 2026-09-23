@@ -1411,7 +1411,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             }
                           : builtinName === 'gemini'
                           ? {
-                              model: config.media.tts.model || 'gemini-3.1-flash-tts-preview',
+                              model: config.media.tts.model || 'gemini-3.8-flash-tts',
                               default_voice: config.media.tts.default_voice || 'Aoede',
                             }
                           : {};
@@ -1431,7 +1431,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             ...config.media.tts,
                             type: 'gemini',
                             builtin_name: undefined,
-                            model: config.media.tts.model || 'gemini-3.1-flash-tts-preview',
+                            model: config.media.tts.model || 'gemini-3.8-flash-tts',
                             default_voice: config.media.tts.default_voice || 'Aoede',
                           },
                         },
@@ -1573,8 +1573,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <label className="text-xs font-cinzel uppercase text-stone-300">Gemini TTS Model</label>
                 <input
                   type="text"
-                  placeholder="e.g. gemini-3.1-flash-tts-preview"
-                  value={config.media.tts.model || 'gemini-3.1-flash-tts-preview'}
+                  placeholder="e.g. gemini-3.8-flash-tts"
+                  value={config.media.tts.model || 'gemini-3.8-flash-tts'}
                   onChange={(e) =>
                     setConfig({
                       ...config,
@@ -1585,6 +1585,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 />
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {[
+                    { id: 'gemini-3.8-flash-tts', label: '3.8 Flash TTS' },
+                    { id: 'gemini-3.8-flash-lite-tts', label: '3.8 Flash-Lite TTS' },
                     { id: 'gemini-3.1-flash-tts-preview', label: '3.1 Flash TTS' },
                     { id: 'gemini-2.5-flash-preview-tts', label: '2.5 Flash TTS' },
                     { id: 'gemini-2.5-pro-preview-tts', label: '2.5 Pro TTS' },
@@ -1599,7 +1601,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         })
                       }
                       className={`text-[11px] px-2.5 py-1 rounded-lg border font-mono transition cursor-pointer ${
-                        (config.media.tts.model || 'gemini-3.1-flash-tts-preview') === m.id
+                        (config.media.tts.model || 'gemini-3.8-flash-tts') === m.id
                           ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
                           : 'bg-stone-900/60 border-stone-800 text-stone-400 hover:text-stone-200'
                       }`}
