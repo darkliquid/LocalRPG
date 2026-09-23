@@ -20,6 +20,7 @@ import {
   Users,
   RotateCcw,
   Bug,
+  Cloud,
 } from 'lucide-react';
 import {
   AGENT_PRESETS,
@@ -59,7 +60,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [activeFilePath, setActiveFilePath] = useState<string>('');
   const [isOverride, setIsOverride] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'paths' | 'agents' | 'media' | 'preferences' | 'debug'>('paths');
+  const [activeSubTab, setActiveSubTab] = useState<'paths' | 'providers' | 'agents' | 'media' | 'preferences' | 'debug'>('paths');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -250,6 +251,15 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           >
             <Folder className="w-3.5 h-3.5" />
             <span>Paths</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('providers')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
+              activeSubTab === 'providers' ? 'bg-amber-600 text-stone-950 font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Cloud className="w-3.5 h-3.5" />
+            <span>Providers</span>
           </button>
           <button
             onClick={() => setActiveSubTab('agents')}
