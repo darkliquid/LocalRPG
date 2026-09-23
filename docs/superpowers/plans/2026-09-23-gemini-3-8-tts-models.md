@@ -29,7 +29,7 @@
 - Modify: `pkg/config/presets_test.go:120-155`
 - Modify: `pkg/media/gemini_tts.go:100-140`
 
-- [ ] **Step 1: Write failing test in `pkg/config/presets_test.go`**
+- [x] **Step 1: Write failing test in `pkg/config/presets_test.go`**
 
 Update `TestGetGeminiTTSPresets` in `pkg/config/presets_test.go` to include the 3.8 models:
 
@@ -64,12 +64,12 @@ func TestGetGeminiTTSPresets(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestGetGeminiTTSPresets ./pkg/config/`
 Expected: FAIL (`expected preset "gemini-3.8-flash-tts" to exist in TTSPresets`)
 
-- [ ] **Step 3: Update `pkg/config/presets.go` and `pkg/media/gemini_tts.go`**
+- [x] **Step 3: Update `pkg/config/presets.go` and `pkg/media/gemini_tts.go`**
 
 In `pkg/config/presets.go`, add to `TTSPresets`:
 ```go
@@ -99,13 +99,13 @@ Update `NewGeminiTTSClientWithClient` and `NewGeminiTTSClientOffline`:
 	}
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v -run TestGetGeminiTTSPresets ./pkg/config/`
 Run: `go test -v ./pkg/media/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/presets.go pkg/config/presets_test.go pkg/media/gemini_tts.go
@@ -120,7 +120,7 @@ git commit -m "feat(media): add Gemini 3.8 Flash and Flash-Lite TTS models"
 - Modify: `frontend/src/templates/providerPresets.ts`
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Add presets to `frontend/src/templates/providerPresets.ts`**
+- [x] **Step 1: Add presets to `frontend/src/templates/providerPresets.ts`**
 
 In `frontend/src/templates/providerPresets.ts`, add to `TTS_PRESETS`:
 ```typescript
@@ -152,7 +152,7 @@ In `frontend/src/templates/providerPresets.ts`, add to `TTS_PRESETS`:
   },
 ```
 
-- [ ] **Step 2: Update `frontend/src/components/SettingsStudio.tsx`**
+- [x] **Step 2: Update `frontend/src/components/SettingsStudio.tsx`**
 
 1. Update default model fallback when switching to Gemini TTS:
    `model: config.media.tts.model || 'gemini-3.8-flash-tts'`
@@ -167,12 +167,12 @@ In `frontend/src/templates/providerPresets.ts`, add to `TTS_PRESETS`:
    ]
    ```
 
-- [ ] **Step 3: Run frontend typecheck**
+- [x] **Step 3: Run frontend typecheck**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/templates/providerPresets.ts frontend/src/components/SettingsStudio.tsx
@@ -183,22 +183,22 @@ git commit -m "feat(frontend): add Gemini 3.8 Flash & Flash-Lite TTS presets and
 
 ### Task 3: Full Verification and Build
 
-- [ ] **Step 1: Run all tests**
+- [x] **Step 1: Run all tests**
 
 Run: `mise run test`
 Expected: PASS
 
-- [ ] **Step 2: Run build**
+- [x] **Step 2: Run build**
 
 Run: `mise run build`
 Expected: SUCCESS
 
-- [ ] **Step 3: Verify clean git status (restore dist/.gitkeep if needed)**
+- [x] **Step 3: Verify clean git status (restore dist/.gitkeep if needed)**
 
 Run: `git status`
 Expected: Clean working tree
 
-- [ ] **Step 4: Mark plan complete and commit**
+- [x] **Step 4: Mark plan complete and commit**
 
 ```bash
 git add docs/superpowers/plans/2026-09-23-gemini-3-8-tts-models.md
