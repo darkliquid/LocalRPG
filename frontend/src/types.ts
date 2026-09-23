@@ -285,6 +285,8 @@ export interface AgentRoleConfig {
   api_key?: string;
   temperature?: number;
   max_tokens?: number;
+  // "auto" (HTTP providers only), "yes", or "no".
+  supports_tools?: 'auto' | 'yes' | 'no';
 }
 
 export interface AgentsConfig {
@@ -296,6 +298,9 @@ export interface AgentsConfig {
   chunk_timeout_seconds?: number;
   // The assembled prompt's estimated token ceiling. 0 means unbounded.
   context_token_budget?: number;
+  // Tool rounds per turn, and the cap on one tool result.
+  tool_rounds?: number;
+  tool_result_chars?: number;
   // How far back the narrator is reminded, and how much of each turn.
   recent_turn_window?: number;
   recent_turn_char_limit?: number;

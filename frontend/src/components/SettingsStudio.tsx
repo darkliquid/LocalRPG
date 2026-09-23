@@ -655,6 +655,30 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 </div>
               )}
 
+              {currentRoleConfig.type !== 'inherit' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">Tool Calling</label>
+                  <select
+                    value={currentRoleConfig.supports_tools ?? 'auto'}
+                    onChange={(e) => {
+                      const updated = { ...currentRoleConfig, supports_tools: e.target.value as 'auto' | 'yes' | 'no' };
+                      setConfig({
+                        ...config,
+                        agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
+                      });
+                    }}
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                  >
+                    <option value="auto">Auto (HTTP providers only)</option>
+                    <option value="yes">Yes (force tools)</option>
+                    <option value="no">No (suppress tools)</option>
+                  </select>
+                  <p className="text-[11px] text-stone-500">
+                    Whether this role may look things up mid-turn. Only the gm role is offered tools.
+                  </p>
+                </div>
+              )}
+
               {currentRoleConfig.type !== 'disabled' && (
                 <div className="pt-2 flex items-center justify-between border-t border-stone-800/60">
                   <button
@@ -927,6 +951,47 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <p className="text-[11px] text-stone-500">
                   How long the narrator may go quiet between chunks before the turn fails.
                 </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">Tool Rounds / Turn</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={config.agents.tool_rounds ?? 4}
+                    onChange={(e) => {
+                      const parsed = parseInt(e.target.value, 10);
+                      setConfig({
+                        ...config,
+                        agents: { ...config.agents, tool_rounds: Number.isNaN(parsed) ? 4 : parsed },
+                      });
+                    }}
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  />
+                  <p className="text-[11px] text-stone-500">How many times a turn may look something up before answering.</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">Tool Result Characters</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={50000}
+                    step={500}
+                    value={config.agents.tool_result_chars ?? 4000}
+                    onChange={(e) => {
+                      const parsed = parseInt(e.target.value, 10);
+                      setConfig({
+                        ...config,
+                        agents: { ...config.agents, tool_result_chars: Number.isNaN(parsed) ? 4000 : parsed },
+                      });
+                    }}
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  />
+                  <p className="text-[11px] text-stone-500">The most of one lookup the model is shown at once.</p>
+                </div>
               </div>
             </div>
           </div>
