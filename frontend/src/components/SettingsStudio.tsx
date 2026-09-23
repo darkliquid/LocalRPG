@@ -88,6 +88,35 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   } | null>(null);
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
 
+  const isBuiltinKokoro =
+    config?.media.tts.type === 'builtin' &&
+    (config?.media.tts.builtin_name === 'sherpa-onnx' || config?.media.tts.builtin_name === 'kokoro');
+  const isKokoro =
+    Boolean(isBuiltinKokoro) ||
+    (config?.media.tts.type === 'http' &&
+      (config?.media.tts.model === 'kokoro' || (config?.media.tts.endpoint || '').includes('8880')));
+
+  const kokoroCatalogVoices: ProviderVoice[] = useMemo(
+    () =>
+      KOKORO_VOICE_PROFILES.map((p) => ({
+        id: p.voice_id,
+        name: p.name,
+        tags: p.tags,
+        description: p.description,
+      })),
+    []
+  );
+
+  const availableTTSVoices = useMemo(() => {
+    if (inspect?.catalog?.voices && inspect.catalog.voices.length > 0) {
+      return inspect.catalog.voices;
+    }
+    if (isKokoro) {
+      return kokoroCatalogVoices;
+    }
+    return [];
+  }, [inspect?.catalog?.voices, isKokoro, kokoroCatalogVoices]);
+
   useEffect(() => {
     loadSettings();
     APIClient.getModels().then(setModels).catch(console.error);
@@ -220,40 +249,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
   const roleNames = Array.from(new Set([...Object.keys(config.agents.roles), 'extractor']));
 
-  const isBuiltinKokoro =
-    config.media.tts.type === 'builtin' &&
-    (config.media.tts.builtin_name === 'sherpa-onnx' || config.media.tts.builtin_name === 'kokoro');
-  const isKokoro =
-    isBuiltinKokoro ||
-    (config.media.tts.type === 'http' &&
-      (config.media.tts.model === 'kokoro' || (config.media.tts.endpoint || '').includes('8880')));
   const kokoroStatus = models.find((m) => m.id === 'kokoro-tts');
   const isGeminiTTS =
     config.media.tts.type === 'gemini' ||
     (config.media.tts.type === 'builtin' && config.media.tts.builtin_name === 'gemini');
   const isElevenLabsTTS =
     config.media.tts.type === 'builtin' && config.media.tts.builtin_name === 'elevenlabs';
-
-  const kokoroCatalogVoices: ProviderVoice[] = useMemo(
-    () =>
-      KOKORO_VOICE_PROFILES.map((p) => ({
-        id: p.voice_id,
-        name: p.name,
-        tags: p.tags,
-        description: p.description,
-      })),
-    []
-  );
-
-  const availableTTSVoices = useMemo(() => {
-    if (inspect?.catalog.voices && inspect.catalog.voices.length > 0) {
-      return inspect.catalog.voices;
-    }
-    if (isKokoro) {
-      return kokoroCatalogVoices;
-    }
-    return [];
-  }, [inspect?.catalog.voices, isKokoro, kokoroCatalogVoices]);
 
   const updateRole = (updated: AgentRoleConfig) => {
     setConfig({
@@ -1802,10 +1803,10 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             )}
 
-            {inspect?.catalog.available && (
+            {inspect?.catalog?.available && (
               <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-stone-400">
                 <span>
-                  {inspect.catalog.voices.length} voices
+                  {inspect.catalog.voices?.length ?? 0} voices
                   {inspect.catalog.fetched_at
                     ? ` - last checked ${new Date(inspect.catalog.fetched_at).toLocaleString()}`
                     : ''}
@@ -2027,7 +2028,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <span>Load Fantasy Defaults</span>
                   </button>
 
-                  {Boolean(inspect?.catalog.voices?.length) && (
+                  {Boolean(inspect?.catalog?.voices?.length) && (
                     <button
                       type="button"
                       onClick={() => setIsCatalogModalOpen(true)}
@@ -2782,7 +2783,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
         <VoiceCatalogModal
           isOpen={isCatalogModalOpen}
           onClose={() => setIsCatalogModalOpen(false)}
-          voices={inspect?.catalog.voices ?? []}
+          voices={inspect?.catalog?.voices ?? []}
           providerKey={inspect?.provider_key || 'tts'}
           onAddProfile={(newProfile) => {
             if (config) {
