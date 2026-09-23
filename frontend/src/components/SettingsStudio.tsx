@@ -29,6 +29,8 @@ import {
   DEFAULT_VOICE_PROFILES,
   KOKORO_VOICE_PROFILES,
 } from '../templates/providerPresets';
+import { VoiceOptionsControl } from './VoiceOptionsControl';
+import { useTTSInspect } from '../hooks/useTTSInspect';
 
 interface SettingsStudioProps {
   isCompact?: boolean;
@@ -65,6 +67,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const [testResult, setTestResult] = useState<{ category: string; res: TestProviderResponse } | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [ttsPreviewText, setTtsPreviewText] = useState<string>(DEFAULT_TTS_PREVIEW_TEXT);
+
+  // The inspect describes the configuration in hand, so a provider is described
+  // before it is saved. The fallback keeps the hook unconditional during load.
+  const inspectConfig = config?.media.tts ?? { type: 'disabled' as const, auto_play: false, master_volume: 1 };
+  const { inspect, loading: inspecting, refresh: refreshInspect } = useTTSInspect(inspectConfig, Boolean(config));
 
   // Selected agent role for editing
   const [selectedRole, setSelectedRole] = useState<string>('gm');
@@ -1154,6 +1161,52 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <span>{kokoroStatus?.downloading ? 'Downloading...' : 'Download Model'}</span>
                   </button>
                 )}
+              </div>
+            )}
+
+            {inspect?.metered && (
+              <div className="flex items-center gap-2 text-[11px] font-mono text-amber-400/90">
+                <span className="px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10">METERED</span>
+                <span>This provider charges per request. Cached clips are reused.</span>
+              </div>
+            )}
+
+            {inspect && inspect.options && inspect.options.length > 0 && (
+              <div className="p-3 rounded-lg bg-stone-950/70 border border-stone-800/80 space-y-2">
+                <label className="text-xs font-cinzel uppercase text-stone-300">Provider Tuning</label>
+                <VoiceOptionsControl
+                  schema={inspect.options}
+                  values={config.media.tts.options ?? {}}
+                  onChange={(key, value) =>
+                    setConfig({
+                      ...config,
+                      media: {
+                        ...config.media,
+                        tts: { ...config.media.tts, options: { ...(config.media.tts.options ?? {}), [key]: value } },
+                      },
+                    })
+                  }
+                />
+              </div>
+            )}
+
+            {inspect?.catalog.available && (
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-stone-400">
+                <span>
+                  {inspect.catalog.voices.length} voices
+                  {inspect.catalog.fetched_at
+                    ? ` - last checked ${new Date(inspect.catalog.fetched_at).toLocaleString()}`
+                    : ''}
+                  {inspect.catalog.stale ? ' (catalog unavailable, showing the last copy)' : ''}
+                </span>
+                <button
+                  type="button"
+                  onClick={refreshInspect}
+                  disabled={inspecting}
+                  className="px-2 py-1 rounded bg-stone-900 border border-stone-800 text-amber-400 hover:text-amber-300 hover:border-amber-500/40 cursor-pointer disabled:opacity-50"
+                >
+                  {inspecting ? 'Refreshing...' : 'Refresh Catalog'}
+                </button>
               </div>
             )}
 
