@@ -103,7 +103,7 @@ export const GraphDrawer: React.FC<GraphDrawerProps> = ({ data, onSelectNode }) 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-cinzel text-amber-400 font-bold flex items-center gap-1.5">
+        <h3 className="text-lg font-sans text-purple-400 font-bold flex items-center gap-1.5">
           <Network className="w-4 h-4" />
           <span>Knowledge Graph</span>
         </h3>
@@ -130,7 +130,7 @@ export const GraphDrawer: React.FC<GraphDrawerProps> = ({ data, onSelectNode }) 
             <div>• Blue: NPC</div>
             <div>• Purple: Location</div>
             <div>• Grey: Lore, arcs and other notes</div>
-            <div className="text-amber-400/80">Click a node to open its note.</div>
+            <div className="text-purple-400/80">Click a node to open its note.</div>
           </div>
         </>
       )}

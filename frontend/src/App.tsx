@@ -409,16 +409,16 @@ export const App: React.FC = () => {
             <div className="flex items-center gap-4">
               <button
                 onClick={handleReturnToLauncher}
-                className="flex items-center gap-1.5 text-xs font-cinzel font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer bg-stone-900/60 hover:bg-stone-800 text-amber-400 border border-amber-500/30"
+                className="flex items-center gap-1.5 text-xs font-sans font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer bg-white/[0.05] hover:bg-white/[0.1] text-stone-200 border border-white/10"
                 title="Switch Campaign / Return to Hub"
               >
                 <Compass className="w-3.5 h-3.5" />
                 <span>Campaigns</span>
               </button>
 
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
-                <h1 className="font-cinzel text-base md:text-lg font-bold text-amber-400 tracking-wider">
+              <div className="flex items-center gap-2.5">
+                <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+                <h1 className="font-sans text-base md:text-lg font-bold text-white tracking-tight">
                   {gameState?.game_name || activeGameID}
                 </h1>
               </div>
@@ -428,8 +428,8 @@ export const App: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setActiveDrawer('character')}
-                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                  activeDrawer === 'character' ? 'bg-amber-600 text-stone-950 font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  activeDrawer === 'character' ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
                 }`}
               >
                 <User className="w-3.5 h-3.5" />
@@ -437,8 +437,8 @@ export const App: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveDrawer('graph')}
-                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                  activeDrawer === 'graph' ? 'bg-amber-600 text-stone-950 font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  activeDrawer === 'graph' ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
                 }`}
               >
                 <Network className="w-3.5 h-3.5" />
@@ -446,8 +446,8 @@ export const App: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveDrawer('codex')}
-                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                  activeDrawer === 'codex' ? 'bg-amber-600 text-stone-950 font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  activeDrawer === 'codex' ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
                 }`}
               >
                 <BookOpen className="w-3.5 h-3.5" />
@@ -455,8 +455,8 @@ export const App: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveDrawer('world')}
-                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                  activeDrawer === 'world' ? 'bg-amber-600 text-stone-950 font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  activeDrawer === 'world' ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
                 }`}
               >
                 <Clock className="w-3.5 h-3.5" />
@@ -464,20 +464,20 @@ export const App: React.FC = () => {
               </button>
               <button
                 onClick={() => setIsTheaterOpen(true)}
-                className="flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-xl transition-all cursor-pointer text-stone-300 hover:text-white hover:bg-white/10"
+                className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer text-stone-300 hover:text-white hover:bg-white/10"
                 title="Open Story Theater replay mode"
               >
-                <Film className="w-3.5 h-3.5 text-amber-400" />
+                <Film className="w-3.5 h-3.5 text-purple-400" />
                 <span className="hidden sm:inline">Theater</span>
               </button>
               <button
                 onClick={() => setIsSettingsOpen(true)}
-                className={`flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                  isSettingsOpen ? 'bg-amber-600 text-stone-950 font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  isSettingsOpen ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
                 }`}
                 title="Global Settings"
               >
-                <Settings className="w-3.5 h-3.5 text-amber-400" />
+                <Settings className="w-3.5 h-3.5 text-purple-400" />
                 <span className="hidden sm:inline">Settings</span>
               </button>
             </div>
@@ -510,9 +510,9 @@ export const App: React.FC = () => {
                   )
                 ) : campaignStatus === 'unavailable' ? (
                   <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
-                    <Compass className="w-8 h-8 text-amber-500/50" />
+                    <Compass className="w-8 h-8 text-purple-500/50" />
                     <div className="space-y-1">
-                      <p className="font-cinzel text-sm text-amber-300 font-bold">This campaign could not be opened</p>
+                      <p className="font-sans text-sm text-purple-300 font-bold">This campaign could not be opened</p>
                       <p className="text-xs text-stone-400 font-mono max-w-md">
                         {campaignError ?? `"${activeGameID}" is unavailable.`}
                       </p>
@@ -520,13 +520,13 @@ export const App: React.FC = () => {
                     <div className="flex items-center gap-2 pt-1">
                       <button
                         onClick={handleReturnToLauncher}
-                        className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold text-xs shadow-md transition-all cursor-pointer"
+                        className="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-sans font-bold text-xs shadow-md transition-all cursor-pointer"
                       >
                         Return to Campaigns
                       </button>
                       <button
                         onClick={() => window.location.reload()}
-                        className="px-3.5 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-300 hover:text-amber-300 hover:border-amber-500/40 font-cinzel text-xs transition-colors cursor-pointer"
+                        className="px-3.5 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-300 hover:text-purple-300 hover:border-purple-500/40 font-sans text-xs transition-colors cursor-pointer"
                       >
                         Retry
                       </button>
@@ -560,7 +560,7 @@ export const App: React.FC = () => {
                 </>
               )}
               {toolActivity && (
-                <div className="text-xs font-mono text-amber-400/80 px-4 pb-1">{toolActivity}</div>
+                <div className="text-xs font-mono text-purple-400/80 px-4 pb-1">{toolActivity}</div>
               )}
               <ActionConsole
                 onSubmit={handleActionSubmit}
@@ -624,11 +624,11 @@ export const App: React.FC = () => {
           {/* Global Settings Modal Dialog */}
           {isSettingsOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in">
-              <div className="relative w-full max-w-4xl max-h-[88vh] bg-stone-900/95 border border-amber-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+              <div className="relative w-full max-w-4xl max-h-[88vh] bg-stone-900/95 border border-purple-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 shrink-0">
                   <div className="flex items-center gap-2">
-                    <Settings className="w-5 h-5 text-amber-400" />
-                    <h2 className="font-cinzel text-lg font-bold text-amber-400">Global Configuration</h2>
+                    <Settings className="w-5 h-5 text-purple-400" />
+                    <h2 className="font-sans text-lg font-bold text-purple-400">Global Configuration</h2>
                   </div>
                   <button
                     onClick={() => setIsSettingsOpen(false)}

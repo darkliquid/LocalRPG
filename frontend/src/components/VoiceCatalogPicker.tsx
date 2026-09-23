@@ -51,7 +51,7 @@ export const VoiceCatalogPicker: React.FC<VoiceCatalogPickerProps> = ({ ttsConfi
 
   return (
     <div className="space-y-2">
-      <label className="text-xs font-cinzel uppercase text-stone-400">Provider Catalog</label>
+      <label className="text-xs font-sans uppercase text-stone-400">Provider Catalog</label>
       <div className="flex flex-wrap gap-2">
         <input
           type="text"
@@ -98,7 +98,7 @@ export const VoiceCatalogPicker: React.FC<VoiceCatalogPickerProps> = ({ ttsConfi
                 <button
                   type="button"
                   onClick={() => playVoicePreview(voice.preview_url as string)}
-                  className="p-1.5 rounded bg-stone-900 border border-stone-800 text-amber-400 hover:text-amber-300 cursor-pointer"
+                  className="p-1.5 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 cursor-pointer"
                   title="Audition"
                 >
                   <Play className="w-3.5 h-3.5" />
@@ -107,7 +107,7 @@ export const VoiceCatalogPicker: React.FC<VoiceCatalogPickerProps> = ({ ttsConfi
               <button
                 type="button"
                 onClick={() => addProfile(voice.id)}
-                className="p-1.5 rounded bg-stone-900 border border-stone-800 text-amber-400 hover:text-amber-300 cursor-pointer"
+                className="p-1.5 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 cursor-pointer"
                 title="Add as profile"
               >
                 <Plus className="w-3.5 h-3.5" />

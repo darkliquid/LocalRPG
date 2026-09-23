@@ -57,10 +57,10 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
       <div className="w-full max-w-md bg-stone-900 border border-stone-800 rounded-xl shadow-2xl p-6 text-stone-200">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg">
+            <div className="p-2 bg-purple-500/10 text-purple-400 rounded-lg">
               <Volume2 className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-semibold text-stone-100 font-cinzel">Enable Voice Narration</h3>
+            <h3 className="text-lg font-semibold text-stone-100 font-sans">Enable Voice Narration</h3>
           </div>
           {!downloading && (
             <button
@@ -101,7 +101,7 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
                 </div>
                 <div className="w-full h-2 bg-stone-800 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-amber-500 transition-all duration-200"
+                    className="h-full bg-purple-500 transition-all duration-200"
                     style={{ width: `${Math.round(progress * 100)}%` }}
                   />
                 </div>
@@ -129,7 +129,7 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
               <button
                 disabled={downloading}
                 onClick={handleStartDownload}
-                className="flex-1 py-2 px-4 bg-amber-600 hover:bg-amber-500 text-stone-950 font-semibold text-sm rounded-lg flex items-center justify-center gap-2 transition shadow-md disabled:opacity-50 cursor-pointer"
+                className="flex-1 py-2 px-4 bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm rounded-lg flex items-center justify-center gap-2 transition shadow-md disabled:opacity-50 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 {downloading ? 'Downloading...' : `Download (${formattedSize} MB)`}

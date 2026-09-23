@@ -21,7 +21,7 @@ export const VoiceOptionsControl: React.FC<VoiceOptionsControlProps> = ({ schema
             {option.kind !== 'bool' && (
               <div className="flex justify-between text-[11px] text-stone-400">
                 <span>{option.label}</span>
-                <span className="font-mono text-amber-400">{describeValue(option, current)}</span>
+                <span className="font-mono text-purple-400">{describeValue(option, current)}</span>
               </div>
             )}
             {renderControl(option, current, onChange)}
@@ -54,9 +54,9 @@ function renderControl(
   current: unknown,
   onChange: (key: string, value: unknown) => void,
 ): React.ReactNode {
-  const rangeClass = 'w-full accent-amber-500';
+  const rangeClass = 'w-full accent-purple-500';
   const inputClass =
-    'w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none focus:border-amber-500/60';
+    'w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none focus:border-purple-500/60';
 
   switch (option.kind) {
     case 'float':
@@ -79,7 +79,7 @@ function renderControl(
             type="checkbox"
             checked={typeof current === 'boolean' ? current : Boolean(option.default)}
             onChange={(e) => onChange(option.key, e.target.checked)}
-            className="accent-amber-500"
+            className="accent-purple-500"
           />
           <span>{option.label}</span>
         </label>

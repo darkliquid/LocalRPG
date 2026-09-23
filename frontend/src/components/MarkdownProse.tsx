@@ -39,12 +39,12 @@ const renderInline = (
           <button
             key={key++}
             onClick={() => onEntityClick(target)}
-            className="text-amber-400 hover:text-amber-300 underline font-medium cursor-pointer transition-colors"
+            className="text-purple-400 hover:text-purple-300 underline font-medium cursor-pointer transition-colors"
           >
             {label}
           </button>
         ) : (
-          <span key={key++} className="text-amber-300/90">
+          <span key={key++} className="text-purple-300/90">
             {label}
           </span>
         )
@@ -58,7 +58,7 @@ const renderInline = (
         nodes.push(
           <span
             key={key++}
-            className="inline-flex items-center text-[0.76em] font-sans font-semibold uppercase tracking-wider text-amber-400/90 bg-amber-950/40 border border-amber-700/40 px-1.5 py-0.2 rounded-md mx-1 select-none not-italic align-baseline"
+            className="inline-flex items-center text-[0.76em] font-sans font-semibold uppercase tracking-wider text-purple-400/90 bg-purple-950/40 border border-purple-700/40 px-1.5 py-0.2 rounded-md mx-1 select-none not-italic align-baseline"
             title="Performance direction"
           >
             {token.slice(1, -1)}
@@ -128,13 +128,13 @@ export const MarkdownProse: React.FC<MarkdownProseProps> = memo(({ text, onEntit
           const content = renderInline(heading[2], onEntityClick, displayMode);
           if (level <= 2) {
             return (
-              <h2 key={index} className="font-cinzel text-lg font-bold text-amber-300 tracking-wide mt-2">
+              <h2 key={index} className="font-sans text-lg font-bold text-purple-300 tracking-wide mt-2">
                 {content}
               </h2>
             );
           }
           return (
-            <h3 key={index} className="font-cinzel text-base font-semibold text-amber-200/90 tracking-wide mt-2">
+            <h3 key={index} className="font-sans text-base font-semibold text-purple-200/90 tracking-wide mt-2">
               {content}
             </h3>
           );
@@ -155,7 +155,7 @@ export const MarkdownProse: React.FC<MarkdownProseProps> = memo(({ text, onEntit
           return (
             <blockquote
               key={index}
-              className="border-l-2 border-amber-500/60 pl-3 my-1 text-stone-300 italic whitespace-pre-wrap"
+              className="border-l-2 border-purple-500/60 pl-3 my-1 text-stone-300 italic whitespace-pre-wrap"
             >
               {renderInline(lines.map((line) => line.replace(/^>\s?/, '')).join('\n'), onEntityClick, displayMode)}
             </blockquote>

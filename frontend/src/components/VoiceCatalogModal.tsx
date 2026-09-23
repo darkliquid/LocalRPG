@@ -86,7 +86,7 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-800">
           <div>
-            <h2 className="font-cinzel text-base font-bold text-amber-400">Voice Catalog Browser</h2>
+            <h2 className="font-sans text-base font-bold text-purple-400">Voice Catalog Browser</h2>
             <p className="text-xs text-stone-400">Audition provider voices and add them directly into your archetypes.</p>
           </div>
           <button
@@ -107,7 +107,7 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by voice name, ID, or tag..."
-              className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60"
+              className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
           </div>
           {categories.length > 0 && (
@@ -170,7 +170,7 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
                       <button
                         type="button"
                         onClick={() => playVoicePreview(voice.preview_url as string)}
-                        className="p-2 rounded-lg bg-stone-900 border border-stone-800 text-amber-400 hover:text-amber-300 hover:bg-stone-800 cursor-pointer"
+                        className="p-2 rounded-lg bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 hover:bg-stone-800 cursor-pointer"
                         title="Audition"
                       >
                         <Play className="w-3.5 h-3.5" />
@@ -179,10 +179,10 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleAdd(voice)}
-                      className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer font-cinzel font-medium transition ${
+                      className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer font-sans font-medium transition ${
                         isAdded
                           ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                          : 'bg-amber-600/20 border-amber-500/40 text-amber-300 hover:bg-amber-600/30'
+                          : 'bg-purple-600/20 border-purple-500/40 text-purple-300 hover:bg-purple-600/30'
                       }`}
                       title="Add as profile"
                     >

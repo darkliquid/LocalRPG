@@ -62,7 +62,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   return (
     <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
       {turns.length === 0 && !pendingAction ? (
-        <div className="h-full flex items-center justify-center text-stone-500 font-cinzel tracking-wider text-sm italic">
+        <div className="h-full flex items-center justify-center text-stone-500 font-sans tracking-wider text-sm italic">
           The chronicle awaits your first action...
         </div>
       ) : (
@@ -72,7 +72,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 the input block is skipped for it to avoid printing it twice. */}
             {turn.input_text && !(turn.segments ?? []).some((segment) => segment.player) && (
               <div className="flex items-start gap-3 text-stone-300 text-sm font-sans italic bg-black/40 p-3.5 rounded-xl border border-white/5 shadow-inner">
-                <span className="text-amber-400 font-semibold uppercase tracking-wider text-xs font-cinzel">
+                <span className="text-purple-400 font-semibold uppercase tracking-wider text-xs font-sans">
                   [{turn.mode || 'Action'}]
                 </span>
                 <span>{turn.input_text}</span>
@@ -98,7 +98,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                   className="w-full object-cover max-h-96"
                 />
                 {turn.location_name && (
-                  <div className="px-3 py-2 text-xs font-cinzel tracking-widest text-stone-400 uppercase">
+                  <div className="px-3 py-2 text-xs font-sans tracking-widest text-stone-400 uppercase">
                     {turn.location_name}
                   </div>
                 )}
@@ -121,7 +121,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
             />
 
             {turn.recovery === 'trimmed' && (
-              <div className="text-xs font-mono text-amber-400/80 pt-1">
+              <div className="text-xs font-mono text-purple-400/80 pt-1">
                 The narrator's reply ended mid-thought; the unfinished tail was dropped.
               </div>
             )}
@@ -133,7 +133,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
             )}
 
             {turn.truncated && (
-              <div className="text-xs font-mono text-amber-400/80 pt-1">
+              <div className="text-xs font-mono text-purple-400/80 pt-1">
                 The narrator's reply could not be completed. Raise the response limit for the gm role in Settings, or
                 check the provider.
               </div>
@@ -149,7 +149,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
             {turn.continuity_notes && turn.continuity_notes.length > 0 && (
               <div
                 className={`text-xs font-mono pt-1 space-y-1 ${
-                  addressedTurns?.has(turn.turn_number) ? 'text-stone-500 opacity-60' : 'text-amber-400/90'
+                  addressedTurns?.has(turn.turn_number) ? 'text-stone-500 opacity-60' : 'text-purple-400/90'
                 }`}
               >
                 {turn.continuity_notes.map((note, index) => (
@@ -163,7 +163,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => onCorrect?.(note, turn.turn_number)}
-                          className="px-1.5 py-0.5 rounded border border-amber-500/40 hover:bg-amber-600/20 cursor-pointer transition-colors"
+                          className="px-1.5 py-0.5 rounded border border-purple-500/40 hover:bg-purple-600/20 cursor-pointer transition-colors"
                           title="Review or correct this finding"
                         >
                           Correct
@@ -191,7 +191,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                   <button
                     key={entityId}
                     onClick={() => onWikilinkClick(entityId)}
-                    className="px-2 py-0.5 text-xs font-cinzel tracking-wider rounded-full bg-white/5 border border-white/10 text-stone-300 hover:text-amber-300 hover:border-amber-500/60 cursor-pointer transition-colors"
+                    className="px-2 py-0.5 text-xs font-sans tracking-wider rounded-full bg-white/5 border border-white/10 text-stone-300 hover:text-purple-300 hover:border-purple-500/60 cursor-pointer transition-colors"
                   >
                     {entityId}
                   </button>
@@ -207,8 +207,8 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
         <div className="space-y-4 pb-6 animate-fade-in">
           {/* Immediate Action Bubble */}
           {pendingAction.text && (
-            <div className="flex items-start gap-3 text-stone-300 text-sm font-sans italic bg-black/40 p-3.5 rounded-xl border border-amber-500/20 shadow-inner">
-              <span className="text-amber-400 font-semibold uppercase tracking-wider text-xs font-cinzel">
+            <div className="flex items-start gap-3 text-stone-300 text-sm font-sans italic bg-black/40 p-3.5 rounded-xl border border-purple-500/20 shadow-inner">
+              <span className="text-purple-400 font-semibold uppercase tracking-wider text-xs font-sans">
                 [{pendingAction.mode || 'Action'}]
               </span>
               <span>{pendingAction.text}</span>
@@ -224,12 +224,12 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               displayMode={displayMode}
             />
           ) : (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 text-stone-300 text-sm animate-pulse">
-              <div className="p-2 rounded-lg bg-amber-600/20 text-amber-400">
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-purple-950/20 border border-purple-500/30 text-stone-300 text-sm animate-pulse">
+              <div className="p-2 rounded-lg bg-purple-600/20 text-purple-400">
                 <Sparkles className="w-4 h-4 animate-spin" />
               </div>
               <div className="space-y-0.5">
-                <div className="font-cinzel text-xs font-bold text-amber-400 uppercase tracking-wider">
+                <div className="font-sans text-xs font-bold text-purple-400 uppercase tracking-wider">
                   The narrator is drafting the scene...
                 </div>
                 <div className="text-xs text-stone-400 font-sans">

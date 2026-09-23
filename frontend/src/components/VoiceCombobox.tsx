@@ -69,7 +69,7 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className={`bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs font-mono text-stone-200 focus:outline-none focus:border-amber-500/60 ${className}`}
+        className={`bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs font-mono text-stone-200 focus:outline-none focus:border-purple-500/60 ${className}`}
       />
     );
   }
@@ -96,7 +96,7 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
           }}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 pr-6 text-xs text-stone-200 focus:outline-none focus:border-amber-500/60 truncate"
+          className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 pr-6 text-xs text-stone-200 focus:outline-none focus:border-purple-500/60 truncate"
         />
         <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {isOpen && query && (
@@ -128,7 +128,7 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
         <button
           type="button"
           onClick={() => playVoicePreview(selectedVoice.preview_url as string)}
-          className="p-1 rounded bg-stone-900 border border-stone-800 text-amber-400 hover:text-amber-300 cursor-pointer shrink-0"
+          className="p-1 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 cursor-pointer shrink-0"
           title="Audition Voice"
         >
           <Play className="w-3 h-3" />
@@ -150,7 +150,7 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
                     setIsOpen(false);
                   }}
                   className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded text-xs cursor-pointer ${
-                    isSelected ? 'bg-amber-500/20 text-amber-300' : 'text-stone-300 hover:bg-stone-900'
+                    isSelected ? 'bg-purple-500/20 text-purple-300' : 'text-stone-300 hover:bg-stone-900'
                   }`}
                 >
                   <div className="min-w-0">
@@ -170,7 +170,7 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
                           e.stopPropagation();
                           playVoicePreview(voice.preview_url as string);
                         }}
-                        className="p-1 rounded hover:bg-stone-800 text-amber-400 cursor-pointer"
+                        className="p-1 rounded hover:bg-stone-800 text-purple-400 cursor-pointer"
                         title="Audition"
                       >
                         <Play className="w-3 h-3" />

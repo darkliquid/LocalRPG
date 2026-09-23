@@ -63,7 +63,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
       {/* Top Controls */}
       <header className="relative z-10 p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
         <div className="flex items-center gap-3">
-          <span className="font-cinzel text-amber-400 font-bold tracking-widest text-lg">STORY THEATER</span>
+          <span className="font-sans text-purple-400 font-bold tracking-widest text-lg">STORY THEATER</span>
           <span className="text-xs font-mono text-stone-400 bg-stone-900/60 px-2 py-1 rounded border border-white/10">
             Turn {currentIdx + 1} of {turns.length}
           </span>
@@ -93,7 +93,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
         {/* Progress Bar */}
         <div className="w-full max-w-2xl h-1.5 bg-stone-900 rounded-full overflow-hidden border border-white/5">
           <div
-            className="h-full bg-amber-500 transition-all duration-300"
+            className="h-full bg-purple-500 transition-all duration-300"
             style={{ width: `${((currentIdx + 1) / turns.length) * 100}%` }}
           />
         </div>
@@ -110,7 +110,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
 
           <button
             onClick={() => setIsPlaying(!isPlaying)}
-            className="p-4 rounded-full bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold shadow-lg transition-transform hover:scale-105 cursor-pointer"
+            className="p-4 rounded-full bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg transition-transform hover:scale-105 cursor-pointer"
           >
             {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
           </button>
@@ -125,7 +125,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
 
           <button
             onClick={() => setSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1))}
-            className="px-3 py-1 rounded-lg bg-stone-900 border border-white/10 text-xs font-mono font-bold text-amber-400 hover:bg-stone-800"
+            className="px-3 py-1 rounded-lg bg-stone-900 border border-white/10 text-xs font-mono font-bold text-purple-400 hover:bg-stone-800"
           >
             {speed}x
           </button>

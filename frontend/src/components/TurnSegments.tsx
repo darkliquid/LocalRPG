@@ -47,14 +47,14 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
           <div
             key={i}
             className={`bg-glass-card border-l-4 pl-4 py-3 pr-4 rounded-r-xl shadow-lg space-y-2 ${
-              segment.player ? 'border-sky-400/90' : 'border-amber-500/90'
+              segment.player ? 'border-sky-400/90' : 'border-purple-500/90'
             }`}
           >
             {hasAudio ? (
               <button
                 onClick={() => (serverPlayback ? startServerPlayback(i) : playFrom(i))}
-                className={`text-xs font-cinzel font-bold tracking-widest hover:opacity-80 cursor-pointer ${
-                  segment.player ? 'text-sky-300' : 'text-amber-400'
+                className={`text-xs font-sans font-bold tracking-widest hover:opacity-80 cursor-pointer ${
+                  segment.player ? 'text-sky-300' : 'text-purple-400'
                 }`}
               >
                 {segment.speaker || 'UNKNOWN'}
@@ -62,8 +62,8 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
               </button>
             ) : (
               <div
-                className={`text-xs font-cinzel font-bold tracking-widest ${
-                  segment.player ? 'text-sky-300' : 'text-amber-400'
+                className={`text-xs font-sans font-bold tracking-widest ${
+                  segment.player ? 'text-sky-300' : 'text-purple-400'
                 }`}
               >
                 {segment.speaker || 'UNKNOWN'}
@@ -91,7 +91,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
         <div className="flex items-center gap-2 text-xs">
           <button
             onClick={() => startServerPlayback()}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900/70 border border-stone-700 text-stone-300 hover:text-amber-300 hover:border-amber-500/40 cursor-pointer transition-colors"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900/70 border border-stone-700 text-stone-300 hover:text-purple-300 hover:border-purple-500/40 cursor-pointer transition-colors"
           >
             <Play className="w-3 h-3" />
             <span>Play turn</span>
@@ -111,7 +111,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             <>
               <button
                 onClick={play}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold cursor-pointer transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-sans font-bold cursor-pointer transition-colors"
               >
                 <Play className="w-3.5 h-3.5 fill-stone-950" />
                 <span>Play narration</span>
@@ -121,7 +121,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
           ) : (
             <button
               onClick={playing ? stop : play}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900/70 border border-stone-700 text-stone-300 hover:text-amber-300 hover:border-amber-500/40 cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900/70 border border-stone-700 text-stone-300 hover:text-purple-300 hover:border-purple-500/40 cursor-pointer transition-colors"
             >
               {playing ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
               <span>{playing ? 'Pause' : 'Play turn'}</span>
