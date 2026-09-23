@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { GameSummary } from '../../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { GameSummary, VoiceProfile } from '../../types';
+import { APIClient } from '../../api/client';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
-import { X, Upload, Sparkles, AlertTriangle } from 'lucide-react';
+import { X, Upload, Sparkles, AlertTriangle, Volume2, MapPin, Check, Save } from 'lucide-react';
 
 interface CampaignSettingsModalProps {
   isOpen: boolean;
@@ -26,10 +27,61 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   const [confirmAction, setConfirmAction] = useState<'restart' | 'delete' | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
+  // Settings State
+  const [narratorVoice, setNarratorVoice] = useState('');
+  const [openingPrompt, setOpeningPrompt] = useState('');
+  const [startLocation, setStartLocation] = useState('');
+  const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (!isOpen || !game) return;
+
+    // Load available voice profiles
+    APIClient.getSettings()
+      .then((res) => {
+        setVoiceProfiles(res.config.media.tts.voice_profiles || []);
+      })
+      .catch((err) => console.error('Failed to load voice profiles', err));
+
+    // Load current campaign game state
+    const client = new APIClient(game.id);
+    client
+      .getGameState()
+      .then((state) => {
+        setNarratorVoice(state.narrator_voice || '');
+        setOpeningPrompt(state.opening_prompt || '');
+        setStartLocation(state.start_location || '');
+      })
+      .catch((err) => console.error('Failed to load game state settings', err));
+
+    setSettingsSaved(false);
+  }, [isOpen, game]);
+
   if (!isOpen || !game) return null;
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    setSettingsSaved(false);
+    try {
+      await APIClient.updateGameSettings(game.id, {
+        narrator_voice: narratorVoice.trim() || '',
+        opening_prompt: openingPrompt.trim() || '',
+        start_location: startLocation.trim() || '',
+      });
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 3000);
+    } catch (err) {
+      console.error('Failed to update game settings:', err);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -115,6 +167,84 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-6">
+          {/* Narrative & Audio Settings */}
+          <form onSubmit={handleSaveSettings} className="space-y-4 p-4 bg-stone-950 border border-white/10 rounded-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-sans font-bold uppercase tracking-wider text-purple-400">
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>Narrative & Audio Settings</span>
+              </div>
+              {settingsSaved && (
+                <span className="flex items-center gap-1 text-[11px] font-sans text-emerald-400 bg-emerald-950/50 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                  <Check className="w-3 h-3" />
+                  Saved
+                </span>
+              )}
+            </div>
+
+            {/* Narrator Voice */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-sans text-stone-300">
+                Narrator Voice
+              </label>
+              <select
+                value={narratorVoice}
+                onChange={(e) => setNarratorVoice(e.target.value)}
+                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500 cursor-pointer"
+              >
+                <option value="">Default (Provider Setting)</option>
+                {voiceProfiles.map((p) => (
+                  <option key={p.id} value={p.voice_id}>
+                    {p.name} ({p.voice_id})
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] font-sans text-stone-500">
+                Voice used to narrate scenes, descriptions, and GM responses in this campaign.
+              </p>
+            </div>
+
+            {/* Start Location */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-sans text-stone-300 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-stone-400" />
+                <span>Start Location Directive</span>
+              </label>
+              <input
+                type="text"
+                value={startLocation}
+                onChange={(e) => setStartLocation(e.target.value)}
+                placeholder="e.g. Old Harbour District"
+                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-200 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            {/* Opening Scene Prompt */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-sans text-stone-300">
+                Opening Scene Directive
+              </label>
+              <textarea
+                rows={2}
+                value={openingPrompt}
+                onChange={(e) => setOpeningPrompt(e.target.value)}
+                placeholder="Where the story begins..."
+                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
+              />
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="submit"
+                disabled={isSavingSettings}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-sans font-bold text-xs shadow-md transition-all cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{isSavingSettings ? 'Saving...' : 'Save Settings'}</span>
+              </button>
+            </div>
+          </form>
+
           {/* Artwork Management */}
           <div className="space-y-3">
             <h3 className="text-xs font-sans font-semibold text-stone-300 uppercase tracking-wider">
