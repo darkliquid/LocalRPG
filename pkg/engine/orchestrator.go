@@ -83,6 +83,69 @@ type TurnOrchestrator struct {
 	continuityChecks *bool
 	completion       harness.ModelProvider
 	completionPolicy CompletionPolicy
+	toolExecutor     ToolExecutor
+	toolCapability   string
+	toolRounds       int
+	toolObserver     func(ToolActivity)
+}
+
+// ToolExecutor runs one tool call and returns the text a model will read. A
+// failed call still returns readable text, so a tool error never loses a turn.
+type ToolExecutor interface {
+	Execute(ctx context.Context, call harness.ToolCall) (result string, ok bool)
+}
+
+// ToolActivity is one step of tool activity a client can render as it happens.
+type ToolActivity struct {
+	Round   int
+	Name    string
+	Status  string // "running" or "done"
+	Summary string
+}
+
+// SetTools attaches the executor and the role's declared capability: "auto",
+// "yes", or "no".
+func (o *TurnOrchestrator) SetTools(executor ToolExecutor, capability string) {
+	o.toolExecutor = executor
+	o.toolCapability = capability
+}
+
+// SetToolRounds caps the tool rounds in one turn.
+func (o *TurnOrchestrator) SetToolRounds(rounds int) {
+	if rounds <= 0 {
+		rounds = 4
+	}
+	o.toolRounds = rounds
+}
+
+// SetToolObserver receives tool activity as it happens, so a client can show it
+// rather than waiting in silence.
+func (o *TurnOrchestrator) SetToolObserver(observer func(ToolActivity)) {
+	o.toolObserver = observer
+}
+
+func (o *TurnOrchestrator) toolRoundCap() int {
+	if o.toolRounds <= 0 {
+		return 4
+	}
+	return o.toolRounds
+}
+
+// offersTools decides whether to offer a tool surface to a provider. isCaller is
+// whether the provider implements harness.ToolCaller; capability "auto" follows
+// it, "yes" forces, and "no" suppresses.
+func (o *TurnOrchestrator) offersTools(isCaller bool) bool {
+	if o.toolExecutor == nil {
+		return false
+	}
+	switch o.toolCapability {
+	case "yes":
+		return true
+	case "no":
+		return false
+	default:
+		return isCaller
+	}
 }
 
 func NewTurnOrchestrator(

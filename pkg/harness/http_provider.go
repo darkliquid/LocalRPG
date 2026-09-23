@@ -69,6 +69,11 @@ func (h *HTTPProvider) ID() string {
 	return h.id
 }
 
+// ToolCallerCapable marks a provider that can accept a tools field and return
+// tool calls. It is what "auto" checks, so a provider type that cannot is never
+// offered a surface it would ignore or reject.
+func (h *HTTPProvider) ToolCallerCapable() bool { return true }
+
 type openAIChatRequest struct {
 	Model       string           `json:"model"`
 	Messages    []openAIMessage  `json:"messages"`

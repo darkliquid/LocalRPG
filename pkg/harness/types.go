@@ -107,6 +107,11 @@ type ModelProvider interface {
 	Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error
 }
 
+// ToolCaller is implemented by providers that can be offered tools.
+type ToolCaller interface {
+	ToolCallerCapable() bool
+}
+
 type ProviderConfig struct {
 	Type        string   `yaml:"type"` // "builtin", "cli", "http", "mock", "disabled"
 	BuiltinName string   `yaml:"builtin_name,omitempty"`
