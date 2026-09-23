@@ -106,6 +106,33 @@ func (c *cliImageClient) GenerateImage(ctx context.Context, prompt string) ([]by
 	return out.Bytes(), nil
 }
 
+// ResolveHTTPEndpoints normalizes an HTTP TTS endpoint into a speech synthesis URL
+// and a voice catalog URL. If the endpoint is already a full speech URL, it extracts
+// the base URL to resolve the voices endpoint. Custom/AllTalk endpoints keep their speech URL
+// and return an empty voices URL.
+func ResolveHTTPEndpoints(endpoint string) (speechURL, voicesURL string) {
+	raw := strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	if raw == "" {
+		return "", ""
+	}
+
+	if strings.Contains(raw, "/api/tts-generate") || strings.Contains(raw, "alltalk") {
+		return raw, ""
+	}
+
+	baseURL := raw
+	if strings.HasSuffix(baseURL, "/v1/audio/speech") {
+		baseURL = strings.TrimSuffix(baseURL, "/v1/audio/speech")
+	} else if strings.HasSuffix(baseURL, "/v1/audio") {
+		baseURL = strings.TrimSuffix(baseURL, "/v1/audio")
+	} else if strings.HasSuffix(baseURL, "/v1") {
+		baseURL = strings.TrimSuffix(baseURL, "/v1")
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
+
+	return baseURL + "/v1/audio/speech", baseURL + "/v1/audio/voices"
+}
+
 // HTTP implementations (OpenAI compatible)
 type httpTTSClient struct {
 	endpoint string
@@ -119,6 +146,11 @@ func (h *httpTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 	if voice != nil && voice.VoiceID != "" {
 		voiceID = voice.VoiceID
 	}
+	speechURL, _ := ResolveHTTPEndpoints(h.endpoint)
+	if speechURL == "" {
+		speechURL = h.endpoint
+	}
+
 	var payload []byte
 	if strings.Contains(h.endpoint, "/api/tts-generate") || strings.Contains(h.endpoint, "alltalk") {
 		payload, _ = json.Marshal(map[string]interface{}{
@@ -129,17 +161,22 @@ func (h *httpTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 			"language":            "en",
 		})
 	} else {
+		isKokoro := strings.Contains(strings.ToLower(h.model), "kokoro") || strings.Contains(h.endpoint, "8880")
 		payloadMap := map[string]interface{}{
 			"model": h.model,
 			"input": text,
 			"voice": voiceID,
+		}
+		if isKokoro {
+			payloadMap["response_format"] = "mp3"
+			payloadMap["allow_voice_tags"] = true
 		}
 		if voice != nil && voice.SpeechRate > 0 {
 			payloadMap["speed"] = voice.SpeechRate
 		}
 		payload, _ = json.Marshal(payloadMap)
 	}
-	req, err := http.NewRequestWithContext(ctx, "POST", h.endpoint, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, "POST", speechURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
 	}

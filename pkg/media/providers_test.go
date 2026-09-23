@@ -396,3 +396,113 @@ func TestNewTTSClientBuildsGemini(t *testing.T) {
 	}
 }
 
+func TestResolveHTTPEndpoints(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		wantSpeech string
+		wantVoices string
+	}{
+		{
+			name:       "bare base url",
+			input:      "http://localhost:8880",
+			wantSpeech: "http://localhost:8880/v1/audio/speech",
+			wantVoices: "http://localhost:8880/v1/audio/voices",
+		},
+		{
+			name:       "base url with trailing slash",
+			input:      "http://localhost:8880/",
+			wantSpeech: "http://localhost:8880/v1/audio/speech",
+			wantVoices: "http://localhost:8880/v1/audio/voices",
+		},
+		{
+			name:       "full speech endpoint",
+			input:      "http://localhost:8880/v1/audio/speech",
+			wantSpeech: "http://localhost:8880/v1/audio/speech",
+			wantVoices: "http://localhost:8880/v1/audio/voices",
+		},
+		{
+			name:       "v1 endpoint",
+			input:      "http://localhost:8880/v1",
+			wantSpeech: "http://localhost:8880/v1/audio/speech",
+			wantVoices: "http://localhost:8880/v1/audio/voices",
+		},
+		{
+			name:       "alltalk endpoint preserved",
+			input:      "http://localhost:7851/api/tts-generate",
+			wantSpeech: "http://localhost:7851/api/tts-generate",
+			wantVoices: "",
+		},
+		{
+			name:       "empty endpoint",
+			input:      "",
+			wantSpeech: "",
+			wantVoices: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotSpeech, gotVoices := media.ResolveHTTPEndpoints(tt.input)
+			if gotSpeech != tt.wantSpeech {
+				t.Errorf("speechURL = %q, want %q", gotSpeech, tt.wantSpeech)
+			}
+			if gotVoices != tt.wantVoices {
+				t.Errorf("voicesURL = %q, want %q", gotVoices, tt.wantVoices)
+			}
+		})
+	}
+}
+
+func TestHTTPTTSClientSynthesizeKokoro(t *testing.T) {
+	var receivedPath string
+	var receivedBody map[string]interface{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedPath = r.URL.Path
+		_ = json.NewDecoder(r.Body).Decode(&receivedBody)
+		w.Header().Set("Content-Type", "audio/mpeg")
+		_, _ = w.Write([]byte("fake-mp3-audio"))
+	}))
+	defer server.Close()
+
+	// Given a base URL (without /v1/audio/speech)
+	client, err := media.NewTTSClient(config.TTSConfig{
+		Type:     "http",
+		Endpoint: server.URL,
+		Model:    "kokoro",
+	})
+	if err != nil {
+		t.Fatalf("NewTTSClient failed: %v", err)
+	}
+
+	audio, err := client.Synthesize(context.Background(), "Hello test", &entity.VoiceConfig{
+		VoiceID:    "af_bella",
+		SpeechRate: 1.25,
+	})
+	if err != nil {
+		t.Fatalf("Synthesize failed: %v", err)
+	}
+	if string(audio) != "fake-mp3-audio" {
+		t.Errorf("unexpected audio: %q", string(audio))
+	}
+	if receivedPath != "/v1/audio/speech" {
+		t.Errorf("receivedPath = %q, want /v1/audio/speech", receivedPath)
+	}
+	if receivedBody["model"] != "kokoro" {
+		t.Errorf("model = %v, want kokoro", receivedBody["model"])
+	}
+	if receivedBody["voice"] != "af_bella" {
+		t.Errorf("voice = %v, want af_bella", receivedBody["voice"])
+	}
+	if receivedBody["allow_voice_tags"] != true {
+		t.Errorf("allow_voice_tags = %v, want true", receivedBody["allow_voice_tags"])
+	}
+	if receivedBody["response_format"] != "mp3" {
+		t.Errorf("response_format = %v, want mp3", receivedBody["response_format"])
+	}
+	if speed, ok := receivedBody["speed"].(float64); !ok || speed != 1.25 {
+		t.Errorf("speed = %v, want 1.25", receivedBody["speed"])
+	}
+}
+
