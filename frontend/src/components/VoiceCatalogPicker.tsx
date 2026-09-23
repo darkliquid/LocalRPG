@@ -12,7 +12,7 @@ interface VoiceCatalogPickerProps {
 // VoiceCatalogPicker lists the voices the configured provider offers, so a voice
 // that was never authored in Settings can still be auditioned and imported.
 export const VoiceCatalogPicker: React.FC<VoiceCatalogPickerProps> = ({ ttsConfig, onAddProfile }) => {
-  const { inspect, loading } = useTTSInspect(ttsConfig);
+  const { inspect, loading, error } = useTTSInspect(ttsConfig);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
 
@@ -76,7 +76,14 @@ export const VoiceCatalogPicker: React.FC<VoiceCatalogPickerProps> = ({ ttsConfi
 
       <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
         {loading && voices.length === 0 && <p className="text-[11px] text-stone-500">Loading catalog...</p>}
-        {!loading && voices.length === 0 && <p className="text-[11px] text-stone-500">No voices match.</p>}
+        {(error || inspect?.error) && (
+          <p className="text-[11px] text-red-400 font-mono p-1.5 bg-red-950/40 rounded border border-red-900/60">
+            {error || inspect?.error}
+          </p>
+        )}
+        {!loading && !error && !inspect?.error && voices.length === 0 && (
+          <p className="text-[11px] text-stone-500">No voices match.</p>
+        )}
         {voices.map((voice) => (
           <div
             key={voice.id}

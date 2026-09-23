@@ -189,6 +189,23 @@ func TestElevenLabsMapsErrors(t *testing.T) {
 	}
 }
 
+func TestElevenLabsMapsDetailedPermissionsError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"detail":{"type":"authentication_error","code":"unauthorized","message":"The API key you used is missing the permission voices_read to execute this operation.","status":"missing_permissions"}}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestElevenLabsClient(t, server)
+	_, err := client.ListVoices(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "missing the permission voices_read") {
+		t.Errorf("expected error to mention missing permission voices_read, got %v", err)
+	}
+}
+
 func TestElevenLabsVoiceOptionsSchema(t *testing.T) {
 	client := &ElevenLabsTTSClient{}
 	options := client.VoiceOptions()

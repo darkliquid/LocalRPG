@@ -225,24 +225,82 @@ func requestHost(endpoint string) string {
 	return parsed.Host
 }
 
-// elevenLabsError maps a failed response onto an actionable message. The body is
-// never included wholesale, because it can echo request context.
+// elevenLabsError maps a failed response onto an actionable message. It extracts
+// detail messages from structured error payloads while avoiding wholesale echoing
+// of response bodies.
 func elevenLabsError(resp *http.Response) error {
-	switch resp.StatusCode {
-	case http.StatusOK:
+	if resp == nil || resp.StatusCode == http.StatusOK {
 		return nil
+	}
+
+	detailMsg := ""
+	if resp.Body != nil {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if len(body) > 0 {
+			detailMsg = extractElevenLabsErrorMessage(body)
+		}
+	}
+
+	switch resp.StatusCode {
 	case http.StatusUnauthorized:
+		if detailMsg != "" {
+			return fmt.Errorf("elevenlabs: %s", detailMsg)
+		}
 		return errors.New("elevenlabs rejected the API key; check media.tts.api_key")
 	case http.StatusPaymentRequired, http.StatusTooManyRequests:
+		if detailMsg != "" {
+			return fmt.Errorf("elevenlabs: %s", detailMsg)
+		}
 		return errors.New("elevenlabs quota or rate limit reached; check your plan and credits")
 	case http.StatusUnprocessableEntity:
+		if detailMsg != "" {
+			return fmt.Errorf("elevenlabs: %s", detailMsg)
+		}
 		return errors.New("elevenlabs: that voice or model is not available on this account")
 	default:
+		if detailMsg != "" {
+			return fmt.Errorf("elevenlabs: %s", detailMsg)
+		}
 		if resp.StatusCode >= 500 {
 			return fmt.Errorf("elevenlabs: the provider returned %d; try again later", resp.StatusCode)
 		}
 		return fmt.Errorf("elevenlabs: request failed with status %d", resp.StatusCode)
 	}
+}
+
+// extractElevenLabsErrorMessage attempts to decode ElevenLabs' structured error
+// payload to extract an actionable detail message without echoing the entire body.
+func extractElevenLabsErrorMessage(body []byte) string {
+	var errResp struct {
+		Detail  json.RawMessage `json:"detail"`
+		Message string          `json:"message"`
+	}
+	if err := json.Unmarshal(body, &errResp); err != nil {
+		return ""
+	}
+	if len(errResp.Detail) > 0 {
+		var strDetail string
+		if err := json.Unmarshal(errResp.Detail, &strDetail); err == nil && strings.TrimSpace(strDetail) != "" {
+			return strings.TrimSpace(strDetail)
+		}
+		var objDetail struct {
+			Message string `json:"message"`
+			Status  string `json:"status"`
+		}
+		if err := json.Unmarshal(errResp.Detail, &objDetail); err == nil && strings.TrimSpace(objDetail.Message) != "" {
+			return strings.TrimSpace(objDetail.Message)
+		}
+		var listDetail []struct {
+			Msg string `json:"msg"`
+		}
+		if err := json.Unmarshal(errResp.Detail, &listDetail); err == nil && len(listDetail) > 0 && strings.TrimSpace(listDetail[0].Msg) != "" {
+			return strings.TrimSpace(listDetail[0].Msg)
+		}
+	}
+	if strings.TrimSpace(errResp.Message) != "" {
+		return strings.TrimSpace(errResp.Message)
+	}
+	return ""
 }
 
 // elevenLabsVoice is one entry of the /v2/voices response. Labels are free-form
