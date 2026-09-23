@@ -369,12 +369,14 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                     : 'bg-stone-900/40 border-stone-800/60 hover:bg-stone-800/40 hover:border-stone-700'
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div>
                   <h4 className="font-sans text-xs font-bold text-stone-200 truncate">{w.name}</h4>
                   {w.genre && (
-                    <span className="text-[10px] font-mono text-purple-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
-                      {w.genre}
-                    </span>
+                    <div className="mt-1">
+                      <span className="inline-block text-[10px] font-mono text-purple-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
+                        {w.genre}
+                      </span>
+                    </div>
                   )}
                 </div>
                 {w.description && (

@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { DebugPanel } from './DebugPanel';
 import { APIClient } from '../api/client';
-import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile, ModelStatus } from '../types';
+import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile, ModelStatus, ProviderVoice } from '../types';
 import { ModelDownloadModal } from './ModelDownloadModal';
 import {
   Folder,
@@ -220,13 +220,40 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
   const roleNames = Array.from(new Set([...Object.keys(config.agents.roles), 'extractor']));
 
-  const isKokoro =
+  const isBuiltinKokoro =
     config.media.tts.type === 'builtin' &&
     (config.media.tts.builtin_name === 'sherpa-onnx' || config.media.tts.builtin_name === 'kokoro');
+  const isKokoro =
+    isBuiltinKokoro ||
+    (config.media.tts.type === 'http' &&
+      (config.media.tts.model === 'kokoro' || (config.media.tts.endpoint || '').includes('8880')));
   const kokoroStatus = models.find((m) => m.id === 'kokoro-tts');
   const isGeminiTTS =
     config.media.tts.type === 'gemini' ||
     (config.media.tts.type === 'builtin' && config.media.tts.builtin_name === 'gemini');
+  const isElevenLabsTTS =
+    config.media.tts.type === 'builtin' && config.media.tts.builtin_name === 'elevenlabs';
+
+  const kokoroCatalogVoices: ProviderVoice[] = useMemo(
+    () =>
+      KOKORO_VOICE_PROFILES.map((p) => ({
+        id: p.voice_id,
+        name: p.name,
+        tags: p.tags,
+        description: p.description,
+      })),
+    []
+  );
+
+  const availableTTSVoices = useMemo(() => {
+    if (inspect?.catalog.voices && inspect.catalog.voices.length > 0) {
+      return inspect.catalog.voices;
+    }
+    if (isKokoro) {
+      return kokoroCatalogVoices;
+    }
+    return [];
+  }, [inspect?.catalog.voices, isKokoro, kokoroCatalogVoices]);
 
   const updateRole = (updated: AgentRoleConfig) => {
     setConfig({
@@ -703,7 +730,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                     >
                       <option value="narrative-oracle">narrative-oracle (Deterministic Procedural Storyteller)</option>
-                      <option value="gemini">gemini (Google Gemini Generative AI)</option>
                       <option value="echo">echo (Debug Provider)</option>
                     </select>
                   </div>
@@ -1328,8 +1354,13 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           ...config.media,
                           tts: {
                             ...preset,
+                            builtin_name: preset.builtin_name,
+                            options: preset.options,
+                            endpoint: preset.endpoint,
+                            model: preset.model,
+                            api_key: preset.api_key,
                             auto_play: config.media.tts.auto_play,
-                            voice_profiles: config.media.tts.voice_profiles,
+                            voice_profiles: preset.voice_profiles ?? config.media.tts.voice_profiles,
                           },
                         },
                       });
@@ -1393,7 +1424,10 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <label className="text-xs font-sans uppercase text-stone-300">TTS Engine</label>
                 <select
                   value={
-                    config.media.tts.type === 'builtin'
+                    config.media.tts.type === 'gemini' ||
+                    (config.media.tts.type === 'builtin' && config.media.tts.builtin_name === 'gemini')
+                      ? 'gemini'
+                      : config.media.tts.type === 'builtin'
                       ? `builtin:${config.media.tts.builtin_name || 'native-os'}`
                       : config.media.tts.type
                   }
@@ -1406,20 +1440,36 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       const builtinDefaults =
                         builtinName === 'elevenlabs'
                           ? {
-                              model: config.media.tts.model || 'eleven_multilingual_v2',
-                              default_voice: config.media.tts.default_voice || 'EXAVITQu4vr4xnSDxMaL',
+                              model:
+                                config.media.tts.model && config.media.tts.model.includes('eleven')
+                                  ? config.media.tts.model
+                                  : 'eleven_multilingual_v2',
+                              default_voice:
+                                config.media.tts.default_voice &&
+                                config.media.tts.default_voice.startsWith('EXAV')
+                                  ? config.media.tts.default_voice
+                                  : 'EXAVITQu4vr4xnSDxMaL',
                             }
-                          : builtinName === 'gemini'
+                          : builtinName === 'sherpa-onnx'
                           ? {
-                              model: config.media.tts.model || 'gemini-3.8-flash-tts',
-                              default_voice: config.media.tts.default_voice || 'Aoede',
+                              default_voice:
+                                config.media.tts.default_voice &&
+                                config.media.tts.default_voice.startsWith('af_')
+                                  ? config.media.tts.default_voice
+                                  : 'af_bella',
                             }
                           : {};
                       setConfig({
                         ...config,
                         media: {
                           ...config.media,
-                          tts: { ...config.media.tts, ...builtinDefaults, type: 'builtin', builtin_name: builtinName },
+                          tts: {
+                            ...config.media.tts,
+                            ...builtinDefaults,
+                            type: 'builtin',
+                            builtin_name: builtinName,
+                            options: builtinName === 'elevenlabs' ? config.media.tts.options : undefined,
+                          },
                         },
                       });
                     } else if (val === 'gemini') {
@@ -1431,8 +1481,43 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             ...config.media.tts,
                             type: 'gemini',
                             builtin_name: undefined,
-                            model: config.media.tts.model || 'gemini-3.8-flash-tts',
-                            default_voice: config.media.tts.default_voice || 'Aoede',
+                            model:
+                              config.media.tts.model && config.media.tts.model.includes('gemini')
+                                ? config.media.tts.model
+                                : 'gemini-3.8-flash-tts',
+                            default_voice:
+                              config.media.tts.default_voice &&
+                              !config.media.tts.default_voice.startsWith('EXAV') &&
+                              !config.media.tts.default_voice.startsWith('af_')
+                                ? config.media.tts.default_voice
+                                : 'Aoede',
+                            options: undefined,
+                          },
+                        },
+                      });
+                    } else if (val === 'http') {
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          tts: {
+                            ...config.media.tts,
+                            type: 'http',
+                            builtin_name: undefined,
+                            endpoint: config.media.tts.endpoint || 'http://localhost:8880/v1/audio/speech',
+                            model:
+                              config.media.tts.model &&
+                              !config.media.tts.model.includes('eleven') &&
+                              !config.media.tts.model.includes('gemini')
+                                ? config.media.tts.model
+                                : 'kokoro',
+                            default_voice:
+                              config.media.tts.default_voice &&
+                              !config.media.tts.default_voice.startsWith('EXAV') &&
+                              config.media.tts.default_voice !== 'Aoede'
+                                ? config.media.tts.default_voice
+                                : 'af_bella',
+                            options: undefined,
                           },
                         },
                       });
@@ -1441,7 +1526,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         ...config,
                         media: {
                           ...config.media,
-                          tts: { ...config.media.tts, type: val as any, builtin_name: undefined },
+                          tts: { ...config.media.tts, type: val as any, builtin_name: undefined, options: undefined },
                         },
                       });
                     }
@@ -1450,7 +1535,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 >
                   <option value="disabled">Disabled</option>
                   <option value="gemini">Google Gemini TTS (Cloud, metered)</option>
-                  <option value="builtin:gemini">Built-in: Google Gemini TTS (Cloud, metered)</option>
                   <option value="builtin:sherpa-onnx">Built-in: Sherpa-ONNX (Kokoro Neural Voice)</option>
                   <option value="builtin:native-os">Built-in: Native OS Speech (spd-say / SAPI / procedural)</option>
                   <option value="builtin:elevenlabs">Built-in: ElevenLabs (Cloud, metered)</option>
@@ -1460,21 +1544,53 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
 
               {config.media.tts.type === 'http' && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-sans uppercase text-stone-300">Speech Endpoint URL</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. http://localhost:8880/v1/audio/speech"
-                    value={config.media.tts.endpoint || ''}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        media: { ...config.media, tts: { ...config.media.tts, endpoint: e.target.value } },
-                      })
-                    }
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                  />
-                </div>
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-sans uppercase text-stone-300">Speech Endpoint URL</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. http://localhost:8880/v1/audio/speech"
+                      value={config.media.tts.endpoint || ''}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, tts: { ...config.media.tts, endpoint: e.target.value } },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-sans uppercase text-stone-300">Model Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. kokoro or tts-1"
+                      value={config.media.tts.model || ''}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, tts: { ...config.media.tts, model: e.target.value } },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-sans uppercase text-stone-300">API Key (Optional)</label>
+                    <input
+                      type="password"
+                      placeholder="Optional authorization token (e.g. for OpenAI)"
+                      value={config.media.tts.api_key || ''}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, tts: { ...config.media.tts, api_key: e.target.value } },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                    />
+                  </div>
+                </>
               )}
 
               {config.media.tts.type === 'cli' && (
@@ -1522,7 +1638,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             </div>
 
-            {isKokoro && (
+            {isBuiltinKokoro && (
               <div className="p-3 bg-stone-950/80 border border-stone-800 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2">
                   <Volume2 className="w-4 h-4 text-purple-400" />
@@ -1624,7 +1740,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               <div className="text-[11px] font-mono text-stone-400">
                 {isGeminiTTS
                   ? 'No Gemini API key configured. Enter one below, or set GEMINI_API_KEY / GOOGLE_API_KEY in the environment.'
-                  : 'No API key configured. Enter one below, or set ELEVENLABS_API_KEY in the environment.'}
+                  : isElevenLabsTTS
+                  ? 'No API key configured. Enter one below, or set ELEVENLABS_API_KEY in the environment.'
+                  : 'No API key configured. Enter one below.'}
               </div>
             )}
 
@@ -1655,7 +1773,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <p className="text-[11px] text-stone-500">
                   {isGeminiTTS
                     ? 'Stored in your configuration file. Set GEMINI_API_KEY instead to keep it off disk.'
-                    : 'Stored in your configuration file. Set ELEVENLABS_API_KEY instead to keep it off disk.'}
+                    : isElevenLabsTTS
+                    ? 'Stored in your configuration file. Set ELEVENLABS_API_KEY instead to keep it off disk.'
+                    : 'Stored in your configuration file.'}
                 </p>
               </div>
             )}
@@ -1719,7 +1839,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       },
                     })
                   }
-                  voices={inspect?.catalog.voices ?? []}
+                  voices={availableTTSVoices}
                   placeholder="Select default provider voice..."
                 />
                 <p className="text-[11px] text-stone-500">
@@ -1996,7 +2116,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                               media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
                             });
                           }}
-                          voices={inspect?.catalog.voices ?? []}
+                          voices={availableTTSVoices}
                           placeholder="Voice ID (e.g. af_bella)"
                         />
                       </div>
@@ -2391,7 +2511,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                   >
                     <option value="procedural-art">procedural-art (Pure-Go Vector Dark Fantasy SVG)</option>
-                    <option value="gemini">gemini (Google Imagen 3 / Nano Banana)</option>
                     <option value="echo">echo (Debug Mock)</option>
                   </select>
                 </div>

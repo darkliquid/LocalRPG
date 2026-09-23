@@ -90,13 +90,14 @@ func floatPtr(f float64) *float64 { return &f }
 
 var TTSPresets = map[string]TTSConfig{
 	"kokoro-fastapi": {
-		Type:         "http",
-		Endpoint:     "http://localhost:8880/v1/audio/speech",
-		Model:        "kokoro",
-		DefaultVoice: "af_bella",
-		Pitch:        1.0,
-		SpeechRate:   1.0,
-		MasterVolume: 1.0,
+		Type:          "http",
+		Endpoint:      "http://localhost:8880/v1/audio/speech",
+		Model:         "kokoro",
+		DefaultVoice:  "af_bella",
+		Pitch:         1.0,
+		SpeechRate:    1.0,
+		MasterVolume:  1.0,
+		VoiceProfiles: KokoroVoiceProfiles,
 	},
 	"alltalk": {
 		Type:         "http",

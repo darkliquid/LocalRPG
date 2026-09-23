@@ -166,3 +166,26 @@ func TestInspectTTSReportsKeyPresenceWithoutTheKey(t *testing.T) {
 		t.Errorf("inspect response leaked the key: %s", encoded)
 	}
 }
+
+func TestInspectTTSHTTPDoesNotRequireKey(t *testing.T) {
+	svc := NewService(t.TempDir())
+	svc.newTTSClient = func(config.TTSConfig) (media.TTSClient, error) {
+		return &bareClient{}, nil
+	}
+
+	res, err := svc.InspectTTS(context.Background(), TTSInspectRequestDTO{
+		Config: config.TTSConfig{
+			Type:        "http",
+			Endpoint:    "http://localhost:8880/v1/audio/speech",
+			Model:       "kokoro",
+			BuiltinName: "elevenlabs",
+		},
+	})
+	if err != nil {
+		t.Fatalf("InspectTTS: %v", err)
+	}
+	if res.KeyRequired {
+		t.Errorf("expected KeyRequired false for http tts provider, got true")
+	}
+}
+

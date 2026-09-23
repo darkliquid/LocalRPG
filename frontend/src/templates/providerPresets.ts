@@ -176,6 +176,7 @@ export const TTS_PRESETS: Record<string, PresetItem<TTSConfig>> = {
       speech_rate: 1.0,
       auto_play: true,
       master_volume: 1.0,
+      voice_profiles: [...KOKORO_VOICE_PROFILES],
     },
   },
   alltalk: {

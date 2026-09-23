@@ -29,7 +29,7 @@ func (s *Service) InspectTTS(ctx context.Context, req TTSInspectRequestDTO) (*TT
 	response := &TTSInspectResponseDTO{
 		ProviderKey: media.ProviderKey(cfg),
 		KeyPresent:  media.KeyPresentWithSharedKey(cfg, sharedKey),
-		KeyRequired: strings.EqualFold(strings.TrimSpace(cfg.BuiltinName), "elevenlabs") || isGemini,
+		KeyRequired: (strings.EqualFold(strings.TrimSpace(cfg.Type), "builtin") && strings.EqualFold(strings.TrimSpace(cfg.BuiltinName), "elevenlabs")) || isGemini,
 		Catalog:     VoiceCatalogDTO{Voices: []media.ProviderVoice{}},
 	}
 
