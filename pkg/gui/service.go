@@ -1057,7 +1057,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	logger.SetGame(gameID)
 
 	timeline := engine.NewTimeline(s.resolver, store, engine.NewHistoryLogger(filepath.Join(gameDir, "history.jsonl")), gameID)
-	timeline.SetVoiceProfiles(cfg.Media.TTS.VoiceProfiles)
+	timeline.SetVoiceProfiles(media.FilterVoiceProfiles(cfg.Media.TTS.VoiceProfiles, media.ProviderKey(cfg.Media.TTS)))
 
 	// A campaign written before player_name existed holds a display name in
 	// player:, which is repaired once here so every later read is exact.
@@ -1773,7 +1773,10 @@ func (s *Service) assignPlayerVoice(gameID, playerName string) error {
 		return err
 	}
 
-	harness.AssignVoiceProfile(ent, s.configMgr.Get().Media.TTS.VoiceProfiles)
+	// Only voices the active provider can synthesise are assignable, so a profile
+	// authored for another engine is never chosen while it is unreachable.
+	mediaCfg := s.configMgr.Get().Media.TTS
+	harness.AssignVoiceProfile(ent, media.FilterVoiceProfiles(mediaCfg.VoiceProfiles, media.ProviderKey(mediaCfg)))
 	if ent.Voice == nil {
 		return nil
 	}
