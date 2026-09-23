@@ -144,3 +144,30 @@ func TestCompletionDisabledReturnsNil(t *testing.T) {
 		t.Errorf("expected a disabled completion role to resolve to nil, got %q", provider.ID())
 	}
 }
+
+func TestNewModelProviderBuildsGemini(t *testing.T) {
+	t.Setenv("GEMINI_API_KEY", "test-key")
+	provider, err := NewModelProvider("gm", ProviderConfig{
+		Type:        "builtin",
+		BuiltinName: "gemini",
+		Model:       "gemini-2.5-flash",
+	})
+	if err != nil {
+		t.Fatalf("NewModelProvider failed: %v", err)
+	}
+	if provider.ID() != "gm" {
+		t.Errorf("ID = %q, want gm", provider.ID())
+	}
+
+	// Also test type: "gemini"
+	p2, err := NewModelProvider("narrator", ProviderConfig{
+		Type:  "gemini",
+		Model: "gemini-2.5-pro",
+	})
+	if err != nil {
+		t.Fatalf("NewModelProvider with type gemini failed: %v", err)
+	}
+	if p2.ID() != "narrator" {
+		t.Errorf("ID = %q, want narrator", p2.ID())
+	}
+}

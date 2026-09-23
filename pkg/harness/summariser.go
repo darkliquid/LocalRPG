@@ -163,15 +163,19 @@ func SummariserFromConfig(cfg *config.Config, router *Router, logger trace.Logge
 		summariser = NewSummariser(provider)
 	default:
 		provider, err := NewModelProviderWithLogger(config.RoleExtractor, ProviderConfig{
-			Type:        roleCfg.Type,
-			BuiltinName: roleCfg.BuiltinName,
-			Command:     roleCfg.Command,
-			Args:        roleCfg.Args,
-			Endpoint:    roleCfg.Endpoint,
-			Model:       roleCfg.Model,
-			APIKey:      roleCfg.APIKey,
-			Temperature: roleCfg.Temperature,
-			MaxTokens:   roleCfg.MaxTokens,
+			Type:           roleCfg.Type,
+			BuiltinName:    roleCfg.BuiltinName,
+			Command:        roleCfg.Command,
+			Args:           roleCfg.Args,
+			Endpoint:       roleCfg.Endpoint,
+			Model:          roleCfg.Model,
+			APIKey:         roleCfg.APIKey,
+			Temperature:    roleCfg.Temperature,
+			MaxTokens:      roleCfg.MaxTokens,
+			ThinkingBudget: roleCfg.ThinkingBudget,
+			TopP:           roleCfg.TopP,
+			TopK:           roleCfg.TopK,
+			SharedAPIKey:   cfg.Providers.Gemini.APIKey,
 		}, logger)
 		if err != nil {
 			return nil

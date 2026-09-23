@@ -347,3 +347,7 @@ func mapGeminiError(err error) error {
 	}
 	return fmt.Errorf("gemini: request failed: %w", err)
 }
+
+func MapGeminiErrorForTest(err error) error {
+	return mapGeminiError(err)
+}

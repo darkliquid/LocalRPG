@@ -57,6 +57,21 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 		if cfg.BuiltinName == "narrative-oracle" {
 			return NewNarrativeOracleProvider(id), nil
 		}
+		if cfg.BuiltinName == "gemini" {
+			apiKey, err := ResolveGeminiAPIKey(cfg.APIKey, cfg.SharedAPIKey)
+			if err != nil {
+				return nil, err
+			}
+			return NewGeminiProvider(id, GeminiProviderOptions{
+				Model:          cfg.Model,
+				APIKey:         apiKey,
+				Temperature:    &cfg.Temperature,
+				MaxTokens:      &cfg.MaxTokens,
+				ThinkingBudget: cfg.ThinkingBudget,
+				TopP:           cfg.TopP,
+				TopK:           cfg.TopK,
+			})
+		}
 		if cfg.Command != "" {
 			return NewCLIProviderWithOptions(id, cfg.Command, cfg.Args, GenerationOptions{
 				Temperature: cfg.Temperature,
@@ -64,6 +79,20 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 			}), nil
 		}
 		return &builtinEchoModelProvider{id: id}, nil
+	case "gemini":
+		apiKey, err := ResolveGeminiAPIKey(cfg.APIKey, cfg.SharedAPIKey)
+		if err != nil {
+			return nil, err
+		}
+		return NewGeminiProvider(id, GeminiProviderOptions{
+			Model:          cfg.Model,
+			APIKey:         apiKey,
+			Temperature:    &cfg.Temperature,
+			MaxTokens:      &cfg.MaxTokens,
+			ThinkingBudget: cfg.ThinkingBudget,
+			TopP:           cfg.TopP,
+			TopK:           cfg.TopK,
+		})
 	default:
 		return nil, fmt.Errorf("unknown model provider type: %s", cfg.Type)
 	}
@@ -120,15 +149,19 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 		}
 
 		provider, err := NewModelProviderWithLogger(role, ProviderConfig{
-			Type:        roleCfg.Type,
-			BuiltinName: roleCfg.BuiltinName,
-			Command:     roleCfg.Command,
-			Args:        roleCfg.Args,
-			Endpoint:    roleCfg.Endpoint,
-			Model:       roleCfg.Model,
-			APIKey:      roleCfg.APIKey,
-			Temperature: roleCfg.Temperature,
-			MaxTokens:   roleCfg.MaxTokens,
+			Type:           roleCfg.Type,
+			BuiltinName:    roleCfg.BuiltinName,
+			Command:        roleCfg.Command,
+			Args:           roleCfg.Args,
+			Endpoint:       roleCfg.Endpoint,
+			Model:          roleCfg.Model,
+			APIKey:         roleCfg.APIKey,
+			Temperature:    roleCfg.Temperature,
+			MaxTokens:      roleCfg.MaxTokens,
+			ThinkingBudget: roleCfg.ThinkingBudget,
+			TopP:           roleCfg.TopP,
+			TopK:           roleCfg.TopK,
+			SharedAPIKey:   cfg.Providers.Gemini.APIKey,
 		}, logger)
 		if err != nil {
 			continue
@@ -191,15 +224,19 @@ func ExtractorFromConfigWithLogger(cfg *config.Config, router *Router, logger tr
 	}
 
 	provider, err := NewModelProviderWithLogger(config.RoleExtractor, ProviderConfig{
-		Type:        roleCfg.Type,
-		BuiltinName: roleCfg.BuiltinName,
-		Command:     roleCfg.Command,
-		Args:        roleCfg.Args,
-		Endpoint:    roleCfg.Endpoint,
-		Model:       roleCfg.Model,
-		APIKey:      roleCfg.APIKey,
-		Temperature: roleCfg.Temperature,
-		MaxTokens:   roleCfg.MaxTokens,
+		Type:           roleCfg.Type,
+		BuiltinName:    roleCfg.BuiltinName,
+		Command:        roleCfg.Command,
+		Args:           roleCfg.Args,
+		Endpoint:       roleCfg.Endpoint,
+		Model:          roleCfg.Model,
+		APIKey:         roleCfg.APIKey,
+		Temperature:    roleCfg.Temperature,
+		MaxTokens:      roleCfg.MaxTokens,
+		ThinkingBudget: roleCfg.ThinkingBudget,
+		TopP:           roleCfg.TopP,
+		TopK:           roleCfg.TopK,
+		SharedAPIKey:   cfg.Providers.Gemini.APIKey,
 	}, logger)
 	if err != nil {
 		return nil
@@ -238,15 +275,19 @@ func CompletionFromConfig(cfg *config.Config, router *Router, logger trace.Logge
 	}
 
 	provider, err := NewModelProviderWithLogger(config.RoleCompletion, ProviderConfig{
-		Type:        roleCfg.Type,
-		BuiltinName: roleCfg.BuiltinName,
-		Command:     roleCfg.Command,
-		Args:        roleCfg.Args,
-		Endpoint:    roleCfg.Endpoint,
-		Model:       roleCfg.Model,
-		APIKey:      roleCfg.APIKey,
-		Temperature: roleCfg.Temperature,
-		MaxTokens:   roleCfg.MaxTokens,
+		Type:           roleCfg.Type,
+		BuiltinName:    roleCfg.BuiltinName,
+		Command:        roleCfg.Command,
+		Args:           roleCfg.Args,
+		Endpoint:       roleCfg.Endpoint,
+		Model:          roleCfg.Model,
+		APIKey:         roleCfg.APIKey,
+		Temperature:    roleCfg.Temperature,
+		MaxTokens:      roleCfg.MaxTokens,
+		ThinkingBudget: roleCfg.ThinkingBudget,
+		TopP:           roleCfg.TopP,
+		TopK:           roleCfg.TopK,
+		SharedAPIKey:   cfg.Providers.Gemini.APIKey,
 	}, logger)
 	if err != nil {
 		return nil

@@ -120,8 +120,12 @@ type ProviderConfig struct {
 	Endpoint    string   `yaml:"endpoint,omitempty"`
 	Model       string   `yaml:"model,omitempty"`
 	APIKey      string   `yaml:"api_key,omitempty"`
-	Temperature float64  `yaml:"temperature,omitempty"`
-	MaxTokens   int      `yaml:"max_tokens,omitempty"`
+	Temperature    float64  `yaml:"temperature,omitempty"`
+	MaxTokens      int      `yaml:"max_tokens,omitempty"`
+	ThinkingBudget *int     `yaml:"thinking_budget,omitempty"`
+	TopP           *float64 `yaml:"top_p,omitempty"`
+	TopK           *int     `yaml:"top_k,omitempty"`
+	SharedAPIKey   string   `yaml:"shared_api_key,omitempty"`
 }
 
 type RoleRoutingConfig struct {

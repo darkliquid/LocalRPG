@@ -2,6 +2,7 @@ package harness_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -213,5 +214,23 @@ func TestGeminiProviderStreamSeparatesThoughtsAndEmitsTools(t *testing.T) {
 	}
 	if !foundThoughtEvent {
 		t.Errorf("expected gemini_thought trace event to be recorded")
+	}
+}
+
+func TestGeminiErrorMapping(t *testing.T) {
+	cases := []struct {
+		errStr   string
+		expected string
+	}{
+		{"401 Unauthorized: API key invalid", "gemini: invalid API key or permission denied"},
+		{"429 RESOURCE_EXHAUSTED", "gemini: quota exceeded or rate limit reached"},
+		{"404 NOT_FOUND: models/unknown", "gemini: model not found"},
+	}
+
+	for _, tc := range cases {
+		mapped := harness.MapGeminiErrorForTest(errors.New(tc.errStr))
+		if !strings.Contains(mapped.Error(), tc.expected) {
+			t.Errorf("error %q mapped to %q, want %q", tc.errStr, mapped.Error(), tc.expected)
+		}
 	}
 }
