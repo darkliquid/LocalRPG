@@ -369,3 +369,30 @@ func TestNewImageClientBuildsGemini(t *testing.T) {
 	}
 }
 
+func TestNewTTSClientBuildsGemini(t *testing.T) {
+	t.Setenv("GEMINI_API_KEY", "env-key")
+
+	// 1. type: "gemini"
+	client, err := media.NewTTSClientWithSharedKey(config.TTSConfig{
+		Type: "gemini",
+	}, "")
+	if err != nil {
+		t.Fatalf("expected gemini client to build, got: %v", err)
+	}
+	if client == nil {
+		t.Fatal("expected non-nil client")
+	}
+
+	// 2. type: "builtin", builtin_name: "gemini"
+	client, err = media.NewTTSClientWithSharedKey(config.TTSConfig{
+		Type:        "builtin",
+		BuiltinName: "gemini",
+	}, "")
+	if err != nil {
+		t.Fatalf("expected builtin gemini client to build, got: %v", err)
+	}
+	if client == nil {
+		t.Fatal("expected non-nil client")
+	}
+}
+

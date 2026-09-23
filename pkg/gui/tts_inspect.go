@@ -20,10 +20,16 @@ func (s *Service) InspectTTS(ctx context.Context, req TTSInspectRequestDTO) (*TT
 		}
 	}
 
+	sharedKey := ""
+	if s.configMgr != nil && s.configMgr.Get() != nil {
+		sharedKey = s.configMgr.Get().Providers.Gemini.APIKey
+	}
+	isGemini := strings.EqualFold(strings.TrimSpace(cfg.Type), "gemini") || strings.EqualFold(strings.TrimSpace(cfg.BuiltinName), "gemini")
+
 	response := &TTSInspectResponseDTO{
 		ProviderKey: media.ProviderKey(cfg),
-		KeyPresent:  media.KeyPresent(cfg),
-		KeyRequired: strings.EqualFold(strings.TrimSpace(cfg.BuiltinName), "elevenlabs"),
+		KeyPresent:  media.KeyPresentWithSharedKey(cfg, sharedKey),
+		KeyRequired: strings.EqualFold(strings.TrimSpace(cfg.BuiltinName), "elevenlabs") || isGemini,
 		Catalog:     VoiceCatalogDTO{Voices: []media.ProviderVoice{}},
 	}
 
@@ -70,5 +76,9 @@ func (s *Service) ttsClientFor(cfg config.TTSConfig) (media.TTSClient, error) {
 	if s.newTTSClient != nil {
 		return s.newTTSClient(cfg)
 	}
-	return media.NewTTSClient(cfg)
+	sharedKey := ""
+	if s.configMgr != nil && s.configMgr.Get() != nil {
+		sharedKey = s.configMgr.Get().Providers.Gemini.APIKey
+	}
+	return media.NewTTSClientWithSharedKey(cfg, sharedKey)
 }
