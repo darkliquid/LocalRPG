@@ -1093,11 +1093,20 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     const val = e.target.value;
                     if (val.startsWith('builtin:')) {
                       const builtinName = val.split(':')[1];
+                      // A builtin that needs a model and a stock voice gets sane
+                      // defaults here, so choosing the engine alone is enough.
+                      const builtinDefaults =
+                        builtinName === 'elevenlabs'
+                          ? {
+                              model: config.media.tts.model || 'eleven_multilingual_v2',
+                              default_voice: config.media.tts.default_voice || 'EXAVITQu4vr4xnSDxMaL',
+                            }
+                          : {};
                       setConfig({
                         ...config,
                         media: {
                           ...config.media,
-                          tts: { ...config.media.tts, type: 'builtin', builtin_name: builtinName },
+                          tts: { ...config.media.tts, ...builtinDefaults, type: 'builtin', builtin_name: builtinName },
                         },
                       });
                     } else {
@@ -1115,6 +1124,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   <option value="disabled">Disabled</option>
                   <option value="builtin:sherpa-onnx">Built-in: Sherpa-ONNX (Kokoro Neural Voice)</option>
                   <option value="builtin:native-os">Built-in: Native OS Speech (spd-say / SAPI / procedural)</option>
+                  <option value="builtin:elevenlabs">Built-in: ElevenLabs (Cloud, metered)</option>
                   <option value="http">HTTP Endpoint (Kokoro-FastAPI, AllTalk, OpenAI Speech)</option>
                   <option value="cli">CLI Command (e.g. piper)</option>
                 </select>
@@ -1241,6 +1251,27 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 No API key configured. Enter one below, or set ELEVENLABS_API_KEY in the environment.
               </div>
             )}
+
+              {inspect?.key_required && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-cinzel uppercase text-stone-300">API Key</label>
+                  <input
+                    type="password"
+                    placeholder="Leave empty to use the provider's environment variable"
+                    value={config.media.tts.api_key || ''}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        media: { ...config.media, tts: { ...config.media.tts, api_key: e.target.value } },
+                      })
+                    }
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                  />
+                  <p className="text-[11px] text-stone-500">
+                    Stored in your configuration file. Set ELEVENLABS_API_KEY instead to keep it off disk.
+                  </p>
+                </div>
+              )}
 
             {inspect && inspect.options && inspect.options.length > 0 && (
               <div className="p-3 rounded-lg bg-stone-950/70 border border-stone-800/80 space-y-2">
