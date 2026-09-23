@@ -70,5 +70,10 @@ func OpenDB(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, fmt.Errorf("migrate schema: %w", err)
 	}
+
+	if err := EnsureFTS(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("ensure fts index: %w", err)
+	}
 	return db, nil
 }
