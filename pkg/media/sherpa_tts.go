@@ -121,6 +121,48 @@ func (s *SherpaTTSClient) Close() {
 	}
 }
 
+// ListVoices enumerates the 11 known Kokoro speakers for the pinned model.
+// It requires neither network access nor loaded model weights.
+func (s *SherpaTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, error) {
+	speakers := KokoroSpeakersForModel(s.modelID)
+	voices := make([]ProviderVoice, 0, len(speakers))
+
+	profiles := map[string]struct {
+		name, gender, accent string
+		tags                 []string
+		description          string
+	}{
+		"af":         {"Default (American Female)", "female", "american", []string{"american", "female", "default", "neutral"}, "The model's stock American female voice."},
+		"af_bella":   {"Bella (American Female)", "female", "american", []string{"american", "female", "warm", "friendly"}, "American female voice, warm, approachable, and pleasant."},
+		"af_nicole":  {"Nicole (American Female)", "female", "american", []string{"american", "female", "youthful", "energetic"}, "American female voice, brisk, youthful, and direct."},
+		"af_sarah":   {"Sarah (American Female)", "female", "american", []string{"american", "female", "poised", "narrative"}, "American female voice, polished, measured, and story-oriented."},
+		"af_sky":     {"Sky (American Female)", "female", "american", []string{"american", "female", "light", "airy"}, "American female voice, light, gentle, and breathy."},
+		"am_adam":    {"Adam (American Male)", "male", "american", []string{"american", "male", "deep", "authoritative"}, "American male voice, deep, steady, and commanding."},
+		"am_michael": {"Michael (American Male)", "male", "american", []string{"american", "male", "commanding", "formal"}, "American male voice, disciplined, authoritative, and formal."},
+		"bf_emma":    {"Emma (British Female)", "female", "british", []string{"british", "female", "gentle", "poised"}, "British female voice, elegant, gentle, and softly spoken."},
+		"bf_isabella": {"Isabella (British Female)", "female", "british", []string{"british", "female", "noble", "melodic"}, "British female voice, aristocratic, melodic, and graceful."},
+		"bm_george":  {"George (British Male)", "male", "british", []string{"british", "male", "mature", "distinguished"}, "British male voice, mature, distinguished, and resonant."},
+		"bm_lewis":   {"Lewis (British Male)", "male", "british", []string{"british", "male", "thoughtful", "refined"}, "British male voice, measured, polite, and reflective."},
+	}
+
+	for _, speaker := range speakers {
+		meta, ok := profiles[speaker.Name]
+		if !ok {
+			meta.name = speaker.Name
+		}
+		voices = append(voices, ProviderVoice{
+			ID:          speaker.Name,
+			Name:        meta.name,
+			Gender:      meta.gender,
+			Accent:      meta.accent,
+			Categories:  []string{"built-in"},
+			Tags:        meta.tags,
+			Description: meta.description,
+		})
+	}
+	return voices, nil
+}
+
 // EncodePCMFloatToWAV serializes 32-bit float audio samples to a 16-bit mono WAV container.
 func EncodePCMFloatToWAV(samples []float32, sampleRate int) ([]byte, error) {
 	numChannels := uint16(1)
