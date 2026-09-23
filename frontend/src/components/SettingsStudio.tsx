@@ -31,6 +31,8 @@ import {
 } from '../templates/providerPresets';
 import { VoiceOptionsControl } from './VoiceOptionsControl';
 import { useTTSInspect } from '../hooks/useTTSInspect';
+import { VoiceCombobox } from './VoiceCombobox';
+import { VoiceCatalogModal } from './VoiceCatalogModal';
 
 interface SettingsStudioProps {
   isCompact?: boolean;
@@ -71,7 +73,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   // The inspect describes the configuration in hand, so a provider is described
   // before it is saved. The fallback keeps the hook unconditional during load.
   const inspectConfig = config?.media.tts ?? { type: 'disabled' as const, auto_play: false, master_volume: 1 };
-  const { inspect, loading: inspecting, refresh: refreshInspect } = useTTSInspect(inspectConfig, Boolean(config));
+  const { inspect, loading: inspecting, refresh: refreshInspect, error: inspectError } = useTTSInspect(inspectConfig, Boolean(config));
 
   // Selected agent role for editing
   const [selectedRole, setSelectedRole] = useState<string>('gm');
@@ -83,6 +85,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     name: string;
     sizeBytes: number;
   } | null>(null);
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -1312,6 +1315,35 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             )}
 
+            {(inspect?.error || inspectError) && (
+              <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-900/60 text-[11px] text-red-300 font-mono">
+                {inspect?.error || inspectError}
+              </div>
+            )}
+
+            {config.media.tts.type !== 'disabled' && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-cinzel uppercase text-stone-300">Default Voice</label>
+                <VoiceCombobox
+                  value={config.media.tts.default_voice || ''}
+                  onChange={(voiceID) =>
+                    setConfig({
+                      ...config,
+                      media: {
+                        ...config.media,
+                        tts: { ...config.media.tts, default_voice: voiceID },
+                      },
+                    })
+                  }
+                  voices={inspect?.catalog.voices ?? []}
+                  placeholder="Select default provider voice..."
+                />
+                <p className="text-[11px] text-stone-500">
+                  Fallback voice used for turn narration and unvoiced characters.
+                </p>
+              </div>
+            )}
+
             {config.media.tts.type !== 'disabled' && (
               <div className="pt-2 space-y-2 border-t border-stone-800/60">
                 <div className="space-y-1.5">
@@ -1406,6 +1438,17 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <span>Load Fantasy Defaults</span>
                   </button>
 
+                  {Boolean(inspect?.catalog.voices?.length) && (
+                    <button
+                      type="button"
+                      onClick={() => setIsCatalogModalOpen(true)}
+                      className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-stone-900 border border-amber-500/40 text-amber-300 hover:bg-stone-800 transition cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Import from Catalog</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => {
                       const currentProfiles = config.media.tts.voice_profiles || [];
@@ -1477,19 +1520,18 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           }}
                           className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
                         />
-                        <input
-                          type="text"
-                          placeholder="Voice ID (e.g. af_bella)"
+                        <VoiceCombobox
                           value={profile.voice_id}
-                          onChange={(e) => {
+                          onChange={(voiceID) => {
                             const updated = [...(config.media.tts.voice_profiles || [])];
-                            updated[idx] = { ...updated[idx], voice_id: e.target.value };
+                            updated[idx] = { ...updated[idx], voice_id: voiceID };
                             setConfig({
                               ...config,
                               media: { ...config.media, tts: { ...config.media.tts, voice_profiles: updated } },
                             });
                           }}
-                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs font-mono text-stone-200 focus:outline-none"
+                          voices={inspect?.catalog.voices ?? []}
+                          placeholder="Voice ID (e.g. af_bella)"
                         />
                       </div>
 
@@ -2019,6 +2061,30 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           modelName={missingModelPrompt.name}
           sizeBytes={missingModelPrompt.sizeBytes}
           onClose={() => setMissingModelPrompt(null)}
+        />
+      )}
+
+      {isCatalogModalOpen && (
+        <VoiceCatalogModal
+          isOpen={isCatalogModalOpen}
+          onClose={() => setIsCatalogModalOpen(false)}
+          voices={inspect?.catalog.voices ?? []}
+          providerKey={inspect?.provider_key || 'tts'}
+          onAddProfile={(newProfile) => {
+            if (config) {
+              const current = config.media.tts.voice_profiles || [];
+              setConfig({
+                ...config,
+                media: {
+                  ...config.media,
+                  tts: {
+                    ...config.media.tts,
+                    voice_profiles: [...current, newProfile],
+                  },
+                },
+              });
+            }
+          }}
         />
       )}
     </div>
