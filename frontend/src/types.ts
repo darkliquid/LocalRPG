@@ -276,7 +276,7 @@ export interface PathsConfig {
 }
 
 export interface AgentRoleConfig {
-  type: 'builtin' | 'http' | 'cli' | 'inherit' | 'disabled';
+  type: 'builtin' | 'http' | 'cli' | 'inherit' | 'disabled' | 'gemini';
   inherit_from?: string;
   builtin_name?: string;
   command?: string;
@@ -288,6 +288,9 @@ export interface AgentRoleConfig {
   max_tokens?: number;
   // "auto" (HTTP providers only), "yes", or "no".
   supports_tools?: 'auto' | 'yes' | 'no';
+  thinking_budget?: number;
+  top_p?: number;
+  top_k?: number;
 }
 
 export interface AgentsConfig {
@@ -467,9 +470,16 @@ export interface TraceEvent {
   fields?: Record<string, unknown>;
 }
 
+export interface ProvidersConfig {
+  gemini?: {
+    api_key?: string;
+  };
+}
+
 export interface AppConfig {
   version: string;
   paths: PathsConfig;
+  providers?: ProvidersConfig;
   agents: AgentsConfig;
   media: MediaConfig;
   preferences: PreferencesConfig;

@@ -422,6 +422,40 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             </div>
 
+            {/* Shared Gemini Credentials */}
+            <div className="p-3 bg-stone-900/60 border border-stone-800 rounded-xl space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-cinzel uppercase text-amber-400 font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Shared Google Gemini API Key</span>
+                </label>
+                <span className="text-[10px] text-stone-500 font-mono">
+                  {config.providers?.gemini?.api_key ? '✓ Configured' : 'Using env or unconfigured'}
+                </span>
+              </div>
+              <input
+                type="password"
+                placeholder="AIzaSy... or leave blank for GEMINI_API_KEY env var"
+                value={config.providers?.gemini?.api_key || ''}
+                onChange={(e) => {
+                  setConfig({
+                    ...config,
+                    providers: {
+                      ...config.providers,
+                      gemini: {
+                        ...config.providers?.gemini,
+                        api_key: e.target.value,
+                      },
+                    },
+                  });
+                }}
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+              />
+              <p className="text-[11px] text-stone-500">
+                Shared across all Gemini agent roles (and future image / voice generation). Can still be overridden per role below.
+              </p>
+            </div>
+
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -444,6 +478,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <option value="http">HTTP / OpenAI-Compatible (Ollama, vLLM, OpenAI)</option>
                     <option value="cli">CLI Command (Local Binary e.g. llama-cli)</option>
                     <option value="builtin">Builtin / Internal Engine</option>
+                    <option value="gemini">Google Gemini (GenAI Cloud)</option>
                     <option value="inherit">Inherit from another role</option>
                   </select>
                 </div>
@@ -599,9 +634,210 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
                     >
                       <option value="narrative-oracle">narrative-oracle (Deterministic Procedural Storyteller)</option>
+                      <option value="gemini">gemini (Google Gemini Generative AI)</option>
                       <option value="echo">echo (Debug Provider)</option>
                     </select>
                   </div>
+                )}
+
+                {(currentRoleConfig.type === 'gemini' || (currentRoleConfig.type === 'builtin' && currentRoleConfig.builtin_name === 'gemini')) && (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-cinzel uppercase text-stone-300">Gemini Model</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. gemini-2.5-flash"
+                        value={currentRoleConfig.model || 'gemini-2.5-flash'}
+                        onChange={(e) => {
+                          const updated = { ...currentRoleConfig, model: e.target.value };
+                          setConfig({
+                            ...config,
+                            agents: {
+                              ...config.agents,
+                              roles: { ...config.agents.roles, [selectedRole]: updated },
+                            },
+                          });
+                        }}
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      />
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'].map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => {
+                              const updated = { ...currentRoleConfig, model: m };
+                              setConfig({
+                                ...config,
+                                agents: {
+                                  ...config.agents,
+                                  roles: { ...config.agents.roles, [selectedRole]: updated },
+                                },
+                              });
+                            }}
+                            className={`px-2 py-0.5 text-[10px] font-mono rounded border transition-colors cursor-pointer ${
+                              (currentRoleConfig.model || 'gemini-2.5-flash') === m
+                                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                                : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200'
+                            }`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                        <span>Role API Key Override</span>
+                        {config.providers?.gemini?.api_key && (
+                          <span className="text-[10px] text-emerald-400 font-mono">Shared key active</span>
+                        )}
+                      </label>
+                      <input
+                        type="password"
+                        placeholder={config.providers?.gemini?.api_key ? 'Using shared key (leave blank)' : 'Optional override or GEMINI_API_KEY env'}
+                        value={currentRoleConfig.api_key || ''}
+                        onChange={(e) => {
+                          const updated = { ...currentRoleConfig, api_key: e.target.value };
+                          setConfig({
+                            ...config,
+                            agents: {
+                              ...config.agents,
+                              roles: { ...config.agents.roles, [selectedRole]: updated },
+                            },
+                          });
+                        }}
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 col-span-1 md:col-span-2">
+                      <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                        <span>Thinking / Reasoning Budget</span>
+                        <span className="font-mono text-amber-400">
+                          {currentRoleConfig.thinking_budget === undefined
+                            ? 'Default'
+                            : currentRoleConfig.thinking_budget === 0
+                            ? '0 (Disabled — Instant Narration)'
+                            : currentRoleConfig.thinking_budget === -1
+                            ? 'Dynamic (-1 — Model Decides)'
+                            : `${currentRoleConfig.thinking_budget} tokens`}
+                        </span>
+                      </label>
+                      <div className="flex gap-2">
+                        <select
+                          value={
+                            currentRoleConfig.thinking_budget === undefined
+                              ? 'default'
+                              : currentRoleConfig.thinking_budget === 0
+                              ? '0'
+                              : currentRoleConfig.thinking_budget === -1
+                              ? '-1'
+                              : 'custom'
+                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            let budget: number | undefined;
+                            if (val === '0') budget = 0;
+                            else if (val === '-1') budget = -1;
+                            else if (val === 'custom') budget = 2048;
+                            else budget = undefined;
+
+                            const updated = { ...currentRoleConfig, thinking_budget: budget };
+                            setConfig({
+                              ...config,
+                              agents: {
+                                ...config.agents,
+                                roles: { ...config.agents.roles, [selectedRole]: updated },
+                              },
+                            });
+                          }}
+                          className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                        >
+                          <option value="0">Disabled (0 — Instant Narration)</option>
+                          <option value="-1">Dynamic (-1 — Model Decides)</option>
+                          <option value="default">Model Default</option>
+                          <option value="custom">Custom Token Limit</option>
+                        </select>
+                        {(currentRoleConfig.thinking_budget ?? 0) > 0 && (
+                          <input
+                            type="number"
+                            min={128}
+                            step={256}
+                            value={currentRoleConfig.thinking_budget}
+                            onChange={(e) => {
+                              const budget = parseInt(e.target.value, 10);
+                              const updated = { ...currentRoleConfig, thinking_budget: isNaN(budget) ? 0 : budget };
+                              setConfig({
+                                ...config,
+                                agents: {
+                                  ...config.agents,
+                                  roles: { ...config.agents.roles, [selectedRole]: updated },
+                                },
+                              });
+                            }}
+                            className="w-32 bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                          />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-stone-500">
+                        Thinking tokens allow Gemini 2.5 to reason deeply before replying. Thought tokens are automatically filtered from the story chronicle.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                        <span>Top-P</span>
+                        <span className="font-mono text-amber-400">{(currentRoleConfig.top_p ?? 0.95).toFixed(2)}</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={currentRoleConfig.top_p ?? 0.95}
+                        onChange={(e) => {
+                          const top_p = parseFloat(e.target.value);
+                          const updated = { ...currentRoleConfig, top_p: isNaN(top_p) ? undefined : top_p };
+                          setConfig({
+                            ...config,
+                            agents: {
+                              ...config.agents,
+                              roles: { ...config.agents.roles, [selectedRole]: updated },
+                            },
+                          });
+                        }}
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-cinzel uppercase text-stone-300 flex items-center justify-between">
+                        <span>Top-K</span>
+                        <span className="font-mono text-amber-400">{currentRoleConfig.top_k ?? 40}</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        step={1}
+                        value={currentRoleConfig.top_k ?? 40}
+                        onChange={(e) => {
+                          const top_k = parseInt(e.target.value, 10);
+                          const updated = { ...currentRoleConfig, top_k: isNaN(top_k) ? undefined : top_k };
+                          setConfig({
+                            ...config,
+                            agents: {
+                              ...config.agents,
+                              roles: { ...config.agents.roles, [selectedRole]: updated },
+                            },
+                          });
+                        }}
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-amber-500/60"
+                      />
+                    </div>
+                  </>
                 )}
               </div>
 
