@@ -99,6 +99,16 @@ var TTSPresets = map[string]TTSConfig{
 		SpeechRate:   1.0,
 		MasterVolume: 1.0,
 	},
+
+	"elevenlabs": {
+		Type:         "builtin",
+		BuiltinName:  "elevenlabs",
+		Model:        "eleven_multilingual_v2",
+		DefaultVoice: "EXAVITQu4vr4xnSDxMaL", // "Sarah", a premade stock voice
+		Pitch:        1.0,
+		SpeechRate:   1.0,
+		MasterVolume: 1.0,
+	},
 }
 
 var STTPresets = map[string]STTConfig{

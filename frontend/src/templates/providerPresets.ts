@@ -176,6 +176,20 @@ export const TTS_PRESETS: Record<string, PresetItem<TTSConfig>> = {
       master_volume: 1.0,
     },
   },
+  elevenlabs: {
+    label: 'ElevenLabs (Cloud, metered)',
+    description: 'Cloud voices fetched from your account. Set a key here or via ELEVENLABS_API_KEY; charges per request.',
+    config: {
+      type: 'builtin',
+      builtin_name: 'elevenlabs',
+      model: 'eleven_multilingual_v2',
+      default_voice: 'EXAVITQu4vr4xnSDxMaL',
+      pitch: 1.0,
+      speech_rate: 1.0,
+      auto_play: true,
+      master_volume: 1.0,
+    },
+  },
 };
 
 export const STT_PRESETS: Record<string, PresetItem<STTConfig>> = {
