@@ -244,3 +244,101 @@ func elevenLabsError(resp *http.Response) error {
 		return fmt.Errorf("elevenlabs: request failed with status %d", resp.StatusCode)
 	}
 }
+
+// elevenLabsVoice is one entry of the /v2/voices response. Labels are free-form
+// strings, never enums, so they are carried as a map.
+type elevenLabsVoice struct {
+	VoiceID           string                 `json:"voice_id"`
+	Name              string                 `json:"name"`
+	Category          string                 `json:"category"`
+	Description       string                 `json:"description"`
+	PreviewURL        string                 `json:"preview_url"`
+	Labels            map[string]string      `json:"labels"`
+	Settings          map[string]interface{} `json:"settings"`
+	AvailableForTiers []string               `json:"available_for_tiers"`
+	VerifiedLanguages []struct {
+		Language string `json:"language"`
+	} `json:"verified_languages"`
+}
+
+// elevenLabsVoicePage is one page of the catalog. Pagination is mandatory: the
+// v2 endpoint pages and the legacy one stops working past 500 voices.
+type elevenLabsVoicePage struct {
+	Voices        []elevenLabsVoice `json:"voices"`
+	HasMore       bool              `json:"has_more"`
+	TotalCount    int               `json:"total_count"`
+	NextPageToken string            `json:"next_page_token"`
+}
+
+// ListVoices pages the account's voices to completion and maps them into the
+// shared shape. Cloned and professional voices appear because they belong to the
+// key in use, which is the point of fetching rather than shipping a list.
+func (c *ElevenLabsTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, error) {
+	voices := make([]ProviderVoice, 0)
+	token := ""
+	for {
+		query := url.Values{"page_size": {fmt.Sprintf("%d", elevenLabsCatalogPageSize)}}
+		if token != "" {
+			query.Set("next_page_token", token)
+		}
+		endpoint := fmt.Sprintf("%s/v2/voices?%s", strings.TrimRight(c.baseURL, "/"), query.Encode())
+
+		resp, err := c.do(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return nil, err
+		}
+		if err := elevenLabsError(resp); err != nil {
+			resp.Body.Close()
+			return nil, err
+		}
+		var page elevenLabsVoicePage
+		err = json.NewDecoder(resp.Body).Decode(&page)
+		resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("elevenlabs: decode voice catalog: %w", err)
+		}
+
+		for _, voice := range page.Voices {
+			voices = append(voices, mapElevenLabsVoice(voice))
+		}
+		if !page.HasMore || page.NextPageToken == "" {
+			return voices, nil
+		}
+		token = page.NextPageToken
+	}
+}
+
+// mapElevenLabsVoice maps a catalog entry onto the shared voice shape.
+func mapElevenLabsVoice(voice elevenLabsVoice) ProviderVoice {
+	mapped := ProviderVoice{
+		ID:          voice.VoiceID,
+		Name:        voice.Name,
+		Gender:      strings.ToLower(strings.TrimSpace(voice.Labels["gender"])),
+		Accent:      voice.Labels["accent"],
+		Description: voice.Description,
+		PreviewURL:  voice.PreviewURL,
+		Defaults:    voice.Settings,
+	}
+	if mapped.Description == "" {
+		mapped.Description = voice.Labels["description"]
+	}
+	if len(voice.VerifiedLanguages) > 0 {
+		mapped.Language = voice.VerifiedLanguages[0].Language
+	}
+	if voice.Category != "" {
+		mapped.Categories = []string{voice.Category}
+	}
+	mapped.Tags = NormaliseVoiceTags(
+		voice.Labels["age"],
+		voice.Labels["use_case"],
+		voice.Labels["gender"],
+		voice.Labels["accent"],
+		voice.Category,
+	)
+	mapped.Metadata = map[string]interface{}{
+		"category":            voice.Category,
+		"available_for_tiers": voice.AvailableForTiers,
+		"verified_languages":  voice.VerifiedLanguages,
+	}
+	return mapped
+}

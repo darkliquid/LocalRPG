@@ -208,3 +208,80 @@ func TestElevenLabsVoiceOptionsSchema(t *testing.T) {
 		t.Errorf("ElevenLabs charges per request and must report metered")
 	}
 }
+
+func TestElevenLabsListVoicesPagesAndMaps(t *testing.T) {
+	page := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v2/voices" {
+			t.Errorf("path = %q, want /v2/voices", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("page_size"); got != "100" {
+			t.Errorf("page_size = %q, want 100", got)
+		}
+		page++
+		switch page {
+		case 1:
+			if r.URL.Query().Get("next_page_token") != "" {
+				t.Errorf("first page should not carry a token")
+			}
+			_, _ = w.Write([]byte(`{
+				"voices": [{
+					"voice_id": "v1",
+					"name": "Sarah",
+					"category": "premade",
+					"description": "A calm narrator.",
+					"preview_url": "https://example.test/v1.mp3",
+					"labels": {"gender": "Female", "accent": "American", "age": "middle-aged", "use_case": "narrative"},
+					"settings": {"stability": 0.5, "similarity_boost": 0.75},
+					"available_for_tiers": ["free"],
+					"verified_languages": [{"language": "en"}]
+				}],
+				"has_more": true,
+				"total_count": 2,
+				"next_page_token": "page-2"
+			}`))
+		default:
+			if r.URL.Query().Get("next_page_token") != "page-2" {
+				t.Errorf("second page token = %q, want page-2", r.URL.Query().Get("next_page_token"))
+			}
+			_, _ = w.Write([]byte(`{"voices": [{"voice_id": "v2", "name": "Brian", "labels": {}}], "has_more": false, "total_count": 2}`))
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestElevenLabsClient(t, server)
+
+	voices, err := client.ListVoices(context.Background())
+	if err != nil {
+		t.Fatalf("ListVoices: %v", err)
+	}
+	if len(voices) != 2 {
+		t.Fatalf("voices = %d, want 2 after paging", len(voices))
+	}
+
+	first := voices[0]
+	if first.ID != "v1" || first.Name != "Sarah" {
+		t.Errorf("first voice = %+v", first)
+	}
+	if first.Gender != "female" {
+		t.Errorf("gender = %q, want lowercased", first.Gender)
+	}
+	if first.Accent != "American" {
+		t.Errorf("accent = %q", first.Accent)
+	}
+	if first.Language != "en" {
+		t.Errorf("language = %q", first.Language)
+	}
+	if first.PreviewURL != "https://example.test/v1.mp3" {
+		t.Errorf("preview = %q", first.PreviewURL)
+	}
+	if first.Defaults["stability"] != 0.5 {
+		t.Errorf("defaults = %v", first.Defaults)
+	}
+	if !containsString(first.Tags, "middle-aged") || !containsString(first.Tags, "narrative") {
+		t.Errorf("tags = %v, want the normalised labels", first.Tags)
+	}
+	if !containsString(first.Categories, "premade") {
+		t.Errorf("categories = %v", first.Categories)
+	}
+}
