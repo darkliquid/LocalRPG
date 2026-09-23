@@ -147,6 +147,9 @@ export interface GameSummary {
   turn_count: number;
   last_played: string;
   thumbnail_url?: string;
+  banner_url?: string;
+  icon_url?: string;
+  play_time_seconds?: number;
 }
 
 export interface SystemInfo {
@@ -162,6 +165,8 @@ export interface WorldInfo {
   description: string;
   genre: string;
   compatible_systems: string[];
+  banner_url?: string;
+  icon_url?: string;
 }
 
 export interface CreateGameRequest {

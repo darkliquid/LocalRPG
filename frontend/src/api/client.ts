@@ -119,6 +119,48 @@ export class APIClient {
     return res.json();
   }
 
+  static async uploadGameAsset(gameId: string, kind: 'banner' | 'icon', file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`/api/game/${encodeURIComponent(gameId)}/${kind}`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    return res.json();
+  }
+
+  static async uploadWorldAsset(worldId: string, kind: 'banner' | 'icon', file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/${kind}`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    return res.json();
+  }
+
+  static async generateGameAsset(gameId: string, kind: 'banner' | 'icon', prompt?: string): Promise<{ url: string }> {
+    const res = await fetch(`/api/game/${encodeURIComponent(gameId)}/generate-asset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, prompt }),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    return res.json();
+  }
+
+  static async generateWorldAsset(worldId: string, kind: 'banner' | 'icon', prompt?: string): Promise<{ url: string }> {
+    const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/generate-asset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, prompt }),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    return res.json();
+  }
+
   static async audioStatus(): Promise<{ available: boolean; playing: boolean }> {
     const res = await fetch('/api/audio/status');
     if (!res.ok) throw new Error(`audioStatus: ${res.statusText}`);
