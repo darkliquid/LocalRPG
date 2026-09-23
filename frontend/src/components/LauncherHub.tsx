@@ -1,89 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { APIClient } from '../api/client';
-import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest, CharacterCreationField, VoiceProfile } from '../types';
-import { Play, Plus, User, Clock, Shield, Globe, Compass, X, Sparkles, BookOpen, AlertCircle, Settings, RotateCcw, Trash2, Wand2, Volume2 } from 'lucide-react';
-import { SystemsStudio } from './SystemsStudio';
+import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types';
+import { LauncherDock } from './launcher/LauncherDock';
+import { WorldFlyout } from './launcher/WorldFlyout';
+import { CampaignHeroStage } from './launcher/CampaignHeroStage';
+import { NewCampaignModal } from './launcher/NewCampaignModal';
+import { CampaignSettingsModal } from './launcher/CampaignSettingsModal';
 import { WorldsStudio } from './WorldsStudio';
+import { SystemsStudio } from './SystemsStudio';
 import { SettingsStudio } from './SettingsStudio';
+import { ArrowLeft, X } from 'lucide-react';
 
 interface LauncherHubProps {
   onSelectGame: (gameId: string) => void;
 }
 
-// The prompts a system falls back to when it defines none, mirroring the engine's
-// default character fields.
-const DEFAULT_CHARACTER_FIELDS: CharacterCreationField[] = [
-  { id: 'appearance', label: 'Appearance', prompt: 'How does your character look?', kind: 'long', required: true, generatable: true },
-  { id: 'age', label: 'Age', kind: 'text', generatable: true },
-  { id: 'gender', label: 'Gender', kind: 'text', generatable: true },
-  { id: 'pronouns', label: 'Pronouns', kind: 'text' },
-  { id: 'background', label: 'Background', prompt: 'Where do they come from?', kind: 'long', generatable: true },
-  { id: 'voice', label: 'Voice', kind: 'voice' },
-];
-
-const CORE_PLAYER_ANSWER_IDS = ['appearance', 'age', 'gender', 'pronouns', 'background', 'voice'];
-
 export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [systems, setSystems] = useState<SystemInfo[]>([]);
   const [worlds, setWorlds] = useState<WorldInfo[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isWizardOpen, setIsWizardOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'campaigns' | 'systems' | 'worlds' | 'settings'>('campaigns');
+  const [selectedGameID, setSelectedGameID] = useState<string | null>(null);
 
-  // Wizard form state
-  const [newGameName, setNewGameName] = useState('');
-  const [newSystemID, setNewSystemID] = useState('');
-  const [newWorldID, setNewWorldID] = useState('');
-  const [newPlayerName, setNewPlayerName] = useState('');
-  const [newOpeningPrompt, setNewOpeningPrompt] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  // Character creation: the fields come from the chosen rules system, and the
-  // voice list from the global settings, so both stay in one place.
-  const [creationFields, setCreationFields] = useState<CharacterCreationField[]>(DEFAULT_CHARACTER_FIELDS);
-  const [playerAnswers, setPlayerAnswers] = useState<Record<string, string>>({});
-  const [playerVoiceID, setPlayerVoiceID] = useState('');
-  const [narratorVoiceID, setNarratorVoiceID] = useState<string>('');
-  const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isFlyoutOpen, setIsFlyoutOpen] = useState(false);
+  const [creatingWorld, setCreatingWorld] = useState<WorldInfo | null>(null);
+  const [isCreatingGame, setIsCreatingGame] = useState(false);
 
-  const openNewGameWizard = () => {
-    setNarratorVoiceID('');
-    setIsWizardOpen(true);
-  };
-  // A destructive campaign action is confirmed inline rather than with a browser
-  // dialog, so the launcher keeps its own styling and stays usable inside Wails.
-  const [pendingAction, setPendingAction] = useState<{ type: 'restart' | 'delete'; id: string } | null>(null);
-  const [busyGameID, setBusyGameID] = useState<string | null>(null);
+  const [settingsGameID, setSettingsGameID] = useState<string | null>(null);
+  const [activeStudio, setActiveStudio] = useState<'worlds' | 'systems' | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // The selected system decides which prompts a character answers.
-  useEffect(() => {
-    if (!newSystemID) return;
-    let cancelled = false;
-    APIClient.getSystem(newSystemID)
-      .then((detail) => {
-        if (cancelled) return;
-        const fields = detail.character_creation?.fields?.length
-          ? detail.character_creation.fields
-          : DEFAULT_CHARACTER_FIELDS;
-        setCreationFields(fields);
-      })
-      .catch(() => {
-        if (!cancelled) setCreationFields(DEFAULT_CHARACTER_FIELDS);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [newSystemID]);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    setError(null);
+  const loadData = useCallback(async () => {
     try {
       const [gList, sList, wList] = await Promise.all([
         APIClient.listGames().catch(() => []),
@@ -94,720 +40,208 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
       setSystems(sList);
       setWorlds(wList);
 
-      if (sList.length > 0 && !newSystemID) setNewSystemID(sList[0].id);
-      if (wList.length > 0 && !newWorldID) setNewWorldID(wList[0].id);
-
-      const settings = await APIClient.getSettings().catch(() => null);
-      const profiles = settings?.config?.media?.tts?.voice_profiles;
-      if (profiles) setVoiceProfiles(profiles);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load campaigns');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const generateCharacterFields = async (only?: string) => {
-    const targets = creationFields.filter(
-      (field) => field.kind !== 'voice' && field.generatable && (!only || field.id === only)
-    );
-    if (targets.length === 0) return;
-
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const res = await APIClient.generateCharacter({
-        system_id: newSystemID,
-        world_id: newWorldID,
-        name: newPlayerName.trim() || undefined,
-        fields: targets,
+      setSelectedGameID((prev) => {
+        if (prev && gList.some((g) => g.id === prev)) return prev;
+        return gList[0]?.id || null;
       });
-      if (Object.keys(res.values).length === 0) {
-        setError('No model is configured to invent character details; fill them in yourself.');
-        return;
-      }
-      setPlayerAnswers((prev) => ({ ...prev, ...res.values }));
-    } catch (err: any) {
-      setError(err.message || 'Character generation failed');
-    } finally {
-      setIsGenerating(false);
+    } catch (err) {
+      console.error('Failed to load launcher data:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const activeGame = games.find((g) => g.id === selectedGameID) || null;
+  const activeWorld = worlds.find((w) => w.id === activeGame?.world_id);
+  const activeSystem = systems.find((s) => s.id === activeGame?.system_id);
+  const settingsGame = games.find((g) => g.id === settingsGameID) || null;
+
+  const handleSelectWorldFromFlyout = (worldId: string) => {
+    const world = worlds.find((w) => w.id === worldId);
+    if (world) {
+      setCreatingWorld(world);
+      setIsFlyoutOpen(false);
     }
   };
 
-  const handleCreateGame = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newGameName.trim()) return;
-
-    const effectiveSystemID = newSystemID || systems[0]?.id;
-    const effectiveWorldID = newWorldID || worlds[0]?.id;
-
-    if (!effectiveSystemID || !effectiveWorldID) {
-      setError('Please create both a Rule System and a World Setting before launching a campaign.');
-      return;
-    }
-
-    setIsSubmitting(true);
+  const handleCreateGame = async (
+    data: CreateGameRequest,
+    bannerFile?: File,
+    iconFile?: File
+  ) => {
+    setIsCreatingGame(true);
     try {
-      const extra: Record<string, string> = {};
-      for (const [key, value] of Object.entries(playerAnswers)) {
-        if (!CORE_PLAYER_ANSWER_IDS.includes(key) && value.trim()) {
-          extra[key] = value.trim();
-        }
+      const newGame = await APIClient.createGame(data);
+      if (bannerFile) {
+        await APIClient.uploadGameAsset(newGame.id, 'banner', bannerFile).catch(console.error);
       }
-
-      const payload: CreateGameRequest = {
-        name: newGameName.trim(),
-        system_id: effectiveSystemID,
-        world_id: effectiveWorldID,
-        player_name: newPlayerName.trim() || 'Adventurer',
-        narrator_voice: narratorVoiceID.trim() || undefined,
-        player: {
-          appearance: playerAnswers.appearance?.trim() || undefined,
-          age: playerAnswers.age?.trim() || undefined,
-          gender: playerAnswers.gender?.trim() || undefined,
-          pronouns: playerAnswers.pronouns?.trim() || undefined,
-          background: playerAnswers.background?.trim() || undefined,
-          voice: playerVoiceID ? voiceProfiles.find((v) => v.id === playerVoiceID) : undefined,
-          extra: Object.keys(extra).length > 0 ? extra : undefined,
-        },
-        opening_prompt: newOpeningPrompt.trim() || undefined,
-      };
-
-      const created = await APIClient.createGame(payload);
-      setIsWizardOpen(false);
-      onSelectGame(created.id);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create campaign');
-      setIsSubmitting(false);
-    }
-  };
-
-  const selectedWorld = worlds.find((w) => w.id === newWorldID);
-  const latestGame = games.length > 0 ? games[0] : null;
-
-  const runPendingAction = async () => {
-    if (!pendingAction) return;
-    const { type, id } = pendingAction;
-    setBusyGameID(id);
-    setError(null);
-    try {
-      if (type === 'delete') {
-        await APIClient.deleteGame(id);
-      } else {
-        await APIClient.restartGame(id);
+      if (iconFile) {
+        await APIClient.uploadGameAsset(newGame.id, 'icon', iconFile).catch(console.error);
       }
-      if (type === 'delete' && localStorage.getItem('localrpg_active_game') === id) {
-        localStorage.removeItem('localrpg_active_game');
-      }
-      setPendingAction(null);
       await loadData();
-    } catch (err: any) {
-      setError(err.message || `Failed to ${type} campaign`);
+      setSelectedGameID(newGame.id);
+      setCreatingWorld(null);
+    } catch (err) {
+      console.error('Failed to create campaign:', err);
     } finally {
-      setBusyGameID(null);
+      setIsCreatingGame(false);
     }
   };
 
-  const pendingGame = pendingAction ? games.find((g) => g.id === pendingAction.id) : null;
+  const handleUploadAsset = async (gameId: string, kind: 'banner' | 'icon', file: File) => {
+    await APIClient.uploadGameAsset(gameId, kind, file);
+    await loadData();
+  };
 
-  return (
-    <div className="relative flex flex-col h-screen overflow-hidden text-stone-200 p-6 md:p-8 select-none">
-      {/* Brand Header */}
-      <header className="relative z-10 mx-auto w-full max-w-6xl shrink-0 h-auto sm:h-16 bg-glass rounded-2xl px-6 py-3 sm:py-0 flex flex-wrap items-center justify-between gap-4 shadow-2xl mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-pulse" />
-          <h1 className="font-cinzel text-xl font-extrabold text-amber-400 tracking-wider">
-            LocalRPG
-          </h1>
-          <span className="text-[10px] uppercase font-mono tracking-widest text-stone-400 bg-stone-900/60 px-2 py-0.5 rounded-full border border-stone-800 hidden sm:inline">
-            Chronicle Hub
-          </span>
-        </div>
+  const handleGenerateAsset = async (gameId: string, kind: 'banner' | 'icon') => {
+    await APIClient.generateGameAsset(gameId, kind);
+    await loadData();
+  };
 
-        {/* Top-Level Studio Navigation Tabs */}
-        <nav className="flex items-center gap-1 bg-stone-950/70 p-1 rounded-xl border border-stone-800">
+  const handleRestartGame = async (gameId: string) => {
+    await APIClient.restartGame(gameId);
+    await loadData();
+  };
+
+  const handleDeleteGame = async (gameId: string) => {
+    await APIClient.deleteGame(gameId);
+    await loadData();
+  };
+
+  // Full-Window Overlay: Worlds Studio
+  if (activeStudio === 'worlds') {
+    return (
+      <div className="relative w-full h-full flex flex-col bg-stone-950 text-stone-200">
+        <header className="h-14 px-6 border-b border-white/10 flex items-center justify-between bg-stone-900/60 backdrop-blur-xl">
           <button
             onClick={() => {
-              setActiveTab('campaigns');
+              setActiveStudio(null);
               loadData();
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
-              activeTab === 'campaigns'
-                ? 'bg-amber-600 text-stone-950 font-bold shadow'
-                : 'text-stone-400 hover:text-stone-200'
-            }`}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-sans font-semibold text-stone-300 hover:text-white transition-all cursor-pointer"
           >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Campaigns</span>
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Launcher</span>
           </button>
-          <button
-            onClick={() => setActiveTab('systems')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
-              activeTab === 'systems'
-                ? 'bg-amber-600 text-stone-950 font-bold shadow'
-                : 'text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span>Rule Systems</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('worlds')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
-              activeTab === 'worlds'
-                ? 'bg-amber-600 text-stone-950 font-bold shadow'
-                : 'text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span>Worlds Studio</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel transition-all cursor-pointer ${
-              activeTab === 'settings'
-                ? 'bg-amber-600 text-stone-950 font-bold shadow'
-                : 'text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span>Settings</span>
-          </button>
-        </nav>
-
-        <button
-          onClick={openNewGameWizard}
-          className="flex items-center gap-2 text-xs font-cinzel font-bold px-4 py-2 rounded-xl transition-all cursor-pointer bg-amber-600 hover:bg-amber-500 text-stone-950 shadow-[0_0_15px_rgba(217,119,6,0.5)] active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Campaign</span>
-        </button>
-      </header>
-
-      {/* Main Content Area */}
-      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 min-h-0 flex flex-col">
-        {error && (
-          <div className="mb-4 p-4 rounded-xl bg-red-950/60 border border-red-500/40 text-red-200 text-sm flex items-center justify-between shrink-0">
-            <span>{error}</span>
-            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-200">
-              <X className="w-4 h-4" />
-            </button>
+          <div className="text-sm font-sans font-bold text-white tracking-wide">
+            Worlds Studio
           </div>
-        )}
-
-        {activeTab === 'campaigns' && (
-          <div className="flex-1 overflow-y-auto space-y-8 pr-1">
-            {/* Hero Resume Banner if a campaign exists */}
-            {latestGame && (
-              <div className="relative overflow-hidden rounded-2xl bg-glass-card border border-amber-500/20 shadow-2xl p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 backdrop-blur-md">
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-amber-400">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Last Played Adventure</span>
-                  </div>
-                  <h2 className="font-cinzel text-2xl md:text-3xl font-bold text-white tracking-wide">
-                    {latestGame.name}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300 pt-1">
-                    <div className="flex items-center gap-1.5 bg-stone-900/60 px-2.5 py-1 rounded-lg border border-stone-800">
-                      <User className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{latestGame.player_name}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-stone-900/60 px-2.5 py-1 rounded-lg border border-stone-800">
-                      <Globe className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{latestGame.world_id}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-stone-900/60 px-2.5 py-1 rounded-lg border border-stone-800">
-                      <Clock className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Turn {latestGame.turn_count}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => onSelectGame(latestGame.id)}
-                  className="flex items-center gap-2.5 text-sm font-cinzel font-bold px-6 py-3.5 rounded-xl transition-all cursor-pointer bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-stone-950 shadow-[0_0_20px_rgba(217,119,6,0.6)] active:scale-95"
-                >
-                  <Play className="w-4 h-4 fill-stone-950" />
-                  <span>Resume Adventure</span>
-                </button>
-              </div>
-            )}
-
-        {/* Campaigns Grid */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-cinzel text-lg font-semibold text-stone-200 tracking-wider flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-amber-400" />
-              <span>Saved Chronicles</span>
-            </h3>
-            <span className="text-xs text-stone-400 font-mono">
-              {games.length} {games.length === 1 ? 'campaign' : 'campaigns'}
-            </span>
-          </div>
-
-          {isLoading ? (
-            <div className="p-12 text-center text-stone-400 font-mono text-sm animate-pulse">
-              Scanning local chronicles...
-            </div>
-          ) : games.length === 0 ? (
-            <div className="p-12 rounded-2xl bg-glass-card border border-stone-800/80 text-center space-y-4 shadow-xl">
-              <Compass className="w-12 h-12 text-amber-500/60 mx-auto stroke-1" />
-              <div className="space-y-1">
-                <h4 className="font-cinzel text-lg font-bold text-stone-200">
-                  {systems.length === 0 || worlds.length === 0 ? 'Welcome to LocalRPG' : 'No Chronicles Found'}
-                </h4>
-                <p className="text-xs text-stone-400 max-w-md mx-auto">
-                  {systems.length === 0 || worlds.length === 0
-                    ? 'LocalRPG starts completely blank with no pre-installed defaults. Visit the Rule Systems and Worlds Studio tabs to create or load the reference templates, then return here to begin!'
-                    : 'Your journey has yet to begin. Create a new campaign to awaken the world and weave your first turn.'}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                {systems.length === 0 && (
-                  <button
-                    onClick={() => setActiveTab('systems')}
-                    className="inline-flex items-center gap-1.5 text-xs font-cinzel font-bold px-4 py-2 rounded-xl bg-stone-900 border border-amber-500/40 hover:bg-stone-800 text-amber-300 transition-all cursor-pointer shadow"
-                  >
-                    <Shield className="w-3.5 h-3.5" />
-                    <span>Rule Systems</span>
-                  </button>
-                )}
-                {worlds.length === 0 && (
-                  <button
-                    onClick={() => setActiveTab('worlds')}
-                    className="inline-flex items-center gap-1.5 text-xs font-cinzel font-bold px-4 py-2 rounded-xl bg-stone-900 border border-amber-500/40 hover:bg-stone-800 text-amber-300 transition-all cursor-pointer shadow"
-                  >
-                    <Globe className="w-3.5 h-3.5" />
-                    <span>Worlds Studio</span>
-                  </button>
-                )}
-                <button
-                  onClick={openNewGameWizard}
-                  className="inline-flex items-center gap-2 text-xs font-cinzel font-bold px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 transition-all cursor-pointer shadow-lg"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Begin Your Tale</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {games.map((g) => (
-                <div
-                  key={g.id}
-                  onClick={() => onSelectGame(g.id)}
-                  className="group relative rounded-xl bg-glass-card hover:bg-stone-900/80 border border-stone-800/80 hover:border-amber-500/50 p-5 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-[0_0_20px_rgba(217,119,6,0.2)] flex flex-col justify-between"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-[11px] font-mono text-stone-400">
-                      <span className="bg-stone-950/70 px-2 py-0.5 rounded border border-stone-800/60 text-amber-400">
-                        {g.system_id}
-                      </span>
-                      <span>Turn {g.turn_count}</span>
-                    </div>
-                    <h4 className="font-cinzel text-base font-bold text-stone-100 group-hover:text-amber-400 transition-colors">
-                      {g.name}
-                    </h4>
-                  </div>
-
-                  <div className="pt-4 mt-4 border-t border-stone-800/60 flex items-center justify-between text-xs text-stone-400">
-                    <div className="flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-stone-500 group-hover:text-amber-400 transition-colors" />
-                      <span className="font-sans truncate max-w-[120px]">{g.player_name}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPendingAction({ type: 'restart', id: g.id });
-                        }}
-                        disabled={busyGameID === g.id}
-                        title="Restart this campaign from its opening scene"
-                        className="p-1.5 rounded-lg text-stone-400 hover:text-amber-300 hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-40"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPendingAction({ type: 'delete', id: g.id });
-                        }}
-                        disabled={busyGameID === g.id}
-                        title="Delete this campaign"
-                        className="p-1.5 rounded-lg text-stone-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-40"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                      <div className="flex items-center gap-1 text-[11px] text-amber-500/80 group-hover:text-amber-400 ml-1">
-                        <span>Launch</span>
-                        <Play className="w-3 h-3 fill-current" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-    )}
-
-    {activeTab === 'systems' && (
-      <SystemsStudio onSystemSaved={loadData} />
-    )}
-
-    {activeTab === 'worlds' && (
-      <WorldsStudio onWorldSaved={loadData} />
-    )}
-
-    {activeTab === 'settings' && (
-      <div className="flex-1 overflow-hidden">
-        <SettingsStudio onSaved={loadData} />
-      </div>
-    )}
-  </main>
-
-      {/* Destructive Campaign Action Confirmation */}
-      {pendingAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md rounded-2xl bg-stone-900/95 border border-red-500/40 shadow-2xl p-6 space-y-4">
-            <div className="flex items-center gap-2 font-cinzel font-bold text-red-400">
-              <AlertCircle className="w-5 h-5" />
-              <span>{pendingAction.type === 'delete' ? 'Delete Campaign' : 'Restart Campaign'}</span>
-            </div>
-            <p className="text-sm text-stone-300">
-              {pendingAction.type === 'delete' ? (
-                <>
-                  This permanently deletes{' '}
-                  <span className="text-amber-300 font-semibold">{pendingGame?.name || pendingAction.id}</span>, including its
-                  history, characters, and generated scenes. This cannot be undone.
-                </>
-              ) : (
-                <>
-                  This rewinds{' '}
-                  <span className="text-amber-300 font-semibold">{pendingGame?.name || pendingAction.id}</span> to its opening
-                  scene. Its history, characters created during play, and generated scenes are discarded. The world, rule
-                  system, protagonist, and opening prompt are kept.
-                </>
-              )}
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button
-                onClick={() => setPendingAction(null)}
-                disabled={busyGameID === pendingAction.id}
-                className="text-xs font-cinzel px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 transition-colors cursor-pointer disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={runPendingAction}
-                disabled={busyGameID === pendingAction.id}
-                className={`text-xs font-cinzel font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer disabled:opacity-50 ${
-                  pendingAction.type === 'delete'
-                    ? 'bg-red-700 hover:bg-red-600 text-white'
-                    : 'bg-amber-600 hover:bg-amber-500 text-stone-950'
-                }`}
-              >
-                {busyGameID === pendingAction.id
-                  ? 'Working...'
-                  : pendingAction.type === 'delete'
-                  ? 'Delete Campaign'
-                  : 'Restart Campaign'}
-              </button>
-            </div>
-          </div>
+          <div className="w-24" />
+        </header>
+        <div className="flex-1 overflow-hidden">
+          <WorldsStudio onWorldSaved={loadData} />
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* New Campaign Creation Wizard Modal */}
-      {isWizardOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-stone-900/95 border border-amber-500/30 shadow-2xl overflow-hidden">
-            {/* Fixed Header */}
-            <div className="flex items-center justify-between border-b border-stone-800 px-6 py-4 shrink-0">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-400" />
-                <h3 className="font-cinzel text-lg font-bold text-amber-400">
-                  New Campaign Wizard
-                </h3>
-              </div>
+  // Full-Window Overlay: Systems Studio
+  if (activeStudio === 'systems') {
+    return (
+      <div className="relative w-full h-full flex flex-col bg-stone-950 text-stone-200">
+        <header className="h-14 px-6 border-b border-white/10 flex items-center justify-between bg-stone-900/60 backdrop-blur-xl">
+          <button
+            onClick={() => {
+              setActiveStudio(null);
+              loadData();
+            }}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-sans font-semibold text-stone-300 hover:text-white transition-all cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Launcher</span>
+          </button>
+          <div className="text-sm font-sans font-bold text-white tracking-wide">
+            Systems Studio
+          </div>
+          <div className="w-24" />
+        </header>
+        <div className="flex-1 overflow-hidden">
+          <SystemsStudio onSystemSaved={loadData} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full flex overflow-hidden bg-stone-950 text-stone-200 font-sans select-none">
+      {/* Left Navigation Dock */}
+      <LauncherDock
+        games={games}
+        activeGameID={selectedGameID}
+        onSelectGame={(id) => {
+          setSelectedGameID(id);
+          setIsFlyoutOpen(false);
+        }}
+        isFlyoutOpen={isFlyoutOpen}
+        onToggleFlyout={() => setIsFlyoutOpen((prev) => !prev)}
+        onOpenWorldsStudio={() => setActiveStudio('worlds')}
+        onOpenSystemsStudio={() => setActiveStudio('systems')}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
+
+      {/* Horizontal World Flyout */}
+      <WorldFlyout
+        isOpen={isFlyoutOpen}
+        worlds={worlds}
+        onSelectWorld={handleSelectWorldFromFlyout}
+        onCreateWorld={() => {
+          setIsFlyoutOpen(false);
+          setActiveStudio('worlds');
+        }}
+      />
+
+      {/* Main Campaign Hero Presentation */}
+      <CampaignHeroStage
+        game={activeGame}
+        worldName={activeWorld?.name}
+        systemName={activeSystem?.name}
+        hasGames={games.length > 0}
+        hasWorlds={worlds.length > 0}
+        onPlay={onSelectGame}
+        onOpenCampaignSettings={(id) => setSettingsGameID(id)}
+        onCreateWorld={() => setActiveStudio('worlds')}
+        onBrowseSystems={() => setActiveStudio('systems')}
+      />
+
+      {/* New Campaign Modal */}
+      <NewCampaignModal
+        isOpen={Boolean(creatingWorld)}
+        world={creatingWorld}
+        systems={systems}
+        onClose={() => setCreatingWorld(null)}
+        onCreateGame={handleCreateGame}
+        isSubmitting={isCreatingGame}
+      />
+
+      {/* Campaign Settings Modal */}
+      <CampaignSettingsModal
+        isOpen={Boolean(settingsGameID)}
+        game={settingsGame}
+        onClose={() => setSettingsGameID(null)}
+        onUploadAsset={handleUploadAsset}
+        onGenerateAsset={handleGenerateAsset}
+        onRestartGame={handleRestartGame}
+        onDeleteGame={handleDeleteGame}
+      />
+
+      {/* Global Settings Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-4xl bg-stone-900 border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 px-6 border-b border-white/10 flex items-center justify-between bg-stone-950/60">
+              <h2 className="text-base font-sans font-bold text-white">Global Settings</h2>
               <button
-                onClick={() => setIsWizardOpen(false)}
-                className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
+                onClick={() => setIsSettingsOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 flex items-center justify-center text-stone-400 hover:text-white transition-all cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
-
-            {/* Form with scrollable body and pinned footer */}
-            <form onSubmit={handleCreateGame} className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {(!systems.length || !worlds.length) && (
-                  <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 space-y-3 text-xs text-amber-200">
-                    <div className="flex items-center gap-2 font-cinzel font-bold text-amber-400">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>Setup Required</span>
-                    </div>
-                    <p className="text-stone-300">
-                      LocalRPG starts with no pre-installed defaults. Before creating a campaign, please author or load a reference template in the Studios.
-                    </p>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {systems.length === 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsWizardOpen(false);
-                            setActiveTab('systems');
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold cursor-pointer transition-all shadow"
-                        >
-                          <Shield className="w-3.5 h-3.5" />
-                          <span>Create Rule System</span>
-                        </button>
-                      )}
-                      {worlds.length === 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsWizardOpen(false);
-                            setActiveTab('worlds');
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-cinzel font-bold cursor-pointer transition-all shadow"
-                        >
-                          <Globe className="w-3.5 h-3.5" />
-                          <span>Create World Setting</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300">
-                    Campaign Title
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Whispers of the High Hollow"
-                    value={newGameName}
-                    onChange={(e) => setNewGameName(e.target.value)}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Rule System</span>
-                    </label>
-                    <select
-                      value={newSystemID}
-                      onChange={(e) => setNewSystemID(e.target.value)}
-                      disabled={systems.length === 0}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3.5 pr-9 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      {systems.length === 0 && <option value="" disabled>No rule systems available</option>}
-                      {systems.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                      <Globe className="w-3.5 h-3.5 text-amber-400" />
-                      <span>World Setting</span>
-                    </label>
-                    <select
-                      value={newWorldID}
-                      onChange={(e) => setNewWorldID(e.target.value)}
-                      disabled={worlds.length === 0}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3.5 pr-9 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      {worlds.length === 0 && <option value="" disabled>No worlds available</option>}
-                      {worlds.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {selectedWorld?.description && (
-                  <p className="text-[11px] text-stone-400 italic bg-stone-950/60 p-3 rounded-xl border border-stone-800/60">
-                    "{selectedWorld.description}"
-                  </p>
-                )}
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Protagonist Character Name</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Elena Nightshade"
-                    value={newPlayerName}
-                    onChange={(e) => setNewPlayerName(e.target.value)}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
-                  />
-                </div>
-
-                <div className="space-y-3 rounded-xl border border-stone-800/60 bg-stone-950/40 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-xs font-cinzel uppercase tracking-wider text-stone-300">
-                      <User className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Character</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => generateCharacterFields()}
-                      disabled={isGenerating || creationFields.every((f) => !f.generatable)}
-                      className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-amber-600/20 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 disabled:opacity-50 transition cursor-pointer"
-                    >
-                      <Wand2 className="w-3 h-3" />
-                      <span>{isGenerating ? 'Inventing...' : 'Generate all'}</span>
-                    </button>
-                  </div>
-
-                  {creationFields.map((field) => (
-                    <div key={field.id} className="space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-[11px] font-cinzel uppercase tracking-wider text-stone-400">
-                          {field.label}
-                          {field.required && <span className="text-amber-400"> *</span>}
-                        </label>
-                        {field.generatable && field.kind !== 'voice' && (
-                          <button
-                            type="button"
-                            onClick={() => generateCharacterFields(field.id)}
-                            disabled={isGenerating}
-                            className="text-[10px] text-amber-400/80 hover:text-amber-300 disabled:opacity-50 cursor-pointer"
-                          >
-                            Generate
-                          </button>
-                        )}
-                      </div>
-                      {field.kind === 'voice' ? (
-                        <select
-                          value={playerVoiceID}
-                          onChange={(e) => setPlayerVoiceID(e.target.value)}
-                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
-                        >
-                          <option value="">Auto-assign from the description</option>
-                          {voiceProfiles.map((profile) => (
-                            <option key={profile.id} value={profile.id}>
-                              {profile.name} ({profile.voice_id})
-                            </option>
-                          ))}
-                        </select>
-                      ) : field.kind === 'select' && field.options?.length ? (
-                        <select
-                          value={playerAnswers[field.id] || field.default || ''}
-                          onChange={(e) => setPlayerAnswers((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
-                        >
-                          <option value="">Unset</option>
-                          {field.options.map((option) => (
-                            <option key={option} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      ) : field.kind === 'long' ? (
-                        <textarea
-                          rows={3}
-                          placeholder={field.prompt || ''}
-                          value={playerAnswers[field.id] || ''}
-                          onChange={(e) => setPlayerAnswers((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                          className="w-full resize-none bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          placeholder={field.prompt || ''}
-                          value={playerAnswers[field.id] || ''}
-                          onChange={(e) => setPlayerAnswers((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
-                        />
-                      )}
-                    </div>
-                  ))}
-                  <p className="text-[11px] text-stone-500">
-                    Fields marked * are required. Generate fills a starter value you can edit.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                    <Volume2 className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Narrator Voice</span>
-                  </label>
-                  <select
-                    value={narratorVoiceID}
-                    onChange={(e) => setNarratorVoiceID(e.target.value)}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-amber-500/60 cursor-pointer"
-                  >
-                    <option value="">Default (Provider Setting)</option>
-                    {voiceProfiles.map((profile) => (
-                      <option key={profile.id} value={profile.voice_id}>
-                        {profile.name} ({profile.voice_id})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-stone-500">
-                    The voice used to narrate scenes, GM responses, and descriptions in this campaign.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-cinzel uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Opening Prompt <span className="text-stone-500 normal-case">(optional)</span></span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Where should the story begin? Leave blank and the GM invents the opening scene."
-                    value={newOpeningPrompt}
-                    onChange={(e) => setNewOpeningPrompt(e.target.value)}
-                    className="w-full resize-none bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/60 transition-colors"
-                  />
-                  <p className="text-[11px] text-stone-500">
-                    Used when you press Begin the story on the campaign's prologue screen.
-                  </p>
-                </div>
-              </div>
-
-              {/* Pinned Action Footer */}
-              <div className="flex items-center justify-end gap-3 border-t border-stone-800 px-6 py-4 shrink-0 bg-stone-900/90">
-                <button
-                  type="button"
-                  onClick={() => setIsWizardOpen(false)}
-                  className="px-4 py-2 text-xs font-cinzel text-stone-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={
-                    isSubmitting ||
-                    !newGameName.trim() ||
-                    !newPlayerName.trim() ||
-                    systems.length === 0 ||
-                    worlds.length === 0
-                  }
-                  className="flex items-center gap-2 text-xs font-cinzel font-bold px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-stone-950 shadow-lg transition-all cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{isSubmitting ? 'Weaving World...' : 'Embark on Adventure'}</span>
-                </button>
-              </div>
-            </form>
+            <div className="flex-1 overflow-y-auto p-6">
+              <SettingsStudio onSaved={() => setIsSettingsOpen(false)} isCompact={false} />
+            </div>
           </div>
         </div>
       )}
