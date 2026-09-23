@@ -35,15 +35,17 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
               ? 'bg-purple-600/30 border-2 border-purple-500 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.4)] rotate-45'
               : 'bg-white/[0.04] border border-dashed border-white/25 text-stone-300 hover:text-white hover:border-white/50 hover:bg-white/[0.08]'
           }`}
-          title="New Campaign (Explore Worlds)"
+          title={isFlyoutOpen ? undefined : "New Campaign (Explore Worlds)"}
           aria-label="New Campaign"
         >
           <Plus className="w-5 h-5 transition-transform duration-200" />
         </button>
         {/* Tooltip */}
-        <div className="pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 px-2.5 py-1 bg-stone-900 border border-white/15 rounded-lg text-xs font-sans text-stone-200 whitespace-nowrap shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-50">
-          New Campaign
-        </div>
+        {!isFlyoutOpen && (
+          <div className="pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 px-2.5 py-1 bg-stone-900 border border-white/15 rounded-lg text-xs font-sans text-stone-200 whitespace-nowrap shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-50">
+            New Campaign
+          </div>
+        )}
       </div>
 
       <div className="w-8 h-[1px] bg-white/10 mb-3" />

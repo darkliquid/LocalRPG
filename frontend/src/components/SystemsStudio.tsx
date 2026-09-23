@@ -129,10 +129,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
   };
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
+    <div className="w-full h-full flex flex-col md:flex-row overflow-hidden select-none">
       {/* Left Master Column: Systems List */}
-      <aside className="w-full md:w-80 bg-glass-card rounded-2xl border border-stone-800/80 p-4 flex flex-col gap-4 shadow-xl backdrop-blur-md">
-        <div className="flex items-center justify-between pb-2 border-b border-stone-800/60">
+      <aside className="w-full md:w-80 h-full bg-stone-950/70 border-r border-white/10 p-4 flex flex-col gap-4 shrink-0 overflow-hidden">
+        <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-purple-400" />
             <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">
@@ -148,7 +148,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
           {isLoading && systems.length === 0 ? (
             <div className="text-center py-8 text-xs font-mono text-stone-500 animate-pulse">
               Loading systems...
@@ -184,9 +184,9 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
       </aside>
 
       {/* Right Detail Column: Editor */}
-      <section className="flex-1 bg-glass-card rounded-2xl border border-stone-800/80 p-6 flex flex-col gap-5 shadow-xl backdrop-blur-md overflow-hidden">
+      <section className="flex-1 h-full min-w-0 bg-stone-900/30 p-6 flex flex-col gap-4 overflow-hidden min-h-0">
         {/* Top Header & Sub-Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800/80 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3 shrink-0">
           <div className="flex items-center gap-3">
             <h2 className="font-sans text-lg font-bold text-purple-400">
               {selectedID ? name || 'Edit System' : 'Create New System'}
@@ -262,7 +262,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
         {/* Toast Feedback */}
         {toast && (
           <div
-            className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+            className={`p-3 rounded-xl text-xs flex items-center gap-2 shrink-0 ${
               toast.type === 'success'
                 ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-200'
                 : 'bg-red-950/60 border border-red-500/40 text-red-200'
@@ -279,7 +279,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
 
         {/* Tab 1: Manifest Form */}
         {activeTab === 'manifest' && (
-          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+          <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
@@ -479,8 +479,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
 
         {/* Tab 2: Agent Rules Prompt Editor */}
         {activeTab === 'rules' && (
-          <div className="flex-1 flex flex-col gap-2 overflow-hidden">
-            <div className="flex items-center justify-between text-[11px] font-mono text-stone-400 px-1">
+          <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
+            <div className="flex items-center justify-between text-[11px] font-mono text-stone-400 px-1 shrink-0">
               <span>AI Storyteller Instructions (prompts/rules.md)</span>
               <span>Injected into LLM context to guide resolution ladder & mechanics hooks</span>
             </div>
@@ -488,15 +488,15 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
               value={rulesPrompt}
               onChange={(e) => setRulesPrompt(e.target.value)}
               spellCheck={false}
-              className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
+              className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
             />
           </div>
         )}
 
         {/* Tab 3: Script Editor */}
         {activeTab === 'script' && (
-          <div className="flex-1 flex flex-col gap-2 overflow-hidden">
-            <div className="flex items-center justify-between text-[11px] font-mono text-stone-400 px-1">
+          <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
+            <div className="flex items-center justify-between text-[11px] font-mono text-stone-400 px-1 shrink-0">
               <span>JavaScript Runtime (Goja Sandbox)</span>
               <span>Exports: evaluateRoll(stats, diceExpr)</span>
             </div>
@@ -504,7 +504,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
               value={script}
               onChange={(e) => setScript(e.target.value)}
               spellCheck={false}
-              className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-purple-200/90 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
+              className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-purple-200/90 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
             />
           </div>
         )}

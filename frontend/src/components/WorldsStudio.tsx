@@ -330,10 +330,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   };
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
+    <div className="w-full h-full flex flex-col md:flex-row overflow-hidden select-none">
       {/* Left Master Column: Worlds List */}
-      <aside className="w-full md:w-80 bg-glass-card rounded-2xl border border-stone-800/80 p-4 flex flex-col gap-4 shadow-xl backdrop-blur-md">
-        <div className="flex items-center justify-between pb-2 border-b border-stone-800/60">
+      <aside className="w-full md:w-80 h-full bg-stone-950/70 border-r border-white/10 p-4 flex flex-col gap-4 shrink-0 overflow-hidden">
+        <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-purple-400" />
             <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">
@@ -349,7 +349,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
           {isLoading && worlds.length === 0 ? (
             <div className="text-center py-8 text-xs font-mono text-stone-500 animate-pulse">
               Loading worlds...
@@ -387,9 +387,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       </aside>
 
       {/* Right Detail Column: Editor */}
-      <section className="flex-1 bg-glass-card rounded-2xl border border-stone-800/80 p-6 flex flex-col gap-5 shadow-xl backdrop-blur-md overflow-hidden">
+      <section className="flex-1 h-full min-w-0 bg-stone-900/30 p-6 flex flex-col gap-4 overflow-hidden min-h-0">
         {/* Top Header & Sub-Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800/80 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3 shrink-0">
           <div className="flex items-center gap-3">
             <h2 className="font-sans text-lg font-bold text-purple-400">
               {selectedID ? name || 'Edit World' : 'Create New World'}
@@ -482,7 +482,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
 
         {/* Tab 1: Lore & Atmosphere Form */}
         {activeTab === 'lore' && (
-          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+          <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
@@ -598,8 +598,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
 
         {/* Tab 2: Agent Lore Prompt Editor */}
         {activeTab === 'prompt' && (
-          <div className="flex-1 flex flex-col gap-2 overflow-hidden">
-            <div className="flex items-center justify-between text-[11px] font-mono text-stone-400 px-1">
+          <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
+            <div className="flex items-center justify-between text-[11px] font-mono text-stone-400 px-1 shrink-0">
               <span>AI Storyteller Atmosphere Instructions (prompts/lore.md)</span>
               <span>Injected into LLM context to guide sensory tone & faction conflicts</span>
             </div>
@@ -607,17 +607,17 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
               value={lorePrompt}
               onChange={(e) => setLorePrompt(e.target.value)}
               spellCheck={false}
-              className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
+              className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
             />
           </div>
         )}
 
         {/* Tab 3: Starter Entities Manager */}
         {activeTab === 'entities' && (
-          <div className="flex-1 flex gap-4 overflow-hidden">
+          <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
             {/* Entity List */}
-            <div className="w-56 shrink-0 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2">
-              <div className="flex items-center justify-between pb-2 border-b border-stone-800/60">
+            <div className="w-56 shrink-0 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2 min-h-0">
+              <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
                 <span className="text-[11px] font-sans uppercase tracking-wider text-stone-400">
                   Templates
                 </span>
@@ -630,7 +630,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+              <div className="flex-1 overflow-y-auto min-h-0 space-y-1.5 pr-1">
                 {entities.length === 0 ? (
                   <div className="text-[11px] text-stone-500 py-6 text-center">
                     No starter templates. Click + Add to create one!
@@ -668,10 +668,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             </div>
 
             {/* Entity Markdown Editor */}
-            <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-hidden">
+            <div className="flex-1 min-w-0 flex flex-col gap-2 min-h-0 overflow-hidden">
               {selectedEntityID ? (
                 <>
-                  <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1">
+                  <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
                     <span>worlds/{selectedID || slugID || 'draft'}/entities/{selectedEntityID}.md</span>
                     <button
                       type="button"
@@ -686,7 +686,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                     value={entityMarkdown}
                     onChange={(e) => setEntityMarkdown(e.target.value)}
                     spellCheck={false}
-                    className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
+                    className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
                   />
                 </>
               ) : (
