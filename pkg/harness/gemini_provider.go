@@ -2,6 +2,7 @@ package harness
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -102,4 +103,187 @@ func (g *GeminiProvider) SetLogger(logger trace.Logger) {
 
 func (g *GeminiProvider) SetChunkLimit(limit int) {
 	g.chunkLimitOverride = limit
+}
+
+func (g *GeminiProvider) buildGenerateConfig(req GenerateRequest) *genai.GenerateContentConfig {
+	cfg := &genai.GenerateContentConfig{}
+
+	// System instruction
+	if sys := strings.TrimSpace(req.System); sys != "" {
+		cfg.SystemInstruction = &genai.Content{
+			Parts: []*genai.Part{{Text: sys}},
+		}
+	}
+
+	// Temperature
+	if req.Temperature > 0 {
+		temp := float32(req.Temperature)
+		cfg.Temperature = &temp
+	} else if g.temperature != nil {
+		temp := float32(*g.temperature)
+		cfg.Temperature = &temp
+	}
+
+	// Max tokens
+	if req.MaxTokens > 0 {
+		cfg.MaxOutputTokens = int32(req.MaxTokens)
+	} else if g.maxTokens != nil {
+		cfg.MaxOutputTokens = int32(*g.maxTokens)
+	}
+
+	// TopP and TopK
+	if g.topP != nil {
+		topP := float32(*g.topP)
+		cfg.TopP = &topP
+	}
+	if g.topK != nil {
+		topK := float32(*g.topK)
+		cfg.TopK = &topK
+	}
+
+	// ThinkingConfig
+	if g.thinkingBudget != nil {
+		cfg.ThinkingConfig = &genai.ThinkingConfig{}
+		budget := *g.thinkingBudget
+		if budget == 0 {
+			cfg.ThinkingConfig.ThinkingBudget = genai.Ptr(int32(0))
+			cfg.ThinkingConfig.IncludeThoughts = false
+		} else if budget > 0 {
+			cfg.ThinkingConfig.ThinkingBudget = genai.Ptr(int32(budget))
+			cfg.ThinkingConfig.IncludeThoughts = true
+		} else {
+			// -1 indicates dynamic thinking
+			cfg.ThinkingConfig.IncludeThoughts = true
+		}
+	}
+
+	// Tools
+	if len(req.Tools) > 0 {
+		var declarations []*genai.FunctionDeclaration
+		for _, tool := range req.Tools {
+			decl := &genai.FunctionDeclaration{
+				Name:                 tool.Name,
+				Description:          tool.Description,
+				ParametersJsonSchema: tool.Parameters,
+			}
+			declarations = append(declarations, decl)
+		}
+		cfg.Tools = []*genai.Tool{
+			{FunctionDeclarations: declarations},
+		}
+	}
+
+	return cfg
+}
+
+func (g *GeminiProvider) buildContents(req GenerateRequest) []*genai.Content {
+	if len(req.Messages) == 0 {
+		promptText := req.PromptText()
+		if promptText == "" {
+			return nil
+		}
+		return []*genai.Content{
+			{
+				Role:  "user",
+				Parts: []*genai.Part{{Text: promptText}},
+			},
+		}
+	}
+
+	var contents []*genai.Content
+	for _, msg := range req.Messages {
+		switch msg.Role {
+		case "system":
+			// Handled in SystemInstruction
+			continue
+		case "user":
+			contents = append(contents, &genai.Content{
+				Role:  "user",
+				Parts: []*genai.Part{{Text: msg.Content}},
+			})
+		case "assistant":
+			var parts []*genai.Part
+			if strings.TrimSpace(msg.Content) != "" {
+				parts = append(parts, &genai.Part{Text: msg.Content})
+			}
+			for _, tc := range msg.ToolCalls {
+				var args map[string]interface{}
+				_ = json.Unmarshal([]byte(tc.Arguments), &args)
+				parts = append(parts, &genai.Part{
+					FunctionCall: &genai.FunctionCall{
+						ID:   tc.ID,
+						Name: tc.Name,
+						Args: args,
+					},
+				})
+			}
+			if len(parts) > 0 {
+				contents = append(contents, &genai.Content{
+					Role:  "model",
+					Parts: parts,
+				})
+			}
+		case "tool":
+			var respMap map[string]interface{}
+			if err := json.Unmarshal([]byte(msg.Content), &respMap); err != nil {
+				respMap = map[string]interface{}{"result": msg.Content}
+			}
+			contents = append(contents, &genai.Content{
+				Role: "user",
+				Parts: []*genai.Part{
+					{
+						FunctionResponse: &genai.FunctionResponse{
+							Name:     msg.ToolCallID,
+							Response: respMap,
+						},
+					},
+				},
+			})
+		}
+	}
+	return contents
+}
+
+func (g *GeminiProvider) Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
+	cfg := g.buildGenerateConfig(req)
+	contents := g.buildContents(req)
+
+	resp, err := g.client.Models.GenerateContent(ctx, g.model, contents, cfg)
+	if err != nil {
+		return nil, mapGeminiError(err)
+	}
+
+	var sb strings.Builder
+	for _, cand := range resp.Candidates {
+		if cand.Content == nil {
+			continue
+		}
+		for _, part := range cand.Content.Parts {
+			if part.Thought {
+				continue
+			}
+			if part.Text != "" {
+				sb.WriteString(part.Text)
+			}
+		}
+	}
+
+	return &GenerateResponse{Text: sb.String()}, nil
+}
+
+func mapGeminiError(err error) error {
+	if err == nil {
+		return nil
+	}
+	errStr := err.Error()
+	if strings.Contains(errStr, "401") || strings.Contains(errStr, "403") || strings.Contains(errStr, "PERMISSION_DENIED") {
+		return errors.New("gemini: invalid API key or permission denied; check providers.gemini.api_key or GEMINI_API_KEY")
+	}
+	if strings.Contains(errStr, "429") || strings.Contains(errStr, "RESOURCE_EXHAUSTED") {
+		return errors.New("gemini: quota exceeded or rate limit reached; check your Google AI Studio plan and credits")
+	}
+	if strings.Contains(errStr, "404") || strings.Contains(errStr, "NOT_FOUND") {
+		return fmt.Errorf("gemini: model not found: %w", err)
+	}
+	return fmt.Errorf("gemini: request failed: %w", err)
 }
