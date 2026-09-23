@@ -45,7 +45,48 @@ var AgentPresets = map[string]AgentRoleConfig{
 		Type:        "builtin",
 		BuiltinName: "narrative-oracle",
 	},
+	"gemini-2.5-flash": {
+		Type:           "builtin",
+		BuiltinName:    "gemini",
+		Model:          "gemini-2.5-flash",
+		Temperature:    0.7,
+		MaxTokens:      2048,
+		ThinkingBudget: intPtr(0),
+		TopP:           floatPtr(0.95),
+		TopK:           intPtr(40),
+	},
+	"gemini-2.5-pro": {
+		Type:           "builtin",
+		BuiltinName:    "gemini",
+		Model:          "gemini-2.5-pro",
+		Temperature:    0.7,
+		MaxTokens:      4096,
+		ThinkingBudget: intPtr(-1),
+		TopP:           floatPtr(0.95),
+		TopK:           intPtr(40),
+	},
+	"gemini-2.0-flash": {
+		Type:        "builtin",
+		BuiltinName: "gemini",
+		Model:       "gemini-2.0-flash",
+		Temperature: 0.7,
+		MaxTokens:   2048,
+		TopP:        floatPtr(0.95),
+		TopK:        intPtr(40),
+	},
+	"gemini-2.0-flash-lite": {
+		Type:        "builtin",
+		BuiltinName: "gemini",
+		Model:       "gemini-2.0-flash-lite",
+		Temperature: 0.7,
+		MaxTokens:   2048,
+		TopP:        floatPtr(0.95),
+		TopK:        intPtr(40),
+	},
 }
+
+func intPtr(i int) *int { return &i }
+func floatPtr(f float64) *float64 { return &f }
 
 var TTSPresets = map[string]TTSConfig{
 	"kokoro-fastapi": {

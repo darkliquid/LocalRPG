@@ -75,3 +75,24 @@ func TestKokoroVoiceProfilesPreset(t *testing.T) {
 	}
 }
 
+func TestGetGeminiAgentPresets(t *testing.T) {
+	preset, ok := config.GetAgentPreset("gemini-2.5-flash")
+	if !ok {
+		t.Fatal("expected gemini-2.5-flash preset to exist")
+	}
+	if preset.BuiltinName != "gemini" || preset.Model != "gemini-2.5-flash" {
+		t.Errorf("unexpected preset: %+v", preset)
+	}
+	if preset.ThinkingBudget == nil || *preset.ThinkingBudget != 0 {
+		t.Errorf("expected thinking_budget 0 for flash, got %v", preset.ThinkingBudget)
+	}
+
+	proPreset, ok := config.GetAgentPreset("gemini-2.5-pro")
+	if !ok {
+		t.Fatal("expected gemini-2.5-pro preset to exist")
+	}
+	if proPreset.ThinkingBudget == nil || *proPreset.ThinkingBudget != -1 {
+		t.Errorf("expected thinking_budget -1 for pro, got %v", proPreset.ThinkingBudget)
+	}
+}
+

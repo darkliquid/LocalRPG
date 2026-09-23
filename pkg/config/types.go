@@ -34,6 +34,10 @@ type AgentRoleConfig struct {
 	// SupportsTools is "auto", "yes", or "no". Empty means auto: an HTTP provider
 	// gets tools and every other type does not.
 	SupportsTools string `yaml:"supports_tools,omitempty" json:"supports_tools,omitempty"`
+
+	ThinkingBudget *int     `yaml:"thinking_budget,omitempty" json:"thinking_budget,omitempty"`
+	TopP           *float64 `yaml:"top_p,omitempty" json:"top_p,omitempty"`
+	TopK           *int     `yaml:"top_k,omitempty" json:"top_k,omitempty"`
 }
 
 type AgentsConfig struct {
@@ -198,9 +202,19 @@ type PreferencesConfig struct {
 	TraceLevel string `yaml:"trace_level" json:"trace_level"`
 }
 
+// ProvidersConfig groups shared credentials and defaults for external ecosystem providers.
+type ProvidersConfig struct {
+	Gemini GeminiProviderConfig `yaml:"gemini,omitempty" json:"gemini,omitempty"`
+}
+
+type GeminiProviderConfig struct {
+	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
+}
+
 type Config struct {
 	Version     string            `yaml:"version" json:"version"`
 	Paths       PathsConfig       `yaml:"paths" json:"paths"`
+	Providers   ProvidersConfig   `yaml:"providers,omitempty" json:"providers,omitempty"`
 	Agents      AgentsConfig      `yaml:"agents" json:"agents"`
 	Media       MediaConfig       `yaml:"media" json:"media"`
 	Preferences PreferencesConfig `yaml:"preferences" json:"preferences"`

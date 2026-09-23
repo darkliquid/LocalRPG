@@ -320,3 +320,39 @@ func TestToolCapabilityAndBounds(t *testing.T) {
 		t.Errorf("ToolResultChars = %d, want 500", got)
 	}
 }
+
+func TestConfigParsesGeminiProviderAndRoleTunables(t *testing.T) {
+	yamlStr := `
+providers:
+  gemini:
+    api_key: "test-shared-gemini-key"
+agents:
+  default_role: "gm"
+  roles:
+    gm:
+      type: "builtin"
+      builtin_name: "gemini"
+      model: "gemini-2.5-flash"
+      thinking_budget: 0
+      top_p: 0.95
+      top_k: 40
+`
+	var cfg Config
+	if err := yaml.Unmarshal([]byte(yamlStr), &cfg); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+
+	if cfg.Providers.Gemini.APIKey != "test-shared-gemini-key" {
+		t.Errorf("expected shared api_key 'test-shared-gemini-key', got %q", cfg.Providers.Gemini.APIKey)
+	}
+	role := cfg.Agents.Roles["gm"]
+	if role.ThinkingBudget == nil || *role.ThinkingBudget != 0 {
+		t.Errorf("expected thinking_budget 0, got %v", role.ThinkingBudget)
+	}
+	if role.TopP == nil || *role.TopP != 0.95 {
+		t.Errorf("expected top_p 0.95, got %v", role.TopP)
+	}
+	if role.TopK == nil || *role.TopK != 40 {
+		t.Errorf("expected top_k 40, got %v", role.TopK)
+	}
+}
