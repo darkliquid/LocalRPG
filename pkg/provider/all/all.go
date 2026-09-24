@@ -7,4 +7,10 @@ import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/geminillm"
 	_ "github.com/darkliquid/localrpg/pkg/provider/openaichat"
 	_ "github.com/darkliquid/localrpg/pkg/provider/oracle"
+	_ "github.com/darkliquid/localrpg/pkg/provider/ttselevenlabs"
+	_ "github.com/darkliquid/localrpg/pkg/provider/ttsgemini"
+	_ "github.com/darkliquid/localrpg/pkg/provider/ttshttp"
+	_ "github.com/darkliquid/localrpg/pkg/provider/ttsnativeos"
+	_ "github.com/darkliquid/localrpg/pkg/provider/ttspiper"
+	_ "github.com/darkliquid/localrpg/pkg/provider/ttssherpa"
 )
