@@ -5,6 +5,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/provider/ttshttp"
 	"github.com/darkliquid/localrpg/pkg/provider/ttssherpa"
 )
 
@@ -37,7 +38,7 @@ func TestSpeechCueAdvertiserImplementations(t *testing.T) {
 		t.Errorf("expected Sherpa to support neither AudioTags nor Markdown, got %+v", capsSherpa)
 	}
 
-	httpTTS := media.NewHTTPTTSProvider(config.TTSConfig{Type: "http", Endpoint: "http://localhost:8880"})
+	httpTTS := ttshttp.NewHTTPTTSClient(config.TTSConfig{Type: "http", Endpoint: "http://localhost:8880"})
 	advHTTP, ok := interface{}(httpTTS).(media.SpeechCueAdvertiser)
 	if !ok {
 		t.Fatal("expected the HTTP TTS client to implement SpeechCueAdvertiser")

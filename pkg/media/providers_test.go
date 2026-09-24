@@ -296,38 +296,6 @@ func TestComfyUIImageClient_GeneratesImage(t *testing.T) {
 	}
 }
 
-func TestHTTPTTSClient_AdaptsAllTalkPayload(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req map[string]interface{}
-		_ = json.NewDecoder(r.Body).Decode(&req)
-		if req["text_input"] != "Greetings, traveler." {
-			t.Errorf("expected text_input, got %v", req["text_input"])
-		}
-		if req["character_voice_gen"] != "elder_sage" {
-			t.Errorf("expected character_voice_gen elder_sage, got %v", req["character_voice_gen"])
-		}
-		w.Header().Set("Content-Type", "audio/wav")
-		_, _ = w.Write([]byte("RIFF1234WAVEfmt audio-clip"))
-	}))
-	defer ts.Close()
-
-	client, err := media.NewTTSClient(config.TTSConfig{
-		Type:     "http",
-		Endpoint: ts.URL + "/api/tts-generate",
-	})
-	if err != nil {
-		t.Fatalf("NewTTSClient failed: %v", err)
-	}
-
-	data, err := client.Synthesize(context.Background(), "Greetings, traveler.", &entity.VoiceConfig{VoiceID: "elder_sage"})
-	if err != nil {
-		t.Fatalf("Synthesize failed: %v", err)
-	}
-	if !strings.HasPrefix(string(data), "RIFF") {
-		t.Errorf("unexpected audio data: %s", string(data))
-	}
-}
-
 func TestNewTTSClientBuildsElevenLabs(t *testing.T) {
 	t.Setenv("ELEVENLABS_API_KEY", "")
 	_, err := media.NewTTSClient(config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs"})
@@ -398,61 +366,119 @@ func TestNewTTSClientBuildsGemini(t *testing.T) {
 	}
 }
 
-func TestResolveHTTPEndpoints(t *testing.T) {
-	tests := []struct {
-		name       string
-		input      string
-		wantSpeech string
-		wantVoices string
-	}{
-		{
-			name:       "bare base url",
-			input:      "http://localhost:8880",
-			wantSpeech: "http://localhost:8880/v1/audio/speech",
-			wantVoices: "http://localhost:8880/v1/audio/voices",
-		},
-		{
-			name:       "base url with trailing slash",
-			input:      "http://localhost:8880/",
-			wantSpeech: "http://localhost:8880/v1/audio/speech",
-			wantVoices: "http://localhost:8880/v1/audio/voices",
-		},
-		{
-			name:       "full speech endpoint",
-			input:      "http://localhost:8880/v1/audio/speech",
-			wantSpeech: "http://localhost:8880/v1/audio/speech",
-			wantVoices: "http://localhost:8880/v1/audio/voices",
-		},
-		{
-			name:       "v1 endpoint",
-			input:      "http://localhost:8880/v1",
-			wantSpeech: "http://localhost:8880/v1/audio/speech",
-			wantVoices: "http://localhost:8880/v1/audio/voices",
-		},
-		{
-			name:       "alltalk endpoint preserved",
-			input:      "http://localhost:7851/api/tts-generate",
-			wantSpeech: "http://localhost:7851/api/tts-generate",
-			wantVoices: "",
-		},
-		{
-			name:       "empty endpoint",
-			input:      "",
-			wantSpeech: "",
-			wantVoices: "",
-		},
+func TestLiveKokoroFastAPI(t *testing.T) {
+	resp, err := http.Get("http://localhost:8880/health")
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Skip("skipping live Kokoro-FastAPI test: server not reachable on http://localhost:8880")
+	}
+	resp.Body.Close()
+
+	// Test 1: Base URL
+	client, err := media.NewTTSClient(config.TTSConfig{
+		Type:     "http",
+		Endpoint: "http://localhost:8880",
+		Model:    "kokoro",
+	})
+	if err != nil {
+		t.Fatalf("NewTTSClient failed: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotSpeech, gotVoices := media.ResolveHTTPEndpoints(tt.input)
-			if gotSpeech != tt.wantSpeech {
-				t.Errorf("speechURL = %q, want %q", gotSpeech, tt.wantSpeech)
+	catalog, ok := client.(media.VoiceCatalog)
+	if !ok {
+		t.Fatalf("client does not implement media.VoiceCatalog")
+	}
+
+	voices, err := catalog.ListVoices(context.Background())
+	if err != nil {
+		t.Fatalf("ListVoices failed: %v", err)
+	}
+	if len(voices) < 10 {
+		t.Fatalf("expected at least 10 voices from live Kokoro-FastAPI, got %d", len(voices))
+	}
+
+	// Verify af_heart is present and parsed with metadata
+	var foundHeart bool
+	for _, v := range voices {
+		if v.ID == "af_heart" {
+			foundHeart = true
+			if v.Gender != "female" {
+				t.Errorf("af_heart gender = %q, want female", v.Gender)
 			}
-			if gotVoices != tt.wantVoices {
-				t.Errorf("voicesURL = %q, want %q", gotVoices, tt.wantVoices)
+			if v.Language != "en-US" {
+				t.Errorf("af_heart language = %q, want en-US", v.Language)
 			}
-		})
+			if v.Accent != "American" {
+				t.Errorf("af_heart accent = %q, want American", v.Accent)
+			}
+			break
+		}
+	}
+	if !foundHeart {
+		t.Errorf("af_heart voice not found in live voices list")
+	}
+
+	// Test 2: Synthesis with base URL
+	audio, err := client.Synthesize(context.Background(), "Live Kokoro test.", &entity.VoiceConfig{
+		VoiceID: "af_heart",
+	})
+	if err != nil {
+		t.Fatalf("Synthesize failed: %v", err)
+	}
+	if len(audio) < 100 {
+		t.Fatalf("expected audio bytes, got %d bytes", len(audio))
+	}
+
+	// Test 3: Legacy URL with /v1/audio/speech
+	clientLegacy, err := media.NewTTSClient(config.TTSConfig{
+		Type:     "http",
+		Endpoint: "http://localhost:8880/v1/audio/speech",
+		Model:    "kokoro",
+	})
+	if err != nil {
+		t.Fatalf("NewTTSClient (legacy) failed: %v", err)
+	}
+	catalogLegacy, ok := clientLegacy.(media.VoiceCatalog)
+	if !ok {
+		t.Fatalf("legacy client does not implement media.VoiceCatalog")
+	}
+	legacyVoices, err := catalogLegacy.ListVoices(context.Background())
+	if err != nil {
+		t.Fatalf("ListVoices (legacy) failed: %v", err)
+	}
+	if len(legacyVoices) != len(voices) {
+		t.Errorf("legacy voice count = %d, want %d", len(legacyVoices), len(voices))
+	}
+}
+
+func TestHTTPTTSClient_AdaptsAllTalkPayload(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req["text_input"] != "Greetings, traveler." {
+			t.Errorf("expected text_input, got %v", req["text_input"])
+		}
+		if req["character_voice_gen"] != "elder_sage" {
+			t.Errorf("expected character_voice_gen elder_sage, got %v", req["character_voice_gen"])
+		}
+		w.Header().Set("Content-Type", "audio/wav")
+		_, _ = w.Write([]byte("RIFF1234WAVEfmt audio-clip"))
+	}))
+	defer ts.Close()
+
+	client, err := media.NewTTSClient(config.TTSConfig{
+		Type:     "http",
+		Endpoint: ts.URL + "/api/tts-generate",
+	})
+	if err != nil {
+		t.Fatalf("NewTTSClient failed: %v", err)
+	}
+
+	data, err := client.Synthesize(context.Background(), "Greetings, traveler.", &entity.VoiceConfig{VoiceID: "elder_sage"})
+	if err != nil {
+		t.Fatalf("Synthesize failed: %v", err)
+	}
+	if !strings.HasPrefix(string(data), "RIFF") {
+		t.Errorf("unexpected audio data: %s", string(data))
 	}
 }
 
@@ -670,88 +696,4 @@ func TestHTTPTTSClientListVoices(t *testing.T) {
 			t.Errorf("expected 0 voices, got %d", len(voices))
 		}
 	})
-}
-
-func TestLiveKokoroFastAPI(t *testing.T) {
-	resp, err := http.Get("http://localhost:8880/health")
-	if err != nil || resp.StatusCode != http.StatusOK {
-		t.Skip("skipping live Kokoro-FastAPI test: server not reachable on http://localhost:8880")
-	}
-	resp.Body.Close()
-
-	// Test 1: Base URL
-	client, err := media.NewTTSClient(config.TTSConfig{
-		Type:     "http",
-		Endpoint: "http://localhost:8880",
-		Model:    "kokoro",
-	})
-	if err != nil {
-		t.Fatalf("NewTTSClient failed: %v", err)
-	}
-
-	catalog, ok := client.(media.VoiceCatalog)
-	if !ok {
-		t.Fatalf("client does not implement media.VoiceCatalog")
-	}
-
-	voices, err := catalog.ListVoices(context.Background())
-	if err != nil {
-		t.Fatalf("ListVoices failed: %v", err)
-	}
-	if len(voices) < 10 {
-		t.Fatalf("expected at least 10 voices from live Kokoro-FastAPI, got %d", len(voices))
-	}
-
-	// Verify af_heart is present and parsed with metadata
-	var foundHeart bool
-	for _, v := range voices {
-		if v.ID == "af_heart" {
-			foundHeart = true
-			if v.Gender != "female" {
-				t.Errorf("af_heart gender = %q, want female", v.Gender)
-			}
-			if v.Language != "en-US" {
-				t.Errorf("af_heart language = %q, want en-US", v.Language)
-			}
-			if v.Accent != "American" {
-				t.Errorf("af_heart accent = %q, want American", v.Accent)
-			}
-			break
-		}
-	}
-	if !foundHeart {
-		t.Errorf("af_heart voice not found in live voices list")
-	}
-
-	// Test 2: Synthesis with base URL
-	audio, err := client.Synthesize(context.Background(), "Live Kokoro test.", &entity.VoiceConfig{
-		VoiceID: "af_heart",
-	})
-	if err != nil {
-		t.Fatalf("Synthesize failed: %v", err)
-	}
-	if len(audio) < 100 {
-		t.Fatalf("expected audio bytes, got %d bytes", len(audio))
-	}
-
-	// Test 3: Legacy URL with /v1/audio/speech
-	clientLegacy, err := media.NewTTSClient(config.TTSConfig{
-		Type:     "http",
-		Endpoint: "http://localhost:8880/v1/audio/speech",
-		Model:    "kokoro",
-	})
-	if err != nil {
-		t.Fatalf("NewTTSClient (legacy) failed: %v", err)
-	}
-	catalogLegacy, ok := clientLegacy.(media.VoiceCatalog)
-	if !ok {
-		t.Fatalf("legacy client does not implement media.VoiceCatalog")
-	}
-	legacyVoices, err := catalogLegacy.ListVoices(context.Background())
-	if err != nil {
-		t.Fatalf("ListVoices (legacy) failed: %v", err)
-	}
-	if len(legacyVoices) != len(voices) {
-		t.Errorf("legacy voice count = %d, want %d", len(legacyVoices), len(voices))
-	}
 }
