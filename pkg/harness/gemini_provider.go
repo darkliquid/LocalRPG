@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
 	"google.golang.org/genai"
 
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -68,8 +70,9 @@ func NewGeminiProvider(id string, opts GeminiProviderOptions) (*GeminiProvider, 
 		ctx := context.Background()
 		var err error
 		client, err = genai.NewClient(ctx, &genai.ClientConfig{
-			APIKey:  apiKey,
-			Backend: genai.BackendGeminiAPI,
+			APIKey:     apiKey,
+			Backend:    genai.BackendGeminiAPI,
+			HTTPClient: &http.Client{Transport: telemetry.HTTPTransport(nil)},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("gemini: create client: %w", err)

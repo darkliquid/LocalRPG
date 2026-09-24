@@ -15,6 +15,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -67,7 +68,7 @@ func NewElevenLabsTTSClient(cfg config.TTSConfig) (*ElevenLabsTTSClient, error) 
 		model:     model,
 		baseURL:   elevenLabsDefaultBaseURL,
 		outputFmt: elevenLabsDefaultFormat,
-		client:    &http.Client{Timeout: elevenLabsRequestTimeout},
+		client:    &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: elevenLabsRequestTimeout},
 	}, nil
 }
 

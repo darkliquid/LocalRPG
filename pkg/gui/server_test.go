@@ -18,10 +18,46 @@ import (
 	"testing"
 	"time"
 
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/models"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
+
+func TestInboundRequestSpanUsesRoutePattern(t *testing.T) {
+	recorder, _, err := telemetry.NewInMemory()
+	if err != nil {
+		t.Fatalf("NewInMemory: %v", err)
+	}
+	defer telemetry.ResetGlobalForTest()
+
+	svc := NewService(t.TempDir())
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest("GET", "/api/game/secret-campaign-id/chronicle", nil)
+	w := httptest.NewRecorder()
+	server.ServeHTTP(w, req)
+
+	found := false
+	for _, span := range recorder.Spans() {
+		if span.Name() == "/api/game/{id}/chronicle" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected a route-pattern span, got %v", spanNames(recorder.Spans()))
+	}
+}
+
+func spanNames(spans []sdktrace.ReadOnlySpan) []string {
+	names := make([]string, 0, len(spans))
+	for _, span := range spans {
+		names = append(names, span.Name())
+	}
+	return names
+}
 
 func TestGUIServerRoutes(t *testing.T) {
 	gameID, svc := setupTestGame(t)

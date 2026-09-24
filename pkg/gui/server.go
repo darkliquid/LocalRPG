@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/media"
@@ -23,6 +25,7 @@ type Server struct {
 	service     *Service
 	assetServer http.Handler
 	mux         *http.ServeMux
+	handler     http.Handler
 }
 
 func NewServer(service *Service, assetHandler http.Handler) *Server {
@@ -32,7 +35,45 @@ func NewServer(service *Service, assetHandler http.Handler) *Server {
 		mux:         http.NewServeMux(),
 	}
 	s.registerRoutes()
+	s.handler = otelhttp.NewHandler(s.mux, "localrpg.http",
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+			return routePattern(r.URL.Path)
+		}),
+	)
 	return s
+}
+
+// routePattern maps a request path to a stable template so span names stay
+// bounded: a campaign id in the path must not create one span name per id.
+func routePattern(path string) string {
+	switch {
+	case path == "/api/games" || path == "/api/systems" || path == "/api/worlds" ||
+		path == "/api/settings" || path == "/api/settings/test-provider" ||
+		path == "/api/providers/models" || path == "/api/tts/inspect" ||
+		path == "/api/tts/voices/search" || path == "/api/stt" ||
+		path == "/api/trace" || path == "/api/character/generate":
+		return path
+	case path == "/api/models" || strings.HasPrefix(path, "/api/models/"):
+		return "/api/models"
+	case strings.HasPrefix(path, "/api/game/"):
+		rest := strings.TrimPrefix(path, "/api/game/")
+		if _, suffix, ok := strings.Cut(rest, "/"); ok {
+			return "/api/game/{id}/" + suffix
+		}
+		return "/api/game/{id}"
+	case strings.HasPrefix(path, "/api/system/"):
+		return "/api/system/{id}"
+	case strings.HasPrefix(path, "/api/world/"):
+		rest := strings.TrimPrefix(path, "/api/world/")
+		if _, suffix, ok := strings.Cut(rest, "/"); ok {
+			return "/api/world/{id}/" + suffix
+		}
+		return "/api/world/{id}"
+	case strings.HasPrefix(path, "/api/audio/"):
+		return "/api/audio"
+	default:
+		return "http.request"
+	}
 }
 
 func (s *Server) registerRoutes() {
@@ -59,7 +100,7 @@ func (s *Server) registerRoutes() {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
+	s.handler.ServeHTTP(w, r)
 }
 
 // writeGameError maps a campaign-lifecycle failure to a status. A turn in flight

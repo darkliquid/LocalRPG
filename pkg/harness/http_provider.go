@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -61,7 +62,7 @@ func NewHTTPProviderWithOptions(id, endpoint, model, apiKey string, opts Generat
 		model:    model,
 		apiKey:   apiKey,
 		opts:     opts,
-		client:   &http.Client{},
+		client:   &http.Client{Transport: telemetry.HTTPTransport(nil)},
 	}
 }
 

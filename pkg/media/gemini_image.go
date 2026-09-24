@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
 	"google.golang.org/genai"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
 
 var ErrGeminiImageAPIKeyRequired = errors.New("gemini: an API key is required for image generation; set media.image.api_key, providers.gemini.api_key, or GEMINI_API_KEY")
@@ -51,8 +53,9 @@ func NewGeminiImageClient(cfg config.ImageConfig, sharedKey string) (*GeminiImag
 
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:  apiKey,
-		Backend: genai.BackendGeminiAPI,
+		APIKey:     apiKey,
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: &http.Client{Transport: telemetry.HTTPTransport(nil)},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("gemini: create image client: %w", err)

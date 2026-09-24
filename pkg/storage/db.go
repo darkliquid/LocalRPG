@@ -56,7 +56,7 @@ CREATE INDEX IF NOT EXISTS idx_turn_entities_entity ON turn_entities(entity_id);
 const pragmas = "_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on&_synchronous=NORMAL"
 
 func OpenDB(path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", "file:"+path+"?"+pragmas)
+	db, err := openWrapped(path, pragmas)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite db: %w", err)
 	}

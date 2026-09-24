@@ -16,6 +16,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
 
 var ErrProviderDisabled = errors.New("provider is disabled")
@@ -729,7 +730,7 @@ func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClien
 	case "cli":
 		return &cliTTSClient{command: cfg.Command, args: cfg.Args}, nil
 	case "http":
-		return &httpTTSClient{endpoint: cfg.Endpoint, model: cfg.Model, apiKey: cfg.APIKey, client: &http.Client{Timeout: 30 * time.Second}}, nil
+		return &httpTTSClient{endpoint: cfg.Endpoint, model: cfg.Model, apiKey: cfg.APIKey, client: &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 30 * time.Second}}, nil
 	default:
 		return nil, fmt.Errorf("unsupported tts provider type: %s", cfg.Type)
 	}
@@ -808,7 +809,7 @@ func NewSTTClient(cfg config.STTConfig) (STTClient, error) {
 			endpoint: cfg.Endpoint,
 			model:    cfg.Model,
 			apiKey:   cfg.APIKey,
-			client:   &http.Client{Timeout: 60 * time.Second},
+			client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 60 * time.Second},
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported stt provider type: %s", cfg.Type)
@@ -875,16 +876,16 @@ func NewImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string) (Imag
 	case "comfyui":
 		return &comfyUIImageClient{
 			endpoint: cfg.Endpoint,
-			client:   &http.Client{Timeout: 120 * time.Second},
+			client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 120 * time.Second},
 		}, nil
 	case "http":
 		if isComfyUI(cfg.Endpoint) {
 			return &comfyUIImageClient{
 				endpoint: cfg.Endpoint,
-				client:   &http.Client{Timeout: 120 * time.Second},
+				client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 120 * time.Second},
 			}, nil
 		}
-		return &httpImageClient{endpoint: cfg.Endpoint, model: cfg.Model, apiKey: cfg.APIKey, client: &http.Client{Timeout: 60 * time.Second}}, nil
+		return &httpImageClient{endpoint: cfg.Endpoint, model: cfg.Model, apiKey: cfg.APIKey, client: &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 60 * time.Second}}, nil
 	default:
 		return nil, fmt.Errorf("unsupported image provider type: %s", cfg.Type)
 	}

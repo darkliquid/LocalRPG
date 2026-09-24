@@ -11,7 +11,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
+
+// catalogHTTPClient is the outbound client for catalogue REST calls, wrapped so
+// the requests become client spans.
+var catalogHTTPClient = &http.Client{Transport: telemetry.HTTPTransport(nil)}
 
 // GeminiAPIBaseURL is the public Gemini API host. The model and voice
 // catalogues are plain JSON REST endpoints, so they are called directly rather
@@ -263,7 +269,7 @@ func geminiGET(ctx context.Context, path, apiKey string, query url.Values, out i
 	req.Header.Set("x-goog-api-key", apiKey)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := catalogHTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("gemini: %s request failed: %w", path, err)
 	}
