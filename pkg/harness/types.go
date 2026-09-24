@@ -113,13 +113,13 @@ type ToolCaller interface {
 }
 
 type ProviderConfig struct {
-	Type        string   `yaml:"type"` // "builtin", "cli", "http", "mock", "disabled"
-	BuiltinName string   `yaml:"builtin_name,omitempty"`
-	Command     string   `yaml:"command,omitempty"`
-	Args        []string `yaml:"args,omitempty"`
-	Endpoint    string   `yaml:"endpoint,omitempty"`
-	Model       string   `yaml:"model,omitempty"`
-	APIKey      string   `yaml:"api_key,omitempty"`
+	Type           string   `yaml:"type"` // "builtin", "cli", "http", "mock", "disabled"
+	BuiltinName    string   `yaml:"builtin_name,omitempty"`
+	Command        string   `yaml:"command,omitempty"`
+	Args           []string `yaml:"args,omitempty"`
+	Endpoint       string   `yaml:"endpoint,omitempty"`
+	Model          string   `yaml:"model,omitempty"`
+	APIKey         string   `yaml:"api_key,omitempty"`
 	Temperature    float64  `yaml:"temperature,omitempty"`
 	MaxTokens      int      `yaml:"max_tokens,omitempty"`
 	ThinkingBudget *int     `yaml:"thinking_budget,omitempty"`
