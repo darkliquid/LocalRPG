@@ -705,6 +705,13 @@ func NewTTSClient(cfg config.TTSConfig) (TTSClient, error) {
 
 // NewTTSClientWithSharedKey builds a TTSClient from configuration and an optional shared key.
 func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClient, error) {
+	// The registry is authoritative when the binary imported pkg/provider/all;
+	// otherwise the inline switch below still builds the client.
+	if regID := TTSProviderIDFor(cfg); regID != "" {
+		if client, err := BuildTTS(regID, cfg, sharedKey); err == nil {
+			return client, nil
+		}
+	}
 	switch cfg.Type {
 	case "disabled", "":
 		return &disabledTTSClient{}, nil
@@ -797,6 +804,12 @@ func (h *httpSTTClient) Transcribe(ctx context.Context, audioData []byte) (strin
 }
 
 func NewSTTClient(cfg config.STTConfig) (STTClient, error) {
+	// Registry-first when pkg/provider/all was imported; inline otherwise.
+	if regID := STTProviderIDFor(cfg); regID != "" {
+		if client, err := BuildSTT(regID, cfg); err == nil {
+			return client, nil
+		}
+	}
 	switch cfg.Type {
 	case "disabled", "":
 		return &disabledSTTClient{}, nil
@@ -858,6 +871,12 @@ func NewImageClient(cfg config.ImageConfig) (ImageClient, error) {
 }
 
 func NewImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string) (ImageClient, error) {
+	// Registry-first when pkg/provider/all was imported; inline otherwise.
+	if regID := ImageProviderIDFor(cfg); regID != "" {
+		if client, err := BuildImage(regID, cfg, sharedKey); err == nil {
+			return client, nil
+		}
+	}
 	switch cfg.Type {
 	case "disabled", "":
 		return &disabledImageClient{}, nil
