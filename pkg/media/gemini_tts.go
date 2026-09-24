@@ -148,6 +148,16 @@ func (c *GeminiTTSClient) SupportsMarkdown() bool {
 	return false
 }
 
+// VoiceOptions declares the tunables Gemini TTS accepts. Direction is free text
+// prepended to the utterance as director's notes, which is how the Gemini API
+// takes style steering: it has no separate style field.
+func (c *GeminiTTSClient) VoiceOptions() []VoiceOption {
+	return []VoiceOption{
+		{Key: "direction", Label: "Voice direction", Kind: "string",
+			Help: "Director's notes steering delivery, e.g. \"weary and guarded, speaking slowly\"."},
+	}
+}
+
 // ListVoices enumerates the 30 Gemini prebuilt voices.
 func (c *GeminiTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, error) {
 	voices := make([]ProviderVoice, len(geminiPrebuiltVoices))
@@ -186,6 +196,17 @@ func (c *GeminiTTSClient) Synthesize(ctx context.Context, text string, voice *en
 		voiceName = strings.TrimSpace(voice.VoiceID)
 	}
 
+	// Gemini TTS has no style field; delivery is steered by director's notes
+	// prepended to the transcript. Sanitise against the declared schema so a
+	// hand-edited note cannot smuggle in a different shape.
+	options, _ := ValidateVoiceOptions(c.VoiceOptions(), voiceOptions(voice))
+	promptText := text
+	if direction, ok := options["direction"].(string); ok {
+		if trimmed := strings.TrimSpace(direction); trimmed != "" {
+			promptText = "### DIRECTOR'S NOTES\nStyle: " + trimmed + "\n\n#### TRANSCRIPT\n" + text
+		}
+	}
+
 	reqConfig := &genai.GenerateContentConfig{
 		ResponseModalities: []string{"AUDIO"},
 		SpeechConfig: &genai.SpeechConfig{
@@ -197,7 +218,7 @@ func (c *GeminiTTSClient) Synthesize(ctx context.Context, text string, voice *en
 		},
 	}
 
-	resp, err := c.client.Models.GenerateContent(ctx, c.model, genai.Text(text), reqConfig)
+	resp, err := c.client.Models.GenerateContent(ctx, c.model, genai.Text(promptText), reqConfig)
 	if err != nil {
 		return nil, mapGeminiTTSError(err, c.model)
 	}

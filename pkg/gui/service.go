@@ -2392,6 +2392,11 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 				Message: fmt.Sprintf("invalid llm config: %v", err),
 			}, nil
 		}
+		// The editor never sends the shared key, so resolve it here the same way
+		// the router does. A role-level override still wins inside the factory.
+		if cfg := s.configMgr.Get(); cfg != nil {
+			agentCfg.SharedAPIKey = cfg.Providers.Gemini.APIKey
+		}
 		p, err := harness.NewModelProvider("test", agentCfg)
 		if err != nil {
 			return &TestProviderResponseDTO{

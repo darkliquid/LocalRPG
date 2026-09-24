@@ -27,6 +27,9 @@ import {
   ModelStatus,
   TTSInspectRequest,
   TTSInspectResponse,
+  ModelCatalogueResponse,
+  VoiceSearchRequest,
+  VoiceSearchResponse,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -302,6 +305,26 @@ export class APIClient {
       body: JSON.stringify(req),
     });
     if (!res.ok) throw new Error(`inspectTTS: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async listGeminiModels(apiKey?: string): Promise<ModelCatalogueResponse> {
+    const res = await fetch('/api/providers/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: apiKey }),
+    });
+    if (!res.ok) throw new Error(`listGeminiModels: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async searchTTSVoices(req: VoiceSearchRequest): Promise<VoiceSearchResponse> {
+    const res = await fetch('/api/tts/voices/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new Error(`searchTTSVoices: ${res.statusText}`);
     return res.json();
   }
 

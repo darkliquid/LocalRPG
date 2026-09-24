@@ -51,6 +51,38 @@ const ROLE_LABELS: Record<string, string> = {
 const DEFAULT_TTS_PREVIEW_TEXT =
   'Local RPG can use a wide range of voices to bring life to your characters, NPCs, and story narration.';
 
+// Suggested Gemini models for narration. This is a fallback used before the
+// live catalogue is fetched, so the editor is never empty and offline.
+const GEMINI_AGENT_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3.1-pro-preview',
+  'gemini-3-flash-preview',
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash-lite',
+  'gemma-4-31b-it',
+  'gemma-4-26b-it',
+  'gemma-4-12b-it',
+  'gemma-3-27b-it',
+];
+
+// narrationModels narrows a live Gemini catalogue to models that can actually
+// narrate a turn: text-out models, with image/audio/embedding variants dropped.
+const narrationModels = (models: { id: string; supported_actions?: string[] }[]): string[] =>
+  models
+    .filter((m) => {
+      const id = m.id.toLowerCase();
+      if (/(tts|image|embedding|aqa|imagen|veo|robotics|learnlm)/.test(id)) return false;
+      const actions = (m.supported_actions ?? []).join(' ').toLowerCase();
+      if (actions && !actions.includes('generatecontent')) return false;
+      return true;
+    })
+    .map((m) => m.id);
+
 // A missing role falls back to inheriting gm for the extractor, which is what
 // makes extraction work out of the box without a second configuration step.
 const defaultRoleConfig = (role: string): AgentRoleConfig =>
@@ -81,6 +113,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
   // Model status state
   const [models, setModels] = useState<ModelStatus[]>([]);
+  // Gemini agent model suggestions. Null means show the static fallback; a
+  // successful catalogue fetch replaces it with the account's live list.
+  const [geminiModels, setGeminiModels] = useState<string[] | null>(null);
+  const [fetchingGeminiModels, setFetchingGeminiModels] = useState(false);
+  const [geminiModelError, setGeminiModelError] = useState<string | null>(null);
   const [missingModelPrompt, setMissingModelPrompt] = useState<{
     id: string;
     name: string;
@@ -234,6 +271,24 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       });
     } finally {
       setTestingCategory(null);
+    }
+  };
+
+  const fetchGeminiModels = async () => {
+    setFetchingGeminiModels(true);
+    setGeminiModelError(null);
+    try {
+      const res = await APIClient.listGeminiModels();
+      if (res.error) {
+        setGeminiModelError(res.error);
+      } else {
+        const ids = narrationModels(res.models);
+        setGeminiModels(ids.length > 0 ? ids : null);
+      }
+    } catch (err: any) {
+      setGeminiModelError(err.message || 'Failed to load the model catalogue');
+    } finally {
+      setFetchingGeminiModels(false);
     }
   };
 
@@ -739,11 +794,21 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 {(currentRoleConfig.type === 'gemini' || (currentRoleConfig.type === 'builtin' && currentRoleConfig.builtin_name === 'gemini')) && (
                   <>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-sans uppercase text-stone-300">Gemini Model</label>
+                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
+                        <span>Gemini Model</span>
+                        <button
+                          type="button"
+                          onClick={fetchGeminiModels}
+                          disabled={fetchingGeminiModels}
+                          className="text-[10px] font-sans px-2 py-0.5 rounded border border-purple-500/40 text-purple-300 hover:bg-purple-600/20 disabled:opacity-50 cursor-pointer"
+                        >
+                          {fetchingGeminiModels ? 'Loading...' : 'Fetch available models'}
+                        </button>
+                      </label>
                       <input
                         type="text"
-                        placeholder="e.g. gemini-2.5-flash"
-                        value={currentRoleConfig.model || 'gemini-2.5-flash'}
+                        placeholder="e.g. gemini-3.8-flash"
+                        value={currentRoleConfig.model || 'gemini-3.8-flash'}
                         onChange={(e) => {
                           const updated = { ...currentRoleConfig, model: e.target.value };
                           setConfig({
@@ -757,7 +822,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                       />
                       <div className="flex flex-wrap gap-1.5 pt-1">
-                        {['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'].map((m) => (
+                        {(geminiModels ?? GEMINI_AGENT_MODELS).map((m) => (
                           <button
                             key={m}
                             type="button"
@@ -772,7 +837,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                               });
                             }}
                             className={`px-2 py-0.5 text-[10px] font-mono rounded border transition-colors cursor-pointer ${
-                              (currentRoleConfig.model || 'gemini-2.5-flash') === m
+                              (currentRoleConfig.model || 'gemini-3.8-flash') === m
                                 ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
                                 : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200'
                             }`}
@@ -781,6 +846,18 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           </button>
                         ))}
                       </div>
+                      {geminiModels ? (
+                        <p className="text-[11px] text-stone-500">
+                          Showing {geminiModels.length} models available to your key.
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-stone-500">
+                          Suggested models shown; fetch the catalogue to list everything your key can use.
+                        </p>
+                      )}
+                      {geminiModelError && (
+                        <p className="text-[11px] text-red-400 font-mono">{geminiModelError}</p>
+                      )}
                     </div>
 
                     <div className="space-y-1.5">
@@ -2028,7 +2105,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <span>Load Fantasy Defaults</span>
                   </button>
 
-                  {Boolean(inspect?.catalog?.voices?.length) && (
+                  {(Boolean(inspect?.catalog?.voices?.length) || isGeminiTTS) && (
                     <button
                       type="button"
                       onClick={() => setIsCatalogModalOpen(true)}
@@ -2785,6 +2862,16 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           onClose={() => setIsCatalogModalOpen(false)}
           voices={inspect?.catalog?.voices ?? []}
           providerKey={inspect?.provider_key || 'tts'}
+          onSearch={
+            isGeminiTTS
+              ? async (query) => {
+                  const res = await APIClient.searchTTSVoices({ config: config.media.tts, query });
+                  if (res.error) throw new Error(res.error);
+                  return res.voices;
+                }
+              : undefined
+          }
+          searchLabel="Search the Gemini extended voice library"
           onAddProfile={(newProfile) => {
             if (config) {
               const current = config.media.tts.voice_profiles || [];

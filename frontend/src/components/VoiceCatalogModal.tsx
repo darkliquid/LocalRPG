@@ -1,7 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { X, Play, Plus, Search } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { X, Play, Plus, Search, Globe } from 'lucide-react';
 import { ProviderVoice, VoiceProfile } from '../types';
 import { playVoicePreview } from '../lib/audioPreview';
+
+// EXTENDED_SEARCH_DEBOUNCE_MS lets a burst of typing settle before one
+// extended-library query is issued.
+const EXTENDED_SEARCH_DEBOUNCE_MS = 400;
 
 export interface VoiceCatalogModalProps {
   isOpen: boolean;
@@ -9,6 +13,10 @@ export interface VoiceCatalogModalProps {
   voices: ProviderVoice[];
   providerKey: string;
   onAddProfile: (profile: VoiceProfile) => void;
+  // onSearch queries a provider's extended voice library. Present only for
+  // providers that publish one (Gemini today).
+  onSearch?: (query: string) => Promise<ProviderVoice[]>;
+  searchLabel?: string;
 }
 
 export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
@@ -17,10 +25,17 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
   voices,
   providerKey,
   onAddProfile,
+  onSearch,
+  searchLabel = 'Search the extended voice library',
 }) => {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
   const [addedVoiceIDs, setAddedVoiceIDs] = useState<Set<string>>(new Set());
+  const [extendedMode, setExtendedMode] = useState(false);
+  const [extendedVoices, setExtendedVoices] = useState<ProviderVoice[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const searchRequestRef = useRef(0);
 
   // Close on Escape key
   useEffect(() => {
@@ -33,6 +48,36 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Query the extended library when extended mode is on. An empty query clears
+  // the results rather than fetching the whole catalogue.
+  useEffect(() => {
+    if (!isOpen || !extendedMode || !onSearch) return;
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setExtendedVoices([]);
+      setSearchError(null);
+      return;
+    }
+
+    const requestID = ++searchRequestRef.current;
+    setSearching(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await onSearch(trimmed);
+        if (searchRequestRef.current !== requestID) return;
+        setExtendedVoices(results);
+        setSearchError(null);
+      } catch (err) {
+        if (searchRequestRef.current !== requestID) return;
+        setSearchError(err instanceof Error ? err.message : 'Voice search failed');
+      } finally {
+        if (searchRequestRef.current === requestID) setSearching(false);
+      }
+    }, EXTENDED_SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [isOpen, extendedMode, query, onSearch]);
+
   const categories = useMemo(() => {
     const seen = new Set<string>();
     voices.forEach((v) => v.categories?.forEach((cat) => seen.add(cat)));
@@ -41,16 +86,17 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
 
   const filteredVoices = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return voices.filter((v) => {
+    const source = extendedMode ? extendedVoices : voices;
+    return source.filter((v) => {
       if (category && !v.categories?.includes(category)) return false;
-      if (!needle) return true;
+      if (!needle || extendedMode) return true;
       return (
         v.name.toLowerCase().includes(needle) ||
         v.id.toLowerCase().includes(needle) ||
         v.tags?.some((t) => t.toLowerCase().includes(needle))
       );
     });
-  }, [voices, query, category]);
+  }, [voices, extendedVoices, query, category, extendedMode]);
 
   if (!isOpen) return null;
 
@@ -106,11 +152,15 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by voice name, ID, or tag..."
+              placeholder={
+                extendedMode
+                  ? 'Search the extended library by name or description...'
+                  : 'Search by voice name, ID, or tag...'
+              }
               className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
           </div>
-          {categories.length > 0 && (
+          {!extendedMode && categories.length > 0 && (
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -124,12 +174,42 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
               ))}
             </select>
           )}
+          {onSearch && (
+            <button
+              type="button"
+              onClick={() => {
+                setExtendedMode((prev) => !prev);
+                setQuery('');
+                setExtendedVoices([]);
+                setSearchError(null);
+              }}
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border cursor-pointer transition ${
+                extendedMode
+                  ? 'bg-purple-600/30 border-purple-500/60 text-purple-200'
+                  : 'bg-stone-950 border-stone-800 text-stone-300 hover:text-purple-300'
+              }`}
+              title={searchLabel}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>{extendedMode ? 'Extended library' : 'Search extended'}</span>
+            </button>
+          )}
         </div>
 
         {/* Voice list */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {filteredVoices.length === 0 ? (
-            <div className="text-center py-12 text-xs text-stone-500 italic">No voices match your search.</div>
+          {searchError ? (
+            <div className="text-center py-12 text-xs text-red-300 font-mono">{searchError}</div>
+          ) : searching ? (
+            <div className="text-center py-12 text-xs text-stone-400 italic">Searching the extended library...</div>
+          ) : extendedMode && !query.trim() ? (
+            <div className="text-center py-12 text-xs text-stone-500 italic">
+              Type a name or description to search the extended library.
+            </div>
+          ) : filteredVoices.length === 0 ? (
+            <div className="text-center py-12 text-xs text-stone-500 italic">
+              {extendedMode ? 'No extended voices match your search.' : 'No voices match your search.'}
+            </div>
           ) : (
             filteredVoices.map((voice) => {
               const isAdded = addedVoiceIDs.has(voice.id);

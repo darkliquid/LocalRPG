@@ -53,6 +53,56 @@ func TestResolveGeminiTTSAPIKey(t *testing.T) {
 	}
 }
 
+func TestGeminiTTSSynthesizeAppliesDirection(t *testing.T) {
+	var gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"candidates": [
+				{"content": {"parts": [{"inlineData": {"data": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=", "mimeType": "audio/wav"}}], "role": "model"}}
+			]
+		}`)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	genaiClient, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:     "test-key",
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: server.Client(),
+		HTTPOptions: genai.HTTPOptions{
+			BaseURL: server.URL,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create genai client: %v", err)
+	}
+
+	ttsClient, err := media.NewGeminiTTSClientWithClient(genaiClient, config.TTSConfig{
+		Model:        "gemini-3.1-flash-tts-preview",
+		DefaultVoice: "Aoede",
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiTTSClientWithClient: %v", err)
+	}
+
+	_, err = ttsClient.Synthesize(ctx, "Hold the line.", &entity.VoiceConfig{
+		VoiceID: "Kore",
+		Options: map[string]interface{}{"direction": "weary and guarded, speaking slowly"},
+	})
+	if err != nil {
+		t.Fatalf("Synthesize failed: %v", err)
+	}
+	if !strings.Contains(gotBody, "DIRECTOR'S NOTES") || !strings.Contains(gotBody, "weary and guarded") {
+		t.Errorf("expected direction to be prepended to the transcript, got: %s", gotBody)
+	}
+	if !strings.Contains(gotBody, "Hold the line.") {
+		t.Errorf("expected the spoken text to remain in the transcript, got: %s", gotBody)
+	}
+}
+
 func TestGeminiTTSVoiceCatalog(t *testing.T) {
 	client := media.NewGeminiTTSClientOffline("gemini-3.1-flash-tts-preview", "Aoede")
 	voices, err := client.ListVoices(context.Background())

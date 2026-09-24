@@ -45,7 +45,9 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/world/", s.handleWorldRoutes)
 	s.mux.HandleFunc("/api/settings", s.handleSettingsRoutes)
 	s.mux.HandleFunc("/api/settings/test-provider", s.handleTestProviderRoute)
+	s.mux.HandleFunc("/api/providers/models", s.handleModelCatalogueRoute)
 	s.mux.HandleFunc("/api/tts/inspect", s.handleTTSInspectRoute)
+	s.mux.HandleFunc("/api/tts/voices/search", s.handleVoiceSearchRoute)
 	s.mux.HandleFunc("/api/audio/", s.handleAudioRoutes)
 	s.mux.HandleFunc("/api/stt", s.handleSTTRoute)
 	s.mux.HandleFunc("/api/trace", s.handleTraceRoute)
@@ -776,6 +778,46 @@ func (s *Server) handleTTSInspectRoute(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, res)
 }
 
+func (s *Server) handleModelCatalogueRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ModelCatalogueRequestDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res, err := s.service.ListModels(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
+func (s *Server) handleVoiceSearchRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req VoiceSearchRequestDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res, err := s.service.SearchTTSVoices(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
 func (s *Server) handleSTTRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -999,4 +1041,3 @@ func (s *Server) handleModelsRoutes(w http.ResponseWriter, r *http.Request) {
 
 	http.NotFound(w, r)
 }
-

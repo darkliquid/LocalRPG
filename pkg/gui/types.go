@@ -327,6 +327,38 @@ type TestProviderResponseDTO struct {
 	ModelID      string `json:"model_id,omitempty"`
 }
 
+// ModelCatalogueRequestDTO asks the provider what models a key can reach. The
+// key is optional so a shared key configured on the Providers tab is used.
+type ModelCatalogueRequestDTO struct {
+	APIKey string `json:"api_key,omitempty"`
+}
+
+// ModelCatalogueResponseDTO is a provider's live model list. A failure is
+// reported in Error so the editor can keep showing a static fallback.
+type ModelCatalogueResponseDTO struct {
+	Models []media.GeminiModel `json:"models"`
+	Error  string              `json:"error,omitempty"`
+}
+
+// VoiceSearchRequestDTO searches a provider's extended voice library. Config is
+// optional; when present its key and provider identity take part in resolution.
+type VoiceSearchRequestDTO struct {
+	Config       config.TTSConfig `json:"config"`
+	Query        string           `json:"query,omitempty"`
+	Type         string           `json:"type,omitempty"`
+	LanguageCode string           `json:"language_code,omitempty"`
+	Gender       string           `json:"gender,omitempty"`
+	Accent       string           `json:"accent,omitempty"`
+	Persona      string           `json:"persona,omitempty"`
+}
+
+// VoiceSearchResponseDTO is one page of extended voices. A failure is reported
+// in Error rather than as an HTTP error, so search can degrade gracefully.
+type VoiceSearchResponseDTO struct {
+	Voices []media.ProviderVoice `json:"voices"`
+	Error  string                `json:"error,omitempty"`
+}
+
 // TurnRequest is a player action as submitted from a client.
 type TurnRequest struct {
 	Mode  string `json:"mode"`

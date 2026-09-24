@@ -86,7 +86,10 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
             if (!isOpen) setIsOpen(true);
           }}
           onFocus={() => {
-            setQuery(selectedVoice ? selectedVoice.name : value);
+            // Open with an empty query so the whole catalog is browsable;
+            // seeding the query with the current selection would filter the
+            // list down to that one voice.
+            setQuery('');
             setIsOpen(true);
           }}
           onKeyDown={(e) => {
@@ -115,7 +118,12 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
           )}
           <button
             type="button"
-            onClick={() => setIsOpen((prev) => !prev)}
+            onClick={() =>
+              setIsOpen((prev) => {
+                if (!prev) setQuery('');
+                return !prev;
+              })
+            }
             tabIndex={-1}
             className="text-stone-500 hover:text-stone-300 cursor-pointer"
           >

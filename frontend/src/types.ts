@@ -525,6 +525,36 @@ export interface TestProviderResponse {
   model_id?: string;
 }
 
+export interface GeminiModel {
+  id: string;
+  display_name?: string;
+  description?: string;
+  supported_actions?: string[];
+  input_token_limit?: number;
+  output_token_limit?: number;
+  thinking?: boolean;
+}
+
+export interface ModelCatalogueResponse {
+  models: GeminiModel[];
+  error?: string;
+}
+
+export interface VoiceSearchRequest {
+  config: TTSConfig;
+  query?: string;
+  type?: string;
+  language_code?: string;
+  gender?: string;
+  accent?: string;
+  persona?: string;
+}
+
+export interface VoiceSearchResponse {
+  voices: ProviderVoice[];
+  error?: string;
+}
+
 export interface AddressedFinding {
   turn: number;
   rule: string;
