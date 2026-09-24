@@ -1,6 +1,8 @@
 package media_test
 
 import (
+	_ "github.com/darkliquid/localrpg/pkg/provider/all"
+
 	"bytes"
 	"context"
 	"encoding/base64"

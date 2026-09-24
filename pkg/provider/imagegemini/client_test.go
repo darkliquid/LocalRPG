@@ -1,4 +1,4 @@
-package media_test
+package imagegemini_test
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/provider/imagegemini"
 )
 
 func TestResolveGeminiImageAPIKey(t *testing.T) {
@@ -98,7 +99,7 @@ func TestGeminiImageClientImagenGeneratesJPEG(t *testing.T) {
 		t.Fatalf("create genai client: %v", err)
 	}
 
-	imgClient, err := media.NewGeminiImageClientWithClient(client, config.ImageConfig{
+	imgClient, err := imagegemini.NewGeminiImageClientWithClient(client, config.ImageConfig{
 		Model:            "imagen-3.0-generate-002",
 		AspectRatio:      "16:9",
 		PersonGeneration: "ALLOW_ADULT",
@@ -167,7 +168,7 @@ func TestGeminiImageClientNanoBananaGeneratesImage(t *testing.T) {
 		t.Fatalf("create genai client: %v", err)
 	}
 
-	imgClient, err := media.NewGeminiImageClientWithClient(client, config.ImageConfig{
+	imgClient, err := imagegemini.NewGeminiImageClientWithClient(client, config.ImageConfig{
 		Model:            "gemini-3.1-flash-image",
 		AspectRatio:      "16:9",
 		PersonGeneration: "ALLOW_ADULT",
@@ -201,7 +202,7 @@ func TestGeminiImageErrorMapping(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		mapped := media.MapGeminiImageErrorForTest(fmt.Errorf("%s", tc.errStr))
+		mapped := imagegemini.MapGeminiImageErrorForTest(fmt.Errorf("%s", tc.errStr))
 		if !strings.Contains(mapped.Error(), tc.expected) {
 			t.Errorf("error %q mapped to %q, want %q", tc.errStr, mapped.Error(), tc.expected)
 		}

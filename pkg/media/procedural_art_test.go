@@ -10,10 +10,7 @@ import (
 )
 
 func TestProceduralArt_GeneratesValidSVG(t *testing.T) {
-	client, err := media.NewImageClient(config.ImageConfig{
-		Type:        "builtin",
-		BuiltinName: "procedural-art",
-	})
+	client, err := media.NewImageClient(config.ImageConfig{Type: "builtin", BuiltinName: "procedural-art"})
 	if err != nil {
 		t.Fatalf("failed to create procedural art client: %v", err)
 	}

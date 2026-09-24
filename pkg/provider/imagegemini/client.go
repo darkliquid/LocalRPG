@@ -1,38 +1,19 @@
-package media
+package imagegemini
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"google.golang.org/genai"
 
+	"github.com/darkliquid/localrpg/pkg/media"
+
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
-
-var ErrGeminiImageAPIKeyRequired = errors.New("gemini: an API key is required for image generation; set media.image.api_key, providers.gemini.api_key, or GEMINI_API_KEY")
-
-// ResolveGeminiImageAPIKey resolves the API key prioritizing the image config override,
-// then the shared providers.gemini.api_key, and finally the environment variables.
-func ResolveGeminiImageAPIKey(imageKey, sharedKey string) (string, error) {
-	if k := strings.TrimSpace(imageKey); k != "" {
-		return k, nil
-	}
-	if k := strings.TrimSpace(sharedKey); k != "" {
-		return k, nil
-	}
-	if k := strings.TrimSpace(os.Getenv("GEMINI_API_KEY")); k != "" {
-		return k, nil
-	}
-	if k := strings.TrimSpace(os.Getenv("GOOGLE_API_KEY")); k != "" {
-		return k, nil
-	}
-	return "", ErrGeminiImageAPIKeyRequired
-}
 
 // GeminiImageClient generates location and scene imagery using Google's Imagen and
 // native Gemini Image ("Nano Banana") models.
@@ -46,7 +27,7 @@ type GeminiImageClient struct {
 // NewGeminiImageClient initializes a new GeminiImageClient using credentials from
 // the configuration or environment.
 func NewGeminiImageClient(cfg config.ImageConfig, sharedKey string) (*GeminiImageClient, error) {
-	apiKey, err := ResolveGeminiImageAPIKey(cfg.APIKey, sharedKey)
+	apiKey, err := media.ResolveGeminiImageAPIKey(cfg.APIKey, sharedKey)
 	if err != nil {
 		return nil, err
 	}

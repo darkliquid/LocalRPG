@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
@@ -130,4 +131,10 @@ func KeyPresentWithSharedKey(cfg config.TTSConfig, sharedKey string) bool {
 		return strings.TrimSpace(os.Getenv("GEMINI_API_KEY")) != "" || strings.TrimSpace(os.Getenv("GOOGLE_API_KEY")) != ""
 	}
 	return false
+}
+
+// VoiceOptionsOf returns a voice's provider options, or nil when it carries
+// none. It is the exported form the provider packages use.
+func VoiceOptionsOf(voice *entity.VoiceConfig) map[string]interface{} {
+	return voiceOptions(voice)
 }
