@@ -2726,3 +2726,113 @@ func (s *Service) GenerateWorldAsset(ctx context.Context, worldID string, req Ge
 	ext := media.ArtExtension(imgBytes)
 	return s.SaveWorldAsset(worldID, req.Kind, imgBytes, ext)
 }
+
+// GetTurnContext returns the most recent turn's context snapshot and prompt for a campaign.
+func (s *Service) GetTurnContext(gameID string) (*TurnContextDTO, error) {
+	s.ensureIndexed(gameID)
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, err
+	}
+	turns, err := store.ListTurns(1, 0)
+	if err != nil || len(turns) == 0 {
+		return nil, fmt.Errorf("no turns recorded for game %q", gameID)
+	}
+	lastTurn := turns[0].Number
+	raw, prompt, err := store.GetTurnContext(lastTurn)
+	if err != nil {
+		return nil, fmt.Errorf("get turn context: %w", err)
+	}
+	var turnCtx harness.TurnContext
+	if err := json.Unmarshal(raw, &turnCtx); err != nil {
+		return nil, fmt.Errorf("decode turn context: %w", err)
+	}
+	return toTurnContextDTO(&turnCtx, prompt), nil
+}
+
+// GetWorkingSet returns the active continuity working set for a campaign.
+func (s *Service) GetWorkingSet(gameID string) ([]WorkingEntryDTO, error) {
+	s.ensureIndexed(gameID)
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, err
+	}
+	records, err := store.LoadWorkingSet()
+	if err != nil {
+		return nil, fmt.Errorf("load working set: %w", err)
+	}
+	entries := make([]WorkingEntryDTO, 0, len(records))
+	for _, rec := range records {
+		name := rec.EntityID
+		if ent, err := store.GetEntity(rec.EntityID); err == nil && ent != nil && ent.Name != "" {
+			name = ent.Name
+		}
+		entries = append(entries, WorkingEntryDTO{
+			Kind:     rec.Kind,
+			ID:       rec.EntityID,
+			Name:     name,
+			Weight:   rec.Weight,
+			LastTurn: rec.LastTurn,
+			Role:     rec.Role,
+		})
+	}
+	return entries, nil
+}
+
+func toTurnContextDTO(tc *harness.TurnContext, prompt string) *TurnContextDTO {
+	if tc == nil {
+		return nil
+	}
+	sections := make([]SectionReportDTO, 0, len(tc.Sections))
+	for _, s := range tc.Sections {
+		refs := make([]RefDTO, 0, len(s.Refs))
+		for _, r := range s.Refs {
+			refs = append(refs, RefDTO{Kind: string(r.Kind), ID: r.ID, Relation: r.Relation})
+		}
+		sections = append(sections, SectionReportDTO{
+			Name:     s.Name,
+			Tokens:   s.Tokens,
+			Included: s.Included,
+			Source:   s.Source,
+			Refs:     refs,
+		})
+	}
+	refs := make([]RefDTO, 0, len(tc.Refs))
+	for _, r := range tc.Refs {
+		refs = append(refs, RefDTO{Kind: string(r.Kind), ID: r.ID, Relation: r.Relation})
+	}
+	ws := make([]RefDTO, 0, len(tc.WorkingSet))
+	for _, r := range tc.WorkingSet {
+		ws = append(ws, RefDTO{Kind: string(r.Kind), ID: r.ID, Relation: r.Relation})
+	}
+	var sess *ProviderSessionDTO
+	if tc.Session != nil {
+		sess = &ProviderSessionDTO{
+			Provider:    tc.Session.Provider,
+			ID:          tc.Session.ID,
+			ThroughTurn: tc.Session.ThroughTurn,
+			Model:       tc.Session.Model,
+			PrefixHash:  tc.Session.PrefixHash,
+		}
+	}
+	return &TurnContextDTO{
+		TurnNumber:      tc.TurnNumber,
+		Mode:            tc.Mode,
+		Budget:          tc.Budget,
+		EstimatedTokens: tc.EstimatedTokens,
+		Sections:        sections,
+		Refs:            refs,
+		WorkingSet:      ws,
+		Threads:         tc.Threads,
+		SummaryVersion:  tc.SummaryVersion,
+		WorldHash:       tc.WorldHash,
+		SystemHash:      tc.SystemHash,
+		PromptHash:      tc.PromptHash,
+		Strategy:        string(tc.Strategy),
+		PrefixHash:      tc.PrefixHash,
+		Session:         sess,
+		CachedTokens:    tc.CachedTokens,
+		Prompt:          prompt,
+	}
+}
+

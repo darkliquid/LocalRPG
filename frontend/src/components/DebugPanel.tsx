@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { APIClient } from '../api/client';
 import { AppConfig, TraceEvent } from '../types';
-import { Bug, RefreshCw, Trash2, Play, Pause } from 'lucide-react';
+import { Bug, RefreshCw, Trash2, Play, Pause, Layers } from 'lucide-react';
+import { ContextDrawer } from './ContextDrawer';
 
 interface DebugPanelProps {
   config: AppConfig;
@@ -24,6 +25,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
   const [error, setError] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showContextDrawer, setShowContextDrawer] = useState(false);
 
   const traceLevel = config.preferences.trace_level ?? 'off';
 
@@ -103,8 +105,20 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
               <Trash2 className="w-3.5 h-3.5" />
               <span>Clear</span>
             </button>
+            <button
+              onClick={() => setShowContextDrawer(true)}
+              className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-stone-300 hover:text-purple-300 hover:border-purple-500/40 transition-all cursor-pointer"
+              title="Inspect prompt context sections and continuity working set"
+            >
+              <Layers className="w-3.5 h-3.5 text-purple-400" />
+              <span>Context &amp; Continuity</span>
+            </button>
           </div>
         </div>
+
+        {showContextDrawer && (
+          <ContextDrawer isOpen={showContextDrawer} onClose={() => setShowContextDrawer(false)} />
+        )}
 
         <p className="text-[11px] text-stone-500">
           Tracing is off by default. At full detail the file records prompts, replies, and raw provider lines, which

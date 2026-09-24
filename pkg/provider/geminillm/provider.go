@@ -1,10 +1,12 @@
 package geminillm
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -25,6 +27,8 @@ type GeminiProvider struct {
 	topK               *int
 	maxTokens          *int
 	client             *genai.Client
+	httpClient         *http.Client
+	baseURL            string
 	logger             trace.Logger
 	chunkLimitOverride int
 }
@@ -38,6 +42,8 @@ type GeminiProviderOptions struct {
 	TopK           *int
 	MaxTokens      *int
 	Client         *genai.Client // Optional client override for testing
+	HTTPClient     *http.Client  // Optional HTTP client override for testing
+	BaseURL        string        // Optional baseURL override for testing
 }
 
 func NewGeminiProvider(id string, opts GeminiProviderOptions) (*GeminiProvider, error) {
@@ -61,6 +67,15 @@ func NewGeminiProvider(id string, opts GeminiProviderOptions) (*GeminiProvider, 
 		}
 	}
 
+	baseURL := strings.TrimRight(opts.BaseURL, "/")
+	if baseURL == "" {
+		baseURL = "https://generativelanguage.googleapis.com"
+	}
+	httpClient := opts.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Transport: telemetry.HTTPTransport(nil)}
+	}
+
 	return &GeminiProvider{
 		id:             id,
 		model:          model,
@@ -71,11 +86,149 @@ func NewGeminiProvider(id string, opts GeminiProviderOptions) (*GeminiProvider, 
 		topK:           opts.TopK,
 		maxTokens:      opts.MaxTokens,
 		client:         client,
+		httpClient:     httpClient,
+		baseURL:        baseURL,
 	}, nil
 }
 
 func (g *GeminiProvider) ID() string {
 	return g.id
+}
+
+func (g *GeminiProvider) Model() string {
+	return g.model
+}
+
+func (g *GeminiProvider) StartSession(ctx context.Context, req harness.GenerateRequest) (*harness.SessionHandle, error) {
+	id, text, cachedTokens, err := g.callInteractions(ctx, "", req)
+	if err != nil {
+		return nil, err
+	}
+	return &harness.SessionHandle{
+		ID:           id,
+		CachedTokens: cachedTokens,
+		Response: &harness.GenerateResponse{
+			Text:         text,
+			SessionID:    id,
+			CachedTokens: cachedTokens,
+		},
+	}, nil
+}
+
+func (g *GeminiProvider) ContinueSession(ctx context.Context, session *harness.SessionHandle, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
+	prevID := ""
+	if session != nil {
+		prevID = session.ID
+	}
+	id, text, cachedTokens, err := g.callInteractions(ctx, prevID, req)
+	if err != nil {
+		return nil, err
+	}
+	return &harness.GenerateResponse{
+		Text:         text,
+		SessionID:    id,
+		CachedTokens: cachedTokens,
+	}, nil
+}
+
+func (g *GeminiProvider) callInteractions(ctx context.Context, prevInteractionID string, req harness.GenerateRequest) (string, string, int, error) {
+	promptText := req.PromptText()
+	payload := map[string]interface{}{
+		"model": g.model,
+		"input": promptText,
+	}
+	if prevInteractionID != "" {
+		payload["previous_interaction_id"] = prevInteractionID
+	}
+	if req.System != "" {
+		payload["system_instruction"] = req.System
+	}
+	genConfig := make(map[string]interface{})
+	if req.Temperature > 0 {
+		genConfig["temperature"] = req.Temperature
+	} else if g.temperature != nil {
+		genConfig["temperature"] = *g.temperature
+	}
+	if req.MaxTokens > 0 {
+		genConfig["max_output_tokens"] = req.MaxTokens
+	} else if g.maxTokens != nil {
+		genConfig["max_output_tokens"] = *g.maxTokens
+	}
+	if len(genConfig) > 0 {
+		payload["generation_config"] = genConfig
+	}
+
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("gemini interactions: marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/v1beta/interactions", strings.TrimRight(g.baseURL, "/"))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return "", "", 0, fmt.Errorf("gemini interactions: new request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if g.apiKey != "" {
+		httpReq.Header.Set("x-goog-api-key", g.apiKey)
+	}
+
+	client := g.httpClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return "", "", 0, mapGeminiError(err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("gemini interactions: read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", 0, mapGeminiError(fmt.Errorf("status %d: %s", resp.StatusCode, string(respBytes)))
+	}
+
+	var parsed struct {
+		ID         string `json:"id"`
+		OutputText string `json:"output_text"`
+		Outputs    []struct {
+			Text string `json:"text"`
+			Type string `json:"type"`
+		} `json:"outputs"`
+		Usage struct {
+			TotalCachedTokens int `json:"total_cached_tokens"`
+		} `json:"usage"`
+		Error *struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(respBytes, &parsed); err != nil {
+		return "", "", 0, fmt.Errorf("gemini interactions: decode response: %w", err)
+	}
+
+	if parsed.Error != nil {
+		return "", "", 0, mapGeminiError(errors.New(parsed.Error.Message))
+	}
+
+	text := parsed.OutputText
+	if text == "" {
+		var sb strings.Builder
+		for _, out := range parsed.Outputs {
+			if out.Text != "" {
+				sb.WriteString(out.Text)
+			}
+		}
+		text = sb.String()
+	}
+
+	return parsed.ID, text, parsed.Usage.TotalCachedTokens, nil
 }
 
 func (g *GeminiProvider) ToolCallerCapable() bool {

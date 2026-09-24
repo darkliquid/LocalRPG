@@ -2,6 +2,7 @@ package geminillm_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -302,3 +303,97 @@ func TestGeminiErrorMapping(t *testing.T) {
 		}
 	}
 }
+
+func TestGeminiProviderInteractionsSession(t *testing.T) {
+	var receivedRequests []map[string]interface{}
+	var authHeaders []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeaders = append(authHeaders, r.Header.Get("x-goog-api-key"))
+		body, _ := io.ReadAll(r.Body)
+		var reqMap map[string]interface{}
+		_ = json.Unmarshal(body, &reqMap)
+		receivedRequests = append(receivedRequests, reqMap)
+
+		w.Header().Set("Content-Type", "application/json")
+		if prevID, ok := reqMap["previous_interaction_id"].(string); ok && prevID != "" {
+			fmt.Fprint(w, `{
+				"id": "interaction-turn-2",
+				"output_text": "The goblin scowls and draws his blade.",
+				"usage": {
+					"total_cached_tokens": 128
+				}
+			}`)
+		} else {
+			fmt.Fprint(w, `{
+				"id": "interaction-turn-1",
+				"output_text": "You enter the dark dungeon.",
+				"usage": {
+					"total_cached_tokens": 0
+				}
+			}`)
+		}
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
+		Model:      "gemini-2.5-flash",
+		APIKey:     "secret-api-key",
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiProvider: %v", err)
+	}
+
+	// 1. StartSession
+	handle, err := provider.StartSession(ctx, harness.GenerateRequest{
+		Prompt: "You are standing at the entrance.",
+		System: "You are the GM.",
+	})
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	if handle.ID != "interaction-turn-1" {
+		t.Errorf("expected handle ID interaction-turn-1, got %q", handle.ID)
+	}
+	if handle.Response == nil || handle.Response.Text != "You enter the dark dungeon." {
+		t.Errorf("unexpected StartSession response: %+v", handle.Response)
+	}
+	if len(receivedRequests) != 1 {
+		t.Fatalf("expected 1 request, got %d", len(receivedRequests))
+	}
+	if receivedRequests[0]["previous_interaction_id"] != nil {
+		t.Errorf("expected no previous_interaction_id in StartSession")
+	}
+
+	// 2. ContinueSession
+	contResp, err := provider.ContinueSession(ctx, handle, harness.GenerateRequest{
+		Prompt: "I approach the torchlight.",
+	})
+	if err != nil {
+		t.Fatalf("ContinueSession: %v", err)
+	}
+	if contResp.SessionID != "interaction-turn-2" {
+		t.Errorf("expected continued session ID interaction-turn-2, got %q", contResp.SessionID)
+	}
+	if contResp.CachedTokens != 128 {
+		t.Errorf("expected 128 cached tokens, got %d", contResp.CachedTokens)
+	}
+	if contResp.Text != "The goblin scowls and draws his blade." {
+		t.Errorf("unexpected ContinueSession text: %q", contResp.Text)
+	}
+	if len(receivedRequests) != 2 {
+		t.Fatalf("expected 2 requests, got %d", len(receivedRequests))
+	}
+	if receivedRequests[1]["previous_interaction_id"] != "interaction-turn-1" {
+		t.Errorf("expected previous_interaction_id interaction-turn-1, got %v", receivedRequests[1]["previous_interaction_id"])
+	}
+	for i, header := range authHeaders {
+		if header != "secret-api-key" {
+			t.Errorf("request %d auth header = %q, want secret-api-key", i, header)
+		}
+	}
+}
+

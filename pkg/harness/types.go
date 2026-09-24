@@ -98,7 +98,9 @@ func (r GenerateRequest) PromptText() string {
 }
 
 type GenerateResponse struct {
-	Text string `json:"text"`
+	Text         string `json:"text"`
+	CachedTokens int    `json:"cached_tokens,omitempty"`
+	SessionID    string `json:"session_id,omitempty"`
 }
 
 type ModelProvider interface {

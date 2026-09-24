@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
@@ -162,5 +164,79 @@ func TestRecordTurnRecordsProseMentions(t *testing.T) {
 	// Kael was already linked, so the scan must not add a second row for him.
 	if len(kinds["guard-kael"]) != 1 || kinds["guard-kael"][0] != entity.MentionWikilink {
 		t.Errorf("expected Kael recorded once as a wikilink, got %+v", kinds["guard-kael"])
+	}
+}
+
+func TestRecordTurnSavesTurnContextSnapshot(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	store := newTestStore(t)
+	history := NewHistoryLogger(filepath.Join(t.TempDir(), "history.jsonl"))
+	timeline := NewTimeline(paths, store, history, "campaign-01")
+
+	turn := Turn{
+		Number:    1,
+		Timestamp: time.Now(),
+		Mode:      "Do",
+		Input:     "look around",
+		Narration: "The harbour is quiet.",
+		Prompt:    "System rules, lore, action: look around",
+		Context: &harness.TurnContext{
+			TurnNumber: 1,
+			PromptHash: "abc123",
+			Strategy:   harness.StrategyFullPrompt,
+		},
+	}
+	if err := timeline.RecordTurn(&turn, nil); err != nil {
+		t.Fatalf("RecordTurn failed: %v", err)
+	}
+
+	rawCtx, prompt, err := store.GetTurnContext(1)
+	if err != nil {
+		t.Fatalf("GetTurnContext: %v", err)
+	}
+	if prompt != "System rules, lore, action: look around" {
+		t.Errorf("expected prompt %q, got %q", "System rules, lore, action: look around", prompt)
+	}
+	var decoded harness.TurnContext
+	if err := json.Unmarshal(rawCtx, &decoded); err != nil {
+		t.Fatalf("json unmarshal context: %v", err)
+	}
+	if decoded.PromptHash != "abc123" || decoded.TurnNumber != 1 {
+		t.Errorf("decoded context mismatch: %+v", decoded)
+	}
+}
+
+func TestEnsureIndexedRederivesWorkingSetWhenEmpty(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	store := newTestStore(t)
+	historyPath := filepath.Join(t.TempDir(), "history.jsonl")
+	history := NewHistoryLogger(historyPath)
+	timeline := NewTimeline(paths, store, history, "campaign-01")
+
+	turn := Turn{
+		Number:    1,
+		Timestamp: time.Now(),
+		Mode:      "Do",
+		Input:     "look around",
+		Narration: "Kaelen nods at Elena.",
+		Entities: []entity.Mention{
+			{ID: "kaelen", Kind: "present"},
+			{ID: "elena", Kind: "player"},
+		},
+	}
+	if err := history.AppendTurn(turn); err != nil {
+		t.Fatalf("AppendTurn: %v", err)
+	}
+
+	if err := timeline.EnsureIndexed(); err != nil {
+		t.Fatalf("EnsureIndexed: %v", err)
+	}
+
+	ws, err := store.LoadWorkingSet()
+	if err != nil {
+		t.Fatalf("LoadWorkingSet: %v", err)
+	}
+	if len(ws) != 2 {
+		t.Fatalf("expected 2 working set entries, got %d", len(ws))
 	}
 }

@@ -97,6 +97,18 @@ func (t *Timeline) RecordTurnContext(ctx context.Context, turn *Turn, extracted 
 		return err
 	}
 
+	if turn.Context != nil && t.store != nil {
+		rawCtx, err := json.Marshal(turn.Context)
+		if err != nil {
+			span.RecordError(err)
+			return fmt.Errorf("marshal turn context: %w", err)
+		}
+		if err := t.store.SaveTurnContext(turn.Number, turn.Prompt, rawCtx); err != nil {
+			span.RecordError(err)
+			return fmt.Errorf("save turn context: %w", err)
+		}
+	}
+
 	if err := t.indexTurn(*turn); err != nil {
 		span.RecordError(err)
 		return err
@@ -322,10 +334,27 @@ func (t *Timeline) EnsureIndexed() error {
 		return fmt.Errorf("read max indexed turn: %w", err)
 	}
 
-	if count == len(turns) && max == lastTurnNumber(turns) {
-		return nil
+	if count != len(turns) || max != lastTurnNumber(turns) {
+		if err := t.indexTurns(turns); err != nil {
+			return err
+		}
 	}
-	return t.indexTurns(turns)
+
+	if t.store != nil && len(turns) > 0 {
+		wsEntries, err := t.store.LoadWorkingSet()
+		if err == nil && len(wsEntries) == 0 {
+			window := DefaultRederiveWindow
+			start := len(turns) - window
+			if start < 0 {
+				start = 0
+			}
+			set := WorkingSet{}
+			rederived := set.Rederive(turns[start:])
+			_ = t.store.ReplaceWorkingSet(rederived.ToStorageRecords())
+		}
+	}
+
+	return nil
 }
 
 func (t *Timeline) indexTurns(turns []Turn) error {

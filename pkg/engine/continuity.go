@@ -34,52 +34,182 @@ var discoveryCues = []string{"a stranger", "an unfamiliar", "a figure", "a newco
 // a short list keeps it from crying wolf.
 var contradictionCues = []string{"cold", "dark", "unlit", "doused", "out", "dead", "extinguished", "guttered"}
 
+// ContinuityInput holds the context, working set, store, and turn for continuity checks.
+type ContinuityInput struct {
+	Store      *storage.Store
+	Turn       *Turn
+	Narration  string
+	LocationID string
+	PlayerID   string
+	Context    harness.TurnContext
+	WorkingSet *WorkingSet
+}
+
 // CheckContinuity compares a turn against what the campaign knows. It is
 // deterministic and model-free, which is what makes it safe to run every turn.
-func CheckContinuity(store *storage.Store, turn *Turn, locationID, playerID string) []ContinuityFinding {
-	if store == nil || turn == nil {
-		return nil
+func CheckContinuity(input ContinuityInput) []ContinuityFinding {
+	narration := input.Narration
+	if narration == "" && input.Turn != nil {
+		narration = input.Turn.Narration
+	}
+	locationID := input.LocationID
+	if locationID == "" && input.Turn != nil {
+		locationID = input.Turn.Location
+	}
+
+	turn := input.Turn
+	if turn == nil {
+		turn = &Turn{
+			Narration: narration,
+			Location:  locationID,
+		}
 	}
 
 	findings := make([]ContinuityFinding, 0)
-	findings = append(findings, checkUnknownEntities(store, turn)...)
-	findings = append(findings, checkLocationDrift(store, turn, locationID)...)
-	findings = append(findings, checkUnresolvedSpeakers(store, turn)...)
-	findings = append(findings, checkReintroductions(store, turn)...)
-	findings = append(findings, checkStateContradictions(store, turn, locationID)...)
+	findings = append(findings, checkUnknownEntities(input, narration)...)
+	if input.Store != nil {
+		findings = append(findings, checkLocationDrift(input.Store, turn, locationID)...)
+		findings = append(findings, checkUnresolvedSpeakers(input.Store, turn)...)
+		findings = append(findings, checkReintroductions(input.Store, turn)...)
+		findings = append(findings, checkStateContradictions(input.Store, turn, locationID)...)
+	}
 	return findings
 }
 
 // checkUnknownEntities flags a name that claims canon and has no note. It fires on a
-// speaker attribution or a naming construction, never on a capitalised phrase alone:
-// scenery is invented legitimately, and flagging it would make the rule noise.
-func checkUnknownEntities(store *storage.Store, turn *Turn) []ContinuityFinding {
+// speaker attribution, a naming construction, or a proper noun phrase absent from context/working set.
+func checkUnknownEntities(input ContinuityInput, narration string) []ContinuityFinding {
 	findings := make([]ContinuityFinding, 0)
 
-	for _, line := range strings.Split(turn.Narration, "\n") {
+	isKnown := func(name string) bool {
+		slug := entity.Slugify(name)
+		if slug == "" {
+			return true
+		}
+		unprefixed := strings.TrimPrefix(slug, "the-")
+		matchSlug := func(target string) bool {
+			targetUnprefixed := strings.TrimPrefix(target, "the-")
+			return target == slug || target == unprefixed || targetUnprefixed == slug || targetUnprefixed == unprefixed
+		}
+
+		if input.PlayerID != "" && matchSlug(entity.Slugify(input.PlayerID)) {
+			return true
+		}
+		for _, ref := range input.Context.Refs {
+			if ref.Kind == harness.RefEntity && matchSlug(ref.ID) {
+				return true
+			}
+		}
+		for _, ref := range input.Context.WorkingSet {
+			if matchSlug(ref.ID) {
+				return true
+			}
+		}
+		if input.WorkingSet != nil {
+			for _, e := range input.WorkingSet.Entries {
+				if matchSlug(e.ID) {
+					return true
+				}
+			}
+		}
+		if input.Store != nil {
+			if resolvesToEntity(input.Store, name) {
+				return true
+			}
+			if ent, err := input.Store.GetEntity(slug); err == nil && ent != nil {
+				return true
+			}
+		}
+		if input.Turn != nil {
+			for _, m := range input.Turn.Entities {
+				if matchSlug(m.ID) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	seenNotes := make(map[string]bool)
+	addFinding := func(rule, note string) {
+		if !seenNotes[note] {
+			seenNotes[note] = true
+			findings = append(findings, ContinuityFinding{Rule: rule, Note: note})
+		}
+	}
+
+	for _, line := range strings.Split(narration, "\n") {
 		candidate := speakingName(line)
 		if candidate == "" {
 			continue
 		}
-		if resolvesToEntity(store, candidate) {
+		if isKnown(candidate) {
 			continue
 		}
-		findings = append(findings, ContinuityFinding{
-			Rule: RuleUnknownEntity,
-			Note: fmt.Sprintf("%q speaks but has no note", candidate),
-		})
+		addFinding(RuleUnknownEntity, fmt.Sprintf("%q speaks but has no note", candidate))
 	}
 
-	for _, phrase := range namedPhrases(turn.Narration) {
-		if resolvesToEntity(store, phrase) {
+	for _, phrase := range namedPhrases(narration) {
+		if isKnown(phrase) {
 			continue
 		}
-		findings = append(findings, ContinuityFinding{
-			Rule: RuleUnknownEntity,
-			Note: fmt.Sprintf("%q is named but has no note", phrase),
-		})
+		addFinding(RuleUnknownEntity, fmt.Sprintf("%q is named but has no note", phrase))
 	}
+
+	for _, phrase := range properNounPhrases(narration) {
+		if isKnown(phrase) {
+			continue
+		}
+		addFinding(RuleUnknownEntity, fmt.Sprintf("%q is named but has no note", phrase))
+	}
+
 	return findings
+}
+
+var leadingPrepositions = map[string]bool{
+	"In": true, "At": true, "On": true, "From": true, "To": true,
+	"With": true, "After": true, "Before": true, "While": true, "As": true, "By": true,
+}
+
+func properNounPhrases(text string) []string {
+	var phrases []string
+	seen := make(map[string]bool)
+
+	for _, line := range strings.Split(text, "\n") {
+		words := strings.Fields(line)
+		var current []string
+
+		addCurrent := func() {
+			if len(current) >= 2 {
+				// Strip leading preposition if length >= 3
+				if len(current) >= 3 && leadingPrepositions[current[0]] {
+					current = current[1:]
+				}
+				phrase := strings.Join(current, " ")
+				if !seen[phrase] {
+					seen[phrase] = true
+					phrases = append(phrases, phrase)
+				}
+			}
+			current = nil
+		}
+
+		for _, rawWord := range words {
+			clean := strings.Trim(rawWord, ".,;:!?\"'()[]{}*`~")
+			if clean == "" {
+				addCurrent()
+				continue
+			}
+
+			if isCapitalised(clean) {
+				current = append(current, clean)
+			} else {
+				addCurrent()
+			}
+		}
+		addCurrent()
+	}
+	return phrases
 }
 
 // speakingName returns the speaker of a line shaped like `Name: "…"`, or "".

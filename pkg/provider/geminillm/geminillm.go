@@ -23,6 +23,7 @@ func init() {
 				provider.FeatureThinking,
 				provider.FeatureKeyRequired,
 				provider.FeatureModelCatalogue,
+				provider.FeatureSessions,
 			},
 			Presets: []provider.Preset{
 				{ID: "gemini", Order: 8, Label: "Google Gemini (Cloud API)",

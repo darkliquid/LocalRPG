@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -519,9 +520,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// Long memory is a recollection, not canon, so it is injected as one and canon
 	// wins wherever they disagree.
 	summary := ""
+	summaryVersion := 0
 	if o.chronicler != nil {
 		if chronicle, err := o.chronicler.Recap(o.gameID()); err == nil {
 			summary = chronicle.Summary
+			summaryVersion = chronicle.ThroughTurn
 		}
 	}
 
@@ -538,33 +541,53 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 
+	var workingSet WorkingSet
+	if o.store != nil {
+		if records, err := o.store.LoadWorkingSet(); err == nil && len(records) > 0 {
+			workingSet.FromStorageRecords(records)
+		}
+	}
+	workingSetSelection := workingSet.Select(8)
+
 	assembly, err := o.assembler.Assemble(harness.ContextRequest{
-		Context:     ctx,
-		LocationID:  locationID,
-		PlayerID:    o.playerID,
-		Action:      generationPrompt,
-		RulesPrompt: o.rulesPrompt,
-		LorePrompt:  o.lorePrompt,
-		Profiles:    o.timeline.VoiceProfiles(),
-		Recent:      recent,
-		TurnNumber:  turnNum,
-		Summary:     summary,
-		Threads:     threads,
-		SpeechCues:  o.speechCues,
+		Context:        ctx,
+		LocationID:     locationID,
+		PlayerID:       o.playerID,
+		Action:         generationPrompt,
+		RulesPrompt:    o.rulesPrompt,
+		LorePrompt:     o.lorePrompt,
+		Profiles:       o.timeline.VoiceProfiles(),
+		Recent:         recent,
+		TurnNumber:     turnNum,
+		Mode:           mode,
+		Summary:        summary,
+		SummaryVersion: summaryVersion,
+		WorkingSet:     workingSetSelection,
+		Threads:        threads,
+		SpeechCues:     o.speechCues,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)
 	}
-	contextPrompt := assembly.Prompt
 
-	if gmDirective != "" {
-		contextPrompt = gmDirective + "\n\n" + contextPrompt
-	}
-
-	result, err := o.runGenerationLoop(ctx, contextPrompt, onChunk)
+	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, onChunk)
 	if err != nil {
 		o.logger.Event("generation.error", map[string]interface{}{"error": err.Error()})
 		return nil, fmt.Errorf("gm generation failed: %w", err)
+	}
+
+	turnSpan.SetAttributes(
+		attribute.String("localrpg.context.strategy", string(assembly.Context.Strategy)),
+		attribute.String("localrpg.context.prefix_hash", assembly.Context.PrefixHash),
+		attribute.Int("localrpg.provider.cached_tokens", assembly.Context.CachedTokens),
+	)
+	if assembly.Context.Session != nil {
+		turnSpan.SetAttributes(attribute.String("localrpg.context.session_id", assembly.Context.Session.ID))
+	}
+
+	contextPrompt := assembly.Prompt
+	if gmDirective != "" {
+		contextPrompt = gmDirective + "\n\n" + contextPrompt
 	}
 
 	cause := o.classifyCut(result)
@@ -597,6 +620,8 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Truncated:    stillIncomplete,
 		Recovery:     string(recovery),
 		ContextNotes: assembly.Trimmed,
+		Context:      &assembly.Context,
+		Prompt:       contextPrompt,
 		ToolCalls:    result.Provenance,
 	}
 
@@ -638,7 +663,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	if o.continuityEnabled() {
 		_, continuitySpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "continuity.check")
-		findings := CheckContinuity(o.store, &turn, locationID, o.playerID)
+		findings := CheckContinuity(ContinuityInput{
+			Store:      o.store,
+			Turn:       &turn,
+			LocationID: locationID,
+			PlayerID:   o.playerID,
+			Context:    assembly.Context,
+			WorkingSet: &workingSet,
+		})
 		for _, finding := range findings {
 			turn.ContinuityNotes = append(turn.ContinuityNotes, finding.Note)
 		}
@@ -689,6 +721,15 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// would be read in the narrator's voice.
 	if err := o.timeline.RecordTurnContext(ctx, &turn, extraction.Entities); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
+	}
+
+	if o.store != nil {
+		var allTurnRefs []harness.Ref
+		if turn.Context != nil {
+			allTurnRefs = turn.Context.Refs
+		}
+		workingSet.Apply(turnNum, allTurnRefs)
+		_ = o.store.ReplaceWorkingSet(workingSet.ToStorageRecords())
 	}
 
 	trace.LogEvent(ctx, o.logger, "record.turn", map[string]interface{}{
@@ -852,20 +893,139 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 // answer. The result is the last reply that carried no tool calls. With no
 // executor attached the loop makes exactly one call, shaped as it was before
 // tools existed, so nothing changes for a provider that cannot call them.
-func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, contextPrompt string, onChunk func(string) error) (streamResult, error) {
-	// One user turn carrying the assembled context keeps the request identical to
-	// the single-prompt path for a provider that ignores messages.
-	messages := []harness.Message{{Role: "user", Content: contextPrompt}}
+func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harness.AssembleResult, gmDirective string, onChunk func(string) error) (streamResult, error) {
+	contextPrompt := assembly.Prompt
+	if gmDirective != "" {
+		contextPrompt = gmDirective + "\n\n" + contextPrompt
+	}
 
 	provider, err := o.router.GetProviderForRole("gm")
 	if err != nil {
 		return streamResult{}, err
 	}
+
+	caps := harness.Describe(provider)
+	modelName := provider.ID()
+	if m, ok := provider.(interface{ Model() string }); ok && m.Model() != "" {
+		modelName = m.Model()
+	}
+
+	turnNum := assembly.Context.TurnNumber
+	var storedSession *harness.ProviderSession
+	if turnNum > 1 && o.store != nil {
+		if raw, _, err := o.store.GetTurnContext(turnNum - 1); err == nil && len(raw) > 0 {
+			var prevCtx harness.TurnContext
+			if err := json.Unmarshal(raw, &prevCtx); err == nil && prevCtx.Session != nil {
+				storedSession = prevCtx.Session
+			}
+		}
+	}
+
+	strategy := harness.SelectStrategy(caps, storedSession, turnNum-1, assembly.Context.PrefixHash, modelName)
+	assembly.Context.Strategy = strategy
+
 	isCaller := false
 	if caller, ok := provider.(harness.ToolCaller); ok {
 		isCaller = caller.ToolCallerCapable()
 	}
 	canCallTools := o.offersTools(isCaller)
+
+	// Server session strategy: try ContinueSession
+	if strategy == harness.StrategyServerSession {
+		if sessProvider, ok := provider.(harness.SessionProvider); ok && storedSession != nil {
+			deltaPrompt := assembly.DeltaPrompt
+			if gmDirective != "" {
+				deltaPrompt = gmDirective + "\n\n" + deltaPrompt
+			}
+			deltaReq := harness.GenerateRequest{
+				Prompt: deltaPrompt,
+				System: o.rulesPrompt,
+			}
+			if canCallTools {
+				deltaReq.Tools = harness.ToolSpecs()
+			}
+			handle := &harness.SessionHandle{
+				ID:          storedSession.ID,
+				ThroughTurn: storedSession.ThroughTurn,
+			}
+			resp, err := sessProvider.ContinueSession(ctx, handle, deltaReq)
+			if err == nil {
+				if onChunk != nil && resp.Text != "" {
+					_ = onChunk(resp.Text)
+				}
+				assembly.Context.CachedTokens = resp.CachedTokens
+				newID := resp.SessionID
+				if newID == "" {
+					newID = storedSession.ID
+				}
+				assembly.Context.Session = &harness.ProviderSession{
+					Provider:    provider.ID(),
+					ID:          newID,
+					ThroughTurn: turnNum,
+					Model:       modelName,
+					PrefixHash:  assembly.Context.PrefixHash,
+				}
+				return streamResult{Text: resp.Text}, nil
+			}
+			// Session continuation failed: fallback to full_prompt
+			o.logger.Event("context.session_fallback", map[string]interface{}{
+				"error":    err.Error(),
+				"from":     string(harness.StrategyServerSession),
+				"fallback": string(harness.StrategyFullPrompt),
+			})
+			assembly.Context.Strategy = harness.StrategyFullPrompt
+		}
+	}
+
+	// Cached prefix strategy: ensure cache
+	if strategy == harness.StrategyCachedPrefix {
+		if cacher, ok := provider.(harness.ContextCacher); ok {
+			_, err := cacher.EnsureCache(ctx, assembly.PrefixPrompt, 1*time.Hour)
+			if err != nil {
+				o.logger.Event("context.cache_fallback", map[string]interface{}{
+					"error":    err.Error(),
+					"fallback": string(harness.StrategyFullPrompt),
+				})
+				assembly.Context.Strategy = harness.StrategyFullPrompt
+			}
+		}
+	}
+
+	// If provider supports sessions, try StartSession when starting or falling back
+	if sessProvider, ok := provider.(harness.SessionProvider); ok {
+		fullReq := harness.GenerateRequest{
+			Prompt: contextPrompt,
+			System: o.rulesPrompt,
+		}
+		if canCallTools {
+			fullReq.Tools = harness.ToolSpecs()
+		}
+		handle, err := sessProvider.StartSession(ctx, fullReq)
+		if err == nil && handle != nil {
+			text := ""
+			if handle.Response != nil {
+				text = handle.Response.Text
+				if onChunk != nil && text != "" {
+					_ = onChunk(text)
+				}
+			}
+			assembly.Context.CachedTokens = handle.CachedTokens
+			assembly.Context.Session = &harness.ProviderSession{
+				Provider:    provider.ID(),
+				ID:          handle.ID,
+				ThroughTurn: turnNum,
+				Model:       modelName,
+				PrefixHash:  assembly.Context.PrefixHash,
+			}
+			if text != "" {
+				return streamResult{Text: text}, nil
+			}
+		}
+	}
+
+	// One user turn carrying the assembled context keeps the request identical to
+	// the single-prompt path for a provider that ignores messages.
+	messages := []harness.Message{{Role: "user", Content: contextPrompt}}
 
 	var provenance []ToolCallRecord
 	withdrawn := false

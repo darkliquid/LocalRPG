@@ -33,7 +33,7 @@
 **Interfaces:**
 - Produces: `harness.RefKind`, `harness.Ref`, `harness.SectionReport`, `harness.ContextStrategy`, `harness.ProviderSession`, `harness.TurnContext`, and `AssembleResult.Context TurnContext`.
 
-- [ ] **Step 1: Write the failing provenance test**
+- [x] **Step 1: Write the failing provenance test**
 
 ```go
 func TestAssembleRecordsSectionRefs(t *testing.T) {
@@ -72,18 +72,18 @@ func TestAssembleRecordsSectionRefs(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `go test -run TestAssembleRecordsSectionRefs ./pkg/harness/ -v`
 Expected: FAIL — `result.Context` undefined.
 
-- [ ] **Step 3: Add the types**
+- [x] **Step 3: Add the types**
 
 Create `pkg/harness/context_types.go` with the `RefKind`, `Ref`,
 `SectionReport`, `ContextStrategy`, `ProviderSession`, and `TurnContext` types
 exactly as specified in spec §2, with JSON tags.
 
-- [ ] **Step 4: Populate refs while building sections**
+- [x] **Step 4: Populate refs while building sections**
 
 In `pkg/harness/context.go`, change the internal `section` struct to carry
 `refs []Ref` and `source string`, and have each builder return them:
@@ -115,7 +115,7 @@ result.Context = TurnContext{
 Add `SummaryVersion int` and `Mode string` to `ContextRequest`. Keep
 `AssembleResult.Prompt` unchanged.
 
-- [ ] **Step 5: Record context in history**
+- [x] **Step 5: Record context in history**
 
 In `pkg/engine/history.go`, add to `TurnRecord`:
 
@@ -126,7 +126,7 @@ Context *harness.TurnContext `json:"context,omitempty"`
 and set it in the orchestrator when the turn is recorded (the field is already
 available on `AssembleResult`).
 
-- [ ] **Step 6: Run and commit**
+- [x] **Step 6: Run and commit**
 
 Run: `go vet ./... && go test -count=1 ./pkg/harness/ ./pkg/engine/`
 Expected: PASS.
@@ -150,7 +150,7 @@ git commit -m "feat(context): record typed provenance with every turn"
 **Interfaces:**
 - Produces: `storage.Store.SaveTurnContext(number int, prompt string, ctx harness.TurnContext) error`, `storage.Store.GetTurnContext(number int) (harness.TurnContext, string, error)`.
 
-- [ ] **Step 1: Write the failing round-trip test**
+- [x] **Step 1: Write the failing round-trip test**
 
 ```go
 func TestTurnContextRoundTrip(t *testing.T) {
@@ -169,8 +169,8 @@ func TestTurnContextRoundTrip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
-- [ ] **Step 3: Add the table and methods**
+- [x] **Step 2: Run it to verify it fails**
+- [x] **Step 3: Add the table and methods**
 
 Add to the schema and migration:
 
@@ -189,13 +189,13 @@ harness import only if it does not exist — if a cycle appears, store the JSON 
 `[]byte` and let the engine decode; prefer the engine-side decode to keep
 storage free of harness).
 
-- [ ] **Step 4: Write the snapshot from `Timeline.RecordTurn`**
+- [x] **Step 4: Write the snapshot from `Timeline.RecordTurn`**
 
 After the history append succeeds, call `SaveTurnContext` with the assembled
 prompt. The prompt travels from `ProcessAction` to `RecordTurn` as a new
 `Turn.Prompt` field (not persisted to history).
 
-- [ ] **Step 5: Run and commit**
+- [x] **Step 5: Run and commit**
 
 Run: `go test -count=1 ./pkg/storage/ ./pkg/engine/`
 Expected: PASS.
@@ -220,7 +220,7 @@ git commit -m "feat(context): persist the exact turn prompt and context snapshot
 **Interfaces:**
 - Produces: `engine.WorkingEntry`, `engine.WorkingSet`, `(*WorkingSet).Apply(turn int, refs []harness.Ref)`, `(*WorkingSet).Select(limit int) []harness.Ref`, `(*WorkingSet).Rederive(turns []Turn) WorkingSet`.
 
-- [ ] **Step 1: Write the failing decay/selection test**
+- [x] **Step 1: Write the failing decay/selection test**
 
 ```go
 func TestWorkingSetDecaysAndSelects(t *testing.T) {
@@ -235,32 +235,32 @@ func TestWorkingSetDecaysAndSelects(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
-- [ ] **Step 3: Implement the working set**
+- [x] **Step 2: Run it to verify it fails**
+- [x] **Step 3: Implement the working set**
 
 `pkg/engine/memory.go` with a decay factor, floor, age cap, and entry cap as
 constants. `Apply` stamps/boosts each ref and decays the rest; `Select` returns
 the top N; `Rederive` replays history turns through `Apply` in order.
 
-- [ ] **Step 4: Persist and load it**
+- [x] **Step 4: Persist and load it**
 
 Add the `working_set` table and `ReplaceWorkingSet`/`LoadWorkingSet` on the
 store. In the orchestrator, before assembly load the set, pass its selection to
 the assembler, and after recording the turn apply the turn's refs and replace
 the persisted set.
 
-- [ ] **Step 5: Add the working-set prompt section**
+- [x] **Step 5: Add the working-set prompt section**
 
 In `buildSections`, insert a `working_set` section between `canon` and `summary`
 with `rank: 5` (dropped after retrieval). Render entries as a short
 "active continuity" list of names/arcs.
 
-- [ ] **Step 6: Repair on index rebuild**
+- [x] **Step 6: Repair on index rebuild**
 
 In `pkg/engine/timeline.go:EnsureIndexed`, if `LoadWorkingSet` is empty, call
 `Rederive` over the last N history turns and `ReplaceWorkingSet`.
 
-- [ ] **Step 7: Run and commit**
+- [x] **Step 7: Run and commit**
 
 Run: `go test -count=1 ./pkg/engine/ ./pkg/storage/ ./pkg/harness/`
 Expected: PASS.
@@ -282,7 +282,7 @@ git commit -m "feat(context): carry a persistent working set across turns"
 **Interfaces:**
 - Consumes: `harness.TurnContext.Refs`, `engine.WorkingSet`.
 
-- [ ] **Step 1: Write the failing checks test**
+- [x] **Step 1: Write the failing checks test**
 
 ```go
 func TestContinuityFlagsUnknownNamedEntity(t *testing.T) {
@@ -296,15 +296,15 @@ func TestContinuityFlagsUnknownNamedEntity(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
-- [ ] **Step 3: Implement the extended pass**
+- [x] **Step 2: Run it to verify it fails**
+- [x] **Step 3: Implement the extended pass**
 
 Extend `continuity.go` with `RuleUnknownEntity` (a named entity absent from
 refs/working set and not newly introduced), reusing the existing mention
 resolution. Keep the existing rename/thread/summary checks and emit the same
 finding shape used by the findings list.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS.
@@ -329,7 +329,7 @@ git commit -m "feat(continuity): check narration against declared context refs"
 **Interfaces:**
 - Produces: `harness.SessionHandle`, `harness.SessionProvider`, `harness.ContextCacher`, `harness.SelectStrategy(caps Capabilities, stored *ProviderSession, tip int, prefixHash, model string) ContextStrategy`.
 
-- [ ] **Step 1: Write the failing selection-test matrix**
+- [x] **Step 1: Write the failing selection-test matrix**
 
 ```go
 func TestSelectStrategy(t *testing.T) {
@@ -359,14 +359,14 @@ func TestSelectStrategy(t *testing.T) {
 `full_prompt`. The test's "mismatched" case expects `full_prompt`; encode the
 exact rule from spec §4.1 in the implementation and test both branches.)
 
-- [ ] **Step 2: Run it to verify it fails**
-- [ ] **Step 3: Implement the interfaces and selector**
+- [x] **Step 2: Run it to verify it fails**
+- [x] **Step 3: Implement the interfaces and selector**
 
 `pkg/harness/session.go` defines `SessionHandle`, `SessionProvider`,
 `ContextCacher` (spec §4). `pkg/harness/context_plan.go` implements
 `SelectStrategy` and a `PrefixHash`/`BuildPrefix` helper over the stable sections.
 
-- [ ] **Step 4: Gate the orchestrator**
+- [x] **Step 4: Gate the orchestrator**
 
 In `runGenerationLoop`, before the first request:
 - load the stored session from the previous turn's context;
@@ -377,19 +377,19 @@ In `runGenerationLoop`, before the first request:
   fallback on the root span and in `TurnContext.Strategy`;
 - persist the new/continued session in `TurnContext.Session`.
 
-- [ ] **Step 5: Clear the session on rewind**
+- [x] **Step 5: Clear the session on rewind**
 
 In `Timeline.RewindToTurn`, delete the `turn_contexts` rows above the target and
 the session reference, so the next turn rebuilds with `full_prompt`.
 
-- [ ] **Step 6: Implement Gemini `SessionProvider`**
+- [x] **Step 6: Implement Gemini `SessionProvider`**
 
 `gemini_provider.go` gains `StartSession`/`ContinueSession` over
 `POST /v1beta/interactions` and `previous_interaction_id`, reading
 `usage.total_cached_tokens` into `CachedTokens`. `store=false` is never used;
 the id is treated as a cache.
 
-- [ ] **Step 7: Run and commit**
+- [x] **Step 7: Run and commit**
 
 Run: `go vet ./... && go test -count=1 ./pkg/harness/ ./pkg/engine/`
 Expected: PASS.
@@ -413,26 +413,26 @@ git commit -m "feat(context): prefer provider sessions and cached prefixes when 
 **Interfaces:**
 - Produces: `GET /api/game/{id}/context`, `GET /api/game/{id}/working-set`.
 
-- [ ] **Step 1: Add the endpoints and route tests**
+- [x] **Step 1: Add the endpoints and route tests**
 
 `Service.GetTurnContext(gameID string) (*TurnContextDTO, error)` reads the last
 turn's context; `Service.GetWorkingSet(gameID string)` returns the current set.
 Register both routes and assert they decode in `server_test.go`.
 
-- [ ] **Step 2: Add frontend types and client methods** for `TurnContext`,
+- [x] **Step 2: Add frontend types and client methods** for `TurnContext`,
 `SectionReport`, `Ref`, `WorkingEntry`, and `APIClient.getTurnContext(id)` /
 `getWorkingSet(id)`.
 
-- [ ] **Step 3: Build the Context drawer** showing sections, tokens, inclusion,
+- [x] **Step 3: Build the Context drawer** showing sections, tokens, inclusion,
 refs as wikilinks, trimmed items, the working set, strategy, session id, prefix
 hash, and cached tokens. Link it from the Debug panel.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `go test -count=1 ./pkg/gui/ && cd frontend && npx tsc --noEmit`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui frontend/src

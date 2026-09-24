@@ -8,8 +8,10 @@ import (
 // SessionHandle identifies a server-held conversation. The turn-context work
 // persists it with the turn and uses it only when it covers the current tip.
 type SessionHandle struct {
-	ID          string
-	ThroughTurn int
+	ID           string
+	ThroughTurn  int
+	Response     *GenerateResponse
+	CachedTokens int
 }
 
 // SessionProvider is implemented by providers that can continue a server-held

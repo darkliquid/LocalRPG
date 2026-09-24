@@ -246,6 +246,9 @@ func (s *Store) DeleteTurnsFrom(number int) error {
 	if _, err := tx.Exec(`DELETE FROM turn_entities WHERE turn_number >= ?`, number); err != nil {
 		return fmt.Errorf("delete turn links from %d: %w", number, err)
 	}
+	if _, err := tx.Exec(`DELETE FROM turn_contexts WHERE turn_number >= ?`, number); err != nil {
+		return fmt.Errorf("delete turn contexts from %d: %w", number, err)
+	}
 	if _, err := tx.Exec(`DELETE FROM turns WHERE number >= ?`, number); err != nil {
 		return fmt.Errorf("delete turns from %d: %w", number, err)
 	}
@@ -399,4 +402,29 @@ func (s *Store) EntitiesInTurns(turnNumbers []int) ([]string, error) {
 		return nil, fmt.Errorf("entities in turns: %w", err)
 	}
 	return ids, nil
+}
+
+// SaveTurnContext stores the assembled prompt and context JSON for a turn.
+func (s *Store) SaveTurnContext(number int, prompt string, contextJSON []byte) error {
+	const upsert = `
+	INSERT INTO turn_contexts (turn_number, prompt, context_json)
+	VALUES (?, ?, ?)
+	ON CONFLICT(turn_number) DO UPDATE SET
+		prompt = excluded.prompt,
+		context_json = excluded.context_json
+	`
+	if _, err := s.db.Exec(upsert, number, prompt, string(contextJSON)); err != nil {
+		return fmt.Errorf("save turn context %d: %w", number, err)
+	}
+	return nil
+}
+
+// GetTurnContext retrieves the raw context JSON and prompt for a turn.
+func (s *Store) GetTurnContext(number int) ([]byte, string, error) {
+	const query = `SELECT prompt, context_json FROM turn_contexts WHERE turn_number = ?`
+	var prompt, ctxStr string
+	if err := s.db.QueryRow(query, number).Scan(&prompt, &ctxStr); err != nil {
+		return nil, "", fmt.Errorf("get turn context %d: %w", number, err)
+	}
+	return []byte(ctxStr), prompt, nil
 }

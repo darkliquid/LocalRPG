@@ -253,6 +253,30 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, state)
 
+	case "context":
+		if r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		turnCtx, err := s.service.GetTurnContext(gameID)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, turnCtx)
+
+	case "working-set":
+		if r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		workingSet, err := s.service.GetWorkingSet(gameID)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, workingSet)
+
 	case "entities":
 		entities, err := s.service.ListEntities(r.Context(), gameID)
 		if err != nil {
