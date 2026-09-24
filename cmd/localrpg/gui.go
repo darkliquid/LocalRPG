@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/gui"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -62,6 +65,20 @@ func handleGUICommand(args []string) {
 	// duplicating the relative-path resolution the service already did.
 	svc.SetLogger(buildTraceLogger(svc.Config(), os.Args, svc.GetResolver().CacheDir()))
 	defer func() { _ = storage.CloseGameStores() }()
+
+	telemetryProvider, err := telemetry.New(context.Background(), svc.Config().Telemetry, telemetry.BuildInfo{
+		Version: Version,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error starting telemetry: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = telemetryProvider.Shutdown(shutdownCtx)
+	}()
+
 	handler := gui.ProtectCrossOrigin(gui.NewServer(svc, gui.AssetHandler()))
 
 	// 1. Explicit TCP Web Mode

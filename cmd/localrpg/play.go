@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/darkliquid/localrpg/pkg/config"
@@ -13,6 +15,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/tools"
 	"github.com/darkliquid/localrpg/pkg/tui"
 )
@@ -25,6 +28,20 @@ func handlePlayCommand(args []string) {
 
 	cfgMgr := config.NewConfigManager()
 	cfg, _ := cfgMgr.Load()
+
+	telemetryProvider, err := telemetry.New(context.Background(), cfg.Telemetry, telemetry.BuildInfo{
+		Version:    Version,
+		ConfigFile: cfgMgr.ActiveFilePath(),
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error starting telemetry: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = telemetryProvider.Shutdown(shutdownCtx)
+	}()
 
 	gameID := args[0]
 	paths := core.NewCustomPathResolver(cfg.Paths.Systems, cfg.Paths.Worlds, cfg.Paths.Games, cfg.Paths.Cache)

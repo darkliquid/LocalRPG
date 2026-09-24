@@ -206,6 +206,21 @@ type PreferencesConfig struct {
 	TraceLevel string `yaml:"trace_level" json:"trace_level"`
 }
 
+// TelemetryConfig configures OpenTelemetry export. The zero value is disabled,
+// so configuration written before telemetry existed behaves as it did.
+type TelemetryConfig struct {
+	Enabled     bool              `yaml:"enabled" json:"enabled"`
+	Endpoint    string            `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
+	Protocol    string            `yaml:"protocol,omitempty" json:"protocol,omitempty"`
+	Insecure    bool              `yaml:"insecure,omitempty" json:"insecure,omitempty"`
+	SampleRatio float64           `yaml:"sample_ratio,omitempty" json:"sample_ratio,omitempty"`
+	Traces      bool              `yaml:"traces" json:"traces"`
+	Metrics     bool              `yaml:"metrics" json:"metrics"`
+	Logs        bool              `yaml:"logs" json:"logs"`
+	Headers     map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
+	ServiceName string            `yaml:"service_name,omitempty" json:"service_name,omitempty"`
+}
+
 // ProvidersConfig groups shared credentials and defaults for external ecosystem providers.
 type ProvidersConfig struct {
 	Gemini GeminiProviderConfig `yaml:"gemini,omitempty" json:"gemini,omitempty"`
@@ -222,6 +237,7 @@ type Config struct {
 	Agents      AgentsConfig      `yaml:"agents" json:"agents"`
 	Media       MediaConfig       `yaml:"media" json:"media"`
 	Preferences PreferencesConfig `yaml:"preferences" json:"preferences"`
+	Telemetry   TelemetryConfig   `yaml:"telemetry,omitempty" json:"telemetry,omitempty"`
 }
 
 func DefaultConfig() *Config {
@@ -333,6 +349,17 @@ func DefaultConfig() *Config {
 			TypingSpeedMS:    15,
 			CinematicEffects: true,
 			FontScale:        "medium",
+		},
+		Telemetry: TelemetryConfig{
+			Enabled:     false,
+			Endpoint:    "localhost:4317",
+			Protocol:    "grpc",
+			Insecure:    true,
+			SampleRatio: 1.0,
+			Traces:      true,
+			Metrics:     true,
+			Logs:        true,
+			ServiceName: "localrpg",
 		},
 	}
 }

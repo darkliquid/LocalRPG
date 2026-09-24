@@ -385,3 +385,12 @@ media:
 	}
 }
 
+func TestDefaultTelemetryIsDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Telemetry.Enabled {
+		t.Fatal("telemetry must default to disabled")
+	}
+	if cfg.Telemetry.Endpoint != "localhost:4317" || !cfg.Telemetry.Traces {
+		t.Fatalf("unexpected telemetry defaults: %+v", cfg.Telemetry)
+	}
+}
