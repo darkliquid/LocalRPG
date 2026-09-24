@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { DebugPanel } from './DebugPanel';
 import { APIClient } from '../api/client';
-import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile, ModelStatus, ProviderVoice } from '../types';
+import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile, ModelStatus, ProviderVoice, ProviderPreset, TTSConfig, STTConfig, ImageConfig } from '../types';
 import { ModelDownloadModal } from './ModelDownloadModal';
 import {
   Folder,
@@ -29,7 +29,8 @@ import {
   IMAGE_PRESETS,
   DEFAULT_VOICE_PROFILES,
   KOKORO_VOICE_PROFILES,
-} from '../templates/providerPresets';
+} from '../lib/providerPresetsFallback';
+import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { VoiceOptionsControl } from './VoiceOptionsControl';
 import { useTTSInspect } from '../hooks/useTTSInspect';
 import { VoiceCombobox } from './VoiceCombobox';
@@ -83,6 +84,24 @@ const narrationModels = (models: { id: string; supported_actions?: string[] }[])
     })
     .map((m) => m.id);
 
+// mergePresets overlays catalogue presets on the built-in fallback list, so a
+// provider that publishes presets is authoritative while the app still works if
+// the catalogue is unavailable.
+const mergePresets = <T,>(
+  catalog: ProviderPreset[],
+  fallback: Record<string, { label: string; description: string; config: T }>
+): Record<string, { label: string; description: string; config: T }> => {
+  const merged = { ...fallback };
+  for (const preset of catalog) {
+    merged[preset.id] = {
+      label: preset.label,
+      description: preset.description,
+      config: preset.config as unknown as T,
+    };
+  }
+  return merged;
+};
+
 // A missing role falls back to inheriting gm for the extractor, which is what
 // makes extraction work out of the box without a second configuration step.
 const defaultRoleConfig = (role: string): AgentRoleConfig =>
@@ -107,6 +126,10 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   // before it is saved. The fallback keeps the hook unconditional during load.
   const inspectConfig = config?.media.tts ?? { type: 'disabled' as const, auto_play: false, master_volume: 1 };
   const { inspect, loading: inspecting, refresh: refreshInspect, error: inspectError } = useTTSInspect(inspectConfig, Boolean(config));
+
+  // The provider catalogue feeds preset lists so a provider that publishes
+  // presets is the source of truth; the built-in fallback covers the rest.
+  const { presets: catalogPresets } = useProviderCatalog(Boolean(config));
 
   // Selected agent role for editing
   const [selectedRole, setSelectedRole] = useState<string>('gm');
@@ -303,6 +326,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const currentRoleConfig: AgentRoleConfig = config.agents.roles[selectedRole] || defaultRoleConfig(selectedRole);
 
   const roleNames = Array.from(new Set([...Object.keys(config.agents.roles), 'extractor']));
+
+  const agentPresets = mergePresets<AgentRoleConfig>(catalogPresets('llm'), AGENT_PRESETS);
+  const ttsPresets = mergePresets<TTSConfig>(catalogPresets('tts'), TTS_PRESETS);
+  const sttPresets = mergePresets<STTConfig>(catalogPresets('stt'), STT_PRESETS);
+  const imagePresets = mergePresets<ImageConfig>(catalogPresets('image'), IMAGE_PRESETS);
 
   const kokoroStatus = models.find((m) => m.id === 'kokoro-tts');
   const isGeminiTTS =
@@ -570,8 +598,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <select
                   onChange={(e) => {
                     const key = e.target.value;
-                    if (key && AGENT_PRESETS[key]) {
-                      const preset = AGENT_PRESETS[key].config;
+                    if (key && agentPresets[key]) {
+                      const preset = agentPresets[key].config;
                       setConfig({
                         ...config,
                         agents: {
@@ -586,7 +614,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load Preset...</option>
-                  {Object.entries(AGENT_PRESETS).map(([id, p]) => (
+                  {Object.entries(agentPresets).map(([id, p]) => (
                     <option key={id} value={id}>
                       {p.label}
                     </option>
@@ -1424,8 +1452,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <select
                   onChange={(e) => {
                     const key = e.target.value;
-                    if (key && TTS_PRESETS[key]) {
-                      const preset = TTS_PRESETS[key].config;
+                    if (key && ttsPresets[key]) {
+                      const preset = ttsPresets[key].config;
                       setConfig({
                         ...config,
                         media: {
@@ -1449,7 +1477,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load TTS Preset...</option>
-                  {Object.entries(TTS_PRESETS).map(([id, p]) => (
+                  {Object.entries(ttsPresets).map(([id, p]) => (
                     <option key={id} value={id}>
                       {p.label}
                     </option>
@@ -2365,8 +2393,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <select
                   onChange={(e) => {
                     const key = e.target.value;
-                    if (key && STT_PRESETS[key]) {
-                      const preset = STT_PRESETS[key].config;
+                    if (key && sttPresets[key]) {
+                      const preset = sttPresets[key].config;
                       setConfig({
                         ...config,
                         media: { ...config.media, stt: { ...preset } },
@@ -2378,7 +2406,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load STT Preset...</option>
-                  {Object.entries(STT_PRESETS).map(([id, p]) => (
+                  {Object.entries(sttPresets).map(([id, p]) => (
                     <option key={id} value={id}>
                       {p.label}
                     </option>
@@ -2501,8 +2529,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <select
                   onChange={(e) => {
                     const key = e.target.value;
-                    if (key && IMAGE_PRESETS[key]) {
-                      const preset = IMAGE_PRESETS[key].config;
+                    if (key && imagePresets[key]) {
+                      const preset = imagePresets[key].config;
                       setConfig({
                         ...config,
                         media: {
@@ -2517,7 +2545,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   defaultValue=""
                 >
                   <option value="" disabled>⚡ Load Image Preset...</option>
-                  {Object.entries(IMAGE_PRESETS).map(([id, p]) => (
+                  {Object.entries(imagePresets).map(([id, p]) => (
                     <option key={id} value={id}>
                       {p.label}
                     </option>

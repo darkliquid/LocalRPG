@@ -550,7 +550,6 @@ func TestTestProviderSherpaTTSMissingModelReturnsStructuredMissing(t *testing.T)
 	}
 }
 
-
 func TestGetGameStateFindsALegacyDisplayNamePlayer(t *testing.T) {
 	gameID, svc := setupTestGame(t)
 

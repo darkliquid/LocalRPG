@@ -30,6 +30,7 @@ import {
   ModelCatalogueResponse,
   VoiceSearchRequest,
   VoiceSearchResponse,
+  ProviderCatalog,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -305,6 +306,12 @@ export class APIClient {
       body: JSON.stringify(req),
     });
     if (!res.ok) throw new Error(`inspectTTS: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async listProviders(): Promise<ProviderCatalog> {
+    const res = await fetch('/api/providers');
+    if (!res.ok) throw new Error(`listProviders: ${res.statusText}`);
     return res.json();
   }
 

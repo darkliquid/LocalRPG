@@ -253,4 +253,3 @@ func TestGenerateLocationImageCachesJPEG(t *testing.T) {
 		t.Errorf("expected 0 calls on cache hit, got %d", client.calls)
 	}
 }
-

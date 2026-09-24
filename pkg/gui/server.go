@@ -49,9 +49,9 @@ func routePattern(path string) string {
 	switch {
 	case path == "/api/games" || path == "/api/systems" || path == "/api/worlds" ||
 		path == "/api/settings" || path == "/api/settings/test-provider" ||
-		path == "/api/providers/models" || path == "/api/tts/inspect" ||
-		path == "/api/tts/voices/search" || path == "/api/stt" ||
-		path == "/api/trace" || path == "/api/character/generate":
+		path == "/api/providers" || path == "/api/providers/models" ||
+		path == "/api/tts/inspect" || path == "/api/tts/voices/search" ||
+		path == "/api/stt" || path == "/api/trace" || path == "/api/character/generate":
 		return path
 	case path == "/api/models" || strings.HasPrefix(path, "/api/models/"):
 		return "/api/models"
@@ -86,6 +86,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/world/", s.handleWorldRoutes)
 	s.mux.HandleFunc("/api/settings", s.handleSettingsRoutes)
 	s.mux.HandleFunc("/api/settings/test-provider", s.handleTestProviderRoute)
+	s.mux.HandleFunc("/api/providers", s.handleProviderCatalogRoute)
 	s.mux.HandleFunc("/api/providers/models", s.handleModelCatalogueRoute)
 	s.mux.HandleFunc("/api/tts/inspect", s.handleTTSInspectRoute)
 	s.mux.HandleFunc("/api/tts/voices/search", s.handleVoiceSearchRoute)
@@ -812,6 +813,19 @@ func (s *Server) handleTTSInspectRoute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res, err := s.service.InspectTTS(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
+func (s *Server) handleProviderCatalogRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	res, err := s.service.ListProviders(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -132,17 +132,17 @@ func (s *SherpaTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, erro
 		tags                 []string
 		description          string
 	}{
-		"af":         {"Default (American Female)", "female", "american", []string{"american", "female", "default", "neutral"}, "The model's stock American female voice."},
-		"af_bella":   {"Bella (American Female)", "female", "american", []string{"american", "female", "warm", "friendly"}, "American female voice, warm, approachable, and pleasant."},
-		"af_nicole":  {"Nicole (American Female)", "female", "american", []string{"american", "female", "youthful", "energetic"}, "American female voice, brisk, youthful, and direct."},
-		"af_sarah":   {"Sarah (American Female)", "female", "american", []string{"american", "female", "poised", "narrative"}, "American female voice, polished, measured, and story-oriented."},
-		"af_sky":     {"Sky (American Female)", "female", "american", []string{"american", "female", "light", "airy"}, "American female voice, light, gentle, and breathy."},
-		"am_adam":    {"Adam (American Male)", "male", "american", []string{"american", "male", "deep", "authoritative"}, "American male voice, deep, steady, and commanding."},
-		"am_michael": {"Michael (American Male)", "male", "american", []string{"american", "male", "commanding", "formal"}, "American male voice, disciplined, authoritative, and formal."},
-		"bf_emma":    {"Emma (British Female)", "female", "british", []string{"british", "female", "gentle", "poised"}, "British female voice, elegant, gentle, and softly spoken."},
+		"af":          {"Default (American Female)", "female", "american", []string{"american", "female", "default", "neutral"}, "The model's stock American female voice."},
+		"af_bella":    {"Bella (American Female)", "female", "american", []string{"american", "female", "warm", "friendly"}, "American female voice, warm, approachable, and pleasant."},
+		"af_nicole":   {"Nicole (American Female)", "female", "american", []string{"american", "female", "youthful", "energetic"}, "American female voice, brisk, youthful, and direct."},
+		"af_sarah":    {"Sarah (American Female)", "female", "american", []string{"american", "female", "poised", "narrative"}, "American female voice, polished, measured, and story-oriented."},
+		"af_sky":      {"Sky (American Female)", "female", "american", []string{"american", "female", "light", "airy"}, "American female voice, light, gentle, and breathy."},
+		"am_adam":     {"Adam (American Male)", "male", "american", []string{"american", "male", "deep", "authoritative"}, "American male voice, deep, steady, and commanding."},
+		"am_michael":  {"Michael (American Male)", "male", "american", []string{"american", "male", "commanding", "formal"}, "American male voice, disciplined, authoritative, and formal."},
+		"bf_emma":     {"Emma (British Female)", "female", "british", []string{"british", "female", "gentle", "poised"}, "British female voice, elegant, gentle, and softly spoken."},
 		"bf_isabella": {"Isabella (British Female)", "female", "british", []string{"british", "female", "noble", "melodic"}, "British female voice, aristocratic, melodic, and graceful."},
-		"bm_george":  {"George (British Male)", "male", "british", []string{"british", "male", "mature", "distinguished"}, "British male voice, mature, distinguished, and resonant."},
-		"bm_lewis":   {"Lewis (British Male)", "male", "british", []string{"british", "male", "thoughtful", "refined"}, "British male voice, measured, polite, and reflective."},
+		"bm_george":   {"George (British Male)", "male", "british", []string{"british", "male", "mature", "distinguished"}, "British male voice, mature, distinguished, and resonant."},
+		"bm_lewis":    {"Lewis (British Male)", "male", "british", []string{"british", "male", "thoughtful", "refined"}, "British male voice, measured, polite, and reflective."},
 	}
 
 	for _, speaker := range speakers {

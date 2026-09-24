@@ -7,7 +7,14 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
+
+// ListProviders returns every registered provider descriptor, so the settings UI
+// can render from capabilities instead of provider names.
+func (s *Service) ListProviders(ctx context.Context) (*ProviderCatalogDTO, error) {
+	return &ProviderCatalogDTO{Providers: provider.List()}, nil
+}
 
 // ListModels returns the live model catalogue a Gemini key can reach, so the
 // editor reflects what the account actually has instead of a static list. An

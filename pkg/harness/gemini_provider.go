@@ -100,6 +100,11 @@ func (g *GeminiProvider) ToolCallerCapable() bool {
 	return true
 }
 
+// SupportsThinking reports that this provider accepts a reasoning budget.
+func (g *GeminiProvider) SupportsThinking() bool {
+	return true
+}
+
 func (g *GeminiProvider) SetLogger(logger trace.Logger) {
 	g.logger = trace.OrNil(logger)
 }

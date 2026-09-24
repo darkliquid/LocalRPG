@@ -753,4 +753,3 @@ func TestLiveKokoroFastAPI(t *testing.T) {
 		t.Errorf("legacy voice count = %d, want %d", len(legacyVoices), len(voices))
 	}
 }
-

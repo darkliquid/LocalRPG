@@ -219,4 +219,3 @@ func TestInspectTTSKokoroHTTP(t *testing.T) {
 		t.Errorf("unexpected voices: %+v", res.Catalog.Voices)
 	}
 }
-

@@ -9,6 +9,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
 type PlayerDTO struct {
@@ -357,6 +358,11 @@ type VoiceSearchRequestDTO struct {
 type VoiceSearchResponseDTO struct {
 	Voices []media.ProviderVoice `json:"voices"`
 	Error  string                `json:"error,omitempty"`
+}
+
+// ProviderCatalogDTO is every provider the build knows, as descriptors.
+type ProviderCatalogDTO struct {
+	Providers []provider.Descriptor `json:"providers"`
 }
 
 // TurnRequest is a player action as submitted from a client.

@@ -20,9 +20,12 @@ import (
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	_ "github.com/darkliquid/localrpg/pkg/provider/all"
+
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/models"
+	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
 
@@ -1017,4 +1020,31 @@ finished:
 	}
 }
 
+func TestProviderCatalogEndpoint(t *testing.T) {
+	svc := NewService(t.TempDir())
+	server := NewServer(svc, http.NotFoundHandler())
 
+	req := httptest.NewRequest("GET", "/api/providers", nil)
+	w := httptest.NewRecorder()
+	server.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var catalog ProviderCatalogDTO
+	if err := json.NewDecoder(w.Body).Decode(&catalog); err != nil {
+		t.Fatalf("decode catalog: %v", err)
+	}
+	if len(catalog.Providers) == 0 {
+		t.Fatal("expected registered providers in the catalog")
+	}
+	families := map[provider.Family]int{}
+	for _, desc := range catalog.Providers {
+		families[desc.Family]++
+	}
+	for _, family := range []provider.Family{provider.FamilyLLM, provider.FamilyTTS, provider.FamilySTT, provider.FamilyImage} {
+		if families[family] == 0 {
+			t.Errorf("expected at least one %s provider, got %v", family, families)
+		}
+	}
+}

@@ -2,9 +2,11 @@ package harness
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -58,19 +60,7 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 			return NewNarrativeOracleProvider(id), nil
 		}
 		if cfg.BuiltinName == "gemini" {
-			apiKey, err := ResolveGeminiAPIKey(cfg.APIKey, cfg.SharedAPIKey)
-			if err != nil {
-				return nil, err
-			}
-			return NewGeminiProvider(id, GeminiProviderOptions{
-				Model:          cfg.Model,
-				APIKey:         apiKey,
-				Temperature:    &cfg.Temperature,
-				MaxTokens:      &cfg.MaxTokens,
-				ThinkingBudget: cfg.ThinkingBudget,
-				TopP:           cfg.TopP,
-				TopK:           cfg.TopK,
-			})
+			return NewGeminiModelProvider(id, cfg)
 		}
 		if cfg.Command != "" {
 			return NewCLIProviderWithOptions(id, cfg.Command, cfg.Args, GenerationOptions{
@@ -80,22 +70,33 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 		}
 		return &builtinEchoModelProvider{id: id}, nil
 	case "gemini":
-		apiKey, err := ResolveGeminiAPIKey(cfg.APIKey, cfg.SharedAPIKey)
-		if err != nil {
-			return nil, err
-		}
-		return NewGeminiProvider(id, GeminiProviderOptions{
-			Model:          cfg.Model,
-			APIKey:         apiKey,
-			Temperature:    &cfg.Temperature,
-			MaxTokens:      &cfg.MaxTokens,
-			ThinkingBudget: cfg.ThinkingBudget,
-			TopP:           cfg.TopP,
-			TopK:           cfg.TopK,
-		})
+		return NewGeminiModelProvider(id, cfg)
 	default:
 		return nil, fmt.Errorf("unknown model provider type: %s", cfg.Type)
 	}
+}
+
+// BuildModel constructs a model provider from the registry by ID. It is the
+// facade the factory delegates to, so a provider package owns its descriptor and
+// its construction while callers keep using NewModelProvider.
+func BuildModel(id string, cfg ProviderConfig) (ModelProvider, error) {
+	reg, ok := provider.Lookup(id)
+	if !ok {
+		return nil, fmt.Errorf("harness: no provider registered for %q", id)
+	}
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("harness: encode %s config: %w", id, err)
+	}
+	built, err := reg.Build(context.Background(), raw)
+	if err != nil {
+		return nil, err
+	}
+	model, ok := built.(ModelProvider)
+	if !ok {
+		return nil, fmt.Errorf("harness: provider %q is not a model provider", id)
+	}
+	return model, nil
 }
 
 // NewModelProviderWithLogger is NewModelProvider with a trace sink attached, so a
