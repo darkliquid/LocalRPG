@@ -26,29 +26,3 @@ func ProviderIDFor(cfg ProviderConfig) string {
 		return ""
 	}
 }
-
-// NewOpenAIChatProvider builds the OpenAI-compatible HTTP provider.
-func NewOpenAIChatProvider(id string, cfg ProviderConfig) ModelProvider {
-	return NewHTTPProviderWithOptions(id, cfg.Endpoint, cfg.Model, cfg.APIKey, GenerationOptions{
-		Temperature: cfg.Temperature,
-		MaxTokens:   cfg.MaxTokens,
-	})
-}
-
-// NewGeminiModelProvider builds the Gemini provider, resolving the API key from
-// the role override, the shared key, or the environment.
-func NewGeminiModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
-	apiKey, err := ResolveGeminiAPIKey(cfg.APIKey, cfg.SharedAPIKey)
-	if err != nil {
-		return nil, err
-	}
-	return NewGeminiProvider(id, GeminiProviderOptions{
-		Model:          cfg.Model,
-		APIKey:         apiKey,
-		Temperature:    &cfg.Temperature,
-		MaxTokens:      &cfg.MaxTokens,
-		ThinkingBudget: cfg.ThinkingBudget,
-		TopP:           cfg.TopP,
-		TopK:           cfg.TopK,
-	})
-}

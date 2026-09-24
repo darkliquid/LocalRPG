@@ -45,7 +45,19 @@ func init() {
 			if id == "" {
 				id = "gemini"
 			}
-			return harness.NewGeminiModelProvider(id, payload.Config)
+			apiKey, err := harness.ResolveGeminiAPIKey(payload.Config.APIKey, payload.Config.SharedAPIKey)
+			if err != nil {
+				return nil, err
+			}
+			return NewGeminiProvider(id, GeminiProviderOptions{
+				Model:          payload.Config.Model,
+				APIKey:         apiKey,
+				Temperature:    &payload.Config.Temperature,
+				MaxTokens:      &payload.Config.MaxTokens,
+				ThinkingBudget: payload.Config.ThinkingBudget,
+				TopP:           payload.Config.TopP,
+				TopK:           payload.Config.TopK,
+			})
 		},
 	})
 }

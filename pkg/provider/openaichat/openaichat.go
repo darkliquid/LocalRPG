@@ -56,7 +56,10 @@ func init() {
 			if id == "" {
 				id = "openaichat"
 			}
-			return harness.NewOpenAIChatProvider(id, payload.Config), nil
+			return NewHTTPProviderWithOptions(id, payload.Config.Endpoint, payload.Config.Model, payload.Config.APIKey, harness.GenerationOptions{
+				Temperature: payload.Config.Temperature,
+				MaxTokens:   payload.Config.MaxTokens,
+			}), nil
 		},
 	})
 }
