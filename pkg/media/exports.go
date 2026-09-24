@@ -75,11 +75,6 @@ func NewGeminiTTSProvider(cfg config.TTSConfig, sharedKey string) (TTSClient, er
 	return NewGeminiTTSClient(cfg, sharedKey)
 }
 
-// NewCLITTSProvider builds the command-line TTS client (for example piper).
-func NewCLITTSProvider(cfg config.TTSConfig) TTSClient {
-	return &cliTTSClient{command: cfg.Command, args: cfg.Args}
-}
-
 // NewHTTPTTSProvider builds the OpenAI-compatible HTTP TTS client.
 func NewHTTPTTSProvider(cfg config.TTSConfig) TTSClient {
 	return &httpTTSClient{

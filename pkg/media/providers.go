@@ -59,23 +59,6 @@ func (e *echoImageClient) GenerateImage(ctx context.Context, prompt string) ([]b
 	return []byte("fake-image-bytes-for-" + prompt), nil
 }
 
-// CLI implementations
-type cliTTSClient struct {
-	command string
-	args    []string
-}
-
-func (c *cliTTSClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, c.command, c.args...)
-	cmd.Stdin = bytes.NewBufferString(text)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("cli tts error: %w", err)
-	}
-	return out.Bytes(), nil
-}
-
 type cliSTTClient struct {
 	command string
 	args    []string
@@ -726,8 +709,6 @@ func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClien
 		default:
 			return &echoTTSClient{}, nil
 		}
-	case "cli":
-		return &cliTTSClient{command: cfg.Command, args: cfg.Args}, nil
 	case "http":
 		return &httpTTSClient{endpoint: cfg.Endpoint, model: cfg.Model, apiKey: cfg.APIKey, client: &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 30 * time.Second}}, nil
 	default:
