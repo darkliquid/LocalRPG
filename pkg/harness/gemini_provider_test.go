@@ -126,6 +126,73 @@ func TestGeminiProviderGenerate(t *testing.T) {
 	}
 }
 
+func TestGeminiProviderResolvesFunctionResponseNames(t *testing.T) {
+	var gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"candidates": [
+				{"content": {"parts": [{"text": "The gate stands open."}], "role": "model"}, "finishReason": "STOP"}
+			]
+		}`)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:     "test-key",
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: server.Client(),
+		HTTPOptions: genai.HTTPOptions{
+			BaseURL: server.URL,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	provider, err := harness.NewGeminiProvider("test-gemini", harness.GeminiProviderOptions{
+		Model:  "gemini-3.8-flash",
+		APIKey: "test-key",
+		Client: client,
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiProvider: %v", err)
+	}
+
+	// Gemini commonly omits function-call ids, so the response must recover the
+	// name positionally; a matching id is used when both sides carry one.
+	_, err = provider.Generate(ctx, harness.GenerateRequest{
+		Messages: []harness.Message{
+			{Role: "user", Content: "Search the gate."},
+			{Role: "assistant", ToolCalls: []harness.ToolCall{
+				{ID: "call-1", Name: "get_entity", Arguments: `{"id":"iron-gate"}`},
+				{Name: "search_entities", Arguments: `{"query":"gate"}`},
+			}},
+			{Role: "tool", ToolCallID: "call-1", Content: "iron-gate note"},
+			{Role: "tool", Content: "2 matching entities"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+
+	if !strings.Contains(gotBody, `"functionResponse"`) {
+		t.Fatalf("expected a function response in the request, got: %s", gotBody)
+	}
+	if !strings.Contains(gotBody, `"name":"get_entity"`) {
+		t.Errorf("expected the first response to resolve get_entity by id, got: %s", gotBody)
+	}
+	if !strings.Contains(gotBody, `"name":"search_entities"`) {
+		t.Errorf("expected the second response to resolve search_entities positionally, got: %s", gotBody)
+	}
+	if strings.Contains(gotBody, `"functionResponse":{"response"`) {
+		t.Errorf("function response must never carry an empty name, got: %s", gotBody)
+	}
+}
+
 func TestGeminiProviderStreamSeparatesThoughtsAndEmitsTools(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")

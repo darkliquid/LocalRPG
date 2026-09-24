@@ -191,6 +191,16 @@ func (g *GeminiProvider) buildContents(req GenerateRequest) []*genai.Content {
 	}
 
 	var contents []*genai.Content
+	// Gemini matches a function response to its call by name (and optionally id),
+	// but the harness tool message only carries the call id. Remember each
+	// assistant call in order so a tool message can recover the function name;
+	// the orchestrator appends responses in the same order it received the calls.
+	type pendingToolCall struct {
+		id   string
+		name string
+	}
+	var pendingToolCalls []pendingToolCall
+
 	for _, msg := range req.Messages {
 		switch msg.Role {
 		case "system":
@@ -216,6 +226,7 @@ func (g *GeminiProvider) buildContents(req GenerateRequest) []*genai.Content {
 						Args: args,
 					},
 				})
+				pendingToolCalls = append(pendingToolCalls, pendingToolCall{id: tc.ID, name: tc.Name})
 			}
 			if len(parts) > 0 {
 				contents = append(contents, &genai.Content{
@@ -228,16 +239,39 @@ func (g *GeminiProvider) buildContents(req GenerateRequest) []*genai.Content {
 			if err := json.Unmarshal([]byte(msg.Content), &respMap); err != nil {
 				respMap = map[string]interface{}{"result": msg.Content}
 			}
+
+			// Recover the function name from the matching call. Prefer an id
+			// match, then fall back to positional order when ids are absent,
+			// which is the common case for Gemini.
+			call := pendingToolCall{}
+			matchIndex := -1
+			if msg.ToolCallID != "" {
+				for i, candidate := range pendingToolCalls {
+					if candidate.id == msg.ToolCallID {
+						call = candidate
+						matchIndex = i
+						break
+					}
+				}
+			}
+			if matchIndex < 0 && len(pendingToolCalls) > 0 {
+				call = pendingToolCalls[0]
+				matchIndex = 0
+			}
+			if matchIndex >= 0 {
+				pendingToolCalls = append(pendingToolCalls[:matchIndex], pendingToolCalls[matchIndex+1:]...)
+			}
+
+			response := &genai.FunctionResponse{
+				Name:     call.name,
+				Response: respMap,
+			}
+			if call.id != "" && call.id == msg.ToolCallID {
+				response.ID = call.id
+			}
 			contents = append(contents, &genai.Content{
-				Role: "user",
-				Parts: []*genai.Part{
-					{
-						FunctionResponse: &genai.FunctionResponse{
-							Name:     msg.ToolCallID,
-							Response: respMap,
-						},
-					},
-				},
+				Role:  "user",
+				Parts: []*genai.Part{{FunctionResponse: response}},
 			})
 		}
 	}

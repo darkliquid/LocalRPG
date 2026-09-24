@@ -533,12 +533,17 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	result, err := o.runGenerationLoop(ctx, contextPrompt, onChunk)
 	if err != nil {
+		o.logger.Event("generation.error", map[string]interface{}{"error": err.Error()})
 		return nil, fmt.Errorf("gm generation failed: %w", err)
 	}
 
 	cause := o.classifyCut(result)
 	narration, recovery, stillIncomplete := o.recoverReply(ctx, result.Text, cause, onChunk)
 	if strings.TrimSpace(narration) == "" {
+		o.logger.Event("generation.error", map[string]interface{}{
+			"error":         "gm returned no narration",
+			"finish_reason": result.FinishReason,
+		})
 		return nil, fmt.Errorf("gm returned no narration")
 	}
 
