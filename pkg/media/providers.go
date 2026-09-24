@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"os/exec"
 	"strings"
@@ -57,22 +56,6 @@ type echoImageClient struct{}
 
 func (e *echoImageClient) GenerateImage(ctx context.Context, prompt string) ([]byte, error) {
 	return []byte("fake-image-bytes-for-" + prompt), nil
-}
-
-type cliSTTClient struct {
-	command string
-	args    []string
-}
-
-func (c *cliSTTClient) Transcribe(ctx context.Context, audioData []byte) (string, error) {
-	cmd := exec.CommandContext(ctx, c.command, c.args...)
-	cmd.Stdin = bytes.NewReader(audioData)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("cli stt error: %w", err)
-	}
-	return out.String(), nil
 }
 
 type cliImageClient struct {
@@ -446,66 +429,6 @@ func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClien
 	}
 }
 
-type httpSTTClient struct {
-	endpoint string
-	model    string
-	apiKey   string
-	client   *http.Client
-}
-
-func (h *httpSTTClient) Transcribe(ctx context.Context, audioData []byte) (string, error) {
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-
-	modelName := h.model
-	if modelName == "" {
-		modelName = "whisper-1"
-	}
-	if err := writer.WriteField("model", modelName); err != nil {
-		return "", fmt.Errorf("write model field: %w", err)
-	}
-
-	part, err := writer.CreateFormFile("file", "audio.webm")
-	if err != nil {
-		return "", fmt.Errorf("create form file: %w", err)
-	}
-	if _, err := part.Write(audioData); err != nil {
-		return "", fmt.Errorf("write audio data: %w", err)
-	}
-	if err := writer.Close(); err != nil {
-		return "", fmt.Errorf("close multipart writer: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", h.endpoint, &body)
-	if err != nil {
-		return "", fmt.Errorf("create stt request: %w", err)
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	if h.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+h.apiKey)
-	}
-
-	resp, err := h.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("stt request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		respBytes, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("stt failed (%d): %s", resp.StatusCode, string(respBytes))
-	}
-
-	var res struct {
-		Text string `json:"text"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return "", fmt.Errorf("decode stt response: %w", err)
-	}
-
-	return strings.TrimSpace(res.Text), nil
-}
-
 func NewSTTClient(cfg config.STTConfig) (STTClient, error) {
 	// Registry-first when pkg/provider/all was imported; inline otherwise.
 	if regID := STTProviderIDFor(cfg); regID != "" {
@@ -518,15 +441,6 @@ func NewSTTClient(cfg config.STTConfig) (STTClient, error) {
 		return &disabledSTTClient{}, nil
 	case "builtin":
 		return &echoSTTClient{}, nil
-	case "cli":
-		return &cliSTTClient{command: cfg.Command, args: cfg.Args}, nil
-	case "http":
-		return &httpSTTClient{
-			endpoint: cfg.Endpoint,
-			model:    cfg.Model,
-			apiKey:   cfg.APIKey,
-			client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 60 * time.Second},
-		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported stt provider type: %s", cfg.Type)
 	}

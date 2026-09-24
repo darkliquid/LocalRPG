@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 
 	"github.com/darkliquid/localrpg/pkg/config"
-	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
@@ -41,7 +40,7 @@ func init() {
 					return nil, err
 				}
 			}
-			return media.NewHTTPSTTProvider(cfg), nil
+			return NewHTTPSTTClient(cfg), nil
 		},
 	})
 }

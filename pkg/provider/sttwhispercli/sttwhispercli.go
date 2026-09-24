@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 
 	"github.com/darkliquid/localrpg/pkg/config"
-	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
@@ -35,7 +34,7 @@ func init() {
 					return nil, err
 				}
 			}
-			return media.NewCLISTTProvider(cfg), nil
+			return NewCLISTTClient(cfg.Command, cfg.Args), nil
 		},
 	})
 }

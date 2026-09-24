@@ -108,21 +108,6 @@ func BuildSTT(id string, cfg config.STTConfig) (STTClient, error) {
 	return client, nil
 }
 
-// NewCLISTTProvider builds the command-line transcription client.
-func NewCLISTTProvider(cfg config.STTConfig) STTClient {
-	return &cliSTTClient{command: cfg.Command, args: cfg.Args}
-}
-
-// NewHTTPSTTProvider builds the HTTP transcription client.
-func NewHTTPSTTProvider(cfg config.STTConfig) STTClient {
-	return &httpSTTClient{
-		endpoint: cfg.Endpoint,
-		model:    cfg.Model,
-		apiKey:   cfg.APIKey,
-		client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 60 * time.Second},
-	}
-}
-
 // ImageBuildPayload is what BuildImage hands an image provider package.
 type ImageBuildPayload struct {
 	Config    config.ImageConfig `json:"config"`
