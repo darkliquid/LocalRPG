@@ -653,7 +653,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	if o.continuityEnabled() {
 		_, continuitySpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "continuity.check")
-		findings := CheckContinuity(o.store, &turn, locationID, o.playerID)
+		findings := CheckContinuity(ContinuityInput{
+			Store:      o.store,
+			Turn:       &turn,
+			LocationID: locationID,
+			PlayerID:   o.playerID,
+			Context:    assembly.Context,
+			WorkingSet: &workingSet,
+		})
 		for _, finding := range findings {
 			turn.ContinuityNotes = append(turn.ContinuityNotes, finding.Note)
 		}
