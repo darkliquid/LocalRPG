@@ -16,3 +16,5 @@ pkg/gui/dist/*
 # Secrets and scratch notes.
 *.key
 todo.txt
+
+.gograph/
