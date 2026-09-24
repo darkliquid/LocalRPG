@@ -362,12 +362,17 @@ func (g *GeminiProvider) buildContents(req harness.GenerateRequest) []*genai.Con
 			for _, tc := range msg.ToolCalls {
 				var args map[string]interface{}
 				_ = json.Unmarshal([]byte(tc.Arguments), &args)
+				sig := tc.Signature
+				if len(sig) == 0 {
+					sig = []byte("skip_thought_signature_validator")
+				}
 				parts = append(parts, &genai.Part{
 					FunctionCall: &genai.FunctionCall{
 						ID:   tc.ID,
 						Name: tc.Name,
 						Args: args,
 					},
+					ThoughtSignature: sig,
 				})
 				pendingToolCalls = append(pendingToolCalls, pendingToolCall{id: tc.ID, name: tc.Name})
 			}
@@ -430,17 +435,35 @@ func (g *GeminiProvider) Generate(ctx context.Context, req harness.GenerateReque
 		return nil, mapGeminiError(err)
 	}
 
+	var lastThoughtSignature []byte
 	var sb strings.Builder
+	var toolCalls []harness.ToolCall
 	for _, cand := range resp.Candidates {
 		if cand.Content == nil {
 			continue
 		}
 		for _, part := range cand.Content.Parts {
+			if len(part.ThoughtSignature) > 0 {
+				lastThoughtSignature = part.ThoughtSignature
+			}
 			if part.Thought {
 				continue
 			}
 			if part.Text != "" {
 				sb.WriteString(part.Text)
+			}
+			if part.FunctionCall != nil {
+				sig := part.ThoughtSignature
+				if len(sig) == 0 {
+					sig = lastThoughtSignature
+				}
+				argsBytes, _ := json.Marshal(part.FunctionCall.Args)
+				toolCalls = append(toolCalls, harness.ToolCall{
+					ID:        part.FunctionCall.ID,
+					Name:      part.FunctionCall.Name,
+					Arguments: string(argsBytes),
+					Signature: sig,
+				})
 			}
 		}
 	}
@@ -456,6 +479,7 @@ func (g *GeminiProvider) Stream(ctx context.Context, req harness.GenerateRequest
 
 	iter := g.client.Models.GenerateContentStream(ctx, g.model, contents, cfg)
 
+	var lastThoughtSignature []byte
 	for resp, err := range iter {
 		if err != nil {
 			mappedErr := mapGeminiError(err)
@@ -472,6 +496,10 @@ func (g *GeminiProvider) Stream(ctx context.Context, req harness.GenerateRequest
 			var textParts []string
 
 			for _, part := range cand.Content.Parts {
+				if len(part.ThoughtSignature) > 0 {
+					lastThoughtSignature = part.ThoughtSignature
+				}
+
 				if part.Thought {
 					if g.logger != nil && part.Text != "" {
 						g.logger.Event("gemini_thought", map[string]interface{}{
@@ -486,11 +514,16 @@ func (g *GeminiProvider) Stream(ctx context.Context, req harness.GenerateRequest
 				}
 
 				if part.FunctionCall != nil {
+					sig := part.ThoughtSignature
+					if len(sig) == 0 {
+						sig = lastThoughtSignature
+					}
 					argsBytes, _ := json.Marshal(part.FunctionCall.Args)
 					toolCalls = append(toolCalls, harness.ToolCall{
 						ID:        part.FunctionCall.ID,
 						Name:      part.FunctionCall.Name,
 						Arguments: string(argsBytes),
+						Signature: sig,
 					})
 				}
 			}

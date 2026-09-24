@@ -397,3 +397,172 @@ func TestGeminiProviderInteractionsSession(t *testing.T) {
 	}
 }
 
+func TestGeminiProviderStreamCapturesAndPropagatesThoughtSignatures(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		// Chunk 1: Thought with a signature
+		fmt.Fprintf(w, "data: %s\n\n", `{"candidates": [{"content": {"parts": [{"thought": true, "text": "Analyzing...", "thoughtSignature": "dGhvdWdodC1zaWc="}], "role": "model"}}]}`)
+		// Chunk 2: Function call that should inherit or carry signature
+		fmt.Fprintf(w, "data: %s\n\n", `{"candidates": [{"content": {"parts": [{"functionCall": {"name": "search_entities", "args": {"query": "gate"}}, "thoughtSignature": "ZnVuYy1zaWc="}], "role": "model"}, "finishReason": "STOP"}]}`)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:     "test-key",
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: server.Client(),
+		HTTPOptions: genai.HTTPOptions{BaseURL: server.URL},
+	})
+	if err != nil {
+		t.Fatalf("genai.NewClient: %v", err)
+	}
+
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
+		Model:  "gemini-2.5-flash",
+		APIKey: "test-key",
+		Client: client,
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiProvider: %v", err)
+	}
+
+	out := make(chan harness.StreamChunk, 10)
+	if err := provider.Stream(ctx, harness.GenerateRequest{Prompt: "open"}, out); err != nil {
+		t.Fatalf("Stream error: %v", err)
+	}
+
+	var foundCall *harness.ToolCall
+	for chunk := range out {
+		if len(chunk.ToolCalls) > 0 {
+			foundCall = &chunk.ToolCalls[0]
+		}
+	}
+
+	if foundCall == nil {
+		t.Fatal("expected tool call in stream chunks")
+	}
+	if string(foundCall.Signature) != "func-sig" {
+		t.Errorf("expected tool call signature 'func-sig', got %q", string(foundCall.Signature))
+	}
+}
+
+func TestGeminiProviderStreamPropagatesSignatureFromThought(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		// Chunk 1: Thought with a signature
+		fmt.Fprintf(w, "data: %s\n\n", `{"candidates": [{"content": {"parts": [{"thought": true, "text": "Analyzing...", "thoughtSignature": "dGhvdWdodC1zaWc="}], "role": "model"}}]}`)
+		// Chunk 2: Function call without its own signature
+		fmt.Fprintf(w, "data: %s\n\n", `{"candidates": [{"content": {"parts": [{"functionCall": {"name": "search_entities", "args": {"query": "gate"}}}], "role": "model"}, "finishReason": "STOP"}]}`)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:     "test-key",
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: server.Client(),
+		HTTPOptions: genai.HTTPOptions{BaseURL: server.URL},
+	})
+	if err != nil {
+		t.Fatalf("genai.NewClient: %v", err)
+	}
+
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
+		Model:  "gemini-2.5-flash",
+		APIKey: "test-key",
+		Client: client,
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiProvider: %v", err)
+	}
+
+	out := make(chan harness.StreamChunk, 10)
+	if err := provider.Stream(ctx, harness.GenerateRequest{Prompt: "open"}, out); err != nil {
+		t.Fatalf("Stream error: %v", err)
+	}
+
+	var foundCall *harness.ToolCall
+	for chunk := range out {
+		if len(chunk.ToolCalls) > 0 {
+			foundCall = &chunk.ToolCalls[0]
+		}
+	}
+
+	if foundCall == nil {
+		t.Fatal("expected tool call in stream chunks")
+	}
+	if string(foundCall.Signature) != "thought-sig" {
+		t.Errorf("expected tool call signature 'thought-sig', got %q", string(foundCall.Signature))
+	}
+}
+
+func TestGeminiProviderBuildContentsEchoesThoughtSignature(t *testing.T) {
+	var gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"candidates": [{"content": {"parts": [{"text": "Done."}], "role": "model"}, "finishReason": "STOP"}]}`)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:     "test-key",
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: server.Client(),
+		HTTPOptions: genai.HTTPOptions{BaseURL: server.URL},
+	})
+	if err != nil {
+		t.Fatalf("genai.NewClient: %v", err)
+	}
+
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
+		Model:  "gemini-2.5-flash",
+		APIKey: "test-key",
+		Client: client,
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiProvider: %v", err)
+	}
+
+	// 1. Assistant message with a specific signature
+	_, err = provider.Generate(ctx, harness.GenerateRequest{
+		Messages: []harness.Message{
+			{Role: "user", Content: "Search."},
+			{Role: "assistant", ToolCalls: []harness.ToolCall{
+				{ID: "call-1", Name: "search_entities", Arguments: `{"query":"gate"}`, Signature: []byte("my-custom-signature")},
+			}},
+			{Role: "tool", ToolCallID: "call-1", Content: "found gate"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+
+	// "my-custom-signature" base64 is "bXktY3VzdG9tLXNpZ25hdHVyZQ=="
+	if !strings.Contains(gotBody, `"thoughtSignature":"bXktY3VzdG9tLXNpZ25hdHVyZQ=="`) {
+		t.Errorf("expected thoughtSignature for custom signature in request body, got: %s", gotBody)
+	}
+
+	// 2. Assistant message with empty signature should use skip_thought_signature_validator fallback
+	_, err = provider.Generate(ctx, harness.GenerateRequest{
+		Messages: []harness.Message{
+			{Role: "user", Content: "Search."},
+			{Role: "assistant", ToolCalls: []harness.ToolCall{
+				{ID: "call-2", Name: "search_entities", Arguments: `{"query":"door"}`},
+			}},
+			{Role: "tool", ToolCallID: "call-2", Content: "found door"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+
+	// "skip_thought_signature_validator" base64 is "c2tpcF90aG91Z2h0X3NpZ25hdHVyZV92YWxpZGF0b3I="
+	if !strings.Contains(gotBody, `"thoughtSignature":"c2tpcF90aG91Z2h0X3NpZ25hdHVyZV92YWxpZGF0b3I="`) {
+		t.Errorf("expected fallback thoughtSignature in request body, got: %s", gotBody)
+	}
+}
+

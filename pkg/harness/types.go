@@ -35,6 +35,7 @@ type ToolCall struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Arguments string `json:"arguments"`
+	Signature []byte `json:"signature,omitempty"`
 }
 
 // MessagesPrompt renders a conversation as one prompt for a provider that only
