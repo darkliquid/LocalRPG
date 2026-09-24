@@ -17,6 +17,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/provider/ttselevenlabs"
 )
 
 func TestMediaProviders_Disabled(t *testing.T) {
@@ -299,7 +300,7 @@ func TestComfyUIImageClient_GeneratesImage(t *testing.T) {
 func TestNewTTSClientBuildsElevenLabs(t *testing.T) {
 	t.Setenv("ELEVENLABS_API_KEY", "")
 	_, err := media.NewTTSClient(config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs"})
-	if !errors.Is(err, media.ErrMissingAPIKey) {
+	if !errors.Is(err, ttselevenlabs.ErrMissingAPIKey) {
 		t.Fatalf("err = %v, want ErrMissingAPIKey when no key is set", err)
 	}
 
@@ -307,8 +308,8 @@ func TestNewTTSClientBuildsElevenLabs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTTSClient: %v", err)
 	}
-	if _, ok := client.(*media.ElevenLabsTTSClient); !ok {
-		t.Errorf("client = %T, want *media.ElevenLabsTTSClient", client)
+	if _, ok := client.(*ttselevenlabs.ElevenLabsTTSClient); !ok {
+		t.Errorf("client = %T, want *ttselevenlabs.ElevenLabsTTSClient", client)
 	}
 }
 

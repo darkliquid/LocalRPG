@@ -62,16 +62,6 @@ func BuildTTS(id string, cfg config.TTSConfig, sharedKey string) (TTSClient, err
 	return client, nil
 }
 
-// NewElevenLabsTTSProvider builds the ElevenLabs client.
-func NewElevenLabsTTSProvider(cfg config.TTSConfig) (TTSClient, error) {
-	return NewElevenLabsTTSClient(cfg)
-}
-
-// NewGeminiTTSProvider builds the Gemini TTS client.
-func NewGeminiTTSProvider(cfg config.TTSConfig, sharedKey string) (TTSClient, error) {
-	return NewGeminiTTSClient(cfg, sharedKey)
-}
-
 // STTProviderIDFor maps an STT configuration to the registry ID a facade should
 // build.
 func STTProviderIDFor(cfg config.STTConfig) string {

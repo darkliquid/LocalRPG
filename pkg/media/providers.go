@@ -7,6 +7,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
 var ErrProviderDisabled = errors.New("provider is disabled")
@@ -58,24 +59,15 @@ func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClien
 	// The registry is authoritative when the binary imported pkg/provider/all;
 	// otherwise the inline switch below still builds the client.
 	if regID := TTSProviderIDFor(cfg); regID != "" {
-		if client, err := BuildTTS(regID, cfg, sharedKey); err == nil {
-			return client, nil
+		if _, ok := provider.Lookup(regID); ok {
+			return BuildTTS(regID, cfg, sharedKey)
 		}
 	}
 	switch cfg.Type {
 	case "disabled", "":
 		return &disabledTTSClient{}, nil
-	case "gemini":
-		return NewGeminiTTSClient(cfg, sharedKey)
 	case "builtin":
-		switch cfg.BuiltinName {
-		case "gemini":
-			return NewGeminiTTSClient(cfg, sharedKey)
-		case "elevenlabs":
-			return NewElevenLabsTTSClient(cfg)
-		default:
-			return &echoTTSClient{}, nil
-		}
+		return &echoTTSClient{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported tts provider type: %s", cfg.Type)
 	}
@@ -84,8 +76,8 @@ func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClien
 func NewSTTClient(cfg config.STTConfig) (STTClient, error) {
 	// Registry-first when pkg/provider/all was imported; inline otherwise.
 	if regID := STTProviderIDFor(cfg); regID != "" {
-		if client, err := BuildSTT(regID, cfg); err == nil {
-			return client, nil
+		if _, ok := provider.Lookup(regID); ok {
+			return BuildSTT(regID, cfg)
 		}
 	}
 	switch cfg.Type {
@@ -142,8 +134,8 @@ func NewImageClient(cfg config.ImageConfig) (ImageClient, error) {
 func NewImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string) (ImageClient, error) {
 	// Registry-first when pkg/provider/all was imported; inline otherwise.
 	if regID := ImageProviderIDFor(cfg); regID != "" {
-		if client, err := BuildImage(regID, cfg, sharedKey); err == nil {
-			return client, nil
+		if _, ok := provider.Lookup(regID); ok {
+			return BuildImage(regID, cfg, sharedKey)
 		}
 	}
 	switch cfg.Type {

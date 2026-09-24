@@ -138,3 +138,11 @@ func KeyPresentWithSharedKey(cfg config.TTSConfig, sharedKey string) bool {
 func VoiceOptionsOf(voice *entity.VoiceConfig) map[string]interface{} {
 	return voiceOptions(voice)
 }
+
+// voiceOptions is a voice's provider options, or nil when it carries none.
+func voiceOptions(voice *entity.VoiceConfig) map[string]interface{} {
+	if voice == nil {
+		return nil
+	}
+	return voice.Options
+}

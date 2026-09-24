@@ -1,4 +1,4 @@
-package media
+package ttselevenlabs
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/darkliquid/localrpg/pkg/media"
 	"io"
 	"net/http"
 	"net/url"
@@ -32,7 +33,7 @@ const (
 )
 
 // ElevenLabsTTSClient is the built-in provider for ElevenLabs speech. It
-// implements TTSClient, VoiceCatalog, VoiceOptions, and MeteredProvider, so the
+// implements media.TTSClient, media.VoiceCatalog, VoiceOptions, and media.MeteredProvider, so the
 // pipeline, the catalog cache, and the settings UI need no provider-specific
 // handling.
 type ElevenLabsTTSClient struct {
@@ -83,8 +84,8 @@ func (c *ElevenLabsTTSClient) Metered() bool { return true }
 // VoiceOptions declares the tunables ElevenLabs accepts. Pitch is deliberately
 // absent: the API exposes speed but no pitch, and speech rate is the portable
 // baseline, so declaring it twice would put two controls on one knob.
-func (c *ElevenLabsTTSClient) VoiceOptions() []VoiceOption {
-	return []VoiceOption{
+func (c *ElevenLabsTTSClient) VoiceOptions() []media.VoiceOption {
+	return []media.VoiceOption{
 		{Key: "stability", Label: "Stability", Kind: "float", Min: 0, Max: 1, Step: 0.05, Default: 0.5,
 			Help: "Lower is more expressive, higher is more consistent."},
 		{Key: "similarity_boost", Label: "Similarity", Kind: "float", Min: 0, Max: 1, Step: 0.05, Default: 0.75,
@@ -114,7 +115,7 @@ func (c *ElevenLabsTTSClient) Synthesize(ctx context.Context, text string, voice
 
 	// Defence in depth for a hand-edited note: clamp and drop against the schema
 	// before anything reaches the wire.
-	options, _ := ValidateVoiceOptions(c.VoiceOptions(), voiceOptions(voice))
+	options, _ := media.ValidateVoiceOptions(c.VoiceOptions(), media.VoiceOptionsOf(voice))
 
 	model := c.model
 	if value, ok := options["model"].(string); ok && value != "" {
@@ -332,8 +333,8 @@ type elevenLabsVoicePage struct {
 // ListVoices pages the account's voices to completion and maps them into the
 // shared shape. Cloned and professional voices appear because they belong to the
 // key in use, which is the point of fetching rather than shipping a list.
-func (c *ElevenLabsTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, error) {
-	voices := make([]ProviderVoice, 0)
+func (c *ElevenLabsTTSClient) ListVoices(ctx context.Context) ([]media.ProviderVoice, error) {
+	voices := make([]media.ProviderVoice, 0)
 	token := ""
 	for {
 		query := url.Values{"page_size": {fmt.Sprintf("%d", elevenLabsCatalogPageSize)}}
@@ -368,8 +369,8 @@ func (c *ElevenLabsTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, 
 }
 
 // mapElevenLabsVoice maps a catalog entry onto the shared voice shape.
-func mapElevenLabsVoice(voice elevenLabsVoice) ProviderVoice {
-	mapped := ProviderVoice{
+func mapElevenLabsVoice(voice elevenLabsVoice) media.ProviderVoice {
+	mapped := media.ProviderVoice{
 		ID:          voice.VoiceID,
 		Name:        voice.Name,
 		Gender:      strings.ToLower(strings.TrimSpace(voice.Labels["gender"])),
@@ -387,7 +388,7 @@ func mapElevenLabsVoice(voice elevenLabsVoice) ProviderVoice {
 	if voice.Category != "" {
 		mapped.Categories = []string{voice.Category}
 	}
-	mapped.Tags = NormaliseVoiceTags(
+	mapped.Tags = media.NormaliseVoiceTags(
 		voice.Labels["age"],
 		voice.Labels["use_case"],
 		voice.Labels["gender"],
@@ -402,9 +403,9 @@ func mapElevenLabsVoice(voice elevenLabsVoice) ProviderVoice {
 	return mapped
 }
 
-// SpeechCueCapabilities advertises ElevenLabs' support for bracketed audio tags.
-func (c *ElevenLabsTTSClient) SpeechCueCapabilities() SpeechCueCapabilities {
-	return SpeechCueCapabilities{
+// media.SpeechCueCapabilities advertises ElevenLabs' support for bracketed audio tags.
+func (c *ElevenLabsTTSClient) SpeechCueCapabilities() media.SpeechCueCapabilities {
+	return media.SpeechCueCapabilities{
 		AudioTags:        true,
 		MarkdownEmphasis: false,
 		SupportedTags: []string{

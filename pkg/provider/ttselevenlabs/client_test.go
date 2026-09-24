@@ -1,4 +1,4 @@
-package media
+package ttselevenlabs
 
 import (
 	"context"
@@ -301,4 +301,13 @@ func TestElevenLabsListVoicesPagesAndMaps(t *testing.T) {
 	if !containsString(first.Categories, "premade") {
 		t.Errorf("categories = %v", first.Categories)
 	}
+}
+
+func containsString(values []string, candidate string) bool {
+	for _, value := range values {
+		if value == candidate {
+			return true
+		}
+	}
+	return false
 }
