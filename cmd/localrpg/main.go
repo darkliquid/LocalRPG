@@ -4,11 +4,19 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/darkliquid/localrpg/pkg/provider"
+	_ "github.com/darkliquid/localrpg/pkg/provider/all"
 )
 
 const Version = "0.1.0"
 
 func main() {
+	if err := provider.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "Provider registry: %v\n", err)
+		os.Exit(1)
+	}
+
 	versionFlag := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 
