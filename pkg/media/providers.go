@@ -59,23 +59,6 @@ func (e *echoImageClient) GenerateImage(ctx context.Context, prompt string) ([]b
 	return []byte("fake-image-bytes-for-" + prompt), nil
 }
 
-// CLI implementations
-type cliTTSClient struct {
-	command string
-	args    []string
-}
-
-func (c *cliTTSClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, c.command, c.args...)
-	cmd.Stdin = bytes.NewBufferString(text)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("cli tts error: %w", err)
-	}
-	return out.Bytes(), nil
-}
-
 type cliSTTClient struct {
 	command string
 	args    []string
@@ -721,21 +704,11 @@ func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClien
 		switch cfg.BuiltinName {
 		case "gemini":
 			return NewGeminiTTSClient(cfg, sharedKey)
-		case "sherpa-onnx", "kokoro":
-			modelDir := cfg.ModelPath
-			if modelDir == "" {
-				modelDir = "./cache/models/tts/kokoro"
-			}
-			return NewSherpaTTSClient(modelDir), nil
-		case "native-os":
-			return NewNativeOSTTSClient(), nil
 		case "elevenlabs":
 			return NewElevenLabsTTSClient(cfg)
 		default:
 			return &echoTTSClient{}, nil
 		}
-	case "cli":
-		return &cliTTSClient{command: cfg.Command, args: cfg.Args}, nil
 	case "http":
 		return &httpTTSClient{endpoint: cfg.Endpoint, model: cfg.Model, apiKey: cfg.APIKey, client: &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 30 * time.Second}}, nil
 	default:
@@ -884,12 +857,7 @@ func NewImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string) (Imag
 		if cfg.BuiltinName == "procedural-art" {
 			return NewProceduralArtClient(), nil
 		}
-		if cfg.BuiltinName == "gemini" {
-			return NewGeminiImageClient(cfg, sharedKey)
-		}
 		return &echoImageClient{}, nil
-	case "gemini":
-		return NewGeminiImageClient(cfg, sharedKey)
 	case "cli":
 		return &cliImageClient{command: cfg.Command, args: cfg.Args}, nil
 	case "comfyui":

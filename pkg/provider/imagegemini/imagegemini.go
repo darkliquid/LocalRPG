@@ -56,7 +56,7 @@ func init() {
 					return nil, err
 				}
 			}
-			return media.NewGeminiImageProvider(payload.Config, payload.SharedKey)
+			return NewGeminiImageClient(payload.Config, payload.SharedKey)
 		},
 	})
 }

@@ -1,22 +1,15 @@
-package media_test
+package ttsnativeos_test
 
 import (
 	"context"
 	"testing"
 
-	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
-	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/provider/ttsnativeos"
 )
 
 func TestNativeOSTTS_GeneratesAudioBytes(t *testing.T) {
-	client, err := media.NewTTSClient(config.TTSConfig{
-		Type:        "builtin",
-		BuiltinName: "native-os",
-	})
-	if err != nil {
-		t.Fatalf("failed to create native-os TTS client: %v", err)
-	}
+	client := ttsnativeos.NewNativeOSTTSClient()
 
 	bytes, err := client.Synthesize(context.Background(), "The road ahead is quiet.", &entity.VoiceConfig{
 		VoiceID: "default",

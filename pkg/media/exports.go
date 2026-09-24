@@ -65,18 +65,6 @@ func BuildTTS(id string, cfg config.TTSConfig, sharedKey string) (TTSClient, err
 	return client, nil
 }
 
-// NewSherpaTTSProvider builds the Sherpa-ONNX Kokoro client.
-func NewSherpaTTSProvider(cfg config.TTSConfig) TTSClient {
-	modelDir := cfg.ModelPath
-	if modelDir == "" {
-		modelDir = "./cache/models/tts/kokoro"
-	}
-	return NewSherpaTTSClient(modelDir)
-}
-
-// NewNativeOSTTSProvider builds the host-OS speech client.
-func NewNativeOSTTSProvider() TTSClient { return NewNativeOSTTSClient() }
-
 // NewElevenLabsTTSProvider builds the ElevenLabs client.
 func NewElevenLabsTTSProvider(cfg config.TTSConfig) (TTSClient, error) {
 	return NewElevenLabsTTSClient(cfg)
@@ -85,11 +73,6 @@ func NewElevenLabsTTSProvider(cfg config.TTSConfig) (TTSClient, error) {
 // NewGeminiTTSProvider builds the Gemini TTS client.
 func NewGeminiTTSProvider(cfg config.TTSConfig, sharedKey string) (TTSClient, error) {
 	return NewGeminiTTSClient(cfg, sharedKey)
-}
-
-// NewCLITTSProvider builds the command-line TTS client (for example piper).
-func NewCLITTSProvider(cfg config.TTSConfig) TTSClient {
-	return &cliTTSClient{command: cfg.Command, args: cfg.Args}
 }
 
 // NewHTTPTTSProvider builds the OpenAI-compatible HTTP TTS client.
@@ -197,11 +180,6 @@ func BuildImage(id string, cfg config.ImageConfig, sharedKey string) (ImageClien
 
 // NewProceduralImageProvider builds the built-in procedural art client.
 func NewProceduralImageProvider() ImageClient { return NewProceduralArtClient() }
-
-// NewGeminiImageProvider builds the Gemini/Imagen image client.
-func NewGeminiImageProvider(cfg config.ImageConfig, sharedKey string) (ImageClient, error) {
-	return NewGeminiImageClient(cfg, sharedKey)
-}
 
 // NewCLIImageProvider builds the command-line image client.
 func NewCLIImageProvider(cfg config.ImageConfig) ImageClient {

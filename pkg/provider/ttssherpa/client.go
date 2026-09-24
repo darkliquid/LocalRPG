@@ -1,4 +1,4 @@
-package media
+package ttssherpa
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/darkliquid/localrpg/pkg/media"
 	"math"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ type SherpaTTSClient struct {
 }
 
 func NewSherpaTTSClient(modelDir string) *SherpaTTSClient {
-	return &SherpaTTSClient{modelDir: modelDir, modelID: KokoroModelV019}
+	return &SherpaTTSClient{modelDir: modelDir, modelID: media.KokoroModelV019}
 }
 
 func (s *SherpaTTSClient) SetLogger(logger trace.Logger) {
@@ -81,7 +82,7 @@ func (s *SherpaTTSClient) Synthesize(ctx context.Context, text string, voice *en
 	sid := 0
 	speed := float32(1.0)
 	if voice != nil {
-		sid = ResolveKokoroSpeakerID(s.modelID, voice.VoiceID)
+		sid = media.ResolveKokoroSpeakerID(s.modelID, voice.VoiceID)
 		if voice.SpeechRate > 0 {
 			speed = float32(voice.SpeechRate)
 		}
@@ -123,9 +124,9 @@ func (s *SherpaTTSClient) Close() {
 
 // ListVoices enumerates the 11 known Kokoro speakers for the pinned model.
 // It requires neither network access nor loaded model weights.
-func (s *SherpaTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, error) {
-	speakers := KokoroSpeakersForModel(s.modelID)
-	voices := make([]ProviderVoice, 0, len(speakers))
+func (s *SherpaTTSClient) ListVoices(ctx context.Context) ([]media.ProviderVoice, error) {
+	speakers := media.KokoroSpeakersForModel(s.modelID)
+	voices := make([]media.ProviderVoice, 0, len(speakers))
 
 	profiles := map[string]struct {
 		name, gender, accent string
@@ -150,7 +151,7 @@ func (s *SherpaTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, erro
 		if !ok {
 			meta.name = speaker.Name
 		}
-		voices = append(voices, ProviderVoice{
+		voices = append(voices, media.ProviderVoice{
 			ID:          speaker.Name,
 			Name:        meta.name,
 			Gender:      meta.gender,
@@ -163,9 +164,9 @@ func (s *SherpaTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, erro
 	return voices, nil
 }
 
-// SpeechCueCapabilities advertises that SherpaTTSClient supports plain text only.
-func (s *SherpaTTSClient) SpeechCueCapabilities() SpeechCueCapabilities {
-	return SpeechCueCapabilities{
+// media.SpeechCueCapabilities advertises that SherpaTTSClient supports plain text only.
+func (s *SherpaTTSClient) SpeechCueCapabilities() media.SpeechCueCapabilities {
+	return media.SpeechCueCapabilities{
 		AudioTags:        false,
 		MarkdownEmphasis: false,
 	}

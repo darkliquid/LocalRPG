@@ -4,7 +4,6 @@ package ttsnativeos
 import (
 	"context"
 
-	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
@@ -27,7 +26,7 @@ func init() {
 			},
 		},
 		Build: func(_ context.Context, _ []byte) (interface{}, error) {
-			return media.NewNativeOSTTSProvider(), nil
+			return NewNativeOSTTSClient(), nil
 		},
 	})
 }

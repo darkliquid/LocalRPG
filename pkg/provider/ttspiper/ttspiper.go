@@ -35,7 +35,7 @@ func init() {
 					return nil, err
 				}
 			}
-			return media.NewCLITTSProvider(payload.Config), nil
+			return NewCLITTSClient(payload.Config.Command, payload.Config.Args), nil
 		},
 	})
 }

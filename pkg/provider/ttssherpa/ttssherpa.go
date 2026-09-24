@@ -36,7 +36,7 @@ func init() {
 					return nil, err
 				}
 			}
-			return media.NewSherpaTTSProvider(payload.Config), nil
+			return NewSherpaTTSClient(payload.Config.ModelPath), nil
 		},
 	})
 }

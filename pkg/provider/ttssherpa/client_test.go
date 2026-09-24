@@ -1,9 +1,10 @@
-package media
+package ttssherpa
 
 import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"github.com/darkliquid/localrpg/pkg/media"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -27,9 +28,9 @@ func TestKokoroVoiceMapping(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := ResolveKokoroSpeakerID(KokoroModelV019, tt.voiceID)
+		got := media.ResolveKokoroSpeakerID(media.KokoroModelV019, tt.voiceID)
 		if got != tt.wantSid {
-			t.Errorf("ResolveKokoroSpeakerID(%q) = %d; want %d", tt.voiceID, got, tt.wantSid)
+			t.Errorf("media.ResolveKokoroSpeakerID(%q) = %d; want %d", tt.voiceID, got, tt.wantSid)
 		}
 	}
 }
