@@ -34,7 +34,7 @@ func init() {
 					return nil, err
 				}
 			}
-			return media.NewCLIImageProvider(payload.Config), nil
+			return NewCLIImageClient(payload.Config.Command, payload.Config.Args), nil
 		},
 	})
 }

@@ -4,12 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/provider"
-	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
 
 // TTSBuildPayload is what BuildTTS hands a provider package: the family config
@@ -155,25 +152,3 @@ func BuildImage(id string, cfg config.ImageConfig, sharedKey string) (ImageClien
 
 // NewProceduralImageProvider builds the built-in procedural art client.
 func NewProceduralImageProvider() ImageClient { return NewProceduralArtClient() }
-
-// NewCLIImageProvider builds the command-line image client.
-func NewCLIImageProvider(cfg config.ImageConfig) ImageClient {
-	return &cliImageClient{command: cfg.Command, args: cfg.Args}
-}
-
-// NewHTTPImageProvider builds the HTTP image client, choosing ComfyUI's API when
-// the endpoint names it.
-func NewHTTPImageProvider(cfg config.ImageConfig) ImageClient {
-	if cfg.Type == "comfyui" || isComfyUI(cfg.Endpoint) {
-		return &comfyUIImageClient{
-			endpoint: cfg.Endpoint,
-			client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 120 * time.Second},
-		}
-	}
-	return &httpImageClient{
-		endpoint: cfg.Endpoint,
-		model:    cfg.Model,
-		apiKey:   cfg.APIKey,
-		client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 60 * time.Second},
-	}
-}
