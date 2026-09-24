@@ -18,6 +18,15 @@ func init() {
 			Description: "Fast, lightweight neural TTS via the piper binary.",
 			Source:      "cli",
 			Features:    []provider.Feature{provider.FeatureOffline},
+			Presets: []provider.Preset{
+				{ID: "piper", Order: 4, Label: "Piper TTS (Local CLI)",
+					Description: "Fast, lightweight neural TTS running directly via the piper binary.",
+					Config: map[string]interface{}{
+						"type": "cli", "command": "piper",
+						"args":  []interface{}{"--model", "en_US-lessac-medium.onnx", "--output_file", "-"},
+						"pitch": 1.0, "speech_rate": 1.0, "auto_play": true, "master_volume": 1.0,
+					}},
+			},
 		},
 		Build: func(_ context.Context, raw []byte) (interface{}, error) {
 			var payload media.TTSBuildPayload

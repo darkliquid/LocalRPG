@@ -18,6 +18,30 @@ func init() {
 			Description: "Stable Diffusion WebUI, ComfyUI, or any compatible image endpoint.",
 			Source:      "http",
 			Features:    []provider.Feature{provider.FeatureAutoGenerate},
+			Presets: []provider.Preset{
+				{ID: "comfyui", Order: 1, Label: "ComfyUI (Local HTTP)",
+					Description: "Connects to local ComfyUI graph execution server on port 8188.",
+					Config: map[string]interface{}{
+						"type": "http", "endpoint": "http://127.0.0.1:8188", "auto_generate": false,
+					}},
+				{ID: "automatic1111", Order: 2, Label: "Stable Diffusion WebUI / A1111 (Local HTTP)",
+					Description: "Connects to AUTOMATIC1111 txt2img API on port 7860.",
+					Config: map[string]interface{}{
+						"type": "http", "endpoint": "http://127.0.0.1:7860/sdapi/v1/txt2img", "auto_generate": false,
+					}},
+				{ID: "localai-image", Order: 3, Label: "LocalAI Image (Local HTTP)",
+					Description: "LocalAI image generation endpoint on port 8080.",
+					Config: map[string]interface{}{
+						"type": "http", "endpoint": "http://127.0.0.1:8080/v1/images/generations",
+						"model": "stablediffusion", "auto_generate": false,
+					}},
+				{ID: "dall-e-3", Order: 6, Label: "OpenAI DALL-E 3 (Cloud API)",
+					Description: "Cloud generation using OpenAI DALL-E 3 endpoint.",
+					Config: map[string]interface{}{
+						"type": "http", "endpoint": "https://api.openai.com/v1/images/generations",
+						"model": "dall-e-3", "auto_generate": false,
+					}},
+			},
 		},
 		Build: func(_ context.Context, raw []byte) (interface{}, error) {
 			var payload media.ImageBuildPayload

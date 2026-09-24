@@ -11,6 +11,7 @@ import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/imageprocedural"
 	_ "github.com/darkliquid/localrpg/pkg/provider/openaichat"
 	_ "github.com/darkliquid/localrpg/pkg/provider/oracle"
+	_ "github.com/darkliquid/localrpg/pkg/provider/sttwebspeech"
 	_ "github.com/darkliquid/localrpg/pkg/provider/sttwhispercli"
 	_ "github.com/darkliquid/localrpg/pkg/provider/sttwhisperhttp"
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttselevenlabs"

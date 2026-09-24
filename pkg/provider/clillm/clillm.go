@@ -18,11 +18,28 @@ func init() {
 			Description: "Runs a local binary such as llama-cli or claude and reads its output.",
 			Source:      "cli",
 			Features:    []provider.Feature{provider.FeatureStreaming},
+			Presets: []provider.Preset{
+				{ID: "llama-cli", Order: 5, Label: "llama-cli (Local Executable)",
+					Description: "Direct llama.cpp command execution without a background server.",
+					Config: map[string]interface{}{
+						"type": "cli", "command": "llama-cli",
+						"args":        []interface{}{"-m", "models/model.gguf", "-p"},
+						"temperature": 0.7, "max_tokens": 1024,
+					}},
+				{ID: "claude-cli", Order: 6, Label: "Claude Code CLI",
+					Description: "Executes Anthropic Claude CLI directly from command line.",
+					Config: map[string]interface{}{
+						"type": "cli", "command": "claude",
+						"args": []interface{}{"-p"},
+					}},
+			},
 		},
 		Build: func(_ context.Context, raw []byte) (interface{}, error) {
 			var cfg harness.ProviderConfig
-			if err := json.Unmarshal(raw, &cfg); err != nil {
-				return nil, err
+			if len(raw) > 0 {
+				if err := json.Unmarshal(raw, &cfg); err != nil {
+					return nil, err
+				}
 			}
 			return harness.NewCLIModelProvider("cli", cfg), nil
 		},

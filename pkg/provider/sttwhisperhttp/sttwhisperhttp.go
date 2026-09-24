@@ -19,6 +19,20 @@ func init() {
 			Description: "OpenAI-compatible transcription endpoint, local or cloud.",
 			Source:      "http",
 			Features:    []provider.Feature{provider.FeatureKeyRequired},
+			Presets: []provider.Preset{
+				{ID: "faster-whisper", Order: 2, Label: "Faster-Whisper (Local HTTP)",
+					Description: "Local OpenAI-compatible transcription server running on port 8000.",
+					Config: map[string]interface{}{
+						"type": "http", "endpoint": "http://localhost:8000/v1/audio/transcriptions",
+						"model": "whisper-1",
+					}},
+				{ID: "openai-whisper", Order: 4, Label: "OpenAI Whisper (Cloud API)",
+					Description: "Cloud transcription via OpenAI Whisper API.",
+					Config: map[string]interface{}{
+						"type": "http", "endpoint": "https://api.openai.com/v1/audio/transcriptions",
+						"model": "whisper-1",
+					}},
+			},
 		},
 		Build: func(_ context.Context, raw []byte) (interface{}, error) {
 			var cfg config.STTConfig
