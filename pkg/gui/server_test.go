@@ -26,6 +26,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/provider"
+	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
 
@@ -98,6 +99,99 @@ func TestGUIServerRoutes(t *testing.T) {
 	}
 	if len(graph.Nodes) < 2 {
 		t.Errorf("expected nodes in graph, got %d", len(graph.Nodes))
+	}
+}
+
+func TestContextAndWorkingSetRoutes(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	store, err := svc.store(gameID)
+	if err != nil {
+		t.Fatalf("svc.store: %v", err)
+	}
+
+	svc.ensureIndexed(gameID)
+
+	// Seed turn and context
+	turnRec := storage.TurnRecord{
+		Number:    1,
+		Timestamp: time.Now(),
+		Mode:      "Do",
+		Input:     "Look around",
+		Narration: "You see the docks.",
+	}
+	if err := store.SaveTurn(turnRec); err != nil {
+		t.Fatalf("SaveTurn: %v", err)
+	}
+	rawCtx := []byte(`{
+		"turn_number": 1,
+		"mode": "Do",
+		"budget": 4000,
+		"estimated_tokens": 120,
+		"strategy": "full_prompt",
+		"prefix_hash": "pre123",
+		"sections": [
+			{"name": "canon", "tokens": 50, "included": true, "refs": [{"kind": "entity", "id": "aldon-harbour", "relation": "location"}]}
+		],
+		"refs": [
+			{"kind": "entity", "id": "aldon-harbour", "relation": "location"}
+		],
+		"working_set": [
+			{"kind": "entity", "id": "aldon-harbour"}
+		]
+	}`)
+	if err := store.SaveTurnContext(1, "The prompt", rawCtx); err != nil {
+		t.Fatalf("SaveTurnContext: %v", err)
+	}
+
+	// Seed working set
+	wsRecords := []storage.WorkingSetRecord{
+		{
+			EntityID: "aldon-harbour",
+			Kind:     "entity",
+			Weight:   2.5,
+			LastTurn: 1,
+			Role:     "location",
+		},
+	}
+	if err := store.ReplaceWorkingSet(wsRecords); err != nil {
+		t.Fatalf("ReplaceWorkingSet: %v", err)
+	}
+
+	// 1. GET /api/game/:id/context
+	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/context", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200 for /context, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var turnCtx TurnContextDTO
+	if err := json.NewDecoder(rec.Body).Decode(&turnCtx); err != nil {
+		t.Fatalf("decode TurnContextDTO failed: %v", err)
+	}
+	if turnCtx.TurnNumber != 1 || turnCtx.Strategy != "full_prompt" || turnCtx.Prompt != "The prompt" {
+		t.Errorf("unexpected TurnContextDTO: %+v", turnCtx)
+	}
+	if len(turnCtx.Sections) != 1 || turnCtx.Sections[0].Name != "canon" {
+		t.Errorf("unexpected sections: %+v", turnCtx.Sections)
+	}
+
+	// 2. GET /api/game/:id/working-set
+	req = httptest.NewRequest("GET", "/api/game/"+gameID+"/working-set", nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200 for /working-set, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var workingSet []WorkingEntryDTO
+	if err := json.NewDecoder(rec.Body).Decode(&workingSet); err != nil {
+		t.Fatalf("decode WorkingEntryDTO slice failed: %v", err)
+	}
+	if len(workingSet) != 1 || workingSet[0].ID != "aldon-harbour" || workingSet[0].Weight != 2.5 {
+		t.Errorf("unexpected workingSet: %+v", workingSet)
 	}
 }
 

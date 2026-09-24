@@ -429,3 +429,55 @@ type TraceEventDTO struct {
 type STTResponse struct {
 	Text string `json:"text"`
 }
+
+type RefDTO struct {
+	Kind     string `json:"kind"`
+	ID       string `json:"id"`
+	Relation string `json:"relation,omitempty"`
+}
+
+type SectionReportDTO struct {
+	Name     string   `json:"name"`
+	Tokens   int      `json:"tokens"`
+	Included bool     `json:"included"`
+	Source   string   `json:"source,omitempty"`
+	Refs     []RefDTO `json:"refs,omitempty"`
+}
+
+type ProviderSessionDTO struct {
+	Provider    string `json:"provider"`
+	ID          string `json:"id"`
+	ThroughTurn int    `json:"through_turn"`
+	Model       string `json:"model,omitempty"`
+	PrefixHash  string `json:"prefix_hash,omitempty"`
+}
+
+type TurnContextDTO struct {
+	TurnNumber      int                 `json:"turn_number"`
+	Mode            string              `json:"mode"`
+	Budget          int                 `json:"budget"`
+	EstimatedTokens int                 `json:"estimated_tokens"`
+	Sections        []SectionReportDTO  `json:"sections"`
+	Refs            []RefDTO            `json:"refs"`
+	WorkingSet      []RefDTO            `json:"working_set"`
+	Threads         []string            `json:"threads,omitempty"`
+	SummaryVersion  int                 `json:"summary_version"`
+	WorldHash       string              `json:"world_hash,omitempty"`
+	SystemHash      string              `json:"system_hash,omitempty"`
+	PromptHash      string              `json:"prompt_hash"`
+	Strategy        string              `json:"strategy"`
+	PrefixHash      string              `json:"prefix_hash,omitempty"`
+	Session         *ProviderSessionDTO `json:"session,omitempty"`
+	CachedTokens    int                 `json:"cached_tokens,omitempty"`
+	Prompt          string              `json:"prompt,omitempty"`
+}
+
+type WorkingEntryDTO struct {
+	Kind     string  `json:"kind"`
+	ID       string  `json:"id"`
+	Name     string  `json:"name,omitempty"`
+	Weight   float64 `json:"weight"`
+	LastTurn int     `json:"last_turn"`
+	Role     string  `json:"role,omitempty"`
+}
+

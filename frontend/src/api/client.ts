@@ -31,6 +31,8 @@ import {
   VoiceSearchRequest,
   VoiceSearchResponse,
   ProviderCatalog,
+  TurnContext,
+  WorkingEntry,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -477,4 +479,25 @@ export class APIClient {
     });
     if (!res.ok) throw new Error(`addressFinding: ${res.statusText}`);
   }
+
+  static async getTurnContext(gameID: string): Promise<TurnContext> {
+    const res = await fetch(`/api/game/${gameID}/context`);
+    if (!res.ok) throw new Error(`getTurnContext: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async getWorkingSet(gameID: string): Promise<WorkingEntry[]> {
+    const res = await fetch(`/api/game/${gameID}/working-set`);
+    if (!res.ok) throw new Error(`getWorkingSet: ${res.statusText}`);
+    return res.json();
+  }
+
+  async getTurnContext(): Promise<TurnContext> {
+    return APIClient.getTurnContext(this.gameID);
+  }
+
+  async getWorkingSet(): Promise<WorkingEntry[]> {
+    return APIClient.getWorkingSet(this.gameID);
+  }
 }
+

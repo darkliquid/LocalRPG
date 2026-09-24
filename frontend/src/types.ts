@@ -615,4 +615,56 @@ export interface AddressedFinding {
   rule: string;
 }
 
+export interface Ref {
+  kind: string;
+  id: string;
+  relation?: string;
+}
+
+export interface SectionReport {
+  name: string;
+  tokens: number;
+  included: boolean;
+  source?: string;
+  refs?: Ref[];
+}
+
+export interface ProviderSession {
+  provider: string;
+  id: string;
+  through_turn: number;
+  model?: string;
+  prefix_hash?: string;
+}
+
+export interface TurnContext {
+  turn_number: number;
+  mode: string;
+  budget: number;
+  estimated_tokens: number;
+  sections: SectionReport[];
+  refs: Ref[];
+  working_set: Ref[];
+  threads?: string[];
+  summary_version: number;
+  world_hash?: string;
+  system_hash?: string;
+  prompt_hash: string;
+  strategy: string;
+  prefix_hash?: string;
+  session?: ProviderSession;
+  cached_tokens?: number;
+  prompt?: string;
+}
+
+export interface WorkingEntry {
+  kind: string;
+  id: string;
+  name?: string;
+  weight: number;
+  last_turn: number;
+  role?: string;
+}
+
+
 

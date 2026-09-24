@@ -9,13 +9,14 @@ import { CharacterSheetDrawer } from './components/CharacterSheetDrawer';
 import { GraphDrawer } from './components/GraphDrawer';
 import { CodexDrawer } from './components/CodexDrawer';
 import { LivingWorldDrawer } from './components/LivingWorldDrawer';
+import { ContextDrawer } from './components/ContextDrawer';
 import { StoryTheater } from './components/StoryTheater';
 import { LauncherHub } from './components/LauncherHub';
 import { SettingsStudio } from './components/SettingsStudio';
 import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
-import { User, Network, BookOpen, Clock, Film, Compass, Settings, X } from 'lucide-react';
+import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers } from 'lucide-react';
 
 // Mirrors entity.Slugify in the Go backend: lowercase, [a-z0-9] kept, runs of
 // spaces/hyphens/underscores collapse to a single hyphen, trailing hyphen trimmed.
@@ -463,6 +464,16 @@ export const App: React.FC = () => {
                 <span className="hidden sm:inline">World Arcs</span>
               </button>
               <button
+                onClick={() => setActiveDrawer('context')}
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  activeDrawer === 'context' ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
+                }`}
+                title="Inspect prompt context sections and continuity working set"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Context</span>
+              </button>
+              <button
                 onClick={() => setIsTheaterOpen(true)}
                 className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer text-stone-300 hover:text-white hover:bg-white/10"
                 title="Open Story Theater replay mode"
@@ -575,15 +586,22 @@ export const App: React.FC = () => {
           <Drawers
             isOpen={activeDrawer !== null}
             onClose={() => setActiveDrawer(null)}
-            size={activeDrawer === 'codex' || activeDrawer === 'graph' ? 'xl' : 'md'}
+            size={activeDrawer === 'codex' || activeDrawer === 'graph' || activeDrawer === 'context' ? 'xl' : 'md'}
             title={
               activeDrawer === 'character' ? 'Character Sheet' :
               activeDrawer === 'graph' ? 'Lore Graph' :
-              activeDrawer === 'codex' ? 'Codex Markdown Editor' : 'Living World Arcs & Clocks'
+              activeDrawer === 'codex' ? 'Codex Markdown Editor' :
+              activeDrawer === 'context' ? 'Turn Context & Continuity' : 'Living World Arcs & Clocks'
             }
           >
             {activeDrawer === 'character' && <CharacterSheetDrawer player={gameState?.player} />}
             {activeDrawer === 'graph' && <GraphDrawer data={graph || undefined} onSelectNode={handleOpenWikilink} />}
+            {activeDrawer === 'context' && (
+              <ContextDrawer
+                gameID={activeGameID}
+                onSelectWikilink={handleOpenWikilink}
+              />
+            )}
             {activeDrawer === 'codex' && (
               <CodexDrawer
                 entity={selectedEntity || undefined}
