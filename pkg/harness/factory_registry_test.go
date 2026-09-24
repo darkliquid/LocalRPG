@@ -36,3 +36,32 @@ func TestBuildModelRejectsUnknownID(t *testing.T) {
 		t.Error("expected BuildModel to reject an unknown ID")
 	}
 }
+
+func TestBuildModelForPreservesID(t *testing.T) {
+	model, err := harness.BuildModelFor("gm", harness.ProviderConfig{Type: "http", Endpoint: "http://localhost:11434/v1"})
+	if err != nil {
+		t.Fatalf("BuildModelFor: %v", err)
+	}
+	if model.ID() != "gm" {
+		t.Fatalf("provider id = %q, want gm", model.ID())
+	}
+}
+
+func TestNewModelProviderPreservesRoleID(t *testing.T) {
+	for _, tt := range []struct {
+		id  string
+		cfg harness.ProviderConfig
+	}{
+		{"gm", harness.ProviderConfig{Type: "gemini", APIKey: "test-key", Model: "gemini-3.8-flash"}},
+		{"narrator", harness.ProviderConfig{Type: "builtin", BuiltinName: "narrative-oracle"}},
+		{"extractor", harness.ProviderConfig{Type: "http", Endpoint: "http://localhost:11434/v1"}},
+	} {
+		model, err := harness.NewModelProvider(tt.id, tt.cfg)
+		if err != nil {
+			t.Fatalf("NewModelProvider(%s): %v", tt.id, err)
+		}
+		if model.ID() != tt.id {
+			t.Errorf("provider id = %q, want %q", model.ID(), tt.id)
+		}
+	}
+}

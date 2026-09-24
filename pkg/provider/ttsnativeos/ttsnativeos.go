@@ -17,6 +17,14 @@ func init() {
 			Description: "Uses spd-say, say, or PowerShell with a procedural fallback.",
 			Source:      "builtin",
 			Features:    []provider.Feature{provider.FeatureOffline},
+			Presets: []provider.Preset{
+				{ID: "native-os", Order: 5, Label: "Native OS Speech (Built-in Fallback)",
+					Description: "Uses spd-say (Linux), say (macOS), or PowerShell (Windows) with procedural audio fallback.",
+					Config: map[string]interface{}{
+						"type": "builtin", "builtin_name": "native-os",
+						"pitch": 1.0, "speech_rate": 1.0, "auto_play": true, "master_volume": 1.0,
+					}},
+			},
 		},
 		Build: func(_ context.Context, _ []byte) (interface{}, error) {
 			return media.NewNativeOSTTSProvider(), nil

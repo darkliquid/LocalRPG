@@ -17,6 +17,13 @@ func init() {
 			Description: "Pure-Go vector landscape generator that needs no model or network.",
 			Source:      "builtin",
 			Features:    []provider.Feature{provider.FeatureOffline},
+			Presets: []provider.Preset{
+				{ID: "procedural-art", Order: 5, Label: "Procedural Dark Fantasy (Built-in Zero-GPU)",
+					Description: "Pure-Go vector landscape and fortress generator creating atmospheric SVG illustrations.",
+					Config: map[string]interface{}{
+						"type": "builtin", "builtin_name": "procedural-art", "auto_generate": false,
+					}},
+			},
 		},
 		Build: func(_ context.Context, _ []byte) (interface{}, error) {
 			return media.NewProceduralImageProvider(), nil

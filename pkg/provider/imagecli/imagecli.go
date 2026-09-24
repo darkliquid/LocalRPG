@@ -18,6 +18,14 @@ func init() {
 			Description: "Runs an image binary such as stable-diffusion.cpp.",
 			Source:      "cli",
 			Features:    []provider.Feature{provider.FeatureOffline},
+			Presets: []provider.Preset{
+				{ID: "sd-cli", Order: 4, Label: "stable-diffusion.cpp (Local CLI)",
+					Description: "Direct SD inference binary using quantized GGUF weights.",
+					Config: map[string]interface{}{
+						"type": "cli", "command": "sd",
+						"args": []interface{}{"-m", "models/sd-v1-5.gguf", "-p"}, "auto_generate": false,
+					}},
+			},
 		},
 		Build: func(_ context.Context, raw []byte) (interface{}, error) {
 			var payload media.ImageBuildPayload

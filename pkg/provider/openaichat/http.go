@@ -1,4 +1,4 @@
-package harness
+package openaichat
 
 import (
 	"bufio"
@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
@@ -21,18 +22,18 @@ type HTTPProvider struct {
 	endpoint           string
 	model              string
 	apiKey             string
-	opts               GenerationOptions
+	opts               harness.GenerationOptions
 	client             *http.Client
 	logger             trace.Logger
 	chunkLimitOverride int
 }
 
 func NewHTTPProvider(id, endpoint, model, apiKey string) *HTTPProvider {
-	return NewHTTPProviderWithOptions(id, endpoint, model, apiKey, GenerationOptions{})
+	return NewHTTPProviderWithOptions(id, endpoint, model, apiKey, harness.GenerationOptions{})
 }
 
 // NewHTTPProviderWithLogger is NewHTTPProviderWithOptions with a trace sink.
-func NewHTTPProviderWithLogger(id, endpoint, model, apiKey string, opts GenerationOptions, logger trace.Logger) *HTTPProvider {
+func NewHTTPProviderWithLogger(id, endpoint, model, apiKey string, opts harness.GenerationOptions, logger trace.Logger) *HTTPProvider {
 	provider := NewHTTPProviderWithOptions(id, endpoint, model, apiKey, opts)
 	provider.SetLogger(logger)
 	return provider
@@ -55,7 +56,7 @@ func (h *HTTPProvider) chunkLimit() int {
 	return h.chunkLimitOverride
 }
 
-func NewHTTPProviderWithOptions(id, endpoint, model, apiKey string, opts GenerationOptions) *HTTPProvider {
+func NewHTTPProviderWithOptions(id, endpoint, model, apiKey string, opts harness.GenerationOptions) *HTTPProvider {
 	return &HTTPProvider{
 		id:       id,
 		endpoint: strings.TrimRight(endpoint, "/"),
@@ -135,17 +136,17 @@ type openAIChatChunk struct {
 // calls and never a vendor's fragment format.
 type toolCallAccumulator struct {
 	order []int
-	calls map[int]*ToolCall
+	calls map[int]*harness.ToolCall
 }
 
 func newToolCallAccumulator() *toolCallAccumulator {
-	return &toolCallAccumulator{calls: make(map[int]*ToolCall)}
+	return &toolCallAccumulator{calls: make(map[int]*harness.ToolCall)}
 }
 
 func (a *toolCallAccumulator) add(index int, id, name, arguments string) {
 	call, ok := a.calls[index]
 	if !ok {
-		call = &ToolCall{}
+		call = &harness.ToolCall{}
 		a.calls[index] = call
 		a.order = append(a.order, index)
 	}
@@ -158,19 +159,19 @@ func (a *toolCallAccumulator) add(index int, id, name, arguments string) {
 	call.Arguments += arguments
 }
 
-func (a *toolCallAccumulator) result() []ToolCall {
+func (a *toolCallAccumulator) result() []harness.ToolCall {
 	if len(a.order) == 0 {
 		return nil
 	}
-	calls := make([]ToolCall, 0, len(a.order))
+	calls := make([]harness.ToolCall, 0, len(a.order))
 	for _, index := range a.order {
 		calls = append(calls, *a.calls[index])
 	}
 	return calls
 }
 
-func (h *HTTPProvider) Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
-	out := make(chan StreamChunk, 20)
+func (h *HTTPProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
+	out := make(chan harness.StreamChunk, 20)
 	var sb strings.Builder
 
 	errCh := make(chan error, 1)
@@ -189,10 +190,10 @@ func (h *HTTPProvider) Generate(ctx context.Context, req GenerateRequest) (*Gene
 		return nil, err
 	}
 
-	return &GenerateResponse{Text: sb.String()}, nil
+	return &harness.GenerateResponse{Text: sb.String()}, nil
 }
 
-func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error {
+func (h *HTTPProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
 	defer close(out)
 	return h.streamOnce(ctx, req, out, true)
 }
@@ -201,7 +202,7 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 // retried once without it, because a rejection is a provider limitation rather
 // than a turn failure; the trace records why. The channel is closed by Stream, so
 // a retry cannot close it twice.
-func (h *HTTPProvider) streamOnce(ctx context.Context, req GenerateRequest, out chan<- StreamChunk, allowTools bool) error {
+func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk, allowTools bool) error {
 	messages := h.buildMessages(req)
 	tools := h.buildTools(req, allowTools)
 
@@ -331,7 +332,7 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req GenerateRequest, out 
 				}
 				chunkCount++
 				byteCount += len(chunk.Choices[0].Delta.Content)
-				out <- StreamChunk{Text: chunk.Choices[0].Delta.Content}
+				out <- harness.StreamChunk{Text: chunk.Choices[0].Delta.Content}
 			}
 			if chunk.Choices[0].FinishReason != "" {
 				finishReason = chunk.Choices[0].FinishReason
@@ -354,14 +355,14 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req GenerateRequest, out 
 		"chunks":         chunkCount,
 		"bytes":          byteCount,
 	})
-	out <- StreamChunk{Done: true, FinishReason: finishReason, ToolCalls: accumulator.result()}
+	out <- harness.StreamChunk{Done: true, FinishReason: finishReason, ToolCalls: accumulator.result()}
 	return nil
 }
 
 // buildMessages maps a request onto the wire's message shape. Messages win when
 // set; otherwise the request's Prompt is sent as one user turn, which is what
 // every caller did before the contract grew a conversation.
-func (h *HTTPProvider) buildMessages(req GenerateRequest) []openAIMessage {
+func (h *HTTPProvider) buildMessages(req harness.GenerateRequest) []openAIMessage {
 	if len(req.Messages) == 0 {
 		messages := make([]openAIMessage, 0, 2)
 		if req.System != "" {
@@ -386,7 +387,7 @@ func (h *HTTPProvider) buildMessages(req GenerateRequest) []openAIMessage {
 }
 
 // buildTools maps the offered tools, or returns none when tools are not allowed.
-func (h *HTTPProvider) buildTools(req GenerateRequest, allowTools bool) []openAIToolSpec {
+func (h *HTTPProvider) buildTools(req harness.GenerateRequest, allowTools bool) []openAIToolSpec {
 	if !allowTools || len(req.Tools) == 0 {
 		return nil
 	}

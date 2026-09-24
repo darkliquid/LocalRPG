@@ -1,4 +1,4 @@
-package harness
+package oracle
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -19,7 +20,8 @@ type narrativeOracleProvider struct {
 	logger trace.Logger
 }
 
-func NewNarrativeOracleProvider(id string) ModelProvider {
+// NewNarrativeOracleProvider builds the deterministic storyteller.
+func NewNarrativeOracleProvider(id string) harness.ModelProvider {
 	return &narrativeOracleProvider{id: id}
 }
 
@@ -43,19 +45,19 @@ func (n *narrativeOracleProvider) logResponse(text string, start time.Time) {
 
 func (n *narrativeOracleProvider) ID() string { return n.id }
 
-func (n *narrativeOracleProvider) Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
+func (n *narrativeOracleProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
 	start := time.Now()
 	text := n.craftProse(req.PromptText())
 	n.logResponse(text, start)
-	return &GenerateResponse{Text: text}, nil
+	return &harness.GenerateResponse{Text: text}, nil
 }
 
-func (n *narrativeOracleProvider) Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error {
+func (n *narrativeOracleProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
 	defer close(out)
 	start := time.Now()
 	text := n.craftProse(req.PromptText())
 	n.logResponse(text, start)
-	out <- StreamChunk{Text: text, Done: true}
+	out <- harness.StreamChunk{Text: text, Done: true}
 	return nil
 }
 

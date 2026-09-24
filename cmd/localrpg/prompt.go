@@ -7,6 +7,8 @@ import (
 	"os"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/provider/clillm"
+	"github.com/darkliquid/localrpg/pkg/provider/openaichat"
 )
 
 func handlePromptCommand(args []string) {
@@ -24,11 +26,11 @@ func handlePromptCommand(args []string) {
 
 	var provider harness.ModelProvider
 	if *cliCmd != "" {
-		provider = harness.NewCLIProvider("cli-harness", *cliCmd, []string{})
+		provider = clillm.NewCLIProvider("cli-harness", *cliCmd, []string{})
 	} else if *httpEndpoint != "" {
-		provider = harness.NewHTTPProvider("http-harness", *httpEndpoint, *model, "")
+		provider = openaichat.NewHTTPProvider("http-harness", *httpEndpoint, *model, "")
 	} else {
-		provider = harness.NewCLIProvider("default-echo", "echo", []string{})
+		provider = clillm.NewCLIProvider("default-echo", "echo", []string{})
 	}
 
 	ctx := context.Background()

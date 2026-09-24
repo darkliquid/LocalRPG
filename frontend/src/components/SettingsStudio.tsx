@@ -23,13 +23,9 @@ import {
   Cloud,
 } from 'lucide-react';
 import {
-  AGENT_PRESETS,
-  TTS_PRESETS,
-  STT_PRESETS,
-  IMAGE_PRESETS,
   DEFAULT_VOICE_PROFILES,
   KOKORO_VOICE_PROFILES,
-} from '../lib/providerPresetsFallback';
+} from '../lib/voiceProfiles';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { VoiceOptionsControl } from './VoiceOptionsControl';
 import { useTTSInspect } from '../hooks/useTTSInspect';
@@ -84,22 +80,20 @@ const narrationModels = (models: { id: string; supported_actions?: string[] }[])
     })
     .map((m) => m.id);
 
-// mergePresets overlays catalogue presets on the built-in fallback list, so a
-// provider that publishes presets is authoritative while the app still works if
-// the catalogue is unavailable.
-const mergePresets = <T,>(
-  catalog: ProviderPreset[],
-  fallback: Record<string, { label: string; description: string; config: T }>
+// presetsToMap turns the catalogue's presets for one family into the id-keyed
+// shape the quick-load selects use.
+const presetsToMap = <T,>(
+  catalog: ProviderPreset[]
 ): Record<string, { label: string; description: string; config: T }> => {
-  const merged = { ...fallback };
+  const map: Record<string, { label: string; description: string; config: T }> = {};
   for (const preset of catalog) {
-    merged[preset.id] = {
+    map[preset.id] = {
       label: preset.label,
       description: preset.description,
       config: preset.config as unknown as T,
     };
   }
-  return merged;
+  return map;
 };
 
 // A missing role falls back to inheriting gm for the extractor, which is what
@@ -327,10 +321,10 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
   const roleNames = Array.from(new Set([...Object.keys(config.agents.roles), 'extractor']));
 
-  const agentPresets = mergePresets<AgentRoleConfig>(catalogPresets('llm'), AGENT_PRESETS);
-  const ttsPresets = mergePresets<TTSConfig>(catalogPresets('tts'), TTS_PRESETS);
-  const sttPresets = mergePresets<STTConfig>(catalogPresets('stt'), STT_PRESETS);
-  const imagePresets = mergePresets<ImageConfig>(catalogPresets('image'), IMAGE_PRESETS);
+  const agentPresets = presetsToMap<AgentRoleConfig>(catalogPresets('llm'));
+  const ttsPresets = presetsToMap<TTSConfig>(catalogPresets('tts'));
+  const sttPresets = presetsToMap<STTConfig>(catalogPresets('stt'));
+  const imagePresets = presetsToMap<ImageConfig>(catalogPresets('image'));
 
   const kokoroStatus = models.find((m) => m.id === 'kokoro-tts');
   const isGeminiTTS =

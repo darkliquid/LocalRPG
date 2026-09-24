@@ -45,7 +45,7 @@ func TestLLMDescriptorsBuildAndFeaturesAreBacked(t *testing.T) {
 			if !ok {
 				t.Fatalf("descriptor %q has no registration", desc.ID)
 			}
-			raw, err := json.Marshal(harness.ProviderConfig{Type: "http", APIKey: "test-key"})
+			raw, err := json.Marshal(harness.ModelBuildPayload{Config: harness.ProviderConfig{Type: "http", APIKey: "test-key"}})
 			if err != nil {
 				t.Fatalf("encode config: %v", err)
 			}

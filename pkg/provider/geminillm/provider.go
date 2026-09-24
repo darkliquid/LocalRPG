@@ -1,4 +1,4 @@
-package harness
+package geminillm
 
 import (
 	"context"
@@ -6,32 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"google.golang.org/genai"
 
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
-
-var ErrGeminiAPIKeyRequired = errors.New("gemini: an API key is required; set providers.gemini.api_key, agents.roles.<role>.api_key, or GEMINI_API_KEY")
-
-func ResolveGeminiAPIKey(roleKey, sharedKey string) (string, error) {
-	if k := strings.TrimSpace(roleKey); k != "" {
-		return k, nil
-	}
-	if k := strings.TrimSpace(sharedKey); k != "" {
-		return k, nil
-	}
-	if k := strings.TrimSpace(os.Getenv("GEMINI_API_KEY")); k != "" {
-		return k, nil
-	}
-	if k := strings.TrimSpace(os.Getenv("GOOGLE_API_KEY")); k != "" {
-		return k, nil
-	}
-	return "", ErrGeminiAPIKeyRequired
-}
 
 type GeminiProvider struct {
 	id                 string
@@ -113,7 +95,7 @@ func (g *GeminiProvider) SetChunkLimit(limit int) {
 	g.chunkLimitOverride = limit
 }
 
-func (g *GeminiProvider) buildGenerateConfig(req GenerateRequest) *genai.GenerateContentConfig {
+func (g *GeminiProvider) buildGenerateConfig(req harness.GenerateRequest) *genai.GenerateContentConfig {
 	cfg := &genai.GenerateContentConfig{}
 
 	// System instruction
@@ -184,7 +166,7 @@ func (g *GeminiProvider) buildGenerateConfig(req GenerateRequest) *genai.Generat
 	return cfg
 }
 
-func (g *GeminiProvider) buildContents(req GenerateRequest) []*genai.Content {
+func (g *GeminiProvider) buildContents(req harness.GenerateRequest) []*genai.Content {
 	if len(req.Messages) == 0 {
 		promptText := req.PromptText()
 		if promptText == "" {
@@ -286,7 +268,7 @@ func (g *GeminiProvider) buildContents(req GenerateRequest) []*genai.Content {
 	return contents
 }
 
-func (g *GeminiProvider) Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
+func (g *GeminiProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
 	cfg := g.buildGenerateConfig(req)
 	contents := g.buildContents(req)
 
@@ -310,10 +292,10 @@ func (g *GeminiProvider) Generate(ctx context.Context, req GenerateRequest) (*Ge
 		}
 	}
 
-	return &GenerateResponse{Text: sb.String()}, nil
+	return &harness.GenerateResponse{Text: sb.String()}, nil
 }
 
-func (g *GeminiProvider) Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error {
+func (g *GeminiProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
 	defer close(out)
 
 	cfg := g.buildGenerateConfig(req)
@@ -324,7 +306,7 @@ func (g *GeminiProvider) Stream(ctx context.Context, req GenerateRequest, out ch
 	for resp, err := range iter {
 		if err != nil {
 			mappedErr := mapGeminiError(err)
-			out <- StreamChunk{Error: mappedErr, Done: true}
+			out <- harness.StreamChunk{Error: mappedErr, Done: true}
 			return mappedErr
 		}
 
@@ -333,7 +315,7 @@ func (g *GeminiProvider) Stream(ctx context.Context, req GenerateRequest, out ch
 				continue
 			}
 
-			var toolCalls []ToolCall
+			var toolCalls []harness.ToolCall
 			var textParts []string
 
 			for _, part := range cand.Content.Parts {
@@ -352,7 +334,7 @@ func (g *GeminiProvider) Stream(ctx context.Context, req GenerateRequest, out ch
 
 				if part.FunctionCall != nil {
 					argsBytes, _ := json.Marshal(part.FunctionCall.Args)
-					toolCalls = append(toolCalls, ToolCall{
+					toolCalls = append(toolCalls, harness.ToolCall{
 						ID:        part.FunctionCall.ID,
 						Name:      part.FunctionCall.Name,
 						Arguments: string(argsBytes),
@@ -361,7 +343,7 @@ func (g *GeminiProvider) Stream(ctx context.Context, req GenerateRequest, out ch
 			}
 
 			if len(textParts) > 0 || len(toolCalls) > 0 {
-				out <- StreamChunk{
+				out <- harness.StreamChunk{
 					Text:      strings.Join(textParts, ""),
 					ToolCalls: toolCalls,
 				}
@@ -369,7 +351,7 @@ func (g *GeminiProvider) Stream(ctx context.Context, req GenerateRequest, out ch
 		}
 	}
 
-	out <- StreamChunk{Done: true}
+	out <- harness.StreamChunk{Done: true}
 	return nil
 }
 

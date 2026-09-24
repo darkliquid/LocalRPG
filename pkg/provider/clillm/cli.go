@@ -1,4 +1,4 @@
-package harness
+package clillm
 
 import (
 	"bufio"
@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -17,12 +18,12 @@ type CLIProvider struct {
 	id      string
 	command string
 	args    []string
-	opts    GenerationOptions
+	opts    harness.GenerationOptions
 	logger  trace.Logger
 }
 
 // NewCLIProviderWithLogger is NewCLIProvider with a trace sink.
-func NewCLIProviderWithLogger(id, command string, args []string, opts GenerationOptions, logger trace.Logger) *CLIProvider {
+func NewCLIProviderWithLogger(id, command string, args []string, opts harness.GenerationOptions, logger trace.Logger) *CLIProvider {
 	provider := NewCLIProviderWithOptions(id, command, args, opts)
 	provider.SetLogger(logger)
 	return provider
@@ -34,10 +35,10 @@ func (c *CLIProvider) SetLogger(logger trace.Logger) {
 }
 
 func NewCLIProvider(id, command string, args []string) *CLIProvider {
-	return NewCLIProviderWithOptions(id, command, args, GenerationOptions{})
+	return NewCLIProviderWithOptions(id, command, args, harness.GenerationOptions{})
 }
 
-func NewCLIProviderWithOptions(id, command string, args []string, opts GenerationOptions) *CLIProvider {
+func NewCLIProviderWithOptions(id, command string, args []string, opts harness.GenerationOptions) *CLIProvider {
 	return &CLIProvider{
 		id:      id,
 		command: command,
@@ -50,7 +51,7 @@ func (c *CLIProvider) ID() string {
 	return c.id
 }
 
-func (c *CLIProvider) buildCmd(ctx context.Context, req GenerateRequest) *exec.Cmd {
+func (c *CLIProvider) buildCmd(ctx context.Context, req harness.GenerateRequest) *exec.Cmd {
 	args := append([]string{}, c.args...)
 	args = append(args, req.PromptText())
 
@@ -71,7 +72,7 @@ func (c *CLIProvider) buildCmd(ctx context.Context, req GenerateRequest) *exec.C
 	return cmd
 }
 
-func (c *CLIProvider) Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
+func (c *CLIProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
 	c.logger = trace.OrNil(c.logger)
 	c.logRequest(req, "generate")
 	start := time.Now()
@@ -94,10 +95,10 @@ func (c *CLIProvider) Generate(ctx context.Context, req GenerateRequest) (*Gener
 		"total_ms":     time.Since(start).Milliseconds(),
 	})
 
-	return &GenerateResponse{Text: text}, nil
+	return &harness.GenerateResponse{Text: text}, nil
 }
 
-func (c *CLIProvider) Stream(ctx context.Context, req GenerateRequest, out chan<- StreamChunk) error {
+func (c *CLIProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
 	defer close(out)
 
 	c.logger = trace.OrNil(c.logger)
@@ -121,11 +122,11 @@ func (c *CLIProvider) Stream(ctx context.Context, req GenerateRequest, out chan<
 	for {
 		n, err := reader.Read(buf)
 		if n > 0 {
-			out <- StreamChunk{Text: string(buf[:n])}
+			out <- harness.StreamChunk{Text: string(buf[:n])}
 		}
 		if err != nil {
 			if err != io.EOF {
-				out <- StreamChunk{Error: err}
+				out <- harness.StreamChunk{Error: err}
 			}
 			break
 		}
@@ -143,13 +144,13 @@ func (c *CLIProvider) Stream(ctx context.Context, req GenerateRequest, out chan<
 		"total_ms":      time.Since(start).Milliseconds(),
 	})
 
-	out <- StreamChunk{Done: true, FinishReason: "stop"}
+	out <- harness.StreamChunk{Done: true, FinishReason: "stop"}
 	return nil
 }
 
 // logRequest records the command without its final argument: that argument is the
 // prompt, which is recorded once on context.assembled.
-func (c *CLIProvider) logRequest(req GenerateRequest, call string) {
+func (c *CLIProvider) logRequest(req harness.GenerateRequest, call string) {
 	c.logger.Event("provider.request", map[string]interface{}{
 		"role":         c.id,
 		"kind":         "cli",

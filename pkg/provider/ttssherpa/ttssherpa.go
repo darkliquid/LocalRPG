@@ -18,6 +18,16 @@ func init() {
 			Description: "High-quality Kokoro TTS in-process, downloading the model on demand.",
 			Source:      "builtin",
 			Features:    []provider.Feature{provider.FeatureOffline, provider.FeatureVoiceCatalog},
+			Presets: []provider.Preset{
+				{ID: "sherpa-onnx", Order: 1, Label: "Sherpa-ONNX Kokoro (Built-in Neural TTS)",
+					Description: "High-quality Kokoro TTS running in-process via Sherpa-ONNX (downloads model on demand).",
+					Config: map[string]interface{}{
+						"type": "builtin", "builtin_name": "sherpa-onnx",
+						"default_voice": "af_bella", "pitch": 1.0, "speech_rate": 1.0,
+						"auto_play": true, "master_volume": 1.0,
+						"voice_profiles": media.KokoroVoiceProfiles(),
+					}},
+			},
 		},
 		Build: func(_ context.Context, raw []byte) (interface{}, error) {
 			var payload media.TTSBuildPayload

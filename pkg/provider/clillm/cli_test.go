@@ -1,4 +1,4 @@
-package harness
+package clillm
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -16,7 +17,7 @@ func TestCLIProviderExecution(t *testing.T) {
 	// Use standard echo/sh command to test CLI harness runner
 	provider := NewCLIProvider("test-cli", "sh", []string{"-c", "echo 'Hello from CLI harness:' $1", "--"})
 
-	req := GenerateRequest{
+	req := harness.GenerateRequest{
 		Prompt: "Adventurer",
 	}
 
@@ -36,8 +37,8 @@ func TestCLIProviderStreaming(t *testing.T) {
 
 	provider := NewCLIProvider("stream-cli", "sh", []string{"-c", "printf 'Line1 '; sleep 0.05; printf 'Line2'", "--"})
 
-	req := GenerateRequest{Prompt: "test"}
-	out := make(chan StreamChunk, 10)
+	req := harness.GenerateRequest{Prompt: "test"}
+	out := make(chan harness.StreamChunk, 10)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -70,12 +71,12 @@ func TestCLIProviderReportsCompletionAndExposesOptions(t *testing.T) {
 
 	provider := NewCLIProviderWithOptions("stream-cli", "sh",
 		[]string{"-c", "printf '%s-%s' \"$LOCALRPG_MAX_TOKENS\" \"$LOCALRPG_TEMPERATURE\"", "--"},
-		GenerationOptions{Temperature: 0.5, MaxTokens: 512})
+		harness.GenerationOptions{Temperature: 0.5, MaxTokens: 512})
 
-	out := make(chan StreamChunk, 10)
+	out := make(chan harness.StreamChunk, 10)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- provider.Stream(ctx, GenerateRequest{Prompt: "x"}, out)
+		errCh <- provider.Stream(ctx, harness.GenerateRequest{Prompt: "x"}, out)
 	}()
 
 	var received strings.Builder
@@ -103,12 +104,12 @@ func TestCLIProviderReportsCompletionAndExposesOptions(t *testing.T) {
 
 func TestCLIProviderTracesTheCommandWithoutItsPromptArgument(t *testing.T) {
 	memory := trace.NewMemory(trace.LevelFull)
-	provider := NewCLIProviderWithLogger("gm", "sh", []string{"-c", "printf 'done'", "--"}, GenerationOptions{}, memory)
+	provider := NewCLIProviderWithLogger("gm", "sh", []string{"-c", "printf 'done'", "--"}, harness.GenerationOptions{}, memory)
 
-	out := make(chan StreamChunk, 10)
+	out := make(chan harness.StreamChunk, 10)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- provider.Stream(context.Background(), GenerateRequest{Prompt: "a secret prompt"}, out)
+		errCh <- provider.Stream(context.Background(), harness.GenerateRequest{Prompt: "a secret prompt"}, out)
 	}()
 	for range out {
 	}
@@ -141,9 +142,9 @@ func TestCLIProviderTracesTheCommandWithoutItsPromptArgument(t *testing.T) {
 
 func TestCLIProviderUsesMessagesAsAPrompt(t *testing.T) {
 	provider := NewCLIProvider("gm", "sh", []string{"-c", "echo $1", "--"})
-	out := make(chan StreamChunk, 20)
+	out := make(chan harness.StreamChunk, 20)
 
-	req := GenerateRequest{Messages: []Message{{Role: "user", Content: "hello from messages"}}}
+	req := harness.GenerateRequest{Messages: []harness.Message{{Role: "user", Content: "hello from messages"}}}
 	if err := provider.Stream(context.Background(), req, out); err != nil {
 		t.Fatalf("Stream: %v", err)
 	}

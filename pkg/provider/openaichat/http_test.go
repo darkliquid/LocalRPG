@@ -1,4 +1,4 @@
-package harness
+package openaichat
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -37,9 +38,9 @@ func TestHTTPProviderStreaming(t *testing.T) {
 	defer cancel()
 
 	provider := NewHTTPProvider("mock-ollama", server.URL, "llama3", "")
-	req := GenerateRequest{Prompt: "Tell a story"}
+	req := harness.GenerateRequest{Prompt: "Tell a story"}
 
-	out := make(chan StreamChunk, 10)
+	out := make(chan harness.StreamChunk, 10)
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- provider.Stream(ctx, req, out)
@@ -81,15 +82,15 @@ func TestHTTPProviderSendsGenerationOptionsAndReportsFinish(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := NewHTTPProviderWithOptions("mock-ollama", server.URL, "llama3", "", GenerationOptions{
+	provider := NewHTTPProviderWithOptions("mock-ollama", server.URL, "llama3", "", harness.GenerationOptions{
 		Temperature: 0.4,
 		MaxTokens:   256,
 	})
 
-	out := make(chan StreamChunk, 10)
+	out := make(chan harness.StreamChunk, 10)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- provider.Stream(context.Background(), GenerateRequest{Prompt: "Tell a story"}, out)
+		errCh <- provider.Stream(context.Background(), harness.GenerateRequest{Prompt: "Tell a story"}, out)
 	}()
 
 	var finishReason string
@@ -123,12 +124,12 @@ func TestHTTPProviderTracesTheEnvelopeButNeverThePromptAtSummary(t *testing.T) {
 
 	const prompt = "the whole prompt"
 	memory := trace.NewMemory(trace.LevelSummary)
-	provider := NewHTTPProviderWithLogger("gm", server.URL, "gemma", "sk-secret-key", GenerationOptions{MaxTokens: 256}, memory)
+	provider := NewHTTPProviderWithLogger("gm", server.URL, "gemma", "sk-secret-key", harness.GenerationOptions{MaxTokens: 256}, memory)
 
-	out := make(chan StreamChunk, 10)
+	out := make(chan harness.StreamChunk, 10)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- provider.Stream(context.Background(), GenerateRequest{Prompt: prompt}, out)
+		errCh <- provider.Stream(context.Background(), harness.GenerateRequest{Prompt: prompt}, out)
 	}()
 	for range out {
 	}
@@ -181,10 +182,10 @@ func TestHTTPProviderRecordsRawWireLinesOnlyAtFull(t *testing.T) {
 
 	names := func(level trace.Level) []string {
 		memory := trace.NewMemory(level)
-		provider := NewHTTPProviderWithLogger("gm", server.URL, "gemma", "", GenerationOptions{}, memory)
-		out := make(chan StreamChunk, 10)
+		provider := NewHTTPProviderWithLogger("gm", server.URL, "gemma", "", harness.GenerationOptions{}, memory)
+		out := make(chan harness.StreamChunk, 10)
 		errCh := make(chan error, 1)
-		go func() { errCh <- provider.Stream(context.Background(), GenerateRequest{Prompt: "hi"}, out) }()
+		go func() { errCh <- provider.Stream(context.Background(), harness.GenerateRequest{Prompt: "hi"}, out) }()
 		for range out {
 		}
 		if err := <-errCh; err != nil {
@@ -222,12 +223,12 @@ func TestHTTPProviderHonoursTheChunkLimit(t *testing.T) {
 	defer server.Close()
 
 	memory := trace.NewMemory(trace.LevelFull)
-	provider := NewHTTPProviderWithLogger("gm", server.URL, "gemma", "", GenerationOptions{}, memory)
+	provider := NewHTTPProviderWithLogger("gm", server.URL, "gemma", "", harness.GenerationOptions{}, memory)
 	provider.SetChunkLimit(3)
 
-	out := make(chan StreamChunk, 20)
+	out := make(chan harness.StreamChunk, 20)
 	errCh := make(chan error, 1)
-	go func() { errCh <- provider.Stream(context.Background(), GenerateRequest{Prompt: "hi"}, out) }()
+	go func() { errCh <- provider.Stream(context.Background(), harness.GenerateRequest{Prompt: "hi"}, out) }()
 	for range out {
 	}
 	if err := <-errCh; err != nil {
@@ -269,8 +270,8 @@ func TestHTTPProviderAccumulatesStreamedToolCalls(t *testing.T) {
 	provider := NewHTTPProvider("gm", server.URL, "test", "")
 	provider.logger = trace.Nop()
 
-	out := make(chan StreamChunk, 20)
-	var calls []ToolCall
+	out := make(chan harness.StreamChunk, 20)
+	var calls []harness.ToolCall
 	done := make(chan struct{})
 	go func() {
 		for chunk := range out {
@@ -281,9 +282,9 @@ func TestHTTPProviderAccumulatesStreamedToolCalls(t *testing.T) {
 		close(done)
 	}()
 
-	req := GenerateRequest{
-		Messages: []Message{{Role: "user", Content: "who is Kael?"}},
-		Tools:    []ToolSpec{{Name: "search_entities", Description: "search", Parameters: map[string]interface{}{"type": "object"}}},
+	req := harness.GenerateRequest{
+		Messages: []harness.Message{{Role: "user", Content: "who is Kael?"}},
+		Tools:    []harness.ToolSpec{{Name: "search_entities", Description: "search", Parameters: map[string]interface{}{"type": "object"}}},
 	}
 	if err := provider.Stream(context.Background(), req, out); err != nil {
 		t.Fatalf("Stream: %v", err)
@@ -322,15 +323,15 @@ func TestHTTPProviderDegradesOnceWhenToolsAreRejected(t *testing.T) {
 	memory := trace.NewMemory(trace.LevelFull)
 	provider.SetLogger(memory)
 
-	out := make(chan StreamChunk, 20)
+	out := make(chan harness.StreamChunk, 20)
 	go func() {
 		for range out {
 		}
 	}()
 
-	req := GenerateRequest{
-		Messages: []Message{{Role: "user", Content: "hello"}},
-		Tools:    []ToolSpec{{Name: "search_entities"}},
+	req := harness.GenerateRequest{
+		Messages: []harness.Message{{Role: "user", Content: "hello"}},
+		Tools:    []harness.ToolSpec{{Name: "search_entities"}},
 	}
 	if err := provider.Stream(context.Background(), req, out); err != nil {
 		t.Fatalf("Stream: %v", err)

@@ -1,4 +1,4 @@
-package harness_test
+package geminillm_test
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"google.golang.org/genai"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/provider/geminillm"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -99,7 +100,7 @@ func TestGeminiProviderGenerate(t *testing.T) {
 	}
 
 	budget := 0
-	provider, err := harness.NewGeminiProvider("test-gemini", harness.GeminiProviderOptions{
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
 		Model:          "gemini-2.5-flash",
 		APIKey:         "test-key",
 		ThinkingBudget: &budget,
@@ -153,7 +154,7 @@ func TestGeminiProviderResolvesFunctionResponseNames(t *testing.T) {
 		t.Fatalf("failed to create client: %v", err)
 	}
 
-	provider, err := harness.NewGeminiProvider("test-gemini", harness.GeminiProviderOptions{
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
 		Model:  "gemini-3.8-flash",
 		APIKey: "test-key",
 		Client: client,
@@ -215,7 +216,7 @@ func TestGeminiProviderStreamSeparatesThoughtsAndEmitsTools(t *testing.T) {
 		t.Fatalf("genai.NewClient: %v", err)
 	}
 
-	provider, err := harness.NewGeminiProvider("test-gemini", harness.GeminiProviderOptions{
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
 		Model:  "gemini-2.5-flash",
 		APIKey: "test-key",
 		Client: client,
@@ -295,7 +296,7 @@ func TestGeminiErrorMapping(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		mapped := harness.MapGeminiErrorForTest(errors.New(tc.errStr))
+		mapped := geminillm.MapGeminiErrorForTest(errors.New(tc.errStr))
 		if !strings.Contains(mapped.Error(), tc.expected) {
 			t.Errorf("error %q mapped to %q, want %q", tc.errStr, mapped.Error(), tc.expected)
 		}

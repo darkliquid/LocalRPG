@@ -24,13 +24,40 @@ func init() {
 				provider.FeatureKeyRequired,
 				provider.FeatureModelCatalogue,
 			},
+			Presets: []provider.Preset{
+				{ID: "gemini", Order: 8, Label: "Google Gemini (Cloud API)",
+					Description: "Cloud model with a shared key from the Providers tab. Pick the exact model after loading.",
+					Config: map[string]interface{}{
+						"type": "gemini", "model": "gemini-3.8-flash",
+						"temperature": 0.7, "max_tokens": 4096,
+						"thinking_budget": 0, "top_p": 0.95, "top_k": 40,
+					}},
+			},
 		},
 		Build: func(_ context.Context, raw []byte) (interface{}, error) {
-			var cfg harness.ProviderConfig
-			if err := json.Unmarshal(raw, &cfg); err != nil {
+			var payload harness.ModelBuildPayload
+			if len(raw) > 0 {
+				if err := json.Unmarshal(raw, &payload); err != nil {
+					return nil, err
+				}
+			}
+			id := payload.ID
+			if id == "" {
+				id = "gemini"
+			}
+			apiKey, err := harness.ResolveGeminiAPIKey(payload.Config.APIKey, payload.Config.SharedAPIKey)
+			if err != nil {
 				return nil, err
 			}
-			return harness.NewGeminiModelProvider("gemini", cfg)
+			return NewGeminiProvider(id, GeminiProviderOptions{
+				Model:          payload.Config.Model,
+				APIKey:         apiKey,
+				Temperature:    &payload.Config.Temperature,
+				MaxTokens:      &payload.Config.MaxTokens,
+				ThinkingBudget: payload.Config.ThinkingBudget,
+				TopP:           payload.Config.TopP,
+				TopK:           payload.Config.TopK,
+			})
 		},
 	})
 }
