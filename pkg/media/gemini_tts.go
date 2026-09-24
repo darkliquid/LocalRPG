@@ -78,6 +78,7 @@ type GeminiTTSClient struct {
 	client       *genai.Client
 	model        string
 	defaultVoice string
+	apiKey       string
 	logger       trace.Logger
 }
 
@@ -100,7 +101,12 @@ func NewGeminiTTSClient(cfg config.TTSConfig, sharedKey string) (*GeminiTTSClien
 		return nil, fmt.Errorf("gemini: create tts client: %w", err)
 	}
 
-	return NewGeminiTTSClientWithClient(client, cfg)
+	ttsClient, err := NewGeminiTTSClientWithClient(client, cfg)
+	if err != nil {
+		return nil, err
+	}
+	ttsClient.apiKey = apiKey
+	return ttsClient, nil
 }
 
 // NewGeminiTTSClientWithClient wraps an existing genai.Client (used for testing or custom configs).
@@ -166,6 +172,16 @@ func (c *GeminiTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, erro
 	voices := make([]ProviderVoice, len(geminiPrebuiltVoices))
 	copy(voices, geminiPrebuiltVoices)
 	return voices, nil
+}
+
+// ListExtendedVoices searches the extended Gemini voice library. It delegates to
+// the REST catalogue, so the client advertises the capability only when it was
+// built with a key.
+func (c *GeminiTTSClient) ListExtendedVoices(ctx context.Context, query string) ([]ProviderVoice, error) {
+	if strings.TrimSpace(c.apiKey) == "" {
+		return nil, ErrGeminiTTSAPIKeyRequired
+	}
+	return ListGeminiVoices(ctx, c.apiKey, GeminiVoiceSearch{Query: query})
 }
 
 // SpeechCueCapabilities declares that Gemini TTS supports bracketed vocal cues/tags.

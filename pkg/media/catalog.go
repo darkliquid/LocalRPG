@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
 // ProviderVoice is one voice a provider offers. It is the shared shape every
@@ -35,18 +36,10 @@ type VoiceCatalog interface {
 }
 
 // VoiceOption declares one tunable a provider accepts, so the UI renders controls
-// from the declaration rather than from provider-specific code.
-type VoiceOption struct {
-	Key     string   `json:"key"`
-	Label   string   `json:"label"`
-	Kind    string   `json:"kind"` // "float" | "int" | "bool" | "string" | "enum"
-	Min     float64  `json:"min,omitempty"`
-	Max     float64  `json:"max,omitempty"`
-	Step    float64  `json:"step,omitempty"`
-	Options []string `json:"options,omitempty"`
-	Default any      `json:"default,omitempty"`
-	Help    string   `json:"help,omitempty"`
-}
+// from the declaration rather than from provider-specific code. It is an alias
+// of provider.Tunable so the vocabulary lives in one place while existing
+// callers and tests compile unchanged.
+type VoiceOption = provider.Tunable
 
 // VoiceOptions is implemented by providers that declare the tunables they accept.
 // Pitch and speech rate are the portable baseline and never declared here.
