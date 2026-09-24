@@ -5,6 +5,7 @@
 package trace
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -58,6 +59,25 @@ type Logger interface {
 	// SetGame stamps later events with a campaign, so one appended trace can be
 	// filtered back down to a campaign without a second file.
 	SetGame(gameID string)
+}
+
+// ContextLogger is an optional extension of Logger for callers that hold a
+// context: an event can then be attached to the active span. Event remains the
+// fallback, so packages with no context keep working unchanged.
+type ContextLogger interface {
+	Logger
+	EventCtx(ctx context.Context, name string, fields map[string]interface{})
+}
+
+// LogEvent records an event through the context-aware variant when the logger
+// supports it, so span-attached events are used wherever a context exists and
+// nothing changes where it does not.
+func LogEvent(ctx context.Context, logger Logger, name string, fields map[string]interface{}) {
+	if contextual, ok := logger.(ContextLogger); ok {
+		contextual.EventCtx(ctx, name, fields)
+		return
+	}
+	logger.Event(name, fields)
 }
 
 type nopLogger struct{}

@@ -691,7 +691,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		return nil, fmt.Errorf("record turn: %w", err)
 	}
 
-	o.logger.Event("record.turn", map[string]interface{}{
+	trace.LogEvent(ctx, o.logger, "record.turn", map[string]interface{}{
 		"number":          turn.Number,
 		"location":        turn.Location,
 		"entities":        len(turn.Entities),
@@ -940,7 +940,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, contextPrompt 
 
 		messages = append(messages, harness.Message{Role: "assistant", ToolCalls: result.ToolCalls})
 		for _, call := range result.ToolCalls {
-			o.logger.Event("tool.call", map[string]interface{}{
+			trace.LogEvent(ctx, o.logger, "tool.call", map[string]interface{}{
 				"round":           round,
 				"name":            call.Name,
 				"arguments":       call.Arguments,
@@ -966,7 +966,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, contextPrompt 
 					attribute.String("localrpg.tool.name", call.Name),
 					attribute.Bool("localrpg.tool.ok", ok),
 				))
-			o.logger.Event("tool.result", map[string]interface{}{
+			trace.LogEvent(ctx, o.logger, "tool.result", map[string]interface{}{
 				"name":        call.Name,
 				"ok":          ok,
 				"bytes":       len(output),

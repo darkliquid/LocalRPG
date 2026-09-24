@@ -97,7 +97,8 @@ func handlePlayCommand(args []string) {
 	ruleLoader := rules.NewRuleLoader(paths, jsEngine)
 	_ = ruleLoader.LoadRules(manifest.SystemID, manifest.WorldID)
 
-	logger := buildTraceLogger(cfg, os.Args, paths.CacheDir())
+	localLogger := buildTraceLogger(cfg, os.Args, paths.CacheDir())
+	logger := telemetryProvider.Logger(localLogger)
 	logger.SetGame(gameID)
 
 	router, err := harness.RouterFromConfigWithLogger(cfg, logger)

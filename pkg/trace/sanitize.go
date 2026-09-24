@@ -84,6 +84,13 @@ func Sanitize(fields map[string]interface{}, level Level, payloadChars int) map[
 	return sanitizeMap(fields, level, payloadChars)
 }
 
+// SanitizeFields redacts and caps fields for a sink with no configured level,
+// such as the OpenTelemetry log bridge. It reuses the same policy as the file
+// sink so there is exactly one redaction implementation.
+func SanitizeFields(fields map[string]interface{}) map[string]interface{} {
+	return Sanitize(fields, LevelFull, defaultPayloadChars)
+}
+
 func sanitizeMap(fields map[string]interface{}, level Level, payloadChars int) map[string]interface{} {
 	clean := make(map[string]interface{}, len(fields))
 	for key, value := range fields {

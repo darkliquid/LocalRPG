@@ -61,9 +61,6 @@ func handleGUICommand(args []string) {
 	}
 
 	svc := gui.NewService(cfg.Dir)
-	// The resolver owns where caches live, so the sink follows it rather than
-	// duplicating the relative-path resolution the service already did.
-	svc.SetLogger(buildTraceLogger(svc.Config(), os.Args, svc.GetResolver().CacheDir()))
 	defer func() { _ = storage.CloseGameStores() }()
 
 	telemetryProvider, err := telemetry.New(context.Background(), svc.Config().Telemetry, telemetry.BuildInfo{
@@ -78,6 +75,12 @@ func handleGUICommand(args []string) {
 		defer cancel()
 		_ = telemetryProvider.Shutdown(shutdownCtx)
 	}()
+
+	// The resolver owns where caches live, so the sink follows it rather than
+	// duplicating the relative-path resolution the service already did. The
+	// telemetry bridge wraps it so events also reach OTel when enabled.
+	localLogger := buildTraceLogger(svc.Config(), os.Args, svc.GetResolver().CacheDir())
+	svc.SetLogger(telemetryProvider.Logger(localLogger))
 
 	handler := gui.ProtectCrossOrigin(gui.NewServer(svc, gui.AssetHandler()))
 
