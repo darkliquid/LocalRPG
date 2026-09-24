@@ -9,11 +9,16 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -346,10 +351,23 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		"input_chars": len([]rune(actionInput)),
 	})
 
+	ctx, turnSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "turn",
+		oteltrace.WithAttributes(
+			attribute.String("game.id", o.gameID()),
+			attribute.Int("turn.number", turnNum),
+			attribute.String("turn.mode", mode),
+		),
+	)
+	defer turnSpan.End()
+
 	var rollRes *rules.RollResult
 	var outcome string
 	var gmDirective string
 	generationPrompt := actionInput
+
+	// The outcome is only known later, so it is attached at return rather than
+	// at start.
+	defer func() { turnSpan.SetAttributes(attribute.String("turn.outcome", outcome)) }()
 
 	// Handle /undo command
 	if strings.HasPrefix(strings.TrimSpace(actionInput), "/undo") {
@@ -428,7 +446,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			Location:  ent.ID,
 			Entities:  moveEntities,
 		}
-		if err := o.timeline.RecordTurn(&move, nil); err != nil {
+		if err := o.timeline.RecordTurnContext(ctx, &move, nil); err != nil {
 			return nil, fmt.Errorf("record move: %w", err)
 		}
 		return &move, nil
@@ -510,6 +528,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	assembly, err := o.assembler.Assemble(harness.ContextRequest{
+		Context:     ctx,
 		LocationID:  locationID,
 		PlayerID:    o.playerID,
 		Action:      generationPrompt,
@@ -574,10 +593,15 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	extraction := harness.Extraction{}
 	if o.extractor != nil {
+		extractCtx, extractSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "extract.entities")
 		// A failed extractor must not lose the turn; the mentions above still stand.
-		if result, err := o.extractor.Extract(ctx, turn.Narration); err == nil {
+		if result, err := o.extractor.Extract(extractCtx, turn.Narration); err == nil {
 			extraction = *result
 		}
+		extractSpan.SetAttributes(
+			attribute.Int("localrpg.entities.extracted", len(extraction.Entities)),
+		)
+		extractSpan.End()
 	}
 
 	turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
@@ -602,9 +626,13 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	if o.continuityEnabled() {
-		for _, finding := range CheckContinuity(o.store, &turn, locationID, o.playerID) {
+		_, continuitySpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "continuity.check")
+		findings := CheckContinuity(o.store, &turn, locationID, o.playerID)
+		for _, finding := range findings {
 			turn.ContinuityNotes = append(turn.ContinuityNotes, finding.Note)
 		}
+		continuitySpan.SetAttributes(attribute.Int("localrpg.continuity.findings", len(findings)))
+		continuitySpan.End()
 	}
 
 	// A move proposed by extraction applies only when it resolves to a real
@@ -648,7 +676,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// RecordTurn creates and voices the entities the turn introduced. Synthesis
 	// must not begin until this returns, or a character invented in this turn
 	// would be read in the narrator's voice.
-	if err := o.timeline.RecordTurn(&turn, extraction.Entities); err != nil {
+	if err := o.timeline.RecordTurnContext(ctx, &turn, extraction.Entities); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
 	}
 
@@ -849,10 +877,21 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, contextPrompt 
 			"budget":              o.contextBudget(),
 		})
 
-		result, err := o.generateRequest(ctx, request, onChunk)
+		roundCtx, roundSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "provider.generate",
+			oteltrace.WithAttributes(
+				attribute.String("localrpg.role", "gm"),
+				attribute.Int("localrpg.round", round),
+				attribute.Bool("localrpg.tools_offered", offerTools),
+			),
+		)
+		result, err := o.generateRequest(roundCtx, request, onChunk)
 		if err != nil {
+			roundSpan.RecordError(err)
+			roundSpan.SetStatus(codes.Error, err.Error())
+			roundSpan.End()
 			return streamResult{}, err
 		}
+		roundSpan.End()
 
 		// A reply carrying calls while tools were not offered is a protocol quirk:
 		// its text is the answer, and the calls are dropped and traced.
@@ -887,7 +926,18 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, contextPrompt 
 			o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "running"})
 
 			started := time.Now()
-			output, ok := o.toolExecutor.Execute(ctx, call)
+			toolCtx, toolSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "tool.call",
+				oteltrace.WithAttributes(
+					attribute.String("localrpg.tool.name", call.Name),
+					attribute.Int("localrpg.round", round),
+				),
+			)
+			output, ok := o.toolExecutor.Execute(toolCtx, call)
+			toolSpan.SetAttributes(attribute.Bool("localrpg.tool.ok", ok), attribute.Int("localrpg.tool.bytes", len(output)))
+			if !ok {
+				toolSpan.SetStatus(codes.Error, "tool execution failed")
+			}
+			toolSpan.End()
 			o.logger.Event("tool.result", map[string]interface{}{
 				"name":        call.Name,
 				"ok":          ok,

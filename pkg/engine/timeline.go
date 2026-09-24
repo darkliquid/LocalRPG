@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,11 +9,15 @@ import (
 	"sort"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
 
 // Timeline owns every write a turn makes across the campaign's entity notes,
@@ -48,6 +53,17 @@ func (t *Timeline) VoiceProfiles() []config.VoiceProfile {
 // turn record, and the index row. Notes are written before the turn is appended,
 // so the record never points at a note that does not exist.
 func (t *Timeline) RecordTurn(turn *Turn, extracted []harness.ExtractedEntity) error {
+	return t.RecordTurnContext(context.Background(), turn, extracted)
+}
+
+// RecordTurnContext is RecordTurn with a caller context, so the write can join
+// the turn's trace. Callers that have no context use RecordTurn.
+func (t *Timeline) RecordTurnContext(ctx context.Context, turn *Turn, extracted []harness.ExtractedEntity) error {
+	_, span := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "timeline.record_turn",
+		oteltrace.WithAttributes(attribute.Int("localrpg.turn.number", turn.Number)),
+	)
+	defer span.End()
+
 	// A turn's mentions are what later recall reasons about, so the names its prose
 	// contains are recorded here rather than left to whichever writer remembered to
 	// resolve them. Extraction records its own, and a link or a spoken line is
@@ -60,6 +76,7 @@ func (t *Timeline) RecordTurn(turn *Turn, extracted []harness.ExtractedEntity) e
 
 	pending, err := t.stageEntities(turn, extracted)
 	if err != nil {
+		span.RecordError(err)
 		return err
 	}
 
@@ -69,15 +86,22 @@ func (t *Timeline) RecordTurn(turn *Turn, extracted []harness.ExtractedEntity) e
 			pending[id] = ent
 		}
 		if err := t.writeEntities(pending); err != nil {
+			span.RecordError(err)
 			return err
 		}
 	}
 
 	if err := t.history.AppendTurn(*turn); err != nil {
-		return fmt.Errorf("append turn: %w", err)
+		err = fmt.Errorf("append turn: %w", err)
+		span.RecordError(err)
+		return err
 	}
 
-	return t.indexTurn(*turn)
+	if err := t.indexTurn(*turn); err != nil {
+		span.RecordError(err)
+		return err
+	}
+	return nil
 }
 
 func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity) (map[string]*entity.Entity, error) {

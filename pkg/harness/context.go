@@ -1,14 +1,20 @@
 package harness
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -83,6 +89,9 @@ type ContextRequest struct {
 	Threads []string
 	// SpeechCues specifies the vocal steering hints the active TTS engine supports.
 	SpeechCues SpeechCueContext
+	// Context carries the caller's trace context so assembly can be a span. Nil
+	// means background, which keeps callers that never had one working.
+	Context context.Context
 }
 
 // SectionStat reports one section's cost so a trace can explain the prompt.
@@ -139,11 +148,31 @@ func (c *ContextAssembler) SetLogger(logger trace.Logger) {
 // Assemble builds the prompt and trims it to the configured budget. Trimming is
 // ordered by what the narrator can best do without, defined by each section's rank.
 func (c *ContextAssembler) Assemble(req ContextRequest) (AssembleResult, error) {
+	ctx := req.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_, span := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/harness").Start(ctx, "context.assemble",
+		oteltrace.WithAttributes(attribute.Int("context.budget", c.limits.TokenBudget)),
+	)
+	defer span.End()
+
 	sections, err := c.buildSections(req)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return AssembleResult{}, err
 	}
-	return c.fitToBudget(req, sections), nil
+	result := c.fitToBudget(req, sections)
+	span.SetAttributes(attribute.Int("context.tokens", result.EstimatedTokens))
+	for _, section := range result.Sections {
+		span.AddEvent("section", oteltrace.WithAttributes(
+			attribute.String("context.section", section.Name),
+			attribute.Int("context.section.tokens", section.Tokens),
+			attribute.Bool("context.section.included", section.Included),
+		))
+	}
+	return result, nil
 }
 
 // buildSections composes the prompt in order. Everything a section needs is read
