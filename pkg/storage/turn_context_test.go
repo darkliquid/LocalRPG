@@ -19,3 +19,43 @@ func TestTurnContextRoundTrip(t *testing.T) {
 		t.Fatalf("round trip mismatch: %q %s", prompt, string(got))
 	}
 }
+
+func TestWorkingSetRoundTrip(t *testing.T) {
+	store := openTestDB(t)
+	entries := []WorkingSetRecord{
+		{EntityID: "elena", Kind: "entity", Weight: 2.5, LastTurn: 5, Role: "action"},
+		{EntityID: "kaelen", Kind: "entity", Weight: 1.2, LastTurn: 3, Role: "present"},
+	}
+	if err := store.ReplaceWorkingSet(entries); err != nil {
+		t.Fatalf("ReplaceWorkingSet: %v", err)
+	}
+
+	loaded, err := store.LoadWorkingSet()
+	if err != nil {
+		t.Fatalf("LoadWorkingSet: %v", err)
+	}
+	if len(loaded) != 2 {
+		t.Fatalf("expected 2 loaded entries, got %d", len(loaded))
+	}
+	if loaded[0].EntityID != "elena" || loaded[0].Weight != 2.5 {
+		t.Errorf("unexpected top entry: %+v", loaded[0])
+	}
+	if loaded[1].EntityID != "kaelen" || loaded[1].Weight != 1.2 {
+		t.Errorf("unexpected second entry: %+v", loaded[1])
+	}
+
+	// Test replacement clears prior entries
+	newEntries := []WorkingSetRecord{
+		{EntityID: "seraphine", Kind: "entity", Weight: 1.0, LastTurn: 6, Role: "present"},
+	}
+	if err := store.ReplaceWorkingSet(newEntries); err != nil {
+		t.Fatalf("second ReplaceWorkingSet: %v", err)
+	}
+	loaded, err = store.LoadWorkingSet()
+	if err != nil {
+		t.Fatalf("LoadWorkingSet: %v", err)
+	}
+	if len(loaded) != 1 || loaded[0].EntityID != "seraphine" {
+		t.Fatalf("expected only seraphine, got %+v", loaded)
+	}
+}

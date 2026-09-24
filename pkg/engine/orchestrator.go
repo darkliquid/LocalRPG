@@ -540,6 +540,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 
+	var workingSet WorkingSet
+	if o.store != nil {
+		if records, err := o.store.LoadWorkingSet(); err == nil && len(records) > 0 {
+			workingSet.FromStorageRecords(records)
+		}
+	}
+	workingSetSelection := workingSet.Select(8)
+
 	assembly, err := o.assembler.Assemble(harness.ContextRequest{
 		Context:        ctx,
 		LocationID:     locationID,
@@ -553,6 +561,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Mode:           mode,
 		Summary:        summary,
 		SummaryVersion: summaryVersion,
+		WorkingSet:     workingSetSelection,
 		Threads:        threads,
 		SpeechCues:     o.speechCues,
 	})
@@ -695,6 +704,15 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// would be read in the narrator's voice.
 	if err := o.timeline.RecordTurnContext(ctx, &turn, extraction.Entities); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
+	}
+
+	if o.store != nil {
+		var allTurnRefs []harness.Ref
+		if turn.Context != nil {
+			allTurnRefs = turn.Context.Refs
+		}
+		workingSet.Apply(turnNum, allTurnRefs)
+		_ = o.store.ReplaceWorkingSet(workingSet.ToStorageRecords())
 	}
 
 	trace.LogEvent(ctx, o.logger, "record.turn", map[string]interface{}{

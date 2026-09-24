@@ -334,10 +334,27 @@ func (t *Timeline) EnsureIndexed() error {
 		return fmt.Errorf("read max indexed turn: %w", err)
 	}
 
-	if count == len(turns) && max == lastTurnNumber(turns) {
-		return nil
+	if count != len(turns) || max != lastTurnNumber(turns) {
+		if err := t.indexTurns(turns); err != nil {
+			return err
+		}
 	}
-	return t.indexTurns(turns)
+
+	if t.store != nil && len(turns) > 0 {
+		wsEntries, err := t.store.LoadWorkingSet()
+		if err == nil && len(wsEntries) == 0 {
+			window := DefaultRederiveWindow
+			start := len(turns) - window
+			if start < 0 {
+				start = 0
+			}
+			set := WorkingSet{}
+			rederived := set.Rederive(turns[start:])
+			_ = t.store.ReplaceWorkingSet(rederived.ToStorageRecords())
+		}
+	}
+
+	return nil
 }
 
 func (t *Timeline) indexTurns(turns []Turn) error {

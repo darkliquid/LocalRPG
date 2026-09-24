@@ -16,6 +16,7 @@ var migrations = []migration{
 	{version: 1, apply: addTimelineColumns},
 	{version: 2, apply: dropAudioRefsColumn},
 	{version: 3, apply: addTurnContextsTable},
+	{version: 4, apply: addWorkingSetTable},
 }
 
 func addTurnContextsTable(db *sql.DB) error {
@@ -28,6 +29,21 @@ func addTurnContextsTable(db *sql.DB) error {
 	);`
 	if _, err := db.Exec(create); err != nil {
 		return fmt.Errorf("create turn_contexts: %w", err)
+	}
+	return nil
+}
+
+func addWorkingSetTable(db *sql.DB) error {
+	const create = `
+	CREATE TABLE IF NOT EXISTS working_set (
+		entity_id TEXT PRIMARY KEY,
+		kind      TEXT NOT NULL,
+		weight    REAL NOT NULL,
+		last_turn INTEGER NOT NULL,
+		role      TEXT
+	);`
+	if _, err := db.Exec(create); err != nil {
+		return fmt.Errorf("create working_set: %w", err)
 	}
 	return nil
 }

@@ -247,3 +247,56 @@ func (s *Store) ListEntities() ([]EntitySummary, error) {
 	}
 	return summaries, nil
 }
+
+// WorkingSetRecord represents a single row in the working_set table.
+type WorkingSetRecord struct {
+	EntityID string
+	Kind     string
+	Weight   float64
+	LastTurn int
+	Role     string
+}
+
+// ReplaceWorkingSet replaces the campaign's working set in a single transaction.
+func (s *Store) ReplaceWorkingSet(entries []WorkingSetRecord) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM working_set`); err != nil {
+		return fmt.Errorf("clear working_set: %w", err)
+	}
+
+	const insert = `INSERT INTO working_set (entity_id, kind, weight, last_turn, role) VALUES (?, ?, ?, ?, ?)`
+	for _, e := range entries {
+		if _, err := tx.Exec(insert, e.EntityID, e.Kind, e.Weight, e.LastTurn, emptyToNull(e.Role)); err != nil {
+			return fmt.Errorf("insert working_set entry %q: %w", e.EntityID, err)
+		}
+	}
+	return tx.Commit()
+}
+
+// LoadWorkingSet loads all entries from the working_set table.
+func (s *Store) LoadWorkingSet() ([]WorkingSetRecord, error) {
+	const query = `SELECT entity_id, kind, weight, last_turn, COALESCE(role, '') FROM working_set ORDER BY weight DESC, last_turn DESC, entity_id ASC`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("load working_set: %w", err)
+	}
+	defer rows.Close()
+
+	entries := make([]WorkingSetRecord, 0)
+	for rows.Next() {
+		var e WorkingSetRecord
+		if err := rows.Scan(&e.EntityID, &e.Kind, &e.Weight, &e.LastTurn, &e.Role); err != nil {
+			return nil, fmt.Errorf("scan working_set entry: %w", err)
+		}
+		entries = append(entries, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("load working_set: %w", err)
+	}
+	return entries, nil
+}

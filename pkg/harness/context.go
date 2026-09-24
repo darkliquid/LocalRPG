@@ -89,6 +89,8 @@ type ContextRequest struct {
 	// window. It is lossy, so it is stated as subordinate to canon.
 	Summary        string
 	SummaryVersion int
+	// WorkingSet contains the active continuity references selected for the turn.
+	WorkingSet []Ref
 	// Threads are the unresolved arcs, already rendered with their idle counts. They
 	// are canon, so they are never trimmed: a thread goes quiet precisely when the
 	// narrator should be prompted to return to it.
@@ -207,6 +209,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 	recallText, recallRefs := c.sceneRecall(req)
 	retrievalText, retrievalRefs := c.relevantHistory(req)
 	summaryText, summaryRefs := summarySection(req.Summary, req.SummaryVersion)
+	workingSetText, workingSetRefs := c.workingSetSection(req)
 
 	var actionRefs []Ref
 	if req.PlayerID != "" {
@@ -218,6 +221,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 		{name: "lore", source: "lore_prompt", text: loreSection(req.LorePrompt)},
 		{name: "instructions", source: "speech_cues", text: FormatSpeechFormattingInstructions(req.SpeechCues) + "\n\n"},
 		{name: "canon", source: "canon", text: canonText, refs: canonRefs},
+		{name: "working_set", source: "working_set", text: workingSetText, refs: workingSetRefs, droppable: true, rank: 5},
 		{name: "summary", source: "summary", text: summaryText, refs: summaryRefs, droppable: true, rank: 6},
 		{name: "recent", source: "recent", text: recentText, refs: recentRefs, droppable: true, rank: 4},
 		{name: "recall", source: "scene_recall", text: recallText, refs: recallRefs, droppable: true, rank: 3},
@@ -225,6 +229,41 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 		{name: "catalogue", source: "profiles", text: catalogue, refs: catalogueRefs, droppable: true, rank: 1},
 		{name: "action", source: "player_action", text: "\n## PLAYER ACTION\n" + req.Action + "\n", refs: actionRefs},
 	}, nil
+}
+
+func (c *ContextAssembler) workingSetSection(req ContextRequest) (string, []Ref) {
+	if len(req.WorkingSet) == 0 {
+		return "", nil
+	}
+
+	var lines []string
+	var refs []Ref
+	for _, r := range req.WorkingSet {
+		refs = append(refs, r)
+		if c.store != nil {
+			if ent, err := c.store.GetEntity(r.ID); err == nil && ent != nil {
+				roleDesc := r.Relation
+				if roleDesc == "" {
+					roleDesc = ent.Type
+				}
+				lines = append(lines, fmt.Sprintf("- **%s** (%s)", ent.Name, roleDesc))
+				continue
+			}
+		}
+		lines = append(lines, fmt.Sprintf("- **%s**", r.ID))
+	}
+
+	if len(lines) == 0 {
+		return "", nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n## ACTIVE CONTINUITY\n")
+	sb.WriteString("Recently active beings, places, and ongoing arcs:\n")
+	for _, line := range lines {
+		sb.WriteString(line + "\n")
+	}
+	return sb.String(), refs
 }
 
 func rulesSection(prompt string) string {
@@ -607,10 +646,7 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 
 	for budget > 0 && total() > budget {
 		dropped := false
-		// Rank 5 is deliberately unused: it was reserved for shortening the recall
-		// excerpts, which happens after every whole section has been dropped. Rank 6
-		// is the summary, which is surrendered last.
-		for _, rank := range []int{1, 2, 3, 4, 6} {
+		for _, rank := range []int{1, 2, 3, 4, 5, 6} {
 			for index := range sections {
 				if sections[index].droppable && sections[index].rank == rank && sections[index].text != "" {
 					sections[index].text = ""
@@ -670,6 +706,7 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 			EstimatedTokens: estimateTokens(promptStr),
 			Sections:        reports,
 			Refs:            dedupeRefs(collectRefs(sections)),
+			WorkingSet:      req.WorkingSet,
 			Threads:         req.Threads,
 			SummaryVersion:  req.SummaryVersion,
 			PromptHash:      hashPrompt(promptStr),
@@ -761,6 +798,8 @@ func sectionDescription(name string) string {
 		return "the story so far"
 	case "recent":
 		return "all recent events"
+	case "working_set":
+		return "the active continuity working set"
 	default:
 		return name
 	}

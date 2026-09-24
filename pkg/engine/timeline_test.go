@@ -205,3 +205,38 @@ func TestRecordTurnSavesTurnContextSnapshot(t *testing.T) {
 		t.Errorf("decoded context mismatch: %+v", decoded)
 	}
 }
+
+func TestEnsureIndexedRederivesWorkingSetWhenEmpty(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	store := newTestStore(t)
+	historyPath := filepath.Join(t.TempDir(), "history.jsonl")
+	history := NewHistoryLogger(historyPath)
+	timeline := NewTimeline(paths, store, history, "campaign-01")
+
+	turn := Turn{
+		Number:    1,
+		Timestamp: time.Now(),
+		Mode:      "Do",
+		Input:     "look around",
+		Narration: "Kaelen nods at Elena.",
+		Entities: []entity.Mention{
+			{ID: "kaelen", Kind: "present"},
+			{ID: "elena", Kind: "player"},
+		},
+	}
+	if err := history.AppendTurn(turn); err != nil {
+		t.Fatalf("AppendTurn: %v", err)
+	}
+
+	if err := timeline.EnsureIndexed(); err != nil {
+		t.Fatalf("EnsureIndexed: %v", err)
+	}
+
+	ws, err := store.LoadWorkingSet()
+	if err != nil {
+		t.Fatalf("LoadWorkingSet: %v", err)
+	}
+	if len(ws) != 2 {
+		t.Fatalf("expected 2 working set entries, got %d", len(ws))
+	}
+}
