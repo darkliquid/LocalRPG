@@ -3,6 +3,7 @@ package oracle
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/provider"
@@ -25,8 +26,18 @@ func init() {
 					}},
 			},
 		},
-		Build: func(_ context.Context, _ []byte) (interface{}, error) {
-			return harness.NewOracleModelProvider("narrative-oracle"), nil
+		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+			id := "narrative-oracle"
+			var payload harness.ModelBuildPayload
+			if len(raw) > 0 {
+				if err := json.Unmarshal(raw, &payload); err != nil {
+					return nil, err
+				}
+				if payload.ID != "" {
+					id = payload.ID
+				}
+			}
+			return harness.NewOracleModelProvider(id), nil
 		},
 	})
 }

@@ -46,13 +46,17 @@ func init() {
 			},
 		},
 		Build: func(_ context.Context, raw []byte) (interface{}, error) {
-			var cfg harness.ProviderConfig
+			var payload harness.ModelBuildPayload
 			if len(raw) > 0 {
-				if err := json.Unmarshal(raw, &cfg); err != nil {
+				if err := json.Unmarshal(raw, &payload); err != nil {
 					return nil, err
 				}
 			}
-			return harness.NewOpenAIChatProvider("openaichat", cfg), nil
+			id := payload.ID
+			if id == "" {
+				id = "openaichat"
+			}
+			return harness.NewOpenAIChatProvider(id, payload.Config), nil
 		},
 	})
 }

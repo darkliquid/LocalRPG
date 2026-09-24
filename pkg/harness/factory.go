@@ -45,48 +45,38 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 	switch cfg.Type {
 	case "disabled":
 		return &disabledModelProvider{id: id}, nil
-	case "cli":
-		return NewCLIProviderWithOptions(id, cfg.Command, cfg.Args, GenerationOptions{
-			Temperature: cfg.Temperature,
-			MaxTokens:   cfg.MaxTokens,
-		}), nil
-	case "http":
-		return NewHTTPProviderWithOptions(id, cfg.Endpoint, cfg.Model, cfg.APIKey, GenerationOptions{
-			Temperature: cfg.Temperature,
-			MaxTokens:   cfg.MaxTokens,
-		}), nil
-	case "builtin", "mock", "":
-		if cfg.BuiltinName == "narrative-oracle" {
-			return NewNarrativeOracleProvider(id), nil
+	case "builtin", "mock", "cli", "http", "gemini", "":
+		if ProviderIDFor(cfg) == "" {
+			// A builtin with no command or known name is the debug echo.
+			return &builtinEchoModelProvider{id: id}, nil
 		}
-		if cfg.BuiltinName == "gemini" {
-			return NewGeminiModelProvider(id, cfg)
-		}
-		if cfg.Command != "" {
-			return NewCLIProviderWithOptions(id, cfg.Command, cfg.Args, GenerationOptions{
-				Temperature: cfg.Temperature,
-				MaxTokens:   cfg.MaxTokens,
-			}), nil
-		}
-		return &builtinEchoModelProvider{id: id}, nil
-	case "gemini":
-		return NewGeminiModelProvider(id, cfg)
+		return BuildModelFor(id, cfg)
 	default:
 		return nil, fmt.Errorf("unknown model provider type: %s", cfg.Type)
 	}
 }
 
-// BuildModel constructs a model provider from the registry by ID. It is the
-// facade the factory delegates to, so a provider package owns its descriptor and
-// its construction while callers keep using NewModelProvider.
-func BuildModel(id string, cfg ProviderConfig) (ModelProvider, error) {
-	reg, ok := provider.Lookup(id)
-	if !ok {
-		return nil, fmt.Errorf("harness: no provider registered for %q", id)
+// ModelBuildPayload is what BuildModelFor hands a provider package: the family
+// config plus the role id the caller wants the provider named.
+type ModelBuildPayload struct {
+	ID     string         `json:"id"`
+	Config ProviderConfig `json:"config"`
+}
+
+// BuildModelFor builds the provider for cfg's registry id, named id, so role
+// routing keeps working when construction goes through the registry.
+func BuildModelFor(id string, cfg ProviderConfig) (ModelProvider, error) {
+	regID := ProviderIDFor(cfg)
+	if regID == "" {
+		return nil, fmt.Errorf("harness: no registry provider for type %q", cfg.Type)
 	}
-	raw, err := json.Marshal(cfg)
+	reg, ok := provider.Lookup(regID)
+	if !ok {
+		return nil, fmt.Errorf("harness: provider %q is not registered", regID)
+	}
+	raw, err := json.Marshal(ModelBuildPayload{ID: id, Config: cfg})
 	if err != nil {
-		return nil, fmt.Errorf("harness: encode %s config: %w", id, err)
+		return nil, fmt.Errorf("harness: encode %s config: %w", regID, err)
 	}
 	built, err := reg.Build(context.Background(), raw)
 	if err != nil {
@@ -94,9 +84,14 @@ func BuildModel(id string, cfg ProviderConfig) (ModelProvider, error) {
 	}
 	model, ok := built.(ModelProvider)
 	if !ok {
-		return nil, fmt.Errorf("harness: provider %q is not a model provider", id)
+		return nil, fmt.Errorf("harness: provider %q is not a model provider", regID)
 	}
 	return model, nil
+}
+
+// BuildModel constructs a model provider from the registry by descriptor ID.
+func BuildModel(descriptorID string, cfg ProviderConfig) (ModelProvider, error) {
+	return BuildModelFor(descriptorID, cfg)
 }
 
 // NewModelProviderWithLogger is NewModelProvider with a trace sink attached, so a
