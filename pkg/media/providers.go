@@ -890,4 +890,3 @@ func NewImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string) (Imag
 		return nil, fmt.Errorf("unsupported image provider type: %s", cfg.Type)
 	}
 }
-
