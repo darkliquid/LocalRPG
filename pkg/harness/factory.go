@@ -175,7 +175,7 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 	}
 
 	if _, err := router.GetProviderForRole(config.RoleGM); err != nil {
-		router.RegisterProvider(NewCLIProviderWithLogger("default-echo", "echo", []string{}, GenerationOptions{}, logger))
+		router.RegisterProvider(&builtinEchoModelProvider{id: "default-echo"})
 		router.AssignRole(config.RoleGM, "default-echo")
 	}
 

@@ -10,7 +10,7 @@ func routerWithGM(t *testing.T) *Router {
 	t.Helper()
 
 	router := NewRouter()
-	router.RegisterProvider(NewCLIProvider("gm", "echo", []string{}))
+	router.RegisterProvider(&builtinEchoModelProvider{id: "gm"})
 	router.AssignRole(config.RoleGM, "gm")
 	return router
 }

@@ -35,14 +35,6 @@ func NewOpenAIChatProvider(id string, cfg ProviderConfig) ModelProvider {
 	})
 }
 
-// NewCLIModelProvider builds the command-line provider.
-func NewCLIModelProvider(id string, cfg ProviderConfig) ModelProvider {
-	return NewCLIProviderWithOptions(id, cfg.Command, cfg.Args, GenerationOptions{
-		Temperature: cfg.Temperature,
-		MaxTokens:   cfg.MaxTokens,
-	})
-}
-
 // NewGeminiModelProvider builds the Gemini provider, resolving the API key from
 // the role override, the shared key, or the environment.
 func NewGeminiModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {

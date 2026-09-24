@@ -45,7 +45,10 @@ func init() {
 			if id == "" {
 				id = "cli"
 			}
-			return harness.NewCLIModelProvider(id, payload.Config), nil
+			return NewCLIProviderWithOptions(id, payload.Config.Command, payload.Config.Args, harness.GenerationOptions{
+				Temperature: payload.Config.Temperature,
+				MaxTokens:   payload.Config.MaxTokens,
+			}), nil
 		},
 	})
 }
