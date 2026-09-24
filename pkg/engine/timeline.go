@@ -97,6 +97,18 @@ func (t *Timeline) RecordTurnContext(ctx context.Context, turn *Turn, extracted 
 		return err
 	}
 
+	if turn.Context != nil && t.store != nil {
+		rawCtx, err := json.Marshal(turn.Context)
+		if err != nil {
+			span.RecordError(err)
+			return fmt.Errorf("marshal turn context: %w", err)
+		}
+		if err := t.store.SaveTurnContext(turn.Number, turn.Prompt, rawCtx); err != nil {
+			span.RecordError(err)
+			return fmt.Errorf("save turn context: %w", err)
+		}
+	}
+
 	if err := t.indexTurn(*turn); err != nil {
 		span.RecordError(err)
 		return err

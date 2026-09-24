@@ -45,6 +45,8 @@ type Turn struct {
 	ToolCalls []ToolCallRecord `json:"tool_calls,omitempty"`
 	// Context records the durable description of this turn's context and provenance.
 	Context *harness.TurnContext `json:"context,omitempty"`
+	// Prompt is the exact assembled prompt string for the turn, persisted in SQLite but omitted from history.jsonl.
+	Prompt string `json:"-"`
 
 	// LegacyOutput is only populated when reading records written before the
 	// narration rename. New records must not set it.

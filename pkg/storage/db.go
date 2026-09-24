@@ -48,6 +48,13 @@ CREATE TABLE IF NOT EXISTS turn_entities (
 );
 
 CREATE INDEX IF NOT EXISTS idx_turn_entities_entity ON turn_entities(entity_id);
+
+CREATE TABLE IF NOT EXISTS turn_contexts (
+    turn_number INTEGER PRIMARY KEY,
+    prompt      TEXT NOT NULL,
+    context_json TEXT NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 `
 
 // pragmas are applied on every connection: WAL lets the GUI, the TUI, and a

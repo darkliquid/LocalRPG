@@ -602,6 +602,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Recovery:     string(recovery),
 		ContextNotes: assembly.Trimmed,
 		Context:      &assembly.Context,
+		Prompt:       contextPrompt,
 		ToolCalls:    result.Provenance,
 	}
 

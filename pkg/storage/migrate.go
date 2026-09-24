@@ -15,6 +15,21 @@ type migration struct {
 var migrations = []migration{
 	{version: 1, apply: addTimelineColumns},
 	{version: 2, apply: dropAudioRefsColumn},
+	{version: 3, apply: addTurnContextsTable},
+}
+
+func addTurnContextsTable(db *sql.DB) error {
+	const create = `
+	CREATE TABLE IF NOT EXISTS turn_contexts (
+		turn_number INTEGER PRIMARY KEY,
+		prompt      TEXT NOT NULL,
+		context_json TEXT NOT NULL,
+		created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);`
+	if _, err := db.Exec(create); err != nil {
+		return fmt.Errorf("create turn_contexts: %w", err)
+	}
+	return nil
 }
 
 // migrate applies every migration a database has not seen. It runs on every open,

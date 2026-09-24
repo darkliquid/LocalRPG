@@ -400,3 +400,28 @@ func (s *Store) EntitiesInTurns(turnNumbers []int) ([]string, error) {
 	}
 	return ids, nil
 }
+
+// SaveTurnContext stores the assembled prompt and context JSON for a turn.
+func (s *Store) SaveTurnContext(number int, prompt string, contextJSON []byte) error {
+	const upsert = `
+	INSERT INTO turn_contexts (turn_number, prompt, context_json)
+	VALUES (?, ?, ?)
+	ON CONFLICT(turn_number) DO UPDATE SET
+		prompt = excluded.prompt,
+		context_json = excluded.context_json
+	`
+	if _, err := s.db.Exec(upsert, number, prompt, string(contextJSON)); err != nil {
+		return fmt.Errorf("save turn context %d: %w", number, err)
+	}
+	return nil
+}
+
+// GetTurnContext retrieves the raw context JSON and prompt for a turn.
+func (s *Store) GetTurnContext(number int) ([]byte, string, error) {
+	const query = `SELECT prompt, context_json FROM turn_contexts WHERE turn_number = ?`
+	var prompt, ctxStr string
+	if err := s.db.QueryRow(query, number).Scan(&prompt, &ctxStr); err != nil {
+		return nil, "", fmt.Errorf("get turn context %d: %w", number, err)
+	}
+	return []byte(ctxStr), prompt, nil
+}
