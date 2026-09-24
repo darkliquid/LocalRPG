@@ -34,7 +34,7 @@
 **Interfaces:**
 - Produces: `media.VoiceOptionsOf(*entity.VoiceConfig) map[string]interface{}`.
 
-- [ ] **Step 1: Add the exported helper**
+- [x] **Step 1: Add the exported helper**
 
 ```go
 // VoiceOptionsOf returns a voice's provider options, or nil when it carries none.
@@ -45,7 +45,7 @@ func VoiceOptionsOf(voice *entity.VoiceConfig) map[string]interface{} {
 
 Confirm no cycle: `go build ./pkg/media/`.
 
-- [ ] **Step 2: Move one adapter and require its constructor locally**
+- [x] **Step 2: Move one adapter and require its constructor locally**
 
 For each adapter: `git mv` the file into the provider package, change
 `package media` to the provider package, import `pkg/media` plus shared packages,
@@ -80,21 +80,21 @@ Build: func(_ context.Context, _ []byte) (interface{}, error) {
 },
 ```
 
-- [ ] **Step 3: Drop the moved cases from the media factories**
+- [x] **Step 3: Drop the moved cases from the media factories**
 
 In `pkg/media/providers.go`, remove the `native-os`, `sherpa-onnx`/`kokoro`,
 `gemini`, `elevenlabs`, `procedural-art`, and `gemini` image branches from the
 inline switches. The registry-first path already builds them; the fallback keeps
 `disabled` and the echo cases only.
 
-- [ ] **Step 4: Move the tests**
+- [x] **Step 4: Move the tests**
 
 Move each moved file's `_test.go` to the provider package, changing the test
 package to `<package>_test` (or `<package>` for tests that need internals) and
 qualifying `media.` identifiers. If a test needs registered providers, add the
 blank import `_ "github.com/darkliquid/localrpg/pkg/provider/all"`.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: PASS.
@@ -117,17 +117,17 @@ git commit -m "refactor(provider): move the self-contained media adapters"
 **Interfaces:**
 - Produces: `ttspiper.NewCLITTSClient(cfg config.TTSConfig) media.TTSClient`, `ttshttp.NewHTTPTTSClient(cfg config.TTSConfig) media.TTSClient`.
 
-- [ ] **Step 1: Move `cliTTSClient`**
+- [x] **Step 1: Move `cliTTSClient`**
 
 Copy the type and its `Synthesize` into `pkg/provider/ttspiper/client.go`, drop
 the media inline case, point `Build` at `NewCLITTSClient`, and move its tests.
 
-- [ ] **Step 2: Move `httpTTSClient`**
+- [x] **Step 2: Move `httpTTSClient`**
 
 Same for `ttshttp`, keeping the shared transport from
 `telemetry.HTTPTransport(nil)`.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: PASS.
@@ -146,10 +146,10 @@ git commit -m "refactor(provider): move the cli and http tts clients"
 - Move: `httpSTTClient` -> `pkg/provider/sttwhisperhttp/client.go`
 - Move: matching tests
 
-- [ ] **Step 1: Move both clients**, dropping their media cases and pointing each
+- [x] **Step 1: Move both clients**, dropping their media cases and pointing each
   `Build` at the local constructor.
 
-- [ ] **Step 2: Verify and commit**
+- [x] **Step 2: Verify and commit**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: PASS.
@@ -168,13 +168,13 @@ git commit -m "refactor(provider): move the stt clients"
 - Move: `httpImageClient`, `comfyUIImageClient`, `isComfyUI` -> `pkg/provider/imagehttp/client.go`
 - Move: matching tests
 
-- [ ] **Step 1: Move `cliImageClient`**, drop the media case, point `Build` at the
+- [x] **Step 1: Move `cliImageClient`**, drop the media case, point `Build` at the
   local constructor.
 
-- [ ] **Step 2: Move the HTTP and ComfyUI clients**, taking `isComfyUI` with them
+- [x] **Step 2: Move the HTTP and ComfyUI clients**, taking `isComfyUI` with them
   and dropping media's use of it.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: PASS.
@@ -197,14 +197,14 @@ git commit -m "refactor(provider): move the image cli and http clients"
 **Interfaces:**
 - Consumes: `media.VoiceOptionsOf`, `media.ListGeminiVoices`, `media.ResolveGeminiTTSAPIKey`.
 
-- [ ] **Step 1: Move both adapters**, replacing `voiceOptions(voice)` with
+- [x] **Step 1: Move both adapters**, replacing `voiceOptions(voice)` with
   `media.VoiceOptionsOf(voice)` and pointing each `Build` at the local
   constructor.
 
-- [ ] **Step 2: Move the tests**, adding the `provider/all` import where a test
+- [x] **Step 2: Move the tests**, adding the `provider/all` import where a test
   needs registered providers.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: PASS.
@@ -226,7 +226,7 @@ git commit -m "refactor(provider): move the elevenlabs and gemini tts clients"
 **Interfaces:**
 - Produces: registry-only `NewTTSClientWithSharedKey`, `NewSTTClient`, `NewImageClientWithSharedKey`.
 
-- [ ] **Step 1: Write the factory-fallback test**
+- [x] **Step 1: Write the factory-fallback test**
 
 ```go
 package media_test
@@ -254,15 +254,15 @@ func TestDisabledFactoriesReturnPlaceholders(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Trim the switches** to the disabled/echo fallback and confirm the
+- [x] **Step 2: Trim the switches** to the disabled/echo fallback and confirm the
   registry-first branch still builds the real clients in a binary that imports
   `provider/all`.
 
-- [ ] **Step 3: Split `providers_test.go`** so the moved-client tests live with
+- [x] **Step 3: Split `providers_test.go`** so the moved-client tests live with
   their clients and `media` keeps only fallback, catalogue, pipeline, and shared
   helper tests.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: PASS.
