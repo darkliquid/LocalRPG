@@ -101,3 +101,126 @@ func NewHTTPTTSProvider(cfg config.TTSConfig) TTSClient {
 		client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 30 * time.Second},
 	}
 }
+
+// STTProviderIDFor maps an STT configuration to the registry ID a facade should
+// build.
+func STTProviderIDFor(cfg config.STTConfig) string {
+	switch cfg.Type {
+	case "cli":
+		return "stt-whisper-cli"
+	case "http":
+		return "stt-whisper-http"
+	}
+	return ""
+}
+
+// BuildSTT constructs an STT client from the registry by ID.
+func BuildSTT(id string, cfg config.STTConfig) (STTClient, error) {
+	reg, ok := provider.Lookup(id)
+	if !ok {
+		return nil, fmt.Errorf("media: no provider registered for %q", id)
+	}
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("media: encode %s config: %w", id, err)
+	}
+	built, err := reg.Build(context.Background(), raw)
+	if err != nil {
+		return nil, err
+	}
+	client, ok := built.(STTClient)
+	if !ok {
+		return nil, fmt.Errorf("media: provider %q is not an stt client", id)
+	}
+	return client, nil
+}
+
+// NewCLISTTProvider builds the command-line transcription client.
+func NewCLISTTProvider(cfg config.STTConfig) STTClient {
+	return &cliSTTClient{command: cfg.Command, args: cfg.Args}
+}
+
+// NewHTTPSTTProvider builds the HTTP transcription client.
+func NewHTTPSTTProvider(cfg config.STTConfig) STTClient {
+	return &httpSTTClient{
+		endpoint: cfg.Endpoint,
+		model:    cfg.Model,
+		apiKey:   cfg.APIKey,
+		client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 60 * time.Second},
+	}
+}
+
+// ImageBuildPayload is what BuildImage hands an image provider package.
+type ImageBuildPayload struct {
+	Config    config.ImageConfig `json:"config"`
+	SharedKey string             `json:"shared_key,omitempty"`
+}
+
+// ImageProviderIDFor maps an image configuration to the registry ID a facade
+// should build.
+func ImageProviderIDFor(cfg config.ImageConfig) string {
+	switch cfg.Type {
+	case "gemini":
+		return "image-gemini"
+	case "builtin":
+		if cfg.BuiltinName == "procedural-art" {
+			return "image-procedural-art"
+		}
+	case "cli":
+		return "image-cli"
+	case "comfyui", "http":
+		return "image-http"
+	}
+	return ""
+}
+
+// BuildImage constructs an image client from the registry by ID.
+func BuildImage(id string, cfg config.ImageConfig, sharedKey string) (ImageClient, error) {
+	reg, ok := provider.Lookup(id)
+	if !ok {
+		return nil, fmt.Errorf("media: no provider registered for %q", id)
+	}
+	raw, err := json.Marshal(ImageBuildPayload{Config: cfg, SharedKey: sharedKey})
+	if err != nil {
+		return nil, fmt.Errorf("media: encode %s config: %w", id, err)
+	}
+	built, err := reg.Build(context.Background(), raw)
+	if err != nil {
+		return nil, err
+	}
+	client, ok := built.(ImageClient)
+	if !ok {
+		return nil, fmt.Errorf("media: provider %q is not an image client", id)
+	}
+	return client, nil
+}
+
+// NewProceduralImageProvider builds the built-in procedural art client.
+func NewProceduralImageProvider() ImageClient { return NewProceduralArtClient() }
+
+// NewGeminiImageProvider builds the Gemini/Imagen image client.
+func NewGeminiImageProvider(cfg config.ImageConfig, sharedKey string) (ImageClient, error) {
+	return NewGeminiImageClient(cfg, sharedKey)
+}
+
+// NewCLIImageProvider builds the command-line image client.
+func NewCLIImageProvider(cfg config.ImageConfig) ImageClient {
+	return &cliImageClient{command: cfg.Command, args: cfg.Args}
+}
+
+// NewHTTPImageProvider builds the HTTP image client, choosing ComfyUI's API when
+// the endpoint names it.
+func NewHTTPImageProvider(cfg config.ImageConfig) ImageClient {
+	if cfg.Type == "comfyui" || isComfyUI(cfg.Endpoint) {
+		return &comfyUIImageClient{
+			endpoint: cfg.Endpoint,
+			client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 120 * time.Second},
+		}
+	}
+	return &httpImageClient{
+		endpoint: cfg.Endpoint,
+		model:    cfg.Model,
+		apiKey:   cfg.APIKey,
+		client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 60 * time.Second},
+	}
+}

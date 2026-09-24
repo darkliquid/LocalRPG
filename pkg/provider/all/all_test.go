@@ -103,3 +103,45 @@ func TestTTSDescriptorsBuildAndFeaturesAreBacked(t *testing.T) {
 		})
 	}
 }
+
+func TestSTTAndImageDescriptorsBuild(t *testing.T) {
+	for _, family := range []provider.Family{provider.FamilySTT, provider.FamilyImage} {
+		descs := provider.List(family)
+		if len(descs) == 0 {
+			t.Fatalf("expected a registered %s provider", family)
+		}
+		for _, desc := range descs {
+			desc := desc
+			t.Run(string(family)+"/"+desc.ID, func(t *testing.T) {
+				reg, ok := provider.Lookup(desc.ID)
+				if !ok {
+					t.Fatalf("descriptor %q has no registration", desc.ID)
+				}
+				var raw []byte
+				var err error
+				if family == provider.FamilySTT {
+					raw, err = json.Marshal(config.STTConfig{APIKey: "test-key"})
+				} else {
+					raw, err = json.Marshal(media.ImageBuildPayload{Config: config.ImageConfig{APIKey: "test-key"}})
+				}
+				if err != nil {
+					t.Fatalf("encode config: %v", err)
+				}
+				built, err := reg.Build(context.Background(), raw)
+				if err != nil {
+					t.Fatalf("build %s: %v", desc.ID, err)
+				}
+				switch family {
+				case provider.FamilySTT:
+					if _, ok := built.(media.STTClient); !ok {
+						t.Fatalf("provider %q is not an stt client", desc.ID)
+					}
+				case provider.FamilyImage:
+					if _, ok := built.(media.ImageClient); !ok {
+						t.Fatalf("provider %q is not an image client", desc.ID)
+					}
+				}
+			})
+		}
+	}
+}
