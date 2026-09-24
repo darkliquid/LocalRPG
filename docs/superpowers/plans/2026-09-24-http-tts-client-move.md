@@ -31,12 +31,12 @@
 **Interfaces:**
 - Produces: `ttshttp.NewHTTPTTSClient(config.TTSConfig) media.TTSClient`, `ttshttp.ResolveHTTPEndpoints(string) (string, string)`.
 
-- [ ] **Step 1: Confirm the resolver has no other callers**
+- [x] **Step 1: Confirm the resolver has no other callers**
 
 Run: `grep -rn "ResolveHTTPEndpoints" --include=*.go pkg cmd | grep -v _test`
 Expected: only `pkg/media/providers.go`.
 
-- [ ] **Step 2: Create the provider client**
+- [x] **Step 2: Create the provider client**
 
 Move `ResolveHTTPEndpoints`, `httpTTSClient`, `kokoroVoiceItem`, and the three
 methods into `pkg/provider/ttshttp/client.go`, changing `package media` to
@@ -57,12 +57,12 @@ func NewHTTPTTSClient(cfg config.TTSConfig) media.TTSClient {
 
 Keep `ResolveHTTPEndpoints` exported.
 
-- [ ] **Step 3: Point the registration at the local constructor**
+- [x] **Step 3: Point the registration at the local constructor**
 
 In `pkg/provider/ttshttp/ttshttp.go`, replace
 `media.NewHTTPTTSProvider(payload.Config)` with `NewHTTPTTSClient(payload.Config)`.
 
-- [ ] **Step 4: Remove the media pieces**
+- [x] **Step 4: Remove the media pieces**
 
 - Delete the moved block from `pkg/media/providers.go` and the `case "http":`
   TTS branch.
@@ -71,7 +71,7 @@ In `pkg/provider/ttshttp/ttshttp.go`, replace
 Run: `go build ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media pkg/provider/ttshttp
@@ -90,12 +90,12 @@ git commit -m "refactor(provider): extract the http tts client into its package"
 **Interfaces:**
 - Consumes: `ttshttp.NewHTTPTTSClient`, `ttshttp.ResolveHTTPEndpoints`.
 
-- [ ] **Step 1: Move the `ResolveHTTPEndpoints` table test**
+- [x] **Step 1: Move the `ResolveHTTPEndpoints` table test**
 
 Cut `TestResolveHTTPEndpoints` from `pkg/media/providers_test.go`, change the
 package to `ttshttp_test`, and call `ttshttp.ResolveHTTPEndpoints`.
 
-- [ ] **Step 2: Add a synthesize test and a voice-list test**
+- [x] **Step 2: Add a synthesize test and a voice-list test**
 
 ```go
 package ttshttp_test
@@ -135,7 +135,7 @@ func TestSynthesizeSendsKokoroFields(t *testing.T) {
 For the voice list, serve a Kokoro-style JSON array and assert
 `ListVoices` maps it to `[]media.ProviderVoice`, using `media` only for the type.
 
-- [ ] **Step 3: Add the factory fallback test** in `pkg/media/factory_test.go`:
+- [x] **Step 3: Add the factory fallback test** in `pkg/media/factory_test.go`:
 
 ```go
 package media_test
@@ -155,7 +155,7 @@ func TestHTTPTTSFallsBackWithoutRegistry(t *testing.T) {
 }
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: PASS.
@@ -172,12 +172,12 @@ git commit -m "test(provider): move the http tts tests beside the client"
 **Files:**
 - Modify: `pkg/media/providers.go` (confirm only disabled/echo remain for TTS)
 
-- [ ] **Step 1: Grep for residue**
+- [x] **Step 1: Grep for residue**
 
 Run: `grep -rn "ResolveHTTPEndpoints\|httpTTSClient\|NewHTTPTTSProvider" --include=*.go pkg | grep -v "pkg/provider/ttshttp"`
 Expected: no matches.
 
-- [ ] **Step 2: Add a registry-preference test**
+- [x] **Step 2: Add a registry-preference test**
 
 In `pkg/media/factory_test.go`, blank-import `provider/all` in a separate
 external file and assert that a `type: http` TTS config builds a client whose
@@ -185,7 +185,7 @@ external file and assert that a `type: http` TTS config builds a client whose
 not the echo fallback). If an internal media test would need `all`, place the
 test in `media_test` instead.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: PASS.

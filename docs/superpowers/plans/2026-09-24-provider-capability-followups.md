@@ -35,7 +35,7 @@
 - Consumes: `provider.Preset`, `provider.Descriptor.Presets`.
 - Produces: a catalogue with at least one preset per family.
 
-- [ ] **Step 1: Write the failing preset guard test**
+- [x] **Step 1: Write the failing preset guard test**
 
 Create `pkg/provider/all/presets_test.go`:
 
@@ -97,7 +97,7 @@ func TestEveryPresetConfigUnmarshals(t *testing.T) {
 Run: `go test -run 'TestEachFamilyHasPresets|TestEveryPresetConfigUnmarshals' ./pkg/provider/all/ -v`
 Expected: FAIL — no family has presets.
 
-- [ ] **Step 2: Move the preset data into descriptors**
+- [x] **Step 2: Move the preset data into descriptors**
 
 For each provider package in the spec's §4.1 table, add the presets from
 `frontend/src/lib/providerPresetsFallback.ts` verbatim. Example,
@@ -126,7 +126,7 @@ config. Keep the `Order` fields matching the fallback file so the UI does not
 reshuffle. (The TTS/STT/image packages are filled the same way from the same
 table.)
 
-- [ ] **Step 3: Register the web-speech STT descriptor**
+- [x] **Step 3: Register the web-speech STT descriptor**
 
 Create `pkg/media/webspeech_stt.go`:
 
@@ -158,12 +158,12 @@ Create `pkg/provider/sttwebspeech/sttwebspeech.go` registering descriptor
 `Build` returning `media.NewWebSpeechSTTProvider()`. Add the import to
 `pkg/provider/all/all.go`.
 
-- [ ] **Step 4: Run the guard test**
+- [x] **Step 4: Run the guard test**
 
 Run: `go test -count=1 ./pkg/provider/all/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Verify the whole suite and commit**
+- [x] **Step 5: Verify the whole suite and commit**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: PASS.
@@ -185,7 +185,7 @@ git commit -m "feat(provider): move every preset into the provider catalogue"
 **Interfaces:**
 - Produces: `harness.ModelBuildPayload`, `harness.BuildModelFor(id string, cfg ProviderConfig) (ModelProvider, error)`.
 
-- [ ] **Step 1: Write the failing id-preservation test**
+- [x] **Step 1: Write the failing id-preservation test**
 
 ```go
 package harness_test
@@ -212,7 +212,7 @@ func TestBuildModelForPreservesID(t *testing.T) {
 Run: `go test -run TestBuildModelForPreservesID ./pkg/harness/ -v`
 Expected: FAIL — undefined `BuildModelFor`.
 
-- [ ] **Step 2: Add the payload and facade**
+- [x] **Step 2: Add the payload and facade**
 
 In `pkg/harness/factory.go`:
 
@@ -252,7 +252,7 @@ func BuildModelFor(id string, cfg ProviderConfig) (ModelProvider, error) {
 Keep the existing `BuildModel` for the drift guard, or make it call
 `BuildModelFor(id, cfg)` with the descriptor id.
 
-- [ ] **Step 3: Read the id in each LLM provider package**
+- [x] **Step 3: Read the id in each LLM provider package**
 
 Change each `Build` to unmarshal `harness.ModelBuildPayload` and use
 `payload.ID`, falling back to the descriptor id when empty:
@@ -273,7 +273,7 @@ Build: func(_ context.Context, raw []byte) (interface{}, error) {
 },
 ```
 
-- [ ] **Step 4: Make `NewModelProvider` registry-first and delete the switch**
+- [x] **Step 4: Make `NewModelProvider` registry-first and delete the switch**
 
 ```go
 func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
@@ -292,7 +292,7 @@ Delete the now-dead inline cases from `factory.go`. Move any internal harness
 test that needs registered providers into an external `harness_test` file (the
 internal test package cannot import `provider/all` without a cycle).
 
-- [ ] **Step 5: Run the tests and commit**
+- [x] **Step 5: Run the tests and commit**
 
 Run: `go vet ./... && go test -count=1 ./pkg/harness/ ./pkg/engine/ ./pkg/provider/... ./pkg/gui/`
 Expected: PASS.
@@ -319,7 +319,7 @@ git commit -m "refactor(provider): build model providers through the registry by
 - Consumes: `harness.ModelProvider`, `harness.GenerateRequest`, `harness.ToolCaller`.
 - Produces: the same provider behaviour from the new packages.
 
-- [ ] **Step 1: Confirm the cycle boundary**
+- [x] **Step 1: Confirm the cycle boundary**
 
 Verify `pkg/harness` imports `pkg/provider` but no subpackage:
 
@@ -327,7 +327,7 @@ Verify `pkg/harness` imports `pkg/provider` but no subpackage:
 go list -deps ./pkg/harness | grep 'pkg/provider/' || echo "no subpackage import (correct)"
 ```
 
-- [ ] **Step 2: Move one provider at a time**
+- [x] **Step 2: Move one provider at a time**
 
 For each provider: move the file into its package, change `package harness` to
 the new package name, export the constructor as needed, add the `provider` import
@@ -335,7 +335,7 @@ where the types now live, and update the factory facade to construct via the
 registry. Move its tests too, adjusting the package name. Run the suite after
 each provider.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: PASS.
@@ -359,19 +359,19 @@ git commit -m "refactor(provider): move the llm adapters into their packages"
 **Interfaces:**
 - Produces: no frontend preset fallback; the catalogue is the only source.
 
-- [ ] **Step 1: Move one media provider at a time**, running `go test ./pkg/media/... ./pkg/provider/...` after each, ending with `go test -count=1 ./...`.
+- [x] **Step 1: Move one media provider at a time**, running `go test ./pkg/media/... ./pkg/provider/...` after each, ending with `go test -count=1 ./...`.
 
-- [ ] **Step 2: Delete the fallback and simplify the UI**
+- [x] **Step 2: Delete the fallback and simplify the UI**
 
 Remove `providerPresetsFallback.ts`; in `SettingsStudio.tsx` build the preset
 maps directly from `catalogPresets(family)` and drop `mergePresets`.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `go vet ./... && go test -count=1 ./... && cd frontend && npx tsc --noEmit`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/media pkg/provider frontend/src

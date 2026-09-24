@@ -37,7 +37,7 @@
 **Interfaces:**
 - Produces: `config.TelemetryConfig`, `telemetry.BuildInfo`, `telemetry.New`, `telemetry.NewInMemory`, `(*telemetry.Provider).Shutdown`, `(*telemetry.Provider).Enabled`, `telemetry.Tracer`, `telemetry.Meter`, `telemetry.Recorder`, `telemetry.ResetGlobalForTest`.
 
-- [ ] **Step 1: Add the config block and its test**
+- [x] **Step 1: Add the config block and its test**
 
 In `pkg/config/types.go` add near `PreferencesConfig`:
 
@@ -78,7 +78,7 @@ func TestDefaultTelemetryIsDisabled(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Add the OTel dependencies**
+- [x] **Step 2: Add the OTel dependencies**
 
 Run:
 
@@ -89,7 +89,7 @@ go mod tidy
 
 Expected: `go.mod` gains the modules; `go build ./...` still passes.
 
-- [ ] **Step 3: Write the failing foundation test**
+- [x] **Step 3: Write the failing foundation test**
 
 Create `pkg/telemetry/telemetry_test.go`:
 
@@ -136,12 +136,12 @@ func TestDisabledConfigProducesNoProvider(t *testing.T) {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it fails**
+- [x] **Step 4: Run the test to verify it fails**
 
 Run: `go test -run TestDisabled ./pkg/telemetry/ -v`
 Expected: FAIL with "no Go files" / undefined `telemetry.NewInMemory`.
 
-- [ ] **Step 5: Implement `pkg/telemetry/telemetry.go`**
+- [x] **Step 5: Implement `pkg/telemetry/telemetry.go`**
 
 ```go
 // Package telemetry owns OpenTelemetry setup for LocalRPG. It is disabled by
@@ -297,7 +297,7 @@ func firstNonEmpty(values ...string) string {
 
 Add `grpcTraceOptions`, `grpcMetricOptions`, `grpcLogOptions`, and `samplerFromEnv` in the same file (small helpers building `otlptracegrpc.WithEndpoint`, `WithInsecure`, `WithHeaders` and `sdktrace.ParentBased(sdktrace.TraceIDRatioBased(ratio))`); the exact helper bodies are mechanical and may be split into `options.go`.
 
-- [ ] **Step 6: Implement `pkg/telemetry/inmemory.go`**
+- [x] **Step 6: Implement `pkg/telemetry/inmemory.go`**
 
 ```go
 package telemetry
@@ -369,12 +369,12 @@ func ResetGlobalForTest() {
 to restore a no-op logger provider use the SDK's default `sdklog.NewLoggerProvider()`
 with no processor. `NewNoopMeterProvider` lives in `go.opentelemetry.io/otel/metric`.)
 
-- [ ] **Step 7: Run the foundation tests**
+- [x] **Step 7: Run the foundation tests**
 
 Run: `go test -count=1 ./pkg/telemetry/ ./pkg/config/ -v`
 Expected: PASS.
 
-- [ ] **Step 8: Wire lifecycle into the entry points**
+- [x] **Step 8: Wire lifecycle into the entry points**
 
 In `cmd/localrpg/gui.go` and `cmd/localrpg/play.go`, after config load:
 
@@ -391,7 +391,7 @@ defer func() {
 _ = provider // wired into loggers in Task 5
 ```
 
-- [ ] **Step 9: Verify and commit**
+- [x] **Step 9: Verify and commit**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: all packages pass.
@@ -415,7 +415,7 @@ git commit -m "feat(telemetry): add disabled-by-default OpenTelemetry foundation
 - Consumes: `telemetry.NewInMemory`, `telemetry.ResetGlobalForTest`, `telemetry.Tracer`.
 - Produces: span names `turn`, `context.assemble`, `provider.generate`, `tool.call`, `extract.entities`, `continuity.check`, `timeline.record_turn`.
 
-- [ ] **Step 1: Write the failing span-tree test**
+- [x] **Step 1: Write the failing span-tree test**
 
 Create `pkg/engine/orchestrator_telemetry_test.go` using the existing scripted-provider pattern from `pkg/engine/tools_loop_test.go`:
 
@@ -458,12 +458,12 @@ func TestTurnProducesSpanTree(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `go test -run TestTurnProducesSpanTree ./pkg/engine/ -v`
 Expected: FAIL — no `turn` span.
 
-- [ ] **Step 3: Add spans to the orchestrator**
+- [x] **Step 3: Add spans to the orchestrator**
 
 In `ProcessAction`, after `turn.begin` logging:
 
@@ -497,11 +497,11 @@ roundSpan.End()
 
 Wrap each tool execution with `tool.call`, extraction with `extract.entities`, and the continuity pass with `continuity.check`, using the same pattern. Record `turn.outcome` and `turn.truncated` on the root span just before it ends.
 
-- [ ] **Step 4: Add the context assembly span**
+- [x] **Step 4: Add the context assembly span**
 
 In `pkg/harness/context.go`, at the top of `(*ContextAssembler).Assemble`, start `context.assemble` from the request context (add a `Context context.Context` field to `harness.ContextRequest`, defaulting to `context.Background()` when nil), and for each returned section record a `section` span event. Set attributes `context.budget` and `context.tokens` from the returned assembly metadata.
 
-- [ ] **Step 5: Add the timeline write span**
+- [x] **Step 5: Add the timeline write span**
 
 In `pkg/engine/timeline.go:RecordTurn`, wrap the body:
 
@@ -513,12 +513,12 @@ defer span.End()
 
 (Thread `ctx` into `RecordTurn` if it does not already take one.)
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `go test -count=1 ./pkg/engine/ ./pkg/harness/ -v`
 Expected: PASS, including all pre-existing engine/harness tests.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/engine pkg/harness
@@ -544,7 +544,7 @@ git commit -m "feat(telemetry): trace the turn, context, provider, and tool span
 - Consumes: `telemetry.NewInMemory`.
 - Produces: `telemetry.HTTPTransport(base http.RoundTripper) http.RoundTripper`, `storage.openDBDriver`, wrapped route names on `http.server`.
 
-- [ ] **Step 1: Prove `otelsql` wraps `modernc.org/sqlite`**
+- [x] **Step 1: Prove `otelsql` wraps `modernc.org/sqlite`**
 
 ```bash
 go get github.com/XSAM/otelsql
@@ -591,12 +591,12 @@ func TestWrappedDriverRecordsQuerySpan(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `go test -run TestWrappedDriver ./pkg/storage/ -v`
 Expected: FAIL — no `storage.query` span.
 
-- [ ] **Step 3: Register the wrapped driver**
+- [x] **Step 3: Register the wrapped driver**
 
 Create `pkg/storage/otel_driver.go`:
 
@@ -642,16 +642,16 @@ driver; if the installed `otelsql` signature differs, use
 `otelsql.Register("sqlite", ...)` and capture the returned registered name.
 Adjust `otelDriverName` to the value `Register` returns.
 
-- [ ] **Step 4: Use the wrapped driver in `OpenDB`**
+- [x] **Step 4: Use the wrapped driver in `OpenDB`**
 
 In `pkg/storage/db.go`, replace `sql.Open("sqlite", "file:"+path+"?"+pragmas)` with `openWrapped(path, pragmas)`.
 
-- [ ] **Step 5: Run storage tests**
+- [x] **Step 5: Run storage tests**
 
 Run: `go test -count=1 ./pkg/storage/ -v`
 Expected: PASS, including the new query-span test.
 
-- [ ] **Step 6: Add the shared HTTP transport helper**
+- [x] **Step 6: Add the shared HTTP transport helper**
 
 Create `pkg/telemetry/http.go`:
 
@@ -675,7 +675,7 @@ func HTTPTransport(base http.RoundTripper) http.RoundTripper {
 }
 ```
 
-- [ ] **Step 7: Instrument the GUI server**
+- [x] **Step 7: Instrument the GUI server**
 
 In `pkg/gui/server.go`, keep the mux and wrap it in the constructor:
 
@@ -693,7 +693,7 @@ cardinality stays bounded. Add a test in `pkg/gui/server_test.go` asserting an
 in-memory recorder sees an `http.server` span whose name is the route pattern,
 not the raw id.
 
-- [ ] **Step 8: Instrument outbound clients**
+- [x] **Step 8: Instrument outbound clients**
 
 In each constructor that builds an `*http.Client`, route it through
 `telemetry.HTTPTransport`. For example in `pkg/harness/http_provider.go`:
@@ -707,7 +707,7 @@ For `pkg/harness/gemini_provider.go`, pass
 `genai.ClientConfig`. Tests that inject `server.Client()` continue to work
 because they pass their own client.
 
-- [ ] **Step 9: Verify and commit**
+- [x] **Step 9: Verify and commit**
 
 Run: `go vet ./... && go test -count=1 ./pkg/storage/ ./pkg/gui/ ./pkg/harness/ ./pkg/telemetry/`
 Expected: PASS.
@@ -732,14 +732,14 @@ git commit -m "feat(telemetry): instrument sqlite queries and http traffic"
 - Consumes: `telemetry.Meter`, `telemetry.Recorder.Metrics(ctx)`.
 - Produces: metric instruments named exactly as in the spec §4.
 
-- [ ] **Step 1: Write the failing metric test**
+- [x] **Step 1: Write the failing metric test**
 
 Create `pkg/telemetry/metrics_test.go` asserting one recorded turn increments
 `localrpg.turn.completed` and records `localrpg.turn.duration`, then run it and
 watch it fail. Use `Recorder.Metrics(ctx)` and search `metricdata.ResourceMetrics`
 for the instrument names.
 
-- [ ] **Step 2: Add instrument helpers**
+- [x] **Step 2: Add instrument helpers**
 
 Create `pkg/telemetry/metrics.go` with constructors that read the global meter:
 
@@ -753,7 +753,7 @@ func Int64Counter(name, unit, description string) (otelmetric.Int64Counter, erro
 // Float64Histogram, Int64Histogram, Float64Counter similarly.
 ```
 
-- [ ] **Step 3: Record metrics beside spans**
+- [x] **Step 3: Record metrics beside spans**
 
 At each span site from Task 2, record the corresponding metric from §4:
 `turn.duration`/`turn.completed` in `ProcessAction`, `context.tokens` per section in
@@ -762,12 +762,12 @@ At each span site from Task 2, record the corresponding metric from §4:
 loop, and `media.tts.duration`/`cache` in the TTS pipeline. Attributes are the
 bounded sets from §4; `game.id` is never used.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `go test -count=1 ./pkg/telemetry/ ./pkg/engine/ ./pkg/harness/ ./pkg/media/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/telemetry pkg/engine pkg/harness pkg/media
@@ -789,7 +789,7 @@ git commit -m "feat(telemetry): add the metrics catalogue"
 - Consumes: `trace.Logger`, `trace.ContextLogger`.
 - Produces: `(*telemetry.Provider).Logger(local trace.Logger) trace.Logger`, `trace.ContextLogger`.
 
-- [ ] **Step 1: Define the optional context-aware interface**
+- [x] **Step 1: Define the optional context-aware interface**
 
 In `pkg/trace/trace.go`:
 
@@ -803,7 +803,7 @@ type ContextLogger interface {
 }
 ```
 
-- [ ] **Step 2: Write the failing bridge test**
+- [x] **Step 2: Write the failing bridge test**
 
 ```go
 func TestBridgeForwardsToLocalAndOTel(t *testing.T) {
@@ -828,7 +828,7 @@ func TestBridgeForwardsToLocalAndOTel(t *testing.T) {
 
 Run: `go test -run TestBridge ./pkg/telemetry/ -v` and watch it fail.
 
-- [ ] **Step 3: Implement the bridge**
+- [x] **Step 3: Implement the bridge**
 
 Create `pkg/telemetry/bridge.go`: a struct holding the local `trace.Logger`, a
 `log.Logger`, and a `trace.Tracer`. `Event` forwards to local, then emits a log
@@ -836,7 +836,7 @@ record whose body is the event name and whose attributes are the sanitized
 fields. `EventCtx` does the same plus `oteltrace.SpanFromContext(ctx).AddEvent(name, ...)`.
 `SetGame` forwards to local and stamps the logger; `Enabled` forwards to local.
 
-- [ ] **Step 4: Use `EventCtx` where a context exists**
+- [x] **Step 4: Use `EventCtx` where a context exists**
 
 In `pkg/engine/orchestrator.go` and the providers, replace `o.logger.Event(...)`
 with a helper that prefers `EventCtx`:
@@ -853,19 +853,19 @@ func logEvent(ctx context.Context, logger trace.Logger, name string, fields map[
 
 Place it in `pkg/trace` so every package shares one implementation.
 
-- [ ] **Step 5: Pass the bridge at startup**
+- [x] **Step 5: Pass the bridge at startup**
 
 In `cmd/localrpg/gui.go` and `play.go`, after building the local `FileSink`,
 replace `logger` with `provider.Logger(sink)` wherever `SetLogger` is called
 (orchestrator, router, extractor, summariser, TTS pipeline, GUI service). The GUI
 Debug panel keeps reading the same JSONL file, so it is unaffected.
 
-- [ ] **Step 6: Run the full suite**
+- [x] **Step 6: Run the full suite**
 
 Run: `go vet ./... && go test -count=1 ./...`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/telemetry pkg/trace pkg/engine pkg/harness cmd/localrpg

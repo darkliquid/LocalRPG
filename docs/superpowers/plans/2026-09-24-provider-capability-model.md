@@ -33,7 +33,7 @@
 **Interfaces:**
 - Produces: `provider.Family`, `provider.Feature`, `provider.Tunable`, `provider.Preset`, `provider.Descriptor`, `provider.Registration`, `provider.Register`, `provider.Lookup`, `provider.List`, `provider.IDs`, `provider.Validate`, `provider.Reset`.
 
-- [ ] **Step 1: Write the failing registry test**
+- [x] **Step 1: Write the failing registry test**
 
 Create `pkg/provider/provider_test.go`:
 
@@ -91,18 +91,18 @@ func TestValidateRejectsEmptyID(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `go test -run TestRegister ./pkg/provider/ -v`
 Expected: FAIL — package does not exist.
 
-- [ ] **Step 3: Implement the descriptor vocabulary**
+- [x] **Step 3: Implement the descriptor vocabulary**
 
 Create `pkg/provider/descriptor.go` exactly as specified in the spec §2.3
 (`Family` + constants, `Feature` + constants, `Tunable`, `Preset`, `Descriptor`).
 No imports beyond `context` where needed.
 
-- [ ] **Step 4: Implement the registry**
+- [x] **Step 4: Implement the registry**
 
 Create `pkg/provider/provider.go`:
 
@@ -200,7 +200,7 @@ func containsFamily(families []Family, candidate Family) bool {
 }
 ```
 
-- [ ] **Step 5: Add the aggregate import package**
+- [x] **Step 5: Add the aggregate import package**
 
 Create `pkg/provider/all/all.go`:
 
@@ -212,7 +212,7 @@ package all
 
 (It will gain blank imports as families migrate in Tasks 3-5.)
 
-- [ ] **Step 6: Wire startup validation**
+- [x] **Step 6: Wire startup validation**
 
 In `cmd/localrpg/gui.go` and `cmd/localrpg/play.go`, add the blank import and a
 validation call near startup:
@@ -225,12 +225,12 @@ if err := provider.Validate(); err != nil {
 }
 ```
 
-- [ ] **Step 7: Run the tests**
+- [x] **Step 7: Run the tests**
 
 Run: `go vet ./... && go test -count=1 ./pkg/provider/ ./cmd/...`
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add pkg/provider cmd/localrpg
@@ -251,7 +251,7 @@ git commit -m "feat(provider): add the self-registration registry and descriptor
 - Consumes: `provider.Feature` constants.
 - Produces: `harness.Capabilities`, `harness.Describe`, `media.Capabilities`, `media.Describe`, `media.ExtendedVoiceSearcher`.
 
-- [ ] **Step 1: Write the failing derivation tests**
+- [x] **Step 1: Write the failing derivation tests**
 
 `pkg/harness/capabilities_test.go`:
 
@@ -270,18 +270,18 @@ func TestDescribeReportsToolsForToolCaller(t *testing.T) {
 `pkg/media/capabilities_test.go` asserts that a `GeminiTTSClient` derives
 `VoiceCatalog`, `VoiceOptions`, `SpeechCues`, `Metered`, and `ExtendedVoices`.
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `go test -run TestDescribe ./pkg/harness/ ./pkg/media/ -v`
 Expected: FAIL — undefined `Describe`.
 
-- [ ] **Step 3: Implement `harness.Describe`**
+- [x] **Step 3: Implement `harness.Describe`**
 
 Create `pkg/harness/capabilities.go` per the spec §2.4. Add an optional
 `SupportsThinking()` check behind an anonymous interface so no existing provider
 must change.
 
-- [ ] **Step 4: Implement `media.Describe` and the extended-voice interface**
+- [x] **Step 4: Implement `media.Describe` and the extended-voice interface**
 
 Create `pkg/media/capabilities.go` per the spec §2.4. Add:
 
@@ -296,7 +296,7 @@ type ExtendedVoiceSearcher interface {
 Implement it on `GeminiTTSClient`, delegating to the existing
 `media.ListGeminiVoices` with the client's model and resolved key.
 
-- [ ] **Step 5: Alias `VoiceOption` to `provider.Tunable`**
+- [x] **Step 5: Alias `VoiceOption` to `provider.Tunable`**
 
 In `pkg/media/catalog.go`:
 
@@ -309,7 +309,7 @@ type VoiceOption = provider.Tunable
 Run the whole suite: `go test -count=1 ./...` and fix any struct-literal fallout
 (field names are identical by design).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/harness/capabilities.go pkg/harness/capabilities_test.go pkg/media/capabilities.go pkg/media/capabilities_test.go pkg/media/catalog.go pkg/media/gemini_tts.go
@@ -333,7 +333,7 @@ git commit -m "feat(provider): derive capabilities from adapter interfaces"
 - Consumes: `provider.Register`, `harness.NewHTTPProviderWithLogger`, `harness.NewCLIProviderWithLogger`, `harness.NewNarrativeOracleProvider`, `harness.NewGeminiProvider`.
 - Produces: `harness.BuildModel(id string, cfg ProviderConfig) (ModelProvider, error)`.
 
-- [ ] **Step 1: Write a failing facade-parity test**
+- [x] **Step 1: Write a failing facade-parity test**
 
 In `pkg/harness/factory_test.go` add:
 
@@ -352,7 +352,7 @@ func TestBuildModelResolvesRegisteredProvider(t *testing.T) {
 
 Run and watch it fail.
 
-- [ ] **Step 2: Implement the LLM provider packages**
+- [x] **Step 2: Implement the LLM provider packages**
 
 Each package embeds its adapter and registers. Example
 `pkg/provider/geminillm/geminillm.go`:
@@ -393,7 +393,7 @@ func init() {
 `NewModelProvider`'s `case "gemini"`/`case "builtin"` Gemini branch, so the body
 exists once. The other three packages do the same for their branches.
 
-- [ ] **Step 3: Add the `BuildModel` facade and delegate**
+- [x] **Step 3: Add the `BuildModel` facade and delegate**
 
 In `pkg/harness/factory.go`:
 
@@ -423,7 +423,7 @@ Change `NewModelProvider` so the migrated cases return
 `BuildModel("gemini", cfg)` etc.; leave the `default` fallback. This introduces a
 `harness → provider` import, which is allowed (provider is a leaf).
 
-- [ ] **Step 4: Register in `all` and add the drift guard**
+- [x] **Step 4: Register in `all` and add the drift guard**
 
 `pkg/provider/all/all.go`:
 
@@ -440,7 +440,7 @@ import (
 config JSON and asserts the result implements `harness.ModelProvider` and that
 each declared feature is backed by `harness.Describe`.
 
-- [ ] **Step 5: Run and commit**
+- [x] **Step 5: Run and commit**
 
 Run: `go vet ./... && go test -count=1 ./pkg/harness/ ./pkg/provider/... ./pkg/engine/`
 Expected: PASS (engine tests prove the facade did not change behaviour).
@@ -463,7 +463,7 @@ git commit -m "refactor(provider): move llm providers into self-registering pack
 - Produces: `media.BuildTTS(id string, cfg config.TTSConfig, sharedKey string) (TTSClient, error)`.
 - Consumes: existing `media.New*TTSClient` constructors.
 
-- [ ] **Step 1: Write a failing `BuildTTS` test**
+- [x] **Step 1: Write a failing `BuildTTS` test**
 
 ```go
 func TestBuildTTSResolvesRegisteredProvider(t *testing.T) {
@@ -478,7 +478,7 @@ func TestBuildTTSResolvesRegisteredProvider(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Implement the TTS provider packages**
+- [x] **Step 2: Implement the TTS provider packages**
 
 Each registers its descriptor (features derived in a test, presets carried from
 `providerPresets.ts`) and its `Build` body calls the existing constructor. The
@@ -487,18 +487,18 @@ signature takes only config; the facade sets `cfg`-adjacent shared key via the
 existing `NewTTSClientWithSharedKey` calls inside each package by reading the
 `shared_api_key` field the facade injects into the JSON.
 
-- [ ] **Step 3: Add the `BuildTTS` facade**
+- [x] **Step 3: Add the `BuildTTS` facade**
 
 Mirror `BuildModel`: look up the ID, inject `shared_api_key` into the JSON,
 call `reg.Build`, type-assert `TTSClient`. Make
 `media.NewTTSClientWithSharedKey` delegate its migrated cases.
 
-- [ ] **Step 4: Extend `all` and the drift guard**
+- [x] **Step 4: Extend `all` and the drift guard**
 
 Blank-import the six TTS packages; extend `all_test.go` to build each with a
 minimal config and assert `media.Describe` backs every declared feature.
 
-- [ ] **Step 5: Run and commit**
+- [x] **Step 5: Run and commit**
 
 Run: `go vet ./... && go test -count=1 ./pkg/media/... ./pkg/provider/... ./pkg/gui/`
 Expected: PASS.
@@ -520,11 +520,11 @@ git commit -m "refactor(provider): move tts providers into self-registering pack
 **Interfaces:**
 - Produces: `media.BuildSTT`, `media.BuildImage`.
 
-- [ ] **Step 1: Write failing `BuildSTT`/`BuildImage` tests** for `web-speech` and `procedural-art`.
-- [ ] **Step 2: Implement the five packages** with descriptors (image carries `FeatureAutoGenerate`, `FeatureOffline` for procedural-art) and `Build` bodies calling existing constructors.
-- [ ] **Step 3: Add the facades** and delegate the migrated cases.
-- [ ] **Step 4: Extend `all` and the drift guard.**
-- [ ] **Step 5: Run and commit**
+- [x] **Step 1: Write failing `BuildSTT`/`BuildImage` tests** for `web-speech` and `procedural-art`.
+- [x] **Step 2: Implement the five packages** with descriptors (image carries `FeatureAutoGenerate`, `FeatureOffline` for procedural-art) and `Build` bodies calling existing constructors.
+- [x] **Step 3: Add the facades** and delegate the migrated cases.
+- [x] **Step 4: Extend `all` and the drift guard.**
+- [x] **Step 5: Run and commit**
 
 ```bash
 git add pkg/provider pkg/media
@@ -539,9 +539,9 @@ git commit -m "refactor(provider): move stt and image providers into self-regist
 - Modify: `pkg/harness/factory.go`, `pkg/media/providers.go` (delete unmigrated branches; keep the facades)
 - Modify: `pkg/harness/factory_test.go`, `pkg/media/providers_test.go` (delete tests for removed branches)
 
-- [ ] **Step 1: Delete the now-dead switch cases** and any helper only they used.
-- [ ] **Step 2: Run `go vet ./... && go test -count=1 ./...`** and fix fallout.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: Delete the now-dead switch cases** and any helper only they used.
+- [x] **Step 2: Run `go vet ./... && go test -count=1 ./...`** and fix fallout.
+- [x] **Step 3: Commit**
 
 ```bash
 git add pkg/harness pkg/media
@@ -566,7 +566,7 @@ git commit -m "refactor(provider): remove dead factory switches"
 **Interfaces:**
 - Produces: `GET /api/providers` returning `{ "providers": Descriptor[] }`; `APIClient.listProviders()`; `useProviderCatalog()`.
 
-- [ ] **Step 1: Add the endpoint and a route test**
+- [x] **Step 1: Add the endpoint and a route test**
 
 `pkg/gui/types.go`:
 
@@ -587,7 +587,7 @@ func (s *Service) ListProviders(ctx context.Context) (*ProviderCatalogDTO, error
 Register `GET /api/providers` in `server.go`; add a `server_test.go` assertion
 that the response decodes and contains at least one descriptor per family.
 
-- [ ] **Step 2: Add frontend types and client**
+- [x] **Step 2: Add frontend types and client**
 
 In `types.ts` mirror `Descriptor`, `Feature`, `Tunable`, `Preset`, and
 `ProviderCatalog`. In `client.ts`:
@@ -600,12 +600,12 @@ static async listProviders(): Promise<ProviderCatalog> {
 }
 ```
 
-- [ ] **Step 3: Add the hook**
+- [x] **Step 3: Add the hook**
 
 `useProviderCatalog.ts` fetches once and falls back to
 `providerCatalogFallback.ts` on error, exposing `{ providers, byFamily, presets, loading }`.
 
-- [ ] **Step 4: Migrate SettingsStudio**
+- [x] **Step 4: Migrate SettingsStudio**
 
 Replace engine/builtin dropdown literals, per-provider fields, and preset lists
 with descriptor-driven rendering:
@@ -615,15 +615,15 @@ with descriptor-driven rendering:
 - catalog/extended-search buttons from `voice_catalog`/`extended_voices`;
 - quick-load presets from `Descriptor.Presets` sorted by `Order`.
 
-- [ ] **Step 5: Delete `providerPresets.ts`** and remove its imports. Presets now
+- [x] **Step 5: Delete `providerPresets.ts`** and remove its imports. Presets now
 arrive from the endpoint.
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 Run: `go test -count=1 ./pkg/gui/ && cd frontend && npx tsc --noEmit`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/gui frontend/src
