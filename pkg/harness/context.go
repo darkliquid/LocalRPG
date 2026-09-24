@@ -113,6 +113,8 @@ type SectionStat struct {
 // report trimming rather than losing context silently.
 type AssembleResult struct {
 	Prompt          string
+	PrefixPrompt    string
+	DeltaPrompt     string
 	EstimatedTokens int
 	Trimmed         []string
 	Sections        []SectionStat
@@ -671,6 +673,8 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 	}
 
 	var prompt strings.Builder
+	var prefixPrompt strings.Builder
+	var deltaPrompt strings.Builder
 	stats := make([]SectionStat, 0, len(sections))
 	reports := make([]SectionReport, 0, len(sections))
 	for _, candidate := range sections {
@@ -678,6 +682,11 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 		tokens := estimateTokens(candidate.text)
 		if included {
 			prompt.WriteString(candidate.text)
+			if isPrefixSection(candidate.name) {
+				prefixPrompt.WriteString(candidate.text)
+			} else {
+				deltaPrompt.WriteString(candidate.text)
+			}
 		}
 		stats = append(stats, SectionStat{
 			Name:     candidate.name,
@@ -694,8 +703,12 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 	}
 
 	promptStr := prompt.String()
+	prefixStr := prefixPrompt.String()
+	prefixHash := PrefixHash(prefixStr)
 	result := AssembleResult{
 		Prompt:          promptStr,
+		PrefixPrompt:    prefixStr,
+		DeltaPrompt:     deltaPrompt.String(),
 		EstimatedTokens: estimateTokens(promptStr),
 		Trimmed:         trimmed,
 		Sections:        stats,
@@ -710,6 +723,7 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 			Threads:         req.Threads,
 			SummaryVersion:  req.SummaryVersion,
 			PromptHash:      hashPrompt(promptStr),
+			PrefixHash:      prefixHash,
 			Strategy:        StrategyFullPrompt,
 		},
 	}
@@ -751,6 +765,10 @@ func dedupeRefs(refs []Ref) []Ref {
 		out = append(out, r)
 	}
 	return out
+}
+
+func isPrefixSection(name string) bool {
+	return name == "rules" || name == "lore" || name == "instructions" || name == "catalogue"
 }
 
 func hashPrompt(prompt string) string {

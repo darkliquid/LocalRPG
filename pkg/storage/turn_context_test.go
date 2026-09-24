@@ -59,3 +59,26 @@ func TestWorkingSetRoundTrip(t *testing.T) {
 		t.Fatalf("expected only seraphine, got %+v", loaded)
 	}
 }
+
+func TestDeleteTurnsCleansTurnContexts(t *testing.T) {
+	store := openTestDB(t)
+	raw := []byte(`{"turn_number":1,"prompt_hash":"abc"}`)
+	if err := store.SaveTurnContext(1, "prompt 1", raw); err != nil {
+		t.Fatalf("SaveTurnContext: %v", err)
+	}
+	if err := store.SaveTurnContext(2, "prompt 2", raw); err != nil {
+		t.Fatalf("SaveTurnContext: %v", err)
+	}
+
+	if err := store.DeleteTurnsFrom(2); err != nil {
+		t.Fatalf("DeleteTurnsFrom: %v", err)
+	}
+
+	if _, _, err := store.GetTurnContext(1); err != nil {
+		t.Errorf("turn 1 context should still exist: %v", err)
+	}
+	if _, _, err := store.GetTurnContext(2); err == nil {
+		t.Errorf("turn 2 context should have been deleted")
+	}
+}
+

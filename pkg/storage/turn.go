@@ -246,6 +246,9 @@ func (s *Store) DeleteTurnsFrom(number int) error {
 	if _, err := tx.Exec(`DELETE FROM turn_entities WHERE turn_number >= ?`, number); err != nil {
 		return fmt.Errorf("delete turn links from %d: %w", number, err)
 	}
+	if _, err := tx.Exec(`DELETE FROM turn_contexts WHERE turn_number >= ?`, number); err != nil {
+		return fmt.Errorf("delete turn contexts from %d: %w", number, err)
+	}
 	if _, err := tx.Exec(`DELETE FROM turns WHERE number >= ?`, number); err != nil {
 		return fmt.Errorf("delete turns from %d: %w", number, err)
 	}
