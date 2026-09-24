@@ -5,6 +5,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/provider/ttselevenlabs"
 	"github.com/darkliquid/localrpg/pkg/provider/ttshttp"
 	"github.com/darkliquid/localrpg/pkg/provider/ttssherpa"
 )
@@ -12,7 +13,7 @@ import (
 // TestSpeechCueAdvertiserImplementations checks that each engine that declares
 // speech-cue capabilities actually implements the advertiser interface.
 func TestSpeechCueAdvertiserImplementations(t *testing.T) {
-	eleven, err := media.NewElevenLabsTTSClient(config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs", APIKey: "test-key"})
+	eleven, err := ttselevenlabs.NewElevenLabsTTSClient(config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs", APIKey: "test-key"})
 	if err != nil {
 		t.Fatalf("elevenlabs client: %v", err)
 	}

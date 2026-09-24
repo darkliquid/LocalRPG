@@ -60,7 +60,7 @@ func init() {
 					return nil, err
 				}
 			}
-			return media.NewGeminiTTSProvider(payload.Config, payload.SharedKey)
+			return NewGeminiTTSClient(payload.Config, payload.SharedKey)
 		},
 	})
 }

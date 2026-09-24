@@ -40,7 +40,7 @@ func init() {
 					return nil, err
 				}
 			}
-			return media.NewElevenLabsTTSProvider(payload.Config)
+			return NewElevenLabsTTSClient(payload.Config)
 		},
 	})
 }

@@ -50,7 +50,7 @@ func init() {
 					return nil, err
 				}
 			}
-			return media.NewHTTPImageProvider(payload.Config), nil
+			return NewHTTPImageClient(payload.Config), nil
 		},
 	})
 }

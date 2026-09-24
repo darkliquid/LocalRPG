@@ -1,45 +1,24 @@
-package media
+package ttsgemini
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"google.golang.org/genai"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
-// ErrGeminiTTSAPIKeyRequired reports that no Gemini API key was found in config or environment.
-var ErrGeminiTTSAPIKeyRequired = errors.New("gemini: an API key is required for speech synthesis; set media.tts.api_key, providers.gemini.api_key, or GEMINI_API_KEY")
-
-// ResolveGeminiTTSAPIKey resolves the API key prioritizing the TTS config override,
-// then the shared providers.gemini.api_key, and finally the environment variables.
-func ResolveGeminiTTSAPIKey(ttsKey, sharedKey string) (string, error) {
-	if k := strings.TrimSpace(ttsKey); k != "" {
-		return k, nil
-	}
-	if k := strings.TrimSpace(sharedKey); k != "" {
-		return k, nil
-	}
-	if k := strings.TrimSpace(os.Getenv("GEMINI_API_KEY")); k != "" {
-		return k, nil
-	}
-	if k := strings.TrimSpace(os.Getenv("GOOGLE_API_KEY")); k != "" {
-		return k, nil
-	}
-	return "", ErrGeminiTTSAPIKeyRequired
-}
-
 // geminiPrebuiltVoices defines the 30 Google Gemini TTS prebuilt voices with their
 // acoustic tone descriptions and character archetype tags.
-var geminiPrebuiltVoices = []ProviderVoice{
+var geminiPrebuiltVoices = []media.ProviderVoice{
 	{ID: "Aoede", Name: "Aoede", Description: "Breezy", Language: "en", Tags: []string{"narrator", "storyteller", "breezy", "female"}},
 	{ID: "Sulafat", Name: "Sulafat", Description: "Warm", Language: "en", Tags: []string{"warm", "elder", "wise", "female"}},
 	{ID: "Sadaltager", Name: "Sadaltager", Description: "Knowledgeable", Language: "en", Tags: []string{"knowledgeable", "sage", "scholar", "male"}},
@@ -73,7 +52,7 @@ var geminiPrebuiltVoices = []ProviderVoice{
 }
 
 // GeminiTTSClient is the provider for Google Gemini speech synthesis. It
-// implements TTSClient, VoiceCatalog, MeteredProvider, and SpeechCueAdvertiser.
+// implements media.TTSClient, media.VoiceCatalog, media.MeteredProvider, and media.SpeechCueAdvertiser.
 type GeminiTTSClient struct {
 	client       *genai.Client
 	model        string
@@ -84,7 +63,7 @@ type GeminiTTSClient struct {
 
 // NewGeminiTTSClient builds a GeminiTTSClient using the configured or shared API key.
 func NewGeminiTTSClient(cfg config.TTSConfig, sharedKey string) (*GeminiTTSClient, error) {
-	apiKey, err := ResolveGeminiTTSAPIKey(cfg.APIKey, sharedKey)
+	apiKey, err := media.ResolveGeminiTTSAPIKey(cfg.APIKey, sharedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -160,16 +139,16 @@ func (c *GeminiTTSClient) SupportsMarkdown() bool {
 // VoiceOptions declares the tunables Gemini TTS accepts. Direction is free text
 // prepended to the utterance as director's notes, which is how the Gemini API
 // takes style steering: it has no separate style field.
-func (c *GeminiTTSClient) VoiceOptions() []VoiceOption {
-	return []VoiceOption{
+func (c *GeminiTTSClient) VoiceOptions() []media.VoiceOption {
+	return []media.VoiceOption{
 		{Key: "direction", Label: "Voice direction", Kind: "string",
 			Help: "Director's notes steering delivery, e.g. \"weary and guarded, speaking slowly\"."},
 	}
 }
 
 // ListVoices enumerates the 30 Gemini prebuilt voices.
-func (c *GeminiTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, error) {
-	voices := make([]ProviderVoice, len(geminiPrebuiltVoices))
+func (c *GeminiTTSClient) ListVoices(ctx context.Context) ([]media.ProviderVoice, error) {
+	voices := make([]media.ProviderVoice, len(geminiPrebuiltVoices))
 	copy(voices, geminiPrebuiltVoices)
 	return voices, nil
 }
@@ -177,16 +156,16 @@ func (c *GeminiTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, erro
 // ListExtendedVoices searches the extended Gemini voice library. It delegates to
 // the REST catalogue, so the client advertises the capability only when it was
 // built with a key.
-func (c *GeminiTTSClient) ListExtendedVoices(ctx context.Context, query string) ([]ProviderVoice, error) {
+func (c *GeminiTTSClient) ListExtendedVoices(ctx context.Context, query string) ([]media.ProviderVoice, error) {
 	if strings.TrimSpace(c.apiKey) == "" {
-		return nil, ErrGeminiTTSAPIKeyRequired
+		return nil, media.ErrGeminiTTSAPIKeyRequired
 	}
-	return ListGeminiVoices(ctx, c.apiKey, GeminiVoiceSearch{Query: query})
+	return media.ListGeminiVoices(ctx, c.apiKey, media.GeminiVoiceSearch{Query: query})
 }
 
 // SpeechCueCapabilities declares that Gemini TTS supports bracketed vocal cues/tags.
-func (c *GeminiTTSClient) SpeechCueCapabilities() SpeechCueCapabilities {
-	return SpeechCueCapabilities{
+func (c *GeminiTTSClient) SpeechCueCapabilities() media.SpeechCueCapabilities {
+	return media.SpeechCueCapabilities{
 		AudioTags:        true,
 		MarkdownEmphasis: false,
 		SupportedTags: []string{
@@ -218,7 +197,7 @@ func (c *GeminiTTSClient) Synthesize(ctx context.Context, text string, voice *en
 	// Gemini TTS has no style field; delivery is steered by director's notes
 	// prepended to the transcript. Sanitise against the declared schema so a
 	// hand-edited note cannot smuggle in a different shape.
-	options, _ := ValidateVoiceOptions(c.VoiceOptions(), voiceOptions(voice))
+	options, _ := media.ValidateVoiceOptions(c.VoiceOptions(), media.VoiceOptionsOf(voice))
 	promptText := text
 	if direction, ok := options["direction"].(string); ok {
 		if trimmed := strings.TrimSpace(direction); trimmed != "" {

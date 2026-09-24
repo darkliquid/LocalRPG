@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/provider/ttsgemini"
 )
 
 func TestDescribeGeminiTTSCapabilities(t *testing.T) {
-	client := media.NewGeminiTTSClientOffline("gemini-3.8-flash-tts", "Aoede")
+	client := ttsgemini.NewGeminiTTSClientOffline("gemini-3.8-flash-tts", "Aoede")
 	caps := media.Describe(client)
 	if !caps.VoiceCatalog || !caps.VoiceOptions || !caps.SpeechCues || !caps.Metered || !caps.ExtendedVoices {
 		t.Fatalf("unexpected capabilities: %+v", caps)

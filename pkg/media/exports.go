@@ -4,12 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/provider"
-	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
 
 // TTSBuildPayload is what BuildTTS hands a provider package: the family config
@@ -65,16 +62,6 @@ func BuildTTS(id string, cfg config.TTSConfig, sharedKey string) (TTSClient, err
 	return client, nil
 }
 
-// NewElevenLabsTTSProvider builds the ElevenLabs client.
-func NewElevenLabsTTSProvider(cfg config.TTSConfig) (TTSClient, error) {
-	return NewElevenLabsTTSClient(cfg)
-}
-
-// NewGeminiTTSProvider builds the Gemini TTS client.
-func NewGeminiTTSProvider(cfg config.TTSConfig, sharedKey string) (TTSClient, error) {
-	return NewGeminiTTSClient(cfg, sharedKey)
-}
-
 // STTProviderIDFor maps an STT configuration to the registry ID a facade should
 // build.
 func STTProviderIDFor(cfg config.STTConfig) string {
@@ -106,21 +93,6 @@ func BuildSTT(id string, cfg config.STTConfig) (STTClient, error) {
 		return nil, fmt.Errorf("media: provider %q is not an stt client", id)
 	}
 	return client, nil
-}
-
-// NewCLISTTProvider builds the command-line transcription client.
-func NewCLISTTProvider(cfg config.STTConfig) STTClient {
-	return &cliSTTClient{command: cfg.Command, args: cfg.Args}
-}
-
-// NewHTTPSTTProvider builds the HTTP transcription client.
-func NewHTTPSTTProvider(cfg config.STTConfig) STTClient {
-	return &httpSTTClient{
-		endpoint: cfg.Endpoint,
-		model:    cfg.Model,
-		apiKey:   cfg.APIKey,
-		client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 60 * time.Second},
-	}
 }
 
 // ImageBuildPayload is what BuildImage hands an image provider package.
@@ -170,25 +142,3 @@ func BuildImage(id string, cfg config.ImageConfig, sharedKey string) (ImageClien
 
 // NewProceduralImageProvider builds the built-in procedural art client.
 func NewProceduralImageProvider() ImageClient { return NewProceduralArtClient() }
-
-// NewCLIImageProvider builds the command-line image client.
-func NewCLIImageProvider(cfg config.ImageConfig) ImageClient {
-	return &cliImageClient{command: cfg.Command, args: cfg.Args}
-}
-
-// NewHTTPImageProvider builds the HTTP image client, choosing ComfyUI's API when
-// the endpoint names it.
-func NewHTTPImageProvider(cfg config.ImageConfig) ImageClient {
-	if cfg.Type == "comfyui" || isComfyUI(cfg.Endpoint) {
-		return &comfyUIImageClient{
-			endpoint: cfg.Endpoint,
-			client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 120 * time.Second},
-		}
-	}
-	return &httpImageClient{
-		endpoint: cfg.Endpoint,
-		model:    cfg.Model,
-		apiKey:   cfg.APIKey,
-		client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 60 * time.Second},
-	}
-}

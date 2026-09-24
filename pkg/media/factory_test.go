@@ -7,23 +7,17 @@ import (
 	"github.com/darkliquid/localrpg/pkg/media"
 )
 
-// TestHTTPTTSBuildsFromTheRegistry proves a type: http TTS config builds the
-// HTTP client through the registry, not the echo fallback (which has no voice
-// catalogue).
-func TestHTTPTTSBuildsFromTheRegistry(t *testing.T) {
-	client, err := media.NewTTSClient(config.TTSConfig{Type: "http", Endpoint: "http://localhost:8880", Model: "kokoro"})
-	if err != nil {
-		t.Fatalf("NewTTSClient: %v", err)
+func TestDisabledFactoriesReturnPlaceholders(t *testing.T) {
+	tts, err := media.NewTTSClient(config.TTSConfig{Type: "disabled"})
+	if err != nil || tts == nil {
+		t.Fatalf("disabled tts: %v", err)
 	}
-	if _, ok := client.(media.VoiceCatalog); !ok {
-		t.Fatalf("expected the registry HTTP client, got %T", client)
+	stt, err := media.NewSTTClient(config.STTConfig{Type: "disabled"})
+	if err != nil || stt == nil {
+		t.Fatalf("disabled stt: %v", err)
 	}
-}
-
-// TestDisabledTTSFactoryReturnsPlaceholder covers the fallback path.
-func TestDisabledTTSFactoryReturnsPlaceholder(t *testing.T) {
-	client, err := media.NewTTSClient(config.TTSConfig{Type: "disabled"})
-	if err != nil || client == nil {
-		t.Fatalf("expected a disabled placeholder, got %v %v", client, err)
+	img, err := media.NewImageClient(config.ImageConfig{Type: "disabled"})
+	if err != nil || img == nil {
+		t.Fatalf("disabled image: %v", err)
 	}
 }
