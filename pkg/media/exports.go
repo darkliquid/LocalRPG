@@ -75,16 +75,6 @@ func NewGeminiTTSProvider(cfg config.TTSConfig, sharedKey string) (TTSClient, er
 	return NewGeminiTTSClient(cfg, sharedKey)
 }
 
-// NewHTTPTTSProvider builds the OpenAI-compatible HTTP TTS client.
-func NewHTTPTTSProvider(cfg config.TTSConfig) TTSClient {
-	return &httpTTSClient{
-		endpoint: cfg.Endpoint,
-		model:    cfg.Model,
-		apiKey:   cfg.APIKey,
-		client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 30 * time.Second},
-	}
-}
-
 // STTProviderIDFor maps an STT configuration to the registry ID a facade should
 // build.
 func STTProviderIDFor(cfg config.STTConfig) string {
