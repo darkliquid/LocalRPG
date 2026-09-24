@@ -555,6 +555,61 @@ export interface VoiceSearchResponse {
   error?: string;
 }
 
+export type ProviderFamily = 'llm' | 'tts' | 'stt' | 'image';
+
+export type ProviderFeature =
+  | 'streaming'
+  | 'tools'
+  | 'thinking'
+  | 'vision'
+  | 'voice_catalog'
+  | 'voice_options'
+  | 'speech_cues'
+  | 'markdown_emphasis'
+  | 'metered'
+  | 'key_required'
+  | 'model_catalogue'
+  | 'extended_voices'
+  | 'offline'
+  | 'auto_generate'
+  | 'sessions'
+  | 'context_cache';
+
+export interface ProviderTunable {
+  key: string;
+  label: string;
+  kind: 'float' | 'int' | 'bool' | 'string' | 'enum';
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: string[];
+  default?: unknown;
+  help?: string;
+}
+
+export interface ProviderPreset {
+  id: string;
+  label: string;
+  description: string;
+  config: Record<string, unknown>;
+  order: number;
+}
+
+export interface ProviderDescriptor {
+  id: string;
+  family: ProviderFamily;
+  label: string;
+  description: string;
+  source: string;
+  features: ProviderFeature[];
+  tunables?: ProviderTunable[];
+  presets?: ProviderPreset[];
+}
+
+export interface ProviderCatalog {
+  providers: ProviderDescriptor[];
+}
+
 export interface AddressedFinding {
   turn: number;
   rule: string;
