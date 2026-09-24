@@ -60,8 +60,3 @@ func NewGeminiModelProvider(id string, cfg ProviderConfig) (ModelProvider, error
 		TopK:           cfg.TopK,
 	})
 }
-
-// NewOracleModelProvider builds the deterministic narrative oracle.
-func NewOracleModelProvider(id string) ModelProvider {
-	return NewNarrativeOracleProvider(id)
-}

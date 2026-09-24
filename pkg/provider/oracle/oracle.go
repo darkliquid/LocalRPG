@@ -37,7 +37,7 @@ func init() {
 					id = payload.ID
 				}
 			}
-			return harness.NewOracleModelProvider(id), nil
+			return NewNarrativeOracleProvider(id), nil
 		},
 	})
 }
