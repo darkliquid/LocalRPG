@@ -519,9 +519,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// Long memory is a recollection, not canon, so it is injected as one and canon
 	// wins wherever they disagree.
 	summary := ""
+	summaryVersion := 0
 	if o.chronicler != nil {
 		if chronicle, err := o.chronicler.Recap(o.gameID()); err == nil {
 			summary = chronicle.Summary
+			summaryVersion = chronicle.ThroughTurn
 		}
 	}
 
@@ -539,18 +541,20 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	assembly, err := o.assembler.Assemble(harness.ContextRequest{
-		Context:     ctx,
-		LocationID:  locationID,
-		PlayerID:    o.playerID,
-		Action:      generationPrompt,
-		RulesPrompt: o.rulesPrompt,
-		LorePrompt:  o.lorePrompt,
-		Profiles:    o.timeline.VoiceProfiles(),
-		Recent:      recent,
-		TurnNumber:  turnNum,
-		Summary:     summary,
-		Threads:     threads,
-		SpeechCues:  o.speechCues,
+		Context:        ctx,
+		LocationID:     locationID,
+		PlayerID:       o.playerID,
+		Action:         generationPrompt,
+		RulesPrompt:    o.rulesPrompt,
+		LorePrompt:     o.lorePrompt,
+		Profiles:       o.timeline.VoiceProfiles(),
+		Recent:         recent,
+		TurnNumber:     turnNum,
+		Mode:           mode,
+		Summary:        summary,
+		SummaryVersion: summaryVersion,
+		Threads:        threads,
+		SpeechCues:     o.speechCues,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)
@@ -597,6 +601,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Truncated:    stillIncomplete,
 		Recovery:     string(recovery),
 		ContextNotes: assembly.Trimmed,
+		Context:      &assembly.Context,
 		ToolCalls:    result.Provenance,
 	}
 

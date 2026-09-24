@@ -2,9 +2,12 @@ package harness
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -81,9 +84,11 @@ type ContextRequest struct {
 	Profiles    []config.VoiceProfile
 	Recent      []RecentTurn
 	TurnNumber  int
+	Mode        string
 	// Summary is the campaign's recollection of everything older than the recall
 	// window. It is lossy, so it is stated as subordinate to canon.
-	Summary string
+	Summary        string
+	SummaryVersion int
 	// Threads are the unresolved arcs, already rendered with their idle counts. They
 	// are canon, so they are never trimmed: a thread goes quiet precisely when the
 	// narrator should be prompted to return to it.
@@ -109,15 +114,18 @@ type AssembleResult struct {
 	EstimatedTokens int
 	Trimmed         []string
 	Sections        []SectionStat
+	Context         TurnContext
 }
 
 // section is one block of the prompt. Its place in the slice is its place in the
 // prompt; rank is the order it is surrendered when the budget bites, lowest first.
 type section struct {
 	name      string
+	source    string
 	text      string
 	droppable bool
 	rank      int
+	refs      []Ref
 }
 
 type ContextAssembler struct {
@@ -181,27 +189,41 @@ func (c *ContextAssembler) Assemble(req ContextRequest) (AssembleResult, error) 
 // buildSections composes the prompt in order. Everything a section needs is read
 // here, so trimming never re-reads the store.
 func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) {
-	canon, err := c.assembleCanon(req)
+	canonText, canonRefs, err := c.assembleCanon(req)
 	if err != nil {
 		return nil, err
 	}
 
 	catalogue := ""
+	var catalogueRefs []Ref
 	if len(req.Profiles) > 0 {
 		catalogue = FormatVoiceProfilesCatalog(req.Profiles) + "\n"
+		for _, p := range req.Profiles {
+			catalogueRefs = append(catalogueRefs, Ref{Kind: RefEntity, ID: p.ID, Relation: "voice"})
+		}
+	}
+
+	recentText, recentRefs := c.recentSection(req)
+	recallText, recallRefs := c.sceneRecall(req)
+	retrievalText, retrievalRefs := c.relevantHistory(req)
+	summaryText, summaryRefs := summarySection(req.Summary, req.SummaryVersion)
+
+	var actionRefs []Ref
+	if req.PlayerID != "" {
+		actionRefs = append(actionRefs, Ref{Kind: RefEntity, ID: req.PlayerID, Relation: "action"})
 	}
 
 	return []section{
-		{name: "rules", text: rulesSection(req.RulesPrompt)},
-		{name: "lore", text: loreSection(req.LorePrompt)},
-		{name: "instructions", text: FormatSpeechFormattingInstructions(req.SpeechCues) + "\n\n"},
-		{name: "canon", text: canon},
-		{name: "summary", text: summarySection(req.Summary), droppable: true, rank: 6},
-		{name: "recent", text: c.recentSection(req), droppable: true, rank: 4},
-		{name: "recall", text: c.sceneRecall(req), droppable: true, rank: 3},
-		{name: "retrieval", text: c.relevantHistory(req), droppable: true, rank: 2},
-		{name: "catalogue", text: catalogue, droppable: true, rank: 1},
-		{name: "action", text: "\n## PLAYER ACTION\n" + req.Action + "\n"},
+		{name: "rules", source: "rules_prompt", text: rulesSection(req.RulesPrompt)},
+		{name: "lore", source: "lore_prompt", text: loreSection(req.LorePrompt)},
+		{name: "instructions", source: "speech_cues", text: FormatSpeechFormattingInstructions(req.SpeechCues) + "\n\n"},
+		{name: "canon", source: "canon", text: canonText, refs: canonRefs},
+		{name: "summary", source: "summary", text: summaryText, refs: summaryRefs, droppable: true, rank: 6},
+		{name: "recent", source: "recent", text: recentText, refs: recentRefs, droppable: true, rank: 4},
+		{name: "recall", source: "scene_recall", text: recallText, refs: recallRefs, droppable: true, rank: 3},
+		{name: "retrieval", source: "retrieval", text: retrievalText, refs: retrievalRefs, droppable: true, rank: 2},
+		{name: "catalogue", source: "profiles", text: catalogue, refs: catalogueRefs, droppable: true, rank: 1},
+		{name: "action", source: "player_action", text: "\n## PLAYER ACTION\n" + req.Action + "\n", refs: actionRefs},
 	}, nil
 }
 
@@ -222,11 +244,13 @@ func loreSection(prompt string) string {
 // assembleCanon renders what is true: the scene, the player, the world's arcs, and
 // who is present. It is never trimmed, because every line of it is a constraint the
 // model would otherwise have to guess.
-func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, error) {
+func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, []Ref, error) {
 	var sb strings.Builder
+	var refs []Ref
 
 	sb.WriteString("## IMMEDIATE SCENE\n")
 	if loc, err := c.store.GetEntity(req.LocationID); err == nil && loc != nil {
+		refs = append(refs, Ref{Kind: RefEntity, ID: loc.ID, Relation: "location"})
 		sb.WriteString(fmt.Sprintf("**Current Location:** %s\n%s\n", loc.Name, strings.TrimSpace(loc.Body)))
 		if loc.State != nil {
 			if rendered := RenderState(loc.State.Raw()); rendered != "" {
@@ -237,6 +261,7 @@ func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, error) {
 	}
 
 	if player, err := c.store.GetEntity(req.PlayerID); err == nil && player != nil {
+		refs = append(refs, Ref{Kind: RefEntity, ID: player.ID, Relation: "player"})
 		sb.WriteString(fmt.Sprintf("**Player Character:** %s\n", player.Name))
 		if player.State != nil {
 			sb.WriteString(fmt.Sprintf("State: %+v\n\n", player.State.Raw()))
@@ -248,6 +273,7 @@ func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, error) {
 	if err == nil {
 		for _, edge := range edges {
 			if ent, err := c.store.GetEntity(edge.TargetID); err == nil && ent != nil && ent.Type == "arc" {
+				refs = append(refs, Ref{Kind: RefEntity, ID: ent.ID, Relation: "arc"})
 				sb.WriteString(fmt.Sprintf("### Arc: %s\n%s\n", ent.Name, strings.TrimSpace(ent.Body)))
 				if ent.State != nil {
 					if rendered := RenderState(ent.State.Raw()); rendered != "" {
@@ -263,6 +289,7 @@ func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, error) {
 	if err == nil {
 		for _, edge := range edges {
 			if ent, err := c.store.GetEntity(edge.TargetID); err == nil && ent != nil && ent.Type == "character" {
+				refs = append(refs, Ref{Kind: RefEntity, ID: ent.ID, Relation: "present"})
 				sb.WriteString(canonEntity(ent) + "\n")
 			}
 		}
@@ -275,11 +302,12 @@ func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, error) {
 	if len(req.Threads) > 0 {
 		sb.WriteString("\n## OPEN THREADS\n")
 		for _, thread := range req.Threads {
+			refs = append(refs, Ref{Kind: RefThread, ID: thread, Relation: "thread"})
 			sb.WriteString("- " + thread + "\n")
 		}
 	}
 
-	return sb.String(), nil
+	return sb.String(), dedupeRefs(refs), nil
 }
 
 // windowTurns is the part of the timeline actually replayed. The caller passes the
@@ -299,26 +327,32 @@ func (c *ContextAssembler) windowTurns(req ContextRequest) []RecentTurn {
 
 // summarySection renders the campaign's long memory. It is explicitly a
 // recollection: it is model-written and lossy, and canon wins wherever they differ.
-func summarySection(summary string) string {
+func summarySection(summary string, summaryVersion int) (string, []Ref) {
 	if strings.TrimSpace(summary) == "" {
-		return ""
+		return "", nil
 	}
 
 	var sb strings.Builder
 	sb.WriteString("\n## STORY SO FAR (a recollection, not authoritative)\n")
 	sb.WriteString("Where this differs from the state and notes above, they are correct and this is not.\n")
 	sb.WriteString(strings.TrimSpace(summary) + "\n")
-	return sb.String()
+	refs := []Ref{{Kind: RefSummary, ID: strconv.Itoa(summaryVersion), Relation: "summary"}}
+	return sb.String(), refs
 }
 
 // recentSection renders the tail of the timeline, bounded by the configured window
 // and excerpt length.
-func (c *ContextAssembler) recentSection(req ContextRequest) string {
+func (c *ContextAssembler) recentSection(req ContextRequest) (string, []Ref) {
 	charLimit := c.limits.RecentTurnChars
 	if charLimit <= 0 {
 		charLimit = defaultRecentTurnChars
 	}
-	return formatRecentTurns(c.windowTurns(req), charLimit)
+	window := c.windowTurns(req)
+	var refs []Ref
+	for _, turn := range window {
+		refs = append(refs, Ref{Kind: RefTurn, ID: strconv.Itoa(turn.Number), Relation: "recent"})
+	}
+	return formatRecentTurns(window, charLimit), dedupeRefs(refs)
 }
 
 // recalledTurns returns the turns scene recall will render: the newest at this
@@ -367,9 +401,9 @@ func (c *ContextAssembler) recalledTurns(req ContextRequest) []storage.TurnRecor
 
 // sceneRecall renders what happened where the party is standing. A place feels
 // continuous only if returning to it is not the same as arriving.
-func (c *ContextAssembler) sceneRecall(req ContextRequest) string {
+func (c *ContextAssembler) sceneRecall(req ContextRequest) (string, []Ref) {
 	if c.store == nil || req.LocationID == "" {
-		return ""
+		return "", nil
 	}
 
 	limit := c.limits.SceneRecallTurns
@@ -382,15 +416,17 @@ func (c *ContextAssembler) sceneRecall(req ContextRequest) string {
 	}
 
 	lines := make([]string, 0, limit)
+	var refs []Ref
 	for _, turn := range c.recalledTurns(req) {
 		narrated := TruncateRunes(strings.TrimSpace(turn.Narration), charLimit)
 		if narrated == "" {
 			continue
 		}
+		refs = append(refs, Ref{Kind: RefTurn, ID: strconv.Itoa(turn.Number), Relation: "recall"})
 		lines = append(lines, fmt.Sprintf("Turn %d: %s", turn.Number, narrated))
 	}
 	if len(lines) == 0 {
-		return ""
+		return "", nil
 	}
 
 	var sb strings.Builder
@@ -398,7 +434,7 @@ func (c *ContextAssembler) sceneRecall(req ContextRequest) string {
 	for _, line := range lines {
 		sb.WriteString(line + "\n")
 	}
-	return sb.String()
+	return sb.String(), dedupeRefs(refs)
 }
 
 // TurnRecordView is the part of a past turn recall needs. It keeps the assembler
@@ -416,10 +452,10 @@ type TurnRecordView struct {
 // The query set excludes the player and the location. The player is mentioned by
 // every turn ever recorded, so including it would rank noise first, and the
 // location is what scene recall already covers.
-func (c *ContextAssembler) relevantHistory(req ContextRequest) string {
+func (c *ContextAssembler) relevantHistory(req ContextRequest) (string, []Ref) {
 	window := c.windowTurns(req)
 	if c.store == nil || len(window) == 0 {
-		return ""
+		return "", nil
 	}
 
 	limit := c.limits.RetrievalTurns
@@ -442,7 +478,7 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) string {
 
 	mentioned, err := c.store.EntitiesInTurns(numbers)
 	if err != nil {
-		return ""
+		return "", nil
 	}
 
 	// Only characters are queried: the location is scene recall's job, and arcs are
@@ -459,7 +495,7 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) string {
 		query = append(query, id)
 	}
 	if len(query) == 0 {
-		return ""
+		return "", nil
 	}
 
 	before := req.TurnNumber
@@ -470,7 +506,7 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) string {
 	// Over-fetch, then drop what the window or scene recall already carries.
 	candidates, err := c.store.TurnsMentioningEntities(query, before, limit*4)
 	if err != nil {
-		return ""
+		return "", nil
 	}
 
 	excluded := make(map[int]bool, len(window))
@@ -534,15 +570,17 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) string {
 	}
 
 	lines := make([]string, 0, len(ranked))
+	var refs []Ref
 	for _, entry := range ranked {
 		narration := TruncateRunes(strings.TrimSpace(entry.record.Narration), charLimit)
 		if narration == "" {
 			continue
 		}
+		refs = append(refs, Ref{Kind: RefTurn, ID: strconv.Itoa(entry.record.Number), Relation: "retrieval"})
 		lines = append(lines, fmt.Sprintf("Turn %d: %s", entry.record.Number, narration))
 	}
 	if len(lines) == 0 {
-		return ""
+		return "", nil
 	}
 
 	var sb strings.Builder
@@ -550,7 +588,7 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) string {
 	for _, line := range lines {
 		sb.WriteString(line + "\n")
 	}
-	return sb.String()
+	return sb.String(), dedupeRefs(refs)
 }
 
 // fitToBudget drops optional sections in rank order until the prompt fits, then
@@ -598,22 +636,45 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 
 	var prompt strings.Builder
 	stats := make([]SectionStat, 0, len(sections))
+	reports := make([]SectionReport, 0, len(sections))
 	for _, candidate := range sections {
-		if candidate.text != "" {
+		included := candidate.text != ""
+		tokens := estimateTokens(candidate.text)
+		if included {
 			prompt.WriteString(candidate.text)
 		}
 		stats = append(stats, SectionStat{
 			Name:     candidate.name,
-			Tokens:   estimateTokens(candidate.text),
-			Included: candidate.text != "",
+			Tokens:   tokens,
+			Included: included,
+		})
+		reports = append(reports, SectionReport{
+			Name:     candidate.name,
+			Tokens:   tokens,
+			Included: included,
+			Source:   candidate.source,
+			Refs:     candidate.refs,
 		})
 	}
 
+	promptStr := prompt.String()
 	result := AssembleResult{
-		Prompt:          prompt.String(),
-		EstimatedTokens: estimateTokens(prompt.String()),
+		Prompt:          promptStr,
+		EstimatedTokens: estimateTokens(promptStr),
 		Trimmed:         trimmed,
 		Sections:        stats,
+		Context: TurnContext{
+			TurnNumber:      req.TurnNumber,
+			Mode:            req.Mode,
+			Budget:          c.limits.TokenBudget,
+			EstimatedTokens: estimateTokens(promptStr),
+			Sections:        reports,
+			Refs:            dedupeRefs(collectRefs(sections)),
+			Threads:         req.Threads,
+			SummaryVersion:  req.SummaryVersion,
+			PromptHash:      hashPrompt(promptStr),
+			Strategy:        StrategyFullPrompt,
+		},
 	}
 
 	// The prompt is recorded here and nowhere else. Everything downstream refers
@@ -629,6 +690,35 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 	})
 
 	return result
+}
+
+func collectRefs(sections []section) []Ref {
+	var all []Ref
+	for _, s := range sections {
+		if s.text != "" {
+			all = append(all, s.refs...)
+		}
+	}
+	return all
+}
+
+func dedupeRefs(refs []Ref) []Ref {
+	seen := make(map[string]bool)
+	var out []Ref
+	for _, r := range refs {
+		key := string(r.Kind) + ":" + r.ID + ":" + r.Relation
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, r)
+	}
+	return out
+}
+
+func hashPrompt(prompt string) string {
+	sum := sha256.Sum256([]byte(prompt))
+	return hex.EncodeToString(sum[:])
 }
 
 // shortenRecent halves the excerpt cap, which is the last thing surrendered before
@@ -653,7 +743,7 @@ func (c *ContextAssembler) shortenRecent(req ContextRequest, sections []section)
 			limit = minRecentTurnChars
 		}
 		c.limits.RecentTurnChars = limit
-		sections[index].text = c.recentSection(req)
+		sections[index].text, sections[index].refs = c.recentSection(req)
 		return true
 	}
 	return false

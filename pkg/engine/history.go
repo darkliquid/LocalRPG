@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
 )
 
@@ -42,6 +43,8 @@ type Turn struct {
 	// ToolCalls records what the turn looked up, compactly: name and result size.
 	// Arguments and results live in the trace, not in the campaign's history.
 	ToolCalls []ToolCallRecord `json:"tool_calls,omitempty"`
+	// Context records the durable description of this turn's context and provenance.
+	Context *harness.TurnContext `json:"context,omitempty"`
 
 	// LegacyOutput is only populated when reading records written before the
 	// narration rename. New records must not set it.
