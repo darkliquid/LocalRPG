@@ -50,7 +50,7 @@ func init() {
 					return nil, err
 				}
 			}
-			return media.NewHTTPTTSProvider(payload.Config), nil
+			return NewHTTPTTSClient(payload.Config), nil
 		},
 	})
 }
