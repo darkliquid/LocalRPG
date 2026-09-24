@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	otelmetric "go.opentelemetry.io/otel/metric"
+
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/dialogue"
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -258,6 +261,9 @@ func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string,
 	})
 
 	if path, ok := p.cachedClip(base); ok {
+		mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "hit")))
+		mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
+			otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", true)))
 		p.logger.Event("media.tts.result", map[string]interface{}{
 			"cache_hit":   true,
 			"duration_ms": time.Since(start).Milliseconds(),
@@ -269,6 +275,11 @@ func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string,
 	if err != nil {
 		return "", fmt.Errorf("synthesize utterance: %w", err)
 	}
+
+	mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "miss")))
+	mediaMetrics().ttsBytes.Record(ctx, int64(len(audioBytes)), otelmetric.WithAttributes(attribute.String("localrpg.tts.provider", provider)))
+	mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
+		otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", false)))
 
 	p.logger.Event("media.tts.result", map[string]interface{}{
 		"cache_hit":    false,

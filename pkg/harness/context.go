@@ -9,6 +9,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	otelmetric "go.opentelemetry.io/otel/metric"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/darkliquid/localrpg/pkg/config"
@@ -171,6 +172,8 @@ func (c *ContextAssembler) Assemble(req ContextRequest) (AssembleResult, error) 
 			attribute.Int("context.section.tokens", section.Tokens),
 			attribute.Bool("context.section.included", section.Included),
 		))
+		contextMetrics().contextTokens.Record(ctx, int64(section.Tokens),
+			otelmetric.WithAttributes(attribute.String("context.section", section.Name)))
 	}
 	return result, nil
 }

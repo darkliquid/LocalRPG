@@ -11,6 +11,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	otelmetric "go.opentelemetry.io/otel/metric"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/darkliquid/localrpg/pkg/core"
@@ -359,15 +360,25 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		),
 	)
 	defer turnSpan.End()
+	turnStarted := time.Now()
 
 	var rollRes *rules.RollResult
 	var outcome string
 	var gmDirective string
 	generationPrompt := actionInput
 
-	// The outcome is only known later, so it is attached at return rather than
-	// at start.
-	defer func() { turnSpan.SetAttributes(attribute.String("turn.outcome", outcome)) }()
+	// The outcome is only known later, so it is attached at return along with
+	// the turn's duration and completion metrics.
+	defer func() {
+		turnSpan.SetAttributes(attribute.String("turn.outcome", outcome))
+		metrics := engineMetrics()
+		attributes := otelmetric.WithAttributes(
+			attribute.String("turn.mode", mode),
+			attribute.String("turn.outcome", outcome),
+		)
+		metrics.turnDuration.Record(context.Background(), float64(time.Since(turnStarted).Milliseconds()), attributes)
+		metrics.turnCompleted.Add(context.Background(), 1, otelmetric.WithAttributes(attribute.String("turn.mode", mode)))
+	}()
 
 	// Handle /undo command
 	if strings.HasPrefix(strings.TrimSpace(actionInput), "/undo") {
@@ -884,13 +895,25 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, contextPrompt 
 				attribute.Bool("localrpg.tools_offered", offerTools),
 			),
 		)
+		roundStarted := time.Now()
 		result, err := o.generateRequest(roundCtx, request, onChunk)
+		roundDuration := float64(time.Since(roundStarted).Milliseconds())
+		roundAttributes := otelmetric.WithAttributes(
+			attribute.String("localrpg.role", "gm"),
+			attribute.Int("localrpg.round", round),
+		)
 		if err != nil {
+			engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
+				attribute.String("localrpg.role", "gm"),
+				attribute.String("error.kind", "provider"),
+			))
+			engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
 			roundSpan.RecordError(err)
 			roundSpan.SetStatus(codes.Error, err.Error())
 			roundSpan.End()
 			return streamResult{}, err
 		}
+		engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
 		roundSpan.End()
 
 		// A reply carrying calls while tools were not offered is a protocol quirk:
@@ -938,6 +961,11 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, contextPrompt 
 				toolSpan.SetStatus(codes.Error, "tool execution failed")
 			}
 			toolSpan.End()
+			engineMetrics().toolDuration.Record(context.Background(), float64(time.Since(started).Milliseconds()),
+				otelmetric.WithAttributes(
+					attribute.String("localrpg.tool.name", call.Name),
+					attribute.Bool("localrpg.tool.ok", ok),
+				))
 			o.logger.Event("tool.result", map[string]interface{}{
 				"name":        call.Name,
 				"ok":          ok,
