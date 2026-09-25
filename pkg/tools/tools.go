@@ -52,6 +52,10 @@ func (e *Executor) Execute(ctx context.Context, call harness.ToolCall) (string, 
 		return e.graphNeighbours(arguments)
 	case "search_timeline":
 		return e.searchTimeline(arguments)
+	case "search_memories":
+		return e.searchMemories(arguments)
+	case "get_entity_timeline":
+		return e.getEntityTimeline(arguments)
 	default:
 		return e.cap(harness.UnknownToolMessage(call.Name)), false
 	}

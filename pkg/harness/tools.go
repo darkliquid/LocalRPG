@@ -66,6 +66,25 @@ func ToolSpecs() []ToolSpec {
 				"match":  stringProperty("Optional raw FTS5 MATCH expression, for callers who know the syntax."),
 			}, "query"),
 		},
+		{
+			Name:        "search_memories",
+			Description: "Search what characters, places, and factions remember by words. Returns turn, kind, importance, and a snippet.",
+			Parameters: objectSchema(map[string]interface{}{
+				"query":          stringProperty("Words to search for in memory text and tags."),
+				"entity":         stringProperty("Optional entity id to restrict the search to its memories."),
+				"kind":           stringProperty("Optional memory kind: event, relationship, discovery, dialogue, or mechanical."),
+				"min_importance": intProperty("Optional minimum importance 1-5."),
+				"limit":          intProperty("Maximum matches to return. Defaults to 10."),
+			}, "query"),
+		},
+		{
+			Name:        "get_entity_timeline",
+			Description: "Read an entity's memories newest-first: its own timeline of key events, relationships, and discoveries.",
+			Parameters: objectSchema(map[string]interface{}{
+				"entity": stringProperty("The entity's id or name."),
+				"limit":  intProperty("Maximum memories to return. Defaults to 20."),
+			}, "entity"),
+		},
 	}
 }
 
