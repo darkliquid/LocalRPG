@@ -48,6 +48,14 @@ type Turn struct {
 	// Prompt is the exact assembled prompt string for the turn, persisted in SQLite but omitted from history.jsonl.
 	Prompt string `json:"-"`
 
+	// Verdict is the GM's feasibility judgement of the player's action, and
+	// Rejected records an impossible action. Checks are the checks it resolved,
+	// and Personae are the stub entity ids this turn introduced.
+	Verdict  *harness.ActionVerdict `json:"verdict,omitempty"`
+	Rejected bool                   `json:"rejected,omitempty"`
+	Checks   []harness.CheckResult  `json:"checks,omitempty"`
+	Personae []string               `json:"personae,omitempty"`
+
 	// LegacyOutput is only populated when reading records written before the
 	// narration rename. New records must not set it.
 	LegacyOutput string `json:"output,omitempty"`

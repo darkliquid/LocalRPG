@@ -642,35 +642,41 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
 	}
 
-	cause := o.classifyCut(result)
-	narration, recovery, stillIncomplete := o.recoverReply(ctx, result.Text, cause, onChunk)
-	if strings.TrimSpace(narration) == "" {
-		outcome = "error"
-		failure := &harness.GenerationFailure{
-			Code:         harness.FailureEmptyResponse,
-			Message:      "gm returned no narration",
-			FinishReason: result.FinishReason,
-			ElapsedMS:    time.Since(turnStarted).Milliseconds(),
+	cause := cutNone
+	var narration string
+	var recovery RecoveryOutcome
+	var stillIncomplete bool
+	if result.Submission == nil {
+		cause = o.classifyCut(result)
+		narration, recovery, stillIncomplete = o.recoverReply(ctx, result.Text, cause, onChunk)
+		if strings.TrimSpace(narration) == "" {
+			outcome = "error"
+			failure := &harness.GenerationFailure{
+				Code:         harness.FailureEmptyResponse,
+				Message:      "gm returned no narration",
+				FinishReason: result.FinishReason,
+				ElapsedMS:    time.Since(turnStarted).Milliseconds(),
+			}
+			if result.Failure != nil {
+				failure = result.Failure
+			}
+			turnSpan.SetAttributes(attribute.String("localrpg.generation.failure_code", string(failure.Code)))
+			turnSpan.RecordError(failure)
+			turnSpan.SetStatus(codes.Error, string(failure.Code))
+			o.logger.Event("generation.error", map[string]interface{}{
+				"code":          string(failure.Code),
+				"error":         failure.Message,
+				"role":          "gm",
+				"provider":      result.ProviderID,
+				"prompt_chars":  len([]rune(actionInput)),
+				"elapsed_ms":    time.Since(turnStarted).Milliseconds(),
+				"chunk_count":   result.ChunkCount,
+				"partial_chars": len([]rune(result.Text)),
+				"attempts":      len(failure.Attempts),
+				"finish_reason": result.FinishReason,
+			})
+			return nil, failure
 		}
-		if result.Failure != nil {
-			failure = result.Failure
-		}
-		turnSpan.SetAttributes(attribute.String("localrpg.generation.failure_code", string(failure.Code)))
-		turnSpan.RecordError(failure)
-		turnSpan.SetStatus(codes.Error, string(failure.Code))
-		o.logger.Event("generation.error", map[string]interface{}{
-			"code":          string(failure.Code),
-			"error":         failure.Message,
-			"role":          "gm",
-			"provider":      result.ProviderID,
-			"prompt_chars":  len([]rune(actionInput)),
-			"elapsed_ms":    time.Since(turnStarted).Milliseconds(),
-			"chunk_count":   result.ChunkCount,
-			"partial_chars": len([]rune(result.Text)),
-			"attempts":      len(failure.Attempts),
-			"finish_reason": result.FinishReason,
-		})
-		return nil, failure
 	}
 
 	o.logger.Event("generation.complete", map[string]interface{}{
@@ -700,8 +706,21 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	turn.Entities = harness.ResolveEntityMentions(o.store, o.playerID, locationID, turn.Narration, actionInput)
 
+	structured := result.Submission != nil
 	extraction := harness.Extraction{}
-	if o.extractor != nil {
+	var personae []harness.PersonaDecl
+	if structured {
+		extraction = extractionFromSubmission(result.Submission)
+		personae = result.Submission.Personae
+		turn.Verdict = &result.Submission.Verdict
+		turn.Rejected = result.Submission.Verdict.Feasibility == harness.FeasibilityImpossible
+		turn.Checks = result.Checks
+		for _, persona := range personae {
+			if id := entity.Slugify(persona.Name); id != "" {
+				turn.Personae = append(turn.Personae, id)
+			}
+		}
+	} else if o.extractor != nil {
 		extractCtx, extractSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "extract.entities")
 		// A failed extractor must not lose the turn; the mentions above still stand.
 		if extracted, err := o.extractor.Extract(extractCtx, turn.Narration); err == nil {
@@ -717,7 +736,15 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		extractSpan.End()
 	}
 
-	turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
+	if structured {
+		narrationText, segs := buildSegments(result.Submission, o.speakerResolver(result.Submission))
+		if narrationText != "" {
+			turn.Narration = narrationText
+		}
+		turn.Segments = segs
+	} else {
+		turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
+	}
 
 	// The player's own spoken line leads the turn, so it is heard in their voice
 	// before the narrator answers. It is a normal speech beat; the chronicle uses
@@ -796,7 +823,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// RecordTurn creates and voices the entities the turn introduced. Synthesis
 	// must not begin until this returns, or a character invented in this turn
 	// would be read in the narrator's voice.
-	if err := o.timeline.RecordTurnContext(ctx, &turn, extraction.Entities); err != nil {
+	if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
 	}
 

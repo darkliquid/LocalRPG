@@ -16,6 +16,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/state"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
@@ -59,6 +60,13 @@ func (t *Timeline) RecordTurn(turn *Turn, extracted []harness.ExtractedEntity) e
 // RecordTurnContext is RecordTurn with a caller context, so the write can join
 // the turn's trace. Callers that have no context use RecordTurn.
 func (t *Timeline) RecordTurnContext(ctx context.Context, turn *Turn, extracted []harness.ExtractedEntity) error {
+	return t.RecordTurnContextStructured(ctx, turn, extracted, nil)
+}
+
+// RecordTurnContextStructured is RecordTurnContext with the structured turn's
+// persona declarations, which are staged as entity stubs (unlike extraction,
+// they carry declared state such as gender and pronouns).
+func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl) error {
 	_, span := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "timeline.record_turn",
 		oteltrace.WithAttributes(attribute.Int("localrpg.turn.number", turn.Number)),
 	)
@@ -74,7 +82,7 @@ func (t *Timeline) RecordTurnContext(ctx context.Context, turn *Turn, extracted 
 		}
 	}
 
-	pending, err := t.stageEntities(turn, extracted)
+	pending, err := t.stageEntities(turn, extracted, personae)
 	if err != nil {
 		span.RecordError(err)
 		return err
@@ -116,8 +124,8 @@ func (t *Timeline) RecordTurnContext(ctx context.Context, turn *Turn, extracted 
 	return nil
 }
 
-func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity) (map[string]*entity.Entity, error) {
-	pending := make(map[string]*entity.Entity, len(turn.Entities)+len(extracted))
+func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl) (map[string]*entity.Entity, error) {
+	pending := make(map[string]*entity.Entity, len(turn.Entities)+len(extracted)+len(personae))
 
 	for _, mention := range turn.Entities {
 		existing, err := t.store.GetEntity(mention.ID)
@@ -125,6 +133,43 @@ func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity
 			continue
 		}
 		pending[existing.ID] = existing
+	}
+
+	for _, persona := range personae {
+		if strings.TrimSpace(persona.Name) == "" {
+			continue
+		}
+		id := entity.Slugify(persona.Name)
+		if id == "" {
+			continue
+		}
+		ent, err := t.store.GetEntity(id)
+		if err != nil || ent == nil {
+			ent = &entity.Entity{ID: id, Name: persona.Name, Type: persona.Type, Wikilinks: make([]string, 0)}
+			if ent.Type == "" {
+				ent.Type = "character"
+			}
+			if ent.State == nil {
+				ent.State = state.NewState(nil)
+			}
+			if persona.Gender != "" {
+				ent.State.Set("gender", persona.Gender)
+			}
+			if persona.Pronouns != "" {
+				ent.State.Set("pronouns", persona.Pronouns)
+			}
+			if len(persona.RoleTags) > 0 {
+				ent.Tags = append(ent.Tags, persona.RoleTags...)
+			}
+			ent.Body = persona.Description
+		}
+		if entity.IsCharacterType(ent.Type) {
+			harness.AssignVoiceProfile(ent, t.voiceProfiles)
+		}
+		pending[ent.ID] = ent
+		if !containsMention(turn.Entities, ent.ID) {
+			turn.Entities = append(turn.Entities, entity.Mention{ID: ent.ID, Kind: entity.MentionExtracted})
+		}
 	}
 
 	for _, raw := range extracted {
