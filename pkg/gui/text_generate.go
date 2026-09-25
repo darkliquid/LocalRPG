@@ -121,7 +121,7 @@ func buildTextGeneratorPrompt(req GenerateTextRequest, systemFields []core.Chara
 // Warning set. The user can always type the answers themselves.
 func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*GenerateTextResponse, error) {
 	started := time.Now()
-	ctx, span := s.startGenerationSpan(ctx, "generate.text", req.FormType, req.FieldName)
+	ctx, span := startGenerationSpan(ctx, s.logger, "generate.text", req.FormType, req.FieldName)
 	defer span.End()
 
 	resp := &GenerateTextResponse{Fields: map[string]string{}, GeneratedBy: "none"}
@@ -156,7 +156,7 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 			Code:    harness.FailureProviderUnavailable,
 			Message: fmt.Sprintf("no model provider is configured: %v", err),
 		}
-		s.recordGeneration(ctx, span, req.FormType, started, failure)
+		s.recordGeneration(ctx, span, req.FormType, "", started, failure)
 		return nil, failure
 	}
 
@@ -191,7 +191,7 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 			PromptChars: len([]rune(request.PromptText())),
 			ElapsedMS:   time.Since(started).Milliseconds(),
 		}
-		s.recordGeneration(ctx, span, req.FormType, started, failure)
+		s.recordGeneration(ctx, span, req.FormType, roleForAttempts(attempts), started, failure)
 		return nil, failure
 	}
 
@@ -203,7 +203,8 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 			ElapsedMS: time.Since(started).Milliseconds(),
 		}
 	}
-	s.recordGeneration(ctx, span, req.FormType, started, nil)
+	s.setTextOutcome(span, outcome, len(resp.Fields))
+	s.recordGeneration(ctx, span, req.FormType, outcome.GeneratedBy, started, nil)
 	return resp, nil
 }
 

@@ -83,7 +83,7 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 	}
 
 	started := time.Now()
-	ctx, span := s.startGenerationSpan(ctx, "generate.text", "character", "_all")
+	ctx, span := startGenerationSpan(ctx, s.logger, "generate.text", "character", "_all")
 	defer span.End()
 
 	router, err := harness.RouterFromConfigWithLogger(s.configMgr.Get(), s.logger)
@@ -92,7 +92,7 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 			Code:    harness.FailureProviderUnavailable,
 			Message: fmt.Sprintf("no model provider is configured: %v", err),
 		}
-		s.recordGeneration(ctx, span, "character", started, failure)
+		s.recordGeneration(ctx, span, "character", "", started, failure)
 		return nil, failure
 	}
 
@@ -124,7 +124,7 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 			PromptChars: len([]rune(request.PromptText())),
 			ElapsedMS:   time.Since(started).Milliseconds(),
 		}
-		s.recordGeneration(ctx, span, "character", started, failure)
+		s.recordGeneration(ctx, span, "character", roleForAttempts(attempts), started, failure)
 		return nil, failure
 	}
 
@@ -140,7 +140,8 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 			ElapsedMS: time.Since(started).Milliseconds(),
 		}
 	}
-	s.recordGeneration(ctx, span, "character", started, nil)
+	s.setTextOutcome(span, outcome, len(resp.Values))
+	s.recordGeneration(ctx, span, "character", outcome.GeneratedBy, started, nil)
 	return resp, nil
 }
 

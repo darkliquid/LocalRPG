@@ -48,10 +48,10 @@ func generationMetrics() generationInstruments {
 	return genInstruments
 }
 
-// startGenerationSpan opens the span for one generation request. The caller must
-// end it. A disabled provider yields a no-op span.
-func (s *Service) startGenerationSpan(ctx context.Context, name, formType, fieldName string) (context.Context, oteltrace.Span) {
-	trace.LogEvent(ctx, trace.OrNil(s.logger), "generate.request", map[string]interface{}{
+// startGenerationSpan opens the span for one generation request and logs the
+// request event. The caller must end it. A disabled provider yields a no-op span.
+func startGenerationSpan(ctx context.Context, logger trace.Logger, name, formType, fieldName string) (context.Context, oteltrace.Span) {
+	trace.LogEvent(ctx, trace.OrNil(logger), "generate.request", map[string]interface{}{
 		"span":       name,
 		"form_type":  formType,
 		"field_name": fieldName,
@@ -64,6 +64,15 @@ func (s *Service) startGenerationSpan(ctx context.Context, name, formType, field
 	)
 }
 
+// roleForAttempts names the role that produced the last attempt, for the
+// failure metric.
+func roleForAttempts(attempts []harness.Attempt) string {
+	if len(attempts) == 0 {
+		return ""
+	}
+	return attempts[len(attempts)-1].Role
+}
+
 func outcomeLabel(failure *harness.GenerationFailure) string {
 	if failure == nil {
 		return "success"
@@ -74,10 +83,11 @@ func outcomeLabel(failure *harness.GenerationFailure) string {
 // recordGeneration writes the outcome of one generation request to the trace
 // logger (and, through the telemetry bridge, to an OTel log record and span
 // event), marks the span, and records the duration and failure counters.
-func (s *Service) recordGeneration(ctx context.Context, span oteltrace.Span, formType string, started time.Time, failure *harness.GenerationFailure) {
+func (s *Service) recordGeneration(ctx context.Context, span oteltrace.Span, formType, role string, started time.Time, failure *harness.GenerationFailure) {
 	elapsed := time.Since(started)
 	fields := map[string]interface{}{
 		"form_type":   formType,
+		"role":        role,
 		"outcome":     outcomeLabel(failure),
 		"duration_ms": elapsed.Milliseconds(),
 	}
@@ -87,6 +97,7 @@ func (s *Service) recordGeneration(ctx context.Context, span oteltrace.Span, for
 		fields["attempts"] = len(failure.Attempts)
 		generationMetrics().errors.Add(ctx, 1, otelmetric.WithAttributes(
 			attribute.String("localrpg.form_type", formType),
+			attribute.String("localrpg.role", role),
 			attribute.String("localrpg.generation.failure_code", string(failure.Code)),
 		))
 		if span != nil {
@@ -103,8 +114,32 @@ func (s *Service) recordGeneration(ctx context.Context, span oteltrace.Span, for
 	}
 	generationMetrics().duration.Record(ctx, float64(elapsed.Milliseconds()), otelmetric.WithAttributes(
 		attribute.String("localrpg.form_type", formType),
+		attribute.String("localrpg.role", role),
 		attribute.String("localrpg.generation.outcome", outcomeLabel(failure)),
 	))
+}
+
+// setTextOutcome records the result-dependent span attributes. An empty attempt
+// list (a request that never reached a provider) omits them.
+func (s *Service) setTextOutcome(span oteltrace.Span, outcome generationOutcome, fieldCount int) {
+	if span == nil {
+		return
+	}
+	attrs := make([]attribute.KeyValue, 0, 4)
+	if len(outcome.Attempts) > 0 {
+		last := outcome.Attempts[len(outcome.Attempts)-1]
+		attrs = append(attrs,
+			attribute.Int("localrpg.generation.attempts", len(outcome.Attempts)),
+			attribute.String("gen_ai.system", last.Provider),
+		)
+	}
+	if outcome.GeneratedBy != "" {
+		attrs = append(attrs,
+			attribute.String("localrpg.generated_by", outcome.GeneratedBy),
+			attribute.Int("localrpg.field_count", fieldCount),
+		)
+	}
+	span.SetAttributes(attrs...)
 }
 
 // recordGenerationAttempts makes the fallback chain visible as span events and
