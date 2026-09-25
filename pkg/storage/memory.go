@@ -142,6 +142,20 @@ func nullIfEmpty(s string) interface{} {
 	return s
 }
 
+// HasMemory reports whether a memory with the same turn, kind, text, and check
+// id already exists. Rebuild keys on content because memory ids are volatile.
+func (s *Store) HasMemory(turn int, kind, text, checkID string) (bool, error) {
+	var count int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM memories WHERE turn = ? AND kind = ? AND text = ? AND COALESCE(check_id, '') = ?`,
+		turn, kind, text, checkID,
+	).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("has memory: %w", err)
+	}
+	return count > 0, nil
+}
+
 // MemoryHit is one memory search match.
 type MemoryHit struct {
 	ID         int64

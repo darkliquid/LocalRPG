@@ -83,6 +83,8 @@ type RollSummary struct {
 // CheckResult is the resolved outcome of a CheckRequest.
 type CheckResult struct {
 	CheckID   string                 `json:"check_id"`
+	Actor     string                 `json:"actor,omitempty"`
+	Target    string                 `json:"target,omitempty"`
 	Roll      *RollSummary           `json:"roll"`
 	Outcome   string                 `json:"outcome"`
 	Breakdown map[string]interface{} `json:"breakdown,omitempty"`

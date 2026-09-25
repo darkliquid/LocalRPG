@@ -60,13 +60,13 @@ func (t *Timeline) RecordTurn(turn *Turn, extracted []harness.ExtractedEntity) e
 // RecordTurnContext is RecordTurn with a caller context, so the write can join
 // the turn's trace. Callers that have no context use RecordTurn.
 func (t *Timeline) RecordTurnContext(ctx context.Context, turn *Turn, extracted []harness.ExtractedEntity) error {
-	return t.RecordTurnContextStructured(ctx, turn, extracted, nil)
+	return t.RecordTurnContextStructured(ctx, turn, extracted, nil, nil, nil)
 }
 
 // RecordTurnContextStructured is RecordTurnContext with the structured turn's
-// persona declarations, which are staged as entity stubs (unlike extraction,
-// they carry declared state such as gender and pronouns).
-func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl) error {
+// persona declarations and memories, which are staged as entity stubs and memory
+// records (unlike extraction, they carry declared state).
+func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl, memories []harness.MemoryDecl, checks []harness.CheckResult) error {
 	_, span := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "timeline.record_turn",
 		oteltrace.WithAttributes(attribute.Int("localrpg.turn.number", turn.Number)),
 	)
@@ -97,6 +97,15 @@ func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, 
 			span.RecordError(err)
 			return err
 		}
+	}
+
+	if err := t.stageMemories(turn, memories); err != nil {
+		span.RecordError(err)
+		return err
+	}
+	if err := t.writeMechanicalMemories(turn, checks); err != nil {
+		span.RecordError(err)
+		return err
 	}
 
 	if err := t.history.AppendTurn(*turn); err != nil {
@@ -385,6 +394,16 @@ func (t *Timeline) EnsureIndexed() error {
 		}
 	}
 
+	// Memories are canonical in the index but re-derivable from a turn's stored
+	// records, so a rebuilt database regains them here.
+	if t.store != nil {
+		for i := range turns {
+			if err := t.ensureTurnMemories(&turns[i]); err != nil {
+				return err
+			}
+		}
+	}
+
 	if t.store != nil && len(turns) > 0 {
 		wsEntries, err := t.store.LoadWorkingSet()
 		if err == nil && len(wsEntries) == 0 {
@@ -460,4 +479,124 @@ func turnRecord(turn Turn) storage.TurnRecord {
 		})
 	}
 	return rec
+}
+
+// stageMemories resolves and stores the GM's memory declarations, attaching the
+// persisted records to the turn so history.jsonl stays canonical. An invalid
+// memory is dropped rather than failing the turn.
+func (t *Timeline) stageMemories(turn *Turn, decls []harness.MemoryDecl) error {
+	for _, decl := range decls {
+		refs := make([]string, 0, len(decl.EntityRefs))
+		for _, raw := range decl.EntityRefs {
+			if id := t.resolveMemoryRef(raw); id != "" {
+				refs = append(refs, id)
+			}
+		}
+		memory := entity.Memory{
+			Turn:       turn.Number,
+			Kind:       decl.Kind,
+			EntityRefs: refs,
+			Text:       decl.Text,
+			Importance: decl.Importance,
+			Tags:       decl.Tags,
+			Source:     entity.SourceGM,
+		}
+		if err := entity.ValidateMemory(&memory); err != nil {
+			continue
+		}
+		id, err := t.store.SaveMemory(&memory)
+		if err != nil {
+			return fmt.Errorf("save memory: %w", err)
+		}
+		memory.ID = id
+		turn.Memories = append(turn.Memories, memory)
+	}
+	return nil
+}
+
+// writeMechanicalMemories records one engine-owned memory per resolved check,
+// linked to the check and its actor/target.
+func (t *Timeline) writeMechanicalMemories(turn *Turn, checks []harness.CheckResult) error {
+	for _, check := range checks {
+		if check.CheckID == "" {
+			continue
+		}
+		refs := make([]string, 0, 2)
+		if id := t.resolveMemoryRef(check.Actor); id != "" {
+			refs = append(refs, id)
+		}
+		if check.Target != "" {
+			if id := t.resolveMemoryRef(check.Target); id != "" && id != check.Actor {
+				refs = append(refs, id)
+			}
+		}
+		if len(refs) == 0 {
+			continue
+		}
+		detail := check.Outcome
+		if check.Roll != nil {
+			detail = fmt.Sprintf("%s=%d, %s", check.Roll.Notation, check.Roll.Total, check.Outcome)
+		}
+		memory := entity.Memory{
+			Turn:       turn.Number,
+			Kind:       entity.MemoryMechanical,
+			EntityRefs: refs,
+			Text:       fmt.Sprintf("Resolved a check: %s.", detail),
+			Importance: 3,
+			Tags:       []string{"check"},
+			Source:     entity.SourceEngine,
+			CheckID:    check.CheckID,
+		}
+		if err := entity.ValidateMemory(&memory); err != nil {
+			continue
+		}
+		id, err := t.store.SaveMemory(&memory)
+		if err != nil {
+			return fmt.Errorf("save mechanical memory: %w", err)
+		}
+		memory.ID = id
+		turn.Memories = append(turn.Memories, memory)
+	}
+	return nil
+}
+
+// resolveMemoryRef turns an id or a name into an entity id, preferring an
+// existing entity and falling back to the slug of the name.
+func (t *Timeline) resolveMemoryRef(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if ent, err := t.store.GetEntity(raw); err == nil && ent != nil {
+		return ent.ID
+	}
+	id := entity.Slugify(raw)
+	if id == "" {
+		return ""
+	}
+	if ent, err := t.store.GetEntity(id); err == nil && ent != nil {
+		return ent.ID
+	}
+	return id
+}
+
+// ensureTurnMemories re-saves a turn's recorded memories when the index is
+// missing them, keyed on content so a rebuild does not duplicate rows.
+func (t *Timeline) ensureTurnMemories(turn *Turn) error {
+	for _, memory := range turn.Memories {
+		exists, err := t.store.HasMemory(memory.Turn, memory.Kind, memory.Text, memory.CheckID)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
+		if err := entity.ValidateMemory(&memory); err != nil {
+			continue
+		}
+		if _, err := t.store.SaveMemory(&memory); err != nil {
+			return fmt.Errorf("rebuild memory: %w", err)
+		}
+	}
+	return nil
 }

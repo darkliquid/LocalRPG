@@ -55,6 +55,9 @@ type Turn struct {
 	Rejected bool                   `json:"rejected,omitempty"`
 	Checks   []harness.CheckResult  `json:"checks,omitempty"`
 	Personae []string               `json:"personae,omitempty"`
+	// Memories are the accepted memory records, so the timeline stays canonical
+	// and the index can be rebuilt from history.jsonl.
+	Memories []entity.Memory `json:"memories,omitempty"`
 
 	// LegacyOutput is only populated when reading records written before the
 	// narration rename. New records must not set it.

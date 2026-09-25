@@ -724,9 +724,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	structured := result.Submission != nil
 	extraction := harness.Extraction{}
 	var personae []harness.PersonaDecl
+	var memories []harness.MemoryDecl
 	if structured {
 		extraction = extractionFromSubmission(result.Submission)
 		personae = result.Submission.Personae
+		memories = result.Submission.Memories
 		turn.Verdict = &result.Submission.Verdict
 		turn.Rejected = result.Submission.Verdict.Feasibility == harness.FeasibilityImpossible
 		turn.Checks = result.Checks
@@ -838,7 +840,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// RecordTurn creates and voices the entities the turn introduced. Synthesis
 	// must not begin until this returns, or a character invented in this turn
 	// would be read in the narrator's voice.
-	if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae); err != nil {
+	if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
 	}
 
@@ -1361,6 +1363,8 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					if call.ID != "" {
 						resolved.CheckID = call.ID
 					}
+					resolved.Actor = req.Actor
+					resolved.Target = req.Target
 					checks = append(checks, *resolved)
 					encoded, _ := json.Marshal(resolved)
 					messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: string(encoded)})
