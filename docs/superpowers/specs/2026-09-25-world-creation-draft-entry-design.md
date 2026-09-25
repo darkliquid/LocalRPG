@@ -113,10 +113,12 @@ export type WorldSelection =
 
 export interface WorldDraft {
   localId: string;          // crypto.randomUUID(), for React keys only
-  name: string;             // display label; the form field itself stays empty
   dirty: boolean;           // any field edited since creation
 }
 ```
+
+The sidebar label is derived from the live form `name`, so the draft does not
+carry a second copy that could drift.
 
 The sidebar renders the draft row (pinned above saved worlds) when a draft
 exists, followed by the saved `worlds`. The draft row shows
@@ -214,7 +216,7 @@ creation flow.
   `setLorePrompt(detail.lore_prompt || '')`** so no implicit Ashen Reach content
   appears.
 - `handleNewWorld()`: set `selection = {kind:'draft'}`, set `draft =
-  {localId, name:'', dirty:false}`, and clear all fields and entity drafts as
+  {localId, dirty:false}`, and clear all fields and entity drafts as
   today. Preserve the existing `defaultSystem` seeding (first system or empty).
 - Sidebar: render the draft row when `draft` is present, then `worlds`. Draft
   row click -> `handleNewWorld()` if no reselect needed, or simply keep the draft
