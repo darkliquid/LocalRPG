@@ -3,6 +3,7 @@ import { APIClient, HTTPError } from './api/client';
 import { GameState, Turn, EntityNote, EntitySummary, Recap, GraphData, AppConfig } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
+import { TurnAudioState } from './components/TurnSegments';
 import { ActionConsole } from './components/ActionConsole';
 import { Drawers } from './components/Drawers';
 import { CharacterSheetDrawer } from './components/CharacterSheetDrawer';
@@ -63,6 +64,8 @@ export const App: React.FC = () => {
   // The application plays audio itself when it can, which is the only way to
   // narrate a turn without a browser autoplay gesture.
   const [serverAudio, setServerAudio] = useState(false);
+  // Per-turn audio status: generating → playing → idle (or error)
+  const [turnAudioStatus, setTurnAudioStatus] = useState<Record<number, { state: TurnAudioState; message?: string }>>({});
 
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
@@ -281,17 +284,60 @@ export const App: React.FC = () => {
     document.getElementById('action-console-input')?.focus();
   };
 
-  const handlePlayTurnAudio = (turnNumber: number, segmentIndex?: number) => {
+  const audioPollingRef = useRef<Record<number, ReturnType<typeof setInterval>>>({});
+
+  const handlePlayTurnAudio = (turnNumber: number, segmentIndex?: number, force = false) => {
     if (!activeGameID) return;
-    if (segmentIndex === undefined) {
-      APIClient.playTurnAudio(activeGameID, turnNumber).catch(console.error);
-    } else {
-      APIClient.playSegmentAudio(activeGameID, turnNumber, segmentIndex).catch(console.error);
-    }
+    // Transition to 'generating' immediately so the spinner shows
+    setTurnAudioStatus((prev) => ({ ...prev, [turnNumber]: { state: 'generating' } }));
+
+    const call = segmentIndex === undefined
+      ? APIClient.playTurnAudio(activeGameID, turnNumber, force)
+      : APIClient.playSegmentAudio(activeGameID, turnNumber, segmentIndex, force);
+
+    call
+      .then(() => {
+        setTurnAudioStatus((prev) => ({ ...prev, [turnNumber]: { state: 'playing' } }));
+        // Poll until server reports playback finished
+        const intervalId = setInterval(() => {
+          APIClient.audioStatus()
+            .then((status) => {
+              if (!status.playing) {
+                clearInterval(intervalId);
+                delete audioPollingRef.current[turnNumber];
+                setTurnAudioStatus((prev) => ({ ...prev, [turnNumber]: { state: 'idle' } }));
+              }
+            })
+            .catch(() => {
+              clearInterval(intervalId);
+              delete audioPollingRef.current[turnNumber];
+              setTurnAudioStatus((prev) => ({ ...prev, [turnNumber]: { state: 'idle' } }));
+            });
+        }, 500);
+        audioPollingRef.current[turnNumber] = intervalId;
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        setTurnAudioStatus((prev) => ({ ...prev, [turnNumber]: { state: 'error', message } }));
+      });
   };
 
   const handleStopAudio = () => {
     APIClient.stopAudio().catch(console.error);
+    // Clear all polling and reset all turns that are playing
+    for (const [turnNum, intervalId] of Object.entries(audioPollingRef.current)) {
+      clearInterval(intervalId);
+      delete audioPollingRef.current[Number(turnNum)];
+    }
+    setTurnAudioStatus((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        if (next[Number(key)].state === 'playing' || next[Number(key)].state === 'generating') {
+          next[Number(key)] = { state: 'idle' };
+        }
+      }
+      return next;
+    });
   };
 
   const handleSaveEntity = async (entityId: string, markdown: string) => {
@@ -574,6 +620,7 @@ export const App: React.FC = () => {
                     pendingAction={pendingAction}
                     streamedProse={streamedProse}
                     displayMode={config?.media.tts.speech_cues?.display_mode}
+                    turnAudioStatus={turnAudioStatus}
                   />
                 </>
               )}

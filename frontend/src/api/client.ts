@@ -256,13 +256,15 @@ export class APIClient {
     if (!res.ok) throw new Error(`stopAudio: ${res.statusText}`);
   }
 
-  static async playTurnAudio(gameID: string, turnNumber: number): Promise<void> {
-    const res = await fetch(`/api/game/${gameID}/turn/${turnNumber}/play`, { method: 'POST' });
+  static async playTurnAudio(gameID: string, turnNumber: number, force = false): Promise<void> {
+    const url = `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/play${force ? '?force=1' : ''}`;
+    const res = await fetch(url, { method: 'POST' });
     if (!res.ok) throw new Error(`playTurnAudio: ${res.statusText}`);
   }
 
-  static async playSegmentAudio(gameID: string, turnNumber: number, segmentIndex: number): Promise<void> {
-    const res = await fetch(`/api/game/${gameID}/turn/${turnNumber}/segment/${segmentIndex}/play`, { method: 'POST' });
+  static async playSegmentAudio(gameID: string, turnNumber: number, segmentIndex: number, force = false): Promise<void> {
+    const url = `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/segment/${segmentIndex}/play${force ? '?force=1' : ''}`;
+    const res = await fetch(url, { method: 'POST' });
     if (!res.ok) throw new Error(`playSegmentAudio: ${res.statusText}`);
   }
 

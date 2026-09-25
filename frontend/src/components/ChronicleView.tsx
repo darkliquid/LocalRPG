@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Turn } from '../types';
-import { TurnSegments } from './TurnSegments';
+import { TurnSegments, TurnAudioState } from './TurnSegments';
 import { Sparkles } from 'lucide-react';
 
 interface PendingAction {
@@ -14,7 +14,7 @@ interface ChronicleViewProps {
   autoPlay?: boolean;
   volume?: number;
   serverPlayback?: boolean;
-  onPlayTurnAudio?: (turnNumber: number, segmentIndex?: number) => void;
+  onPlayTurnAudio?: (turnNumber: number, segmentIndex?: number, force?: boolean) => void;
   onStopAudio?: () => void;
   onCorrect?: (note: string, turnNumber?: number) => void;
   addressedTurns?: Set<number>;
@@ -23,6 +23,7 @@ interface ChronicleViewProps {
   pendingAction?: PendingAction | null;
   streamedProse?: string;
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
+  turnAudioStatus?: Record<number, { state: TurnAudioState; message?: string }>;
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
@@ -37,6 +38,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   pendingAction,
   streamedProse,
   displayMode,
+  turnAudioStatus = {},
 }) => {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -63,119 +65,124 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
           The chronicle awaits your first action...
         </div>
       ) : (
-        beats.map(({ turn, isSceneChange }, index) => (
-          <div key={turn.turn_number} className="space-y-4 pb-6 border-b border-white/5 last:border-0">
-            {/* Player Input Block. A spoken line is rendered as speech below, so
-                the input block is skipped for it to avoid printing it twice. */}
-            {turn.input_text && !(turn.segments ?? []).some((segment) => segment.player) && (
-              <div className="flex items-start gap-3 text-stone-300 text-sm font-sans italic bg-black/40 p-3.5 rounded-xl border border-white/5 shadow-inner">
-                <span className="text-purple-400 font-semibold uppercase tracking-wider text-xs font-sans">
-                  [{turn.mode || 'Action'}]
-                </span>
-                <span>{turn.input_text}</span>
-                {turn.outcome && (
-                  <span className="ml-auto text-xs font-mono text-stone-400">{turn.outcome}</span>
-                )}
-              </div>
-            )}
-
-            {/* Scene Illustration if available */}
-            {turn.image_url && (
-              <div className="my-4 rounded-xl overflow-hidden border border-white/10 shadow-2xl">
-                <img src={turn.image_url} alt="Scene illustration" className="w-full object-cover max-h-96" />
-              </div>
-            )}
-
-            {/* Scene art, when the party has moved somewhere new */}
-            {turn.location_art_url && isSceneChange && (
-              <div className="my-4 rounded-xl overflow-hidden border border-white/10 shadow-2xl">
-                <img
-                  src={turn.location_art_url}
-                  alt={turn.location_name || 'Scene'}
-                  className="w-full object-cover max-h-96"
-                />
-                {turn.location_name && (
-                  <div className="px-3 py-2 text-xs font-sans tracking-widest text-stone-400 uppercase">
-                    {turn.location_name}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Narrated prose and attributed speech, in playback order */}
-            <TurnSegments
-              segments={turn.segments}
-              fallback={turn.prose}
-              onEntityClick={onWikilinkClick}
-              displayMode={displayMode}
-              // Only the newest turn narrates itself: autoplaying every turn would
-              // start them all at once on load.
-              autoPlay={autoPlay && index === beats.length - 1}
-              volume={volume}
-              serverPlayback={serverPlayback}
-              onPlayTurn={onPlayTurnAudio ? (segmentIndex) => onPlayTurnAudio(turn.turn_number, segmentIndex) : undefined}
-              onStopTurn={onStopAudio}
-            />
-
-            {turn.rejected && (
-              <div className="text-xs font-sans text-amber-300 bg-amber-950/40 border border-amber-500/30 rounded-lg px-3 py-2">
-                That action was impossible{turn.verdict?.reason ? `: ${turn.verdict.reason}` : '.'}
-              </div>
-            )}
-
-            {turn.checks && turn.checks.length > 0 && (
-              <div className="text-xs font-mono text-stone-400">
-                {turn.checks.map((check) => (
-                  <span key={check.check_id} className="mr-3">
-                    {check.roll ? `${check.roll.notation}=${check.roll.total} ` : ''}
-                    {check.outcome}
+        beats.map(({ turn, isSceneChange }, index) => {
+          const audioStatus = turnAudioStatus[turn.turn_number];
+          return (
+            <div key={turn.turn_number} className="space-y-4 pb-6 border-b border-white/5 last:border-0">
+              {/* Player Input Block. A spoken line is rendered as speech below, so
+                  the input block is skipped for it to avoid printing it twice. */}
+              {turn.input_text && !(turn.segments ?? []).some((segment) => segment.player) && (
+                <div className="flex items-start gap-3 text-stone-300 text-sm font-sans italic bg-black/40 p-3.5 rounded-xl border border-white/5 shadow-inner">
+                  <span className="text-purple-400 font-semibold uppercase tracking-wider text-xs font-sans">
+                    [{turn.mode || 'Action'}]
                   </span>
-                ))}
-              </div>
-            )}
+                  <span>{turn.input_text}</span>
+                  {turn.outcome && (
+                    <span className="ml-auto text-xs font-mono text-stone-400">{turn.outcome}</span>
+                  )}
+                </div>
+              )}
 
-            {turn.recovery === 'trimmed' && (
-              <div className="text-xs font-mono text-purple-400/80 pt-1">
-                The narrator's reply ended mid-thought; the unfinished tail was dropped.
-              </div>
-            )}
+              {/* Scene Illustration if available */}
+              {turn.image_url && (
+                <div className="my-4 rounded-xl overflow-hidden border border-white/10 shadow-2xl">
+                  <img src={turn.image_url} alt="Scene illustration" className="w-full object-cover max-h-96" />
+                </div>
+              )}
 
-            {turn.tool_calls && turn.tool_calls.length > 0 && (
-              <div className="text-[11px] font-mono text-stone-500 pt-1">
-                Looked up: {turn.tool_calls.map((call) => `${call.name} (${call.result_chars})`).join(', ')}
-              </div>
-            )}
+              {/* Scene art, when the party has moved somewhere new */}
+              {turn.location_art_url && isSceneChange && (
+                <div className="my-4 rounded-xl overflow-hidden border border-white/10 shadow-2xl">
+                  <img
+                    src={turn.location_art_url}
+                    alt={turn.location_name || 'Scene'}
+                    className="w-full object-cover max-h-96"
+                  />
+                  {turn.location_name && (
+                    <div className="px-3 py-2 text-xs font-sans tracking-widest text-stone-400 uppercase">
+                      {turn.location_name}
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {turn.truncated && (
-              <div className="text-xs font-mono text-purple-400/80 pt-1">
-                The narrator's reply could not be completed. Raise the response limit for the gm role in Settings, or
-                check the provider.
-              </div>
-            )}
+              {/* Narrated prose and attributed speech, in playback order */}
+              <TurnSegments
+                segments={turn.segments}
+                fallback={turn.prose}
+                onEntityClick={onWikilinkClick}
+                displayMode={displayMode}
+                // Only the newest turn narrates itself: autoplaying every turn would
+                // start them all at once on load.
+                autoPlay={autoPlay && index === beats.length - 1}
+                volume={volume}
+                serverPlayback={serverPlayback}
+                onPlayTurn={onPlayTurnAudio ? (segmentIndex, force) => onPlayTurnAudio(turn.turn_number, segmentIndex, force) : undefined}
+                onStopTurn={onStopAudio}
+                turnAudioState={audioStatus?.state}
+                turnAudioMessage={audioStatus?.message}
+              />
 
-            {turn.context_notes && turn.context_notes.length > 0 && (
-              <div className="text-xs font-mono text-stone-500 pt-1">
-                Context trimmed to fit the prompt budget: {turn.context_notes.join(', ')}. Raise the context budget in
-                Settings to keep more.
-              </div>
-            )}
+              {turn.rejected && (
+                <div className="text-xs font-sans text-amber-300 bg-amber-950/40 border border-amber-500/30 rounded-lg px-3 py-2">
+                  That action was impossible{turn.verdict?.reason ? `: ${turn.verdict.reason}` : '.'}
+                </div>
+              )}
 
-            {/* Entities involved in this turn */}
-            {turn.entities_hit && turn.entities_hit.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                {turn.entities_hit.map((entityId) => (
-                  <button
-                    key={entityId}
-                    onClick={() => onWikilinkClick(entityId)}
-                    className="px-2 py-0.5 text-xs font-sans tracking-wider rounded-full bg-white/5 border border-white/10 text-stone-300 hover:text-purple-300 hover:border-purple-500/60 cursor-pointer transition-colors"
-                  >
-                    {entityId}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))
+              {turn.checks && turn.checks.length > 0 && (
+                <div className="text-xs font-mono text-stone-400">
+                  {turn.checks.map((check) => (
+                    <span key={check.check_id} className="mr-3">
+                      {check.roll ? `${check.roll.notation}=${check.roll.total} ` : ''}
+                      {check.outcome}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {turn.recovery === 'trimmed' && (
+                <div className="text-xs font-mono text-purple-400/80 pt-1">
+                  The narrator's reply ended mid-thought; the unfinished tail was dropped.
+                </div>
+              )}
+
+              {turn.tool_calls && turn.tool_calls.length > 0 && (
+                <div className="text-[11px] font-mono text-stone-500 pt-1">
+                  Looked up: {turn.tool_calls.map((call) => `${call.name} (${call.result_chars})`).join(', ')}
+                </div>
+              )}
+
+              {turn.truncated && (
+                <div className="text-xs font-mono text-purple-400/80 pt-1">
+                  The narrator's reply could not be completed. Raise the response limit for the gm role in Settings, or
+                  check the provider.
+                </div>
+              )}
+
+              {turn.context_notes && turn.context_notes.length > 0 && (
+                <div className="text-xs font-mono text-stone-500 pt-1">
+                  Context trimmed to fit the prompt budget: {turn.context_notes.join(', ')}. Raise the context budget in
+                  Settings to keep more.
+                </div>
+              )}
+
+              {/* Entities involved in this turn */}
+              {turn.entities_hit && turn.entities_hit.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {turn.entities_hit.map((entityId) => (
+                    <button
+                      key={entityId}
+                      onClick={() => onWikilinkClick(entityId)}
+                      className="px-2 py-0.5 text-xs font-sans tracking-wider rounded-full bg-white/5 border border-white/10 text-stone-300 hover:text-purple-300 hover:border-purple-500/60 cursor-pointer transition-colors"
+                    >
+                      {entityId}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })
       )}
 
       {/* Pending Turn in Flight */}

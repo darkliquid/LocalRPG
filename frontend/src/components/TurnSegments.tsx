@@ -2,7 +2,9 @@ import React from 'react';
 import { TurnSegment } from '../types';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { MarkdownProse } from './MarkdownProse';
-import { Play, Square } from 'lucide-react';
+import { Play, Square, RotateCw, Loader2 } from 'lucide-react';
+
+export type TurnAudioState = 'idle' | 'generating' | 'playing' | 'error';
 
 interface TurnSegmentsProps {
   segments?: TurnSegment[];
@@ -13,8 +15,11 @@ interface TurnSegmentsProps {
   // When set, playback is the application's job: the browser never starts audio,
   // so nothing depends on an autoplay gesture.
   serverPlayback?: boolean;
-  onPlayTurn?: (segmentIndex?: number) => void;
+  onPlayTurn?: (segmentIndex?: number, force?: boolean) => void;
   onStopTurn?: () => void;
+  // Managed externally by App when serverPlayback is true
+  turnAudioState?: TurnAudioState;
+  turnAudioMessage?: string;
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
 }
 
@@ -27,6 +32,8 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   serverPlayback = false,
   onPlayTurn,
   onStopTurn,
+  turnAudioState = 'idle',
+  turnAudioMessage,
   displayMode = 'stage_directions',
 }) => {
   const ordered = segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: fallback }];
@@ -37,8 +44,12 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
     volume
   );
 
-  const startServerPlayback = (segmentIndex?: number) => onPlayTurn?.(segmentIndex);
+  const startServerPlayback = (segmentIndex?: number, force?: boolean) => onPlayTurn?.(segmentIndex, force);
   const stopServerPlayback = () => onStopTurn?.();
+
+  const isGenerating = turnAudioState === 'generating';
+  const isPlaying = turnAudioState === 'playing';
+  const isError = turnAudioState === 'error';
 
   return (
     <div className="space-y-3">
@@ -105,24 +116,72 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
           />
         )
       )}
+
+      {/* Server-side playback controls */}
       {hasAudio && serverPlayback && (
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {/* Play button — spinner while generating, disabled while playing */}
           <button
-            onClick={() => startServerPlayback()}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900/70 border border-stone-700 text-stone-300 hover:text-purple-300 hover:border-purple-500/40 cursor-pointer transition-colors"
+            onClick={() => !isGenerating && !isPlaying ? startServerPlayback() : undefined}
+            disabled={isGenerating || isPlaying}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
+              isGenerating || isPlaying
+                ? 'opacity-40 cursor-not-allowed bg-stone-900/70 border-stone-700 text-stone-400'
+                : 'bg-stone-900/70 border-stone-700 text-stone-300 hover:text-purple-300 hover:border-purple-500/40 cursor-pointer'
+            }`}
           >
-            <Play className="w-3 h-3" />
-            <span>Play turn</span>
+            {isGenerating
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Generating speech…</span></>
+              : <><Play className="w-3 h-3" /><span>Play turn</span></>
+            }
           </button>
+
+          {/* Stop button — only enabled while playing */}
           <button
-            onClick={stopServerPlayback}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-900/70 border border-stone-700 text-stone-300 hover:text-red-300 hover:border-red-500/40 cursor-pointer transition-colors"
+            onClick={isPlaying ? stopServerPlayback : undefined}
+            disabled={!isPlaying}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
+              isPlaying
+                ? 'text-rose-400 border-rose-500/50 hover:bg-rose-500/20 cursor-pointer bg-stone-900/70'
+                : 'opacity-30 cursor-not-allowed pointer-events-none bg-stone-900/70 border-stone-700 text-stone-400'
+            }`}
           >
             <Square className="w-3 h-3" />
             <span>Stop</span>
           </button>
+
+          {/* Force regenerate button */}
+          <button
+            onClick={() => !isGenerating && !isPlaying ? startServerPlayback(undefined, true) : undefined}
+            disabled={isGenerating || isPlaying}
+            title="Force regenerate speech"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
+              isGenerating || isPlaying
+                ? 'opacity-30 cursor-not-allowed pointer-events-none bg-stone-900/70 border-stone-700 text-stone-400'
+                : 'bg-stone-900/70 border-stone-700 text-stone-400 hover:text-amber-300 hover:border-amber-500/40 cursor-pointer'
+            }`}
+          >
+            <RotateCw className="w-3 h-3" />
+            <span>Regenerate</span>
+          </button>
+
+          {/* Status chip */}
+          {isGenerating && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-900/50 border border-purple-500/40 text-purple-300 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />
+              Rendering speech (calling provider)…
+            </span>
+          )}
+          {isError && turnAudioMessage && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-rose-900/40 border border-rose-500/40 text-rose-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
+              Error: {turnAudioMessage}
+            </span>
+          )}
         </div>
       )}
+
+      {/* Client-side browser playback controls */}
       {hasAudio && !serverPlayback && (
         <div className="flex items-center gap-2 text-xs">
           {blocked && !playing ? (
