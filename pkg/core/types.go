@@ -16,6 +16,9 @@ type SystemManifest struct {
 	// CharacterCreation describes the prompts a player answers when starting a
 	// campaign with this system. An empty spec falls back to the engine default.
 	CharacterCreation CharacterCreationSpec `yaml:"character_creation,omitempty"`
+	// Mechanics is the optional declarative mechanics schema. A nil value means
+	// the system is schema-agnostic and mechanics.js owns everything.
+	Mechanics *MechanicsSpec `yaml:"mechanics,omitempty"`
 }
 
 // CharacterCreationField is one prompt in a system's character creation.
