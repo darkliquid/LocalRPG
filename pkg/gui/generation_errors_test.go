@@ -3,6 +3,7 @@ package gui
 import (
 	"encoding/json"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -56,3 +57,31 @@ func TestWriteGenerationFailureIgnoresPlainErrors(t *testing.T) {
 type errPlain struct{}
 
 func (errPlain) Error() string { return "plain" }
+
+func TestWriteInvalidRequest(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeInvalidRequest(rec, "invalid request body")
+	if rec.Code != 400 {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+	var body struct {
+		Error harness.GenerationFailure `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body is not JSON: %v", err)
+	}
+	if body.Error.Code != harness.FailureInvalidRequest {
+		t.Fatalf("code = %q, want invalid_request", body.Error.Code)
+	}
+}
+
+func TestWriteJSONError(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeJSONError(rec, 409, "world already exists")
+	if rec.Code != 409 {
+		t.Fatalf("status = %d, want 409", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "world already exists") {
+		t.Fatalf("body = %q, want the message", rec.Body.String())
+	}
+}

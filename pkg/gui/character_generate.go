@@ -24,7 +24,7 @@ func (s *Server) handleCharacterGenerateRoute(w http.ResponseWriter, r *http.Req
 
 	var req GenerateCharacterRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeInvalidRequest(w, "invalid request body")
 		return
 	}
 

@@ -188,7 +188,7 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		var req GenerateAssetRequestDTO
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024)).Decode(&req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			writeInvalidRequest(w, "invalid request body")
 			return
 		}
 		url, err := s.service.GenerateGameAsset(r.Context(), gameID, req)
@@ -637,7 +637,7 @@ func (s *Server) handleWorldsRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		world, err := s.service.CreateWorld(r.Context(), req)
 		if errors.Is(err, ErrWorldExists) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			writeJSONError(w, http.StatusConflict, err.Error())
 			return
 		}
 		if err != nil {
@@ -746,7 +746,7 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		var req GenerateAssetRequestDTO
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024)).Decode(&req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			writeInvalidRequest(w, "invalid request body")
 			return
 		}
 		url, err := s.service.GenerateWorldAsset(r.Context(), worldID, req)
@@ -1033,11 +1033,11 @@ const maxTurnBody = 64 << 10
 func (s *Server) handleTurnSubmit(w http.ResponseWriter, r *http.Request, gameID string) {
 	var req TurnRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeInvalidRequest(w, "invalid request body")
 		return
 	}
 	if err := req.validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeInvalidRequest(w, err.Error())
 		return
 	}
 
@@ -1155,11 +1155,11 @@ func (s *Server) handleGenerateAssetPreview(w http.ResponseWriter, r *http.Reque
 	}
 	var req GenerateAssetPreviewRequestDTO
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024)).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeInvalidRequest(w, "invalid request body")
 		return
 	}
 	if req.Kind != "banner" && req.Kind != "icon" {
-		http.Error(w, "kind must be 'banner' or 'icon'", http.StatusBadRequest)
+		writeInvalidRequest(w, "kind must be 'banner' or 'icon'")
 		return
 	}
 	data, contentType, err := s.service.GenerateAssetPreview(r.Context(), req)

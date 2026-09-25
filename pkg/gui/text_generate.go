@@ -266,7 +266,7 @@ func (s *Server) handleGenerateTextRoute(w http.ResponseWriter, r *http.Request)
 
 	var req GenerateTextRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeInvalidRequest(w, "invalid request body")
 		return
 	}
 

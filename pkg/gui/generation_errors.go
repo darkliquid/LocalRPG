@@ -1,7 +1,6 @@
 package gui
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -33,7 +32,24 @@ func generationStatus(code harness.FailureCode) int {
 func writeGenerationError(w http.ResponseWriter, failure *harness.GenerationFailure) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(generationStatus(failure.Code))
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"error": failure})
+	writeJSON(w, map[string]interface{}{"error": failure})
+}
+
+// writeInvalidRequest writes a 400 in the same shape as every other generation
+// failure, so clients parse one error type.
+func writeInvalidRequest(w http.ResponseWriter, message string) {
+	writeGenerationError(w, &harness.GenerationFailure{
+		Code:    harness.FailureInvalidRequest,
+		Message: message,
+	})
+}
+
+// writeJSONError writes a JSON error envelope with an explicit status, for
+// non-generation failures such as a world conflict.
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	writeJSON(w, map[string]interface{}{"error": map[string]string{"message": message}})
 }
 
 // writeGenerationFailure recognises a generation failure and writes it, so
