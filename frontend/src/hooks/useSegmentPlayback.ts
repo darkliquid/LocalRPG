@@ -40,6 +40,13 @@ export const useSegmentPlayback = (
       audioRef.current = audio;
       setPlaying(true);
 
+      // Preload subsequent segment audio so playback flows continuously without delays
+      const following = urls.findIndex((url, i) => i > next && !!url);
+      if (following !== -1) {
+        const prefetch = new Audio(urls[following] as string);
+        prefetch.preload = 'auto';
+      }
+
       audio
         .play()
         .then(() => setBlocked(false))

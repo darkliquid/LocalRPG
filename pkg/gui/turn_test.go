@@ -351,3 +351,27 @@ func TestTurnSessionEmitsModelMissingWhenTTSMissing(t *testing.T) {
 		t.Errorf("expected modelID = kokoro-tts, got %q", modelID)
 	}
 }
+
+func TestTurnRequest_NormalizesSlashCommands(t *testing.T) {
+	req := TurnRequest{Mode: "do", Input: "/say Hello there!"}
+	if err := req.validate(); err != nil {
+		t.Fatalf("validate failed: %v", err)
+	}
+	if req.Mode != "Say" {
+		t.Errorf("req.Mode = %q, want Say", req.Mode)
+	}
+	if req.Input != "Hello there!" {
+		t.Errorf("req.Input = %q, want 'Hello there!'", req.Input)
+	}
+
+	req2 := TurnRequest{Mode: "say", Input: "/roll 2d6+1"}
+	if err := req2.validate(); err != nil {
+		t.Fatalf("validate failed: %v", err)
+	}
+	if req2.Mode != "Roll" {
+		t.Errorf("req2.Mode = %q, want Roll", req2.Mode)
+	}
+	if req2.Input != "2d6+1" {
+		t.Errorf("req2.Input = %q, want '2d6+1'", req2.Input)
+	}
+}

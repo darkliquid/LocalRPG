@@ -414,6 +414,21 @@ var turnModes = map[string]string{
 
 // validate normalises a submitted turn and rejects one the engine cannot run.
 func (r *TurnRequest) validate() error {
+	trimmedInput := strings.TrimSpace(r.Input)
+	if strings.HasPrefix(trimmedInput, "/say ") {
+		r.Mode = "say"
+		r.Input = strings.TrimPrefix(trimmedInput, "/say ")
+	} else if strings.HasPrefix(trimmedInput, "/do ") {
+		r.Mode = "do"
+		r.Input = strings.TrimPrefix(trimmedInput, "/do ")
+	} else if strings.HasPrefix(trimmedInput, "/story ") {
+		r.Mode = "story"
+		r.Input = strings.TrimPrefix(trimmedInput, "/story ")
+	} else if strings.HasPrefix(trimmedInput, "/roll ") {
+		r.Mode = "roll"
+		r.Input = strings.TrimPrefix(trimmedInput, "/roll ")
+	}
+
 	mode, ok := turnModes[strings.ToLower(strings.TrimSpace(r.Mode))]
 	if !ok {
 		return fmt.Errorf("unknown mode %q", r.Mode)

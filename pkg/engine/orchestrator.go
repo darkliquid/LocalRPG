@@ -292,15 +292,14 @@ func (o *TurnOrchestrator) threadsCap() int {
 	return o.threadsMax
 }
 
-// SetContinuityChecks turns the deterministic continuity pass on or off. A nil value
-// is the default, which is on.
+// SetContinuityChecks turns the deterministic continuity pass on or off.
 func (o *TurnOrchestrator) SetContinuityChecks(enabled bool) {
 	o.continuityChecks = &enabled
 }
 
 // continuityEnabled reports whether the pass should run.
 func (o *TurnOrchestrator) continuityEnabled() bool {
-	return o.continuityChecks == nil || *o.continuityChecks
+	return o.continuityChecks != nil && *o.continuityChecks
 }
 
 // currentLocation resolves where this turn is happening. The player note wins
@@ -795,11 +794,9 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	// The player's own spoken line leads the turn, so it is heard in their voice
-	// before the narrator answers. It is a normal speech beat; the chronicle uses
-	// its flag to avoid printing the input a second time.
-	if beat := playerSegment(mode, actionInput, o.playerID, o.playerDisplayName()); beat != nil {
-		turn.Segments = append([]entity.TurnSegment{*beat}, turn.Segments...)
-	}
+	// before the narrator answers. If the narrator's generated text already begins
+	// with the player's line, attachPlayerSegment marks it rather than duplicating it.
+	turn.Segments = attachPlayerSegment(turn.Segments, mode, actionInput, o.playerID, o.playerDisplayName())
 
 	o.logger.Event("segment.build", map[string]interface{}{
 		"count":      len(turn.Segments),

@@ -557,9 +557,9 @@ func (c *Config) ThreadsMax() int {
 	return c.Agents.ThreadsMax
 }
 
-// ContinuityChecks runs the deterministic drift pass unless it is switched off.
+// ContinuityChecks runs the deterministic drift pass when explicitly configured on.
 func (c *Config) ContinuityChecks() bool {
-	return c.Agents.ContinuityChecks == nil || *c.Agents.ContinuityChecks
+	return c.Agents.ContinuityChecks != nil && *c.Agents.ContinuityChecks
 }
 
 // CompletionMode is the recovery policy: "auto", "continue", "trim", or "off".

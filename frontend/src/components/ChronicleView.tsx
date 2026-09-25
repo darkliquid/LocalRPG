@@ -33,9 +33,6 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   serverPlayback = false,
   onPlayTurnAudio,
   onStopAudio,
-  onCorrect,
-  addressedTurns,
-  onAddress,
   turnInFlight,
   pendingAction,
   streamedProse,
@@ -160,44 +157,6 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               <div className="text-xs font-mono text-stone-500 pt-1">
                 Context trimmed to fit the prompt budget: {turn.context_notes.join(', ')}. Raise the context budget in
                 Settings to keep more.
-              </div>
-            )}
-
-            {turn.continuity_notes && turn.continuity_notes.length > 0 && (
-              <div
-                className={`text-xs font-mono pt-1 space-y-1 ${
-                  addressedTurns?.has(turn.turn_number) ? 'text-stone-500 opacity-60' : 'text-purple-400/90'
-                }`}
-              >
-                {turn.continuity_notes.map((note, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <span>{note}</span>
-                    {addressedTurns?.has(turn.turn_number) ? (
-                      <span className="shrink-0 px-1.5 py-0.5 rounded border border-stone-700 text-stone-500 text-[10px]">
-                        Addressed
-                      </span>
-                    ) : (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => onCorrect?.(note, turn.turn_number)}
-                          className="px-1.5 py-0.5 rounded border border-purple-500/40 hover:bg-purple-600/20 cursor-pointer transition-colors"
-                          title="Review or correct this finding"
-                        >
-                          Correct
-                        </button>
-                        {onAddress && (
-                          <button
-                            onClick={() => onAddress(turn.turn_number)}
-                            className="px-1.5 py-0.5 rounded border border-stone-600 hover:bg-stone-800 text-stone-400 cursor-pointer transition-colors text-[10px]"
-                            title="Mark this finding as addressed"
-                          >
-                            Dismiss
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
               </div>
             )}
 

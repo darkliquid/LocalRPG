@@ -1299,6 +1299,14 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		go func() {
 			_ = t.service.PlayTurnAudio(context.Background(), t.gameID, turn.Number)
 		}()
+	} else if t.cfg.Media.TTS.Type != "" && t.cfg.Media.TTS.Type != "disabled" {
+		go func() {
+			for i := range turn.Segments {
+				go func(idx int) {
+					_, _ = t.service.GetSegmentAudio(context.Background(), t.gameID, turn.Number, idx)
+				}(i)
+			}
+		}()
 	}
 
 	// Memory is repaired behind the turn, on the same principle as playback: the
@@ -1642,15 +1650,25 @@ func (s *Service) PlayTurnAudio(ctx context.Context, gameID string, turnNumber i
 		return err
 	}
 
-	paths := make([]string, 0, len(turn.Segments))
+	rawPaths := make([]string, len(turn.Segments))
+	var wg sync.WaitGroup
 	for i := range turn.Segments {
-		path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, i)
-		if err != nil {
-			// A beat that cannot be synthesized is skipped so one failure does
-			// not silence the rest of the turn.
-			continue
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, idx)
+			if err == nil && path != "" {
+				rawPaths[idx] = path
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	paths := make([]string, 0, len(turn.Segments))
+	for _, p := range rawPaths {
+		if p != "" {
+			paths = append(paths, p)
 		}
-		paths = append(paths, path)
 	}
 	if len(paths) == 0 {
 		return scene.ErrAudioUnavailable

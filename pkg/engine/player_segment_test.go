@@ -32,3 +32,51 @@ func TestPlayerSegmentIgnoredForEmptyInput(t *testing.T) {
 		t.Errorf("expected no beat for empty input, got %+v", got)
 	}
 }
+
+func TestAttachPlayerSegment_DeduplicatesExistingEcho(t *testing.T) {
+	existing := []entity.TurnSegment{
+		{
+			Kind:      entity.SegmentSpeech,
+			Speaker:   "Sean",
+			SpeakerID: "sean",
+			Text:      "I draw my blade.",
+			Player:    false,
+		},
+		{
+			Kind:      entity.SegmentNarration,
+			Text:      "The shadows lengthen.",
+		},
+	}
+
+	result := attachPlayerSegment(existing, "say", "I draw my blade.", "sean", "Sean")
+	if len(result) != 2 {
+		t.Fatalf("expected 2 segments (no duplicate prepended), got %d", len(result))
+	}
+	if !result[0].Player {
+		t.Errorf("expected result[0].Player to be true")
+	}
+	if result[0].Text != "I draw my blade." {
+		t.Errorf("expected result[0].Text to be %q, got %q", "I draw my blade.", result[0].Text)
+	}
+}
+
+func TestAttachPlayerSegment_PrependsWhenNoEcho(t *testing.T) {
+	existing := []entity.TurnSegment{
+		{
+			Kind:    entity.SegmentSpeech,
+			Speaker: "Goblin",
+			Text:    "Who goes there?",
+		},
+	}
+
+	result := attachPlayerSegment(existing, "say", "I draw my blade.", "sean", "Sean")
+	if len(result) != 2 {
+		t.Fatalf("expected 2 segments (player prepended), got %d", len(result))
+	}
+	if !result[0].Player || result[0].SpeakerID != "sean" {
+		t.Errorf("expected result[0] to be player segment, got %+v", result[0])
+	}
+	if result[1].Speaker != "Goblin" {
+		t.Errorf("expected result[1] to be goblin segment, got %+v", result[1])
+	}
+}

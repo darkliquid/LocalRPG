@@ -31,8 +31,28 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() || disabled || streaming) return;
-    onSubmit(mode, text.trim());
+    const raw = text.trim();
+    if (!raw || disabled || streaming) return;
+
+    let submitMode = mode;
+    let submitText = raw;
+
+    if (raw.startsWith('/say ')) {
+      submitMode = 'say';
+      submitText = raw.slice(5).trim();
+    } else if (raw.startsWith('/do ')) {
+      submitMode = 'do';
+      submitText = raw.slice(4).trim();
+    } else if (raw.startsWith('/story ')) {
+      submitMode = 'story';
+      submitText = raw.slice(7).trim();
+    } else if (raw.startsWith('/roll ')) {
+      submitMode = 'roll';
+      submitText = raw.slice(6).trim();
+    }
+
+    if (!submitText) return;
+    onSubmit(submitMode, submitText);
     setText('');
   };
 
