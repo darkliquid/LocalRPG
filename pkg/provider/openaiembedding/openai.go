@@ -1,0 +1,164 @@
+package openaiembedding
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/darkliquid/localrpg/pkg/embeddings"
+	"github.com/darkliquid/localrpg/pkg/provider"
+)
+
+type ClientConfig struct {
+	Endpoint   string `json:"endpoint"`
+	APIKey     string `json:"api_key"`
+	Model      string `json:"model"`
+	Dimensions int    `json:"dimensions"`
+}
+
+type Client struct {
+	endpoint   string
+	apiKey     string
+	model      string
+	dimensions int
+	httpClient *http.Client
+}
+
+func init() {
+	provider.Register(provider.Registration{
+		Descriptor: provider.Descriptor{
+			ID:          "openai-embedding",
+			Family:      provider.FamilyEmbedding,
+			Label:       "OpenAI / Ollama Embedding API",
+			Description: "Vector embeddings via standard OpenAI-compatible /v1/embeddings endpoint",
+			Source:      "http",
+		},
+		Build: func(ctx context.Context, raw []byte) (interface{}, error) {
+			var cfg ClientConfig
+			if len(raw) > 0 {
+				if err := json.Unmarshal(raw, &cfg); err != nil {
+					return nil, err
+				}
+			}
+			return NewClient(cfg), nil
+		},
+	})
+}
+
+func NewClient(cfg ClientConfig) *Client {
+	endpoint := strings.TrimRight(cfg.Endpoint, "/")
+	if endpoint == "" {
+		endpoint = "https://api.openai.com/v1"
+	}
+	model := cfg.Model
+	if model == "" {
+		model = "text-embedding-3-small"
+	}
+	dims := cfg.Dimensions
+	if dims <= 0 {
+		if strings.Contains(model, "large") {
+			dims = 3072
+		} else {
+			dims = 1536
+		}
+	}
+	return &Client{
+		endpoint:   endpoint,
+		apiKey:     cfg.APIKey,
+		model:      model,
+		dimensions: dims,
+		httpClient: &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+func (c *Client) ID() string {
+	return "openai-embedding"
+}
+
+func (c *Client) Dimensions() int {
+	return c.dimensions
+}
+
+type embeddingRequest struct {
+	Model string   `json:"model"`
+	Input []string `json:"input"`
+}
+
+type embeddingData struct {
+	Index     int       `json:"index"`
+	Embedding []float32 `json:"embedding"`
+}
+
+type embeddingResponse struct {
+	Data  []embeddingData `json:"data"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
+}
+
+func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	if len(texts) == 0 {
+		return nil, nil
+	}
+
+	url := c.endpoint
+	if !strings.HasSuffix(url, "/embeddings") {
+		url += "/embeddings"
+	}
+
+	reqBody := embeddingRequest{
+		Model: c.model,
+		Input: texts,
+	}
+	raw, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal embedding request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(raw))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("embedding request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("embedding API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var parsed embeddingResponse
+	if err := json.Unmarshal(bodyBytes, &parsed); err != nil {
+		return nil, fmt.Errorf("unmarshal embedding response: %w", err)
+	}
+	if parsed.Error != nil && parsed.Error.Message != "" {
+		return nil, fmt.Errorf("embedding API error: %s", parsed.Error.Message)
+	}
+
+	result := make([][]float32, len(texts))
+	for _, item := range parsed.Data {
+		if item.Index >= 0 && item.Index < len(result) {
+			result[item.Index] = item.Embedding
+		}
+	}
+	return result, nil
+}
+
+var _ embeddings.Provider = (*Client)(nil)

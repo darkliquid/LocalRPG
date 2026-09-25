@@ -5,11 +5,13 @@ package all
 import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/clillm"
 	_ "github.com/darkliquid/localrpg/pkg/provider/geminillm"
+	_ "github.com/darkliquid/localrpg/pkg/provider/geminiembedding"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imagecli"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imagegemini"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imagehttp"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imageprocedural"
 	_ "github.com/darkliquid/localrpg/pkg/provider/openaichat"
+	_ "github.com/darkliquid/localrpg/pkg/provider/openaiembedding"
 	_ "github.com/darkliquid/localrpg/pkg/provider/oracle"
 	_ "github.com/darkliquid/localrpg/pkg/provider/sttwebspeech"
 	_ "github.com/darkliquid/localrpg/pkg/provider/sttwhispercli"

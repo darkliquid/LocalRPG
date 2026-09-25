@@ -4,10 +4,11 @@ package provider
 type Family string
 
 const (
-	FamilyLLM   Family = "llm"
-	FamilyTTS   Family = "tts"
-	FamilySTT   Family = "stt"
-	FamilyImage Family = "image"
+	FamilyLLM       Family = "llm"
+	FamilyTTS       Family = "tts"
+	FamilySTT       Family = "stt"
+	FamilyImage     Family = "image"
+	FamilyEmbedding Family = "embedding"
 )
 
 // Feature is one capability a provider may advertise. Features are declared by
