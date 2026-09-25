@@ -189,3 +189,47 @@ func TestVoiceOptionsRoundTripThroughFrontmatter(t *testing.T) {
 		t.Errorf("options = %v", parsed.Voice.Options)
 	}
 }
+
+func TestEntityFrontmatterGenderAgeAndPortrait(t *testing.T) {
+	raw := `---
+id: elena-vance
+name: Elena Vance
+type: character
+gender: female
+age: "32"
+appearance: A tall pilot with silver hair.
+portrait: assets/portraits/elena-vance.png
+---
+Experienced navigator of the Maw.`
+
+	ent, err := ParseMarkdownEntity([]byte(raw))
+	if err != nil {
+		t.Fatalf("ParseMarkdownEntity failed: %v", err)
+	}
+
+	if ent.Gender != "female" {
+		t.Errorf("Gender = %q, want female", ent.Gender)
+	}
+	if ent.Age != "32" {
+		t.Errorf("Age = %q, want 32", ent.Age)
+	}
+	if ent.Portrait != "assets/portraits/elena-vance.png" {
+		t.Errorf("Portrait = %q, want assets/portraits/elena-vance.png", ent.Portrait)
+	}
+	if ent.Appearance != "A tall pilot with silver hair." {
+		t.Errorf("Appearance = %q, want expected appearance", ent.Appearance)
+	}
+
+	// Verify serialization round-trips
+	data, err := ent.SerializeMarkdown()
+	if err != nil {
+		t.Fatalf("SerializeMarkdown failed: %v", err)
+	}
+	reparsed, err := ParseMarkdownEntity(data)
+	if err != nil {
+		t.Fatalf("ParseMarkdownEntity roundtrip failed: %v", err)
+	}
+	if reparsed.Gender != "female" || reparsed.Age != "32" || reparsed.Portrait != "assets/portraits/elena-vance.png" {
+		t.Errorf("Roundtrip mismatch: %+v", reparsed)
+	}
+}
