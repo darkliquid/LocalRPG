@@ -372,3 +372,42 @@ func TestTTSPipelineNamesTheProviderInTheTrace(t *testing.T) {
 		t.Errorf("model = %v", event.Fields["model"])
 	}
 }
+
+func TestSynthesizeUtteranceForceBypassesCache(t *testing.T) {
+	client := &recordingTTSClient{}
+	cache := NewContentCache(t.TempDir())
+	pipeline := NewTTSPipeline(client, cache)
+
+	first, err := pipeline.SynthesizeUtterance(context.Background(), "speaker-1", nil, "Hello world")
+	if err != nil {
+		t.Fatalf("first synthesize: %v", err)
+	}
+	if client.calls != 1 {
+		t.Fatalf("expected 1 call, got %d", client.calls)
+	}
+
+	// Normal call without force hits cache
+	second, err := pipeline.SynthesizeUtterance(context.Background(), "speaker-1", nil, "Hello world")
+	if err != nil {
+		t.Fatalf("second synthesize: %v", err)
+	}
+	if client.calls != 1 {
+		t.Fatalf("expected cached hit, but client was called %d times", client.calls)
+	}
+	if first != second {
+		t.Errorf("expected same path for cached hit, got %s and %s", first, second)
+	}
+
+	// Forced call bypasses cache and increments calls
+	third, err := pipeline.SynthesizeUtteranceForce(context.Background(), "speaker-1", nil, "Hello world", true)
+	if err != nil {
+		t.Fatalf("forced synthesize: %v", err)
+	}
+	if client.calls != 2 {
+		t.Fatalf("expected 2 calls after force, got %d", client.calls)
+	}
+	if third == "" {
+		t.Fatal("expected non-empty third path")
+	}
+}
+

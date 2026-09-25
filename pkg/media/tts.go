@@ -196,6 +196,11 @@ func (p *TTSPipeline) prepareSegment(segment entity.TurnSegment, narratorVoice *
 // the narrator voice, resolved speech in the speaker's own. Legacy records carry a
 // speaker name but no entity ID, so the name is tried as a voice key too.
 func (p *TTSPipeline) SynthesizeSegment(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (string, error) {
+	return p.SynthesizeSegmentForce(ctx, segment, narratorVoice, voiceFor, false)
+}
+
+// SynthesizeSegmentForce renders one segment with optional force cache bypass.
+func (p *TTSPipeline) SynthesizeSegmentForce(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig, force bool) (string, error) {
 	speakerID, voice, spoken := p.prepareSegment(segment, narratorVoice, voiceFor)
 	if strings.TrimSpace(spoken) == "" {
 		return "", ErrNoSpeakableText
@@ -207,7 +212,7 @@ func (p *TTSPipeline) SynthesizeSegment(ctx context.Context, segment entity.Turn
 			"chars_spoken": len([]rune(spoken)),
 		})
 	}
-	return p.SynthesizeUtterance(ctx, speakerID, voice, spoken)
+	return p.SynthesizeUtteranceForce(ctx, speakerID, voice, spoken, force)
 }
 
 // CountUncached reports how many speakable segments already have a clip and how
@@ -236,6 +241,10 @@ func NewTTSPipeline(client TTSClient, cache *ContentCache) *TTSPipeline {
 }
 
 func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string, voice *entity.VoiceConfig, text string) (string, error) {
+	return p.SynthesizeUtteranceForce(ctx, speakerID, voice, text, false)
+}
+
+func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID string, voice *entity.VoiceConfig, text string, force bool) (string, error) {
 	base := ComputeAudioCacheKeyForVoice(speakerID, voice, text)
 	start := time.Now()
 
@@ -260,15 +269,17 @@ func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string,
 		"cache_key": base,
 	})
 
-	if path, ok := p.cachedClip(base); ok {
-		mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "hit")))
-		mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
-			otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", true)))
-		p.logger.Event("media.tts.result", map[string]interface{}{
-			"cache_hit":   true,
-			"duration_ms": time.Since(start).Milliseconds(),
-		})
-		return path, nil
+	if !force {
+		if path, ok := p.cachedClip(base); ok {
+			mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "hit")))
+			mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
+				otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", true)))
+			p.logger.Event("media.tts.result", map[string]interface{}{
+				"cache_hit":   true,
+				"duration_ms": time.Since(start).Milliseconds(),
+			})
+			return path, nil
+		}
 	}
 
 	audioBytes, err := p.client.Synthesize(ctx, text, voice)
