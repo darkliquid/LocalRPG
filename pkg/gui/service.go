@@ -2682,19 +2682,51 @@ type GenerateAssetPreviewRequestDTO struct {
 	Genre       string `json:"genre,omitempty"`
 }
 
+// guardImageBytes rejects a provider that returned success with no image data,
+// so a zero-byte file is never written or served as .webp/octet-stream.
+func guardImageBytes(imgBytes []byte) ([]byte, *harness.GenerationFailure) {
+	if len(imgBytes) == 0 {
+		return nil, &harness.GenerationFailure{
+			Code:    harness.FailureProviderError,
+			Message: "image provider returned no data",
+		}
+	}
+	return imgBytes, nil
+}
+
 // GenerateAssetPreview renders banner or icon image bytes in memory and returns
 // them with a MIME type detected from the bytes.
 func (s *Service) GenerateAssetPreview(ctx context.Context, req GenerateAssetPreviewRequestDTO) ([]byte, string, error) {
+	started := time.Now()
+	ctx, span := s.startGenerationSpan(ctx, "generate.image", "image", req.Kind)
+	defer span.End()
+
 	cfg := s.configMgr.Get()
 	client, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
 	if err != nil {
-		return nil, "", fmt.Errorf("image provider: %w", err)
+		failure := &harness.GenerationFailure{
+			Code:    harness.FailureProviderUnavailable,
+			Message: fmt.Sprintf("image provider: %v", err),
+		}
+		s.recordGeneration(ctx, span, "image", started, failure)
+		return nil, "", failure
 	}
 	prompt := buildAssetPrompt(req.Kind, req.Name, req.Description, req.ArtStyle, req.Genre)
 	imgBytes, err := client.GenerateImage(ctx, prompt)
 	if err != nil {
-		return nil, "", fmt.Errorf("generate image: %w", err)
+		failure := &harness.GenerationFailure{
+			Code:    harness.ClassifyProviderError(err),
+			Message: fmt.Sprintf("generate image: %v", err),
+		}
+		s.recordGeneration(ctx, span, "image", started, failure)
+		return nil, "", failure
 	}
+	checked, failure := guardImageBytes(imgBytes)
+	if failure != nil {
+		s.recordGeneration(ctx, span, "image", started, failure)
+		return nil, "", failure
+	}
+	imgBytes = checked
 
 	ext := media.ArtExtension(imgBytes)
 	contentType := "application/octet-stream"
@@ -2709,14 +2741,21 @@ func (s *Service) GenerateAssetPreview(ctx context.Context, req GenerateAssetPre
 		contentType = "image/webp"
 	}
 
+	s.recordGeneration(ctx, span, "image", started, nil)
 	return imgBytes, contentType, nil
 }
 
 func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req GenerateAssetRequestDTO) (string, error) {
+	started := time.Now()
+	ctx, span := s.startGenerationSpan(ctx, "generate.image", "image", req.Kind)
+	defer span.End()
+
 	cfg := s.configMgr.Get()
 	client, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
 	if err != nil {
-		return "", fmt.Errorf("image provider: %w", err)
+		failure := &harness.GenerationFailure{Code: harness.FailureProviderUnavailable, Message: fmt.Sprintf("image provider: %v", err)}
+		s.recordGeneration(ctx, span, "image", started, failure)
+		return "", failure
 	}
 	prompt := req.Prompt
 	if prompt == "" {
@@ -2739,17 +2778,32 @@ func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req Gene
 	}
 	imgBytes, err := client.GenerateImage(ctx, prompt)
 	if err != nil {
-		return "", fmt.Errorf("generate image: %w", err)
+		failure := &harness.GenerationFailure{Code: harness.ClassifyProviderError(err), Message: fmt.Sprintf("generate image: %v", err)}
+		s.recordGeneration(ctx, span, "image", started, failure)
+		return "", failure
 	}
+	checked, failure := guardImageBytes(imgBytes)
+	if failure != nil {
+		s.recordGeneration(ctx, span, "image", started, failure)
+		return "", failure
+	}
+	imgBytes = checked
 	ext := media.ArtExtension(imgBytes)
+	s.recordGeneration(ctx, span, "image", started, nil)
 	return s.SaveGameAsset(gameID, req.Kind, imgBytes, ext)
 }
 
 func (s *Service) GenerateWorldAsset(ctx context.Context, worldID string, req GenerateAssetRequestDTO) (string, error) {
+	started := time.Now()
+	ctx, span := s.startGenerationSpan(ctx, "generate.image", "image", req.Kind)
+	defer span.End()
+
 	cfg := s.configMgr.Get()
 	client, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
 	if err != nil {
-		return "", fmt.Errorf("image provider: %w", err)
+		failure := &harness.GenerationFailure{Code: harness.FailureProviderUnavailable, Message: fmt.Sprintf("image provider: %v", err)}
+		s.recordGeneration(ctx, span, "image", started, failure)
+		return "", failure
 	}
 	prompt := req.Prompt
 	if prompt == "" {
@@ -2771,9 +2825,18 @@ func (s *Service) GenerateWorldAsset(ctx context.Context, worldID string, req Ge
 	}
 	imgBytes, err := client.GenerateImage(ctx, prompt)
 	if err != nil {
-		return "", fmt.Errorf("generate image: %w", err)
+		failure := &harness.GenerationFailure{Code: harness.ClassifyProviderError(err), Message: fmt.Sprintf("generate image: %v", err)}
+		s.recordGeneration(ctx, span, "image", started, failure)
+		return "", failure
 	}
+	checked, failure := guardImageBytes(imgBytes)
+	if failure != nil {
+		s.recordGeneration(ctx, span, "image", started, failure)
+		return "", failure
+	}
+	imgBytes = checked
 	ext := media.ArtExtension(imgBytes)
+	s.recordGeneration(ctx, span, "image", started, nil)
 	return s.SaveWorldAsset(worldID, req.Kind, imgBytes, ext)
 }
 
