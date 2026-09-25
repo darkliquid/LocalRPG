@@ -130,3 +130,14 @@ localrpg export video <game-id> [--out FILE] [--still] [--fps N] [--size WxH] [-
 **Video.** Draws every frame in Go with the bundled Go fonts, so no browser or external rasteriser is involved. Frames are muxed against each beat's own clip, with silence generated for beats that have none, so picture and sound stay in step. The result is staged and renamed into place: a failed render leaves no file behind. `--still` renders one frame per beat instead of animating, which is the fast path on a weak machine.
 
 **Requirements.** `ffmpeg` is required for video export, and `ffprobe` is used to measure clip lengths so pacing follows the audio; without `ffprobe` a beat falls back to the reading-time estimate. Both are checked at the point of use, and video export fails with a clear message rather than producing a half-written file.
+
+---
+
+## Debugging & Diagnostics
+
+LocalRPG includes an embedded debugging suite for diagnosing turn failures and inspecting prompts:
+
+- **Interactive Debug Server**: Run `localrpg debug server --port 8080 --debugger-port 8089` to play in your browser with real-time prompt, span waterfall, and raw LLM completion inspection.
+- **Automated Test Runner**: Run `localrpg debug test-run --scenario scenarios/smoke-test.yaml` to execute declarative browser scenarios headlessly and generate standalone HTML reports.
+
+See [docs/debugging.md](docs/debugging.md) for full instructions and scenario syntax.

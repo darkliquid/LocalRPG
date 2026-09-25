@@ -22,7 +22,7 @@ mise run clean
 
 Run a single Go test: `go test -run TestTurnOrchestrator ./pkg/engine/`.
 
-CLI surface (`localrpg <cmd>`): `roll <notation>`, `prompt`, `play <game-id>`, `tts`, `image`, `gui`, `export <web|video>`, `version`.
+CLI surface (`localrpg <cmd>`): `roll <notation>`, `prompt`, `play <game-id>`, `tts`, `image`, `gui`, `export <web|video>`, `debug <test-run|server>`, `version`.
 
 ## Build gotcha: the frontend is embedded in the Go binary
 
