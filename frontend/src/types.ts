@@ -27,6 +27,7 @@ export interface TurnSegment {
   speaker_id?: string;
   text: string;
   audio_url?: string;
+  portrait_url?: string;
   // Version token for the clip, which changes when the speaker's voice changes.
   audio_key?: string;
   // True for the protagonist's own line, which renders as speech but suppresses

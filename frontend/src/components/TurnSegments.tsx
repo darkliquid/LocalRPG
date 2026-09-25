@@ -50,26 +50,44 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
               segment.player ? 'border-sky-400/90' : 'border-purple-500/90'
             }`}
           >
-            {hasAudio ? (
-              <button
-                onClick={() => (serverPlayback ? startServerPlayback(i) : playFrom(i))}
-                className={`text-xs font-sans font-bold tracking-widest hover:opacity-80 cursor-pointer ${
-                  segment.player ? 'text-sky-300' : 'text-purple-400'
-                }`}
-              >
-                {segment.speaker || 'UNKNOWN'}
-                {segment.player && <span className="ml-2 text-stone-400 normal-case">(you)</span>}
-              </button>
-            ) : (
-              <div
-                className={`text-xs font-sans font-bold tracking-widest ${
-                  segment.player ? 'text-sky-300' : 'text-purple-400'
-                }`}
-              >
-                {segment.speaker || 'UNKNOWN'}
-                {segment.player && <span className="ml-2 text-stone-400 normal-case">(you)</span>}
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              {segment.portrait_url && (
+                <div
+                  onClick={() => segment.speaker_id && onEntityClick?.(segment.speaker_id)}
+                  className={`w-9 h-9 rounded-full overflow-hidden shrink-0 border-2 shadow-md cursor-pointer transition-transform hover:scale-105 ${
+                    segment.player ? 'border-sky-400/80' : 'border-purple-400/80'
+                  }`}
+                  title={segment.speaker || 'Character'}
+                >
+                  <img
+                    src={segment.portrait_url}
+                    alt={segment.speaker || 'Speaker portrait'}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+              {hasAudio ? (
+                <button
+                  onClick={() => (serverPlayback ? startServerPlayback(i) : playFrom(i))}
+                  className={`text-xs font-sans font-bold tracking-widest hover:opacity-80 cursor-pointer ${
+                    segment.player ? 'text-sky-300' : 'text-purple-400'
+                  }`}
+                >
+                  {segment.speaker || 'UNKNOWN'}
+                  {segment.player && <span className="ml-2 text-stone-400 normal-case">(you)</span>}
+                </button>
+              ) : (
+                <div
+                  className={`text-xs font-sans font-bold tracking-widest ${
+                    segment.player ? 'text-sky-300' : 'text-purple-400'
+                  }`}
+                >
+                  {segment.speaker || 'UNKNOWN'}
+                  {segment.player && <span className="ml-2 text-stone-400 normal-case">(you)</span>}
+                </div>
+              )}
+            </div>
             <MarkdownProse
               text={`\u201c${segment.text}\u201d`}
               onEntityClick={onEntityClick}
