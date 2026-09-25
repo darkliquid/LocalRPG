@@ -3,6 +3,7 @@ import { GameSummary, VoiceProfile } from '../../types';
 import { APIClient } from '../../api/client';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
 import { X, Upload, Sparkles, AlertTriangle, Volume2, MapPin, Check, Save } from 'lucide-react';
+import { AIGenerateButton } from '../ui/AIGenerateButton';
 
 interface CampaignSettingsModalProps {
   isOpen: boolean;
@@ -82,6 +83,12 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
       setIsSavingSettings(false);
     }
   };
+
+  const getCampaignContext = (): Record<string, string> => ({
+    campaign_name: game?.name || '',
+    start_location: startLocation,
+    opening_prompt: openingPrompt,
+  });
 
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -206,10 +213,20 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
 
             {/* Start Location */}
             <div className="space-y-1">
-              <label className="text-[11px] font-sans text-stone-300 flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-stone-400" />
-                <span>Start Location Directive</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-sans text-stone-300 flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-stone-400" />
+                  <span>Start Location Directive</span>
+                </label>
+                <AIGenerateButton
+                  formType="campaign"
+                  fieldName="start_location"
+                  getContext={getCampaignContext}
+                  onGenerated={(val) => setStartLocation(val)}
+                  worldID={game?.world_id}
+                  systemID={game?.system_id}
+                />
+              </div>
               <input
                 type="text"
                 value={startLocation}
@@ -221,9 +238,20 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
 
             {/* Opening Scene Prompt */}
             <div className="space-y-1">
-              <label className="text-[11px] font-sans text-stone-300">
-                Opening Scene Directive
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-sans text-stone-300">
+                  Opening Scene Directive
+                </label>
+                <AIGenerateButton
+                  formType="campaign"
+                  fieldName="opening_prompt"
+                  getContext={getCampaignContext}
+                  onGenerated={(val) => setOpeningPrompt(val)}
+                  worldID={game?.world_id}
+                  systemID={game?.system_id}
+                  seed={openingPrompt}
+                />
+              </div>
               <textarea
                 rows={2}
                 value={openingPrompt}
