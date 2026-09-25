@@ -1,9 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { EntityMemory, EntityNote, EntitySummary, TTSConfig, VoiceProfile } from '../types';
 import { APIClient } from '../api/client';
-import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X } from 'lucide-react';
+import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X, Loader2 } from 'lucide-react';
 import { TurnHistoryList } from './TurnHistoryList';
-import { VoiceCatalogPicker } from './VoiceCatalogPicker';
 
 interface CodexDrawerProps {
   gameID?: string;
@@ -30,8 +29,6 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   entities,
   voiceProfiles,
   ttsConfig,
-  activeProvider,
-  onAddProfile,
   onSelect,
   onSave,
   onMerge,
@@ -44,6 +41,8 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const [mergeTarget, setMergeTarget] = useState('');
   const [saveError, setSaveError] = useState('');
   const [memories, setMemories] = useState<EntityMemory[]>([]);
+  const [previewProfileId, setPreviewProfileId] = useState('');
+  const [isPreviewing, setIsPreviewing] = useState(false);
 
   const profiles = voiceProfiles ?? [];
 
@@ -129,6 +128,27 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
     }
 
     setMarkdown(`---\n${voiceSnippet}\n---\n\n${markdown}`);
+  };
+
+  const handlePreviewVoice = () => {
+    const profile = profiles.find((p) => p.id === previewProfileId);
+    if (!profile || !ttsConfig || isPreviewing) return;
+    setIsPreviewing(true);
+    const greetingText = `Greetings. I am ${entity?.name ?? 'ready for the journey'}.`;
+    APIClient.testProvider({
+      category: 'tts',
+      provider: { ...ttsConfig, default_voice: profile.voice_id, pitch: profile.pitch, speech_rate: profile.speech_rate },
+      test_prompt: greetingText,
+      voice_id: profile.voice_id,
+    })
+      .then((result) => {
+        if (result.audio_data_uri) {
+          const audio = new Audio(result.audio_data_uri);
+          audio.play().catch(console.error);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setIsPreviewing(false));
   };
 
   const handleSave = async () => {
@@ -270,6 +290,16 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                     <span>Browse Notes</span>
                   </button>
                 )}
+                {entity.type === 'character' && gameID && (
+                  <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border-2 border-purple-500/30 shadow-lg bg-black/40">
+                    <img
+                      src={`/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(entity.id)}/portrait`}
+                      alt={entity.name}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
                 <div className="min-w-0">
                   <h2 className="text-xl font-sans text-purple-400 font-bold truncate">{entity.name}</h2>
                   <span className="text-xs font-mono uppercase text-stone-400">{entity.type}</span>
@@ -307,36 +337,50 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <div className="flex flex-wrap items-center gap-2 px-1">
               <label className="flex items-center gap-1.5 text-xs text-stone-400 font-sans shrink-0">
                 <Volume2 className="w-3.5 h-3.5 text-purple-400" />
                 <span>Apply Voice Archetype:</span>
               </label>
               <select
+                value={previewProfileId}
                 onChange={(e) => {
+                  setPreviewProfileId(e.target.value);
                   if (e.target.value) {
                     applyVoiceArchetype(e.target.value);
-                    e.target.value = '';
                   }
                 }}
                 disabled={profiles.length === 0}
-                className="bg-stone-900 border border-purple-500/30 rounded-lg pl-2.5 pr-8 py-1 text-xs font-mono text-purple-300 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                defaultValue=""
+                className="max-w-[280px] truncate bg-stone-900 border border-purple-500/30 rounded-lg pl-2.5 pr-8 py-1 text-xs font-mono text-purple-300 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="" disabled>
-                  {profiles.length === 0 ? 'Configure voices in Settings' : 'Select Archetype...'}
+                <option value="">
+                  {profiles.length === 0 ? 'Configure voices in Settings' : 'Select Archetype…'}
                 </option>
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.voice_id}){p.provider && p.provider !== activeProvider ? ` - belongs to ${p.provider}` : ''}
-                  </option>
-                ))}
+                {profiles.map((p) => {
+                  const tags = (p.tags ?? []).join(', ');
+                  const suffix = tags ? ` [${tags}]` : '';
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.voice_id}){suffix}
+                    </option>
+                  );
+                })}
               </select>
+              {ttsConfig && previewProfileId && (
+                <button
+                  onClick={handlePreviewVoice}
+                  disabled={isPreviewing}
+                  title="Preview this voice with a greeting"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-stone-900/80 border border-purple-500/30 text-purple-300 hover:text-purple-100 hover:border-purple-400 text-xs cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isPreviewing
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Volume2 className="w-3.5 h-3.5" />
+                  }
+                  <span>{isPreviewing ? 'Playing…' : 'Preview'}</span>
+                </button>
+              )}
             </div>
-
-            {ttsConfig && onAddProfile && (
-              <VoiceCatalogPicker ttsConfig={ttsConfig} onAddProfile={onAddProfile} />
-            )}
 
             <textarea
               value={markdown}
