@@ -69,5 +69,6 @@ func printUsage() {
 	fmt.Println("  image <prompt>     Generate scene or character image")
 	fmt.Println("  gui                Launch desktop application (Wails v3)")
 	fmt.Println("  export <format>    Export story replay (web, video)")
+	fmt.Println("  debug <cmd>        Run automated scenario tests or debug server")
 	fmt.Println("  version            Print version information")
 }

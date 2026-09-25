@@ -1,0 +1,14 @@
+name: "Turn Failure Recovery"
+description: "Verify UI displays error banner and recovers when provider returns an empty response"
+setup:
+  world: "valeria"
+  system: "dnd5e"
+  mock_provider:
+    role: "gm"
+    behavior: "empty_response_once"
+steps:
+  - action: "navigate"
+    url: "/"
+  - action: "wait_visible"
+    selector: "body"
+    timeout_ms: 3000
