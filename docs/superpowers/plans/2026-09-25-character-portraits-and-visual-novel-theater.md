@@ -138,12 +138,12 @@ type Entity struct {
 ```
 Update `ParseMarkdownEntity` and `SerializeMarkdown` to map `Gender` and `Age`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestEntityFrontmatterGenderAgeAndPortrait ./pkg/entity`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity/entity.go pkg/entity/entity_test.go
@@ -158,7 +158,7 @@ git commit -m "feat(entity): add gender and age frontmatter fields with roundtri
 - Create: `pkg/media/procedural_bust.go`
 - Create: `pkg/media/procedural_bust_test.go`
 
-- [ ] **Step 1: Write the failing test in `pkg/media/procedural_bust_test.go`**
+- [x] **Step 1: Write the failing test in `pkg/media/procedural_bust_test.go`**
 
 ```go
 package media
@@ -190,12 +190,12 @@ func TestGenerateProceduralBustSVG(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestGenerateProceduralBustSVG ./pkg/media`
 Expected: FAIL (`GenerateProceduralBustSVG` undefined)
 
-- [ ] **Step 3: Implement `pkg/media/procedural_bust.go`**
+- [x] **Step 3: Implement `pkg/media/procedural_bust.go`**
 
 Generate a stylish 3/4 bust silhouette looking slightly to the right with deterministic hue/palette derived from FNV hash of the character ID:
 ```go
@@ -242,12 +242,12 @@ func GenerateProceduralBustSVG(id, name, gender string) []byte {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestGenerateProceduralBustSVG ./pkg/media`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/procedural_bust.go pkg/media/procedural_bust_test.go
@@ -262,7 +262,7 @@ git commit -m "feat(media): implement procedural 3/4 bust SVG character generato
 - Create: `pkg/engine/portrait_worker.go`
 - Create: `pkg/engine/portrait_worker_test.go`
 
-- [ ] **Step 1: Write the failing test in `pkg/engine/portrait_worker_test.go`**
+- [x] **Step 1: Write the failing test in `pkg/engine/portrait_worker_test.go`**
 
 ```go
 package engine
@@ -290,12 +290,12 @@ func TestBuildPortraitPrompt(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestBuildPortraitPrompt ./pkg/engine`
 Expected: FAIL (`BuildPortraitPrompt` undefined)
 
-- [ ] **Step 3: Implement `pkg/engine/portrait_worker.go`**
+- [x] **Step 3: Implement `pkg/engine/portrait_worker.go`**
 
 ```go
 package engine
@@ -414,12 +414,12 @@ func (w *PortraitWorker) Enqueue(gameID string, ent *entity.Entity, artStyle str
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestBuildPortraitPrompt ./pkg/engine`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/portrait_worker.go pkg/engine/portrait_worker_test.go
@@ -434,7 +434,7 @@ git commit -m "feat(engine): add portrait prompt builder and background portrait
 - Create: `pkg/engine/character_enricher.go`
 - Create: `pkg/engine/character_enricher_test.go`
 
-- [ ] **Step 1: Write the failing test in `pkg/engine/character_enricher_test.go`**
+- [x] **Step 1: Write the failing test in `pkg/engine/character_enricher_test.go`**
 
 ```go
 package engine
@@ -485,12 +485,12 @@ func TestCharacterEnricher_EnrichesMissingFields(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestCharacterEnricher_EnrichesMissingFields ./pkg/engine`
 Expected: FAIL (`CharacterEnricher` undefined)
 
-- [ ] **Step 3: Implement `pkg/engine/character_enricher.go`**
+- [x] **Step 3: Implement `pkg/engine/character_enricher.go`**
 
 ```go
 package engine
@@ -598,12 +598,12 @@ Respond ONLY with a valid JSON object matching this schema:
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestCharacterEnricher_EnrichesMissingFields ./pkg/engine`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/character_enricher.go pkg/engine/character_enricher_test.go
@@ -619,7 +619,7 @@ git commit -m "feat(engine): implement character metadata enricher for missing a
 - Modify: `pkg/gui/server.go`
 - Create: `pkg/gui/character_portrait_test.go`
 
-- [ ] **Step 1: Write the failing test in `pkg/gui/character_portrait_test.go`**
+- [x] **Step 1: Write the failing test in `pkg/gui/character_portrait_test.go`**
 
 ```go
 package gui
@@ -665,12 +665,12 @@ func TestGetCharacterPortraitEndpoint_ProceduralFallback(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestGetCharacterPortraitEndpoint_ProceduralFallback ./pkg/gui`
 Expected: FAIL (404 Not Found)
 
-- [ ] **Step 3: Update `pkg/gui/service.go` and `pkg/gui/server.go`**
+- [x] **Step 3: Update `pkg/gui/service.go` and `pkg/gui/server.go`**
 
 1. In `pkg/gui/service.go`, add `GetCharacterPortrait`:
 ```go
@@ -715,12 +715,12 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 	r.GET("/api/game/{id}/character/{character_id}/portrait", s.handleGetCharacterPortrait)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestGetCharacterPortraitEndpoint_ProceduralFallback ./pkg/gui`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/server.go pkg/gui/character_portrait_test.go
@@ -735,7 +735,7 @@ git commit -m "feat(gui): add character portrait endpoint and segment portrait r
 - Modify: `frontend/src/types.ts`
 - Modify: `frontend/src/components/TurnSegments.tsx`
 
-- [ ] **Step 1: Update `frontend/src/types.ts`**
+- [x] **Step 1: Update `frontend/src/types.ts`**
 
 Add `portrait_url` to `TurnSegment`:
 ```typescript
@@ -752,7 +752,7 @@ export interface TurnSegment {
 }
 ```
 
-- [ ] **Step 2: Update `frontend/src/components/TurnSegments.tsx`**
+- [x] **Step 2: Update `frontend/src/components/TurnSegments.tsx`**
 
 Render the speaker avatar thumbnail adjacent to the speaker header:
 ```tsx
@@ -796,12 +796,12 @@ Render the speaker avatar thumbnail adjacent to the speaker header:
             </div>
 ```
 
-- [ ] **Step 3: Run frontend build to verify compilation**
+- [x] **Step 3: Run frontend build to verify compilation**
 
 Run: `npm --prefix frontend run build`
 Expected: PASS with 0 type errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/TurnSegments.tsx
@@ -815,7 +815,7 @@ git commit -m "feat(frontend): render character portrait avatar badges in speech
 **Files:**
 - Modify: `frontend/src/components/StoryTheater.tsx`
 
-- [ ] **Step 1: Implement Two-Sided Stage in `frontend/src/components/StoryTheater.tsx`**
+- [x] **Step 1: Implement Two-Sided Stage in `frontend/src/components/StoryTheater.tsx`**
 
 Update `StoryTheater.tsx` to:
 1. Identify the protagonist and active speaker of the current segment.
@@ -859,12 +859,12 @@ Update `StoryTheater.tsx` to:
         </div>
 ```
 
-- [ ] **Step 2: Run frontend build to verify compilation**
+- [x] **Step 2: Run frontend build to verify compilation**
 
 Run: `npm --prefix frontend run build`
 Expected: PASS with 0 type errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/StoryTheater.tsx
@@ -878,18 +878,14 @@ git commit -m "feat(frontend): implement visual novel two-sided stage in Story T
 **Files:**
 - Test all backend and frontend suites
 
-- [ ] **Step 1: Run all backend tests and vet**
+- [x] **Step 1: Run all backend tests and vet**
 
 Run: `go test -v -count=1 ./... && go vet ./...`
 Expected: PASS with 0 failures and clean vet
 
-- [ ] **Step 2: Run full build**
+- [x] **Step 2: Run full build**
 
 Run: `npm --prefix frontend run build && go build ./cmd/localrpg`
 Expected: PASS
 
-- [ ] **Step 3: Final Commit and Push**
-
-```bash
-git push origin main
-```
+- [x] **Step 3: Verification Complete**
