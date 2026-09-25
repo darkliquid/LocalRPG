@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TurnSegment } from '../types';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { MarkdownProse } from './MarkdownProse';
+import { ImageLightbox } from './ImageLightbox';
 import { Play, Square, RotateCw, Loader2 } from 'lucide-react';
 
 export type TurnAudioState = 'idle' | 'generating' | 'playing' | 'error';
@@ -51,6 +52,8 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   const isPlaying = turnAudioState === 'playing';
   const isError = turnAudioState === 'error';
 
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
+
   return (
     <div className="space-y-3">
       {ordered.map((segment, i) =>
@@ -64,11 +67,11 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             <div className="flex items-center gap-3">
               {segment.portrait_url && (
                 <div
-                  onClick={() => segment.speaker_id && onEntityClick?.(segment.speaker_id)}
-                  className={`w-9 h-9 rounded-full overflow-hidden shrink-0 border-2 shadow-md cursor-pointer transition-transform hover:scale-105 ${
+                  onClick={() => setLightbox({ src: segment.portrait_url!, alt: segment.speaker || 'Portrait' })}
+                  className={`w-9 h-9 rounded-full overflow-hidden shrink-0 border-2 shadow-md cursor-zoom-in transition-transform hover:scale-105 ${
                     segment.player ? 'border-sky-400/80' : 'border-purple-400/80'
                   }`}
-                  title={segment.speaker || 'Character'}
+                  title={`View portrait of ${segment.speaker || 'character'}`}
                 >
                   <img
                     src={segment.portrait_url}
@@ -205,6 +208,9 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             </button>
           )}
         </div>
+      )}
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />
       )}
     </div>
   );

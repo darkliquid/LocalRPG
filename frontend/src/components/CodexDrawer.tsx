@@ -3,6 +3,7 @@ import { EntityMemory, EntityNote, EntitySummary, TTSConfig, VoiceProfile } from
 import { APIClient } from '../api/client';
 import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X, Loader2 } from 'lucide-react';
 import { TurnHistoryList } from './TurnHistoryList';
+import { ImageLightbox } from './ImageLightbox';
 
 interface CodexDrawerProps {
   gameID?: string;
@@ -43,6 +44,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const [memories, setMemories] = useState<EntityMemory[]>([]);
   const [previewProfileId, setPreviewProfileId] = useState('');
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
 
   const profiles = voiceProfiles ?? [];
 
@@ -291,7 +293,14 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                   </button>
                 )}
                 {entity.type === 'character' && gameID && (
-                  <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border-2 border-purple-500/30 shadow-lg bg-black/40">
+                  <div
+                    onClick={() => setLightbox({
+                      src: `/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(entity.id)}/portrait`,
+                      alt: entity.name,
+                    })}
+                    className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border-2 border-purple-500/30 shadow-lg bg-black/40 cursor-zoom-in transition-transform hover:scale-105"
+                    title={`View portrait of ${entity.name}`}
+                  >
                     <img
                       src={`/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(entity.id)}/portrait`}
                       alt={entity.name}
@@ -471,6 +480,9 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
             </div>
           </div>
         </div>
+      )}
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />
       )}
     </div>
   );
