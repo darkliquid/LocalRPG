@@ -40,10 +40,9 @@ func TestProcessActionPreservesRawInput(t *testing.T) {
 	if turn.Input != "1d20+5" {
 		t.Errorf("Input = %q, want the raw player entry", turn.Input)
 	}
-	if turn.Roll == nil {
-		t.Errorf("expected the roll to be evaluated")
-	}
-	if !strings.Contains(model.lastPrompt, "I rolled 1d20+5") {
-		t.Errorf("expected the resolved roll in the generation prompt, got %q", model.lastPrompt)
+	// A player-initiated roll is a proposed check, not an executed one: the GM
+	// adopts or dismisses it in its submission.
+	if !strings.Contains(model.lastPrompt, "[PROPOSED CHECK: 1d20+5") {
+		t.Errorf("expected the proposed check in the generation prompt, got %q", model.lastPrompt)
 	}
 }

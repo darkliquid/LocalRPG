@@ -92,6 +92,7 @@ type TurnOrchestrator struct {
 	completionPolicy CompletionPolicy
 	toolExecutor     ToolExecutor
 	checkResolver    harness.CheckResolver
+	declaredStats    map[string]bool
 	toolCapability   string
 	toolRounds       int
 	toolObserver     func(ToolActivity)
@@ -140,6 +141,12 @@ func (o *TurnOrchestrator) SetCheckResolver(resolver harness.CheckResolver) {
 		return
 	}
 	o.checkResolver = resolver
+}
+
+// SetDeclaredStats sets the mechanics schema's declared stat ids, used to reject
+// an undeclared state change. Nil means the system declares no stats.
+func (o *TurnOrchestrator) SetDeclaredStats(stats map[string]bool) {
+	o.declaredStats = stats
 }
 
 // checkResolverOrDefault returns the configured resolver.
@@ -505,10 +512,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		directiveText := strings.TrimPrefix(actionInput, "/gm ")
 		gmDirective = fmt.Sprintf("[DIRECTOR CORRECTION DIRECTIVE: %s]", directiveText)
 	} else if !isOpening && strings.EqualFold(mode, "Roll") {
-		if r, err := rules.EvaluateRoll(actionInput); err == nil {
-			rollRes = r
-			generationPrompt = fmt.Sprintf("I rolled %s with result %d", r.Notation, r.Total)
+		// A player-initiated roll is a proposal, not an executed result: the GM
+		// either adopts it with request_check or dismisses it, and its decision is
+		// authoritative. This is the player pre-empting being asked to roll.
+		proposed := strings.TrimSpace(actionInput)
+		if proposed == "" {
+			proposed = "a check"
 		}
+		gmDirective = fmt.Sprintf("[PROPOSED CHECK: %s by %s]", proposed, o.playerID)
 	} else if !isOpening && o.rulesEngine != nil {
 		// Run action through mechanics hook if available
 		res, err := o.rulesEngine.ExecuteAction(strings.ToLower(mode), map[string]interface{}{
@@ -640,6 +651,10 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	contextPrompt := assembly.Prompt
 	if gmDirective != "" {
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
+	}
+
+	if result.FallbackReason != "" {
+		o.logger.Event("turn.protocol_fallback", map[string]interface{}{"reason": result.FallbackReason})
 	}
 
 	cause := cutNone
@@ -882,9 +897,11 @@ type streamResult struct {
 	ProviderID string
 	ChunkCount int
 	// Submission is the structured turn when the GM called submit_turn, and
-	// Checks are the checks it resolved with request_check.
-	Submission *harness.TurnSubmission
-	Checks     []harness.CheckResult
+	// Checks are the checks it resolved with request_check. FallbackReason is set
+	// when a structured turn failed validation twice and prose was used instead.
+	Submission     *harness.TurnSubmission
+	Checks         []harness.CheckResult
+	FallbackReason string
 }
 
 // generationCode reads a bounded failure code for logging, defaulting to a
@@ -1224,6 +1241,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 
 	var provenance []ToolCallRecord
 	var checks []harness.CheckResult
+	submitAttempts := 0
 	withdrawn := false
 
 	for round := 0; round <= o.toolRoundCap(); round++ {
@@ -1338,6 +1356,11 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + resolveErr.Error()})
 						continue
 					}
+					// The GM references this id in its segments, so it must be stable
+					// and known to the model: the tool call id it chose serves that.
+					if call.ID != "" {
+						resolved.CheckID = call.ID
+					}
 					checks = append(checks, *resolved)
 					encoded, _ := json.Marshal(resolved)
 					messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: string(encoded)})
@@ -1347,6 +1370,19 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					sub, parseErr := harness.ParseSubmission(call.Arguments)
 					if parseErr != nil {
 						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
+						continue
+					}
+					if vErr := validateSubmission(sub, checks, o.declaredStats); vErr != nil {
+						o.logger.Event("turn.protocol_error", map[string]interface{}{"detail": vErr.Error()})
+						submitAttempts++
+						if submitAttempts >= 2 {
+							result.Submission = nil
+							result.FallbackReason = vErr.Error()
+							result.Provenance = provenance
+							result.ToolCalls = nil
+							return result, nil
+						}
+						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "protocol validation failed: " + vErr.Error()})
 						continue
 					}
 					result.Submission = sub
