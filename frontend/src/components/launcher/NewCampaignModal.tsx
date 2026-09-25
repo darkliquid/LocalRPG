@@ -35,6 +35,8 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   const [openingPrompt, setOpeningPrompt] = useState('');
   const [startLocation, setStartLocation] = useState('');
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [generatingKind, setGeneratingKind] = useState<'banner' | 'icon' | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
 
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -143,6 +145,34 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
       console.error('Failed to generate all fields:', err);
     } finally {
       setIsGeneratingAll(false);
+    }
+  };
+
+  const handleAIGenerate = async (kind: 'banner' | 'icon') => {
+    if (!world) return;
+    setGeneratingKind(kind);
+    setGenError(null);
+    try {
+      const blob = await APIClient.generateAssetPreview(
+        kind,
+        campaignName.trim() || world.name,
+        world.description || '',
+        world.art_style || '',
+        world.genre || ''
+      );
+      const file = new File([blob], `${kind}.png`, { type: blob.type });
+      if (kind === 'banner') {
+        setBannerFile(file);
+        setBannerPreview(URL.createObjectURL(blob));
+      } else {
+        setIconFile(file);
+        setIconPreview(URL.createObjectURL(blob));
+      }
+    } catch (err: any) {
+      console.error('Failed to generate preview', err);
+      setGenError(err.message || 'Generation failed');
+    } finally {
+      setGeneratingKind(null);
     }
   };
 
@@ -539,11 +569,14 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
               <div className="text-[11px] font-sans text-stone-400">
                 A procedural gradient theme will be generated if omitted.
               </div>
+              {genError && (
+                <div className="text-[11px] text-red-400 font-sans mt-1">{genError}</div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-1">
-              {/* Banner Upload */}
-              <div>
+              {/* Banner Upload & Generate */}
+              <div className="space-y-2">
                 <input
                   type="file"
                   ref={bannerInputRef}
@@ -551,24 +584,40 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   accept="image/png,image/jpeg,image/webp,image/svg+xml"
                   className="hidden"
                 />
-                <button
-                  type="button"
+                <div
                   onClick={() => bannerInputRef.current?.click()}
-                  className="w-full h-16 rounded-xl border border-dashed border-white/20 hover:border-purple-400/60 bg-white/[0.02] flex items-center justify-center gap-2 text-xs font-sans text-stone-300 hover:text-white transition-all cursor-pointer overflow-hidden"
+                  className="w-full h-16 rounded-xl border border-dashed border-white/20 hover:border-purple-400/60 bg-white/[0.02] flex items-center justify-center text-xs font-sans text-stone-300 hover:text-white transition-all cursor-pointer overflow-hidden"
                 >
                   {bannerPreview ? (
                     <img src={bannerPreview} alt="Banner Preview" className="w-full h-full object-cover" />
                   ) : (
-                    <>
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload Banner</span>
-                    </>
+                    <span className="text-stone-500 text-[11px]">No Banner Selected</span>
                   )}
-                </button>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    disabled={isSubmitting || generatingKind === 'banner'}
+                    className="flex-1 py-1.5 px-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-sans font-semibold text-stone-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAIGenerate('banner')}
+                    disabled={isSubmitting || generatingKind === 'banner'}
+                    className="flex-1 py-1.5 px-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-xs font-sans font-semibold text-purple-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{generatingKind === 'banner' ? 'Gen...' : 'AI Gen'}</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Icon Upload */}
-              <div>
+              {/* Icon Upload & Generate */}
+              <div className="space-y-2">
                 <input
                   type="file"
                   ref={iconInputRef}
@@ -576,20 +625,36 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   accept="image/png,image/jpeg,image/webp,image/svg+xml"
                   className="hidden"
                 />
-                <button
-                  type="button"
+                <div
                   onClick={() => iconInputRef.current?.click()}
-                  className="w-full h-16 rounded-xl border border-dashed border-white/20 hover:border-purple-400/60 bg-white/[0.02] flex items-center justify-center gap-2 text-xs font-sans text-stone-300 hover:text-white transition-all cursor-pointer overflow-hidden"
+                  className="w-full h-16 rounded-xl border border-dashed border-white/20 hover:border-purple-400/60 bg-white/[0.02] flex items-center justify-center text-xs font-sans text-stone-300 hover:text-white transition-all cursor-pointer overflow-hidden"
                 >
                   {iconPreview ? (
                     <img src={iconPreview} alt="Icon Preview" className="w-12 h-12 rounded-lg object-cover" />
                   ) : (
-                    <>
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload Icon</span>
-                    </>
+                    <span className="text-stone-500 text-[11px]">No Icon Selected</span>
                   )}
-                </button>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => iconInputRef.current?.click()}
+                    disabled={isSubmitting || generatingKind === 'icon'}
+                    className="flex-1 py-1.5 px-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-sans font-semibold text-stone-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAIGenerate('icon')}
+                    disabled={isSubmitting || generatingKind === 'icon'}
+                    className="flex-1 py-1.5 px-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-xs font-sans font-semibold text-purple-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{generatingKind === 'icon' ? 'Gen...' : 'AI Gen'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
