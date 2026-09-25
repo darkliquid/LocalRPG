@@ -236,3 +236,25 @@ func TestToolLoopAcceptsSubmitTurnEvenWhenToolsWithdrawn(t *testing.T) {
 	}
 }
 
+func TestToolLoopUnboundedByDefault(t *testing.T) {
+	orchestrator, _ := toolLoopOrchestrator(t, &scriptedStreamProvider{})
+	if got := orchestrator.toolRoundCap(); got != defaultUnboundedToolRounds {
+		t.Errorf("default toolRoundCap = %d, want %d", got, defaultUnboundedToolRounds)
+	}
+
+	orchestrator.SetToolRounds(0)
+	if got := orchestrator.toolRoundCap(); got != defaultUnboundedToolRounds {
+		t.Errorf("toolRoundCap with 0 = %d, want %d", got, defaultUnboundedToolRounds)
+	}
+
+	orchestrator.SetToolRounds(-1)
+	if got := orchestrator.toolRoundCap(); got != defaultUnboundedToolRounds {
+		t.Errorf("toolRoundCap with negative = %d, want %d", got, defaultUnboundedToolRounds)
+	}
+
+	orchestrator.SetToolRounds(15)
+	if got := orchestrator.toolRoundCap(); got != 15 {
+		t.Errorf("toolRoundCap with explicit 15 = %d, want 15", got)
+	}
+}
+

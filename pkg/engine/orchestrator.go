@@ -127,10 +127,11 @@ func (o *TurnOrchestrator) SetTools(executor ToolExecutor, capability string) {
 	o.toolCapability = capability
 }
 
-// SetToolRounds caps the tool rounds in one turn.
+// SetToolRounds caps the tool rounds in one turn. Zero or negative means unbounded
+// (with a 100-round runaway safety ceiling).
 func (o *TurnOrchestrator) SetToolRounds(rounds int) {
-	if rounds <= 0 {
-		rounds = 4
+	if rounds < 0 {
+		rounds = 0
 	}
 	o.toolRounds = rounds
 }
@@ -172,9 +173,11 @@ func (o *TurnOrchestrator) SetToolObserver(observer func(ToolActivity)) {
 	o.toolObserver = observer
 }
 
+const defaultUnboundedToolRounds = 100
+
 func (o *TurnOrchestrator) toolRoundCap() int {
 	if o.toolRounds <= 0 {
-		return 4
+		return defaultUnboundedToolRounds
 	}
 	return o.toolRounds
 }

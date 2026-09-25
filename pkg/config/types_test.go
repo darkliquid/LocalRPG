@@ -293,8 +293,8 @@ func TestToolCapabilityAndBounds(t *testing.T) {
 	if got := empty.RoleSupportsTools("gm"); got != "auto" {
 		t.Errorf("RoleSupportsTools = %q, want auto", got)
 	}
-	if got := empty.ToolRounds(); got != 4 {
-		t.Errorf("ToolRounds = %d, want 4", got)
+	if got := empty.ToolRounds(); got != 0 {
+		t.Errorf("ToolRounds = %d, want 0", got)
 	}
 	if got := empty.ToolResultChars(); got != 4000 {
 		t.Errorf("ToolResultChars = %d, want 4000", got)

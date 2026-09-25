@@ -87,7 +87,7 @@ type AgentsConfig struct {
 	// Completion governs how a narrator reply that stops mid-thought is repaired.
 	Completion CompletionConfig `yaml:"completion" json:"completion"`
 	// ToolRounds caps how many times a turn may call tools before tools are
-	// withdrawn. Zero means the default of four.
+	// withdrawn. Zero or negative means unbounded (with a 100-round runaway safety ceiling).
 	ToolRounds int `yaml:"tool_rounds" json:"tool_rounds"`
 	// ToolResultChars caps one tool result. Zero means the default of 4000.
 	ToolResultChars int `yaml:"tool_result_chars" json:"tool_result_chars"`
@@ -283,7 +283,7 @@ func DefaultConfig() *Config {
 				MinIncompleteChars: 24,
 				TimeoutSeconds:     45,
 			},
-			ToolRounds:      4,
+			ToolRounds:      0,
 			ToolResultChars: 4000,
 			Roles: map[string]AgentRoleConfig{
 				"gm": {
@@ -617,10 +617,10 @@ func (c *Config) RoleSupportsTools(role string) string {
 	}
 }
 
-// ToolRounds caps how many times a turn may call tools.
+// ToolRounds caps how many times a turn may call tools. Zero means unbounded.
 func (c *Config) ToolRounds() int {
-	if c.Agents.ToolRounds <= 0 {
-		return 4
+	if c.Agents.ToolRounds < 0 {
+		return 0
 	}
 	return c.Agents.ToolRounds
 }

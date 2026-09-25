@@ -1393,18 +1393,18 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   <input
                     type="number"
                     min={0}
-                    max={20}
-                    value={config.agents.tool_rounds ?? 4}
+                    max={100}
+                    value={config.agents.tool_rounds ?? 0}
                     onChange={(e) => {
                       const parsed = parseInt(e.target.value, 10);
                       setConfig({
                         ...config,
-                        agents: { ...config.agents, tool_rounds: Number.isNaN(parsed) ? 4 : parsed },
+                        agents: { ...config.agents, tool_rounds: Number.isNaN(parsed) ? 0 : parsed },
                       });
                     }}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                   />
-                  <p className="text-[11px] text-stone-500">How many times a turn may look something up before answering.</p>
+                  <p className="text-[11px] text-stone-500">How many times a turn may look something up before answering (0 = unbounded).</p>
                 </div>
 
                 <div className="space-y-1.5">
