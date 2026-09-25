@@ -631,7 +631,7 @@ func (s *Server) handleWorldsRoutes(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, worlds)
 	case http.MethodPost:
 		var req CreateWorldRequestDTO
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}

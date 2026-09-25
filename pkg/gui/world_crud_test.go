@@ -49,6 +49,49 @@ func TestUpdateWorldRequiresExisting(t *testing.T) {
 	}
 }
 
+func TestCreateWorldDerivedSlugCollision(t *testing.T) {
+	service := newWorldTestService(t)
+	if _, err := service.CreateWorld(context.Background(), CreateWorldRequestDTO{Name: "Ember Peak"}); err != nil {
+		t.Fatalf("first CreateWorld: %v", err)
+	}
+	// The same name derives the same slug, which must not overwrite.
+	if _, err := service.CreateWorld(context.Background(), CreateWorldRequestDTO{Name: "Ember Peak"}); !errors.Is(err, ErrWorldExists) {
+		t.Fatalf("derived-slug collision err = %v, want ErrWorldExists", err)
+	}
+}
+
+func TestWorldUpdateMissingIsNotFound(t *testing.T) {
+	svc := newWorldTestService(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest(http.MethodPut, "/api/world/missing", strings.NewReader(`{"name":"Missing"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("update missing status = %d, want 404: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestWorldUpdateReturnsOK(t *testing.T) {
+	svc := newWorldTestService(t)
+	created, err := svc.CreateWorld(context.Background(), CreateWorldRequestDTO{Name: "Ember Peak"})
+	if err != nil {
+		t.Fatalf("CreateWorld: %v", err)
+	}
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest(http.MethodPut, "/api/world/"+created.ID, strings.NewReader(`{"name":"Ember Peak","description":"changed"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestWorldCreateDuplicateIsConflict(t *testing.T) {
 	svc := newWorldTestService(t)
 	server := NewServer(svc, http.NotFoundHandler())

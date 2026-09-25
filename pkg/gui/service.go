@@ -2286,14 +2286,17 @@ func (s *Service) writeWorld(ctx context.Context, req CreateWorldRequestDTO) (*W
 		return nil, fmt.Errorf("write world.yaml: %w", err)
 	}
 
+	lorePath := filepath.Join(worldDir, "prompts", "lore.md")
 	if req.LorePrompt != "" {
 		promptDir := filepath.Join(worldDir, "prompts")
 		if err := os.MkdirAll(promptDir, 0755); err != nil {
 			return nil, fmt.Errorf("create world prompts dir: %w", err)
 		}
-		if err := os.WriteFile(filepath.Join(promptDir, "lore.md"), []byte(req.LorePrompt), 0644); err != nil {
+		if err := os.WriteFile(lorePath, []byte(req.LorePrompt), 0644); err != nil {
 			return nil, fmt.Errorf("write lore.md: %w", err)
 		}
+	} else if err := os.Remove(lorePath); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("remove lore.md: %w", err)
 	}
 
 	return s.GetWorld(ctx, id)
@@ -2301,13 +2304,17 @@ func (s *Service) writeWorld(ctx context.Context, req CreateWorldRequestDTO) (*W
 
 // CreateWorld writes a new world and refuses an id that is already taken.
 func (s *Service) CreateWorld(ctx context.Context, req CreateWorldRequestDTO) (*WorldDetailDTO, error) {
-	id := req.ID
+	id := ""
+	if req.ID != "" {
+		id = slugify(req.ID)
+	}
 	if id == "" {
 		id = slugify(req.Name)
 	}
 	if _, err := os.Stat(filepath.Join(s.resolver.WorldDir(id), "world.yaml")); err == nil {
 		return nil, fmt.Errorf("%w: %s", ErrWorldExists, id)
 	}
+	req.ID = id
 	return s.writeWorld(ctx, req)
 }
 

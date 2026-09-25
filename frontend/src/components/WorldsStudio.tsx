@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient, WorldExistsError } from '../api/client';
-import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft } from '../types';
+import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail } from '../types';
 import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
@@ -203,6 +203,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   };
 
   const requestSelection = (target: WorldSelection) => {
+    // Re-selecting the open draft is a no-op; only leaving it can discard work.
+    if (target?.kind === 'draft' && isDraft) return;
     if (isDraft && draft?.dirty) {
       setPendingSelection(target);
       return;
@@ -211,6 +213,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   };
 
   const handleLoadReferenceTemplate = () => {
+    markDirty();
     setName(REFERENCE_WORLD_TEMPLATE.name);
     if (isDraft) {
       setSlugID(REFERENCE_WORLD_TEMPLATE.id);
@@ -300,6 +303,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       } else if (Object.keys(res.fields).length === 0) {
         setToast({ type: 'error', message: 'The model returned nothing to fill.' });
       } else {
+        markDirty();
         setToast({ type: 'success', message: 'Auto-filled world fields!' });
       }
     } catch (err: any) {
@@ -335,7 +339,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         lore_prompt: lorePrompt.trim(),
       };
 
-      const saved = isDraft
+      if (!isDraft && !savedID) return;
+      const saved: WorldDetail = isDraft
         ? await APIClient.createWorld(payload)
         : await APIClient.updateWorld(savedID as string, payload);
 
@@ -358,7 +363,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       }
 
       setToast({ type: 'success', message: `World "${saved.name}" saved successfully!` });
-      await loadWorlds(saved.id);
+      await loadWorlds(saved.id, 'browse');
       if (onWorldSaved) onWorldSaved();
     } catch (err: any) {
       if (err instanceof WorldExistsError) {
@@ -377,6 +382,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
     setEntityDrafts((prev) => ({ ...prev, [selectedEntityID]: entityMarkdown }));
 
     if (isDraft) {
+      markDirty();
       setToast({ type: 'success', message: `Draft entity "${selectedEntityID}" updated! (Will be persisted when you click Save World)` });
       return;
     }
@@ -405,6 +411,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         setEntityMarkdown(next ? (updatedDrafts[next.id] || '') : '');
       }
       setToast({ type: 'success', message: `Entity "${entityId}" removed from draft.` });
+      markDirty();
       return;
     }
     if (!savedID) return;
@@ -438,6 +445,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       setEntityMarkdown(STARTER_ENTITY_TEMPLATE);
       setIsNewEntityModal(false);
       setNewEntitySlug('');
+      markDirty();
       return;
     }
     if (!savedID) return;
@@ -651,6 +659,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                     getContext={getWorldContext}
                     onGenerated={(val) => {
                       setName(val);
+                      markDirty();
                       if (isDraft) {
                         setSlugID(val.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''));
                       }
@@ -683,7 +692,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                     formType="world"
                     fieldName="genre"
                     getContext={getWorldContext}
-                    onGenerated={(val) => setGenre(val)}
+                    onGenerated={(val) => { setGenre(val); markDirty(); }}
                     systemID={defaultSystem}
                   />
                 </div>
@@ -740,7 +749,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   formType="world"
                   fieldName="art_style"
                   getContext={getWorldContext}
-                  onGenerated={(val) => setArtStyle(val)}
+                  onGenerated={(val) => { setArtStyle(val); markDirty(); }}
                   systemID={defaultSystem}
                   seed={artStyle}
                 />
@@ -780,7 +789,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   formType="world"
                   fieldName="description"
                   getContext={getWorldContext}
-                  onGenerated={(val) => setDescription(val)}
+                  onGenerated={(val) => { setDescription(val); markDirty(); }}
                   systemID={defaultSystem}
                   seed={description}
                 />
@@ -921,7 +930,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   formType="world"
                   fieldName="lore_prompt"
                   getContext={getWorldContext}
-                  onGenerated={(val) => setLorePrompt(val)}
+                  onGenerated={(val) => { setLorePrompt(val); markDirty(); }}
                   systemID={defaultSystem}
                   seed={lorePrompt}
                 />
