@@ -4,6 +4,7 @@ import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types'
 import { LauncherDock } from './launcher/LauncherDock';
 import { WorldFlyout } from './launcher/WorldFlyout';
 import { WorldGallery } from './launcher/WorldGallery';
+import { CampaignGallery } from './launcher/CampaignGallery';
 import { CampaignHeroStage } from './launcher/CampaignHeroStage';
 import { NewCampaignModal } from './launcher/NewCampaignModal';
 import { CampaignSettingsModal } from './launcher/CampaignSettingsModal';
@@ -24,6 +25,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
 
   const [isFlyoutOpen, setIsFlyoutOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [isCampaignGalleryOpen, setIsCampaignGalleryOpen] = useState(false);
   const [creatingWorld, setCreatingWorld] = useState<WorldInfo | null>(null);
   const [isCreatingGame, setIsCreatingGame] = useState(false);
 
@@ -178,9 +180,18 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         onSelectGame={(id) => {
           setSelectedGameID(id);
           setIsFlyoutOpen(false);
+          setIsCampaignGalleryOpen(false);
         }}
         isFlyoutOpen={isFlyoutOpen}
-        onToggleFlyout={() => setIsFlyoutOpen((prev) => !prev)}
+        onToggleFlyout={() => {
+          setIsFlyoutOpen((prev) => !prev);
+          setIsCampaignGalleryOpen(false);
+        }}
+        isCampaignGalleryOpen={isCampaignGalleryOpen}
+        onToggleCampaignGallery={() => {
+          setIsCampaignGalleryOpen((prev) => !prev);
+          setIsFlyoutOpen(false);
+        }}
         onOpenWorldsStudio={() => setActiveStudio({ studio: 'worlds', mode: 'browse' })}
         onOpenSystemsStudio={() => setActiveStudio({ studio: 'systems' })}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -208,6 +219,27 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
           setActiveStudio({ studio: 'worlds', mode: 'new' });
         }}
         onClose={() => setIsGalleryOpen(false)}
+      />
+
+      {/* Full-Page Campaign Gallery */}
+      <CampaignGallery
+        isOpen={isCampaignGalleryOpen}
+        games={games}
+        worlds={worlds}
+        systems={systems}
+        onPlayGame={(id) => {
+          setIsCampaignGalleryOpen(false);
+          onSelectGame(id);
+        }}
+        onOpenSettings={(id) => {
+          setIsCampaignGalleryOpen(false);
+          setSettingsGameID(id);
+        }}
+        onCreateCampaign={() => {
+          setIsCampaignGalleryOpen(false);
+          setIsFlyoutOpen(true);
+        }}
+        onClose={() => setIsCampaignGalleryOpen(false)}
       />
 
       {/* Main Campaign Hero Presentation */}
