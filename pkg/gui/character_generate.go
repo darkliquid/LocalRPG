@@ -170,7 +170,11 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 		return nil, failure
 	}
 
-	if len(attempts) > 0 {
+	requested := make([]string, 0, len(generatable))
+	for _, field := range generatable {
+		requested = append(requested, field.ID)
+	}
+	if len(attempts) > 0 && missingFields(requested, resp.Values) > 0 {
 		resp.Warning = &harness.GenerationFailure{
 			Code:      attempts[len(attempts)-1].Code,
 			Message:   "some requested fields were not generated",

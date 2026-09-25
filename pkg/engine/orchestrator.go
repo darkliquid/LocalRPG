@@ -593,7 +593,8 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			turnSpan.RecordError(failure)
 			turnSpan.SetStatus(codes.Error, string(failure.Code))
 		} else {
-			turnSpan.SetStatus(codes.Error, err.Error())
+			code := string(harness.ClassifyProviderError(err))
+			turnSpan.SetStatus(codes.Error, code)
 			turnSpan.RecordError(err)
 		}
 		if result.Failure != nil {
@@ -875,6 +876,7 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 			Code:      code,
 			Message:   err.Error(),
 			ElapsedMS: time.Since(started).Milliseconds(),
+			Cause:     err,
 		}
 		return result, err
 	}
@@ -966,22 +968,48 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 	}
 
 	result, err := o.stream(ctx, provider, req, onChunk)
-	if err == nil || errors.Is(err, errStreamListener) || ctx.Err() != nil {
+	if errors.Is(err, errStreamListener) || ctx.Err() != nil {
 		return result, err
 	}
+	// A hard error or an empty reply both justify the fallback.
+	if err == nil && result.Failure == nil {
+		return result, nil
+	}
+
+	primaryFailure := result.Failure
+	if primaryFailure == nil {
+		primaryFailure = &harness.GenerationFailure{
+			Code:    harness.ClassifyProviderError(err),
+			Message: err.Error(),
+			Cause:   err,
+		}
+		result.Failure = primaryFailure
+	}
+
 	if fallback, ok := o.router.FallbackForRole("gm"); ok {
 		fallbackResult, fallbackErr := o.stream(ctx, fallback, req, onChunk)
 		if fallbackErr == nil && fallbackResult.Failure == nil {
 			return fallbackResult, nil
 		}
-		if result.Failure != nil && len(result.Failure.Attempts) == 0 {
-			result.Failure.Attempts = []harness.Attempt{{
-				Role: "gm", Provider: result.ProviderID, Code: result.Failure.Code, Detail: result.Failure.Message,
-			}}
+		switch {
+		case fallbackResult.Failure != nil:
+			primaryFailure.Attempts = append(primaryFailure.Attempts, harness.Attempt{
+				Role: "gm", Provider: fallbackResult.ProviderID,
+				Code: fallbackResult.Failure.Code, Detail: fallbackResult.Failure.Message,
+			})
+		case fallbackErr != nil:
+			primaryFailure.Attempts = append(primaryFailure.Attempts, harness.Attempt{
+				Role: "gm", Provider: fallback.ID(),
+				Code: harness.ClassifyProviderError(fallbackErr), Detail: fallbackErr.Error(),
+			})
 		}
-		return result, err
 	}
-	return result, err
+	if len(primaryFailure.Attempts) == 0 {
+		primaryFailure.Attempts = []harness.Attempt{{
+			Role: "gm", Provider: result.ProviderID, Code: primaryFailure.Code, Detail: primaryFailure.Message,
+		}}
+	}
+	return result, primaryFailure
 }
 
 // runGenerationLoop runs the turn as a bounded conversation. It offers tools only

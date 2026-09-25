@@ -40,6 +40,9 @@ type GenerationFailure struct {
 	PromptChars  int         `json:"prompt_chars,omitempty"`
 	ContextChars int         `json:"context_chars,omitempty"`
 	ElapsedMS    int64       `json:"elapsed_ms,omitempty"`
+	// Cause is the underlying provider error, kept out of JSON so callers can
+	// still errors.Is/As through the failure.
+	Cause error `json:"-"`
 }
 
 func (f *GenerationFailure) Error() string {
@@ -47,6 +50,14 @@ func (f *GenerationFailure) Error() string {
 		return ""
 	}
 	return f.Message
+}
+
+// Unwrap exposes the underlying provider error to errors.Is/As.
+func (f *GenerationFailure) Unwrap() error {
+	if f == nil {
+		return nil
+	}
+	return f.Cause
 }
 
 // ClassifyProviderError maps an arbitrary provider error to a bounded code. The

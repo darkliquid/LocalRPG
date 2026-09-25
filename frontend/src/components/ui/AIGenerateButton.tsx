@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { APIClient, GenerationError } from '../../api/client';
 import { GenerateTextRequest, GenerationFailure } from '../../types';
@@ -37,10 +37,16 @@ export const AIGenerateButton: React.FC<AIGenerateButtonProps> = ({
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<GenerationFailure | null>(null);
+  const clearTimer = useRef<number | null>(null);
 
   const report = (failure: GenerationFailure) => {
     setError(failure);
     if (onError) onError(failure);
+    if (clearTimer.current !== null) window.clearTimeout(clearTimer.current);
+    clearTimer.current = window.setTimeout(() => {
+      setError(null);
+      clearTimer.current = null;
+    }, 6000);
   };
 
   const handleGenerate = async (e: React.MouseEvent) => {

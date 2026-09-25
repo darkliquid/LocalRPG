@@ -235,7 +235,7 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 		return nil, failure
 	}
 
-	if len(attempts) > 0 {
+	if len(attempts) > 0 && missingFields(requestedTextFields(req, systemFields), resp.Fields) > 0 {
 		resp.Warning = &harness.GenerationFailure{
 			Code:      attempts[len(attempts)-1].Code,
 			Message:   "some requested fields were not generated",
@@ -259,6 +259,40 @@ func pickFailureCode(attempts []harness.Attempt) harness.FailureCode {
 		}
 	}
 	return harness.FailureProviderError
+}
+
+// requestedTextFields lists the field ids a request asks for, so a fallback that
+// filled every field does not raise a partial warning.
+func requestedTextFields(req GenerateTextRequest, systemFields []core.CharacterCreationField) []string {
+	if req.FieldName != "_all" {
+		return []string{req.FieldName}
+	}
+	switch req.FormType {
+	case "character":
+		ids := []string{"name", "age", "gender", "pronouns", "appearance", "background"}
+		for _, f := range systemFields {
+			ids = append(ids, f.ID)
+		}
+		return ids
+	case "world":
+		return []string{"name", "description", "genre", "art_style", "lore_prompt"}
+	case "system":
+		return []string{"name", "description", "rules_prompt"}
+	case "campaign":
+		return []string{"name", "start_location", "opening_prompt"}
+	}
+	return nil
+}
+
+// missingFields counts requested field ids absent from a decoded result.
+func missingFields(requested []string, got map[string]string) int {
+	missing := 0
+	for _, id := range requested {
+		if _, ok := got[id]; !ok {
+			missing++
+		}
+	}
+	return missing
 }
 
 // handleGenerateTextRoute serves POST /api/generate-text. It creates nothing;

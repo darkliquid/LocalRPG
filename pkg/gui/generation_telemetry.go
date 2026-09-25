@@ -51,6 +51,11 @@ func generationMetrics() generationInstruments {
 // startGenerationSpan opens the span for one generation request. The caller must
 // end it. A disabled provider yields a no-op span.
 func (s *Service) startGenerationSpan(ctx context.Context, name, formType, fieldName string) (context.Context, oteltrace.Span) {
+	trace.LogEvent(ctx, trace.OrNil(s.logger), "generate.request", map[string]interface{}{
+		"span":       name,
+		"form_type":  formType,
+		"field_name": fieldName,
+	})
 	return telemetry.Tracer("github.com/darkliquid/localrpg/pkg/gui").Start(ctx, name,
 		oteltrace.WithAttributes(
 			attribute.String("localrpg.form_type", formType),
@@ -107,6 +112,12 @@ func (s *Service) recordGeneration(ctx context.Context, span oteltrace.Span, for
 // and the structured failure body, never on the span.
 func (s *Service) recordGenerationAttempts(ctx context.Context, span oteltrace.Span, attempts []harness.Attempt) {
 	for i, attempt := range attempts {
+		trace.LogEvent(ctx, trace.OrNil(s.logger), "generate.attempt", map[string]interface{}{
+			"role":         attempt.Role,
+			"provider":     attempt.Provider,
+			"code":         string(attempt.Code),
+			"duration_ms":  attempt.DurationMS,
+		})
 		if span != nil {
 			span.AddEvent("attempt", oteltrace.WithAttributes(
 				attribute.String("localrpg.role", attempt.Role),
@@ -118,15 +129,17 @@ func (s *Service) recordGenerationAttempts(ctx context.Context, span oteltrace.S
 		if i == 0 {
 			continue
 		}
+		// The fallback engaged because the previous attempt failed, so its code
+		// explains why, not the fallback's own outcome.
 		generationMetrics().fallbacks.Add(ctx, 1, otelmetric.WithAttributes(
 			attribute.String("localrpg.role", attempt.Role),
-			attribute.String("localrpg.generation.failure_code", string(attempt.Code)),
+			attribute.String("localrpg.generation.failure_code", string(attempts[i-1].Code)),
 		))
 		if span != nil {
 			span.AddEvent("fallback", oteltrace.WithAttributes(
 				attribute.String("localrpg.role", attempts[i-1].Role),
 				attribute.String("localrpg.role.next", attempt.Role),
-				attribute.String("localrpg.generation.failure_code", string(attempt.Code)),
+				attribute.String("localrpg.generation.failure_code", string(attempts[i-1].Code)),
 			))
 		}
 	}

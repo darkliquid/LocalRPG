@@ -193,6 +193,9 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		url, err := s.service.GenerateGameAsset(r.Context(), gameID, req)
 		if err != nil {
+			if writeGenerationFailure(w, err) {
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -744,6 +747,9 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		url, err := s.service.GenerateWorldAsset(r.Context(), worldID, req)
 		if err != nil {
+			if writeGenerationFailure(w, err) {
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
