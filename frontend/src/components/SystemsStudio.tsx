@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
 import { SystemInfo, CreateSystemRequest, CharacterCreationField } from '../types';
-import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2 } from 'lucide-react';
+import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2 } from 'lucide-react';
+import { AIGenerateButton } from './ui/AIGenerateButton';
 import { REFERENCE_SYSTEM_TEMPLATE } from '../templates/referenceTemplates';
 
 interface SystemsStudioProps {
@@ -26,6 +27,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
@@ -92,6 +94,32 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
     setCreationPreamble('');
     setCreationFields([]);
     setToast({ type: 'success', message: 'Reset to Narrative 2d6 Reference Template!' });
+  };
+
+  const getSystemContext = (): Record<string, string> => ({
+    name,
+    description,
+    rules_prompt: rulesPrompt,
+  });
+
+  const handleGenerateAllSystemFields = async () => {
+    if (isGeneratingAll) return;
+    setIsGeneratingAll(true);
+    try {
+      const res = await APIClient.generateText({
+        form_type: 'system',
+        field_name: '_all',
+        context: getSystemContext(),
+      });
+      if (res.fields.name && !name.trim()) setName(res.fields.name);
+      if (res.fields.description && !description.trim()) setDescription(res.fields.description);
+      if (res.fields.rules_prompt && !rulesPrompt.trim()) setRulesPrompt(res.fields.rules_prompt);
+      setToast({ type: 'success', message: 'Auto-filled system fields!' });
+    } catch (err: any) {
+      setToast({ type: 'error', message: err.message || 'Auto-fill failed' });
+    } finally {
+      setIsGeneratingAll(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -240,6 +268,17 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
 
             <button
               type="button"
+              onClick={handleGenerateAllSystemFields}
+              disabled={isGeneratingAll || isSaving}
+              title="Auto-fill empty system fields with AI"
+              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-purple-500/40 bg-purple-600/15 hover:bg-purple-600/25 text-purple-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Wand2 className={`w-3.5 h-3.5 ${isGeneratingAll ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isGeneratingAll ? 'Generating...' : 'Auto-Fill'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleResetToReference}
               title="Reset current editor to the comprehensive Narrative 2d6 reference template"
               className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-stone-800 hover:border-purple-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-purple-400 transition-all cursor-pointer"
@@ -282,9 +321,22 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
           <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                  System Name
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
+                    System Name
+                  </label>
+                  <AIGenerateButton
+                    formType="system"
+                    fieldName="name"
+                    getContext={getSystemContext}
+                    onGenerated={(val) => {
+                      setName(val);
+                      if (!selectedID) {
+                        setSlugID(val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+                      }
+                    }}
+                  />
+                </div>
                 <input
                   type="text"
                   required
@@ -332,9 +384,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                Rulebook Overview & Philosophy
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
+                  Rulebook Overview & Philosophy
+                </label>
+                <AIGenerateButton
+                  formType="system"
+                  fieldName="description"
+                  getContext={getSystemContext}
+                  onGenerated={(val) => setDescription(val)}
+                  seed={description}
+                />
+              </div>
               <textarea
                 rows={5}
                 placeholder="Describe core dice mechanics, resolution philosophy, and character stats..."
@@ -482,7 +543,16 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
           <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
             <div className="flex items-center justify-between text-[11px] font-mono text-stone-400 px-1 shrink-0">
               <span>AI Storyteller Instructions (prompts/rules.md)</span>
-              <span>Injected into LLM context to guide resolution ladder & mechanics hooks</span>
+              <div className="flex items-center gap-2">
+                <span>Injected into LLM context to guide resolution ladder &amp; mechanics hooks</span>
+                <AIGenerateButton
+                  formType="system"
+                  fieldName="rules_prompt"
+                  getContext={getSystemContext}
+                  onGenerated={(val) => setRulesPrompt(val)}
+                  seed={rulesPrompt}
+                />
+              </div>
             </div>
             <textarea
               value={rulesPrompt}
