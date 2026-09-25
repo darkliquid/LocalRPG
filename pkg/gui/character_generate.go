@@ -102,52 +102,10 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 		MaxTokens: 700,
 	}
 
-	roles := []string{"character", "gm"}
-	attempts := make([]harness.Attempt, 0, len(roles))
-	var values map[string]string
-	for _, role := range roles {
-		roleStarted := time.Now()
-		result, err := router.GenerateForRole(ctx, role, request)
-		if err != nil {
-			if failure, ok := harness.FailureFrom(err); ok {
-				attempts = append(attempts, failure.Attempts...)
-				if len(failure.Attempts) == 0 {
-					attempts = append(attempts, harness.Attempt{
-						Role: role, Provider: router.ProviderIDForRole(role),
-						Code: failure.Code, Detail: failure.Message,
-						DurationMS: time.Since(roleStarted).Milliseconds(),
-					})
-				}
-				continue
-			}
-			attempts = append(attempts, harness.Attempt{
-				Role: role, Provider: router.ProviderIDForRole(role),
-				Code: harness.FailureProviderError, Detail: err.Error(),
-				DurationMS: time.Since(roleStarted).Milliseconds(),
-			})
-			continue
-		}
-		if result == nil || strings.TrimSpace(result.Text) == "" {
-			attempts = append(attempts, harness.Attempt{
-				Role: role, Provider: router.ProviderIDForRole(role),
-				Code: harness.FailureEmptyResponse, Detail: "model returned no text",
-				DurationMS: time.Since(roleStarted).Milliseconds(),
-			})
-			continue
-		}
-		decoded, decodeErr := decodeGeneratedValuesChecked(result.Text)
-		if decodeErr != nil {
-			attempts = append(attempts, harness.Attempt{
-				Role: role, Provider: router.ProviderIDForRole(role),
-				Code: harness.FailureParseError, Detail: decodeErr.Error(),
-				DurationMS: time.Since(roleStarted).Milliseconds(),
-			})
-			continue
-		}
-		values = decoded
-		resp.GeneratedBy = role
-		break
-	}
+	outcome := collectTextAttempts(ctx, router, []string{"character", "gm"}, request)
+	attempts := outcome.Attempts
+	resp.GeneratedBy = outcome.GeneratedBy
+	values := outcome.Values
 
 	for _, field := range generatable {
 		if value, ok := values[field.ID]; ok && strings.TrimSpace(value) != "" {

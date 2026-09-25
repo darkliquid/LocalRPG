@@ -171,53 +171,13 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 		roles = append(roles, "gm")
 	}
 
-	attempts := make([]harness.Attempt, 0, len(roles))
-	for _, tryRole := range roles {
-		roleStarted := time.Now()
-		result, err := router.GenerateForRole(ctx, tryRole, request)
-		if err != nil {
-			if failure, ok := harness.FailureFrom(err); ok {
-				attempts = append(attempts, failure.Attempts...)
-				if len(failure.Attempts) == 0 {
-					attempts = append(attempts, harness.Attempt{
-						Role: tryRole, Provider: router.ProviderIDForRole(tryRole),
-						Code: failure.Code, Detail: failure.Message,
-						DurationMS: time.Since(roleStarted).Milliseconds(),
-					})
-				}
-				continue
-			}
-			attempts = append(attempts, harness.Attempt{
-				Role: tryRole, Provider: router.ProviderIDForRole(tryRole),
-				Code: harness.FailureProviderError, Detail: err.Error(),
-				DurationMS: time.Since(roleStarted).Milliseconds(),
-			})
-			continue
+	outcome := collectTextAttempts(ctx, router, roles, request)
+	attempts := outcome.Attempts
+	resp.GeneratedBy = outcome.GeneratedBy
+	for k, v := range outcome.Values {
+		if trimmed := strings.TrimSpace(v); trimmed != "" {
+			resp.Fields[k] = trimmed
 		}
-		if result == nil || strings.TrimSpace(result.Text) == "" {
-			attempts = append(attempts, harness.Attempt{
-				Role: tryRole, Provider: router.ProviderIDForRole(tryRole),
-				Code: harness.FailureEmptyResponse, Detail: "model returned no text",
-				DurationMS: time.Since(roleStarted).Milliseconds(),
-			})
-			continue
-		}
-		values, decodeErr := decodeGeneratedValuesChecked(result.Text)
-		if decodeErr != nil {
-			attempts = append(attempts, harness.Attempt{
-				Role: tryRole, Provider: router.ProviderIDForRole(tryRole),
-				Code: harness.FailureParseError, Detail: decodeErr.Error(),
-				DurationMS: time.Since(roleStarted).Milliseconds(),
-			})
-			continue
-		}
-		resp.GeneratedBy = tryRole
-		for k, v := range values {
-			if trimmed := strings.TrimSpace(v); trimmed != "" {
-				resp.Fields[k] = trimmed
-			}
-		}
-		break
 	}
 
 	s.recordGenerationAttempts(ctx, span, attempts)
