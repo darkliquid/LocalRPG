@@ -144,11 +144,14 @@ behaviour.
 The structured-turn protocol calls `request_check`; the engine resolves it here.
 
 ```go
-// pkg/rules
+// pkg/harness
 type CheckResolver interface {
-    Resolve(req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error)
+    Resolve(ctx context.Context, req CheckRequest, actor *entity.Entity) (*CheckResult, error)
 }
 ```
+
+The interface lives in `pkg/harness` so `pkg/rules` can implement it without
+importing `pkg/engine` (which imports `pkg/rules`). `pkg/engine` consumes it.
 
 `RuleEngine` (the orchestrator's rules dependency) gains
 `ResolveCheck(ctx, req) (*harness.CheckResult, error)`:

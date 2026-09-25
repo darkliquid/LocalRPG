@@ -90,6 +90,10 @@ never the primary path.
 - **Turn tools** (available on narrative turns): `submit_turn` (terminal) and
   `request_check` (mid-stream, repeatable). Defined in a new
   `pkg/harness/turn_tools.go`, offered alongside the query tools.
+
+The `CheckResolver` interface lives in `pkg/harness` (not `pkg/engine`) so that
+`pkg/rules` can implement it without importing `pkg/engine`, which imports
+`pkg/rules`.
 - **Query tools** (available any round): the existing `search_entities`,
   `get_entity`, `graph_neighbours`, `search_timeline`, plus the memory tools from
   spec 2.
@@ -159,9 +163,18 @@ type CheckRequest struct {
 
 type CheckResult struct {
     CheckID  string         `json:"check_id"`
-    Roll     *rules.RollResult `json:"roll"`
+    Roll     *RollSummary   `json:"roll"`
     Outcome  string         `json:"outcome"`
     Breakdown map[string]interface{} `json:"breakdown,omitempty"`
+}
+
+// RollSummary is harness's view of a die roll, so the protocol types never
+// import pkg/rules (rules imports harness and would cycle).
+type RollSummary struct {
+    Notation  string `json:"notation"`
+    Total     int    `json:"total"`
+    Successes int    `json:"successes"`
+    RollCount int    `json:"roll_count"`
 }
 
 type TurnSubmission struct {

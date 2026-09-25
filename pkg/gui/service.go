@@ -1155,6 +1155,16 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	})
 	orchestrator.SetTools(tools.NewExecutor(store, cfg.ToolResultChars()), cfg.RoleSupportsTools("gm"))
 	orchestrator.SetToolRounds(cfg.ToolRounds())
+
+	// Hand the engine the declared stats so it can validate a state change.
+	if sm, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml")); err == nil && sm.Mechanics != nil {
+		stats := make(map[string]core.StatSpec, len(sm.Mechanics.Stats))
+		for _, stat := range sm.Mechanics.Stats {
+			stats[stat.ID] = stat
+		}
+		orchestrator.SetDeclaredStats(stats)
+		orchestrator.SetAllowFreeformState(sm.Mechanics.AllowFreeformState)
+	}
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
