@@ -91,6 +91,7 @@ type TurnOrchestrator struct {
 	completion       harness.ModelProvider
 	completionPolicy CompletionPolicy
 	toolExecutor     ToolExecutor
+	checkResolver    harness.CheckResolver
 	toolCapability   string
 	toolRounds       int
 	toolObserver     func(ToolActivity)
@@ -129,6 +130,25 @@ func (o *TurnOrchestrator) SetToolRounds(rounds int) {
 		rounds = 4
 	}
 	o.toolRounds = rounds
+}
+
+// SetCheckResolver sets how request_check is resolved. A nil resolver restores
+// the deterministic default.
+func (o *TurnOrchestrator) SetCheckResolver(resolver harness.CheckResolver) {
+	if resolver == nil {
+		o.checkResolver = defaultCheckResolver{}
+		return
+	}
+	o.checkResolver = resolver
+}
+
+// checkResolverOrDefault returns the configured resolver.
+func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error) {
+	resolver := o.checkResolver
+	if resolver == nil {
+		resolver = defaultCheckResolver{}
+	}
+	return resolver.Resolve(ctx, req, actor)
 }
 
 // SetToolObserver receives tool activity as it happens, so a client can show it
@@ -834,6 +854,10 @@ type streamResult struct {
 	Failure    *harness.GenerationFailure
 	ProviderID string
 	ChunkCount int
+	// Submission is the structured turn when the GM called submit_turn, and
+	// Checks are the checks it resolved with request_check.
+	Submission *harness.TurnSubmission
+	Checks     []harness.CheckResult
 }
 
 // generationCode reads a bounded failure code for logging, defaulting to a
@@ -1172,6 +1196,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 	messages := []harness.Message{{Role: "user", Content: contextPrompt}}
 
 	var provenance []ToolCallRecord
+	var checks []harness.CheckResult
 	withdrawn := false
 
 	for round := 0; round <= o.toolRoundCap(); round++ {
@@ -1183,7 +1208,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		// tools reads Messages instead.
 		request := harness.GenerateRequest{Messages: messages, Prompt: contextPrompt}
 		if offerTools {
-			request.Tools = harness.ToolSpecs()
+			request.Tools = append(harness.ToolSpecs(), harness.TurnToolSpecs()...)
 		}
 		o.logger.Event("tool.round", map[string]interface{}{
 			"round":               round,
@@ -1269,6 +1294,41 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				"arguments_chars": len([]rune(call.Arguments)),
 			})
 			o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "running"})
+
+			// Turn tools are handled here, not by the query executor: a check
+			// resolves through the rules layer and feeds its result back, and a
+			// submission ends the loop.
+			if harness.IsTurnTool(call.Name) {
+				switch call.Name {
+				case "request_check":
+					req, parseErr := harness.ParseCheckRequest(call.Arguments)
+					if parseErr != nil {
+						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
+						continue
+					}
+					resolved, resolveErr := o.resolveCheck(ctx, *req, nil)
+					if resolveErr != nil {
+						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + resolveErr.Error()})
+						continue
+					}
+					checks = append(checks, *resolved)
+					encoded, _ := json.Marshal(resolved)
+					messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: string(encoded)})
+					o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "done", Summary: resolved.Outcome})
+					continue
+				case "submit_turn":
+					sub, parseErr := harness.ParseSubmission(call.Arguments)
+					if parseErr != nil {
+						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
+						continue
+					}
+					result.Submission = sub
+					result.Checks = checks
+					result.Provenance = provenance
+					result.ToolCalls = nil
+					return result, nil
+				}
+			}
 
 			started := time.Now()
 			toolCtx, toolSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "tool.call",
