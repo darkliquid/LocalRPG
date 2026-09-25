@@ -120,10 +120,11 @@ attributes are omitted rather than set to `""`.
 - Add a `localrpg.media.image.duration` histogram instrument (in the existing
   cached `generationInstruments` struct, or a sibling `mediaInstruments` if that
   reads cleaner) recorded with `localrpg.image.provider`.
-- Emit `image.request`, `image.complete`, and `image.error` through the same
-  `trace.LogEvent` seam used by text generation. On failure also emit an
-  `error` span event with the bounded code; on a role-style fallback (there is
-  none for images today) an `attempt` event.
+- Emit `generate.request`, `generate.complete`, and `generate.error` through the
+  same `trace.LogEvent` seam used by text generation, with `form_type` set to
+  `image` and `field_name` set to the asset kind. There is one unified event
+  family; images do not get their own `image.*` names. On failure also emit an
+  `error` span event with the bounded code.
 - Failures continue to increment `localrpg.generation.errors` with
   `localrpg.form_type=image`; success increments `localrpg.generation.duration`
   with the same form type.
@@ -333,7 +334,7 @@ Backend (standard library only, `t.TempDir()`):
   orchestrator fixture plus `telemetry.NewInMemory()`.
 - **Trace events:** a one-shot failure emits `generate.request`,
   `generate.attempt`, and `generate.error`; an image failure emits
-  `image.request` and `image.error`.
+  `generate.request` and `generate.error` with `form_type=image`.
 - **OTel attributes:** assert `generate.text` has `attempts`/`field_count`/
   `gen_ai.system` on success, and `generate.image` has `localrpg.image.bytes`.
 
@@ -364,13 +365,14 @@ Frontend: `mise run test:frontend` plus the manual checklist in section 9.
 - The amended `WorldDraft` design doc drops the unused `name` field.
 - `StreamForRole` behaviour changes only for empty streams; it has no callers.
 
-## 11. Open Questions
+## 11. Resolved Decisions
 
-- Should image and text generation share one `generate.*` event family instead
-  of `image.*` for images? The OTel spec names `image.*`; unifying would reduce
-  drift but would deviate from the approved spec. Current proposal: keep
-  `image.*`.
-- Should the game/world asset routes get their own `localrpg.image.generate`
-  span name (the OTel spec's original name) rather than `generate.image`? The
-  shipped code uses `generate.image`; this spec keeps it for continuity and
-  notes the divergence.
+- **Event family:** text and image generation share one `generate.*` event
+  family (`generate.request`, `generate.attempt`, `generate.complete`,
+  `generate.error`). Images are identified by `form_type=image`; there is no
+  separate `image.*` family.
+- **Span name:** the image span stays `generate.image`. The `localrpg.` prefix
+  belongs on attributes, not span names, and `generate.image` matches the
+  existing `generate.text` and dotted `noun.verb` convention in the
+  OpenTelemetry spec. Image-specific attributes keep their `localrpg.image.*`
+  prefix.
