@@ -58,6 +58,17 @@ export interface Turn {
   continuity_notes?: string[];
   // What the turn looked up: the name and result size of each tool call.
   tool_calls?: ToolCall[];
+  // The GM's verdict on the player's action, whether it was rejected as
+  // impossible, and the checks it resolved.
+  verdict?: { feasibility: 'automatic' | 'uncertain' | 'impossible'; reason?: string };
+  rejected?: boolean;
+  checks?: TurnCheck[];
+}
+
+export interface TurnCheck {
+  check_id: string;
+  outcome: string;
+  roll?: { notation: string; total: number };
 }
 
 export interface ToolCall {

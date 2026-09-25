@@ -120,6 +120,23 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               onStopTurn={onStopAudio}
             />
 
+            {turn.rejected && (
+              <div className="text-xs font-sans text-amber-300 bg-amber-950/40 border border-amber-500/30 rounded-lg px-3 py-2">
+                That action was impossible{turn.verdict?.reason ? `: ${turn.verdict.reason}` : '.'}
+              </div>
+            )}
+
+            {turn.checks && turn.checks.length > 0 && (
+              <div className="text-xs font-mono text-stone-400">
+                {turn.checks.map((check) => (
+                  <span key={check.check_id} className="mr-3">
+                    {check.roll ? `${check.roll.notation}=${check.roll.total} ` : ''}
+                    {check.outcome}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {turn.recovery === 'trimmed' && (
               <div className="text-xs font-mono text-purple-400/80 pt-1">
                 The narrator's reply ended mid-thought; the unfinished tail was dropped.
