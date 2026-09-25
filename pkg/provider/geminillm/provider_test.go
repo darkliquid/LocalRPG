@@ -195,6 +195,69 @@ func TestGeminiProviderResolvesFunctionResponseNames(t *testing.T) {
 	}
 }
 
+func TestGeminiProviderToolWithdrawnOrUnmatchedDoesNotSendEmptyFunctionResponse(t *testing.T) {
+	var gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"candidates": [
+				{"content": {"parts": [{"text": "You push the gate open and step into the courtyard."}], "role": "model"}, "finishReason": "STOP"}
+			]
+		}`)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:     "test-key",
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: server.Client(),
+		HTTPOptions: genai.HTTPOptions{
+			BaseURL: server.URL,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
+		Model:  "gemini-3.8-flash",
+		APIKey: "test-key",
+		Client: client,
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiProvider: %v", err)
+	}
+
+	// Tool message without a matching function call (e.g. tools withdrawn instruction)
+	// must be sent as a text part, NEVER as a functionResponse with an empty name.
+	_, err = provider.Generate(ctx, harness.GenerateRequest{
+		Messages: []harness.Message{
+			{Role: "user", Content: "Search the gate."},
+			{Role: "assistant", ToolCalls: []harness.ToolCall{
+				{ID: "call-1", Name: "get_entity", Arguments: `{"id":"iron-gate"}`},
+			}},
+			{Role: "tool", ToolCallID: "call-1", Content: "iron-gate note"},
+			{Role: "tool", Content: "Tools are no longer available for this turn. Complete and submit the turn now (call submit_turn or provide your narration as text)."},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+
+	if strings.Contains(gotBody, `"functionResponse":{"response"`) || strings.Contains(gotBody, `"functionResponse":{"name":""`) {
+		t.Errorf("function response must never carry an empty name: %s", gotBody)
+	}
+	if !strings.Contains(gotBody, `"name":"get_entity"`) {
+		t.Errorf("expected get_entity function response: %s", gotBody)
+	}
+	if !strings.Contains(gotBody, "Tools are no longer available") {
+		t.Errorf("expected tool withdrawal instruction to be sent as text: %s", gotBody)
+	}
+}
+
 func TestGeminiProviderStreamSeparatesThoughtsAndEmitsTools(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")

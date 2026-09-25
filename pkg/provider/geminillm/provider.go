@@ -360,16 +360,24 @@ func (g *GeminiProvider) buildContents(req harness.GenerateRequest) []*genai.Con
 	}
 	var pendingToolCalls []pendingToolCall
 
+	appendUserPart := func(part *genai.Part) {
+		if len(contents) > 0 && contents[len(contents)-1].Role == "user" {
+			contents[len(contents)-1].Parts = append(contents[len(contents)-1].Parts, part)
+		} else {
+			contents = append(contents, &genai.Content{
+				Role:  "user",
+				Parts: []*genai.Part{part},
+			})
+		}
+	}
+
 	for _, msg := range req.Messages {
 		switch msg.Role {
 		case "system":
 			// Handled in SystemInstruction
 			continue
 		case "user":
-			contents = append(contents, &genai.Content{
-				Role:  "user",
-				Parts: []*genai.Part{{Text: msg.Content}},
-			})
+			appendUserPart(&genai.Part{Text: msg.Content})
 		case "assistant":
 			var parts []*genai.Part
 			if strings.TrimSpace(msg.Content) != "" {
@@ -393,10 +401,14 @@ func (g *GeminiProvider) buildContents(req harness.GenerateRequest) []*genai.Con
 				pendingToolCalls = append(pendingToolCalls, pendingToolCall{id: tc.ID, name: tc.Name})
 			}
 			if len(parts) > 0 {
-				contents = append(contents, &genai.Content{
-					Role:  "model",
-					Parts: parts,
-				})
+				if len(contents) > 0 && contents[len(contents)-1].Role == "model" {
+					contents[len(contents)-1].Parts = append(contents[len(contents)-1].Parts, parts...)
+				} else {
+					contents = append(contents, &genai.Content{
+						Role:  "model",
+						Parts: parts,
+					})
+				}
 			}
 		case "tool":
 			var respMap map[string]interface{}
@@ -426,6 +438,16 @@ func (g *GeminiProvider) buildContents(req harness.GenerateRequest) []*genai.Con
 				pendingToolCalls = append(pendingToolCalls[:matchIndex], pendingToolCalls[matchIndex+1:]...)
 			}
 
+			if call.name == "" {
+				// No matching function call. Never send an empty function response
+				// name to Gemini as it violates the schema (400 INVALID_ARGUMENT: Name cannot be empty).
+				// Send as text instead.
+				if msg.Content != "" {
+					appendUserPart(&genai.Part{Text: msg.Content})
+				}
+				continue
+			}
+
 			response := &genai.FunctionResponse{
 				Name:     call.name,
 				Response: respMap,
@@ -433,10 +455,7 @@ func (g *GeminiProvider) buildContents(req harness.GenerateRequest) []*genai.Con
 			if call.id != "" && call.id == msg.ToolCallID {
 				response.ID = call.id
 			}
-			contents = append(contents, &genai.Content{
-				Role:  "user",
-				Parts: []*genai.Part{{FunctionResponse: response}},
-			})
+			appendUserPart(&genai.Part{FunctionResponse: response})
 		}
 	}
 	return contents

@@ -374,7 +374,11 @@ func (h *HTTPProvider) buildMessages(req harness.GenerateRequest) []openAIMessag
 
 	messages := make([]openAIMessage, 0, len(req.Messages))
 	for _, message := range req.Messages {
-		mapped := openAIMessage{Role: message.Role, Content: message.Content, ToolCallID: message.ToolCallID}
+		role := message.Role
+		if role == "tool" && message.ToolCallID == "" {
+			role = "user"
+		}
+		mapped := openAIMessage{Role: role, Content: message.Content, ToolCallID: message.ToolCallID}
 		for _, call := range message.ToolCalls {
 			wire := openAIToolCall{ID: call.ID, Type: "function"}
 			wire.Function.Name = call.Name
