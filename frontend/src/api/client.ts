@@ -36,6 +36,7 @@ import {
   TurnContext,
   WorkingEntry,
   GenerationFailure,
+  EntityMemory,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -128,6 +129,13 @@ export class APIClient {
   static async listWorlds(): Promise<WorldInfo[]> {
     const res = await fetch('/api/worlds');
     if (!res.ok) throw new Error(`listWorlds: ${res.statusText}`);
+    return res.json();
+  }
+
+  // listEntityMemories reads one entity's memory timeline for the codex.
+  static async listEntityMemories(gameID: string, entityID: string, limit = 20): Promise<EntityMemory[]> {
+    const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/entity/${encodeURIComponent(entityID)}/memories?limit=${limit}`);
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
   }
 

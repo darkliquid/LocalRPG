@@ -2905,3 +2905,28 @@ func toTurnContextDTO(tc *harness.TurnContext, prompt string) *TurnContextDTO {
 	}
 }
 
+
+// ListEntityMemories returns an entity's memories newest-first for the codex
+// timeline.
+func (s *Service) ListEntityMemories(gameID, entityID string, limit int) ([]MemoryDTO, error) {
+	s.ensureIndexed(gameID)
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, err
+	}
+	memories, err := store.ListMemoriesForEntity(entityID, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]MemoryDTO, 0, len(memories))
+	for _, memory := range memories {
+		out = append(out, MemoryDTO{
+			Turn:       memory.Turn,
+			Kind:       memory.Kind,
+			Text:       memory.Text,
+			Importance: memory.Importance,
+			Tags:       memory.Tags,
+		})
+	}
+	return out, nil
+}

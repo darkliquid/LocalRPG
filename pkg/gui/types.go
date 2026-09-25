@@ -93,8 +93,16 @@ type ToolCallDTO struct {
 	ResultChars int    `json:"result_chars"`
 }
 
-type EntityDTO struct {
-	ID         string                 `json:"id"`
+// MemoryDTO is one entity memory in an entity's timeline.
+type MemoryDTO struct {
+	Turn       int      `json:"turn"`
+	Kind       string   `json:"kind"`
+	Text       string   `json:"text"`
+	Importance int      `json:"importance"`
+	Tags       []string `json:"tags,omitempty"`
+}
+
+type EntityDTO struct {	ID         string                 `json:"id"`
 	Name       string                 `json:"name"`
 	Type       string                 `json:"type"`
 	Markdown   string                 `json:"markdown"`

@@ -610,6 +610,7 @@ export const App: React.FC = () => {
             )}
             {activeDrawer === 'codex' && (
               <CodexDrawer
+                gameID={activeGameID || undefined}
                 entity={selectedEntity || undefined}
                 entities={entities}
                 voiceProfiles={config?.media.tts.voice_profiles ?? []}

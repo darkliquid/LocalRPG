@@ -461,6 +461,21 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, turns)
 			return
 		}
+		if len(parts) >= 4 && parts[3] == "memories" && r.Method == http.MethodGet {
+			limit := 20
+			if raw := r.URL.Query().Get("limit"); raw != "" {
+				if parsed, err := strconv.Atoi(raw); err == nil {
+					limit = parsed
+				}
+			}
+			memories, err := s.service.ListEntityMemories(gameID, entityID, limit)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, memories)
+			return
+		}
 		if r.Method == http.MethodPut {
 			var body struct {
 				Markdown string `json:"markdown"`

@@ -1,10 +1,12 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EntityNote, EntitySummary, TTSConfig, VoiceProfile } from '../types';
+import { EntityMemory, EntityNote, EntitySummary, TTSConfig, VoiceProfile } from '../types';
+import { APIClient } from '../api/client';
 import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X } from 'lucide-react';
 import { TurnHistoryList } from './TurnHistoryList';
 import { VoiceCatalogPicker } from './VoiceCatalogPicker';
 
 interface CodexDrawerProps {
+  gameID?: string;
   entity?: EntityNote;
   entities?: EntitySummary[];
   voiceProfiles?: VoiceProfile[];
@@ -23,6 +25,7 @@ function inlineYaml(value: unknown): string {
 }
 
 export const CodexDrawer: React.FC<CodexDrawerProps> = ({
+  gameID,
   entity,
   entities,
   voiceProfiles,
@@ -40,6 +43,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [mergeTarget, setMergeTarget] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [memories, setMemories] = useState<EntityMemory[]>([]);
 
   const profiles = voiceProfiles ?? [];
 
@@ -50,6 +54,25 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
       setIsSidebarOpen(true);
     }
   }, [entity]);
+
+  // The entity's memory timeline is read-only and fetched on selection.
+  useEffect(() => {
+    if (!gameID || !entity?.id) {
+      setMemories([]);
+      return;
+    }
+    let cancelled = false;
+    APIClient.listEntityMemories(gameID, entity.id)
+      .then((rows) => {
+        if (!cancelled) setMemories(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setMemories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameID, entity?.id]);
 
   // The corpus grows every turn, so the browser derives its own facets rather
   // than assuming a fixed set of note types.
@@ -176,6 +199,25 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               </button>
             ))}
           </div>
+
+          {entity && memories.length > 0 && (
+            <div className="border-t border-white/10 pt-2">
+              <div className="text-[10px] font-sans text-stone-400 font-bold uppercase tracking-wider mb-1">
+                Memories
+              </div>
+              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                {memories.map((memory, index) => (
+                  <div
+                    key={`${memory.turn}-${index}`}
+                    className="text-[11px] text-stone-300 bg-black/30 border border-white/5 rounded px-2 py-1"
+                  >
+                    <span className="font-mono text-stone-500 mr-1">t{memory.turn}</span>
+                    {memory.text}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 min-h-[160px] overflow-y-auto space-y-1 pr-1">
             {filtered.length === 0 ? (

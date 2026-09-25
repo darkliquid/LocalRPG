@@ -71,6 +71,14 @@ export interface TurnCheck {
   roll?: { notation: string; total: number };
 }
 
+export interface EntityMemory {
+  turn: number;
+  kind: string;
+  text: string;
+  importance: number;
+  tags?: string[];
+}
+
 export interface ToolCall {
   name: string;
   result_chars: number;
