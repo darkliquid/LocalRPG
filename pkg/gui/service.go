@@ -1787,6 +1787,7 @@ func (s *Service) ListWorlds(ctx context.Context) ([]WorldSummaryDTO, error) {
 			Name:              m.Name,
 			Description:       m.Description,
 			Genre:             m.Genre,
+			ArtStyle:          m.ArtStyle,
 			CompatibleSystems: compat,
 			BannerURL:         bannerURL,
 			IconURL:           iconURL,
@@ -2654,6 +2655,62 @@ type GenerateAssetRequestDTO struct {
 	Prompt string `json:"prompt,omitempty"`
 }
 
+// buildAssetPrompt renders the image prompt shared by game, world, and preview
+// generation. A non-empty genre means world context; otherwise this is a
+// campaign, where description carries the world name.
+func buildAssetPrompt(kind, name, description, artStyle, genre string) string {
+	if genre == "" {
+		if kind == "icon" {
+			return fmt.Sprintf("%s game app icon emblem for %s in %s, high contrast vector emblem, centered dark backdrop", artStyle, name, description)
+		}
+		return fmt.Sprintf("%s widescreen cinematic concept art landscape for %s in %s, highly detailed masterpiece environment", artStyle, name, description)
+	}
+	if kind == "icon" {
+		return fmt.Sprintf("%s emblem icon badge for world %s (%s), %s, clean centered icon", artStyle, name, genre, description)
+	}
+	return fmt.Sprintf("%s widescreen landscape banner concept art for world %s (%s), %s, atmospheric panoramic background", artStyle, name, genre, description)
+}
+
+// GenerateAssetPreviewRequestDTO carries inline form metadata for a stateless
+// preview render. Nothing is persisted.
+type GenerateAssetPreviewRequestDTO struct {
+	Kind        string `json:"kind"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ArtStyle    string `json:"art_style"`
+	Genre       string `json:"genre,omitempty"`
+}
+
+// GenerateAssetPreview renders banner or icon image bytes in memory and returns
+// them with a MIME type detected from the bytes.
+func (s *Service) GenerateAssetPreview(ctx context.Context, req GenerateAssetPreviewRequestDTO) ([]byte, string, error) {
+	cfg := s.configMgr.Get()
+	client, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
+	if err != nil {
+		return nil, "", fmt.Errorf("image provider: %w", err)
+	}
+	prompt := buildAssetPrompt(req.Kind, req.Name, req.Description, req.ArtStyle, req.Genre)
+	imgBytes, err := client.GenerateImage(ctx, prompt)
+	if err != nil {
+		return nil, "", fmt.Errorf("generate image: %w", err)
+	}
+
+	ext := media.ArtExtension(imgBytes)
+	contentType := "application/octet-stream"
+	switch ext {
+	case ".svg":
+		contentType = "image/svg+xml"
+	case ".png":
+		contentType = "image/png"
+	case ".jpg", ".jpeg":
+		contentType = "image/jpeg"
+	case ".webp":
+		contentType = "image/webp"
+	}
+
+	return imgBytes, contentType, nil
+}
+
 func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req GenerateAssetRequestDTO) (string, error) {
 	cfg := s.configMgr.Get()
 	client, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
@@ -2677,11 +2734,7 @@ func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req Gene
 				artStyle = wm.ArtStyle
 			}
 		}
-		if req.Kind == "icon" {
-			prompt = fmt.Sprintf("%s game app icon emblem for %s in %s, high contrast vector emblem, centered dark backdrop", artStyle, gameName, worldName)
-		} else {
-			prompt = fmt.Sprintf("%s widescreen cinematic concept art landscape for %s in %s, highly detailed masterpiece environment", artStyle, gameName, worldName)
-		}
+		prompt = buildAssetPrompt(req.Kind, gameName, worldName, artStyle, "")
 	}
 	imgBytes, err := client.GenerateImage(ctx, prompt)
 	if err != nil {
@@ -2713,11 +2766,7 @@ func (s *Service) GenerateWorldAsset(ctx context.Context, worldID string, req Ge
 			genre = wm.Genre
 			desc = wm.Description
 		}
-		if req.Kind == "icon" {
-			prompt = fmt.Sprintf("%s emblem icon badge for world %s (%s), %s, clean centered icon", artStyle, worldName, genre, desc)
-		} else {
-			prompt = fmt.Sprintf("%s widescreen landscape banner concept art for world %s (%s), %s, atmospheric panoramic background", artStyle, worldName, genre, desc)
-		}
+		prompt = buildAssetPrompt(req.Kind, worldName, desc, artStyle, genre)
 	}
 	imgBytes, err := client.GenerateImage(ctx, prompt)
 	if err != nil {

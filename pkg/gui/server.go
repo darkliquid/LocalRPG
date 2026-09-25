@@ -52,7 +52,7 @@ func routePattern(path string) string {
 		path == "/api/providers" || path == "/api/providers/models" ||
 		path == "/api/tts/inspect" || path == "/api/tts/voices/search" ||
 		path == "/api/stt" || path == "/api/trace" || path == "/api/character/generate" ||
-		path == "/api/generate-text":
+		path == "/api/generate-text" || path == "/api/generate-asset-preview":
 		return path
 	case path == "/api/models" || strings.HasPrefix(path, "/api/models/"):
 		return "/api/models"
@@ -82,6 +82,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/games", s.handleGamesRoutes)
 	s.mux.HandleFunc("/api/character/generate", s.handleCharacterGenerateRoute)
 	s.mux.HandleFunc("/api/generate-text", s.handleGenerateTextRoute)
+	s.mux.HandleFunc("/api/generate-asset-preview", s.handleGenerateAssetPreview)
 	s.mux.HandleFunc("/api/systems", s.handleSystemsRoutes)
 	s.mux.HandleFunc("/api/system/", s.handleSystemRoutes)
 	s.mux.HandleFunc("/api/worlds", s.handleWorldsRoutes)
@@ -1121,4 +1122,30 @@ func (s *Server) handleModelsRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.NotFound(w, r)
+}
+
+// handleGenerateAssetPreview serves POST /api/generate-asset-preview. It renders
+// image bytes from inline form metadata and writes them back without touching
+// disk.
+func (s *Server) handleGenerateAssetPreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req GenerateAssetPreviewRequestDTO
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024)).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Kind != "banner" && req.Kind != "icon" {
+		http.Error(w, "kind must be 'banner' or 'icon'", http.StatusBadRequest)
+		return
+	}
+	data, contentType, err := s.service.GenerateAssetPreview(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	_, _ = w.Write(data)
 }

@@ -148,6 +148,7 @@ type WorldSummaryDTO struct {
 	Name              string   `json:"name"`
 	Description       string   `json:"description"`
 	Genre             string   `json:"genre"`
+	ArtStyle          string   `json:"art_style,omitempty"`
 	CompatibleSystems []string `json:"compatible_systems"`
 	BannerURL         string   `json:"banner_url,omitempty"`
 	IconURL           string   `json:"icon_url,omitempty"`
