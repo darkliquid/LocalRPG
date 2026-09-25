@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Turn } from '../types';
 import { TurnSegments } from './TurnSegments';
 import { Play, Pause, SkipBack, SkipForward, X } from 'lucide-react';
@@ -9,6 +9,9 @@ interface StoryTheaterProps {
   onClose: () => void;
   autoPlay?: boolean;
   volume?: number;
+  gameId?: string;
+  playerId?: string;
+  playerPortrait?: string;
 }
 
 export const StoryTheater: React.FC<StoryTheaterProps> = ({
@@ -17,6 +20,9 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   onClose,
   autoPlay = false,
   volume = 1,
+  gameId,
+  playerId,
+  playerPortrait: propPlayerPortrait,
 }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -32,6 +38,30 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     0
   );
   const turnDurationMs = reportedMs > 0 ? reportedMs : 4000;
+
+  // Resolve player portrait from props, segments across chronicle, or fallback endpoint
+  const playerPortrait = useMemo(() => {
+    if (propPlayerPortrait) return propPlayerPortrait;
+    for (const turn of turns) {
+      const pSeg = turn.segments?.find((s) => s.player && s.portrait_url);
+      if (pSeg?.portrait_url) return pSeg.portrait_url;
+    }
+    if (gameId && playerId) {
+      return `/api/game/${gameId}/character/${playerId}/portrait`;
+    }
+    return undefined;
+  }, [propPlayerPortrait, turns, gameId, playerId]);
+
+  // Active speech and speaker identification
+  const speechSegments = currentTurn?.segments?.filter((s) => s.kind === 'speech') ?? [];
+  const activeSpeech = speechSegments[0]; // primary speech segment for the turn if present
+  const isPlayerSpeaking = Boolean(activeSpeech?.player);
+  const isNpcSpeaking = Boolean(activeSpeech && !activeSpeech.player);
+
+  const npcPortrait = useMemo(() => {
+    const npcSeg = currentTurn?.segments?.find((s) => !s.player && s.portrait_url);
+    return npcSeg?.portrait_url;
+  }, [currentTurn]);
 
   useEffect(() => {
     if (!isOpen || !isPlaying || turns.length === 0) return;
@@ -76,9 +106,50 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
         </button>
       </header>
 
-      {/* Main Dialogue Card */}
-      <main className="relative z-10 flex-1 flex items-center justify-center p-8">
-        <div className="max-w-3xl w-full bg-glass-card rounded-2xl p-8 shadow-2xl border border-white/10 space-y-4">
+      {/* Visual Novel Character Stage */}
+      <main className="relative z-10 flex-1 flex flex-col justify-end items-center max-w-5xl mx-auto w-full px-8 pb-4 pointer-events-none">
+        <div className="w-full flex items-end justify-between px-8 mb-2">
+          {/* Protagonist (Stage Left, facing Right) */}
+          {playerPortrait ? (
+            <div
+              className={`relative w-64 h-80 transition-all duration-500 transform origin-bottom ${
+                isPlayerSpeaking
+                  ? 'opacity-100 scale-105 drop-shadow-[0_10px_25px_rgba(56,189,248,0.35)] z-20'
+                  : 'opacity-40 brightness-75 scale-95 z-10'
+              }`}
+            >
+              <img
+                src={playerPortrait}
+                alt="Protagonist"
+                className="w-full h-full object-contain filter drop-shadow-md"
+              />
+            </div>
+          ) : (
+            <div className="w-64" />
+          )}
+
+          {/* NPC Interlocutor (Stage Right, flipped facing Left) */}
+          {npcPortrait ? (
+            <div
+              className={`relative w-64 h-80 transition-all duration-500 transform origin-bottom scale-x-[-1] ${
+                isNpcSpeaking
+                  ? 'opacity-100 scale-105 drop-shadow-[0_10px_25px_rgba(168,85,247,0.35)] z-20'
+                  : 'opacity-40 brightness-75 scale-95 z-10'
+              }`}
+            >
+              <img
+                src={npcPortrait}
+                alt="Interlocutor"
+                className="w-full h-full object-contain filter drop-shadow-md"
+              />
+            </div>
+          ) : (
+            <div className="w-64" />
+          )}
+        </div>
+
+        {/* Main Dialogue Card */}
+        <div className="w-full pointer-events-auto bg-stone-900/85 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10 space-y-4 max-h-[38vh] overflow-y-auto">
           <TurnSegments
             segments={currentTurn?.segments}
             fallback={currentTurn?.prose ?? ''}

@@ -683,6 +683,8 @@ export const App: React.FC = () => {
             onClose={() => setIsTheaterOpen(false)}
             autoPlay={serverAudio ? false : config?.media.tts.auto_play ?? false}
             volume={config?.media.tts.master_volume ?? 1}
+            gameId={activeGameID ?? undefined}
+            playerId={gameState?.player?.id}
           />
 
           {/* Add Entity Modal */}
