@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { WorldInfo, SystemInfo, CreateGameRequest, VoiceProfile } from '../../types';
 import { APIClient } from '../../api/client';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
-import { X, Upload, Check, Volume2, MapPin, Sparkles, User } from 'lucide-react';
+import { X, Upload, Check, Volume2, MapPin, Sparkles, User, Wand2 } from 'lucide-react';
+import { AIGenerateButton } from '../ui/AIGenerateButton';
 
 interface NewCampaignModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   const [narratorVoice, setNarratorVoice] = useState('');
   const [openingPrompt, setOpeningPrompt] = useState('');
   const [startLocation, setStartLocation] = useState('');
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -88,6 +90,59 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
     if (file) {
       setIconFile(file);
       setIconPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const getFormContext = (): Record<string, string> => ({
+    world_name: world?.name || '',
+    world_description: world?.description || '',
+    world_genre: world?.genre || '',
+    campaign_name: campaignName,
+    player_name: playerName,
+    player_appearance: playerAppearance,
+    player_background: playerBackground,
+    player_age: playerAge,
+    player_gender: playerGender,
+    player_pronouns: playerPronouns,
+    start_location: startLocation,
+    opening_prompt: openingPrompt,
+  });
+
+  const handleGenerateAll = async () => {
+    if (isGeneratingAll) return;
+    setIsGeneratingAll(true);
+    try {
+      const ctx = getFormContext();
+      // Generate campaign directives
+      const campRes = await APIClient.generateText({
+        form_type: 'campaign',
+        field_name: '_all',
+        context: ctx,
+        world_id: world?.id,
+        system_id: selectedSystemID,
+      });
+      if (campRes.fields.name && !campaignName.trim()) setCampaignName(campRes.fields.name);
+      if (campRes.fields.start_location && !startLocation.trim()) setStartLocation(campRes.fields.start_location);
+      if (campRes.fields.opening_prompt && !openingPrompt.trim()) setOpeningPrompt(campRes.fields.opening_prompt);
+
+      // Generate character fields
+      const charRes = await APIClient.generateText({
+        form_type: 'character',
+        field_name: '_all',
+        context: { ...ctx, ...campRes.fields },
+        world_id: world?.id,
+        system_id: selectedSystemID,
+      });
+      if (charRes.fields.name && !playerName.trim()) setPlayerName(charRes.fields.name);
+      if (charRes.fields.appearance && !playerAppearance.trim()) setPlayerAppearance(charRes.fields.appearance);
+      if (charRes.fields.background && !playerBackground.trim()) setPlayerBackground(charRes.fields.background);
+      if (charRes.fields.age && !playerAge.trim()) setPlayerAge(charRes.fields.age);
+      if (charRes.fields.gender && !playerGender.trim()) setPlayerGender(charRes.fields.gender);
+      if (charRes.fields.pronouns && !playerPronouns.trim()) setPlayerPronouns(charRes.fields.pronouns);
+    } catch (err) {
+      console.error('Failed to generate all fields:', err);
+    } finally {
+      setIsGeneratingAll(false);
     }
   };
 
@@ -171,9 +226,19 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Campaign Title */}
           <div className="space-y-1.5">
-            <label className="text-xs font-sans font-semibold text-stone-300 uppercase tracking-wider">
-              Campaign Title
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-sans font-semibold text-stone-300 uppercase tracking-wider">
+                Campaign Title
+              </label>
+              <AIGenerateButton
+                formType="campaign"
+                fieldName="name"
+                getContext={getFormContext}
+                onGenerated={(val) => setCampaignName(val)}
+                worldID={world?.id}
+                systemID={selectedSystemID}
+              />
+            </div>
             <input
               type="text"
               required
@@ -280,9 +345,19 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-sans text-stone-300">
-                Character Name <span className="text-purple-400">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-sans text-stone-300">
+                  Character Name <span className="text-purple-400">*</span>
+                </label>
+                <AIGenerateButton
+                  formType="character"
+                  fieldName="name"
+                  getContext={getFormContext}
+                  onGenerated={(val) => setPlayerName(val)}
+                  worldID={world?.id}
+                  systemID={selectedSystemID}
+                />
+              </div>
               <input
                 type="text"
                 required
@@ -295,7 +370,17 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div className="space-y-1">
-                <label className="text-[11px] font-sans text-stone-400">Age</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-sans text-stone-400">Age</label>
+                  <AIGenerateButton
+                    formType="character"
+                    fieldName="age"
+                    getContext={getFormContext}
+                    onGenerated={(val) => setPlayerAge(val)}
+                    worldID={world?.id}
+                    systemID={selectedSystemID}
+                  />
+                </div>
                 <input
                   type="text"
                   value={playerAge}
@@ -305,7 +390,17 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-sans text-stone-400">Gender</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-sans text-stone-400">Gender</label>
+                  <AIGenerateButton
+                    formType="character"
+                    fieldName="gender"
+                    getContext={getFormContext}
+                    onGenerated={(val) => setPlayerGender(val)}
+                    worldID={world?.id}
+                    systemID={selectedSystemID}
+                  />
+                </div>
                 <input
                   type="text"
                   value={playerGender}
@@ -315,7 +410,17 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-sans text-stone-400">Pronouns</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-sans text-stone-400">Pronouns</label>
+                  <AIGenerateButton
+                    formType="character"
+                    fieldName="pronouns"
+                    getContext={getFormContext}
+                    onGenerated={(val) => setPlayerPronouns(val)}
+                    worldID={world?.id}
+                    systemID={selectedSystemID}
+                  />
+                </div>
                 <input
                   type="text"
                   value={playerPronouns}
@@ -327,7 +432,18 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-sans text-stone-400">Appearance</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-sans text-stone-400">Appearance</label>
+                <AIGenerateButton
+                  formType="character"
+                  fieldName="appearance"
+                  getContext={getFormContext}
+                  onGenerated={(val) => setPlayerAppearance(val)}
+                  worldID={world?.id}
+                  systemID={selectedSystemID}
+                  seed={playerAppearance}
+                />
+              </div>
               <input
                 type="text"
                 value={playerAppearance}
@@ -338,7 +454,18 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-sans text-stone-400">Background / Origin</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-sans text-stone-400">Background / Origin</label>
+                <AIGenerateButton
+                  formType="character"
+                  fieldName="background"
+                  getContext={getFormContext}
+                  onGenerated={(val) => setPlayerBackground(val)}
+                  worldID={world?.id}
+                  systemID={selectedSystemID}
+                  seed={playerBackground}
+                />
+              </div>
               <textarea
                 rows={2}
                 value={playerBackground}
@@ -357,10 +484,20 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-sans text-stone-300 flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-stone-400" />
-                <span>Start Location (Optional)</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-sans text-stone-300 flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-stone-400" />
+                  <span>Start Location (Optional)</span>
+                </label>
+                <AIGenerateButton
+                  formType="campaign"
+                  fieldName="start_location"
+                  getContext={getFormContext}
+                  onGenerated={(val) => setStartLocation(val)}
+                  worldID={world?.id}
+                  systemID={selectedSystemID}
+                />
+              </div>
               <input
                 type="text"
                 value={startLocation}
@@ -371,9 +508,20 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-sans text-stone-300">
-                Opening Scene Directive (Optional)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-sans text-stone-300">
+                  Opening Scene Directive (Optional)
+                </label>
+                <AIGenerateButton
+                  formType="campaign"
+                  fieldName="opening_prompt"
+                  getContext={getFormContext}
+                  onGenerated={(val) => setOpeningPrompt(val)}
+                  worldID={world?.id}
+                  systemID={selectedSystemID}
+                  seed={openingPrompt}
+                />
+              </div>
               <textarea
                 rows={2}
                 value={openingPrompt}
@@ -448,6 +596,15 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
 
           {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleGenerateAll}
+              disabled={isSubmitting || isGeneratingAll}
+              className="px-3 py-2 rounded-xl border border-purple-500/30 bg-purple-600/10 hover:bg-purple-600/20 text-purple-300 text-xs font-sans font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Wand2 className={`w-3.5 h-3.5 ${isGeneratingAll ? 'animate-spin' : ''}`} />
+              <span>{isGeneratingAll ? 'Generating...' : 'Auto-Fill Fields'}</span>
+            </button>
             <button
               type="button"
               onClick={onClose}
