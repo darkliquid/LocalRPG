@@ -122,9 +122,6 @@ func (s *Service) recordGeneration(ctx context.Context, span oteltrace.Span, for
 		}
 		trace.LogEvent(ctx, trace.OrNil(s.logger), "generate.error", fields)
 	} else {
-		if span != nil {
-			span.SetAttributes(attribute.String("localrpg.generation.failure_code", ""))
-		}
 		trace.LogEvent(ctx, trace.OrNil(s.logger), "generate.complete", fields)
 	}
 	generationMetrics().duration.Record(ctx, float64(elapsed.Milliseconds()), otelmetric.WithAttributes(
@@ -141,7 +138,7 @@ func (s *Service) recordImage(ctx context.Context, span oteltrace.Span, kind, pr
 	elapsed := time.Since(started)
 	fields := map[string]interface{}{
 		"form_type":   "image",
-		"image_kind":  kind,
+		"field_name":  kind,
 		"provider":    provider,
 		"bytes":       size,
 		"duration_ms": elapsed.Milliseconds(),

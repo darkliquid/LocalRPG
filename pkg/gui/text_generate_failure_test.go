@@ -30,7 +30,11 @@ func TestGenerateTextEmitsTraceEvents(t *testing.T) {
 
 	names := mem.Names()
 	want := map[string]bool{"generate.request": false, "generate.attempt": false, "generate.error": false}
+	errorCount := 0
 	for _, name := range names {
+		if name == "generate.error" {
+			errorCount++
+		}
 		if _, ok := want[name]; ok {
 			want[name] = true
 		}
@@ -39,5 +43,9 @@ func TestGenerateTextEmitsTraceEvents(t *testing.T) {
 		if !seen {
 			t.Fatalf("trace events %v missing %q", names, name)
 		}
+	}
+	// The service owns the event; the handler must not emit a duplicate.
+	if errorCount != 1 {
+		t.Fatalf("generate.error emitted %d times, want exactly 1 (%v)", errorCount, names)
 	}
 }

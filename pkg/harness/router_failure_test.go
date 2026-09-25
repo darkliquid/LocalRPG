@@ -2,6 +2,7 @@ package harness
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -136,5 +137,32 @@ func TestStreamForRoleEmptyEverywhereIsFailure(t *testing.T) {
 	}
 	if len(failure.Attempts) != 2 {
 		t.Fatalf("attempts = %d, want 2", len(failure.Attempts))
+	}
+}
+
+type errorFirstProvider struct{ err error }
+
+func (p *errorFirstProvider) ID() string { return "error-first" }
+
+func (p *errorFirstProvider) Generate(context.Context, GenerateRequest) (*GenerateResponse, error) {
+	return &GenerateResponse{}, nil
+}
+
+func (p *errorFirstProvider) Stream(_ context.Context, _ GenerateRequest, out chan<- StreamChunk) error {
+	out <- StreamChunk{Error: p.err}
+	close(out)
+	return nil
+}
+
+func TestStreamForRoleClassifiesFirstChunkError(t *testing.T) {
+	router := NewRouter()
+	router.RegisterProvider(&errorFirstProvider{err: errors.New("connection reset")})
+	router.AssignRole("gm", "error-first")
+
+	out := make(chan StreamChunk, 4)
+	err := router.StreamForRole(context.Background(), "gm", GenerateRequest{Prompt: "hi"}, out)
+	failure, ok := FailureFrom(err)
+	if !ok || failure.Code != FailureProviderError {
+		t.Fatalf("error = %v, want provider_error", err)
 	}
 }

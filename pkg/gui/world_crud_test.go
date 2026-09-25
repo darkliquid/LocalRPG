@@ -108,7 +108,11 @@ func TestWorldCreateDuplicateIsConflict(t *testing.T) {
 	if rec := post(); rec.Code != http.StatusCreated {
 		t.Fatalf("first create status = %d, want 201: %s", rec.Code, rec.Body.String())
 	}
-	if rec := post(); rec.Code != http.StatusConflict {
+	rec := post()
+	if rec.Code != http.StatusConflict {
 		t.Fatalf("duplicate create status = %d, want 409: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"error"`) {
+		t.Fatalf("duplicate create body = %q, want a JSON error envelope", rec.Body.String())
 	}
 }

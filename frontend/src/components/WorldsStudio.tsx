@@ -146,6 +146,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         setEntityDrafts({});
       }
     } catch (err) {
+      if (token !== detailRequest.current) return;
       setToast({ type: 'error', message: errorMessage(err) || 'Failed to load world details' });
     }
   };

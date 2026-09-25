@@ -315,7 +315,17 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (res.status === 409) throw new WorldExistsError(await res.text());
+    if (res.status === 409) {
+      const text = await res.text();
+      let message = text;
+      try {
+        const body = JSON.parse(text) as { error?: { message?: string } };
+        if (body.error?.message) message = body.error.message;
+      } catch {
+        // Keep the raw text when the body is not JSON.
+      }
+      throw new WorldExistsError(message);
+    }
     if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
   }

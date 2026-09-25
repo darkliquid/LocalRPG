@@ -148,29 +148,29 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 	attempts := make([]Attempt, 0, 2)
 	started := time.Now()
 
-	if streamed, streamErr := r.forwardStream(ctx, primary, req, out); streamed {
+	streamed, code, detail, streamErr := r.forwardStream(ctx, primary, req, out)
+	if streamed {
 		return streamErr
 	}
 	attempts = append(attempts, Attempt{
-		Role: role, Provider: primary.ID(),
-		Code: FailureEmptyResponse, Detail: "provider streamed no text",
+		Role: role, Provider: primary.ID(), Code: code, Detail: detail,
 		DurationMS: time.Since(started).Milliseconds(),
 	})
 
 	if fallback, ok := r.FallbackForRole(role); ok && fallback != nil {
-		if streamed, streamErr := r.forwardStream(ctx, fallback, req, out); streamed {
+		streamed, code, detail, streamErr = r.forwardStream(ctx, fallback, req, out)
+		if streamed {
 			return streamErr
 		}
 		attempts = append(attempts, Attempt{
-			Role: role, Provider: fallback.ID(),
-			Code: FailureEmptyResponse, Detail: "provider streamed no text",
+			Role: role, Provider: fallback.ID(), Code: code, Detail: detail,
 			DurationMS: time.Since(started).Milliseconds(),
 		})
 	}
 
 	close(out)
 	return &GenerationFailure{
-		Code:      FailureEmptyResponse,
+		Code:      attempts[len(attempts)-1].Code,
 		Message:   fmt.Sprintf("role %q streamed no text", role),
 		Attempts:  attempts,
 		ElapsedMS: time.Since(started).Milliseconds(),
@@ -179,9 +179,9 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 
 // forwardStream pushes a provider's chunks to out once it has seen a usable
 // first chunk. It reports whether anything was forwarded; a provider that closes
-// empty, or whose first chunk carries an error, is treated as having streamed
-// nothing so the caller can fall back.
-func (r *Router) forwardStream(ctx context.Context, provider ModelProvider, req GenerateRequest, out chan<- StreamChunk) (bool, error) {
+// empty, or whose first chunk carries an error, is reported with its classified
+// failure code so the caller can fall back and explain why it did.
+func (r *Router) forwardStream(ctx context.Context, provider ModelProvider, req GenerateRequest, out chan<- StreamChunk) (bool, FailureCode, string, error) {
 	tempOut := make(chan StreamChunk, 20)
 	errCh := make(chan error, 1)
 	go func() {
@@ -189,13 +189,20 @@ func (r *Router) forwardStream(ctx context.Context, provider ModelProvider, req 
 	}()
 
 	chunk, ok := <-tempOut
-	if !ok || chunk.Error != nil {
+	if !ok {
+		streamErr := <-errCh
+		if streamErr != nil {
+			return false, ClassifyProviderError(streamErr), streamErr.Error(), nil
+		}
+		return false, FailureEmptyResponse, "provider streamed no text", nil
+	}
+	if chunk.Error != nil {
 		go func() {
 			for range tempOut {
 			}
 		}()
 		<-errCh
-		return false, nil
+		return false, ClassifyProviderError(chunk.Error), chunk.Error.Error(), nil
 	}
 	go func() {
 		defer close(out)
@@ -204,5 +211,5 @@ func (r *Router) forwardStream(ctx context.Context, provider ModelProvider, req 
 			out <- rest
 		}
 	}()
-	return true, <-errCh
+	return true, "", "", <-errCh
 }

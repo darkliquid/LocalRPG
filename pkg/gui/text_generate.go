@@ -191,6 +191,7 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 			PromptChars: len([]rune(request.PromptText())),
 			ElapsedMS:   time.Since(started).Milliseconds(),
 		}
+		s.setTextOutcome(span, generationOutcome{Attempts: attempts}, 0)
 		s.recordGeneration(ctx, span, req.FormType, roleForAttempts(attempts), started, failure)
 		return nil, failure
 	}

@@ -61,6 +61,12 @@ func collectTextAttempts(ctx context.Context, router *harness.Router, roles []st
 		}
 		out.Values = values
 		out.GeneratedBy = role
+		// Record the winning attempt too, so the span's gen_ai.system and
+		// attempt count name the provider that actually answered.
+		out.Attempts = append(out.Attempts, harness.Attempt{
+			Role: role, Provider: router.ProviderIDForRole(role),
+			DurationMS: time.Since(roleStarted).Milliseconds(),
+		})
 		break
 	}
 	return out

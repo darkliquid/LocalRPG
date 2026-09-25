@@ -124,6 +124,7 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 			PromptChars: len([]rune(request.PromptText())),
 			ElapsedMS:   time.Since(started).Milliseconds(),
 		}
+		s.setTextOutcome(span, generationOutcome{Attempts: attempts}, 0)
 		s.recordGeneration(ctx, span, "character", roleForAttempts(attempts), started, failure)
 		return nil, failure
 	}

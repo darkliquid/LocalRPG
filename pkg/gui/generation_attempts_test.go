@@ -52,7 +52,7 @@ func TestCollectTextAttempts(t *testing.T) {
 			roles:     []string{"character", "gm"},
 			wantValue: "Vela",
 			wantBy:    "gm",
-			wantCodes: []harness.FailureCode{harness.FailureProviderError},
+			wantCodes: []harness.FailureCode{harness.FailureProviderError, ""},
 		},
 		{
 			name:      "role fallback after an empty reply",
@@ -61,7 +61,7 @@ func TestCollectTextAttempts(t *testing.T) {
 			roles:     []string{"character", "gm"},
 			wantValue: "Vela",
 			wantBy:    "gm",
-			wantCodes: []harness.FailureCode{harness.FailureEmptyResponse},
+			wantCodes: []harness.FailureCode{harness.FailureEmptyResponse, ""},
 		},
 		{
 			name:      "role fallback after unparseable text",
@@ -70,7 +70,7 @@ func TestCollectTextAttempts(t *testing.T) {
 			roles:     []string{"character", "gm"},
 			wantValue: "Vela",
 			wantBy:    "gm",
-			wantCodes: []harness.FailureCode{harness.FailureParseError},
+			wantCodes: []harness.FailureCode{harness.FailureParseError, ""},
 		},
 		{
 			name:      "both roles empty",
@@ -85,6 +85,7 @@ func TestCollectTextAttempts(t *testing.T) {
 			roles:     []string{"character"},
 			wantValue: "Vela",
 			wantBy:    "character",
+			wantCodes: []harness.FailureCode{""},
 		},
 	}
 
