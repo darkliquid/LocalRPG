@@ -2733,66 +2733,14 @@ func guardImageBytes(imgBytes []byte) ([]byte, *harness.GenerationFailure) {
 // GenerateAssetPreview renders banner or icon image bytes in memory and returns
 // them with a MIME type detected from the bytes.
 func (s *Service) GenerateAssetPreview(ctx context.Context, req GenerateAssetPreviewRequestDTO) ([]byte, string, error) {
-	started := time.Now()
-	ctx, span := startGenerationSpan(ctx, s.logger, "generate.image", "image", req.Kind)
-	defer span.End()
-
-	cfg := s.configMgr.Get()
-	client, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
-	if err != nil {
-		failure := &harness.GenerationFailure{
-			Code:    harness.FailureProviderUnavailable,
-			Message: fmt.Sprintf("image provider: %v", err),
-		}
-		s.recordGeneration(ctx, span, "image", "image", started, failure)
-		return nil, "", failure
-	}
-	prompt := buildAssetPrompt(req.Kind, req.Name, req.Description, req.ArtStyle, req.Genre)
-	imgBytes, err := client.GenerateImage(ctx, prompt)
-	if err != nil {
-		failure := &harness.GenerationFailure{
-			Code:    harness.ClassifyProviderError(err),
-			Message: fmt.Sprintf("generate image: %v", err),
-		}
-		s.recordGeneration(ctx, span, "image", "image", started, failure)
-		return nil, "", failure
-	}
-	checked, failure := guardImageBytes(imgBytes)
+	imgBytes, failure := s.generateImage(ctx, req.Kind, buildAssetPrompt(req.Kind, req.Name, req.Description, req.ArtStyle, req.Genre))
 	if failure != nil {
-		s.recordGeneration(ctx, span, "image", "image", started, failure)
 		return nil, "", failure
 	}
-	imgBytes = checked
-
-	ext := media.ArtExtension(imgBytes)
-	contentType := "application/octet-stream"
-	switch ext {
-	case ".svg":
-		contentType = "image/svg+xml"
-	case ".png":
-		contentType = "image/png"
-	case ".jpg", ".jpeg":
-		contentType = "image/jpeg"
-	case ".webp":
-		contentType = "image/webp"
-	}
-
-	s.recordGeneration(ctx, span, "image", "image", started, nil)
-	return imgBytes, contentType, nil
+	return imgBytes, imageContentType(imgBytes), nil
 }
 
 func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req GenerateAssetRequestDTO) (string, error) {
-	started := time.Now()
-	ctx, span := startGenerationSpan(ctx, s.logger, "generate.image", "image", req.Kind)
-	defer span.End()
-
-	cfg := s.configMgr.Get()
-	client, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
-	if err != nil {
-		failure := &harness.GenerationFailure{Code: harness.FailureProviderUnavailable, Message: fmt.Sprintf("image provider: %v", err)}
-		s.recordGeneration(ctx, span, "image", "image", started, failure)
-		return "", failure
-	}
 	prompt := req.Prompt
 	if prompt == "" {
 		gameDir := s.resolver.GameDir(gameID)
@@ -2812,35 +2760,14 @@ func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req Gene
 		}
 		prompt = buildAssetPrompt(req.Kind, gameName, worldName, artStyle, "")
 	}
-	imgBytes, err := client.GenerateImage(ctx, prompt)
-	if err != nil {
-		failure := &harness.GenerationFailure{Code: harness.ClassifyProviderError(err), Message: fmt.Sprintf("generate image: %v", err)}
-		s.recordGeneration(ctx, span, "image", "image", started, failure)
-		return "", failure
-	}
-	checked, failure := guardImageBytes(imgBytes)
+	imgBytes, failure := s.generateImage(ctx, req.Kind, prompt)
 	if failure != nil {
-		s.recordGeneration(ctx, span, "image", "image", started, failure)
 		return "", failure
 	}
-	imgBytes = checked
-	ext := media.ArtExtension(imgBytes)
-	s.recordGeneration(ctx, span, "image", "image", started, nil)
-	return s.SaveGameAsset(gameID, req.Kind, imgBytes, ext)
+	return s.SaveGameAsset(gameID, req.Kind, imgBytes, media.ArtExtension(imgBytes))
 }
 
 func (s *Service) GenerateWorldAsset(ctx context.Context, worldID string, req GenerateAssetRequestDTO) (string, error) {
-	started := time.Now()
-	ctx, span := startGenerationSpan(ctx, s.logger, "generate.image", "image", req.Kind)
-	defer span.End()
-
-	cfg := s.configMgr.Get()
-	client, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
-	if err != nil {
-		failure := &harness.GenerationFailure{Code: harness.FailureProviderUnavailable, Message: fmt.Sprintf("image provider: %v", err)}
-		s.recordGeneration(ctx, span, "image", "image", started, failure)
-		return "", failure
-	}
 	prompt := req.Prompt
 	if prompt == "" {
 		worldDir := s.resolver.WorldDir(worldID)
@@ -2859,21 +2786,11 @@ func (s *Service) GenerateWorldAsset(ctx context.Context, worldID string, req Ge
 		}
 		prompt = buildAssetPrompt(req.Kind, worldName, desc, artStyle, genre)
 	}
-	imgBytes, err := client.GenerateImage(ctx, prompt)
-	if err != nil {
-		failure := &harness.GenerationFailure{Code: harness.ClassifyProviderError(err), Message: fmt.Sprintf("generate image: %v", err)}
-		s.recordGeneration(ctx, span, "image", "image", started, failure)
-		return "", failure
-	}
-	checked, failure := guardImageBytes(imgBytes)
+	imgBytes, failure := s.generateImage(ctx, req.Kind, prompt)
 	if failure != nil {
-		s.recordGeneration(ctx, span, "image", "image", started, failure)
 		return "", failure
 	}
-	imgBytes = checked
-	ext := media.ArtExtension(imgBytes)
-	s.recordGeneration(ctx, span, "image", "image", started, nil)
-	return s.SaveWorldAsset(worldID, req.Kind, imgBytes, ext)
+	return s.SaveWorldAsset(worldID, req.Kind, imgBytes, media.ArtExtension(imgBytes))
 }
 
 // GetTurnContext returns the most recent turn's context snapshot and prompt for a campaign.

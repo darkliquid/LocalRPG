@@ -20,9 +20,10 @@ import (
 // rebuilt whenever the global meter provider changes so a test that installs an
 // in-memory provider binds to it.
 type generationInstruments struct {
-	errors    otelmetric.Int64Counter
-	duration  otelmetric.Float64Histogram
-	fallbacks otelmetric.Int64Counter
+	errors        otelmetric.Int64Counter
+	duration      otelmetric.Float64Histogram
+	fallbacks     otelmetric.Int64Counter
+	imageDuration otelmetric.Float64Histogram
 }
 
 var (
@@ -40,9 +41,10 @@ func generationMetrics() generationInstruments {
 	}
 	meter := provider.Meter(telemetry.MeterName)
 	genInstruments = generationInstruments{
-		errors:    telemetry.Int64Counter(meter, "localrpg.generation.errors", "1", "Generation requests that failed."),
-		duration:  telemetry.Float64Histogram(meter, "localrpg.generation.duration", "ms", "Wall-clock duration of one generation request."),
-		fallbacks: telemetry.Int64Counter(meter, "localrpg.provider.fallbacks", "1", "Fallback providers engaged after a failed attempt."),
+		errors:        telemetry.Int64Counter(meter, "localrpg.generation.errors", "1", "Generation requests that failed."),
+		duration:      telemetry.Float64Histogram(meter, "localrpg.generation.duration", "ms", "Wall-clock duration of one generation request."),
+		fallbacks:     telemetry.Int64Counter(meter, "localrpg.provider.fallbacks", "1", "Fallback providers engaged after a failed attempt."),
+		imageDuration: telemetry.Float64Histogram(meter, "localrpg.media.image.duration", "ms", "Duration of one image generation."),
 	}
 	genInstrumentsProvider = provider
 	return genInstruments
@@ -61,6 +63,19 @@ func startGenerationSpan(ctx context.Context, logger trace.Logger, name, formTyp
 			attribute.String("localrpg.form_type", formType),
 			attribute.String("localrpg.field_name", fieldName),
 		),
+	)
+}
+
+// startImageSpan opens the image span. The image attributes are set on
+// completion, when the provider identity and byte count are known.
+func startImageSpan(ctx context.Context, logger trace.Logger, kind string) (context.Context, oteltrace.Span) {
+	trace.LogEvent(ctx, trace.OrNil(logger), "generate.request", map[string]interface{}{
+		"span":       "generate.image",
+		"form_type":  "image",
+		"field_name": kind,
+	})
+	return telemetry.Tracer("github.com/darkliquid/localrpg/pkg/gui").Start(ctx, "generate.image",
+		oteltrace.WithAttributes(attribute.String("localrpg.image.kind", kind)),
 	)
 }
 
@@ -115,6 +130,52 @@ func (s *Service) recordGeneration(ctx context.Context, span oteltrace.Span, for
 	generationMetrics().duration.Record(ctx, float64(elapsed.Milliseconds()), otelmetric.WithAttributes(
 		attribute.String("localrpg.form_type", formType),
 		attribute.String("localrpg.role", role),
+		attribute.String("localrpg.generation.outcome", outcomeLabel(failure)),
+	))
+}
+
+// recordImage writes the outcome of one image request: span attributes, the
+// image duration, the shared generation metrics, and the unified generate.*
+// events.
+func (s *Service) recordImage(ctx context.Context, span oteltrace.Span, kind, provider string, size int, started time.Time, failure *harness.GenerationFailure) {
+	elapsed := time.Since(started)
+	fields := map[string]interface{}{
+		"form_type":   "image",
+		"image_kind":  kind,
+		"provider":    provider,
+		"bytes":       size,
+		"duration_ms": elapsed.Milliseconds(),
+	}
+	if span != nil {
+		span.SetAttributes(
+			attribute.String("localrpg.image.provider", provider),
+			attribute.Int("localrpg.image.bytes", size),
+		)
+	}
+	generationMetrics().imageDuration.Record(ctx, float64(elapsed.Milliseconds()), otelmetric.WithAttributes(
+		attribute.String("localrpg.image.provider", provider),
+	))
+	if failure != nil {
+		fields["code"] = string(failure.Code)
+		fields["message"] = failure.Message
+		generationMetrics().errors.Add(ctx, 1, otelmetric.WithAttributes(
+			attribute.String("localrpg.form_type", "image"),
+			attribute.String("localrpg.role", "image"),
+			attribute.String("localrpg.generation.failure_code", string(failure.Code)),
+		))
+		if span != nil {
+			span.SetAttributes(attribute.String("localrpg.generation.failure_code", string(failure.Code)))
+			span.SetStatus(codes.Error, string(failure.Code))
+			span.RecordError(failure)
+			span.AddEvent("error", oteltrace.WithAttributes(attribute.String("localrpg.generation.failure_code", string(failure.Code))))
+		}
+		trace.LogEvent(ctx, trace.OrNil(s.logger), "generate.error", fields)
+	} else {
+		trace.LogEvent(ctx, trace.OrNil(s.logger), "generate.complete", fields)
+	}
+	generationMetrics().duration.Record(ctx, float64(elapsed.Milliseconds()), otelmetric.WithAttributes(
+		attribute.String("localrpg.form_type", "image"),
+		attribute.String("localrpg.role", "image"),
 		attribute.String("localrpg.generation.outcome", outcomeLabel(failure)),
 	))
 }
