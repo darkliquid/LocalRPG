@@ -51,7 +51,8 @@ func routePattern(path string) string {
 		path == "/api/settings" || path == "/api/settings/test-provider" ||
 		path == "/api/providers" || path == "/api/providers/models" ||
 		path == "/api/tts/inspect" || path == "/api/tts/voices/search" ||
-		path == "/api/stt" || path == "/api/trace" || path == "/api/character/generate":
+		path == "/api/stt" || path == "/api/trace" || path == "/api/character/generate" ||
+		path == "/api/generate-text":
 		return path
 	case path == "/api/models" || strings.HasPrefix(path, "/api/models/"):
 		return "/api/models"
@@ -80,6 +81,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/game/", s.handleGameRoutes)
 	s.mux.HandleFunc("/api/games", s.handleGamesRoutes)
 	s.mux.HandleFunc("/api/character/generate", s.handleCharacterGenerateRoute)
+	s.mux.HandleFunc("/api/generate-text", s.handleGenerateTextRoute)
 	s.mux.HandleFunc("/api/systems", s.handleSystemsRoutes)
 	s.mux.HandleFunc("/api/system/", s.handleSystemRoutes)
 	s.mux.HandleFunc("/api/worlds", s.handleWorldsRoutes)
