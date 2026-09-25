@@ -46,6 +46,8 @@ func main() {
 		handleGUICommand(args[1:])
 	case "export":
 		handleExportCommand(args[1:])
+	case "debug":
+		handleDebugCommand(args[1:])
 	case "version":
 		fmt.Printf("LocalRPG v%s\n", Version)
 	case "help":
