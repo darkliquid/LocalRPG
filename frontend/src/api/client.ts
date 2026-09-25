@@ -75,6 +75,15 @@ async function throwGenerationError(res: Response): Promise<never> {
   throw new GenerationError(res.status, failure);
 }
 
+// WorldExistsError signals a 409 from world creation, so the form can point the
+// user at the slug field instead of showing a generic failure.
+export class WorldExistsError extends HTTPError {
+  constructor(message: string) {
+    super(409, message);
+    this.name = 'WorldExistsError';
+  }
+}
+
 export class APIClient {
   private gameID: string;
 
@@ -300,16 +309,24 @@ export class APIClient {
     return res.json();
   }
 
-  static async saveWorld(req: CreateWorldRequest): Promise<WorldDetail> {
-    const isNew = !req.id;
-    const url = isNew ? '/api/worlds' : `/api/world/${req.id}`;
-    const method = isNew ? 'POST' : 'PUT';
-    const res = await fetch(url, {
-      method,
+  static async createWorld(req: CreateWorldRequest): Promise<WorldDetail> {
+    const res = await fetch('/api/worlds', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new Error(`saveWorld: ${res.statusText}`);
+    if (res.status === 409) throw new WorldExistsError(await res.text());
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    return res.json();
+  }
+
+  static async updateWorld(id: string, req: CreateWorldRequest): Promise<WorldDetail> {
+    const res = await fetch(`/api/world/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
   }
 

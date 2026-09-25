@@ -28,7 +28,9 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const [isCreatingGame, setIsCreatingGame] = useState(false);
 
   const [settingsGameID, setSettingsGameID] = useState<string | null>(null);
-  const [activeStudio, setActiveStudio] = useState<'worlds' | 'systems' | null>(null);
+  const [activeStudio, setActiveStudio] = useState<
+    { studio: 'worlds'; mode: 'new' | 'browse' } | { studio: 'systems' } | null
+  >(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -114,7 +116,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   };
 
   // Full-Window Overlay: Worlds Studio
-  if (activeStudio === 'worlds') {
+  if (activeStudio?.studio === 'worlds') {
     return (
       <div className="relative w-full h-full flex flex-col bg-stone-950 text-stone-200">
         <header className="h-14 px-6 border-b border-white/10 flex items-center justify-between bg-stone-900/60 backdrop-blur-xl">
@@ -134,14 +136,14 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
           <div className="w-24" />
         </header>
         <div className="flex-1 overflow-hidden">
-          <WorldsStudio onWorldSaved={loadData} />
+          <WorldsStudio onWorldSaved={loadData} startMode={activeStudio.mode} />
         </div>
       </div>
     );
   }
 
   // Full-Window Overlay: Systems Studio
-  if (activeStudio === 'systems') {
+  if (activeStudio?.studio === 'systems') {
     return (
       <div className="relative w-full h-full flex flex-col bg-stone-950 text-stone-200">
         <header className="h-14 px-6 border-b border-white/10 flex items-center justify-between bg-stone-900/60 backdrop-blur-xl">
@@ -179,8 +181,8 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         }}
         isFlyoutOpen={isFlyoutOpen}
         onToggleFlyout={() => setIsFlyoutOpen((prev) => !prev)}
-        onOpenWorldsStudio={() => setActiveStudio('worlds')}
-        onOpenSystemsStudio={() => setActiveStudio('systems')}
+        onOpenWorldsStudio={() => setActiveStudio({ studio: 'worlds', mode: 'browse' })}
+        onOpenSystemsStudio={() => setActiveStudio({ studio: 'systems' })}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
@@ -191,7 +193,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         onSelectWorld={handleSelectWorldFromFlyout}
         onCreateWorld={() => {
           setIsFlyoutOpen(false);
-          setActiveStudio('worlds');
+          setActiveStudio({ studio: 'worlds', mode: 'new' });
         }}
         onExpand={() => setIsGalleryOpen(true)}
       />
@@ -203,7 +205,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         onSelectWorld={handleSelectWorldFromFlyout}
         onCreateWorld={() => {
           setIsGalleryOpen(false);
-          setActiveStudio('worlds');
+          setActiveStudio({ studio: 'worlds', mode: 'new' });
         }}
         onClose={() => setIsGalleryOpen(false)}
       />
@@ -217,8 +219,8 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         hasWorlds={worlds.length > 0}
         onPlay={onSelectGame}
         onOpenCampaignSettings={(id) => setSettingsGameID(id)}
-        onCreateWorld={() => setActiveStudio('worlds')}
-        onBrowseSystems={() => setActiveStudio('systems')}
+        onCreateWorld={() => setActiveStudio({ studio: 'worlds', mode: 'new' })}
+        onBrowseSystems={() => setActiveStudio({ studio: 'systems' })}
       />
 
       {/* New Campaign Modal */}

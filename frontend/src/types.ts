@@ -325,6 +325,18 @@ export interface WorldEntityDetail {
   markdown: string;
 }
 
+// WorldSelection models what the Worlds Studio editor is showing: a saved
+// world, a local unsaved draft, or nothing.
+export type WorldSelection =
+  | { kind: 'saved'; id: string }
+  | { kind: 'draft' }
+  | null;
+
+export interface WorldDraft {
+  localId: string;
+  dirty: boolean;
+}
+
 export interface PathsConfig {
   systems: string;
   worlds: string;

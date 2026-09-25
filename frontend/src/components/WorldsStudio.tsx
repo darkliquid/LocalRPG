@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { APIClient } from '../api/client';
-import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest } from '../types';
+import { APIClient, WorldExistsError } from '../api/client';
+import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft } from '../types';
 import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
+import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
 
 interface WorldsStudioProps {
   onWorldSaved?: () => void;
+  startMode?: 'new' | 'browse';
 }
 
 const STARTER_ENTITY_TEMPLATE = `---
@@ -19,10 +21,12 @@ wikilinks: []
 An intriguing location waiting to be explored.
 `;
 
-export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
+export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startMode = 'browse' }) => {
   const [worlds, setWorlds] = useState<WorldInfo[]>([]);
   const [systems, setSystems] = useState<SystemInfo[]>([]);
-  const [selectedID, setSelectedID] = useState<string | null>(null);
+  const [selection, setSelection] = useState<WorldSelection>(null);
+  const [draft, setDraft] = useState<WorldDraft | null>(null);
+  const [pendingSelection, setPendingSelection] = useState<WorldSelection>(null);
   const [activeTab, setActiveTab] = useState<'lore' | 'prompt' | 'entities'>('lore');
 
   // World form state (defaults to blank slate)
@@ -59,11 +63,15 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   const bannerInputRef = React.useRef<HTMLInputElement>(null);
   const iconInputRef = React.useRef<HTMLInputElement>(null);
 
+  const isDraft = selection?.kind === 'draft';
+  const savedID = selection?.kind === 'saved' ? selection.id : null;
+  const markDirty = () => setDraft((d) => (d ? { ...d, dirty: true } : d));
+
   useEffect(() => {
-    loadWorlds();
+    loadWorlds(undefined, startMode);
   }, []);
 
-  const loadWorlds = async (selectID?: string) => {
+  const loadWorlds = async (selectID?: string, mode: 'new' | 'browse' = startMode) => {
     setIsLoading(true);
     try {
       const [wList, sList] = await Promise.all([
@@ -72,6 +80,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       ]);
       setWorlds(wList);
       setSystems(sList);
+      if (mode === 'new') {
+        handleNewWorld(sList);
+        return;
+      }
       const target = selectID || (wList.length > 0 ? wList[0].id : null);
       if (target) {
         loadWorldDetail(target);
@@ -88,7 +100,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   const loadWorldDetail = async (id: string) => {
     try {
       const detail = await APIClient.getWorld(id);
-      setSelectedID(detail.id);
+      setSelection({ kind: 'saved', id: detail.id });
+      setDraft(null);
       setName(detail.name);
       setSlugID(detail.id);
       setGenre(detail.genre || '');
@@ -96,7 +109,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       setArtStyle(detail.art_style || '');
       setTags(detail.tags ? detail.tags.join(', ') : '');
       setDescription(detail.description || '');
-      setLorePrompt(detail.lore_prompt || REFERENCE_WORLD_TEMPLATE.lore_prompt);
+      setLorePrompt(detail.lore_prompt || '');
       setEntities(detail.entities || []);
 
       setBannerFile(null);
@@ -144,9 +157,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
     }
 
     // Otherwise, if world is saved, fetch from API
-    if (selectedID) {
+    if (savedID) {
       try {
-        const ent = await APIClient.getWorldEntity(selectedID, targetId);
+        const ent = await APIClient.getWorldEntity(savedID, targetId);
         setEntityDrafts((prev) => ({ ...prev, [targetId]: ent.markdown }));
         setEntityMarkdown(ent.markdown);
       } catch (err: any) {
@@ -158,7 +171,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   };
 
   const handleNewWorld = (sysList?: SystemInfo[]) => {
-    setSelectedID(null);
+    setSelection({ kind: 'draft' });
+    setDraft((prev) => ({ localId: prev?.localId ?? crypto.randomUUID(), dirty: false }));
     setName('');
     setSlugID('');
     setGenre('');
@@ -179,9 +193,26 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
     setActiveTab('lore');
   };
 
+  const applySelection = (target: WorldSelection) => {
+    setPendingSelection(null);
+    if (!target || target.kind === 'draft') {
+      handleNewWorld();
+      return;
+    }
+    loadWorldDetail(target.id);
+  };
+
+  const requestSelection = (target: WorldSelection) => {
+    if (isDraft && draft?.dirty) {
+      setPendingSelection(target);
+      return;
+    }
+    applySelection(target);
+  };
+
   const handleLoadReferenceTemplate = () => {
     setName(REFERENCE_WORLD_TEMPLATE.name);
-    if (!selectedID) {
+    if (isDraft) {
       setSlugID(REFERENCE_WORLD_TEMPLATE.id);
     }
     setGenre(REFERENCE_WORLD_TEMPLATE.genre);
@@ -207,12 +238,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   const handleAIGenerate = async (kind: 'banner' | 'icon') => {
     setGeneratingKind(kind);
     try {
-      if (selectedID) {
-        await APIClient.generateWorldAsset(selectedID, kind);
+      if (savedID) {
+        await APIClient.generateWorldAsset(savedID, kind);
         if (kind === 'banner') {
-          setBannerPreview(`/api/world/${encodeURIComponent(selectedID)}/banner?t=${Date.now()}`);
+          setBannerPreview(`/api/world/${encodeURIComponent(savedID)}/banner?t=${Date.now()}`);
         } else {
-          setIconPreview(`/api/world/${encodeURIComponent(selectedID)}/icon?t=${Date.now()}`);
+          setIconPreview(`/api/world/${encodeURIComponent(savedID)}/icon?t=${Date.now()}`);
         }
         setToast({ type: 'success', message: `Generated world ${kind}!` });
       } else {
@@ -294,7 +325,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
         .filter(Boolean);
 
       const payload: CreateWorldRequest = {
-        id: slugID.trim() || undefined,
+        id: isDraft ? slugID.trim() || undefined : undefined,
         name: name.trim(),
         description: description.trim(),
         genre: genre.trim(),
@@ -304,7 +335,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
         lore_prompt: lorePrompt.trim(),
       };
 
-      const saved = await APIClient.saveWorld(payload);
+      const saved = isDraft
+        ? await APIClient.createWorld(payload)
+        : await APIClient.updateWorld(savedID as string, payload);
 
       // Save all entity templates (whether new world or edited world)
       const allDrafts = { ...entityDrafts };
@@ -328,7 +361,11 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       await loadWorlds(saved.id);
       if (onWorldSaved) onWorldSaved();
     } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Failed to save world' });
+      if (err instanceof WorldExistsError) {
+        setToast({ type: 'error', message: 'A world with this id already exists. Change the name or slug.' });
+      } else {
+        setToast({ type: 'error', message: err.message || 'Failed to save world' });
+      }
     } finally {
       setIsSaving(false);
     }
@@ -339,22 +376,23 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
 
     setEntityDrafts((prev) => ({ ...prev, [selectedEntityID]: entityMarkdown }));
 
-    if (!selectedID) {
+    if (isDraft) {
       setToast({ type: 'success', message: `Draft entity "${selectedEntityID}" updated! (Will be persisted when you click Save World)` });
       return;
     }
+    if (!savedID) return;
 
     try {
-      await APIClient.saveWorldEntity(selectedID, selectedEntityID, entityMarkdown);
+      await APIClient.saveWorldEntity(savedID, selectedEntityID, entityMarkdown);
       setToast({ type: 'success', message: `Entity "${selectedEntityID}" saved!` });
-      await loadWorldDetail(selectedID);
+      await loadWorldDetail(savedID);
     } catch (err: any) {
       setToast({ type: 'error', message: err.message || 'Failed to save entity' });
     }
   };
 
   const handleDeleteEntity = async (entityId: string) => {
-    if (!selectedID) {
+    if (isDraft) {
       const remaining = entities.filter((e) => e.id !== entityId);
       setEntities(remaining);
       const updatedDrafts = { ...entityDrafts };
@@ -369,11 +407,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       setToast({ type: 'success', message: `Entity "${entityId}" removed from draft.` });
       return;
     }
+    if (!savedID) return;
 
     try {
-      await APIClient.deleteWorldEntity(selectedID, entityId);
+      await APIClient.deleteWorldEntity(savedID, entityId);
       setToast({ type: 'success', message: `Entity "${entityId}" deleted!` });
-      await loadWorldDetail(selectedID);
+      await loadWorldDetail(savedID);
     } catch (err: any) {
       setToast({ type: 'error', message: err.message || 'Failed to delete entity' });
     }
@@ -383,7 +422,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
     if (!newEntitySlug.trim()) return;
     const slug = newEntitySlug.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
 
-    if (!selectedID) {
+    if (isDraft) {
       if (entities.some((e) => e.id === slug)) {
         setToast({ type: 'error', message: `Entity "${slug}" already exists` });
         return;
@@ -401,12 +440,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       setNewEntitySlug('');
       return;
     }
+    if (!savedID) return;
 
     try {
-      await APIClient.saveWorldEntity(selectedID, slug, STARTER_ENTITY_TEMPLATE);
+      await APIClient.saveWorldEntity(savedID, slug, STARTER_ENTITY_TEMPLATE);
       setIsNewEntityModal(false);
       setNewEntitySlug('');
-      await loadWorldDetail(selectedID);
+      await loadWorldDetail(savedID);
       await handleSelectEntity(slug);
     } catch (err: any) {
       setToast({ type: 'error', message: err.message || 'Failed to create entity' });
@@ -425,7 +465,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             </h3>
           </div>
           <button
-            onClick={() => handleNewWorld()}
+            onClick={() => requestSelection({ kind: 'draft' })}
             className="flex items-center gap-1 text-[11px] font-sans font-bold px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -434,6 +474,25 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+          {draft && (
+            <div
+              onClick={() => requestSelection({ kind: 'draft' })}
+              className={`p-3 rounded-xl border transition-all cursor-pointer text-left border-dashed ${
+                selection?.kind === 'draft'
+                  ? 'bg-purple-950/30 border-purple-500/50'
+                  : 'bg-stone-900/40 border-stone-700 hover:bg-stone-800/40'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="font-sans text-xs font-bold text-stone-200 truncate">
+                  {name.trim() || 'Untitled World'}
+                </h4>
+                <span className="text-[10px] font-mono text-amber-300 bg-amber-950/40 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                  unsaved
+                </span>
+              </div>
+            </div>
+          )}
           {isLoading && worlds.length === 0 ? (
             <div className="text-center py-8 text-xs font-mono text-stone-500 animate-pulse">
               Loading worlds...
@@ -446,9 +505,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             worlds.map((w) => (
               <div
                 key={w.id}
-                onClick={() => loadWorldDetail(w.id)}
+                onClick={() => requestSelection({ kind: 'saved', id: w.id })}
                 className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${
-                  selectedID === w.id
+                  selection?.kind === 'saved' && selection.id === w.id
                     ? 'bg-purple-950/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
                     : 'bg-stone-900/40 border-stone-800/60 hover:bg-stone-800/40 hover:border-stone-700'
                 }`}
@@ -478,7 +537,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3 shrink-0">
           <div className="flex items-center gap-3">
             <h2 className="font-sans text-lg font-bold text-purple-400">
-              {selectedID ? name || 'Edit World' : 'Create New World'}
+              {selection?.kind === 'saved' ? name || 'Edit World' : 'Create New World'}
             </h2>
             {slugID && (
               <span className="text-xs font-mono text-stone-400 bg-stone-950 px-2 py-0.5 rounded border border-stone-800">
@@ -592,7 +651,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                     getContext={getWorldContext}
                     onGenerated={(val) => {
                       setName(val);
-                      if (!selectedID) {
+                      if (isDraft) {
                         setSlugID(val.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''));
                       }
                     }}
@@ -606,7 +665,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
-                    if (!selectedID) {
+                    markDirty();
+                    if (isDraft) {
                       setSlugID(e.target.value.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''));
                     }
                   }}
@@ -631,7 +691,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                   type="text"
                   placeholder="e.g. Gothic Fantasy, Cyberpunk"
                   value={genre}
-                  onChange={(e) => setGenre(e.target.value)}
+                  onChange={(e) => { setGenre(e.target.value); markDirty(); }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
                 />
               </div>
@@ -644,7 +704,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 </label>
                 <input
                   type="text"
-                  disabled={!!selectedID}
+                  disabled={selection?.kind === 'saved'}
                   placeholder="e.g. solitary_defiance"
                   value={slugID}
                   onChange={(e) => setSlugID(e.target.value)}
@@ -689,7 +749,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 type="text"
                 placeholder="e.g. Dark watercolor gothic, mist, gaslight, copper accents, muted palette"
                 value={artStyle}
-                onChange={(e) => setArtStyle(e.target.value)}
+                onChange={(e) => { setArtStyle(e.target.value); markDirty(); }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
               />
               <p className="text-[11px] text-stone-400">
@@ -706,7 +766,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 type="text"
                 placeholder="e.g. gothic, horror, city, rebellion"
                 value={tags}
-                onChange={(e) => setTags(e.target.value)}
+                onChange={(e) => { setTags(e.target.value); markDirty(); }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
               />
             </div>
@@ -729,7 +789,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 rows={4}
                 placeholder="Describe the setting, major conflicts, factions, and atmosphere..."
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => { setDescription(e.target.value); markDirty(); }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors resize-none"
               />
             </div>
@@ -869,7 +929,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             </div>
             <textarea
               value={lorePrompt}
-              onChange={(e) => setLorePrompt(e.target.value)}
+              onChange={(e) => { setLorePrompt(e.target.value); markDirty(); }}
               spellCheck={false}
               className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
             />
@@ -936,19 +996,19 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
               {selectedEntityID ? (
                 <>
                   <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
-                    <span>worlds/{selectedID || slugID || 'draft'}/entities/{selectedEntityID}.md</span>
+                    <span>worlds/{savedID || slugID || 'draft'}/entities/{selectedEntityID}.md</span>
                     <button
                       type="button"
                       onClick={handleSaveEntity}
                       className="flex items-center gap-1 px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs cursor-pointer shadow transition-all"
                     >
                       <Save className="w-3 h-3" />
-                      <span>{selectedID ? 'Save Entity' : 'Update Draft'}</span>
+                      <span>{savedID ? 'Save Entity' : 'Update Draft'}</span>
                     </button>
                   </div>
                   <textarea
                     value={entityMarkdown}
-                    onChange={(e) => setEntityMarkdown(e.target.value)}
+                    onChange={(e) => { setEntityMarkdown(e.target.value); markDirty(); }}
                     spellCheck={false}
                     className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
                   />
@@ -962,6 +1022,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
           </div>
         )}
       </section>
+
+      <DiscardDraftConfirm
+        isOpen={pendingSelection !== null}
+        onCancel={() => setPendingSelection(null)}
+        onDiscard={() => applySelection(pendingSelection)}
+      />
 
       {/* New Entity Modal */}
       {isNewEntityModal && (
