@@ -16,7 +16,7 @@
 - Modify: `pkg/gui/service.go:2657-2728`
 - Create: `pkg/gui/asset_prompt_test.go`
 
-- [ ] **Step 1: Write the failing prompt builder test**
+- [x] **Step 1: Write the failing prompt builder test**
 
 Create `pkg/gui/asset_prompt_test.go`:
 ```go
@@ -88,12 +88,12 @@ func TestBuildAssetPrompt(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestBuildAssetPrompt ./pkg/gui/`  
 Expected output: FAIL (`undefined: buildAssetPrompt`)
 
-- [ ] **Step 3: Implement `buildAssetPrompt` and refactor existing generators**
+- [x] **Step 3: Implement `buildAssetPrompt` and refactor existing generators**
 
 In `pkg/gui/service.go`, add `buildAssetPrompt` and update `GenerateGameAsset` and `GenerateWorldAsset`:
 ```go
@@ -158,12 +158,12 @@ Replace the manual prompt construction with:
 	}
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestBuildAssetPrompt ./pkg/gui/`  
 Expected output: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/asset_prompt_test.go
@@ -179,7 +179,7 @@ git commit -m "feat(gui): extract shared prompt builder for asset generation"
 - Modify: `pkg/gui/server.go`
 - Create: `pkg/gui/asset_preview_test.go`
 
-- [ ] **Step 1: Write failing test for the preview endpoint**
+- [x] **Step 1: Write failing test for the preview endpoint**
 
 Create `pkg/gui/asset_preview_test.go`:
 ```go
@@ -237,12 +237,12 @@ func TestHandleGenerateAssetPreview(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestHandleGenerateAssetPreview ./pkg/gui/`  
 Expected output: FAIL (`404 page not found` or `undefined: GenerateAssetPreviewRequestDTO`)
 
-- [ ] **Step 3: Implement DTO, Service Method, and Server Handler**
+- [x] **Step 3: Implement DTO, Service Method, and Server Handler**
 
 In `pkg/gui/service.go`, define the DTO:
 ```go
@@ -315,12 +315,12 @@ func (s *Server) handleGenerateAssetPreview(w http.ResponseWriter, r *http.Reque
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestHandleGenerateAssetPreview ./pkg/gui/`  
 Expected output: PASS
 
-- [ ] **Step 5: Verify full package and commit**
+- [x] **Step 5: Verify full package and commit**
 
 Run: `go vet ./... && go test -count=1 ./pkg/gui/`  
 Expected output: PASS  
@@ -336,7 +336,7 @@ git commit -m "feat(gui): add POST /api/generate-asset-preview endpoint"
 **Files:**
 - Modify: `frontend/src/api/client.ts`
 
-- [ ] **Step 1: Add `generateAssetPreview` method to `APIClient`**
+- [x] **Step 1: Add `generateAssetPreview` method to `APIClient`**
 
 In `frontend/src/api/client.ts`, add after `generateWorldAsset`:
 ```typescript
@@ -357,12 +357,12 @@ In `frontend/src/api/client.ts`, add after `generateWorldAsset`:
   }
 ```
 
-- [ ] **Step 2: Verify TypeScript compiles**
+- [x] **Step 2: Verify TypeScript compiles**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected output: Clean exit (0 errors).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/api/client.ts
@@ -376,7 +376,7 @@ git commit -m "feat(frontend): add generateAssetPreview to APIClient"
 **Files:**
 - Modify: `frontend/src/components/launcher/NewCampaignModal.tsx`
 
-- [ ] **Step 1: Add generating state and handler to `NewCampaignModal`**
+- [x] **Step 1: Add generating state and handler to `NewCampaignModal`**
 
 In `frontend/src/components/launcher/NewCampaignModal.tsx`:
 1. Import `Sparkles`:
@@ -418,7 +418,7 @@ import { Upload, Sparkles } from 'lucide-react';
   };
 ```
 
-- [ ] **Step 2: Replace Artwork upload buttons with Upload + AI Gen pair**
+- [x] **Step 2: Replace Artwork upload buttons with Upload + AI Gen pair**
 
 In `frontend/src/components/launcher/NewCampaignModal.tsx`, update the Custom Artwork section:
 ```tsx
@@ -520,12 +520,12 @@ In `frontend/src/components/launcher/NewCampaignModal.tsx`, update the Custom Ar
           </div>
 ```
 
-- [ ] **Step 3: Verify TypeScript compiles**
+- [x] **Step 3: Verify TypeScript compiles**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected output: Clean exit (0 errors).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/launcher/NewCampaignModal.tsx
@@ -539,7 +539,7 @@ git commit -m "feat(frontend): add AI Gen buttons for banner and icon in NewCamp
 **Files:**
 - Modify: `frontend/src/components/WorldsStudio.tsx`
 
-- [ ] **Step 1: Update initial state to blank and update generic starter entity**
+- [x] **Step 1: Update initial state to blank and update generic starter entity**
 
 In `frontend/src/components/WorldsStudio.tsx`:
 Replace `STARTER_ENTITY_TEMPLATE`:
@@ -642,12 +642,12 @@ Update the header button in `WorldsStudio.tsx`:
             </button>
 ```
 
-- [ ] **Step 2: Verify TypeScript compiles**
+- [x] **Step 2: Verify TypeScript compiles**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected output: Clean exit (0 errors).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/WorldsStudio.tsx
@@ -661,7 +661,7 @@ git commit -m "feat(frontend): default WorldsStudio to blank slate with opt-in r
 **Files:**
 - Modify: `frontend/src/components/WorldsStudio.tsx`
 
-- [ ] **Step 1: Add artwork state, refs, and handlers in `WorldsStudio`**
+- [x] **Step 1: Add artwork state, refs, and handlers in `WorldsStudio`**
 
 In `frontend/src/components/WorldsStudio.tsx`:
 1. Import `Upload`, `Sparkles`:
@@ -734,7 +734,7 @@ import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Pal
       }
 ```
 
-- [ ] **Step 2: Render Artwork section in the `activeTab === 'lore'` view**
+- [x] **Step 2: Render Artwork section in the `activeTab === 'lore'` view**
 
 In `frontend/src/components/WorldsStudio.tsx`, right after the Description textarea:
 ```tsx
@@ -853,12 +853,12 @@ In `frontend/src/components/WorldsStudio.tsx`, right after the Description texta
             </div>
 ```
 
-- [ ] **Step 3: Verify TypeScript compiles**
+- [x] **Step 3: Verify TypeScript compiles**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected output: Clean exit (0 errors).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/WorldsStudio.tsx
@@ -872,12 +872,12 @@ git commit -m "feat(frontend): add artwork upload and AI Gen to WorldsStudio"
 **Files:**
 - N/A
 
-- [ ] **Step 1: Run Go linter and tests**
+- [x] **Step 1: Run Go linter and tests**
 
 Run: `go vet ./... && go test -count=1 ./...`  
 Expected output: PASS
 
-- [ ] **Step 2: Run frontend build and typecheck**
+- [x] **Step 2: Run frontend build and typecheck**
 
 Run: `cd frontend && npx tsc --noEmit && npm run build`  
 Expected output: PASS (dist built cleanly)
