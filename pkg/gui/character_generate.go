@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -29,6 +30,9 @@ func (s *Server) handleCharacterGenerateRoute(w http.ResponseWriter, r *http.Req
 
 	resp, err := s.service.GenerateCharacter(r.Context(), req)
 	if err != nil {
+		if writeGenerationFailure(w, err) {
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -47,13 +51,14 @@ type GenerateCharacterRequest struct {
 }
 
 type GenerateCharacterResponse struct {
-	Values      map[string]string `json:"values"`
-	GeneratedBy string            `json:"generated_by"`
+	Values      map[string]string          `json:"values"`
+	GeneratedBy string                     `json:"generated_by"`
+	Warning     *harness.GenerationFailure `json:"warning,omitempty"`
 }
 
 // GenerateCharacter fills starting values for the fields the client asks about.
-// A model failure or an unconfigured provider is reported through GeneratedBy,
-// never as an error: the player can always type the answers themselves.
+// A failure is returned as a *harness.GenerationFailure; a partial success is a
+// 200 with Warning set. The player can always type the answers themselves.
 func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRequest) (*GenerateCharacterResponse, error) {
 	resp := &GenerateCharacterResponse{Values: map[string]string{}, GeneratedBy: "none"}
 
@@ -77,9 +82,18 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 		return resp, nil
 	}
 
+	started := time.Now()
+	ctx, span := s.startGenerationSpan(ctx, "generate.text", "character", "_all")
+	defer span.End()
+
 	router, err := harness.RouterFromConfigWithLogger(s.configMgr.Get(), s.logger)
 	if err != nil {
-		return resp, nil
+		failure := &harness.GenerationFailure{
+			Code:    harness.FailureProviderUnavailable,
+			Message: fmt.Sprintf("no model provider is configured: %v", err),
+		}
+		s.recordGeneration(ctx, span, "character", started, failure)
+		return nil, failure
 	}
 
 	request := harness.GenerateRequest{
@@ -88,29 +102,83 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 		MaxTokens: 700,
 	}
 
-	var text string
-	for _, role := range []string{"character", "gm"} {
+	roles := []string{"character", "gm"}
+	attempts := make([]harness.Attempt, 0, len(roles))
+	var values map[string]string
+	for _, role := range roles {
+		roleStarted := time.Now()
 		result, err := router.GenerateForRole(ctx, role, request)
-		if err != nil || result == nil || strings.TrimSpace(result.Text) == "" {
+		if err != nil {
+			if failure, ok := harness.FailureFrom(err); ok {
+				attempts = append(attempts, failure.Attempts...)
+				if len(failure.Attempts) == 0 {
+					attempts = append(attempts, harness.Attempt{
+						Role: role, Provider: router.ProviderIDForRole(role),
+						Code: failure.Code, Detail: failure.Message,
+						DurationMS: time.Since(roleStarted).Milliseconds(),
+					})
+				}
+				continue
+			}
+			attempts = append(attempts, harness.Attempt{
+				Role: role, Provider: router.ProviderIDForRole(role),
+				Code: harness.FailureProviderError, Detail: err.Error(),
+				DurationMS: time.Since(roleStarted).Milliseconds(),
+			})
 			continue
 		}
-		text = result.Text
+		if result == nil || strings.TrimSpace(result.Text) == "" {
+			attempts = append(attempts, harness.Attempt{
+				Role: role, Provider: router.ProviderIDForRole(role),
+				Code: harness.FailureEmptyResponse, Detail: "model returned no text",
+				DurationMS: time.Since(roleStarted).Milliseconds(),
+			})
+			continue
+		}
+		decoded, decodeErr := decodeGeneratedValuesChecked(result.Text)
+		if decodeErr != nil {
+			attempts = append(attempts, harness.Attempt{
+				Role: role, Provider: router.ProviderIDForRole(role),
+				Code: harness.FailureParseError, Detail: decodeErr.Error(),
+				DurationMS: time.Since(roleStarted).Milliseconds(),
+			})
+			continue
+		}
+		values = decoded
 		resp.GeneratedBy = role
 		break
 	}
-	if text == "" {
-		return resp, nil
-	}
 
-	values := decodeGeneratedValues(text)
 	for _, field := range generatable {
 		if value, ok := values[field.ID]; ok && strings.TrimSpace(value) != "" {
 			resp.Values[field.ID] = strings.TrimSpace(value)
 		}
 	}
+
+	s.recordGenerationAttempts(ctx, span, attempts)
+
 	if len(resp.Values) == 0 {
 		resp.GeneratedBy = "none"
+		failure := &harness.GenerationFailure{
+			Code:        pickFailureCode(attempts),
+			Message:     "the model did not return any usable character values",
+			Attempts:    attempts,
+			PromptChars: len([]rune(request.PromptText())),
+			ElapsedMS:   time.Since(started).Milliseconds(),
+		}
+		s.recordGeneration(ctx, span, "character", started, failure)
+		return nil, failure
 	}
+
+	if len(attempts) > 0 {
+		resp.Warning = &harness.GenerationFailure{
+			Code:      attempts[len(attempts)-1].Code,
+			Message:   "some requested fields were not generated",
+			Attempts:  attempts,
+			ElapsedMS: time.Since(started).Milliseconds(),
+		}
+	}
+	s.recordGeneration(ctx, span, "character", started, nil)
 	return resp, nil
 }
 

@@ -196,7 +196,11 @@ HTTP API requests start an independent root:
 
 ```
 http.server                           gui, via otelhttp.NewHandler
-└── game.turn (for POST /turn)        engine turn, mirrors the turn span
+├── game.turn (for POST /turn)        engine turn, mirrors the turn span
+├── generate.text                     gui service, one-shot text generation
+│   └── http.client (auto)            otelhttp transport, outbound LLM call
+└── generate.image                    gui service, asset generation
+    └── http.client (auto)            otelhttp transport, outbound image call
 ```
 
 ### 3.2 Span attributes
@@ -211,6 +215,8 @@ http.server                           gui, via otelhttp.NewHandler
 | `timeline.record_turn` | `localrpg.turn.number`, `localrpg.entities.noted` |
 | `media.tts.synthesize` | `localrpg.tts.provider`, `localrpg.tts.voice`, `localrpg.tts.bytes`, `localrpg.cache.hit` |
 | `media.image.generate` | `localrpg.image.provider`, `localrpg.image.model` |
+| `generate.text` | `localrpg.form_type`, `localrpg.field_name`, `localrpg.generated_by`, `localrpg.field_count`, `localrpg.generation.attempts`, `localrpg.generation.failure_code`, `gen_ai.system` |
+| `generate.image` | `localrpg.image.kind`, `localrpg.image.provider`, `localrpg.image.bytes`, `localrpg.generation.failure_code` |
 
 `gen_ai.*` follows the OpenTelemetry GenAI semantic conventions so LLM calls are
 comparable across providers. Payload text (prompts, narration) is **never** a
@@ -224,6 +230,14 @@ span attribute; it stays in the JSONL trace.
 - `context.assemble`: `section` events mirroring the existing `sections`
   trace field, one per included/trimmed section.
 - `tool.call`: `error` with the message when the executor reports failure.
+- `generate.text` / `generate.image`: `attempt` (per role in the fallback chain,
+  with `localrpg.generation.failure_code` when it failed), `fallback` (fallback
+  engaged, with the reason code), and `error` (with the failure code and a
+  sanitised message).
+
+The generation-failure contract that defines `localrpg.generation.failure_code`
+and these events is specified in the Generation Failure Diagnostics Design
+(2026-09-25).
 
 ### 3.4 Error recording
 
@@ -231,7 +245,10 @@ A span is marked `Error` and `RecordError(err)` is called on every failure
 path that already returns an error, using the existing typed errors
 (`engine.ErrGenerationStalled`, provider errors, storage errors). HTTP status
 `>= 500` from an instrumented client records an error; `otelhttp` handles the
-server side.
+server side. Generation failures use the shared `*harness.GenerationFailure` and
+set the status description to the bounded failure code (not the free-form
+message). A failed turn sets `turn.outcome=error` on the root span and is
+recorded with that attribute rather than counted as a completed turn.
 
 ---
 
@@ -248,8 +265,10 @@ metric attribute** (it is unbounded); it appears on spans only.
 | `localrpg.context.tokens` | histogram | tokens | `context.section` |
 | `localrpg.provider.request.duration` | histogram | ms | `gen_ai.system`, `localrpg.role`, `localrpg.round` |
 | `localrpg.provider.tokens` | counter | tokens | `gen_ai.system`, `gen_ai.token.type` (input/output) |
-| `localrpg.provider.errors` | counter | 1 | `gen_ai.system`, `localrpg.role`, `error.kind` |
-| `localrpg.provider.fallbacks` | counter | 1 | `localrpg.role` |
+| `localrpg.provider.errors` | counter | 1 | `gen_ai.system`, `localrpg.role`, `error.kind` (a `LocalRPG` failure code: `provider_error`, `empty_response`, `timeout`, `context_too_large`, `provider_unavailable`, `parse_error`) |
+| `localrpg.provider.fallbacks` | counter | 1 | `localrpg.role`, `localrpg.generation.failure_code` |
+| `localrpg.generation.errors` | counter | 1 | `localrpg.form_type`, `localrpg.generation.failure_code`, `localrpg.role` |
+| `localrpg.generation.duration` | histogram | ms | `localrpg.form_type`, `localrpg.generation.outcome` (success/failure), `localrpg.role` |
 | `localrpg.tool.call.duration` | histogram | ms | `localrpg.tool.name`, `localrpg.tool.ok` |
 | `localrpg.tool.rounds` | histogram | 1 | `localrpg.role` |
 | `localrpg.storage.query.duration` | histogram | ms | `db.operation` |

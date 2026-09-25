@@ -42,19 +42,29 @@ func TestCharacterGenerateRouteIsSideEffectFree(t *testing.T) {
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code == http.StatusOK {
+		var resp GenerateCharacterResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if resp.GeneratedBy == "" {
+			t.Errorf("expected a generated_by marker, got %+v", resp)
+		}
+	} else {
+		var body struct {
+			Error struct {
+				Code string `json:"code"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatalf("failure body is not a JSON error: %v (%s)", err, rec.Body.String())
+		}
+		if body.Error.Code == "" {
+			t.Fatalf("failure body is missing a code: %s", rec.Body.String())
+		}
 	}
 
-	var resp GenerateCharacterResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if resp.GeneratedBy == "" {
-		t.Errorf("expected a generated_by marker, got %+v", resp)
-	}
-
-	// The route must not invent a campaign.
+	// The route must not invent a campaign, whether it generated or failed.
 	games, err := svc.ListGames(context.Background())
 	if err != nil {
 		t.Fatalf("ListGames failed: %v", err)

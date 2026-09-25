@@ -1143,6 +1143,9 @@ func (s *Server) handleGenerateAssetPreview(w http.ResponseWriter, r *http.Reque
 	}
 	data, contentType, err := s.service.GenerateAssetPreview(r.Context(), req)
 	if err != nil {
+		if writeGenerationFailure(w, err) {
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

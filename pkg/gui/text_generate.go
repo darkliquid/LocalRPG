@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -24,8 +25,9 @@ type GenerateTextRequest struct {
 }
 
 type GenerateTextResponse struct {
-	Fields      map[string]string `json:"fields"`
-	GeneratedBy string            `json:"generated_by"`
+	Fields      map[string]string          `json:"fields"`
+	GeneratedBy string                     `json:"generated_by"`
+	Warning     *harness.GenerationFailure `json:"warning,omitempty"`
 }
 
 const (
@@ -113,10 +115,15 @@ func buildTextGeneratorPrompt(req GenerateTextRequest, systemFields []core.Chara
 	return b.String()
 }
 
-// GenerateText fills one field or a whole form's worth of values. A model
-// failure or an unconfigured provider is reported through GeneratedBy, never as
-// an error: the user can always type the answers themselves.
+// GenerateText fills one field or a whole form's worth of values. A failure is
+// returned as a *harness.GenerationFailure: an unconfigured provider, a provider
+// error, an empty reply, or an unparseable reply. A partial success is a 200 with
+// Warning set. The user can always type the answers themselves.
 func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*GenerateTextResponse, error) {
+	started := time.Now()
+	ctx, span := s.startGenerationSpan(ctx, "generate.text", req.FormType, req.FieldName)
+	defer span.End()
+
 	resp := &GenerateTextResponse{Fields: map[string]string{}, GeneratedBy: "none"}
 
 	systemPrompt := textGeneratorSystemPromptWorld
@@ -145,7 +152,12 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 
 	router, err := harness.RouterFromConfigWithLogger(s.configMgr.Get(), s.logger)
 	if err != nil {
-		return resp, nil
+		failure := &harness.GenerationFailure{
+			Code:    harness.FailureProviderUnavailable,
+			Message: fmt.Sprintf("no model provider is configured: %v", err),
+		}
+		s.recordGeneration(ctx, span, req.FormType, started, failure)
+		return nil, failure
 	}
 
 	request := harness.GenerateRequest{
@@ -154,13 +166,52 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 		MaxTokens: 1000,
 	}
 
-	for _, tryRole := range []string{role, "gm"} {
+	roles := []string{role}
+	if role != "gm" {
+		roles = append(roles, "gm")
+	}
+
+	attempts := make([]harness.Attempt, 0, len(roles))
+	for _, tryRole := range roles {
+		roleStarted := time.Now()
 		result, err := router.GenerateForRole(ctx, tryRole, request)
-		if err != nil || result == nil || strings.TrimSpace(result.Text) == "" {
+		if err != nil {
+			if failure, ok := harness.FailureFrom(err); ok {
+				attempts = append(attempts, failure.Attempts...)
+				if len(failure.Attempts) == 0 {
+					attempts = append(attempts, harness.Attempt{
+						Role: tryRole, Provider: router.ProviderIDForRole(tryRole),
+						Code: failure.Code, Detail: failure.Message,
+						DurationMS: time.Since(roleStarted).Milliseconds(),
+					})
+				}
+				continue
+			}
+			attempts = append(attempts, harness.Attempt{
+				Role: tryRole, Provider: router.ProviderIDForRole(tryRole),
+				Code: harness.FailureProviderError, Detail: err.Error(),
+				DurationMS: time.Since(roleStarted).Milliseconds(),
+			})
+			continue
+		}
+		if result == nil || strings.TrimSpace(result.Text) == "" {
+			attempts = append(attempts, harness.Attempt{
+				Role: tryRole, Provider: router.ProviderIDForRole(tryRole),
+				Code: harness.FailureEmptyResponse, Detail: "model returned no text",
+				DurationMS: time.Since(roleStarted).Milliseconds(),
+			})
+			continue
+		}
+		values, decodeErr := decodeGeneratedValuesChecked(result.Text)
+		if decodeErr != nil {
+			attempts = append(attempts, harness.Attempt{
+				Role: tryRole, Provider: router.ProviderIDForRole(tryRole),
+				Code: harness.FailureParseError, Detail: decodeErr.Error(),
+				DurationMS: time.Since(roleStarted).Milliseconds(),
+			})
 			continue
 		}
 		resp.GeneratedBy = tryRole
-		values := decodeGeneratedValues(result.Text)
 		for k, v := range values {
 			if trimmed := strings.TrimSpace(v); trimmed != "" {
 				resp.Fields[k] = trimmed
@@ -169,10 +220,45 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 		break
 	}
 
+	s.recordGenerationAttempts(ctx, span, attempts)
+
 	if len(resp.Fields) == 0 {
 		resp.GeneratedBy = "none"
+		failure := &harness.GenerationFailure{
+			Code:        pickFailureCode(attempts),
+			Message:     "the model did not return any usable text",
+			Attempts:    attempts,
+			PromptChars: len([]rune(request.PromptText())),
+			ElapsedMS:   time.Since(started).Milliseconds(),
+		}
+		s.recordGeneration(ctx, span, req.FormType, started, failure)
+		return nil, failure
 	}
+
+	if len(attempts) > 0 {
+		resp.Warning = &harness.GenerationFailure{
+			Code:      attempts[len(attempts)-1].Code,
+			Message:   "some requested fields were not generated",
+			Attempts:  attempts,
+			ElapsedMS: time.Since(started).Milliseconds(),
+		}
+	}
+	s.recordGeneration(ctx, span, req.FormType, started, nil)
 	return resp, nil
+}
+
+// pickFailureCode chooses the most informative code from a fallback chain. An
+// empty chain means no role could even be built.
+func pickFailureCode(attempts []harness.Attempt) harness.FailureCode {
+	if len(attempts) == 0 {
+		return harness.FailureProviderUnavailable
+	}
+	for i := len(attempts) - 1; i >= 0; i-- {
+		if attempts[i].Code != "" {
+			return attempts[i].Code
+		}
+	}
+	return harness.FailureProviderError
 }
 
 // handleGenerateTextRoute serves POST /api/generate-text. It creates nothing;
@@ -191,6 +277,9 @@ func (s *Server) handleGenerateTextRoute(w http.ResponseWriter, r *http.Request)
 
 	resp, err := s.service.GenerateText(r.Context(), req)
 	if err != nil {
+		if writeGenerationFailure(w, err) {
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

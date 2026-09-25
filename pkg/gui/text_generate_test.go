@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -86,7 +87,7 @@ func TestHandleGenerateTextRoute_InvalidMethod(t *testing.T) {
 	}
 }
 
-func TestHandleGenerateTextRoute_EmptyBody(t *testing.T) {
+func TestHandleGenerateTextRoute_FailureIsStructured(t *testing.T) {
 	_, svc := setupTestGame(t)
 	server := NewServer(svc, http.NotFoundHandler())
 
@@ -95,7 +96,19 @@ func TestHandleGenerateTextRoute_EmptyBody(t *testing.T) {
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200 OK with empty response, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code < 400 {
+		t.Fatalf("expected a non-2xx generation failure, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body is not a JSON error: %v (%s)", err, rec.Body.String())
+	}
+	if body.Error.Code == "" || body.Error.Message == "" {
+		t.Fatalf("error body is missing code or message: %s", rec.Body.String())
 	}
 }
