@@ -3,7 +3,15 @@ import { APIClient } from '../api/client';
 import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure } from '../types';
 import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2 } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
+import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_SYSTEM_TEMPLATE } from '../templates/referenceTemplates';
+
+type SystemSelection = { kind: 'saved'; id: string } | { kind: 'draft' } | null;
+
+interface SystemDraft {
+  localId: string;
+  dirty: boolean;
+}
 
 interface SystemsStudioProps {
   onSystemSaved?: () => void;
@@ -11,16 +19,18 @@ interface SystemsStudioProps {
 
 export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) => {
   const [systems, setSystems] = useState<SystemInfo[]>([]);
-  const [selectedID, setSelectedID] = useState<string | null>(null);
+  const [selection, setSelection] = useState<SystemSelection>(null);
+  const [draft, setDraft] = useState<SystemDraft | null>(null);
+  const [pendingSelection, setPendingSelection] = useState<SystemSelection>(null);
   const [activeTab, setActiveTab] = useState<'manifest' | 'rules' | 'script'>('manifest');
 
   // Form state
-  const [name, setName] = useState(REFERENCE_SYSTEM_TEMPLATE.name);
-  const [slugID, setSlugID] = useState(REFERENCE_SYSTEM_TEMPLATE.id);
-  const [version, setVersion] = useState(REFERENCE_SYSTEM_TEMPLATE.version);
-  const [description, setDescription] = useState(REFERENCE_SYSTEM_TEMPLATE.description);
-  const [rulesPrompt, setRulesPrompt] = useState(REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
-  const [script, setScript] = useState(REFERENCE_SYSTEM_TEMPLATE.script);
+  const [name, setName] = useState('');
+  const [slugID, setSlugID] = useState('');
+  const [version, setVersion] = useState('1.0.0');
+  const [description, setDescription] = useState('');
+  const [rulesPrompt, setRulesPrompt] = useState('');
+  const [script, setScript] = useState('');
   // Character creation prompts a player answers when starting with this system.
   const [creationPreamble, setCreationPreamble] = useState('');
   const [creationFields, setCreationFields] = useState<CharacterCreationField[]>([]);
@@ -29,6 +39,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const savedID = selection?.kind === 'saved' ? selection.id : null;
+  const markDirty = () => setDraft((d) => (d ? { ...d, dirty: true } : d));
+
   const reportGenerationError = (failure: GenerationFailure) =>
     setToast({ type: 'error', message: `${failure.code}: ${failure.message}` });
   const errorMessage = (err: unknown): string =>
@@ -59,7 +73,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
   const loadSystemDetail = async (id: string) => {
     try {
       const detail = await APIClient.getSystem(id);
-      setSelectedID(detail.id);
+      setSelection({ kind: 'saved', id: detail.id });
+      setDraft(null);
       setName(detail.name);
       setSlugID(detail.id);
       setVersion(detail.version || '1.0.0');
@@ -73,14 +88,31 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
     }
   };
 
+  const applySelection = (target: SystemSelection) => {
+    if (target?.kind === 'saved') {
+      loadSystemDetail(target.id);
+    } else if (target?.kind === 'draft') {
+      setSelection({ kind: 'draft' });
+    }
+  };
+
+  const requestSelection = (target: SystemSelection) => {
+    if (selection?.kind === 'draft' && draft?.dirty && target?.kind !== 'draft') {
+      setPendingSelection(target);
+      return;
+    }
+    applySelection(target);
+  };
+
   const handleNewSystem = () => {
-    setSelectedID(null);
-    setName(REFERENCE_SYSTEM_TEMPLATE.name);
-    setSlugID(REFERENCE_SYSTEM_TEMPLATE.id);
-    setVersion(REFERENCE_SYSTEM_TEMPLATE.version);
-    setDescription(REFERENCE_SYSTEM_TEMPLATE.description);
-    setRulesPrompt(REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
-    setScript(REFERENCE_SYSTEM_TEMPLATE.script);
+    setSelection({ kind: 'draft' });
+    setDraft({ localId: crypto.randomUUID(), dirty: false });
+    setName('');
+    setSlugID('');
+    setVersion('1.0.0');
+    setDescription('');
+    setRulesPrompt('');
+    setScript('');
     setCreationPreamble('');
     setCreationFields([]);
     setActiveTab('manifest');
@@ -88,7 +120,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
 
   const handleResetToReference = () => {
     setName(REFERENCE_SYSTEM_TEMPLATE.name);
-    if (!selectedID) {
+    if (!savedID) {
       setSlugID(REFERENCE_SYSTEM_TEMPLATE.id);
     }
     setVersion(REFERENCE_SYSTEM_TEMPLATE.version);
@@ -97,6 +129,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
     setScript(REFERENCE_SYSTEM_TEMPLATE.script);
     setCreationPreamble('');
     setCreationFields([]);
+    markDirty();
     setToast({ type: 'success', message: 'Reset to Narrative 2d6 Reference Template!' });
   };
 
@@ -157,6 +190,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
 
       const saved = await APIClient.saveSystem(payload);
       setToast({ type: 'success', message: `System "${saved.name}" saved successfully!` });
+      setDraft(null);
       await loadSystems(saved.id);
       if (onSystemSaved) onSystemSaved();
     } catch (err) {
@@ -178,7 +212,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
             </h3>
           </div>
           <button
-            onClick={handleNewSystem}
+            onClick={() => {
+              if (selection?.kind === 'draft') return;
+              requestSelection({ kind: 'draft' });
+            }}
             className="flex items-center gap-1 text-[11px] font-sans font-bold px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -187,6 +224,25 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+          {draft && (
+            <div
+              onClick={() => requestSelection({ kind: 'draft' })}
+              className={`p-3 rounded-xl border transition-all cursor-pointer text-left border-dashed ${
+                selection?.kind === 'draft'
+                  ? 'bg-purple-950/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+                  : 'bg-stone-900/40 border-stone-700 hover:bg-stone-800/40'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="font-sans text-xs font-bold text-stone-200 truncate">
+                  {name.trim() || 'Untitled System'}
+                </h4>
+                <span className="text-[10px] font-mono text-amber-300 bg-amber-950/40 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                  unsaved
+                </span>
+              </div>
+            </div>
+          )}
           {isLoading && systems.length === 0 ? (
             <div className="text-center py-8 text-xs font-mono text-stone-500 animate-pulse">
               Loading systems...
@@ -199,9 +255,9 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
             systems.map((s) => (
               <div
                 key={s.id}
-                onClick={() => loadSystemDetail(s.id)}
+                onClick={() => requestSelection({ kind: 'saved', id: s.id })}
                 className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${
-                  selectedID === s.id
+                  selection?.kind === 'saved' && selection.id === s.id
                     ? 'bg-purple-950/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
                     : 'bg-stone-900/40 border-stone-800/60 hover:bg-stone-800/40 hover:border-stone-700'
                 }`}
@@ -227,7 +283,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3 shrink-0">
           <div className="flex items-center gap-3">
             <h2 className="font-sans text-lg font-bold text-purple-400">
-              {selectedID ? name || 'Edit System' : 'Create New System'}
+              {savedID ? name || 'Edit System' : 'Create New System'}
             </h2>
             {slugID && (
               <span className="text-xs font-mono text-stone-400 bg-stone-950 px-2 py-0.5 rounded border border-stone-800">
@@ -342,7 +398,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                     getContext={getSystemContext}
                     onGenerated={(val) => {
                       setName(val);
-                      if (!selectedID) {
+                      markDirty();
+                      if (!savedID) {
                         setSlugID(val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
                       }
                     }}
@@ -355,7 +412,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
-                    if (!selectedID) {
+                    markDirty();
+                    if (!savedID) {
                       setSlugID(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
                     }
                   }}
@@ -371,7 +429,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                   type="text"
                   placeholder="1.0.0"
                   value={version}
-                  onChange={(e) => setVersion(e.target.value)}
+                  onChange={(e) => { setVersion(e.target.value); markDirty(); }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors font-mono"
                 />
               </div>
@@ -383,10 +441,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
               </label>
               <input
                 type="text"
-                disabled={!!selectedID}
+                disabled={!!savedID}
                 placeholder="e.g. iron-realm"
                 value={slugID}
-                onChange={(e) => setSlugID(e.target.value)}
+                onChange={(e) => { setSlugID(e.target.value); markDirty(); }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors font-mono disabled:opacity-60"
               />
               <p className="text-[11px] text-stone-400">
@@ -404,7 +462,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                   fieldName="description"
                   onError={reportGenerationError}
                   getContext={getSystemContext}
-                  onGenerated={(val) => setDescription(val)}
+                  onGenerated={(val) => { setDescription(val); markDirty(); }}
                   seed={description}
                 />
               </div>
@@ -412,7 +470,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                 rows={5}
                 placeholder="Describe core dice mechanics, resolution philosophy, and character stats..."
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => { setDescription(e.target.value); markDirty(); }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors resize-none"
               />
             </div>
@@ -428,12 +486,13 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
                     setCreationFields((prev) => [
                       ...prev,
                       { id: `prompt_${prev.length + 1}`, label: 'New Prompt', kind: 'text', generatable: true },
-                    ])
-                  }
+                    ]);
+                    markDirty();
+                  }}
                   className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 transition cursor-pointer"
                 >
                   <Plus className="w-3 h-3" />
@@ -445,7 +504,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                 type="text"
                 placeholder="Preamble shown above the prompts (optional)"
                 value={creationPreamble}
-                onChange={(e) => setCreationPreamble(e.target.value)}
+                onChange={(e) => { setCreationPreamble(e.target.value); markDirty(); }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-xs text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
               />
 
@@ -466,6 +525,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                             const updated = [...creationFields];
                             updated[index] = { ...updated[index], id: e.target.value };
                             setCreationFields(updated);
+                            markDirty();
                           }}
                           className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs font-mono text-purple-300 focus:outline-none"
                         />
@@ -477,6 +537,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                             const updated = [...creationFields];
                             updated[index] = { ...updated[index], label: e.target.value };
                             setCreationFields(updated);
+                            markDirty();
                           }}
                           className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
                         />
@@ -489,6 +550,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                           const updated = [...creationFields];
                           updated[index] = { ...updated[index], prompt: e.target.value };
                           setCreationFields(updated);
+                          markDirty();
                         }}
                         className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
                       />
@@ -499,6 +561,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                             const updated = [...creationFields];
                             updated[index] = { ...updated[index], kind: e.target.value as CharacterCreationField['kind'] };
                             setCreationFields(updated);
+                            markDirty();
                           }}
                           className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none cursor-pointer"
                         >
@@ -514,6 +577,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                               const updated = [...creationFields];
                               updated[index] = { ...updated[index], required: e.target.checked };
                               setCreationFields(updated);
+                              markDirty();
                             }}
                             className="rounded bg-stone-950 border-stone-800 text-purple-600 focus:ring-0"
                           />
@@ -528,6 +592,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                               const updated = [...creationFields];
                               updated[index] = { ...updated[index], generatable: e.target.checked };
                               setCreationFields(updated);
+                              markDirty();
                             }}
                             className="rounded bg-stone-950 border-stone-800 text-purple-600 focus:ring-0 disabled:opacity-40"
                           />
@@ -535,7 +600,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                         </label>
                         <button
                           type="button"
-                          onClick={() => setCreationFields((prev) => prev.filter((_, i) => i !== index))}
+                          onClick={() => {
+                            setCreationFields((prev) => prev.filter((_, i) => i !== index));
+                            markDirty();
+                          }}
                           className="ml-auto flex items-center gap-1 text-red-400/80 hover:text-red-300 cursor-pointer"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -562,14 +630,14 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                   fieldName="rules_prompt"
                   onError={reportGenerationError}
                   getContext={getSystemContext}
-                  onGenerated={(val) => setRulesPrompt(val)}
+                  onGenerated={(val) => { setRulesPrompt(val); markDirty(); }}
                   seed={rulesPrompt}
                 />
               </div>
             </div>
             <textarea
               value={rulesPrompt}
-              onChange={(e) => setRulesPrompt(e.target.value)}
+              onChange={(e) => { setRulesPrompt(e.target.value); markDirty(); }}
               spellCheck={false}
               className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
             />
@@ -585,13 +653,27 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
             </div>
             <textarea
               value={script}
-              onChange={(e) => setScript(e.target.value)}
+              onChange={(e) => { setScript(e.target.value); markDirty(); }}
               spellCheck={false}
               className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-purple-200/90 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
             />
           </div>
         )}
       </section>
+
+      {/* Discard Draft Confirmation Dialog */}
+      <DiscardDraftConfirm
+        isOpen={pendingSelection !== null}
+        title="Discard unsaved system?"
+        description="This system has not been saved. Leaving now discards every field you entered."
+        onCancel={() => setPendingSelection(null)}
+        onDiscard={() => {
+          const target = pendingSelection;
+          setPendingSelection(null);
+          setDraft(null);
+          applySelection(target);
+        }}
+      />
     </div>
   );
 };
