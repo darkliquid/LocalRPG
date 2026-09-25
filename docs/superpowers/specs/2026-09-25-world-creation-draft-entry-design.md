@@ -1,7 +1,7 @@
 # World Creation Draft Entry Design
 
 **Date:** 2026-09-25
-**Status:** Proposed
+**Status:** Approved
 **Scope:** Worlds Studio frontend, Launcher entry points, small world-create backend guard
 **Related:** Creation Flow Asset Generation Design (2026-09-24), UI Improvements Design (2026-09-21), Systems and Worlds Studio Design (2026-09-20)
 

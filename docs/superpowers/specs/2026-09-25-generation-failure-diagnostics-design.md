@@ -1,7 +1,7 @@
 # Generation Failure Diagnostics Design
 
 **Date:** 2026-09-25
-**Status:** Proposed
+**Status:** Approved
 **Scope:** Backend generation paths (one-shot text, turn, image), frontend generation controls
 **Related:** On-Demand Text Generation Design (2026-09-24), Agentic Turns and Tools Design (2026-09-22), Narrative Coherence and Trace Design (2026-09-22), Creation Flow Asset Generation Design (2026-09-24)
 
