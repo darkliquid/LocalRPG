@@ -79,6 +79,11 @@ type TurnDTO struct {
 	LocationID      string        `json:"location_id,omitempty"`
 	LocationName    string        `json:"location_name,omitempty"`
 	LocationArtURL  string        `json:"location_art_url,omitempty"`
+	// Structured turn fields: the action verdict, whether it was rejected, and
+	// the checks the GM resolved.
+	Verdict  *harness.ActionVerdict `json:"verdict,omitempty"`
+	Rejected bool                   `json:"rejected,omitempty"`
+	Checks   []harness.CheckResult  `json:"checks,omitempty"`
 }
 
 // ToolCallDTO is one tool a turn called, with only its name and result size: the

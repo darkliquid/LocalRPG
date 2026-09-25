@@ -867,6 +867,9 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		ContextNotes:    turn.ContextNotes,
 		ContinuityNotes: turn.ContinuityNotes,
 		EntitiesHit:     mentionIDs(turn.Entities),
+		Verdict:         turn.Verdict,
+		Rejected:        turn.Rejected,
+		Checks:          turn.Checks,
 		Segments: segmentDTOs(turn.Segments, gameID, turn.Number, audioAvailable, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
 		}, func(ref string) *entity.VoiceConfig {
