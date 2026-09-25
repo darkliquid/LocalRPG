@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -139,4 +140,98 @@ func nullIfEmpty(s string) interface{} {
 		return nil
 	}
 	return s
+}
+
+// MemoryHit is one memory search match.
+type MemoryHit struct {
+	ID         int64
+	Turn       int
+	Kind       string
+	Snippet    string
+	Importance int
+}
+
+// SearchMemories runs an FTS5 MATCH over memory text and tags, with optional
+// entity, kind, and importance filters. Results are in bm25 order; callers that
+// want importance and recency weighting apply RankMemoryHits.
+func (s *Store) SearchMemories(match, entityID, kind string, minImportance, limit int) ([]MemoryHit, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	query := `
+		SELECT m.id, m.turn, m.kind, snippet(memories_fts, 0, '[', ']', '…', 12), m.importance
+		FROM memories_fts
+		JOIN memories m ON m.id = memories_fts.rowid
+		WHERE memories_fts MATCH ?`
+	args := []interface{}{match}
+	if kind != "" {
+		query += " AND m.kind = ?"
+		args = append(args, kind)
+	}
+	if minImportance > 0 {
+		query += " AND m.importance >= ?"
+		args = append(args, minImportance)
+	}
+	if entityID != "" {
+		query += " AND EXISTS (SELECT 1 FROM memory_entities me WHERE me.memory_id = m.id AND me.entity_id = ?)"
+		args = append(args, entityID)
+	}
+	query += " ORDER BY bm25(memories_fts) LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("search memories: %w", err)
+	}
+	defer rows.Close()
+
+	hits := make([]MemoryHit, 0)
+	for rows.Next() {
+		var hit MemoryHit
+		if err := rows.Scan(&hit.ID, &hit.Turn, &hit.Kind, &hit.Snippet, &hit.Importance); err != nil {
+			return nil, fmt.Errorf("scan memory hit: %w", err)
+		}
+		hits = append(hits, hit)
+	}
+	return hits, rows.Err()
+}
+
+// RankMemoryHits re-ranks hits by importance and recency, so an important recent
+// memory outranks an equal-text older one. halfLife is in turns; a non-positive
+// value disables decay.
+func RankMemoryHits(hits []MemoryHit, currentTurn, halfLife int) []MemoryHit {
+	if len(hits) == 0 {
+		return hits
+	}
+	if halfLife <= 0 {
+		halfLife = 20
+	}
+	scored := make([]struct {
+		hit   MemoryHit
+		score float64
+	}, len(hits))
+	for i, hit := range hits {
+		age := currentTurn - hit.Turn
+		if age < 0 {
+			age = 0
+		}
+		decay := 1.0
+		if age > 0 {
+			decay = math.Pow(0.5, float64(age)/float64(halfLife))
+		}
+		scored[i] = struct {
+			hit   MemoryHit
+			score float64
+		}{hit: hit, score: float64(hit.Importance) * decay}
+	}
+	for i := 1; i < len(scored); i++ {
+		for j := i; j > 0 && scored[j].score > scored[j-1].score; j-- {
+			scored[j], scored[j-1] = scored[j-1], scored[j]
+		}
+	}
+	ranked := make([]MemoryHit, len(scored))
+	for i, s := range scored {
+		ranked[i] = s.hit
+	}
+	return ranked
 }

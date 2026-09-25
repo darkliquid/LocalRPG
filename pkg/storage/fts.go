@@ -73,6 +73,12 @@ func EnsureFTS(db *sql.DB) error {
 		 WHERE t.rowid NOT IN (SELECT rowid FROM turns_fts)`,
 		`DELETE FROM turns_fts
 		 WHERE rowid NOT IN (SELECT rowid FROM turns)`,
+		`INSERT INTO memories_fts(rowid, text, tags)
+		 SELECT m.rowid, m.text, coalesce((SELECT group_concat(tag, ' ') FROM memory_tags mt WHERE mt.memory_id = m.id), '')
+		 FROM memories m
+		 WHERE m.rowid NOT IN (SELECT rowid FROM memories_fts)`,
+		`DELETE FROM memories_fts
+		 WHERE rowid NOT IN (SELECT id FROM memories)`,
 	}
 	for _, statement := range backfill {
 		if _, err := db.Exec(statement); err != nil {
