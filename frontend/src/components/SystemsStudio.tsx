@@ -15,14 +15,16 @@ interface SystemDraft {
 
 interface SystemsStudioProps {
   onSystemSaved?: () => void;
+  startMode?: 'new' | 'browse';
 }
 
-export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) => {
+export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, startMode = 'browse' }) => {
   const [systems, setSystems] = useState<SystemInfo[]>([]);
   const [selection, setSelection] = useState<SystemSelection>(null);
   const [draft, setDraft] = useState<SystemDraft | null>(null);
   const [pendingSelection, setPendingSelection] = useState<SystemSelection>(null);
   const [activeTab, setActiveTab] = useState<'manifest' | 'rules' | 'script'>('manifest');
+  const startModeRef = React.useRef(startMode);
 
   // Form state
   const [name, setName] = useState('');
@@ -40,6 +42,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  const isDraft = selection?.kind === 'draft';
   const savedID = selection?.kind === 'saved' ? selection.id : null;
   const markDirty = () => setDraft((d) => (d ? { ...d, dirty: true } : d));
 
@@ -49,14 +52,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
     err instanceof Error ? err.message : 'Unexpected error';
 
   useEffect(() => {
-    loadSystems();
+    loadSystems(undefined, startModeRef.current);
   }, []);
 
-  const loadSystems = async (selectID?: string) => {
+  const loadSystems = async (selectID?: string, mode: 'new' | 'browse' = 'browse') => {
     setIsLoading(true);
     try {
       const list = await APIClient.listSystems();
       setSystems(list);
+      if (mode === 'new') {
+        handleNewSystem();
+        return;
+      }
       const target = selectID || (list.length > 0 ? list[0].id : null);
       if (target) {
         loadSystemDetail(target);
@@ -89,15 +96,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
   };
 
   const applySelection = (target: SystemSelection) => {
-    if (target?.kind === 'saved') {
-      loadSystemDetail(target.id);
-    } else if (target?.kind === 'draft') {
-      setSelection({ kind: 'draft' });
+    setPendingSelection(null);
+    if (!target || target.kind === 'draft') {
+      handleNewSystem();
+      return;
     }
+    loadSystemDetail(target.id);
   };
 
   const requestSelection = (target: SystemSelection) => {
-    if (selection?.kind === 'draft' && draft?.dirty && target?.kind !== 'draft') {
+    // Re-selecting the open draft is a no-op; only leaving it can discard work.
+    if (target?.kind === 'draft' && isDraft) return;
+    if (isDraft && draft?.dirty) {
       setPendingSelection(target);
       return;
     }
@@ -191,7 +201,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
       const saved = await APIClient.saveSystem(payload);
       setToast({ type: 'success', message: `System "${saved.name}" saved successfully!` });
       setDraft(null);
-      await loadSystems(saved.id);
+      await loadSystems(saved.id, 'browse');
       if (onSystemSaved) onSystemSaved();
     } catch (err) {
       setToast({ type: 'error', message: errorMessage(err) || 'Failed to save system' });
@@ -213,8 +223,11 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
           </div>
           <button
             onClick={() => {
-              if (selection?.kind === 'draft') return;
-              requestSelection({ kind: 'draft' });
+              if (isDraft && draft?.dirty) {
+                setPendingSelection({ kind: 'draft' });
+                return;
+              }
+              handleNewSystem();
             }}
             className="flex items-center gap-1 text-[11px] font-sans font-bold px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow"
           >
@@ -228,18 +241,24 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
             <div
               onClick={() => requestSelection({ kind: 'draft' })}
               className={`p-3 rounded-xl border transition-all cursor-pointer text-left border-dashed ${
-                selection?.kind === 'draft'
+                isDraft
                   ? 'bg-purple-950/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
                   : 'bg-stone-900/40 border-stone-700 hover:bg-stone-800/40'
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <h4 className="font-sans text-xs font-bold text-stone-200 truncate">
-                  {name.trim() || 'Untitled System'}
-                </h4>
-                <span className="text-[10px] font-mono text-amber-300 bg-amber-950/40 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                  unsaved
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Shield className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  <span className="font-serif font-bold text-sm text-stone-200 truncate">
+                    {name.trim() || 'Untitled System'}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 shrink-0">
+                  Draft
                 </span>
+              </div>
+              <div className="text-xs text-stone-400 truncate mt-1">
+                {description.trim() || 'Unsaved system draft'}
               </div>
             </div>
           )}
@@ -667,12 +686,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
         title="Discard unsaved system?"
         description="This system has not been saved. Leaving now discards every field you entered."
         onCancel={() => setPendingSelection(null)}
-        onDiscard={() => {
-          const target = pendingSelection;
-          setPendingSelection(null);
-          setDraft(null);
-          applySelection(target);
-        }}
+        onDiscard={() => applySelection(pendingSelection)}
       />
     </div>
   );
