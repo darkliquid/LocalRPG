@@ -446,6 +446,26 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", contentType)
 		http.ServeFile(w, r, path)
 
+	case "character":
+		if len(parts) < 3 {
+			http.Error(w, "missing character id", http.StatusBadRequest)
+			return
+		}
+		characterID := parts[2]
+		if len(parts) >= 4 && parts[3] == "portrait" && r.Method == http.MethodGet {
+			data, contentType, err := s.service.GetCharacterPortrait(r.Context(), gameID, characterID)
+			if err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.Header().Set("Content-Type", contentType)
+			w.Header().Set("Cache-Control", "no-cache")
+			_, _ = w.Write(data)
+			return
+		}
+		http.NotFound(w, r)
+		return
+
 	case "entity":
 		if len(parts) < 3 {
 			http.Error(w, "missing entity id", http.StatusBadRequest)

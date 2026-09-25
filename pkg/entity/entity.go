@@ -218,7 +218,20 @@ func (e *Entity) SerializeMarkdown() ([]byte, error) {
 		Age:        e.Age,
 		Aliases:    e.Aliases,
 		History:    e.History,
-		ExtraMeta:  e.ExtraMeta,
+	}
+	if len(e.ExtraMeta) > 0 {
+		extra := make(map[string]interface{}, len(e.ExtraMeta))
+		for k, v := range e.ExtraMeta {
+			switch strings.ToLower(k) {
+			case "id", "name", "type", "tags", "voice", "portrait", "location", "faction", "appearance", "gender", "age", "aliases", "history", "state":
+				continue
+			default:
+				extra[k] = v
+			}
+		}
+		if len(extra) > 0 {
+			fm.ExtraMeta = extra
+		}
 	}
 	if e.State != nil {
 		fm.State = e.State.Raw()

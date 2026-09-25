@@ -39,7 +39,7 @@ func BuildPortraitPrompt(name, gender, age, appearance, artStyle string) string 
 
 // PortraitGenerator abstracts image generation for the worker.
 type PortraitGenerator interface {
-	GenerateImage(ctx context.Context, kind, prompt string) ([]byte, error)
+	GenerateImage(ctx context.Context, prompt string) ([]byte, error)
 }
 
 // PortraitWorker manages queued portrait generation with in-memory deduplication.
@@ -89,7 +89,7 @@ func (w *PortraitWorker) Enqueue(gameID string, ent *entity.Entity, artStyle str
 		}()
 
 		prompt := BuildPortraitPrompt(entCopy.Name, entCopy.Gender, entCopy.Age, entCopy.Appearance, artStyle)
-		imgBytes, err := w.generator.GenerateImage(context.Background(), "portrait", prompt)
+		imgBytes, err := w.generator.GenerateImage(context.Background(), prompt)
 		if err != nil || len(imgBytes) == 0 {
 			return
 		}

@@ -200,6 +200,8 @@ func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, pl
 		Name:       playerName,
 		Type:       "character",
 		Appearance: pc.Appearance,
+		Gender:     pc.Gender,
+		Age:        pc.Age,
 		Body:       body,
 		Voice:      pc.Voice,
 		ExtraMeta:  map[string]interface{}{},
@@ -210,10 +212,8 @@ func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, pl
 		}
 		player.ExtraMeta[key] = value
 	}
-	for key, value := range map[string]string{"age": pc.Age, "gender": pc.Gender, "pronouns": pc.Pronouns} {
-		if strings.TrimSpace(value) != "" {
-			player.ExtraMeta[key] = value
-		}
+	if strings.TrimSpace(pc.Pronouns) != "" {
+		player.ExtraMeta["pronouns"] = pc.Pronouns
 	}
 	if locationID != "" {
 		player.Location = "[[" + locationID + "]]"

@@ -57,8 +57,9 @@ type SegmentDTO struct {
 	Text      string  `json:"text"`
 	AudioURL  string  `json:"audio_url,omitempty"`
 	AudioKey  string  `json:"audio_key,omitempty"`
-	Player    bool    `json:"player,omitempty"`
-	Duration  float64 `json:"duration"`
+	PortraitURL string  `json:"portrait_url,omitempty"`
+	Player      bool    `json:"player,omitempty"`
+	Duration    float64 `json:"duration"`
 }
 
 type TurnDTO struct {

@@ -193,6 +193,7 @@ func (s *Service) ensureIndexed(gameID string) {
 			}
 		}
 	}
+	go s.scanAndEnrichCharacters(gameID, store)
 }
 
 func (s *Service) ensureEmbeddingWorker(gameID string, store *storage.Store) *storage.EmbeddingWorker {
@@ -299,6 +300,18 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, a
 			// The reading estimate is the same one the exports pace with, so the
 			// app and a rendered bundle hold a line for the same length of time.
 			Duration: scene.ReadingDuration(text).Seconds(),
+		}
+		if segment.Kind == "speech" {
+			refID := segment.SpeakerID
+			if refID == "" && resolve != nil {
+				refID = resolve(segment.Speaker)
+			}
+			if refID == "" && segment.Speaker != "" {
+				refID = entity.Slugify(segment.Speaker)
+			}
+			if refID != "" {
+				dto.PortraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait", gameID, refID)
+			}
 		}
 		if audioAvailable {
 			// The ref is what the synthesis pipeline uses to find a voice, so the
@@ -1325,6 +1338,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// Memory is repaired behind the turn, on the same principle as playback: the
 	// reply is already recorded, so nothing about it should wait for a second call.
 	t.service.summariseBehind(t.gameID, t.chronicler)
+	go t.service.scanAndEnrichCharacters(t.gameID, t.store)
 	return nil
 }
 
@@ -1378,6 +1392,39 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 	return path, contentTypeForArt(path), nil
 }
 
+// GetCharacterPortrait returns the portrait image for a character, or a procedural SVG fallback if not found.
+func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID string) ([]byte, string, error) {
+	s.ensureIndexed(gameID)
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, "", err
+	}
+	ent, err := store.GetEntity(characterID)
+	if err != nil || ent == nil {
+		// Fallback: check entity markdown file on disk directly
+		notePath := filepath.Join(s.resolver.GameDir(gameID), "entities", characterID+".md")
+		if data, readErr := os.ReadFile(notePath); readErr == nil {
+			if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
+				ent = parsed
+			}
+		}
+	}
+	if ent == nil {
+		return nil, "", fmt.Errorf("character %q not found", characterID)
+	}
+
+	if ent.Portrait != "" {
+		portraitPath := filepath.Join(s.resolver.GameDir(gameID), ent.Portrait)
+		if data, err := os.ReadFile(portraitPath); err == nil && len(data) > 0 {
+			return data, imageContentType(data), nil
+		}
+	}
+
+	// Procedural SVG fallback
+	svg := media.GenerateProceduralBustSVG(ent.ID, ent.Name, ent.Gender)
+	return svg, "image/svg+xml", nil
+}
+
 // worldArtStyle reads the art style and genre of the campaign's world, which keeps a
 // setting's imagery visually consistent.
 func (s *Service) worldArtStyle(gameID string) string {
@@ -1391,6 +1438,59 @@ func (s *Service) worldArtStyle(gameID string) string {
 		return ""
 	}
 	return strings.TrimSpace(strings.Join([]string{world.ArtStyle, world.Genre}, ", "))
+}
+
+// scanAndEnrichCharacters scans a campaign's character entities, enriching missing attributes and generating portraits.
+func (s *Service) scanAndEnrichCharacters(gameID string, store *storage.Store) {
+	if store == nil {
+		return
+	}
+	worldStyle := s.worldArtStyle(gameID)
+	cfg := s.Config()
+
+	ents, err := store.ListEntities()
+	if err != nil {
+		return
+	}
+
+	var enricher *engine.CharacterEnricher
+	if cfg != nil {
+		if router, err := harness.RouterFromConfig(cfg); err == nil && router != nil {
+			enricher = engine.NewCharacterEnricher(router)
+		}
+	}
+
+	var portraitWorker *engine.PortraitWorker
+	if cfg != nil && cfg.Media.Image.Type != "" && cfg.Media.Image.Type != "disabled" {
+		if imgClient, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey); err == nil && imgClient != nil {
+			portraitWorker = engine.NewPortraitWorker(s.resolver, store, imgClient)
+		}
+	}
+
+	for _, eSummary := range ents {
+		if eSummary.Type != "character" {
+			continue
+		}
+		ent, err := store.GetEntity(eSummary.ID)
+		if err != nil || ent == nil {
+			continue
+		}
+
+		if enricher != nil && enricher.NeedsEnrichment(ent) {
+			if enriched, err := enricher.Enrich(context.Background(), ent, worldStyle); err == nil && enriched != nil {
+				notePath := filepath.Join(s.resolver.GameDir(gameID), "entities", enriched.ID+".md")
+				if data, err := enriched.SerializeMarkdown(); err == nil {
+					_ = os.WriteFile(notePath, data, 0644)
+					_ = storage.NewSyncer(store).SyncFile(notePath)
+				}
+				ent = enriched
+			}
+		}
+
+		if portraitWorker != nil && ent.Portrait == "" {
+			portraitWorker.Enqueue(gameID, ent, worldStyle)
+		}
+	}
 }
 
 // tracePath is where the sink appends, matching what the composition root builds.

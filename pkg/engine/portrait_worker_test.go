@@ -34,7 +34,7 @@ type mockPortraitGenerator struct {
 	returnBytes      []byte
 }
 
-func (m *mockPortraitGenerator) GenerateImage(ctx context.Context, kind, prompt string) ([]byte, error) {
+func (m *mockPortraitGenerator) GenerateImage(ctx context.Context, prompt string) ([]byte, error) {
 	m.calledWithPrompt = prompt
 	return m.returnBytes, nil
 }
