@@ -139,43 +139,70 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 	primary, err := r.GetProviderForRole(role)
 	if err != nil {
 		close(out)
-		return err
+		return &GenerationFailure{
+			Code:    FailureProviderUnavailable,
+			Message: fmt.Sprintf("no provider available for role %q: %v", role, err),
+		}
 	}
 
-	// Attempt primary stream
+	attempts := make([]Attempt, 0, 2)
+	started := time.Now()
+
+	if streamed, streamErr := r.forwardStream(ctx, primary, req, out); streamed {
+		return streamErr
+	}
+	attempts = append(attempts, Attempt{
+		Role: role, Provider: primary.ID(),
+		Code: FailureEmptyResponse, Detail: "provider streamed no text",
+		DurationMS: time.Since(started).Milliseconds(),
+	})
+
+	if fallback, ok := r.FallbackForRole(role); ok && fallback != nil {
+		if streamed, streamErr := r.forwardStream(ctx, fallback, req, out); streamed {
+			return streamErr
+		}
+		attempts = append(attempts, Attempt{
+			Role: role, Provider: fallback.ID(),
+			Code: FailureEmptyResponse, Detail: "provider streamed no text",
+			DurationMS: time.Since(started).Milliseconds(),
+		})
+	}
+
+	close(out)
+	return &GenerationFailure{
+		Code:      FailureEmptyResponse,
+		Message:   fmt.Sprintf("role %q streamed no text", role),
+		Attempts:  attempts,
+		ElapsedMS: time.Since(started).Milliseconds(),
+	}
+}
+
+// forwardStream pushes a provider's chunks to out once it has seen a usable
+// first chunk. It reports whether anything was forwarded; a provider that closes
+// empty, or whose first chunk carries an error, is treated as having streamed
+// nothing so the caller can fall back.
+func (r *Router) forwardStream(ctx context.Context, provider ModelProvider, req GenerateRequest, out chan<- StreamChunk) (bool, error) {
 	tempOut := make(chan StreamChunk, 20)
 	errCh := make(chan error, 1)
-
 	go func() {
-		errCh <- primary.Stream(ctx, req, tempOut)
+		errCh <- provider.Stream(ctx, req, tempOut)
 	}()
 
-	firstChunk, ok := <-tempOut
-	if !ok || (firstChunk.Error != nil) {
-		// Fallback
-		r.mu.RLock()
-		fallbackID, hasFallback := r.fallbacks[role]
-		var fallback ModelProvider
-		if hasFallback {
-			fallback = r.providers[fallbackID]
-		}
-		r.mu.RUnlock()
-
-		if fallback != nil {
-			return fallback.Stream(ctx, req, out)
-		}
-		close(out)
-		return <-errCh
+	chunk, ok := <-tempOut
+	if !ok || chunk.Error != nil {
+		go func() {
+			for range tempOut {
+			}
+		}()
+		<-errCh
+		return false, nil
 	}
-
-	// Forward stream
 	go func() {
 		defer close(out)
-		out <- firstChunk
-		for chunk := range tempOut {
-			out <- chunk
+		out <- chunk
+		for rest := range tempOut {
+			out <- rest
 		}
 	}()
-
-	return <-errCh
+	return true, <-errCh
 }

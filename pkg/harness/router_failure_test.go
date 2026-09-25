@@ -81,3 +81,60 @@ func TestProviderIDForRole(t *testing.T) {
 		t.Fatalf("ProviderIDForRole(other) = %q, want empty", got)
 	}
 }
+
+type chunkProvider struct {
+	id     string
+	chunks []StreamChunk
+}
+
+func (p *chunkProvider) ID() string { return p.id }
+
+func (p *chunkProvider) Generate(context.Context, GenerateRequest) (*GenerateResponse, error) {
+	return &GenerateResponse{}, nil
+}
+
+func (p *chunkProvider) Stream(_ context.Context, _ GenerateRequest, out chan<- StreamChunk) error {
+	for _, chunk := range p.chunks {
+		out <- chunk
+	}
+	close(out)
+	return nil
+}
+
+func TestStreamForRoleFallsBackOnNoChunks(t *testing.T) {
+	router := NewRouter()
+	router.RegisterProvider(&chunkProvider{id: "primary"})
+	router.RegisterProvider(&chunkProvider{id: "fallback", chunks: []StreamChunk{{Text: "hello"}}})
+	router.AssignRole("gm", "primary")
+	router.SetFallback("gm", "fallback")
+
+	out := make(chan StreamChunk, 8)
+	if err := router.StreamForRole(context.Background(), "gm", GenerateRequest{Prompt: "hi"}, out); err != nil {
+		t.Fatalf("StreamForRole: %v", err)
+	}
+	var text string
+	for chunk := range out {
+		text += chunk.Text
+	}
+	if text != "hello" {
+		t.Fatalf("text = %q, want the fallback text", text)
+	}
+}
+
+func TestStreamForRoleEmptyEverywhereIsFailure(t *testing.T) {
+	router := NewRouter()
+	router.RegisterProvider(&chunkProvider{id: "primary"})
+	router.RegisterProvider(&chunkProvider{id: "fallback"})
+	router.AssignRole("gm", "primary")
+	router.SetFallback("gm", "fallback")
+
+	out := make(chan StreamChunk, 8)
+	err := router.StreamForRole(context.Background(), "gm", GenerateRequest{Prompt: "hi"}, out)
+	failure, ok := FailureFrom(err)
+	if !ok || failure.Code != FailureEmptyResponse {
+		t.Fatalf("error = %v, want empty_response", err)
+	}
+	if len(failure.Attempts) != 2 {
+		t.Fatalf("attempts = %d, want 2", len(failure.Attempts))
+	}
+}
