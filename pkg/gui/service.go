@@ -2246,7 +2246,16 @@ func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, err
 	}, nil
 }
 
-func (s *Service) SaveWorld(ctx context.Context, req CreateWorldRequestDTO) (*WorldDetailDTO, error) {
+// ErrWorldExists reports an attempt to create a world whose id is already taken.
+var ErrWorldExists = errors.New("world already exists")
+
+// ErrWorldNotFound reports an attempt to update a world that does not exist.
+var ErrWorldNotFound = errors.New("world not found")
+
+// writeWorld writes a world directory. It never decides create vs update; the
+// caller does, so a create can refuse a duplicate and an update can require a
+// target.
+func (s *Service) writeWorld(ctx context.Context, req CreateWorldRequestDTO) (*WorldDetailDTO, error) {
 	if req.Name == "" {
 		return nil, fmt.Errorf("world name is required")
 	}
@@ -2288,6 +2297,26 @@ func (s *Service) SaveWorld(ctx context.Context, req CreateWorldRequestDTO) (*Wo
 	}
 
 	return s.GetWorld(ctx, id)
+}
+
+// CreateWorld writes a new world and refuses an id that is already taken.
+func (s *Service) CreateWorld(ctx context.Context, req CreateWorldRequestDTO) (*WorldDetailDTO, error) {
+	id := req.ID
+	if id == "" {
+		id = slugify(req.Name)
+	}
+	if _, err := os.Stat(filepath.Join(s.resolver.WorldDir(id), "world.yaml")); err == nil {
+		return nil, fmt.Errorf("%w: %s", ErrWorldExists, id)
+	}
+	return s.writeWorld(ctx, req)
+}
+
+// UpdateWorld rewrites an existing world and refuses an unknown id.
+func (s *Service) UpdateWorld(ctx context.Context, req CreateWorldRequestDTO) (*WorldDetailDTO, error) {
+	if _, err := os.Stat(filepath.Join(s.resolver.WorldDir(req.ID), "world.yaml")); err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrWorldNotFound, req.ID)
+	}
+	return s.writeWorld(ctx, req)
 }
 
 func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) (*WorldEntityDetailDTO, error) {

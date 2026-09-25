@@ -635,7 +635,11 @@ func (s *Server) handleWorldsRoutes(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		world, err := s.service.SaveWorld(r.Context(), req)
+		world, err := s.service.CreateWorld(r.Context(), req)
+		if errors.Is(err, ErrWorldExists) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -773,7 +777,11 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		req.ID = worldID
-		world, err := s.service.SaveWorld(r.Context(), req)
+		world, err := s.service.UpdateWorld(r.Context(), req)
+		if errors.Is(err, ErrWorldNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
