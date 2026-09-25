@@ -63,6 +63,11 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
 
   const bannerInputRef = React.useRef<HTMLInputElement>(null);
   const iconInputRef = React.useRef<HTMLInputElement>(null);
+  const detailRequest = React.useRef(0);
+  const startModeRef = React.useRef(startMode);
+
+  const errorMessage = (err: unknown): string =>
+    err instanceof Error ? err.message : 'Unexpected error';
 
   const isDraft = selection?.kind === 'draft';
   const savedID = selection?.kind === 'saved' ? selection.id : null;
@@ -71,7 +76,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
     setToast({ type: 'error', message: `${failure.code}: ${failure.message}` });
 
   useEffect(() => {
-    loadWorlds(undefined, startMode);
+    loadWorlds(undefined, startModeRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadWorlds = async (selectID?: string, mode: 'new' | 'browse' = startMode) => {
@@ -93,16 +99,18 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       } else {
         handleNewWorld(sList);
       }
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Failed to load worlds' });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to load worlds' });
     } finally {
       setIsLoading(false);
     }
   };
 
   const loadWorldDetail = async (id: string) => {
+    const token = ++detailRequest.current;
     try {
       const detail = await APIClient.getWorld(id);
+      if (token !== detailRequest.current) return;
       setSelection({ kind: 'saved', id: detail.id });
       setDraft(null);
       setName(detail.name);
@@ -125,6 +133,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         setSelectedEntityID(first.id);
         try {
           const ent = await APIClient.getWorldEntity(detail.id, first.id);
+          if (token !== detailRequest.current) return;
           setEntityMarkdown(ent.markdown);
           setEntityDrafts({ [first.id]: ent.markdown });
         } catch {
@@ -136,8 +145,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         setEntityMarkdown('');
         setEntityDrafts({});
       }
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Failed to load world details' });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to load world details' });
     }
   };
 
@@ -165,8 +174,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         const ent = await APIClient.getWorldEntity(savedID, targetId);
         setEntityDrafts((prev) => ({ ...prev, [targetId]: ent.markdown }));
         setEntityMarkdown(ent.markdown);
-      } catch (err: any) {
-        setToast({ type: 'error', message: err.message || 'Failed to load entity markdown' });
+      } catch (err) {
+        setToast({ type: 'error', message: errorMessage(err) || 'Failed to load entity markdown' });
       }
     } else {
       setEntityMarkdown('');
@@ -174,6 +183,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   };
 
   const handleNewWorld = (sysList?: SystemInfo[]) => {
+    detailRequest.current += 1;
     setSelection({ kind: 'draft' });
     setDraft((prev) => ({ localId: prev?.localId ?? crypto.randomUUID(), dirty: false }));
     setSlugError(false);
@@ -271,8 +281,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         }
         setToast({ type: 'success', message: `Previewed world ${kind}!` });
       }
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || `Failed to generate ${kind}` });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || `Failed to generate ${kind}` });
     } finally {
       setGeneratingKind(null);
     }
@@ -310,8 +320,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         markDirty();
         setToast({ type: 'success', message: 'Auto-filled world fields!' });
       }
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Auto-fill failed' });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Auto-fill failed' });
     } finally {
       setIsGeneratingAll(false);
     }
@@ -369,12 +379,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       setToast({ type: 'success', message: `World "${saved.name}" saved successfully!` });
       await loadWorlds(saved.id, 'browse');
       if (onWorldSaved) onWorldSaved();
-    } catch (err: any) {
+    } catch (err) {
       if (err instanceof WorldExistsError) {
         setSlugError(true);
         setToast({ type: 'error', message: 'A world with this id already exists. Change the name or slug.' });
       } else {
-        setToast({ type: 'error', message: err.message || 'Failed to save world' });
+        setToast({ type: 'error', message: errorMessage(err) || 'Failed to save world' });
       }
     } finally {
       setIsSaving(false);
@@ -397,8 +407,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       await APIClient.saveWorldEntity(savedID, selectedEntityID, entityMarkdown);
       setToast({ type: 'success', message: `Entity "${selectedEntityID}" saved!` });
       await loadWorldDetail(savedID);
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Failed to save entity' });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to save entity' });
     }
   };
 
@@ -425,8 +435,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       await APIClient.deleteWorldEntity(savedID, entityId);
       setToast({ type: 'success', message: `Entity "${entityId}" deleted!` });
       await loadWorldDetail(savedID);
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Failed to delete entity' });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to delete entity' });
     }
   };
 
@@ -461,8 +471,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       setNewEntitySlug('');
       await loadWorldDetail(savedID);
       await handleSelectEntity(slug);
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Failed to create entity' });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to create entity' });
     }
   };
 
