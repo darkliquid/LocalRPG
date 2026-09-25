@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -175,4 +176,18 @@ func decodeGeneratedValues(text string) map[string]string {
 		}
 	}
 	return values
+}
+
+// ErrNoDecodableFields reports that a model returned text from which no field
+// values could be decoded. It is distinct from an empty reply.
+var ErrNoDecodableFields = errors.New("no decodable fields in model response")
+
+// decodeGeneratedValuesChecked is decodeGeneratedValues with the parse failure
+// made explicit, so a caller can record parse_error rather than guessing.
+func decodeGeneratedValuesChecked(text string) (map[string]string, error) {
+	values := decodeGeneratedValues(text)
+	if len(values) == 0 {
+		return nil, ErrNoDecodableFields
+	}
+	return values, nil
 }
