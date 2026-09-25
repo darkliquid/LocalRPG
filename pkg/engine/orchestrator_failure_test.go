@@ -64,3 +64,30 @@ func TestStreamEmptyCloseIsEmptyResponseFailure(t *testing.T) {
 		t.Fatalf("ProviderID = %q, want empty", result.ProviderID)
 	}
 }
+
+func TestStreamCountsChunks(t *testing.T) {
+	o := &TurnOrchestrator{chunkTimeout: time.Second}
+	result, err := o.stream(context.Background(), countingProvider{chunks: []string{"a", "b", "c"}}, harness.GenerateRequest{}, nil)
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	if result.ChunkCount != 3 {
+		t.Fatalf("ChunkCount = %d, want 3", result.ChunkCount)
+	}
+}
+
+type countingProvider struct{ chunks []string }
+
+func (c countingProvider) ID() string { return "counting" }
+
+func (c countingProvider) Generate(context.Context, harness.GenerateRequest) (*harness.GenerateResponse, error) {
+	return &harness.GenerateResponse{}, nil
+}
+
+func (c countingProvider) Stream(_ context.Context, _ harness.GenerateRequest, out chan<- harness.StreamChunk) error {
+	for _, text := range c.chunks {
+		out <- harness.StreamChunk{Text: text}
+	}
+	close(out)
+	return nil
+}

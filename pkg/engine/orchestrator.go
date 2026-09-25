@@ -578,11 +578,15 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		outcome = "error"
 		failure, _ := harness.FailureFrom(err)
 		fields := map[string]interface{}{
-			"error":           err.Error(),
-			"generation_code": generationCode(failure),
-			"provider":        result.ProviderID,
-			"prompt_chars":    len([]rune(assembly.Prompt)),
-			"elapsed_ms":      time.Since(turnStarted).Milliseconds(),
+			"code":          generationCode(failure),
+			"error":         err.Error(),
+			"role":          "gm",
+			"provider":      result.ProviderID,
+			"prompt_chars":  len([]rune(actionInput)),
+			"context_chars": len([]rune(assembly.Prompt)),
+			"elapsed_ms":    time.Since(turnStarted).Milliseconds(),
+			"chunk_count":   result.ChunkCount,
+			"partial_chars": len([]rune(result.Text)),
 		}
 		if failure != nil {
 			fields["attempts"] = len(failure.Attempts)
@@ -635,9 +639,16 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		turnSpan.RecordError(failure)
 		turnSpan.SetStatus(codes.Error, string(failure.Code))
 		o.logger.Event("generation.error", map[string]interface{}{
-			"error":           failure.Message,
-			"generation_code": string(failure.Code),
-			"finish_reason":   result.FinishReason,
+			"code":          string(failure.Code),
+			"error":         failure.Message,
+			"role":          "gm",
+			"provider":      result.ProviderID,
+			"prompt_chars":  len([]rune(actionInput)),
+			"elapsed_ms":    time.Since(turnStarted).Milliseconds(),
+			"chunk_count":   result.ChunkCount,
+			"partial_chars": len([]rune(result.Text)),
+			"attempts":      len(failure.Attempts),
+			"finish_reason": result.FinishReason,
 		})
 		return nil, failure
 	}
@@ -818,9 +829,11 @@ type streamResult struct {
 	// Arguments and results live in the trace, not in the campaign's history.
 	Provenance []ToolCallRecord
 	// Failure is the bounded generation failure when the stream produced no
-	// usable text. ProviderID names the provider that failed.
+	// usable text. ProviderID names the provider that failed. ChunkCount is how
+	// many non-empty chunks arrived, for diagnostics.
 	Failure    *harness.GenerationFailure
 	ProviderID string
+	ChunkCount int
 }
 
 // generationCode reads a bounded failure code for logging, defaulting to a
@@ -860,8 +873,9 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 	finishReason := ""
 	var toolCalls []harness.ToolCall
 	sawText := false
+	chunkCount := 0
 	interrupted := func(err error) (streamResult, error) {
-		result := streamResult{ProviderID: provider.ID()}
+		result := streamResult{ProviderID: provider.ID(), ChunkCount: chunkCount}
 		if sawText {
 			result.Text = sb.String()
 			result.FinishReason = finishReason
@@ -907,6 +921,7 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 				if strings.TrimSpace(sb.String()) == "" && len(toolCalls) == 0 {
 					return streamResult{
 						ProviderID: provider.ID(),
+						ChunkCount: chunkCount,
 						Failure: &harness.GenerationFailure{
 							Code:      harness.FailureEmptyResponse,
 							Message:   "provider returned no text",
@@ -914,7 +929,7 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 						},
 					}, nil
 				}
-				return streamResult{Text: sb.String(), FinishReason: finishReason, ToolCalls: toolCalls, ProviderID: provider.ID()}, nil
+				return streamResult{Text: sb.String(), FinishReason: finishReason, ToolCalls: toolCalls, ProviderID: provider.ID(), ChunkCount: chunkCount}, nil
 			}
 			if chunk.Error != nil {
 				<-streamErr
@@ -933,6 +948,10 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 				}
 			}
 			idle.Reset(timeout)
+
+			if chunk.Text != "" || len(chunk.ToolCalls) > 0 {
+				chunkCount++
+			}
 
 			if chunk.Text == "" {
 				continue
