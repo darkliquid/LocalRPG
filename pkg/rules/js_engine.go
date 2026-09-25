@@ -6,6 +6,8 @@ import (
 	"sync"
 
 	"github.com/dop251/goja"
+
+	"github.com/darkliquid/localrpg/pkg/core"
 )
 
 type JSEngine struct {
@@ -116,6 +118,15 @@ func (j *JSEngine) bindHostAPI() {
 		j.worldTickHooks = append(j.worldTickHooks, fn)
 		return goja.Undefined()
 	})
+}
+
+// SetManifest hands the declarative schema to the host bridge if it accepts one.
+func (j *JSEngine) SetManifest(manifest *core.SystemManifest) {
+	if setter, ok := j.bridge.(interface {
+		SetManifest(*core.SystemManifest)
+	}); ok {
+		setter.SetManifest(manifest)
+	}
 }
 
 func (j *JSEngine) LoadScript(script string) error {

@@ -21,6 +21,13 @@ func NewRuleLoader(paths *core.PathResolver, jsEngine *JSEngine) *RuleLoader {
 }
 
 func (r *RuleLoader) LoadRules(systemID, worldID string) error {
+	// 0. Hand the declarative mechanics schema to the host bridge, so a script
+	// can read the stats, skills, and check conventions it declares.
+	manifestPath := filepath.Join(r.paths.SystemDir(systemID), "system.yaml")
+	if manifest, err := core.LoadSystemManifest(manifestPath); err == nil && manifest != nil {
+		r.jsEngine.SetManifest(manifest)
+	}
+
 	// 1. Load base system JS if present
 	sysScriptPath := filepath.Join(r.paths.SystemDir(systemID), "mechanics.js")
 	if data, err := os.ReadFile(sysScriptPath); err == nil {

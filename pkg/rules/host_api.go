@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
@@ -32,6 +33,11 @@ type GameHostAPI interface {
 	GetLogs() []string
 	SetLocation(locationID string) error
 	GetLocation() (string, error)
+	// ListStats, ListSkills, and CheckConventions expose the system's declarative
+	// mechanics schema to scripts, which may derive stats and register resolvers.
+	ListStats() []core.StatSpec
+	ListSkills() []core.SkillSpec
+	CheckConventions() core.CheckConventions
 }
 
 type DefaultHostBridge struct {
@@ -40,6 +46,7 @@ type DefaultHostBridge struct {
 	playerID   string
 	directives []string
 	logs       []string
+	manifest   *core.SystemManifest
 }
 
 // NewHostBridge builds the host API a system's scripts are given. writer persists
@@ -155,4 +162,34 @@ func (h *DefaultHostBridge) Log(message string) {
 
 func (h *DefaultHostBridge) GetLogs() []string {
 	return h.logs
+}
+
+// SetManifest gives the bridge the system's declarative mechanics schema, so
+// scripts can read it through ListStats/ListSkills/CheckConventions.
+func (h *DefaultHostBridge) SetManifest(manifest *core.SystemManifest) {
+	h.manifest = manifest
+}
+
+// ListStats returns the declared stats, or nothing when no schema is set.
+func (h *DefaultHostBridge) ListStats() []core.StatSpec {
+	if h.manifest == nil || h.manifest.Mechanics == nil {
+		return nil
+	}
+	return h.manifest.Mechanics.Stats
+}
+
+// ListSkills returns the declared skills.
+func (h *DefaultHostBridge) ListSkills() []core.SkillSpec {
+	if h.manifest == nil || h.manifest.Mechanics == nil {
+		return nil
+	}
+	return h.manifest.Mechanics.Skills
+}
+
+// CheckConventions returns the declared check conventions.
+func (h *DefaultHostBridge) CheckConventions() core.CheckConventions {
+	if h.manifest == nil || h.manifest.Mechanics == nil {
+		return core.CheckConventions{}
+	}
+	return h.manifest.Mechanics.Checks
 }
