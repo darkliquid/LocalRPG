@@ -35,6 +35,7 @@ import {
   ProviderCatalog,
   TurnContext,
   WorkingEntry,
+  GenerationFailure,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -46,6 +47,32 @@ export class HTTPError extends Error {
     this.name = 'HTTPError';
     this.status = status;
   }
+}
+
+// GenerationError carries the structured failure a generation endpoint returns,
+// so a caller can show why nothing was generated instead of guessing.
+export class GenerationError extends HTTPError {
+  failure: GenerationFailure;
+  constructor(status: number, failure: GenerationFailure) {
+    super(status, failure.message);
+    this.name = 'GenerationError';
+    this.failure = failure;
+  }
+}
+
+async function throwGenerationError(res: Response): Promise<never> {
+  const text = await res.text();
+  let failure: GenerationFailure = {
+    code: 'provider_error',
+    message: text || `generation failed with status ${res.status}`,
+  };
+  try {
+    const body = JSON.parse(text) as { error?: GenerationFailure };
+    if (body.error && body.error.code) failure = body.error;
+  } catch {
+    // A non-JSON body is left as the message.
+  }
+  throw new GenerationError(res.status, failure);
 }
 
 export class APIClient {
@@ -113,7 +140,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(`generateCharacter: ${res.statusText}`);
+    if (!res.ok) return throwGenerationError(res);
     return res.json();
   }
 
@@ -125,7 +152,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    if (!res.ok) return throwGenerationError(res);
     return res.json();
   }
 
@@ -168,7 +195,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind, prompt }),
     });
-    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    if (!res.ok) return throwGenerationError(res);
     return res.json();
   }
 
@@ -178,7 +205,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind, prompt }),
     });
-    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    if (!res.ok) return throwGenerationError(res);
     return res.json();
   }
 
@@ -197,7 +224,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind, name, description, art_style: artStyle, genre }),
     });
-    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    if (!res.ok) return throwGenerationError(res);
     return res.blob();
   }
 

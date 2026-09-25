@@ -217,6 +217,28 @@ export interface PlayerCharacter {
   extra?: Record<string, string>;
 }
 
+export type GenerationFailureCode =
+  | 'provider_unavailable' | 'provider_error' | 'empty_response'
+  | 'parse_error' | 'timeout' | 'context_too_large' | 'invalid_request';
+
+export interface GenerationAttempt {
+  role: string;
+  provider: string;
+  code: GenerationFailureCode;
+  detail?: string;
+  duration_ms: number;
+}
+
+export interface GenerationFailure {
+  code: GenerationFailureCode;
+  message: string;
+  attempts?: GenerationAttempt[];
+  finish_reason?: string;
+  prompt_chars?: number;
+  context_chars?: number;
+  elapsed_ms?: number;
+}
+
 export interface GenerateCharacterRequest {
   system_id?: string;
   world_id?: string;
@@ -228,6 +250,7 @@ export interface GenerateCharacterRequest {
 export interface GenerateCharacterResponse {
   values: Record<string, string>;
   generated_by: string;
+  warning?: GenerationFailure;
 }
 
 export interface GenerateTextRequest {
@@ -242,6 +265,7 @@ export interface GenerateTextRequest {
 export interface GenerateTextResponse {
   fields: Record<string, string>;
   generated_by: string;
+  warning?: GenerationFailure;
 }
 
 export interface SystemDetail {
