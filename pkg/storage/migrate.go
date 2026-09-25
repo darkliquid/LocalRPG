@@ -17,6 +17,40 @@ var migrations = []migration{
 	{version: 2, apply: dropAudioRefsColumn},
 	{version: 3, apply: addTurnContextsTable},
 	{version: 4, apply: addWorkingSetTable},
+	{version: 5, apply: addMemoriesTables},
+}
+
+// addMemoriesTables creates the per-entity memory store: the records, their
+// entity links, their tags, and a full-text index over text and tags.
+func addMemoriesTables(db *sql.DB) error {
+	const ddl = `
+	CREATE TABLE IF NOT EXISTS memories (
+		id          INTEGER PRIMARY KEY AUTOINCREMENT,
+		turn        INTEGER NOT NULL,
+		kind        TEXT NOT NULL,
+		text        TEXT NOT NULL,
+		importance  INTEGER NOT NULL DEFAULT 3,
+		source      TEXT NOT NULL,
+		check_id    TEXT,
+		created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_memories_turn ON memories(turn);
+	CREATE TABLE IF NOT EXISTS memory_entities (
+		memory_id INTEGER NOT NULL,
+		entity_id TEXT NOT NULL,
+		PRIMARY KEY (memory_id, entity_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_memory_entities_entity ON memory_entities(entity_id);
+	CREATE TABLE IF NOT EXISTS memory_tags (
+		memory_id INTEGER NOT NULL,
+		tag       TEXT NOT NULL,
+		PRIMARY KEY (memory_id, tag)
+	);
+	CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(text, tags, tokenize='porter');`
+	if _, err := db.Exec(ddl); err != nil {
+		return fmt.Errorf("create memories tables: %w", err)
+	}
+	return nil
 }
 
 func addTurnContextsTable(db *sql.DB) error {
