@@ -182,6 +182,25 @@ export class APIClient {
     return res.json();
   }
 
+  // generateAssetPreview renders banner or icon bytes from inline form
+  // metadata without persisting anything, so creation flows can show a result
+  // before the campaign or world exists.
+  static async generateAssetPreview(
+    kind: 'banner' | 'icon',
+    name: string,
+    description: string,
+    artStyle: string,
+    genre: string = ''
+  ): Promise<Blob> {
+    const res = await fetch('/api/generate-asset-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, name, description, art_style: artStyle, genre }),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    return res.blob();
+  }
+
   static async audioStatus(): Promise<{ available: boolean; playing: boolean }> {
     const res = await fetch('/api/audio/status');
     if (!res.ok) throw new Error(`audioStatus: ${res.statusText}`);
