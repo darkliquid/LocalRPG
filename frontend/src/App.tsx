@@ -38,9 +38,8 @@ const slugify = (name: string): string => {
 };
 
 export const App: React.FC = () => {
-  const [activeGameID, setActiveGameID] = useState<string | null>(() => {
-    return localStorage.getItem('localrpg_active_game') || null;
-  });
+  // Always open in the launcher hub view rather than directly entering a campaign.
+  const [activeGameID, setActiveGameID] = useState<string | null>(null);
 
   const client = useMemo(() => {
     return activeGameID ? new APIClient(activeGameID) : null;
@@ -90,6 +89,7 @@ export const App: React.FC = () => {
     if (err instanceof HTTPError && err.status === 404) {
       // The campaign is definitively gone: forget it and return to the launcher.
       localStorage.removeItem('localrpg_active_game');
+      localStorage.removeItem('localrpg_last_played_game');
       setActiveGameID(null);
       setCampaignStatus('idle');
       setCampaignError(null);
@@ -133,6 +133,7 @@ export const App: React.FC = () => {
           return;
         }
         localStorage.removeItem('localrpg_active_game');
+        localStorage.removeItem('localrpg_last_played_game');
         setActiveGameID(null);
         setCampaignStatus('idle');
       })
@@ -164,7 +165,8 @@ export const App: React.FC = () => {
   }, [client, refreshCorpus]);
 
   const handleSelectGame = (gameId: string) => {
-    localStorage.setItem('localrpg_active_game', gameId);
+    localStorage.setItem('localrpg_last_played_game', gameId);
+    localStorage.removeItem('localrpg_active_game');
     setActiveGameID(gameId);
   };
 

@@ -13,6 +13,23 @@ import { SystemsStudio } from './SystemsStudio';
 import { SettingsStudio } from './SettingsStudio';
 import { ArrowLeft, X } from 'lucide-react';
 
+export function isWorkingGame(
+  game: GameSummary,
+  worldList: WorldInfo[],
+  systemList: SystemInfo[]
+): boolean {
+  if (!game || !game.id || !game.world_id || !game.system_id) {
+    return false;
+  }
+  if (worldList.length > 0 && !worldList.some((w) => w.id === game.world_id)) {
+    return false;
+  }
+  if (systemList.length > 0 && !systemList.some((s) => s.id === game.system_id)) {
+    return false;
+  }
+  return true;
+}
+
 interface LauncherHubProps {
   onSelectGame: (gameId: string) => void;
 }
@@ -21,7 +38,9 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [systems, setSystems] = useState<SystemInfo[]>([]);
   const [worlds, setWorlds] = useState<WorldInfo[]>([]);
-  const [selectedGameID, setSelectedGameID] = useState<string | null>(null);
+  const [selectedGameID, setSelectedGameID] = useState<string | null>(() => {
+    return localStorage.getItem('localrpg_last_played_game') || localStorage.getItem('localrpg_active_game') || null;
+  });
 
   const [isFlyoutOpen, setIsFlyoutOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -47,8 +66,13 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
       setWorlds(wList);
 
       setSelectedGameID((prev) => {
-        if (prev && gList.some((g) => g.id === prev)) return prev;
-        return gList[0]?.id || null;
+        const candidateID = prev || localStorage.getItem('localrpg_last_played_game') || localStorage.getItem('localrpg_active_game') || null;
+        const candidate = candidateID ? gList.find((g) => g.id === candidateID) : null;
+        if (candidate && isWorkingGame(candidate, wList, sList)) {
+          return candidate.id;
+        }
+        const nextWorking = gList.find((g) => isWorkingGame(g, wList, sList));
+        return nextWorking?.id || gList[0]?.id || null;
       });
     } catch (err) {
       console.error('Failed to load launcher data:', err);

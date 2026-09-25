@@ -1790,9 +1790,19 @@ func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 			turnCount = len(turns)
 		}
 
-		lastPlayed := ""
+		var latestTime time.Time
 		if fi, err := os.Stat(manifestPath); err == nil {
-			lastPlayed = fi.ModTime().Format(time.RFC3339)
+			latestTime = fi.ModTime()
+		}
+		if fi, err := os.Stat(historyPath); err == nil {
+			if fi.ModTime().After(latestTime) {
+				latestTime = fi.ModTime()
+			}
+		}
+
+		lastPlayed := ""
+		if !latestTime.IsZero() {
+			lastPlayed = latestTime.Format(time.RFC3339)
 		}
 
 		name := m.Name

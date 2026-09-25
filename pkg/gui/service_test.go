@@ -622,6 +622,61 @@ func TestCampaignTitleIsPersistedAndLatestIsFirst(t *testing.T) {
 	}
 }
 
+func TestListGamesOrdersByLatestHistoryModTime(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewService(tmpDir)
+
+	sysDir := svc.GetResolver().SystemDir("freeform")
+	_ = os.MkdirAll(sysDir, 0755)
+	_ = os.WriteFile(filepath.Join(sysDir, "system.yaml"), []byte("id: freeform\nname: Freeform\nversion: 1.0\n"), 0644)
+	worldDir := svc.GetResolver().WorldDir("harbour-realm")
+	_ = os.MkdirAll(worldDir, 0755)
+	_ = os.WriteFile(filepath.Join(worldDir, "world.yaml"), []byte("id: harbour-realm\nname: Harbour Realm\n"), 0644)
+
+	g1, err := svc.CreateGame(context.Background(), CreateGameRequestDTO{
+		Name:       "Older Campaign",
+		SystemID:   "freeform",
+		WorldID:    "harbour-realm",
+		PlayerName: "Hero 1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+
+	g2, err := svc.CreateGame(context.Background(), CreateGameRequestDTO{
+		Name:       "Newer Campaign",
+		SystemID:   "freeform",
+		WorldID:    "harbour-realm",
+		PlayerName: "Hero 2",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := svc.ListGames(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 2 || list[0].ID != g2.ID {
+		t.Fatalf("expected g2 to be first initially, got %v", list)
+	}
+
+	historyPath := filepath.Join(svc.GetResolver().GameDir(g1.ID), "history.jsonl")
+	_ = os.WriteFile(historyPath, []byte(`{"turn_number":1,"input_text":"look","mode":"Action","prose":"You look."}`+"\n"), 0644)
+	futureTime := time.Now().Add(1 * time.Hour)
+	_ = os.Chtimes(historyPath, futureTime, futureTime)
+
+	listAfterHistory, err := svc.ListGames(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if listAfterHistory[0].ID != g1.ID {
+		t.Errorf("expected g1 with updated history.jsonl to be first, got %s", listAfterHistory[0].ID)
+	}
+}
+
 func setupFreeformSystem(t *testing.T, svc *Service) {
 	t.Helper()
 
