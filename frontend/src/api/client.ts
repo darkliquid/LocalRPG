@@ -13,6 +13,8 @@ import {
   GameSettingsPatch,
   GenerateCharacterRequest,
   GenerateCharacterResponse,
+  GenerateTextRequest,
+  GenerateTextResponse,
   SystemDetail,
   CreateSystemRequest,
   WorldDetail,
@@ -112,6 +114,18 @@ export class APIClient {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`generateCharacter: ${res.statusText}`);
+    return res.json();
+  }
+
+  // generateText asks the backend for one field or a whole form's worth of
+  // values. It creates nothing.
+  static async generateText(payload: GenerateTextRequest): Promise<GenerateTextResponse> {
+    const res = await fetch('/api/generate-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
   }
 

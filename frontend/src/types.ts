@@ -228,6 +228,20 @@ export interface GenerateCharacterResponse {
   generated_by: string;
 }
 
+export interface GenerateTextRequest {
+  form_type: 'character' | 'world' | 'system' | 'campaign';
+  field_name: string;
+  context: Record<string, string>;
+  world_id?: string;
+  system_id?: string;
+  seed?: string;
+}
+
+export interface GenerateTextResponse {
+  fields: Record<string, string>;
+  generated_by: string;
+}
+
 export interface SystemDetail {
   id: string;
   name: string;
