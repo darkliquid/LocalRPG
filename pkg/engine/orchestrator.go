@@ -196,7 +196,7 @@ func NewTurnOrchestrator(
 	startLocation string,
 	playerID string,
 ) *TurnOrchestrator {
-	return &TurnOrchestrator{
+	o := &TurnOrchestrator{
 		store:         store,
 		timeline:      timeline,
 		rulesEngine:   rulesEngine,
@@ -205,6 +205,12 @@ func NewTurnOrchestrator(
 		playerID:      playerID,
 		assembler:     harness.NewContextAssembler(store),
 	}
+	// A loaded rules engine resolves checks from the system's declared schema and
+	// its own js resolvers; otherwise the deterministic default stands in.
+	if rulesEngine != nil {
+		o.checkResolver = rulesEngine
+	}
+	return o
 }
 
 func (o *TurnOrchestrator) SetPrompts(rulesPrompt, lorePrompt string) {

@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -8,6 +9,8 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/darkliquid/localrpg/pkg/core"
+	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
 type JSEngine struct {
@@ -16,7 +19,9 @@ type JSEngine struct {
 	bridge         GameHostAPI
 	actionHandlers map[string]goja.Callable
 	turnEndHooks   []goja.Callable
+	turnBeginHooks []goja.Callable
 	worldTickHooks []goja.Callable
+	checkResolvers map[string]goja.Callable
 }
 
 func NewJSEngine(bridge GameHostAPI) *JSEngine {
@@ -26,7 +31,9 @@ func NewJSEngine(bridge GameHostAPI) *JSEngine {
 		bridge:         bridge,
 		actionHandlers: make(map[string]goja.Callable),
 		turnEndHooks:   make([]goja.Callable, 0),
+		turnBeginHooks: make([]goja.Callable, 0),
 		worldTickHooks: make([]goja.Callable, 0),
+		checkResolvers: make(map[string]goja.Callable),
 	}
 
 	engine.bindHostAPI()
@@ -116,6 +123,25 @@ func (j *JSEngine) bindHostAPI() {
 			panic(j.vm.ToValue("onWorldTick handler must be a function"))
 		}
 		j.worldTickHooks = append(j.worldTickHooks, fn)
+		return goja.Undefined()
+	})
+
+	j.vm.Set("onTurnBegin", func(call goja.FunctionCall) goja.Value {
+		fn, ok := goja.AssertFunction(call.Argument(0))
+		if !ok {
+			panic(j.vm.ToValue("onTurnBegin handler must be a function"))
+		}
+		j.turnBeginHooks = append(j.turnBeginHooks, fn)
+		return goja.Undefined()
+	})
+
+	j.vm.Set("onCheck", func(call goja.FunctionCall) goja.Value {
+		kind := call.Argument(0).String()
+		fn, ok := goja.AssertFunction(call.Argument(1))
+		if !ok {
+			panic(j.vm.ToValue("onCheck handler must be a function"))
+		}
+		j.checkResolvers[kind] = fn
 		return goja.Undefined()
 	})
 }
@@ -216,6 +242,53 @@ func (j *JSEngine) ExecuteWorldTick(ctx map[string]interface{}) error {
 	for _, hook := range j.worldTickHooks {
 		if _, err := hook(goja.Undefined(), j.vm.ToValue(ctx)); err != nil {
 			return fmt.Errorf("execute worldTick hook: %w", err)
+		}
+	}
+	return nil
+}
+
+// Resolve implements harness.CheckResolver: a script resolver registered for the
+// check kind wins, otherwise the system's declared conventions resolve it.
+func (j *JSEngine) Resolve(ctx context.Context, req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error) {
+	j.mu.Lock()
+	fn, hasResolver := j.checkResolvers[req.CheckKind]
+	if hasResolver {
+		arg := j.vm.ToValue(map[string]interface{}{
+			"actor": req.Actor, "target": req.Target, "check_kind": req.CheckKind,
+			"stat": req.Stat, "difficulty": req.Difficulty, "stakes": req.Stakes,
+		})
+		value, err := fn(goja.Undefined(), arg)
+		j.mu.Unlock()
+		if err != nil {
+			return nil, fmt.Errorf("check resolver %q: %w", req.CheckKind, err)
+		}
+		result := &harness.CheckResult{CheckID: newCheckID(), Actor: req.Actor, Target: req.Target, Outcome: "fail"}
+		if mapped, ok := value.Export().(map[string]interface{}); ok {
+			if outcome, ok := mapped["outcome"].(string); ok && outcome != "" {
+				result.Outcome = outcome
+			}
+		}
+		return result, nil
+	}
+
+	conventions := core.CheckConventions{}
+	if schema, ok := j.bridge.(interface {
+		CheckConventions() core.CheckConventions
+	}); ok {
+		conventions = schema.CheckConventions()
+	}
+	bridge := j.bridge
+	j.mu.Unlock()
+	return SchemaResolver{bridge: bridge, conventions: conventions}.Resolve(ctx, req, actor)
+}
+
+// ExecuteTurnBegin runs every onTurnBegin hook.
+func (j *JSEngine) ExecuteTurnBegin(ctx map[string]interface{}) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	for _, hook := range j.turnBeginHooks {
+		if _, err := hook(goja.Undefined(), j.vm.ToValue(ctx)); err != nil {
+			return fmt.Errorf("turn begin hook: %w", err)
 		}
 	}
 	return nil
