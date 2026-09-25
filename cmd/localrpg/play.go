@@ -135,6 +135,8 @@ func handlePlayCommand(args []string) {
 		Timeout:     cfg.CompletionTimeout(),
 	})
 	toolExecutor := tools.NewExecutor(store, cfg.ToolResultChars())
+	toolExecutor.SetVoiceProfiles(timeline.VoiceProfiles())
+	toolExecutor.SetEntityWriter(timeline)
 	if embProvider, err := embeddings.NewProviderFromConfig(cfg.Embeddings); err == nil && embProvider != nil {
 		toolExecutor.SetEmbeddingsProvider(embProvider)
 	}

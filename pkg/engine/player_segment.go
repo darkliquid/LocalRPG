@@ -15,6 +15,7 @@ func playerSegment(mode, input, playerID, playerName string) *entity.TurnSegment
 		return nil
 	}
 	text := strings.TrimSpace(input)
+	text = strings.Trim(text, "\"' \t\r\n")
 	if text == "" {
 		return nil
 	}
@@ -27,32 +28,38 @@ func playerSegment(mode, input, playerID, playerName string) *entity.TurnSegment
 	}
 }
 
+// isPlayerSpeech reports whether a turn segment is a speech beat by the protagonist.
+func isPlayerSpeech(s entity.TurnSegment, playerID, playerName string) bool {
+	if s.Kind != entity.SegmentSpeech {
+		return false
+	}
+	if s.Player {
+		return true
+	}
+	if s.SpeakerID != "" && (s.SpeakerID == playerID || strings.EqualFold(s.SpeakerID, playerID)) {
+		return true
+	}
+	if s.Speaker != "" && strings.EqualFold(s.Speaker, playerName) {
+		return true
+	}
+	return false
+}
+
 // attachPlayerSegment ensures the player's spoken line leads the turn segments.
-// If the generated segments already begin with a speech beat matching the player's
-// utterance, it tags that segment with Player: true rather than prepending a duplicate.
+// If the generated segments already contain a speech beat spoken by the player,
+// it tags that segment with Player: true rather than prepending a duplicate.
 func attachPlayerSegment(segments []entity.TurnSegment, mode, input, playerID, playerName string) []entity.TurnSegment {
 	beat := playerSegment(mode, input, playerID, playerName)
 	if beat == nil {
 		return segments
 	}
 
-	cleanInput := strings.Trim(beat.Text, "\"' \t\r\n")
-
-	if len(segments) > 0 {
-		first := &segments[0]
-		if first.Kind == entity.SegmentSpeech {
-			speakerMatch := first.SpeakerID == playerID ||
-				strings.EqualFold(first.SpeakerID, playerID) ||
-				strings.EqualFold(first.Speaker, playerName)
-			cleanFirst := strings.Trim(first.Text, "\"' \t\r\n")
-			textMatch := strings.EqualFold(cleanFirst, cleanInput)
-
-			if speakerMatch && textMatch {
-				first.Player = true
-				first.SpeakerID = playerID
-				first.Speaker = playerName
-				return segments
-			}
+	for i := range segments {
+		if isPlayerSpeech(segments[i], playerID, playerName) {
+			segments[i].Player = true
+			segments[i].SpeakerID = playerID
+			segments[i].Speaker = playerName
+			return segments
 		}
 	}
 

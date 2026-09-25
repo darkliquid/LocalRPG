@@ -18,6 +18,7 @@ export interface GameState {
   opening_prompt?: string;
   narrator_voice?: string;
   start_location?: string;
+  banner_url?: string;
 }
 
 export interface TurnSegment {

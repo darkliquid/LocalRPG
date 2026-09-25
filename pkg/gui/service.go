@@ -401,6 +401,16 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		}
 	}
 
+	var bannerURL string
+	if p, _ := findAssetFile(gameDir, "banner"); p != "" {
+		bannerURL = fmt.Sprintf("/api/game/%s/banner", gameID)
+	} else if gameManifest.WorldID != "" {
+		worldDir := s.resolver.WorldDir(gameManifest.WorldID)
+		if p, _ := findAssetFile(worldDir, "banner"); p != "" {
+			bannerURL = fmt.Sprintf("/api/world/%s/banner", gameManifest.WorldID)
+		}
+	}
+
 	return &GameStateDTO{
 		GameID:   gameID,
 		GameName: gameManifest.Name,
@@ -418,6 +428,7 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		OpeningPrompt: engine.OpeningPrompt(gameManifest),
 		NarratorVoice: narratorVoice,
 		StartLocation: startLocation,
+		BannerURL:     bannerURL,
 	}, nil
 }
 
@@ -1201,6 +1212,8 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		Timeout:     cfg.CompletionTimeout(),
 	})
 	toolExecutor := tools.NewExecutor(store, cfg.ToolResultChars())
+	toolExecutor.SetVoiceProfiles(timeline.VoiceProfiles())
+	toolExecutor.SetEntityWriter(timeline)
 	if embProvider, err := embeddings.NewProviderFromConfig(cfg.Embeddings); err == nil && embProvider != nil {
 		toolExecutor.SetEmbeddingsProvider(embProvider)
 	}

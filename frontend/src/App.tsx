@@ -386,12 +386,12 @@ export const App: React.FC = () => {
     setAddressed((prev) => new Set(prev).add(turnNumber));
   };
 
-  // Find latest scene image for full-window atmospheric background
-  const activeBgImage = chronicle.slice().reverse().find((t) => t.image_url)?.image_url;
+  // Find latest scene image for full-window atmospheric background, falling back to campaign banner
+  const activeBgImage = chronicle.slice().reverse().find((t) => t.image_url)?.image_url || gameState?.banner_url;
 
   return (
     <div className="relative flex flex-col h-screen overflow-hidden text-stone-200">
-      {/* Full-window atmospheric background layer (Twintail Launcher aesthetic) */}
+      {/* Full-window atmospheric background layer */}
       <div
         id="app-bg"
         key={activeBgImage || 'default'}
@@ -402,9 +402,8 @@ export const App: React.FC = () => {
         }}
       />
 
-      {/* Cinematic dark vignette and noise overlays */}
-      <div className="fixed inset-0 bg-gradient-to-b from-black/70 via-black/45 to-black/85 pointer-events-none" />
-      <div className="fixed inset-0 bg-radial-[circle_at_center] from-transparent via-black/30 to-black/90 pointer-events-none bg-noise" />
+      {/* Cinematic dark overlay letting the banner shine through cleanly without film grain */}
+      <div className="fixed inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70 pointer-events-none" />
 
       {/* When no game is selected: Mount the Launcher Hub */}
       {!activeGameID ? (

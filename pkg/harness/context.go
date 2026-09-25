@@ -97,6 +97,8 @@ type ContextRequest struct {
 	Threads []string
 	// SpeechCues specifies the vocal steering hints the active TTS engine supports.
 	SpeechCues SpeechCueContext
+	// OmitVoiceCatalog suppresses the static catalog of all voice profiles in favor of tool-based discovery.
+	OmitVoiceCatalog bool
 	// Context carries the caller's trace context so assembly can be a span. Nil
 	// means background, which keeps callers that never had one working.
 	Context context.Context
@@ -201,9 +203,13 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 	catalogue := ""
 	var catalogueRefs []Ref
 	if len(req.Profiles) > 0 {
-		catalogue = FormatVoiceProfilesCatalog(req.Profiles) + "\n"
-		for _, p := range req.Profiles {
-			catalogueRefs = append(catalogueRefs, Ref{Kind: RefEntity, ID: p.ID, Relation: "voice"})
+		if req.OmitVoiceCatalog {
+			catalogue = "## NPC VOICES\nNew characters can be voiced dynamically. Use the search_voice_profiles and assign_voice tools to discover and assign voices, or specify voice_hint when introducing personae in submit_turn.\n\n"
+		} else {
+			catalogue = FormatVoiceProfilesCatalog(req.Profiles) + "\n"
+			for _, p := range req.Profiles {
+				catalogueRefs = append(catalogueRefs, Ref{Kind: RefEntity, ID: p.ID, Relation: "voice"})
+			}
 		}
 	}
 

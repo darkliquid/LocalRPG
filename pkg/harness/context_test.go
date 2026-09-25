@@ -580,6 +580,28 @@ func TestContextBudgetDropsSectionsInRankOrder(t *testing.T) {
 	}
 }
 
+func TestContextAssemblerOmitVoiceCatalog(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+	profiles := []config.VoiceProfile{
+		{ID: "aoede", Description: "Warm voice", Tags: []string{"warm"}},
+	}
+	req := ContextRequest{
+		Profiles:         profiles,
+		OmitVoiceCatalog: true,
+		Action:           "Hello",
+	}
+	res, err := assembler.Assemble(req)
+	if err != nil {
+		t.Fatalf("Assemble: %v", err)
+	}
+	if strings.Contains(res.Prompt, "Warm voice") {
+		t.Errorf("expected voice description to be omitted when OmitVoiceCatalog is true")
+	}
+	if !strings.Contains(res.Prompt, "search_voice_profiles") {
+		t.Errorf("expected search_voice_profiles hint in prompt, got %s", res.Prompt)
+	}
+}
+
 func TestRelevantHistoryCountsAnEntityOncePerTurn(t *testing.T) {
 	store := newTestEntityStore(t)
 	saveEntity(t, store, &entity.Entity{ID: "guard-kael", Name: "Guard Kael", Type: "character", Hash: "h1"})

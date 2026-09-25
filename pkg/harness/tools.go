@@ -85,6 +85,22 @@ func ToolSpecs() []ToolSpec {
 				"limit":  intProperty("Maximum memories to return. Defaults to 20."),
 			}, "entity"),
 		},
+		{
+			Name:        "search_voice_profiles",
+			Description: "Search available NPC voice profiles by traits, gender, age, tone, or style keywords (e.g. 'gruff elder', 'cheerful young pilot', 'sinister whisper'). Returns matching profile IDs and descriptions.",
+			Parameters: objectSchema(map[string]interface{}{
+				"query": stringProperty("Trait, gender, age, tone, or style keywords to search for."),
+				"limit": intProperty("Optional maximum matches to return. Defaults to 5."),
+			}, "query"),
+		},
+		{
+			Name:        "assign_voice",
+			Description: "Assign a voice profile to an NPC character. Use search_voice_profiles to find an appropriate profile ID first.",
+			Parameters: objectSchema(map[string]interface{}{
+				"entity":     stringProperty("The character's name or ID."),
+				"profile_id": stringProperty("The voice profile ID to assign (e.g. 'fenrir', 'aoede')."),
+			}, "entity", "profile_id"),
+		},
 	}
 }
 

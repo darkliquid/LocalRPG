@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/embeddings"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -171,3 +172,67 @@ func TestHybridSearchEntitiesTool(t *testing.T) {
 		t.Errorf("expected Smoldering Hollow in result, got: %s", result)
 	}
 }
+
+func TestVoiceTools(t *testing.T) {
+	executor := newTestExecutor(t)
+	profiles := []config.VoiceProfile{
+		{
+			ID:          "aoede",
+			Name:        "Aoede",
+			Description: "Warm, narrative female voice for guides and wise allies.",
+			Tags:        []string{"warm", "wise", "companion", "female"},
+			Provider:    "native-os",
+			VoiceID:     "voice-aoede",
+		},
+		{
+			ID:          "fenrir",
+			Name:        "Fenrir",
+			Description: "Gravelly, deep warrior voice for brutes and hardened veterans.",
+			Tags:        []string{"gravelly", "deep", "veteran", "male"},
+			Provider:    "native-os",
+			VoiceID:     "voice-fenrir",
+		},
+	}
+	executor.SetVoiceProfiles(profiles)
+
+	// 1. Search voice profiles
+	res, ok := executor.Execute(context.Background(), call("search_voice_profiles", `{"query":"gravelly warrior"}`))
+	if !ok {
+		t.Fatalf("search_voice_profiles failed: %s", res)
+	}
+	if !strings.Contains(res, "fenrir") {
+		t.Errorf("expected fenrir in results, got %s", res)
+	}
+
+	// 2. Assign voice to existing entity "warden"
+	res, ok = executor.Execute(context.Background(), call("assign_voice", `{"entity":"The Warden","profile_id":"fenrir"}`))
+	if !ok {
+		t.Fatalf("assign_voice failed: %s", res)
+	}
+	if !strings.Contains(res, "assigned") {
+		t.Errorf("expected assignment confirmation, got %s", res)
+	}
+
+	// Verify entity in store has updated voice
+	ent, err := executor.store.GetEntity("warden")
+	if err != nil || ent == nil {
+		t.Fatalf("failed to get warden: %v", err)
+	}
+	if ent.Voice == nil || ent.Voice.VoiceID != "voice-fenrir" {
+		t.Errorf("expected warden voice to be voice-fenrir, got %+v", ent.Voice)
+	}
+
+	// 3. Assign voice to unknown entity (stages it)
+	res, ok = executor.Execute(context.Background(), call("assign_voice", `{"entity":"new-scout","profile_id":"aoede"}`))
+	if !ok {
+		t.Fatalf("assign_voice for staged entity failed: %s", res)
+	}
+	if !strings.Contains(res, "staged") {
+		t.Errorf("expected staged confirmation, got %s", res)
+	}
+	staged := executor.AssignedVoices()
+	if staged["new-scout"].ID != "aoede" {
+		t.Errorf("expected staged voice for new-scout to be aoede, got %+v", staged["new-scout"])
+	}
+}
+

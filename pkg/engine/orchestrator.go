@@ -15,6 +15,7 @@ import (
 	otelmetric "go.opentelemetry.io/otel/metric"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -595,22 +596,31 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 	workingSetSelection := workingSet.Select(8)
 
+	isCaller := false
+	if gmProvider, err := o.router.GetProviderForRole("gm"); err == nil && gmProvider != nil {
+		if caller, ok := gmProvider.(harness.ToolCaller); ok {
+			isCaller = caller.ToolCallerCapable()
+		}
+	}
+	canCallTools := o.offersTools(isCaller)
+
 	assembly, err := o.assembler.Assemble(harness.ContextRequest{
-		Context:        ctx,
-		LocationID:     locationID,
-		PlayerID:       o.playerID,
-		Action:         generationPrompt,
-		RulesPrompt:    o.rulesPrompt,
-		LorePrompt:     o.lorePrompt,
-		Profiles:       o.timeline.VoiceProfiles(),
-		Recent:         recent,
-		TurnNumber:     turnNum,
-		Mode:           mode,
-		Summary:        summary,
-		SummaryVersion: summaryVersion,
-		WorkingSet:     workingSetSelection,
-		Threads:        threads,
-		SpeechCues:     o.speechCues,
+		Context:          ctx,
+		LocationID:       locationID,
+		PlayerID:         o.playerID,
+		Action:           generationPrompt,
+		RulesPrompt:      o.rulesPrompt,
+		LorePrompt:       o.lorePrompt,
+		Profiles:         o.timeline.VoiceProfiles(),
+		OmitVoiceCatalog: canCallTools,
+		Recent:           recent,
+		TurnNumber:       turnNum,
+		Mode:             mode,
+		Summary:          summary,
+		SummaryVersion:   summaryVersion,
+		WorkingSet:       workingSetSelection,
+		Threads:          threads,
+		SpeechCues:       o.speechCues,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("assemble context: %w", err)
@@ -876,6 +886,25 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
+	}
+
+	if exec, ok := o.toolExecutor.(interface{ AssignedVoices() map[string]config.VoiceProfile }); ok {
+		assigned := exec.AssignedVoices()
+		for _, persona := range personae {
+			slugID := entity.Slugify(persona.Name)
+			if prof, has := assigned[slugID]; has {
+				if ent, err := o.store.GetEntity(slugID); err == nil && ent != nil {
+					ent.Voice = &entity.VoiceConfig{
+						Provider:   prof.Provider,
+						VoiceID:    prof.VoiceID,
+						Pitch:      prof.Pitch,
+						SpeechRate: prof.SpeechRate,
+						Options:    prof.Options,
+					}
+					_ = o.timeline.SaveEntity(ent)
+				}
+			}
+		}
 	}
 
 	if o.store != nil {
@@ -1184,17 +1213,24 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		}
 	}
 
-	strategy := harness.SelectStrategy(caps, storedSession, turnNum-1, assembly.Context.PrefixHash, modelName)
-	assembly.Context.Strategy = strategy
-
 	isCaller := false
 	if caller, ok := provider.(harness.ToolCaller); ok {
 		isCaller = caller.ToolCallerCapable()
 	}
 	canCallTools := o.offersTools(isCaller)
 
-	// Server session strategy: try ContinueSession
-	if strategy == harness.StrategyServerSession {
+	strategy := harness.SelectStrategy(caps, storedSession, turnNum-1, assembly.Context.PrefixHash, modelName)
+	if canCallTools && strategy == harness.StrategyServerSession {
+		if caps.ContextCache && assembly.Context.PrefixHash != "" {
+			strategy = harness.StrategyCachedPrefix
+		} else {
+			strategy = harness.StrategyFullPrompt
+		}
+	}
+	assembly.Context.Strategy = strategy
+
+	// Server session strategy: try ContinueSession when tools are not offered
+	if !canCallTools && strategy == harness.StrategyServerSession {
 		if sessProvider, ok := provider.(harness.SessionProvider); ok && storedSession != nil {
 			deltaPrompt := assembly.DeltaPrompt
 			if gmDirective != "" {
@@ -1203,9 +1239,6 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 			deltaReq := harness.GenerateRequest{
 				Prompt: deltaPrompt,
 				System: o.rulesPrompt,
-			}
-			if canCallTools {
-				deltaReq.Tools = harness.ToolSpecs()
 			}
 			handle := &harness.SessionHandle{
 				ID:          storedSession.ID,
@@ -1254,34 +1287,33 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		}
 	}
 
-	// If provider supports sessions, try StartSession when starting or falling back
-	if sessProvider, ok := provider.(harness.SessionProvider); ok {
-		fullReq := harness.GenerateRequest{
-			Prompt: contextPrompt,
-			System: o.rulesPrompt,
-		}
-		if canCallTools {
-			fullReq.Tools = harness.ToolSpecs()
-		}
-		handle, err := sessProvider.StartSession(ctx, fullReq)
-		if err == nil && handle != nil {
-			text := ""
-			if handle.Response != nil {
-				text = handle.Response.Text
-				if onChunk != nil && text != "" {
-					_ = onChunk(text)
+	// If provider supports sessions, try StartSession when starting or falling back (only when tools are not offered)
+	if !canCallTools {
+		if sessProvider, ok := provider.(harness.SessionProvider); ok {
+			fullReq := harness.GenerateRequest{
+				Prompt: contextPrompt,
+				System: o.rulesPrompt,
+			}
+			handle, err := sessProvider.StartSession(ctx, fullReq)
+			if err == nil && handle != nil {
+				text := ""
+				if handle.Response != nil {
+					text = handle.Response.Text
+					if onChunk != nil && text != "" {
+						_ = onChunk(text)
+					}
 				}
-			}
-			assembly.Context.CachedTokens = handle.CachedTokens
-			assembly.Context.Session = &harness.ProviderSession{
-				Provider:    provider.ID(),
-				ID:          handle.ID,
-				ThroughTurn: turnNum,
-				Model:       modelName,
-				PrefixHash:  assembly.Context.PrefixHash,
-			}
-			if text != "" {
-				return streamResult{Text: text}, nil
+				assembly.Context.CachedTokens = handle.CachedTokens
+				assembly.Context.Session = &harness.ProviderSession{
+					Provider:    provider.ID(),
+					ID:          handle.ID,
+					ThroughTurn: turnNum,
+					Model:       modelName,
+					PrefixHash:  assembly.Context.PrefixHash,
+				}
+				if text != "" {
+					return streamResult{Text: text}, nil
+				}
 			}
 		}
 	}

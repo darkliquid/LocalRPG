@@ -196,3 +196,86 @@ func TestOrchestratorRewindClearsSession(t *testing.T) {
 		t.Errorf("turn 2 rerun should have continued from turn 1 session sess-1, got %+v", model.lastSession)
 	}
 }
+
+type mockSessionAndToolModel struct {
+	mockSessionOrchestratorModel
+	rounds int
+}
+
+func (m *mockSessionAndToolModel) ToolCallerCapable() bool { return true }
+
+func (m *mockSessionAndToolModel) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
+	defer close(out)
+	m.rounds++
+	if len(req.Tools) == 0 {
+		out <- harness.StreamChunk{Text: "No tools offered", Done: true}
+		return nil
+	}
+	if m.rounds == 1 {
+		out <- harness.StreamChunk{
+			ToolCalls: []harness.ToolCall{{
+				ID:        "call-1",
+				Name:      "request_check",
+				Arguments: `{"actor":"player","check_kind":"skill","stakes":"jump","outcomes":{"pass":"landed","fail":"fell"}}`,
+			}},
+			Done: true,
+		}
+		return nil
+	}
+	out <- harness.StreamChunk{
+		ToolCalls: []harness.ToolCall{{
+			ID:        "call-2",
+			Name:      "submit_turn",
+			Arguments: `{"action_verdict":{"feasibility":"uncertain","reason":"gap"},"segments":[{"kind":"narration","text":"You cleared the gap!"}]}`,
+		}},
+		Done: true,
+	}
+	return nil
+}
+
+func TestOrchestratorToolCallerWithSessionDoesNotBypassTools(t *testing.T) {
+	ctx := context.Background()
+	tempDir := t.TempDir()
+
+	store, err := storage.NewStore(filepath.Join(tempDir, "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	store.SaveEntity(&entity.Entity{ID: "tavern", Name: "Alden Tavern", Type: "location", Body: "Cozy tavern."})
+	player := &entity.Entity{ID: "player", Name: "Sean", Type: "character"}
+	store.SaveEntity(player)
+
+	history := NewHistoryLogger(filepath.Join(tempDir, "history.jsonl"))
+	bridge := rules.NewHostBridge(store, nil, "player")
+	jsEngine := rules.NewJSEngine(bridge)
+
+	model := &mockSessionAndToolModel{
+		mockSessionOrchestratorModel: mockSessionOrchestratorModel{id: "mock-tool-session", model: "gemini-2.5-flash"},
+	}
+	router := harness.NewRouter()
+	router.RegisterProvider(model)
+	router.AssignRole("gm", "mock-tool-session")
+
+	timeline := NewTimeline(core.NewPathResolver(tempDir), store, history, "test-campaign")
+	orchestrator := NewTurnOrchestrator(store, timeline, jsEngine, router, "tavern", "player")
+
+	// Set tools so offersTools returns true
+	fakeExec := &fakeExecutor{}
+	orchestrator.SetTools(fakeExec, "yes")
+
+	turn, err := orchestrator.ProcessAction(ctx, "Do", "I leap across the chasm")
+	if err != nil {
+		t.Fatalf("ProcessAction failed: %v", err)
+	}
+
+	// Must have run tool loop and resolved the check
+	if len(turn.Checks) != 1 {
+		t.Fatalf("expected 1 check resolved via request_check in tool loop, got %d", len(turn.Checks))
+	}
+	if model.startCalls > 0 {
+		t.Errorf("StartSession should not be called when tool calling is required, got %d calls", model.startCalls)
+	}
+}
+

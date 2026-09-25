@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/embeddings"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -19,11 +20,19 @@ import (
 // defaultLimit caps a modest tool result when the model does not ask for a limit.
 const defaultLimit = 10
 
+// EntityWriter saves an entity note to persistent storage.
+type EntityWriter interface {
+	SaveEntity(ent *entity.Entity) error
+}
+
 // Executor runs tool calls against one campaign's index.
 type Executor struct {
 	store              *storage.Store
+	writer             EntityWriter
 	maxChars           int
 	embeddingsProvider embeddings.Provider
+	voiceProfiles      []config.VoiceProfile
+	assignedVoices     map[string]config.VoiceProfile
 }
 
 // NewExecutor builds an executor. maxChars is agents.tool_result_chars; a
@@ -32,12 +41,35 @@ func NewExecutor(store *storage.Store, maxChars int) *Executor {
 	if maxChars <= 0 {
 		maxChars = 4000
 	}
-	return &Executor{store: store, maxChars: maxChars}
+	return &Executor{
+		store:          store,
+		maxChars:       maxChars,
+		assignedVoices: make(map[string]config.VoiceProfile),
+	}
 }
 
 // SetEmbeddingsProvider configures the vector embedding provider for hybrid search.
 func (e *Executor) SetEmbeddingsProvider(p embeddings.Provider) {
 	e.embeddingsProvider = p
+}
+
+// SetVoiceProfiles sets the available NPC voice profiles.
+func (e *Executor) SetVoiceProfiles(profiles []config.VoiceProfile) {
+	e.voiceProfiles = profiles
+}
+
+// SetEntityWriter sets a custom entity writer such as Timeline.
+func (e *Executor) SetEntityWriter(w EntityWriter) {
+	e.writer = w
+}
+
+// AssignedVoices returns a copy of voice profiles assigned or staged during this executor's lifetime.
+func (e *Executor) AssignedVoices() map[string]config.VoiceProfile {
+	res := make(map[string]config.VoiceProfile, len(e.assignedVoices))
+	for k, v := range e.assignedVoices {
+		res[k] = v
+	}
+	return res
 }
 
 // Execute runs one call and returns the text the model will read. ok is false
@@ -64,6 +96,10 @@ func (e *Executor) Execute(ctx context.Context, call harness.ToolCall) (string, 
 		return e.searchMemories(ctx, arguments)
 	case "get_entity_timeline":
 		return e.getEntityTimeline(arguments)
+	case "search_voice_profiles":
+		return e.searchVoiceProfiles(arguments)
+	case "assign_voice":
+		return e.assignVoice(arguments)
 	default:
 		return e.cap(harness.UnknownToolMessage(call.Name)), false
 	}
@@ -346,3 +382,140 @@ func intArgument(arguments map[string]interface{}, key string, fallback int) int
 	}
 	return fallback
 }
+
+func (e *Executor) searchVoiceProfiles(arguments map[string]interface{}) (string, bool) {
+	query := strings.TrimSpace(stringArgument(arguments, "query"))
+	if query == "" {
+		return "error: search_voice_profiles needs a query describing desired traits", false
+	}
+	if len(e.voiceProfiles) == 0 {
+		return "no voice profiles configured", true
+	}
+	limit := intArgument(arguments, "limit", 5)
+	if limit <= 0 {
+		limit = 5
+	}
+
+	terms := strings.Fields(strings.ToLower(query))
+
+	type scoredProfile struct {
+		profile config.VoiceProfile
+		score   int
+	}
+	var scored []scoredProfile
+
+	for _, p := range e.voiceProfiles {
+		s := 0
+		searchText := strings.ToLower(strings.Join([]string{
+			p.ID,
+			p.Name,
+			p.Description,
+			strings.Join(p.Tags, " "),
+		}, " "))
+
+		for _, term := range terms {
+			if strings.Contains(searchText, term) {
+				s += 2
+			}
+		}
+		for _, tag := range p.Tags {
+			for _, term := range terms {
+				if strings.EqualFold(tag, term) {
+					s += 3
+				}
+			}
+		}
+		if s > 0 {
+			scored = append(scored, scoredProfile{profile: p, score: s})
+		}
+	}
+
+	sort.SliceStable(scored, func(i, j int) bool {
+		return scored[i].score > scored[j].score
+	})
+
+	if len(scored) == 0 {
+		var sb strings.Builder
+		sb.WriteString("No voice profile directly matched traits; available profiles:\n")
+		n := limit
+		if n > len(e.voiceProfiles) {
+			n = len(e.voiceProfiles)
+		}
+		for i := 0; i < n; i++ {
+			p := e.voiceProfiles[i]
+			sb.WriteString(fmt.Sprintf("- `%s`: %s [tags: %s]\n", p.ID, p.Description, strings.Join(p.Tags, ", ")))
+		}
+		return e.cap(sb.String()), true
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Found %d matching voice profiles:\n", len(scored)))
+	for i := 0; i < len(scored) && i < limit; i++ {
+		p := scored[i].profile
+		sb.WriteString(fmt.Sprintf("- `%s`: %s [tags: %s]\n", p.ID, p.Description, strings.Join(p.Tags, ", ")))
+	}
+	return e.cap(sb.String()), true
+}
+
+func (e *Executor) assignVoice(arguments map[string]interface{}) (string, bool) {
+	idOrName := strings.TrimSpace(stringArgument(arguments, "entity"))
+	profileID := strings.TrimSpace(stringArgument(arguments, "profile_id"))
+	if idOrName == "" || profileID == "" {
+		return "error: assign_voice requires 'entity' and 'profile_id'", false
+	}
+
+	var targetProfile *config.VoiceProfile
+	for i := range e.voiceProfiles {
+		if strings.EqualFold(e.voiceProfiles[i].ID, profileID) {
+			targetProfile = &e.voiceProfiles[i]
+			break
+		}
+	}
+	if targetProfile == nil {
+		available := make([]string, 0, len(e.voiceProfiles))
+		for _, p := range e.voiceProfiles {
+			available = append(available, p.ID)
+		}
+		return fmt.Sprintf("error: unknown voice profile %q. Available: %s", profileID, strings.Join(available, ", ")), false
+	}
+
+	if e.assignedVoices == nil {
+		e.assignedVoices = make(map[string]config.VoiceProfile)
+	}
+	slugID := entity.Slugify(idOrName)
+	e.assignedVoices[slugID] = *targetProfile
+
+	var ent *entity.Entity
+	if e.store != nil {
+		if found, err := e.findEntity(idOrName); err == nil && found != nil {
+			ent = found
+		} else if found, err := e.findEntity(slugID); err == nil && found != nil {
+			ent = found
+		}
+	}
+
+	voiceCfg := &entity.VoiceConfig{
+		Provider:   targetProfile.Provider,
+		VoiceID:    targetProfile.VoiceID,
+		Pitch:      targetProfile.Pitch,
+		SpeechRate: targetProfile.SpeechRate,
+		Options:    targetProfile.Options,
+	}
+
+	if ent != nil {
+		ent.Voice = voiceCfg
+		var saveErr error
+		if e.writer != nil {
+			saveErr = e.writer.SaveEntity(ent)
+		} else if e.store != nil {
+			saveErr = e.store.SaveEntity(ent)
+		}
+		if saveErr != nil {
+			return fmt.Sprintf("failed to save voice to entity %s: %v", ent.Name, saveErr), false
+		}
+		return fmt.Sprintf("Voice profile %q (%s) assigned to %s.", targetProfile.ID, targetProfile.Description, ent.Name), true
+	}
+
+	return fmt.Sprintf("Voice profile %q (%s) staged for %q. It will be assigned when the character note is created.", targetProfile.ID, targetProfile.Description, idOrName), true
+}
+

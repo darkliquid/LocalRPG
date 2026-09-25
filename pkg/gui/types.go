@@ -47,6 +47,7 @@ type GameStateDTO struct {
 	OpeningPrompt string            `json:"opening_prompt,omitempty"`
 	NarratorVoice string            `json:"narrator_voice,omitempty"`
 	StartLocation string            `json:"start_location,omitempty"`
+	BannerURL     string            `json:"banner_url,omitempty"`
 }
 
 type SegmentDTO struct {
