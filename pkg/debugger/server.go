@@ -56,19 +56,71 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/", s.handleDashboardUI)
 }
 
-func (s *Server) handleActions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getEffectiveActions() []ActionRecord {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	result := make([]ActionRecord, len(s.actions))
+	copy(result, s.actions)
+
+	registeredTraceIDs := make(map[string]bool)
+	for _, a := range result {
+		if a.RootTraceID != "" {
+			registeredTraceIDs[a.RootTraceID] = true
+		}
+	}
+
+	if s.collector != nil {
+		allSpans := s.collector.GetSpans()
+		for _, span := range allSpans {
+			if (span.Name == "turn" || span.Name == "POST /api/game/{id}/turn") && !registeredTraceIDs[span.TraceID] {
+				registeredTraceIDs[span.TraceID] = true
+
+				traceSpans := s.collector.FindSpansByTraceID(span.TraceID)
+				status := "passed"
+				if span.Status == "Error" || span.Status == "ERROR" || span.Attributes["turn.failure_code"] != "" || span.Attributes["localrpg.generation.failure_code"] != "" {
+					status = "failed"
+				}
+
+				turnLabel := "turn"
+				if num := span.Attributes["turn.number"]; num != "" {
+					turnLabel = "turn #" + num
+				}
+				gameID := span.Attributes["game.id"]
+				mode := span.Attributes["turn.mode"]
+
+				synthetic := ActionRecord{
+					ID:            span.SpanID,
+					StepIndex:     len(result) + 1,
+					ActionType:    turnLabel,
+					Selector:      gameID,
+					InputData:     mode,
+					Timestamp:     span.StartTime,
+					DurationMs:    span.Duration.Milliseconds(),
+					RootTraceID:   span.TraceID,
+					Status:        status,
+					FailureReason: span.Attributes["turn.failure_code"],
+					Spans:         traceSpans,
+					Diagnostics:   extractDiagnostics(span, traceSpans),
+				}
+				result = append(result, synthetic)
+			}
+		}
+	}
+
+	return result
+}
+
+func (s *Server) handleActions(w http.ResponseWriter, r *http.Request) {
+	actions := s.getEffectiveActions()
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(s.actions)
+	_ = json.NewEncoder(w).Encode(actions)
 }
 
 func (s *Server) handleActionDetail(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Path[len("/api/actions/"):]
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	for _, a := range s.actions {
+	actions := s.getEffectiveActions()
+	for _, a := range actions {
 		if a.ID == id {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(a)

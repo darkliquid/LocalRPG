@@ -53,11 +53,34 @@ func hasDiagnosticAttributes(attrs map[string]string) bool {
 }
 
 func extractDiagnostics(root SpanSummary, allSpans []SpanSummary) *TurnDiagnostics {
+	code := root.Attributes["turn.failure_code"]
+	if code == "" {
+		code = root.Attributes["localrpg.generation.failure_code"]
+	}
+	msg := root.Attributes["turn.failure_message"]
+	prompt := root.Attributes["turn.assembled_prompt"]
+	comp := root.Attributes["turn.raw_completion"]
+
+	for _, span := range allSpans {
+		if prompt == "" && span.Attributes["turn.assembled_prompt"] != "" {
+			prompt = span.Attributes["turn.assembled_prompt"]
+		}
+		if comp == "" && span.Attributes["turn.raw_completion"] != "" {
+			comp = span.Attributes["turn.raw_completion"]
+		}
+		if code == "" && span.Attributes["turn.failure_code"] != "" {
+			code = span.Attributes["turn.failure_code"]
+		}
+		if msg == "" && span.Attributes["turn.failure_message"] != "" {
+			msg = span.Attributes["turn.failure_message"]
+		}
+	}
+
 	d := &TurnDiagnostics{
-		FailureCode:     root.Attributes["turn.failure_code"],
-		FailureMessage:  root.Attributes["turn.failure_message"],
-		AssembledPrompt: root.Attributes["turn.assembled_prompt"],
-		RawCompletion:   root.Attributes["turn.raw_completion"],
+		FailureCode:     code,
+		FailureMessage:  msg,
+		AssembledPrompt: prompt,
+		RawCompletion:   comp,
 	}
 
 	// Collect attempts from child spans if available

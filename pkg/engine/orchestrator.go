@@ -626,9 +626,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 
+	turnSpan.SetAttributes(attribute.String("turn.assembled_prompt", assembly.Prompt))
 	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, onChunk)
 	if err != nil {
 		outcome = "error"
+		turnSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
 		failure, _ := harness.FailureFrom(err)
 		fields := map[string]interface{}{
 			"code":          generationCode(failure),
@@ -644,6 +646,8 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		if failure != nil {
 			fields["attempts"] = len(failure.Attempts)
 			turnSpan.SetAttributes(
+				attribute.String("turn.failure_code", string(failure.Code)),
+				attribute.String("turn.failure_message", failure.Message),
 				attribute.String("localrpg.generation.failure_code", string(failure.Code)),
 				attribute.Int("localrpg.generation.attempts", len(failure.Attempts)),
 			)
@@ -651,6 +655,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			turnSpan.SetStatus(codes.Error, string(failure.Code))
 		} else {
 			code := string(harness.ClassifyProviderError(err))
+			turnSpan.SetAttributes(attribute.String("turn.failure_code", code))
 			turnSpan.SetStatus(codes.Error, code)
 			turnSpan.RecordError(err)
 		}
@@ -662,10 +667,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	turnSpan.SetAttributes(
+		attribute.String("turn.raw_completion", result.Text),
 		attribute.String("localrpg.context.strategy", string(assembly.Context.Strategy)),
 		attribute.String("localrpg.context.prefix_hash", assembly.Context.PrefixHash),
 		attribute.Int("localrpg.provider.cached_tokens", assembly.Context.CachedTokens),
 	)
+	if strings.TrimSpace(result.Text) == "" && len(result.ToolCalls) == 0 {
+		turnSpan.SetAttributes(attribute.String("turn.failure_code", "empty_response"))
+	}
 	if assembly.Context.Session != nil {
 		turnSpan.SetAttributes(attribute.String("localrpg.context.session_id", assembly.Context.Session.ID))
 	}
@@ -1310,6 +1319,8 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		roundCtx, roundSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "provider.generate",
 			oteltrace.WithAttributes(
 				attribute.String("localrpg.role", "gm"),
+				attribute.String("provider.id", provider.ID()),
+				attribute.String("turn.assembled_prompt", contextPrompt),
 				attribute.Int("localrpg.round", round),
 				attribute.Bool("localrpg.tools_offered", offerTools),
 			),
@@ -1321,6 +1332,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 			attribute.String("localrpg.role", "gm"),
 			attribute.Int("localrpg.round", round),
 		)
+		roundSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
 		if err != nil {
 			code := harness.ClassifyProviderError(err)
 			if result.Failure != nil && result.Failure.Code != "" {
@@ -1332,7 +1344,10 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				attribute.String("gen_ai.system", provider.ID()),
 			))
 			engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
-			roundSpan.SetAttributes(attribute.String("localrpg.generation.failure_code", string(code)))
+			roundSpan.SetAttributes(
+				attribute.String("turn.failure_code", string(code)),
+				attribute.String("localrpg.generation.failure_code", string(code)),
+			)
 			roundSpan.RecordError(err)
 			roundSpan.SetStatus(codes.Error, string(code))
 			roundSpan.End()
@@ -1345,7 +1360,11 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				attribute.String("error.kind", string(result.Failure.Code)),
 				attribute.String("gen_ai.system", provider.ID()),
 			))
-			roundSpan.SetAttributes(attribute.String("localrpg.generation.failure_code", string(result.Failure.Code)))
+			roundSpan.SetAttributes(
+				attribute.String("turn.failure_code", string(result.Failure.Code)),
+				attribute.String("turn.failure_message", result.Failure.Message),
+				attribute.String("localrpg.generation.failure_code", string(result.Failure.Code)),
+			)
 			roundSpan.RecordError(result.Failure)
 			roundSpan.SetStatus(codes.Error, string(result.Failure.Code))
 			roundSpan.End()

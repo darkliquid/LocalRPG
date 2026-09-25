@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -14,6 +16,8 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/debugger"
 	"github.com/darkliquid/localrpg/pkg/driver"
+	"github.com/darkliquid/localrpg/pkg/gui"
+	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
 type debugConfig struct {
@@ -62,15 +66,44 @@ func handleDebugCommand(args []string) {
 
 	switch subcmd {
 	case "server":
-		fmt.Printf("Starting LocalRPG Debugger Server on http://localhost:%d\n", cfg.DebuggerPort)
-		server := &http.Server{
+		fmt.Println("LocalRPG Debug Server mode active")
+		fmt.Printf("  • LocalRPG App GUI:   http://localhost:%d\n", cfg.Port)
+		fmt.Printf("  • Live Debugger UI:   http://localhost:%d\n", cfg.DebuggerPort)
+
+		dbgHttpServer := &http.Server{
 			Addr:    fmt.Sprintf(":%d", cfg.DebuggerPort),
 			Handler: dbgServer.Handler(),
 		}
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Fprintf(os.Stderr, "Debugger server failed: %v\n", err)
-			os.Exit(1)
+		go func() {
+			if err := dbgHttpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				fmt.Fprintf(os.Stderr, "Debugger server error: %v\n", err)
+			}
+		}()
+
+		svc := gui.NewService(".")
+		defer func() { _ = storage.CloseGameStores() }()
+		appHandler := gui.ProtectCrossOrigin(gui.NewServer(svc, gui.AssetHandler()))
+
+		appHttpServer := &http.Server{
+			Addr:    fmt.Sprintf(":%d", cfg.Port),
+			Handler: appHandler,
 		}
+
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		go func() {
+			if err := appHttpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				fmt.Fprintf(os.Stderr, "App server error: %v\n", err)
+			}
+		}()
+
+		<-sigChan
+		fmt.Println("\nShutting down debug servers...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_ = dbgHttpServer.Shutdown(shutdownCtx)
+		_ = appHttpServer.Shutdown(shutdownCtx)
 
 	case "test-run":
 		if cfg.Scenario == "" {
