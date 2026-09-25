@@ -117,8 +117,13 @@ func ParseMarkdownEntity(data []byte) (*Entity, error) {
 		}
 	}
 
+	entID := fm.ID
+	if entID == "" {
+		entID = Slugify(fm.Name)
+	}
+
 	entity := &Entity{
-		ID:         fm.ID,
+		ID:         entID,
 		Name:       fm.Name,
 		Type:       fm.Type,
 		Tags:       fm.Tags,

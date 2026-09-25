@@ -216,3 +216,23 @@ func TestToolLoopWithoutToolsIsUnchanged(t *testing.T) {
 		t.Errorf("Narration = %q", turn.Narration)
 	}
 }
+
+func TestToolLoopAcceptsSubmitTurnEvenWhenToolsWithdrawn(t *testing.T) {
+	provider := &toolScriptProvider{replies: []toolReply{
+		{tools: []harness.ToolCall{{ID: "1", Name: "search_entities", Arguments: `{"query":"warden"}`}}},
+		{tools: []harness.ToolCall{{ID: "2", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"automatic","reason":"established"},"segments":[{"kind":"narration","text":"The gate stands tall before you."}]}`}}},
+	}}
+	executor := &fakeExecutor{results: []string{"Warden found"}}
+	orchestrator, _ := toolLoopOrchestrator(t, provider)
+	orchestrator.SetTools(executor, "yes")
+	orchestrator.SetToolRounds(1) // 1 round cap means round 0 offers tools, and round 1 has tools withdrawn
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I approach", nil)
+	if err != nil {
+		t.Fatalf("expected turn to succeed with submit_turn, got err: %v", err)
+	}
+	if turn.Narration != "The gate stands tall before you." {
+		t.Errorf("got narration %q, want %q", turn.Narration, "The gate stands tall before you.")
+	}
+}
+

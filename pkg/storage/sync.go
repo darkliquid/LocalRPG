@@ -49,6 +49,9 @@ func (s *Syncer) Sync(dir string) (*SyncResult, error) {
 			// Skip or log malformed markdown
 			continue
 		}
+		if ent.ID == "" {
+			ent.ID = strings.TrimSuffix(entry.Name(), ".md")
+		}
 
 		existing, err := s.store.GetEntity(ent.ID)
 		if err != nil {

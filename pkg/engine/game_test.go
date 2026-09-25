@@ -30,6 +30,8 @@ func TestGameInitAndLoad(t *testing.T) {
 	os.WriteFile(filepath.Join(worldDir, "world.yaml"), []byte("id: fantasy-realm\nname: Fantasy Realm\n"), 0644)
 	tavernDoc := "---\nid: tavern\nname: Oakhaven Tavern\ntype: location\n---\nStarting tavern."
 	os.WriteFile(filepath.Join(worldEntities, "Tavern.md"), []byte(tavernDoc), 0644)
+	gafferDoc := "---\nname: Old Gaffer\ntype: character\n---\nAn old storyteller."
+	os.WriteFile(filepath.Join(worldEntities, "gaffer.md"), []byte(gafferDoc), 0644)
 
 	// 3. Initialize game
 	session, err := InitGame(paths, InitOptions{
@@ -80,6 +82,13 @@ func TestGameInitAndLoad(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(paths.GameDir("campaign-01"), "entities", "tavern.md")); err != nil {
 		t.Errorf("expected the world template to be copied as <id>.md: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(paths.GameDir("campaign-01"), "entities", "old-gaffer.md")); err != nil {
+		t.Errorf("expected the world template without id to be copied as slugified-name.md: %v", err)
+	}
+	if gaffer, err := session.Store.GetEntity("old-gaffer"); err != nil || gaffer == nil {
+		t.Errorf("expected old-gaffer entity in store: %v", err)
 	}
 }
 

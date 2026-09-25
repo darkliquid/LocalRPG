@@ -1401,9 +1401,19 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		}
 		roundSpan.End()
 
+		hasSubmitTurn := false
+		for _, call := range result.ToolCalls {
+			if call.Name == "submit_turn" {
+				hasSubmitTurn = true
+				break
+			}
+		}
+
 		// A reply carrying calls while tools were not offered is a protocol quirk:
 		// its text is the answer, and the calls are dropped and traced.
-		if len(result.ToolCalls) > 0 && !offerTools {
+		// However, if the model called submit_turn, that is the terminal submission
+		// of the turn and must be honored rather than discarded.
+		if len(result.ToolCalls) > 0 && !offerTools && !hasSubmitTurn {
 			o.logger.Event("tool.stray", map[string]interface{}{"round": round, "calls": len(result.ToolCalls)})
 			result.ToolCalls = nil
 			result.Provenance = provenance
@@ -1488,6 +1498,11 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				}
 			}
 
+			if !offerTools {
+				o.logger.Event("tool.stray", map[string]interface{}{"round": round, "call": call.Name})
+				continue
+			}
+
 			started := time.Now()
 			toolCtx, toolSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "tool.call",
 				oteltrace.WithAttributes(
@@ -1522,11 +1537,11 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		// After the final allowed round, or once the budget is crossed, tools are
 		// withdrawn and the model is told so as a readable result rather than a
 		// silent stop it would retry.
-		if round+1 > o.toolRoundCap() || o.overBudget(messages) {
+		if round+1 >= o.toolRoundCap() || o.overBudget(messages) {
 			withdrawn = true
 			messages = append(messages, harness.Message{
 				Role:    "tool",
-				Content: "Tools are no longer available for this turn. Answer now with what you already know.",
+				Content: "Tools are no longer available for this turn. Complete and submit the turn now (call submit_turn or provide your narration as text).",
 			})
 		}
 	}

@@ -111,7 +111,14 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 			if err != nil {
 				return nil, fmt.Errorf("parse entity template %q: %w", e.Name(), err)
 			}
-			if err := os.WriteFile(filepath.Join(gameEntitiesDir, template.ID+".md"), data, 0644); err != nil {
+			templateID := template.ID
+			if templateID == "" {
+				templateID = entity.Slugify(template.Name)
+			}
+			if templateID == "" {
+				templateID = strings.TrimSuffix(e.Name(), ".md")
+			}
+			if err := os.WriteFile(filepath.Join(gameEntitiesDir, templateID+".md"), data, 0644); err != nil {
 				return nil, fmt.Errorf("write entity template %q: %w", e.Name(), err)
 			}
 		}
