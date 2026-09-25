@@ -1,13 +1,14 @@
 import React from 'react';
 import { WorldInfo } from '../../types';
 import { ProceduralIcon } from './ProceduralAsset';
-import { Plus } from 'lucide-react';
+import { Plus, LayoutGrid } from 'lucide-react';
 
 interface WorldFlyoutProps {
   isOpen: boolean;
   worlds: WorldInfo[];
   onSelectWorld: (worldId: string) => void;
   onCreateWorld: () => void;
+  onExpand: () => void;
 }
 
 export const WorldFlyout: React.FC<WorldFlyoutProps> = ({
@@ -15,6 +16,7 @@ export const WorldFlyout: React.FC<WorldFlyoutProps> = ({
   worlds,
   onSelectWorld,
   onCreateWorld,
+  onExpand,
 }) => {
   if (!isOpen) return null;
 
@@ -60,6 +62,18 @@ export const WorldFlyout: React.FC<WorldFlyoutProps> = ({
             <Plus className="w-4 h-4" />
           </button>
         </div>
+      </div>
+
+      {/* Expand to full gallery */}
+      <div className="shrink-0 border-l border-white/10 pl-2">
+        <button
+          onClick={onExpand}
+          className="w-[42px] h-[42px] rounded-xl border border-white/10 hover:border-purple-400/80 bg-white/[0.03] hover:bg-white/[0.08] flex items-center justify-center text-stone-300 hover:text-white transition-all cursor-pointer"
+          title="Expand world gallery"
+          aria-label="Expand world gallery"
+        >
+          <LayoutGrid className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );

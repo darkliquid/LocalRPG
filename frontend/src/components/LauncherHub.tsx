@@ -3,6 +3,7 @@ import { APIClient } from '../api/client';
 import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types';
 import { LauncherDock } from './launcher/LauncherDock';
 import { WorldFlyout } from './launcher/WorldFlyout';
+import { WorldGallery } from './launcher/WorldGallery';
 import { CampaignHeroStage } from './launcher/CampaignHeroStage';
 import { NewCampaignModal } from './launcher/NewCampaignModal';
 import { CampaignSettingsModal } from './launcher/CampaignSettingsModal';
@@ -22,6 +23,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   const [selectedGameID, setSelectedGameID] = useState<string | null>(null);
 
   const [isFlyoutOpen, setIsFlyoutOpen] = useState(false);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [creatingWorld, setCreatingWorld] = useState<WorldInfo | null>(null);
   const [isCreatingGame, setIsCreatingGame] = useState(false);
 
@@ -63,6 +65,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
     if (world) {
       setCreatingWorld(world);
       setIsFlyoutOpen(false);
+      setIsGalleryOpen(false);
     }
   };
 
@@ -190,6 +193,19 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
           setIsFlyoutOpen(false);
           setActiveStudio('worlds');
         }}
+        onExpand={() => setIsGalleryOpen(true)}
+      />
+
+      {/* Full-Page World Gallery */}
+      <WorldGallery
+        isOpen={isGalleryOpen}
+        worlds={worlds}
+        onSelectWorld={handleSelectWorldFromFlyout}
+        onCreateWorld={() => {
+          setIsGalleryOpen(false);
+          setActiveStudio('worlds');
+        }}
+        onClose={() => setIsGalleryOpen(false)}
       />
 
       {/* Main Campaign Hero Presentation */}

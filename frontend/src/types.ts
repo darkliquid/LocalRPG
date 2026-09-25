@@ -167,6 +167,7 @@ export interface WorldInfo {
   description: string;
   genre: string;
   art_style?: string;
+  tags?: string[];
   compatible_systems: string[];
   banner_url?: string;
   icon_url?: string;

@@ -1788,6 +1788,7 @@ func (s *Service) ListWorlds(ctx context.Context) ([]WorldSummaryDTO, error) {
 			Description:       m.Description,
 			Genre:             m.Genre,
 			ArtStyle:          m.ArtStyle,
+			Tags:              m.Tags,
 			CompatibleSystems: compat,
 			BannerURL:         bannerURL,
 			IconURL:           iconURL,
