@@ -191,6 +191,7 @@ export const App: React.FC = () => {
   const [pendingAction, setPendingAction] = useState<{ mode: string; text: string } | null>(null);
   const [streamedProse, setStreamedProse] = useState('');
   const [toolActivity, setToolActivity] = useState<string | null>(null);
+  const [turnError, setTurnError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const handleActionSubmit = async (mode: string, text: string) => {
@@ -200,6 +201,7 @@ export const App: React.FC = () => {
     setPendingAction({ mode, text });
     setStreamedProse('');
     setToolActivity(null);
+    setTurnError(null);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -234,6 +236,10 @@ export const App: React.FC = () => {
               });
             }
           } else if (event.type === 'error') {
+            const reason = event.failure
+              ? `${event.failure.code}: ${event.failure.message}`
+              : (event.detail || event.message || 'The turn failed.');
+            setTurnError(reason);
             console.error('turn failed:', event.message);
           }
         },
@@ -685,6 +691,19 @@ export const App: React.FC = () => {
             onEditInCodex={handleEditInCodexEntity}
             onClose={() => setModalEntity(null)}
           />
+
+          {/* Turn Failure Banner */}
+          {turnError && (
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-xl px-4 py-3 rounded-xl bg-red-950/90 border border-red-500/40 text-red-100 text-xs font-sans shadow-2xl flex items-center gap-3">
+              <span className="flex-1">{turnError}</span>
+              <button
+                onClick={() => setTurnError(null)}
+                className="text-red-300 hover:text-white cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
           {/* Model Download Modal */}
           {missingModel && (

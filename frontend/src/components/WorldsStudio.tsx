@@ -264,7 +264,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       if (res.fields.art_style && !artStyle.trim()) setArtStyle(res.fields.art_style);
       if (res.fields.description && !description.trim()) setDescription(res.fields.description);
       if (res.fields.lore_prompt && !lorePrompt.trim()) setLorePrompt(res.fields.lore_prompt);
-      setToast({ type: 'success', message: 'Auto-filled world fields!' });
+      if (res.warning) {
+        setToast({ type: 'error', message: `Partial: ${res.warning.code} — ${res.warning.message}` });
+      } else if (Object.keys(res.fields).length === 0) {
+        setToast({ type: 'error', message: 'The model returned nothing to fill.' });
+      } else {
+        setToast({ type: 'success', message: 'Auto-filled world fields!' });
+      }
     } catch (err: any) {
       setToast({ type: 'error', message: err.message || 'Auto-fill failed' });
     } finally {

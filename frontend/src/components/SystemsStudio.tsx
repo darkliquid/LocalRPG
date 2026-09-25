@@ -114,7 +114,13 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
       if (res.fields.name && !name.trim()) setName(res.fields.name);
       if (res.fields.description && !description.trim()) setDescription(res.fields.description);
       if (res.fields.rules_prompt && !rulesPrompt.trim()) setRulesPrompt(res.fields.rules_prompt);
-      setToast({ type: 'success', message: 'Auto-filled system fields!' });
+      if (res.warning) {
+        setToast({ type: 'error', message: `Partial: ${res.warning.code} — ${res.warning.message}` });
+      } else if (Object.keys(res.fields).length === 0) {
+        setToast({ type: 'error', message: 'The model returned nothing to fill.' });
+      } else {
+        setToast({ type: 'success', message: 'Auto-filled system fields!' });
+      }
     } catch (err: any) {
       setToast({ type: 'error', message: err.message || 'Auto-fill failed' });
     } finally {

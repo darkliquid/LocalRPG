@@ -141,8 +141,13 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
       if (charRes.fields.age && !playerAge.trim()) setPlayerAge(charRes.fields.age);
       if (charRes.fields.gender && !playerGender.trim()) setPlayerGender(charRes.fields.gender);
       if (charRes.fields.pronouns && !playerPronouns.trim()) setPlayerPronouns(charRes.fields.pronouns);
+
+      const warning = campRes.warning ?? charRes.warning;
+      if (warning) {
+        setGenError(`${warning.code}: ${warning.message}`);
+      }
     } catch (err) {
-      console.error('Failed to generate all fields:', err);
+      setGenError((err as Error).message || 'Generation failed');
     } finally {
       setIsGeneratingAll(false);
     }

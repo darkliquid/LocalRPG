@@ -76,6 +76,9 @@ export interface TurnEvent {
   tool_name?: string;
   tool_status?: 'running' | 'done';
   tool_summary?: string;
+  code?: string;
+  detail?: string;
+  failure?: GenerationFailure;
 }
 
 export interface ModelStatus {
