@@ -1608,7 +1608,7 @@ func tailLines(path string, want int) ([]string, error) {
 
 // GetSegmentAudio synthesizes one segment on demand and returns the cached clip,
 // reusing it for every later request.
-func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber, segmentIndex int) (string, error) {
+func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber, segmentIndex int, force ...bool) (string, error) {
 	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
 	turns, err := engine.NewHistoryLogger(historyPath).LoadHistory()
 	if err != nil {
@@ -1643,7 +1643,8 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
-	return pipeline.SynthesizeSegment(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID))
+	isForce := len(force) > 0 && force[0]
+	return pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
 }
 
 // narratorVoiceFor resolves the narrator voice for a campaign, preferring any
@@ -1752,7 +1753,7 @@ func (s *Service) findTurn(gameID string, turnNumber int) (*engine.Turn, error) 
 
 // PlayTurnAudio synthesizes any beat the turn has not already cached and plays
 // the whole turn in order. Clips are content-addressed, so a replay is instant.
-func (s *Service) PlayTurnAudio(ctx context.Context, gameID string, turnNumber int) error {
+func (s *Service) PlayTurnAudio(ctx context.Context, gameID string, turnNumber int, force ...bool) error {
 	player := s.audioPlayer()
 	if player == nil || !player.Available() {
 		return playback.ErrUnavailable
@@ -1763,13 +1764,15 @@ func (s *Service) PlayTurnAudio(ctx context.Context, gameID string, turnNumber i
 		return err
 	}
 
+	isForce := len(force) > 0 && force[0]
+
 	rawPaths := make([]string, len(turn.Segments))
 	var wg sync.WaitGroup
 	for i := range turn.Segments {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, idx)
+			path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, idx, isForce)
 			if err == nil && path != "" {
 				rawPaths[idx] = path
 			}
@@ -1792,13 +1795,13 @@ func (s *Service) PlayTurnAudio(ctx context.Context, gameID string, turnNumber i
 }
 
 // PlaySegmentAudio plays one beat, which is what a speaker chip triggers.
-func (s *Service) PlaySegmentAudio(ctx context.Context, gameID string, turnNumber, segmentIndex int) error {
+func (s *Service) PlaySegmentAudio(ctx context.Context, gameID string, turnNumber, segmentIndex int, force ...bool) error {
 	player := s.audioPlayer()
 	if player == nil || !player.Available() {
 		return playback.ErrUnavailable
 	}
 
-	path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, segmentIndex)
+	path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, segmentIndex, force...)
 	if err != nil {
 		return err
 	}

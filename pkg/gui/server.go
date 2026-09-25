@@ -352,6 +352,7 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// POST /api/game/{id}/turn/{n}/play plays the whole turn through the
+		// POST /api/game/{id}/turn/{n}/play plays the whole turn through the
 		// application's audio device.
 		if r.Method == http.MethodPost && len(parts) == 4 && parts[3] == "play" {
 			turnNumber, err := strconv.Atoi(parts[2])
@@ -359,7 +360,8 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "invalid turn number", http.StatusBadRequest)
 				return
 			}
-			if err := s.service.PlayTurnAudio(r.Context(), gameID, turnNumber); err != nil {
+			force := r.URL.Query().Get("force") == "1" || r.URL.Query().Get("force") == "true"
+			if err := s.service.PlayTurnAudio(r.Context(), gameID, turnNumber, force); err != nil {
 				writeGameError(w, err)
 				return
 			}
@@ -379,7 +381,8 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "invalid segment index", http.StatusBadRequest)
 				return
 			}
-			if err := s.service.PlaySegmentAudio(r.Context(), gameID, turnNumber, segmentIndex); err != nil {
+			force := r.URL.Query().Get("force") == "1" || r.URL.Query().Get("force") == "true"
+			if err := s.service.PlaySegmentAudio(r.Context(), gameID, turnNumber, segmentIndex, force); err != nil {
 				writeGameError(w, err)
 				return
 			}
@@ -403,7 +406,8 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		path, err := s.service.GetSegmentAudio(r.Context(), gameID, turnNumber, segmentIndex)
+		force := r.URL.Query().Get("force") == "1" || r.URL.Query().Get("force") == "true"
+		path, err := s.service.GetSegmentAudio(r.Context(), gameID, turnNumber, segmentIndex, force)
 		switch {
 		case errors.Is(err, ErrAudioUnavailable):
 			w.WriteHeader(http.StatusNoContent)
