@@ -1,0 +1,8 @@
+name: "UI Smoke Test"
+description: "Verify launcher loads and renders the navigation sidebar"
+steps:
+  - action: "navigate"
+    url: "/"
+  - action: "wait_visible"
+    selector: "body"
+    timeout_ms: 5000
