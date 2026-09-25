@@ -86,7 +86,7 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 	ctx, span := startGenerationSpan(ctx, s.logger, "generate.text", "character", "_all")
 	defer span.End()
 
-	router, err := harness.RouterFromConfigWithLogger(s.configMgr.Get(), s.logger)
+	router, err := textRouterFactory(s.configMgr.Get(), s.logger)
 	if err != nil {
 		failure := &harness.GenerationFailure{
 			Code:    harness.FailureProviderUnavailable,

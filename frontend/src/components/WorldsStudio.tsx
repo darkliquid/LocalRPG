@@ -75,9 +75,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const reportGenerationError = (failure: GenerationFailure) =>
     setToast({ type: 'error', message: `${failure.code}: ${failure.message}` });
 
+  const loadWorldsRef = React.useRef<((selectID?: string, mode?: 'new' | 'browse') => Promise<void>) | null>(null);
+
   useEffect(() => {
-    loadWorlds(undefined, startModeRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadWorldsRef.current?.(undefined, startModeRef.current);
   }, []);
 
   const loadWorlds = async (selectID?: string, mode: 'new' | 'browse' = startMode) => {
@@ -105,6 +106,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       setIsLoading(false);
     }
   };
+
+  loadWorldsRef.current = loadWorlds;
 
   const loadWorldDetail = async (id: string) => {
     const token = ++detailRequest.current;

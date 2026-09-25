@@ -148,9 +148,9 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 	attempts := make([]Attempt, 0, 2)
 	started := time.Now()
 
-	streamed, code, detail, streamErr := r.forwardStream(ctx, primary, req, out)
+	streamed, code, detail := r.forwardStream(ctx, primary, req, out)
 	if streamed {
-		return streamErr
+		return nil
 	}
 	attempts = append(attempts, Attempt{
 		Role: role, Provider: primary.ID(), Code: code, Detail: detail,
@@ -158,9 +158,9 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 	})
 
 	if fallback, ok := r.FallbackForRole(role); ok && fallback != nil {
-		streamed, code, detail, streamErr = r.forwardStream(ctx, fallback, req, out)
+		streamed, code, detail = r.forwardStream(ctx, fallback, req, out)
 		if streamed {
-			return streamErr
+			return nil
 		}
 		attempts = append(attempts, Attempt{
 			Role: role, Provider: fallback.ID(), Code: code, Detail: detail,
@@ -177,39 +177,51 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 	}
 }
 
-// forwardStream pushes a provider's chunks to out once it has seen a usable
-// first chunk. It reports whether anything was forwarded; a provider that closes
-// empty, or whose first chunk carries an error, is reported with its classified
-// failure code so the caller can fall back and explain why it did.
-func (r *Router) forwardStream(ctx context.Context, provider ModelProvider, req GenerateRequest, out chan<- StreamChunk) (bool, FailureCode, string, error) {
-	tempOut := make(chan StreamChunk, 20)
+// forwardStream relays a provider's chunks to out once a usable first chunk
+// arrives, and returns immediately after that first chunk so a caller can range
+// out without the two loops deadlocking. A terminal provider error is relayed as
+// a final StreamChunk with Error set. When nothing usable arrives it returns the
+// classified failure code so the caller can fall back and explain why.
+func (r *Router) forwardStream(ctx context.Context, provider ModelProvider, req GenerateRequest, out chan<- StreamChunk) (bool, FailureCode, string) {
+	chunks := make(chan StreamChunk, 32)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- provider.Stream(ctx, req, tempOut)
+		errCh <- provider.Stream(ctx, req, chunks)
 	}()
 
-	chunk, ok := <-tempOut
+	first, ok := <-chunks
 	if !ok {
-		streamErr := <-errCh
-		if streamErr != nil {
-			return false, ClassifyProviderError(streamErr), streamErr.Error(), nil
+		if streamErr := <-errCh; streamErr != nil {
+			return false, ClassifyProviderError(streamErr), streamErr.Error()
 		}
-		return false, FailureEmptyResponse, "provider streamed no text", nil
+		return false, FailureEmptyResponse, "provider streamed no text"
 	}
-	if chunk.Error != nil {
+	if first.Error != nil {
 		go func() {
-			for range tempOut {
+			for range chunks {
 			}
 		}()
 		<-errCh
-		return false, ClassifyProviderError(chunk.Error), chunk.Error.Error(), nil
+		return false, ClassifyProviderError(first.Error), first.Error.Error()
 	}
+
 	go func() {
 		defer close(out)
-		out <- chunk
-		for rest := range tempOut {
-			out <- rest
+		out <- first
+		for {
+			select {
+			case chunk, ok := <-chunks:
+				if !ok {
+					if streamErr := <-errCh; streamErr != nil {
+						out <- StreamChunk{Error: streamErr, Done: true}
+					}
+					return
+				}
+				out <- chunk
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
-	return true, "", "", <-errCh
+	return true, "", ""
 }

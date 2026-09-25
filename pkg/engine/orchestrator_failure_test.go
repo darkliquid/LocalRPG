@@ -6,7 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
 
 type failingStreamProvider struct{ err error }
@@ -90,4 +96,72 @@ func (c countingProvider) Stream(_ context.Context, _ harness.GenerateRequest, o
 	}
 	close(out)
 	return nil
+}
+
+func TestTurnFailureMarksSpanAndMetric(t *testing.T) {
+	recorder, _, err := telemetry.NewInMemory()
+	if err != nil {
+		t.Fatalf("NewInMemory: %v", err)
+	}
+	defer telemetry.ResetGlobalForTest()
+
+	orchestrator, _ := toolLoopOrchestrator(t, &toolScriptProvider{})
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Do", "hello", nil); err == nil {
+		t.Fatal("ProcessActionStream returned no error for an empty provider")
+	} else if _, ok := harness.FailureFrom(err); !ok {
+		t.Fatalf("err = %v, want a *GenerationFailure", err)
+	}
+
+	var turnSpan sdktrace.ReadOnlySpan
+	for _, span := range recorder.Spans() {
+		if span.Name() == "turn" {
+			turnSpan = span
+		}
+	}
+	if turnSpan == nil {
+		t.Fatal("no turn span was recorded")
+	}
+	if turnSpan.Status().Code != codes.Error {
+		t.Fatalf("turn span status = %v, want error", turnSpan.Status().Code)
+	}
+	var outcomeErr bool
+	for _, attr := range turnSpan.Attributes() {
+		if attr.Key == attribute.Key("turn.outcome") && attr.Value.AsString() == "error" {
+			outcomeErr = true
+		}
+	}
+	if !outcomeErr {
+		t.Fatal("turn span is missing turn.outcome=error")
+	}
+
+	rm, err := recorder.Metrics(context.Background())
+	if err != nil {
+		t.Fatalf("Metrics: %v", err)
+	}
+	if !engineMetricHasAttribute(rm, "turn.outcome", "error") {
+		t.Fatal("localrpg.turn.completed is missing turn.outcome=error")
+	}
+}
+
+// engineMetricHasAttribute scans recorded metrics for an attribute key/value pair.
+func engineMetricHasAttribute(rm metricdata.ResourceMetrics, key, value string) bool {
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			switch data := m.Data.(type) {
+			case metricdata.Sum[int64]:
+				for _, dp := range data.DataPoints {
+					if v, ok := dp.Attributes.Value(attribute.Key(key)); ok && v.AsString() == value {
+						return true
+					}
+				}
+			case metricdata.Histogram[float64]:
+				for _, dp := range data.DataPoints {
+					if v, ok := dp.Attributes.Value(attribute.Key(key)); ok && v.AsString() == value {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
 }

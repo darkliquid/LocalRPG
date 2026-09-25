@@ -37,6 +37,8 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generatingKind, setGeneratingKind] = useState<'banner' | 'icon' | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
+  const errorMessage = (err: unknown): string =>
+    err instanceof Error ? err.message : 'Unexpected error';
 
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -173,9 +175,9 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
         setIconFile(file);
         setIconPreview(URL.createObjectURL(blob));
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to generate preview', err);
-      setGenError(err.message || 'Generation failed');
+      setGenError(errorMessage(err) || 'Generation failed');
     } finally {
       setGeneratingKind(null);
     }

@@ -8,6 +8,10 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
+// textRouterFactory builds the router for one-shot text generation. It is a
+// package variable so a test can inject a scripted router.
+var textRouterFactory = harness.RouterFromConfigWithLogger
+
 // generationOutcome is the result of walking a role fallback chain.
 type generationOutcome struct {
 	Values      map[string]string

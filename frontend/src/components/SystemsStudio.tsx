@@ -31,6 +31,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const reportGenerationError = (failure: GenerationFailure) =>
     setToast({ type: 'error', message: `${failure.code}: ${failure.message}` });
+  const errorMessage = (err: unknown): string =>
+    err instanceof Error ? err.message : 'Unexpected error';
 
   useEffect(() => {
     loadSystems();
@@ -47,8 +49,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
       } else {
         handleNewSystem();
       }
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Failed to load systems' });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to load systems' });
     } finally {
       setIsLoading(false);
     }
@@ -66,8 +68,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
       setScript(detail.script || REFERENCE_SYSTEM_TEMPLATE.script);
       setCreationPreamble(detail.character_creation?.preamble || '');
       setCreationFields(detail.character_creation?.fields || []);
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Failed to load system details' });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to load system details' });
     }
   };
 
@@ -123,8 +125,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
       } else {
         setToast({ type: 'success', message: 'Auto-filled system fields!' });
       }
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Auto-fill failed' });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Auto-fill failed' });
     } finally {
       setIsGeneratingAll(false);
     }
@@ -157,8 +159,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
       setToast({ type: 'success', message: `System "${saved.name}" saved successfully!` });
       await loadSystems(saved.id);
       if (onSystemSaved) onSystemSaved();
-    } catch (err: any) {
-      setToast({ type: 'error', message: err.message || 'Failed to save system' });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to save system' });
     } finally {
       setIsSaving(false);
     }

@@ -530,6 +530,14 @@ func writeJSON(w http.ResponseWriter, data interface{}) {
 	_ = json.NewEncoder(w).Encode(data)
 }
 
+// writeJSONStatus writes a JSON body with an explicit status, so header
+// handling stays in one place for error envelopes.
+func writeJSONStatus(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(data)
+}
+
 func (s *Server) handleGamesRoutes(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:

@@ -7,7 +7,9 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
@@ -47,5 +49,28 @@ func TestRecordImageFailureEmitsGenerateError(t *testing.T) {
 	span.End()
 	if _, ok := mem.Find("generate.error"); !ok {
 		t.Fatalf("events = %v, want generate.error", mem.Names())
+	}
+}
+
+type stubImageClient struct {
+	data []byte
+	err  error
+}
+
+func (c stubImageClient) GenerateImage(context.Context, string) ([]byte, error) {
+	return c.data, c.err
+}
+
+func TestGenerateImageRejectsEmptyBytes(t *testing.T) {
+	_, svc := setupTestGame(t)
+	original := imageClientFactory
+	defer func() { imageClientFactory = original }()
+	imageClientFactory = func(config.ImageConfig, string) (media.ImageClient, error) {
+		return stubImageClient{data: nil}, nil
+	}
+
+	_, failure := svc.generateImage(context.Background(), "banner", "a banner")
+	if failure == nil || failure.Code != harness.FailureProviderError {
+		t.Fatalf("generateImage failure = %v, want provider_error", failure)
 	}
 }

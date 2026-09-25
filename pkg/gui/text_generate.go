@@ -150,7 +150,7 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 		systemPrompt = textGeneratorSystemPromptCampaign
 	}
 
-	router, err := harness.RouterFromConfigWithLogger(s.configMgr.Get(), s.logger)
+	router, err := textRouterFactory(s.configMgr.Get(), s.logger)
 	if err != nil {
 		failure := &harness.GenerationFailure{
 			Code:    harness.FailureProviderUnavailable,

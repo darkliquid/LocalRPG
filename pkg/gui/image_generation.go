@@ -5,9 +5,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 )
+
+// imageClientFactory builds the image client. It is a package variable so a
+// test can substitute a stub without a live provider.
+var imageClientFactory = func(cfg config.ImageConfig, sharedKey string) (media.ImageClient, error) {
+	return media.NewImageClientWithSharedKey(cfg, sharedKey)
+}
 
 // generateImage runs one image request: span, provider call, byte guard, and
 // observability. It never persists.
@@ -17,7 +24,7 @@ func (s *Service) generateImage(ctx context.Context, kind, prompt string) ([]byt
 	defer span.End()
 
 	cfg := s.configMgr.Get()
-	client, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
+	client, err := imageClientFactory(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
 	if err != nil {
 		failure := &harness.GenerationFailure{Code: harness.FailureProviderUnavailable, Message: fmt.Sprintf("image provider: %v", err)}
 		s.recordImage(ctx, span, kind, "", 0, started, failure)

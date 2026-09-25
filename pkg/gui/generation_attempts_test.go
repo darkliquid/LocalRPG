@@ -5,7 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 type scriptedProvider struct {
@@ -112,5 +114,66 @@ func TestCollectTextAttempts(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func stubRouterFor(provider *scriptedProvider) func(*config.Config, trace.Logger) (*harness.Router, error) {
+	return func(*config.Config, trace.Logger) (*harness.Router, error) {
+		return routerForRoles(map[string]*scriptedProvider{"gm": provider}), nil
+	}
+}
+
+func TestGenerateTextFailureCodes(t *testing.T) {
+	_, svc := setupTestGame(t)
+	original := textRouterFactory
+	defer func() { textRouterFactory = original }()
+
+	cases := []struct {
+		name     string
+		provider *scriptedProvider
+		wantCode harness.FailureCode
+	}{
+		{"provider error", &scriptedProvider{id: "p", err: errors.New("boom")}, harness.FailureProviderError},
+		{"empty reply", &scriptedProvider{id: "p", text: "   "}, harness.FailureEmptyResponse},
+		{"unparseable", &scriptedProvider{id: "p", text: "not json"}, harness.FailureParseError},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			textRouterFactory = stubRouterFor(tc.provider)
+			resp, err := svc.GenerateText(context.Background(), GenerateTextRequest{FormType: "world", FieldName: "name"})
+			if resp != nil {
+				t.Fatalf("resp = %+v, want nil", resp)
+			}
+			failure, ok := harness.FailureFrom(err)
+			if !ok || failure.Code != tc.wantCode {
+				t.Fatalf("err = %v, want code %q", err, tc.wantCode)
+			}
+		})
+	}
+}
+
+func TestGenerateTextWarningOnlyWhenFieldsMissing(t *testing.T) {
+	_, svc := setupTestGame(t)
+	original := textRouterFactory
+	defer func() { textRouterFactory = original }()
+
+	// A single requested field that is present must not warn.
+	textRouterFactory = stubRouterFor(&scriptedProvider{id: "p", text: `{"name":"Vela"}`})
+	resp, err := svc.GenerateText(context.Background(), GenerateTextRequest{FormType: "world", FieldName: "name"})
+	if err != nil {
+		t.Fatalf("GenerateText: %v", err)
+	}
+	if resp.Warning != nil {
+		t.Fatalf("warning = %+v, want none when the field was generated", resp.Warning)
+	}
+
+	// An _all request that produced one of five fields must warn.
+	resp, err = svc.GenerateText(context.Background(), GenerateTextRequest{FormType: "world", FieldName: "_all"})
+	if err != nil {
+		t.Fatalf("GenerateText(_all): %v", err)
+	}
+	if resp.Warning == nil {
+		t.Fatal("warning = nil, want a partial warning for _all")
 	}
 }
