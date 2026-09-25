@@ -1,7 +1,7 @@
 import React from 'react';
 import { GameSummary } from '../../types';
 import { ProceduralIcon } from './ProceduralAsset';
-import { Plus, Globe, BookOpen, Settings } from 'lucide-react';
+import { Plus, Globe, BookOpen, Settings, LayoutGrid } from 'lucide-react';
 
 interface LauncherDockProps {
   games: GameSummary[];
@@ -9,6 +9,8 @@ interface LauncherDockProps {
   onSelectGame: (gameId: string) => void;
   isFlyoutOpen: boolean;
   onToggleFlyout: () => void;
+  isCampaignGalleryOpen: boolean;
+  onToggleCampaignGallery: () => void;
   onOpenWorldsStudio: () => void;
   onOpenSystemsStudio: () => void;
   onOpenSettings: () => void;
@@ -20,6 +22,8 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
   onSelectGame,
   isFlyoutOpen,
   onToggleFlyout,
+  isCampaignGalleryOpen,
+  onToggleCampaignGallery,
   onOpenWorldsStudio,
   onOpenSystemsStudio,
   onOpenSettings,
@@ -51,6 +55,28 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
       </div>
 
       <div className="w-8 h-[1px] bg-white/10 mb-3" />
+
+      {/* Campaign Gallery Grid Button */}
+      <div className="relative group mb-3">
+        <button
+          onClick={onToggleCampaignGallery}
+          className={`w-[46px] h-[46px] rounded-2xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
+            isCampaignGalleryOpen
+              ? 'bg-purple-600/30 border-2 border-purple-500 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.4)]'
+              : 'bg-white/[0.04] border border-white/15 text-stone-300 hover:text-white hover:border-purple-400/60 hover:bg-white/[0.08]'
+          }`}
+          title="Browse Campaigns (Grid View)"
+          aria-label="Browse Campaigns (Grid View)"
+        >
+          <LayoutGrid className="w-5 h-5" />
+        </button>
+        {/* Tooltip */}
+        {!isCampaignGalleryOpen && (
+          <div className="pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 px-2.5 py-1 bg-stone-900 border border-white/15 rounded-lg text-xs font-sans text-stone-200 whitespace-nowrap shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-50">
+            Browse Campaigns
+          </div>
+        )}
+      </div>
 
       {/* Campaigns List (Scrollable) */}
       <div
