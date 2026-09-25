@@ -18,6 +18,30 @@ var migrations = []migration{
 	{version: 3, apply: addTurnContextsTable},
 	{version: 4, apply: addWorkingSetTable},
 	{version: 5, apply: addMemoriesTables},
+	{version: 6, apply: addEmbeddingsTable},
+}
+
+// addEmbeddingsTable creates the table and indexes for vector embeddings.
+func addEmbeddingsTable(db *sql.DB) error {
+	const ddl = `
+	CREATE TABLE IF NOT EXISTS embeddings (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		target_type TEXT NOT NULL,
+		target_id TEXT NOT NULL,
+		chunk_index INTEGER NOT NULL DEFAULT 0,
+		content_hash TEXT NOT NULL,
+		model_id TEXT NOT NULL,
+		dimensions INTEGER NOT NULL,
+		vector BLOB NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(target_type, target_id, chunk_index)
+	);
+	CREATE INDEX IF NOT EXISTS idx_embeddings_target ON embeddings(target_type, target_id);
+	CREATE INDEX IF NOT EXISTS idx_embeddings_model_type ON embeddings(model_id, target_type);`
+	if _, err := db.Exec(ddl); err != nil {
+		return fmt.Errorf("create embeddings table: %w", err)
+	}
+	return nil
 }
 
 // addMemoriesTables creates the per-entity memory store: the records, their
