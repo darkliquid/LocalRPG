@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
 import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest } from '../types';
-import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, RotateCcw, BookOpen, Wand2 } from 'lucide-react';
+import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
 
@@ -10,13 +10,13 @@ interface WorldsStudioProps {
 }
 
 const STARTER_ENTITY_TEMPLATE = `---
-name: The Whispering Bastion
+name: New Location
 type: location
 state:
-  danger_level: 2
+  danger_level: 1
 wikilinks: []
 ---
-An ancient stone fortress overlooking the misty valleys. Legends say its halls whisper secrets to those who wander in twilight.
+An intriguing location waiting to be explored.
 `;
 
 export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
@@ -25,33 +25,21 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   const [selectedID, setSelectedID] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'lore' | 'prompt' | 'entities'>('lore');
 
-  // World form state
-  const [name, setName] = useState(REFERENCE_WORLD_TEMPLATE.name);
-  const [slugID, setSlugID] = useState(REFERENCE_WORLD_TEMPLATE.id);
-  const [genre, setGenre] = useState(REFERENCE_WORLD_TEMPLATE.genre);
-  const [defaultSystem, setDefaultSystem] = useState(REFERENCE_WORLD_TEMPLATE.default_system);
-  const [artStyle, setArtStyle] = useState(REFERENCE_WORLD_TEMPLATE.art_style);
-  const [tags, setTags] = useState(REFERENCE_WORLD_TEMPLATE.tags.join(', '));
-  const [description, setDescription] = useState(REFERENCE_WORLD_TEMPLATE.description);
-  const [lorePrompt, setLorePrompt] = useState(REFERENCE_WORLD_TEMPLATE.lore_prompt);
+  // World form state (defaults to blank slate)
+  const [name, setName] = useState('');
+  const [slugID, setSlugID] = useState('');
+  const [genre, setGenre] = useState('');
+  const [defaultSystem, setDefaultSystem] = useState('');
+  const [artStyle, setArtStyle] = useState('');
+  const [tags, setTags] = useState('');
+  const [description, setDescription] = useState('');
+  const [lorePrompt, setLorePrompt] = useState('');
 
   // Entities state
-  const [entities, setEntities] = useState<WorldEntitySummary[]>(
-    REFERENCE_WORLD_TEMPLATE.entities.map((e) => ({ id: e.id, name: e.name, type: e.type }))
-  );
-  const [selectedEntityID, setSelectedEntityID] = useState<string | null>(
-    REFERENCE_WORLD_TEMPLATE.entities[0]?.id || null
-  );
-  const [entityMarkdown, setEntityMarkdown] = useState(
-    REFERENCE_WORLD_TEMPLATE.entities[0]?.markdown || ''
-  );
-  const [entityDrafts, setEntityDrafts] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {};
-    REFERENCE_WORLD_TEMPLATE.entities.forEach((e) => {
-      initial[e.id] = e.markdown;
-    });
-    return initial;
-  });
+  const [entities, setEntities] = useState<WorldEntitySummary[]>([]);
+  const [selectedEntityID, setSelectedEntityID] = useState<string | null>(null);
+  const [entityMarkdown, setEntityMarkdown] = useState('');
+  const [entityDrafts, setEntityDrafts] = useState<Record<string, string>>({});
   const [isNewEntityModal, setIsNewEntityModal] = useState(false);
   const [newEntitySlug, setNewEntitySlug] = useState('');
 
@@ -59,6 +47,17 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // World artwork (banner & icon) staged for upload on save, or previewed for
+  // an unsaved world.
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [generatingKind, setGeneratingKind] = useState<'banner' | 'icon' | null>(null);
+
+  const bannerInputRef = React.useRef<HTMLInputElement>(null);
+  const iconInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadWorlds();
@@ -99,6 +98,11 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       setDescription(detail.description || '');
       setLorePrompt(detail.lore_prompt || REFERENCE_WORLD_TEMPLATE.lore_prompt);
       setEntities(detail.entities || []);
+
+      setBannerFile(null);
+      setIconFile(null);
+      setBannerPreview(`/api/world/${encodeURIComponent(id)}/banner?t=${Date.now()}`);
+      setIconPreview(`/api/world/${encodeURIComponent(id)}/icon?t=${Date.now()}`);
 
       if (detail.entities && detail.entities.length > 0) {
         const first = detail.entities[0];
@@ -155,30 +159,27 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
 
   const handleNewWorld = (sysList?: SystemInfo[]) => {
     setSelectedID(null);
-    setName(REFERENCE_WORLD_TEMPLATE.name);
-    setSlugID(REFERENCE_WORLD_TEMPLATE.id);
-    setGenre(REFERENCE_WORLD_TEMPLATE.genre);
+    setName('');
+    setSlugID('');
+    setGenre('');
     const availableSys = sysList && sysList.length > 0 ? sysList : systems;
-    const matchingSys = availableSys.find((s) => s.id === REFERENCE_WORLD_TEMPLATE.default_system);
-    setDefaultSystem(matchingSys ? matchingSys.id : (availableSys[0]?.id ?? ''));
-    setArtStyle(REFERENCE_WORLD_TEMPLATE.art_style);
-    setTags(REFERENCE_WORLD_TEMPLATE.tags.join(', '));
-    setDescription(REFERENCE_WORLD_TEMPLATE.description);
-    setLorePrompt(REFERENCE_WORLD_TEMPLATE.lore_prompt);
-    setEntities(
-      REFERENCE_WORLD_TEMPLATE.entities.map((e) => ({ id: e.id, name: e.name, type: e.type }))
-    );
-    setSelectedEntityID(REFERENCE_WORLD_TEMPLATE.entities[0].id);
-    setEntityMarkdown(REFERENCE_WORLD_TEMPLATE.entities[0].markdown);
-    const initialDrafts: Record<string, string> = {};
-    REFERENCE_WORLD_TEMPLATE.entities.forEach((e) => {
-      initialDrafts[e.id] = e.markdown;
-    });
-    setEntityDrafts(initialDrafts);
+    setDefaultSystem(availableSys[0]?.id ?? '');
+    setArtStyle('');
+    setTags('');
+    setDescription('');
+    setLorePrompt('');
+    setEntities([]);
+    setSelectedEntityID(null);
+    setEntityMarkdown('');
+    setEntityDrafts({});
+    setBannerFile(null);
+    setIconFile(null);
+    setBannerPreview(null);
+    setIconPreview(null);
     setActiveTab('lore');
   };
 
-  const handleResetToReference = () => {
+  const handleLoadReferenceTemplate = () => {
     setName(REFERENCE_WORLD_TEMPLATE.name);
     if (!selectedID) {
       setSlugID(REFERENCE_WORLD_TEMPLATE.id);
@@ -200,7 +201,43 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       initialDrafts[e.id] = e.markdown;
     });
     setEntityDrafts(initialDrafts);
-    setToast({ type: 'success', message: 'Reset to The Ashen Reach Reference Template!' });
+    setToast({ type: 'success', message: 'Loaded The Ashen Reach reference template' });
+  };
+
+  const handleAIGenerate = async (kind: 'banner' | 'icon') => {
+    setGeneratingKind(kind);
+    try {
+      if (selectedID) {
+        await APIClient.generateWorldAsset(selectedID, kind);
+        if (kind === 'banner') {
+          setBannerPreview(`/api/world/${encodeURIComponent(selectedID)}/banner?t=${Date.now()}`);
+        } else {
+          setIconPreview(`/api/world/${encodeURIComponent(selectedID)}/icon?t=${Date.now()}`);
+        }
+        setToast({ type: 'success', message: `Generated world ${kind}!` });
+      } else {
+        const blob = await APIClient.generateAssetPreview(
+          kind,
+          name.trim() || 'New World',
+          description.trim(),
+          artStyle.trim(),
+          genre.trim()
+        );
+        const file = new File([blob], `${kind}.png`, { type: blob.type });
+        if (kind === 'banner') {
+          setBannerFile(file);
+          setBannerPreview(URL.createObjectURL(blob));
+        } else {
+          setIconFile(file);
+          setIconPreview(URL.createObjectURL(blob));
+        }
+        setToast({ type: 'success', message: `Previewed world ${kind}!` });
+      }
+    } catch (err: any) {
+      setToast({ type: 'error', message: err.message || `Failed to generate ${kind}` });
+    } finally {
+      setGeneratingKind(null);
+    }
   };
 
   const getWorldContext = (): Record<string, string> => ({
@@ -272,6 +309,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
       for (const ent of entities) {
         const md = allDrafts[ent.id] || STARTER_ENTITY_TEMPLATE;
         await APIClient.saveWorldEntity(saved.id, ent.id, md).catch(() => {});
+      }
+
+      if (bannerFile) {
+        await APIClient.uploadWorldAsset(saved.id, 'banner', bannerFile).catch(console.error);
+      }
+      if (iconFile) {
+        await APIClient.uploadWorldAsset(saved.id, 'icon', iconFile).catch(console.error);
       }
 
       setToast({ type: 'success', message: `World "${saved.name}" saved successfully!` });
@@ -490,12 +534,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
 
             <button
               type="button"
-              onClick={handleResetToReference}
-              title="Reset current editor to the comprehensive Ashen Reach reference template"
+              onClick={handleLoadReferenceTemplate}
+              title="Load the comprehensive Ashen Reach reference template"
               className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-stone-800 hover:border-purple-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-purple-400 transition-all cursor-pointer"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Reset Template</span>
+              <BookOpen className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Load Reference Template</span>
             </button>
 
             <button
@@ -682,6 +726,120 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors resize-none"
               />
+            </div>
+
+            {/* World Artwork (Banner & Icon) */}
+            <div className="space-y-3 pt-2">
+              <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
+                World Artwork
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Banner */}
+                <div className="p-3 bg-stone-950 border border-stone-800 rounded-xl space-y-2">
+                  <span className="text-[11px] font-sans font-semibold text-stone-400">World Banner</span>
+                  <input
+                    type="file"
+                    ref={bannerInputRef}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setBannerFile(file);
+                        setBannerPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() => bannerInputRef.current?.click()}
+                    className="h-24 rounded-lg overflow-hidden border border-stone-800 bg-stone-900/40 flex items-center justify-center cursor-pointer"
+                  >
+                    {bannerPreview ? (
+                      <img
+                        src={bannerPreview}
+                        alt="Banner Preview"
+                        className="w-full h-full object-cover"
+                        onError={() => setBannerPreview(null)}
+                      />
+                    ) : (
+                      <span className="text-stone-600 text-xs">Click to upload banner</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => bannerInputRef.current?.click()}
+                      disabled={isSaving || generatingKind === 'banner'}
+                      className="flex-1 py-1.5 px-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-sans font-semibold text-stone-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAIGenerate('banner')}
+                      disabled={isSaving || generatingKind === 'banner'}
+                      className="flex-1 py-1.5 px-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-xs font-sans font-semibold text-purple-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{generatingKind === 'banner' ? 'Gen...' : 'AI Gen'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Icon */}
+                <div className="p-3 bg-stone-950 border border-stone-800 rounded-xl space-y-2">
+                  <span className="text-[11px] font-sans font-semibold text-stone-400">World Icon</span>
+                  <input
+                    type="file"
+                    ref={iconInputRef}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setIconFile(file);
+                        setIconPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() => iconInputRef.current?.click()}
+                    className="h-24 rounded-lg overflow-hidden border border-stone-800 bg-stone-900/40 flex items-center justify-center cursor-pointer"
+                  >
+                    {iconPreview ? (
+                      <img
+                        src={iconPreview}
+                        alt="Icon Preview"
+                        className="w-16 h-16 rounded-xl object-cover"
+                        onError={() => setIconPreview(null)}
+                      />
+                    ) : (
+                      <span className="text-stone-600 text-xs">Click to upload icon</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => iconInputRef.current?.click()}
+                      disabled={isSaving || generatingKind === 'icon'}
+                      className="flex-1 py-1.5 px-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-sans font-semibold text-stone-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAIGenerate('icon')}
+                      disabled={isSaving || generatingKind === 'icon'}
+                      className="flex-1 py-1.5 px-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-xs font-sans font-semibold text-purple-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{generatingKind === 'icon' ? 'Gen...' : 'AI Gen'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
