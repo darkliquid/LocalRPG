@@ -200,6 +200,13 @@ func (g *GeminiProvider) callInteractions(ctx context.Context, prevInteractionID
 			Text string `json:"text"`
 			Type string `json:"type"`
 		} `json:"outputs"`
+		Steps []struct {
+			Type    string `json:"type"`
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"steps"`
 		Usage struct {
 			TotalCachedTokens int `json:"total_cached_tokens"`
 		} `json:"usage"`
@@ -220,6 +227,15 @@ func (g *GeminiProvider) callInteractions(ctx context.Context, prevInteractionID
 	text := parsed.OutputText
 	if text == "" {
 		var sb strings.Builder
+		for _, step := range parsed.Steps {
+			if step.Type == "model_output" || step.Type == "" {
+				for _, c := range step.Content {
+					if c.Text != "" {
+						sb.WriteString(c.Text)
+					}
+				}
+			}
+		}
 		for _, out := range parsed.Outputs {
 			if out.Text != "" {
 				sb.WriteString(out.Text)

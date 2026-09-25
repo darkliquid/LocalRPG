@@ -566,3 +566,72 @@ func TestGeminiProviderBuildContentsEchoesThoughtSignature(t *testing.T) {
 	}
 }
 
+func TestGeminiProviderInteractionsStepsSchema(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"id": "v1_test_interaction_step_id",
+			"status": "completed",
+			"steps": [
+				{
+					"signature": "thought-sig",
+					"type": "thought"
+				},
+				{
+					"type": "model_output",
+					"content": [
+						{
+							"type": "text",
+							"text": "The corridor ahead is shrouded in impenetrable mist."
+						}
+					]
+				}
+			],
+			"usage": {
+				"total_cached_tokens": 42
+			}
+		}`)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
+		Model:      "gemini-3.8-flash",
+		APIKey:     "secret-api-key",
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiProvider: %v", err)
+	}
+
+	handle, err := provider.StartSession(ctx, harness.GenerateRequest{
+		Prompt: "What do I see?",
+	})
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	if handle.ID != "v1_test_interaction_step_id" {
+		t.Errorf("expected handle ID v1_test_interaction_step_id, got %q", handle.ID)
+	}
+	if handle.Response == nil {
+		t.Fatalf("expected non-nil Response in handle")
+	}
+	if handle.Response.Text != "The corridor ahead is shrouded in impenetrable mist." {
+		t.Errorf("StartSession text = %q, want %q", handle.Response.Text, "The corridor ahead is shrouded in impenetrable mist.")
+	}
+	if handle.CachedTokens != 42 {
+		t.Errorf("StartSession cached tokens = %d, want 42", handle.CachedTokens)
+	}
+
+	contResp, err := provider.ContinueSession(ctx, handle, harness.GenerateRequest{
+		Prompt: "I step forward.",
+	})
+	if err != nil {
+		t.Fatalf("ContinueSession: %v", err)
+	}
+	if contResp.Text != "The corridor ahead is shrouded in impenetrable mist." {
+		t.Errorf("ContinueSession text = %q, want %q", contResp.Text, "The corridor ahead is shrouded in impenetrable mist.")
+	}
+}
+
