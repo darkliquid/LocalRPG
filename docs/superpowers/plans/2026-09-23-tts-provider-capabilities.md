@@ -75,7 +75,7 @@ This plan follows the spec's explicit rule (delegate to `ComputeAudioCacheKeyWit
 - Consumes: `config.TTSConfig`.
 - Produces: `media.ProviderVoice`, `media.VoiceCatalog`, `media.VoiceOption`, `media.VoiceOptions`, `media.MeteredProvider`, `media.ProviderKey(config.TTSConfig) string`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/media/catalog_test.go`:
 
@@ -113,12 +113,12 @@ func TestProviderKey(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestProviderKey ./pkg/media/ -v`
 Expected: FAIL with "undefined: ProviderKey".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/media/catalog.go`:
 
@@ -239,12 +239,12 @@ func sanitiseKey(value string) string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestProviderKey ./pkg/media/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/catalog.go pkg/media/catalog_test.go
@@ -262,7 +262,7 @@ git commit -m "feat(media): add provider voice capabilities and stable identity"
 **Interfaces:**
 - Produces: `media.NormaliseVoiceTags(raw ...string) []string`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/media/tags_test.go`:
 
@@ -298,12 +298,12 @@ func TestNormaliseVoiceTags(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestNormaliseVoiceTags ./pkg/media/ -v`
 Expected: FAIL with "undefined: NormaliseVoiceTags".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/media/tags.go`:
 
@@ -361,12 +361,12 @@ func normaliseTag(tag string) string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestNormaliseVoiceTags ./pkg/media/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/tags.go pkg/media/tags_test.go
@@ -385,7 +385,7 @@ git commit -m "feat(media): share one voice tag vocabulary across providers"
 - Consumes: `media.VoiceOption`.
 - Produces: `media.ValidateVoiceOptions(schema []VoiceOption, values map[string]interface{}) (map[string]interface{}, []string)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/media/options_test.go`:
 
@@ -466,12 +466,12 @@ func TestValidateVoiceOptions(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestValidateVoiceOptions ./pkg/media/ -v`
 Expected: FAIL with "undefined: ValidateVoiceOptions".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/media/options.go`:
 
@@ -620,12 +620,12 @@ func containsString(values []string, candidate string) bool {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestValidateVoiceOptions ./pkg/media/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/options.go pkg/media/options_test.go
@@ -644,7 +644,7 @@ git commit -m "feat(media): validate provider options against their schema"
 - Consumes: `entity.VoiceConfig`.
 - Produces: `media.ComputeAudioCacheKeyForVoice(speakerID string, voice *entity.VoiceConfig, text string) string`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 If `pkg/media/cache_test.go` does not exist, create it; otherwise append:
 
@@ -702,12 +702,12 @@ func TestComputeAudioCacheKeyForVoice(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestComputeAudioCacheKeyForVoice ./pkg/media/ -v`
 Expected: FAIL with "undefined: ComputeAudioCacheKeyForVoice".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `pkg/media/cache.go`, add the import `"encoding/json"` and `"github.com/darkliquid/localrpg/pkg/entity"`, then add:
 
@@ -751,12 +751,12 @@ func ComputeAudioCacheKeyForVoice(speakerID string, voice *entity.VoiceConfig, t
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestComputeAudioCacheKeyForVoice ./pkg/media/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/cache.go pkg/media/cache_test.go
@@ -776,7 +776,7 @@ git commit -m "feat(media): hash provider options into the audio cache key"
 - Consumes: `media.ComputeAudioCacheKeyForVoice` (Task 4).
 - Produces: no new exports; clips and value tokens become option-sensitive.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/media/cache_test.go`:
 
@@ -830,12 +830,12 @@ func TestSegmentDTOKeysFollowVoiceOptions(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestPipelineKeyFollowsVoiceOptions|TestSegmentDTOKeysFollowVoiceOptions' ./pkg/media/ ./pkg/gui/ -v`
 Expected: FAIL. The pipeline test fails because the clip lands under the old key; the DTO test passes already only if `voiceFor` feeds the old function, so it should fail on the option-sensitivity assertion.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `pkg/media/tts.go`, replace the voice-hash block in `SynthesizeUtterance`:
 
@@ -883,12 +883,12 @@ In `pkg/gui/service.go`, replace the key derivation in `segmentDTOs`:
 		}
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/media/ ./pkg/gui/ -count=1`
 Expected: PASS, including the pre-existing media and gui suites.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/tts.go pkg/gui/service.go pkg/media/cache_test.go pkg/gui/service_test.go
@@ -908,7 +908,7 @@ git commit -m "feat(media): key clips by provider options end to end"
 **Interfaces:**
 - Produces: `config.VoiceProfile.Options map[string]interface{}`, `config.TTSConfig.Metered *bool`, `entity.VoiceConfig.Options map[string]interface{}`; `AssignVoiceProfile` copies a profile's options onto the entity.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/config/types_test.go`:
 
@@ -1015,12 +1015,12 @@ func TestAssignVoiceProfileCopiesOptions(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestVoiceProfileOptionsAndMeteredRoundTrip|TestVoiceOptionsRoundTripThroughFrontmatter|TestAssignVoiceProfileCopiesOptions' ./pkg/config/ ./pkg/entity/ ./pkg/harness/ -v`
 Expected: FAIL to compile with "unknown field Options" and "unknown field Metered".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `pkg/config/types.go`, add to `VoiceProfile` after `Description`:
 
@@ -1086,12 +1086,12 @@ Replace the hash-fallback block:
 	ent.Voice = voiceFromProfile(p)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/config/ ./pkg/entity/ ./pkg/harness/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/config/types_test.go pkg/entity/entity.go pkg/entity/entity_test.go pkg/harness/extractor.go pkg/harness/extractor_test.go
@@ -1110,7 +1110,7 @@ git commit -m "feat: carry provider voice options on profiles and entities"
 - Consumes: `media.TTSClient`, `media.VoiceCatalog`, `media.ProviderVoice`.
 - Produces: `media.CachedVoiceCatalog`, `media.CatalogSnapshot`, `media.NewCachedVoiceCatalog(cacheDir string) *CachedVoiceCatalog`, `(*CachedVoiceCatalog).Load(ctx, providerID string, client TTSClient, refresh bool) (CatalogSnapshot, error)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/media/voice_catalog_test.go`:
 
@@ -1253,12 +1253,12 @@ func TestCachedVoiceCatalogHonoursTTL(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestCachedVoiceCatalog ./pkg/media/ -v`
 Expected: FAIL with "undefined: NewCachedVoiceCatalog".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/media/voice_catalog.go`:
 
@@ -1366,12 +1366,12 @@ func writeCatalogSnapshot(path string, snapshot CatalogSnapshot) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestCachedVoiceCatalog ./pkg/media/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/voice_catalog.go pkg/media/voice_catalog_test.go
@@ -1393,7 +1393,7 @@ git commit -m "feat(media): cache a provider voice catalog with stale fallback"
 - Consumes: `media.ProviderKey`, `media.VoiceOptions`, `media.VoiceCatalog`, `media.MeteredProvider`, `media.NewCachedVoiceCatalog`.
 - Produces: `gui.TTSInspectRequestDTO`, `gui.TTSInspectResponseDTO`, `gui.VoiceCatalogDTO`, `(*Service).InspectTTS(ctx, req TTSInspectRequestDTO) (*TTSInspectResponseDTO, error)`, `POST /api/tts/inspect`, `TestProviderRequestDTO.VoiceID`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/tts_inspect_test.go`:
 
@@ -1529,12 +1529,12 @@ func TestInspectTTSRoute(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestInspectTTS ./pkg/gui/ -v`
 Expected: FAIL with "unknown field newTTSClient" and "undefined: TTSInspectRequestDTO".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `pkg/gui/types.go`, add `"time"` to the imports and the DTOs after `TestProviderResponseDTO`:
 
@@ -1705,12 +1705,12 @@ func (s *Server) handleTTSInspectRoute(w http.ResponseWriter, r *http.Request) {
 
 Add `"github.com/darkliquid/localrpg/pkg/media"` to `pkg/gui/types.go` imports.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestInspectTTS ./pkg/gui/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/tts_inspect.go pkg/gui/service.go pkg/gui/server.go pkg/gui/tts_inspect_test.go
@@ -1730,7 +1730,7 @@ git commit -m "feat(gui): describe a TTS provider's voices and options"
 - Consumes: `config.VoiceProfile`, `media.ProviderKey`.
 - Produces: `media.FilterVoiceProfiles(profiles []config.VoiceProfile, activeProvider string) []config.VoiceProfile`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/media/filter_test.go`:
 
@@ -1788,12 +1788,12 @@ func TestPrepareTurnFiltersProfilesToTheActiveProvider(t *testing.T) {
 
 Add `"github.com/darkliquid/localrpg/pkg/media"` to the test imports if missing. (This asserts the helper; the wiring is verified by the task's edit and the full suite.)
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestFilterVoiceProfiles|TestPrepareTurnFiltersProfilesToTheActiveProvider' ./pkg/media/ ./pkg/gui/ -v`
 Expected: FAIL with "undefined: FilterVoiceProfiles".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/media/filter.go`:
 
@@ -1832,12 +1832,12 @@ and the codex assignment (line 1775):
 
 Match the surrounding code's existing `cfg` handling; if the function already holds a `cfg`, reuse it instead of re-reading the manager.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/media/ ./pkg/gui/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/filter.go pkg/media/filter_test.go pkg/gui/service.go pkg/gui/service_test.go
@@ -1850,17 +1850,17 @@ git commit -m "feat: assign only voices the active provider can synthesise"
 
 **Files:** none (verification only).
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `go test ./... -count=1`
 Expected: every package ok.
 
-- [ ] **Step 2: Vet and typecheck**
+- [x] **Step 2: Vet and typecheck**
 
 Run: `mise run lint` and `mise run test:frontend`
 Expected: `go vet ./...` clean and `npx tsc --noEmit` clean (no frontend change in this plan, so this guards against accidental breakage).
 
-- [ ] **Step 3: Confirm the acceptance criteria this plan owns**
+- [x] **Step 3: Confirm the acceptance criteria this plan owns**
 
 - 3: a profile can carry provider options and they persist (Task 6).
 - 4: changing an option changes the cache key; no-options keys match the legacy value token (Task 4).

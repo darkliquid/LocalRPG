@@ -22,7 +22,7 @@
 - Modify: `pkg/gui/server.go`
 - Test: `pkg/gui/server_test.go`
 
-- [ ] **Step 1: Write failing tests for discovery & game creation in `pkg/gui/server_test.go`**
+- [x] **Step 1: Write failing tests for discovery & game creation in `pkg/gui/server_test.go`**
 
 Add tests to `pkg/gui/server_test.go`:
 ```go
@@ -113,12 +113,12 @@ func TestDiscoveryAndCreationEndpoints(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
 
 Run: `go test -v ./pkg/gui -run TestDiscoveryAndCreationEndpoints`  
 Expected: FAIL with compilation errors (undefined DTOs or methods)
 
-- [ ] **Step 3: Define DTOs in `pkg/gui/types.go`**
+- [x] **Step 3: Define DTOs in `pkg/gui/types.go`**
 
 Add to `pkg/gui/types.go`:
 ```go
@@ -157,7 +157,7 @@ type CreateGameRequestDTO struct {
 }
 ```
 
-- [ ] **Step 4: Implement Service methods in `pkg/gui/service.go`**
+- [x] **Step 4: Implement Service methods in `pkg/gui/service.go`**
 
 Add methods to `Service`:
 - `ListGames(ctx context.Context) ([]GameSummaryDTO, error)`
@@ -165,19 +165,19 @@ Add methods to `Service`:
 - `ListWorlds(ctx context.Context) ([]WorldSummaryDTO, error)`
 - `CreateGame(ctx context.Context, req CreateGameRequestDTO) (*GameSummaryDTO, error)` (uses `engine.InitGame`)
 
-- [ ] **Step 5: Register routes in `pkg/gui/server.go`**
+- [x] **Step 5: Register routes in `pkg/gui/server.go`**
 
 Add routes to `registerRoutes()`:
 - `s.mux.HandleFunc("/api/games", s.handleGamesRoutes)`
 - `s.mux.HandleFunc("/api/systems", s.handleSystemsRoutes)`
 - `s.mux.HandleFunc("/api/worlds", s.handleWorldsRoutes)`
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/gui -run TestDiscoveryAndCreationEndpoints`  
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/server.go pkg/gui/server_test.go
@@ -192,7 +192,7 @@ git commit -m "feat(gui): add campaign discovery, listing, and creation backend 
 - Modify: `frontend/src/types.ts`
 - Modify: `frontend/src/api/client.ts`
 
-- [ ] **Step 1: Add discovery types in `frontend/src/types.ts`**
+- [x] **Step 1: Add discovery types in `frontend/src/types.ts`**
 
 Add:
 ```typescript
@@ -231,7 +231,7 @@ export interface CreateGameRequest {
 }
 ```
 
-- [ ] **Step 2: Add static discovery methods to `APIClient` in `frontend/src/api/client.ts`**
+- [x] **Step 2: Add static discovery methods to `APIClient` in `frontend/src/api/client.ts`**
 
 Add:
 ```typescript
@@ -264,12 +264,12 @@ static async createGame(payload: CreateGameRequest): Promise<GameSummary> {
 }
 ```
 
-- [ ] **Step 3: Run TypeScript compiler check**
+- [x] **Step 3: Run TypeScript compiler check**
 
 Run: `npm --prefix frontend run tsc`  
 Expected: PASS with 0 errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/api/client.ts
@@ -284,7 +284,7 @@ git commit -m "feat(frontend): add launcher discovery and game creation API clie
 - Create: `frontend/src/components/LauncherHub.tsx`
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Implement `LauncherHub.tsx`**
+- [x] **Step 1: Implement `LauncherHub.tsx`**
 
 Create `frontend/src/components/LauncherHub.tsx` with:
 - Top brand header: "LocalRPG" in Cinzel font + status indicator.
@@ -294,7 +294,7 @@ Create `frontend/src/components/LauncherHub.tsx` with:
 - Quick-Start Wizard Modal with inputs for campaign name, system dropdown, world dropdown, and protagonist character name.
 - Empty state message when no campaigns exist.
 
-- [ ] **Step 2: Update `frontend/src/App.tsx`**
+- [x] **Step 2: Update `frontend/src/App.tsx`**
 
 Update `App.tsx`:
 - Add `activeGameID` state initialized from `localStorage.getItem('localrpg_active_game')`.
@@ -302,7 +302,7 @@ Update `App.tsx`:
 - When `activeGameID !== null`, render active game chronicle view, drawers, action console, and story theater.
 - Add "Campaigns" / Home button in the header (`Compass` icon) that calls `setActiveGameID(null)` to return to the launcher.
 
-- [ ] **Step 3: Test and build frontend bundle**
+- [x] **Step 3: Test and build frontend bundle**
 
 Run:
 ```bash
@@ -310,7 +310,7 @@ npm --prefix frontend run build
 ```
 Expected: PASS, compiles cleanly into `pkg/gui/dist`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/LauncherHub.tsx frontend/src/App.tsx
@@ -325,12 +325,12 @@ git commit -m "feat(gui): implement twintail-style launcher hub and quick-start 
 - Verify: `mise run test`
 - Verify: `mise run build`
 
-- [ ] **Step 1: Run full automated tests**
+- [x] **Step 1: Run full automated tests**
 
 Run: `mise run test`  
 Expected: PASS across all 12 Go packages and TypeScript type checks.
 
-- [ ] **Step 2: Run CLI binary build and test with Unix domain socket**
+- [x] **Step 2: Run CLI binary build and test with Unix domain socket**
 
 Run:
 ```bash
@@ -345,7 +345,7 @@ rm -f /tmp/test-launcher.sock
 ```
 Expected: Both system and world discovery succeed over Unix socket.
 
-- [ ] **Step 3: Commit and merge**
+- [x] **Step 3: Commit and merge**
 
 ```bash
 git commit --allow-empty -m "chore: verify full test suite for launcher hub"

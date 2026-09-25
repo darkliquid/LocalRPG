@@ -48,7 +48,7 @@ One catalogue refinement is made here: `extraction.result` loses `matched[]`/`cr
 - Produces: `trace.Logger` (`Enabled(Level) bool`, `Event(name string, fields map[string]interface{})`), `trace.Nop() Logger`, `trace.OrNil(Logger) Logger`
 - Produces: `trace.Memory` (`NewMemory(Level)`, `Event`, `Events()`, `Names()`, `Find(string) (Event, bool)`) and `trace.Event`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/trace/trace_test.go`:
 
@@ -144,12 +144,12 @@ func TestMemoryOnlyRecordsEnabledEvents(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run 'TestParseLevel|TestLevels|TestNop|TestMemory' ./pkg/trace/`
 Expected: FAIL — `no Go files in .../pkg/trace`, or undefined symbols.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `pkg/trace/trace.go`:
 
@@ -309,12 +309,12 @@ func (m *Memory) Find(name string) (Event, bool) {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `go test -count=1 ./pkg/trace/ && gofmt -l pkg/trace/`
 Expected: PASS and no formatting output.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/trace/trace.go pkg/trace/trace_test.go
@@ -333,7 +333,7 @@ git commit -m "feat(trace): add one logger interface with three levels"
 - Consumes: `trace.Level` (Task 1)
 - Produces: `trace.Sanitize(fields map[string]interface{}, level Level, payloadChars int) map[string]interface{}`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/trace/sanitize_test.go`:
 
@@ -432,12 +432,12 @@ func TestSanitizeKeepsCacheKeys(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestSanitize ./pkg/trace/`
 Expected: FAIL — `undefined: Sanitize`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `pkg/trace/sanitize.go`:
 
@@ -531,12 +531,12 @@ func truncate(value string, payloadChars int) string {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `go test -count=1 ./pkg/trace/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/trace/sanitize.go pkg/trace/sanitize_test.go
@@ -557,7 +557,7 @@ git commit -m "feat(trace): redact secrets and gate payloads by level"
 - Produces: `trace.NewFileSink(path string, opts FileOptions) (*FileSink, error)`, `(*FileSink).Event`, `(*FileSink).Enabled`, `(*FileSink).Close() error`, `(*FileSink).Failures() int`, `(*FileSink).Path() string`
 - Produces: `trace.Multi(loggers ...Logger) Logger`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/trace/file_test.go`:
 
@@ -718,12 +718,12 @@ func splitLines(data string) []string {
 
 Add `"strings"` to that file's imports.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestFileSink ./pkg/trace/`
 Expected: FAIL — `undefined: NewFileSink`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `pkg/trace/file.go`:
 
@@ -965,12 +965,12 @@ func (m multiLogger) SetGame(gameID string) {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `go test -count=1 ./pkg/trace/ && gofmt -l pkg/trace/`
 Expected: PASS. Rotation is checked after a write, so a file that passes the ceiling rotates on the write that crossed it, not the next one.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/trace/file.go pkg/trace/file_test.go
@@ -992,7 +992,7 @@ git commit -m "feat(trace): append JSONL to one file, rotating by size"
 
 This task also adds `agents.trace_chunk_limit` to the spec's config table in section 11, because the spec's levels table refers to it without listing it.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/config/types_test.go`:
 
@@ -1043,12 +1043,12 @@ func TestTraceSettingsHaveDefaults(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestTraceSettingsHaveDefaults ./pkg/config/`
 Expected: FAIL — `empty.TraceLevel undefined`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `pkg/config/types.go`, extend `PreferencesConfig`:
 
@@ -1130,7 +1130,7 @@ func (c *Config) TraceChunkLimit() int {
 
 `strings` is already imported in that file; if not, add it.
 
-- [ ] **Step 4: Update the spec's config table**
+- [x] **Step 4: Update the spec's config table**
 
 In `docs/superpowers/specs/2026-09-22-narrative-coherence-and-trace-design.md`, section 11, add:
 
@@ -1138,12 +1138,12 @@ In `docs/superpowers/specs/2026-09-22-narrative-coherence-and-trace-design.md`, 
 | `agents.trace_chunk_limit` | 500 | Wire or chunk events recorded per provider call |
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `go test -count=1 ./pkg/config/`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/config/types_test.go docs/superpowers/specs/2026-09-22-narrative-coherence-and-trace-design.md
@@ -1173,7 +1173,7 @@ git commit -m "feat(config): add the trace level and its bounds"
 
 The existing constructors and factory stay as they are and delegate with `trace.Nop()`, so no existing test changes.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/http_provider_test.go`:
 
@@ -1275,12 +1275,12 @@ func TestHTTPProviderRecordsRawWireLinesOnlyAtFull(t *testing.T) {
 
 Add `"github.com/darkliquid/localrpg/pkg/trace"` to that file's imports.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestHTTPProviderTraces ./pkg/harness/`
 Expected: FAIL — `undefined: NewHTTPProviderWithLogger`.
 
-- [ ] **Step 3: Implement provider tracing**
+- [x] **Step 3: Implement provider tracing**
 
 In `pkg/harness/http_provider.go`, add the field, the logger-aware constructor, `SetLogger`, and the two events:
 
@@ -1382,7 +1382,7 @@ func (h *HTTPProvider) chunkLimit() int {
 
 with `chunkLimitOverride int` on the struct and a setter `SetChunkLimit(int)` so the orchestrator can pass `cfg.TraceChunkLimit()`.
 
-- [ ] **Step 4: Implement CLI and oracle tracing the same way**
+- [x] **Step 4: Implement CLI and oracle tracing the same way**
 
 In `pkg/harness/cli_provider.go`: add a `logger trace.Logger` field, `NewCLIProviderWithLogger`, `SetLogger`, and record:
 
@@ -1490,12 +1490,12 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 
 `ExtractorFromConfigWithLogger` follows the same shape, attaching the logger to the extractor and to any provider it builds itself.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/harness/ && go vet ./pkg/harness/`
 Expected: PASS, including every pre-existing provider test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/harness/
@@ -1519,7 +1519,7 @@ git commit -m "feat(harness): trace provider requests, wire lines, and responses
 - Produces: `(*TurnOrchestrator).SetLogger(trace.Logger)`
 - Produces: events `context.assembled`, `turn.begin`, `generation.complete`, `segment.build`, `extraction.request`, `extraction.result`, `extraction.reconcile`, `record.turn`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/orchestrator_trace_test.go`:
 
@@ -1608,12 +1608,12 @@ func TestTraceIsSilentWhenOff(t *testing.T) {
 
 Note: `streamingOrchestrator` builds the orchestrator without a logger, which is exactly the nil case the plan must tolerate.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestATurnProducesAnOrderedTrace ./pkg/engine/`
 Expected: FAIL — `orchestrator.SetLogger undefined`.
 
-- [ ] **Step 3: Implement assembler and orchestrator tracing**
+- [x] **Step 3: Implement assembler and orchestrator tracing**
 
 In `pkg/harness/context.go`, add `logger trace.Logger` to `ContextAssembler`, a `SetLogger`, and at the end of `AssembleContextWithProfiles`:
 
@@ -1758,7 +1758,7 @@ func unresolvedSpeakers(segments []entity.TurnSegment) []string {
 }
 ```
 
-- [ ] **Step 4: Update the spec's event catalogue**
+- [x] **Step 4: Update the spec's event catalogue**
 
 In the coherence spec section 9.1, change the `extraction.result` row to drop `matched[]` and `created[]`, and add:
 
@@ -1766,12 +1766,12 @@ In the coherence spec section 9.1, change the `extraction.result` row to drop `m
 | `extraction.reconcile` | matched[], created[] |
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/ ./pkg/harness/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/harness/ pkg/engine/ docs/superpowers/specs/
@@ -1794,7 +1794,7 @@ git commit -m "feat(engine): trace context, generation, segments, and the write"
 - Produces: `(*playback.Player).SetLogger(trace.Logger)`
 - Produces: events `media.tts.request`, `media.tts.result`, `media.stt.request`, `media.stt.result`, `media.image.request`, `media.image.result`, `audio.play`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/media/tts_test.go`:
 
@@ -1873,12 +1873,12 @@ func TestPlayerTracesWhatItPlayed(t *testing.T) {
 
 Add the `trace` import to both test files.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run 'TestTTSPipelineTraces|TestPlayerTraces' ./pkg/media/...`
 Expected: FAIL — `pipeline.SetLogger undefined`.
 
-- [ ] **Step 3: Implement TTS and playback tracing**
+- [x] **Step 3: Implement TTS and playback tracing**
 
 In `pkg/media/tts.go`, add `logger trace.Logger` to `TTSPipeline`, `SetLogger`, and trace both branches of `SynthesizeUtterance`:
 
@@ -1927,7 +1927,7 @@ In `pkg/media/playback/player.go`, add `logger trace.Logger`, `SetLogger`, and i
 	})
 ```
 
-- [ ] **Step 4: Implement media tracing at the service call sites**
+- [x] **Step 4: Implement media tracing at the service call sites**
 
 Speech to text and image generation have several provider implementations, so instrumenting each would spread the same three lines across them. Trace at the call sites instead, in `pkg/gui/service.go`, which already owns both:
 
@@ -1936,12 +1936,12 @@ Speech to text and image generation have several provider implementations, so in
 
 `Service` gains the logger via `NewService(rootDir)` and a `SetLogger(trace.Logger)` method, stored as `s.logger`.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/media/... ./pkg/gui/`
 Expected: PASS, including pre-existing media tests that never set a logger.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/media/ pkg/gui/service.go
@@ -1965,7 +1965,7 @@ git commit -m "feat(media): trace speech synthesis, transcription, imagery, and 
 - Produces: `TraceEventDTO{Time, Event, Level string; Fields map[string]interface{}}`
 - Produces: routes `GET /api/trace`, `DELETE /api/trace`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/server_test.go`:
 
@@ -2028,12 +2028,12 @@ func TestTraceRouteReturnsTheMostRecentEvents(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestTraceRoute ./pkg/gui/`
 Expected: FAIL — `undefined: TraceEventDTO`.
 
-- [ ] **Step 3: Implement the service methods**
+- [x] **Step 3: Implement the service methods**
 
 In `pkg/gui/types.go`:
 
@@ -2169,7 +2169,7 @@ func tailLines(path string, want int) ([]string, error) {
 }
 ```
 
-- [ ] **Step 4: Implement the routes**
+- [x] **Step 4: Implement the routes**
 
 In `pkg/gui/server.go`, register the exact path beside `/api/games`:
 
@@ -2206,12 +2206,12 @@ func (s *Server) handleTraceRoute(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/gui/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/
@@ -2233,7 +2233,7 @@ git commit -m "feat(gui): serve the recorded trace over the API"
 - Produces: `(*Service).SetLogger(trace.Logger)`
 - Produces: `traceFlagLevel(args []string, configured string) (string, bool)` in `package main`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `cmd/localrpg/gui_test.go`:
 
@@ -2267,12 +2267,12 @@ func TestTraceFlagDefaultsToFullWhenBare(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestTraceFlag ./cmd/localrpg/`
 Expected: FAIL — `undefined: traceFlagLevel`.
 
-- [ ] **Step 3: Implement the flag handling and the sink**
+- [x] **Step 3: Implement the flag handling and the sink**
 
 Create `cmd/localrpg/trace.go` in `package main`:
 
@@ -2402,7 +2402,7 @@ func (l *StderrLogger) SetGame(gameID string) {
 
 with a test in `pkg/trace/file_test.go` asserting one line per event and that payloads are omitted at summary.
 
-- [ ] **Step 4: Attach the logger in both commands**
+- [x] **Step 4: Attach the logger in both commands**
 
 In `cmd/localrpg/gui.go`:
 
@@ -2438,12 +2438,12 @@ with `harness.RouterFromConfigWithLogger(cfg, s.logger)` and `harness.ExtractorF
 
 In `cmd/localrpg/play.go`, the same: build the logger, `timeline.SetLogger(logger)`, `orchestrator.SetLogger(logger)`, and pass the logger into `harness.RouterFromConfigWithLogger`.
 
-- [ ] **Step 5: Run the tests and the full gate**
+- [x] **Step 5: Run the tests and the full gate**
 
 Run: `go test -count=1 ./... && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add cmd/localrpg/ pkg/trace/ pkg/gui/ pkg/engine/
@@ -2465,7 +2465,7 @@ git commit -m "feat(cmd): add --trace and wire the sink through both clients"
 - Produces: `APIClient.traceEvents(limit, gameID)`, `APIClient.clearTrace()`
 - Produces: `TraceEvent` type in `frontend/src/types.ts`
 
-- [ ] **Step 1: Add the client methods and types**
+- [x] **Step 1: Add the client methods and types**
 
 In `frontend/src/types.ts`:
 
@@ -2497,7 +2497,7 @@ In `frontend/src/api/client.ts`:
   }
 ```
 
-- [ ] **Step 2: Add the Debug tab**
+- [x] **Step 2: Add the Debug tab**
 
 In `SettingsStudio.tsx`, add `'debug'` to the sub-tab union and a fifth tab button beside Preferences. The panel:
 
@@ -2508,12 +2508,12 @@ In `SettingsStudio.tsx`, add `'debug'` to the sub-tab union and a fifth tab butt
 
 The list polls every second only while a turn is in flight; otherwise it loads on open and on Refresh. Keep the polling in one `useEffect` with a `setInterval` cleared on unmount.
 
-- [ ] **Step 3: Typecheck and build**
+- [x] **Step 3: Typecheck and build**
 
 Run: `cd frontend && npx tsc --noEmit && npm run build`
 Expected: no type errors; a successful build. Restore `pkg/gui/dist/.gitkeep` afterwards and do not stage its deletion.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/

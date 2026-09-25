@@ -59,7 +59,7 @@
 - Create: `pkg/config/presets.go`
 - Test: `pkg/config/presets_test.go`
 
-- [ ] **Step 1: Write failing test for Presets & VoiceProfile defaults**
+- [x] **Step 1: Write failing test for Presets & VoiceProfile defaults**
 
 Create `pkg/config/presets_test.go`:
 ```go
@@ -117,12 +117,12 @@ func TestDefaultVoiceProfiles(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/config -run TestPresetsCatalog`
 Expected: FAIL (`GetAgentPreset` undefined)
 
-- [ ] **Step 3: Update `pkg/config/types.go` and implement `pkg/config/presets.go`**
+- [x] **Step 3: Update `pkg/config/types.go` and implement `pkg/config/presets.go`**
 
 In `pkg/config/types.go`:
 Add `VoiceProfile` and update `TTSConfig`:
@@ -360,12 +360,12 @@ func GetImagePreset(id string) (ImageConfig, bool) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/config`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/
@@ -383,7 +383,7 @@ git commit -m "feat(config): add VoiceProfile schema and static preset catalogs"
 - Modify: `pkg/media/providers.go`
 - Test: `pkg/media/tts_test.go`, `pkg/media/cache_test.go`
 
-- [ ] **Step 1: Write failing test for per-character speech rate & voice dispatch**
+- [x] **Step 1: Write failing test for per-character speech rate & voice dispatch**
 
 In `pkg/media/tts_test.go`:
 ```go
@@ -421,12 +421,12 @@ func TestTTSPipeline_PerCharacterVoiceAndSpeed(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/media -run TestTTSPipeline_PerCharacterVoiceAndSpeed`
 Expected: FAIL (`SpeechRate` undefined in `VoiceConfig`)
 
-- [ ] **Step 3: Update `pkg/entity/entity.go`, `pkg/media/cache.go`, and `pkg/media/providers.go`**
+- [x] **Step 3: Update `pkg/entity/entity.go`, `pkg/media/cache.go`, and `pkg/media/providers.go`**
 
 In `pkg/entity/entity.go`:
 ```go
@@ -485,12 +485,12 @@ Include `speed` if `voice.SpeechRate > 0`:
 	payload, _ := json.Marshal(payloadMap)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/media`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity/ pkg/media/
@@ -506,7 +506,7 @@ git commit -m "feat(media): support SpeechRate and per-character voice option ov
 - Modify: `pkg/media/providers.go`
 - Test: `pkg/media/procedural_art_test.go`
 
-- [ ] **Step 1: Write failing test for `procedural-art` generator**
+- [x] **Step 1: Write failing test for `procedural-art` generator**
 
 Create `pkg/media/procedural_art_test.go`:
 ```go
@@ -552,12 +552,12 @@ func TestProceduralArt_GeneratesValidSVG(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/media -run TestProceduralArt_GeneratesValidSVG`
 Expected: FAIL (builtin procedural-art not recognized)
 
-- [ ] **Step 3: Implement `pkg/media/procedural_art.go`**
+- [x] **Step 3: Implement `pkg/media/procedural_art.go`**
 
 ```go
 package media
@@ -671,12 +671,12 @@ Update `NewImageClient` in `pkg/media/providers.go` to dispatch `"procedural-art
 		return &echoImageClient{}, nil
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/media -run TestProceduralArt`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/
@@ -692,7 +692,7 @@ git commit -m "feat(media): implement pure-Go procedural SVG dark fantasy art ge
 - Modify: `pkg/media/providers.go`
 - Test: `pkg/media/native_tts_test.go`
 
-- [ ] **Step 1: Write failing test for `native-os` TTS**
+- [x] **Step 1: Write failing test for `native-os` TTS**
 
 Create `pkg/media/native_tts_test.go`:
 ```go
@@ -730,12 +730,12 @@ func TestNativeOSTTS_GeneratesAudioBytes(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/media -run TestNativeOSTTS`
 Expected: FAIL (`native-os` not recognized)
 
-- [ ] **Step 3: Implement `pkg/media/native_tts.go`**
+- [x] **Step 3: Implement `pkg/media/native_tts.go`**
 
 ```go
 package media
@@ -840,12 +840,12 @@ Update `NewTTSClient` in `pkg/media/providers.go` to dispatch `"native-os"`:
 		return &echoTTSClient{}, nil
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/media -run TestNativeOSTTS`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/
@@ -861,7 +861,7 @@ git commit -m "feat(media): implement native-os TTS client with procedural audio
 - Modify: `pkg/harness/factory.go`
 - Test: `pkg/harness/oracle_provider_test.go`
 
-- [ ] **Step 1: Write failing test for `narrative-oracle` provider**
+- [x] **Step 1: Write failing test for `narrative-oracle` provider**
 
 Create `pkg/harness/oracle_provider_test.go`:
 ```go
@@ -909,12 +909,12 @@ Player Action: I strike at the shadow beast with my silver blade!
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/harness -run TestNarrativeOracle`
 Expected: FAIL (`narrative-oracle` returns generic echo)
 
-- [ ] **Step 3: Implement `pkg/harness/oracle_provider.go`**
+- [x] **Step 3: Implement `pkg/harness/oracle_provider.go`**
 
 ```go
 package harness
@@ -1011,12 +1011,12 @@ Update `NewModelProvider` in `pkg/harness/factory.go` to dispatch `"narrative-or
 		return &builtinEchoModelProvider{id: id}, nil
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/harness -run TestNarrativeOracle`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/
@@ -1033,7 +1033,7 @@ git commit -m "feat(harness): implement pure-Go deterministic narrative oracle a
 - Modify: `pkg/engine/orchestrator.go`
 - Test: `pkg/harness/context_test.go`, `pkg/harness/extractor_test.go`
 
-- [ ] **Step 1: Write failing tests for voice profiles prompt injection and auto-assignment**
+- [x] **Step 1: Write failing tests for voice profiles prompt injection and auto-assignment**
 
 In `pkg/harness/context_test.go`:
 ```go
@@ -1078,12 +1078,12 @@ func TestEntityExtractor_AutoAssignsVoiceProfile(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -v ./pkg/harness -run TestContextAssembler_WithVoiceProfiles`
 Expected: FAIL (`AssembleContextWithProfiles` undefined)
 
-- [ ] **Step 3: Update `pkg/harness/context.go` and `pkg/harness/extractor.go`**
+- [x] **Step 3: Update `pkg/harness/context.go` and `pkg/harness/extractor.go`**
 
 Implement `AssembleContextWithProfiles` in `pkg/harness/context.go`:
 ```go
@@ -1105,12 +1105,12 @@ Implement `ExtractEntitiesWithProfiles` in `pkg/harness/extractor.go` with keywo
 
 Update `TurnOrchestrator` in `pkg/engine/orchestrator.go` to store `voiceProfiles []config.VoiceProfile` and pass them into context assembly and turn extraction.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/harness ./pkg/engine`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/ pkg/engine/
@@ -1126,7 +1126,7 @@ git commit -m "feat(harness): inject voice profiles into GM context and auto-ass
 - Create: `frontend/src/templates/providerPresets.ts`
 - Test: `mise run test:frontend`
 
-- [ ] **Step 1: Add `VoiceProfile` and update `TTSConfig` in `frontend/src/types.ts`**
+- [x] **Step 1: Add `VoiceProfile` and update `TTSConfig` in `frontend/src/types.ts`**
 
 ```typescript
 export interface VoiceProfile {
@@ -1156,16 +1156,16 @@ export interface TTSConfig {
 }
 ```
 
-- [ ] **Step 2: Create `frontend/src/templates/providerPresets.ts`**
+- [x] **Step 2: Create `frontend/src/templates/providerPresets.ts`**
 
 Export `AGENT_PRESETS`, `TTS_PRESETS`, `STT_PRESETS`, `IMAGE_PRESETS`, and `DEFAULT_VOICE_PROFILES`.
 
-- [ ] **Step 3: Run typescript verification**
+- [x] **Step 3: Run typescript verification**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/templates/providerPresets.ts
@@ -1181,7 +1181,7 @@ git commit -m "feat(frontend): export typed provider presets and voice profile a
 - Modify: `frontend/src/components/CodexDrawer.tsx`
 - Test: `mise run test:frontend`
 
-- [ ] **Step 1: Update `SettingsStudio.tsx`**
+- [x] **Step 1: Update `SettingsStudio.tsx`**
 
 1. In **AI Agents & Roles**, add `<select>` **"Load Preset..."** button populating `AGENT_PRESETS`.
 2. In **Media / TTS**, add **"Load Preset..."** button populating `TTS_PRESETS`.
@@ -1192,16 +1192,16 @@ git commit -m "feat(frontend): export typed provider presets and voice profile a
    - "Test Voice" play button invoking `APIClient.testProvider` with sample dialogue.
    - "Add Profile", "Remove Profile", and "Load Default Fantasy Archetypes" buttons.
 
-- [ ] **Step 2: Update `CodexDrawer.tsx`**
+- [x] **Step 2: Update `CodexDrawer.tsx`**
 
 Add a Voice Profile dropdown helper in the entity editor so users can select an archetype (e.g. `elder_sage`, `young_scout`) and have its `voice_id` and pitch automatically written into the entity frontmatter.
 
-- [ ] **Step 3: Run typescript check**
+- [x] **Step 3: Run typescript check**
 
 Run: `mise run test:frontend`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx frontend/src/components/CodexDrawer.tsx
@@ -1217,21 +1217,21 @@ git commit -m "feat(frontend): add Quick Presets loader and Voice Profiles Libra
 - Build: `mise run build`
 - Modify: `README.md` (Document built-ins and voice profile library)
 
-- [ ] **Step 1: Run comprehensive tests**
+- [x] **Step 1: Run comprehensive tests**
 
 Run: `mise run test`
 Expected: All Go unit tests pass, TypeScript compiles with 0 errors.
 
-- [ ] **Step 2: Run build**
+- [x] **Step 2: Run build**
 
 Run: `mise run build`
 Expected: Production bundle and binary built successfully.
 
-- [ ] **Step 3: Update documentation in `README.md`**
+- [x] **Step 3: Update documentation in `README.md`**
 
 Document built-in providers (`native-os`, `procedural-art`, `narrative-oracle`) and the NPC Voice Profiles library.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md

@@ -49,7 +49,7 @@ LocalRPG/
 - Create: `pkg/core/types.go`
 - Test: `pkg/core/types_test.go`
 
-- [ ] **Step 1: Write the failing test for Core Manifests**
+- [x] **Step 1: Write the failing test for Core Manifests**
 
 ```go
 // pkg/core/types_test.go
@@ -99,12 +99,12 @@ func TestResolvePaths(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/core/... -v`  
 Expected: FAIL (package/types not defined)
 
-- [ ] **Step 3: Implement go.mod and core manifest types**
+- [x] **Step 3: Implement go.mod and core manifest types**
 
 Initialize `go.mod`:
 ```bash
@@ -218,12 +218,12 @@ func LoadGameManifest(path string) (*GameManifest, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/core/... -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add go.mod go.sum pkg/core/
@@ -238,7 +238,7 @@ git commit -m "feat(core): initialize Go module and core manifest types"
 - Create: `pkg/state/state.go`
 - Test: `pkg/state/state_test.go`
 
-- [ ] **Step 1: Write the failing test for State Get/Set**
+- [x] **Step 1: Write the failing test for State Get/Set**
 
 ```go
 // pkg/state/state_test.go
@@ -297,12 +297,12 @@ func TestStateGetSet(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/state/... -v`  
 Expected: FAIL (package/state not defined)
 
-- [ ] **Step 3: Implement Schema-Agnostic State Container**
+- [x] **Step 3: Implement Schema-Agnostic State Container**
 
 Write `pkg/state/state.go`:
 ```go
@@ -390,12 +390,12 @@ func (s *State) Raw() map[string]interface{} {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/state/... -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/state/
@@ -410,7 +410,7 @@ git commit -m "feat(state): implement schema-agnostic generic state container"
 - Create: `pkg/entity/entity.go`
 - Test: `pkg/entity/entity_test.go`
 
-- [ ] **Step 1: Write the failing test for Entity Markdown parsing**
+- [x] **Step 1: Write the failing test for Entity Markdown parsing**
 
 ```go
 // pkg/entity/entity_test.go
@@ -493,12 +493,12 @@ func TestSerializeMarkdownEntity(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/entity/... -v`  
 Expected: FAIL (package/entity not defined)
 
-- [ ] **Step 3: Implement Entity Parser & Wikilink Extractor**
+- [x] **Step 3: Implement Entity Parser & Wikilink Extractor**
 
 Write `pkg/entity/entity.go`:
 ```go
@@ -657,12 +657,12 @@ func (e *Entity) SerializeMarkdown() ([]byte, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/entity/... -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity/
@@ -678,7 +678,7 @@ git commit -m "feat(entity): implement markdown entity parser with wikilink extr
 - Create: `pkg/storage/store.go`
 - Test: `pkg/storage/store_test.go`
 
-- [ ] **Step 1: Install pure Go SQLite driver & write failing test**
+- [x] **Step 1: Install pure Go SQLite driver & write failing test**
 
 ```bash
 go get modernc.org/sqlite
@@ -738,12 +738,12 @@ func TestStorageOperations(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/storage/... -v`  
 Expected: FAIL (store types not defined)
 
-- [ ] **Step 3: Implement SQLite Schema & Store**
+- [x] **Step 3: Implement SQLite Schema & Store**
 
 Write `pkg/storage/db.go`:
 ```go
@@ -919,12 +919,12 @@ func (s *Store) GetEdgesFrom(sourceID string) ([]Edge, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/storage/... -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add go.mod go.sum pkg/storage/
@@ -939,7 +939,7 @@ git commit -m "feat(storage): implement SQLite entity and graph edge store"
 - Create: `pkg/storage/sync.go`
 - Test: `pkg/storage/sync_test.go`
 
-- [ ] **Step 1: Write the failing test for SyncDirectory**
+- [x] **Step 1: Write the failing test for SyncDirectory**
 
 ```go
 // pkg/storage/sync_test.go
@@ -998,12 +998,12 @@ A rustic [[Tavern]] in [[Eldoria]].
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/storage/... -v -run TestSyncDirectory`  
 Expected: FAIL (Syncer not defined)
 
-- [ ] **Step 3: Implement Directory Syncer**
+- [x] **Step 3: Implement Directory Syncer**
 
 Write `pkg/storage/sync.go`:
 ```go
@@ -1085,12 +1085,12 @@ func (s *Syncer) Sync(dir string) (*SyncResult, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/storage/... -v -run TestSyncDirectory`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/sync.go pkg/storage/sync_test.go
@@ -1105,7 +1105,7 @@ git commit -m "feat(storage): implement filesystem incremental entity syncer"
 - Create: `pkg/engine/game.go`
 - Test: `pkg/engine/game_test.go`
 
-- [ ] **Step 1: Write the failing test for Game Session Loader**
+- [x] **Step 1: Write the failing test for Game Session Loader**
 
 ```go
 // pkg/engine/game_test.go
@@ -1162,12 +1162,12 @@ func TestGameInitAndLoad(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/engine/... -v`  
 Expected: FAIL (package/engine not defined)
 
-- [ ] **Step 3: Implement Game Session & Composition Loader**
+- [x] **Step 3: Implement Game Session & Composition Loader**
 
 Write `pkg/engine/game.go`:
 ```go
@@ -1294,12 +1294,12 @@ func copyFile(src, dst string) error {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/engine/... -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/
@@ -1314,7 +1314,7 @@ git commit -m "feat(engine): implement 3-tier game composition and session loade
 - Create: `cmd/localrpg/main.go`
 - Test: `cmd/localrpg/main_test.go`
 
-- [ ] **Step 1: Write integration test for CLI**
+- [x] **Step 1: Write integration test for CLI**
 
 ```go
 // cmd/localrpg/main_test.go
@@ -1339,12 +1339,12 @@ func TestCLIVersionAndHelp(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./cmd/localrpg/... -v`  
 Expected: FAIL (main.go not implemented)
 
-- [ ] **Step 3: Implement CLI Entry Point**
+- [x] **Step 3: Implement CLI Entry Point**
 
 Write `cmd/localrpg/main.go`:
 ```go
@@ -1395,12 +1395,12 @@ func printUsage() {
 }
 ```
 
-- [ ] **Step 4: Run all package tests**
+- [x] **Step 4: Run all package tests**
 
 Run: `go test ./... -v`  
 Expected: All package tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cmd/localrpg/

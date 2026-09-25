@@ -62,7 +62,7 @@ Two notes on the existing code:
 - Consumes: `harness.StreamChunk.ToolCalls` (contract plan).
 - Produces: `streamResult.ToolCalls []harness.ToolCall`; `(*TurnOrchestrator).generateRequest(ctx, req harness.GenerateRequest, onChunk) (streamResult, error)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/orchestrator_stream_test.go`:
 
@@ -100,12 +100,12 @@ Add a `toolCalls []harness.ToolCall` field to `scriptedStreamProvider` and emit 
 	return p.err
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestStreamSurfacesToolCalls ./pkg/engine/ -v`
 Expected: FAIL with "unknown field toolCalls" or "undefined: generateRequest".
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/engine/orchestrator.go`, extend `streamResult`:
 
@@ -182,12 +182,12 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/engine/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/orchestrator_stream_test.go
@@ -206,7 +206,7 @@ git commit -m "feat(engine): carry tool calls out of a provider stream"
 **Interfaces:**
 - Produces: `engine.ToolExecutor`, `engine.ToolActivity`, `(*TurnOrchestrator).SetTools(executor ToolExecutor, capability string)`, `(*TurnOrchestrator).SetToolRounds(rounds int)`, `(*TurnOrchestrator).SetToolObserver(observer func(ToolActivity))`, `harness.ToolCaller`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/tools_loop_test.go` with the fixture and a capability test:
 
@@ -325,12 +325,12 @@ func TestToolCapabilityResolution(t *testing.T) {
 
 Adjust the capability helper's exact shape while implementing Step 3; the test is the contract: `auto` follows `ToolCaller`, `yes` forces, `no` suppresses.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestToolCapabilityResolution ./pkg/engine/ -v`
 Expected: FAIL with "undefined: SetTools".
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/engine/orchestrator.go`, add to the struct:
 
@@ -424,12 +424,12 @@ type ToolCaller interface {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/engine/ ./pkg/harness/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/tools_loop_test.go pkg/harness/http_provider.go pkg/harness/types.go
@@ -448,7 +448,7 @@ git commit -m "feat(engine): add the tool execution seams"
 - Consumes: `generateRequest`, the seams (Tasks 1-2), `harness.ToolSpecs`, `recoverReply`.
 - Produces: the loop, with rounds, budget withdrawal, readable refusal, and the `tool.round`/`tool.call`/`tool.result` trace rows.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/engine/tools_loop_test.go`:
 
@@ -575,12 +575,12 @@ func TestToolLoopWithoutToolsIsUnchanged(t *testing.T) {
 
 Add `"strings"` to the test file's imports.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestToolLoop' ./pkg/engine/ -v`
 Expected: FAIL: no loop runs, so the executor is never called and provenance is empty.
 
-- [ ] **Step 3: Implement the loop**
+- [x] **Step 3: Implement the loop**
 
 In `pkg/engine/orchestrator.go`, replace the generation block in `ProcessActionStream`:
 
@@ -763,12 +763,12 @@ func (o *TurnOrchestrator) overBudget(messages []harness.Message) bool {
 		}
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/engine/ -count=1`
 Expected: PASS. If `TestToolLoopStopsAtTheRoundLimit` fails because the loop returns the scripted empty reply rather than an error, make the scripted provider return no reply once its list is exhausted (already the fixture's behaviour) and assert on the executor's call count and the error instead.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/tools_loop_test.go
@@ -788,7 +788,7 @@ git commit -m "feat(engine): run a turn as a bounded tool loop"
 **Interfaces:**
 - Produces: `Turn.ToolCalls []ToolCallRecord`, populated from the loop's provenance.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/history_test.go`:
 
@@ -823,12 +823,12 @@ func TestTurnToolCallsRoundTrip(t *testing.T) {
 
 Match the imports already in that file (`path/filepath`, `time`).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestTurnToolCallsRoundTrip ./pkg/engine/ -v`
 Expected: FAIL to compile: `Turn` has no `ToolCalls`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/engine/history.go`, add the field to `Turn` (`ToolCallRecord` was defined here by Task 1):
 
@@ -849,12 +849,12 @@ In `orchestrator.go`'s `ProcessActionStream`, after the loop and the recovery pa
 
 and in `TestToolLoopRunsACallThenAnswers`, the existing `turn.ToolCalls` assertion now exercises this.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/engine/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/history.go pkg/engine/orchestrator.go pkg/engine/history_test.go pkg/engine/tools_loop_test.go
@@ -874,7 +874,7 @@ git commit -m "feat(engine): record what a turn looked up"
 - Consumes: `engine.ToolActivity`, `engine.Turn.ToolCalls`.
 - Produces: `TurnEvent` tool fields, `ToolCallDTO`, `TurnDTO.ToolCalls`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/tool_loop_test.go`:
 
@@ -912,12 +912,12 @@ func TestToolActivityMapsToATurnEvent(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestTurnDTOCarriesTool|TestTurnEventCarriesTool|TestToolActivityMaps' ./pkg/gui/ -v`
 Expected: FAIL with "unknown field ToolCalls" and "undefined: toolEvent".
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/gui/types.go`, extend `TurnEvent` and add the DTO:
 
@@ -985,12 +985,12 @@ and in `TurnSession.Run`, before calling `ProcessActionStream`, attach the obser
 
 An emit failure is ignored here on purpose: the turn still records, and a disconnected client is handled by the existing chunk listener.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/gui/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/tool_loop_test.go
@@ -1008,7 +1008,7 @@ git commit -m "feat(gui): stream a turn's tool activity and record its provenanc
 **Interfaces:**
 - Consumes: `tools.NewExecutor`, `config.RoleSupportsTools`, `config.ToolRounds`, `config.ToolResultChars`.
 
-- [ ] **Step 1: Wire the GUI pipeline**
+- [x] **Step 1: Wire the GUI pipeline**
 
 In `prepareTurn`, after the completion policy is set:
 
@@ -1019,7 +1019,7 @@ In `prepareTurn`, after the completion policy is set:
 
 Add `"github.com/darkliquid/localrpg/pkg/tools"` to `pkg/gui/service.go`'s imports.
 
-- [ ] **Step 2: Wire the TUI pipeline**
+- [x] **Step 2: Wire the TUI pipeline**
 
 In `cmd/localrpg/play.go`, after `SetCompletionPolicy`:
 
@@ -1030,12 +1030,12 @@ In `cmd/localrpg/play.go`, after `SetCompletionPolicy`:
 
 Add the `tools` import.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `go build ./... && go test ./pkg/gui/ ./cmd/... -count=1`
 Expected: build and tests pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/gui/service.go cmd/localrpg/play.go
@@ -1054,7 +1054,7 @@ git commit -m "feat: give the turn loop its tools in the GUI and the TUI"
 **Interfaces:**
 - Consumes: the `tool` stream event and `TurnDTO.ToolCalls`.
 
-- [ ] **Step 1: Add the types**
+- [x] **Step 1: Add the types**
 
 In `frontend/src/types.ts`:
 
@@ -1084,7 +1084,7 @@ and add to `interface Turn`:
   tool_calls?: ToolCall[];
 ```
 
-- [ ] **Step 2: Render the activity line**
+- [x] **Step 2: Render the activity line**
 
 In `App.tsx`, add state beside `streamedProse`:
 
@@ -1123,7 +1123,7 @@ Render it where the drafting indicator is shown (near `pendingAction`), so a too
 
 Place it inside the same container that renders the streamed prose or the drafting indicator, and match that container's existing classes; the exact anchor is the `pendingAction` block.
 
-- [ ] **Step 3: Render the provenance line**
+- [x] **Step 3: Render the provenance line**
 
 In `ChronicleView.tsx`, after the recovery block, add one quiet line:
 
@@ -1135,12 +1135,12 @@ In `ChronicleView.tsx`, after the recovery block, add one quiet line:
             )}
 ```
 
-- [ ] **Step 4: Typecheck**
+- [x] **Step 4: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/App.tsx frontend/src/components/ChronicleView.tsx
@@ -1157,7 +1157,7 @@ git commit -m "feat(frontend): show tool activity and what a turn looked up"
 **Interfaces:**
 - Consumes: `agents.tool_rounds`, `agents.tool_result_chars`, `agents.roles.<role>.supports_tools`.
 
-- [ ] **Step 1: Add the role capability control**
+- [x] **Step 1: Add the role capability control**
 
 In the agent role editor, beside the existing provider-type control, add a select bound to `config.agents.roles[selectedRole].supports_tools`:
 
@@ -1197,7 +1197,7 @@ Match the surrounding role-editor markup; the anchor is the provider-type select
   supports_tools?: 'auto' | 'yes' | 'no';
 ```
 
-- [ ] **Step 2: Add the numeric limits**
+- [x] **Step 2: Add the numeric limits**
 
 In the media/agents limits area, beside the context-budget control, add two number inputs bound to `config.agents.tool_rounds` and `config.agents.tool_result_chars`:
 
@@ -1241,12 +1241,12 @@ In the media/agents limits area, beside the context-budget control, add two numb
 
 Add `tool_rounds?: number;` and `tool_result_chars?: number;` to `AgentsConfig` in `frontend/src/types.ts`.
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx frontend/src/types.ts
@@ -1259,16 +1259,16 @@ git commit -m "feat(frontend): expose tool capability and limits in Settings"
 
 **Files:** none (verification only).
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `go test ./... -count=1`
 Expected: every package ok.
 
-- [ ] **Step 2: Vet and build the frontend**
+- [x] **Step 2: Vet and build the frontend**
 
 Run: `mise run lint` and `cd frontend && npm run build`, then restore the tracked placeholder if the build removed it: `git checkout -- pkg/gui/dist/.gitkeep`.
 
-- [ ] **Step 3: Confirm the criteria this plan owns**
+- [x] **Step 3: Confirm the criteria this plan owns**
 
 - A turn may call the model again after a tool result, bounded by `tool_rounds` (Task 3).
 - Tools degrade honestly: a provider without `ToolCaller` or a `no` capability simply answers, and a rejected `tools` field degrades once (Task 2 plus the contract plan).

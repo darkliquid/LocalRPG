@@ -51,7 +51,7 @@ The spec's increments 4 to 6 are a separate plan, B2, because they add a subsyst
 
 This is a refactor with no behaviour change to what is sent, apart from section order, which becomes explicit. The positional form is removed rather than kept as a wrapper: a wrapper without the turn number would silently skip recall, and tests would then fail to exercise the path they appear to.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/context_test.go`:
 
@@ -112,12 +112,12 @@ func saveEntity(t *testing.T, store *storage.Store, ent *entity.Entity) {
 
 That helper and the tests below need `storage`, `entity`, `state`, and `time` in `context_test.go`'s imports; add whichever are missing.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestAssembleReportsEverySection ./pkg/harness/`
 Expected: FAIL — `undefined: ContextRequest`.
 
-- [ ] **Step 3: Replace the assembler's entry point**
+- [x] **Step 3: Replace the assembler's entry point**
 
 In `pkg/harness/context.go`, add the request and section types beside the existing ones:
 
@@ -412,7 +412,7 @@ func (c *ContextAssembler) shortenRecent(req ContextRequest, sections []section)
 
 `SectionStat` needs `interface{}`-friendly logging, which it is, being a struct of strings and ints.
 
-- [ ] **Step 4: Migrate the call sites**
+- [x] **Step 4: Migrate the call sites**
 
 In `pkg/engine/orchestrator.go`, replace the assembly call:
 
@@ -458,12 +458,12 @@ and
 
 Then use `result.Prompt` where the old code used the returned string, and `result` where it used the `AssembleResult` fields.
 
-- [ ] **Step 5: Run the suite to verify it passes**
+- [x] **Step 5: Run the suite to verify it passes**
 
 Run: `go test -count=1 ./pkg/harness/ ./pkg/engine/ && go vet ./...`
 Expected: PASS, including every pre-existing prompt-composition test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/harness/context.go pkg/harness/context_test.go pkg/engine/orchestrator.go
@@ -483,7 +483,7 @@ git commit -m "refactor(harness): assemble the prompt from named sections"
 - Produces: `(*Store).TurnsMentioningEntities(entityIDs []string, excludeFromTurn, limit int) ([]TurnRecord, error)`
 - Produces: `(*Store).EntitiesInTurns(turnNumbers []int) ([]string, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/storage/turn_test.go`:
 
@@ -588,12 +588,12 @@ func seedTurns(t *testing.T, store *Store, turns ...TurnRecord) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run 'TestTurnsAtLocation|TestTurnsMentioningEntities|TestEntitiesInTurns' ./pkg/storage/`
 Expected: FAIL — `store.TurnsAtLocation undefined`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Append to `pkg/storage/turn.go`:
 
@@ -749,12 +749,12 @@ func (s *Store) EntitiesInTurns(turnNumbers []int) ([]string, error) {
 
 Add `"strings"` and `"time"` to that file's imports if they are not already there.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `go test -count=1 ./pkg/storage/ && go vet ./pkg/storage/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/turn.go pkg/storage/turn_test.go
@@ -774,7 +774,7 @@ git commit -m "feat(storage): query turns by location, entity overlap, and entit
 - Produces: `harness.RenderState(raw map[string]interface{}) string` (exported so the continuity checks in B2 reuse it)
 - Produces: `(*ContextAssembler).establishedNames(req ContextRequest) string`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/context_test.go`:
 
@@ -863,12 +863,12 @@ func TestEstablishedNamesListsWhatIsInPlay(t *testing.T) {
 
 That test needs `state`, `storage`, and `time` imports in `context_test.go`; add whichever are missing.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run 'TestRenderState|TestCanonRendersState|TestEstablishedNames' ./pkg/harness/`
 Expected: FAIL — `undefined: RenderState`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `pkg/harness/context.go`, add the state renderer:
 
@@ -1022,12 +1022,12 @@ func (c *ContextAssembler) establishedNames(req ContextRequest) string {
 
 Add `"sort"` and `"github.com/darkliquid/localrpg/pkg/entity"` to that file's imports if missing.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/harness/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/context.go pkg/harness/context_test.go
@@ -1048,7 +1048,7 @@ git commit -m "feat(harness): show the narrator state and established names"
 - Produces: `config.AgentsConfig.SceneRecallTurns`, `.SceneRecallChars`; `(*Config).SceneRecallTurns() int`, `(*Config).SceneRecallChars() int`
 - Produces: `ContextLimits.SceneRecallTurns`, `ContextLimits.SceneRecallChars`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/context_test.go`:
 
@@ -1114,12 +1114,12 @@ func TestSceneRecallExcludesTurnsAlreadyInTheWindow(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestSceneRecall ./pkg/harness/`
 Expected: FAIL — no `WHAT HAPPENED HERE` section.
 
-- [ ] **Step 3: Add the configuration**
+- [x] **Step 3: Add the configuration**
 
 In `pkg/config/types.go`, extend `AgentsConfig`:
 
@@ -1195,7 +1195,7 @@ type ContextLimits struct {
 }
 ```
 
-- [ ] **Step 4: Build the section**
+- [x] **Step 4: Build the section**
 
 In `pkg/harness/context.go`, add the recall builder:
 
@@ -1269,7 +1269,7 @@ and register the section in `buildSections`, immediately after `recent`:
 		{name: "recall", text: c.sceneRecall(req), droppable: true, rank: 3},
 ```
 
-- [ ] **Step 5: Add the config test and run everything**
+- [x] **Step 5: Add the config test and run everything**
 
 Append to `pkg/config/types_test.go`:
 
@@ -1298,7 +1298,7 @@ func TestRecallSettingsHaveDefaults(t *testing.T) {
 Run: `go test -count=1 ./pkg/config/ ./pkg/harness/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/config/ pkg/harness/context.go pkg/harness/context_test.go
@@ -1317,7 +1317,7 @@ git commit -m "feat(harness): recall what happened at the current location"
 - Consumes: `(*Store).TurnsMentioningEntities`, `(*Store).EntitiesInTurns` (Task 2), `ContextLimits` recall bounds (Task 4)
 - Produces: `(*ContextAssembler).relevantHistory(req ContextRequest) string`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/context_test.go`:
 
@@ -1389,12 +1389,12 @@ func TestRelevantHistoryExcludesTheLocationAndThePlayer(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestRelevantHistory ./pkg/harness/`
 Expected: FAIL — no `RELEVANT HISTORY` section.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `pkg/harness/context.go`:
 
@@ -1563,12 +1563,12 @@ Add constants beside the others, and register the section in `buildSections` aft
 
 Add `"math"` to that file's imports.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `go test -count=1 ./pkg/harness/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/context.go pkg/harness/context_test.go
@@ -1588,7 +1588,7 @@ git commit -m "feat(harness): retrieve turns that share the entities in play"
 - Consumes: every section from Tasks 1-5
 - Produces: `(*Service).prepareTurn` sets the recall limits from config
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/context_test.go`:
 
@@ -1736,12 +1736,12 @@ func TestPrepareTurnAppliesTheRecallLimits(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestContextBudgetDropsSectionsInRankOrder ./pkg/harness/`
 Expected: FAIL — either a section was dropped out of order, or the catalogue survived.
 
-- [ ] **Step 3: Wire the config**
+- [x] **Step 3: Wire the config**
 
 In `pkg/gui/service.go`, extend the limits set in `prepareTurn`:
 
@@ -1758,7 +1758,7 @@ In `pkg/gui/service.go`, extend the limits set in `prepareTurn`:
 	})
 ```
 
-- [ ] **Step 4: Surface the new limits in the Settings Studio**
+- [x] **Step 4: Surface the new limits in the Settings Studio**
 
 In `frontend/src/types.ts`, extend `AgentsConfig`:
 
@@ -1799,12 +1799,12 @@ In `frontend/src/components/SettingsStudio.tsx`, in the **Context & Response Lim
 
 Repeat for `retrieval_turns` (label "Turns Retrieved By Entity", default 3), `retrieval_chars` ("Retrieved Excerpt Length", 800), `retrieval_halflife_turns` ("Retrieval Recency Half-Life", 12), and `scene_recall_chars` ("Recalled Excerpt Length", 800).
 
-- [ ] **Step 5: Run the full gate**
+- [x] **Step 5: Run the full gate**
 
 Run: `go test -count=1 ./... && go vet ./... && (cd frontend && npx tsc --noEmit)`
 Expected: PASS on all three.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/ pkg/gui/ frontend/src/
@@ -1823,7 +1823,7 @@ git commit -m "feat(gui): apply the configured recall limits and expose them"
 - Consumes: everything above
 - Produces: `(*scriptedStreamProvider).onRequest func(harness.GenerateRequest)` for asserting prompts
 
-- [ ] **Step 1: Add the request hook to the scripted provider**
+- [x] **Step 1: Add the request hook to the scripted provider**
 
 In `pkg/engine/orchestrator_stream_test.go`, add the field and call it:
 
@@ -1844,7 +1844,7 @@ and inside `Stream`, before the chunk loop:
 	}
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `pkg/engine/orchestrator_recall_test.go`:
 
@@ -1900,12 +1900,12 @@ func TestAPromiseSurvivesTheRecallWindow(t *testing.T) {
 
 The provider in this test returns the same chunk every turn, and the fixture's location carries no entities, so the assertion is deliberately loose: it proves the prompt is assembled once per turn and that retrieval has an input, not that a specific sentence ranked first. The precise ranking is covered in Task 5.
 
-- [ ] **Step 3: Run the test to verify it passes**
+- [x] **Step 3: Run the test to verify it passes**
 
 Run: `go test -count=1 -run TestAPromiseSurvivesTheRecallWindow -v ./pkg/engine/`
 Expected: PASS. If it fails because the fixture has no entities in play, add a character note to `streamingOrchestrator`'s fixture and link it from the location, then rerun.
 
-- [ ] **Step 4: Run the full gate and commit**
+- [x] **Step 4: Run the full gate and commit**
 
 Run: `go test -count=1 ./... && go vet ./...`
 Expected: PASS.

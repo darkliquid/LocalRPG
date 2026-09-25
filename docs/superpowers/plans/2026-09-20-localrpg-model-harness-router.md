@@ -42,7 +42,7 @@ LocalRPG/
 - Create: `pkg/harness/types.go`
 - Test: `pkg/harness/types_test.go`
 
-- [ ] **Step 1: Write the failing test for Harness Types**
+- [x] **Step 1: Write the failing test for Harness Types**
 
 ```go
 // pkg/harness/types_test.go
@@ -77,12 +77,12 @@ func TestProviderConfigValidation(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/harness/... -v`  
 Expected: FAIL (package/harness not defined)
 
-- [ ] **Step 3: Implement Core Harness Types**
+- [x] **Step 3: Implement Core Harness Types**
 
 Write `pkg/harness/types.go`:
 ```go
@@ -131,12 +131,12 @@ type RoleRoutingConfig struct {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/harness/... -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/types.go pkg/harness/types_test.go
@@ -151,7 +151,7 @@ git commit -m "feat(harness): define core ModelProvider interface and role confi
 - Create: `pkg/harness/cli_provider.go`
 - Test: `pkg/harness/cli_provider_test.go`
 
-- [ ] **Step 1: Write failing test for CLI Provider**
+- [x] **Step 1: Write failing test for CLI Provider**
 
 ```go
 // pkg/harness/cli_provider_test.go
@@ -220,12 +220,12 @@ func TestCLIProviderStreaming(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/harness/... -v -run TestCLIProviderExecution`  
 Expected: FAIL (NewCLIProvider not defined)
 
-- [ ] **Step 3: Implement CLI Subprocess Provider**
+- [x] **Step 3: Implement CLI Subprocess Provider**
 
 Write `pkg/harness/cli_provider.go`:
 ```go
@@ -324,12 +324,12 @@ func (c *CLIProvider) Stream(ctx context.Context, req GenerateRequest, out chan<
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/harness/... -v -run TestCLIProvider`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/cli_provider.go pkg/harness/cli_provider_test.go
@@ -344,7 +344,7 @@ git commit -m "feat(harness): implement CLI subprocess harness runner with strea
 - Create: `pkg/harness/http_provider.go`
 - Test: `pkg/harness/http_provider_test.go`
 
-- [ ] **Step 1: Write failing test with mock HTTP server**
+- [x] **Step 1: Write failing test with mock HTTP server**
 
 ```go
 // pkg/harness/http_provider_test.go
@@ -410,12 +410,12 @@ func TestHTTPProviderStreaming(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/harness/... -v -run TestHTTPProviderStreaming`  
 Expected: FAIL (NewHTTPProvider not defined)
 
-- [ ] **Step 3: Implement HTTP Provider**
+- [x] **Step 3: Implement HTTP Provider**
 
 Write `pkg/harness/http_provider.go`:
 ```go
@@ -566,12 +566,12 @@ func (h *HTTPProvider) Stream(ctx context.Context, req GenerateRequest, out chan
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/harness/... -v -run TestHTTPProviderStreaming`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/http_provider.go pkg/harness/http_provider_test.go
@@ -586,7 +586,7 @@ git commit -m "feat(harness): implement local HTTP and OpenAI-compatible SSE str
 - Create: `pkg/harness/router.go`
 - Test: `pkg/harness/router_test.go`
 
-- [ ] **Step 1: Write failing test for Role Router**
+- [x] **Step 1: Write failing test for Role Router**
 
 ```go
 // pkg/harness/router_test.go
@@ -644,12 +644,12 @@ func TestRouterRoleDispatchAndFallback(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/harness/... -v -run TestRouterRoleDispatchAndFallback`  
 Expected: FAIL (NewRouter not defined)
 
-- [ ] **Step 3: Implement Router**
+- [x] **Step 3: Implement Router**
 
 Write `pkg/harness/router.go`:
 ```go
@@ -783,12 +783,12 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/harness/... -v -run TestRouterRoleDispatchAndFallback`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/router.go pkg/harness/router_test.go
@@ -803,7 +803,7 @@ git commit -m "feat(harness): implement role-based model router with failover"
 - Create: `pkg/harness/context.go`
 - Test: `pkg/harness/context_test.go`
 
-- [ ] **Step 1: Write failing test for Context Assembler**
+- [x] **Step 1: Write failing test for Context Assembler**
 
 ```go
 // pkg/harness/context_test.go
@@ -877,12 +877,12 @@ func TestContextAssembler(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/harness/... -v -run TestContextAssembler`  
 Expected: FAIL (NewContextAssembler not defined)
 
-- [ ] **Step 3: Implement Context Assembler**
+- [x] **Step 3: Implement Context Assembler**
 
 Write `pkg/harness/context.go`:
 ```go
@@ -949,12 +949,12 @@ func (c *ContextAssembler) AssembleContext(locationID, playerID, playerAction st
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/harness/... -v -run TestContextAssembler`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/context.go pkg/harness/context_test.go
@@ -969,7 +969,7 @@ git commit -m "feat(harness): implement 4-layer living world context assembler"
 - Create: `pkg/harness/extractor.go`
 - Test: `pkg/harness/extractor_test.go`
 
-- [ ] **Step 1: Write failing test for Entity Extractor**
+- [x] **Step 1: Write failing test for Entity Extractor**
 
 ```go
 // pkg/harness/extractor_test.go
@@ -1023,12 +1023,12 @@ func TestExtractAndSyncEntities(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/harness/... -v -run TestExtractAndSyncEntities`  
 Expected: FAIL (NewEntityExtractor not defined)
 
-- [ ] **Step 3: Implement Entity Extractor**
+- [x] **Step 3: Implement Entity Extractor**
 
 Write `pkg/harness/extractor.go`:
 ```go
@@ -1127,12 +1127,12 @@ func (e *EntityExtractor) ExtractFromTurn(ctx context.Context, narrativeOutput s
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/harness/... -v -run TestExtractAndSyncEntities`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/extractor.go pkg/harness/extractor_test.go
@@ -1148,7 +1148,7 @@ git commit -m "feat(harness): implement background entity extractor and sync pip
 - Modify: `cmd/localrpg/main.go`
 - Test: `cmd/localrpg/prompt_test.go`
 
-- [ ] **Step 1: Write integration test for CLI Prompt command**
+- [x] **Step 1: Write integration test for CLI Prompt command**
 
 ```go
 // cmd/localrpg/prompt_test.go
@@ -1173,12 +1173,12 @@ func TestCLIPromptCommand(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./cmd/localrpg/... -v -run TestCLIPromptCommand`  
 Expected: FAIL (subcommand prompt not handled)
 
-- [ ] **Step 3: Implement CLI Prompt Subcommand**
+- [x] **Step 3: Implement CLI Prompt Subcommand**
 
 Write `cmd/localrpg/prompt.go`:
 ```go
@@ -1229,12 +1229,12 @@ func handlePromptCommand(args []string) {
 
 Update `cmd/localrpg/main.go` to dispatch `case "prompt": handlePromptCommand(args[1:])`.
 
-- [ ] **Step 4: Run all package tests across project**
+- [x] **Step 4: Run all package tests across project**
 
 Run: `go test -count=1 ./... -v`  
 Expected: All package tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cmd/localrpg/prompt.go cmd/localrpg/main.go cmd/localrpg/prompt_test.go

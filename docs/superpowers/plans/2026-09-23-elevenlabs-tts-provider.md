@@ -61,7 +61,7 @@ Acceptance criterion 7 ("bulk synthesis warns first") stays partial for the same
 - Consumes: `config.TTSConfig`, `entity.VoiceConfig`, `media.VoiceOption`, `media.ValidateVoiceOptions`, `trace.Logger`.
 - Produces: `media.ElevenLabsTTSClient`, `media.NewElevenLabsTTSClient(cfg config.TTSConfig) (*ElevenLabsTTSClient, error)`, `media.ErrMissingAPIKey`, and the four capability methods.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/media/elevenlabs_tts_test.go`:
 
@@ -279,12 +279,12 @@ func TestElevenLabsVoiceOptionsSchema(t *testing.T) {
 
 Add `"strings"` to the test imports.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestNewElevenLabs|TestElevenLabs' ./pkg/media/ -v`
 Expected: FAIL with "undefined: NewElevenLabsTTSClient".
 
-- [ ] **Step 3: Write the client**
+- [x] **Step 3: Write the client**
 
 Create `pkg/media/elevenlabs_tts.go`:
 
@@ -539,12 +539,12 @@ func elevenLabsError(resp *http.Response) error {
 
 Task 2 adds `ListVoices` to this file.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestNewElevenLabs|TestElevenLabs' ./pkg/media/ -v`
 Expected: PASS. Vet the package: `go vet ./pkg/media/`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/elevenlabs_tts.go pkg/media/elevenlabs_tts_test.go
@@ -563,7 +563,7 @@ git commit -m "feat(media): add a built-in ElevenLabs speech provider"
 - Consumes: `ProviderVoice`, `NormaliseVoiceTags`, the client's `do`.
 - Produces: `(*ElevenLabsTTSClient).ListVoices(ctx) ([]ProviderVoice, error)`, which pages `/v2/voices` to completion.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/media/elevenlabs_tts_test.go`:
 
@@ -649,12 +649,12 @@ func TestElevenLabsListVoicesPagesAndMaps(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestElevenLabsListVoices ./pkg/media/ -v`
 Expected: FAIL with "client.ListVoices undefined".
 
-- [ ] **Step 3: Implement `ListVoices`**
+- [x] **Step 3: Implement `ListVoices`**
 
 Append to `pkg/media/elevenlabs_tts.go`:
 
@@ -758,12 +758,12 @@ func mapElevenLabsVoice(voice elevenLabsVoice) ProviderVoice {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestElevenLabsListVoices ./pkg/media/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/elevenlabs_tts.go pkg/media/elevenlabs_tts_test.go
@@ -783,7 +783,7 @@ git commit -m "feat(media): list and map the ElevenLabs voice catalog"
 - Consumes: `NewElevenLabsTTSClient` (Task 1).
 - Produces: `NewTTSClient` returns the ElevenLabs client for `builtin_name: elevenlabs`; `media.KeyPresent(cfg config.TTSConfig) bool`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/media/catalog_test.go`:
 
@@ -837,12 +837,12 @@ func TestNewTTSClientBuildsElevenLabs(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestKeyPresent|TestNewTTSClientBuildsElevenLabs' ./pkg/media/ -v`
 Expected: FAIL with "undefined: KeyPresent" and "undefined: ErrMissingAPIKey" (in the factory path).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/media/catalog.go`, add the `os` import and:
 
@@ -868,12 +868,12 @@ In `pkg/media/providers.go`, add to `NewTTSClient`'s `case "builtin"` switch, be
 			return NewElevenLabsTTSClient(cfg)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/media/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/providers.go pkg/media/catalog.go pkg/media/catalog_test.go pkg/media/elevenlabs_factory_test.go
@@ -893,7 +893,7 @@ git commit -m "feat(media): build the ElevenLabs provider from configuration"
 **Interfaces:**
 - Produces: `trace.RegisterSecret(value string)`, and `Sanitize` replaces any registered value wherever it appears in a recorded string.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/trace/sanitize_secret_test.go`:
 
@@ -934,12 +934,12 @@ func TestRegisterSecretIgnoresEmptyValues(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestSanitizeRedacts|TestRegisterSecret' ./pkg/trace/ -v`
 Expected: FAIL with "undefined: RegisterSecret".
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/trace/sanitize.go`, add `"sync"` to the imports and:
 
@@ -988,12 +988,12 @@ Change `sanitizeValue`'s string branch to redact before truncating:
 		return truncate(redactSecrets(typed), payloadChars)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/trace/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/trace/sanitize.go pkg/trace/sanitize_secret_test.go
@@ -1012,7 +1012,7 @@ git commit -m "feat(trace): redact a registered secret wherever it appears"
 - Consumes: the existing `trace.Memory` sink.
 - Produces: `media.tts.request` carries `provider` and `model` fields.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/media/tts_test.go`:
 
@@ -1044,12 +1044,12 @@ func TestTTSPipelineNamesTheProviderInTheTrace(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestTTSPipelineNamesTheProvider ./pkg/media/ -v`
 Expected: FAIL because `provider` is absent from the event.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/media/tts.go`, inside `SynthesizeUtterance`, extend the existing trace payload. Before the `p.logger.Event("media.tts.request", ...)` call, compute:
 
@@ -1070,12 +1070,12 @@ Then add to the event map:
 		"model":     model,
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/media/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/tts.go pkg/media/tts_test.go
@@ -1093,7 +1093,7 @@ git commit -m "feat(media): name the provider and model in the TTS trace"
 **Interfaces:**
 - Produces: `config.TTSPresets["elevenlabs"]` and `TTS_PRESETS['elevenlabs']`, carrying no API key and no voice profiles.
 
-- [ ] **Step 1: Add the Go preset**
+- [x] **Step 1: Add the Go preset**
 
 In `pkg/config/presets.go`, inside `TTSPresets`, add:
 
@@ -1111,7 +1111,7 @@ In `pkg/config/presets.go`, inside `TTSPresets`, add:
 
 Deliberately no `APIKey` and no `VoiceProfiles`: selecting the preset is an explicit act, and the catalog supplies the voices.
 
-- [ ] **Step 2: Add the frontend preset**
+- [x] **Step 2: Add the frontend preset**
 
 In `frontend/src/templates/providerPresets.ts`, inside `TTS_PRESETS`, add:
 
@@ -1132,12 +1132,12 @@ In `frontend/src/templates/providerPresets.ts`, inside `TTS_PRESETS`, add:
   },
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `go test ./pkg/config/ -count=1` and `cd frontend && npx tsc --noEmit`
 Expected: PASS and no TypeScript errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/config/presets.go frontend/src/templates/providerPresets.ts
@@ -1159,7 +1159,7 @@ git commit -m "feat: add an opt-in ElevenLabs preset"
 - Consumes: `media.KeyPresent`.
 - Produces: `TTSInspectResponseDTO.KeyPresent` / `TTSInspectResponse.key_present`, and a Settings indicator.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/tts_inspect_test.go`:
 
@@ -1201,12 +1201,12 @@ func TestInspectTTSReportsKeyPresenceWithoutTheKey(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestInspectTTSReportsKeyPresence ./pkg/gui/ -v`
 Expected: FAIL with "unknown field KeyPresent".
 
-- [ ] **Step 3: Implement the backend field**
+- [x] **Step 3: Implement the backend field**
 
 In `pkg/gui/types.go`, add both fields to `TTSInspectResponseDTO`:
 
@@ -1230,7 +1230,7 @@ In `pkg/gui/tts_inspect.go`, add `"strings"` to the imports and set both where t
 	}
 ```
 
-- [ ] **Step 4: Add the frontend field and indicator**
+- [x] **Step 4: Add the frontend field and indicator**
 
 In `frontend/src/types.ts`, add to `TTSInspectResponse`:
 
@@ -1249,12 +1249,12 @@ In `SettingsStudio.tsx`, inside the block the previous plan added for the metere
             )}
 ```
 
-- [ ] **Step 5: Run tests and typecheck**
+- [x] **Step 5: Run tests and typecheck**
 
 Run: `go test ./pkg/gui/ -count=1` and `cd frontend && npx tsc --noEmit`
 Expected: PASS and no TypeScript errors.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/tts_inspect.go pkg/gui/tts_inspect_test.go frontend/src/types.ts frontend/src/components/SettingsStudio.tsx
@@ -1267,17 +1267,17 @@ git commit -m "feat(gui): report key presence without echoing the key"
 
 **Files:** none (verification only).
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `go test ./... -count=1`
 Expected: every package ok.
 
-- [ ] **Step 2: Vet and typecheck**
+- [x] **Step 2: Vet and typecheck**
 
 Run: `mise run lint` and `cd frontend && npx tsc --noEmit`
 Expected: `go vet ./...` clean and no TypeScript errors.
 
-- [ ] **Step 3: Confirm the acceptance criteria this plan owns**
+- [x] **Step 3: Confirm the acceptance criteria this plan owns**
 
 - 1 and 5: the client synthesises and omits `voice_settings` when a profile declares nothing (Tasks 1-3).
 - 2: Markdown reduction applies automatically, because the client is not `MarkdownAware` (Task 1; the pipeline's `SpeakableTextFor` path).

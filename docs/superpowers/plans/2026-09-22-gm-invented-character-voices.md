@@ -31,7 +31,7 @@
 - Modify: `pkg/entity/entity.go`
 - Modify: `pkg/entity/entity_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestIsCharacterType(t *testing.T) {
@@ -48,12 +48,12 @@ func TestIsCharacterType(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestIsCharacterType ./pkg/entity/`
 Expected: FAIL, undefined `IsCharacterType`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```go
 // IsCharacterType reports whether a type names a speaking being. Content authors,
@@ -67,12 +67,12 @@ func IsCharacterType(t string) bool {
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `go test -run TestIsCharacterType ./pkg/entity/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity/entity.go pkg/entity/entity_test.go
@@ -87,7 +87,7 @@ git commit -m "feat(entity): recognise npc and other character type spellings"
 - Modify: `pkg/harness/extractor.go`
 - Modify: `pkg/harness/extractor_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestAssignVoiceProfileUsesAppearance(t *testing.T) {
@@ -112,12 +112,12 @@ func TestAssignVoiceProfileAcceptsNPCStyleType(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestAssignVoiceProfile ./pkg/harness/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `AssignVoiceProfile`:
 - replace `ent.Type != "character"` with `!entity.IsCharacterType(ent.Type)`;
@@ -132,12 +132,12 @@ corpus := strings.ToLower(strings.Join([]string{
 }, " "))
 ```
 
-- [ ] **Step 4: Run the harness tests**
+- [x] **Step 4: Run the harness tests**
 
 Run: `go test -count=1 ./pkg/harness/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/extractor.go pkg/harness/extractor_test.go
@@ -152,7 +152,7 @@ git commit -m "fix(harness): choose a voice from a character's full description"
 - Modify: `pkg/engine/timeline.go`
 - Modify: `pkg/engine/timeline_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add a test that feeds `RecordTurn` an extraction containing an `npc` entity and asserts the written note parses back with a non-nil `Voice`.
 
@@ -164,12 +164,12 @@ func TestRecordTurnVoicesInventedNPC(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestRecordTurnVoicesInventedNPC ./pkg/engine/`
 Expected: FAIL (no voice assigned for `npc`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `recordEntities`, replace the gate:
 
@@ -181,12 +181,12 @@ if entity.IsCharacterType(ent.Type) {
 
 Then extend the reconciliation so a **matched** character-like entity that has no voice receives one. The loop already has `ent` in hand; after `MergeExtractedEntity`, if `entity.IsCharacterType(ent.Type) && ent.Voice == nil`, call `AssignVoiceProfile` and add `ent` to `pending` so the voice is written back. Keep `AssignVoiceProfile`'s existing no-overwrite rule intact.
 
-- [ ] **Step 4: Run the engine tests**
+- [x] **Step 4: Run the engine tests**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/timeline.go pkg/engine/timeline_test.go
@@ -203,7 +203,7 @@ git commit -m "fix(engine): give invented and previously unvoiced characters a v
 - Modify: `pkg/export/script.go`
 - Modify: `pkg/harness/extractor_test.go`
 
-- [ ] **Step 1: Add the failing test**
+- [x] **Step 1: Add the failing test**
 
 ```go
 func TestResolveSpeakerVoiceByDisplayName(t *testing.T) {
@@ -215,12 +215,12 @@ func TestResolveSpeakerVoiceByDisplayName(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestResolveSpeakerVoice ./pkg/harness/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement `ResolveSpeakerVoice`**
+- [x] **Step 3: Implement `ResolveSpeakerVoice`**
 
 ```go
 // ResolveSpeakerVoice finds the configured voice for a speaker reference, which
@@ -242,20 +242,20 @@ func ResolveSpeakerVoice(store *storage.Store, speakerRef string) *entity.VoiceC
 }
 ```
 
-- [ ] **Step 4: Use it in the GUI**
+- [x] **Step 4: Use it in the GUI**
 
 Replace the body of `Service.voiceFor`'s closure with `return harness.ResolveSpeakerVoice(store, speakerID)`. Confirm `harness` is already imported (`pkg/gui/service.go` imports it).
 
-- [ ] **Step 5: Use it in the export resolver**
+- [x] **Step 5: Use it in the export resolver**
 
 Replace `pkg/export/script.go`'s `speechResolver.voiceFor` body with the same call, importing `harness` if not already present.
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `go test -count=1 ./pkg/harness/ ./pkg/gui/ ./pkg/export/`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/harness/extractor.go pkg/gui/service.go pkg/export/script.go pkg/harness/extractor_test.go
@@ -270,19 +270,19 @@ git commit -m "fix(harness): resolve a speaker's voice from their display name t
 - Modify: `pkg/engine/orchestrator.go`
 - Modify: `pkg/gui/turn_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add a test that runs a turn whose extraction creates a character and asserts the character's note exists on disk (and is indexed) by the time `ProcessAction` returns. Then add a GUI-level test that resolves the character's voice from the store immediately after the turn event and asserts it is non-nil.
 
-- [ ] **Step 2: Run and confirm the test passes**
+- [x] **Step 2: Run and confirm the test passes**
 
 If the ordering is already correct the test passes immediately; keep it as a regression guard. If it fails, fix `Run` so playback cannot start before `RecordTurn` has completed.
 
-- [ ] **Step 3: Document the invariant**
+- [x] **Step 3: Document the invariant**
 
 Add a comment at the `RecordTurn` call in `ProcessActionStream` and at the playback launch in `Service.Run` stating that entities must be persisted and voiced before any segment is synthesised.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/gui/turn_test.go
@@ -293,11 +293,11 @@ git commit -m "test(engine): guard the persist-before-synthesis ordering for new
 
 ### Task 6: Verification
 
-- [ ] **Step 1: Backend gate**
+- [x] **Step 1: Backend gate**
 
 Run: `mise run test:backend` and `mise run lint`
 Expected: all tests pass, `go vet` clean.
 
-- [ ] **Step 2: Manual smoke**
+- [x] **Step 2: Manual smoke**
 
 Run a campaign turn in which the GM invents a character typed `npc`, confirm the note appears in the codex with a `voice` block, and confirm the character's line plays in that voice rather than the narrator's.

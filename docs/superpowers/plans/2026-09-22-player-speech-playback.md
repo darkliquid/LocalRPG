@@ -36,7 +36,7 @@
 - Modify: `pkg/entity/segment.go`
 - Modify: `pkg/entity/history_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestTurnSegmentPlayerRoundTrip(t *testing.T) {
@@ -55,12 +55,12 @@ func TestTurnSegmentPlayerRoundTrip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestTurnSegmentPlayerRoundTrip ./pkg/entity/`
 Expected: FAIL, unknown field `Player`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```go
 // Player marks the utterance as the protagonist's own line. It renders and
@@ -69,12 +69,12 @@ Expected: FAIL, unknown field `Player`.
 Player bool `json:"player,omitempty"`
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `go test -count=1 ./pkg/entity/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity/segment.go pkg/entity/history_test.go
@@ -90,7 +90,7 @@ git commit -m "feat(entity): mark the player's own line as a speech beat"
 - Modify: `pkg/engine/orchestrator.go`
 - Create: `pkg/engine/player_segment_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestPlayerSegmentForSay(t *testing.T) {
@@ -109,12 +109,12 @@ func TestPlayerSegmentIgnoredForNonSpeechModes(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestPlayerSegment ./pkg/engine/`
 Expected: FAIL, undefined `playerSegment`.
 
-- [ ] **Step 3: Implement `pkg/engine/player_segment.go`**
+- [x] **Step 3: Implement `pkg/engine/player_segment.go`**
 
 ```go
 // playerSegment returns the speech beat for the player's own utterance, or nil
@@ -137,7 +137,7 @@ func playerSegment(mode, input, playerID, playerName string) *entity.TurnSegment
 }
 ```
 
-- [ ] **Step 4: Prepend it**
+- [x] **Step 4: Prepend it**
 
 In `ProcessActionStream`, immediately after `turn.Segments = buildTurnSegments(...)`:
 
@@ -149,12 +149,12 @@ if beat := playerSegment(mode, actionInput, o.playerID, playerName); beat != nil
 
 Resolve `playerName` from the player entity (the orchestrator stores `playerID`; a small store lookup or an existing accessor provides the display name). If no name is available, fall back to `playerID`.
 
-- [ ] **Step 5: Run the engine tests**
+- [x] **Step 5: Run the engine tests**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/engine/player_segment.go pkg/engine/player_segment_test.go pkg/engine/orchestrator.go
@@ -170,20 +170,20 @@ git commit -m "feat(engine): record the player's own line as speech"
 - Modify: `pkg/gui/service.go`
 - Modify: `pkg/gui/turn_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add a test that builds a `TurnDTO` for a turn whose first segment is marked `Player` and asserts `Segments[0].Player` is true. Use the existing DTO test helpers.
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 Add `Player bool `json:"player,omitempty"`` to `SegmentDTO` and set `Player: segment.Player` in `segmentDTOs`. Audio URL generation already runs for every segment, so the player beat gets one.
 
-- [ ] **Step 3: Run the GUI tests**
+- [x] **Step 3: Run the GUI tests**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/turn_test.go
@@ -200,11 +200,11 @@ git commit -m "feat(gui): expose the player's speech beat to the client"
 - Modify: `frontend/src/components/TurnSegments.tsx`
 - Modify: `frontend/src/components/StoryTheater.tsx`
 
-- [ ] **Step 1: Types**
+- [x] **Step 1: Types**
 
 Add `player?: boolean` to `TurnSegment`.
 
-- [ ] **Step 2: Suppress the duplicate action block**
+- [x] **Step 2: Suppress the duplicate action block**
 
 In `ChronicleView`, only render the `turn.input_text` action block when the turn has no player speech beat:
 
@@ -221,20 +221,20 @@ const hasPlayerBeat = (turn.segments ?? []).some((segment) => segment.player);
 
 Keep the block for `do`/`story`/`roll` turns, which have no player beat.
 
-- [ ] **Step 3: Render the beat as ordinary speech**
+- [x] **Step 3: Render the beat as ordinary speech**
 
 In `TurnSegments`, the existing `kind === 'speech'` branch already renders `speaker` + quoted text; the player beat needs no new branch. Optionally add a subtle marker (a "You" chip or an amber tint) driven by `segment.player`, but keep text, quoting, and layout identical to other speakers. Ensure the beat still participates in `useSegmentPlayback` so it plays first.
 
-- [ ] **Step 4: Story theater**
+- [x] **Step 4: Story theater**
 
 In `StoryTheater`, confirm the player beat renders through the same speech path as other speakers and is not filtered or treated as narration.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/ChronicleView.tsx frontend/src/components/TurnSegments.tsx frontend/src/components/StoryTheater.tsx
@@ -245,17 +245,17 @@ git commit -m "feat(frontend): show the player's line as speech instead of a say
 
 ### Task 5: Verification
 
-- [ ] **Step 1: Backend gate**
+- [x] **Step 1: Backend gate**
 
 Run: `mise run test:backend` and `mise run lint`
 Expected: all tests pass, `go vet` clean.
 
-- [ ] **Step 2: Frontend gate**
+- [x] **Step 2: Frontend gate**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 3: Manual smoke**
+- [x] **Step 3: Manual smoke**
 
 1. Submit a `say` action and confirm the line appears once, as a speech beat with the player's name and quoted text.
 2. Confirm the line is spoken in the player's voice first, then the narration.

@@ -28,7 +28,7 @@
 **Files:**
 - Modify: `frontend/src/api/client.ts`
 
-- [ ] **Step 1: Add the error type**
+- [x] **Step 1: Add the error type**
 
 At the top of `client.ts`:
 
@@ -43,7 +43,7 @@ export class HTTPError extends Error {
 }
 ```
 
-- [ ] **Step 2: Use it for the game-state read**
+- [x] **Step 2: Use it for the game-state read**
 
 Update `getGameState` (and the other campaign reads as they are touched) to throw it:
 
@@ -57,12 +57,12 @@ async getGameState(): Promise<GameState> {
 
 Confirm the real path from the existing implementation before editing; keep it unchanged if it differs.
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/api/client.ts
@@ -76,7 +76,7 @@ git commit -m "feat(frontend): expose the HTTP status of campaign read failures"
 **Files:**
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Track campaign availability**
+- [x] **Step 1: Track campaign availability**
 
 Add state alongside `activeGameID`:
 
@@ -85,7 +85,7 @@ const [campaignStatus, setCampaignStatus] = useState<'idle' | 'loading' | 'ready
 const [campaignError, setCampaignError] = useState<string | null>(null);
 ```
 
-- [ ] **Step 2: Add the bootstrap effect**
+- [x] **Step 2: Add the bootstrap effect**
 
 Place it after the existing corpus effect:
 
@@ -124,7 +124,7 @@ useEffect(() => {
 }, [activeGameID]);
 ```
 
-- [ ] **Step 3: Handle a 404 from the campaign load**
+- [x] **Step 3: Handle a 404 from the campaign load**
 
 In the corpus effect (`client.getGameState()`), replace the swallow with:
 
@@ -147,12 +147,12 @@ client.getGameState()
 
 Import `HTTPError` from `./api/client`.
 
-- [ ] **Step 4: Typecheck**
+- [x] **Step 4: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/App.tsx
@@ -166,7 +166,7 @@ git commit -m "fix(frontend): verify the remembered campaign before opening it"
 **Files:**
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Replace the loading placeholder**
+- [x] **Step 1: Replace the loading placeholder**
 
 Where the play shell currently renders `Opening the chronicle...` when `!gameState`, branch on the status:
 
@@ -174,16 +174,16 @@ Where the play shell currently renders `Opening the chronicle...` when `!gameSta
 - `campaignStatus === 'loading'` or `ready` with no state yet renders the existing loading text.
 - `campaignStatus === 'idle'` should not occur inside the play shell.
 
-- [ ] **Step 2: Keep the launcher authoritative**
+- [x] **Step 2: Keep the launcher authoritative**
 
 Ensure `handleReturnToLauncher` also resets `campaignStatus` to `'idle'` and `campaignError` to `null` so a later selection starts clean.
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/App.tsx
@@ -197,7 +197,7 @@ git commit -m "fix(frontend): replace the dead campaign spinner with a recovery 
 **Files:**
 - Modify: `frontend/src/components/LauncherHub.tsx`
 
-- [ ] **Step 1: Remove the key after a successful delete**
+- [x] **Step 1: Remove the key after a successful delete**
 
 In `runPendingAction`, after `APIClient.deleteGame(id)`:
 
@@ -207,12 +207,12 @@ if (localStorage.getItem('localrpg_active_game') === id) {
 }
 ```
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/LauncherHub.tsx
@@ -223,12 +223,12 @@ git commit -m "fix(frontend): forget a deleted campaign's stored selection"
 
 ### Task 5: Verification
 
-- [ ] **Step 1: Frontend gate**
+- [x] **Step 1: Frontend gate**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 2: Manual smoke**
+- [x] **Step 2: Manual smoke**
 
 1. Create a campaign, open it, delete it from the launcher, reload the app: the launcher appears.
 2. With a valid campaign stored, stop the server and reload: the unavailable panel appears with Retry, and storage is unchanged.

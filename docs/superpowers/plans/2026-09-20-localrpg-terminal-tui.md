@@ -41,7 +41,7 @@ LocalRPG/
 - Create: `pkg/engine/history.go`
 - Test: `pkg/engine/history_test.go`
 
-- [ ] **Step 1: Write the failing test for Turn History**
+- [x] **Step 1: Write the failing test for Turn History**
 
 ```go
 // pkg/engine/history_test.go
@@ -113,12 +113,12 @@ func TestTurnHistoryAppendAndLoad(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/engine/... -v -run TestTurnHistoryAppendAndLoad`  
 Expected: FAIL (NewHistoryLogger not defined)
 
-- [ ] **Step 3: Implement History Logger**
+- [x] **Step 3: Implement History Logger**
 
 Write `pkg/engine/history.go`:
 ```go
@@ -263,12 +263,12 @@ func (h *HistoryLogger) loadHistoryUnlocked() ([]Turn, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/engine/... -v -run TestTurnHistoryAppendAndLoad`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/history.go pkg/engine/history_test.go
@@ -283,7 +283,7 @@ git commit -m "feat(engine): implement append-only turn history logger and rewin
 - Create: `pkg/engine/orchestrator.go`
 - Test: `pkg/engine/orchestrator_test.go`
 
-- [ ] **Step 1: Write failing test for Turn Orchestrator**
+- [x] **Step 1: Write failing test for Turn Orchestrator**
 
 ```go
 // pkg/engine/orchestrator_test.go
@@ -368,12 +368,12 @@ func TestTurnOrchestrator(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/engine/... -v -run TestTurnOrchestrator`  
 Expected: FAIL (NewTurnOrchestrator not defined)
 
-- [ ] **Step 3: Implement Turn Orchestrator**
+- [x] **Step 3: Implement Turn Orchestrator**
 
 Write `pkg/engine/orchestrator.go`:
 ```go
@@ -515,12 +515,12 @@ func (o *TurnOrchestrator) ProcessAction(ctx context.Context, mode, actionInput 
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/engine/... -v -run TestTurnOrchestrator`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/orchestrator_test.go
@@ -536,7 +536,7 @@ git commit -m "feat(engine): implement end-to-end turn orchestrator with GM stee
 - Create: `pkg/tui/render.go`
 - Test: `pkg/tui/render_test.go`
 
-- [ ] **Step 1: Write failing test for Glamour Markdown Renderer**
+- [x] **Step 1: Write failing test for Glamour Markdown Renderer**
 
 ```go
 // pkg/tui/render_test.go
@@ -560,12 +560,12 @@ func TestRenderMarkdown(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/tui/... -v -run TestRenderMarkdown`  
 Expected: FAIL (package/tui not defined)
 
-- [ ] **Step 3: Implement Styles and Markdown Renderer**
+- [x] **Step 3: Implement Styles and Markdown Renderer**
 
 Write `pkg/tui/styles.go`:
 ```go
@@ -634,12 +634,12 @@ func RenderMarkdown(content string, wordWrap int) (string, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/tui/... -v -run TestRenderMarkdown`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/tui/styles.go pkg/tui/render.go pkg/tui/render_test.go
@@ -654,7 +654,7 @@ git commit -m "feat(tui): implement terminal UI styles and Glamour markdown rend
 - Create: `pkg/tui/app.go`
 - Test: `pkg/tui/app_test.go`
 
-- [ ] **Step 1: Write failing test for Bubbletea Model message handling**
+- [x] **Step 1: Write failing test for Bubbletea Model message handling**
 
 ```go
 // pkg/tui/app_test.go
@@ -717,12 +717,12 @@ func TestTUIModelInitializationAndInput(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/tui/... -v -run TestTUIModel`  
 Expected: FAIL (NewAppModel not defined)
 
-- [ ] **Step 3: Implement Bubbletea App Model**
+- [x] **Step 3: Implement Bubbletea App Model**
 
 Write `pkg/tui/app.go`:
 ```go
@@ -885,12 +885,12 @@ func (m *AppModel) View() string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/tui/... -v -run TestTUIModel`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/tui/app.go pkg/tui/app_test.go
@@ -906,7 +906,7 @@ git commit -m "feat(tui): implement interactive Bubbletea TUI application model"
 - Modify: `cmd/localrpg/main.go`
 - Test: `cmd/localrpg/play_test.go`
 
-- [ ] **Step 1: Write CLI play argument test**
+- [x] **Step 1: Write CLI play argument test**
 
 ```go
 // cmd/localrpg/play_test.go
@@ -931,12 +931,12 @@ func TestCLIPlayMissingArg(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./cmd/localrpg/... -v -run TestCLIPlayMissingArg`  
 Expected: FAIL (play subcommand not implemented)
 
-- [ ] **Step 3: Implement CLI Play Subcommand**
+- [x] **Step 3: Implement CLI Play Subcommand**
 
 Write `cmd/localrpg/play.go`:
 ```go
@@ -1017,12 +1017,12 @@ func handlePlayCommand(args []string) {
 
 Update `cmd/localrpg/main.go` to route `case "play": handlePlayCommand(args[1:])`.
 
-- [ ] **Step 4: Run all package tests across workspace**
+- [x] **Step 4: Run all package tests across workspace**
 
 Run: `go test -count=1 ./... -v`  
 Expected: All package tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cmd/localrpg/play.go cmd/localrpg/main.go cmd/localrpg/play_test.go

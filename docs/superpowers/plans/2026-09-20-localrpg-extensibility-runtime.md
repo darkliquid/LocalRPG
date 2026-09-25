@@ -42,7 +42,7 @@ LocalRPG/
 - Create: `pkg/rules/dice.go`
 - Test: `pkg/rules/dice_test.go`
 
-- [ ] **Step 1: Write the failing test for Dice Roller**
+- [x] **Step 1: Write the failing test for Dice Roller**
 
 ```go
 // pkg/rules/dice_test.go
@@ -82,12 +82,12 @@ func TestEvaluateRoll(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/rules/... -v`  
 Expected: FAIL (package/rules not defined)
 
-- [ ] **Step 3: Implement Dice Roller**
+- [x] **Step 3: Implement Dice Roller**
 
 Write `pkg/rules/dice.go`:
 ```go
@@ -126,12 +126,12 @@ func EvaluateRoll(notation string) (*RollResult, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/rules/... -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/rules/dice.go pkg/rules/dice_test.go
@@ -145,7 +145,7 @@ git commit -m "feat(rules): integrate darkliquid/roll for dice evaluation"
 **Files:**
 - Create: `pkg/rules/host_api.go`
 
-- [ ] **Step 1: Write host_api.go interface and default implementation**
+- [x] **Step 1: Write host_api.go interface and default implementation**
 
 Write `pkg/rules/host_api.go`:
 ```go
@@ -244,12 +244,12 @@ func (h *DefaultHostBridge) GetLogs() []string {
 }
 ```
 
-- [ ] **Step 2: Run build to verify compilation**
+- [x] **Step 2: Run build to verify compilation**
 
 Run: `go test ./pkg/rules/... -v`  
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pkg/rules/host_api.go
@@ -264,7 +264,7 @@ git commit -m "feat(rules): define unified GameHostAPI and default storage bridg
 - Create: `pkg/rules/js_engine.go`
 - Test: `pkg/rules/js_engine_test.go`
 
-- [ ] **Step 1: Write failing test for JavaScript Engine**
+- [x] **Step 1: Write failing test for JavaScript Engine**
 
 ```go
 // pkg/rules/js_engine_test.go
@@ -338,12 +338,12 @@ onAction("attack", function(ctx) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/rules/... -v -run TestJSEngineExecution`  
 Expected: FAIL (JSEngine not defined)
 
-- [ ] **Step 3: Implement Sandboxed JavaScript Runtime**
+- [x] **Step 3: Implement Sandboxed JavaScript Runtime**
 
 Write `pkg/rules/js_engine.go`:
 ```go
@@ -507,12 +507,12 @@ func (j *JSEngine) ExecuteWorldTick(ctx map[string]interface{}) error {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/rules/... -v -run TestJSEngineExecution`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/rules/js_engine.go pkg/rules/js_engine_test.go
@@ -527,7 +527,7 @@ git commit -m "feat(rules): implement sandboxed JavaScript runtime via Goja"
 - Create: `pkg/rules/wasm_engine.go`
 - Test: `pkg/rules/wasm_engine_test.go`
 
-- [ ] **Step 1: Write failing test for Wazero Wasm Engine**
+- [x] **Step 1: Write failing test for Wazero Wasm Engine**
 
 ```go
 // pkg/rules/wasm_engine_test.go
@@ -581,12 +581,12 @@ func TestWasmEngineExecution(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/rules/... -v -run TestWasmEngineExecution`  
 Expected: FAIL (WasmEngine not defined)
 
-- [ ] **Step 3: Implement Wazero Wasm Runtime**
+- [x] **Step 3: Implement Wazero Wasm Runtime**
 
 Write `pkg/rules/wasm_engine.go`:
 ```go
@@ -687,12 +687,12 @@ func (w *WasmEngine) Close(ctx context.Context) error {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/rules/... -v -run TestWasmEngineExecution`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/rules/wasm_engine.go pkg/rules/wasm_engine_test.go
@@ -707,7 +707,7 @@ git commit -m "feat(rules): implement sandboxed WebAssembly runtime via Wazero"
 - Create: `pkg/rules/loader.go`
 - Test: `pkg/rules/loader_test.go`
 
-- [ ] **Step 1: Write failing test for Script Loader**
+- [x] **Step 1: Write failing test for Script Loader**
 
 ```go
 // pkg/rules/loader_test.go
@@ -770,12 +770,12 @@ onAction("inspect", function(ctx) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/rules/... -v -run TestLoaderComposition`  
 Expected: FAIL (RuleLoader not defined)
 
-- [ ] **Step 3: Implement RuleLoader**
+- [x] **Step 3: Implement RuleLoader**
 
 Write `pkg/rules/loader.go`:
 ```go
@@ -824,12 +824,12 @@ func (r *RuleLoader) LoadRules(systemID, worldID string) error {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/rules/... -v -run TestLoaderComposition`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/rules/loader.go pkg/rules/loader_test.go
@@ -845,7 +845,7 @@ git commit -m "feat(rules): implement multi-tier script loader and world overrid
 - Modify: `cmd/localrpg/main.go`
 - Test: `cmd/localrpg/roll_test.go`
 
-- [ ] **Step 1: Write CLI roll test**
+- [x] **Step 1: Write CLI roll test**
 
 ```go
 // cmd/localrpg/roll_test.go
@@ -871,12 +871,12 @@ func TestCLIRollCommand(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./cmd/localrpg/... -v -run TestCLIRollCommand`  
 Expected: FAIL (subcommand roll not handled)
 
-- [ ] **Step 3: Implement CLI Roll Subcommand**
+- [x] **Step 3: Implement CLI Roll Subcommand**
 
 Write `cmd/localrpg/roll.go`:
 ```go
@@ -927,12 +927,12 @@ Modify `cmd/localrpg/main.go` to dispatch to `handleRollCommand`:
 	}
 ```
 
-- [ ] **Step 4: Run all project tests**
+- [x] **Step 4: Run all project tests**
 
 Run: `go test ./... -v`  
 Expected: All package tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cmd/localrpg/roll.go cmd/localrpg/main.go cmd/localrpg/roll_test.go

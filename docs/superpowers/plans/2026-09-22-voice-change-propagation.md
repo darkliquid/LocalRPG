@@ -33,7 +33,7 @@
 - Modify: `pkg/gui/service.go`
 - Modify: `pkg/gui/service_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add a test that saves a character with a display name different from its ID, then resolves the voice by display name.
 
@@ -51,12 +51,12 @@ func TestVoiceForResolvesDisplayName(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestVoiceForResolvesDisplayName ./pkg/gui/`
 Expected: FAIL (nil voice).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Replace the closure body in `Service.voiceFor`:
 
@@ -66,12 +66,12 @@ return func(speakerID string) *entity.VoiceConfig {
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `go test -run TestVoiceForResolvesDisplayName ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/service_test.go
@@ -88,7 +88,7 @@ git commit -m "fix(gui): resolve a speaker's voice by display name as well as id
 - Modify: `pkg/gui/service_test.go`
 - Modify: `frontend/src/types.ts`
 
-- [ ] **Step 1: Add the DTO field**
+- [x] **Step 1: Add the DTO field**
 
 In `pkg/gui/types.go`:
 
@@ -106,7 +106,7 @@ type SegmentDTO struct {
 
 Mirror `audio_key?: string` on `TurnSegment` in `frontend/src/types.ts`.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```go
 func TestSegmentAudioURLChangesWithVoice(t *testing.T) {
@@ -116,12 +116,12 @@ func TestSegmentAudioURLChangesWithVoice(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run and confirm failure**
+- [x] **Step 3: Run and confirm failure**
 
 Run: `go test -run TestSegmentAudioURLChangesWithVoice ./pkg/gui/`
 Expected: FAIL (URLs identical).
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Extend `segmentDTOs` with a resolver that returns the segment's current voice:
 
@@ -143,17 +143,17 @@ dto.AudioURL = fmt.Sprintf("/api/game/%s/turn/%d/segment/%d/audio?v=%s", gameID,
 
 where `speakerRef` is `segment.SpeakerID` when set, else `segment.Speaker`. Update the `turnDTO` caller to pass `s.voiceFor(gameID)` (it already has a store-backed lookup available). Keep `ComputeAudioCacheKeyWithRate` as-is; it already hashes speaker, voice, prosody, and text.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/service_test.go frontend/src/types.ts
@@ -168,16 +168,16 @@ git commit -m "fix(gui): give a segment's audio url a voice-sensitive version"
 - Modify: `pkg/gui/server.go`
 - Modify: `pkg/gui/server_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add a test that requests a segment audio route and asserts `Cache-Control: no-store` is present.
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestSegmentAudioNoStore ./pkg/gui/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Before serving the segment or turn audio, set the header:
 
@@ -187,12 +187,12 @@ w.Header().Set("Cache-Control", "no-store")
 
 Apply it to both the `turn/{n}/audio` and `segment/{i}/audio` responses in `pkg/gui/server.go` (see the `GetSegmentAudio`/`PlayTurnAudio` branches around lines 214 and 258).
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/server.go pkg/gui/server_test.go
@@ -207,16 +207,16 @@ git commit -m "fix(gui): never cache turn audio in the browser"
 - Modify: `pkg/export/script.go`
 - Modify: `pkg/export/script_test.go`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 Replace `speechResolver.voiceFor`'s body with `return harness.ResolveSpeakerVoice(r.store, speakerID)` (import `harness` if needed and keep the store field it already holds).
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run: `go test -count=1 ./pkg/export/`
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pkg/export/script.go pkg/export/script_test.go
@@ -227,16 +227,16 @@ git commit -m "fix(export): resolve speaker voices by name when rendering audio"
 
 ### Task 5: Verification
 
-- [ ] **Step 1: Backend gate**
+- [x] **Step 1: Backend gate**
 
 Run: `mise run test:backend` and `mise run lint`
 Expected: all tests pass, `go vet` clean.
 
-- [ ] **Step 2: Frontend gate**
+- [x] **Step 2: Frontend gate**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 3: Manual smoke**
+- [x] **Step 3: Manual smoke**
 
 Open a campaign, change a character's voice in the codex, submit a turn in which the character speaks, and confirm both the auto-play and a replay use the new voice.

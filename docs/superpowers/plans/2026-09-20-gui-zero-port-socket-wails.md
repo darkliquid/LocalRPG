@@ -23,14 +23,14 @@
 - Modify: `pkg/gui/assets.go`
 - Test: `pkg/gui/server_test.go`
 
-- [ ] **Step 1: Create placeholder in `pkg/gui/dist` so `go:embed` compiles**
+- [x] **Step 1: Create placeholder in `pkg/gui/dist` so `go:embed` compiles**
 
 ```bash
 mkdir -p pkg/gui/dist
 touch pkg/gui/dist/.gitkeep
 ```
 
-- [ ] **Step 2: Update `frontend/vite.config.ts` and `mise.toml` to build into `pkg/gui/dist`**
+- [x] **Step 2: Update `frontend/vite.config.ts` and `mise.toml` to build into `pkg/gui/dist`**
 
 Update `frontend/vite.config.ts`:
 ```typescript
@@ -71,7 +71,7 @@ sources = ["cmd/**/*", "pkg/**/*", "go.mod"]
 outputs = ["bin/localrpg"]
 ```
 
-- [ ] **Step 3: Write failing test for SPA asset routing in `pkg/gui/server_test.go`**
+- [x] **Step 3: Write failing test for SPA asset routing in `pkg/gui/server_test.go`**
 
 Add test to `pkg/gui/server_test.go`:
 ```go
@@ -110,12 +110,12 @@ func TestSPARouting(t *testing.T) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it fails**
+- [x] **Step 4: Run test to verify it fails**
 
 Run: `go test -v ./pkg/gui -run TestSPARouting`  
 Expected: FAIL with `undefined: AssetHandler`
 
-- [ ] **Step 5: Implement `AssetHandler` with embedded FS and SPA fallback in `pkg/gui/assets.go`**
+- [x] **Step 5: Implement `AssetHandler` with embedded FS and SPA fallback in `pkg/gui/assets.go`**
 
 Replace `pkg/gui/assets.go`:
 ```go
@@ -194,7 +194,7 @@ func spaHandler(fileSystem fs.FS) http.Handler {
 }
 ```
 
-- [ ] **Step 6: Build frontend bundle to populate `pkg/gui/dist` and run test**
+- [x] **Step 6: Build frontend bundle to populate `pkg/gui/dist` and run test**
 
 Run:
 ```bash
@@ -203,7 +203,7 @@ go test -v ./pkg/gui -run TestSPARouting
 ```
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/vite.config.ts mise.toml pkg/gui/dist/.gitkeep pkg/gui/assets.go pkg/gui/server_test.go
@@ -219,7 +219,7 @@ git commit -m "feat(gui): embed compiled React SPA bundle and support client-sid
 - Test: `pkg/gui/socket_test.go`
 - Modify: `pkg/gui/server_test.go`
 
-- [ ] **Step 1: Write failing tests for Unix domain socket in `pkg/gui/socket_test.go`**
+- [x] **Step 1: Write failing tests for Unix domain socket in `pkg/gui/socket_test.go`**
 
 Create `pkg/gui/socket_test.go`:
 ```go
@@ -319,12 +319,12 @@ func TestUnixSocketHTTPCommunication(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/gui -run "TestDefaultSocketPath|TestListenUnix|TestUnixSocketHTTPCommunication"`  
 Expected: FAIL with `undefined: DefaultSocketPath`, `undefined: ListenUnix`
 
-- [ ] **Step 3: Implement `DefaultSocketPath` and `ListenUnix` in `pkg/gui/socket.go`**
+- [x] **Step 3: Implement `DefaultSocketPath` and `ListenUnix` in `pkg/gui/socket.go`**
 
 Create `pkg/gui/socket.go`:
 ```go
@@ -396,12 +396,12 @@ func ListenUnix(socketPath string) (net.Listener, error) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/gui -run "TestDefaultSocketPath|TestListenUnix|TestUnixSocketHTTPCommunication"`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/socket.go pkg/gui/socket_test.go
@@ -417,7 +417,7 @@ git commit -m "feat(gui): implement unix domain socket listener and lifecycle ma
 - Modify: `cmd/localrpg/gui.go`
 - Test: `cmd/localrpg/gui_test.go`
 
-- [ ] **Step 1: Add `github.com/wailsapp/wails/v3` dependency**
+- [x] **Step 1: Add `github.com/wailsapp/wails/v3` dependency**
 
 Run:
 ```bash
@@ -425,7 +425,7 @@ go get github.com/wailsapp/wails/v3@v3.0.0-beta.24
 go mod tidy
 ```
 
-- [ ] **Step 2: Write failing test in `cmd/localrpg/gui_test.go`**
+- [x] **Step 2: Write failing test in `cmd/localrpg/gui_test.go`**
 
 Update `cmd/localrpg/gui_test.go` to test flag parsing and configuration:
 ```go
@@ -486,12 +486,12 @@ func TestParseGUIConfig(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `go test -v ./cmd/localrpg -run TestParseGUIConfig`  
 Expected: FAIL with `undefined: parseGUIConfig`
 
-- [ ] **Step 4: Implement Wails v3 Desktop and Socket Dispatch in `cmd/localrpg/gui.go`**
+- [x] **Step 4: Implement Wails v3 Desktop and Socket Dispatch in `cmd/localrpg/gui.go`**
 
 Update `cmd/localrpg/gui.go`:
 ```go
@@ -624,17 +624,17 @@ func handleGUICommand(args []string) {
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -v ./cmd/localrpg -run TestParseGUIConfig`  
 Expected: PASS
 
-- [ ] **Step 6: Verify full test suite across all packages**
+- [x] **Step 6: Verify full test suite across all packages**
 
 Run: `mise run test`  
 Expected: PASS across all 12 packages and frontend TypeScript checks.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add go.mod go.sum cmd/localrpg/gui.go cmd/localrpg/gui_test.go
@@ -649,7 +649,7 @@ git commit -m "feat(gui): wire wails v3 native desktop window and unix socket da
 - Modify: `README.md`
 - Verify: Full binary build with `mise run build`
 
-- [ ] **Step 1: Update README.md with zero-TCP GUI execution documentation**
+- [x] **Step 1: Update README.md with zero-TCP GUI execution documentation**
 
 Update `README.md` GUI section:
 ```markdown
@@ -678,7 +678,7 @@ LocalRPG runs **zero-TCP by default**:
   Explicitly exposes an HTTP server on `127.0.0.1:8080` for standard web browsers.
 ```
 
-- [ ] **Step 2: Execute full build and verification**
+- [x] **Step 2: Execute full build and verification**
 
 Run:
 ```bash
@@ -693,7 +693,7 @@ rm -f /tmp/test-localrpg.sock
 ```
 Expected: All build steps pass, curl over unix socket returns valid JSON with 0 TCP ports opened.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add README.md

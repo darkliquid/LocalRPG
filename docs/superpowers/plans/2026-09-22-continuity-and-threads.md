@@ -39,7 +39,7 @@ This is the last coherence plan, covering **increments 6**. It depends on the ca
 - Produces: `engine.Thread{ID, Name, Status string; LastAdvanced, Idle int}`
 - Produces: `engine.OpenThreads(store *storage.Store, latestTurn int) ([]Thread, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/threads_test.go`:
 
@@ -142,12 +142,12 @@ func TestOpenThreadsPutsTheStalestFirst(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run 'TestArcStatus|TestOpenThreads' ./pkg/engine/`
 Expected: FAIL — `undefined: ArcStatus`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `pkg/engine/threads.go`:
 
@@ -258,12 +258,12 @@ func OpenThreads(store *storage.Store, latestTurn int) ([]Thread, error) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/threads.go pkg/engine/threads_test.go
@@ -285,7 +285,7 @@ git commit -m "feat(engine): give arcs a status and a last-advanced turn"
 - Produces: `ContextRequest.Threads []string`
 - Produces: `config.AgentsConfig.ThreadIdleTurns`, `.ThreadsMax`; accessors `ThreadIdleTurns() int` (10) and `ThreadsMax() int` (8)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/context_test.go`:
 
@@ -315,12 +315,12 @@ func TestOpenThreadsAreAlwaysInThePrompt(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestOpenThreadsAreAlwaysInThePrompt ./pkg/harness/`
 Expected: FAIL — no thread in the prompt.
 
-- [ ] **Step 3: Add the config**
+- [x] **Step 3: Add the config**
 
 In `pkg/config/types.go`, extend `AgentsConfig` and add the accessors:
 
@@ -350,7 +350,7 @@ func (c *Config) ThreadsMax() int {
 }
 ```
 
-- [ ] **Step 4: Add the section**
+- [x] **Step 4: Add the section**
 
 In `pkg/harness/context.go`, add to `ContextRequest`:
 
@@ -418,7 +418,7 @@ func (o *TurnOrchestrator) threadsCap() int {
 
 Add `const defaultThreadsMax = 8` beside the other engine constants, and pass `Threads: threads` in the `harness.ContextRequest`.
 
-- [ ] **Step 5: Wire the service**
+- [x] **Step 5: Wire the service**
 
 In `pkg/gui/service.go`, `prepareTurn` sets it from config:
 
@@ -426,12 +426,12 @@ In `pkg/gui/service.go`, `prepareTurn` sets it from config:
 	orchestrator.SetThreadsMax(cfg.ThreadsMax())
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/harness/ ./pkg/engine/ ./pkg/config/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/config/ pkg/harness/context.go pkg/harness/context_test.go pkg/engine/ pkg/gui/service.go
@@ -451,7 +451,7 @@ git commit -m "feat(harness): keep unresolved threads in front of the narrator"
 - Produces: `engine.CheckContinuity(store *storage.Store, turn *Turn, locationID, playerID string) []ContinuityFinding`
 - Produces: rule names `unknown-entity`, `location-drift`, `unresolved-speaker`, `reintroduction`, `state-contradiction`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/continuity_test.go`. One test per rule, plus the false positives that must stay silent:
 
@@ -600,12 +600,12 @@ func TestContinuityFindingsSayWhatTheySaw(t *testing.T) {
 
 Add `"github.com/darkliquid/localrpg/pkg/storage"` to that file's imports.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestContinuity ./pkg/engine/`
 Expected: FAIL — `undefined: CheckContinuity`.
 
-- [ ] **Step 3: Write the rules**
+- [x] **Step 3: Write the rules**
 
 Create `pkg/engine/continuity.go`:
 
@@ -888,12 +888,12 @@ func contradictionSubject(key string) string {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/ && go vet ./...`
 Expected: PASS. If `unknown-entity` fires twice for one line, keep both: the two checks answer different questions, and the note distinguishes them.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/continuity.go pkg/engine/continuity_test.go
@@ -916,7 +916,7 @@ git commit -m "feat(engine): notice when a reply drifts from what the campaign k
 - Produces: `Turn.ContinuityNotes []string`, `TurnDTO.ContinuityNotes []string`
 - Produces: `(*TurnOrchestrator).SetContinuityChecks(bool)`, `config.AgentsConfig.ContinuityChecks *bool` with `ContinuityChecks() bool` defaulting to true
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/orchestrator_test.go`:
 
@@ -968,12 +968,12 @@ func TestContinuityChecksCanBeSwitchedOff(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run 'TestATurnRecordsWhatItsProseContradicts|TestContinuityChecksCanBeSwitchedOff' ./pkg/engine/`
 Expected: FAIL — `orchestrator.SetContinuityChecks undefined`.
 
-- [ ] **Step 3: Record them**
+- [x] **Step 3: Record them**
 
 In `pkg/engine/history.go`, add to `Turn`:
 
@@ -1039,7 +1039,7 @@ In `pkg/gui/service.go`, `prepareTurn` applies the config:
 	orchestrator.SetContinuityChecks(cfg.ContinuityChecks())
 ```
 
-- [ ] **Step 4: Show them**
+- [x] **Step 4: Show them**
 
 In `frontend/src/types.ts`, add `continuity_notes?: string[];` to `Turn`.
 
@@ -1076,12 +1076,12 @@ with `onCorrect?: (note: string) => void` added to the props, and wired in `App.
                 onCorrect={handleCorrect}
 ```
 
-- [ ] **Step 5: Run the full gate**
+- [x] **Step 5: Run the full gate**
 
 Run: `go test -count=1 ./... && go vet ./... && (cd frontend && npx tsc --noEmit)`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/engine/ pkg/config/ pkg/gui/ frontend/src/
@@ -1103,7 +1103,7 @@ git commit -m "feat(engine): report a turn's continuity findings on the turn"
 - Produces: `(*Service).Findings(gameID string) (FindingsDTO, error)`, `(*Service).AddressFinding(gameID string, turn int, rule string) error`
 - Produces: `GET`/`POST /api/game/{id}/findings`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/service_test.go`:
 
@@ -1146,12 +1146,12 @@ func TestAddressingAFindingSurvivesAReload(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestAddressingAFinding ./pkg/gui/`
 Expected: FAIL — `svc.Findings undefined`.
 
-- [ ] **Step 3: Write the sidecar**
+- [x] **Step 3: Write the sidecar**
 
 Create `pkg/gui/findings.go`:
 
@@ -1233,7 +1233,7 @@ func (s *Service) AddressFinding(gameID string, turn int, rule string) error {
 }
 ```
 
-- [ ] **Step 4: Add the routes**
+- [x] **Step 4: Add the routes**
 
 In `pkg/gui/server.go`, in the game switch:
 
@@ -1265,7 +1265,7 @@ In `pkg/gui/server.go`, in the game switch:
 		}
 ```
 
-- [ ] **Step 5: Show addressed findings in the client**
+- [x] **Step 5: Show addressed findings in the client**
 
 In `frontend/src/types.ts`:
 
@@ -1306,12 +1306,12 @@ In `frontend/src/api/client.ts`:
 
 `ChronicleView` gains `addressedTurns?: Set<number>` and renders the findings block dimmed, with the Correct button replaced by "Addressed", when the turn is in that set.
 
-- [ ] **Step 6: Run the full gate**
+- [x] **Step 6: Run the full gate**
 
 Run: `go test -count=1 ./... && go vet ./... && (cd frontend && npx tsc --noEmit)`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/gui/ frontend/src/
@@ -1331,7 +1331,7 @@ git commit -m "feat(gui): let a player mark a continuity finding as dealt with"
 - Consumes: `engine.OpenThreads` (Task 1), `RecapDTO` (memory plan)
 - Produces: `RecapDTO.Threads []ThreadDTO` and `ThreadDTO{ID, Name, Status string; LastAdvanced, Idle int}`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/service_test.go`:
 
@@ -1374,12 +1374,12 @@ func TestResolvedThreadsAreNotOpen(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run 'TestRecapCarriesTheOpenThreads|TestResolvedThreadsAreNotOpen' ./pkg/gui/`
 Expected: FAIL — `recap.Threads undefined`.
 
-- [ ] **Step 3: Add them to the DTO**
+- [x] **Step 3: Add them to the DTO**
 
 In `pkg/gui/types.go`:
 
@@ -1426,7 +1426,7 @@ In `pkg/gui/service.go`, `GetRecap` fills them:
 	}, nil
 ```
 
-- [ ] **Step 4: Show them, and nudge on the stale ones**
+- [x] **Step 4: Show them, and nudge on the stale ones**
 
 In `frontend/src/types.ts`:
 
@@ -1478,12 +1478,12 @@ In `frontend/src/components/LivingWorldDrawer.tsx`, below the Story So Far block
 
 with `idleTurns: number` added to the props, passed from `App.tsx` as `config?.agents.thread_idle_turns ?? 10`, and `recap.threads.length` included in the empty-state condition so the panel does not claim there is nothing when only the summary is absent.
 
-- [ ] **Step 5: Run the full gate**
+- [x] **Step 5: Run the full gate**
 
 Run: `go test -count=1 ./... && go vet ./... && (cd frontend && npx tsc --noEmit && npm run build)`
 Expected: PASS. Restore `pkg/gui/dist/.gitkeep` afterwards and do not stage its deletion.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/ frontend/src/

@@ -39,7 +39,7 @@ Phase 1 (streaming) and Phase 2 (shared factories) are prerequisites for the end
 - Consumes: `harness.Router.StreamForRole`, `harness.StreamChunk`
 - Produces: `(*TurnOrchestrator).ProcessActionStream(ctx context.Context, mode, actionInput string, onChunk func(text string) error) (*Turn, error)`; `(*TurnOrchestrator).generate(ctx context.Context, prompt string, onChunk func(string) error) (string, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/engine/orchestrator_stream_test.go`:
 
@@ -207,12 +207,12 @@ func TestProcessActionStreamEmitsNothingForShortCircuitModes(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestProcessActionStream|TestProcessActionMatchesTheStreaming" -count=1 ./pkg/engine/`
 Expected: FAIL — `orchestrator.ProcessActionStream undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/engine/orchestrator.go`, split generation out and make the non-streaming entry point a wrapper:
 
@@ -274,12 +274,12 @@ func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk 
 
 The `ProcessAction` doc comment that described the pipeline moves onto `ProcessActionStream`; nothing else in the pipeline changes, which is the point of the task.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/ ./pkg/tui/`
 Expected: PASS, including the TUI's existing turn tests, which now exercise the streaming path.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/orchestrator_stream_test.go
@@ -296,7 +296,7 @@ git commit -m "feat(engine): stream the narrator's prose through the turn pipeli
 - Consumes: `Timeline.RecordTurn`, `storage.Store.CountTurns`
 - Produces: cancellation and failure checks before `RecordTurn`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/engine/orchestrator_stream_test.go`:
 
@@ -376,12 +376,12 @@ func TestMidStreamProviderFailureRecordsNothing(t *testing.T) {
 
 Add `"errors"` to the test file's imports. (`scriptedStreamProvider` returns `p.err` after its chunks, which is exactly the mid-stream failure the router forwards.)
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestCancellationRecordsNothing|TestChunkFailure|TestMidStreamProviderFailure" -count=1 ./pkg/engine/`
 Expected: FAIL — a cancelled stream still records a turn with empty narration, because nothing checks the context before `RecordTurn`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `ProcessActionStream`, immediately before the timeline write:
 
@@ -405,12 +405,12 @@ Also guard the empty-narration case, which is what a provider returning nothing 
 	}
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/orchestrator_stream_test.go
@@ -432,7 +432,7 @@ git commit -m "fix(engine): record nothing when a turn is interrupted"
 - Consumes: `NewModelProvider`, `config.AgentsConfig`
 - Produces: `harness.RouterFromConfig(cfg *config.Config) (*Router, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/factory_test.go`:
 
@@ -497,12 +497,12 @@ func TestRouterFromConfigFallsBackToEchoForGM(t *testing.T) {
 
 Add the `config` import to the test file.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestRouterFromConfig -count=1 ./pkg/harness/`
 Expected: FAIL — `undefined: RouterFromConfig`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/harness/factory.go`:
 
@@ -567,12 +567,12 @@ In `cmd/localrpg/play.go`, replace the role loop, the fallback loop, and the gm 
 	}
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/harness/ ./cmd/localrpg/ ./pkg/tui/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/factory.go pkg/harness/factory_test.go cmd/localrpg/play.go
@@ -591,7 +591,7 @@ git commit -m "refactor(harness): build the model router from config in one plac
 - Consumes: `RouterFromConfig`, `Router.GetProviderForRole`
 - Produces: `harness.ExtractorFromConfig(cfg *config.Config, router *Router) *Extractor`
 
-- [ ] **Step 1: Move the failing test**
+- [x] **Step 1: Move the failing test**
 
 Move `cmd/localrpg/play_resolver_test.go` to `pkg/harness/extractor_config_test.go`, changing the package to `harness`, dropping the `config.`/`harness.` qualifiers, and repointing `resolveExtractor` at `ExtractorFromConfig`. Its `routerWithGM` helper becomes:
 
@@ -609,7 +609,7 @@ func routerWithGM(t *testing.T) *Router {
 Run: `go test -run TestExtractorFromConfig -count=1 ./pkg/harness/`
 Expected: FAIL — `undefined: ExtractorFromConfig`
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 In `pkg/harness/factory.go`:
 
@@ -664,12 +664,12 @@ func ExtractorFromConfig(cfg *config.Config, router *Router) *Extractor {
 
 In `cmd/localrpg/play.go`, replace `orchestrator.SetExtractor(resolveExtractor(cfg, router))` with `orchestrator.SetExtractor(harness.ExtractorFromConfig(cfg, router))` and delete `resolveExtractor`.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `go test -count=1 ./pkg/harness/ ./cmd/localrpg/`
 Expected: PASS, with the relocated resolver tests running in their new home.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/harness/factory.go pkg/harness/extractor_config_test.go cmd/localrpg/play.go
@@ -693,7 +693,7 @@ git commit -m "refactor(harness): resolve the extractor role for every client"
 - Consumes: `engine.Turn`, `TurnDTO`, `segmentDTOs`
 - Produces: `(*Service).turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID string) TurnDTO`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/service_test.go`:
 
@@ -732,12 +732,12 @@ func TestChronicleTurnsCarryLocationAndPacing(t *testing.T) {
 
 The test's `aldon-harbour` location and the config's media settings come from the fixtures the earlier plans added to `setupTestGame`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestChronicleTurnsCarryLocationAndPacing -count=1 ./pkg/gui/`
 Expected: FAIL if the chronicle's mapping is still inline and incomplete for these fields; PASS means the fields already exist and this test is the pin for the refactor.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Extract the mapping in `pkg/gui/service.go`:
 
@@ -792,12 +792,12 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 
 The existing chronicle tests are the regression pin for this refactor.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/service_test.go
@@ -814,7 +814,7 @@ git commit -m "refactor(gui): map a turn the same way live and replayed"
 - Consumes: `engine.NewTimeline`, `engine.NewTurnOrchestrator`, `harness.RouterFromConfig`, `harness.ExtractorFromConfig`, `rules.NewJSEngine`, `rules.NewHostBridge`, `core.LoadSystemManifest`, `core.LoadWorldManifest`
 - Produces: `gui.TurnSession`, `(*Service).BeginTurn(gameID string) (*TurnSession, error)`, `(*TurnSession).Run(ctx context.Context, req TurnRequest, emit func(TurnEvent) error) error`, `(*TurnSession).Close()`, `gui.ErrTurnInFlight`, `gui.ErrCampaignNotPlayable`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/gui/turn_test.go`:
 
@@ -980,12 +980,12 @@ func TestTurnSessionRecordsNothingWhenEmitFails(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestBeginTurn|TestTurnSession" -count=1 ./pkg/gui/`
 Expected: FAIL — `svc.BeginTurn undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/gui/service.go`, add to `Service` a lock map beside `indexed`, initialised in `NewService`:
 
@@ -1129,12 +1129,12 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/turn_test.go
@@ -1152,7 +1152,7 @@ git commit -m "feat(gui): prepare and run one turn per campaign under a lock"
 - Consumes: `BeginTurn`, `TurnSession.Run`, `ErrTurnInFlight`, `ErrCampaignNotPlayable`
 - Produces: `gui.TurnRequest`, `gui.TurnEvent`, `(*TurnRequest).validate() error`; route `POST /api/game/{id}/turn`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/gui/server_test.go`:
 
@@ -1282,12 +1282,12 @@ func TestTurnEndpointConflictsWhileATurnIsInFlight(t *testing.T) {
 
 Add `"encoding/json"` to `server_test.go`'s imports.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestTurnEndpoint -count=1 ./pkg/gui/`
 Expected: FAIL — the route does not exist, so these requests 404.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/gui/types.go`:
 
@@ -1407,12 +1407,12 @@ func (s *Server) handleTurnSubmit(w http.ResponseWriter, r *http.Request, gameID
 
 Add `"errors"` to `server.go`'s imports.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/server.go pkg/gui/turn_test.go pkg/gui/server_test.go
@@ -1434,7 +1434,7 @@ git commit -m "feat(gui): play a turn from the desktop app"
 - Consumes: the NDJSON body from Task 7
 - Produces: `APIClient.streamTurn(gameID, body, onEvent, signal): Promise<void>`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 In `frontend/src/types.ts`:
 
@@ -1499,12 +1499,12 @@ In `frontend/src/api/client.ts`:
 
 Add `TurnEvent` to the file's type imports.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/api/client.ts
@@ -1522,7 +1522,7 @@ git commit -m "feat(frontend): read a streamed turn"
 - Consumes: `APIClient.streamTurn`, `TurnSegments`
 - Produces: `ActionConsole` props `streaming?: boolean` and `onStop?: () => void`
 
-- [ ] **Step 1: Implement the console controls**
+- [x] **Step 1: Implement the console controls**
 
 `ActionConsole`'s existing `onSubmit(mode, text)` contract is unchanged; it gains the streaming affordances:
 
@@ -1558,7 +1558,7 @@ The mode tabs and the input take `disabled={disabled || streaming}`, and the sub
 
 `Square` comes from `lucide-react` alongside the icons already imported.
 
-- [ ] **Step 2: Replace the stub handler in `App.tsx`**
+- [x] **Step 2: Replace the stub handler in `App.tsx`**
 
 `handleActionSubmit` currently appends an optimistic turn reading "The storyteller ponders your directive..." and does nothing else. Replace it with a streaming submit:
 
@@ -1631,12 +1631,12 @@ and pass the streaming props to the console:
 
 `onEntityClick` is the same handler `App` already passes to the chronicle as `onWikilinkClick`; reuse that binding rather than inventing a second one. Add `useRef` to the React import.
 
-- [ ] **Step 3: Verify the type check and the build**
+- [x] **Step 3: Verify the type check and the build**
 
 Run: `cd frontend && npx tsc --noEmit && npm run build`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/App.tsx frontend/src/components/ActionConsole.tsx
@@ -1657,20 +1657,20 @@ git commit -m "feat(frontend): play turns from the action console"
 - Consumes: the behaviour observed in Task 9's manual check
 - Produces: documentation only
 
-- [ ] **Step 1: Update `AGENTS.md`**
+- [x] **Step 1: Update `AGENTS.md`**
 
 Add to the GUI paragraph: the desktop app plays turns through `POST /api/game/{id}/turn`, which streams newline-delimited JSON; turns are serialised per campaign by `Service.BeginTurn` (409 while one is in flight); nothing is persisted for a cancelled or disconnected turn; and provider setup lives in `pkg/harness.RouterFromConfig`/`ExtractorFromConfig` rather than in `package main`. Replace the gotcha that says the GUI has no turn-submission endpoint.
 
-- [ ] **Step 2: Run the manual desktop check**
+- [x] **Step 2: Run the manual desktop check**
 
 With a local provider configured, run `bin/localrpg gui`, open a campaign, type an action, and record two observations in the spec's §12: whether the prose appears progressively or in one burst, and that a new turn lands in the chronicle with its audio controls. Then press Stop mid-generation and confirm no turn was recorded.
 
-- [ ] **Step 3: Verify nothing else regressed**
+- [x] **Step 3: Verify nothing else regressed**
 
 Run: `go vet ./... && go test -count=1 ./... && (cd frontend && npx tsc --noEmit)`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add AGENTS.md docs/superpowers/specs/2026-09-21-desktop-turn-submission-design.md

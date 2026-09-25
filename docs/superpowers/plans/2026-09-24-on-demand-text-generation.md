@@ -16,7 +16,7 @@
 - Create: `pkg/gui/text_generate.go`
 - Create: `pkg/gui/text_generate_test.go`
 
-- [ ] **Step 1: Write the failing tests for prompt building**
+- [x] **Step 1: Write the failing tests for prompt building**
 
 Create `pkg/gui/text_generate_test.go`:
 ```go
@@ -94,12 +94,12 @@ func TestBuildTextGeneratorPrompt_CharacterFields(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestBuildTextGeneratorPrompt ./pkg/gui/`  
 Expected output: FAIL (`undefined: GenerateTextRequest` or `undefined: buildTextGeneratorPrompt`)
 
-- [ ] **Step 3: Implement DTOs and prompt builder**
+- [x] **Step 3: Implement DTOs and prompt builder**
 
 Create `pkg/gui/text_generate.go`:
 ```go
@@ -212,12 +212,12 @@ func buildTextGeneratorPrompt(req GenerateTextRequest, systemFields []core.Chara
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestBuildTextGeneratorPrompt ./pkg/gui/`  
 Expected output: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/text_generate.go pkg/gui/text_generate_test.go
@@ -233,7 +233,7 @@ git commit -m "feat(gui): define text generation DTOs and prompt builder"
 - Modify: `pkg/gui/server.go`
 - Modify: `pkg/gui/text_generate_test.go`
 
-- [ ] **Step 1: Write integration test for the HTTP route**
+- [x] **Step 1: Write integration test for the HTTP route**
 
 Append to `pkg/gui/text_generate_test.go`:
 ```go
@@ -267,12 +267,12 @@ func TestHandleGenerateTextRoute_EmptyBody(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestHandleGenerateTextRoute ./pkg/gui/`  
 Expected output: FAIL (`404 page not found`)
 
-- [ ] **Step 3: Implement `Service.GenerateText` and `handleGenerateTextRoute`**
+- [x] **Step 3: Implement `Service.GenerateText` and `handleGenerateTextRoute`**
 
 Append to `pkg/gui/text_generate.go`:
 ```go
@@ -370,12 +370,12 @@ In `pkg/gui/server.go`, add route registration in `registerRoutes()`:
 s.mux.HandleFunc("/api/generate-text", s.handleGenerateTextRoute)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestHandleGenerateTextRoute ./pkg/gui/`  
 Expected output: PASS
 
-- [ ] **Step 5: Run full backend vet and tests, then commit**
+- [x] **Step 5: Run full backend vet and tests, then commit**
 
 Run: `go vet ./... && go test -count=1 ./pkg/gui/`  
 Expected output: PASS  
@@ -392,7 +392,7 @@ git commit -m "feat(gui): add POST /api/generate-text endpoint and service metho
 - Modify: `frontend/src/types.ts`
 - Modify: `frontend/src/api/client.ts`
 
-- [ ] **Step 1: Add types to `frontend/src/types.ts`**
+- [x] **Step 1: Add types to `frontend/src/types.ts`**
 
 Add to `frontend/src/types.ts`:
 ```typescript
@@ -411,7 +411,7 @@ export interface GenerateTextResponse {
 }
 ```
 
-- [ ] **Step 2: Add `generateText` method to `APIClient`**
+- [x] **Step 2: Add `generateText` method to `APIClient`**
 
 In `frontend/src/api/client.ts`, add:
 ```typescript
@@ -426,12 +426,12 @@ In `frontend/src/api/client.ts`, add:
   }
 ```
 
-- [ ] **Step 3: Verify TypeScript compilation**
+- [x] **Step 3: Verify TypeScript compilation**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected output: Clean exit (0 errors).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/api/client.ts
@@ -445,7 +445,7 @@ git commit -m "feat(frontend): add generateText API client and types"
 **Files:**
 - Create: `frontend/src/components/ui/AIGenerateButton.tsx`
 
-- [ ] **Step 1: Create `AIGenerateButton` component**
+- [x] **Step 1: Create `AIGenerateButton` component**
 
 Create `frontend/src/components/ui/AIGenerateButton.tsx`:
 ```typescript
@@ -526,12 +526,12 @@ export const AIGenerateButton: React.FC<AIGenerateButtonProps> = ({
 };
 ```
 
-- [ ] **Step 2: Verify TypeScript compilation**
+- [x] **Step 2: Verify TypeScript compilation**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected output: Clean exit (0 errors).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/ui/AIGenerateButton.tsx
@@ -545,7 +545,7 @@ git commit -m "feat(frontend): create reusable AIGenerateButton component"
 **Files:**
 - Modify: `frontend/src/components/launcher/NewCampaignModal.tsx`
 
-- [ ] **Step 1: Add context helper, generate-all handler, and button imports**
+- [x] **Step 1: Add context helper, generate-all handler, and button imports**
 
 In `frontend/src/components/launcher/NewCampaignModal.tsx`:
 1. Import `AIGenerateButton` and `Wand2`:
@@ -611,7 +611,7 @@ import { AIGenerateButton } from '../ui/AIGenerateButton';
   };
 ```
 
-- [ ] **Step 2: Add inline `AIGenerateButton` to character and campaign fields**
+- [x] **Step 2: Add inline `AIGenerateButton` to character and campaign fields**
 
 In `frontend/src/components/launcher/NewCampaignModal.tsx`:
 1. Campaign Name field label:
@@ -704,12 +704,12 @@ In `frontend/src/components/launcher/NewCampaignModal.tsx`:
             </button>
 ```
 
-- [ ] **Step 3: Verify TypeScript compilation**
+- [x] **Step 3: Verify TypeScript compilation**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected output: Clean exit (0 errors).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/launcher/NewCampaignModal.tsx
@@ -723,7 +723,7 @@ git commit -m "feat(frontend): integrate AI text generation into NewCampaignModa
 **Files:**
 - Modify: `frontend/src/components/launcher/CampaignSettingsModal.tsx`
 
-- [ ] **Step 1: Add `AIGenerateButton` to directives in `CampaignSettingsModal`**
+- [x] **Step 1: Add `AIGenerateButton` to directives in `CampaignSettingsModal`**
 
 In `frontend/src/components/launcher/CampaignSettingsModal.tsx`:
 1. Import `AIGenerateButton`:
@@ -792,12 +792,12 @@ import { AIGenerateButton } from '../ui/AIGenerateButton';
             </div>
 ```
 
-- [ ] **Step 2: Verify TypeScript compilation**
+- [x] **Step 2: Verify TypeScript compilation**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected output: Clean exit (0 errors).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/launcher/CampaignSettingsModal.tsx
@@ -811,7 +811,7 @@ git commit -m "feat(frontend): integrate AI text generation into CampaignSetting
 **Files:**
 - Modify: `frontend/src/components/WorldsStudio.tsx`
 
-- [ ] **Step 1: Add context helper and auto-fill handler to `WorldsStudio`**
+- [x] **Step 1: Add context helper and auto-fill handler to `WorldsStudio`**
 
 In `frontend/src/components/WorldsStudio.tsx`:
 1. Import `AIGenerateButton` and `Wand2`:
@@ -856,7 +856,7 @@ import { AIGenerateButton } from './ui/AIGenerateButton';
   };
 ```
 
-- [ ] **Step 2: Add inline `AIGenerateButton` to World inputs and "Auto-Fill" button to header**
+- [x] **Step 2: Add inline `AIGenerateButton` to World inputs and "Auto-Fill" button to header**
 
 1. Add Auto-Fill button to the tab header toolbar:
 ```tsx
@@ -957,12 +957,12 @@ import { AIGenerateButton } from './ui/AIGenerateButton';
             </div>
 ```
 
-- [ ] **Step 3: Verify TypeScript compilation**
+- [x] **Step 3: Verify TypeScript compilation**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected output: Clean exit (0 errors).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/WorldsStudio.tsx
@@ -976,7 +976,7 @@ git commit -m "feat(frontend): integrate AI text generation into WorldsStudio"
 **Files:**
 - Modify: `frontend/src/components/SystemsStudio.tsx`
 
-- [ ] **Step 1: Add context helper and auto-fill handler to `SystemsStudio`**
+- [x] **Step 1: Add context helper and auto-fill handler to `SystemsStudio`**
 
 In `frontend/src/components/SystemsStudio.tsx`:
 1. Import `AIGenerateButton` and `Wand2`:
@@ -1015,7 +1015,7 @@ import { AIGenerateButton } from './ui/AIGenerateButton';
   };
 ```
 
-- [ ] **Step 2: Add inline `AIGenerateButton` to System inputs and "Auto-Fill" button to header**
+- [x] **Step 2: Add inline `AIGenerateButton` to System inputs and "Auto-Fill" button to header**
 
 1. Add Auto-Fill button to the tab header toolbar:
 ```tsx
@@ -1082,12 +1082,12 @@ import { AIGenerateButton } from './ui/AIGenerateButton';
             </div>
 ```
 
-- [ ] **Step 3: Verify TypeScript compilation**
+- [x] **Step 3: Verify TypeScript compilation**
 
 Run: `cd frontend && npx tsc --noEmit`  
 Expected output: Clean exit (0 errors).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/SystemsStudio.tsx
@@ -1101,12 +1101,12 @@ git commit -m "feat(frontend): integrate AI text generation into SystemsStudio"
 **Files:**
 - N/A
 
-- [ ] **Step 1: Run Go linter and test suite**
+- [x] **Step 1: Run Go linter and test suite**
 
 Run: `go vet ./... && go test -count=1 ./...`  
 Expected output: PASS
 
-- [ ] **Step 2: Run frontend typecheck and bundle build**
+- [x] **Step 2: Run frontend typecheck and bundle build**
 
 Run: `cd frontend && npx tsc --noEmit && npm run build`  
 Expected output: PASS (dist generated, .gitkeep touched)

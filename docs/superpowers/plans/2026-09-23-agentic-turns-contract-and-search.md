@@ -68,7 +68,7 @@ Nothing here is user-visible on its own, which the spec anticipates: a contract 
 **Interfaces:**
 - Produces: `harness.Message`, `harness.ToolSpec`, `harness.ToolCall`, `GenerateRequest.Messages`/`Tools`, `StreamChunk.ToolCalls`, `GenerateRequest.PromptText()`, `harness.MessagesPrompt(messages []Message) string`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/types_test.go`:
 
@@ -104,12 +104,12 @@ func TestPromptTextPrefersAnExplicitPrompt(t *testing.T) {
 
 Add `"strings"` to the test imports if absent.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestMessagesPrompt|TestPromptText' ./pkg/harness/ -v`
 Expected: FAIL with "undefined: MessagesPrompt".
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/harness/types.go`, add `"strings"` to the imports and add:
 
@@ -199,12 +199,12 @@ func (r GenerateRequest) PromptText() string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/harness/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/types.go pkg/harness/types_test.go
@@ -223,7 +223,7 @@ git commit -m "feat(harness): add the tool-round vocabulary to the provider cont
 - Consumes: `Message`, `ToolSpec`, `ToolCall` (Task 1).
 - Produces: an OpenAI-compatible `tools` request field; whole `ToolCalls` on the terminal chunk; a single retry without tools when the server rejects the field, traced as `provider.tools`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/http_provider_test.go`:
 
@@ -334,12 +334,12 @@ func TestHTTPProviderDegradesOnceWhenToolsAreRejected(t *testing.T) {
 
 Match the existing test file's imports (`fmt`, `encoding/json`, `net/http`, `net/http/httptest`, `context`, `testing`, `github.com/darkliquid/localrpg/pkg/trace`) and add any that are missing.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestHTTPProviderAccumulates|TestHTTPProviderDegrades' ./pkg/harness/ -v`
 Expected: FAIL: no `tools` field is sent, and no accumulation happens.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/harness/http_provider.go`, extend the wire types:
 
@@ -545,12 +545,12 @@ and the terminal chunk:
 
 Note: `defer close(out)` now lives in `streamOnce`, and the retry re-enters it; that is correct because the first attempt closes the channel only after returning, and the retry is a fresh stream on the same channel. Do not also close `out` in `Stream`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/harness/ -count=1`
 Expected: PASS, including the existing HTTP provider tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/http_provider.go pkg/harness/http_provider_test.go
@@ -569,7 +569,7 @@ git commit -m "feat(harness): offer tools and reassemble streamed tool calls"
 - Consumes: `GenerateRequest.PromptText()` (Task 1).
 - Produces: no behaviour change for a request that only sets `Messages`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/cli_provider_test.go`:
 
@@ -595,23 +595,23 @@ func TestCLIProviderUsesMessagesAsAPrompt(t *testing.T) {
 
 This follows the file's existing `sh -c ... --` pattern, so it works anywhere the current CLI tests do.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestCLIProviderUsesMessages ./pkg/harness/ -v`
 Expected: FAIL because the provider reads `req.Prompt`, which is empty.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/harness/cli_provider.go`, `pkg/harness/oracle_provider.go`, and the echo provider in `pkg/harness/factory.go`, replace `req.Prompt` with `req.PromptText()`. Find every use with `grep -rn "req.Prompt" pkg/harness/` and update each one that is a provider reading a request; leave the HTTP provider's `buildMessages` fallback as it is (it already uses `PromptText`).
 
 The CLI and oracle providers ignore `req.Tools` entirely, which is the compatibility property: a provider that cannot call tools simply produces its normal reply.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/harness/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/cli_provider.go pkg/harness/oracle_provider.go pkg/harness/factory.go pkg/harness/cli_provider_test.go
@@ -631,7 +631,7 @@ git commit -m "feat(harness): derive a prompt for providers that take only a str
 **Interfaces:**
 - Produces: `config.AgentRoleConfig.SupportsTools`, `config.AgentsConfig.ToolRounds`/`ToolResultChars`, `(*Config).RoleSupportsTools(role string) string`, `(*Config).ToolRounds() int`, `(*Config).ToolResultChars() int`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/config/types_test.go`:
 
@@ -672,12 +672,12 @@ func TestToolCapabilityAndBounds(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestToolCapabilityAndBounds ./pkg/config/ -v`
 Expected: FAIL to compile with "unknown field SupportsTools".
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/config/types.go`, add to `AgentRoleConfig`:
 
@@ -735,12 +735,12 @@ Add the keys to `DefaultConfig`'s `Agents` literal so a fresh config shows them:
 			ToolResultChars:     4000,
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/config/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/config/types_test.go
@@ -761,7 +761,7 @@ git commit -m "feat(config): declare tool capability and result bounds"
 
 **Design note (a deviation worth stating):** the spec asks for FTS5 over `entities(name, body, tags)`. Entity tags live inside `frontmatter_json`, and an FTS5 *external-content* table can only index columns that exist on the content table, so `tags` cannot be a column of an external-content table. This plan uses plain FTS5 tables keyed by the content table's `rowid` and kept in step by triggers, which is the same join and the same migration story. It is called out here because it is a real difference from the spec's wording.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/storage/fts_test.go`:
 
@@ -877,12 +877,12 @@ func TestEnsureFTSBackfillsAnExistingIndex(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestFTS|TestEnsureFTS' ./pkg/storage/ -v`
 Expected: FAIL with "store.SearchEntities undefined".
 
-- [ ] **Step 3: Implement the FTS tables**
+- [x] **Step 3: Implement the FTS tables**
 
 Create `pkg/storage/fts.go`:
 
@@ -1060,12 +1060,12 @@ In `pkg/storage/db.go`, call it after the existing migration:
 
 `storage.TurnRecord`'s fields are `Number`, `Timestamp`, `Mode`, `Input`, `Narration`, `Location`, `Outcome`, `RollJSON`, and `Entities` (`pkg/storage/turn.go`); `SaveTurn` upserts by `Number`, so an update fires the update trigger rather than the insert one.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/storage/ -count=1`
 Expected: PASS, including the existing migration test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/fts.go pkg/storage/fts_test.go pkg/storage/db.go
@@ -1084,7 +1084,7 @@ git commit -m "feat(storage): add a derived FTS5 index kept in step by triggers"
 - Consumes: `ToolSpec` (Task 1).
 - Produces: `harness.ToolSpecs() []ToolSpec`, `harness.ToolNames() []string`, `harness.UnknownToolMessage(name string) string`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/harness/tools_test.go`:
 
@@ -1135,12 +1135,12 @@ func TestUnknownToolMessageListsTheSurface(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestToolSpecs|TestUnknownTool' ./pkg/harness/ -v`
 Expected: FAIL with "undefined: ToolSpecs".
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/harness/tools.go`:
 
@@ -1233,12 +1233,12 @@ func UnknownToolMessage(name string) string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestToolSpecs|TestUnknownTool' ./pkg/harness/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/tools.go pkg/harness/tools_test.go
@@ -1256,7 +1256,7 @@ git commit -m "feat(harness): declare the read-only tool surface"
 **Interfaces:**
 - Produces: `tools.BuildMatch(query string) string`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/tools/query_test.go`:
 
@@ -1289,12 +1289,12 @@ func TestBuildMatch(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestBuildMatch ./pkg/tools/ -v`
 Expected: FAIL with "no Go files" or "undefined: BuildMatch".
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/tools/query.go`:
 
@@ -1342,12 +1342,12 @@ func stripFTSPunctuation(word string) string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestBuildMatch ./pkg/tools/ -v`
 Expected: PASS. Note `"kael's oath"` becomes `"kaels"`, which is what the test asserts.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/tools/query.go pkg/tools/query_test.go
@@ -1366,7 +1366,7 @@ git commit -m "feat(tools): build FTS queries that cannot break the grammar"
 - Consumes: `harness.ToolCall`, `harness.ToolSpecs`, `harness.UnknownToolMessage`, `storage.Store`, `tools.BuildMatch`.
 - Produces: `tools.Executor`, `tools.NewExecutor(store *storage.Store, maxResultChars int) *Executor`, `(*Executor).Execute(ctx context.Context, call harness.ToolCall) (result string, ok bool)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/tools/tools_test.go`:
 
@@ -1510,12 +1510,12 @@ func TestToolResultsAreCapped(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestSearchEntitiesTool|TestGetEntityTool|TestGraphNeighboursTool|TestSearchTimelineTool|TestToolErrors|TestToolResults' ./pkg/tools/ -v`
 Expected: FAIL with "undefined: NewExecutor".
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/tools/tools.go`:
 
@@ -1754,12 +1754,12 @@ func intArgument(arguments map[string]interface{}, key string, fallback int) int
 
 The test reaches `executor.store`, so the field stays unexported and the test lives in package `tools`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/tools/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/tools/tools.go pkg/tools/tools_test.go
@@ -1772,17 +1772,17 @@ git commit -m "feat(tools): implement the four read-only campaign tools"
 
 **Files:** none (verification only).
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `go test ./... -count=1`
 Expected: every package ok, including every pre-existing provider and storage test, which is the compatibility check for a contract change.
 
-- [ ] **Step 2: Vet and typecheck**
+- [x] **Step 2: Vet and typecheck**
 
 Run: `mise run lint` and `cd frontend && npx tsc --noEmit`
 Expected: `go vet ./...` clean and no TypeScript errors.
 
-- [ ] **Step 3: Confirm the increment's properties**
+- [x] **Step 3: Confirm the increment's properties**
 
 - A provider that ignores `Messages`, `Tools`, and `ToolCalls` behaves exactly as before (Task 9 Step 1, plus Task 3's test).
 - Streamed tool calls arrive whole, never as fragments (Task 2).

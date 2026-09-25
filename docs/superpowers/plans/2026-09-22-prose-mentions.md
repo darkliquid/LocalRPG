@@ -44,7 +44,7 @@ This plan closes the retrieval gap for turns where extraction did not run or mis
 
 One entity can hold several `turn_entities` rows, because the table's key is `(turn_number, entity_id, mention)`. A character who is both wikilinked and extracted therefore counts twice in a ranking that counts rows. This is a bug in the retrieval added by the previous plan, and it is fixed first so the prose work lands on correct arithmetic.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/context_test.go`:
 
@@ -104,12 +104,12 @@ func TestRelevantHistoryCountsAnEntityOncePerTurn(t *testing.T) {
 
 Note: the window turns passed in must mention both characters for both to be query entities. The fixture's recent turn names both in speech, so the query set is `{guard-kael, sera-vane}`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestRelevantHistoryCountsAnEntityOncePerTurn ./pkg/harness/`
 Expected: FAIL — turn 1 ranks first, because Kael's two rows give it a higher count.
 
-- [ ] **Step 3: Deduplicate the count**
+- [x] **Step 3: Deduplicate the count**
 
 In `pkg/harness/context.go`, replace the overlap loop in `relevantHistory`:
 
@@ -136,12 +136,12 @@ In `pkg/harness/context.go`, replace the overlap loop in `relevantHistory`:
 		}
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `go test -count=1 ./pkg/harness/ ./pkg/engine/`
 Expected: PASS, including the existing retrieval tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/context.go pkg/harness/context_test.go
@@ -161,7 +161,7 @@ git commit -m "fix(harness): count a turn's entities once when ranking retrieval
 - Produces: `entity.MentionProse = "prose"`
 - Produces: `harness.ResolveProseMentions(store *storage.Store, texts ...string) []entity.Mention`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/extractor_test.go`:
 
@@ -209,12 +209,12 @@ func TestResolveProseMentionsIgnoresShortAndPartialNames(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestResolveProseMentions ./pkg/harness/`
 Expected: FAIL — `undefined: ResolveProseMentions`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `pkg/entity/mention.go`, add the kind beside the others:
 
@@ -314,12 +314,12 @@ func longestNameWord(name string) string {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/harness/ ./pkg/entity/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity/mention.go pkg/harness/extractor.go pkg/harness/extractor_test.go
@@ -340,7 +340,7 @@ git commit -m "feat(harness): find the characters a turn names in prose"
 
 `RecordTurn` is the single writer for a turn, so recording here means the GUI, the TUI, and any future writer all get the behaviour without each remembering to.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/timeline_test.go`:
 
@@ -387,12 +387,12 @@ func TestRecordTurnRecordsProseMentions(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestRecordTurnRecordsProseMentions ./pkg/engine/`
 Expected: FAIL — no `prose` mention for Sera Vane.
 
-- [ ] **Step 3: Record them in `RecordTurn`**
+- [x] **Step 3: Record them in `RecordTurn`**
 
 In `pkg/engine/timeline.go`, extend the head of `RecordTurn`:
 
@@ -415,12 +415,12 @@ func (t *Timeline) RecordTurn(turn *Turn, extracted []harness.ExtractedEntity) e
 
 `containsMention` already exists in the package and is used by `stageEntities`, so nothing new is needed for deduplication.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `go test -count=1 ./pkg/engine/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/timeline.go pkg/engine/timeline_test.go
@@ -438,7 +438,7 @@ git commit -m "feat(engine): record the characters a turn names in prose"
 - Consumes: everything above
 - Produces: no new interface; the gap is closed by test
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/orchestrator_recall_test.go`:
 
@@ -526,17 +526,17 @@ func TestRetrievalWorksWithoutTheExtractor(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it passes**
+- [x] **Step 2: Run the test to verify it passes**
 
 Run: `go test -count=1 -run TestRetrievalWorksWithoutTheExtractor -v ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 3: Run the full gate**
+- [x] **Step 3: Run the full gate**
 
 Run: `go test -count=1 ./... && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/engine/orchestrator_recall_test.go

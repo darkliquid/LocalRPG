@@ -33,7 +33,7 @@
 - Create: `pkg/media/speakable.go`
 - Create: `pkg/media/speakable_test.go`
 
-- [ ] **Step 1: Write the failing table test**
+- [x] **Step 1: Write the failing table test**
 
 ```go
 func TestSpeakableText(t *testing.T) {
@@ -63,12 +63,12 @@ func TestSpeakableText(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestSpeakableText ./pkg/media/`
 Expected: FAIL, undefined `SpeakableText`.
 
-- [ ] **Step 3: Implement `pkg/media/speakable.go`**
+- [x] **Step 3: Implement `pkg/media/speakable.go`**
 
 Handle, in order: line-ending normalisation, fenced code fences, wikilinks, inline code, emphasis (with the underscore guard), blockquotes, headings, list markers, scene breaks, HTML entities, then whitespace collapse. Preserve `. , ! ? ; : — … - ( ) " '`.
 
@@ -91,12 +91,12 @@ func SpeakableText(text string) string {
 
 Decode entities with `html.UnescapeString` from the standard library and keep any unrecognised entity as written. Collapse whitespace with `strings.Fields` and a single-space join, then `strings.TrimSpace`. A newline becomes a space; punctuation already provides the pause.
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `go test -run TestSpeakableText ./pkg/media/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/speakable.go pkg/media/speakable_test.go
@@ -112,7 +112,7 @@ git commit -m "feat(media): reduce narrator markdown to speakable text"
 - Modify: `pkg/media/tts.go`
 - Modify: `pkg/media/tts_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 type markdownFake struct{ got []string; aware bool }
@@ -161,12 +161,12 @@ func TestPipelineSharesCacheForEquivalentText(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run 'TestPipeline' ./pkg/media/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/media/speakable.go`:
 
@@ -204,12 +204,12 @@ return p.SynthesizeUtterance(ctx, speakerID, voice, spoken)
 
 Move the existing empty-input guard so the sentinel is the single empty case.
 
-- [ ] **Step 4: Run the media tests**
+- [x] **Step 4: Run the media tests**
 
 Run: `go test -count=1 ./pkg/media/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/speakable.go pkg/media/tts.go pkg/media/tts_test.go
@@ -226,7 +226,7 @@ git commit -m "feat(media): strip markdown for engines that do not read it"
 - Modify: `pkg/export/script.go`
 - Modify: `pkg/media/tts_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestSynthesizeSegmentsSkipsUnspeakableBeats(t *testing.T) {
@@ -235,7 +235,7 @@ func TestSynthesizeSegmentsSkipsUnspeakableBeats(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 In `SynthesizeSegments`, skip `ErrNoSpeakableText` rather than returning it:
 
@@ -251,12 +251,12 @@ if err != nil {
 
 `PlayTurnAudio` already skips synthesis errors, so `ErrNoSpeakableText` needs no change there; confirm it. In the export compiler's `resolveAudio`, count the sentinel as silent so the progress message stays honest.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Run: `go test -count=1 ./pkg/media/ ./pkg/gui/ ./pkg/export/ ./pkg/scene/`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/media/tts.go pkg/gui/service.go pkg/export/script.go pkg/media/tts_test.go
@@ -271,7 +271,7 @@ git commit -m "fix(media): skip beats that reduce to no speakable text"
 - Modify: `pkg/config/types.go`
 - Modify: `pkg/config/types_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestTTSMarkdownDefaultsToAuto(t *testing.T) {
@@ -282,7 +282,7 @@ func TestTTSMarkdownDefaultsToAuto(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 Add to `TTSConfig`:
 
@@ -293,16 +293,16 @@ Add to `TTSConfig`:
 Markdown string `yaml:"markdown,omitempty" json:"markdown,omitempty"`
 ```
 
-- [ ] **Step 3: Map the string to a policy**
+- [x] **Step 3: Map the string to a policy**
 
 Add `media.TextPolicyFromConfig(cfg config.TTSConfig) TextPolicy` (accepting `""`/`"auto"` as auto, `"strip"`, `"keep"`, and logging/ignoring anything else as auto).
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `go test -count=1 ./pkg/config/ ./pkg/media/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/config/types_test.go pkg/media/speakable.go
@@ -318,11 +318,11 @@ git commit -m "feat(config): let tts markdown handling be configured"
 - Modify: `pkg/export/script.go`
 - Modify: `pkg/gui/service_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add a GUI test asserting that a TTS preview whose prompt contains `**bold**` synthesises "bold" (inspect via the echo/mock client or the returned bytes for a fake).
 
-- [ ] **Step 2: Set the policy on every pipeline**
+- [x] **Step 2: Set the policy on every pipeline**
 
 Where `media.NewTTSPipeline(...)` is constructed, follow it with:
 
@@ -332,7 +332,7 @@ pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 
 Do this in `GetSegmentAudio` (`pkg/gui/service.go`) and in the export compiler's pipeline construction (`pkg/export/script.go`).
 
-- [ ] **Step 3: Reduce the preview**
+- [x] **Step 3: Reduce the preview**
 
 In the TTS test branch (`pkg/gui/service.go` around line 2163), replace the direct call with:
 
@@ -344,12 +344,12 @@ if strings.TrimSpace(spoken) == "" {
 audio, err := client.Synthesize(ctx, spoken, voice)
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `go test -count=1 ./pkg/gui/ ./pkg/export/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/export/script.go pkg/gui/service_test.go
@@ -364,20 +364,20 @@ git commit -m "fix(gui): apply markdown handling to playback and the tts preview
 - Modify: `frontend/src/types.ts`
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Types**
+- [x] **Step 1: Types**
 
 Add `markdown?: 'auto' | 'strip' | 'keep'` to `TTSConfig`.
 
-- [ ] **Step 2: Selector**
+- [x] **Step 2: Selector**
 
 In the TTS panel add a small select labelled "Narration Markdown" with the three options and help text: auto reduces formatting unless the provider understands it, strip always reduces, keep sends it unchanged.
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/SettingsStudio.tsx
@@ -388,17 +388,17 @@ git commit -m "feat(frontend): configure tts markdown handling in settings"
 
 ### Task 7: Verification
 
-- [ ] **Step 1: Backend gate**
+- [x] **Step 1: Backend gate**
 
 Run: `mise run test:backend` and `mise run lint`
 Expected: all tests pass, `go vet` clean.
 
-- [ ] **Step 2: Frontend gate**
+- [x] **Step 2: Frontend gate**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 3: Manual smoke**
+- [x] **Step 3: Manual smoke**
 
 1. With the built-in Sherpa-ONNX TTS, play a turn whose prose contains `*emphasis*`, a heading, a list, and a `[[wikilink]]`; confirm none of the marks are spoken.
 2. Confirm a scene break produces no audio and no error.

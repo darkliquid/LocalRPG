@@ -30,7 +30,7 @@
 2. Add `isMaximized` state inside `Drawers.tsx` toggled by a button in the drawer header with `Maximize2` and `Minimize2` icons from `lucide-react`.
 3. When maximized, the drawer container uses `w-full max-w-full` instead of `sizeClasses[size]`.
 
-- [ ] **Step 1: Update Drawers.tsx**
+- [x] **Step 1: Update Drawers.tsx**
 
 In `frontend/src/components/Drawers.tsx`:
 ```tsx
@@ -90,12 +90,12 @@ export const Drawers: React.FC<DrawersProps> = ({ isOpen, onClose, title, childr
 };
 ```
 
-- [ ] **Step 2: Typecheck the changes**
+- [x] **Step 2: Typecheck the changes**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/Drawers.tsx
@@ -117,7 +117,7 @@ git commit -m "feat(gui): widen drawer default to 3xl and add maximize toggle"
 4. When selecting a note from the sidebar on narrower screens or normal width, keep or auto-collapse the sidebar.
 5. Prevent horizontal overflow on textareas, inputs, and selects.
 
-- [ ] **Step 1: Update CodexDrawer.tsx**
+- [x] **Step 1: Update CodexDrawer.tsx**
 
 In `frontend/src/components/CodexDrawer.tsx`:
 ```tsx
@@ -399,12 +399,12 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({ entity, entities, onSe
 };
 ```
 
-- [ ] **Step 2: Typecheck the changes**
+- [x] **Step 2: Typecheck the changes**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/CodexDrawer.tsx
@@ -440,7 +440,7 @@ git commit -m "feat(frontend): collapse entity sidebar by default in codex drawe
    - Pass `turnInFlight`, `pendingAction`, and `streamedProse` directly into `<ChronicleView ... />`.
    - Remove the separate `streamedProse` card outside `ChronicleView` in `App.tsx` since it now renders inline as part of the pending turn.
 
-- [ ] **Step 1: Update ChronicleView.tsx**
+- [x] **Step 1: Update ChronicleView.tsx**
 
 In `frontend/src/components/ChronicleView.tsx`:
 Add `Loader2`, `Feather`, or `Sparkles` icon from `lucide-react`, accept `turnInFlight`, `pendingAction`, and `streamedProse`, render pending card, and add smooth auto-scroll.
@@ -677,7 +677,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
 };
 ```
 
-- [ ] **Step 2: Update App.tsx with pendingAction**
+- [x] **Step 2: Update App.tsx with pendingAction**
 
 In `frontend/src/App.tsx`:
 Add `pendingAction` state, pass it to `ChronicleView`, and remove the duplicate `streamedProse` container.
@@ -726,12 +726,12 @@ Pass props to `ChronicleView`:
                   />
 ```
 
-- [ ] **Step 3: Typecheck the changes**
+- [x] **Step 3: Typecheck the changes**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/ChronicleView.tsx frontend/src/App.tsx
@@ -775,7 +775,7 @@ git commit -m "feat(frontend): show immediate inline turn action and drafting in
      - Opens Codex drawer (`setActiveDrawer('codex')`).
      - Marks finding addressed.
 
-- [ ] **Step 1: Create AddEntityModal.tsx**
+- [x] **Step 1: Create AddEntityModal.tsx**
 
 Write `frontend/src/components/AddEntityModal.tsx`:
 ```tsx
@@ -874,7 +874,7 @@ export const AddEntityModal: React.FC<AddEntityModalProps> = ({
 };
 ```
 
-- [ ] **Step 2: Wire AddEntityModal in App.tsx**
+- [x] **Step 2: Wire AddEntityModal in App.tsx**
 
 In `frontend/src/App.tsx`:
 - Import `AddEntityModal`.
@@ -953,12 +953,12 @@ In `frontend/src/App.tsx`:
   />
   ```
 
-- [ ] **Step 3: Typecheck the changes**
+- [x] **Step 3: Typecheck the changes**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/AddEntityModal.tsx frontend/src/App.tsx
@@ -973,22 +973,22 @@ git commit -m "feat(frontend): add non-disruptive entity note modal for continui
 - All modified and new files
 - Verification of test suites and builds
 
-- [ ] **Step 1: Run Go test and vet suite**
+- [x] **Step 1: Run Go test and vet suite**
 
 Run: `go test -count=1 ./... && go vet ./...`
 Expected: PASS with 0 failures, clean vet.
 
-- [ ] **Step 2: Run frontend typecheck and production build**
+- [x] **Step 2: Run frontend typecheck and production build**
 
 Run: `cd frontend && npx tsc --noEmit && npm run build`
 Expected: PASS with 0 errors, bundle generated in `pkg/gui/dist`.
 
-- [ ] **Step 3: Restore .gitkeep**
+- [x] **Step 3: Restore .gitkeep**
 
 Run: `git checkout -- pkg/gui/dist/.gitkeep`
 Expected: Working tree clean of deleted `.gitkeep`.
 
-- [ ] **Step 4: Verify complete binary compilation**
+- [x] **Step 4: Verify complete binary compilation**
 
 Run: `go build -o /dev/null ./cmd/localrpg`
 Expected: Exit code 0 with embedded assets.

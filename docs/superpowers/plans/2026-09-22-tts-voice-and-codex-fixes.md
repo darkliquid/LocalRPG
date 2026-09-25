@@ -43,7 +43,7 @@
 - Create: `pkg/media/kokoro_voices.go`
 - Create: `pkg/media/kokoro_voices_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/media/kokoro_voices_test.go`:
 
@@ -84,12 +84,12 @@ func TestKokoroUnknownVoiceAndModelFallback(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test and confirm it fails**
+- [x] **Step 2: Run the test and confirm it fails**
 
 Run: `go test -run TestKokoroV019 ./pkg/media/`
 Expected: FAIL with undefined `KokoroSpeakersForModel` / `KokoroModelV019`.
 
-- [ ] **Step 3: Implement `pkg/media/kokoro_voices.go`**
+- [x] **Step 3: Implement `pkg/media/kokoro_voices.go`**
 
 ```go
 package media
@@ -138,12 +138,12 @@ func ResolveKokoroSpeakerID(modelID, voiceID string) int {
 }
 ```
 
-- [ ] **Step 4: Run the test to confirm it passes**
+- [x] **Step 4: Run the test to confirm it passes**
 
 Run: `go test -run TestKokoro ./pkg/media/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/kokoro_voices.go pkg/media/kokoro_voices_test.go
@@ -159,7 +159,7 @@ git commit -m "fix(media): pin Kokoro speaker ids to the bundled model variant"
 - Modify: `pkg/media/sherpa_tts_test.go`
 - Modify: `pkg/media/providers.go`
 
-- [ ] **Step 1: Update the failing test**
+- [x] **Step 1: Update the failing test**
 
 Replace `TestKokoroVoiceMapping` in `pkg/media/sherpa_tts_test.go` with:
 
@@ -190,12 +190,12 @@ func TestKokoroVoiceMapping(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test and confirm it fails**
+- [x] **Step 2: Run the test and confirm it fails**
 
 Run: `go test -run TestKokoroVoiceMapping ./pkg/media/`
 Expected: FAIL on the `am_adam`/`bm_george` cases.
 
-- [ ] **Step 3: Delete the old map and wire `modelID`**
+- [x] **Step 3: Delete the old map and wire `modelID`**
 
 In `pkg/media/sherpa_tts.go`:
 - Delete the `kokoroSpeakerMap` var and the package-level `ResolveKokoroSpeakerID(voiceID string)` (superseded by Task 1).
@@ -210,12 +210,12 @@ func NewSherpaTTSClient(modelDir string) *SherpaTTSClient {
 
 - In `Synthesize`, change the call to `sid = ResolveKokoroSpeakerID(s.modelID, voice.VoiceID)`.
 
-- [ ] **Step 4: Run the media tests**
+- [x] **Step 4: Run the media tests**
 
 Run: `go test -count=1 ./pkg/media/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/sherpa_tts.go pkg/media/sherpa_tts_test.go
@@ -232,7 +232,7 @@ git commit -m "fix(media): resolve Kokoro speakers against the loaded model"
 - Modify: `frontend/src/templates/providerPresets.ts`
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Update the failing tests**
+- [x] **Step 1: Update the failing tests**
 
 Replace `TestKokoroVoiceProfilesPreset` in `pkg/config/presets_test.go`:
 
@@ -257,12 +257,12 @@ func TestKokoroVoiceProfilesPreset(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestKokoroVoiceProfilesPreset ./pkg/config/`
 Expected: FAIL, "expected 11 ... got 27".
 
-- [ ] **Step 3: Replace `KokoroVoiceProfiles` in `pkg/config/presets.go`**
+- [x] **Step 3: Replace `KokoroVoiceProfiles` in `pkg/config/presets.go`**
 
 Keep the existing prose/tags for the ten retained voices and add `af`. The order must match the SID table:
 
@@ -282,11 +282,11 @@ var KokoroVoiceProfiles = []VoiceProfile{
 }
 ```
 
-- [ ] **Step 4: Mirror the list in `frontend/src/templates/providerPresets.ts`**
+- [x] **Step 4: Mirror the list in `frontend/src/templates/providerPresets.ts`**
 
 Replace `KOKORO_VOICE_PROFILES` with the same 11 entries in camelCase (`voice_id`, `speech_rate`). Update the shelf copy in `frontend/src/components/SettingsStudio.tsx` from "Load Kokoro Voices (27 Profiles)" / "Autofill all 27 ..." to "(11 Profiles)" / "11".
 
-- [ ] **Step 5: Add a cross-check test**
+- [x] **Step 5: Add a cross-check test**
 
 In `pkg/media/kokoro_voices_test.go` add a test that imports `pkg/config` and asserts every `KokoroVoiceProfiles` entry resolves to a non-fallback SID and that the counts match:
 
@@ -310,12 +310,12 @@ func TestKokoroProfilesMatchPinnedModel(t *testing.T) {
 
 Add the `pkg/config` import to that test file.
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `go test -count=1 ./pkg/config/ ./pkg/media/`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/config/presets.go pkg/config/presets_test.go pkg/media/kokoro_voices_test.go frontend/src/templates/providerPresets.ts frontend/src/components/SettingsStudio.tsx
@@ -331,7 +331,7 @@ git commit -m "fix(config): align Kokoro profiles with the downloaded model"
 - Modify: `pkg/gui/service_test.go`
 - Modify: `pkg/gui/server.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `pkg/gui/service_test.go` (use the helpers already present for creating a game/service; mirror the style of the existing tests):
 
@@ -347,12 +347,12 @@ func TestSaveEntityForcesFrontmatterIDToFileName(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run 'TestSaveEntity' ./pkg/gui/`
 Expected: FAIL.
 
-- [ ] **Step 3: Harden `Service.SaveEntity`**
+- [x] **Step 3: Harden `Service.SaveEntity`**
 
 In `pkg/gui/service.go`:
 
@@ -388,7 +388,7 @@ func (s *Service) SaveEntity(ctx context.Context, gameID, entityID, rawMarkdown 
 
 Confirm `service.go` already imports `entity`, `storage`, `os`, `filepath`, and `fmt` (it does).
 
-- [ ] **Step 4: Map the error to HTTP 400**
+- [x] **Step 4: Map the error to HTTP 400**
 
 In `pkg/gui/server.go`, in the `entity` PUT branch, distinguish validation failures:
 
@@ -399,12 +399,12 @@ if err := s.service.SaveEntity(r.Context(), gameID, entityID, body.Markdown); er
 }
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/server.go pkg/gui/service_test.go
@@ -420,26 +420,26 @@ git commit -m "fix(gui): stop a note save from rewriting another note's identity
 - Modify: `pkg/gui/types.go`
 - Modify: `frontend/src/types.ts`
 
-- [ ] **Step 1: Add the DTO fields**
+- [x] **Step 1: Add the DTO fields**
 
 In `pkg/gui/types.go`, add `ParseError bool `json:"parse_error,omitempty"`` to `EntitySummaryDTO` and `EntityDTO`. Mirror as `parse_error?: boolean` in `frontend/src/types.ts` on `EntitySummary` and `EntityNote`.
 
-- [ ] **Step 2: Degrade instead of skipping in `ListEntities`**
+- [x] **Step 2: Degrade instead of skipping in `ListEntities`**
 
 When `entity.ParseMarkdownEntity` fails, still append a summary with `ID` from the file name, `Name` from the file name (or the `name:` line if trivially extractable), and `ParseError: true`, instead of `continue`.
 
-- [ ] **Step 3: Flag parse failure in `GetEntity`**
+- [x] **Step 3: Flag parse failure in `GetEntity`**
 
 Return the raw markdown with `ParseError: true` rather than a hard error, so the codex can open the note and repair it. Keep the error only when the file cannot be read at all.
 
-- [ ] **Step 4: Test**
+- [x] **Step 4: Test**
 
 Add a `TestListEntitiesIncludesMalformedNote` case asserting a file with bad YAML appears once with `ParseError` set.
 
 Run: `go test -run TestListEntities ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/types.go frontend/src/types.ts pkg/gui/service_test.go
@@ -458,15 +458,15 @@ git commit -m "fix(gui): surface unparsable notes instead of dropping them from 
 - Modify: `frontend/src/components/CodexDrawer.tsx`
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Require `confirm` on the server**
+- [x] **Step 1: Require `confirm` on the server**
 
 Add `Confirm bool `json:"confirm"`` to `MergeEntityRequestDTO` in `pkg/gui/types.go`. In the `merge` branch of `server.go`, reject with `400` when `!req.Confirm` before calling `MergeEntities`.
 
-- [ ] **Step 2: Send `confirm` from the client**
+- [x] **Step 2: Send `confirm` from the client**
 
 In `frontend/src/api/client.ts`, add `confirm: true` to the merge body.
 
-- [ ] **Step 3: Replace the inline select with a modal**
+- [x] **Step 3: Replace the inline select with a modal**
 
 In `frontend/src/components/CodexDrawer.tsx`:
 - Remove the `<select>` merge control entirely.
@@ -474,12 +474,12 @@ In `frontend/src/components/CodexDrawer.tsx`:
 - Render a modal listing eligible targets (all entities except the open one), a summary of what moves, and a destructive `Merge and delete "<source name>"` button disabled until a target is chosen.
 - On confirm, call `onMerge(entity.id, mergeTarget)` and close the modal. Remove the `window.confirm` from `App.handleMergeEntity` since the modal is now the confirmation.
 
-- [ ] **Step 4: Verify TypeScript**
+- [x] **Step 4: Verify TypeScript**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/server.go frontend/src/types.ts frontend/src/api/client.ts frontend/src/components/CodexDrawer.tsx frontend/src/App.tsx
@@ -493,20 +493,20 @@ git commit -m "fix(frontend): require an explicit confirmation before merging no
 **Files:**
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Align and guard the slug helper**
+- [x] **Step 1: Align and guard the slug helper**
 
 Add a single `slugify(name)` helper in `App.tsx` matching `entity.Slugify` semantics (lowercase; keep `[a-z0-9]`; collapse spaces/`-`/`_` to a single `-`; trim trailing `-`). Use it in `handleQuickCreateEntity` and `handleEditInCodexEntity`.
 
-- [ ] **Step 2: Do not overwrite an existing note**
+- [x] **Step 2: Do not overwrite an existing note**
 
 Before writing the template, check the already-loaded `entities` list for a matching id; if found, open that note (fetch it and select it) and mark the finding addressed instead of writing. Otherwise create as today.
 
-- [ ] **Step 3: Verify TypeScript**
+- [x] **Step 3: Verify TypeScript**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/App.tsx
@@ -521,24 +521,24 @@ git commit -m "fix(frontend): stop quick-registering a note from overwriting an 
 - Modify: `frontend/src/components/CodexDrawer.tsx`
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Add the `voiceProfiles` prop**
+- [x] **Step 1: Add the `voiceProfiles` prop**
 
 In `CodexDrawer.tsx`, add `voiceProfiles?: VoiceProfile[]` to `CodexDrawerProps`, remove the `DEFAULT_VOICE_PROFILES` import, and render `voiceProfiles ?? []` in the archetype `<select>`. `applyVoiceArchetype` looks the profile up in `voiceProfiles`. When the list is empty, render the select disabled with the option text `Configure voices in Settings`.
 
-- [ ] **Step 2: Pass the configured list**
+- [x] **Step 2: Pass the configured list**
 
 In `App.tsx`, pass `voiceProfiles={config?.media.tts.voice_profiles ?? []}` to `CodexDrawer`.
 
-- [ ] **Step 3: Include the provider in the snippet when set**
+- [x] **Step 3: Include the provider in the snippet when set**
 
 Write `provider:` into the emitted `voice:` block when `profile.provider` is defined, so a note reproduces the profile's provider as well as its voice.
 
-- [ ] **Step 4: Verify TypeScript**
+- [x] **Step 4: Verify TypeScript**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/CodexDrawer.tsx frontend/src/App.tsx
@@ -549,23 +549,23 @@ git commit -m "fix(frontend): use the configured voice profiles in the codex pic
 
 ### Task 9: Full verification
 
-- [ ] **Step 1: Backend**
+- [x] **Step 1: Backend**
 
 Run: `mise run test:backend` and `mise run lint`
 Expected: `go test` passes; `go vet` clean (the pre-existing "sherpa-onnx-go should be direct" gopls hint may remain).
 
-- [ ] **Step 2: Frontend**
+- [x] **Step 2: Frontend**
 
 Run: `mise run test:frontend`
 Expected: clean `tsc --noEmit`.
 
-- [ ] **Step 3: Manual smoke**
+- [x] **Step 3: Manual smoke**
 
 1. Settings: load Kokoro voices and confirm 11 profiles.
 2. Codex: the archetype picker lists the same 11 voices; apply one and confirm the frontmatter.
 3. Save a note and confirm every other note is unchanged; break the frontmatter and confirm the note stays listed as needing repair.
 4. Merge requires the modal confirm and removes exactly the chosen source.
 
-- [ ] **Step 4: Update `todo.txt`**
+- [x] **Step 4: Update `todo.txt`**
 
 Clear the three resolved bullets.

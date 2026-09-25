@@ -55,7 +55,7 @@
 - Consumes: nothing.
 - Produces: `harness.ProseComplete(text string) bool`, `harness.LastSentenceBoundary(text string, minChars int) (int, bool)`, `harness.TrimToLastSentence(text string, minChars int) (string, bool)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/harness/prose_test.go`:
 
@@ -132,12 +132,12 @@ func TestTrimToLastSentence(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestProseComplete|TestLastSentenceBoundary|TestTrimToLastSentence' ./pkg/harness/ -v`
 Expected: FAIL with "undefined: ProseComplete".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/harness/prose.go`:
 
@@ -447,12 +447,12 @@ func isAbbreviation(prefix []rune) bool {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestProseComplete|TestLastSentenceBoundary|TestTrimToLastSentence' ./pkg/harness/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/prose.go pkg/harness/prose_test.go
@@ -471,7 +471,7 @@ git commit -m "feat(harness): detect complete endings and trim to a safe boundar
 - Consumes: nothing from Task 1.
 - Produces: `harness.StitchContinuation(existing, continuation string) string`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/prose_test.go`:
 
@@ -544,12 +544,12 @@ func TestStitchContinuation(t *testing.T) {
 
 The overlap case uses a 14-rune repeated phrase (`and the hinges`); a shorter overlap such as `hinges` (6 runes) is below the 8-rune floor and is intentionally ignored.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestStitchContinuation ./pkg/harness/ -v`
 Expected: FAIL with "undefined: StitchContinuation".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Append to `pkg/harness/prose.go`:
 
@@ -678,12 +678,12 @@ func endsWithSentencePunctuation(text string) bool {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestStitchContinuation ./pkg/harness/ -v`
 Expected: PASS. Fix the expected strings and the overlap case if the seam rules produce a different but correct join; the implementation, not the test, defines the seam, so align the test to the spec's rules.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/prose.go pkg/harness/prose_test.go
@@ -702,7 +702,7 @@ git commit -m "feat(harness): stitch a continuation onto a cut-off reply"
 - Consumes: nothing.
 - Produces: `config.RoleCompletion`, `config.CompletionConfig`, `(*Config).CompletionMode() string`, `(*Config).CompletionAttempts() int`, `(*Config).CompletionTailChars() int`, `(*Config).CompletionMinChars() int`, `(*Config).CompletionTimeout() time.Duration`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/config/types_test.go`:
 
@@ -771,12 +771,12 @@ func TestDefaultConfigCarriesCompletionKnobs(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestCompletionSettings|TestDefaultConfigCarriesCompletion' ./pkg/config/ -v`
 Expected: FAIL with "undefined: RoleCompletion" and "unknown field Completion".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `pkg/config/types.go`, add `RoleCompletion` to the role constants block:
 
@@ -899,12 +899,12 @@ In `DefaultConfig`, inside the `Agents: AgentsConfig{...}` literal, add the comp
 
 Do not duplicate the `Roles` key; edit the existing map in place to add only the `RoleCompletion` entry, and add the `Completion:` field to the same literal.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestCompletionSettings|TestDefaultConfigCarriesCompletion' ./pkg/config/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/config/types_test.go
@@ -924,7 +924,7 @@ git commit -m "feat(config): add reply-recovery settings and the completion role
 - Consumes: `config.RoleCompletion`, `config.CompletionConfig` (Task 3).
 - Produces: `(*Router).FallbackForRole(role string) (ModelProvider, bool)`, `harness.CompletionFromConfig(cfg *config.Config, router *Router, logger trace.Logger) ModelProvider`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/factory_test.go`:
 
@@ -964,12 +964,12 @@ func TestCompletionDisabledReturnsNil(t *testing.T) {
 
 Ensure `factory_test.go` imports `config` and `trace` (add them to the import block if missing).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestCompletion' ./pkg/harness/ -v`
 Expected: FAIL with "undefined: CompletionFromConfig".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `pkg/harness/router.go`, add after `SetFallback`:
 
@@ -1038,12 +1038,12 @@ func CompletionFromConfig(cfg *config.Config, router *Router, logger trace.Logge
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestCompletion' ./pkg/harness/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/router.go pkg/harness/factory.go pkg/harness/factory_test.go
@@ -1062,7 +1062,7 @@ git commit -m "feat(harness): resolve the completion role and its fallback"
 - Consumes: `harness.ProseComplete` (Task 1), `Router.FallbackForRole` (Task 4).
 - Produces: `streamResult` (unexported) and `(*TurnOrchestrator).stream(ctx, provider, req, onChunk) (streamResult, error)`; `(*TurnOrchestrator).generate` now returns `(streamResult, error)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Replace `TestMidStreamProviderFailureRecordsNothing` in `pkg/engine/orchestrator_stream_test.go` with the two tests below:
 
@@ -1109,12 +1109,12 @@ func TestProviderFailureBeforeAnyTextRecordsNothing(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestMidStreamProviderFailureKeepsPartialText|TestProviderFailureBeforeAnyText' ./pkg/engine/ -v`
 Expected: FAIL, `TestMidStreamProviderFailureKeepsPartialText` errors with "gm generation failed", `TestProviderFailureBeforeAnyText` passes already.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `pkg/engine/orchestrator.go`, add a sentinel next to `ErrGenerationStalled`:
 
@@ -1277,12 +1277,12 @@ Update the call site in `ProcessActionStream` (currently lines 458-461) to the n
 
 The recovery pass in Task 7 replaces the `truncated` computation with its own `stillIncomplete` result. The generic `map[string]interface{}` lines elsewhere are unchanged.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/engine/ -run 'TestMidStream|TestProviderFailure|TestChunkFailure|TestGenerationStalls|TestCancellation' -v`
 Expected: PASS. `TestChunkFailureAbortsBeforeRecording` must still see the listener error through `errors.Is(err, clientGone)`; the double `%w` wrapping preserves it.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/orchestrator_stream_test.go
@@ -1301,7 +1301,7 @@ git commit -m "fix(engine): keep the narrator text that arrives before a stream 
 - Consumes: `harness.ProseComplete`, `harness.TrimToLastSentence`, `harness.StitchContinuation` (Tasks 1-2); `(*TurnOrchestrator).stream` and `streamResult` (Task 5); the `harness.ModelProvider` and `trace.Logger` types.
 - Produces: `engine.RecoveryOutcome` (values `RecoveryNone`, `RecoveryContinued`, `RecoveryTrimmed`, `RecoveryKept`), `engine.CutCause`, `engine.CompletionPolicy`, `(*TurnOrchestrator).SetCompletionProvider(harness.ModelProvider)`, `(*TurnOrchestrator).SetCompletionPolicy(CompletionPolicy)`, `(*TurnOrchestrator).recoverReply(ctx, partial string, cut CutCause, onChunk func(string) error) (string, RecoveryOutcome, bool)`, and `(*TurnOrchestrator).classifyCut(result streamResult) CutCause`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/recovery_test.go`:
 
@@ -1531,12 +1531,12 @@ func TestContinuationDeltaIsStreamed(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestCompleteReply|TestStructuralCut|TestInterruptedStreamKeeps|TestContinuationFailure|TestShortIncomplete|TestModeOff|TestModeTrim|TestModeContinue|TestContinuationDelta' ./pkg/engine/ -v`
 Expected: FAIL with "undefined: CompletionPolicy" and "unknown field Recovery".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/engine/recovery.go`:
 
@@ -1783,12 +1783,12 @@ In `pkg/engine/orchestrator.go`, add the two fields to `TurnOrchestrator` (after
 	completionPolicy CompletionPolicy
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestCompleteReply|TestStructuralCut|TestInterruptedStreamKeeps|TestContinuationFailure|TestShortIncomplete|TestModeOff|TestModeTrim|TestModeContinue|TestContinuationDelta' ./pkg/engine/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/recovery.go pkg/engine/recovery_test.go pkg/engine/orchestrator.go
@@ -1808,7 +1808,7 @@ git commit -m "feat(engine): continue or trim a narrator reply that stops mid-th
 - Consumes: `recoverReply` and `classifyCut` (Task 6).
 - Produces: `Turn.Recovery string` becomes part of the recorded turn; `Turn.Truncated` now describes the recorded prose.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/recovery_test.go`:
 
@@ -1840,12 +1840,12 @@ func TestRecoveryOutcomeIsPersisted(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestRecoveryOutcomeIsPersisted ./pkg/engine/ -v`
 Expected: FAIL with "unknown field Recovery".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `pkg/engine/history.go`, add the field to `Turn` before `LegacyOutput`:
 
@@ -1901,12 +1901,12 @@ Remove the previous `o.logger.Event("generation.complete", ...)` block, and set 
 
 Remove the now-duplicated `if strings.TrimSpace(turn.Narration) == ""` check that followed the old block.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/engine/ -v`
 Expected: PASS for the whole engine package.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/history.go pkg/engine/recovery_test.go
@@ -1926,7 +1926,7 @@ git commit -m "feat(engine): record how a cut-off reply was repaired"
 - Consumes: `Turn.Recovery` (Task 7), `engine.CompletionPolicy`, `harness.CompletionFromConfig` (Tasks 3-4), config accessors (Task 3).
 - Produces: `TurnDTO.Recovery string` on the API; the completion provider and policy reach both turn pipelines.
 
-- [ ] **Step 1: Add the DTO field and copy it**
+- [x] **Step 1: Add the DTO field and copy it**
 
 In `pkg/gui/types.go`, add to `TurnDTO` after `Truncated`:
 
@@ -1940,7 +1940,7 @@ In `pkg/gui/service.go`, inside `turnDTO`'s `TurnDTO{...}` literal, add after `T
 		Recovery:        turn.Recovery,
 ```
 
-- [ ] **Step 2: Wire the provider and policy into the GUI turn pipeline**
+- [x] **Step 2: Wire the provider and policy into the GUI turn pipeline**
 
 In `pkg/gui/service.go`, after `orchestrator.SetExtractor(...)` (line 1086), add:
 
@@ -1955,7 +1955,7 @@ In `pkg/gui/service.go`, after `orchestrator.SetExtractor(...)` (line 1086), add
 	})
 ```
 
-- [ ] **Step 3: Wire the provider and policy into the TUI pipeline**
+- [x] **Step 3: Wire the provider and policy into the TUI pipeline**
 
 In `cmd/localrpg/play.go`, after `orchestrator.SetExtractor(...)`, add:
 
@@ -1970,12 +1970,12 @@ In `cmd/localrpg/play.go`, after `orchestrator.SetExtractor(...)`, add:
 	})
 ```
 
-- [ ] **Step 4: Verify the backend builds and its tests pass**
+- [x] **Step 4: Verify the backend builds and its tests pass**
 
 Run: `go build ./... && go test ./pkg/gui/ ./cmd/... -count=1`
 Expected: build succeeds and tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go cmd/localrpg/play.go
@@ -1994,7 +1994,7 @@ git commit -m "feat(gui): carry the recovery outcome to the client and wire the 
 - Consumes: the `recovery` field on the API turn.
 - Produces: no new exports.
 
-- [ ] **Step 1: Add the field to the frontend type**
+- [x] **Step 1: Add the field to the frontend type**
 
 In `frontend/src/types.ts`, in `interface Turn`, after the `truncated` comment and field:
 
@@ -2006,7 +2006,7 @@ In `frontend/src/types.ts`, in `interface Turn`, after the `truncated` comment a
   recovery?: string;
 ```
 
-- [ ] **Step 2: Render the trimmed note and broaden the truncated note**
+- [x] **Step 2: Render the trimmed note and broaden the truncated note**
 
 In `frontend/src/components/ChronicleView.tsx`, replace the truncated block (lines 120-124) with:
 
@@ -2027,17 +2027,17 @@ In `frontend/src/components/ChronicleView.tsx`, replace the truncated block (lin
 
 `continued` renders nothing: the reply reads as complete, which is the point.
 
-- [ ] **Step 3: Typecheck the frontend**
+- [x] **Step 3: Typecheck the frontend**
 
 Run: `npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 4: Run the full verification gate**
+- [x] **Step 4: Run the full verification gate**
 
 Run: `mise run test && mise run lint`
 Expected: `go test` passes, `npx tsc --noEmit` passes, and `go vet ./...` is clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/ChronicleView.tsx

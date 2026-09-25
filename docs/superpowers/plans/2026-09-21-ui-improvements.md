@@ -31,7 +31,7 @@
 - Modify: `frontend/src/App.tsx`
 - Test: `frontend/src/App.tsx`, `frontend/src/components/Drawers.tsx` via `npx tsc --noEmit`
 
-- [ ] **Step 1: Update `Drawers.tsx` with size prop**
+- [x] **Step 1: Update `Drawers.tsx` with size prop**
   Update `frontend/src/components/Drawers.tsx`:
   - Extend `DrawersProps` to include `size?: 'md' | 'lg' | 'xl'`.
   - Map `size` to Tailwind classes (`md: 'max-w-md'`, `lg: 'max-w-lg'`, `xl: 'max-w-xl'`). Default to `'md'`.
@@ -53,7 +53,7 @@
   };
   ```
 
-- [ ] **Step 2: Update `App.tsx` to use Settings Modal and sized Drawers**
+- [x] **Step 2: Update `App.tsx` to use Settings Modal and sized Drawers**
   In `frontend/src/App.tsx`:
   - Add state `const [isSettingsOpen, setIsSettingsOpen] = useState(false);`.
   - Change the header "Settings" button click handler to `onClick={() => setIsSettingsOpen(true)}` and active state `className={... isSettingsOpen ? 'bg-amber-600 ...' : ...}`.
@@ -113,11 +113,11 @@
     ```
   - Import `X` icon from `lucide-react`.
 
-- [ ] **Step 3: Run TypeScript typecheck**
+- [x] **Step 3: Run TypeScript typecheck**
   Run: `mise run test:frontend`
   Expected: PASS (`npx tsc --noEmit` exits with 0).
 
-- [ ] **Step 4: Commit changes**
+- [x] **Step 4: Commit changes**
   ```bash
   git add frontend/src/components/Drawers.tsx frontend/src/App.tsx
   git commit -m "feat(frontend): add drawer sizing and campaign settings modal"
@@ -131,7 +131,7 @@
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 - Test: `frontend/src/components/SettingsStudio.tsx` via `npx tsc --noEmit`
 
-- [ ] **Step 1: Add responsive flex-wrapping in `SettingsStudio.tsx`**
+- [x] **Step 1: Add responsive flex-wrapping in `SettingsStudio.tsx`**
   In `frontend/src/components/SettingsStudio.tsx`:
   - Locate the header at lines 142-195.
   - Update container:
@@ -143,11 +143,11 @@
   - Ensure the AI agent preset selector and role dropdown cluster in the Agents subtab (lines 276-316) uses `flex flex-wrap items-center gap-2` so it wraps cleanly without clipping on narrower viewports.
   - In the Media tab (lines 541-587), ensure the TTS preset selector and Auto-play checkbox use `flex flex-wrap items-center gap-3`.
 
-- [ ] **Step 2: Run TypeScript typecheck**
+- [x] **Step 2: Run TypeScript typecheck**
   Run: `mise run test:frontend`
   Expected: PASS.
 
-- [ ] **Step 3: Commit changes**
+- [x] **Step 3: Commit changes**
   ```bash
   git add frontend/src/components/SettingsStudio.tsx
   git commit -m "fix(frontend): make settings studio header and control bars responsive"
@@ -161,7 +161,7 @@
 - Modify: `frontend/src/components/WorldsStudio.tsx`
 - Test: `frontend/src/components/WorldsStudio.tsx` via `npx tsc --noEmit`
 
-- [ ] **Step 1: Add `entityDrafts` in-memory store in `WorldsStudio.tsx`**
+- [x] **Step 1: Add `entityDrafts` in-memory store in `WorldsStudio.tsx`**
   In `frontend/src/components/WorldsStudio.tsx`:
   - Define `entityDrafts`:
     ```tsx
@@ -183,7 +183,7 @@
     setEntityDrafts(initial);
     ```
 
-- [ ] **Step 2: Implement `handleSelectEntity` for non-gated switching**
+- [x] **Step 2: Implement `handleSelectEntity` for non-gated switching**
   Implement `handleSelectEntity`:
   ```tsx
   const handleSelectEntity = async (targetId: string) => {
@@ -227,7 +227,7 @@
   >
   ```
 
-- [ ] **Step 3: Update `handleCreateNewEntity`, `handleDeleteEntity`, and `handleSaveEntity`**
+- [x] **Step 3: Update `handleCreateNewEntity`, `handleDeleteEntity`, and `handleSaveEntity`**
   - In `handleCreateNewEntity`:
     ```tsx
     const handleCreateNewEntity = async () => {
@@ -319,7 +319,7 @@
     };
     ```
 
-- [ ] **Step 4: Update `handleSaveWorld` to persist all drafted and modified entities**
+- [x] **Step 4: Update `handleSaveWorld` to persist all drafted and modified entities**
   In `handleSaveWorld`:
   ```tsx
   const saved = await APIClient.saveWorld(payload);
@@ -340,7 +340,7 @@
   if (onWorldSaved) onWorldSaved();
   ```
 
-- [ ] **Step 5: Update Topbar & New Entity Modal Shell in `WorldsStudio.tsx`**
+- [x] **Step 5: Update Topbar & New Entity Modal Shell in `WorldsStudio.tsx`**
   - Update top header:
     ```tsx
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800/80 pb-3">
@@ -394,11 +394,11 @@
     )}
     ```
 
-- [ ] **Step 6: Run TypeScript typecheck**
+- [x] **Step 6: Run TypeScript typecheck**
   Run: `mise run test:frontend`
   Expected: PASS.
 
-- [ ] **Step 7: Commit changes**
+- [x] **Step 7: Commit changes**
   ```bash
   git add frontend/src/components/WorldsStudio.tsx
   git commit -m "feat(frontend): fix world studio entity switching and add in-memory drafts"
@@ -414,7 +414,7 @@
 - Modify: `frontend/src/components/ActionConsole.tsx`
 - Test: All via `npx tsc --noEmit`
 
-- [ ] **Step 1: Refactor New Campaign Wizard in `LauncherHub.tsx`**
+- [x] **Step 1: Refactor New Campaign Wizard in `LauncherHub.tsx`**
   In `frontend/src/components/LauncherHub.tsx`:
   - Locate `isWizardOpen` modal (lines 323-485).
   - Convert dialog to the three-tier shell:
@@ -480,7 +480,7 @@
     )}
     ```
 
-- [ ] **Step 2: Update topbar in `SystemsStudio.tsx`**
+- [x] **Step 2: Update topbar in `SystemsStudio.tsx`**
   In `frontend/src/components/SystemsStudio.tsx`:
   - Update top header:
     ```tsx
@@ -505,16 +505,16 @@
     </div>
     ```
 
-- [ ] **Step 3: Update `ActionConsole.tsx` responsive wrapping**
+- [x] **Step 3: Update `ActionConsole.tsx` responsive wrapping**
   In `frontend/src/components/ActionConsole.tsx`:
   - Change line 32 mode switcher container to `flex flex-wrap items-center gap-2 mb-3`.
   - In line 80 form container, ensure the text input has `min-w-0 flex-1` and buttons have `shrink-0`.
 
-- [ ] **Step 4: Run TypeScript typecheck**
+- [x] **Step 4: Run TypeScript typecheck**
   Run: `mise run test:frontend`
   Expected: PASS.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   ```bash
   git add frontend/src/components/LauncherHub.tsx frontend/src/components/SystemsStudio.tsx frontend/src/components/ActionConsole.tsx
   git commit -m "fix(frontend): add pinned modal shell and responsive studio layouts"
@@ -527,18 +527,18 @@
 **Files:**
 - None (verification across all touched frontend and backend components)
 
-- [ ] **Step 1: Run frontend test check**
+- [x] **Step 1: Run frontend test check**
   Run: `mise run test:frontend`
   Expected: `npx tsc --noEmit` exits with 0.
 
-- [ ] **Step 2: Run backend tests**
+- [x] **Step 2: Run backend tests**
   Run: `mise run test:backend`
   Expected: All Go packages pass with 0 failures.
 
-- [ ] **Step 3: Run full production build**
+- [x] **Step 3: Run full production build**
   Run: `mise run build`
   Expected: Vite compiles bundle into `pkg/gui/dist/`, Go compiles binary `bin/localrpg` without error.
 
-- [ ] **Step 4: Verify git status and tracked files**
+- [x] **Step 4: Verify git status and tracked files**
   Run: `git status`
   Expected: Working tree clean (ignoring tracked `.gitkeep` as documented in AGENTS.md).

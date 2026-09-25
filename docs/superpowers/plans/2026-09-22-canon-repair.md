@@ -39,7 +39,7 @@ This plan implements **increment 5**. Increment 6 (the continuity checks, open t
 
 `ListEntities` already selects `frontmatter_json`, so the index gains aliases without a SQL change: the summary parses them from the same blob it already reads for location and tags.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/entity/entity_test.go`:
 
@@ -81,12 +81,12 @@ func TestAnEntityWithoutAliasesHasNone(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestAliases ./pkg/entity/`
 Expected: FAIL — `unknown field Aliases`.
 
-- [ ] **Step 3: Add the field**
+- [x] **Step 3: Add the field**
 
 In `pkg/entity/entity.go`, add to `Entity`:
 
@@ -105,7 +105,7 @@ and to `EntityFrontmatter`:
 
 In `SerializeMarkdown`, set `Aliases: e.Aliases` on the frontmatter; in `ParseMarkdownEntity`, set `Aliases: frontmatter.Aliases` on the entity. Follow the surrounding pattern for the other optional fields.
 
-- [ ] **Step 4: Carry them into the index summary**
+- [x] **Step 4: Carry them into the index summary**
 
 In `pkg/storage/store.go`, extend `EntitySummary` and the existing decode of `frontmatter_json` in `ListEntities`:
 
@@ -163,12 +163,12 @@ func TestListEntitiesCarriesAliases(t *testing.T) {
 }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/entity/ ./pkg/storage/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/entity/entity.go pkg/entity/entity_test.go pkg/storage/store.go pkg/storage/store_test.go
@@ -188,7 +188,7 @@ git commit -m "feat(entity): let a note record the other names a being is known 
 - Consumes: `entity.Aliases`, `storage.EntitySummary.Aliases` (Task 1)
 - Produces: no signature change; three lookups gain a signal
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/extractor_test.go`:
 
@@ -218,12 +218,12 @@ func TestResolveSpeakerIDAndMatchingKnowAliases(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestResolveSpeakerIDAndMatchingKnowAliases ./pkg/harness/`
 Expected: FAIL — an alias does not resolve.
 
-- [ ] **Step 3: Consult aliases**
+- [x] **Step 3: Consult aliases**
 
 In `pkg/harness/extractor.go`, add a shared helper and use it in both lookups:
 
@@ -316,12 +316,12 @@ That test needs the alias-bearing entity to be in play; `establishedNames` only 
 
 with a store whose turn 1 mentions `guard-kael`, as the earlier established-names test does.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/harness/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/extractor.go pkg/harness/context.go pkg/harness/extractor_test.go pkg/harness/context_test.go
@@ -341,7 +341,7 @@ git commit -m "feat(harness): resolve and name a being by their aliases too"
 - Produces: `(*Store).DeleteEntity(id string) error`
 - Produces: `(*Service).MergeEntities(ctx context.Context, gameID, sourceID, targetID string) (*EntityDTO, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/service_test.go`:
 
@@ -391,12 +391,12 @@ func TestMergeFoldsANoteIntoAnother(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestMergeFoldsANoteIntoAnother ./pkg/gui/`
 Expected: FAIL — `svc.MergeEntities undefined`.
 
-- [ ] **Step 3: Add the index delete**
+- [x] **Step 3: Add the index delete**
 
 In `pkg/storage/store.go`:
 
@@ -420,7 +420,7 @@ func (s *Store) DeleteEntity(id string) error {
 }
 ```
 
-- [ ] **Step 4: Implement the merge**
+- [x] **Step 4: Implement the merge**
 
 In `pkg/gui/service.go`:
 
@@ -578,12 +578,12 @@ func appendUnique(existing []string, values ...string) []string {
 
 Since `Service` is in a different package from `entity`, `appendUnique` here is a local helper; if `entity` grows one later, use that instead.
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `go test -count=1 ./pkg/gui/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/storage/store.go pkg/gui/service.go pkg/gui/service_test.go
@@ -602,7 +602,7 @@ git commit -m "feat(gui): fold one note into another when a player says they are
 **Interfaces:**
 - Produces: `POST /api/game/{id}/entity/{source}/merge` with body `{"into": "<id>"}`, answering with the merged `EntityDTO`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/server_test.go`:
 
@@ -643,12 +643,12 @@ func TestMergeRouteFoldsOneNoteIntoAnother(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestMergeRoute ./pkg/gui/`
 Expected: FAIL — 404, because nothing serves `merge`.
 
-- [ ] **Step 3: Add the route**
+- [x] **Step 3: Add the route**
 
 In `pkg/gui/types.go`:
 
@@ -684,12 +684,12 @@ In `pkg/gui/server.go`, inside the `entity` case, before the plain entity read:
 		}
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `go test -count=1 ./pkg/gui/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/server.go pkg/gui/types.go pkg/gui/server_test.go
@@ -710,7 +710,7 @@ git commit -m "feat(gui): expose the merge as an endpoint"
 - Produces: `APIClient.mergeEntity(sourceID, intoID)`
 - Produces: a "Merge into…" control in the Codex note editor, confirmed before it runs
 
-- [ ] **Step 1: Add the client method**
+- [x] **Step 1: Add the client method**
 
 In `frontend/src/api/client.ts`:
 
@@ -726,7 +726,7 @@ In `frontend/src/api/client.ts`:
   }
 ```
 
-- [ ] **Step 2: Add the control**
+- [x] **Step 2: Add the control**
 
 In `frontend/src/components/CodexDrawer.tsx`, add to the props:
 
@@ -772,7 +772,7 @@ and in the note header, beside Save, a control that only appears when there is s
 
 The existing header's Save button is replaced by this block.
 
-- [ ] **Step 3: Confirm and call it from App**
+- [x] **Step 3: Confirm and call it from App**
 
 In `frontend/src/App.tsx`:
 
@@ -803,12 +803,12 @@ and pass it to the drawer:
                 onMerge={handleMergeEntity}
 ```
 
-- [ ] **Step 4: Typecheck and build**
+- [x] **Step 4: Typecheck and build**
 
 Run: `cd frontend && npx tsc --noEmit && npm run build`
 Expected: no type errors, a successful build. Restore `pkg/gui/dist/.gitkeep` afterwards and do not stage its deletion.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/

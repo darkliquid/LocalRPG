@@ -45,7 +45,7 @@
 - Modify: `pkg/media/providers.go`
 - Create: `pkg/media/speech_cues_test.go`
 
-- [ ] **Step 1: Write unit tests for `SpeechCueAdvertiser` in `pkg/media/speech_cues_test.go`**
+- [x] **Step 1: Write unit tests for `SpeechCueAdvertiser` in `pkg/media/speech_cues_test.go`**
 
 ```go
 package media
@@ -90,12 +90,12 @@ func TestSpeechCueAdvertiserImplementations(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run: `go test -v -run TestSpeechCueAdvertiserImplementations ./pkg/media/`  
 Expected: FAIL (compilation error: `SpeechCueAdvertiser` undefined)
 
-- [ ] **Step 3: Define `SpeechCueCapabilities` and `SpeechCueAdvertiser` in `pkg/media/tts.go`**
+- [x] **Step 3: Define `SpeechCueCapabilities` and `SpeechCueAdvertiser` in `pkg/media/tts.go`**
 
 In `pkg/media/tts.go`:
 ```go
@@ -114,7 +114,7 @@ type SpeechCueAdvertiser interface {
 }
 ```
 
-- [ ] **Step 4: Implement `SpeechCueAdvertiser` on `ElevenLabsTTSClient`, `SherpaTTSClient`, and `httpTTSClient`**
+- [x] **Step 4: Implement `SpeechCueAdvertiser` on `ElevenLabsTTSClient`, `SherpaTTSClient`, and `httpTTSClient`**
 
 In `pkg/media/elevenlabs_tts.go`:
 ```go
@@ -152,12 +152,12 @@ func (h *httpTTSClient) SpeechCueCapabilities() SpeechCueCapabilities {
 }
 ```
 
-- [ ] **Step 5: Run tests to verify pass**
+- [x] **Step 5: Run tests to verify pass**
 
 Run: `go test -v -run TestSpeechCueAdvertiserImplementations ./pkg/media/`  
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/media/tts.go pkg/media/elevenlabs_tts.go pkg/media/sherpa_tts.go pkg/media/providers.go pkg/media/speech_cues_test.go
@@ -172,7 +172,7 @@ git commit -m "feat(media): add SpeechCueCapabilities and SpeechCueAdvertiser in
 - Modify: `pkg/media/speakable.go`
 - Create: `pkg/media/speakable_cues_test.go`
 
-- [ ] **Step 1: Write unit tests in `pkg/media/speakable_cues_test.go`**
+- [x] **Step 1: Write unit tests in `pkg/media/speakable_cues_test.go`**
 
 ```go
 package media
@@ -245,12 +245,12 @@ func TestSpeakableTextForSpeechCues(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run: `go test -v -run "TestStripAudioTags|TestSpeakableTextForSpeechCues" ./pkg/media/`  
 Expected: FAIL (`StripAudioTags` undefined)
 
-- [ ] **Step 3: Implement `audioTagRe`, `StripAudioTags`, and `ClientSupportsAudioTags` in `pkg/media/speakable.go`**
+- [x] **Step 3: Implement `audioTagRe`, `StripAudioTags`, and `ClientSupportsAudioTags` in `pkg/media/speakable.go`**
 
 In `pkg/media/speakable.go`:
 ```go
@@ -302,17 +302,17 @@ func SpeakableTextFor(policy TextPolicy, client TTSClient, text string) string {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify pass**
+- [x] **Step 4: Run tests to verify pass**
 
 Run: `go test -v -run "TestStripAudioTags|TestSpeakableTextForSpeechCues" ./pkg/media/`  
 Expected: PASS
 
-- [ ] **Step 5: Run all tests in `pkg/media`**
+- [x] **Step 5: Run all tests in `pkg/media`**
 
 Run: `go test -v -count=1 ./pkg/media/`  
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/media/speakable.go pkg/media/speakable_cues_test.go
@@ -328,7 +328,7 @@ git commit -m "feat(media): add audio tag stripping and sanitization in Speakabl
 - Create: `pkg/harness/speech_cues_test.go`
 - Modify: `pkg/engine/orchestrator.go`
 
-- [ ] **Step 1: Write unit tests in `pkg/harness/speech_cues_test.go`**
+- [x] **Step 1: Write unit tests in `pkg/harness/speech_cues_test.go`**
 
 ```go
 package harness
@@ -366,12 +366,12 @@ func TestFormatSpeechFormattingInstructions(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run: `go test -v -run TestFormatSpeechFormattingInstructions ./pkg/harness/`  
 Expected: FAIL (`FormatSpeechFormattingInstructions` undefined)
 
-- [ ] **Step 3: Define `SpeechCueContext` and `FormatSpeechFormattingInstructions` in `pkg/harness/context.go`**
+- [x] **Step 3: Define `SpeechCueContext` and `FormatSpeechFormattingInstructions` in `pkg/harness/context.go`**
 
 In `pkg/harness/context.go`:
 ```go
@@ -437,7 +437,7 @@ SpeechCues SpeechCueContext
 ```
 And replace usage of `speechFormattingInstruction` in `AssembleContextWithProfiles` with `FormatSpeechFormattingInstructions(req.SpeechCues)`.
 
-- [ ] **Step 4: Update `pkg/engine/orchestrator.go` to hold and pass `SpeechCueContext`**
+- [x] **Step 4: Update `pkg/engine/orchestrator.go` to hold and pass `SpeechCueContext`**
 
 In `pkg/engine/orchestrator.go`:
 Add field to `TurnOrchestrator`:
@@ -467,14 +467,14 @@ In `ProcessAction` where `o.assembler.Assemble` is called:
 	})
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `go test -v -run TestFormatSpeechFormattingInstructions ./pkg/harness/`  
 Run: `go test -v -count=1 ./pkg/harness/`  
 Run: `go test -v -count=1 ./pkg/engine/`  
 Expected: ALL PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/harness/context.go pkg/harness/speech_cues_test.go pkg/engine/orchestrator.go
@@ -490,7 +490,7 @@ git commit -m "feat(harness,engine): add dynamic speech formatting instructions 
 - Modify: `pkg/gui/types.go`
 - Modify: `pkg/gui/service.go`
 
-- [ ] **Step 1: Add `SpeechCuesConfig` in `pkg/config/types.go`**
+- [x] **Step 1: Add `SpeechCuesConfig` in `pkg/config/types.go`**
 
 ```go
 type SpeechCuesConfig struct {
@@ -506,7 +506,7 @@ type TTSConfig struct {
 }
 ```
 
-- [ ] **Step 2: Add `SpeechCueCapabilities` to `TTSInspectResponseDTO` in `pkg/gui/types.go`**
+- [x] **Step 2: Add `SpeechCueCapabilities` to `TTSInspectResponseDTO` in `pkg/gui/types.go`**
 
 ```go
 type TTSInspectResponseDTO struct {
@@ -518,7 +518,7 @@ type TTSInspectResponseDTO struct {
 }
 ```
 
-- [ ] **Step 3: Update `InspectTTS` and orchestrator setup in `pkg/gui/service.go`**
+- [x] **Step 3: Update `InspectTTS` and orchestrator setup in `pkg/gui/service.go`**
 
 In `InspectTTS`:
 ```go
@@ -559,12 +559,12 @@ Resolve effective cues from config and client:
 	orch.SetSpeechCues(effCues)
 ```
 
-- [ ] **Step 4: Run Go tests**
+- [x] **Step 4: Run Go tests**
 
 Run: `go test -v -count=1 ./pkg/gui/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/gui/types.go pkg/gui/service.go
@@ -580,7 +580,7 @@ git commit -m "feat(config,gui): wire speech cues configuration and inspect resp
 - Modify: `frontend/src/components/MarkdownProse.tsx`
 - Modify: `frontend/src/components/TurnSegments.tsx`
 
-- [ ] **Step 1: Update `frontend/src/types.ts`**
+- [x] **Step 1: Update `frontend/src/types.ts`**
 
 Add `SpeechCuesConfig` and `SpeechCueCapabilities`:
 ```typescript
@@ -612,7 +612,7 @@ export interface TTSInspectResponse {
 }
 ```
 
-- [ ] **Step 2: Update `frontend/src/components/MarkdownProse.tsx` to support `displayMode`**
+- [x] **Step 2: Update `frontend/src/components/MarkdownProse.tsx` to support `displayMode`**
 
 Add `displayMode?: 'stage_directions' | 'hidden' | 'raw'` to `MarkdownProseProps`.
 
@@ -646,16 +646,16 @@ Strip tags before paragraph processing:
 const stripped = displayMode === 'hidden' ? normalized.replace(/\[[a-zA-Z][a-zA-Z\s_-]{1,28}\]/g, '') : normalized;
 ```
 
-- [ ] **Step 3: Update `frontend/src/components/TurnSegments.tsx`**
+- [x] **Step 3: Update `frontend/src/components/TurnSegments.tsx`**
 
 Pass `displayMode` prop to `TurnSegmentsProps` and pass down to `<MarkdownProse displayMode={displayMode} ... />`.
 
-- [ ] **Step 4: Run frontend typecheck**
+- [x] **Step 4: Run frontend typecheck**
 
 Run: `mise run test:frontend`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/MarkdownProse.tsx frontend/src/components/TurnSegments.tsx
@@ -669,7 +669,7 @@ git commit -m "feat(frontend): render speech cues as styled stage directions or 
 **Files:**
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Add Speech Steering Cues panel to `SettingsStudio.tsx`**
+- [x] **Step 1: Add Speech Steering Cues panel to `SettingsStudio.tsx`**
 
 Under the TTS section in `SettingsStudio.tsx` (around line 1300):
 ```tsx
@@ -756,12 +756,12 @@ Under the TTS section in `SettingsStudio.tsx` (around line 1300):
             )}
 ```
 
-- [ ] **Step 2: Run frontend typecheck**
+- [x] **Step 2: Run frontend typecheck**
 
 Run: `mise run test:frontend`  
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx
@@ -772,31 +772,31 @@ git commit -m "feat(frontend): add speech steering cues panel to SettingsStudio"
 
 ### Task 7: Full Verification and Build
 
-- [ ] **Step 1: Run frontend typecheck**
+- [x] **Step 1: Run frontend typecheck**
 
 Run: `mise run test:frontend`  
 Expected: PASS
 
-- [ ] **Step 2: Run frontend production build**
+- [x] **Step 2: Run frontend production build**
 
 Run: `mise run build:frontend`  
 Expected: PASS
 
-- [ ] **Step 3: Restore dist placeholder**
+- [x] **Step 3: Restore dist placeholder**
 
 Run: `git checkout -- pkg/gui/dist/.gitkeep 2>/dev/null || true`
 
-- [ ] **Step 4: Run Go linter**
+- [x] **Step 4: Run Go linter**
 
 Run: `mise run lint`  
 Expected: PASS
 
-- [ ] **Step 5: Run all backend tests**
+- [x] **Step 5: Run all backend tests**
 
 Run: `mise run test:backend`  
 Expected: PASS
 
-- [ ] **Step 6: Run full binary build**
+- [x] **Step 6: Run full binary build**
 
 Run: `mise run build`  
 Expected: PASS (`bin/localrpg` created)

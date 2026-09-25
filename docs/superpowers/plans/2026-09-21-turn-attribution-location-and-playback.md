@@ -39,7 +39,7 @@ Phase 1 is a prerequisite for every later phase, because without it the new colu
 - Consumes: `storage.OpenDB` (existing callers unchanged)
 - Produces: `storage.migrations`, `storage.migrate(db *sql.DB) error`, `storage.columnExists(db *sql.DB, table, column string) (bool, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/storage/migrate_test.go`:
 
@@ -163,12 +163,12 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestMigrations -count=1 ./pkg/storage/`
 Expected: FAIL — `undefined: columnExists`, and `turns.location` missing after open.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/storage/migrate.go`:
 
@@ -298,12 +298,12 @@ func OpenDB(path string) (*sql.DB, error) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/storage/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/db.go pkg/storage/migrate.go pkg/storage/migrate_test.go
@@ -326,7 +326,7 @@ git commit -m "feat(storage): add a schema migration path before the timeline gr
 - Consumes: `migrations` from Task 1
 - Produces: `storage.TurnRecord{Location, Outcome string}`, `storage.TurnEntityRef{EntityID, Mention, Outcome string}`, `engine.Turn.Location` (JSON `location`), `engine.Turn.Outcome` (JSON `outcome`)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/storage/turn_test.go`:
 
@@ -391,12 +391,12 @@ func TestTurnRecordCarriesLocationAndOutcome(t *testing.T) {
 
 In `pkg/export/script_test.go`, remove the `AudioRefs:` line from the two `engine.Turn` literals it builds (`AudioRefs` is gone), keeping the rest of the fixture intact.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestTurnRecordCarriesLocationAndOutcome -count=1 ./pkg/storage/`
 Expected: FAIL — `unknown field Location in struct literal of type TurnRecord`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 First, retire the vestigial column in the same change that removes its only reader:
 
@@ -545,12 +545,12 @@ In `pkg/engine/timeline.go`, `turnRecord` maps them, and every link carries the 
 
 In `pkg/export/types.go`, delete `SceneBeat.AudioPath`. In `pkg/export/script.go`, delete the block that populated it. In `pkg/gui/types.go`, delete `TurnDTO.AudioURL`, and in `pkg/gui/service.go` delete the `audioURL` local and the field assignment in `GetChronicle`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go build ./... && go test -count=1 ./...`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage pkg/engine pkg/export pkg/gui
@@ -571,7 +571,7 @@ git commit -m "feat(storage): record where a turn happened and how its check res
 - Consumes: `entity.SerializeMarkdown`, `ResolveStartLocation` (existing)
 - Produces: `engine.playerNotePath(paths *core.PathResolver, gameID, player string) string`; the note itself
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/game_test.go`:
 
@@ -658,12 +658,12 @@ func TestInitGameLeavesAnAuthoredPlayerNoteAlone(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestInitGameCreatesThePlayerNote|TestInitGameLeavesAnAuthored" -count=1 ./pkg/engine/`
 Expected: FAIL — the player note does not exist.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/engine/game.go`, after the start location is resolved and `manifest.Settings[StartLocationSetting]` is set, create the note when the file is absent:
 
@@ -716,12 +716,12 @@ func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, pl
 
 Pass `store` into the helper rather than reaching for the session, and keep it a plain function of `(paths, store, gameID, playerName, locationID)`. `InitGame` calls it before `ResolveStartLocation`? No — after, because the location is the point of the link. The note is written before the manifest is written so a failure leaves no half-built campaign manifest.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/game.go pkg/engine/game_test.go
@@ -738,7 +738,7 @@ git commit -m "feat(engine): give every campaign a player note"
 - Consumes: `engine.findLocationByRef` (existing, `pkg/engine/startlocation.go`), `Timeline.history`
 - Produces: `(*TurnOrchestrator).currentLocation() string`, `(*TurnOrchestrator).previousLocation() string`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/engine/orchestrator_location_test.go`:
 
@@ -850,12 +850,12 @@ func TestLocationFallsBackToThePinnedStartThenThePreviousTurn(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestProcessActionRecordsThePlayersLocation|TestLocationFallsBack" -count=1 ./pkg/engine/`
 Expected: FAIL — `turn.Location` is empty and `timeline.SetPlayerLocation undefined`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add to `pkg/engine/timeline.go` the durable location write:
 
@@ -948,12 +948,12 @@ The orchestrator's field is renamed `startLocation` and is only ever the bootstr
 value: it is consulted after the player note and after the last recorded turn, so a
 campaign that has played a turn never snaps back to where it opened.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/orchestrator_location_test.go pkg/engine/timeline.go cmd/localrpg/play.go
@@ -970,7 +970,7 @@ git commit -m "feat(engine): record where each turn happens, not where the campa
 - Consumes: `Timeline.SetPlayerLocation`, `Timeline.RecordTurn`, `findLocationByRef`
 - Produces: `/go <location>` handling in `ProcessAction`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/orchestrator_location_test.go`:
 
@@ -1028,12 +1028,12 @@ func TestGoMovesThePlayerAndRecordsASystemTurn(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestGoMovesThePlayer -count=1 ./pkg/engine/`
 Expected: FAIL — `/go Alden Harbour` is treated as an action and no move is recorded.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `ProcessAction`, next to the `/undo` branch:
 
@@ -1077,12 +1077,12 @@ In `ProcessAction`, next to the `/undo` branch:
 
 The unresolvable-target and non-location cases are both covered by `findLocationByRef`, which only ever returns entities of type `location`. This adds `github.com/darkliquid/localrpg/pkg/entity` to `pkg/engine/orchestrator.go`'s imports, which it does not currently need.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/orchestrator_location_test.go
@@ -1101,7 +1101,7 @@ git commit -m "feat(engine): add a /go command that moves the player and records
 - Consumes: `Timeline.SaveEntity` (Task 4)
 - Produces: `rules.EntityWriter`, `rules.NewHostBridge(store *storage.Store, writer EntityWriter, playerID string) *DefaultHostBridge`, `(*DefaultHostBridge).SetLocation(string) error`, `(*DefaultHostBridge).GetLocation() (string, error)`; JS `setLocation(id)`, `getLocation()`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/rules/host_api_test.go`:
 
@@ -1159,12 +1159,12 @@ func TestHostBridgeMovesThePlayerThroughItsWriter(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestHostBridgeMovesThePlayer -count=1 ./pkg/rules/`
 Expected: FAIL — `too many arguments in call to NewHostBridge`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/rules/host_api.go`:
 
@@ -1270,12 +1270,12 @@ Update every construction site to pass the writer and player: `cmd/localrpg/play
 	bridge := rules.NewHostBridge(store, timeline, manifest.Player)
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/rules/ ./pkg/engine/ ./pkg/tui/ ./cmd/localrpg/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/rules pkg/engine cmd/localrpg pkg/tui
@@ -1293,7 +1293,7 @@ git commit -m "feat(rules): let a system move the player and read their location
 - Consumes: `Timeline.SetPlayerLocation`, `findLocationByRef`
 - Produces: `harness.Extraction.PlayerLocation string` (JSON `player_location`)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/harness/extractor_test.go`:
 
@@ -1386,12 +1386,12 @@ func TestExtractorProposedLocationAppliesOnlyWhenItResolves(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestExtractorReturnsAProposedPlayerLocation|TestExtractorProposedLocationApplies" -count=1 ./pkg/harness/ ./pkg/engine/`
 Expected: FAIL — `result.PlayerLocation undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/harness/extractor.go`:
 
@@ -1422,12 +1422,12 @@ In `pkg/engine/orchestrator.go`, apply the proposal after extraction and before 
 	}
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/harness/ ./pkg/engine/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/extractor.go pkg/harness/extractor_test.go pkg/engine/orchestrator.go pkg/engine/orchestrator_location_test.go
@@ -1449,7 +1449,7 @@ git commit -m "feat(engine): let extraction propose a move the engine then verif
 - Consumes: nothing new
 - Produces: `rules.ActionResult.Outcome string` (JSON `outcome`)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/rules/js_engine_test.go`:
 
@@ -1491,12 +1491,12 @@ func TestExecuteActionReadsTheOutcomeLabel(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestExecuteActionReadsTheOutcomeLabel -count=1 ./pkg/rules/`
 Expected: FAIL — `res.Outcome undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/rules/host_api.go`:
 
@@ -1520,12 +1520,12 @@ In `pkg/rules/js_engine.go`'s `ExecuteAction`, after the `success` key is read a
 
 The `Data` sweep already excludes reserved keys; add `outcome` to that exclusion list so it does not appear twice.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/rules/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/rules/host_api.go pkg/rules/js_engine.go pkg/rules/js_engine_test.go
@@ -1544,7 +1544,7 @@ git commit -m "feat(rules): let a system name its own check outcome"
 - Consumes: `rules.ActionResult.Outcome` (Task 8), `storage.ListTurnEntitiesByOutcome` (Task 2)
 - Produces: `Turn.Outcome`, `TurnDTO.Outcome`, `Turn.outcome` in the frontend types
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `pkg/engine/orchestrator_outcome_test.go`:
 
@@ -1615,12 +1615,12 @@ func TestProcessActionRecordsTheSystemsOutcomeLabel(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestProcessActionRecordsTheSystemsOutcomeLabel -count=1 ./pkg/engine/`
 Expected: FAIL — `turn.Outcome` empty.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `ProcessAction`, alongside `var rollRes *rules.RollResult`:
 
@@ -1658,12 +1658,12 @@ In `frontend/src/types.ts`, `Turn` gains `outcome?: string`. In `ChronicleView.t
                 )}
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/ ./pkg/gui/ && cd frontend && npx tsc --noEmit`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine pkg/gui frontend/src
@@ -1685,7 +1685,7 @@ git commit -m "feat(engine): record how each check resolved, per turn and per en
 - Consumes: `harness.NewModelProvider`, `harness.Router.GetProviderForRole`
 - Produces: `config.AgentRoleConfig.InheritFrom string`; `resolveExtractor` honouring `inherit` and `disabled`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `cmd/localrpg/play_resolver_test.go`:
 
@@ -1761,12 +1761,12 @@ func TestResolveExtractorUsesAConcreteProvider(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestResolveExtractor -count=1 ./cmd/localrpg/`
 Expected: FAIL — `cfg.Agents.Roles[config.RoleExtractor]` has no `InheritFrom`, and `inherit` falls through to the provider factory.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/config/types.go`:
 
@@ -1847,12 +1847,12 @@ func resolveExtractor(cfg *config.Config, router *harness.Router) *harness.Extra
 
 The router loop in `play.go` must not try to build a provider for an `inherit` role itself; skip `inherit` there, since it is resolved through the router by name.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./cmd/localrpg/ ./pkg/config/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/types.go cmd/localrpg/play.go cmd/localrpg/play_resolver_test.go
@@ -1870,7 +1870,7 @@ git commit -m "feat(config): make the extractor a role you can see and aim"
 - Consumes: `AgentsConfig.roles` from the API (already sent)
 - Produces: a role list derived from config; an `inherit` provider type with an `inherit_from` selector
 
-- [ ] **Step 1: Write the failing check**
+- [x] **Step 1: Write the failing check**
 
 There is no frontend test runner, so the check is the type checker plus the existing manual path. Introduce the change and let the compiler find the fallout: replace the hardcoded union at `SettingsStudio.tsx:48`
 
@@ -1889,7 +1889,7 @@ Then run the type check:
 Run: `cd frontend && npx tsc --noEmit`
 Expected: FAIL if any code depended on the union, which is the point of starting here.
 
-- [ ] **Step 2: Implement the role list**
+- [x] **Step 2: Implement the role list**
 
 Replace the hardcoded options at `SettingsStudio.tsx:288-290` with a derived list, add the labels and the per-role default, near the top of the component:
 
@@ -1922,7 +1922,7 @@ and the selector body:
 
 `evaluator` disappears with the hardcoded list: no backend code has ever routed it.
 
-- [ ] **Step 3: Implement `inherit` and the cost hint**
+- [x] **Step 3: Implement `inherit` and the cost hint**
 
 At `SettingsStudio.tsx:114`, default a missing role through the helper:
 
@@ -1979,12 +1979,12 @@ where `updateRole` is the existing pattern already used by the other fields:
 
 In `frontend/src/types.ts`, `AgentRoleConfig` gains `inherit_from?: string;`.
 
-- [ ] **Step 4: Verify the type check and the build**
+- [x] **Step 4: Verify the type check and the build**
 
 Run: `cd frontend && npx tsc --noEmit && npm run build`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/SettingsStudio.tsx
@@ -2005,7 +2005,7 @@ git commit -m "feat(frontend): configure every agent role, including the extract
 - Consumes: `entity.WikilinkTarget`
 - Produces: `dialogue.Parse` accepting emphasis and wikilink speaker wrappers, splitting trailing prose
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/dialogue/dialogue_test.go`:
 
@@ -2076,12 +2076,12 @@ func TestParseRejectsImpossibleSpeakers(t *testing.T) {
 
 Add `"strings"` to the test file's imports.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestParseAcceptsTheForms|TestParseKeepsProseAfter|TestParseRejectsImpossible" -count=1 ./pkg/dialogue/`
 Expected: FAIL — bold, italic, and trailing-prose cases are not recognised.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Replace the parser in `pkg/dialogue/dialogue.go`:
 
@@ -2144,12 +2144,12 @@ func cleanSpeaker(raw string) string {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/dialogue/ ./pkg/engine/`
 Expected: PASS, including the retained `As you declare` regression in the engine's segment tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/dialogue
@@ -2166,7 +2166,7 @@ git commit -m "feat(dialogue): parse the speaker forms a GM actually writes"
 - Consumes: `AssembleContextWithProfiles` (existing)
 - Produces: the instruction appears in every assembled prompt
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/context_test.go`:
 
@@ -2194,12 +2194,12 @@ func TestAssembleContextAlwaysAsksForAttributableSpeech(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestAssembleContextAlwaysAsksForAttributableSpeech -count=1 ./pkg/harness/`
 Expected: FAIL — no such section.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/harness/context.go`, add the block as a package constant:
 
@@ -2220,12 +2220,12 @@ and write it in `AssembleContextWithProfiles`, after the lore block and before t
 	sb.WriteString(speechFormattingInstruction + "\n\n")
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/harness/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/context.go pkg/harness/context_test.go
@@ -2251,7 +2251,7 @@ git commit -m "feat(harness): tell the GM how to mark up spoken lines"
 
 The hash and the prompt are deliberately separate inputs. The hash decides whether cached art still applies and covers only authored intent (the `appearance` field, else tags and state); the prompt is free to include a body excerpt because it only runs when generation actually happens. Collapsing the two would regenerate art on every turn, since extraction appends to the body almost every turn.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/media/image_test.go`:
 
@@ -2415,12 +2415,12 @@ func TestProceduralArtVariesByContentNotLength(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestLocationImage|TestAppearanceHash|TestBuildLocationPrompt|TestProceduralArtVaries" -count=1 ./pkg/media/`
 Expected: FAIL — `undefined: GenerateLocationImage`, `undefined: AppearanceHash`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/media/image.go`, replace `GenerateSceneImage` with the location-aware pair:
 
@@ -2530,12 +2530,12 @@ In `pkg/media/procedural_art.go`, replace the length-based seed:
 
 with `"hash/fnv"` imported. Rewrite the `GenerateSceneImage` cases in `pkg/media/image_test.go` that this replaces, and update any other call site the compiler flags.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/media/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media
@@ -2554,7 +2554,7 @@ git commit -m "feat(media): key scene art on authored appearance, not on prose"
 - Consumes: nothing new
 - Produces: `entity.Entity.Appearance` (frontmatter `appearance`), `harness.ExtractedEntity.Appearance` (JSON `appearance`)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/entity/history_test.go`:
 
@@ -2625,12 +2625,12 @@ func TestExtractorReadsAnEntityAppearance(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestEntityAppearanceRoundTrip|TestMergeOnlyFills|TestExtractorReadsAnEntityAppearance" -count=1 ./pkg/entity/ ./pkg/harness/`
 Expected: FAIL — `ent.Appearance undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/entity/entity.go`, add to both types and to parse and serialize:
 
@@ -2668,12 +2668,12 @@ and the prompt's entity schema documents the field:
 "appearance": "How this place or person looks right now, when it has visibly changed."
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/entity/ ./pkg/storage/ ./pkg/harness/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity pkg/storage pkg/harness
@@ -2691,7 +2691,7 @@ git commit -m "feat(entity): let a note describe how it currently looks"
 - Consumes: `NewImageClient`, the builtin `procedural-art` provider
 - Produces: `config.ImageConfig.BuiltinFallback bool`, `media.NewSceneImageClient(cfg config.ImageConfig) (ImageClient, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/media/providers_test.go`:
 
@@ -2743,12 +2743,12 @@ func TestSceneImageClientWithoutFallbackStaysDisabled(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run TestSceneImageClient -count=1 ./pkg/media/`
 Expected: FAIL — `undefined: NewSceneImageClient`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/config/types.go`, `ImageConfig` gains:
 
@@ -2797,12 +2797,12 @@ func NewSceneImageClient(cfg config.ImageConfig) (ImageClient, error) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/media/ ./pkg/config/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/media/providers.go pkg/media/providers_test.go
@@ -2823,7 +2823,7 @@ git commit -m "feat(media): keep scene art available with no provider configured
 - Consumes: `media.NewSceneImageClient`, `media.NewImagePipeline`, `media.GenerateLocationImage`, `media.AppearanceHash` (all inside the pipeline call)
 - Produces: `(*Service).GetLocationArt(ctx context.Context, gameID, locationID string, force bool) (string, string, error)` returning a path and content type; route `GET /api/game/{id}/location/{eid}/art`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `pkg/gui/service_test.go`, add a location to `setupTestGame` and point the player at it, so art and location tests have something real to work with:
 
@@ -2916,12 +2916,12 @@ func TestLocationArtRoute(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestGetLocationArt|TestLocationArtRoute" -count=1 ./pkg/gui/`
 Expected: FAIL — `svc.GetLocationArt undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/gui/service.go`:
 
@@ -3034,12 +3034,12 @@ In `pkg/gui/types.go`, `TurnDTO` gains `LocationID`, `LocationName`, and `Locati
 
 with `let previousLocationID: string | undefined;` reset on each render pass inside the `turns.map` callback, assigning `previousLocationID = turn.location_id;` after the comparison so consecutive turns in one place show the image once.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/gui/ && cd frontend && npx tsc --noEmit`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui frontend/src
@@ -3062,7 +3062,7 @@ git commit -m "feat(gui): show a location's art when the scene changes"
 - Consumes: `SynthesizeUtterance` (existing)
 - Produces: `(*TTSPipeline).SynthesizeSegment(ctx, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (string, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/media/tts_test.go`:
 
@@ -3105,12 +3105,12 @@ func TestSynthesizeSegmentPicksTheRightVoice(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestSynthesizeSegmentPicksTheRightVoice -count=1 ./pkg/media/`
 Expected: FAIL — `pipeline.SynthesizeSegment undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/media/tts.go`, extract the existing per-segment body out of `SynthesizeSegments`:
 
@@ -3155,12 +3155,12 @@ func (p *TTSPipeline) SynthesizeSegment(ctx context.Context, segment entity.Turn
 	return clips, nil
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/media/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/tts.go pkg/media/tts_test.go
@@ -3180,7 +3180,7 @@ git commit -m "feat(media): synthesize a single segment for on-demand playback"
 - Consumes: `media.NewTTSClient`, `media.NewTTSPipeline`, `media.NewContentCache`, `TTSPipeline.SynthesizeSegment`
 - Produces: `(*Service).GetSegmentAudio(ctx context.Context, gameID string, turnNumber, segmentIndex int) (string, error)`; `gui.ErrAudioUnavailable`; route `GET /api/game/{id}/turn/{n}/segment/{i}/audio`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `pkg/gui/service_test.go`, extend `setupTestGame` so media is configured for playback tests:
 
@@ -3287,12 +3287,12 @@ func TestSegmentAudioRoute(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestGetSegmentAudio|TestChronicleOffersAudioURLs|TestSegmentAudioRoute" -count=1 ./pkg/gui/`
 Expected: FAIL — `svc.GetSegmentAudio undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/gui/service.go`:
 
@@ -3422,12 +3422,12 @@ In `pkg/gui/server.go`, add a `turn` action to `handleGameRoutes`:
 
 In `pkg/gui/types.go`, `SegmentDTO` gains `AudioURL string \`json:"audio_url,omitempty"\``, and `frontend/src/types.ts` mirrors it as `audio_url?: string`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui frontend/src/types.ts
@@ -3445,14 +3445,14 @@ git commit -m "feat(gui): synthesize a turn's dialogue on demand"
 - Consumes: `TurnSegment.audio_url` from the API
 - Produces: `useSegmentPlayback(segments, autoPlay, volume)` returning `{ playing, play, stop }`
 
-- [ ] **Step 1: Write the failing check**
+- [x] **Step 1: Write the failing check**
 
 Create the hook and use it, then let the type checker find what does not line up:
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: FAIL until the props are threaded through.
 
-- [ ] **Step 2: Implement the hook**
+- [x] **Step 2: Implement the hook**
 
 `frontend/src/hooks/useSegmentPlayback.ts`:
 
@@ -3506,7 +3506,7 @@ export const useSegmentPlayback = (
 };
 ```
 
-- [ ] **Step 3: Wire it into the segment renderer**
+- [x] **Step 3: Wire it into the segment renderer**
 
 `TurnSegments.tsx` gains `autoPlay` and `volume` props, uses the hook, and renders a transport when any segment has a clip:
 
@@ -3534,12 +3534,12 @@ and each speech segment's label becomes a control that plays from that segment:
 
 The chronicle and the story theater read `preferences.tts.auto_play` and `preferences.tts.master_volume` from the settings they already fetch and pass them down, so the two existing switches finally do something.
 
-- [ ] **Step 4: Verify the type check and the build**
+- [x] **Step 4: Verify the type check and the build**
 
 Run: `cd frontend && npx tsc --noEmit && npm run build`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src
@@ -3557,7 +3557,7 @@ git commit -m "feat(frontend): play a turn's dialogue in each character's voice"
 - Consumes: `media.NewTTSClient`, `media.NewTTSPipeline`, `media.NewContentCache`, `config.NewConfigManager`
 - Produces: `localrpg tts [--voice id] [--pitch n] [--rate n] -- <text>` printing the written clip path
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Replace the TTS assertion in `cmd/localrpg/media_test.go` with one that proves a clip was written, using a throwaway config so the test does not depend on the developer's own settings:
 
@@ -3584,12 +3584,12 @@ func TestCLITTSWritesAClip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestCLITTSWritesAClip -count=1 ./cmd/localrpg/`
 Expected: FAIL — the command prints a synthetic message and writes nothing.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `cmd/localrpg/media.go`, `handleTTSCommand` gains flags and a real synthesis path:
 
@@ -3644,12 +3644,12 @@ func handleTTSCommand(args []string) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./cmd/localrpg/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cmd/localrpg/media.go cmd/localrpg/media_test.go
@@ -3667,7 +3667,7 @@ git commit -m "feat(cli): make the tts command produce a file"
 - Consumes: `(*TurnOrchestrator).currentLocation` (Task 4)
 - Produces: `(*TurnOrchestrator).CurrentLocationName() string`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/engine/orchestrator_location_test.go`:
 
@@ -3717,12 +3717,12 @@ func TestTUIViewShowsTheLocation(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test -run "TestCurrentLocationName|TestTUIViewShowsTheLocation" -count=1 ./pkg/engine/ ./pkg/tui/`
 Expected: FAIL — `o.CurrentLocationName undefined`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/engine/orchestrator.go`:
 
@@ -3751,12 +3751,12 @@ In `pkg/tui/app.go`'s `View`, prefix the status line:
 	sb.WriteString(StatusStyle.Render(status) + "\n")
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/ ./pkg/tui/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/tui/app.go pkg/engine/orchestrator_location_test.go pkg/tui/app_test.go

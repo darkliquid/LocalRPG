@@ -37,7 +37,7 @@
 - Modify: `pkg/core/types.go`
 - Modify: `pkg/core/types_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestSystemManifestCharacterCreationRoundTrip(t *testing.T) {
@@ -65,12 +65,12 @@ func TestSystemManifestCharacterCreationRoundTrip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestSystemManifestCharacterCreationRoundTrip ./pkg/core/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add the types from the spec and the field:
 
@@ -84,12 +84,12 @@ type SystemManifest struct {
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `go test -run TestSystemManifestCharacterCreationRoundTrip ./pkg/core/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/core/types.go pkg/core/types_test.go
@@ -105,7 +105,7 @@ git commit -m "feat(core): let a rules system define character creation prompts"
 - Modify: `pkg/engine/game.go`
 - Modify: `pkg/engine/game_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestInitGameWritesPlayerCharacter(t *testing.T) {
@@ -114,12 +114,12 @@ func TestInitGameWritesPlayerCharacter(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `go test -run TestInitGameWritesPlayerCharacter ./pkg/engine/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement `pkg/engine/character.go`**
+- [x] **Step 3: Implement `pkg/engine/character.go`**
 
 ```go
 package engine
@@ -141,7 +141,7 @@ type PlayerCharacter struct {
 func DefaultCharacterFields() []string { return []string{"appearance", "age", "gender", "pronouns", "background", "voice"} }
 ```
 
-- [ ] **Step 4: Populate the note**
+- [x] **Step 4: Populate the note**
 
 Add `PlayerCharacter PlayerCharacter` to `InitOptions`, change `ensurePlayerNote` to accept it, and set:
 
@@ -174,12 +174,12 @@ if player.Body == "" {
 
 Do not auto-assign a voice here; the caller (Task 5) does that with the configured profiles.
 
-- [ ] **Step 5: Run the engine tests**
+- [x] **Step 5: Run the engine tests**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/engine/character.go pkg/engine/game.go pkg/engine/game_test.go
@@ -195,7 +195,7 @@ git commit -m "feat(engine): write a described player character at campaign star
 - Modify: `pkg/gui/service.go`
 - Modify: `pkg/gui/service_test.go`
 
-- [ ] **Step 1: Add the DTOs**
+- [x] **Step 1: Add the DTOs**
 
 ```go
 type PlayerCharacterDTO struct {
@@ -211,7 +211,7 @@ type PlayerCharacterDTO struct {
 
 Add `Player PlayerCharacterDTO `json:"player,omitempty"`` to `CreateGameRequestDTO`; add `CharacterCreation core.CharacterCreationSpec` to `SystemDetailDTO` and `CreateSystemRequestDTO`; add `Appearance string` and `Voice *config.VoiceProfile` to `PlayerDTO`.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```go
 func TestCreateGamePersistsPlayerCharacter(t *testing.T) {
@@ -221,7 +221,7 @@ func TestCreateGamePersistsPlayerCharacter(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `CreateGame`:
 - convert `PlayerCharacterDTO.Voice` to `*entity.VoiceConfig`;
@@ -231,12 +231,12 @@ In `CreateGame`:
 
 In `GetSystem`/`SaveSystem`, carry `CharacterCreation` through.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/service_test.go
@@ -252,7 +252,7 @@ git commit -m "feat(gui): accept a player character when creating a campaign"
 - Modify: `pkg/gui/server.go`
 - Create: `pkg/gui/character_generate_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestGenerateCharacterValues(t *testing.T) {
@@ -265,7 +265,7 @@ func TestGenerateCharacterFallsBackWhenDisabled(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Implement `character_generate.go`**
+- [x] **Step 2: Implement `character_generate.go`**
 
 ```go
 type GenerateCharacterRequest struct {
@@ -284,16 +284,16 @@ type GenerateCharacterResponse struct {
 
 Build a JSON-only system prompt from the fields, resolve the router role `character` falling back to `gm` (`harness.RouterFromConfig`), call `GenerateForRole`, and parse the returned object leniently: keep only known field ids, coerce numbers to strings, and never fail the request on a model error - return `generated_by: "none"` instead. `kind: voice` fields are excluded from generation.
 
-- [ ] **Step 3: Route it**
+- [x] **Step 3: Route it**
 
 In `pkg/gui/server.go`, map `POST /api/character/generate` (a top-level `/api/character/...` route, outside `/api/game/{id}`). Use `http.MaxBytesReader` as the other write routes do.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/character_generate.go pkg/gui/character_generate_test.go pkg/gui/server.go
@@ -308,7 +308,7 @@ git commit -m "feat(gui): generate starting character values with a safe fallbac
 - Modify: `pkg/gui/service.go`
 - Modify: `pkg/gui/service_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestCreateGameAutoAssignsPlayerVoice(t *testing.T) {
@@ -317,7 +317,7 @@ func TestCreateGameAutoAssignsPlayerVoice(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 In `CreateGame`, when `req.Player.Voice == nil`:
 
@@ -326,12 +326,12 @@ In `CreateGame`, when `req.Player.Voice == nil`:
 
 Reuse the existing `harness.AssignVoiceProfile` rather than duplicating matching logic.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/service_test.go
@@ -349,7 +349,7 @@ git commit -m "feat(gui): give the player a voice chosen from their description"
 - Modify: `frontend/src/components/SystemsStudio.tsx`
 - Modify: `frontend/src/components/CharacterSheetDrawer.tsx`
 
-- [ ] **Step 1: Types and client**
+- [x] **Step 1: Types and client**
 
 Add `CharacterCreationField`, `CharacterCreationSpec`, `PlayerCharacter`, extend `SystemDetail`, `CreateGameRequest`, and `Player`; add:
 
@@ -361,24 +361,24 @@ static async generateCharacter(payload: GenerateCharacterRequest): Promise<Gener
 }
 ```
 
-- [ ] **Step 2: Wizard**
+- [x] **Step 2: Wizard**
 
 Restructure the create wizard into campaign → character → review, loading the system spec when the system changes, rendering each field by kind (`voice` renders the configured `voice_profiles` picker), wiring per-field and generate-all buttons, and sending `player` on create.
 
-- [ ] **Step 3: Studio editor**
+- [x] **Step 3: Studio editor**
 
 Add a character-creation section to `SystemsStudio`: list fields with add/remove, editing id/label/prompt/kind/required/generatable/options.
 
-- [ ] **Step 4: Sheet**
+- [x] **Step 4: Sheet**
 
 Show `player.appearance` and `player.voice` in `CharacterSheetDrawer`.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/api/client.ts frontend/src/components/LauncherHub.tsx frontend/src/components/SystemsStudio.tsx frontend/src/components/CharacterSheetDrawer.tsx
@@ -392,15 +392,15 @@ git commit -m "feat(frontend): add a character creation step to the campaign wiz
 **Files:**
 - Modify: `systems/narrative_2d6/system.yaml`
 
-- [ ] **Step 1: Add an example spec**
+- [x] **Step 1: Add an example spec**
 
 Add a `character_creation` block with `appearance`, `age`, `gender`, `pronouns`, `background`, and a `voice` field so the feature is discoverable.
 
-- [ ] **Step 2: Full verification**
+- [x] **Step 2: Full verification**
 
 Run: `mise run test:backend`, `mise run lint`, `cd frontend && npx tsc --noEmit`
 Expected: all pass.
 
-- [ ] **Step 3: Manual smoke**
+- [x] **Step 3: Manual smoke**
 
 Create a campaign with a generated character, confirm the player note has appearance, background, voice, and the extra fields, and confirm they appear in the codex.

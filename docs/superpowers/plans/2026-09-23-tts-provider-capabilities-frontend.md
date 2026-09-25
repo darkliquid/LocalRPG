@@ -63,7 +63,7 @@ This is the second half of the spec. It consumes the `POST /api/tts/inspect` end
 - Consumes: the backend `TTSInspectResponseDTO` shape and `GET /api/game/{id}/tts/uncached`.
 - Produces: `VoiceOption`, `ProviderVoice`, `VoiceCatalog`, `TTSInspectRequest`, `TTSInspectResponse`; `VoiceProfile.options`, `TTSConfig.options`, `TTSConfig.metered`, `TestProviderRequest.voice_id`; `APIClient.inspectTTS`, `APIClient.uncachedBeats`.
 
-- [ ] **Step 1: Add the types**
+- [x] **Step 1: Add the types**
 
 In `frontend/src/types.ts`, replace the `VoiceProfile` and `TTSConfig` interfaces with:
 
@@ -163,7 +163,7 @@ export interface TestProviderRequest {
 }
 ```
 
-- [ ] **Step 2: Add the client methods**
+- [x] **Step 2: Add the client methods**
 
 In `frontend/src/api/client.ts`, add `TTSInspectRequest, TTSInspectResponse` to the type import list, then add after `testProvider`:
 
@@ -185,12 +185,12 @@ In `frontend/src/api/client.ts`, add `TTSInspectRequest, TTSInspectResponse` to 
   }
 ```
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: no errors (the methods are unused for now, which TypeScript permits).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/api/client.ts
@@ -208,7 +208,7 @@ git commit -m "feat(frontend): type the TTS inspect response and add client call
 - Consumes: `APIClient.inspectTTS` (Task 1), `TTSConfig`, `TTSInspectResponse`.
 - Produces: `useTTSInspect(config: TTSConfig | null, enabled?: boolean): { inspect, loading, error, refresh }`.
 
-- [ ] **Step 1: Write the hook**
+- [x] **Step 1: Write the hook**
 
 Create `frontend/src/hooks/useTTSInspect.ts`:
 
@@ -284,12 +284,12 @@ export function useTTSInspect(config: TTSConfig | null, enabled = true): TTSInsp
 }
 ```
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/hooks/useTTSInspect.ts
@@ -307,7 +307,7 @@ git commit -m "feat(frontend): add a debounced TTS inspect hook"
 - Consumes: `VoiceOption` (Task 1).
 - Produces: `<VoiceOptionsControl schema values onChange />`, where `onChange(key: string, value: unknown)`.
 
-- [ ] **Step 1: Write the component**
+- [x] **Step 1: Write the component**
 
 Create `frontend/src/components/VoiceOptionsControl.tsx`:
 
@@ -426,12 +426,12 @@ function renderControl(
 }
 ```
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: no errors. If the unused `eslint-disable` comment or an unused import is flagged, remove it; TypeScript does not require the comment.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/VoiceOptionsControl.tsx
@@ -449,7 +449,7 @@ git commit -m "feat(frontend): render provider options from their declaration"
 - Consumes: `useTTSInspect` (Task 2), `VoiceOptionsControl` (Task 3), `TTSConfig.options` (Task 1).
 - Produces: the TTS panel renders provider controls, catalog freshness, and a metered badge.
 
-- [ ] **Step 1: Add imports and the hook call**
+- [x] **Step 1: Add imports and the hook call**
 
 At the top of `SettingsStudio.tsx`, add to the existing imports:
 
@@ -467,7 +467,7 @@ Inside the component body, immediately after the existing `useState` declaration
   const { inspect, loading: inspecting, refresh: refreshInspect } = useTTSInspect(inspectConfig, Boolean(config));
 ```
 
-- [ ] **Step 2: Insert the options block, catalog strip, and metered badge**
+- [x] **Step 2: Insert the options block, catalog strip, and metered badge**
 
 In the TTS section, immediately before the preview block that begins `{config.media.tts.type !== 'disabled' && (`, insert:
 
@@ -519,12 +519,12 @@ In the TTS section, immediately before the preview block that begins `{config.me
             )}
 ```
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: no errors. Remove any unused import the compiler flags.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx
@@ -542,7 +542,7 @@ git commit -m "feat(frontend): render provider tuning and catalog state in Setti
 - Consumes: `VoiceOptionsControl` (Task 3), `VoiceProfile.options` (Task 1), `inspect.options` (Task 4).
 - Produces: a profile carries its own provider options, and a profile preview auditions them.
 
-- [ ] **Step 1: Pass profile options to the preview probe**
+- [x] **Step 1: Pass profile options to the preview probe**
 
 In the per-profile Play button, the provider object passed to `handleTestProvider` currently ends with `speech_rate: profile.speech_rate`. Add one line after it:
 
@@ -550,7 +550,7 @@ In the per-profile Play button, the provider object passed to `handleTestProvide
                                 options: profile.options,
 ```
 
-- [ ] **Step 2: Insert the per-profile options editor**
+- [x] **Step 2: Insert the per-profile options editor**
 
 In the profile card, between the closing `</div>` of the pitch/rate/tags grid and the card's closing `</div>`, insert:
 
@@ -583,12 +583,12 @@ In the profile card, between the closing `</div>` of the pitch/rate/tags grid an
 
 Anchor the insertion on the end of the description input plus its two closing `</div>` lines and the `))}` that ends the profile map.
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx
@@ -608,7 +608,7 @@ git commit -m "feat(frontend): edit and audition per-profile provider options"
 - Consumes: `useTTSInspect` (Task 2), `APIClient.inspectTTS`, `VoiceProfile`/`ProviderVoice` (Task 1).
 - Produces: `VoiceCatalogPicker` with props `{ ttsConfig, onAddProfile }`; `CodexDrawer` gains `ttsConfig?: TTSConfig` and `onAddProfile?: (profile: VoiceProfile) => void`; `App` supplies both from its existing config state.
 
-- [ ] **Step 1: Write the catalog picker**
+- [x] **Step 1: Write the catalog picker**
 
 Create `frontend/src/components/VoiceCatalogPicker.tsx`:
 
@@ -740,7 +740,7 @@ export function playVoicePreview(url: string, volume = 1): void {
 
 `SettingsStudio.tsx` keeps its own preview helper because it stops the previous preview and reports a blocked-playback message; the picker has no such feedback surface, so it uses this simpler one. Do not refactor `SettingsStudio`.
 
-- [ ] **Step 2: Extend CodexDrawer**
+- [x] **Step 2: Extend CodexDrawer**
 
 In `CodexDrawer.tsx`:
 
@@ -791,7 +791,7 @@ After the archetype select row closes, render the catalog picker when a config i
             )}
 ```
 
-- [ ] **Step 3: Wire App**
+- [x] **Step 3: Wire App**
 
 In `App.tsx`'s `<CodexDrawer ... />`, add:
 
@@ -815,12 +815,12 @@ In `App.tsx`'s `<CodexDrawer ... />`, add:
 
 `activeProvider` can be left unset here; the hint simply does not render. If the inspect already runs elsewhere in `App`, pass `activeProvider={...}` from it rather than adding a second call.
 
-- [ ] **Step 4: Typecheck**
+- [x] **Step 4: Typecheck**
 
 Run: `cd frontend && npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/VoiceCatalogPicker.tsx frontend/src/components/CodexDrawer.tsx frontend/src/App.tsx frontend/src/lib/audioPreview.ts
@@ -841,7 +841,7 @@ git commit -m "feat(frontend): pick, audition, and import provider catalog voice
 **Interfaces:**
 - Produces: `config.TTSConfig.Options map[string]interface{}`; the narrator voice and the test probe carry it.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/config/types_test.go`:
 
@@ -870,12 +870,12 @@ func TestTTSConfigOptionsRoundTrip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestTTSConfigOptionsRoundTrip ./pkg/config/ -v`
 Expected: FAIL to compile with "unknown field Options".
 
-- [ ] **Step 3: Add the field**
+- [x] **Step 3: Add the field**
 
 In `pkg/config/types.go`, add to `TTSConfig` after `Metered`:
 
@@ -885,7 +885,7 @@ In `pkg/config/types.go`, add to `TTSConfig` after `Metered`:
 	Options map[string]interface{} `yaml:"options,omitempty" json:"options,omitempty"`
 ```
 
-- [ ] **Step 4: Carry it into the narrator voice and the probe**
+- [x] **Step 4: Carry it into the narrator voice and the probe**
 
 In `pkg/gui/service.go`, find the narrator voice literal in the per-segment synthesis path (`narratorVoice := &entity.VoiceConfig{...}`) and add:
 
@@ -906,12 +906,12 @@ In `TestProvider`'s `"tts"` case, extend the probe voice:
 		}
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `go test ./pkg/config/ ./pkg/gui/ ./pkg/export/ ./cmd/... -count=1`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/config/types_test.go pkg/gui/service.go pkg/export/script.go cmd/localrpg/play.go
@@ -933,7 +933,7 @@ git commit -m "feat: tune the default narrator voice with provider options"
 - Consumes: `media.ValidateVoiceOptions`, `media.NewTTSClient`/`Service.ttsClientFor`, `media.VoiceOptions`.
 - Produces: `(*Service).validateVoiceOptionsInConfig(ctx, cfg *config.Config) error`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/tts_validate_test.go`:
 
@@ -1004,12 +1004,12 @@ func TestSaveSettingsKeepsOptionsWhenProviderIsDisabled(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestSaveSettings ./pkg/gui/ -v`
 Expected: FAIL with "undefined: validateVoiceOptionsInConfig".
 
-- [ ] **Step 3: Write the validator**
+- [x] **Step 3: Write the validator**
 
 Create `pkg/gui/tts_validate.go`:
 
@@ -1057,7 +1057,7 @@ func (s *Service) validateVoiceOptionsInConfig(cfg *config.Config) error {
 }
 ```
 
-- [ ] **Step 4: Call it from SaveSettings**
+- [x] **Step 4: Call it from SaveSettings**
 
 In `pkg/gui/service.go`, inside `SaveSettings`, before the config is written:
 
@@ -1069,12 +1069,12 @@ In `pkg/gui/service.go`, inside `SaveSettings`, before the config is written:
 
 Match the surrounding code's parameter type and error style.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `go test ./pkg/gui/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/tts_validate.go pkg/gui/tts_validate_test.go pkg/gui/service.go
@@ -1096,7 +1096,7 @@ git commit -m "feat(gui): clamp provider options when settings are saved"
 - Consumes: `ComputeAudioCacheKeyForVoice`, `TTSPipeline`, `Service.voiceFor`, `engine.HistoryLogger`.
 - Produces: `(*TTSPipeline).CountUncached(segments, narratorVoice, voiceFor) (cached, uncached int)`; `(*Service).CountUncachedBeats(ctx, gameID) (cached, uncached int, err error)`; `GET /api/game/{id}/tts/uncached`.
 
-- [ ] **Step 1: Write the failing media test**
+- [x] **Step 1: Write the failing media test**
 
 Create `pkg/media/uncached_test.go`:
 
@@ -1139,12 +1139,12 @@ func TestCountUncached(t *testing.T) {
 
 The `***` segment is a scene break that reduces to no speakable text, so it is counted in neither total.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestCountUncached ./pkg/media/ -v`
 Expected: FAIL with "pipeline.CountUncached undefined".
 
-- [ ] **Step 3: Implement `CountUncached` and share the resolver**
+- [x] **Step 3: Implement `CountUncached` and share the resolver**
 
 In `pkg/media/tts.go`, factor the speaker/voice resolution out of `SynthesizeSegment`:
 
@@ -1216,7 +1216,7 @@ func (p *TTSPipeline) CountUncached(segments []entity.TurnSegment, narratorVoice
 }
 ```
 
-- [ ] **Step 4: Add the service method and route**
+- [x] **Step 4: Add the service method and route**
 
 In `pkg/gui/service.go`, add:
 
@@ -1274,7 +1274,7 @@ In `pkg/gui/server.go`, the game routes are dispatched by `handleGameRoutes`, wh
 		writeJSON(w, map[string]int{"cached": cached, "uncached": uncached})
 ```
 
-- [ ] **Step 5: Write the route test**
+- [x] **Step 5: Write the route test**
 
 Create `pkg/gui/uncached_test.go`:
 
@@ -1312,12 +1312,12 @@ func TestUncachedBeatsRoute(t *testing.T) {
 
 `setupTestGame(t) (string, *Service)` already exists in `pkg/gui/service_test.go`. Being a read-only count over an empty history, the expected body is `{"cached":0,"uncached":0}`.
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `go test ./pkg/media/ ./pkg/gui/ -count=1`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/media/tts.go pkg/media/uncached_test.go pkg/gui/service.go pkg/gui/server.go pkg/gui/uncached_test.go
@@ -1330,17 +1330,17 @@ git commit -m "feat: count uncached speech beats before a bulk synthesis"
 
 **Files:** none (verification only).
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `go test ./... -count=1`
 Expected: every package ok.
 
-- [ ] **Step 2: Vet and frontend gate**
+- [x] **Step 2: Vet and frontend gate**
 
 Run: `mise run lint` and `cd frontend && npm run build`
 Expected: `go vet ./...` clean and the frontend build (tsc plus vite) succeeds.
 
-- [ ] **Step 3: Confirm the acceptance criteria this plan owns**
+- [x] **Step 3: Confirm the acceptance criteria this plan owns**
 
 - 1: a provider's options render generically through `VoiceOptionsControl`; a provider without them shows nothing extra (Tasks 3-4).
 - 2: its catalog lists, searches, filters, and auditions, and a stale snapshot still renders (Tasks 6 and the backend plan's `CachedVoiceCatalog`).

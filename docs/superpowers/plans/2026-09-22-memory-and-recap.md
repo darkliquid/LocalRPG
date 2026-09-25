@@ -42,7 +42,7 @@ This plan implements **increment 4** of the coherence spec: long memory and the 
 
 The summary lives in a normal note rather than the database, so the player can read it, edit it, and export it, and so a rebuild of the index cannot lose it.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/chronicle_test.go`:
 
@@ -111,12 +111,12 @@ Add `os` and `strings` to that file's imports.
 
 Note: `WriteChronicle` takes an entities directory rather than a resolver, so it is testable without a campaign layout. The caller passes `timeline.EntitiesDir()`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestReadChronicle|TestWriteThenReadChronicle ./pkg/engine/`
 Expected: FAIL — `undefined: ReadChronicle`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `pkg/engine/chronicle.go`:
 
@@ -219,12 +219,12 @@ func intFromAny(value interface{}) int {
 
 Add `"github.com/darkliquid/localrpg/pkg/state"` to that file's imports.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/chronicle.go pkg/engine/chronicle_test.go
@@ -244,7 +244,7 @@ git commit -m "feat(engine): keep a campaign's story-so-far note"
 - Produces: `harness.Summariser` with `NewSummariser(provider ModelProvider)`, `SetLogger(trace.Logger)`, `SetCharLimit(int)`, `Summarise(ctx context.Context, previous string, turns []SummaryTurn) (string, error)`
 - Produces: `harness.SummariserFromConfig(cfg *config.Config, router *Router, logger trace.Logger) *Summariser`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/harness/summariser_test.go`:
 
@@ -360,12 +360,12 @@ func (p *failingSummaryProvider) Stream(ctx context.Context, req GenerateRequest
 
 Add `"errors"` to that file's imports.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestSummariser ./pkg/harness/`
 Expected: FAIL — `undefined: NewSummariser`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `pkg/harness/summariser.go`:
 
@@ -565,12 +565,12 @@ func (c *Config) SummaryCharLimit() int {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/harness/ ./pkg/config/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/summariser.go pkg/harness/summariser_test.go pkg/config/types.go
@@ -589,7 +589,7 @@ git commit -m "feat(harness): summarise a campaign's older turns"
 - Consumes: `engine.ReadChronicle`, `engine.WriteChronicle` (Task 1), `harness.Summariser` (Task 2)
 - Produces: `engine.Chronicler` with `NewChronicler(paths *core.PathResolver, store *storage.Store, summariser *harness.Summariser)`, `SetEvery(int)`, `SetLogger(trace.Logger)`, `Due(gameID string) (bool, error)`, `Regenerate(ctx context.Context, gameID string) (bool, error)`, `Recap(gameID string) (Chronicle, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/chronicler_test.go`:
 
@@ -742,12 +742,12 @@ func TestChroniclerDisabledWritesNothing(t *testing.T) {
 
 Add `"errors"` and `"strings"` to that file's imports.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestChronicler ./pkg/engine/`
 Expected: FAIL — `undefined: NewChronicler`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `pkg/engine/chronicler.go`:
 
@@ -901,12 +901,12 @@ func (c *Chronicler) entitiesDir(gameID string) string {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/engine/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/chronicler.go pkg/engine/chronicler_test.go
@@ -927,7 +927,7 @@ git commit -m "feat(engine): regenerate a campaign's story so far on a cadence"
 - Produces: the `summary` section, droppable at rank 6
 - Produces: `(*TurnOrchestrator).SetChronicler(*Chronicler)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/context_test.go`:
 
@@ -996,12 +996,12 @@ func TestSummaryIsTheLastSectionSurrendered(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestSummary ./pkg/harness/`
 Expected: FAIL — no `STORY SO FAR` section.
 
-- [ ] **Step 3: Add the section**
+- [x] **Step 3: Add the section**
 
 In `pkg/harness/context.go`:
 
@@ -1048,7 +1048,7 @@ The trim loop iterates ranks 1 to 4 today; extend it to the new ranks:
 
 Rank 5 is deliberately unused: it was reserved for the recall-excerpt shortening, which happens after every whole-section drop.
 
-- [ ] **Step 4: Read the summary in the orchestrator**
+- [x] **Step 4: Read the summary in the orchestrator**
 
 In `pkg/engine/orchestrator.go`:
 
@@ -1097,12 +1097,12 @@ func (t *Timeline) GameID() string {
 
 Finally pass `Summary: summary` in the `harness.ContextRequest`.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/harness/ ./pkg/engine/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/harness/context.go pkg/harness/context_test.go pkg/engine/orchestrator.go pkg/engine/timeline.go
@@ -1123,7 +1123,7 @@ git commit -m "feat(harness): inject the story so far as a recollection"
 - Produces: `(*Service).SetChronicler(*engine.Chronicler)`
 - Produces: coalescing state in the service: one pending regeneration per campaign
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/service_test.go`:
 
@@ -1165,12 +1165,12 @@ func TestAServiceRegeneratesTheSummaryBehindTheTurn(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestAServiceRegeneratesTheSummaryBehindTheTurn ./pkg/gui/`
 Expected: FAIL — `svc.SetSummaryCadence undefined`.
 
-- [ ] **Step 3: Wire it**
+- [x] **Step 3: Wire it**
 
 In `pkg/gui/service.go`, add the state and the setters:
 
@@ -1312,7 +1312,7 @@ func (s *Service) chronicler(gameID string) *engine.Chronicler {
 
 The orchestrator's chronicler in `prepareTurn` is built the same way; both are cheap.
 
-- [ ] **Step 4: Add the recap endpoint**
+- [x] **Step 4: Add the recap endpoint**
 
 In `pkg/gui/types.go`:
 
@@ -1365,12 +1365,12 @@ In `pkg/gui/server.go`, register the route and add it to the game switch:
 		writeJSON(w, recap)
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `go test -count=1 ./pkg/gui/ && go vet ./...`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/ pkg/config/ pkg/engine/ pkg/harness/
@@ -1391,7 +1391,7 @@ git commit -m "feat(gui): regenerate the story so far behind the turn"
 - Produces: `/recap` as an engine command, recognised in `ProcessActionStream`, which regenerates a stale summary before printing it
 - Produces: `APIClient.getRecap()`, and a "Story so far" block in the Living World drawer with a refresh
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/orchestrator_test.go`:
 
@@ -1480,12 +1480,12 @@ func TestRecapCommandSaysWhenThereIsNothingYet(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestRecapCommand ./pkg/engine/`
 Expected: FAIL — `/recap` falls through to the model.
 
-- [ ] **Step 3: Implement the command**
+- [x] **Step 3: Implement the command**
 
 In `pkg/engine/orchestrator.go`, beside the `/undo` and `/go` handlers, before anything that touches the model:
 
@@ -1521,7 +1521,7 @@ In `pkg/engine/orchestrator.go`, beside the `/undo` and `/go` handlers, before a
 	}
 ```
 
-- [ ] **Step 4: Add the client and the panel**
+- [x] **Step 4: Add the client and the panel**
 
 In `frontend/src/types.ts`:
 
@@ -1610,12 +1610,12 @@ add `client.getRecap().then(setRecap).catch(console.error);` to `refreshCorpus`,
             )}
 ```
 
-- [ ] **Step 5: Run the full gate**
+- [x] **Step 5: Run the full gate**
 
 Run: `go test -count=1 ./... && go vet ./... && (cd frontend && npx tsc --noEmit && npm run build)`
 Expected: PASS, and a successful build. Restore `pkg/gui/dist/.gitkeep` afterwards and do not stage its deletion.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/engine/ frontend/src/

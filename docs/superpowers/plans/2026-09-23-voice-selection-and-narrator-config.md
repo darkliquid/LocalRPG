@@ -36,7 +36,7 @@
 - Create: `pkg/media/sherpa_tts_catalog_test.go`
 - Modify: `pkg/media/sherpa_tts.go`
 
-- [ ] **Step 1: Write failing test for `SherpaTTSClient.ListVoices`**
+- [x] **Step 1: Write failing test for `SherpaTTSClient.ListVoices`**
 
 ```go
 package media
@@ -74,12 +74,12 @@ func TestSherpaTTSClientListVoices(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -count=1 ./pkg/media/ -run TestSherpaTTSClientListVoices`  
 Expected: FAIL with `client.ListVoices undefined`
 
-- [ ] **Step 3: Implement `ListVoices` on `SherpaTTSClient`**
+- [x] **Step 3: Implement `ListVoices` on `SherpaTTSClient`**
 
 In `pkg/media/sherpa_tts.go`:
 
@@ -174,12 +174,12 @@ func (s *SherpaTTSClient) ListVoices(ctx context.Context) ([]ProviderVoice, erro
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -count=1 ./pkg/media/ -run TestSherpaTTSClientListVoices`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/sherpa_tts.go pkg/media/sherpa_tts_catalog_test.go
@@ -195,7 +195,7 @@ git commit -m "feat(media): implement VoiceCatalog for SherpaTTSClient"
 - Modify: `pkg/gui/service.go:1410-1425,1720-1760`
 - Modify: `pkg/gui/service_test.go`
 
-- [ ] **Step 1: Write failing test in `pkg/gui/service_test.go`**
+- [x] **Step 1: Write failing test in `pkg/gui/service_test.go`**
 
 ```go
 func TestCreateGamePersistsNarratorVoice(t *testing.T) {
@@ -224,12 +224,12 @@ func TestCreateGamePersistsNarratorVoice(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -count=1 ./pkg/gui/ -run TestCreateGamePersistsNarratorVoice`  
 Expected: FAIL (field `NarratorVoice` unknown in `CreateGameRequestDTO`)
 
-- [ ] **Step 3: Update `CreateGameRequestDTO` and `service.go`**
+- [x] **Step 3: Update `CreateGameRequestDTO` and `service.go`**
 
 In `pkg/gui/types.go`:
 ```go
@@ -274,17 +274,17 @@ func (s *Service) narratorVoiceFor(gameID string, cfg config.Config) *entity.Voi
 ```
 Update `SynthesizeUtterance` (around line 1416) and `probeTTSWithConfig` (around line 1478) to call `s.narratorVoiceFor(gameID, cfg)` instead of bare `cfg.Media.TTS.DefaultVoice`.
 
-- [ ] **Step 4: Run tests to verify it passes**
+- [x] **Step 4: Run tests to verify it passes**
 
 Run: `go test -v -count=1 ./pkg/gui/ -run TestCreateGamePersistsNarratorVoice`  
 Expected: PASS
 
-- [ ] **Step 5: Run all backend tests**
+- [x] **Step 5: Run all backend tests**
 
 Run: `go test -count=1 ./pkg/...`  
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/service_test.go
@@ -299,7 +299,7 @@ git commit -m "feat(gui): support campaign-level narrator voice setting"
 - Create: `frontend/src/components/VoiceCombobox.tsx`
 - Modify: `frontend/src/types.ts`
 
-- [ ] **Step 1: Check `frontend/src/types.ts` and add `narrator_voice` to `CreateGameRequest`**
+- [x] **Step 1: Check `frontend/src/types.ts` and add `narrator_voice` to `CreateGameRequest`**
 
 In `frontend/src/types.ts`:
 ```typescript
@@ -315,7 +315,7 @@ export interface CreateGameRequest {
 }
 ```
 
-- [ ] **Step 2: Create `frontend/src/components/VoiceCombobox.tsx`**
+- [x] **Step 2: Create `frontend/src/components/VoiceCombobox.tsx`**
 
 Implement `VoiceCombobox`:
 ```typescript
@@ -488,12 +488,12 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
 };
 ```
 
-- [ ] **Step 3: Test TypeScript build**
+- [x] **Step 3: Test TypeScript build**
 
 Run: `mise run test:frontend`  
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/VoiceCombobox.tsx frontend/src/types.ts
@@ -507,7 +507,7 @@ git commit -m "feat(frontend): add reusable VoiceCombobox component"
 **Files:**
 - Create: `frontend/src/components/VoiceCatalogModal.tsx`
 
-- [ ] **Step 1: Create `VoiceCatalogModal.tsx`**
+- [x] **Step 1: Create `VoiceCatalogModal.tsx`**
 
 ```typescript
 import React, { useState, useMemo } from 'react';
@@ -684,12 +684,12 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
 };
 ```
 
-- [ ] **Step 2: Test TypeScript compilation**
+- [x] **Step 2: Test TypeScript compilation**
 
 Run: `mise run test:frontend`  
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/VoiceCatalogModal.tsx
@@ -703,7 +703,7 @@ git commit -m "feat(frontend): add VoiceCatalogModal component"
 **Files:**
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Import `VoiceCombobox` and `VoiceCatalogModal` in `SettingsStudio.tsx`**
+- [x] **Step 1: Import `VoiceCombobox` and `VoiceCatalogModal` in `SettingsStudio.tsx`**
 
 In `frontend/src/components/SettingsStudio.tsx`:
 Add imports:
@@ -716,7 +716,7 @@ Add state for the catalog modal:
 const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
 ```
 
-- [ ] **Step 2: Add Default Voice setting to TTS Provider section**
+- [x] **Step 2: Add Default Voice setting to TTS Provider section**
 
 Under the API Key / Model / Tuning section (around line 1290):
 ```typescript
@@ -744,7 +744,7 @@ Under the API Key / Model / Tuning section (around line 1290):
             )}
 ```
 
-- [ ] **Step 3: Replace profile `voice_id` input with `VoiceCombobox`**
+- [x] **Step 3: Replace profile `voice_id` input with `VoiceCombobox`**
 
 In the Voice Profiles map function (around line 1486):
 Replace `<input placeholder="Voice ID (e.g. af_bella)">` with:
@@ -764,7 +764,7 @@ Replace `<input placeholder="Voice ID (e.g. af_bella)">` with:
                         />
 ```
 
-- [ ] **Step 4: Add "Import from Catalog" button in Voice Profiles header**
+- [x] **Step 4: Add "Import from Catalog" button in Voice Profiles header**
 
 Next to `Load Fantasy Defaults` and `Add Profile`:
 ```typescript
@@ -804,12 +804,12 @@ And render `<VoiceCatalogModal>` before the closing container:
       />
 ```
 
-- [ ] **Step 5: Test TypeScript compilation**
+- [x] **Step 5: Test TypeScript compilation**
 
 Run: `mise run test:frontend`  
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx
@@ -823,14 +823,14 @@ git commit -m "feat(frontend): integrate VoiceCombobox and VoiceCatalogModal int
 **Files:**
 - Modify: `frontend/src/components/LauncherHub.tsx`
 
-- [ ] **Step 1: Add `narratorVoiceID` state in `LauncherHub.tsx`**
+- [x] **Step 1: Add `narratorVoiceID` state in `LauncherHub.tsx`**
 
 ```typescript
 const [narratorVoiceID, setNarratorVoiceID] = useState<string>('');
 ```
 Reset `narratorVoiceID` in `openNewGameWizard` to empty string.
 
-- [ ] **Step 2: Add Narrator Voice field to Campaign Wizard in `LauncherHub.tsx`**
+- [x] **Step 2: Add Narrator Voice field to Campaign Wizard in `LauncherHub.tsx`**
 
 In `LauncherHub.tsx` in the character / story setup step (around line 690):
 ```typescript
@@ -854,7 +854,7 @@ In `LauncherHub.tsx` in the character / story setup step (around line 690):
                       </div>
 ```
 
-- [ ] **Step 3: Pass `narrator_voice` in `createGame` payload**
+- [x] **Step 3: Pass `narrator_voice` in `createGame` payload**
 
 In `handleCreateGame`:
 ```typescript
@@ -869,12 +869,12 @@ In `handleCreateGame`:
 ...
 ```
 
-- [ ] **Step 4: Test TypeScript build**
+- [x] **Step 4: Test TypeScript build**
 
 Run: `mise run test:frontend`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/LauncherHub.tsx
@@ -885,31 +885,31 @@ git commit -m "feat(frontend): add narrator voice selection to campaign creation
 
 ### Task 7: Full Verification and Build
 
-- [ ] **Step 1: Run frontend typecheck**
+- [x] **Step 1: Run frontend typecheck**
 
 Run: `mise run test:frontend`  
 Expected: PASS
 
-- [ ] **Step 2: Run frontend production build**
+- [x] **Step 2: Run frontend production build**
 
 Run: `mise run build:frontend`  
 Expected: PASS, Vite bundle emitted into `pkg/gui/dist`
 
-- [ ] **Step 3: Restore tracked placeholder if deleted**
+- [x] **Step 3: Restore tracked placeholder if deleted**
 
 Run: `git checkout -- pkg/gui/dist/.gitkeep 2>/dev/null || true`
 
-- [ ] **Step 4: Run Go vet**
+- [x] **Step 4: Run Go vet**
 
 Run: `mise run lint`  
 Expected: PASS
 
-- [ ] **Step 5: Run all backend tests**
+- [x] **Step 5: Run all backend tests**
 
 Run: `mise run test:backend`  
 Expected: PASS
 
-- [ ] **Step 6: Run full binary build**
+- [x] **Step 6: Run full binary build**
 
 Run: `mise run build`  
 Expected: PASS with binary at `bin/localrpg`

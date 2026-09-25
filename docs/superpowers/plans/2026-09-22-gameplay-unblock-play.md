@@ -63,7 +63,7 @@ This plan implements increment 1 ("Unblock play") of the spec: provider generati
 
 The existing `NewHTTPProvider` and `NewCLIProvider` signatures are kept as wrappers so every current call site (`cmd/localrpg/prompt.go`, tests) keeps compiling.
 
-- [ ] **Step 1: Write the failing HTTP test**
+- [x] **Step 1: Write the failing HTTP test**
 
 Append to `pkg/harness/http_provider_test.go` (and add `"encoding/json"` to its import block):
 
@@ -120,12 +120,12 @@ func TestHTTPProviderSendsGenerationOptionsAndReportsFinish(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestHTTPProviderSendsGenerationOptionsAndReportsFinish -v ./pkg/harness/`
 Expected: FAIL — `undefined: NewHTTPProviderWithOptions` and `unknown field FinishReason` in `StreamChunk`.
 
-- [ ] **Step 3: Add the shared types**
+- [x] **Step 3: Add the shared types**
 
 In `pkg/harness/types.go`, replace `StreamChunk` and add `GenerationOptions`:
 
@@ -147,7 +147,7 @@ type GenerationOptions struct {
 }
 ```
 
-- [ ] **Step 4: Teach the HTTP provider to send and report them**
+- [x] **Step 4: Teach the HTTP provider to send and report them**
 
 In `pkg/harness/http_provider.go`:
 
@@ -262,12 +262,12 @@ Replace the streaming loop's tail so the finish reason is captured and `Done` is
 	return nil
 ```
 
-- [ ] **Step 5: Run the HTTP test to verify it passes**
+- [x] **Step 5: Run the HTTP test to verify it passes**
 
 Run: `go test -run TestHTTPProvider -v ./pkg/harness/`
 Expected: PASS, including the pre-existing `TestHTTPProviderStreaming`.
 
-- [ ] **Step 6: Write the failing CLI test**
+- [x] **Step 6: Write the failing CLI test**
 
 Append to `pkg/harness/cli_provider_test.go`:
 
@@ -310,14 +310,14 @@ func TestCLIProviderReportsCompletionAndExposesOptions(t *testing.T) {
 }
 ```
 
-- [ ] **Step 7: Run the CLI test to verify it fails**
+- [x] **Step 7: Run the CLI test to verify it fails**
 
 Run: `go test -run TestCLIProviderReportsCompletionExposesOptions -v ./pkg/harness/`
 Expected: FAIL — `undefined: NewCLIProviderWithOptions`.
 
 (If the run name above does not match, run `go test -run TestCLIProvider -v ./pkg/harness/`; the new test will fail to compile.)
 
-- [ ] **Step 8: Implement the CLI options**
+- [x] **Step 8: Implement the CLI options**
 
 In `pkg/harness/cli_provider.go`:
 
@@ -375,12 +375,12 @@ Set the finish reason in `Stream`:
 	return nil
 ```
 
-- [ ] **Step 9: Run the CLI tests to verify they pass**
+- [x] **Step 9: Run the CLI tests to verify they pass**
 
 Run: `go test -run TestCLIProvider -v ./pkg/harness/`
 Expected: PASS.
 
-- [ ] **Step 10: Wire the options through the factory**
+- [x] **Step 10: Wire the options through the factory**
 
 In `pkg/harness/factory.go`, replace the `cli` and `http` branches of `NewModelProvider`:
 
@@ -408,12 +408,12 @@ In `pkg/harness/factory.go`, replace the `cli` and `http` branches of `NewModelP
 		return &builtinEchoModelProvider{id: id}, nil
 ```
 
-- [ ] **Step 11: Run the harness suite and vet**
+- [x] **Step 11: Run the harness suite and vet**
 
 Run: `go test -count=1 ./pkg/harness/ && go vet ./pkg/harness/`
 Expected: PASS and clean vet.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add pkg/harness/types.go pkg/harness/http_provider.go pkg/harness/cli_provider.go pkg/harness/factory.go pkg/harness/http_provider_test.go pkg/harness/cli_provider_test.go
@@ -437,7 +437,7 @@ git commit -m "fix(harness): send configured sampling and report model completio
 - Produces: `engine.ErrGenerationStalled`
 - Produces: `(*engine.TurnOrchestrator).SetChunkTimeout(timeout time.Duration)`
 
-- [ ] **Step 1: Write the failing config test**
+- [x] **Step 1: Write the failing config test**
 
 Create `pkg/config/types_test.go`:
 
@@ -469,12 +469,12 @@ func TestTurnAndChunkTimeoutsHaveDefaults(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestTurnAndChunkTimeoutsHaveDefaults -v ./pkg/config/`
 Expected: FAIL — `unknown field TurnTimeoutSeconds`.
 
-- [ ] **Step 3: Add the settings and accessors**
+- [x] **Step 3: Add the settings and accessors**
 
 In `pkg/config/types.go`, add `"time"` to the import block (create the block if there is none).
 
@@ -525,12 +525,12 @@ Add the defaults to `DefaultConfig`'s `Agents` literal:
 			Roles: map[string]AgentRoleConfig{
 ```
 
-- [ ] **Step 4: Run the config test to verify it passes**
+- [x] **Step 4: Run the config test to verify it passes**
 
 Run: `go test -run TestTurnAndChunkTimeoutsHaveDefaults -v ./pkg/config/`
 Expected: PASS.
 
-- [ ] **Step 5: Write the failing orchestrator test**
+- [x] **Step 5: Write the failing orchestrator test**
 
 Append to `pkg/engine/orchestrator_stream_test.go`:
 
@@ -560,12 +560,12 @@ func TestGenerationStallsWhenNoChunkArrives(t *testing.T) {
 
 Add `"time"` to that file's import block.
 
-- [ ] **Step 6: Run the test to verify it fails**
+- [x] **Step 6: Run the test to verify it fails**
 
 Run: `go test -run TestGenerationStallsWhenNoChunkArrives -v ./pkg/engine/`
 Expected: FAIL — `undefined: ErrGenerationStalled` or `SetChunkTimeout`.
 
-- [ ] **Step 7: Implement the idle watchdog**
+- [x] **Step 7: Implement the idle watchdog**
 
 In `pkg/engine/orchestrator.go`, add `"errors"` to the import block.
 
@@ -673,12 +673,12 @@ func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk 
 }
 ```
 
-- [ ] **Step 8: Run the orchestrator suite to verify it passes**
+- [x] **Step 8: Run the orchestrator suite to verify it passes**
 
 Run: `go test -count=1 ./pkg/engine/`
 Expected: PASS, including the existing cancellation and streaming tests.
 
-- [ ] **Step 9: Apply the deadlines in the service**
+- [x] **Step 9: Apply the deadlines in the service**
 
 In `pkg/gui/service.go`, in `prepareTurn`, after `orchestrator.LoadPrompts(...)`:
 
@@ -705,12 +705,12 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 }
 ```
 
-- [ ] **Step 10: Run the GUI suite and vet**
+- [x] **Step 10: Run the GUI suite and vet**
 
 Run: `go test -count=1 ./pkg/gui/ && go vet ./...`
 Expected: PASS and clean vet. The existing `TestTurnSessionRunsAndRecordsATurn` still passes because it finishes well inside the 300s default.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/config/types_test.go pkg/engine/orchestrator.go pkg/engine/orchestrator_stream_test.go pkg/gui/service.go
@@ -741,7 +741,7 @@ git commit -m "fix(engine): fail a turn whose narrator goes silent"
 - Produces: `engine.ResolvePlayerID(store *storage.Store, manifest *core.GameManifest) (string, error)`
 - Produces: `engine.RepairPlayerIdentity(paths *core.PathResolver, store *storage.Store, manifest *core.GameManifest) (string, error)`
 
-- [ ] **Step 1: Write the failing resolver test**
+- [x] **Step 1: Write the failing resolver test**
 
 Create `pkg/engine/player_test.go`:
 
@@ -826,12 +826,12 @@ func TestResolvePlayerIDReadsALegacyDisplayName(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestResolvePlayerIDReadsALegacyDisplayName -v ./pkg/engine/`
 Expected: FAIL — `undefined: InitOptions`.
 
-- [ ] **Step 3: Add the display name to the manifest**
+- [x] **Step 3: Add the display name to the manifest**
 
 In `pkg/core/types.go`, extend `GameManifest`:
 
@@ -847,7 +847,7 @@ type GameManifest struct {
 }
 ```
 
-- [ ] **Step 4: Replace `InitGame`'s signature and write IDs**
+- [x] **Step 4: Replace `InitGame`'s signature and write IDs**
 
 In `pkg/engine/game.go`, add `"strings"` to the imports and introduce the options struct above `InitGame`:
 
@@ -936,7 +936,7 @@ func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, pl
 	}
 ```
 
-- [ ] **Step 5: Create the resolver**
+- [x] **Step 5: Create the resolver**
 
 Create `pkg/engine/player.go`:
 
@@ -1023,12 +1023,12 @@ func RepairPlayerIdentity(paths *core.PathResolver, store *storage.Store, manife
 }
 ```
 
-- [ ] **Step 6: Run the resolver test to verify it passes**
+- [x] **Step 6: Run the resolver test to verify it passes**
 
 Run: `go test -run TestResolvePlayerIDReadsALegacyDisplayName -v ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 7: Update the existing callers that no longer compile**
+- [x] **Step 7: Update the existing callers that no longer compile**
 
 In `pkg/engine/game_test.go`, replace each `InitGame(paths, "campaign-0N", "d20-test", "fantasy-realm", name)` with:
 
@@ -1065,7 +1065,7 @@ In `pkg/gui/turn_test.go`, replace the call at line 44 with:
 	})
 ```
 
-- [ ] **Step 8: Use the resolver in `ResolveStartLocation`**
+- [x] **Step 8: Use the resolver in `ResolveStartLocation`**
 
 In `pkg/engine/startlocation.go`, replace the direct player lookup:
 
@@ -1079,7 +1079,7 @@ In `pkg/engine/startlocation.go`, replace the direct player lookup:
 
 Keep the body that inspects the player's location and wikilinks exactly as it is; only the lookup changes.
 
-- [ ] **Step 9: Use the resolver in the GUI service**
+- [x] **Step 9: Use the resolver in the GUI service**
 
 In `pkg/gui/service.go`, `GetGameState` currently reads the file by `gameManifest.Player`:
 
@@ -1125,7 +1125,7 @@ Then use `playerID` instead of `manifest.Player` in the bridge and orchestrator:
 	orchestrator := engine.NewTurnOrchestrator(store, timeline, jsEngine, router, startLocation, playerID)
 ```
 
-- [ ] **Step 10: Use the resolver in the TUI**
+- [x] **Step 10: Use the resolver in the TUI**
 
 In `cmd/localrpg/play.go`, after the entity sync and before the bridge:
 
@@ -1140,7 +1140,7 @@ In `cmd/localrpg/play.go`, after the entity sync and before the bridge:
 
 Replace `manifest.Player` with `playerID` in `rules.NewHostBridge(...)` and `engine.NewTurnOrchestrator(...)`.
 
-- [ ] **Step 11: Add a GUI regression test**
+- [x] **Step 11: Add a GUI regression test**
 
 Append to `pkg/gui/service_test.go`:
 
@@ -1168,12 +1168,12 @@ func TestGetGameStateFindsALegacyDisplayNamePlayer(t *testing.T) {
 
 Note: `setupTestGame` names the player note `player-elena.md` while its frontmatter reads `name: Elena Nightshade`. The resolver's name-match fallback finds it, so the assertion holds; no fixture change is needed.
 
-- [ ] **Step 12: Run the engine and GUI suites**
+- [x] **Step 12: Run the engine and GUI suites**
 
 Run: `go test -count=1 ./pkg/engine/ ./pkg/gui/ && go vet ./...`
 Expected: PASS and clean vet.
 
-- [ ] **Step 13: Commit**
+- [x] **Step 13: Commit**
 
 ```bash
 git add pkg/core/types.go pkg/engine/player.go pkg/engine/player_test.go pkg/engine/game.go pkg/engine/game_test.go pkg/engine/startlocation.go pkg/gui/service.go pkg/gui/service_test.go pkg/gui/turn_test.go cmd/localrpg/play.go
@@ -1193,7 +1193,7 @@ git commit -m "fix(engine): resolve the protagonist across legacy player identif
 - Consumes: `engine.InitOptions` (Task 3)
 - Produces: `engine.InitOptions.Name string`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/service_test.go`:
 
@@ -1242,12 +1242,12 @@ func TestCampaignTitleIsPersistedAndLatestIsFirst(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test -run TestCampaignTitleIsPersistedAndLatestIsFirst -v ./pkg/gui/`
 Expected: FAIL — `unknown field Name` on `CreateGameRequestDTO`, or `Name` equals the slug.
 
-- [ ] **Step 3: Add the title to the request and the init options**
+- [x] **Step 3: Add the title to the request and the init options**
 
 In `pkg/gui/types.go`, extend `CreateGameRequestDTO` (around line 118):
 
@@ -1289,7 +1289,7 @@ Use it in the manifest with a slug fallback:
 	}
 ```
 
-- [ ] **Step 4: Pass the title and return the display name from `CreateGame`**
+- [x] **Step 4: Pass the title and return the display name from `CreateGame`**
 
 In `pkg/gui/service.go`, replace the `InitGame` call:
 
@@ -1303,7 +1303,7 @@ In `pkg/gui/service.go`, replace the `InitGame` call:
 	})
 ```
 
-- [ ] **Step 5: Sort the campaign list by most recently played**
+- [x] **Step 5: Sort the campaign list by most recently played**
 
 Add `"sort"` to `pkg/gui/service.go`'s imports.
 
@@ -1335,17 +1335,17 @@ Populate the display name in the summary:
 		})
 ```
 
-- [ ] **Step 6: Run the GUI suite to verify it passes**
+- [x] **Step 6: Run the GUI suite to verify it passes**
 
 Run: `go test -count=1 ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 7: Run the full verification gate**
+- [x] **Step 7: Run the full verification gate**
 
 Run: `go vet ./... && go test -count=1 ./... && (cd frontend && npx tsc --noEmit)`
 Expected: all clean. No frontend files changed, but the repo gate is the same command.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add pkg/engine/game.go pkg/gui/service.go pkg/gui/service_test.go

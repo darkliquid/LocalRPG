@@ -25,7 +25,7 @@
 - Modify: `pkg/media/providers.go:110-165`
 - Test: `pkg/media/providers_test.go`
 
-- [ ] **Step 1: Write failing tests for HTTP endpoint resolution and Kokoro synthesis payload**
+- [x] **Step 1: Write failing tests for HTTP endpoint resolution and Kokoro synthesis payload**
 
 Add `TestResolveHTTPEndpoints` and `TestHTTPTTSClientSynthesizeKokoro` in `pkg/media/providers_test.go`:
 
@@ -89,24 +89,24 @@ func TestResolveHTTPEndpoints(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestResolveHTTPEndpoints ./pkg/media/`
 Expected: FAIL with undefined `resolveHTTPEndpoints`.
 
-- [ ] **Step 3: Implement `resolveHTTPEndpoints` and update `httpTTSClient.Synthesize`**
+- [x] **Step 3: Implement `resolveHTTPEndpoints` and update `httpTTSClient.Synthesize`**
 
 In `pkg/media/providers.go`:
 1. Implement `resolveHTTPEndpoints(endpoint string) (speechURL, voicesURL string)`.
 2. Update `httpTTSClient.Synthesize` to resolve `speechURL`.
 3. If model is `kokoro` or endpoint is Kokoro, include `"allow_voice_tags": true` and `"response_format": "mp3"`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestResolveHTTPEndpoints ./pkg/media/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 
 ```bash
 git add pkg/media/providers.go pkg/media/providers_test.go
@@ -121,7 +121,7 @@ git commit -m "feat(media): add HTTP TTS endpoint resolution and Kokoro speech p
 - Modify: `pkg/media/providers.go`
 - Test: `pkg/media/providers_test.go`
 
-- [ ] **Step 1: Write failing tests for `httpTTSClient.ListVoices`**
+- [x] **Step 1: Write failing tests for `httpTTSClient.ListVoices`**
 
 In `pkg/media/providers_test.go`:
 Add `TestHTTPTTSClientListVoices` testing:
@@ -129,12 +129,12 @@ Add `TestHTTPTTSClientListVoices` testing:
 - Enrichment of language, gender, accent, tags, and readable name
 - Handling server errors and empty voices
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestHTTPTTSClientListVoices ./pkg/media/`
 Expected: FAIL (`ListVoices` not implemented or test fails).
 
-- [ ] **Step 3: Implement `ListVoices` on `httpTTSClient`**
+- [x] **Step 3: Implement `ListVoices` on `httpTTSClient`**
 
 In `pkg/media/providers.go`:
 - Implement `ListVoices(ctx context.Context) ([]ProviderVoice, error)`
@@ -143,12 +143,12 @@ In `pkg/media/providers.go`:
 - Decode response handling `{ "voices": [...] }` and raw arrays.
 - Helper `parseKokoroVoice(raw voiceItem) ProviderVoice` extracting `id`, `name`, `gender`, `language`, `accent`, `tags`, etc.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestHTTPTTSClientListVoices ./pkg/media/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 
 ```bash
 git add pkg/media/providers.go pkg/media/providers_test.go
@@ -165,7 +165,7 @@ git commit -m "feat(media): implement VoiceCatalog for Kokoro-FastAPI HTTP TTS"
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 - Modify: `~/.config/localrpg/config.yaml` (if present)
 
-- [ ] **Step 1: Update backend and frontend presets**
+- [x] **Step 1: Update backend and frontend presets**
 
 In `pkg/config/presets.go`:
 Change `kokoro-fastapi` endpoint from `"http://localhost:8880/v1/audio/speech"` to `"http://localhost:8880"`.
@@ -176,14 +176,14 @@ Change `kokoro-fastapi` endpoint from `'http://localhost:8880/v1/audio/speech'` 
 In `frontend/src/components/SettingsStudio.tsx`:
 Update placeholder for speech endpoint from `"e.g. http://localhost:8880/v1/audio/speech"` to `"e.g. http://localhost:8880"`.
 
-- [ ] **Step 2: Run backend and frontend tests and lint**
+- [x] **Step 2: Run backend and frontend tests and lint**
 
 Run:
 `mise run test:backend`
 `mise run test:frontend`
 `mise run lint`
 
-- [ ] **Step 3: Commit changes**
+- [x] **Step 3: Commit changes**
 
 ```bash
 git add pkg/config/presets.go frontend/src/templates/providerPresets.ts frontend/src/components/SettingsStudio.tsx
@@ -197,18 +197,18 @@ git commit -m "feat(config): update kokoro-fastapi presets to base url"
 **Files:**
 - Test against live `http://localhost:8880`
 
-- [ ] **Step 1: Verify InspectTTS against live Kokoro-FastAPI**
+- [x] **Step 1: Verify InspectTTS against live Kokoro-FastAPI**
 
 Run automated test or test script verifying `Service.InspectTTS` with `http://localhost:8880`:
 - Returns `Catalog.Available == true`
 - Returns > 50 voices from live instance
 - Returns proper `ProviderKey == "http:localhost:8880"`
 
-- [ ] **Step 2: Full project build & test verification**
+- [x] **Step 2: Full project build & test verification**
 
 Run:
 `mise run test`
 `mise run build`
 Verify `pkg/gui/dist/.gitkeep` is intact.
 
-- [ ] **Step 3: Final branch review & merge**
+- [x] **Step 3: Final branch review & merge**
