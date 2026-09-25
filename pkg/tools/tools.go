@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/embeddings"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -19,8 +21,9 @@ const defaultLimit = 10
 
 // Executor runs tool calls against one campaign's index.
 type Executor struct {
-	store    *storage.Store
-	maxChars int
+	store              *storage.Store
+	maxChars           int
+	embeddingsProvider embeddings.Provider
 }
 
 // NewExecutor builds an executor. maxChars is agents.tool_result_chars; a
@@ -30,6 +33,11 @@ func NewExecutor(store *storage.Store, maxChars int) *Executor {
 		maxChars = 4000
 	}
 	return &Executor{store: store, maxChars: maxChars}
+}
+
+// SetEmbeddingsProvider configures the vector embedding provider for hybrid search.
+func (e *Executor) SetEmbeddingsProvider(p embeddings.Provider) {
+	e.embeddingsProvider = p
 }
 
 // Execute runs one call and returns the text the model will read. ok is false
@@ -45,15 +53,15 @@ func (e *Executor) Execute(ctx context.Context, call harness.ToolCall) (string, 
 
 	switch call.Name {
 	case "search_entities":
-		return e.searchEntities(arguments)
+		return e.searchEntities(ctx, arguments)
 	case "get_entity":
 		return e.getEntity(arguments)
 	case "graph_neighbours":
 		return e.graphNeighbours(arguments)
 	case "search_timeline":
-		return e.searchTimeline(arguments)
+		return e.searchTimeline(ctx, arguments)
 	case "search_memories":
-		return e.searchMemories(arguments)
+		return e.searchMemories(ctx, arguments)
 	case "get_entity_timeline":
 		return e.getEntityTimeline(arguments)
 	default:
@@ -61,27 +69,73 @@ func (e *Executor) Execute(ctx context.Context, call harness.ToolCall) (string, 
 	}
 }
 
-func (e *Executor) searchEntities(arguments map[string]interface{}) (string, bool) {
+func (e *Executor) searchEntities(ctx context.Context, arguments map[string]interface{}) (string, bool) {
+	rawQuery := stringArgument(arguments, "query")
 	match := stringArgument(arguments, "match")
 	if match == "" {
-		match = BuildMatch(stringArgument(arguments, "query"))
+		match = BuildMatch(rawQuery)
 	}
-	if match == "" {
+	if match == "" && rawQuery == "" {
 		return "error: search_entities needs a query", false
 	}
+	limit := intArgument(arguments, "limit", defaultLimit)
+	entityType := stringArgument(arguments, "type")
 
-	hits, err := e.store.SearchEntities(match, stringArgument(arguments, "type"), intArgument(arguments, "limit", defaultLimit))
-	if err != nil {
-		return e.cap(fmt.Sprintf("error: search_entities failed: %v", err)), false
+	var ftsHits []storage.SearchEntityHit
+	if match != "" {
+		hits, err := e.store.SearchEntities(match, entityType, limit*2)
+		if err == nil {
+			ftsHits = hits
+		}
 	}
-	if len(hits) == 0 {
+
+	var vecIDs []string
+	if e.embeddingsProvider != nil && rawQuery != "" {
+		vecs, err := e.embeddingsProvider.Embed(ctx, []string{rawQuery})
+		if err == nil && len(vecs) > 0 {
+			vHits, err := e.store.SearchSimilarVectors(ctx, []string{"entity"}, e.embeddingsProvider.ID(), vecs[0], limit*2)
+			if err == nil {
+				for _, vh := range vHits {
+					if entityType != "" {
+						ent, err := e.store.GetEntity(vh.TargetID)
+						if err != nil || ent == nil || ent.Type != entityType {
+							continue
+						}
+					}
+					vecIDs = append(vecIDs, vh.TargetID)
+				}
+			}
+		}
+	}
+
+	if len(ftsHits) == 0 && len(vecIDs) == 0 {
+		return "No entities matched.", true
+	}
+
+	ftsIDs := make([]string, len(ftsHits))
+	ftsMap := make(map[string]storage.SearchEntityHit, len(ftsHits))
+	for i, hit := range ftsHits {
+		ftsIDs[i] = hit.ID
+		ftsMap[hit.ID] = hit
+	}
+
+	fusedIDs := FuseRankings(ftsIDs, vecIDs, limit)
+	if len(fusedIDs) == 0 {
 		return "No entities matched.", true
 	}
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "%d matching entities:\n", len(hits))
-	for _, hit := range hits {
-		fmt.Fprintf(&sb, "- %s (%s, id %s): %s\n", hit.Name, hit.Type, hit.ID, hit.Snippet)
+	fmt.Fprintf(&sb, "%d matching entities:\n", len(fusedIDs))
+	for _, id := range fusedIDs {
+		if hit, ok := ftsMap[id]; ok {
+			fmt.Fprintf(&sb, "- %s (%s, id %s): %s\n", hit.Name, hit.Type, hit.ID, hit.Snippet)
+		} else if ent, err := e.store.GetEntity(id); err == nil && ent != nil {
+			snippet := ent.Body
+			if len([]rune(snippet)) > 120 {
+				snippet = string([]rune(snippet)[:120]) + "..."
+			}
+			fmt.Fprintf(&sb, "- %s (%s, id %s): %s\n", ent.Name, ent.Type, ent.ID, snippet)
+		}
 	}
 	return e.cap(sb.String()), true
 }
@@ -179,27 +233,87 @@ func (e *Executor) graphNeighbours(arguments map[string]interface{}) (string, bo
 	return e.cap(sb.String()), true
 }
 
-func (e *Executor) searchTimeline(arguments map[string]interface{}) (string, bool) {
+func (e *Executor) searchTimeline(ctx context.Context, arguments map[string]interface{}) (string, bool) {
+	rawQuery := stringArgument(arguments, "query")
 	match := stringArgument(arguments, "match")
 	if match == "" {
-		match = BuildMatch(stringArgument(arguments, "query"))
+		match = BuildMatch(rawQuery)
 	}
-	if match == "" {
+	if match == "" && rawQuery == "" {
 		return "error: search_timeline needs a query", false
 	}
+	limit := intArgument(arguments, "limit", defaultLimit)
+	entityFilter := stringArgument(arguments, "entity")
 
-	hits, err := e.store.SearchTurns(match, stringArgument(arguments, "entity"), intArgument(arguments, "limit", defaultLimit))
-	if err != nil {
-		return e.cap(fmt.Sprintf("error: search_timeline failed: %v", err)), false
+	var ftsHits []storage.SearchTurnHit
+	if match != "" {
+		hits, err := e.store.SearchTurns(match, entityFilter, limit*2)
+		if err == nil {
+			ftsHits = hits
+		}
 	}
-	if len(hits) == 0 {
+
+	var vecTurnNumbers []string
+	if e.embeddingsProvider != nil && rawQuery != "" {
+		vecs, err := e.embeddingsProvider.Embed(ctx, []string{rawQuery})
+		if err == nil && len(vecs) > 0 {
+			vHits, err := e.store.SearchSimilarVectors(ctx, []string{"turn"}, e.embeddingsProvider.ID(), vecs[0], limit*2)
+			if err == nil {
+				for _, vh := range vHits {
+					if entityFilter != "" {
+						num, _ := strconv.Atoi(vh.TargetID)
+						turnRec, err := e.store.GetTurn(num)
+						if err != nil || turnRec == nil {
+							continue
+						}
+						// Check if entity is mentioned in turn
+						mentioned := false
+						for _, m := range turnRec.Entities {
+							if m.EntityID == entityFilter {
+								mentioned = true
+								break
+							}
+						}
+						if !mentioned {
+							continue
+						}
+					}
+					vecTurnNumbers = append(vecTurnNumbers, vh.TargetID)
+				}
+			}
+		}
+	}
+
+	if len(ftsHits) == 0 && len(vecTurnNumbers) == 0 {
+		return "No turns matched.", true
+	}
+
+	ftsTurnNumbers := make([]string, len(ftsHits))
+	ftsMap := make(map[string]storage.SearchTurnHit, len(ftsHits))
+	for i, hit := range ftsHits {
+		strNum := strconv.Itoa(hit.Number)
+		ftsTurnNumbers[i] = strNum
+		ftsMap[strNum] = hit
+	}
+
+	fusedNumbers := FuseRankings(ftsTurnNumbers, vecTurnNumbers, limit)
+	if len(fusedNumbers) == 0 {
 		return "No turns matched.", true
 	}
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "%d matching turns:\n", len(hits))
-	for _, hit := range hits {
-		fmt.Fprintf(&sb, "- turn %d: %s\n", hit.Number, hit.Snippet)
+	fmt.Fprintf(&sb, "%d matching turns:\n", len(fusedNumbers))
+	for _, strNum := range fusedNumbers {
+		num, _ := strconv.Atoi(strNum)
+		if hit, ok := ftsMap[strNum]; ok {
+			fmt.Fprintf(&sb, "- turn %d: %s\n", hit.Number, hit.Snippet)
+		} else if turnRec, err := e.store.GetTurn(num); err == nil && turnRec != nil {
+			snippet := turnRec.Narration
+			if len([]rune(snippet)) > 120 {
+				snippet = string([]rune(snippet)[:120]) + "..."
+			}
+			fmt.Fprintf(&sb, "- turn %d: %s\n", turnRec.Number, snippet)
+		}
 	}
 	return e.cap(sb.String()), true
 }

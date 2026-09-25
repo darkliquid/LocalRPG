@@ -210,6 +210,23 @@ func (s *Store) SearchMemories(match, entityID, kind string, minImportance, limi
 	return hits, rows.Err()
 }
 
+// GetMemoryHit fetches a single memory by ID formatted as a MemoryHit.
+func (s *Store) GetMemoryHit(id int64) (*MemoryHit, error) {
+	var hit MemoryHit
+	var text string
+	err := s.db.QueryRow(`SELECT id, turn, kind, text, importance FROM memories WHERE id = ?`, id).
+		Scan(&hit.ID, &hit.Turn, &hit.Kind, &text, &hit.Importance)
+	if err != nil {
+		return nil, err
+	}
+	if len([]rune(text)) > 120 {
+		hit.Snippet = string([]rune(text)[:120]) + "…"
+	} else {
+		hit.Snippet = text
+	}
+	return &hit, nil
+}
+
 // RankMemoryHits re-ranks hits by importance and recency, so an important recent
 // memory outranks an equal-text older one. halfLife is in turns; a non-positive
 // value disables decay.

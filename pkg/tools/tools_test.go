@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/embeddings"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -129,5 +130,44 @@ func TestToolResultsAreCapped(t *testing.T) {
 	}
 	if !strings.Contains(result, "truncated") {
 		t.Errorf("a cap that bites must say so: %s", result)
+	}
+}
+
+func TestHybridSearchEntitiesTool(t *testing.T) {
+	store, err := storage.NewStore(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer store.Close()
+
+	lair := &entity.Entity{
+		ID:   "dragon-lair",
+		Name: "Smoldering Hollow",
+		Type: "location",
+		Body: "A fiery mountain cavern filled with heaps of gold and bones.",
+	}
+	if err := store.SaveEntity(lair); err != nil {
+		t.Fatalf("SaveEntity: %v", err)
+	}
+
+	provider := embeddings.NewBuiltinHashProjectionProvider(384)
+	vecs, err := provider.Embed(context.Background(), []string{lair.Name + " " + lair.Body})
+	if err != nil {
+		t.Fatalf("Embed: %v", err)
+	}
+	if err := store.SaveEmbedding("entity", lair.ID, "hash", provider.ID(), 0, vecs[0]); err != nil {
+		t.Fatalf("SaveEmbedding: %v", err)
+	}
+
+	executor := NewExecutor(store, 4000)
+	executor.SetEmbeddingsProvider(provider)
+
+	// Query with terms matching concept/n-grams
+	result, ok := executor.Execute(context.Background(), call("search_entities", `{"query":"fiery gold cavern"}`))
+	if !ok {
+		t.Fatalf("Execute reported failure: %s", result)
+	}
+	if !strings.Contains(result, "Smoldering Hollow") {
+		t.Errorf("expected Smoldering Hollow in result, got: %s", result)
 	}
 }
