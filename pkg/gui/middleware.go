@@ -1,6 +1,12 @@
 package gui
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+
+	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
+)
 
 // embeddedWebviewOrigins are the origins used by the native Wails webview when
 // it requests the API through an in-process scheme handler rather than a
@@ -20,4 +26,36 @@ func ProtectCrossOrigin(h http.Handler) http.Handler {
 		_ = protection.AddTrustedOrigin(origin)
 	}
 	return protection.Handler(h)
+}
+
+type actionIDKey struct{}
+
+// ActionIDHeader is the HTTP header used to correlate browser actions with backend spans.
+const ActionIDHeader = "X-LocalRPG-Action-ID"
+
+// ActionCorrelationMiddleware extracts X-LocalRPG-Action-ID from requests and annotates the trace context.
+func ActionCorrelationMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		actionID := r.Header.Get(ActionIDHeader)
+		if actionID == "" {
+			actionID = r.URL.Query().Get("action_id")
+		}
+		if actionID != "" {
+			ctx := context.WithValue(r.Context(), actionIDKey{}, actionID)
+			span := oteltrace.SpanFromContext(ctx)
+			if span.IsRecording() {
+				span.SetAttributes(attribute.String("localrpg.action.id", actionID))
+			}
+			r = r.WithContext(ctx)
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+// ActionIDFromContext retrieves the correlated action ID from context if present.
+func ActionIDFromContext(ctx context.Context) string {
+	if val, ok := ctx.Value(actionIDKey{}).(string); ok {
+		return val
+	}
+	return ""
 }

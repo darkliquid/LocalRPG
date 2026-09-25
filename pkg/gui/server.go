@@ -36,7 +36,7 @@ func NewServer(service *Service, assetHandler http.Handler) *Server {
 		mux:         http.NewServeMux(),
 	}
 	s.registerRoutes()
-	s.handler = otelhttp.NewHandler(s.mux, "localrpg.http",
+	s.handler = otelhttp.NewHandler(ActionCorrelationMiddleware(s.mux), "localrpg.http",
 		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
 			return routePattern(r.URL.Path)
 		}),

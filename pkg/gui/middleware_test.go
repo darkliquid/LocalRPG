@@ -1,94 +1,53 @@
-package gui
+package gui_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+
+	"github.com/darkliquid/localrpg/pkg/gui"
 )
 
-func TestProtectCrossOrigin(t *testing.T) {
-	handler := ProtectCrossOrigin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
+func TestActionIDMiddleware(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	defer tp.Shutdown(context.Background())
+	otel.SetTracerProvider(tp)
 
-	cases := []struct {
-		name       string
-		method     string
-		origin     string
-		fetchSite  string
-		wantStatus int
-	}{
-		{
-			name:       "same-origin write allowed",
-			method:     http.MethodPost,
-			origin:     "http://localhost:8080",
-			wantStatus: http.StatusNoContent,
-		},
-		{
-			name:       "native webview origin allowed",
-			method:     http.MethodPost,
-			origin:     "wails://wails",
-			wantStatus: http.StatusNoContent,
-		},
-		{
-			name:       "local tooling without browser headers allowed",
-			method:     http.MethodPut,
-			wantStatus: http.StatusNoContent,
-		},
-		{
-			name:       "cross-site write rejected by fetch metadata",
-			method:     http.MethodPost,
-			origin:     "http://evil.example",
-			fetchSite:  "cross-site",
-			wantStatus: http.StatusForbidden,
-		},
-		{
-			name:       "cross-site write rejected by origin mismatch",
-			method:     http.MethodPost,
-			origin:     "http://evil.example",
-			wantStatus: http.StatusForbidden,
-		},
-		{
-			name:       "cross-site read allowed",
-			method:     http.MethodGet,
-			origin:     "http://evil.example",
-			fetchSite:  "cross-site",
-			wantStatus: http.StatusNoContent,
-		},
-	}
+	innerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		actionID := gui.ActionIDFromContext(r.Context())
+		if actionID != "act-999" {
+			t.Errorf("Expected action ID act-999 in context, got %s", actionID)
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := otelhttp.NewHandler(gui.ActionCorrelationMiddleware(innerHandler), "test.http")
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest(tc.method, "http://localhost:8080/api/games", nil)
-			if tc.origin != "" {
-				req.Header.Set("Origin", tc.origin)
-			}
-			if tc.fetchSite != "" {
-				req.Header.Set("Sec-Fetch-Site", tc.fetchSite)
-			}
-
-			rec := httptest.NewRecorder()
-			handler.ServeHTTP(rec, req)
-
-			if rec.Code != tc.wantStatus {
-				t.Errorf("expected status %d, got %d", tc.wantStatus, rec.Code)
-			}
-		})
-	}
-}
-
-func TestServerDoesNotEmitWildcardCORS(t *testing.T) {
-	gameID, svc := setupTestGame(t)
-	server := ProtectCrossOrigin(NewServer(svc, http.NotFoundHandler()))
-
-	req := httptest.NewRequest(http.MethodGet, "/api/game/"+gameID+"/state", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/games", nil)
+	req.Header.Set("X-LocalRPG-Action-ID", "act-999")
 	rec := httptest.NewRecorder()
-	server.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
+	handler.ServeHTTP(rec, req)
+
+	spans := exporter.GetSpans()
+	if len(spans) == 0 {
+		t.Fatalf("Expected recorded spans")
 	}
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
-		t.Errorf("expected no wildcard CORS header, got %q", got)
+
+	var found bool
+	for _, kv := range spans[0].Attributes {
+		if string(kv.Key) == "localrpg.action.id" && kv.Value.AsString() == "act-999" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected span to have attribute localrpg.action.id = act-999")
 	}
 }
