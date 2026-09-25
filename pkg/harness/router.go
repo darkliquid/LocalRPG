@@ -3,7 +3,9 @@ package harness
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 )
 
 type Router struct {
@@ -68,31 +70,69 @@ func (r *Router) GetProviderForRole(role string) (ModelProvider, error) {
 	return p, nil
 }
 
+// ProviderIDForRole names the provider assigned to a role, or "" when none is.
+func (r *Router) ProviderIDForRole(role string) string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.roleMap[role]
+}
+
+// attemptOutcome pairs a provider result with the bounded reason it is unusable.
+func attemptOutcome(res *GenerateResponse, err error) (FailureCode, string) {
+	if err != nil {
+		return ClassifyProviderError(err), err.Error()
+	}
+	if res == nil || strings.TrimSpace(res.Text) == "" {
+		return FailureEmptyResponse, "model returned no text"
+	}
+	return "", ""
+}
+
+// GenerateForRole asks one role for a reply, treating a whitespace-only response
+// as a failed attempt and falling back, so a model that answers 200 "" cannot
+// silently defeat the configured fallback.
 func (r *Router) GenerateForRole(ctx context.Context, role string, req GenerateRequest) (*GenerateResponse, error) {
 	primary, err := r.GetProviderForRole(role)
 	if err != nil {
-		return nil, err
+		return nil, &GenerationFailure{
+			Code:    FailureProviderUnavailable,
+			Message: fmt.Sprintf("no provider available for role %q: %v", role, err),
+		}
 	}
 
-	res, err := primary.Generate(ctx, req)
-	if err == nil {
+	attempts := make([]Attempt, 0, 2)
+	started := time.Now()
+
+	primaryStarted := time.Now()
+	res, callErr := primary.Generate(ctx, req)
+	code, detail := attemptOutcome(res, callErr)
+	if code == "" {
 		return res, nil
 	}
+	attempts = append(attempts, Attempt{
+		Role: role, Provider: primary.ID(), Code: code, Detail: detail,
+		DurationMS: time.Since(primaryStarted).Milliseconds(),
+	})
 
-	// Try fallback if available
-	r.mu.RLock()
-	fallbackID, hasFallback := r.fallbacks[role]
-	var fallback ModelProvider
-	if hasFallback {
-		fallback = r.providers[fallbackID]
+	if fallback, ok := r.FallbackForRole(role); ok && fallback != nil {
+		fallbackStarted := time.Now()
+		fbRes, fbErr := fallback.Generate(ctx, req)
+		fbCode, fbDetail := attemptOutcome(fbRes, fbErr)
+		if fbCode == "" {
+			return fbRes, nil
+		}
+		attempts = append(attempts, Attempt{
+			Role: role, Provider: fallback.ID(), Code: fbCode, Detail: fbDetail,
+			DurationMS: time.Since(fallbackStarted).Milliseconds(),
+		})
 	}
-	r.mu.RUnlock()
 
-	if fallback != nil {
-		return fallback.Generate(ctx, req)
+	return nil, &GenerationFailure{
+		Code:      attempts[len(attempts)-1].Code,
+		Message:   fmt.Sprintf("role %q produced no usable response", role),
+		Attempts:  attempts,
+		ElapsedMS: time.Since(started).Milliseconds(),
 	}
-
-	return nil, fmt.Errorf("primary role %q failed: %w", role, err)
 }
 
 func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateRequest, out chan<- StreamChunk) error {
