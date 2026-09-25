@@ -17,6 +17,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/engine"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/models"
 )
@@ -1061,7 +1062,13 @@ func (s *Server) handleTurnSubmit(w http.ResponseWriter, r *http.Request, gameID
 	}
 
 	if err := session.Run(r.Context(), req, writeEvent); err != nil {
-		_ = writeEvent(TurnEvent{Type: "error", Message: err.Error()})
+		event := TurnEvent{Type: "error", Message: err.Error()}
+		if failure, ok := harness.FailureFrom(err); ok {
+			event.Code = string(failure.Code)
+			event.Detail = failure.Message
+			event.Failure = failure
+		}
+		_ = writeEvent(event)
 	}
 }
 

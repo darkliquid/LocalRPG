@@ -378,7 +378,10 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			attribute.String("turn.outcome", outcome),
 		)
 		metrics.turnDuration.Record(context.Background(), float64(time.Since(turnStarted).Milliseconds()), attributes)
-		metrics.turnCompleted.Add(context.Background(), 1, otelmetric.WithAttributes(attribute.String("turn.mode", mode)))
+		metrics.turnCompleted.Add(context.Background(), 1, otelmetric.WithAttributes(
+			attribute.String("turn.mode", mode),
+			attribute.String("turn.outcome", outcome),
+		))
 	}()
 
 	// Handle /undo command
@@ -572,7 +575,31 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, onChunk)
 	if err != nil {
-		o.logger.Event("generation.error", map[string]interface{}{"error": err.Error()})
+		outcome = "error"
+		failure, _ := harness.FailureFrom(err)
+		fields := map[string]interface{}{
+			"error":           err.Error(),
+			"generation_code": generationCode(failure),
+			"provider":        result.ProviderID,
+			"prompt_chars":    len([]rune(assembly.Prompt)),
+			"elapsed_ms":      time.Since(turnStarted).Milliseconds(),
+		}
+		if failure != nil {
+			fields["attempts"] = len(failure.Attempts)
+			turnSpan.SetAttributes(
+				attribute.String("localrpg.generation.failure_code", string(failure.Code)),
+				attribute.Int("localrpg.generation.attempts", len(failure.Attempts)),
+			)
+			turnSpan.RecordError(failure)
+			turnSpan.SetStatus(codes.Error, string(failure.Code))
+		} else {
+			turnSpan.SetStatus(codes.Error, err.Error())
+			turnSpan.RecordError(err)
+		}
+		if result.Failure != nil {
+			fields["finish_reason"] = result.Failure.FinishReason
+		}
+		o.logger.Event("generation.error", fields)
 		return nil, fmt.Errorf("gm generation failed: %w", err)
 	}
 
@@ -593,11 +620,25 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	cause := o.classifyCut(result)
 	narration, recovery, stillIncomplete := o.recoverReply(ctx, result.Text, cause, onChunk)
 	if strings.TrimSpace(narration) == "" {
+		outcome = "error"
+		failure := &harness.GenerationFailure{
+			Code:         harness.FailureEmptyResponse,
+			Message:      "gm returned no narration",
+			FinishReason: result.FinishReason,
+			ElapsedMS:    time.Since(turnStarted).Milliseconds(),
+		}
+		if result.Failure != nil {
+			failure = result.Failure
+		}
+		turnSpan.SetAttributes(attribute.String("localrpg.generation.failure_code", string(failure.Code)))
+		turnSpan.RecordError(failure)
+		turnSpan.SetStatus(codes.Error, string(failure.Code))
 		o.logger.Event("generation.error", map[string]interface{}{
-			"error":         "gm returned no narration",
-			"finish_reason": result.FinishReason,
+			"error":           failure.Message,
+			"generation_code": string(failure.Code),
+			"finish_reason":   result.FinishReason,
 		})
-		return nil, fmt.Errorf("gm returned no narration")
+		return nil, failure
 	}
 
 	o.logger.Event("generation.complete", map[string]interface{}{
@@ -631,8 +672,12 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	if o.extractor != nil {
 		extractCtx, extractSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "extract.entities")
 		// A failed extractor must not lose the turn; the mentions above still stand.
-		if result, err := o.extractor.Extract(extractCtx, turn.Narration); err == nil {
-			extraction = *result
+		if extracted, err := o.extractor.Extract(extractCtx, turn.Narration); err == nil {
+			extraction = *extracted
+		} else {
+			extractSpan.RecordError(err)
+			extractSpan.SetStatus(codes.Error, string(harness.ClassifyProviderError(err)))
+			o.logger.Event("extract.error", map[string]interface{}{"error": err.Error()})
 		}
 		extractSpan.SetAttributes(
 			attribute.Int("localrpg.entities.extracted", len(extraction.Entities)),
@@ -771,6 +816,19 @@ type streamResult struct {
 	// Provenance is what the turn looked up, compactly: name and result size.
 	// Arguments and results live in the trace, not in the campaign's history.
 	Provenance []ToolCallRecord
+	// Failure is the bounded generation failure when the stream produced no
+	// usable text. ProviderID names the provider that failed.
+	Failure    *harness.GenerationFailure
+	ProviderID string
+}
+
+// generationCode reads a bounded failure code for logging, defaulting to a
+// provider error when the failure is not typed.
+func generationCode(failure *harness.GenerationFailure) string {
+	if failure == nil {
+		return string(harness.FailureProviderError)
+	}
+	return string(failure.Code)
 }
 
 // stream pumps one provider stream, forwarding each delta to onChunk and
@@ -786,6 +844,8 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 	streamCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	started := time.Now()
+
 	chunks := make(chan harness.StreamChunk, 32)
 	streamErr := make(chan error, 1)
 	go func() {
@@ -800,10 +860,23 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 	var toolCalls []harness.ToolCall
 	sawText := false
 	interrupted := func(err error) (streamResult, error) {
-		if !sawText {
-			return streamResult{}, err
+		result := streamResult{ProviderID: provider.ID()}
+		if sawText {
+			result.Text = sb.String()
+			result.FinishReason = finishReason
+			result.Interrupted = err
+			return result, nil
 		}
-		return streamResult{Text: sb.String(), FinishReason: finishReason, Interrupted: err}, nil
+		code := harness.ClassifyProviderError(err)
+		if errors.Is(err, ErrGenerationStalled) {
+			code = harness.FailureTimeout
+		}
+		result.Failure = &harness.GenerationFailure{
+			Code:      code,
+			Message:   err.Error(),
+			ElapsedMS: time.Since(started).Milliseconds(),
+		}
+		return result, err
 	}
 
 	for {
@@ -829,7 +902,17 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 					}
 					return interrupted(err)
 				}
-				return streamResult{Text: sb.String(), FinishReason: finishReason, ToolCalls: toolCalls}, nil
+				if strings.TrimSpace(sb.String()) == "" && len(toolCalls) == 0 {
+					return streamResult{
+						ProviderID: provider.ID(),
+						Failure: &harness.GenerationFailure{
+							Code:      harness.FailureEmptyResponse,
+							Message:   "provider returned no text",
+							ElapsedMS: time.Since(started).Milliseconds(),
+						},
+					}, nil
+				}
+				return streamResult{Text: sb.String(), FinishReason: finishReason, ToolCalls: toolCalls, ProviderID: provider.ID()}, nil
 			}
 			if chunk.Error != nil {
 				<-streamErr
@@ -874,7 +957,12 @@ func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk 
 func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.GenerateRequest, onChunk func(string) error) (streamResult, error) {
 	provider, err := o.router.GetProviderForRole("gm")
 	if err != nil {
-		return streamResult{}, err
+		return streamResult{
+			Failure: &harness.GenerationFailure{
+				Code:    harness.FailureProviderUnavailable,
+				Message: err.Error(),
+			},
+		}, err
 	}
 
 	result, err := o.stream(ctx, provider, req, onChunk)
@@ -882,7 +970,16 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 		return result, err
 	}
 	if fallback, ok := o.router.FallbackForRole("gm"); ok {
-		return o.stream(ctx, fallback, req, onChunk)
+		fallbackResult, fallbackErr := o.stream(ctx, fallback, req, onChunk)
+		if fallbackErr == nil && fallbackResult.Failure == nil {
+			return fallbackResult, nil
+		}
+		if result.Failure != nil && len(result.Failure.Attempts) == 0 {
+			result.Failure.Attempts = []harness.Attempt{{
+				Role: "gm", Provider: result.ProviderID, Code: result.Failure.Code, Detail: result.Failure.Message,
+			}}
+		}
+		return result, err
 	}
 	return result, err
 }
@@ -1063,17 +1160,35 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 			attribute.Int("localrpg.round", round),
 		)
 		if err != nil {
+			code := harness.ClassifyProviderError(err)
+			if result.Failure != nil && result.Failure.Code != "" {
+				code = result.Failure.Code
+			}
 			engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
 				attribute.String("localrpg.role", "gm"),
-				attribute.String("error.kind", "provider"),
+				attribute.String("error.kind", string(code)),
+				attribute.String("gen_ai.system", provider.ID()),
 			))
 			engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
+			roundSpan.SetAttributes(attribute.String("localrpg.generation.failure_code", string(code)))
 			roundSpan.RecordError(err)
-			roundSpan.SetStatus(codes.Error, err.Error())
+			roundSpan.SetStatus(codes.Error, string(code))
 			roundSpan.End()
-			return streamResult{}, err
+			return result, err
 		}
 		engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
+		if result.Failure != nil {
+			engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
+				attribute.String("localrpg.role", "gm"),
+				attribute.String("error.kind", string(result.Failure.Code)),
+				attribute.String("gen_ai.system", provider.ID()),
+			))
+			roundSpan.SetAttributes(attribute.String("localrpg.generation.failure_code", string(result.Failure.Code)))
+			roundSpan.RecordError(result.Failure)
+			roundSpan.SetStatus(codes.Error, string(result.Failure.Code))
+			roundSpan.End()
+			return result, result.Failure
+		}
 		roundSpan.End()
 
 		// A reply carrying calls while tools were not offered is a protocol quirk:

@@ -8,6 +8,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
@@ -386,6 +387,10 @@ type TurnEvent struct {
 	ToolName    string `json:"tool_name,omitempty"`
 	ToolStatus  string `json:"tool_status,omitempty"`
 	ToolSummary string `json:"tool_summary,omitempty"`
+	// Structured generation failure detail, present when Type is "error".
+	Code    string                     `json:"code,omitempty"`
+	Detail  string                     `json:"detail,omitempty"`
+	Failure *harness.GenerationFailure `json:"failure,omitempty"`
 }
 
 // turnModes maps the mode names a client may send to the engine's casing.
