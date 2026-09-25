@@ -293,3 +293,7 @@ func (j *JSEngine) ExecuteTurnBegin(ctx map[string]interface{}) error {
 	}
 	return nil
 }
+
+// HostAPI exposes the host bridge a script was given, so the engine can apply
+// state changes through the same path scripts use.
+func (j *JSEngine) HostAPI() GameHostAPI { return j.bridge }

@@ -92,7 +92,8 @@ type TurnOrchestrator struct {
 	completionPolicy CompletionPolicy
 	toolExecutor     ToolExecutor
 	checkResolver    harness.CheckResolver
-	declaredStats    map[string]bool
+	declaredStats    map[string]core.StatSpec
+	allowFreeform    bool
 	toolCapability   string
 	toolRounds       int
 	toolObserver     func(ToolActivity)
@@ -143,10 +144,16 @@ func (o *TurnOrchestrator) SetCheckResolver(resolver harness.CheckResolver) {
 	o.checkResolver = resolver
 }
 
-// SetDeclaredStats sets the mechanics schema's declared stat ids, used to reject
-// an undeclared state change. Nil means the system declares no stats.
-func (o *TurnOrchestrator) SetDeclaredStats(stats map[string]bool) {
+// SetDeclaredStats sets the mechanics schema's declared stats, used to validate
+// state changes. Nil means the system declares no stats.
+func (o *TurnOrchestrator) SetDeclaredStats(stats map[string]core.StatSpec) {
 	o.declaredStats = stats
+}
+
+// SetAllowFreeformState permits state changes to undeclared paths even when the
+// system declares stats.
+func (o *TurnOrchestrator) SetAllowFreeformState(allow bool) {
+	o.allowFreeform = allow
 }
 
 // checkResolverOrDefault returns the configured resolver.
@@ -846,6 +853,12 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// RecordTurn creates and voices the entities the turn introduced. Synthesis
 	// must not begin until this returns, or a character invented in this turn
 	// would be read in the narrator's voice.
+	if structured && len(result.Submission.StateChanges) > 0 && o.rulesEngine != nil {
+		if err := rules.ApplyStateChanges(o.rulesEngine.HostAPI(), result.Submission.StateChanges, o.declaredStats, o.allowFreeform); err != nil {
+			return nil, fmt.Errorf("apply state changes: %w", err)
+		}
+	}
+
 	if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
 	}

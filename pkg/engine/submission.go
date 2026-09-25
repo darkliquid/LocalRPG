@@ -3,6 +3,7 @@ package engine
 import (
 	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 )
@@ -93,9 +94,9 @@ func (e *submissionError) Error() string {
 }
 
 // validateSubmission audits a structured turn against the checks it resolved.
-// declaredStats is the mechanics schema's declared stat ids (nil when the system
+// declaredStats is the mechanics schema's declared stats (nil when the system
 // declares none, in which case any state path is allowed).
-func validateSubmission(sub *harness.TurnSubmission, checks []harness.CheckResult, declaredStats map[string]bool) error {
+func validateSubmission(sub *harness.TurnSubmission, checks []harness.CheckResult, declaredStats map[string]core.StatSpec) error {
 	if sub == nil {
 		return &submissionError{Code: "no_submission", Detail: "empty submission"}
 	}
@@ -125,8 +126,10 @@ func validateSubmission(sub *harness.TurnSubmission, checks []harness.CheckResul
 	}
 
 	for _, change := range sub.StateChanges {
-		if len(declaredStats) > 0 && !declaredStats[change.Path] {
-			return &submissionError{Code: "undeclared_stat", Detail: change.Path}
+		if len(declaredStats) > 0 {
+			if _, ok := declaredStats[change.Path]; !ok {
+				return &submissionError{Code: "undeclared_stat", Detail: change.Path}
+			}
 		}
 	}
 

@@ -3,6 +3,7 @@ package engine
 import (
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
@@ -34,7 +35,7 @@ func TestValidateSubmission(t *testing.T) {
 	stat := base()
 	stat.Segments[0].CheckRef = "1"
 	stat.StateChanges = []harness.StateChangeDecl{{Entity: "player", Path: "gold", Op: "set", Value: 1}}
-	if err := validateSubmission(stat, []harness.CheckResult{{CheckID: "1"}}, map[string]bool{"hp": true}); err == nil {
+	if err := validateSubmission(stat, []harness.CheckResult{{CheckID: "1"}}, map[string]core.StatSpec{"hp": {ID: "hp"}}); err == nil {
 		t.Fatal("undeclared stat should fail under a declared schema")
 	}
 }
