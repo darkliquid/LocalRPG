@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient, WorldExistsError } from '../api/client';
-import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail } from '../types';
+import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail, GenerationFailure } from '../types';
 import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
@@ -27,6 +27,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const [selection, setSelection] = useState<WorldSelection>(null);
   const [draft, setDraft] = useState<WorldDraft | null>(null);
   const [pendingSelection, setPendingSelection] = useState<WorldSelection>(null);
+  const [slugError, setSlugError] = useState(false);
   const [activeTab, setActiveTab] = useState<'lore' | 'prompt' | 'entities'>('lore');
 
   // World form state (defaults to blank slate)
@@ -66,6 +67,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const isDraft = selection?.kind === 'draft';
   const savedID = selection?.kind === 'saved' ? selection.id : null;
   const markDirty = () => setDraft((d) => (d ? { ...d, dirty: true } : d));
+  const reportGenerationError = (failure: GenerationFailure) =>
+    setToast({ type: 'error', message: `${failure.code}: ${failure.message}` });
 
   useEffect(() => {
     loadWorlds(undefined, startMode);
@@ -173,6 +176,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const handleNewWorld = (sysList?: SystemInfo[]) => {
     setSelection({ kind: 'draft' });
     setDraft((prev) => ({ localId: prev?.localId ?? crypto.randomUUID(), dirty: false }));
+    setSlugError(false);
     setName('');
     setSlugID('');
     setGenre('');
@@ -367,6 +371,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       if (onWorldSaved) onWorldSaved();
     } catch (err: any) {
       if (err instanceof WorldExistsError) {
+        setSlugError(true);
         setToast({ type: 'error', message: 'A world with this id already exists. Change the name or slug.' });
       } else {
         setToast({ type: 'error', message: err.message || 'Failed to save world' });
@@ -656,6 +661,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   <AIGenerateButton
                     formType="world"
                     fieldName="name"
+                    onError={reportGenerationError}
                     getContext={getWorldContext}
                     onGenerated={(val) => {
                       setName(val);
@@ -675,6 +681,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   onChange={(e) => {
                     setName(e.target.value);
                     markDirty();
+                    setSlugError(false);
                     if (isDraft) {
                       setSlugID(e.target.value.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''));
                     }
@@ -691,6 +698,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   <AIGenerateButton
                     formType="world"
                     fieldName="genre"
+                    onError={reportGenerationError}
                     getContext={getWorldContext}
                     onGenerated={(val) => { setGenre(val); markDirty(); }}
                     systemID={defaultSystem}
@@ -716,9 +724,16 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   disabled={selection?.kind === 'saved'}
                   placeholder="e.g. solitary_defiance"
                   value={slugID}
-                  onChange={(e) => setSlugID(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors font-mono disabled:opacity-60"
+                  onChange={(e) => { setSlugID(e.target.value); setSlugError(false); }}
+                  className={`w-full bg-stone-950 border rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                    slugError ? 'border-red-500/70 focus:border-red-500' : 'border-stone-800 focus:border-purple-500/50'
+                  }`}
                 />
+                {slugError && (
+                  <p className="text-[11px] text-red-400">
+                    That id already exists. Change the name or slug.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -748,6 +763,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 <AIGenerateButton
                   formType="world"
                   fieldName="art_style"
+                  onError={reportGenerationError}
                   getContext={getWorldContext}
                   onGenerated={(val) => { setArtStyle(val); markDirty(); }}
                   systemID={defaultSystem}
@@ -788,6 +804,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 <AIGenerateButton
                   formType="world"
                   fieldName="description"
+                  onError={reportGenerationError}
                   getContext={getWorldContext}
                   onGenerated={(val) => { setDescription(val); markDirty(); }}
                   systemID={defaultSystem}
@@ -929,6 +946,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 <AIGenerateButton
                   formType="world"
                   fieldName="lore_prompt"
+                  onError={reportGenerationError}
                   getContext={getWorldContext}
                   onGenerated={(val) => { setLorePrompt(val); markDirty(); }}
                   systemID={defaultSystem}

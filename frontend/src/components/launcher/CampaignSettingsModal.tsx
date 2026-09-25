@@ -27,6 +27,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   const [generatingKind, setGeneratingKind] = useState<'banner' | 'icon' | null>(null);
   const [confirmAction, setConfirmAction] = useState<'restart' | 'delete' | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
 
   // Settings State
   const [narratorVoice, setNarratorVoice] = useState('');
@@ -174,6 +175,11 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-6">
+          {genError && (
+            <div className="p-3 rounded-xl text-xs font-sans bg-red-950/60 border border-red-500/40 text-red-200">
+              {genError}
+            </div>
+          )}
           {/* Narrative & Audio Settings */}
           <form onSubmit={handleSaveSettings} className="space-y-4 p-4 bg-stone-950 border border-white/10 rounded-2xl">
             <div className="flex items-center justify-between">
@@ -221,6 +227,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
                 <AIGenerateButton
                   formType="campaign"
                   fieldName="start_location"
+                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
                   getContext={getCampaignContext}
                   onGenerated={(val) => setStartLocation(val)}
                   worldID={game?.world_id}
@@ -245,6 +252,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
                 <AIGenerateButton
                   formType="campaign"
                   fieldName="opening_prompt"
+                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
                   getContext={getCampaignContext}
                   onGenerated={(val) => setOpeningPrompt(val)}
                   worldID={game?.world_id}

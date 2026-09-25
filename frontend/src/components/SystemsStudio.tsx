@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
-import { SystemInfo, CreateSystemRequest, CharacterCreationField } from '../types';
+import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure } from '../types';
 import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2 } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { REFERENCE_SYSTEM_TEMPLATE } from '../templates/referenceTemplates';
@@ -29,6 +29,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const reportGenerationError = (failure: GenerationFailure) =>
+    setToast({ type: 'error', message: `${failure.code}: ${failure.message}` });
 
   useEffect(() => {
     loadSystems();
@@ -334,6 +336,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                   <AIGenerateButton
                     formType="system"
                     fieldName="name"
+                    onError={reportGenerationError}
                     getContext={getSystemContext}
                     onGenerated={(val) => {
                       setName(val);
@@ -397,6 +400,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                 <AIGenerateButton
                   formType="system"
                   fieldName="description"
+                  onError={reportGenerationError}
                   getContext={getSystemContext}
                   onGenerated={(val) => setDescription(val)}
                   seed={description}
@@ -554,6 +558,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved }) =
                 <AIGenerateButton
                   formType="system"
                   fieldName="rules_prompt"
+                  onError={reportGenerationError}
                   getContext={getSystemContext}
                   onGenerated={(val) => setRulesPrompt(val)}
                   seed={rulesPrompt}

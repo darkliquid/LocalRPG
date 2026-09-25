@@ -268,6 +268,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
               <AIGenerateButton
                 formType="campaign"
                 fieldName="name"
+                onError={(failure) => setGenError(failure.code + ": " + failure.message)}
                 getContext={getFormContext}
                 onGenerated={(val) => setCampaignName(val)}
                 worldID={world?.id}
@@ -387,6 +388,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 <AIGenerateButton
                   formType="character"
                   fieldName="name"
+                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
                   getContext={getFormContext}
                   onGenerated={(val) => setPlayerName(val)}
                   worldID={world?.id}
@@ -410,6 +412,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   <AIGenerateButton
                     formType="character"
                     fieldName="age"
+                    onError={(failure) => setGenError(failure.code + ": " + failure.message)}
                     getContext={getFormContext}
                     onGenerated={(val) => setPlayerAge(val)}
                     worldID={world?.id}
@@ -430,6 +433,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   <AIGenerateButton
                     formType="character"
                     fieldName="gender"
+                    onError={(failure) => setGenError(failure.code + ": " + failure.message)}
                     getContext={getFormContext}
                     onGenerated={(val) => setPlayerGender(val)}
                     worldID={world?.id}
@@ -450,6 +454,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   <AIGenerateButton
                     formType="character"
                     fieldName="pronouns"
+                    onError={(failure) => setGenError(failure.code + ": " + failure.message)}
                     getContext={getFormContext}
                     onGenerated={(val) => setPlayerPronouns(val)}
                     worldID={world?.id}
@@ -472,6 +477,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 <AIGenerateButton
                   formType="character"
                   fieldName="appearance"
+                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
                   getContext={getFormContext}
                   onGenerated={(val) => setPlayerAppearance(val)}
                   worldID={world?.id}
@@ -494,6 +500,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 <AIGenerateButton
                   formType="character"
                   fieldName="background"
+                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
                   getContext={getFormContext}
                   onGenerated={(val) => setPlayerBackground(val)}
                   worldID={world?.id}
@@ -527,6 +534,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 <AIGenerateButton
                   formType="campaign"
                   fieldName="start_location"
+                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
                   getContext={getFormContext}
                   onGenerated={(val) => setStartLocation(val)}
                   worldID={world?.id}
@@ -550,6 +558,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 <AIGenerateButton
                   formType="campaign"
                   fieldName="opening_prompt"
+                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
                   getContext={getFormContext}
                   onGenerated={(val) => setOpeningPrompt(val)}
                   worldID={world?.id}
