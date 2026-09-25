@@ -617,6 +617,15 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		return nil, fmt.Errorf("assemble context: %w", err)
 	}
 
+	if o.rulesEngine != nil {
+		if err := o.rulesEngine.ExecuteTurnBegin(map[string]interface{}{
+			"turn":     turnNum,
+			"location": locationID,
+		}); err != nil {
+			o.logger.Event("turn.begin_hook_error", map[string]interface{}{"error": err.Error()})
+		}
+	}
+
 	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, onChunk)
 	if err != nil {
 		outcome = "error"
@@ -882,7 +891,22 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	// Trigger post-turn hooks
 	if o.rulesEngine != nil {
-		_ = o.rulesEngine.ExecuteTurnEnd(map[string]interface{}{"turn": turnNum})
+		entityIDs := make([]string, 0, len(turn.Entities))
+		for _, mention := range turn.Entities {
+			entityIDs = append(entityIDs, mention.ID)
+		}
+		hookCtx := map[string]interface{}{
+			"turn":      turnNum,
+			"narration": turn.Narration,
+			"entities":  entityIDs,
+			"checks":    len(turn.Checks),
+		}
+		if turn.Verdict != nil {
+			hookCtx["verdict"] = string(turn.Verdict.Feasibility)
+		}
+		if err := o.rulesEngine.ExecuteTurnEnd(hookCtx); err != nil {
+			o.logger.Event("turn.end_hook_error", map[string]interface{}{"error": err.Error()})
+		}
 	}
 
 	return &turn, nil

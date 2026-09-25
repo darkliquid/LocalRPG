@@ -14,26 +14,28 @@ import (
 )
 
 type JSEngine struct {
-	mu             sync.Mutex
-	vm             *goja.Runtime
-	bridge         GameHostAPI
-	actionHandlers map[string]goja.Callable
-	turnEndHooks   []goja.Callable
-	turnBeginHooks []goja.Callable
-	worldTickHooks []goja.Callable
-	checkResolvers map[string]goja.Callable
+	mu              sync.Mutex
+	vm              *goja.Runtime
+	bridge          GameHostAPI
+	actionHandlers  map[string]goja.Callable
+	turnEndHooks    []goja.Callable
+	turnBeginHooks  []goja.Callable
+	worldTickHooks  []goja.Callable
+	checkResolvers  map[string]goja.Callable
+	healthZeroHooks []goja.Callable
 }
 
 func NewJSEngine(bridge GameHostAPI) *JSEngine {
 	vm := goja.New()
 	engine := &JSEngine{
-		vm:             vm,
-		bridge:         bridge,
-		actionHandlers: make(map[string]goja.Callable),
-		turnEndHooks:   make([]goja.Callable, 0),
-		turnBeginHooks: make([]goja.Callable, 0),
-		worldTickHooks: make([]goja.Callable, 0),
-		checkResolvers: make(map[string]goja.Callable),
+		vm:              vm,
+		bridge:          bridge,
+		actionHandlers:  make(map[string]goja.Callable),
+		turnEndHooks:    make([]goja.Callable, 0),
+		turnBeginHooks:  make([]goja.Callable, 0),
+		worldTickHooks:  make([]goja.Callable, 0),
+		checkResolvers:  make(map[string]goja.Callable),
+		healthZeroHooks: make([]goja.Callable, 0),
 	}
 
 	engine.bindHostAPI()
@@ -142,6 +144,15 @@ func (j *JSEngine) bindHostAPI() {
 			panic(j.vm.ToValue("onCheck handler must be a function"))
 		}
 		j.checkResolvers[kind] = fn
+		return goja.Undefined()
+	})
+
+	j.vm.Set("onHealthZero", func(call goja.FunctionCall) goja.Value {
+		fn, ok := goja.AssertFunction(call.Argument(0))
+		if !ok {
+			panic(j.vm.ToValue("onHealthZero handler must be a function"))
+		}
+		j.healthZeroHooks = append(j.healthZeroHooks, fn)
 		return goja.Undefined()
 	})
 }
@@ -297,3 +308,21 @@ func (j *JSEngine) ExecuteTurnBegin(ctx map[string]interface{}) error {
 // HostAPI exposes the host bridge a script was given, so the engine can apply
 // state changes through the same path scripts use.
 func (j *JSEngine) HostAPI() GameHostAPI { return j.bridge }
+
+// EvaluateHealthZero resolves the declared health-zero effect: the first
+// onHealthZero hook that returns text wins, otherwise the free-text effect is
+// returned unchanged.
+func (j *JSEngine) EvaluateHealthZero(effect string) (string, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	for _, hook := range j.healthZeroHooks {
+		value, err := hook(goja.Undefined(), j.vm.ToValue(effect))
+		if err != nil {
+			return "", fmt.Errorf("health zero hook: %w", err)
+		}
+		if mapped, ok := value.Export().(string); ok && mapped != "" {
+			return mapped, nil
+		}
+	}
+	return effect, nil
+}

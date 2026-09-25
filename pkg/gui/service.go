@@ -54,6 +54,10 @@ type Service struct {
 	// queue of overlapping ones.
 	summaryMu      sync.Mutex
 	summaryPending map[string]bool
+	// rulesLoaded records campaigns whose mechanics.js has been loaded, so a
+	// per-turn orchestrator does not reload hooks and duplicate them.
+	rulesMu     sync.Mutex
+	rulesLoaded map[string]bool
 }
 
 // Config returns the configuration the service is running with, so a command can
@@ -110,6 +114,7 @@ func NewService(rootDir string) *Service {
 		locks:          make(map[string]*sync.Mutex),
 		modelsManager:  models.NewManager(cacheDir),
 		summaryPending: make(map[string]bool),
+		rulesLoaded:    make(map[string]bool),
 	}
 }
 
@@ -1111,6 +1116,21 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	}
 
 	jsEngine := rules.NewJSEngine(rules.NewHostBridge(store, timeline, playerID))
+
+	// The web path never loaded system rules, so every GUI campaign ran with an
+	// empty mechanics VM. Load them once per campaign.
+	s.rulesMu.Lock()
+	loaded := s.rulesLoaded[manifest.ID]
+	s.rulesMu.Unlock()
+	if !loaded {
+		loader := rules.NewRuleLoader(s.resolver, jsEngine)
+		if err := loader.LoadRules(manifest.SystemID, manifest.WorldID); err != nil {
+			logger.Event("rules.load_error", map[string]interface{}{"error": err.Error()})
+		}
+		s.rulesMu.Lock()
+		s.rulesLoaded[manifest.ID] = true
+		s.rulesMu.Unlock()
+	}
 
 	startLocation := ""
 	if pinned, ok := manifest.Settings[engine.StartLocationSetting].(string); ok {
