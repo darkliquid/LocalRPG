@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -24,15 +25,21 @@ import (
 // Timeline owns every write a turn makes across the campaign's entity notes,
 // history.jsonl, and the SQLite index.
 type Timeline struct {
-	paths         *core.PathResolver
-	store         *storage.Store
-	history       *HistoryLogger
-	gameID        string
-	voiceProfiles []config.VoiceProfile
+	paths           *core.PathResolver
+	store           *storage.Store
+	history         *HistoryLogger
+	gameID          string
+	voiceProfiles   []config.VoiceProfile
+	embeddingWorker *storage.EmbeddingWorker
 }
 
 func NewTimeline(paths *core.PathResolver, store *storage.Store, history *HistoryLogger, gameID string) *Timeline {
 	return &Timeline{paths: paths, store: store, history: history, gameID: gameID}
+}
+
+// SetEmbeddingWorker attaches a background embedding indexing worker.
+func (t *Timeline) SetEmbeddingWorker(worker *storage.EmbeddingWorker) {
+	t.embeddingWorker = worker
 }
 
 // GameID is the campaign this timeline records.
@@ -130,6 +137,22 @@ func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, 
 		span.RecordError(err)
 		return err
 	}
+
+	if t.embeddingWorker != nil {
+		for id, ent := range pending {
+			t.embeddingWorker.Enqueue(storage.EmbeddingItem{
+				TargetType: "entity",
+				TargetID:   id,
+				Text:       ent.Name + " " + ent.Body,
+			})
+		}
+		t.embeddingWorker.Enqueue(storage.EmbeddingItem{
+			TargetType: "turn",
+			TargetID:   strconv.Itoa(turn.Number),
+			Text:       turn.Input + " " + turn.Narration,
+		})
+	}
+
 	return nil
 }
 
@@ -415,6 +438,16 @@ func (t *Timeline) EnsureIndexed() error {
 			set := WorkingSet{}
 			rederived := set.Rederive(turns[start:])
 			_ = t.store.ReplaceWorkingSet(rederived.ToStorageRecords())
+		}
+	}
+
+	if t.embeddingWorker != nil {
+		for i := range turns {
+			t.embeddingWorker.Enqueue(storage.EmbeddingItem{
+				TargetType: "turn",
+				TargetID:   strconv.Itoa(turns[i].Number),
+				Text:       turns[i].Input + " " + turns[i].Narration,
+			})
 		}
 	}
 

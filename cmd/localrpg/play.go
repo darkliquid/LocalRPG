@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
+	"github.com/darkliquid/localrpg/pkg/embeddings"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
@@ -71,6 +72,14 @@ func handlePlayCommand(args []string) {
 	history := engine.NewHistoryLogger(historyPath)
 
 	timeline := engine.NewTimeline(paths, store, history, gameID)
+	if embProvider, err := embeddings.NewProviderFromConfig(cfg.Embeddings); err == nil && embProvider != nil {
+		worker := storage.NewEmbeddingWorker(store, embProvider, storage.EmbeddingWorkerOptions{
+			BatchSize: cfg.Embeddings.BatchSize,
+		})
+		worker.Start()
+		defer worker.Stop()
+		timeline.SetEmbeddingWorker(worker)
+	}
 	if err := timeline.EnsureIndexed(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error indexing turns: %v\n", err)
 		os.Exit(1)
@@ -125,7 +134,11 @@ func handlePlayCommand(args []string) {
 		MinChars:    cfg.CompletionMinChars(),
 		Timeout:     cfg.CompletionTimeout(),
 	})
-	orchestrator.SetTools(tools.NewExecutor(store, cfg.ToolResultChars()), cfg.RoleSupportsTools("gm"))
+	toolExecutor := tools.NewExecutor(store, cfg.ToolResultChars())
+	if embProvider, err := embeddings.NewProviderFromConfig(cfg.Embeddings); err == nil && embProvider != nil {
+		toolExecutor.SetEmbeddingsProvider(embProvider)
+	}
+	orchestrator.SetTools(toolExecutor, cfg.RoleSupportsTools("gm"))
 	orchestrator.SetToolRounds(cfg.ToolRounds())
 	orchestrator.LoadPrompts(paths, manifest.SystemID, manifest.WorldID)
 

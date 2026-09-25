@@ -394,3 +394,42 @@ func TestDefaultTelemetryIsDisabled(t *testing.T) {
 		t.Fatalf("unexpected telemetry defaults: %+v", cfg.Telemetry)
 	}
 }
+
+func TestConfigParsesEmbeddings(t *testing.T) {
+	yamlData := `
+version: "1"
+embeddings:
+  enabled: true
+  provider: "openai"
+  model: "text-embedding-3-small"
+  dimensions: 1536
+  batch_size: 32
+  providers:
+    openai:
+      type: "http"
+      url: "https://api.openai.com/v1"
+      api_key: "test-openai-key"
+      model: "text-embedding-3-small"
+`
+	var cfg Config
+	if err := yaml.Unmarshal([]byte(yamlData), &cfg); err != nil {
+		t.Fatalf("unmarshal yaml: %v", err)
+	}
+
+	if !cfg.Embeddings.Enabled {
+		t.Fatal("expected embeddings.enabled to be true")
+	}
+	if cfg.Embeddings.Provider != "openai" {
+		t.Errorf("expected provider 'openai', got %q", cfg.Embeddings.Provider)
+	}
+	if cfg.Embeddings.BatchSize != 32 {
+		t.Errorf("expected batch_size 32, got %d", cfg.Embeddings.BatchSize)
+	}
+	pCfg, ok := cfg.Embeddings.Providers["openai"]
+	if !ok {
+		t.Fatal("expected openai provider in config")
+	}
+	if pCfg.APIKey != "test-openai-key" || pCfg.Type != "http" {
+		t.Errorf("unexpected openai provider config: %+v", pCfg)
+	}
+}

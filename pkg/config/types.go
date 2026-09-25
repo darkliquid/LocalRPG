@@ -230,12 +230,31 @@ type GeminiProviderConfig struct {
 	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 }
 
+type EmbeddingsConfig struct {
+	Enabled    bool                               `yaml:"enabled" json:"enabled"`
+	Provider   string                             `yaml:"provider" json:"provider"` // "builtin-local", "openai", "gemini", "disabled"
+	Model      string                             `yaml:"model,omitempty" json:"model,omitempty"`
+	Dimensions int                                `yaml:"dimensions,omitempty" json:"dimensions,omitempty"`
+	BatchSize  int                                `yaml:"batch_size,omitempty" json:"batch_size,omitempty"`
+	Providers  map[string]EmbeddingProviderConfig `yaml:"providers,omitempty" json:"providers,omitempty"`
+}
+
+type EmbeddingProviderConfig struct {
+	Type        string `yaml:"type" json:"type"` // "builtin", "http", "gemini", "disabled"
+	BuiltinName string `yaml:"builtin_name,omitempty" json:"builtin_name,omitempty"`
+	Endpoint    string `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
+	URL         string `yaml:"url,omitempty" json:"url,omitempty"`
+	APIKey      string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
+	Model       string `yaml:"model,omitempty" json:"model,omitempty"`
+}
+
 type Config struct {
 	Version     string            `yaml:"version" json:"version"`
 	Paths       PathsConfig       `yaml:"paths" json:"paths"`
 	Providers   ProvidersConfig   `yaml:"providers,omitempty" json:"providers,omitempty"`
 	Agents      AgentsConfig      `yaml:"agents" json:"agents"`
 	Media       MediaConfig       `yaml:"media" json:"media"`
+	Embeddings  EmbeddingsConfig  `yaml:"embeddings,omitempty" json:"embeddings,omitempty"`
 	Preferences PreferencesConfig `yaml:"preferences" json:"preferences"`
 	Telemetry   TelemetryConfig   `yaml:"telemetry,omitempty" json:"telemetry,omitempty"`
 }
@@ -342,6 +361,19 @@ func DefaultConfig() *Config {
 				Type:            "disabled",
 				AutoGenerate:    false,
 				BuiltinFallback: true,
+			},
+		},
+		Embeddings: EmbeddingsConfig{
+			Enabled:    true,
+			Provider:   "builtin-local",
+			Model:      "hash-projection",
+			Dimensions: 384,
+			BatchSize:  16,
+			Providers: map[string]EmbeddingProviderConfig{
+				"builtin-local": {
+					Type:        "builtin",
+					BuiltinName: "hash-projection",
+				},
 			},
 		},
 		Preferences: PreferencesConfig{

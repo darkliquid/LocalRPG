@@ -18,6 +18,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
+	"github.com/darkliquid/localrpg/pkg/embeddings"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -38,6 +39,7 @@ type Service struct {
 	resolver      *core.PathResolver
 	configMgr     *config.ConfigManager
 	indexed       map[string]bool
+	embWorkers    map[string]*storage.EmbeddingWorker
 	locks         map[string]*sync.Mutex
 	modelsManager *models.Manager
 	// newTTSClient builds a TTS client from configuration. It is a field so a test
@@ -111,6 +113,7 @@ func NewService(rootDir string) *Service {
 		resolver:       core.NewCustomPathResolver(sysDir, worldDir, gameDir, cacheDir),
 		configMgr:      mgr,
 		indexed:        make(map[string]bool),
+		embWorkers:     make(map[string]*storage.EmbeddingWorker),
 		locks:          make(map[string]*sync.Mutex),
 		modelsManager:  models.NewManager(cacheDir),
 		summaryPending: make(map[string]bool),
@@ -171,7 +174,48 @@ func (s *Service) ensureIndexed(gameID string) {
 
 	_, _ = storage.NewSyncer(store).Sync(filepath.Join(gameDir, "entities"))
 	history := engine.NewHistoryLogger(filepath.Join(gameDir, "history.jsonl"))
-	_ = engine.NewTimeline(s.resolver, store, history, gameID).EnsureIndexed()
+	timeline := engine.NewTimeline(s.resolver, store, history, gameID)
+	worker := s.ensureEmbeddingWorker(gameID, store)
+	if worker != nil {
+		timeline.SetEmbeddingWorker(worker)
+	}
+	_ = timeline.EnsureIndexed()
+	if worker != nil {
+		if ents, err := store.ListEntities(); err == nil {
+			for _, eSummary := range ents {
+				if ent, err := store.GetEntity(eSummary.ID); err == nil && ent != nil {
+					worker.Enqueue(storage.EmbeddingItem{
+						TargetType: "entity",
+						TargetID:   ent.ID,
+						Text:       ent.Name + " " + ent.Body,
+					})
+				}
+			}
+		}
+	}
+}
+
+func (s *Service) ensureEmbeddingWorker(gameID string, store *storage.Store) *storage.EmbeddingWorker {
+	cfg := s.Config()
+	embProvider, err := embeddings.NewProviderFromConfig(cfg.Embeddings)
+	if err != nil || embProvider == nil {
+		return nil
+	}
+
+	s.mu.Lock()
+	if s.embWorkers == nil {
+		s.embWorkers = make(map[string]*storage.EmbeddingWorker)
+	}
+	worker, ok := s.embWorkers[gameID]
+	if !ok {
+		worker = storage.NewEmbeddingWorker(store, embProvider, storage.EmbeddingWorkerOptions{
+			BatchSize: cfg.Embeddings.BatchSize,
+		})
+		worker.Start()
+		s.embWorkers[gameID] = worker
+	}
+	s.mu.Unlock()
+	return worker
 }
 
 // GetEntityTurns returns the turns an entity took part in.
@@ -1101,6 +1145,9 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	logger.SetGame(gameID)
 
 	timeline := engine.NewTimeline(s.resolver, store, engine.NewHistoryLogger(filepath.Join(gameDir, "history.jsonl")), gameID)
+	if worker := s.ensureEmbeddingWorker(gameID, store); worker != nil {
+		timeline.SetEmbeddingWorker(worker)
+	}
 	timeline.SetVoiceProfiles(media.FilterVoiceProfiles(cfg.Media.TTS.VoiceProfiles, media.ProviderKey(cfg.Media.TTS)))
 
 	// A campaign written before player_name existed holds a display name in
@@ -1153,7 +1200,11 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		MinChars:    cfg.CompletionMinChars(),
 		Timeout:     cfg.CompletionTimeout(),
 	})
-	orchestrator.SetTools(tools.NewExecutor(store, cfg.ToolResultChars()), cfg.RoleSupportsTools("gm"))
+	toolExecutor := tools.NewExecutor(store, cfg.ToolResultChars())
+	if embProvider, err := embeddings.NewProviderFromConfig(cfg.Embeddings); err == nil && embProvider != nil {
+		toolExecutor.SetEmbeddingsProvider(embProvider)
+	}
+	orchestrator.SetTools(toolExecutor, cfg.RoleSupportsTools("gm"))
 	orchestrator.SetToolRounds(cfg.ToolRounds())
 
 	// Hand the engine the declared stats so it can validate a state change.
