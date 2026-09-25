@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
 import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest } from '../types';
-import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, RotateCcw, BookOpen } from 'lucide-react';
+import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, RotateCcw, BookOpen, Wand2 } from 'lucide-react';
+import { AIGenerateButton } from './ui/AIGenerateButton';
 import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
 
 interface WorldsStudioProps {
@@ -56,6 +57,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
@@ -199,6 +201,38 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
     });
     setEntityDrafts(initialDrafts);
     setToast({ type: 'success', message: 'Reset to The Ashen Reach Reference Template!' });
+  };
+
+  const getWorldContext = (): Record<string, string> => ({
+    name,
+    genre,
+    art_style: artStyle,
+    description,
+    lore_prompt: lorePrompt,
+    tags,
+  });
+
+  const handleGenerateAllWorldFields = async () => {
+    if (isGeneratingAll) return;
+    setIsGeneratingAll(true);
+    try {
+      const res = await APIClient.generateText({
+        form_type: 'world',
+        field_name: '_all',
+        context: getWorldContext(),
+        system_id: defaultSystem,
+      });
+      if (res.fields.name && !name.trim()) setName(res.fields.name);
+      if (res.fields.genre && !genre.trim()) setGenre(res.fields.genre);
+      if (res.fields.art_style && !artStyle.trim()) setArtStyle(res.fields.art_style);
+      if (res.fields.description && !description.trim()) setDescription(res.fields.description);
+      if (res.fields.lore_prompt && !lorePrompt.trim()) setLorePrompt(res.fields.lore_prompt);
+      setToast({ type: 'success', message: 'Auto-filled world fields!' });
+    } catch (err: any) {
+      setToast({ type: 'error', message: err.message || 'Auto-fill failed' });
+    } finally {
+      setIsGeneratingAll(false);
+    }
   };
 
   const handleSaveWorld = async (e: React.FormEvent) => {
@@ -445,6 +479,17 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
 
             <button
               type="button"
+              onClick={handleGenerateAllWorldFields}
+              disabled={isGeneratingAll || isSaving}
+              title="Auto-fill empty world fields with AI"
+              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-purple-500/40 bg-purple-600/15 hover:bg-purple-600/25 text-purple-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Wand2 className={`w-3.5 h-3.5 ${isGeneratingAll ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isGeneratingAll ? 'Generating...' : 'Auto-Fill'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleResetToReference}
               title="Reset current editor to the comprehensive Ashen Reach reference template"
               className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-stone-800 hover:border-purple-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-purple-400 transition-all cursor-pointer"
@@ -487,9 +532,23 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
           <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                  World Setting Name
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
+                    World Setting Name
+                  </label>
+                  <AIGenerateButton
+                    formType="world"
+                    fieldName="name"
+                    getContext={getWorldContext}
+                    onGenerated={(val) => {
+                      setName(val);
+                      if (!selectedID) {
+                        setSlugID(val.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''));
+                      }
+                    }}
+                    systemID={defaultSystem}
+                  />
+                </div>
                 <input
                   type="text"
                   required
@@ -506,9 +565,18 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                  Genre / Setting Style
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
+                    Genre / Setting Style
+                  </label>
+                  <AIGenerateButton
+                    formType="world"
+                    fieldName="genre"
+                    getContext={getWorldContext}
+                    onGenerated={(val) => setGenre(val)}
+                    systemID={defaultSystem}
+                  />
+                </div>
                 <input
                   type="text"
                   placeholder="e.g. Gothic Fantasy, Cyberpunk"
@@ -553,10 +621,20 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-sans uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                <Palette className="w-3.5 h-3.5 text-purple-400" />
-                <span>Visual Art Style Prompt Guide</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-sans uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Visual Art Style Prompt Guide</span>
+                </label>
+                <AIGenerateButton
+                  formType="world"
+                  fieldName="art_style"
+                  getContext={getWorldContext}
+                  onGenerated={(val) => setArtStyle(val)}
+                  systemID={defaultSystem}
+                  seed={artStyle}
+                />
+              </div>
               <input
                 type="text"
                 placeholder="e.g. Dark watercolor gothic, mist, gaslight, copper accents, muted palette"
@@ -584,9 +662,19 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                World Synopsis & Lore
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
+                  World Synopsis & Lore
+                </label>
+                <AIGenerateButton
+                  formType="world"
+                  fieldName="description"
+                  getContext={getWorldContext}
+                  onGenerated={(val) => setDescription(val)}
+                  systemID={defaultSystem}
+                  seed={description}
+                />
+              </div>
               <textarea
                 rows={4}
                 placeholder="Describe the setting, major conflicts, factions, and atmosphere..."
@@ -603,7 +691,17 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved }) => {
           <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
             <div className="flex items-center justify-between text-[11px] font-mono text-stone-400 px-1 shrink-0">
               <span>AI Storyteller Atmosphere Instructions (prompts/lore.md)</span>
-              <span>Injected into LLM context to guide sensory tone & faction conflicts</span>
+              <div className="flex items-center gap-2">
+                <span>Injected into LLM context to guide sensory tone &amp; faction conflicts</span>
+                <AIGenerateButton
+                  formType="world"
+                  fieldName="lore_prompt"
+                  getContext={getWorldContext}
+                  onGenerated={(val) => setLorePrompt(val)}
+                  systemID={defaultSystem}
+                  seed={lorePrompt}
+                />
+              </div>
             </div>
             <textarea
               value={lorePrompt}
