@@ -85,6 +85,12 @@ func heroView(p ui.Palette) {
 		Label(appState.WorldName(game.WorldID)+" · "+appState.SystemName(game.SystemID), FontSize(14), TextColorVec(p.Muted))
 		Spacer(8)
 		Label(game.PlayerName+" · "+turnLabel(game.TurnCount), FontSize(13), TextColorVec(p.Muted))
+		Spacer(8)
+		NextAccessName("launcher.settings")
+		if Button(NoIcon, "Settings") {
+			openSettings(game.ID)
+		}
+		AssignAccess()
 	})
 }
 

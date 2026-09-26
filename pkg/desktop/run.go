@@ -47,9 +47,22 @@ func Run(cfg Config) error {
 			_, err := svc.CreateGame(ctx, req)
 			return err
 		}
+		saveGameSettings = func(ctx context.Context, svc *gui.Service, gameID string, patch map[string]any) error {
+			return svc.UpdateGameSettings(ctx, gameID, patch)
+		}
+		restartGame = func(ctx context.Context, svc *gui.Service, gameID string) error {
+			_, err := svc.RestartGame(ctx, gameID)
+			return err
+		}
+		deleteGame = func(ctx context.Context, svc *gui.Service, gameID string) error {
+			return svc.DeleteGame(ctx, gameID)
+		}
 	} else {
 		liveService = nil
 		createGame = nil
+		saveGameSettings = nil
+		restartGame = nil
+		deleteGame = nil
 	}
 
 	if cfg.PNGPath != "" {

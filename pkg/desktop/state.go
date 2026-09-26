@@ -1,6 +1,9 @@
 package desktop
 
-import "github.com/darkliquid/localrpg/pkg/gui"
+import (
+	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/gui"
+)
 
 // Screen identifies which top-level view the shell renders.
 type Screen int
@@ -32,6 +35,14 @@ type State struct {
 
 	// WorldFlyoutOpen shows the compact world strip beside the dock.
 	WorldFlyoutOpen bool
+
+	// Per-campaign settings modal state.
+	SettingsGameID  string
+	SettingsOpening string
+	SettingsStart   string
+	SettingsVoice   string
+	SettingsConfirm bool
+	VoiceProfiles   []config.VoiceProfile
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art

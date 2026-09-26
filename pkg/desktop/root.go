@@ -11,4 +11,5 @@ func RootView() {
 		launcherView()
 	}
 	lightbox()
+	campaignSettingsModal()
 }
