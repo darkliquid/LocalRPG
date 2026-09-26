@@ -284,7 +284,7 @@ func DefaultConfig() *Config {
 			SummaryEvery:        10,
 			SummaryCharLimit:    2000,
 			Completion: CompletionConfig{
-				Mode:               "auto",
+				Mode:               "trim",
 				MaxAttempts:        1,
 				TailChars:          1500,
 				MinIncompleteChars: 24,
@@ -592,13 +592,15 @@ func (c *Config) OpusBitrate() int {
 }
 
 // CompletionMode is the recovery policy: "auto", "continue", "trim", or "off".
+// Unset defaults to "trim" so a cut reply ends instead of paying for a second
+// full model call.
 func (c *Config) CompletionMode() string {
 	mode := strings.ToLower(strings.TrimSpace(c.Agents.Completion.Mode))
 	switch mode {
 	case "auto", "continue", "trim", "off":
 		return mode
 	default:
-		return "auto"
+		return "trim"
 	}
 }
 
@@ -646,10 +648,18 @@ func (c *Config) RoleSupportsTools(role string) string {
 	}
 }
 
-// ToolRounds caps how many times a turn may call tools. Zero means unbounded.
+// defaultToolRounds bounds a turn's tool calls when none is configured. A
+// negative value means unbounded.
+const defaultToolRounds = 3
+
+// ToolRounds caps how many times a turn may call tools. Zero or unset uses the
+// default; a negative value means unbounded.
 func (c *Config) ToolRounds() int {
 	if c.Agents.ToolRounds < 0 {
 		return 0
+	}
+	if c.Agents.ToolRounds == 0 {
+		return defaultToolRounds
 	}
 	return c.Agents.ToolRounds
 }

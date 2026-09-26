@@ -162,8 +162,8 @@ func TestSummarySettingsHaveDefaults(t *testing.T) {
 func TestCompletionSettingsHaveDefaults(t *testing.T) {
 	empty := &Config{}
 
-	if got := empty.CompletionMode(); got != "auto" {
-		t.Errorf("CompletionMode() = %q, want auto for an omitted setting", got)
+	if got := empty.CompletionMode(); got != "trim" {
+		t.Errorf("CompletionMode() = %q, want trim for an omitted setting", got)
 	}
 	if got := empty.CompletionAttempts(); got != 1 {
 		t.Errorf("CompletionAttempts() = %d, want 1", got)
@@ -203,15 +203,15 @@ func TestCompletionSettingsHaveDefaults(t *testing.T) {
 
 	// An unrecognised mode falls back to auto rather than silently disabling.
 	unknown := &Config{Agents: AgentsConfig{Completion: CompletionConfig{Mode: "banana"}}}
-	if got := unknown.CompletionMode(); got != "auto" {
-		t.Errorf("CompletionMode() = %q, want auto for an unknown mode", got)
+	if got := unknown.CompletionMode(); got != "trim" {
+		t.Errorf("CompletionMode() = %q, want trim for an unknown mode", got)
 	}
 }
 
 func TestDefaultConfigCarriesCompletionKnobs(t *testing.T) {
 	cfg := DefaultConfig()
-	if cfg.Agents.Completion.Mode != "auto" {
-		t.Errorf("default completion mode = %q, want auto", cfg.Agents.Completion.Mode)
+	if cfg.Agents.Completion.Mode != "trim" {
+		t.Errorf("default completion mode = %q, want trim", cfg.Agents.Completion.Mode)
 	}
 	role, ok := cfg.Agents.Roles[RoleCompletion]
 	if !ok {
@@ -293,8 +293,8 @@ func TestToolCapabilityAndBounds(t *testing.T) {
 	if got := empty.RoleSupportsTools("gm"); got != "auto" {
 		t.Errorf("RoleSupportsTools = %q, want auto", got)
 	}
-	if got := empty.ToolRounds(); got != 0 {
-		t.Errorf("ToolRounds = %d, want 0", got)
+	if got := empty.ToolRounds(); got != 3 {
+		t.Errorf("ToolRounds = %d, want the bounded default 3", got)
 	}
 	if got := empty.ToolResultChars(); got != 4000 {
 		t.Errorf("ToolResultChars = %d, want 4000", got)
@@ -467,5 +467,26 @@ func TestOpusBitrateDefaultsAndClamps(t *testing.T) {
 	cfg.Media.TTS.OpusBitrate = 999999
 	if got := cfg.OpusBitrate(); got != 510000 {
 		t.Fatalf("OpusBitrate() = %d, want the clamp ceiling 510000", got)
+	}
+}
+
+func TestToolRoundsDefaultsToABoundedCap(t *testing.T) {
+	if got := (&Config{}).ToolRounds(); got != 3 {
+		t.Errorf("ToolRounds() = %d, want 3 for an unset value", got)
+	}
+	if got := (&Config{Agents: AgentsConfig{ToolRounds: 7}}).ToolRounds(); got != 7 {
+		t.Errorf("ToolRounds() = %d, want the configured 7", got)
+	}
+	if got := (&Config{Agents: AgentsConfig{ToolRounds: -1}}).ToolRounds(); got != 0 {
+		t.Errorf("ToolRounds() = %d, want 0 (unbounded) for a negative value", got)
+	}
+}
+
+func TestCompletionModeDefaultsToTrim(t *testing.T) {
+	if got := (&Config{}).CompletionMode(); got != "trim" {
+		t.Errorf("CompletionMode() = %q, want trim for an unset value", got)
+	}
+	if got := (&Config{Agents: AgentsConfig{Completion: CompletionConfig{Mode: "auto"}}}).CompletionMode(); got != "auto" {
+		t.Errorf("CompletionMode() = %q, want the configured auto", got)
 	}
 }
