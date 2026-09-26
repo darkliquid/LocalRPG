@@ -61,6 +61,7 @@ func handleGUICommand(args []string) {
 	}
 
 	svc := gui.NewService(cfg.Dir)
+	defer svc.Close()
 	defer func() { _ = storage.CloseGameStores() }()
 
 	telemetryProvider, err := telemetry.New(context.Background(), svc.Config().Telemetry, telemetry.BuildInfo{
@@ -68,6 +69,7 @@ func handleGUICommand(args []string) {
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error starting telemetry: %v\n", err)
+		svc.Close()
 		os.Exit(1)
 	}
 	defer func() {
@@ -75,6 +77,18 @@ func handleGUICommand(args []string) {
 		defer cancel()
 		_ = telemetryProvider.Shutdown(shutdownCtx)
 	}()
+
+	// os.Exit skips defers, so every exit path past this point drains the
+	// service's background work (narration warm-up, enrichment, retro-summary)
+	// before leaving.
+	shutdown := func(code int) {
+		svc.Close()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_ = telemetryProvider.Shutdown(shutdownCtx)
+		cancel()
+		_ = storage.CloseGameStores()
+		os.Exit(code)
+	}
 
 	// The resolver owns where caches live, so the sink follows it rather than
 	// duplicating the relative-path resolution the service already did. The
@@ -90,7 +104,7 @@ func handleGUICommand(args []string) {
 		fmt.Printf("Starting LocalRPG Web GUI on http://%s\n", addr)
 		if err := http.ListenAndServe(addr, handler); err != nil {
 			fmt.Fprintf(os.Stderr, "Server failed: %v\n", err)
-			os.Exit(1)
+			shutdown(1)
 		}
 		return
 	}
@@ -106,7 +120,7 @@ func handleGUICommand(args []string) {
 		listener, err := gui.ListenUnix(sockPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Socket error: %v\n", err)
-			os.Exit(1)
+			shutdown(1)
 		}
 		defer listener.Close()
 		defer os.Remove(sockPath)
@@ -119,7 +133,7 @@ func handleGUICommand(args []string) {
 			fmt.Println("\nShutting down LocalRPG GUI socket daemon...")
 			_ = listener.Close()
 			_ = os.Remove(sockPath)
-			os.Exit(0)
+			shutdown(0)
 		}()
 
 		fmt.Printf("LocalRPG GUI daemon listening on Unix domain socket: %s (0 TCP ports)\n", sockPath)
@@ -128,7 +142,7 @@ func handleGUICommand(args []string) {
 		}
 		if err := http.Serve(listener, handler); err != nil && err != http.ErrServerClosed {
 			fmt.Fprintf(os.Stderr, "Daemon failed: %v\n", err)
-			os.Exit(1)
+			shutdown(1)
 		}
 		return
 	}
@@ -154,6 +168,6 @@ func handleGUICommand(args []string) {
 
 	if err := app.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Wails application failed: %v\n", err)
-		os.Exit(1)
+		shutdown(1)
 	}
 }
