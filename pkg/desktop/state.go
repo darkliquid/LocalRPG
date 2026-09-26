@@ -53,6 +53,9 @@ type State struct {
 	// WorldFlyoutOpen shows the compact world strip beside the dock.
 	WorldFlyoutOpen bool
 
+	// CampaignGalleryOpen shows the full-screen campaign grid.
+	CampaignGalleryOpen bool
+
 	// Per-campaign settings modal state.
 	SettingsGameID  string
 	SettingsOpening string
