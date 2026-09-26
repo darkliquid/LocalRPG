@@ -10,6 +10,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/paths"
 )
 
 func handleTTSCommand(args []string) {
@@ -56,7 +57,8 @@ func handleTTSCommand(args []string) {
 		voiceCfg.SpeechRate = *rate
 	}
 
-	pipeline := media.NewTTSPipeline(client, media.NewContentCache(cfg.Paths.Cache))
+	dirs := paths.Resolve(paths.System(), cfg.Paths, "")
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(dirs.Cache))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
 	path, err := pipeline.SynthesizeUtterance(context.Background(), "cli", voiceCfg, text)
 	if err != nil {

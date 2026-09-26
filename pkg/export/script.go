@@ -14,6 +14,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/paths"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
@@ -86,9 +87,14 @@ type ScriptCompiler struct {
 // campaign unless it is deliberately told otherwise.
 func NewScriptCompiler(rootDir string) *ScriptCompiler {
 	cfg, _ := config.NewConfigManager().Load()
+	projectRoot := ""
+	if rootDir != "" {
+		projectRoot = rootDir
+	}
+	dirs := paths.Resolve(paths.System(), cfg.Paths, projectRoot)
 	return &ScriptCompiler{
 		rootDir:  rootDir,
-		resolver: core.NewPathResolver(rootDir),
+		resolver: core.NewCustomPathResolver(dirs.Systems, dirs.Worlds, dirs.Games, dirs.Cache),
 		config:   cfg,
 		art:      true,
 		audio:    true,

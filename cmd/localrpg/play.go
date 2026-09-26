@@ -14,6 +14,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/paths"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
@@ -45,8 +46,9 @@ func handlePlayCommand(args []string) {
 	}()
 
 	gameID := args[0]
-	paths := core.NewCustomPathResolver(cfg.Paths.Systems, cfg.Paths.Worlds, cfg.Paths.Games, cfg.Paths.Cache)
-	gameDir := paths.GameDir(gameID)
+	dirs := paths.Resolve(paths.System(), cfg.Paths, "")
+	resolver := core.NewCustomPathResolver(dirs.Systems, dirs.Worlds, dirs.Games, dirs.Cache)
+	gameDir := resolver.GameDir(gameID)
 
 	manifestPath := filepath.Join(gameDir, "game.yaml")
 	manifest, err := core.LoadGameManifest(manifestPath)
@@ -55,7 +57,7 @@ func handlePlayCommand(args []string) {
 		os.Exit(1)
 	}
 
-	store, err := storage.OpenGameStore(paths, gameID)
+	store, err := storage.OpenGameStore(resolver, gameID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening game database: %v\n", err)
 		os.Exit(1)
@@ -71,7 +73,7 @@ func handlePlayCommand(args []string) {
 	historyPath := filepath.Join(gameDir, "history.jsonl")
 	history := engine.NewHistoryLogger(historyPath)
 
-	timeline := engine.NewTimeline(paths, store, history, gameID)
+	timeline := engine.NewTimeline(resolver, store, history, gameID)
 	if embProvider, err := embeddings.NewProviderFromConfig(cfg.Embeddings); err == nil && embProvider != nil {
 		worker := storage.NewEmbeddingWorker(store, embProvider, storage.EmbeddingWorkerOptions{
 			BatchSize: cfg.Embeddings.BatchSize,
@@ -88,13 +90,13 @@ func handlePlayCommand(args []string) {
 	// A campaign written before player_name existed holds a display name in
 	// player:, which is repaired once here so the turn pipeline uses the real ID.
 	playerID := manifest.Player
-	if resolved, err := engine.RepairPlayerIdentity(paths, store, manifest); err != nil {
+	if resolved, err := engine.RepairPlayerIdentity(resolver, store, manifest); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not reconcile player identity: %v\n", err)
 	} else if resolved != "" {
 		playerID = resolved
 	}
 
-	startLocation, err := engine.ResolveStartLocation(paths, store, manifest)
+	startLocation, err := engine.ResolveStartLocation(resolver, store, manifest)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error resolving start location: %v\n", err)
 		os.Exit(1)
@@ -103,10 +105,10 @@ func handlePlayCommand(args []string) {
 	bridge := rules.NewHostBridge(store, timeline, playerID)
 	jsEngine := rules.NewJSEngine(bridge)
 
-	ruleLoader := rules.NewRuleLoader(paths, jsEngine)
+	ruleLoader := rules.NewRuleLoader(resolver, jsEngine)
 	_ = ruleLoader.LoadRules(manifest.SystemID, manifest.WorldID)
 
-	localLogger := buildTraceLogger(cfg, os.Args, paths.CacheDir())
+	localLogger := buildTraceLogger(cfg, os.Args, resolver.CacheDir())
 	logger := telemetryProvider.Logger(localLogger)
 	logger.SetGame(gameID)
 
@@ -143,7 +145,7 @@ func handlePlayCommand(args []string) {
 	orchestrator.SetTools(toolExecutor, cfg.RoleSupportsTools("gm"))
 	orchestrator.SetToolRounds(cfg.ToolRounds())
 	orchestrator.SetActionEcho(cfg.ActionEcho())
-	orchestrator.LoadPrompts(paths, manifest.SystemID, manifest.WorldID)
+	orchestrator.LoadPrompts(resolver, manifest.SystemID, manifest.WorldID)
 
 	if ttsCli, err := media.NewTTSClient(cfg.Media.TTS); err == nil {
 		cueCaps := media.ResolveSpeechCueCapabilities(cfg.Media.TTS, ttsCli)
