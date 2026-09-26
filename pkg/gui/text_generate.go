@@ -2,9 +2,7 @@ package gui
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
@@ -255,29 +253,4 @@ func missingFields(requested []string, got map[string]string) int {
 		}
 	}
 	return missing
-}
-
-// handleGenerateTextRoute serves POST /api/generate-text. It creates nothing;
-// the caller decides whether to keep the returned values.
-func (s *Server) handleGenerateTextRoute(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req GenerateTextRequest
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
-		writeInvalidRequest(w, "invalid request body")
-		return
-	}
-
-	resp, err := s.service.GenerateText(r.Context(), req)
-	if err != nil {
-		if writeGenerationFailure(w, err) {
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, resp)
 }

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
@@ -13,31 +12,6 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/harness"
 )
-
-// handleCharacterGenerateRoute serves POST /api/character/generate. It creates
-// nothing; the caller decides whether to keep the values.
-func (s *Server) handleCharacterGenerateRoute(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req GenerateCharacterRequest
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
-		writeInvalidRequest(w, "invalid request body")
-		return
-	}
-
-	resp, err := s.service.GenerateCharacter(r.Context(), req)
-	if err != nil {
-		if writeGenerationFailure(w, err) {
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, resp)
-}
 
 // GenerateCharacterRequest asks for starter values for a system's character
 // creation fields. It is side-effect free: no campaign is created and no files
