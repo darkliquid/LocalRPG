@@ -20,6 +20,8 @@ func toggleDrawer(name string) {
 		refreshContext()
 	case "graph":
 		refreshGraph()
+	case "world":
+		refreshWorld()
 	}
 }
 
@@ -95,5 +97,4 @@ func drawerTitle() string {
 	}
 }
 
-func worldDrawer(p ui.Palette)     { Label("Living World", TextColorVec(p.Muted)) }
-func characterDrawer(p ui.Palette) { Label("Character Sheet", TextColorVec(p.Muted)) }
+// (drawer bodies live in their own files: codex.go, context.go, graph.go, world.go)

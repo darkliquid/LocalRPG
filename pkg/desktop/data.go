@@ -90,6 +90,19 @@ func loadMemories(svc *gui.Service, gameID, entityID string) []gui.MemoryDTO {
 	return memories
 }
 
+// loadWorld reads the campaign state and recap.
+func loadWorld(ctx context.Context, svc *gui.Service, gameID string) (*gui.GameStateDTO, *gui.RecapDTO) {
+	var state *gui.GameStateDTO
+	if got, err := svc.GetGameState(ctx, gameID); err == nil {
+		state = got
+	}
+	var recap *gui.RecapDTO
+	if got, err := svc.GetRecap(ctx, gameID); err == nil {
+		recap = got
+	}
+	return state, recap
+}
+
 // loadGraph reads the campaign's entity graph.
 func loadGraph(ctx context.Context, svc *gui.Service, gameID string) *gui.GraphDTO {
 	graph, err := svc.GetGraph(ctx, gameID)

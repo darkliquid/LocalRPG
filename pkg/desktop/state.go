@@ -85,6 +85,10 @@ type State struct {
 	Graph      *gui.GraphDTO
 	GraphImage *image.RGBA
 
+	// Living world / character sheet state.
+	GameState *gui.GameStateDTO
+	Recap     *gui.RecapDTO
+
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
 	WorldArt map[string]Art
