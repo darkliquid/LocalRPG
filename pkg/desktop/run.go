@@ -89,6 +89,13 @@ func Run(cfg Config) error {
 		downloadModel = func(ctx context.Context, svc *gui.Service, id string) error {
 			return svc.DownloadModel(ctx, id)
 		}
+		saveSystem = func(ctx context.Context, svc *gui.Service, req gui.CreateSystemRequestDTO) error {
+			_, err := svc.SaveSystem(ctx, req)
+			return err
+		}
+		generateText = func(ctx context.Context, svc *gui.Service, req gui.GenerateTextRequest) (*gui.GenerateTextResponse, error) {
+			return svc.GenerateText(ctx, req)
+		}
 		refreshModels(cfg.Service)
 		startModelEvents(cfg.Service)
 	} else {
@@ -107,6 +114,8 @@ func Run(cfg Config) error {
 		testProvider = nil
 		inspectTTS = nil
 		downloadModel = nil
+		saveSystem = nil
+		generateText = nil
 	}
 
 	if cfg.PNGPath != "" {

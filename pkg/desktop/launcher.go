@@ -52,6 +52,12 @@ func dockView(p ui.Palette) {
 		}
 		AssignAccess()
 
+		NextAccessName("launcher.systems-studio")
+		if Button(NoIcon, "S") {
+			openSystemsStudio()
+		}
+		AssignAccess()
+
 		for i := range appState.Games {
 			game := &appState.Games[i]
 			selected := game.ID == appState.Selected

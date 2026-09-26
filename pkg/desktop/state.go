@@ -4,6 +4,7 @@ import (
 	"image"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/gui"
 	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/provider"
@@ -121,10 +122,23 @@ type State struct {
 	Models []models.ModelStatus
 
 	// Studio state.
-	Studio          Selection
-	PendingStudio   Selection
-	StudioDirty     bool
-	ConfirmDiscard  bool
+	Studio         Selection
+	PendingStudio  Selection
+	StudioDirty    bool
+	ConfirmDiscard bool
+
+	// Systems studio.
+	System         *gui.SystemDetailDTO
+	FormSysName    string
+	FormSysVersion string
+	FormSysSlug    string
+	FormSysDesc    string
+	FormSysRules   string
+	FormSysScript  string
+	FormSysPrelude string
+	FormSysFields  []core.CharacterCreationField
+	SystemSaved    bool
+	SystemTab      string
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art

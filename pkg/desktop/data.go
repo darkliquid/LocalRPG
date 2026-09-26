@@ -91,6 +91,24 @@ func loadMemories(svc *gui.Service, gameID, entityID string) []gui.MemoryDTO {
 	return memories
 }
 
+// loadSystems reads the registered systems.
+func loadSystems(ctx context.Context, svc *gui.Service) []gui.SystemSummaryDTO {
+	systems, err := svc.ListSystems(ctx)
+	if err != nil || systems == nil {
+		return []gui.SystemSummaryDTO{}
+	}
+	return systems
+}
+
+// loadSystemDetail reads one system's full definition.
+func loadSystemDetail(ctx context.Context, svc *gui.Service, id string) *gui.SystemDetailDTO {
+	detail, err := svc.GetSystem(ctx, id)
+	if err != nil {
+		return nil
+	}
+	return detail
+}
+
 // loadProviders reads the registered provider catalogue.
 func loadProviders(ctx context.Context, svc *gui.Service) []provider.Descriptor {
 	catalog, err := svc.ListProviders(ctx)

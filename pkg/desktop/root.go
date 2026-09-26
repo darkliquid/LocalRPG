@@ -11,6 +11,8 @@ func RootView() {
 		chronicleView()
 	case ScreenSettings:
 		settingsView()
+	case ScreenSystemsStudio:
+		systemsStudioView()
 	default:
 		launcherView()
 	}
