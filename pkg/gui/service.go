@@ -25,6 +25,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/media/playback"
 	"github.com/darkliquid/localrpg/pkg/models"
+	"github.com/darkliquid/localrpg/pkg/paths"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -75,48 +76,29 @@ func (s *Service) SetLogger(logger trace.Logger) {
 }
 
 func NewService(rootDir string) *Service {
-	configDir := os.Getenv("LOCALRPG_CONFIG_DIR")
-	if configDir == "" {
-		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-			configDir = filepath.Join(xdg, "localrpg")
-		} else {
-			userHome, _ := os.UserHomeDir()
-			configDir = filepath.Join(userHome, ".config", "localrpg")
-		}
-	}
-	userPath := filepath.Join(configDir, "config.yaml")
+	projectMode := rootDir != "" && rootDir != "."
+	userPath, _ := config.DetectConfigFile()
 	localPath := filepath.Join(rootDir, "localrpg.yaml")
-	if rootDir != "" && rootDir != "." {
+	if projectMode {
 		userPath = filepath.Join(rootDir, "config.yaml")
 	}
 	mgr := config.NewConfigManagerWithPaths(userPath, localPath)
 	cfg, _ := mgr.Load()
 
-	sysDir := cfg.Paths.Systems
-	worldDir := cfg.Paths.Worlds
-	gameDir := cfg.Paths.Games
-	cacheDir := cfg.Paths.Cache
-	if !filepath.IsAbs(sysDir) && rootDir != "" {
-		sysDir = filepath.Join(rootDir, sysDir)
+	projectRoot := ""
+	if projectMode {
+		projectRoot = rootDir
 	}
-	if !filepath.IsAbs(worldDir) && rootDir != "" {
-		worldDir = filepath.Join(rootDir, worldDir)
-	}
-	if !filepath.IsAbs(gameDir) && rootDir != "" {
-		gameDir = filepath.Join(rootDir, gameDir)
-	}
-	if !filepath.IsAbs(cacheDir) && rootDir != "" {
-		cacheDir = filepath.Join(rootDir, cacheDir)
-	}
+	dirs := paths.Resolve(paths.System(), cfg.Paths, projectRoot)
 
 	return &Service{
 		rootDir:        rootDir,
-		resolver:       core.NewCustomPathResolver(sysDir, worldDir, gameDir, cacheDir),
+		resolver:       core.NewCustomPathResolver(dirs.Systems, dirs.Worlds, dirs.Games, dirs.Cache),
 		configMgr:      mgr,
 		indexed:        make(map[string]bool),
 		embWorkers:     make(map[string]*storage.EmbeddingWorker),
 		locks:          make(map[string]*sync.Mutex),
-		modelsManager:  models.NewManager(cacheDir),
+		modelsManager:  models.NewManager(dirs.Cache),
 		summaryPending: make(map[string]bool),
 	}
 }
@@ -2688,11 +2670,23 @@ func (s *Service) DeleteWorldEntity(ctx context.Context, worldID, entityID strin
 	return os.Remove(path)
 }
 
+// applyResolvedPaths fills a config's path fields with the absolute directories
+// in effect, so the settings surface and a saved config both name real locations.
+func (s *Service) applyResolvedPaths(cfg *config.Config) {
+	projectRoot := ""
+	if s.rootDir != "" && s.rootDir != "." {
+		projectRoot = s.rootDir
+	}
+	dirs := paths.Resolve(paths.System(), cfg.Paths, projectRoot)
+	cfg.Paths = config.PathsConfig{Systems: dirs.Systems, Worlds: dirs.Worlds, Games: dirs.Games, Cache: dirs.Cache}
+}
+
 func (s *Service) GetSettings(ctx context.Context) (*SettingsResponseDTO, error) {
 	cfg, err := s.configMgr.Load()
 	if err != nil {
 		return nil, err
 	}
+	s.applyResolvedPaths(cfg)
 	return &SettingsResponseDTO{
 		Config:          *cfg,
 		ConfigFilePath:  s.configMgr.ActiveFilePath(),
@@ -2704,36 +2698,19 @@ func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*Setting
 	if err := s.validateVoiceOptionsInConfig(&cfg); err != nil {
 		return nil, fmt.Errorf("validate tts options: %w", err)
 	}
+	s.applyResolvedPaths(&cfg)
 	if err := s.configMgr.Save(&cfg); err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
 	}
 
-	sysDir := cfg.Paths.Systems
-	worldDir := cfg.Paths.Worlds
-	gameDir := cfg.Paths.Games
-	cacheDir := cfg.Paths.Cache
-
-	if !filepath.IsAbs(sysDir) && s.rootDir != "" {
-		sysDir = filepath.Join(s.rootDir, sysDir)
-	}
-	if !filepath.IsAbs(worldDir) && s.rootDir != "" {
-		worldDir = filepath.Join(s.rootDir, worldDir)
-	}
-	if !filepath.IsAbs(gameDir) && s.rootDir != "" {
-		gameDir = filepath.Join(s.rootDir, gameDir)
-	}
-	if !filepath.IsAbs(cacheDir) && s.rootDir != "" {
-		cacheDir = filepath.Join(s.rootDir, cacheDir)
-	}
-
 	s.mu.Lock()
-	s.resolver.SetPaths(sysDir, worldDir, gameDir, cacheDir)
+	s.resolver.SetPaths(cfg.Paths.Systems, cfg.Paths.Worlds, cfg.Paths.Games, cfg.Paths.Cache)
 	s.mu.Unlock()
 
-	_ = os.MkdirAll(sysDir, 0755)
-	_ = os.MkdirAll(worldDir, 0755)
-	_ = os.MkdirAll(gameDir, 0755)
-	_ = os.MkdirAll(cacheDir, 0755)
+	_ = os.MkdirAll(cfg.Paths.Systems, 0755)
+	_ = os.MkdirAll(cfg.Paths.Worlds, 0755)
+	_ = os.MkdirAll(cfg.Paths.Games, 0755)
+	_ = os.MkdirAll(cfg.Paths.Cache, 0755)
 
 	return &SettingsResponseDTO{
 		Config:          cfg,
