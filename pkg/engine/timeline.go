@@ -258,18 +258,21 @@ func (t *Timeline) writeEntities(pending map[string]*entity.Entity) error {
 	sort.Strings(ids)
 
 	for _, id := range ids {
+		path := filepath.Join(dir, id+".md")
 		data, err := pending[id].SerializeMarkdown()
 		if err != nil {
 			return fmt.Errorf("serialize entity %q: %w", id, err)
 		}
-		if err := os.WriteFile(filepath.Join(dir, id+".md"), data, 0644); err != nil {
+		if err := os.WriteFile(path, data, 0644); err != nil {
 			return fmt.Errorf("write entity %q: %w", id, err)
+		}
+		// Index just this file. Syncing the whole directory re-parsed every
+		// entity on every turn that touched one.
+		if err := storage.NewSyncer(t.store).SyncFile(path); err != nil {
+			return fmt.Errorf("index entity %q: %w", id, err)
 		}
 	}
 
-	if _, err := storage.NewSyncer(t.store).Sync(dir); err != nil {
-		return fmt.Errorf("sync entities: %w", err)
-	}
 	return nil
 }
 
