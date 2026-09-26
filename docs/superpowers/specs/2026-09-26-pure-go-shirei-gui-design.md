@@ -1,7 +1,7 @@
 # Design Spec: Pure-Go GUI with go-shirei (retiring Wails, the React SPA, the TUI, the HTTP daemon, and the in-app debugger)
 
 **Date:** 2026-09-26
-**Status:** Draft for review (rev 2)
+**Status:** Approved (rev 5)
 **Topic:** Replace the Wails window and the React/Vite SPA with an in-process,
 pure-Go immediate-mode GUI built on `go.hasen.dev/shirei`, unify the in-app
 Story Theater with video export, drop the unused TUI and the HTTP/socket daemon,
@@ -36,7 +36,7 @@ ffmpeg video exporter.
 | --- | --- | --- |
 | 1 | End state | shirei is the only GUI; Wails, React, Vite, Node, TUI, HTTP daemon, and `pkg/debugger` deleted |
 | 2 | Platforms | Desktop only: Linux, Windows, macOS. No mobile, no web in v1 |
-| 3 | Audio | Keep `oto` untouched for now; adopt shirei audio (mono) later |
+| 3 | Audio | Retire `oto` for shirei's purego audio (mono accepted) so the default build stays CGO-free |
 | 4 | Dependency posture | Pin exact shirei version, `vendor/`, thin internal adapter |
 | 5 | Theatre goal | One implementation for in-app **and** video-encoded theatre (ultimate goal) |
 | 6 | Web/HTTP layer | Delete SPA, assets, daemon, `--port`/`--socket`/`--headless`, Node |
@@ -53,6 +53,8 @@ ffmpeg video exporter.
 | 17 | Go style | Prefer `any` over `interface{}` and current-Go idioms; update `AGENTS.md` |
 | 18 | Fidelity | Follow SPA layouts/styling closely; 1:1 pixel parity is **not** required |
 | 19 | CLI surface | No `gui` subcommand: the root command boots straight into the shirei GUI |
+| 20 | Built-in TTS | `ttssherpa`/sherpa-onnx becomes opt-in behind a build tag; the default binary is pure Go |
+| 21 | Portability | CGO-free desktop cross-compile is a hard goal; it requires removing Wails, retiring `oto`, and gating sherpa |
 
 ## 3. Goals and non-goals
 
@@ -60,6 +62,8 @@ ffmpeg video exporter.
 
 - One pure-Go GUI (`pkg/desktop`) over a transport-free application core.
 - No CGO on desktop; cross-compiled Linux/Windows/macOS artifacts from one host.
+  This requires retiring all three cgo dependencies: Wails, `oto`, and
+  sherpa-onnx (decisions #3, #20, #21, §4.6).
 - One shared theatre view used by both the live window and video export.
 - Node/Vite/npm gone from the build and from `mise.toml`; TUI and daemon gone.
 - Headless, deterministic UI verification (`--png`, golden snapshots).
@@ -69,7 +73,6 @@ ffmpeg video exporter.
 **Non-goals (v1)**
 
 - Mobile (iOS/Android) and web/WASM targets, even though shirei supports them.
-- Replacing `oto`; audio stays exactly as it is until a later, separate step.
 - Voice input / microphone capture; the browser STT path is deleted with the SPA.
 - Full screen-reader support.
 - A daemon/API server of any kind: with the SPA gone there is no first-party
@@ -157,6 +160,27 @@ subcommand, and `pkg/driver` (chromedp). The `--port`, `--socket`, and
 rewritten against the transport-free core or deleted with the handlers they
 test; the underlying `Service` behaviour must keep its coverage.
 
+### 4.6 Pure-Go portability
+
+The default binary must build and cross-compile with `CGO_ENABLED=0`. Three
+cgo dependencies currently prevent this, and each is removed:
+
+- **Wails** (`pkg/application/application_linux.go`, `linux_cgo.go`) — removed
+  in §4.3.
+- **`oto`** (`ebitengine/oto/v3` `context.go` plus cgo `internal/oboe`) — used
+  only by `pkg/media/playback/player.go`; retire it for shirei's
+  `app.StartAudio` + `shirei/audio` mixer, which dlopens ALSA through `purego`
+  (no cgo). The existing `playback` seam stays; only the device backend
+  changes, and speech is downmixed to mono.
+- **sherpa-onnx** (`sherpa-onnx-go-linux/sherpa_onnx.go:46 import "C"`) —
+  imported unconditionally by `pkg/provider/all` → `pkg/provider/ttssherpa`.
+  Gate the provider behind an opt-in build tag (`sherpa`) so the default build
+  omits it. Other TTS providers (native-os, piper, HTTP, Gemini, ElevenLabs)
+  cover the default; local sherpa TTS becomes an opt-in offering.
+
+After all three, `CGO_ENABLED=0 go build ./...` and the `desktop:build`
+cross-compile matrix become the standing portability gate.
+
 ## 5. Shared theatre and export
 
 The payoff decision (grilling #5) is that the live theatre and the video
@@ -240,8 +264,8 @@ Adopt current-Go idioms project-wide, ahead of and during this work:
   Change it to `/localrpg` (root binary only) before adding entry-point code.
 - **mise tasks:** remove `build:frontend`, `dev:frontend`, `test:frontend`;
   `build:backend` no longer depends on the frontend. Add `desktop:build`
-  (linux/amd64+arm64, windows/amd64, darwin/universal) and a `desktop:png`
-  snapshot helper.
+  (linux/amd64+arm64, windows/amd64, darwin/amd64+arm64) and a `desktop:png`
+  snapshot helper. The cross-compile matrix is green only once §4.6 lands.
 - **CLI:** the root command boots the GUI directly; drop the `gui`
   subcommand, `--port`, `--socket`, `--headless`, and the `play`
   subcommand. Root flags: `--dir` (project root) and `--png <path>`
@@ -251,18 +275,19 @@ Adopt current-Go idioms project-wide, ahead of and during this work:
 
 ## 11. Phasing and screen inventory
 
-The SPA is frozen at the start of Phase 2 and used only as a visual reference.
+The SPA is frozen at the start of Phase 3 and used only as a visual reference.
 
 | Phase | Deliverable | Screens / pieces |
 | --- | --- | --- |
-| 0 | Foundations, no user-visible change | vendor+pin shirei; `.gitignore` fix; `pkg/ui` adapter; `pkg/desktop` shell with a `--png` golden test; cross-compile mise tasks; Go-style sweep |
-| 1 | Core split + removals | `BeginTurn(ctx, …)`; move `play.go` reindex/re-resolve into the desktop open path; delete TUI (`pkg/tui`, `play.go`, `play` cmd); delete daemon/HTTP/driver/`debug server`; rewrite or drop handler tests |
-| 2 | First shirei window | root command boots the GUI (`gui` subcommand removed); launcher/hub (`LauncherHub`, `launcher/*`: campaign gallery, hero stage, new-campaign modal, world gallery); drawer shell; app frame; Wails block removed here |
-| 3 | Core loop | Chronicle (`ChronicleView`, `TurnHistoryList`, `TurnSegments`, `SegmentAudioControls`, `DiceCheckCard`, `ActionConsole`, `ProloguePanel`); Codex/`CodexDrawer`; `ContextDrawer`, `GraphDrawer`, `LivingWorldDrawer`, `CharacterSheetDrawer`; `MarkdownProse` |
-| 4 | Settings | `SettingsStudio`, provider/model catalogue, `ModelDownloadModal`, `VoiceCatalogModal`, `VoiceCatalogPicker`, `VoiceCombobox`, `VoiceOptionsControl`, TTS inspect |
-| 5 | Theatre + export | `pkg/theater` shared view; `pkg/desktop/theater` live; `pkg/export/video.go` re-rastered; `ImageLightbox` |
-| 6 | Studios & remaining | `SystemsStudio`, `WorldsStudio`, character creation, asset generation; rewrite `docs/debugging.md` for external OTel collectors |
-| 7 | Teardown | delete `frontend/`, `pkg/gui/assets.go` remnants, Node from mise; drop Wails/TUI/chromedp deps from `go.mod`; final Node-free `go build` |
+| 0 | Foundations, no user-visible change | vendor+pin shirei; `.gitignore` fix; `pkg/ui` adapter; `pkg/desktop` shell with a `--png` golden test; snapshot mise task; Go-style sweep |
+| 1 | Core split + removals | `BeginTurn(ctx, …)`; move `play.go` reindex/re-resolve into the desktop open path; delete TUI (`pkg/tui`, `play.go`, `play` cmd); delete Wails, daemon/HTTP/driver/`debug server`, `pkg/debugger`; rewrite or drop handler tests |
+| 2 | Pure-Go portability | build-tag `ttssherpa`; swap `oto` for shirei audio; `CGO_ENABLED=0 go build ./...` and `desktop:build` cross-compile green |
+| 3 | First shirei window | root command boots the GUI (`gui` subcommand removed); launcher/hub (`LauncherHub`, `launcher/*`: campaign gallery, hero stage, new-campaign modal, world gallery); drawer shell; app frame |
+| 4 | Core loop | Chronicle (`ChronicleView`, `TurnHistoryList`, `TurnSegments`, `SegmentAudioControls`, `DiceCheckCard`, `ActionConsole`, `ProloguePanel`); Codex/`CodexDrawer`; `ContextDrawer`, `GraphDrawer`, `LivingWorldDrawer`, `CharacterSheetDrawer`; `MarkdownProse` |
+| 5 | Settings | `SettingsStudio`, provider/model catalogue, `ModelDownloadModal`, `VoiceCatalogModal`, `VoiceCatalogPicker`, `VoiceCombobox`, `VoiceOptionsControl`, TTS inspect |
+| 6 | Theatre + export | `pkg/theater` shared view; `pkg/desktop/theater` live; `pkg/export/video.go` re-rastered; `ImageLightbox` |
+| 7 | Studios & remaining | `SystemsStudio`, `WorldsStudio`, character creation, asset generation; rewrite `docs/debugging.md` for external OTel collectors |
+| 8 | Teardown | delete `frontend/`, Node from mise; drop Wails/TUI/chromedp deps from `go.mod`; final Node-free, CGO-free `go build` |
 
 ## 12. Testing strategy
 
@@ -276,6 +301,8 @@ The SPA is frozen at the start of Phase 2 and used only as a visual reference.
 - **Scenario DSL** re-platformed onto shirei's UDP drive harness (grilling #7);
   `SHIREI_SNAP_REPORT` can feed the same review tooling as goldens.
 - **`go vet` stays clean**; `any` is now the house style (§9).
+- **CGO-free gate:** `CGO_ENABLED=0 go build ./...` and `mise run desktop:build`
+  must pass. They are red until §4.6 lands and are a required gate thereafter.
 
 ## 13. Risks
 
@@ -286,6 +313,7 @@ The SPA is frozen at the start of Phase 2 and used only as a visual reference.
 | Shared theatre trade-off leaks implicit animation | Medium | explicit `t` model; golden video frames as the test |
 | Shirei a11y weaker than the browser | Medium | accepted non-goal; opportunistic access names |
 | `cmd/localrpg` ignored by `.gitignore` | Medium | fix to `/localrpg` before Phase 0 code |
+| cgo dependencies block the portability goal | High | retire Wails + `oto`, tag-gate sherpa (§4.6); CGO-free build is the gate |
 | TUI deletion loses play-start reindex/re-resolve | Medium | port `play.go:64-97` into the desktop open path in Phase 1 |
 | Handler-test coverage lost with the daemon | Medium | rewrite `Service` tests against the core, not delete them |
 | Loss of in-app debug dashboard | Low | external OTel collectors (otel-desktop-viewer) + `docs/debugging.md` (Phase 6) |
@@ -308,13 +336,15 @@ Modify:
 - `cmd/localrpg/main.go` — no-args boots the GUI instead of printing usage; remove the `gui` case, the `play` subcommand, and their help lines.
 - `cmd/localrpg/debug.go` — remove `server`; re-platform `test-run` off chromedp.
 - `pkg/gui/service.go` — `BeginTurn(ctx, …)`, transport-free; remove NDJSON.
+- `pkg/media/playback/player.go` — device backend switched to shirei audio (§4.6).
+- `pkg/provider/all/all.go`, `pkg/provider/ttssherpa/` — build-tag gating for sherpa (§4.6).
 - `pkg/export/video.go` — rasterise via `pkg/theater` + `RenderToImage`.
 - `pkg/scene/render.go` — retired as rasteriser (kept as model).
 - `docs/debugging.md` — rewritten for external OTel collectors; scenario/CDP docs removed.
 - `.gitignore` — `localrpg` → `/localrpg`.
 - `mise.toml` — Node-free tasks, cross-compile, snapshot helper.
 - `AGENTS.md` — `any`/modern-Go convention; remove TUI/daemon from the description.
-- `go.mod` / `go.sum` / `vendor/` — pin + vendor shirei; drop Wails, TUI, chromedp.
+- `go.mod` / `go.sum` / `vendor/` — pin + vendor shirei; drop Wails, `oto`, TUI, chromedp.
 
 Delete:
 
@@ -330,8 +360,6 @@ Delete:
 2. Do we ever want the WASM target as the "web again" route, or is web
    permanently out of scope?
 3. Should `pkg/gui` be renamed to `pkg/session` once the split settles?
-4. Audio follow-up: shirei's mono device and process-global `StartAudio` mean
-   `playback.Player`'s lazy `Open`/`Available`/`Stop` semantics must be
-   redesigned; schedule as a separate spec after the GUI lands.
-5. Go-style sweep: fold the `interface{}` → `any` change into Phase 0, or land
-   it as its own standalone commit/PR first?
+4. Sherpa opt-in ergonomics: does the tag-gated build need a documented
+   download step for the sherpa shared libraries, or is omitting it entirely
+   acceptable for v1?

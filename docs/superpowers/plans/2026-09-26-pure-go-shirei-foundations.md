@@ -260,14 +260,18 @@ Expected: PASS.
 Run: `go mod tidy`
 Expected: no changes to `go.mod` beyond the shirei requirement and its indirect deps.
 
-- [ ] **Step 6: Vendor and verify a CGO-free build**
+- [ ] **Step 6: Vendor and verify the adapter builds CGO-free**
 
 ```bash
 go mod vendor
-CGO_ENABLED=0 go build ./...
+CGO_ENABLED=0 go build ./pkg/ui
 ```
 
-Expected: `vendor/go.hasen.dev/shirei/` exists; build succeeds.
+Expected: `vendor/go.hasen.dev/shirei/` exists; `./pkg/ui` builds.
+
+Note: `CGO_ENABLED=0 go build ./...` is still red at this point because Wails,
+`oto`, and sherpa-onnx are cgo dependencies that later phases remove (spec
+§4.6). This step only proves shirei and our adapter are cgo-free.
 
 - [ ] **Step 7: Commit**
 
@@ -427,12 +431,16 @@ Expected: PASS, logging `snapshot root: created`. `pkg/desktop/testdata/snapshot
 Run: `go test ./pkg/desktop/ -run TestRootViewSnapshot -v`
 Expected: PASS with status `match` (no `created` log line).
 
-- [ ] **Step 7: Verify build, vet, and the `--png` render path**
+- [ ] **Step 7: Verify build, vet, and CGO-free compilation of the new packages**
 
 Run: `go build ./... && go vet ./...`
 Expected: clean.
 
-Run: `go run ./cmd/localrpg --help` is not expected to change in this plan; instead verify the shell's PNG path compiles by building the test binary above. (The `--png` flag is wired to `desktop.Run` in the next plan.)
+Run: `CGO_ENABLED=0 go build ./pkg/ui ./pkg/desktop`
+Expected: clean. (`./...` remains cgo-bound until spec §4.6 lands.)
+
+The `--png` flag is wired to `desktop.Run` in the next plan; this plan only
+proves the render path compiles.
 
 - [ ] **Step 8: Commit**
 
@@ -453,68 +461,45 @@ Add the desktop build targets and a snapshot-regeneration helper, and record the
 
 **Interfaces:**
 - Consumes: `pkg/desktop` from Task 4.
-- Produces: mise tasks `desktop:build`, `desktop:png`, `desktop:snapshots`.
+- Produces: mise task `desktop:snapshots`.
 
 - [ ] **Step 1: Add the tasks**
 
 Append to `mise.toml`:
 
 ```toml
-[tasks."desktop:build"]
-description = "Cross-compile the desktop GUI for Linux, Windows, and macOS (CGO-free)"
-run = """
-mkdir -p bin
-CGO_ENABLED=0 GOOS=linux   GOARCH=amd64 go build -o bin/localrpg-linux-amd64   ./cmd/localrpg
-CGO_ENABLED=0 GOOS=linux   GOARCH=arm64 go build -o bin/localrpg-linux-arm64   ./cmd/localrpg
-CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o bin/localrpg-windows-amd64.exe ./cmd/localrpg
-CGO_ENABLED=0 GOOS=darwin  GOARCH=amd64 go build -o bin/localrpg-darwin-amd64  ./cmd/localrpg
-CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64 go build -o bin/localrpg-darwin-arm64  ./cmd/localrpg
-"""
-sources = ["cmd/**/*", "pkg/**/*", "go.mod"]
-
-[tasks."desktop:png"]
-description = "Render one frame of the desktop root view to PNG"
-run = "go run ./cmd/localrpg --png /tmp/localrpg-root.png"
-
 [tasks."desktop:snapshots"]
 description = "Regenerate desktop golden snapshots"
 run = "UPDATE_SNAPSHOTS=1 go test ./pkg/desktop/... -run Snapshot -count=1"
 ```
 
-Note: `desktop:png` documents the intended entry flag; it will only work once the next plan wires `--png` into the root command. Until then it is documentation of the target surface.
+`desktop:build` (the CGO-free cross-compile matrix) and `desktop:png` (the root
+`--png` flag) are deliberately deferred: `./cmd/localrpg` still links Wails,
+`oto`, and sherpa-onnx (all cgo) until spec §4.6 and the root-wiring plan land.
 
-- [ ] **Step 2: Verify the cross-compile task**
-
-Run: `mise run desktop:build`
-Expected: five binaries written under `bin/` (which is gitignored), no CGO errors.
-
-Run: `ls -1 bin/localrpg-*`
-Expected: the five binaries listed.
-
-- [ ] **Step 3: Verify the snapshot task**
+- [ ] **Step 2: Verify the snapshot task**
 
 Run: `mise run desktop:snapshots`
-Expected: `pkg/desktop` snapshot tests pass; regenerated golden committed in Task 4 remains valid.
+Expected: `pkg/desktop` snapshot tests pass; the golden committed in Task 4 stays valid.
 
-- [ ] **Step 4: Record the tasks in AGENTS.md**
+- [ ] **Step 3: Record the task in AGENTS.md**
 
 In `AGENTS.md`, in the `## Commands` fenced block, after the existing `mise run clean` line, add:
 
 ```
-mise run desktop:build  # cross-compile localrpg for linux/windows/darwin (CGO-free)
 mise run desktop:snapshots # regenerate shirei golden snapshots in pkg/desktop
 ```
 
-- [ ] **Step 5: Verify the full test gate**
+- [ ] **Step 4: Verify the full test gate**
 
 Run: `mise run test`
 Expected: `go test -v -count=1 ./...` passes; the frontend type check still passes (the SPA is untouched in this plan).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add mise.toml AGENTS.md
-git commit -m "build(gui): add desktop cross-compile and snapshot tasks"
+git commit -m "build(gui): add desktop snapshot task"
 ```
 
 ---
@@ -529,7 +514,8 @@ git commit -m "build(gui): add desktop cross-compile and snapshot tasks"
 | `.gitignore` fix | Task 1 |
 | `pkg/ui` adapter | Task 3 (theme + boot), Task 4 (snapshot) |
 | `pkg/desktop` shell with a `--png` golden test | Task 4 (shell + golden); `--png` CLI wiring deferred to the next plan by design |
-| cross-compile mise tasks | Task 5 |
+| desktop snapshot mise task | Task 5 |
+| cross-compile mise task | deferred to the portability plan (spec Phase 2); `./cmd/localrpg` is cgo-bound until §4.6 |
 | Go-style sweep | Task 2 |
 | "no user-visible change" | No `cmd/localrpg` behaviour is touched; Wails keeps running the app |
 
@@ -537,4 +523,4 @@ git commit -m "build(gui): add desktop cross-compile and snapshot tasks"
 
 **Type consistency:** `ui.Palette`/`ui.DefaultPalette`/`ui.Run`/`ui.Snapshot` are defined once and used with the same names in Tasks 3–4. `desktop.Config`/`desktop.Run`/`desktop.RootView` are defined in Task 4 and referenced consistently in Task 5. `shirei.Vec4`, `shirei.FrameFn`, `shirei.Snapshot`, and the `Snap*` status constants are taken verbatim from the vendored `v0.8.0` source.
 
-**Known deferrals (not gaps):** wiring `desktop.Run` into the root command, deleting Wails, the core split, and screen ports are the next four plans.
+**Known deferrals (not gaps):** wiring `desktop.Run` into the root command, deleting Wails, the core split, the portability work (sherpa gating + oto retirement), and screen ports are the later plans.
