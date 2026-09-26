@@ -6,7 +6,7 @@
 // as the player, so it owns the device and is free of that restriction.
 //
 // Clips are decoded on demand by the audio device's callback and never
-// materialised twice: the cache keeps its small MP3s, and mp3 or wav is decoded
+// materialised twice: the cache stores every clip as Ogg/Opus, and it is decoded
 // straight into the output buffer as it is consumed.
 package playback
 
