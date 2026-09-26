@@ -116,10 +116,10 @@ func TestPipelineKeyFollowsVoiceOptions(t *testing.T) {
 	if _, err := pipeline.SynthesizeUtterance(context.Background(), "speaker", low, "hello"); err != nil {
 		t.Fatalf("SynthesizeUtterance: %v", err)
 	}
-	if !cache.Exists("audio", lowKey+".wav") && !cache.Exists("audio", lowKey+".mp3") {
+	if !cache.Exists("audio", lowKey+".opus") {
 		t.Errorf("expected a clip stored under the low-options key %q", lowKey)
 	}
-	if cache.Exists("audio", highKey+".wav") || cache.Exists("audio", highKey+".mp3") {
+	if cache.Exists("audio", highKey+".opus") {
 		t.Errorf("a second options set must not share the first clip")
 	}
 }

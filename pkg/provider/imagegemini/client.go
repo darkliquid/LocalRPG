@@ -114,6 +114,9 @@ func (g *GeminiImageClient) generateGeminiImage(ctx context.Context, prompt stri
 		ResponseModalities: []string{"IMAGE"},
 		ImageConfig:        imgCfg,
 	}
+	// Some image models require text output alongside the image, and some reject
+	// per-model image options; this fallback covers both.
+	fallbackCfg := &genai.GenerateContentConfig{ResponseModalities: []string{"TEXT", "IMAGE"}}
 
 	contents := []*genai.Content{
 		{
@@ -125,22 +128,61 @@ func (g *GeminiImageClient) generateGeminiImage(ctx context.Context, prompt stri
 	}
 
 	resp, err := g.client.Models.GenerateContent(ctx, g.model, contents, reqCfg)
+	if err != nil && imgCfg.AspectRatio != "" && isUnsupportedImageOption(err) {
+		// Model-specific options (such as an aspect ratio a given image model does
+		// not accept) are worth dropping rather than failing the generation.
+		resp, err = g.client.Models.GenerateContent(ctx, g.model, contents, fallbackCfg)
+	}
 	if err != nil {
 		return nil, mapGeminiImageError(err)
 	}
+	if data := firstImageBytes(resp); data != nil {
+		return data, nil
+	}
 
+	// The image may have been withheld because the model also wanted text output.
+	resp, err = g.client.Models.GenerateContent(ctx, g.model, contents, fallbackCfg)
+	if err != nil {
+		return nil, mapGeminiImageError(err)
+	}
+	if data := firstImageBytes(resp); data != nil {
+		return data, nil
+	}
+
+	return nil, errors.New("gemini image: no image data found in response candidates")
+}
+
+// firstImageBytes returns the first inline image in a response, or nil.
+func firstImageBytes(resp *genai.GenerateContentResponse) []byte {
+	if resp == nil {
+		return nil
+	}
 	for _, cand := range resp.Candidates {
 		if cand.Content == nil {
 			continue
 		}
 		for _, part := range cand.Content.Parts {
 			if part.InlineData != nil && len(part.InlineData.Data) > 0 {
-				return part.InlineData.Data, nil
+				return part.InlineData.Data
 			}
 		}
 	}
+	return nil
+}
 
-	return nil, errors.New("gemini image: no image data found in response candidates")
+// isUnsupportedImageOption reports whether an image error names a rejected
+// request option, which is model-specific and worth retrying without.
+func isUnsupportedImageOption(err error) bool {
+	msg := strings.ToLower(err.Error())
+	for _, marker := range []string{
+		"aspect", "image_config", "imageconfig", "invalid_argument",
+		"unknown name", "unsupported", "cannot find field", "not supported",
+	} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func mapGeminiImageError(err error) error {

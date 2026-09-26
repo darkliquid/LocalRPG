@@ -1715,6 +1715,7 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
+	pipeline.SetOpusBitrate(cfg.OpusBitrate())
 	isForce := len(force) > 0 && force[0]
 	return pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
 }
@@ -1795,6 +1796,7 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 	narratorVoice := s.narratorVoiceFor(gameID, cfg)
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
+	pipeline.SetOpusBitrate(cfg.OpusBitrate())
 
 	voiceFor := s.voiceFor(gameID)
 	for _, turn := range turns {

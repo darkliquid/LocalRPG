@@ -155,6 +155,9 @@ type TTSConfig struct {
 	Options map[string]interface{} `yaml:"options,omitempty" json:"options,omitempty"`
 	// SpeechCues configures vocal performance steering tags and transcript display.
 	SpeechCues SpeechCuesConfig `yaml:"speech_cues,omitempty" json:"speech_cues,omitempty"`
+	// OpusBitrate is the target bitrate for stored Ogg/Opus clips, in bits per
+	// second. Zero means the default.
+	OpusBitrate int `yaml:"opus_bitrate,omitempty" json:"opus_bitrate,omitempty"`
 }
 
 // SpeechCuesConfig controls how vocal acting and steering hints are used and rendered.
@@ -570,6 +573,22 @@ func (c *Config) ContinuityChecks() bool {
 // The default is on, so a configuration that never mentions it keeps echoing.
 func (c *Config) ActionEcho() bool {
 	return c.Agents.ActionEcho == nil || *c.Agents.ActionEcho
+}
+
+// OpusBitrate is the bitrate stored speech is encoded at, defaulted and clamped
+// to Opus's accepted range.
+func (c *Config) OpusBitrate() int {
+	bitrate := c.Media.TTS.OpusBitrate
+	switch {
+	case bitrate <= 0:
+		return 32000
+	case bitrate < 6000:
+		return 6000
+	case bitrate > 510000:
+		return 510000
+	default:
+		return bitrate
+	}
 }
 
 // CompletionMode is the recovery policy: "auto", "continue", "trim", or "off".

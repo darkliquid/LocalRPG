@@ -14,7 +14,7 @@ type mockCueClient struct {
 }
 
 func (m *mockCueClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
-	return []byte("audio"), nil
+	return GenerateToneWAV(440, 0.02), nil
 }
 
 func (m *mockCueClient) SpeechCueCapabilities() SpeechCueCapabilities {

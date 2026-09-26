@@ -57,6 +57,7 @@ func handleTTSCommand(args []string) {
 	}
 
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(cfg.Paths.Cache))
+	pipeline.SetOpusBitrate(cfg.OpusBitrate())
 	path, err := pipeline.SynthesizeUtterance(context.Background(), "cli", voiceCfg, text)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error synthesizing: %v\n", err)

@@ -232,7 +232,14 @@ func (c *GeminiTTSClient) Synthesize(ctx context.Context, text string, voice *en
 
 	for _, part := range cand.Content.Parts {
 		if part.InlineData != nil && len(part.InlineData.Data) > 0 {
-			return part.InlineData.Data, nil
+			data := part.InlineData.Data
+			// Gemini TTS returns headerless PCM ("audio/L16;..."). Wrap it so a
+			// decoder or browser can play it; an already-containerised clip (some
+			// models return WAV) is passed through unchanged.
+			if media.IsPCMAudio(part.InlineData.MIMEType) {
+				return media.WrapPCMAsWAV(data, media.PCMSampleRate(part.InlineData.MIMEType)), nil
+			}
+			return data, nil
 		}
 	}
 

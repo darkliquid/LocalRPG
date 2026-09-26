@@ -37,7 +37,9 @@ func (d *disabledImageClient) GenerateImage(ctx context.Context, prompt string) 
 type echoTTSClient struct{}
 
 func (e *echoTTSClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
-	return []byte("RIFF....WAVEfmt ....data" + text), nil
+	// A real, decodable tone: the pipeline normalises every clip to Opus, so the
+	// built-in probe must return valid PCM rather than a placeholder string.
+	return GenerateToneWAV(440, 0.1), nil
 }
 
 type echoSTTClient struct{}

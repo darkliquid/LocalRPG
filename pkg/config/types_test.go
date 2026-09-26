@@ -450,3 +450,22 @@ func TestActionEchoDefaultsOn(t *testing.T) {
 		t.Fatal("ActionEcho() should honour an explicit true")
 	}
 }
+
+func TestOpusBitrateDefaultsAndClamps(t *testing.T) {
+	cfg := DefaultConfig()
+	if got := cfg.OpusBitrate(); got != 32000 {
+		t.Fatalf("OpusBitrate() = %d, want the default 32000", got)
+	}
+	cfg.Media.TTS.OpusBitrate = 48000
+	if got := cfg.OpusBitrate(); got != 48000 {
+		t.Fatalf("OpusBitrate() = %d, want 48000", got)
+	}
+	cfg.Media.TTS.OpusBitrate = 1
+	if got := cfg.OpusBitrate(); got != 6000 {
+		t.Fatalf("OpusBitrate() = %d, want the clamp floor 6000", got)
+	}
+	cfg.Media.TTS.OpusBitrate = 999999
+	if got := cfg.OpusBitrate(); got != 510000 {
+		t.Fatalf("OpusBitrate() = %d, want the clamp ceiling 510000", got)
+	}
+}

@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -16,29 +18,29 @@ import (
 	"github.com/darkliquid/localrpg/pkg/dialogue"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/media/opus"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 // narratorSpeaker is the cache namespace for lines read in the narrator voice.
 const narratorSpeaker = "narrator"
 
-// audioExtensions are the names a cached clip may carry, in the order they are
-// looked for. The legacy .wav name is last so a cache written before clips were
-// named honestly stays warm.
-var audioExtensions = []string{".mp3", ".ogg", ".flac", ".wav"}
+// audioExtensions are the names a cached clip may carry. Every clip is stored as
+// Ogg/Opus, so there is exactly one.
+var audioExtensions = []string{".opus"}
 
 // AudioExtension names a clip from its bytes, because a provider returns whatever
 // its engine produces rather than what the configuration implies.
 func AudioExtension(data []byte) string {
 	switch {
+	case bytes.HasPrefix(data, []byte("OggS")):
+		return ".opus"
 	case bytes.HasPrefix(data, []byte("RIFF")):
 		return ".wav"
 	case bytes.HasPrefix(data, []byte("ID3")):
 		return ".mp3"
 	case len(data) > 1 && data[0] == 0xFF && data[1]&0xE0 == 0xE0:
 		return ".mp3"
-	case bytes.HasPrefix(data, []byte("OggS")):
-		return ".ogg"
 	case bytes.HasPrefix(data, []byte("fLaC")):
 		return ".flac"
 	default:
@@ -49,6 +51,8 @@ func AudioExtension(data []byte) string {
 // AudioContentType is the MIME type for a clip's bytes.
 func AudioContentType(data []byte) string {
 	switch AudioExtension(data) {
+	case ".opus":
+		return "audio/ogg"
 	case ".mp3":
 		return "audio/mpeg"
 	case ".ogg":
@@ -129,10 +133,20 @@ func ResolveSpeechCueCapabilities(cfg config.TTSConfig, client TTSClient) Speech
 }
 
 type TTSPipeline struct {
-	client TTSClient
-	cache  *ContentCache
-	logger trace.Logger
-	policy TextPolicy
+	client      TTSClient
+	cache       *ContentCache
+	logger      trace.Logger
+	policy      TextPolicy
+	opusBitrate int
+}
+
+// SetOpusBitrate selects the on-disk Opus bitrate. Out-of-range values fall back
+// to the default.
+func (p *TTSPipeline) SetOpusBitrate(bitrate int) {
+	if bitrate < opus.MinBitrate || bitrate > opus.MaxBitrate {
+		bitrate = opus.DefaultBitrate
+	}
+	p.opusBitrate = bitrate
 }
 
 // SetLogger attaches a trace sink. A nil logger records nothing.
@@ -236,8 +250,9 @@ func (p *TTSPipeline) CountUncached(segments []entity.TurnSegment, narratorVoice
 
 func NewTTSPipeline(client TTSClient, cache *ContentCache) *TTSPipeline {
 	return &TTSPipeline{
-		client: client,
-		cache:  cache,
+		client:      client,
+		cache:       cache,
+		opusBitrate: opus.DefaultBitrate,
 	}
 }
 
@@ -304,19 +319,38 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 		}
 	}
 
+	// Normalise whatever the provider returned into Ogg/Opus, so the cache holds
+	// exactly one format and playback decodes one codec.
+	pcm, inRate, inChannels, decodeErr := DecodeProviderAudio(audioBytes, "")
+	if decodeErr != nil {
+		return "", &harness.GenerationFailure{
+			Code:    harness.FailureProviderError,
+			Message: fmt.Sprintf("normalise speech: %v", decodeErr),
+			Cause:   decodeErr,
+		}
+	}
+	encoded, encodeErr := opus.Encode(pcm, inRate, inChannels, p.opusBitrate)
+	if encodeErr != nil {
+		return "", &harness.GenerationFailure{
+			Code:    harness.FailureProviderError,
+			Message: fmt.Sprintf("encode speech: %v", encodeErr),
+			Cause:   encodeErr,
+		}
+	}
+
 	mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "miss")))
-	mediaMetrics().ttsBytes.Record(ctx, int64(len(audioBytes)), otelmetric.WithAttributes(attribute.String("localrpg.tts.provider", provider)))
+	mediaMetrics().ttsBytes.Record(ctx, int64(len(encoded)), otelmetric.WithAttributes(attribute.String("localrpg.tts.provider", provider)))
 	mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
 		otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", false)))
 
 	p.logger.Event("media.tts.result", map[string]interface{}{
 		"cache_hit":    false,
-		"bytes":        len(audioBytes),
-		"content_type": AudioContentType(audioBytes),
+		"bytes":        len(encoded),
+		"content_type": "audio/ogg",
 		"duration_ms":  time.Since(start).Milliseconds(),
 	})
 
-	return p.cache.Put("audio", base+AudioExtension(audioBytes), audioBytes)
+	return p.cache.Put("audio", base+".opus", encoded)
 }
 
 // cachedClip finds a clip under any known extension, so a cache written under an
@@ -324,8 +358,40 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 func (p *TTSPipeline) cachedClip(base string) (string, bool) {
 	for _, ext := range audioExtensions {
 		if p.cache.Exists("audio", base+ext) {
-			return filepath.Join(p.cache.Subdir("audio"), base+ext), true
+			path := filepath.Join(p.cache.Subdir("audio"), base+ext)
+			if !clipHasValidHeader(path, ext) {
+				// A clip written before format sniffing (or by a provider that
+				// changed its output) would fail to decode; drop it so it is
+				// re-synthesized rather than served as broken audio.
+				_ = os.Remove(path)
+				continue
+			}
+			return path, true
 		}
 	}
 	return "", false
+}
+
+// clipHasValidHeader reports whether a cached clip's leading bytes match its
+// extension, so a headerless or mistyped file is never served as audio.
+func clipHasValidHeader(path, ext string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	head := make([]byte, 12)
+	n, _ := io.ReadFull(f, head)
+	if n < 4 {
+		return false
+	}
+	head = head[:n]
+
+	switch ext {
+	case ".opus":
+		return bytes.HasPrefix(head, []byte("OggS"))
+	default:
+		return false
+	}
 }

@@ -47,7 +47,7 @@ type markdownFake struct {
 
 func (m *markdownFake) Synthesize(_ context.Context, text string, _ *entity.VoiceConfig) ([]byte, error) {
 	m.got = append(m.got, text)
-	return []byte("RIFF" + text), nil
+	return GenerateToneWAV(440, 0.02), nil
 }
 
 func (m *markdownFake) SupportsMarkdown() bool { return m.aware }

@@ -136,6 +136,7 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 			cache := media.NewContentCache(c.resolver.CacheDir())
 			pipeline := media.NewTTSPipeline(client, cache)
 			pipeline.SetTextPolicy(media.TextPolicyFromConfig(c.config.Media.TTS))
+			pipeline.SetOpusBitrate(c.config.OpusBitrate())
 			compiler.SetSpeechResolver(&speechResolver{
 				pipeline: pipeline,
 				store:    store,

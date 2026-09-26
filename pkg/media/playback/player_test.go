@@ -1,8 +1,6 @@
 package playback
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
 	"math"
 	"os"
@@ -11,55 +9,29 @@ import (
 	"testing"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/media/opus"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
-// writeToneWAV lays down a mono 16-bit WAV, which is the shape the decoder reads.
+// writeToneWAV lays down a mono Ogg/Opus clip, which is the shape the player reads.
 func writeToneWAV(t *testing.T, dir, name string, sampleRate int, duration time.Duration) string {
 	t.Helper()
 
 	frameCount := int(float64(sampleRate) * duration.Seconds())
-
-	pcm := bytes.Buffer{}
-	for frame := 0; frame < frameCount; frame++ {
-		sample := int16(math.Sin(2*math.Pi*330*float64(frame)/float64(sampleRate)) * 0.3 * 32767)
-		if err := binary.Write(&pcm, binary.LittleEndian, sample); err != nil {
-			t.Fatal(err)
-		}
+	pcm := make([]int16, frameCount)
+	for frame := range pcm {
+		pcm[frame] = int16(math.Sin(2*math.Pi*330*float64(frame)/float64(sampleRate)) * 0.3 * 32767)
 	}
 
+	data, err := opus.Encode(pcm, sampleRate, 1, opus.DefaultBitrate)
+	if err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, wrapPCMAsWAV(pcm.Bytes(), 1, sampleRate, 16), 0644); err != nil {
+	if err := os.WriteFile(path, data, 0644); err != nil {
 		t.Fatal(err)
 	}
 	return path
-}
-
-// wrapPCMAsWAV builds a WAV container around raw PCM. It exists so the tests can
-// produce input without a fixture file.
-func wrapPCMAsWAV(pcm []byte, channels, sampleRate, bitsPerSample int) []byte {
-	blockAlign := channels * bitsPerSample / 8
-	byteRate := sampleRate * blockAlign
-
-	var buf bytes.Buffer
-	buf.WriteString("RIFF")
-	_ = binary.Write(&buf, binary.LittleEndian, uint32(36+len(pcm)))
-	buf.WriteString("WAVE")
-
-	buf.WriteString("fmt ")
-	_ = binary.Write(&buf, binary.LittleEndian, uint32(16))
-	_ = binary.Write(&buf, binary.LittleEndian, uint16(1))
-	_ = binary.Write(&buf, binary.LittleEndian, uint16(channels))
-	_ = binary.Write(&buf, binary.LittleEndian, uint32(sampleRate))
-	_ = binary.Write(&buf, binary.LittleEndian, uint32(byteRate))
-	_ = binary.Write(&buf, binary.LittleEndian, uint16(blockAlign))
-	_ = binary.Write(&buf, binary.LittleEndian, uint16(bitsPerSample))
-
-	buf.WriteString("data")
-	_ = binary.Write(&buf, binary.LittleEndian, uint32(len(pcm)))
-	buf.Write(pcm)
-
-	return buf.Bytes()
 }
 
 var (

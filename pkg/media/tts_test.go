@@ -2,7 +2,6 @@ package media
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -18,7 +17,7 @@ type formatTTSClient struct {
 
 func (c *formatTTSClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
 	c.calls++
-	return []byte("ID3\x04\x00" + text), nil
+	return GenerateToneWAV(440, 0.02), nil
 }
 
 func TestAudioExtensionSniffsTheBytes(t *testing.T) {
@@ -26,7 +25,7 @@ func TestAudioExtensionSniffsTheBytes(t *testing.T) {
 		"RIFF....WAVEfmt ":           ".wav",
 		"ID3\x04\x00":                ".mp3",
 		"\xff\xfb\x90\x00":           ".mp3",
-		"OggS\x00\x02":               ".ogg",
+		"OggS\x00\x02":               ".opus",
 		"fLaC\x00\x00":               ".flac",
 		"surprise bytes from a host": ".wav",
 	}
@@ -51,7 +50,7 @@ func TestAudioExtensionSniffsTheBytes(t *testing.T) {
 	}
 }
 
-func TestSynthesizeUtteranceReusesALegacyWavNamedClip(t *testing.T) {
+func TestSynthesizeUtteranceReusesTheCachedClip(t *testing.T) {
 	client := &recordingTTSClient{}
 	cache := NewContentCache(t.TempDir())
 	pipeline := NewTTSPipeline(client, cache)
@@ -61,22 +60,16 @@ func TestSynthesizeUtteranceReusesALegacyWavNamedClip(t *testing.T) {
 		t.Fatalf("SynthesizeUtterance failed: %v", err)
 	}
 
-	// A cache written before clips were named honestly still holds a .wav, and a
-	// second run must reuse it rather than synthesising again.
-	data, err := os.ReadFile(first)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(first, data, 0644); err != nil {
-		t.Fatal(err)
-	}
-
+	// A second run reuses the cached Opus clip rather than synthesising again.
 	second, err := pipeline.SynthesizeUtterance(context.Background(), "narrator", nil, "hello")
 	if err != nil {
 		t.Fatalf("second SynthesizeUtterance failed: %v", err)
 	}
 	if second != first {
 		t.Errorf("expected the cached clip %q, got %q", first, second)
+	}
+	if filepath.Ext(first) != ".opus" {
+		t.Errorf("clip path = %q, want an .opus name", first)
 	}
 	if client.calls != 1 {
 		t.Errorf("expected 1 synthesis call, got %d", client.calls)
@@ -92,8 +85,8 @@ func TestSynthesizeUtteranceNamesAClipFromItsBytes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SynthesizeUtterance failed: %v", err)
 	}
-	if ext := filepath.Ext(path); ext != ".mp3" {
-		t.Errorf("clip path = %q, want an .mp3 name for MP3 bytes", path)
+	if ext := filepath.Ext(path); ext != ".opus" {
+		t.Errorf("clip path = %q, want an .opus name for normalised audio", path)
 	}
 
 	// The honest name is found on the next run, so nothing is regenerated.
@@ -119,7 +112,7 @@ func (m *mockTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 	if voice != nil {
 		m.lastVoice = voice.VoiceID
 	}
-	return []byte("mock-wav-bytes"), nil
+	return GenerateToneWAV(440, 0.01), nil
 }
 
 type recordingTTSClient struct {
@@ -130,7 +123,7 @@ type recordingTTSClient struct {
 func (c *recordingTTSClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
 	c.calls++
 	c.lastVoice = voice
-	return []byte("RIFF" + text), nil
+	return GenerateToneWAV(440, 0.02), nil
 }
 
 func TestLegacySegmentsKeepProseAndAttributeObviousSpeakers(t *testing.T) {
@@ -215,7 +208,7 @@ func (t *testTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 	if t.onSynthesize != nil {
 		return t.onSynthesize(ctx, text, voice)
 	}
-	return []byte("test-wav"), nil
+	return GenerateToneWAV(440, 0.01), nil
 }
 
 func TestTTSPipeline_PerCharacterVoiceAndSpeed(t *testing.T) {
@@ -226,7 +219,7 @@ func TestTTSPipeline_PerCharacterVoiceAndSpeed(t *testing.T) {
 	client := &testTTSClient{
 		onSynthesize: func(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
 			lastSynthesizedVoice = voice
-			return []byte("WAV_DATA_FOR_" + text), nil
+			return GenerateToneWAV(440, 0.02), nil
 		},
 	}
 

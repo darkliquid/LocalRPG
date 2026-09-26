@@ -20,11 +20,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/media/opus"
 	"github.com/darkliquid/localrpg/pkg/trace"
 	"github.com/ebitengine/oto/v3"
 	"github.com/gopxl/beep"
-	beepmp3 "github.com/gopxl/beep/mp3"
-	beepwav "github.com/gopxl/beep/wav"
 )
 
 // ErrUnavailable means this process has no usable audio device, so a caller
@@ -313,62 +312,38 @@ func (sr *streamerReader) Read(p []byte) (int, error) {
 	return n * 4, nil
 }
 
-// decodeFile opens a clip and returns a streamer that decodes it lazily. The
-// returned closer owns the file and must outlive the streamer.
+// decodeFile reads a clip and returns a streamer over its decoded 48 kHz stereo
+// samples. Every stored clip is Ogg/Opus, so there is one decode path.
 func decodeFile(path string) (beep.Streamer, io.Closer, error) {
-	file, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	_, isMP3, err := sniff(file)
+	pcm, _, _, err := opus.Decode(data)
 	if err != nil {
-		_ = file.Close()
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("%w: %v", ErrUnsupportedFormat, err)
 	}
-
-	var decoded beep.StreamSeekCloser
-	var format beep.Format
-	if isMP3 {
-		decoded, format, err = beepmp3.Decode(file)
-	} else {
-		decoded, format, err = beepwav.Decode(file)
-	}
-	if err != nil {
-		_ = file.Close()
-		return nil, nil, err
-	}
-
-	var streamer beep.Streamer = decoded
-	if format.SampleRate != deviceSampleRate {
-		streamer = beep.Resample(resampleQuality, format.SampleRate, deviceSampleRate, decoded)
-	}
-	return streamer, file, nil
+	return &opusStreamer{data: pcm}, nil, nil
 }
 
-// sniff identifies the container and rewinds the file for the decoder.
-func sniff(file *os.File) (beep.Format, bool, error) {
-	header := make([]byte, 4)
-	n, err := io.ReadFull(file, header)
-	if err != nil && n == 0 {
-		return beep.Format{}, false, fmt.Errorf("read clip header: %w", err)
-	}
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return beep.Format{}, false, fmt.Errorf("rewind clip: %w", err)
-	}
-
-	head := header[:n]
-	switch {
-	case len(head) >= 4 && string(head) == "RIFF":
-		return beep.Format{}, false, nil
-	case len(head) >= 3 && string(head[:3]) == "ID3":
-		return beep.Format{}, true, nil
-	case len(head) >= 2 && head[0] == 0xFF && head[1]&0xE0 == 0xE0:
-		return beep.Format{}, true, nil
-	default:
-		return beep.Format{}, false, ErrUnsupportedFormat
-	}
+// opusStreamer presents decoded mono 48 kHz PCM as the stereo frames beep expects.
+type opusStreamer struct {
+	data []int16
+	pos  int
 }
+
+func (s *opusStreamer) Stream(samples [][2]float64) (int, bool) {
+	n := 0
+	for n < len(samples) && s.pos < len(s.data) {
+		f := float64(s.data[s.pos]) / 32768
+		samples[n] = [2]float64{f, f}
+		s.pos++
+		n++
+	}
+	return n, s.pos < len(s.data)
+}
+
+func (s *opusStreamer) Err() error { return nil }
 
 func closeAll(closers []io.Closer) {
 	for _, closer := range closers {

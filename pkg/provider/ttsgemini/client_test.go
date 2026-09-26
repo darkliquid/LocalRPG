@@ -167,3 +167,62 @@ func TestGeminiTTSSynthesize(t *testing.T) {
 		t.Errorf("expected .wav audio extension, got %s", ext)
 	}
 }
+
+func TestGeminiTTSWrapsPCM(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Gemini returns headerless L16 PCM for some TTS models.
+		fmt.Fprint(w, `{
+			"candidates": [
+				{
+					"content": {
+						"parts": [
+							{
+								"inlineData": {
+									"data": "AQIDBA==",
+									"mimeType": "audio/L16;codec=pcm;rate=24000"
+								}
+							}
+						],
+						"role": "model"
+					}
+				}
+			]
+		}`)
+	}))
+	defer server.Close()
+
+	genaiClient, err := genai.NewClient(context.Background(), &genai.ClientConfig{
+		APIKey:     "test-key",
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: server.Client(),
+		HTTPOptions: genai.HTTPOptions{
+			BaseURL: server.URL,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create genai client: %v", err)
+	}
+
+	ttsClient, err := ttsgemini.NewGeminiTTSClientWithClient(genaiClient, config.TTSConfig{
+		Model:        "gemini-2.5-flash-preview-tts",
+		DefaultVoice: "Aoede",
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiTTSClientWithClient: %v", err)
+	}
+
+	audio, err := ttsClient.Synthesize(context.Background(), "Hello", nil)
+	if err != nil {
+		t.Fatalf("Synthesize failed: %v", err)
+	}
+	if !strings.HasPrefix(string(audio), "RIFF") {
+		t.Fatalf("expected raw PCM to be wrapped in a WAV container")
+	}
+	if len(audio) != 44+4 {
+		t.Fatalf("length = %d, want %d", len(audio), 44+4)
+	}
+	if ext := media.AudioExtension(audio); ext != ".wav" {
+		t.Fatalf("extension = %q, want .wav", ext)
+	}
+}
