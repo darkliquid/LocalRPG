@@ -96,8 +96,9 @@ func (e *submissionError) Error() string {
 
 // validateSubmission audits a structured turn against the checks it resolved.
 // declaredStats is the mechanics schema's declared stats (nil when the system
-// declares none, in which case any state path is allowed).
-func validateSubmission(sub *harness.TurnSubmission, checks []harness.CheckResult, declaredStats map[string]core.StatSpec) error {
+// declares none, in which case any state path is allowed). proposed is the
+// player's explicit roll, when this turn had one.
+func validateSubmission(sub *harness.TurnSubmission, checks []harness.CheckResult, declaredStats map[string]core.StatSpec, proposed *harness.ProposedCheck) error {
 	if sub == nil {
 		return &submissionError{Code: "no_submission", Detail: "empty submission"}
 	}
@@ -137,6 +138,22 @@ func validateSubmission(sub *harness.TurnSubmission, checks []harness.CheckResul
 	for _, dismissed := range sub.DismissedChecks {
 		if strings.TrimSpace(dismissed.Reason) == "" {
 			return &submissionError{Code: "unjustified_dismissal", Detail: dismissed.CheckRef}
+		}
+	}
+
+	// A player's explicit roll must be answered: either a check resolves it, or
+	// the GM dismisses that exact proposal with a reason. An impossible action
+	// needs no roll, so it is exempt.
+	if proposed != nil && sub.Verdict.Feasibility != harness.FeasibilityImpossible {
+		resolved := len(checks) > 0
+		dismissed := false
+		for _, entry := range sub.DismissedChecks {
+			if entry.CheckRef == proposed.Ref && strings.TrimSpace(entry.Reason) != "" {
+				dismissed = true
+			}
+		}
+		if !resolved && !dismissed {
+			return &submissionError{Code: "unresolved_proposed_check", Detail: proposed.Ref}
 		}
 	}
 

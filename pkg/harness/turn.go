@@ -98,6 +98,15 @@ type DismissedCheck struct {
 	Reason   string `json:"reason"`
 }
 
+// ProposedCheck is a player's explicit request to roll, carried as structured
+// data so the engine can require the GM to resolve or dismiss it. Ref is the
+// stable id the GM references in dismissed_checks.
+type ProposedCheck struct {
+	Ref         string `json:"ref"`
+	Actor       string `json:"actor,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
 // TurnSubmission is the terminal payload the GM authors for one turn.
 type TurnSubmission struct {
 	Verdict         ActionVerdict     `json:"action_verdict"`

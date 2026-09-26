@@ -443,6 +443,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	var rollRes *rules.RollResult
 	var outcome string
 	var gmDirective string
+	var proposedCheck *harness.ProposedCheck
 	generationPrompt := actionInput
 
 	// The outcome is only known later, so it is attached at return along with
@@ -563,13 +564,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		gmDirective = fmt.Sprintf("[DIRECTOR CORRECTION DIRECTIVE: %s]", directiveText)
 	} else if !isOpening && strings.EqualFold(mode, "Roll") {
 		// A player-initiated roll is a proposal, not an executed result: the GM
-		// either adopts it with request_check or dismisses it, and its decision is
-		// authoritative. This is the player pre-empting being asked to roll.
-		proposed := strings.TrimSpace(actionInput)
-		if proposed == "" {
-			proposed = "a check"
+		// either adopts it with request_check or dismisses it. It is carried as
+		// structured data so the submission can be held to that.
+		proposal := strings.TrimSpace(actionInput)
+		if proposal == "" {
+			proposal = "a check"
 		}
-		gmDirective = fmt.Sprintf("[PROPOSED CHECK: %s by %s]", proposed, o.playerID)
+		proposedCheck = &harness.ProposedCheck{Ref: "player-roll", Actor: o.playerID, Description: proposal}
+		gmDirective = fmt.Sprintf("[PROPOSED CHECK: %s by %s (ref: %s)]", proposal, o.playerID, proposedCheck.Ref)
 	} else if !isOpening && o.rulesEngine != nil {
 		// Run action through mechanics hook if available
 		res, err := o.rulesEngine.ExecuteAction(strings.ToLower(mode), map[string]interface{}{
@@ -682,7 +684,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	turnSpan.SetAttributes(attribute.String("turn.assembled_prompt", assembly.Prompt))
-	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, onChunk)
+	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, proposedCheck, onChunk)
 	if err != nil {
 		outcome = "error"
 		turnSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
@@ -1231,7 +1233,7 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 // answer. The result is the last reply that carried no tool calls. With no
 // executor attached the loop makes exactly one call, shaped as it was before
 // tools existed, so nothing changes for a provider that cannot call them.
-func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harness.AssembleResult, gmDirective string, onChunk func(string) error) (streamResult, error) {
+func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harness.AssembleResult, gmDirective string, proposed *harness.ProposedCheck, onChunk func(string) error) (streamResult, error) {
 	contextPrompt := assembly.Prompt
 	if gmDirective != "" {
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
@@ -1523,7 +1525,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
 						continue
 					}
-					if vErr := validateSubmission(sub, checks, o.declaredStats); vErr != nil {
+					if vErr := validateSubmission(sub, checks, o.declaredStats, proposed); vErr != nil {
 						o.logger.Event("turn.protocol_error", map[string]interface{}{"detail": vErr.Error()})
 						submitAttempts++
 						if submitAttempts >= 2 {
