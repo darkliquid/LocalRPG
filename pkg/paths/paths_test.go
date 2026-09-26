@@ -1,6 +1,7 @@
 package paths
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -66,5 +67,21 @@ func TestResolveProjectMode(t *testing.T) {
 	abs := filepath.Join(root, "elsewhere", "systems")
 	if got := Resolve(bases, config.PathsConfig{Systems: abs}, root).Systems; got != abs {
 		t.Errorf("absolute wins in project mode: %q", got)
+	}
+}
+
+func TestLegacyWarningPointsAtTheWorkingDirectory(t *testing.T) {
+	base := Bases{Data: filepath.Join(t.TempDir(), "data"), Cache: filepath.Join(t.TempDir(), "cache")}
+	if got := LegacyWarning(base, config.PathsConfig{}); got != "" {
+		t.Fatalf("no legacy directory exists, got %q", got)
+	}
+
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "systems"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	if got := LegacyWarning(base, config.PathsConfig{}); got == "" {
+		t.Fatal("expected a warning for a legacy ./systems")
 	}
 }

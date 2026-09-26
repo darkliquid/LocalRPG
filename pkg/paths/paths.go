@@ -4,6 +4,8 @@
 package paths
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/adrg/xdg"
@@ -64,4 +66,41 @@ func resolveValue(value, relBase, globalDefault, projectName, rootDir string) st
 		return filepath.Join(rootDir, value)
 	}
 	return filepath.Join(relBase, value)
+}
+
+// LegacyWarning reports a configured path that will move under the XDG bases
+// while the old working-directory copy still exists, so a user can re-point it.
+// It performs no migration and creates nothing.
+func LegacyWarning(bases Bases, paths config.PathsConfig) string {
+	keys := []struct {
+		name   string
+		value  string
+		legacy string
+	}{
+		{"systems", paths.Systems, "systems"},
+		{"worlds", paths.Worlds, "worlds"},
+		{"games", paths.Games, "games"},
+		{"cache", paths.Cache, "cache"},
+	}
+	dirs := Resolve(bases, paths, "")
+	resolved := map[string]string{
+		"systems": dirs.Systems,
+		"worlds":  dirs.Worlds,
+		"games":   dirs.Games,
+		"cache":   dirs.Cache,
+	}
+	for _, key := range keys {
+		if key.value != "" {
+			continue
+		}
+		if _, err := os.Stat(key.legacy); err != nil {
+			continue
+		}
+		if _, err := os.Stat(resolved[key.name]); err == nil {
+			continue
+		}
+		return fmt.Sprintf("paths.legacy_relative detected ./%s but %s is empty; set paths.%s to an absolute path to keep using it",
+			key.legacy, resolved[key.name], key.name)
+	}
+	return ""
 }

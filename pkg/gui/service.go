@@ -91,7 +91,7 @@ func NewService(rootDir string) *Service {
 	}
 	dirs := paths.Resolve(paths.System(), cfg.Paths, projectRoot)
 
-	return &Service{
+	svc := &Service{
 		rootDir:        rootDir,
 		resolver:       core.NewCustomPathResolver(dirs.Systems, dirs.Worlds, dirs.Games, dirs.Cache),
 		configMgr:      mgr,
@@ -101,6 +101,12 @@ func NewService(rootDir string) *Service {
 		modelsManager:  models.NewManager(dirs.Cache),
 		summaryPending: make(map[string]bool),
 	}
+	if !projectMode {
+		if warning := paths.LegacyWarning(paths.System(), cfg.Paths); warning != "" {
+			trace.OrNil(svc.logger).Event("paths.legacy_relative", map[string]interface{}{"detail": warning})
+		}
+	}
+	return svc
 }
 
 func (s *Service) GetModelsStatus() []models.ModelStatus {
