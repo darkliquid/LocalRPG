@@ -5,25 +5,22 @@
 // never narrate a turn automatically. The application runs on the same machine
 // as the player, so it owns the device and is free of that restriction.
 //
-// Clips are decoded on demand by the audio device's callback and never
-// materialised twice: the cache keeps its small MP3s, and mp3 or wav is decoded
-// straight into the output buffer as it is consumed.
+// Output goes through shirei's mono mixer, whose ALSA backend is pure Go. Clips
+// are decoded to 48 kHz mono float32 and streamed into the mixer as they are
+// consumed.
 package playback
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
-	"math"
 	"os"
 	"sync"
-	"time"
+
+	app "go.hasen.dev/shirei/app"
+	"go.hasen.dev/shirei/audio"
 
 	"github.com/darkliquid/localrpg/pkg/media/opus"
 	"github.com/darkliquid/localrpg/pkg/trace"
-	"github.com/ebitengine/oto/v3"
-	"github.com/gopxl/beep"
 )
 
 // ErrUnavailable means this process has no usable audio device, so a caller
@@ -33,31 +30,42 @@ var ErrUnavailable = errors.New("audio playback is unavailable")
 // ErrUnsupportedFormat means a clip is in a container this player cannot decode.
 var ErrUnsupportedFormat = errors.New("unsupported audio format")
 
-const (
-	// deviceChannels and deviceSampleRate are what the mixer is opened at. Sources
-	// at any rate or channel count are resampled and folded into it on the fly.
-	deviceChannels   = 2
-	deviceSampleRate = 48000
-	resampleQuality  = 4
-	bufferDuration   = 100 * time.Millisecond
-)
+// deviceSampleRate matches the rate Opus decoding always yields.
+const deviceSampleRate = opus.SampleRate
+
+// startDevice is the platform audio boundary. Tests replace it with a draining
+// sink so no sound card is required.
+var startDevice = func(rate int, fill func([]float32)) error {
+	return app.StartAudio(rate, app.AudioFillFn(fill))
+}
 
 // Player owns the process-wide audio device and plays one clip queue at a time.
 // A new queue replaces the current one, so a second turn or a manual replay
 // interrupts rather than overlaps.
 type Player struct {
-	otoCtx   *oto.Context
-	otoReady chan struct{}
-
 	mu         sync.Mutex
-	otoPlayer  *oto.Player
-	streamer   beep.Streamer
-	closers    []io.Closer
+	mixer      *audio.Mixer
+	voice      *clipVoice
 	gain       float64
 	playing    bool
 	logger     trace.Logger
 	generation uint64
 	closed     bool
+}
+
+// clipVoice wraps a StreamVoice so the player can observe end-of-clip.
+type clipVoice struct {
+	stream *audio.StreamVoice
+	done   chan struct{}
+	once   sync.Once
+}
+
+func (v *clipVoice) Render(out []float32) bool {
+	alive := v.stream.Render(out)
+	if !alive {
+		v.once.Do(func() { close(v.done) })
+	}
+	return alive
 }
 
 // Open starts the application's audio device. It returns ErrUnavailable when the
@@ -67,37 +75,13 @@ func Open(volume float64) (*Player, error) {
 		volume = 1.0
 	}
 
-	readyChan := make(chan struct{})
-	options := &oto.NewContextOptions{
-		SampleRate:   deviceSampleRate,
-		ChannelCount: deviceChannels,
-		Format:       oto.FormatSignedInt16LE,
-		BufferSize:   bufferDuration,
-	}
-
-	otoCtx, ready, err := oto.NewContext(options)
-	if err != nil {
+	mixer := audio.NewMixer()
+	mixer.SetVolume(float32(volume))
+	if err := startDevice(deviceSampleRate, mixer.Fill); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}
 
-	p := &Player{
-		otoCtx:   otoCtx,
-		otoReady: readyChan,
-		gain:     volume,
-	}
-
-	go func() {
-		<-ready
-		close(readyChan)
-	}()
-
-	select {
-	case <-readyChan:
-	case <-time.After(2 * time.Second):
-		// Context took too long to become ready
-	}
-
-	return p, nil
+	return &Player{mixer: mixer, gain: volume}, nil
 }
 
 // SetLogger attaches a trace sink. A nil logger records nothing.
@@ -110,9 +94,10 @@ func (p *Player) SetLogger(logger trace.Logger) {
 	p.logger = trace.OrNil(logger)
 }
 
-// Available reports whether a device is open.
+// Available reports whether a device is open. The device lives for the process,
+// so unlike the previous backend a player cannot be re-opened after Close.
 func (p *Player) Available() bool {
-	return p != nil && p.otoCtx != nil && !p.closed
+	return p != nil && p.mixer != nil && !p.closed
 }
 
 // Playing reports whether a queue is currently running.
@@ -122,7 +107,7 @@ func (p *Player) Playing() bool {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.playing && p.otoPlayer != nil
+	return p.playing
 }
 
 // SetVolume sets the gain applied to every clip in the queue.
@@ -130,14 +115,15 @@ func (p *Player) SetVolume(volume float64) {
 	if p == nil {
 		return
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	if volume <= 0 {
 		volume = 1
 	}
+	p.mu.Lock()
 	p.gain = volume
-	if p.otoPlayer != nil {
-		p.otoPlayer.SetVolume(p.gain)
+	mixer := p.mixer
+	p.mu.Unlock()
+	if mixer != nil {
+		mixer.SetVolume(float32(volume))
 	}
 }
 
@@ -145,210 +131,124 @@ func (p *Player) SetVolume(volume float64) {
 // as they are consumed. It returns once playback has started. A clip that cannot
 // be decoded is skipped rather than silencing the rest of the turn.
 func (p *Player) PlayFiles(paths []string) error {
-	if !p.Available() {
+	if p == nil {
 		return ErrUnavailable
 	}
 
-	streamers := make([]beep.Streamer, 0, len(paths))
-	closers := make([]io.Closer, 0, len(paths))
-	for _, path := range paths {
-		streamer, closer, err := decodeFile(path)
-		if err != nil {
-			continue
-		}
-		streamers = append(streamers, streamer)
-		closers = append(closers, closer)
+	p.mu.Lock()
+	unavailable := p.closed || p.mixer == nil
+	p.mu.Unlock()
+	if unavailable {
+		return ErrUnavailable
 	}
 
-	if len(streamers) == 0 {
-		return ErrUnsupportedFormat
-	}
-
-	var queue beep.Streamer
-	if len(streamers) == 1 {
-		queue = streamers[0]
-	} else {
-		queue = beep.Seq(streamers...)
+	samples, err := decodeSamples(paths)
+	if err != nil {
+		return err
 	}
 
 	p.mu.Lock()
-	previousClosers := p.closers
-	if p.otoPlayer != nil {
-		_ = p.otoPlayer.Close()
-		p.otoPlayer = nil
+	if p.closed || p.mixer == nil {
+		p.mu.Unlock()
+		return ErrUnavailable
 	}
-
+	previous := p.voice
 	p.generation++
 	gen := p.generation
-	p.streamer = queue
-	p.closers = closers
-	p.playing = true
-
-	reader := &streamerReader{
-		streamer: queue,
+	voice := &clipVoice{
+		stream: audio.NewStreamVoice(deviceSampleRate / 2),
+		done:   make(chan struct{}),
 	}
-
-	otoPlayer := p.otoCtx.NewPlayer(reader)
-	otoPlayer.SetVolume(p.gain)
-	p.otoPlayer = otoPlayer
-
+	p.voice = voice
+	p.playing = true
 	logger := trace.OrNil(p.logger)
 	gain := p.gain
+	mixer := p.mixer
 	p.mu.Unlock()
 
+	if previous != nil {
+		previous.stream.Release()
+	}
+
 	logger.Event("audio.play", map[string]any{
-		"clips":  len(streamers),
+		"clips":  len(paths),
 		"volume": gain,
 	})
 
-	go closeAll(previousClosers)
-	otoPlayer.Play()
+	mixer.Add(voice)
 
-	go func(player *oto.Player, gen uint64, closers []io.Closer, r *streamerReader) {
-		for {
-			time.Sleep(20 * time.Millisecond)
-			p.mu.Lock()
-			if p.generation != gen || p.otoPlayer != player {
-				p.mu.Unlock()
+	go func() {
+		defer func() { _ = voice.stream.Close() }()
+		const chunk = 4096
+		for pos := 0; pos < len(samples); pos += chunk {
+			end := min(pos+chunk, len(samples))
+			if _, err := voice.stream.Write(samples[pos:end]); err != nil {
 				return
 			}
-			if !player.IsPlaying() || (r.isDrained() && player.BufferedSize() == 0) {
-				p.playing = false
-				p.streamer = nil
-				p.closers = nil
-				p.otoPlayer = nil
-				p.mu.Unlock()
-				_ = player.Close()
-				closeAll(closers)
-				return
-			}
-			p.mu.Unlock()
 		}
-	}(otoPlayer, gen, closers, reader)
+	}()
+
+	go func() {
+		<-voice.done
+		p.mu.Lock()
+		if p.generation == gen && p.voice == voice {
+			p.playing = false
+			p.voice = nil
+		}
+		p.mu.Unlock()
+	}()
 
 	return nil
 }
 
-// Stop ends the current queue.
+// Stop silences the current queue.
 func (p *Player) Stop() {
-	if !p.Available() {
+	if p == nil {
 		return
 	}
-
 	p.mu.Lock()
-	closers := p.closers
-	p.generation++
-	p.closers = nil
-	p.streamer = nil
+	voice := p.voice
+	p.voice = nil
 	p.playing = false
-	if p.otoPlayer != nil {
-		_ = p.otoPlayer.Close()
-		p.otoPlayer = nil
-	}
+	p.generation++
 	p.mu.Unlock()
-
-	go closeAll(closers)
+	if voice != nil {
+		voice.stream.Release()
+	}
 }
 
-// Close stops playback and releases the device.
+// Close silences playback and marks the player unusable. The device stays open
+// for the process, matching shirei's StartAudio contract.
 func (p *Player) Close() error {
 	if p == nil {
 		return nil
 	}
 	p.Stop()
-
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	p.closed = true
-	p.otoCtx = nil
+	p.mu.Unlock()
 	return nil
 }
 
-type streamerReader struct {
-	streamer beep.Streamer
-	buf      [][2]float64
-	drained  bool
-	mu       sync.Mutex
-}
-
-func (sr *streamerReader) isDrained() bool {
-	sr.mu.Lock()
-	defer sr.mu.Unlock()
-	return sr.drained
-}
-
-func (sr *streamerReader) Read(p []byte) (int, error) {
-	framesWanted := len(p) / (deviceChannels * 2) // 4 bytes per stereo 16-bit frame
-	if framesWanted == 0 {
-		return 0, nil
-	}
-
-	sr.mu.Lock()
-	defer sr.mu.Unlock()
-
-	if cap(sr.buf) < framesWanted {
-		sr.buf = make([][2]float64, framesWanted)
-	}
-	buf := sr.buf[:framesWanted]
-
-	n, ok := sr.streamer.Stream(buf)
-	for i := 0; i < n; i++ {
-		left := math.Max(-1.0, math.Min(1.0, buf[i][0]))
-		right := math.Max(-1.0, math.Min(1.0, buf[i][1]))
-
-		leftInt := int16(left * 32767)
-		rightInt := int16(right * 32767)
-
-		offset := i * 4
-		binary.LittleEndian.PutUint16(p[offset:], uint16(leftInt))
-		binary.LittleEndian.PutUint16(p[offset+2:], uint16(rightInt))
-	}
-
-	if !ok || n == 0 {
-		sr.drained = true
-		return n * 4, io.EOF
-	}
-
-	return n * 4, nil
-}
-
-// decodeFile reads a clip and returns a streamer over its decoded 48 kHz stereo
-// samples. Every stored clip is Ogg/Opus, so there is one decode path.
-func decodeFile(path string) (beep.Streamer, io.Closer, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, nil, err
-	}
-	pcm, _, _, err := opus.Decode(data)
-	if err != nil {
-		return nil, nil, fmt.Errorf("%w: %v", ErrUnsupportedFormat, err)
-	}
-	return &opusStreamer{data: pcm}, nil, nil
-}
-
-// opusStreamer presents decoded mono 48 kHz PCM as the stereo frames beep expects.
-type opusStreamer struct {
-	data []int16
-	pos  int
-}
-
-func (s *opusStreamer) Stream(samples [][2]float64) (int, bool) {
-	n := 0
-	for n < len(samples) && s.pos < len(s.data) {
-		f := float64(s.data[s.pos]) / 32768
-		samples[n] = [2]float64{f, f}
-		s.pos++
-		n++
-	}
-	return n, s.pos < len(s.data)
-}
-
-func (s *opusStreamer) Err() error { return nil }
-
-func closeAll(closers []io.Closer) {
-	for _, closer := range closers {
-		if closer != nil {
-			_ = closer.Close()
+// decodeSamples concatenates the clips into one mono float32 buffer. Opus
+// decoding always yields 48 kHz mono s16, matching the device rate.
+func decodeSamples(paths []string) ([]float32, error) {
+	var out []float32
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		pcm, _, _, err := opus.Decode(data)
+		if err != nil {
+			continue
+		}
+		for _, sample := range pcm {
+			out = append(out, float32(sample)/32768.0)
 		}
 	}
+	if len(out) == 0 {
+		return nil, ErrUnsupportedFormat
+	}
+	return out, nil
 }
