@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/adrg/xdg"
 	"gopkg.in/yaml.v3"
 )
 
@@ -17,17 +18,25 @@ type ConfigManager struct {
 	isOverride      bool
 }
 
-func NewConfigManager() *ConfigManager {
-	configDir := os.Getenv("LOCALRPG_CONFIG_DIR")
-	if configDir == "" {
-		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-			configDir = filepath.Join(xdg, "localrpg")
-		} else {
-			homeDir, _ := os.UserHomeDir()
-			configDir = filepath.Join(homeDir, ".config", "localrpg")
-		}
+// DetectConfigFile returns the config file to read and where to write one. An
+// explicit LOCALRPG_CONFIG_DIR wins; otherwise the XDG config search path is
+// used (XDG_CONFIG_HOME then XDG_CONFIG_DIRS), falling back to the application's
+// config directory for the first save.
+func DetectConfigFile() (read, write string) {
+	if dir := os.Getenv("LOCALRPG_CONFIG_DIR"); dir != "" {
+		path := filepath.Join(dir, "config.yaml")
+		return path, path
 	}
-	userPath := filepath.Join(configDir, "config.yaml")
+	rel := filepath.Join("localrpg", "config.yaml")
+	if found, err := xdg.SearchConfigFile(rel); err == nil && found != "" {
+		return found, found
+	}
+	fallback := filepath.Join(xdg.ConfigHome, "localrpg", "config.yaml")
+	return fallback, fallback
+}
+
+func NewConfigManager() *ConfigManager {
+	userPath, _ := DetectConfigFile()
 	localPath := "./localrpg.yaml"
 	return NewConfigManagerWithPaths(userPath, localPath)
 }

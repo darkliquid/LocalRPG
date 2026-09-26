@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/adrg/xdg"
+
 	"github.com/darkliquid/localrpg/pkg/config"
 )
 
@@ -63,5 +65,30 @@ func TestConfigManager_HierarchicalSaveAndLoad(t *testing.T) {
 	}
 	if mgr.ActiveFilePath() != localConfigPath {
 		t.Errorf("expected ActiveFilePath to be %s, got %s", localConfigPath, mgr.ActiveFilePath())
+	}
+}
+
+func TestDetectConfigFileUsesConfigHome(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCALRPG_CONFIG_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("XDG_CONFIG_DIRS", "")
+	xdg.Reload()
+	t.Cleanup(xdg.Reload)
+
+	read, write := config.DetectConfigFile()
+	want := filepath.Join(dir, "localrpg", "config.yaml")
+	if read != want || write != want {
+		t.Fatalf("DetectConfigFile = (%q, %q), want %q", read, write, want)
+	}
+}
+
+func TestDetectConfigFileHonoursConfigDirOverride(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCALRPG_CONFIG_DIR", dir)
+
+	read, _ := config.DetectConfigFile()
+	if read != filepath.Join(dir, "config.yaml") {
+		t.Fatalf("DetectConfigFile = %q, want the override path", read)
 	}
 }
