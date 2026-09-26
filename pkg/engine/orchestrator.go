@@ -82,6 +82,7 @@ type TurnOrchestrator struct {
 	assembler        *harness.ContextAssembler
 	rulesPrompt      string
 	lorePrompt       string
+	mechanicsPrompt  string
 	extractor        *harness.Extractor
 	chunkTimeout     time.Duration
 	openingPrompt    string
@@ -387,8 +388,19 @@ func (o *TurnOrchestrator) previousLocation() string {
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
 	if paths != nil {
 		if systemID != "" {
-			if data, err := os.ReadFile(filepath.Join(paths.SystemDir(systemID), "prompts", "rules.md")); err == nil {
+			sysDir := paths.SystemDir(systemID)
+			if data, err := os.ReadFile(filepath.Join(sysDir, "prompts", "rules.md")); err == nil {
 				o.rulesPrompt = string(data)
+			}
+			// A system ships mechanics when it has a script or a declarative
+			// block. Either way the GM needs to know when to call a check.
+			var spec *core.MechanicsSpec
+			if manifest, err := core.LoadSystemManifest(filepath.Join(sysDir, "system.yaml")); err == nil {
+				spec = manifest.Mechanics
+			}
+			_, scriptErr := os.Stat(filepath.Join(sysDir, "mechanics.js"))
+			if scriptErr == nil || spec != nil {
+				o.mechanicsPrompt = harness.FormatMechanicsInstructions(spec)
 			}
 		}
 		if worldID != "" {
@@ -644,6 +656,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		ActionEcho:       echoAction,
 		RulesPrompt:      o.rulesPrompt,
 		LorePrompt:       o.lorePrompt,
+		MechanicsPrompt:  o.mechanicsPrompt,
 		Profiles:         o.timeline.VoiceProfiles(),
 		OmitVoiceCatalog: canCallTools,
 		Recent:           recent,
