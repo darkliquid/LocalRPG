@@ -91,6 +91,33 @@ func loadMemories(svc *gui.Service, gameID, entityID string) []gui.MemoryDTO {
 	return memories
 }
 
+// loadWorlds reads the registered worlds.
+func loadWorlds(ctx context.Context, svc *gui.Service) []gui.WorldSummaryDTO {
+	worlds, err := svc.ListWorlds(ctx)
+	if err != nil || worlds == nil {
+		return []gui.WorldSummaryDTO{}
+	}
+	return worlds
+}
+
+// loadWorldDetail reads one world's full definition.
+func loadWorldDetail(ctx context.Context, svc *gui.Service, id string) *gui.WorldDetailDTO {
+	detail, err := svc.GetWorld(ctx, id)
+	if err != nil {
+		return nil
+	}
+	return detail
+}
+
+// loadWorldEntity reads one world entity's markdown.
+func loadWorldEntity(ctx context.Context, svc *gui.Service, worldID, entityID string) (string, error) {
+	detail, err := svc.GetWorldEntity(ctx, worldID, entityID)
+	if err != nil || detail == nil {
+		return "", err
+	}
+	return detail.Markdown, nil
+}
+
 // loadSystems reads the registered systems.
 func loadSystems(ctx context.Context, svc *gui.Service) []gui.SystemSummaryDTO {
 	systems, err := svc.ListSystems(ctx)

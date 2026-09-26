@@ -17,7 +17,7 @@ func worldsView() {
 			Filler(1)
 			NextAccessName("worlds.new")
 			if Button(NoIcon, "New World") {
-				// Studio work lands in a later plan; this is a stub entry point.
+				openWorldsStudio()
 			}
 			AssignAccess()
 			NextAccessName("worlds.close")

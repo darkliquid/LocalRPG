@@ -140,6 +140,22 @@ type State struct {
 	SystemSaved    bool
 	SystemTab      string
 
+	// Worlds studio.
+	World          *gui.WorldDetailDTO
+	WorldEntities  []gui.WorldEntitySummaryDTO
+	WorldMarkdown  string
+	FormWorldName  string
+	FormWorldSlug  string
+	FormWorldGenre string
+	FormWorldSys   string
+	FormWorldStyle string
+	FormWorldTags  string
+	FormWorldDesc  string
+	FormWorldLore  string
+	WorldSaved     bool
+	WorldTab       string
+	WorldEntityID  string
+
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
 	WorldArt map[string]Art

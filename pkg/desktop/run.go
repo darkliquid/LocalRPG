@@ -96,6 +96,20 @@ func Run(cfg Config) error {
 		generateText = func(ctx context.Context, svc *gui.Service, req gui.GenerateTextRequest) (*gui.GenerateTextResponse, error) {
 			return svc.GenerateText(ctx, req)
 		}
+		saveWorld = func(ctx context.Context, svc *gui.Service, req gui.CreateWorldRequestDTO) error {
+			if req.ID == "" {
+				_, err := svc.CreateWorld(ctx, req)
+				return err
+			}
+			_, err := svc.UpdateWorld(ctx, req)
+			return err
+		}
+		saveWorldEntity = func(ctx context.Context, svc *gui.Service, worldID, entityID, markdown string) error {
+			return svc.SaveWorldEntity(ctx, worldID, entityID, markdown)
+		}
+		deleteWorldEntity = func(ctx context.Context, svc *gui.Service, worldID, entityID string) error {
+			return svc.DeleteWorldEntity(ctx, worldID, entityID)
+		}
 		refreshModels(cfg.Service)
 		startModelEvents(cfg.Service)
 	} else {
@@ -116,6 +130,9 @@ func Run(cfg Config) error {
 		downloadModel = nil
 		saveSystem = nil
 		generateText = nil
+		saveWorld = nil
+		saveWorldEntity = nil
+		deleteWorldEntity = nil
 	}
 
 	if cfg.PNGPath != "" {
