@@ -343,10 +343,12 @@ func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, []Ref, err
 
 	if player, err := c.store.GetEntity(req.PlayerID); err == nil && player != nil {
 		refs = append(refs, Ref{Kind: RefEntity, ID: player.ID, Relation: "player"})
-		sb.WriteString(fmt.Sprintf("**Player Character:** %s\n", player.Name))
+		sb.WriteString(fmt.Sprintf("**Player Character:** %s (the protagonist, played by the user)\n", player.Name))
+		sb.WriteString(playerProfile(player))
 		if player.State != nil {
-			sb.WriteString(fmt.Sprintf("State: %+v\n\n", player.State.Raw()))
+			sb.WriteString(fmt.Sprintf("State: %+v\n", player.State.Raw()))
 		}
+		sb.WriteString("\n")
 	}
 
 	sb.WriteString("## LIVING WORLD & BACKGROUND ARCS\n")
@@ -389,6 +391,28 @@ func (c *ContextAssembler) assembleCanon(req ContextRequest) (string, []Ref, err
 	}
 
 	return sb.String(), dedupeRefs(refs), nil
+}
+
+// playerProfile renders the protagonist's authored traits. The narrator is told
+// the name already; without the rest it tends to reinvent age, gender, and
+// pronouns turn to turn.
+func playerProfile(ent *entity.Entity) string {
+	var sb strings.Builder
+	if v := strings.TrimSpace(ent.Age); v != "" {
+		sb.WriteString("Age: " + v + "\n")
+	}
+	if v := strings.TrimSpace(ent.Gender); v != "" {
+		sb.WriteString("Gender: " + v + "\n")
+	}
+	if ent.ExtraMeta != nil {
+		if v, ok := ent.ExtraMeta["pronouns"].(string); ok && strings.TrimSpace(v) != "" {
+			sb.WriteString("Pronouns: " + strings.TrimSpace(v) + "\n")
+		}
+	}
+	if v := strings.TrimSpace(ent.Appearance); v != "" {
+		sb.WriteString("Appearance: " + v + "\n")
+	}
+	return sb.String()
 }
 
 // windowTurns is the part of the timeline actually replayed. The caller passes the

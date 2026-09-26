@@ -50,7 +50,7 @@ export const ProloguePanel: React.FC<ProloguePanelProps> = ({
             placeholder="Where should the story open? e.g. Begin in a rain-soaked market at dusk, the city gates closing behind me."
             className="w-full resize-none bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 disabled:opacity-60"
           />
-          <p className="text-[11px] text-stone-500">
+          <p className="text-xs text-stone-500">
             Leave it blank and the GM will invent the scene from your world and rules.
           </p>
         </div>

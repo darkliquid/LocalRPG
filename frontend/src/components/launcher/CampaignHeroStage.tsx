@@ -51,9 +51,9 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
   onBrowseSystems,
 }) => {
   const iconURL = game?.icon_url;
-  const { lightbox, openLightbox, closeLightbox } = useLightbox();
+  const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
   return (
-    <main className="relative flex-1 h-full overflow-hidden select-none flex flex-col justify-between p-8 bg-stone-950">
+    <main className="relative flex-1 h-full overflow-hidden select-none flex flex-col justify-between py-8 pr-8 pl-[104px] bg-stone-950">
       {/* Background Banner */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {game?.banner_url ? (
@@ -61,10 +61,10 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
             key={game.banner_url}
             src={game.banner_url}
             alt={game.name}
-            className="w-full h-full object-cover animate-in fade-in duration-500"
+            className="w-full h-full object-cover anim-fade-in"
           />
         ) : game ? (
-          <ProceduralBanner id={game.id} name={game.name} className="animate-in fade-in duration-500" />
+          <ProceduralBanner id={game.id} name={game.name} className="anim-fade-in" />
         ) : (
           <div className="w-full h-full bg-radial-[circle_at_center] from-purple-950/20 via-stone-950/80 to-stone-950" />
         )}
@@ -75,13 +75,13 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
       </div>
 
       {/* Top Row: Stats Badge */}
-      <div className="relative z-10 flex justify-end">
+      <div key={game?.id ?? 'none'} className="relative z-10 flex justify-end anim-slide-in-up">
         {game && (
           <div className="flex items-center gap-6 bg-stone-900/80 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-2.5 shadow-2xl">
             <div className="flex items-center gap-2.5">
               <Clock className="w-4 h-4 text-purple-400" />
               <div>
-                <div className="text-[10px] font-sans font-bold uppercase tracking-wider text-stone-400">
+                <div className="text-xs font-sans font-bold uppercase tracking-wider text-stone-400">
                   Play Time
                 </div>
                 <div className="text-xs font-sans font-bold text-stone-100">
@@ -95,7 +95,7 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
             <div className="flex items-center gap-2.5">
               <Compass className="w-4 h-4 text-purple-400" />
               <div>
-                <div className="text-[10px] font-sans font-bold uppercase tracking-wider text-stone-400">
+                <div className="text-xs font-sans font-bold uppercase tracking-wider text-stone-400">
                   Turns
                 </div>
                 <div className="text-xs font-sans font-bold text-stone-100">
@@ -109,7 +109,7 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
             <div className="flex items-center gap-2.5">
               <Calendar className="w-4 h-4 text-purple-400" />
               <div>
-                <div className="text-[10px] font-sans font-bold uppercase tracking-wider text-stone-400">
+                <div className="text-xs font-sans font-bold uppercase tracking-wider text-stone-400">
                   Last Played
                 </div>
                 <div className="text-xs font-sans font-bold text-stone-100">
@@ -123,7 +123,7 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
 
       {/* Center Onboarding Zero-State (If no game is selected or available) */}
       {!game && (
-        <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center max-w-md mx-auto">
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center max-w-md mx-auto anim-slide-in-up">
           {!hasGames && hasWorlds && (
             <div className="bg-stone-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
               <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/40 text-purple-400 flex items-center justify-center mx-auto mb-4">
@@ -168,7 +168,7 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
 
       {/* Bottom Row: Title Card & Action Cluster */}
       {game && (
-        <div className="relative z-10 flex items-end justify-between gap-6">
+        <div key={game.id} className="relative z-10 flex items-end justify-between gap-6 anim-slide-in-up">
           {/* Bottom Left: Title Card */}
           <div className="flex items-center gap-4 bg-stone-900/85 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 shadow-2xl max-w-xl">
             <div className="w-[52px] h-[52px] rounded-xl overflow-hidden flex-shrink-0 shadow-lg border border-white/10">
@@ -228,7 +228,7 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
       )}
 
       {lightbox && (
-        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
+        <ImageLightbox isOpen={isLightboxOpen} src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
       )}
     </main>
   );

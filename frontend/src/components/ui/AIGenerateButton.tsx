@@ -102,7 +102,7 @@ export const AIGenerateButton: React.FC<AIGenerateButtonProps> = ({
         )}
       </button>
       {error && (
-        <span className="inline-flex flex-col items-start gap-0.5 text-[10px] font-sans text-red-300" role="alert">
+        <span className="inline-flex flex-col items-start gap-0.5 text-xs font-sans text-red-300" role="alert">
           <span className="inline-flex items-center gap-1">
             <AlertCircle className="w-3 h-3 text-red-400" />
             <button
@@ -117,7 +117,7 @@ export const AIGenerateButton: React.FC<AIGenerateButtonProps> = ({
           </span>
           {showDetails &&
             generationAttemptLines(error).map((line, index) => (
-              <span key={index} className="max-w-[18rem] truncate text-[10px] text-red-400/80">
+              <span key={index} className="max-w-[18rem] truncate text-xs text-red-400/80">
                 {line}
               </span>
             ))}

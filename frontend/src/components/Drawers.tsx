@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Maximize2, Minimize2 } from 'lucide-react';
+import { useMountTransition } from '../hooks/useMountTransition';
 
 interface DrawersProps {
   isOpen: boolean;
@@ -18,14 +19,30 @@ const sizeClasses: Record<'md' | 'lg' | 'xl' | 'full', string> = {
 
 export const Drawers: React.FC<DrawersProps> = ({ isOpen, onClose, title, children, size = 'md' }) => {
   const [isMaximized, setIsMaximized] = useState(false);
+  const { mounted, state } = useMountTransition(isOpen, 300);
 
-  if (!isOpen) return null;
+  if (!mounted) return null;
 
   const currentSizeClass = isMaximized ? 'w-full max-w-full' : `w-full ${sizeClasses[size]}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs transition-opacity duration-300">
-      <div className={`${currentSizeClass} bg-glass-drawer h-full p-6 shadow-2xl flex flex-col transform transition-all duration-300`}>
+    <div className="fixed inset-0 z-50 flex justify-end" style={{ '--anim-dur': '300ms' } as React.CSSProperties}>
+      {/* The dim layer fades on its own. Keeping the fade off the element that
+          wraps the blurred panel stops the panel's backdrop-filter from being
+          recomposited every frame, which is what made the transition flicker. */}
+      <div
+        data-state={state}
+        onClick={onClose}
+        className={`absolute inset-0 bg-black/60 ${
+          state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
+        }`}
+      />
+      <div
+        data-state={state}
+        className={`relative ${currentSizeClass} bg-glass-drawer h-full p-6 shadow-2xl flex flex-col ${
+          state === 'enter' ? 'anim-slide-in-right' : 'anim-slide-out-right'
+        }`}
+      >
         <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4 shrink-0">
           <span className="font-sans text-purple-400 font-bold tracking-wider text-base">{title}</span>
           <div className="flex items-center gap-2">

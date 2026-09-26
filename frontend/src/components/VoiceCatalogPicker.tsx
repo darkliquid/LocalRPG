@@ -75,14 +75,14 @@ export const VoiceCatalogPicker: React.FC<VoiceCatalogPickerProps> = ({ ttsConfi
       </div>
 
       <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
-        {loading && voices.length === 0 && <p className="text-[11px] text-stone-500">Loading catalog...</p>}
+        {loading && voices.length === 0 && <p className="text-xs text-stone-500">Loading catalog...</p>}
         {(error || inspect?.error) && (
-          <p className="text-[11px] text-red-400 font-mono p-1.5 bg-red-950/40 rounded border border-red-900/60">
+          <p className="text-xs text-red-400 font-mono p-1.5 bg-red-950/40 rounded border border-red-900/60">
             {error || inspect?.error}
           </p>
         )}
         {!loading && !error && !inspect?.error && voices.length === 0 && (
-          <p className="text-[11px] text-stone-500">No voices match.</p>
+          <p className="text-xs text-stone-500">No voices match.</p>
         )}
         {voices.map((voice) => (
           <div
@@ -91,7 +91,7 @@ export const VoiceCatalogPicker: React.FC<VoiceCatalogPickerProps> = ({ ttsConfi
           >
             <div className="min-w-0">
               <div className="text-xs text-stone-200 truncate">{voice.name}</div>
-              <div className="text-[10px] font-mono text-stone-500 truncate">{voice.id}</div>
+              <div className="text-xs font-mono text-stone-500 truncate">{voice.id}</div>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               {voice.preview_url && (

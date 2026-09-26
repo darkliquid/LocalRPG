@@ -29,7 +29,7 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({
           {recap?.enabled && onRefreshRecap && (
             <button
               onClick={onRefreshRecap}
-              className="text-[11px] font-sans px-2 py-1 rounded-lg bg-stone-900 border border-stone-700 text-stone-300 hover:text-purple-300 cursor-pointer transition-colors"
+              className="text-xs font-sans px-2 py-1 rounded-lg bg-stone-900 border border-stone-700 text-stone-300 hover:text-purple-300 cursor-pointer transition-colors"
             >
               Refresh
             </button>
@@ -40,7 +40,7 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({
             <p className="text-xs text-stone-300 leading-relaxed whitespace-pre-wrap bg-black/30 p-3 rounded-xl border border-white/5">
               {recap.summary}
             </p>
-            <p className="text-[11px] font-mono text-stone-500">Through turn {recap.through_turn}</p>
+            <p className="text-xs font-mono text-stone-500">Through turn {recap.through_turn}</p>
           </>
         ) : (!recap?.threads || recap.threads.length === 0) ? (
           <p className="text-stone-500 text-xs italic bg-black/30 p-3 rounded-xl border border-white/5">
@@ -67,9 +67,9 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({
               >
                 <div className="flex items-center justify-between">
                   <span className="text-stone-200">{thread.name}</span>
-                  <span className="font-mono text-[11px] text-stone-400">{thread.status}</span>
+                  <span className="font-mono text-xs text-stone-400">{thread.status}</span>
                 </div>
-                <div className="text-[11px] font-mono text-stone-500">
+                <div className="text-xs font-mono text-stone-500">
                   {thread.last_advanced > 0
                     ? `Last advanced at turn ${thread.last_advanced} (${thread.idle} turns ago)`
                     : 'Not advanced yet'}

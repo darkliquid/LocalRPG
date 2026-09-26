@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserPlus, BookOpen, Check, X } from 'lucide-react';
+import { useMountTransition } from '../hooks/useMountTransition';
 
 interface AddEntityModalProps {
   isOpen: boolean;
@@ -17,12 +18,23 @@ export const AddEntityModal: React.FC<AddEntityModalProps> = ({
   onClose,
 }) => {
   const [type, setType] = useState('character');
+  const { mounted, state } = useMountTransition(isOpen, 200);
 
-  if (!isOpen) return null;
+  if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-md bg-stone-900 border border-purple-500/40 rounded-2xl p-6 shadow-2xl space-y-5">
+    <div
+      data-state={state}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm ${
+        state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
+      }`}
+      style={{ '--anim-dur': '200ms' } as React.CSSProperties}
+    >
+      <div
+        className={`relative w-full max-w-md bg-stone-900 border border-purple-500/40 rounded-2xl p-6 shadow-2xl space-y-5 ${
+          state === 'enter' ? 'anim-scale-in' : 'anim-scale-out'
+        }`}
+      >
         <div className="flex items-center justify-between border-b border-stone-800 pb-3">
           <div className="flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-purple-400" />

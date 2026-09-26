@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { X, Play, Plus, Search, Globe } from 'lucide-react';
 import { ProviderVoice, VoiceProfile } from '../types';
 import { playVoicePreview } from '../lib/audioPreview';
+import { useMountTransition } from '../hooks/useMountTransition';
 
 // EXTENDED_SEARCH_DEBOUNCE_MS lets a burst of typing settle before one
 // extended-library query is issued.
@@ -98,7 +99,9 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
     });
   }, [voices, extendedVoices, query, category, extendedMode]);
 
-  if (!isOpen) return null;
+  const { mounted, state } = useMountTransition(isOpen, 200);
+
+  if (!mounted) return null;
 
   const handleAdd = (voice: ProviderVoice) => {
     const slug = voice.name
@@ -123,12 +126,20 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4"
+      data-state={state}
+      className={`fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 ${
+        state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
+      }`}
+      style={{ '--anim-dur': '200ms' } as React.CSSProperties}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-stone-950 border border-stone-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div
+        className={`bg-stone-950 border border-stone-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden ${
+          state === 'enter' ? 'anim-scale-in' : 'anim-scale-out'
+        }`}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-800">
           <div>
@@ -221,22 +232,22 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-stone-200">{voice.name}</span>
-                      <span className="text-[10px] font-mono text-stone-500">{voice.id}</span>
+                      <span className="text-xs font-mono text-stone-500">{voice.id}</span>
                       {voice.accent && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-stone-900 border border-stone-800 text-stone-400 capitalize">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-stone-900 border border-stone-800 text-stone-400 capitalize">
                           {voice.accent}
                         </span>
                       )}
                     </div>
                     {voice.description && (
-                      <p className="text-[11px] text-stone-400 mt-0.5 truncate">{voice.description}</p>
+                      <p className="text-xs text-stone-400 mt-0.5 truncate">{voice.description}</p>
                     )}
                     {voice.tags && voice.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {voice.tags.slice(0, 4).map((tag) => (
                           <span
                             key={tag}
-                            className="text-[9px] px-1 py-0.2 rounded bg-stone-950 text-stone-400 border border-stone-800"
+                            className="text-xs px-1 py-0.2 rounded bg-stone-950 text-stone-400 border border-stone-800"
                           >
                             {tag}
                           </span>

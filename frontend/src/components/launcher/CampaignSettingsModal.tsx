@@ -1,11 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { GameSummary, VoiceProfile } from '../../types';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { GameSummary, ProviderVoice, TTSConfig, VoiceProfile } from '../../types';
 import { APIClient } from '../../api/client';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
 import { X, Upload, Sparkles, AlertTriangle, Volume2, MapPin, Check, Save } from 'lucide-react';
 import { AIGenerateButton } from '../ui/AIGenerateButton';
 import { useLightbox } from '../../hooks/useLightbox';
+import { useMountTransition } from '../../hooks/useMountTransition';
 import { ImageLightbox } from '../ImageLightbox';
+import { VoiceCombobox } from '../VoiceCombobox';
+import { playVoicePreview } from '../../lib/audioPreview';
 
 interface CampaignSettingsModalProps {
   isOpen: boolean;
@@ -19,7 +22,7 @@ interface CampaignSettingsModalProps {
 
 export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   isOpen,
-  game,
+  game: gameProp,
   onClose,
   onUploadAsset,
   onGenerateAsset,
@@ -30,7 +33,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   const [confirmAction, setConfirmAction] = useState<'restart' | 'delete' | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
-  const { lightbox, openLightbox, closeLightbox } = useLightbox();
+  const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
 
   // Settings State
   const [narratorVoice, setNarratorVoice] = useState('');
@@ -39,9 +42,15 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [ttsConfig, setTtsConfig] = useState<TTSConfig | null>(null);
+  const [auditioningVoiceId, setAuditioningVoiceId] = useState<string | null>(null);
 
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
+  const lastGameRef = useRef<GameSummary | null>(null);
+  if (gameProp) lastGameRef.current = gameProp;
+  const game = gameProp ?? lastGameRef.current;
+  const { mounted, state } = useMountTransition(isOpen, 200);
 
   useEffect(() => {
     if (!isOpen || !game) return;
@@ -50,6 +59,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
     APIClient.getSettings()
       .then((res) => {
         setVoiceProfiles(res.config.media.tts.voice_profiles || []);
+        setTtsConfig(res.config.media.tts);
       })
       .catch((err) => console.error('Failed to load voice profiles', err));
 
@@ -67,10 +77,51 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
     setSettingsSaved(false);
   }, [isOpen, game]);
 
-  if (!isOpen || !game) return null;
+  // The narrator picker lists configured archetypes, plus an explicit Default.
+  // Shaped as catalog voices so it shares the combobox that already dedupes the
+  // label, shows tags, and portals its menu clear of the modal's scroll area.
+  const narratorVoiceOptions = useMemo<ProviderVoice[]>(() => {
+    const options: ProviderVoice[] = [{ id: '', name: 'Default (Provider Setting)' }];
+    for (const profile of voiceProfiles) {
+      options.push({
+        id: profile.voice_id,
+        name: profile.name,
+        tags: profile.tags,
+        description: profile.description,
+      });
+    }
+    return options;
+  }, [voiceProfiles]);
+
+  if (!mounted || !game) return null;
 
   const bannerURL = game.banner_url;
   const iconURL = game.icon_url;
+
+  const handleAuditionVoice = async (voice: ProviderVoice) => {
+    setAuditioningVoiceId(voice.id);
+    setGenError(null);
+    try {
+      const provider: TTSConfig = {
+        ...(ttsConfig ?? { type: 'disabled', auto_play: false, master_volume: 1 }),
+        default_voice: voice.id || ttsConfig?.default_voice || '',
+      };
+      const res = await APIClient.testProvider({
+        category: 'tts',
+        provider,
+        test_prompt: 'This is how your narrator will sound.',
+      });
+      if (res.success && res.audio_data_uri) {
+        playVoicePreview(res.audio_data_uri, ttsConfig?.master_volume ?? 1);
+      } else {
+        setGenError(res.message || 'Voice preview failed.');
+      }
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : 'Voice preview failed.');
+    } finally {
+      setAuditioningVoiceId(null);
+    }
+  };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,8 +214,18 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md select-none animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-stone-900/95 border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+    <div
+      data-state={state}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md select-none ${
+        state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
+      }`}
+      style={{ '--anim-dur': '200ms' } as React.CSSProperties}
+    >
+      <div
+        className={`relative w-full max-w-xl bg-stone-900/95 border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] ${
+          state === 'enter' ? 'anim-scale-in' : 'anim-scale-out'
+        }`}
+      >
         {/* Header */}
         <div className="p-5 px-6 border-b border-white/10 flex items-center justify-between bg-stone-950/50">
           <div>
@@ -194,7 +255,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
                 <span>Narrative & Audio Settings</span>
               </div>
               {settingsSaved && (
-                <span className="flex items-center gap-1 text-[11px] font-sans text-emerald-400 bg-emerald-950/50 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                <span className="flex items-center gap-1 text-xs font-sans text-emerald-400 bg-emerald-950/50 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                   <Check className="w-3 h-3" />
                   Saved
                 </span>
@@ -203,22 +264,18 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
 
             {/* Narrator Voice */}
             <div className="space-y-1">
-              <label className="text-[11px] font-sans text-stone-300">
+              <label className="text-xs font-sans text-stone-300">
                 Narrator Voice
               </label>
-              <select
+              <VoiceCombobox
                 value={narratorVoice}
-                onChange={(e) => setNarratorVoice(e.target.value)}
-                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500 cursor-pointer"
-              >
-                <option value="">Default (Provider Setting)</option>
-                {voiceProfiles.map((p) => (
-                  <option key={p.id} value={p.voice_id}>
-                    {p.name} ({p.voice_id})
-                  </option>
-                ))}
-              </select>
-              <p className="text-[10px] font-sans text-stone-500">
+                onChange={setNarratorVoice}
+                voices={narratorVoiceOptions}
+                onAudition={handleAuditionVoice}
+                auditioningId={auditioningVoiceId}
+                placeholder="Default (Provider Setting)"
+              />
+              <p className="text-xs font-sans text-stone-500">
                 Voice used to narrate scenes, descriptions, and GM responses in this campaign.
               </p>
             </div>
@@ -226,7 +283,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
             {/* Start Location */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-sans text-stone-300 flex items-center gap-1">
+                <label className="text-xs font-sans text-stone-300 flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-stone-400" />
                   <span>Start Location Directive</span>
                 </label>
@@ -252,7 +309,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
             {/* Opening Scene Prompt */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-sans text-stone-300">
+                <label className="text-xs font-sans text-stone-300">
                   Opening Scene Directive
                 </label>
                 <AIGenerateButton
@@ -271,7 +328,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
                 value={openingPrompt}
                 onChange={(e) => setOpeningPrompt(e.target.value)}
                 placeholder="Where the story begins..."
-                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
+                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
               />
             </div>
 
@@ -296,7 +353,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
             <div className="grid grid-cols-2 gap-4">
               {/* Banner Artwork */}
               <div className="p-3 bg-stone-950 border border-white/10 rounded-2xl flex flex-col justify-between gap-3">
-                <span className="text-[11px] font-sans font-semibold text-stone-300">Main Banner</span>
+                <span className="text-xs font-sans font-semibold text-stone-300">Main Banner</span>
                 <div className="h-24 rounded-xl overflow-hidden relative border border-white/10">
                   {bannerURL ? (
                     <button
@@ -343,7 +400,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
 
               {/* Icon Artwork */}
               <div className="p-3 bg-stone-950 border border-white/10 rounded-2xl flex flex-col justify-between gap-3">
-                <span className="text-[11px] font-sans font-semibold text-stone-300">Campaign Icon</span>
+                <span className="text-xs font-sans font-semibold text-stone-300">Campaign Icon</span>
                 <div className="h-24 rounded-xl overflow-hidden relative border border-white/10 flex items-center justify-center bg-stone-900">
                   {iconURL ? (
                     <button
@@ -401,7 +458,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
             <div className="flex items-center justify-between pt-1">
               <div>
                 <div className="text-xs font-sans font-semibold text-stone-200">Restart Campaign</div>
-                <div className="text-[11px] font-sans text-stone-400">Resets timeline to Turn 0. Retains character & world.</div>
+                <div className="text-xs font-sans text-stone-400">Resets timeline to Turn 0. Retains character & world.</div>
               </div>
               {confirmAction === 'restart' ? (
                 <div className="flex items-center gap-2">
@@ -435,7 +492,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-xs font-sans font-semibold text-stone-200">Delete Campaign</div>
-                <div className="text-[11px] font-sans text-stone-400">Permanently removes campaign files and history.</div>
+                <div className="text-xs font-sans text-stone-400">Permanently removes campaign files and history.</div>
               </div>
               {confirmAction === 'delete' ? (
                 <div className="flex items-center gap-2">
@@ -477,7 +534,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
       </div>
 
       {lightbox && (
-        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
+        <ImageLightbox isOpen={isLightboxOpen} src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { WorldInfo } from '../../types';
 import { ProceduralBanner, ProceduralIcon, getGenreIcon } from './ProceduralAsset';
 import { X, Plus, Globe, Maximize2 } from 'lucide-react';
 import { useLightbox } from '../../hooks/useLightbox';
+import { useMountTransition } from '../../hooks/useMountTransition';
 import { ImageLightbox } from '../ImageLightbox';
 
 interface WorldGalleryProps {
@@ -19,7 +20,7 @@ const WorldCard: React.FC<{
 }> = ({ world, onSelect }) => {
   const GenreIcon = getGenreIcon(world.genre) || getGenreIcon(world.name);
   const tags = world.tags ?? [];
-  const { lightbox, openLightbox, closeLightbox } = useLightbox();
+  const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
   const artworkURL = world.banner_url || world.icon_url;
 
   return (
@@ -56,7 +57,7 @@ const WorldCard: React.FC<{
                 {world.name}
               </h3>
               {world.genre && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-sans font-semibold uppercase tracking-wider text-purple-300">
+                <span className="inline-flex items-center gap-1 text-xs font-sans font-semibold uppercase tracking-wider text-purple-300">
                   {GenreIcon && <GenreIcon className="w-3 h-3" />}
                   {world.genre}
                 </span>
@@ -76,7 +77,7 @@ const WorldCard: React.FC<{
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[11px] font-sans font-medium px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-stone-300"
+                  className="text-xs font-sans font-medium px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-stone-300"
                 >
                   {tag}
                 </span>
@@ -102,7 +103,7 @@ const WorldCard: React.FC<{
       )}
 
       {lightbox && (
-        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
+        <ImageLightbox isOpen={isLightboxOpen} src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
       )}
     </div>
   );
@@ -115,10 +116,17 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
   onCreateWorld,
   onClose,
 }) => {
-  if (!isOpen) return null;
+  const { mounted, state } = useMountTransition(isOpen, 200);
+  if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-stone-950/98 backdrop-blur-xl select-none animate-in fade-in duration-200">
+    <div
+      data-state={state}
+      className={`fixed inset-0 z-50 flex flex-col bg-stone-950/98 backdrop-blur-xl select-none ${
+        state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
+      }`}
+      style={{ '--anim-dur': '200ms' } as React.CSSProperties}
+    >
       {/* Header */}
       <header className="h-16 px-8 border-b border-white/10 flex items-center justify-between bg-stone-900/70 shrink-0">
         <div className="flex items-center gap-3">
@@ -127,7 +135,7 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
           </div>
           <div>
             <h2 className="text-base font-sans font-bold text-white tracking-tight">Explore Worlds</h2>
-            <p className="text-[11px] font-sans text-stone-400">
+            <p className="text-xs font-sans text-stone-400">
               {worlds.length} {worlds.length === 1 ? 'world' : 'worlds'} available
             </p>
           </div>

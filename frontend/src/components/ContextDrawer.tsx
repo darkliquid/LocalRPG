@@ -151,11 +151,11 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
                 <span className="text-xs uppercase font-sans font-bold tracking-wider text-stone-400">
                   Turn {context.turn_number} ({context.mode})
                 </span>
-                <span className={`text-[11px] font-mono px-2 py-0.5 rounded-md border ${strategyColor(context.strategy)}`}>
+                <span className={`text-xs font-mono px-2 py-0.5 rounded-md border ${strategyColor(context.strategy)}`}>
                   {context.strategy}
                 </span>
                 {context.cached_tokens !== undefined && context.cached_tokens > 0 && (
-                  <span className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-md bg-purple-950/80 text-purple-300 border border-purple-700/50">
+                  <span className="flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-md bg-purple-950/80 text-purple-300 border border-purple-700/50">
                     <Zap className="w-3 h-3" />
                     <span>{context.cached_tokens} cached tokens</span>
                   </span>
@@ -166,7 +166,7 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono pt-2 border-t border-stone-800/80">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono pt-2 border-t border-stone-800/80">
               <div className="flex items-center gap-1 text-stone-400 truncate">
                 <Hash className="w-3.5 h-3.5 shrink-0 text-stone-500" />
                 <span className="text-stone-500">Prompt Hash:</span>
@@ -204,7 +204,7 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
           <div className="space-y-3">
             <h4 className="text-xs font-sans uppercase font-bold tracking-wider text-purple-400 flex items-center justify-between">
               <span>Active Continuity Working Set</span>
-              <span className="font-mono text-stone-400 text-[11px]">{workingSet.length} entries</span>
+              <span className="font-mono text-stone-400 text-xs">{workingSet.length} entries</span>
             </h4>
             {workingSet.length === 0 ? (
               <p className="text-xs text-stone-500 italic bg-black/20 p-3 rounded-xl border border-stone-800">
@@ -225,7 +225,7 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
                           {item.name || item.id}
                         </span>
                       </div>
-                      <div className="text-[10px] font-mono text-stone-500 flex items-center gap-2">
+                      <div className="text-xs font-mono text-stone-500 flex items-center gap-2">
                         <span>{item.kind}</span>
                         {item.role && <span>• {item.role}</span>}
                         <span>• Turn {item.last_turn}</span>
@@ -244,7 +244,7 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
           <div className="space-y-3">
             <h4 className="text-xs font-sans uppercase font-bold tracking-wider text-purple-400 flex items-center justify-between">
               <span>Prompt Sections Breakdown</span>
-              <span className="font-mono text-stone-400 text-[11px]">
+              <span className="font-mono text-stone-400 text-xs">
                 {context.sections.filter((s) => s.included).length} / {context.sections.length} included
               </span>
             </h4>
@@ -269,7 +269,7 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
                         {sec.name}
                       </span>
                       {sec.source && (
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-900 text-stone-400">
+                        <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-stone-900 text-stone-400">
                           {sec.source}
                         </span>
                       )}
@@ -285,12 +285,12 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
                         <button
                           key={`${r.kind}-${r.id}-${i}`}
                           onClick={() => handleRefClick(r)}
-                          className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-md bg-stone-900/80 hover:bg-purple-950/60 border border-stone-800 hover:border-purple-600/50 text-stone-300 hover:text-purple-200 transition-colors cursor-pointer"
+                          className="flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-md bg-stone-900/80 hover:bg-purple-950/60 border border-stone-800 hover:border-purple-600/50 text-stone-300 hover:text-purple-200 transition-colors cursor-pointer"
                         >
                           <span className="text-purple-400 font-bold">[[</span>
                           <span>{r.id}</span>
                           {r.relation && (
-                            <span className="text-stone-500 text-[10px]">({r.relation})</span>
+                            <span className="text-stone-500 text-xs">({r.relation})</span>
                           )}
                           <span className="text-purple-400 font-bold">]]</span>
                         </button>
@@ -314,7 +314,7 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
                 <span>Assembled Prompt Snapshot</span>
               </button>
               {showPrompt && (
-                <pre className="p-3 bg-stone-950 rounded-xl border border-stone-800 text-[11px] font-mono text-stone-300 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-96">
+                <pre className="p-3 bg-stone-950 rounded-xl border border-stone-800 text-xs font-mono text-stone-300 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-96">
                   {context.prompt}
                 </pre>
               )}

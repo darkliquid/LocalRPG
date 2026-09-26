@@ -6,6 +6,7 @@ import { TheaterStage } from './theater/TheaterStage';
 import { TheaterDialogue } from './theater/TheaterDialogue';
 import { TheaterTransport } from './theater/TheaterTransport';
 import { X } from 'lucide-react';
+import { useMountTransition } from '../hooks/useMountTransition';
 
 interface StoryTheaterProps {
   turns: Turn[];
@@ -14,6 +15,7 @@ interface StoryTheaterProps {
   volume?: number;
   gameId?: string;
   playerId?: string;
+  playerName?: string;
   playerPortrait?: string;
   campaignImage?: string;
   serverPlayback?: boolean;
@@ -35,6 +37,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   volume = 1,
   gameId,
   playerId,
+  playerName: propPlayerName,
   playerPortrait: propPlayerPortrait,
   campaignImage,
   serverPlayback = false,
@@ -77,12 +80,13 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   const npcPortrait = npcSegment?.portrait_url;
 
   const playerLabel = useMemo(() => {
+    if (propPlayerName && propPlayerName.trim()) return propPlayerName;
     for (const turn of turns) {
       const pSeg = turn.segments?.find((s) => s.player && s.kind === 'speech' && s.speaker);
       if (pSeg?.speaker) return pSeg.speaker;
     }
     return 'You';
-  }, [turns]);
+  }, [propPlayerName, turns]);
   const npcLabel = npcSegment?.speaker || 'Unknown';
 
   const playerSpeaking = active?.kind === 'speech' && !!active.player;
@@ -209,13 +213,18 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     setCurrentIdx((prev) => Math.min(Math.max(0, prev + delta), turns.length - 1));
   };
 
-  if (!isOpen || turns.length === 0) return null;
+  const { mounted, state } = useMountTransition(isOpen && turns.length > 0, 250);
 
+  if (!mounted) return null;
   const progress = ((currentIdx + (activeIndex + 1) / segments.length) / turns.length) * 100;
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-hidden select-none bg-stone-950 text-stone-100"
+      data-state={state}
+      className={`fixed inset-0 z-50 overflow-hidden select-none bg-stone-950 text-stone-100 ${
+        state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
+      }`}
+      style={{ '--anim-dur': '250ms' } as React.CSSProperties}
       role="dialog"
       aria-label="Story theater"
     >

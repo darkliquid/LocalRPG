@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Volume2, Download, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import { APIClient } from '../api/client';
 import { ModelStatus } from '../types';
+import { useMountTransition } from '../hooks/useMountTransition';
 
 interface ModelDownloadModalProps {
   modelId: string;
   modelName: string;
   sizeBytes: number;
   onClose: () => void;
+  isOpen?: boolean;
 }
 
 export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
@@ -15,6 +17,7 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
   modelName,
   sizeBytes,
   onClose,
+  isOpen = true,
 }) => {
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -22,9 +25,14 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
 
-  const formattedSize = (sizeBytes / (1024 * 1024)).toFixed(1);
+  const lastRef = useRef({ id: modelId, name: modelName, size: sizeBytes });
+  if (isOpen) lastRef.current = { id: modelId, name: modelName, size: sizeBytes };
+  const active = lastRef.current;
+  const formattedSize = (active.size / (1024 * 1024)).toFixed(1);
+  const { mounted, state } = useMountTransition(isOpen, 200);
 
   useEffect(() => {
+    if (!isOpen) return;
     const unsubscribe = APIClient.subscribeModelEvents((status: ModelStatus) => {
       if (status.id === modelId) {
         setDownloading(status.downloading);
@@ -39,7 +47,7 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
       }
     });
     return () => unsubscribe();
-  }, [modelId]);
+  }, [isOpen, modelId]);
 
   const handleStartDownload = async () => {
     try {
@@ -52,9 +60,21 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
     }
   };
 
+  if (!mounted) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div className="w-full max-w-md bg-stone-900 border border-stone-800 rounded-xl shadow-2xl p-6 text-stone-200">
+    <div
+      data-state={state}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 ${
+        state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
+      }`}
+      style={{ '--anim-dur': '200ms' } as React.CSSProperties}
+    >
+      <div
+        className={`w-full max-w-md bg-stone-900 border border-stone-800 rounded-xl shadow-2xl p-6 text-stone-200 ${
+          state === 'enter' ? 'anim-scale-in' : 'anim-scale-out'
+        }`}
+      >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-500/10 text-purple-400 rounded-lg">
@@ -89,7 +109,7 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
           <div className="space-y-4">
             <p className="text-sm text-stone-400 leading-relaxed font-serif">
               Natural voice narration for characters and scene descriptions requires the{' '}
-              <span className="text-stone-200 font-medium">{modelName}</span> (~{formattedSize} MB).
+              <span className="text-stone-200 font-medium">{active.name}</span> (~{formattedSize} MB).
               Would you like to download it now?
             </p>
 

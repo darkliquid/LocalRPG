@@ -120,7 +120,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
           <ContextDrawer isOpen={showContextDrawer} onClose={() => setShowContextDrawer(false)} />
         )}
 
-        <p className="text-[11px] text-stone-500">
+        <p className="text-xs text-stone-500">
           Tracing is off by default. At full detail the file records prompts, replies, and raw provider lines, which
           are your own story and never leave this machine. The file is owner-only and rotates by size.
         </p>
@@ -142,7 +142,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
               <option value="summary">{levelLabel('summary')}</option>
               <option value="full">{levelLabel('full')}</option>
             </select>
-            <p className="text-[11px] text-stone-500">Save settings after changing this for it to take effect.</p>
+            <p className="text-xs text-stone-500">Save settings after changing this for it to take effect.</p>
           </div>
 
           <div className="space-y-1.5">
@@ -161,7 +161,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
               }}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
-            <p className="text-[11px] text-stone-500">Any single recorded string is truncated past this.</p>
+            <p className="text-xs text-stone-500">Any single recorded string is truncated past this.</p>
           </div>
 
           <div className="space-y-1.5">
@@ -182,7 +182,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
               }}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
-            <p className="text-[11px] text-stone-500">
+            <p className="text-xs text-stone-500">
               Generous by default: this guards a session left running, not normal play.
             </p>
           </div>
@@ -203,7 +203,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
               }}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
-            <p className="text-[11px] text-stone-500">Older rotations are dropped once this many exist.</p>
+            <p className="text-xs text-stone-500">Older rotations are dropped once this many exist.</p>
           </div>
 
           <div className="space-y-1.5">
@@ -222,7 +222,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
               }}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
-            <p className="text-[11px] text-stone-500">How often the file size is considered.</p>
+            <p className="text-xs text-stone-500">How often the file size is considered.</p>
           </div>
 
           <div className="space-y-1.5">
@@ -241,7 +241,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
               }}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
-            <p className="text-[11px] text-stone-500">Provider streams can be hundreds of lines; this bounds one call.</p>
+            <p className="text-xs text-stone-500">Provider streams can be hundreds of lines; this bounds one call.</p>
           </div>
         </div>
       </div>
@@ -249,7 +249,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
       <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="font-sans text-xs uppercase font-bold text-stone-200">Recorded Events</h4>
-          <span className="text-[11px] font-mono text-stone-500">{events.length} events</span>
+          <span className="text-xs font-mono text-stone-500">{events.length} events</span>
         </div>
 
         {error && <p className="text-xs text-red-400 font-mono">{error}</p>}
@@ -267,7 +267,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
                   <span className="text-purple-300">{event.event}</span>
                   <span className="text-stone-500">{event.level}</span>
                 </summary>
-                <pre className="mt-1 text-[11px] text-stone-400 whitespace-pre-wrap break-all">
+                <pre className="mt-1 text-xs text-stone-400 whitespace-pre-wrap break-all">
                   {JSON.stringify(event.fields ?? {}, null, 2)}
                 </pre>
               </details>
@@ -280,14 +280,14 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
       <details className="p-4 rounded-xl bg-glass-card border border-stone-800">
         <summary className="cursor-pointer font-sans text-xs uppercase font-bold text-stone-200 flex items-center gap-2">
           <span>Raw Provider Lines</span>
-          <span className="text-[11px] font-mono text-stone-500">({wireLines.length} shown)</span>
+          <span className="text-xs font-mono text-stone-500">({wireLines.length} shown)</span>
         </summary>
         {wireLines.length === 0 ? (
           <p className="text-stone-500 text-xs italic mt-2">
             Only recorded at full detail. These are what the provider actually sent, before parsing.
           </p>
         ) : (
-          <pre className="mt-2 text-[11px] text-stone-400 whitespace-pre-wrap break-all max-h-72 overflow-y-auto">
+          <pre className="mt-2 text-xs text-stone-400 whitespace-pre-wrap break-all max-h-72 overflow-y-auto">
             {wireLines.map((event) => `${event.ts} ${String(event.fields?.line ?? '')}`).join('\n')}
           </pre>
         )}

@@ -73,16 +73,16 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
               </text>
             </svg>
           ))}
-          {count > shown && <span className="text-[10px] font-mono text-stone-400">+{count - shown}</span>}
+          {count > shown && <span className="text-xs font-mono text-stone-400">+{count - shown}</span>}
         </span>
         <span className="text-xs font-mono text-stone-300">{notation}</span>
         {roll && <span className="text-xs font-mono text-stone-400">&rarr; {roll.total}</span>}
         {roll && roll.successes !== undefined && roll.successes > 0 && (
           <span className="text-xs font-mono text-stone-400">{roll.successes} successes</span>
         )}
-        <span className={`text-[11px] font-sans font-bold uppercase tracking-wider ${style.chip}`}>{check.outcome}</span>
+        <span className={`text-xs font-sans font-bold uppercase tracking-wider ${style.chip}`}>{check.outcome}</span>
       </div>
-      {stakes && <div className="text-[11px] font-sans text-stone-400">{stakes}</div>}
+      {stakes && <div className="text-xs font-sans text-stone-400">{stakes}</div>}
     </div>
   );
 };

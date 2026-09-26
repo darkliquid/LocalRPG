@@ -19,13 +19,13 @@ export const VoiceOptionsControl: React.FC<VoiceOptionsControlProps> = ({ schema
         return (
           <div key={option.key} className="space-y-1">
             {option.kind !== 'bool' && (
-              <div className="flex justify-between text-[11px] text-stone-400">
+              <div className="flex justify-between text-xs text-stone-400">
                 <span>{option.label}</span>
                 <span className="font-mono text-purple-400">{describeValue(option, current)}</span>
               </div>
             )}
             {renderControl(option, current, onChange)}
-            {option.help && <p className="text-[10px] text-stone-500">{option.help}</p>}
+            {option.help && <p className="text-xs text-stone-500">{option.help}</p>}
           </div>
         );
       })}

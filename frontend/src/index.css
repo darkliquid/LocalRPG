@@ -76,12 +76,14 @@
   box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
 }
 
+/* The drawer panel is the one surface that slides, so it must not carry a
+   backdrop-filter: the compositor would re-blur the backdrop every frame and the
+   transition stutters. A slightly more opaque fill keeps it readable instead. */
 .bg-glass-drawer {
-  background: rgba(12, 10, 9, 0.85);
-  backdrop-filter: blur(32px) saturate(160%);
-  -webkit-backdrop-filter: blur(32px) saturate(160%);
+  background: rgba(16, 13, 12, 0.95);
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: -20px 0 50px -10px rgba(0, 0, 0, 0.85);
+  contain: paint;
 }
 
 /* Subtle noise texture */
@@ -112,4 +114,130 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* === Motion primitives === */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes slideInRight {
+  from { transform: translate3d(100%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes slideOutRight {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(100%, 0, 0); }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translate3d(-14px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes slideOutLeft {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(-14px, 0, 0); }
+}
+@keyframes slideInUp {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes slideOutDown {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(0, 14px, 0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes scaleOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.96); }
+}
+@keyframes contentRise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.anim-fade-in,
+.anim-fade-out,
+.anim-slide-in-right,
+.anim-slide-out-right,
+.anim-slide-in-left,
+.anim-slide-out-left,
+.anim-slide-in-up,
+.anim-slide-out-down,
+.anim-scale-in,
+.anim-scale-out {
+  animation-duration: var(--anim-dur, 250ms);
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+.anim-fade-in { animation-name: fadeIn; }
+.anim-fade-out { animation-name: fadeOut; }
+.anim-slide-in-right { animation-name: slideInRight; }
+.anim-slide-out-right { animation-name: slideOutRight; }
+.anim-slide-in-left { animation-name: slideInLeft; }
+.anim-slide-out-left { animation-name: slideOutLeft; }
+.anim-slide-in-up { animation-name: slideInUp; }
+.anim-slide-out-down { animation-name: slideOutDown; }
+.anim-scale-in { animation-name: scaleIn; }
+.anim-scale-out { animation-name: scaleOut; }
+
+/* Promote animated elements to their own compositor layer. Without this an
+   opacity fade on a parent of a backdrop-filtered child repaints every frame. */
+.anim-fade-in,
+.anim-fade-out,
+.anim-scale-in,
+.anim-scale-out {
+  will-change: opacity;
+}
+.anim-slide-in-right,
+.anim-slide-out-right,
+.anim-slide-in-left,
+.anim-slide-out-left,
+.anim-slide-in-up,
+.anim-slide-out-down {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Staggered entrance for list children */
+.anim-stagger > * {
+  animation: contentRise var(--anim-dur, 300ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--stagger-step, 28ms) * var(--stagger-index, 0));
+}
+.anim-stagger > *:nth-child(1) { --stagger-index: 0; }
+.anim-stagger > *:nth-child(2) { --stagger-index: 1; }
+.anim-stagger > *:nth-child(3) { --stagger-index: 2; }
+.anim-stagger > *:nth-child(4) { --stagger-index: 3; }
+.anim-stagger > *:nth-child(5) { --stagger-index: 4; }
+.anim-stagger > *:nth-child(6) { --stagger-index: 5; }
+.anim-stagger > *:nth-child(7) { --stagger-index: 6; }
+.anim-stagger > *:nth-child(8) { --stagger-index: 7; }
+.anim-stagger > *:nth-child(9) { --stagger-index: 8; }
+.anim-stagger > *:nth-child(10) { --stagger-index: 9; }
+.anim-stagger > *:nth-child(11) { --stagger-index: 10; }
+.anim-stagger > *:nth-child(12) { --stagger-index: 11; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-in,
+  .anim-fade-out,
+  .anim-slide-in-right,
+  .anim-slide-out-right,
+  .anim-slide-in-left,
+  .anim-slide-out-left,
+  .anim-slide-in-up,
+  .anim-slide-out-down,
+  .anim-scale-in,
+  .anim-scale-out,
+  .anim-stagger > *,
+  .animate-bg-fade-in {
+    animation: none !important;
+  }
 }

@@ -12,6 +12,7 @@ import { WorldsStudio } from './WorldsStudio';
 import { SystemsStudio } from './SystemsStudio';
 import { SettingsStudio } from './SettingsStudio';
 import { ArrowLeft, X } from 'lucide-react';
+import { useMountTransition } from '../hooks/useMountTransition';
 
 export function isWorkingGame(
   game: GameSummary,
@@ -53,6 +54,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
     { studio: 'worlds'; mode: 'new' | 'browse' } | { studio: 'systems' } | null
   >(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { mounted: settingsMounted, state: settingsState } = useMountTransition(isSettingsOpen, 200);
 
   const loadData = useCallback(async () => {
     try {
@@ -144,7 +146,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   // Full-Window Overlay: Worlds Studio
   if (activeStudio?.studio === 'worlds') {
     return (
-      <div className="relative w-full h-full flex flex-col bg-stone-950 text-stone-200">
+      <div className="relative w-full h-full flex flex-col bg-stone-950 text-stone-200 anim-fade-in">
         <header className="h-14 px-6 border-b border-white/10 flex items-center justify-between bg-stone-900/60 backdrop-blur-xl">
           <button
             onClick={() => {
@@ -171,7 +173,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   // Full-Window Overlay: Systems Studio
   if (activeStudio?.studio === 'systems') {
     return (
-      <div className="relative w-full h-full flex flex-col bg-stone-950 text-stone-200">
+      <div className="relative w-full h-full flex flex-col bg-stone-950 text-stone-200 anim-fade-in">
         <header className="h-14 px-6 border-b border-white/10 flex items-center justify-between bg-stone-900/60 backdrop-blur-xl">
           <button
             onClick={() => {
@@ -196,7 +198,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   }
 
   return (
-    <div className="relative w-full h-full flex overflow-hidden bg-stone-950 text-stone-200 font-sans select-none">
+    <div className="relative w-full h-full flex overflow-hidden bg-stone-950 text-stone-200 font-sans select-none anim-fade-in">
       {/* Left Navigation Dock */}
       <LauncherDock
         games={games}
@@ -301,9 +303,19 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
       />
 
       {/* Global Settings Modal */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-4xl bg-stone-900 border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+      {settingsMounted && (
+        <div
+          data-state={settingsState}
+          className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md ${
+            settingsState === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
+          }`}
+          style={{ '--anim-dur': '200ms' } as React.CSSProperties}
+        >
+          <div
+            className={`relative w-full max-w-4xl bg-stone-900 border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] ${
+              settingsState === 'enter' ? 'anim-scale-in' : 'anim-scale-out'
+            }`}
+          >
             <div className="p-4 px-6 border-b border-white/10 flex items-center justify-between bg-stone-950/60">
               <h2 className="text-base font-sans font-bold text-white">Global Settings</h2>
               <button

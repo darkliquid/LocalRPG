@@ -1,6 +1,9 @@
 package engine
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
@@ -15,7 +18,50 @@ type PlayerCharacter struct {
 	Pronouns   string
 	Background string
 	Voice      *entity.VoiceConfig
-	Extra      map[string]string
+	// Portrait is the character's portrait path relative to the game directory,
+	// carried so recreating a campaign does not silently drop the picture.
+	Portrait string
+	Extra    map[string]string
+}
+
+// PlayerCharacterFromEntity recovers the authored character fields from an
+// existing protagonist note, so a campaign can be recreated without retyping the
+// sheet. It is the inverse of what ensurePlayerNote writes: descriptive frontmatter
+// survives, while state and history are deliberately left behind because a restart
+// resets them.
+func PlayerCharacterFromEntity(ent *entity.Entity) PlayerCharacter {
+	pc := PlayerCharacter{}
+	if ent == nil {
+		return pc
+	}
+
+	pc.Appearance = ent.Appearance
+	pc.Age = ent.Age
+	pc.Gender = ent.Gender
+	pc.Voice = ent.Voice
+	pc.Portrait = ent.Portrait
+
+	for key, value := range ent.ExtraMeta {
+		if key == "pronouns" {
+			if s, ok := value.(string); ok {
+				pc.Pronouns = s
+			}
+			continue
+		}
+		if value == nil {
+			continue
+		}
+		s := strings.TrimSpace(fmt.Sprint(value))
+		if s == "" {
+			continue
+		}
+		if pc.Extra == nil {
+			pc.Extra = map[string]string{}
+		}
+		pc.Extra[key] = s
+	}
+
+	return pc
 }
 
 // DefaultCharacterFields is the fallback creation spec for a system that defines

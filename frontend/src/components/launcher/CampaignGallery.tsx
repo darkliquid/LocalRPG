@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { GameSummary, SystemInfo, WorldInfo } from '../../types';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
 import { Search, Plus, X, Settings, Play, LayoutGrid } from 'lucide-react';
+import { useMountTransition } from '../../hooks/useMountTransition';
 
 export interface CampaignGalleryProps {
   isOpen: boolean;
@@ -65,7 +66,7 @@ const CampaignCard: React.FC<{
 
         {/* Top Badges: Turn count & Settings button */}
         <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
-          <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[11px] font-sans font-semibold text-stone-200">
+          <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-xs font-sans font-semibold text-stone-200">
             Turn {game.turn_count}
           </span>
           <button
@@ -97,13 +98,13 @@ const CampaignCard: React.FC<{
             </h3>
             <div className="flex items-center gap-2 mt-0.5">
               {worldName && (
-                <span className="text-[11px] font-sans font-semibold text-purple-300 truncate">
+                <span className="text-xs font-sans font-semibold text-purple-300 truncate">
                   {worldName}
                 </span>
               )}
               {worldName && systemName && <span className="text-stone-500 text-xs">•</span>}
               {systemName && (
-                <span className="text-[11px] font-sans font-medium text-stone-400 truncate">
+                <span className="text-xs font-sans font-medium text-stone-400 truncate">
                   {systemName}
                 </span>
               )}
@@ -204,10 +205,18 @@ export const CampaignGallery: React.FC<CampaignGalleryProps> = ({
     return result;
   }, [games, searchQuery, sortBy, worldMap, systemMap]);
 
-  if (!isOpen) return null;
+  const { mounted, state } = useMountTransition(isOpen, 200);
+
+  if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-stone-950/98 backdrop-blur-xl select-none animate-in fade-in duration-200">
+    <div
+      data-state={state}
+      className={`fixed inset-0 z-50 flex flex-col bg-stone-950/98 backdrop-blur-xl select-none ${
+        state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
+      }`}
+      style={{ '--anim-dur': '200ms' } as React.CSSProperties}
+    >
       {/* Header */}
       <header className="h-16 px-8 border-b border-white/10 flex items-center justify-between bg-stone-900/70 shrink-0">
         <div className="flex items-center gap-3">

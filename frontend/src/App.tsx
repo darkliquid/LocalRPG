@@ -471,6 +471,10 @@ export const App: React.FC = () => {
       <div className="fixed inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70 pointer-events-none" />
 
       {/* When no game is selected: Mount the Launcher Hub */}
+      <div
+        key={activeGameID ? 'play' : 'launcher'}
+        className="relative flex-1 flex flex-col min-h-0 anim-fade-in"
+      >
       {!activeGameID ? (
         <LauncherHub onSelectGame={handleSelectGame} />
       ) : (
@@ -484,7 +488,7 @@ export const App: React.FC = () => {
                 title="Switch Campaign / Return to Hub"
               >
                 <Compass className="w-3.5 h-3.5" />
-                <span>Campaigns</span>
+                <span>Back</span>
               </button>
 
               <div className="flex items-center gap-2.5">
@@ -714,7 +718,7 @@ export const App: React.FC = () => {
 
           {/* Global Settings Modal Dialog */}
           {isSettingsOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm anim-fade-in">
               <div className="relative w-full max-w-4xl max-h-[88vh] bg-stone-900/95 border border-purple-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 shrink-0">
                   <div className="flex items-center gap-2">
@@ -752,6 +756,7 @@ export const App: React.FC = () => {
             volume={config?.media.tts.master_volume ?? 1}
             gameId={activeGameID ?? undefined}
             playerId={gameState?.player?.id}
+            playerName={gameState?.player?.name}
             campaignImage={gameState?.banner_url}
             serverPlayback={serverAudio}
             onPlayAudio={handlePlayTurnAudio}
@@ -784,19 +789,19 @@ export const App: React.FC = () => {
           )}
 
           {/* Model Download Modal */}
-          {missingModel && (
-            <ModelDownloadModal
-              modelId={missingModel.id}
-              modelName={missingModel.name}
-              sizeBytes={missingModel.sizeBytes}
-              onClose={() => {
-                setMissingModel(null);
-                setDismissedModelPrompt(true);
-              }}
-            />
-          )}
+          <ModelDownloadModal
+            isOpen={missingModel !== null}
+            modelId={missingModel?.id ?? ''}
+            modelName={missingModel?.name ?? ''}
+            sizeBytes={missingModel?.sizeBytes ?? 0}
+            onClose={() => {
+              setMissingModel(null);
+              setDismissedModelPrompt(true);
+            }}
+          />
         </>
       )}
+      </div>
     </div>
   );
 };

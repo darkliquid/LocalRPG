@@ -63,7 +63,7 @@ export const SegmentAudioControls: React.FC<SegmentAudioControlsProps> = ({
         <RotateCw className="w-3 h-3" />
       </button>
       {state === 'error' && message && (
-        <span className="max-w-[140px] truncate text-[10px] text-rose-300" title={message}>
+        <span className="max-w-[140px] truncate text-xs text-rose-300" title={message}>
           Error: {message}
         </span>
       )}

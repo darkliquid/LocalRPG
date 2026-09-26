@@ -31,7 +31,7 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
   const [hoveredGame, setHoveredGame] = React.useState<{ game: GameSummary; top: number } | null>(null);
 
   return (
-    <aside className="w-[72px] h-full flex flex-col items-center py-4 bg-stone-950/90 backdrop-blur-2xl border-r border-white/10 z-30 select-none flex-shrink-0">
+    <aside className="absolute left-0 top-0 w-[72px] h-full flex flex-col items-center py-4 bg-stone-900/70 backdrop-blur-2xl border-r border-white/10 z-30 select-none anim-fade-in">
       {/* Add Campaign Button (+) */}
       <div className="relative group mb-3">
         <button
@@ -80,7 +80,7 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
 
       {/* Campaigns List (Scrollable) */}
       <div
-        className="flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col items-center gap-3 no-scrollbar py-1"
+        className="flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col items-center gap-3 no-scrollbar py-1 anim-stagger"
         onScroll={() => setHoveredGame(null)}
       >
         {games.map((game) => {
@@ -121,7 +121,7 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
       </div>
 
       {/* Bottom Utility Icons */}
-      <div className="flex flex-col items-center gap-2.5 pt-3 border-t border-white/10">
+      <div className="flex flex-col items-center gap-2.5 pt-3 border-t border-white/10 anim-stagger">
         <div className="relative group">
           <button
             onClick={onOpenWorldsStudio}
@@ -169,10 +169,10 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
       {!isFlyoutOpen && hoveredGame && (
         <div
           style={{ top: `${hoveredGame.top}px` }}
-          className="pointer-events-none fixed left-[76px] -translate-y-1/2 px-2.5 py-1.5 bg-stone-900/95 border border-white/15 rounded-lg text-xs font-sans text-stone-100 whitespace-nowrap shadow-2xl z-50 animate-in fade-in duration-150"
+          className="pointer-events-none fixed left-[76px] -translate-y-1/2 px-2.5 py-1.5 bg-stone-900/95 border border-white/15 rounded-lg text-xs font-sans text-stone-100 whitespace-nowrap shadow-2xl z-50 anim-fade-in"
         >
           <div className="font-semibold text-white">{hoveredGame.game.name}</div>
-          <div className="text-[11px] text-stone-400 mt-0.5">
+          <div className="text-xs text-stone-400 mt-0.5">
             {hoveredGame.game.turn_count} {hoveredGame.game.turn_count === 1 ? 'turn' : 'turns'}
           </div>
         </div>

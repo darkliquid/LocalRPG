@@ -204,6 +204,7 @@ func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, pl
 		Age:        pc.Age,
 		Body:       body,
 		Voice:      pc.Voice,
+		Portrait:   pc.Portrait,
 		ExtraMeta:  map[string]interface{}{},
 	}
 	for key, value := range pc.Extra {

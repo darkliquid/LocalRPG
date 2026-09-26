@@ -405,7 +405,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-mono text-stone-400 bg-stone-900 px-2.5 py-1 rounded-lg border border-stone-800">
+          <span className="text-xs font-mono text-stone-400 bg-stone-900 px-2.5 py-1 rounded-lg border border-stone-800">
             {isOverride ? 'Workspace Override' : 'Global User Config'}: {activeFilePath}
           </span>
           <button
@@ -510,17 +510,17 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   </div>
                   <div>
                     <h4 className="text-xs font-sans font-bold text-stone-200">Google Gemini (GenAI)</h4>
-                    <p className="text-[11px] text-stone-400">Multi-modal intelligence: text reasoning, image creation, and vocal performance.</p>
+                    <p className="text-xs text-stone-400">Multi-modal intelligence: text reasoning, image creation, and vocal performance.</p>
                   </div>
                 </div>
                 <div>
                   {config.providers?.gemini?.api_key ? (
-                    <span className="flex items-center gap-1 text-emerald-400 font-mono text-[11px] bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
+                    <span className="flex items-center gap-1 text-emerald-400 font-mono text-xs bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
                       <CheckCircle className="w-3.5 h-3.5" />
                       <span>Configured in Settings</span>
                     </span>
                   ) : (
-                    <span className="text-[11px] font-mono text-stone-500 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded-md">
+                    <span className="text-xs font-mono text-stone-500 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded-md">
                       Using env or unconfigured
                     </span>
                   )}
@@ -530,7 +530,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               <div className="space-y-1.5">
                 <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>Shared Gemini API Key</span>
-                  <span className="text-[10px] text-stone-500 font-mono">
+                  <span className="text-xs text-stone-500 font-mono">
                     {config.providers?.gemini?.api_key ? '✓ Custom Key Saved' : 'Optional if GEMINI_API_KEY is set'}
                   </span>
                 </label>
@@ -552,23 +552,23 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }}
                   className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">
+                <p className="text-xs text-stone-500">
                   Automatically inherited by Gemini LLM agents, Gemini/Imagen image generators, and Gemini TTS voice synthesis. Individual roles and media engines can still provide an override key.
                 </p>
               </div>
 
               <div className="pt-2 border-t border-stone-800/50">
-                <div className="text-[11px] font-sans uppercase text-stone-400 font-semibold mb-2">Connected Subsystems</div>
+                <div className="text-xs font-sans uppercase text-stone-400 font-semibold mb-2">Connected Subsystems</div>
                 <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-[11px] text-stone-300 font-mono">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
                     <Cpu className="w-3 h-3 text-purple-400" />
                     <span>AI Agents (GM, Narrator, Extractor)</span>
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-[11px] text-stone-300 font-mono">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
                     <Sparkles className="w-3 h-3 text-purple-400" />
                     <span>Image Generation (Imagen 3, Nano Banana)</span>
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-[11px] text-stone-300 font-mono">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
                     <Volume2 className="w-3 h-3 text-purple-400" />
                     <span>Voice Synthesis (Gemini 3.1 & 2.5 Flash/Pro TTS)</span>
                   </span>
@@ -685,7 +685,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         </option>
                       ))}
                     </select>
-                    <p className="text-[11px] text-stone-500">
+                    <p className="text-xs text-stone-500">
                       Resolves to{' '}
                       {config.agents.roles[currentRoleConfig.inherit_from || 'gm']?.model ||
                         config.agents.roles[currentRoleConfig.inherit_from || 'gm']?.command ||
@@ -836,7 +836,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           type="button"
                           onClick={fetchGeminiModels}
                           disabled={fetchingGeminiModels}
-                          className="text-[10px] font-sans px-2 py-0.5 rounded border border-purple-500/40 text-purple-300 hover:bg-purple-600/20 disabled:opacity-50 cursor-pointer"
+                          className="text-xs font-sans px-2 py-0.5 rounded border border-purple-500/40 text-purple-300 hover:bg-purple-600/20 disabled:opacity-50 cursor-pointer"
                         >
                           {fetchingGeminiModels ? 'Loading...' : 'Fetch available models'}
                         </button>
@@ -872,7 +872,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                                 },
                               });
                             }}
-                            className={`px-2 py-0.5 text-[10px] font-mono rounded border transition-colors cursor-pointer ${
+                            className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors cursor-pointer ${
                               (currentRoleConfig.model || 'gemini-3.8-flash') === m
                                 ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
                                 : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200'
@@ -883,16 +883,16 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         ))}
                       </div>
                       {geminiModels ? (
-                        <p className="text-[11px] text-stone-500">
+                        <p className="text-xs text-stone-500">
                           Showing {geminiModels.length} models available to your key.
                         </p>
                       ) : (
-                        <p className="text-[11px] text-stone-500">
+                        <p className="text-xs text-stone-500">
                           Suggested models shown; fetch the catalogue to list everything your key can use.
                         </p>
                       )}
                       {geminiModelError && (
-                        <p className="text-[11px] text-red-400 font-mono">{geminiModelError}</p>
+                        <p className="text-xs text-red-400 font-mono">{geminiModelError}</p>
                       )}
                     </div>
 
@@ -900,7 +900,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                         <span>Role API Key Override</span>
                         {config.providers?.gemini?.api_key && (
-                          <span className="text-[10px] text-emerald-400 font-mono">Shared key active (from Providers tab)</span>
+                          <span className="text-xs text-emerald-400 font-mono">Shared key active (from Providers tab)</span>
                         )}
                       </label>
                       <input
@@ -990,7 +990,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           />
                         )}
                       </div>
-                      <p className="text-[11px] text-stone-500">
+                      <p className="text-xs text-stone-500">
                         Thinking tokens allow Gemini 2.5 to reason deeply before replying. Thought tokens are automatically filtered from the story chronicle.
                       </p>
                     </div>
@@ -1072,7 +1072,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       }}
                       className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                     />
-                    <p className="text-[11px] text-stone-500">
+                    <p className="text-xs text-stone-500">
                       How long a single reply may be. Raise it for longer scenes; the reply is marked as cut off when it
                       hits this.
                     </p>
@@ -1098,7 +1098,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       }}
                       className="w-full accent-purple-500"
                     />
-                    <p className="text-[11px] text-stone-500">Lower is steadier, which helps long-run continuity.</p>
+                    <p className="text-xs text-stone-500">Lower is steadier, which helps long-run continuity.</p>
                   </div>
                 </div>
               )}
@@ -1121,7 +1121,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <option value="yes">Yes (force tools)</option>
                     <option value="no">No (suppress tools)</option>
                   </select>
-                  <p className="text-[11px] text-stone-500">
+                  <p className="text-xs text-stone-500">
                     Whether this role may look things up mid-turn. Only the gm role is offered tools.
                   </p>
                 </div>
@@ -1184,7 +1184,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">
+                <p className="text-xs text-stone-500">
                   Estimated ceiling for the assembled prompt. 0 sends everything. When it is exceeded, the voice
                   catalogue and the oldest remembered turns are dropped first; rules, lore, the scene, and your action
                   are never dropped.
@@ -1211,7 +1211,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">
+                <p className="text-xs text-stone-500">
                   How many prior turns are replayed to the narrator. A larger window means better continuity and a
                   larger prompt.
                 </p>
@@ -1236,7 +1236,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">Cap on the text recalled from any one prior turn.</p>
+                <p className="text-xs text-stone-500">Cap on the text recalled from any one prior turn.</p>
               </div>
 
               <div className="space-y-1.5">
@@ -1258,7 +1258,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">What happened where the party is standing.</p>
+                <p className="text-xs text-stone-500">What happened where the party is standing.</p>
               </div>
 
               <div className="space-y-1.5">
@@ -1280,7 +1280,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">Cap on the excerpt taken from one recalled turn.</p>
+                <p className="text-xs text-stone-500">Cap on the excerpt taken from one recalled turn.</p>
               </div>
 
               <div className="space-y-1.5">
@@ -1302,7 +1302,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">
+                <p className="text-xs text-stone-500">
                   Past turns that share characters with the ones in play, wherever they happened.
                 </p>
               </div>
@@ -1326,7 +1326,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">Cap on the excerpt taken from one retrieved turn.</p>
+                <p className="text-xs text-stone-500">Cap on the excerpt taken from one retrieved turn.</p>
               </div>
 
               <div className="space-y-1.5">
@@ -1348,7 +1348,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">
+                <p className="text-xs text-stone-500">
                   Turns after which a retrieved turn's recency weight halves. Lower favours the recent.
                 </p>
               </div>
@@ -1372,7 +1372,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">
+                <p className="text-xs text-stone-500">
                   Wall clock for a whole turn. Raise it for slower local models and long contexts.
                 </p>
               </div>
@@ -1396,7 +1396,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">
+                <p className="text-xs text-stone-500">
                   How long the narrator may go quiet between chunks before the turn fails.
                 </p>
               </div>
@@ -1418,7 +1418,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     }}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                   />
-                  <p className="text-[11px] text-stone-500">How many times a turn may look something up before answering (0 = unbounded).</p>
+                  <p className="text-xs text-stone-500">How many times a turn may look something up before answering (0 = unbounded).</p>
                 </div>
 
                 <div className="space-y-1.5">
@@ -1438,7 +1438,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     }}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                   />
-                  <p className="text-[11px] text-stone-500">The most of one lookup the model is shown at once.</p>
+                  <p className="text-xs text-stone-500">The most of one lookup the model is shown at once.</p>
                 </div>
               </div>
             </div>
@@ -1528,7 +1528,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <option value="strip">Always reduce formatting to plain speech</option>
                 <option value="keep">Keep formatting as written</option>
               </select>
-              <p className="text-[11px] text-stone-500">
+              <p className="text-xs text-stone-500">
                 Markdown emphasis, headings, lists and wikilinks are otherwise read aloud by engines that do not interpret them.
               </p>
             </div>
@@ -1673,7 +1673,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       }
                       className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                     />
-                    <p className="text-[11px] text-stone-500">
+                    <p className="text-xs text-stone-500">
                       Accepts either the base server URL (e.g. http://localhost:8880) or the full /v1/audio/speech endpoint.
                     </p>
                   </div>
@@ -1761,12 +1761,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   <Volume2 className="w-4 h-4 text-purple-400" />
                   <span className="font-medium text-stone-200">Kokoro Model:</span>
                   {kokoroStatus?.installed ? (
-                    <span className="flex items-center gap-1 text-emerald-400 font-mono text-[11px] bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
+                    <span className="flex items-center gap-1 text-emerald-400 font-mono text-xs bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
                       <CheckCircle className="w-3.5 h-3.5" />
                       <span>Installed</span>
                     </span>
                   ) : kokoroStatus?.downloading ? (
-                    <div className="flex items-center gap-2 text-purple-400 font-mono text-[11px]">
+                    <div className="flex items-center gap-2 text-purple-400 font-mono text-xs">
                       <span>Downloading {Math.round(kokoroStatus.progress * 100)}%</span>
                       <div className="w-20 h-1.5 bg-stone-800 rounded-full overflow-hidden">
                         <div
@@ -1776,7 +1776,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       </div>
                     </div>
                   ) : (
-                    <span className="flex items-center gap-1 text-purple-400/90 font-mono text-[11px] bg-purple-950/40 border border-purple-800/40 px-2 py-0.5 rounded-md">
+                    <span className="flex items-center gap-1 text-purple-400/90 font-mono text-xs bg-purple-950/40 border border-purple-800/40 px-2 py-0.5 rounded-md">
                       <AlertCircle className="w-3.5 h-3.5" />
                       <span>Not Installed (~320 MB)</span>
                     </span>
@@ -1833,7 +1833,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           media: { ...config.media, tts: { ...config.media.tts, model: m.id } },
                         })
                       }
-                      className={`text-[11px] px-2.5 py-1 rounded-lg border font-mono transition cursor-pointer ${
+                      className={`text-xs px-2.5 py-1 rounded-lg border font-mono transition cursor-pointer ${
                         (config.media.tts.model || 'gemini-3.8-flash-tts') === m.id
                           ? 'bg-purple-500/20 border-purple-500/60 text-purple-300'
                           : 'bg-stone-900/60 border-stone-800 text-stone-400 hover:text-stone-200'
@@ -1847,14 +1847,14 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             )}
 
             {inspect?.metered && (
-              <div className="flex items-center gap-2 text-[11px] font-mono text-purple-400/90">
+              <div className="flex items-center gap-2 text-xs font-mono text-purple-400/90">
                 <span className="px-1.5 py-0.5 rounded border border-purple-500/40 bg-purple-500/10">METERED</span>
                 <span>This provider charges per request. Cached clips are reused.</span>
               </div>
             )}
 
             {inspect?.key_required && !inspect.key_present && (
-              <div className="text-[11px] font-mono text-stone-400">
+              <div className="text-xs font-mono text-stone-400">
                 {isGeminiTTS
                   ? 'No Gemini API key configured. Enter one below, or set GEMINI_API_KEY / GOOGLE_API_KEY in the environment.'
                   : isElevenLabsTTS
@@ -1868,7 +1868,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                   <span>API Key</span>
                   {isGeminiTTS && config.providers?.gemini?.api_key && !config.media.tts.api_key && (
-                    <span className="text-[11px] text-emerald-400 font-mono">Using shared Gemini key</span>
+                    <span className="text-xs text-emerald-400 font-mono">Using shared Gemini key</span>
                   )}
                 </label>
                 <input
@@ -1887,7 +1887,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   }
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                 />
-                <p className="text-[11px] text-stone-500">
+                <p className="text-xs text-stone-500">
                   {isGeminiTTS
                     ? 'Stored in your configuration file. Set GEMINI_API_KEY instead to keep it off disk.'
                     : isElevenLabsTTS
@@ -1917,7 +1917,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             )}
 
             {inspect?.catalog?.available && (
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-stone-400">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-stone-400">
                 <span>
                   {inspect.catalog.voices?.length ?? 0} voices
                   {inspect.catalog.fetched_at
@@ -1937,7 +1937,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             )}
 
             {(inspect?.error || inspectError) && (
-              <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-900/60 text-[11px] text-red-300 font-mono">
+              <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-900/60 text-xs text-red-300 font-mono">
                 {inspect?.error || inspectError}
               </div>
             )}
@@ -1959,7 +1959,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   voices={availableTTSVoices}
                   placeholder="Select default provider voice..."
                 />
-                <p className="text-[11px] text-stone-500">
+                <p className="text-xs text-stone-500">
                   Fallback voice used for turn narration and unvoiced characters.
                 </p>
               </div>
@@ -1972,7 +1972,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <div className="text-xs font-sans font-bold text-stone-200">
                       Speech Steering & Acting Cues
                     </div>
-                    <div className="text-[11px] text-stone-400">
+                    <div className="text-xs text-stone-400">
                       Instruct the GM to use emotive directions (e.g. [whispers], [sighs]) when supported.
                     </div>
                   </div>
@@ -1999,7 +1999,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 </div>
 
                 {inspect?.speech_cues && (
-                  <div className="text-[11px] p-2.5 rounded-lg bg-stone-950/60 border border-stone-800/80 text-stone-400">
+                  <div className="text-xs p-2.5 rounded-lg bg-stone-950/60 border border-stone-800/80 text-stone-400">
                     <span className="font-semibold text-stone-300">Provider Capabilities: </span>
                     {inspect.speech_cues.audio_tags ? (
                       <span className="text-purple-400">
@@ -2094,7 +2094,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   <span className="font-sans text-xs uppercase font-bold text-stone-200">
                     NPC Voice Profiles Library
                   </span>
-                  <span className="text-[10px] font-mono text-stone-500">
+                  <span className="text-xs font-mono text-stone-500">
                     ({config.media.tts.voice_profiles?.length || 0} archetypes)
                   </span>
                 </div>
@@ -2113,7 +2113,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           },
                         });
                       }}
-                      className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 transition cursor-pointer"
+                      className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 transition cursor-pointer"
                       title="Autofill all 11 Kokoro voice profiles with gender and accent tags"
                     >
                       <Sparkles className="w-3 h-3" />
@@ -2134,7 +2134,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         },
                       });
                     }}
-                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-300 hover:text-purple-300 transition cursor-pointer"
+                    className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-300 hover:text-purple-300 transition cursor-pointer"
                     title="Restore default fantasy archetypes"
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -2145,7 +2145,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <button
                       type="button"
                       onClick={() => setIsCatalogModalOpen(true)}
-                      className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-stone-900 border border-purple-500/40 text-purple-300 hover:bg-stone-800 transition cursor-pointer"
+                      className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-stone-900 border border-purple-500/40 text-purple-300 hover:bg-stone-800 transition cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Import from Catalog</span>
@@ -2175,7 +2175,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                         },
                       });
                     }}
-                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 transition cursor-pointer"
+                    className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 transition cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
                     <span>Add Profile</span>
@@ -2183,7 +2183,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 </div>
               </div>
 
-              <p className="text-[11px] text-stone-400">
+              <p className="text-xs text-stone-400">
                 The GM and world extractor match NPC descriptions against these voice archetypes and tags to assign unique speech parameters automatically.
               </p>
 
@@ -2276,7 +2276,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                       <div className="space-y-1">
-                        <div className="flex justify-between text-[11px] text-stone-400">
+                        <div className="flex justify-between text-xs text-stone-400">
                           <span>Pitch</span>
                           <span className="font-mono text-purple-400">{(profile.pitch ?? 1.0).toFixed(2)}x</span>
                         </div>
@@ -2299,7 +2299,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       </div>
 
                       <div className="space-y-1">
-                        <div className="flex justify-between text-[11px] text-stone-400">
+                        <div className="flex justify-between text-xs text-stone-400">
                           <span>Speed / Speech Rate</span>
                           <span className="font-mono text-purple-400">{(profile.speech_rate ?? 1.0).toFixed(2)}x</span>
                         </div>
@@ -2356,7 +2356,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
                     {inspect && inspect.options && inspect.options.length > 0 && (
                       <details className="text-xs">
-                        <summary className="cursor-pointer text-[11px] font-sans uppercase text-stone-400">
+                        <summary className="cursor-pointer text-xs font-sans uppercase text-stone-400">
                           Provider Options
                         </summary>
                         <div className="pt-2">
@@ -2686,7 +2686,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                               media: { ...config.media, image: { ...config.media.image, model: m.id } },
                             })
                           }
-                          className={`px-2 py-0.5 text-[10px] font-mono rounded border transition-colors cursor-pointer ${
+                          className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors cursor-pointer ${
                             (config.media.image.model || 'imagen-3.0-generate-002') === m.id
                               ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
                               : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200'
@@ -2741,7 +2741,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
                       <span>API Key Override</span>
                       {config.providers?.gemini?.api_key && (
-                        <span className="text-[10px] text-emerald-400 font-mono">Shared key active</span>
+                        <span className="text-xs text-emerald-400 font-mono">Shared key active</span>
                       )}
                     </label>
                     <input
@@ -2800,7 +2800,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-sans uppercase text-stone-300">Cinematic Backdrop Overlays</label>
-                <p className="text-[11px] text-stone-400">
+                <p className="text-xs text-stone-400">
                   Enable atmospheric vignette darkening and cinematic film noise textures.
                 </p>
                 <button
@@ -2826,7 +2826,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
               <div className="space-y-2">
                 <label className="text-xs font-sans uppercase text-stone-300">Typography Scaling</label>
-                <p className="text-[11px] text-stone-400">Select font scaling across story chronicles and dialogue.</p>
+                <p className="text-xs text-stone-400">Select font scaling across story chronicles and dialogue.</p>
                 <div className="flex gap-2">
                   {(['small', 'medium', 'large'] as const).map((scale) => (
                     <button
@@ -2852,7 +2852,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
               <div className="space-y-2">
                 <label className="text-xs font-sans uppercase text-stone-300">Story Token Streaming</label>
-                <p className="text-[11px] text-stone-400">
+                <p className="text-xs text-stone-400">
                   Stream narrative text word-by-word as generated by the storyteller model.
                 </p>
                 <button
@@ -2883,19 +2883,17 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       {/* Tab 5: Debug (developer view over the trace) */}
       {activeSubTab === 'debug' && <DebugPanel config={config} setConfig={setConfig} />}
 
-      {missingModelPrompt && (
-        <ModelDownloadModal
-          modelId={missingModelPrompt.id}
-          modelName={missingModelPrompt.name}
-          sizeBytes={missingModelPrompt.sizeBytes}
-          onClose={() => setMissingModelPrompt(null)}
-        />
-      )}
+      <ModelDownloadModal
+        isOpen={missingModelPrompt !== null}
+        modelId={missingModelPrompt?.id ?? ''}
+        modelName={missingModelPrompt?.name ?? ''}
+        sizeBytes={missingModelPrompt?.sizeBytes ?? 0}
+        onClose={() => setMissingModelPrompt(null)}
+      />
 
-      {isCatalogModalOpen && (
-        <VoiceCatalogModal
-          isOpen={isCatalogModalOpen}
-          onClose={() => setIsCatalogModalOpen(false)}
+      <VoiceCatalogModal
+        isOpen={isCatalogModalOpen}
+        onClose={() => setIsCatalogModalOpen(false)}
           voices={inspect?.catalog?.voices ?? []}
           providerKey={inspect?.provider_key || 'tts'}
           onSearch={
@@ -2924,7 +2922,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             }
           }}
         />
-      )}
     </div>
   );
 };

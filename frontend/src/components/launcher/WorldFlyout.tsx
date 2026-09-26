@@ -3,6 +3,7 @@ import { WorldInfo } from '../../types';
 import { ProceduralIcon } from './ProceduralAsset';
 import { Plus, LayoutGrid, Maximize2 } from 'lucide-react';
 import { useLightbox } from '../../hooks/useLightbox';
+import { useMountTransition } from '../../hooks/useMountTransition';
 import { ImageLightbox } from '../ImageLightbox';
 
 interface WorldFlyoutProps {
@@ -20,12 +21,19 @@ export const WorldFlyout: React.FC<WorldFlyoutProps> = ({
   onCreateWorld,
   onExpand,
 }) => {
-  const { lightbox, openLightbox, closeLightbox } = useLightbox();
-  if (!isOpen) return null;
+  const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
+  const { mounted, state } = useMountTransition(isOpen, 200);
+  if (!mounted) return null;
 
   return (
-    <div className="absolute left-[84px] top-4 z-40 flex items-center gap-3 bg-stone-900/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-2 px-3 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-200 select-none">
-      <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-stone-400 pl-1 pr-1 border-r border-white/10 shrink-0">
+    <div
+      data-state={state}
+      className={`absolute left-[84px] top-4 z-40 flex items-center gap-3 bg-stone-900/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-2 px-3 shadow-2xl select-none ${
+        state === 'enter' ? 'anim-slide-in-left' : 'anim-slide-out-left pointer-events-none'
+      }`}
+      style={{ '--anim-dur': '200ms' } as React.CSSProperties}
+    >
+      <div className="text-xs font-sans font-semibold uppercase tracking-wider text-stone-400 pl-1 pr-1 border-r border-white/10 shrink-0">
         Worlds
       </div>
 
@@ -91,7 +99,7 @@ export const WorldFlyout: React.FC<WorldFlyoutProps> = ({
       </div>
 
       {lightbox && (
-        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
+        <ImageLightbox isOpen={isLightboxOpen} src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
       )}
     </div>
   );

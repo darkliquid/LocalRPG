@@ -5,6 +5,7 @@ import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X
 import { formatGenerationError } from '../lib/generationError';
 import { TurnHistoryList } from './TurnHistoryList';
 import { ImageLightbox } from './ImageLightbox';
+import { useLightbox } from '../hooks/useLightbox';
 
 interface CodexDrawerProps {
   gameID?: string;
@@ -45,7 +46,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const [memories, setMemories] = useState<EntityMemory[]>([]);
   const [previewProfileId, setPreviewProfileId] = useState('');
   const [isPreviewing, setIsPreviewing] = useState(false);
-  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
+  const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
   const [sidebarTab, setSidebarTab] = useState<'notes' | 'memories'>('notes');
   const [portraitVersion, setPortraitVersion] = useState(0);
   const [isRegeneratingPortrait, setIsRegeneratingPortrait] = useState(false);
@@ -208,7 +209,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               <button
                 type="button"
                 onClick={() => setSidebarTab('notes')}
-                className={`text-[10px] font-sans font-bold uppercase tracking-wider px-2 py-1 rounded border transition-colors cursor-pointer ${
+                className={`text-xs font-sans font-bold uppercase tracking-wider px-2 py-1 rounded border transition-colors cursor-pointer ${
                   sidebarTab === 'notes'
                     ? 'bg-purple-600/30 border-purple-500/50 text-purple-200'
                     : 'bg-black/40 border-white/10 text-stone-400 hover:text-stone-200'
@@ -219,7 +220,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               <button
                 type="button"
                 onClick={() => setSidebarTab('memories')}
-                className={`text-[10px] font-sans font-bold uppercase tracking-wider px-2 py-1 rounded border transition-colors cursor-pointer ${
+                className={`text-xs font-sans font-bold uppercase tracking-wider px-2 py-1 rounded border transition-colors cursor-pointer ${
                   sidebarTab === 'memories'
                     ? 'bg-purple-600/30 border-purple-500/50 text-purple-200'
                     : 'bg-black/40 border-white/10 text-stone-400 hover:text-stone-200'
@@ -255,7 +256,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               <div className="flex flex-wrap gap-1">
                 <button
                   onClick={() => setTypeFilter('all')}
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                  className={`text-xs font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
                     typeFilter === 'all'
                       ? 'bg-purple-600/30 border-purple-500/50 text-purple-200'
                       : 'bg-black/40 border-white/10 text-stone-400 hover:text-stone-200'
@@ -267,7 +268,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                   <button
                     key={type}
                     onClick={() => setTypeFilter(type)}
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                    className={`text-xs font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
                       typeFilter === type
                         ? 'bg-purple-600/30 border-purple-500/50 text-purple-200'
                         : 'bg-black/40 border-white/10 text-stone-400 hover:text-stone-200'
@@ -297,7 +298,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                       }`}
                     >
                       <div className="text-xs text-stone-200 truncate font-medium">{candidate.name}</div>
-                      <div className="text-[10px] font-mono text-stone-500 truncate">
+                      <div className="text-xs font-mono text-stone-500 truncate">
                         {candidate.type || 'note'}
                         {candidate.location ? ` · ${candidate.location.replace(/\[\[|\]\]/g, '')}` : ''}
                       </div>
@@ -318,7 +319,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                 memories.map((memory, index) => (
                   <div
                     key={`${memory.turn}-${index}`}
-                    className="text-[11px] text-stone-300 bg-black/30 border border-white/5 rounded px-2 py-1"
+                    className="text-xs text-stone-300 bg-black/30 border border-white/5 rounded px-2 py-1"
                   >
                     <span className="font-mono text-stone-500 mr-1">t{memory.turn}</span>
                     {memory.text}
@@ -354,7 +355,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                 {entity.type === 'character' && gameID && (
                   <div className="flex items-center gap-1.5 shrink-0">
                     <div
-                      onClick={() => setLightbox({ src: portraitURL, alt: entity.name })}
+                      onClick={() => openLightbox(portraitURL, entity.name)}
                       className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border-2 border-purple-500/30 shadow-lg bg-black/40 cursor-zoom-in transition-transform hover:scale-105"
                       title={`View portrait of ${entity.name}`}
                     >
@@ -494,7 +495,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
       </div>
 
       {isMergeOpen && entity && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm anim-fade-in">
           <div className="relative w-full max-w-md bg-stone-900 border border-red-500/40 rounded-2xl p-6 shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-stone-800 pb-3">
               <div className="flex items-center gap-2">
@@ -556,7 +557,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
         </div>
       )}
       {lightbox && (
-        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />
+        <ImageLightbox isOpen={isLightboxOpen} src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
       )}
     </div>
   );

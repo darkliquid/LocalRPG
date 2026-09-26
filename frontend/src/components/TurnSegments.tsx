@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { TurnSegment, TurnCheck } from '../types';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { MarkdownProse } from './MarkdownProse';
 import { ImageLightbox } from './ImageLightbox';
+import { useLightbox } from '../hooks/useLightbox';
 import { DiceCheckCard } from './DiceCheckCard';
 import { Play, Square, RotateCw, Loader2 } from 'lucide-react';
 import { SegmentAudioControls } from './SegmentAudioControls';
@@ -86,7 +87,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
     );
   };
 
-  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
+  const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
 
   // Merge checks into the segment stream so a roll renders immediately before the
   // line it produced; any check the GM did not attach renders after the prose.
@@ -118,7 +119,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
         return segment.kind === 'speech' ? (
           <div
             key={streamIndex}
-            className={`group relative bg-glass-card border-l-4 pl-4 py-3 pr-4 rounded-r-xl shadow-lg space-y-2 ${
+            className={`group relative bg-glass-card border-l-4 pl-4 py-3 pr-4 rounded-r-xl shadow-lg space-y-2 anim-fade-in ${
               segment.player ? 'border-sky-400/90' : 'border-purple-500/90'
             }`}
           >
@@ -126,7 +127,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             <div className="flex items-center gap-3">
               {segment.portrait_url && (
                 <div
-                  onClick={() => setLightbox({ src: segment.portrait_url!, alt: segment.speaker || 'Portrait' })}
+                  onClick={() => openLightbox(segment.portrait_url!, segment.speaker || 'Portrait')}
                   className={`w-9 h-9 rounded-full overflow-hidden shrink-0 border-2 shadow-md cursor-zoom-in transition-transform hover:scale-105 ${
                     segment.player ? 'border-sky-400/80' : 'border-purple-400/80'
                   }`}
@@ -169,7 +170,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             />
           </div>
         ) : (
-          <div key={streamIndex} className="group relative">
+          <div key={streamIndex} className="group relative anim-fade-in">
             {segmentControls(i)}
             <MarkdownProse
               text={segment.text}
@@ -271,7 +272,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
         </div>
       )}
       {lightbox && (
-        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />
+        <ImageLightbox isOpen={isLightboxOpen} src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
       )}
     </div>
   );

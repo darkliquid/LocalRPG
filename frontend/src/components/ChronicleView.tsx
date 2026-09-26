@@ -45,7 +45,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   segmentAudioStatus = {},
 }) => {
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const { lightbox, openLightbox, closeLightbox } = useLightbox();
+  const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
 
   // Auto-scroll when a new turn is added, turn starts, or prose streams in
   useEffect(() => {
@@ -162,7 +162,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               )}
 
               {turn.tool_calls && turn.tool_calls.length > 0 && (
-                <div className="text-[11px] font-mono text-stone-500 pt-1">
+                <div className="text-xs font-mono text-stone-500 pt-1">
                   Looked up: {turn.tool_calls.map((call) => `${call.name} (${call.result_chars})`).join(', ')}
                 </div>
               )}
@@ -202,7 +202,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
 
       {/* Pending Turn in Flight */}
       {turnInFlight && pendingAction && (
-        <div className="space-y-4 pb-6 animate-fade-in">
+        <div className="space-y-4 pb-6 anim-fade-in">
           {/* Immediate Action Bubble */}
           {pendingAction.text && (
             <div className="flex items-start gap-3 text-stone-300 text-sm font-sans italic bg-black/40 p-3.5 rounded-xl border border-purple-500/20 shadow-inner">
@@ -240,7 +240,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
       )}
 
       {lightbox && (
-        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
+        <ImageLightbox isOpen={isLightboxOpen} src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
       )}
 
       <div ref={bottomRef} />

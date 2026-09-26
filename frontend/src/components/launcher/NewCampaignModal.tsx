@@ -4,6 +4,7 @@ import { APIClient } from '../../api/client';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
 import { X, Upload, Check, Volume2, MapPin, Sparkles, User, Wand2 } from 'lucide-react';
 import { AIGenerateButton } from '../ui/AIGenerateButton';
+import { useMountTransition } from '../../hooks/useMountTransition';
 
 interface NewCampaignModalProps {
   isOpen: boolean;
@@ -16,7 +17,7 @@ interface NewCampaignModalProps {
 
 export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   isOpen,
-  world,
+  world: worldProp,
   systems,
   onClose,
   onCreateGame,
@@ -48,6 +49,10 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
 
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
+  const lastWorldRef = useRef<WorldInfo | null>(null);
+  if (worldProp) lastWorldRef.current = worldProp;
+  const world = worldProp ?? lastWorldRef.current;
+  const { mounted, state } = useMountTransition(isOpen, 200);
 
   useEffect(() => {
     APIClient.getSettings()
@@ -79,7 +84,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
     }
   }, [world, systems]);
 
-  if (!isOpen || !world) return null;
+  if (!mounted || !world) return null;
 
   const handleBannerSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -211,8 +216,18 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md select-none animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-stone-900/95 border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+    <div
+      data-state={state}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md select-none ${
+        state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
+      }`}
+      style={{ '--anim-dur': '200ms' } as React.CSSProperties}
+    >
+      <div
+        className={`relative w-full max-w-2xl bg-stone-900/95 border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] ${
+          state === 'enter' ? 'anim-scale-in' : 'anim-scale-out'
+        }`}
+      >
         {/* Modal Banner Header - Absolute Background Layer */}
         <div className="relative h-44 w-full overflow-hidden border-b border-white/10 select-none shrink-0">
           <div className="absolute inset-0 z-0 pointer-events-none">
@@ -239,7 +254,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   <h2 className="text-xl font-sans font-extrabold text-white tracking-tight">
                     New Campaign
                   </h2>
-                  <span className="text-[11px] font-sans font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-sans font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
                     {world.name}
                   </span>
                 </div>
@@ -293,7 +308,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
               <label className="text-xs font-sans font-semibold text-stone-300 uppercase tracking-wider">
                 Rules System
               </label>
-              <span className="text-[11px] font-sans text-purple-400">
+              <span className="text-xs font-sans text-purple-400">
                 {world.compatible_systems?.length ? 'Compatible systems highlighted' : 'All systems'}
               </span>
             </div>
@@ -318,7 +333,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                       <div className="text-xs font-sans font-bold text-white">{s.name}</div>
                       {isSelected && <Check className="w-3.5 h-3.5 text-purple-400" />}
                     </div>
-                    <div className="text-[11px] font-sans text-stone-400 mt-0.5 line-clamp-1">
+                    <div className="text-xs font-sans text-stone-400 mt-0.5 line-clamp-1">
                       {s.description || 'Rules system'}
                     </div>
                   </button>
@@ -337,7 +352,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Narrator Voice */}
               <div className="space-y-1">
-                <label className="text-[11px] font-sans text-stone-300">
+                <label className="text-xs font-sans text-stone-300">
                   Narrator Voice
                 </label>
                 <select
@@ -356,7 +371,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
 
               {/* Character Voice */}
               <div className="space-y-1">
-                <label className="text-[11px] font-sans text-stone-300">
+                <label className="text-xs font-sans text-stone-300">
                   Protagonist Voice
                 </label>
                 <select
@@ -384,7 +399,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-sans text-stone-300">
+                <label className="text-xs font-sans text-stone-300">
                   Character Name <span className="text-purple-400">*</span>
                 </label>
                 <AIGenerateButton
@@ -410,7 +425,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-sans text-stone-400">Age</label>
+                  <label className="text-xs font-sans text-stone-400">Age</label>
                   <AIGenerateButton
                     formType="character"
                     fieldName="age"
@@ -431,7 +446,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
               </div>
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-sans text-stone-400">Gender</label>
+                  <label className="text-xs font-sans text-stone-400">Gender</label>
                   <AIGenerateButton
                     formType="character"
                     fieldName="gender"
@@ -452,7 +467,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
               </div>
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-sans text-stone-400">Pronouns</label>
+                  <label className="text-xs font-sans text-stone-400">Pronouns</label>
                   <AIGenerateButton
                     formType="character"
                     fieldName="pronouns"
@@ -475,7 +490,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-sans text-stone-400">Appearance</label>
+                <label className="text-xs font-sans text-stone-400">Appearance</label>
                 <AIGenerateButton
                   formType="character"
                   fieldName="appearance"
@@ -498,7 +513,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-sans text-stone-400">Background / Origin</label>
+                <label className="text-xs font-sans text-stone-400">Background / Origin</label>
                 <AIGenerateButton
                   formType="character"
                   fieldName="background"
@@ -529,7 +544,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-sans text-stone-300 flex items-center gap-1">
+                <label className="text-xs font-sans text-stone-300 flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-stone-400" />
                   <span>Start Location (Optional)</span>
                 </label>
@@ -554,7 +569,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-sans text-stone-300">
+                <label className="text-xs font-sans text-stone-300">
                   Opening Scene Directive (Optional)
                 </label>
                 <AIGenerateButton
@@ -573,7 +588,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 value={openingPrompt}
                 onChange={(e) => setOpeningPrompt(e.target.value)}
                 placeholder="Where should the story begin? (e.g. You awaken in the hold of a smuggler's ship during a tempest...)"
-                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
+                className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
               />
             </div>
           </div>
@@ -582,11 +597,11 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
           <div className="p-3.5 bg-stone-950/70 border border-white/10 rounded-2xl space-y-3">
             <div>
               <div className="text-xs font-sans font-bold text-white">Custom Campaign Artwork (Optional)</div>
-              <div className="text-[11px] font-sans text-stone-400">
+              <div className="text-xs font-sans text-stone-400">
                 A procedural gradient theme will be generated if omitted.
               </div>
               {genError && (
-                <div className="text-[11px] text-red-400 font-sans mt-1">{genError}</div>
+                <div className="text-xs text-red-400 font-sans mt-1">{genError}</div>
               )}
             </div>
 
@@ -607,7 +622,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   {bannerPreview ? (
                     <img src={bannerPreview} alt="Banner Preview" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-stone-500 text-[11px]">No Banner Selected</span>
+                    <span className="text-stone-500 text-xs">No Banner Selected</span>
                   )}
                 </div>
                 <div className="flex gap-2">
@@ -648,7 +663,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   {iconPreview ? (
                     <img src={iconPreview} alt="Icon Preview" className="w-12 h-12 rounded-lg object-cover" />
                   ) : (
-                    <span className="text-stone-500 text-[11px]">No Icon Selected</span>
+                    <span className="text-stone-500 text-xs">No Icon Selected</span>
                   )}
                 </div>
                 <div className="flex gap-2">

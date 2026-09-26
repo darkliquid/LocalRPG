@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, Play, X } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, Play, X, Loader2 } from 'lucide-react';
 import { ProviderVoice } from '../types';
 import { playVoicePreview } from '../lib/audioPreview';
 
@@ -10,6 +11,19 @@ export interface VoiceComboboxProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  // onAudition synthesizes a sample for a voice that has no preview_url (for
+  // example a configured voice profile). When set it replaces preview playback.
+  onAudition?: (voice: ProviderVoice) => void;
+  auditioningId?: string | null;
+}
+
+// voiceLabel avoids the "Name (Name)" duplication providers produce when a
+// voice's display name is just its id.
+export function voiceLabel(voice: { id: string; name?: string }): string {
+  const name = (voice.name || '').trim();
+  if (!name) return voice.id;
+  if (!voice.id || name === voice.id) return name;
+  return `${name} (${voice.id})`;
 }
 
 export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
@@ -19,10 +33,38 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
   placeholder = 'Select or enter voice ID...',
   disabled = false,
   className = '',
+  onAudition,
+  auditioningId = null,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menu, setMenu] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+
+  const MENU_MAX_HEIGHT = 240;
+  const MENU_GAP = 4;
+
+  // Position the menu against the viewport, flipping above the field when there
+  // is no room below. The menu is portalled to the body so a scrolling or
+  // clipping ancestor cannot cut it off.
+  const positionMenu = useCallback(() => {
+    const anchor = containerRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const width = Math.max(rect.width, 260);
+    let left = rect.left;
+    if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
+    if (left < 8) left = 8;
+
+    const spaceBelow = window.innerHeight - rect.bottom - MENU_GAP - 8;
+    const spaceAbove = rect.top - MENU_GAP - 8;
+    const up = spaceBelow < MENU_MAX_HEIGHT && spaceAbove > spaceBelow;
+    const height = Math.max(120, Math.min(MENU_MAX_HEIGHT, up ? spaceAbove : spaceBelow));
+    const top = up ? rect.top - MENU_GAP - height : rect.bottom + MENU_GAP;
+
+    setMenu({ top, left, width, height });
+  }, []);
 
   const selectedVoice = useMemo(() => {
     return voices.find((v) => v.id === value);
@@ -38,13 +80,27 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
   // Handle outside clicks to close dropdown
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setIsOpen(false);
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  // Reposition while open, and follow any ancestor scroll.
+  useEffect(() => {
+    if (!isOpen) return;
+    positionMenu();
+    const reposition = () => positionMenu();
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [isOpen, positionMenu]);
 
   const filteredVoices = useMemo(() => {
     if (!voices.length) return [];
@@ -79,7 +135,7 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
       <div className="relative flex-1">
         <input
           type="text"
-          value={isOpen ? query : (selectedVoice ? `${selectedVoice.name} (${selectedVoice.id})` : value)}
+          value={isOpen ? query : (selectedVoice ? voiceLabel(selectedVoice) : value)}
           onChange={(e) => {
             setQuery(e.target.value);
             onChange(e.target.value);
@@ -132,21 +188,31 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
         </div>
       </div>
 
-      {selectedVoice?.preview_url && (
+      {selectedVoice && (onAudition || selectedVoice.preview_url) && (
         <button
           type="button"
-          onClick={() => playVoicePreview(selectedVoice.preview_url as string)}
-          className="p-1 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 cursor-pointer shrink-0"
+          onClick={() => (onAudition ? onAudition(selectedVoice) : playVoicePreview(selectedVoice.preview_url as string))}
+          disabled={!!onAudition && auditioningId === selectedVoice.id}
+          className="p-1 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 cursor-pointer shrink-0 disabled:opacity-50"
           title="Audition Voice"
         >
-          <Play className="w-3 h-3" />
+          {onAudition && auditioningId === selectedVoice.id ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <Play className="w-3 h-3" />
+          )}
         </button>
       )}
 
-      {isOpen && (
-        <div className="absolute left-0 top-full mt-1 w-full min-w-[260px] max-h-60 overflow-y-auto bg-stone-950 border border-stone-800 rounded-lg shadow-2xl z-50 p-1 space-y-0.5">
+      {isOpen && menu &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: 'fixed', top: menu.top, left: menu.left, width: menu.width, maxHeight: menu.height }}
+            className="overflow-y-auto bg-stone-950 border border-stone-800 rounded-lg shadow-2xl z-[120] p-1 space-y-0.5"
+          >
           {filteredVoices.length === 0 ? (
-            <div className="px-2 py-1.5 text-[11px] text-stone-500 italic">No matching voices</div>
+            <div className="px-2 py-1.5 text-xs text-stone-500 italic">No matching voices</div>
           ) : (
             filteredVoices.map((voice) => {
               const isSelected = voice.id === value;
@@ -162,26 +228,49 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
                   }`}
                 >
                   <div className="min-w-0">
-                    <div className="font-medium truncate">{voice.name}</div>
-                    <div className="text-[10px] font-mono text-stone-500 truncate">{voice.id}</div>
+                    <div className="font-medium truncate">{voice.name || voice.id}</div>
+                    {voice.id && voice.name !== voice.id && (
+                      <div className="text-xs font-mono text-stone-500 truncate">{voice.id}</div>
+                    )}
+                    {voice.description && (
+                      <div className="text-xs text-stone-500 truncate">{voice.description}</div>
+                    )}
+                    {voice.tags && voice.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {voice.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-xs px-1 py-0.5 rounded bg-purple-500/10 text-purple-300/90 border border-purple-500/20"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {voice.categories?.[0] && (
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-stone-900 text-stone-400 border border-stone-800">
+                      <span className="text-xs px-1 py-0.5 rounded bg-stone-900 text-stone-400 border border-stone-800">
                         {voice.categories[0]}
                       </span>
                     )}
-                    {voice.preview_url && (
+                    {(onAudition || voice.preview_url) && (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          playVoicePreview(voice.preview_url as string);
+                          if (onAudition) onAudition(voice);
+                          else playVoicePreview(voice.preview_url as string);
                         }}
-                        className="p-1 rounded hover:bg-stone-800 text-purple-400 cursor-pointer"
+                        disabled={!!onAudition && auditioningId === voice.id}
+                        className="p-1 rounded hover:bg-stone-800 text-purple-400 cursor-pointer disabled:opacity-50"
                         title="Audition"
                       >
-                        <Play className="w-3 h-3" />
+                        {onAudition && auditioningId === voice.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Play className="w-3 h-3" />
+                        )}
                       </button>
                     )}
                   </div>
@@ -189,8 +278,9 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
               );
             })
           )}
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

@@ -2309,17 +2309,33 @@ func (s *Service) RestartGame(ctx context.Context, gameID string) (*GameSummaryD
 
 	playerName := manifest.PlayerName
 	details := ""
+	var playerCharacter engine.PlayerCharacter
+	var portraitRel string
+	var portraitBytes []byte
 	if store, err := s.store(gameID); err == nil {
 		if playerID, err := engine.ResolvePlayerID(store, manifest); err == nil && playerID != "" {
-			if data, err := os.ReadFile(filepath.Join(gameDir, "entities", playerID+".md")); err == nil {
+			playerPath := filepath.Join(gameDir, "entities", playerID+".md")
+			if data, err := os.ReadFile(playerPath); err == nil {
 				if ent, err := entity.ParseMarkdownEntity(data); err == nil {
 					if playerName == "" {
 						playerName = ent.Name
 					}
 					details = strings.TrimSpace(ent.Body)
+					playerCharacter = engine.PlayerCharacterFromEntity(ent)
+					if ent.Portrait != "" {
+						if art, err := os.ReadFile(filepath.Join(gameDir, ent.Portrait)); err == nil {
+							portraitRel = ent.Portrait
+							portraitBytes = art
+						}
+					}
 				}
 			}
 		}
+	}
+	// Only carry the portrait reference forward when the file itself survived, so
+	// the recreated note never points at an asset that is no longer on disk.
+	if portraitRel == "" {
+		playerCharacter.Portrait = ""
 	}
 
 	startLocation := ""
@@ -2341,17 +2357,30 @@ func (s *Service) RestartGame(ctx context.Context, gameID string) (*GameSummaryD
 	}
 
 	session, err := engine.InitGame(s.resolver, engine.InitOptions{
-		GameID:        gameID,
-		Name:          manifest.Name,
-		SystemID:      manifest.SystemID,
-		WorldID:       manifest.WorldID,
-		PlayerName:    playerName,
-		PlayerDetails: details,
+		GameID:          gameID,
+		Name:            manifest.Name,
+		SystemID:        manifest.SystemID,
+		WorldID:         manifest.WorldID,
+		PlayerName:      playerName,
+		PlayerDetails:   details,
+		PlayerCharacter: playerCharacter,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("recreate campaign: %w", err)
 	}
 	_ = session.Close()
+
+	// The recreated campaign starts with empty assets, so put the protagonist's
+	// portrait back under the path its note already references.
+	if portraitRel != "" && len(portraitBytes) > 0 {
+		dest := filepath.Join(gameDir, portraitRel)
+		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+			return nil, fmt.Errorf("restore portrait dir: %w", err)
+		}
+		if err := os.WriteFile(dest, portraitBytes, 0644); err != nil {
+			return nil, fmt.Errorf("restore portrait: %w", err)
+		}
+	}
 
 	settings := map[string]interface{}{}
 	if startLocation != "" {
