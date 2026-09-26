@@ -1,39 +1,31 @@
 # AGENTS.md
 
-LocalRPG is a local-first, turn-based tabletop RPG client: a single Go binary that runs a Wails v3 desktop GUI, a Bubbletea terminal TUI, an HTTP/Unix-socket API daemon, plus media generation and story export. Module path: `github.com/darkliquid/localrpg`. The engine is **schema-agnostic** — no HP/Mana/classes are hardcoded anywhere; all RPG state is opaque YAML frontmatter plus sandboxed JS/Wasm hooks.
+LocalRPG is a local-first, turn-based tabletop RPG client: a single Go binary that runs an in-process pure-Go desktop GUI (`go-shirei`), plus media generation and story export. Module path: `github.com/darkliquid/localrpg`. The engine is **schema-agnostic** — no HP/Mana/classes are hardcoded anywhere; all RPG state is opaque YAML frontmatter plus sandboxed JS/Wasm hooks.
 
 ## Commands
 
-Toolchain is pinned by `mise.toml` (Go 1.27.1, Node 26.9.0). Prefer `mise run`, but plain `go`/`npm` work if the toolchain is already active.
+Toolchain is pinned by `mise.toml` (Go 1.27.1). Prefer `mise run`, but plain `go` works if the toolchain is already active.
 
 ```bash
-mise run setup          # go mod download + cd frontend && npm install
-mise run build          # frontend bundle -> pkg/gui/dist, then bin/localrpg
-mise run build:frontend # npm run build in frontend/ (tsc + vite)
-mise run build:backend  # depends on build:frontend
-mise run test           # go test -v -count=1 ./...  AND  npx tsc --noEmit
-mise run test:backend   # go test -v -count=1 ./...
-mise run test:frontend  # npx tsc --noEmit (in frontend/)
-mise run lint           # go vet ./...
-mise run dev:gui        # go run ./cmd/localrpg gui --port 8080
-mise run dev:frontend   # vite dev server on :3000, proxies /api -> localhost:8080
+mise run setup            # go mod download
+mise run build            # build bin/localrpg
+mise run build:backend    # go build ./cmd/localrpg
+mise run test             # go test -v -count=1 ./...
+mise run lint             # go vet ./...
+mise run dev:gui          # go run ./cmd/localrpg
+mise run desktop:snapshots # regenerate shirei golden snapshots
+mise run desktop:build    # CGO-free cross-compile for linux/windows/macos
+mise run desktop:png      # render one GUI frame to a PNG
 mise run clean
-mise run desktop:snapshots # regenerate shirei golden snapshots in pkg/desktop
 ```
 
 Run a single Go test: `go test -run TestTurnOrchestrator ./pkg/engine/`.
 
-CLI surface (`localrpg <cmd>`): `roll <notation>`, `prompt`, `play <game-id>`, `tts`, `image`, `gui`, `export <web|video>`, `debug <test-run|server>`, `version`.
-
-## Build gotcha: the frontend is embedded in the Go binary
-
-`pkg/gui/assets.go` declares `//go:embed all:dist`, so **`go build` fails if `pkg/gui/dist/` does not exist**. It is gitignored except for a tracked `.gitkeep` placeholder. Vite writes straight into `pkg/gui/dist` (`frontend/vite.config.ts` sets `outDir: ../pkg/gui/dist`, `emptyOutDir: true`), which would delete that `.gitkeep`; the build tasks in `mise.toml` and `frontend/package.json` automatically touch `.gitkeep` immediately after building so `git status` stays clean.
-
-Always build the frontend before the backend, or use `mise run build`, which enforces the ordering. `pkg/gui/assets.go` also falls back to `frontend/dist/` and `pkg/gui/dist/` on local disk, then to a placeholder HTML page, for backend-only development.
+CLI surface: `localrpg` with no command opens the GUI. Flags: `--dir <path>`, `--png <path>`, `--version`. Commands: `roll <notation>`, `prompt`, `tts`, `image`, `export <web|video>`, `version`.
 
 ## Architecture
 
-> Planned change: the Wails window, React SPA, Bubbletea TUI, and HTTP/socket daemon are being retired in favour of an in-process pure-Go GUI built on `go.hasen.dev/shirei`. See `docs/superpowers/specs/2026-09-26-pure-go-shirei-gui-design.md` for the approved direction and phased plan.
+> The desktop GUI is in-process (`pkg/desktop`) on `go.hasen.dev/shirei`; the application core (`pkg/gui`) is transport-free and `pkg/theater` is the shared theatre view used by both the live window and the video exporter. Keep the default binary buildable with `CGO_ENABLED=0`: any new dependency that needs cgo must be behind an opt-in build tag.
 
 Three-tier on-disk separation, resolved through `core.PathResolver` (`pkg/core/types.go`). A campaign has exactly one database, `games/<id>/cache/index.db`, and it is only ever opened through `storage.OpenGameStore(paths, gameID)` — which resolves `PathResolver.GameDBPath`, retires any legacy `game.db` to `game.db.legacy`, and returns a pooled handle (`storage.Pool`, `shared` stores whose `Close` is a no-op; `Pool.Close` owns their lifetime). Do not call `storage.NewStore` for a game.
 
@@ -55,9 +47,9 @@ Extracted entities are reconciled before they are written: `harness.MatchExistin
 
 Memory model: entities are Markdown files with YAML frontmatter; `[[wikilinks]]` in the body plus the frontmatter `location`/`faction` fields become graph edges on parse (`pkg/entity/entity.go`). `storage.Syncer.Sync` hashes file contents and upserts into SQLite (`modernc.org/sqlite`, no CGO) — `cache/index.db` is disposable and rebuildable from the Markdown. `history.jsonl` is the canonical timeline and append-only; each record carries the number, the player's raw prompt, the narrator's rewrite, the entities involved (`entity.Mention` with a `player`/`location`/`wikilink`/`extracted`/`speech` kind), and ordered narration/speech `entity.TurnSegment`s whose speakers are resolved to entity IDs. The index mirrors it as `turns` + `turn_entities`; `/undo` rewrites the log below the target turn number.
 
-GUI: `pkg/gui.Service` (`service.go`) is the entire API surface; `pkg/gui/server.go` maps it to `/api/...` routes and serves the embedded SPA with client-side-routing fallback. `frontend/src/api/client.ts` is the only fetch layer and mirrors those routes — when adding an endpoint, update `Service`, `server.go`, `frontend/src/types.ts`, and `client.ts` together. The desktop app plays turns through `POST /api/game/{id}/turn`, which streams newline-delimited JSON; turns are serialised per campaign by `Service.BeginTurn` (409 while one is in flight); nothing is persisted for a cancelled or disconnected turn; and provider setup lives in `pkg/harness.RouterFromConfig`/`ExtractorFromConfig` rather than in `package main`.
+GUI: `pkg/gui.Service` (`service.go`) is the transport-free application core. The desktop GUI lives in `pkg/desktop` (built on `go.hasen.dev/shirei`) and calls the core in-process; `pkg/theater` holds the shared theatre view used by both the live window and the video exporter. Turns are serialised per campaign by `Service.BeginTurn`, and provider setup lives in `pkg/harness.RouterFromConfig`/`ExtractorFromConfig` rather than in `package main`.
 
-Runtime modes in `cmd/localrpg/gui.go`: default is a native Wails v3 window (zero TCP); if `$DISPLAY`/`$WAYLAND_DISPLAY` are unset, or `--headless`/`--socket` is passed, it serves the same handler over a `0600` Unix socket (`pkg/gui/socket.go`, unlinks stale sockets); `--port N` opts into `127.0.0.1:N` TCP for a browser.
+Runtime: `cmd/localrpg` boots the GUI from the root command (see `cmd/localrpg/gui.go`, `bootDesktop`). `--png <path>` renders a single frame and exits.
 
 ## Provider model (uniform across LLMs and media)
 
@@ -73,8 +65,7 @@ Resolution order (`pkg/config/manager.go`): `$LOCALRPG_CONFIG_DIR`, else `$XDG_C
 
 - Go: standard library only for tests (`testing`, `t.TempDir()`); no testify. Errors wrapped with `fmt.Errorf("...: %w", err)`. Prefer `any` over `interface{}`, and current-Go idioms the pinned toolchain affords (`min`/`max`, `slices`/`maps`, `for i := range n`, typed `sync/atomic`, `errors.Join`, `log/slog`, `clear`). `go vet` must stay clean.
 - Identifiers: `entity.Slugify` (display name -> kebab-case ID) and `entity.WikilinkTarget` (unwraps `[[target|label]]`) are the shared helpers — reuse them instead of writing local slug/link parsing.
-- TypeScript: React 19 + Tailwind v4 (config lives in CSS via `@import "tailwindcss"` in `frontend/src/index.css`, there is no `tailwind.config.js`). `tsconfig.json` has `strict`, `noUnusedLocals`, `noUnusedParameters`, so `npm run build`/`tsc --noEmit` fails on unused imports — that is the frontend lint gate. Components live in `frontend/src/components/`, icons come from `lucide-react`. **The frontend is being retired** (see the pure-Go shirei GUI spec); treat it as reference-only until deleted and do not add new features to it.
-- Commits: Conventional Commits with a scope, e.g. `feat(harness): …`, `fix(frontend): …`, `docs: …`. Keep the subject under 72 chars.
+- Commits: Conventional Commits with a scope, e.g. `feat(harness): …`, `fix(desktop): …`, `docs: …`. Keep the subject under 72 chars.
 - Design work is spec-first: `docs/superpowers/specs/` holds approved design docs and `docs/superpowers/plans/` holds task-by-task implementation plans with `- [ ]` checkboxes, including a "File Map" listing files to create/modify per feature. Read the relevant spec before changing a subsystem; the plans reference the superpowers skills workflow. Note `.superpowers/` is gitignored while `docs/superpowers/` is tracked.
 
 ## Gotchas
@@ -85,6 +76,5 @@ Resolution order (`pkg/config/manager.go`): `$LOCALRPG_CONFIG_DIR`, else `$XDG_C
 - Per-turn extraction reuses the `gm` provider unless `agents.roles.extractor` names another one; set that role to `disabled` to record deterministic mentions only. A failed extractor never loses the turn, and `harness.ResolveEntityMentions` needs no model at all.
 - The extractor is only reached through `Timeline.RecordTurn`. Calling `harness.Extractor.Extract` directly returns records without persisting anything, by design.
 - An entity note is written as `<id>.md` because `gui.Service.GetGraph` derives node IDs from file names. Template notes copied from a world are renamed to their frontmatter ID on game creation for the same reason.
-- `pkg/gui` exposes `ProtectCrossOrigin` (`middleware.go`), which wraps handlers in the standard library's `http.CrossOriginProtection` instead of hand-rolled CORS headers. Cross-origin browser writes get a 403; same-origin callers, the native Wails webview (`wails://wails`), and header-less local tooling are allowed. `Server.ServeHTTP` is now a bare mux delegation, so do not add `Access-Control-*` headers back.
 - `gui.Service.ensureIndexed` repairs a campaign's index once per process, the first time that process serves the game. Timeline queries (`GetEntityTurns`) answer from the database; chronicle reads still come from `history.jsonl`, which is where the segments live.
-- The desktop app plays turns through `POST /api/game/{id}/turn`, streaming newline-delimited JSON; turns are serialised per campaign by `Service.BeginTurn` (409 while one is in flight); nothing is persisted for a cancelled or disconnected turn; and provider setup lives in `pkg/harness.RouterFromConfig`/`ExtractorFromConfig` rather than in `package main`.
+- The desktop app plays turns in-process through `Service.BeginTurn`; turns are serialised per campaign, and nothing is persisted for a cancelled turn. Provider setup lives in `pkg/harness.RouterFromConfig`/`ExtractorFromConfig` rather than in `package main`.

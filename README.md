@@ -1,6 +1,6 @@
 # LocalRPG
 
-A local-first, turn-based tabletop RPG client orchestrated by local and CLI LLMs, built in Go, Wails v3, and React 19.
+A local-first, turn-based tabletop RPG client orchestrated by local and CLI LLMs, built in Go with a pure-Go desktop GUI (`go-shirei`).
 
 ---
 
@@ -10,58 +10,40 @@ A local-first, turn-based tabletop RPG client orchestrated by local and CLI LLMs
 - **Rule Extensibility:** Deterministic dice roller (`github.com/darkliquid/roll`), sandboxed JavaScript rules via Goja, and Wasm runtime via Wazero.
 - **LLM Harness Router:** CLI subprocess integration (`claude`, `codex`, `agy`), streaming HTTP Ollama, 4-layer context assembler, and background entity extraction.
 - **Campaign Timeline:** Every turn is recorded with the player's prompt, the narrator's rewrite, the entities involved, and who spoke which line — so a campaign's history is queryable rather than re-inferred from prose.
-- **Headless Terminal TUI:** Interactive Bubbletea client with Glamour Markdown rendering, dice rolling, and `/gm` steering.
 - **Multimodal Pipelines:** State-aware audio and art caching, per-character voice playback from recorded dialogue, ComfyUI image generator, and Whisper STT.
-- **Wails v3 Desktop GUI:** Twintail Launcher inspired glassmorphic aesthetic in React 19 + TypeScript + Tailwind CSS.
-- **Story Theater & Exporter:** In-app Visual Novel replay player, and two exports built from one scene script — an animated web bundle that runs itself and plays each line in the speaker's voice, and a video rendered frame by frame in Go.
+- **Pure-Go Desktop GUI:** An in-process immediate-mode GUI built on `go-shirei`, with no browser engine or JavaScript stack.
+- **Story Theater & Exporter:** In-app Visual Novel replay player, and two exports built from one scene script — an animated web bundle that runs itself and plays each line in the speaker's voice, and a video rendered frame by frame through the same theatre view.
 
 ---
 
-## Zero-TCP GUI Execution
+## Desktop GUI
 
-LocalRPG runs **zero-TCP by default**:
+Running the binary with no arguments opens the desktop GUI, which renders entirely in-process through `go-shirei` — no webview, browser, TCP port, or JavaScript runtime is involved.
 
-### 1. Native Desktop Window (Default)
 ```bash
-localrpg gui
+localrpg                 # open the GUI
+localrpg --dir /path     # choose the project root
+localrpg --png out.png   # render one frame and exit (useful for tests)
 ```
-- **0 TCP Ports:** Opens a native Wails v3 desktop window with translucent glassmorphic acrylic panels.
-- Assets and REST API routes (`/api/game/...`) are served in-process directly to the WebKit webview via native OS scheme handlers.
-
-### 2. Headless Unix Domain Socket Daemon
-```bash
-localrpg gui --headless
-# Or specify a custom socket path:
-localrpg gui --socket /path/to/localrpg.sock
-```
-- **0 TCP Ports:** Listens exclusively on a local Unix domain socket with `0600` permissions (readable/writable only by your user).
-- Default path: `$XDG_RUNTIME_DIR/localrpg.sock` (or `~/.local/state/localrpg/gui.sock`).
-- Automatically unlinks on clean shutdown and cleans up stale sockets.
-
-### 3. Opt-in Web Browser Mode (TCP)
-```bash
-localrpg gui --port 8080
-```
-- Explicitly binds an HTTP listener on `127.0.0.1:8080` for standard external browser access.
 
 ---
 
 ## Build & Toolchain (`mise`)
 
-The project uses [mise](https://mise.jdx.dev/) for pinned toolchain versioning (Go 1.27.1, Node 26.9.0) and task automation:
+The project uses [mise](https://mise.jdx.dev/) for pinned toolchain versioning (Go 1.27.1) and task automation:
 
 ```bash
 # Setup dependencies
 mise run setup
 
-# Build frontend and backend binary
+# Build the binary
 mise run build
 
-# Run all Go and TypeScript tests
+# Run all Go tests
 mise run test
 
-# Launch desktop GUI
-bin/localrpg gui
+# Launch the desktop GUI
+bin/localrpg
 ```
 
 ---
