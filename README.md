@@ -135,9 +135,6 @@ localrpg export video <game-id> [--out FILE] [--still] [--fps N] [--size WxH] [-
 
 ## Debugging & Diagnostics
 
-LocalRPG includes an embedded debugging suite for diagnosing turn failures and inspecting prompts:
+LocalRPG exports OpenTelemetry over OTLP/gRPC and can write a sanitized local trace file. Point it at an external collector (for example `otel-desktop-viewer`) and inspect spans there.
 
-- **Interactive Debug Server**: Run `localrpg debug server --port 8080 --debugger-port 8089` to play in your browser with real-time prompt, span waterfall, and raw LLM completion inspection.
-- **Automated Test Runner**: Run `localrpg debug test-run --scenario scenarios/smoke-test.yaml` to execute declarative browser scenarios headlessly and generate standalone HTML reports.
-
-See [docs/debugging.md](docs/debugging.md) for full instructions and scenario syntax.
+See [docs/debugging.md](docs/debugging.md) for collector setup and the file-based `--trace` flag.

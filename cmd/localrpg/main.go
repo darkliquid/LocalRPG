@@ -18,6 +18,9 @@ func main() {
 	}
 
 	versionFlag := flag.Bool("version", false, "Print version and exit")
+	// Registered so the root flag set accepts it; traceFlagLevel reads the raw
+	// argument list itself, because a bare --trace means "full".
+	flag.String("trace", "", "Enable tracing: off, summary, or full")
 	flag.Parse()
 
 	if *versionFlag {
@@ -44,8 +47,6 @@ func main() {
 		handleGUICommand(args[1:])
 	case "export":
 		handleExportCommand(args[1:])
-	case "debug":
-		handleDebugCommand(args[1:])
 	case "version":
 		fmt.Printf("LocalRPG v%s\n", Version)
 	case "help":
@@ -66,6 +67,5 @@ func printUsage() {
 	fmt.Println("  image <prompt>     Generate scene or character image")
 	fmt.Println("  gui                Launch desktop application (Wails v3)")
 	fmt.Println("  export <format>    Export story replay (web, video)")
-	fmt.Println("  debug <cmd>        Run automated scenario tests or debug server")
 	fmt.Println("  version            Print version information")
 }
