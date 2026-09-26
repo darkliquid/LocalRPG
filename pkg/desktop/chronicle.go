@@ -31,24 +31,30 @@ func openCampaign(gameID string) {
 func chronicleView() {
 	p := ui.DefaultPalette()
 	Container(Attrs(Viewport, BackgroundVec(p.Bg)), func() {
-		ScrollOnInput()
-		ScrollBars()
-		Container(Attrs(Expand, Pad(20), Gap(12)), func() {
-			if len(appState.Turns) == 0 {
-				prologuePanel()
-				return
-			}
-			prevLocation := ""
-			for i := range appState.Turns {
-				turn := &appState.Turns[i]
-				locationChanged := turn.LocationID != "" && turn.LocationID != prevLocation
-				prevLocation = turn.LocationID
-				turnView(p, turn, locationChanged)
-			}
-			if appState.TurnInFlight {
-				inFlightView(p)
-			}
-			actionConsole()
+		Container(Attrs(Row, Expand, Grow(1), Clip), func() {
+			Container(Attrs(Viewport, Grow(1)), func() {
+				ScrollOnInput()
+				ScrollBars()
+				Container(Attrs(Expand, Pad(20), Gap(12)), func() {
+					drawerToolbar(p)
+					if len(appState.Turns) == 0 {
+						prologuePanel()
+						return
+					}
+					prevLocation := ""
+					for i := range appState.Turns {
+						turn := &appState.Turns[i]
+						locationChanged := turn.LocationID != "" && turn.LocationID != prevLocation
+						prevLocation = turn.LocationID
+						turnView(p, turn, locationChanged)
+					}
+					if appState.TurnInFlight {
+						inFlightView(p)
+					}
+					actionConsole()
+				})
+			})
+			drawerPanel()
 		})
 	})
 }

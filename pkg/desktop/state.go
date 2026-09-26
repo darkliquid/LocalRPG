@@ -60,6 +60,9 @@ type State struct {
 	ConsoleMode   string
 	ConsoleText   string
 
+	// Drawer is the active side drawer name, or empty.
+	Drawer string
+
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
 	WorldArt map[string]Art
