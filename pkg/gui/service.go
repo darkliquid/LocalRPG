@@ -62,6 +62,12 @@ type Service struct {
 	ttsMu       sync.Mutex
 	ttsConfig   *config.Config
 	ttsPipeline *media.TTSPipeline
+	// Background work (entity enrichment, playback warm-up, retro-summary) is
+	// tracked so Close can wait for it. Untracked writers outlived a caller's
+	// view of the service and raced shutdown and test cleanup.
+	bgMu   sync.Mutex
+	bg     sync.WaitGroup
+	closed bool
 }
 
 // Config returns the configuration the service is running with, so a command can
@@ -107,6 +113,43 @@ func NewService(rootDir string) *Service {
 		}
 	}
 	return svc
+}
+
+// goBackground runs fn in a goroutine that Close waits for. Work submitted after
+// Close is dropped, so shutdown never starts a new write.
+func (s *Service) goBackground(fn func()) {
+	s.bgMu.Lock()
+	if s.closed {
+		s.bgMu.Unlock()
+		return
+	}
+	s.bg.Add(1)
+	s.bgMu.Unlock()
+
+	go func() {
+		defer s.bg.Done()
+		fn()
+	}()
+}
+
+// Close stops background work and waits for it, so no goroutine writes after a
+// caller considers the service done. It is safe to call more than once.
+func (s *Service) Close() {
+	s.bgMu.Lock()
+	s.closed = true
+	s.bgMu.Unlock()
+	s.bg.Wait()
+
+	s.mu.Lock()
+	workers := make([]*storage.EmbeddingWorker, 0, len(s.embWorkers))
+	for _, worker := range s.embWorkers {
+		workers = append(workers, worker)
+	}
+	s.embWorkers = make(map[string]*storage.EmbeddingWorker)
+	s.mu.Unlock()
+	for _, worker := range workers {
+		worker.Stop()
+	}
 }
 
 func (s *Service) GetModelsStatus() []models.ModelStatus {
@@ -181,7 +224,7 @@ func (s *Service) ensureIndexed(gameID string) {
 			}
 		}
 	}
-	go s.scanAndEnrichCharacters(gameID, store)
+	s.goBackground(func() { s.scanAndEnrichCharacters(gameID, store) })
 }
 
 func (s *Service) ensureEmbeddingWorker(gameID string, store *storage.Store) *storage.EmbeddingWorker {
@@ -1056,7 +1099,7 @@ func (s *Service) summariseBehind(gameID string, chronicler *engine.Chronicler) 
 	s.summaryPending[gameID] = true
 	s.summaryMu.Unlock()
 
-	go func() {
+	s.goBackground(func() {
 		defer func() {
 			s.summaryMu.Lock()
 			delete(s.summaryPending, gameID)
@@ -1066,7 +1109,7 @@ func (s *Service) summariseBehind(gameID string, chronicler *engine.Chronicler) 
 		if _, err := chronicler.Regenerate(context.Background(), gameID); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: could not update the story so far: %v\n", err)
 		}
-	}()
+	})
 }
 
 // chronicler builds a campaign's chronicler from the current configuration, for a
@@ -1305,23 +1348,21 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// request: the turn is already recorded - and its entities, with their voices,
 	// persisted - so a slow synthesis must not hold the stream open.
 	if t.cfg.Media.TTS.AutoPlay {
-		go func() {
+		t.service.goBackground(func() {
 			_ = t.service.PlayTurnAudio(context.Background(), t.gameID, turn.Number)
-		}()
+		})
 	} else if t.cfg.Media.TTS.Type != "" && t.cfg.Media.TTS.Type != "disabled" {
-		go func() {
+		t.service.goBackground(func() {
 			for i := range turn.Segments {
-				go func(idx int) {
-					_, _ = t.service.GetSegmentAudio(context.Background(), t.gameID, turn.Number, idx)
-				}(i)
+				_, _ = t.service.GetSegmentAudio(context.Background(), t.gameID, turn.Number, i)
 			}
-		}()
+		})
 	}
 
 	// Memory is repaired behind the turn, on the same principle as playback: the
 	// reply is already recorded, so nothing about it should wait for a second call.
 	t.service.summariseBehind(t.gameID, t.chronicler)
-	go t.service.scanAndEnrichCharacters(t.gameID, t.store)
+	t.service.goBackground(func() { t.service.scanAndEnrichCharacters(t.gameID, t.store) })
 	return nil
 }
 
@@ -1515,7 +1556,7 @@ func (s *Service) scanAndEnrichCharacters(gameID string, store *storage.Store) {
 
 	var portraitWorker *engine.PortraitWorker
 	if cfg != nil && cfg.Media.Image.Type != "" && cfg.Media.Image.Type != "disabled" {
-		if imgClient, err := media.NewImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey); err == nil && imgClient != nil {
+		if imgClient, err := imageClientFactory(cfg.Media.Image, cfg.Providers.Gemini.APIKey); err == nil && imgClient != nil {
 			portraitWorker = engine.NewPortraitWorker(s.resolver, store, imgClient)
 		}
 	}
