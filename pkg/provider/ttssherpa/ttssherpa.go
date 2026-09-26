@@ -1,3 +1,5 @@
+//go:build sherpa
+
 // Package ttssherpa registers the Sherpa-ONNX Kokoro speech provider.
 package ttssherpa
 

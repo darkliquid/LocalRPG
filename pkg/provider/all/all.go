@@ -4,8 +4,8 @@ package all
 
 import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/clillm"
-	_ "github.com/darkliquid/localrpg/pkg/provider/geminillm"
 	_ "github.com/darkliquid/localrpg/pkg/provider/geminiembedding"
+	_ "github.com/darkliquid/localrpg/pkg/provider/geminillm"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imagecli"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imagegemini"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imagehttp"
@@ -21,5 +21,4 @@ import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttshttp"
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttsnativeos"
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttspiper"
-	_ "github.com/darkliquid/localrpg/pkg/provider/ttssherpa"
 )

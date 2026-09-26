@@ -1,3 +1,5 @@
+//go:build sherpa
+
 package media_test
 
 import (
