@@ -22,9 +22,11 @@ var (
 	Amber          = shirei.Vec4{38, 92, 50, 1}    // #f59e0b amber-500
 	Danger         = shirei.Vec4{0, 70, 52, 1}     // #ef4444 red-500
 	Success        = shirei.Vec4{160, 60, 45, 1}   // emerald
-	DockBG         = shirei.Vec4{20, 13, 4, 0.90}  // stone-950/90 rail
-	PillBG         = shirei.Vec4{24, 10, 8, 0.80}  // stone-900/80 pill
-	HoverFill      = shirei.Vec4{0, 0, 100, 0.06}  // white/[0.06]
+	SuccessSoft    = shirei.Vec4{160, 60, 20, 0.30}
+	DangerSoft     = shirei.Vec4{0, 70, 25, 0.30}
+	DockBG         = shirei.Vec4{20, 13, 4, 0.90} // stone-950/90 rail
+	PillBG         = shirei.Vec4{24, 10, 8, 0.80} // stone-900/80 pill
+	HoverFill      = shirei.Vec4{0, 0, 100, 0.06} // white/[0.06]
 	AccentSoft     = shirei.Vec4{270, 60, 55, 0.30}
 	AccentBtn      = shirei.Vec4{271, 81, 56, 1} // purple-600
 	AccentBtnHover = shirei.Vec4{271, 91, 61, 1}

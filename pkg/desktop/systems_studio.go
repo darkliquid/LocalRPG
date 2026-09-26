@@ -116,77 +116,53 @@ func systemsStudioView() {
 			for i := range appState.Systems {
 				system := appState.Systems[i]
 				selected := appState.Studio.Kind == "saved" && appState.Studio.ID == system.ID
-				Container(Attrs(Pad2(4, 10), Corners(6), BackgroundVec(p.Panel)), func() {
-					if selected {
-						ModAttrs(BackgroundVec(p.Accent))
-					}
-					NextAccessName("systems.item." + system.ID)
-					if PressAction() {
-						loadSystemIntoForm(system.ID)
-					}
-					AssignAccess()
-					Label(system.Name, FontSize(12), TextColorVec(p.Text))
+				studioPill("systems.item."+system.ID, system.Name, selected, func() {
+					loadSystemIntoForm(system.ID)
 				})
 			}
 		})
 
-		Container(Attrs(Row, Gap(4)), func() {
-			for _, tab := range []struct{ key, label string }{
-				{"manifest", "Manifest"}, {"rules", "rules.md"}, {"script", "mechanics.js"},
-			} {
-				tab := tab
-				selected := systemTab() == tab.key
-				Container(Attrs(Pad2(4, 10), Corners(6), BackgroundVec(p.Bg)), func() {
-					if selected {
-						ModAttrs(BackgroundVec(p.Accent))
+		studioTabStrip("systems.tab", []studioTab{
+			{"manifest", "Manifest"}, {"rules", "rules.md"}, {"script", "mechanics.js"},
+		}, systemTab(), func(key string) { appState.SystemTab = key })
+
+		studioForm(func() {
+			switch systemTab() {
+			case "rules":
+				FieldArea(&appState.FormSysRules)
+			case "script":
+				FieldArea(&appState.FormSysScript)
+			default:
+				studioFieldLabel("Name")
+				FieldInput(&appState.FormSysName)
+				studioFieldLabel("Version")
+				FieldInput(&appState.FormSysVersion)
+				studioFieldLabel("Slug")
+				FieldInput(&appState.FormSysSlug)
+				studioFieldLabel("Description")
+				FieldArea(&appState.FormSysDesc)
+				studioFieldLabel("Creation preamble")
+				FieldInput(&appState.FormSysPrelude)
+				characterFieldsEditor(p)
+			}
+
+			Container(Attrs(Row, Gap(8)), func() {
+				studioPrimaryButton("systems.save", "Save", func() {
+					svc := liveService
+					req := systemPayload()
+					if saveSystem != nil && svc != nil {
+						go func() {
+							if err := saveSystem(context.Background(), svc, req); err == nil {
+								WithFrameLock(func() {
+									appState.SystemSaved = true
+									appState.StudioDirty = false
+								})
+								refreshSystems()
+							}
+						}()
 					}
-					NextAccessName("systems.tab." + tab.key)
-					if PressAction() {
-						appState.SystemTab = tab.key
-					}
-					AssignAccess()
-					Label(tab.label, FontSize(11), TextColorVec(p.Text))
 				})
-			}
-		})
-
-		switch systemTab() {
-		case "rules":
-			TextArea(&appState.FormSysRules)
-		case "script":
-			TextArea(&appState.FormSysScript)
-		default:
-			Label("Name", FontSize(12), TextColorVec(p.Muted))
-			TextInput(&appState.FormSysName)
-			Label("Version", FontSize(12), TextColorVec(p.Muted))
-			TextInput(&appState.FormSysVersion)
-			Label("Slug", FontSize(12), TextColorVec(p.Muted))
-			TextInput(&appState.FormSysSlug)
-			Label("Description", FontSize(12), TextColorVec(p.Muted))
-			TextArea(&appState.FormSysDesc)
-			Label("Creation preamble", FontSize(12), TextColorVec(p.Muted))
-			TextInput(&appState.FormSysPrelude)
-			characterFieldsEditor(p)
-		}
-
-		Container(Attrs(Row, Gap(8)), func() {
-			NextAccessName("systems.save")
-			if Button(NoIcon, "Save") {
-				svc := liveService
-				req := systemPayload()
-				if saveSystem != nil && svc != nil {
-					go func() {
-						if err := saveSystem(context.Background(), svc, req); err == nil {
-							WithFrameLock(func() {
-								appState.SystemSaved = true
-								appState.StudioDirty = false
-							})
-							refreshSystems()
-						}
-					}()
-				}
-			}
-			AssignAccess()
+			})
 		})
 	})
 }
@@ -196,9 +172,9 @@ func characterFieldsEditor(p ui.Palette) {
 	for i := range appState.FormSysFields {
 		field := &appState.FormSysFields[i]
 		Container(Attrs(Row, CrossMid, Gap(6)), func() {
-			Container(Attrs(FixWidth(120)), func() { TextInput(&field.ID) })
-			Container(Attrs(FixWidth(160)), func() { TextInput(&field.Label) })
-			Container(Attrs(FixWidth(240)), func() { TextInput(&field.Prompt) })
+			Container(Attrs(FixWidth(120)), func() { FieldInput(&field.ID) })
+			Container(Attrs(FixWidth(160)), func() { FieldInput(&field.Label) })
+			Container(Attrs(FixWidth(240)), func() { FieldInput(&field.Prompt) })
 			CheckBox(&field.Generatable, "gen")
 		})
 	}

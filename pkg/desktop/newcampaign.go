@@ -95,11 +95,11 @@ func newCampaignView() {
 		})
 
 		Label("Campaign name", FontSize(13), FontWeight(WeightBold), TextColorVec(p.Muted))
-		TextInput(&newForm.Name)
+		FieldInput(&newForm.Name)
 		Label("Player name", FontSize(13), FontWeight(WeightBold), TextColorVec(p.Muted))
-		TextInput(&newForm.PlayerName)
+		FieldInput(&newForm.PlayerName)
 		Label("Opening prompt", FontSize(13), FontWeight(WeightBold), TextColorVec(p.Muted))
-		TextInput(&newForm.Opening)
+		FieldInput(&newForm.Opening)
 
 		characterForm(p)
 
@@ -254,7 +254,7 @@ func characterForm(p ui.Palette) {
 				}
 			})
 		case "long":
-			TextArea(&value)
+			FieldArea(&value)
 		case "select":
 			MenuButton(NoIcon, selectLabel(value), func() {
 				for _, option := range field.Options {
@@ -265,7 +265,7 @@ func characterForm(p ui.Palette) {
 				}
 			})
 		default:
-			TextInput(&value)
+			FieldInput(&value)
 		}
 		if appState.CharacterAnswers[field.ID] == "" && field.Default != "" {
 			appState.CharacterAnswers[field.ID] = field.Default

@@ -111,9 +111,9 @@ func campaignSettingsModal() {
 		})
 
 		Label("Start location", FontSize(12), FontWeight(WeightBold), TextColorVec(p.Muted))
-		TextInput(&appState.SettingsStart)
+		FieldInput(&appState.SettingsStart)
 		Label("Opening prompt", FontSize(12), FontWeight(WeightBold), TextColorVec(p.Muted))
-		TextArea(&appState.SettingsOpening)
+		FieldArea(&appState.SettingsOpening)
 
 		Container(Attrs(Row, CrossMid, Gap(8)), func() {
 			NextAccessName("settings.save")

@@ -13,8 +13,8 @@ import (
 
 // Injected world operations; nil outside a live app.
 var (
-	saveWorld        func(ctx context.Context, svc *gui.Service, req gui.CreateWorldRequestDTO) error
-	saveWorldEntity  func(ctx context.Context, svc *gui.Service, worldID, entityID, markdown string) error
+	saveWorld         func(ctx context.Context, svc *gui.Service, req gui.CreateWorldRequestDTO) error
+	saveWorldEntity   func(ctx context.Context, svc *gui.Service, worldID, entityID, markdown string) error
 	deleteWorldEntity func(ctx context.Context, svc *gui.Service, worldID, entityID string) error
 )
 
@@ -124,87 +124,63 @@ func worldsStudioView() {
 			for i := range appState.Worlds {
 				world := appState.Worlds[i]
 				selected := appState.Studio.Kind == "saved" && appState.Studio.ID == world.ID
-				Container(Attrs(Pad2(4, 10), Corners(6), BackgroundVec(p.Panel)), func() {
-					if selected {
-						ModAttrs(BackgroundVec(p.Accent))
-					}
-					NextAccessName("worlds.item." + world.ID)
-					if PressAction() {
-						loadWorldIntoForm(world.ID)
-					}
-					AssignAccess()
-					Label(world.Name, FontSize(12), TextColorVec(p.Text))
+				studioPill("worlds.item."+world.ID, world.Name, selected, func() {
+					loadWorldIntoForm(world.ID)
 				})
 			}
 		})
 
-		Container(Attrs(Row, Gap(4)), func() {
-			for _, tab := range []struct{ key, label string }{
-				{"lore", "Lore"}, {"prompt", "lore.md"}, {"entities", "Entities"},
-			} {
-				tab := tab
-				selected := worldTab() == tab.key
-				Container(Attrs(Pad2(4, 10), Corners(6), BackgroundVec(p.Bg)), func() {
-					if selected {
-						ModAttrs(BackgroundVec(p.Accent))
-					}
-					NextAccessName("worlds.tab." + tab.key)
-					if PressAction() {
-						appState.WorldTab = tab.key
-					}
-					AssignAccess()
-					Label(tab.label, FontSize(11), TextColorVec(p.Text))
-				})
-			}
-		})
+		studioTabStrip("worlds.tab", []studioTab{
+			{"lore", "Lore"}, {"prompt", "lore.md"}, {"entities", "Entities"},
+		}, worldTab(), func(key string) { appState.WorldTab = key })
 
-		switch worldTab() {
-		case "prompt":
-			TextArea(&appState.FormWorldLore)
-		case "entities":
-			worldEntitiesEditor(p)
-		default:
-			Label("Name", FontSize(12), TextColorVec(p.Muted))
-			TextInput(&appState.FormWorldName)
-			Label("Genre", FontSize(12), TextColorVec(p.Muted))
-			TextInput(&appState.FormWorldGenre)
-			Label("Slug", FontSize(12), TextColorVec(p.Muted))
-			TextInput(&appState.FormWorldSlug)
-			Label("Default system", FontSize(12), TextColorVec(p.Muted))
-			MenuButton(NoIcon, worldSystemLabel(), func() {
-				for _, system := range appState.Systems {
-					system := system
-					if MenuItem(NoIcon, system.Name) {
-						appState.FormWorldSys = system.ID
-					}
-				}
-			})
-			Label("Art style", FontSize(12), TextColorVec(p.Muted))
-			TextInput(&appState.FormWorldStyle)
-			Label("Tags (comma-separated)", FontSize(12), TextColorVec(p.Muted))
-			TextInput(&appState.FormWorldTags)
-			Label("Description", FontSize(12), TextColorVec(p.Muted))
-			TextArea(&appState.FormWorldDesc)
-		}
-
-		Container(Attrs(Row, Gap(8)), func() {
-			NextAccessName("worlds.save")
-			if Button(NoIcon, "Save") {
-				svc := liveService
-				req := worldPayload()
-				if saveWorld != nil && svc != nil {
-					go func() {
-						if err := saveWorld(context.Background(), svc, req); err == nil {
-							WithFrameLock(func() {
-								appState.WorldSaved = true
-								appState.StudioDirty = false
-							})
-							refreshWorlds()
+		studioForm(func() {
+			switch worldTab() {
+			case "prompt":
+				FieldArea(&appState.FormWorldLore)
+			case "entities":
+				worldEntitiesEditor(p)
+			default:
+				studioFieldLabel("Name")
+				FieldInput(&appState.FormWorldName)
+				studioFieldLabel("Genre")
+				FieldInput(&appState.FormWorldGenre)
+				studioFieldLabel("Slug")
+				FieldInput(&appState.FormWorldSlug)
+				studioFieldLabel("Default system")
+				MenuButton(NoIcon, worldSystemLabel(), func() {
+					for _, system := range appState.Systems {
+						system := system
+						if MenuItem(NoIcon, system.Name) {
+							appState.FormWorldSys = system.ID
 						}
-					}()
-				}
+					}
+				})
+				studioFieldLabel("Art style")
+				FieldInput(&appState.FormWorldStyle)
+				studioFieldLabel("Tags (comma-separated)")
+				FieldInput(&appState.FormWorldTags)
+				studioFieldLabel("Description")
+				FieldArea(&appState.FormWorldDesc)
 			}
-			AssignAccess()
+
+			Container(Attrs(Row, Gap(8)), func() {
+				studioPrimaryButton("worlds.save", "Save", func() {
+					svc := liveService
+					req := worldPayload()
+					if saveWorld != nil && svc != nil {
+						go func() {
+							if err := saveWorld(context.Background(), svc, req); err == nil {
+								WithFrameLock(func() {
+									appState.WorldSaved = true
+									appState.StudioDirty = false
+								})
+								refreshWorlds()
+							}
+						}()
+					}
+				})
+			})
 		})
 	})
 }
@@ -241,7 +217,7 @@ func worldEntitiesEditor(p ui.Palette) {
 	if appState.WorldEntityID == "" {
 		return
 	}
-	TextArea(&appState.WorldMarkdown)
+	FieldArea(&appState.WorldMarkdown)
 	Container(Attrs(Row, Gap(8)), func() {
 		NextAccessName("worlds.entity.save")
 		if Button(NoIcon, "Save entity") {

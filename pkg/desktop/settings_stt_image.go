@@ -7,6 +7,7 @@ import (
 	. "go.hasen.dev/shirei"
 	. "go.hasen.dev/shirei/widgets"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/gui"
 	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/provider"
@@ -49,44 +50,116 @@ func refreshModels(svc *gui.Service) {
 
 func settingsSTT(p ui.Palette) {
 	cfg := appState.Config
-	Label("STT Engine", FontSize(14), FontWeight(WeightBold), TextColorVec(p.Text))
-	Label("Type", FontSize(12), TextColorVec(p.Muted))
+	settingsSubTitle(TypMicrophone, "Speech-to-Text")
+	if presets := providerPresets(provider.FamilySTT); len(presets) > 0 {
+		MenuButton(NoIcon, "Load STT Preset", func() {
+			for _, preset := range presets {
+				preset := preset
+				if MenuItem(NoIcon, preset.Label) {
+					applySTTPreset(&cfg.Media.STT, preset)
+				}
+			}
+		})
+	}
+	Label("Type", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
 	OptionGroup(&cfg.Media.STT.Type, func() {
 		OptionButton("Disabled", "disabled")
 		OptionButton("HTTP", "http")
 		OptionButton("CLI", "cli")
 	})
-	Label("Endpoint", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.STT.Endpoint)
-	Label("Model", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.STT.Model)
-	Label("Command", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.STT.Command)
+	Label("Endpoint", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.STT.Endpoint)
+	Label("Model", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.STT.Model)
+	Label("Command", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.STT.Command)
+	providerTestRow("settings.stt.test", "Test Transcription Engine", "stt", cfg.Media.STT)
 }
 
 func settingsImage(p ui.Palette) {
 	cfg := appState.Config
-	Label("Image Engine", FontSize(14), FontWeight(WeightBold), TextColorVec(p.Text))
+	settingsSubTitle(TypImage, "Image Generation")
+	if presets := providerPresets(provider.FamilyImage); len(presets) > 0 {
+		MenuButton(NoIcon, "Load Image Preset", func() {
+			for _, preset := range presets {
+				preset := preset
+				if MenuItem(NoIcon, preset.Label) {
+					applyImagePreset(&cfg.Media.Image, preset)
+				}
+			}
+		})
+	}
 	CheckBox(&cfg.Media.Image.AutoGenerate, "Auto-generate scene imagery")
 	CheckBox(&cfg.Media.Image.BuiltinFallback, "Use built-in procedural art as a fallback")
-	Label("Type", FontSize(12), TextColorVec(p.Muted))
+	Label("Type", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
 	OptionGroup(&cfg.Media.Image.Type, func() {
 		OptionButton("Disabled", "disabled")
 		OptionButton("Built-in", "builtin")
 		OptionButton("HTTP", "http")
 	})
-	Label("Built-in name", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.Image.BuiltinName)
-	Label("Endpoint", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.Image.Endpoint)
-	Label("Model", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.Image.Model)
-	Label("Aspect ratio", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.Image.AspectRatio)
-	Label("Person generation", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.Image.PersonGeneration)
-	Label("API key", FontSize(12), TextColorVec(p.Muted))
-	PasswordInput(&cfg.Media.Image.APIKey)
+	Label("Built-in name", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.Image.BuiltinName)
+	Label("Endpoint", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.Image.Endpoint)
+	Label("Model", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.Image.Model)
+	Label("Aspect ratio", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.Image.AspectRatio)
+	Label("Person generation", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.Image.PersonGeneration)
+	Label("API key", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldPassword(&cfg.Media.Image.APIKey)
+	providerTestRow("settings.image.test", "Test Image Engine", "image", cfg.Media.Image)
+}
+
+// applySTTPreset copies a preset's config values into an STT config.
+func applySTTPreset(cfg *config.STTConfig, preset provider.Preset) {
+	if preset.Config == nil {
+		return
+	}
+	if v, ok := preset.Config["type"].(string); ok {
+		cfg.Type = v
+	}
+	if v, ok := preset.Config["builtin_name"].(string); ok {
+		cfg.BuiltinName = v
+	}
+	if v, ok := preset.Config["endpoint"].(string); ok {
+		cfg.Endpoint = v
+	}
+	if v, ok := preset.Config["model"].(string); ok {
+		cfg.Model = v
+	}
+	if v, ok := preset.Config["command"].(string); ok {
+		cfg.Command = v
+	}
+}
+
+// applyImagePreset copies a preset's config values into an image config.
+func applyImagePreset(cfg *config.ImageConfig, preset provider.Preset) {
+	if preset.Config == nil {
+		return
+	}
+	if v, ok := preset.Config["type"].(string); ok {
+		cfg.Type = v
+	}
+	if v, ok := preset.Config["builtin_name"].(string); ok {
+		cfg.BuiltinName = v
+	}
+	if v, ok := preset.Config["endpoint"].(string); ok {
+		cfg.Endpoint = v
+	}
+	if v, ok := preset.Config["model"].(string); ok {
+		cfg.Model = v
+	}
+	if v, ok := preset.Config["aspect_ratio"].(string); ok {
+		cfg.AspectRatio = v
+	}
+	if v, ok := preset.Config["auto_generate"].(bool); ok {
+		cfg.AutoGenerate = v
+	}
+	if v, ok := preset.Config["builtin_fallback"].(bool); ok {
+		cfg.BuiltinFallback = v
+	}
 }
 
 // settingsModelPresets offers provider presets for a family.
@@ -102,32 +175,42 @@ func settingsModelPresets(p ui.Palette, family provider.Family, apply func(provi
 }
 
 func modelsSection(p ui.Palette) {
-	Label("Models", FontSize(14), FontWeight(WeightBold), TextColorVec(p.Text))
+	settingsSubTitle(TypDownload, "Models")
 	if len(appState.Models) == 0 {
-		Label("No models reported.", FontSize(11), TextColorVec(p.Muted))
+		settingsHint("No models reported.")
 		return
 	}
 	for _, model := range appState.Models {
-		Label(model.Name, FontSize(12), TextColorVec(p.Text))
-		if model.Installed {
-			Label("installed", FontSize(11), TextColorVec(p.Accent))
-			continue
-		}
-		ProgressBar(float32(model.Progress))
-		if model.Downloading {
-			BusyDots()
-		}
-		NextAccessName("models.download." + model.ID)
-		if Button(NoIcon, "Download") {
-			if downloadModel != nil && liveService != nil {
-				id := model.ID
-				go func() { _ = downloadModel(context.Background(), liveService, id) }()
+		Container(Attrs(Expand, Gap(6), Corners(10), Pad(12), BackgroundVec(ui.PillBG),
+			BorderWidth(1), BorderColorVec(ui.Hairline)), func() {
+			Container(Attrs(Row, CrossMid, Gap(8)), func() {
+				Label(model.Name, Fonts(ui.SansStack...), FontSize(12), FontWeight(WeightBold), TextColorVec(ui.TextMain))
+				Filler(1)
+				if model.Installed {
+					Label("installed", Fonts(Monospace...), FontSize(11), TextColorVec(ui.Success))
+				}
+			})
+			if model.Installed {
+				return
 			}
-		}
-		AssignAccess()
-		if model.Error != "" {
-			Label(model.Error, FontSize(11), TextColorVec(p.Danger))
-		}
-		Label(fmt.Sprintf("%d/%d bytes", model.BytesDownloaded, model.TotalBytes), FontSize(10), TextColorVec(p.Muted))
+			ProgressBar(float32(model.Progress))
+			Container(Attrs(Row, CrossMid, Gap(8)), func() {
+				if model.Downloading {
+					BusyDots()
+				}
+				NextAccessName("models.download." + model.ID)
+				if Button(NoIcon, "Download") {
+					if downloadModel != nil && liveService != nil {
+						id := model.ID
+						go func() { _ = downloadModel(context.Background(), liveService, id) }()
+					}
+				}
+				AssignAccess()
+				Label(fmt.Sprintf("%d/%d bytes", model.BytesDownloaded, model.TotalBytes), Fonts(Monospace...), FontSize(10), TextColorVec(ui.TextFaint))
+			})
+			if model.Error != "" {
+				Label(model.Error, FontSize(11), TextColorVec(ui.Danger))
+			}
+		})
 	}
 }

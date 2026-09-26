@@ -7,6 +7,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/gui"
+	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
@@ -133,6 +134,20 @@ type State struct {
 	// TTS inspection.
 	Inspect    *gui.TTSInspectResponseDTO
 	InspectSig string
+
+	// Voice catalogue browsing and extended search.
+	VoiceQuery     string
+	VoiceResults   []media.ProviderVoice
+	VoiceSearching bool
+	VoiceError     string
+	// ProfileTagsEdit holds per-profile raw tag buffers so a comma survives
+	// while typing.
+	ProfileTagsEdit map[string]string
+
+	// Model catalogue (Gemini).
+	ModelList      []media.GeminiModel
+	ModelListErr   string
+	FetchingModels bool
 
 	// Bundled model statuses.
 	Models []models.ModelStatus

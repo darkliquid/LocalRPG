@@ -98,6 +98,12 @@ func Run(cfg Config) error {
 		inspectTTS = func(ctx context.Context, svc *gui.Service, req gui.TTSInspectRequestDTO) (*gui.TTSInspectResponseDTO, error) {
 			return svc.InspectTTS(ctx, req)
 		}
+		searchTTSVoices = func(ctx context.Context, svc *gui.Service, req gui.VoiceSearchRequestDTO) (*gui.VoiceSearchResponseDTO, error) {
+			return svc.SearchTTSVoices(ctx, req)
+		}
+		listModels = func(ctx context.Context, svc *gui.Service, req gui.ModelCatalogueRequestDTO) (*gui.ModelCatalogueResponseDTO, error) {
+			return svc.ListModels(ctx, req)
+		}
 		downloadModel = func(ctx context.Context, svc *gui.Service, id string) error {
 			return svc.DownloadModel(ctx, id)
 		}
@@ -144,6 +150,8 @@ func Run(cfg Config) error {
 		locationArt = nil
 		testProvider = nil
 		inspectTTS = nil
+		searchTTSVoices = nil
+		listModels = nil
 		downloadModel = nil
 		saveSystem = nil
 		generateText = nil

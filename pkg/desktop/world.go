@@ -53,22 +53,18 @@ func bar(p ui.Palette, frac float64, colour Vec4) {
 }
 
 func worldDrawer(p ui.Palette) {
-	NextAccessName("world.refresh")
-	if Button(NoIcon, "Refresh") {
-		refreshWorld()
-	}
-	AssignAccess()
+	settingsSmallButton("world.refresh", "Refresh", refreshWorld)
 
 	if appState.Recap != nil {
-		Label("Story So Far", FontSize(12), FontWeight(WeightBold), TextColorVec(p.Text))
+		settingsSubTitle(TypTime, "Story So Far")
 		if appState.Recap.Summary != "" {
-			Label(appState.Recap.Summary, FontSize(12), TextColorVec(p.Muted))
+			Label(appState.Recap.Summary, FontSize(12), TextColorVec(ui.TextMuted))
 		} else if !appState.Recap.Enabled {
-			Label("Recap is disabled.", FontSize(11), TextColorVec(p.Muted))
+			settingsHint("Recap is disabled.")
 		}
 		for _, thread := range appState.Recap.Threads {
 			Label(fmt.Sprintf("%s · %s · t%d", thread.Name, thread.Status, thread.LastAdvanced),
-				FontSize(11), TextColorVec(p.Muted))
+				FontSize(11), TextColorVec(ui.TextMuted))
 		}
 	}
 
@@ -77,21 +73,19 @@ func worldDrawer(p ui.Palette) {
 	}
 
 	if len(appState.GameState.Arcs) > 0 {
-		Spacer(6)
-		Label("Narrative Arcs", FontSize(12), FontWeight(WeightBold), TextColorVec(p.Text))
+		settingsSubTitle(TypChartLine, "Narrative Arcs")
 		for _, arc := range appState.GameState.Arcs {
-			Label(fmt.Sprintf("%s (%d/%d)", arc.Name, arc.Progress, arc.MaxProgress), FontSize(11), TextColorVec(p.Text))
-			bar(p, progressFraction(arc.Progress, arc.MaxProgress), p.Accent)
+			Label(fmt.Sprintf("%s (%d/%d)", arc.Name, arc.Progress, arc.MaxProgress), FontSize(11), TextColorVec(ui.TextMain))
+			bar(p, progressFraction(arc.Progress, arc.MaxProgress), ui.Accent)
 		}
 	}
 
 	if len(appState.GameState.Clocks) > 0 {
-		Spacer(6)
-		Label("Faction Clocks", FontSize(12), FontWeight(WeightBold), TextColorVec(p.Text))
+		settingsSubTitle(TypTime, "Faction Clocks")
 		for _, clock := range appState.GameState.Clocks {
 			Label(fmt.Sprintf("%s · %s (%d/%d)", clock.Name, clock.Faction, clock.Ticks, clock.MaxTicks),
-				FontSize(11), TextColorVec(p.Text))
-			bar(p, progressFraction(clock.Ticks, clock.MaxTicks), p.Danger)
+				FontSize(11), TextColorVec(ui.TextMain))
+			bar(p, progressFraction(clock.Ticks, clock.MaxTicks), ui.Danger)
 		}
 	}
 }
@@ -99,41 +93,41 @@ func worldDrawer(p ui.Palette) {
 func characterDrawer(p ui.Palette) {
 	state := appState.GameState
 	if state == nil {
-		Label("No character loaded.", FontSize(12), TextColorVec(p.Muted))
+		settingsHint("No character loaded.")
 		return
 	}
 	player := state.Player
-	Label(player.Name, FontSize(15), FontWeight(WeightBold), TextColorVec(p.Text))
+	settingsSubTitle(TypUser, player.Name)
 	level := 1
 	if v, ok := numericField(player.State, "level"); ok {
 		level = v
 	}
-	Label(fmt.Sprintf("level %d · %s", level, player.Type), FontSize(12), TextColorVec(p.Muted))
+	Label(fmt.Sprintf("level %d · %s", level, player.Type), FontSize(12), TextColorVec(ui.TextMuted))
 
 	hp, _ := numericField(player.State, "hp")
 	maxHP, ok := numericField(player.State, "max_hp")
 	if !ok {
 		maxHP = 20
 	}
-	Label(fmt.Sprintf("HP %d/%d", hp, maxHP), FontSize(12), TextColorVec(p.Text))
-	bar(p, progressFraction(hp, maxHP), p.Accent)
+	Label(fmt.Sprintf("HP %d/%d", hp, maxHP), FontSize(12), TextColorVec(ui.TextMain))
+	bar(p, progressFraction(hp, maxHP), ui.Accent)
 
 	if player.Appearance != "" {
-		Label(player.Appearance, FontSize(11), TextColorVec(p.Muted))
+		Label(player.Appearance, FontSize(11), TextColorVec(ui.TextMuted))
 	}
 	if player.Voice != nil {
 		name := player.Voice.Name
 		if name == "" {
 			name = player.Voice.VoiceID
 		}
-		Label("voice: "+name, FontSize(11), TextColorVec(p.Muted))
+		Label("voice: "+name, FontSize(11), TextColorVec(ui.TextMuted))
 	}
 	for key, value := range player.State {
 		switch key {
 		case "hp", "max_hp", "level":
 			continue
 		}
-		Label(fmt.Sprintf("%s: %v", key, value), FontSize(11), TextColorVec(p.Muted))
+		Label(fmt.Sprintf("%s: %v", key, value), FontSize(11), TextColorVec(ui.TextMuted))
 	}
 }
 

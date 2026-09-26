@@ -113,7 +113,7 @@ func refreshEntities() {
 
 func codexDrawer(p ui.Palette) {
 	Container(Attrs(Gap(8)), func() {
-		TextInput(&appState.EntityQuery)
+		FieldInput(&appState.EntityQuery)
 
 		types := map[string]bool{}
 		for _, entity := range appState.Entities {
@@ -125,20 +125,12 @@ func codexDrawer(p ui.Palette) {
 		for t := range types {
 			chips = append(chips, t)
 		}
-		Container(Attrs(Row, Wrap, Gap(4)), func() {
+		Container(Attrs(Row, Wrap, Gap(6)), func() {
 			for _, t := range chips {
 				typ := t
 				selected := appState.EntityType == typ || (typ == "all" && appState.EntityType == "")
-				Container(Attrs(Pad2(2, 8), Corners(6), BackgroundVec(p.Bg)), func() {
-					if selected {
-						ModAttrs(BackgroundVec(p.Accent))
-					}
-					NextAccessName("codex.type." + typ)
-					if PressAction() {
-						appState.EntityType = typ
-					}
-					AssignAccess()
-					Label(typ, FontSize(11), TextColorVec(p.Text))
+				studioPill("codex.type."+typ, typ, selected, func() {
+					appState.EntityType = typ
 				})
 			}
 		})
@@ -149,25 +141,26 @@ func codexDrawer(p ui.Palette) {
 			func(int, float32) float32 { return 36 },
 			func(i int, width float32) {
 				entity := appState.Entities[idxs[i]]
-				Container(Attrs(Expand, FixHeight(32), Pad2(4, 8), Corners(6)), func() {
+				Container(Attrs(Expand, FixHeight(34), Corners(10), Pad2(6, 10)), func() {
 					if IsHovered() {
-						ModAttrs(BackgroundVec(p.Bg))
+						ModAttrs(BackgroundVec(ui.HoverFill))
 					}
 					NextAccessName("codex.entity." + entity.ID)
 					if PressAction() {
 						openEntity(entity.ID)
 					}
 					AssignAccess()
-					Label(entity.Name+" · "+entity.Type, FontSize(12), TextColorVec(p.Text))
+					Label(entity.Name, Fonts(ui.SansStack...), FontSize(12), FontWeight(WeightBold), TextColorVec(ui.TextMain))
+					Label(entity.Type, FontSize(11), TextColorVec(ui.TextMuted))
 				})
 			})
 
 		if appState.Entity == nil {
-			Label("Choose a note from the codex.", FontSize(12), TextColorVec(p.Muted))
+			settingsHint("Choose a note from the codex.")
 			return
 		}
 
-		Label(appState.Entity.Name, FontSize(15), FontWeight(WeightBold), TextColorVec(p.Text))
+		settingsSubTitle(TypBook, appState.Entity.Name)
 		if appState.Entity.ParseError {
 			Label("This note has a frontmatter parse error.", FontSize(11), TextColorVec(p.Danger))
 		}
@@ -178,7 +171,7 @@ func codexDrawer(p ui.Palette) {
 					artTile(p, appState.PortraitPath, "?", 56)
 				}
 				NextAccessName("codex.portrait.regenerate")
-				if Button(NoIcon, "Regenerate portrait") {
+				settingsSmallButton("codex.portrait.regenerate", "Regenerate portrait", func() {
 					svc := liveService
 					gameID := appState.OpenGame
 					id := appState.Entity.ID
@@ -188,43 +181,32 @@ func codexDrawer(p ui.Palette) {
 							openEntity(id)
 						}()
 					}
-				}
-				AssignAccess()
+				})
 			})
 		}
 
-		Container(Attrs(Row, Gap(4)), func() {
-			for _, tab := range []struct{ key, label string }{{"notes", "Notes"}, {"memories", "Memories"}} {
-				tab := tab
-				selected := appState.CodexTab == tab.key || (tab.key == "notes" && appState.CodexTab == "")
-				Container(Attrs(Pad2(2, 8), Corners(6), BackgroundVec(p.Bg)), func() {
-					if selected {
-						ModAttrs(BackgroundVec(p.Accent))
-					}
-					NextAccessName("codex.tab." + tab.key)
-					if PressAction() {
-						appState.CodexTab = tab.key
-					}
-					AssignAccess()
-					Label(tab.label, FontSize(11), TextColorVec(p.Text))
-				})
+		studioTabStrip("codex.tab", []studioTab{
+			{"notes", "Notes"}, {"memories", "Memories"},
+		}, func() string {
+			if appState.CodexTab == "" {
+				return "notes"
 			}
-		})
+			return appState.CodexTab
+		}(), func(key string) { appState.CodexTab = key })
 
 		if appState.CodexTab == "memories" {
 			if len(appState.Memories) == 0 {
-				Label("No memories yet.", FontSize(12), TextColorVec(p.Muted))
+				settingsHint("No memories yet.")
 			}
 			for _, memory := range appState.Memories {
-				Label(fmt.Sprintf("t%d · %s", memory.Turn, memory.Text), FontSize(11), TextColorVec(p.Text))
+				Label(fmt.Sprintf("t%d · %s", memory.Turn, memory.Text), FontSize(11), TextColorVec(ui.TextMuted))
 			}
 			return
 		}
 
-		TextArea(&appState.EntityMarkdown)
+		FieldArea(&appState.EntityMarkdown)
 		Container(Attrs(Row, Gap(8)), func() {
-			NextAccessName("codex.save")
-			if Button(NoIcon, "Save") {
+			studioPrimaryButton("codex.save", "Save", func() {
 				svc := liveService
 				gameID := appState.OpenGame
 				id := appState.Entity.ID
@@ -235,13 +217,10 @@ func codexDrawer(p ui.Palette) {
 						refreshEntities()
 					}()
 				}
-			}
-			AssignAccess()
-			NextAccessName("codex.merge")
-			if Button(NoIcon, "Merge note…") {
+			})
+			settingsSmallButton("codex.merge", "Merge note…", func() {
 				appState.MergeOpen = true
-			}
-			AssignAccess()
+			})
 		})
 
 		if len(appState.Entity.Backlinks) > 0 {

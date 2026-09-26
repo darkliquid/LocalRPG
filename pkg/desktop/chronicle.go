@@ -103,26 +103,52 @@ func chronicleView() {
 					}
 				})
 			})
-			drawerPanel()
 		})
 	})
+	drawerPanel()
 	actionConsole()
 }
 
 func chronicleHeader() {
-	Container(Attrs(Row, CrossMid, Gap(12), Expand), func() {
-		iconButton("chronicle.home", SymHome, func() {
-			appState.Screen = ScreenLauncher
-			appState.CampaignGalleryOpen = false
+	showLabels := GetContentWidth() > 1120
+	Container(Attrs(Row, CrossMid, Gap(14), Expand, Corners(16), BackgroundVec(ui.PanelBG),
+		BorderWidth(1), BorderColorVec(ui.Hairline), Pad2(10, 16), BoxShadow(22)), func() {
+		Container(Attrs(Row, CrossMid, Gap(6), Corners(12), Pad2(6, 12), BackgroundVec(ui.HoverFill),
+			BorderWidth(1), BorderColorVec(ui.Hairline)), func() {
+			if IsHovered() {
+				ModAttrs(BackgroundVec(ui.AccentSoft))
+			}
+			NextAccessName("chronicle.home")
+			if PressAction() {
+				appState.Screen = ScreenLauncher
+				appState.CampaignGalleryOpen = false
+			}
+			AssignAccess()
+			Icon(TypCompass, FontSize(14), TextColorVec(ui.TextMain))
+			Label("Campaigns", Fonts(ui.SansStack...), FontSize(12), TextColorVec(ui.TextMain))
 		})
-		Label(appState.GameName(), Fonts(ui.SansStack...), FontSize(20), FontWeight(WeightBold), TextColorVec(ui.TextMain))
+		Container(Attrs(Row, CrossMid, Gap(10)), func() {
+			Element(Attrs(FixSize(8, 8), Corners(4), BackgroundVec(ui.Accent), BoxShadow(8)))
+			Label(appState.GameName(), Fonts(ui.SansStack...), FontSize(16), FontWeight(WeightBold), TextColorVec(ui.TextMain))
+		})
 		Filler(1)
-		drawerToolbar(ui.DefaultPalette())
-		NextAccessName("chronicle.theater")
-		if Button(NoIcon, "Theater") {
-			openTheater()
-		}
-		AssignAccess()
+		drawerToolbar(ui.DefaultPalette(), showLabels)
+		Container(Attrs(Row, CrossMid, Gap(6), Corners(12), Pad2(8, 10)), func() {
+			if appState.Screen == ScreenTheater {
+				ModAttrs(BackgroundVec(ui.AccentBtn))
+			} else if IsHovered() {
+				ModAttrs(BackgroundVec(ui.HoverFill))
+			}
+			NextAccessName("chronicle.theater")
+			if PressAction() {
+				openTheater()
+			}
+			AssignAccess()
+			Icon(TypFilm, FontSize(14), TextColorVec(ui.TextMain))
+			if showLabels {
+				Label("Theater", Fonts(ui.SansStack...), FontSize(12), TextColorVec(ui.TextMain))
+			}
+		})
 	})
 }
 

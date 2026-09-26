@@ -136,7 +136,7 @@ func prologuePanel() {
 
 			Label("Opening Prompt (optional)", Fonts(ui.SansStack...), FontSize(11), FontWeight(WeightBold), TextColorVec(ui.TextMuted))
 			Container(Attrs(Expand, FixHeight(120), Corners(12), BackgroundVec(ui.InputBG), BorderWidth(1), BorderColorVec(ui.Hairline), Clip), func() {
-				TextArea(&appState.ProloguePrompt)
+				FieldArea(&appState.ProloguePrompt)
 			})
 			Label("Leave it blank and the GM will invent the scene from your world and rules.",
 				FontSize(11), TextColorVec(ui.TextFaint))

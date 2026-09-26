@@ -20,6 +20,12 @@ import (
 // inspectTTS is injected by Run for a live service.
 var inspectTTS func(ctx context.Context, svc *gui.Service, req gui.TTSInspectRequestDTO) (*gui.TTSInspectResponseDTO, error)
 
+// searchTTSVoices is injected by Run for a live service.
+var searchTTSVoices func(ctx context.Context, svc *gui.Service, req gui.VoiceSearchRequestDTO) (*gui.VoiceSearchResponseDTO, error)
+
+// listModels is injected by Run for a live service.
+var listModels func(ctx context.Context, svc *gui.Service, req gui.ModelCatalogueRequestDTO) (*gui.ModelCatalogueResponseDTO, error)
+
 // inspectSig returns a stable signature of a TTS config.
 func inspectSig(cfg config.TTSConfig) string {
 	data, err := json.Marshal(cfg)
@@ -81,7 +87,7 @@ func voiceOptionsControl(p ui.Palette, schema []media.VoiceOption, values map[st
 			})
 		default:
 			s := toString(values[opt.Key], opt.Default)
-			TextInput(&s)
+			FieldInput(&s)
 			onChange(opt.Key, s)
 		}
 	}
@@ -91,8 +97,10 @@ func settingsMedia(p ui.Palette) {
 	cfg := appState.Config
 	maybeInspectTTS()
 
-	Label("TTS Engine", FontSize(14), FontWeight(WeightBold), TextColorVec(p.Text))
-	Label("Engine", FontSize(12), TextColorVec(p.Muted))
+	settingsSectionTitle(TypVolume, "Media Engines")
+	settingsHint("Voice synthesis, transcription, and scene imagery backends.")
+	settingsSubTitle(TypVolumeUp, "Text-to-Speech")
+	Label("Engine", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
 	MenuButton(NoIcon, engineLabel(cfg.Media.TTS), func() {
 		for _, desc := range providersForFamily(provider.FamilyTTS) {
 			for _, preset := range desc.Presets {
@@ -110,34 +118,35 @@ func settingsMedia(p ui.Palette) {
 	})
 
 	CheckBox(&cfg.Media.TTS.AutoPlay, "Auto-play narration")
-	Label("Markdown handling", FontSize(12), TextColorVec(p.Muted))
+	Label("Markdown handling", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
 	OptionGroup(&cfg.Media.TTS.Markdown, func() {
 		OptionButton("Auto", "auto")
 		OptionButton("Strip", "strip")
 		OptionButton("Keep", "keep")
 	})
-	Label("Endpoint", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.TTS.Endpoint)
-	Label("Model", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.TTS.Model)
-	Label("Command", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.TTS.Command)
-	Label("Built-in name", FontSize(12), TextColorVec(p.Muted))
-	TextInput(&cfg.Media.TTS.BuiltinName)
-	Label("API key", FontSize(12), TextColorVec(p.Muted))
-	PasswordInput(&cfg.Media.TTS.APIKey)
+	settingsSubTitle(TypCog, "Connection")
+	Label("Endpoint", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.TTS.Endpoint)
+	Label("Model", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.TTS.Model)
+	Label("Command", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.TTS.Command)
+	Label("Built-in name", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldInput(&cfg.Media.TTS.BuiltinName)
+	Label("API key", FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
+	FieldPassword(&cfg.Media.TTS.APIKey)
 
 	vol := float32(cfg.Media.TTS.MasterVolume)
-	Label(fmt.Sprintf("Master volume %.2f", vol), FontSize(12), TextColorVec(p.Muted))
+	Label(fmt.Sprintf("Master volume %.2f", vol), FontSize(12), Fonts(ui.SansStack...), TextColorVec(ui.TextMuted))
 	Slider(&vol, SliderAttrs{Min: 0, Max: 1, Step: 0.05, Width: 260})
 	cfg.Media.TTS.MasterVolume = float64(vol)
 
 	if appState.Inspect != nil {
 		if appState.Inspect.Error != "" {
-			Label("Inspect: "+appState.Inspect.Error, FontSize(11), TextColorVec(p.Danger))
+			Label("Inspect: "+appState.Inspect.Error, FontSize(11), TextColorVec(ui.Danger))
 		}
 		Label(fmt.Sprintf("provider: %s · metered: %v", appState.Inspect.ProviderKey, appState.Inspect.Metered),
-			FontSize(11), TextColorVec(p.Muted))
+			FontSize(11), Fonts(Monospace...), TextColorVec(ui.TextMuted))
 		voiceOptionsControl(p, appState.Inspect.Options, cfg.Media.TTS.Options, func(key string, value any) {
 			if cfg.Media.TTS.Options == nil {
 				cfg.Media.TTS.Options = map[string]any{}
@@ -158,6 +167,19 @@ func settingsMedia(p ui.Palette) {
 	}
 
 	CheckBox(&cfg.Media.TTS.SpeechCues.Enabled, "Speak speech cues")
+	if cfg.Media.TTS.SpeechCues.Enabled {
+		studioFieldLabel("Transcript display mode")
+		OptionGroup(&cfg.Media.TTS.SpeechCues.DisplayMode, func() {
+			OptionButton("Stage Directions", "stage_directions")
+			OptionButton("Hidden", "hidden")
+			OptionButton("Raw text", "raw")
+		})
+	}
+	speechCueCapabilities()
+	providerTestRow("settings.tts.test", "Test Voice Engine", "tts", cfg.Media.TTS)
+
+	voiceCatalogueSection(p)
+	voiceProfilesSection(p)
 
 	settingsSTT(p)
 	settingsImage(p)

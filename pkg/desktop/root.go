@@ -8,7 +8,7 @@ import (
 
 // RootView renders the application frame for the active screen.
 func RootView() {
-	Container(Attrs(Viewport, BackgroundVec(ui.CanvasBG)), func() {
+	Container(Attrs(Viewport, BackgroundVec(ui.CanvasBG), AmendTextStyle(TextColorVec(ui.TextMain))), func() {
 		switch appState.Screen {
 		case ScreenNewCampaign:
 			newCampaignView()

@@ -36,52 +36,46 @@ func contextTokenSummary() string {
 }
 
 func contextDrawer(p ui.Palette) {
-	NextAccessName("context.refresh")
-	if Button(NoIcon, "Refresh") {
-		refreshContext()
-	}
-	AssignAccess()
+	settingsSmallButton("context.refresh", "Refresh", refreshContext)
 
 	tc := appState.TurnContext
 	if tc == nil {
-		Label("No turn context yet.", FontSize(12), TextColorVec(p.Muted))
+		settingsHint("No turn context yet.")
 		return
 	}
 
-	Label(fmt.Sprintf("Turn %d (%s)", tc.TurnNumber, tc.Mode), FontSize(13), FontWeight(WeightBold), TextColorVec(p.Text))
-	Label("strategy: "+tc.Strategy+" · "+contextTokenSummary(), FontSize(11), TextColorVec(p.Muted))
+	settingsSubTitle(TypThList, fmt.Sprintf("Turn %d (%s)", tc.TurnNumber, tc.Mode))
+	Label("strategy: "+tc.Strategy+" · "+contextTokenSummary(), Fonts(Monospace...), FontSize(11), TextColorVec(ui.TextMuted))
 	if tc.CachedTokens > 0 {
-		Label(fmt.Sprintf("cached: %d", tc.CachedTokens), FontSize(11), TextColorVec(p.Muted))
+		Label(fmt.Sprintf("cached: %d", tc.CachedTokens), Fonts(Monospace...), FontSize(11), TextColorVec(ui.TextMuted))
 	}
-	Label("prompt "+shortHash(tc.PromptHash)+" · prefix "+shortHash(tc.PrefixHash), FontSize(11), TextColorVec(p.Muted))
+	Label("prompt "+shortHash(tc.PromptHash)+" · prefix "+shortHash(tc.PrefixHash), Fonts(Monospace...), FontSize(11), TextColorVec(ui.TextMuted))
 	if tc.Session != nil {
 		Label(fmt.Sprintf("session %s · %s · through turn %d", tc.Session.Provider, tc.Session.ID, tc.Session.ThroughTurn),
-			FontSize(11), TextColorVec(p.Muted))
+			Fonts(Monospace...), FontSize(11), TextColorVec(ui.TextMuted))
 	}
 
 	if len(appState.WorkingSet) > 0 {
-		Spacer(6)
-		Label("Working Set", FontSize(12), FontWeight(WeightBold), TextColorVec(p.Text))
+		settingsSubTitle(TypGroup, "Working Set")
 		for _, entry := range appState.WorkingSet {
 			label := entry.Name
 			if label == "" {
 				label = entry.ID
 			}
 			Label(fmt.Sprintf("%s · %s · t%d · %.1f", label, entry.Kind, entry.LastTurn, entry.Weight),
-				FontSize(11), TextColorVec(p.Muted))
+				FontSize(11), TextColorVec(ui.TextMuted))
 		}
 	}
 
 	if len(tc.Sections) > 0 {
-		Spacer(6)
-		Label("Prompt Sections", FontSize(12), FontWeight(WeightBold), TextColorVec(p.Text))
+		settingsSubTitle(TypThList, "Prompt Sections")
 		for _, section := range tc.Sections {
 			mark := "·"
 			if section.Included {
 				mark = "✓"
 			}
 			Label(fmt.Sprintf("%s %s (%d tokens) %s", mark, section.Name, section.Tokens, section.Source),
-				FontSize(11), TextColorVec(p.Muted))
+				FontSize(11), TextColorVec(ui.TextMuted))
 		}
 	}
 }

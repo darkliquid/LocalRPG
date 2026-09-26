@@ -8,7 +8,6 @@ import (
 	"math"
 
 	. "go.hasen.dev/shirei"
-	. "go.hasen.dev/shirei/widgets"
 
 	"golang.org/x/image/vector"
 
@@ -125,14 +124,10 @@ func drawLine(dst *image.RGBA, a, b [2]float64, col color.RGBA) {
 }
 
 func graphDrawer(p ui.Palette) {
-	NextAccessName("graph.refresh")
-	if Button(NoIcon, "Refresh") {
-		refreshGraph()
-	}
-	AssignAccess()
+	settingsSmallButton("graph.refresh", "Refresh", refreshGraph)
 
 	if appState.GraphImage == nil {
-		Label("No graph yet.", FontSize(12), TextColorVec(p.Muted))
+		settingsHint("No graph yet.")
 		return
 	}
 
@@ -142,11 +137,7 @@ func graphDrawer(p ui.Palette) {
 	if appState.Graph != nil {
 		for _, node := range appState.Graph.Nodes {
 			id := node.ID
-			NextAccessName("graph.node." + id)
-			if Button(NoIcon, node.Label) {
-				openEntity(id)
-			}
-			AssignAccess()
+			studioPill("graph.node."+id, node.Label, false, func() { openEntity(id) })
 		}
 	}
 }
