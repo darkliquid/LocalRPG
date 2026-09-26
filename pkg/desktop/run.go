@@ -6,6 +6,7 @@ import (
 
 	"go.hasen.dev/shirei"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/gui"
 	"github.com/darkliquid/localrpg/pkg/ui"
 )
@@ -75,6 +76,10 @@ func Run(cfg Config) error {
 			return err
 		}
 		portraitPath = writePortrait
+		saveSettings = func(ctx context.Context, svc *gui.Service, cfg config.Config) error {
+			_, err := svc.SaveSettings(ctx, cfg)
+			return err
+		}
 	} else {
 		liveService = nil
 		createGame = nil
@@ -87,6 +92,7 @@ func Run(cfg Config) error {
 		regeneratePortrait = nil
 		mergeEntities = nil
 		portraitPath = nil
+		saveSettings = nil
 	}
 
 	if cfg.PNGPath != "" {

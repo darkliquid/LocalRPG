@@ -46,6 +46,12 @@ func dockView(p ui.Palette) {
 		}
 		AssignAccess()
 
+		NextAccessName("launcher.global-settings")
+		if Button(NoIcon, "⚙") {
+			openGlobalSettings()
+		}
+		AssignAccess()
+
 		for i := range appState.Games {
 			game := &appState.Games[i]
 			selected := game.ID == appState.Selected

@@ -9,6 +9,8 @@ func RootView() {
 		worldsView()
 	case ScreenChronicle:
 		chronicleView()
+	case ScreenSettings:
+		settingsView()
 	default:
 		launcherView()
 	}

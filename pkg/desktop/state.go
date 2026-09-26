@@ -15,6 +15,7 @@ const (
 	ScreenNewCampaign
 	ScreenWorldGallery
 	ScreenChronicle
+	ScreenSettings
 )
 
 // State is the desktop application's cached data. It is replaced wholesale by
@@ -88,6 +89,13 @@ type State struct {
 	// Living world / character sheet state.
 	GameState *gui.GameStateDTO
 	Recap     *gui.RecapDTO
+
+	// Global settings state.
+	Config           *config.Config
+	ConfigPath       string
+	ConfigIsOverride bool
+	SettingsSaved    bool
+	SettingsTab      string
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
