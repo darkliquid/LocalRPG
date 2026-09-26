@@ -130,6 +130,8 @@ func settingsView() {
 			settingsProviders(p)
 		case "agents":
 			settingsAgents(p)
+		case "media":
+			settingsMedia(p)
 		case "preferences":
 			settingsPreferences(p)
 		case "debug":

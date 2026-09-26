@@ -103,6 +103,10 @@ type State struct {
 	SelectedRole string
 	TestResult   *gui.TestProviderResponseDTO
 
+	// TTS inspection.
+	Inspect    *gui.TTSInspectResponseDTO
+	InspectSig string
+
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
 	WorldArt map[string]Art

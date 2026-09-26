@@ -83,6 +83,9 @@ func Run(cfg Config) error {
 		testProvider = func(ctx context.Context, svc *gui.Service, req gui.TestProviderRequestDTO) (*gui.TestProviderResponseDTO, error) {
 			return svc.TestProvider(ctx, req)
 		}
+		inspectTTS = func(ctx context.Context, svc *gui.Service, req gui.TTSInspectRequestDTO) (*gui.TTSInspectResponseDTO, error) {
+			return svc.InspectTTS(ctx, req)
+		}
 	} else {
 		liveService = nil
 		createGame = nil
@@ -97,6 +100,7 @@ func Run(cfg Config) error {
 		portraitPath = nil
 		saveSettings = nil
 		testProvider = nil
+		inspectTTS = nil
 	}
 
 	if cfg.PNGPath != "" {
