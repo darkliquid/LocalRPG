@@ -8,6 +8,7 @@ type Screen int
 const (
 	ScreenLauncher Screen = iota
 	ScreenNewCampaign
+	ScreenWorldGallery
 )
 
 // State is the desktop application's cached data. It is replaced wholesale by
@@ -28,6 +29,9 @@ type State struct {
 
 	// LightboxPath is the image shown full-window, or empty.
 	LightboxPath string
+
+	// WorldFlyoutOpen shows the compact world strip beside the dock.
+	WorldFlyoutOpen bool
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art

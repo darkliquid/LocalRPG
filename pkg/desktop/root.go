@@ -5,6 +5,8 @@ func RootView() {
 	switch appState.Screen {
 	case ScreenNewCampaign:
 		newCampaignView()
+	case ScreenWorldGallery:
+		worldsView()
 	default:
 		launcherView()
 	}

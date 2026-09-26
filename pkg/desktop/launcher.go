@@ -21,6 +21,9 @@ func launcherView() {
 	Container(Attrs(Viewport, BackgroundVec(p.Bg)), func() {
 		Container(Attrs(Row, Expand, Grow(1), Clip), func() {
 			dockView(p)
+			if appState.WorldFlyoutOpen {
+				worldFlyout()
+			}
 			Container(Attrs(Grow(1), Expand, Clip, Pad(24), Gap(12)), func() {
 				heroView(p)
 				campaignListView(p)
@@ -34,6 +37,12 @@ func dockView(p ui.Palette) {
 		NextAccessName("launcher.new-campaign")
 		if Button(NoIcon, "+") {
 			appState.Screen = ScreenNewCampaign
+		}
+		AssignAccess()
+
+		NextAccessName("launcher.worlds")
+		if Button(NoIcon, "W") {
+			appState.WorldFlyoutOpen = !appState.WorldFlyoutOpen
 		}
 		AssignAccess()
 
