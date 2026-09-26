@@ -275,19 +275,23 @@ Adopt current-Go idioms project-wide, ahead of and during this work:
 
 ## 11. Phasing and screen inventory
 
-The SPA is frozen at the start of Phase 3 and used only as a visual reference.
+The SPA is frozen at the start of Phase 1 and used only as a visual
+reference. It must keep running, so the HTTP daemon, SPA assets, and Wails
+window all survive until teardown. The shirei shell is reachable during the
+transition via `LOCALRPG_UI=shirei`; the flag is deleted at teardown, when the
+root command boots shirei unconditionally.
 
 | Phase | Deliverable | Screens / pieces |
 | --- | --- | --- |
-| 0 | Foundations, no user-visible change | vendor+pin shirei; `.gitignore` fix; `pkg/ui` adapter; `pkg/desktop` shell with a `--png` golden test; snapshot mise task; Go-style sweep |
-| 1 | Core split + removals | `BeginTurn(ctx, …)`; move `play.go` reindex/re-resolve into the desktop open path; delete TUI (`pkg/tui`, `play.go`, `play` cmd); delete Wails, daemon/HTTP/driver/`debug server`, `pkg/debugger`; rewrite or drop handler tests |
-| 2 | Pure-Go portability | build-tag `ttssherpa`; swap `oto` for shirei audio; `CGO_ENABLED=0 go build ./...` and `desktop:build` cross-compile green |
-| 3 | First shirei window | root command boots the GUI (`gui` subcommand removed); launcher/hub (`LauncherHub`, `launcher/*`: campaign gallery, hero stage, new-campaign modal, world gallery); drawer shell; app frame |
+| 0 | Foundations, no user-visible change | pin shirei; `.gitignore` fix; `pkg/ui` adapter; `pkg/desktop` shell with a `--png` golden test; snapshot mise task; Go-style sweep |
+| 1 | Non-GUI removals | port `play.go` reindex/re-resolve into the desktop open path; delete TUI (`pkg/tui`, `play.go`, `play` cmd, bubbletea/lipgloss/glamour); delete `pkg/driver`, `pkg/debugger`, `debug server`/`test-run`. SPA + Wails keep shipping. |
+| 2 | Portability prep | build-tag `ttssherpa`; swap `oto` for shirei audio. The CGO-free gate is not yet green (Wails remains). |
+| 3 | shirei shell + launcher | `LOCALRPG_UI=shirei` boots the shell; launcher/hub (`LauncherHub`, `launcher/*`: campaign gallery, hero stage, new-campaign modal, world gallery); drawer shell; app frame |
 | 4 | Core loop | Chronicle (`ChronicleView`, `TurnHistoryList`, `TurnSegments`, `SegmentAudioControls`, `DiceCheckCard`, `ActionConsole`, `ProloguePanel`); Codex/`CodexDrawer`; `ContextDrawer`, `GraphDrawer`, `LivingWorldDrawer`, `CharacterSheetDrawer`; `MarkdownProse` |
 | 5 | Settings | `SettingsStudio`, provider/model catalogue, `ModelDownloadModal`, `VoiceCatalogModal`, `VoiceCatalogPicker`, `VoiceCombobox`, `VoiceOptionsControl`, TTS inspect |
-| 6 | Theatre + export | `pkg/theater` shared view; `pkg/desktop/theater` live; `pkg/export/video.go` re-rastered; `ImageLightbox` |
-| 7 | Studios & remaining | `SystemsStudio`, `WorldsStudio`, character creation, asset generation; rewrite `docs/debugging.md` for external OTel collectors |
-| 8 | Teardown | delete `frontend/`, Node from mise; drop Wails/TUI/chromedp deps from `go.mod`; final Node-free, CGO-free `go build` |
+| 6 | Studios & remaining | `SystemsStudio`, `WorldsStudio`, character creation, asset generation; rewrite `docs/debugging.md` for external OTel collectors |
+| 7 | Theatre + export | `pkg/theater` shared view; `pkg/desktop/theater` live; `pkg/export/video.go` re-rastered; `ImageLightbox` |
+| 8 | Teardown | shirei becomes the only UI (root boots it; `LOCALRPG_UI` and `gui` subcommand gone); delete `frontend/`, `pkg/gui/server.go`/`socket.go`/`assets.go`/`middleware.go`/`dist/`, Wails, Node; drop Wails/TUI/chromedp deps; CGO-free `go build ./...` and `desktop:build` cross-compile green |
 
 ## 12. Testing strategy
 
