@@ -36,8 +36,6 @@ func main() {
 		handleRollCommand(args[1:])
 	case "prompt":
 		handlePromptCommand(args[1:])
-	case "play":
-		handlePlayCommand(args[1:])
 	case "tts":
 		handleTTSCommand(args[1:])
 	case "image":
@@ -64,7 +62,6 @@ func printUsage() {
 	fmt.Println("\nCommands:")
 	fmt.Println("  roll <notation>    Evaluate dice notation (e.g. 1d20+5, 4d6kh3, 4dF)")
 	fmt.Println("  prompt [flags]     Test model execution via CLI harness or HTTP")
-	fmt.Println("  play <game-id>     Launch terminal TUI play mode")
 	fmt.Println("  tts <text>         Synthesize text to speech")
 	fmt.Println("  image <prompt>     Generate scene or character image")
 	fmt.Println("  gui                Launch desktop application (Wails v3)")
