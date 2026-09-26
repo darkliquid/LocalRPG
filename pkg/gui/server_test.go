@@ -543,7 +543,7 @@ func TestSegmentAudioRouteSniffsTheContentType(t *testing.T) {
 	}
 }
 
-func TestSegmentAudioRouteIsNotCached(t *testing.T) {
+func TestSegmentAudioRouteIsCacheable(t *testing.T) {
 	gameID, svc := setupTestGame(t)
 	writeSegmentTurn(t, svc, gameID)
 	server := NewServer(svc, http.NotFoundHandler())
@@ -552,8 +552,11 @@ func TestSegmentAudioRouteIsNotCached(t *testing.T) {
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
 
-	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
-		t.Errorf("Cache-Control = %q, want no-store", got)
+	if cc := rec.Header().Get("Cache-Control"); strings.Contains(cc, "no-store") {
+		t.Errorf("Cache-Control = %q, want it cacheable", cc)
+	}
+	if rec.Header().Get("ETag") == "" {
+		t.Error("expected an ETag on the clip response")
 	}
 }
 

@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -429,11 +430,10 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			// A segment's URL is stable across a voice change, so the browser must
-			// not reuse a clip read in the previous voice. The server's own content
-			// cache keeps repeat synthesis instant.
-			w.Header().Set("Cache-Control", "no-store")
-			w.Header().Set("Content-Type", media.AudioContentType(data))
+			// The clip URL embeds the audio cache key, so a voice or text change
+			// yields a new URL and the old one can be cached hard. The ETag is
+			// derived from the bytes, so it changes if the clip is regenerated.
+			setClipHeaders(w, data)
 			_, _ = w.Write(data)
 		}
 
@@ -1242,4 +1242,13 @@ func (s *Server) handleGenerateAssetPreview(w http.ResponseWriter, r *http.Reque
 	}
 	w.Header().Set("Content-Type", contentType)
 	_, _ = w.Write(data)
+}
+// setClipHeaders marks a synthesized clip as cacheable. The clip URL already
+// carries the audio cache key, so a changed voice or text is a new URL; the ETag
+// is derived from the bytes so a regenerated clip on the same URL is not reused.
+func setClipHeaders(w http.ResponseWriter, data []byte) {
+	sum := sha256.Sum256(data)
+	w.Header().Set("ETag", fmt.Sprintf(`"%x"`, sum[:8]))
+	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	w.Header().Set("Content-Type", media.AudioContentType(data))
 }

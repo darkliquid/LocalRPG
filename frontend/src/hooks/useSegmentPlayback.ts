@@ -14,6 +14,8 @@ export const useSegmentPlayback = (
   volume: number
 ) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const prefetchRef = useRef<HTMLAudioElement | null>(null);
+  const prefetchedUrlRef = useRef<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
@@ -58,11 +60,17 @@ export const useSegmentPlayback = (
         return;
       }
 
-      // Preload subsequent segment audio so playback flows continuously without delays
+      // Preload the next clip and keep it, so the browser has it ready when the
+      // current one ends. Discarding the element let it be collected unplayed.
       const following = urls.findIndex((url, i) => i > next && !!url);
       if (following !== -1) {
-        const prefetch = new Audio(urls[following] as string);
-        prefetch.preload = 'auto';
+        const nextUrl = urls[following] as string;
+        if (prefetchedUrlRef.current !== nextUrl) {
+          const prefetch = new Audio(nextUrl);
+          prefetch.preload = 'auto';
+          prefetchRef.current = prefetch;
+          prefetchedUrlRef.current = nextUrl;
+        }
       }
 
       playUrl(urls[next] as string, next, () => playFrom(next + 1));
