@@ -56,6 +56,11 @@ type Service struct {
 	// queue of overlapping ones.
 	summaryMu      sync.Mutex
 	summaryPending map[string]bool
+	// The audio pipeline is shared and rebuilt only when the configuration
+	// object changes, so a built-in TTS model is loaded once, not per segment.
+	ttsMu       sync.Mutex
+	ttsConfig   *config.Config
+	ttsPipeline *media.TTSPipeline
 }
 
 // Config returns the configuration the service is running with, so a command can
@@ -1690,22 +1695,40 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 	}
 
 	cfg := s.configMgr.Get()
+	narratorVoice := s.narratorVoiceFor(gameID, cfg)
+
+	pipeline, err := s.audioPipeline()
+	if err != nil {
+		return "", err
+	}
+	isForce := len(force) > 0 && force[0]
+	return pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
+}
+
+// audioPipeline returns the shared TTS pipeline, building it when the current
+// configuration object differs from the one it was built from. Sharing it means a
+// built-in TTS model is loaded once, not once per segment.
+func (s *Service) audioPipeline() (*media.TTSPipeline, error) {
+	cfg := s.configMgr.Get()
 	if cfg.Media.TTS.Type == "" || cfg.Media.TTS.Type == "disabled" {
-		return "", ErrAudioUnavailable
+		return nil, ErrAudioUnavailable
+	}
+
+	s.ttsMu.Lock()
+	defer s.ttsMu.Unlock()
+	if s.ttsPipeline != nil && s.ttsConfig == cfg {
+		return s.ttsPipeline, nil
 	}
 
 	client, err := s.ttsClientFor(cfg.Media.TTS)
 	if err != nil {
-		return "", fmt.Errorf("build tts client: %w", err)
+		return nil, fmt.Errorf("build tts client: %w", err)
 	}
-
-	narratorVoice := s.narratorVoiceFor(gameID, cfg)
-
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
-	isForce := len(force) > 0 && force[0]
-	return pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
+	s.ttsConfig, s.ttsPipeline = cfg, pipeline
+	return pipeline, nil
 }
 
 // narratorVoiceFor resolves the narrator voice for a campaign, preferring any
