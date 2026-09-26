@@ -89,7 +89,6 @@ func drawerTitle() string {
 	}
 }
 
-func codexDrawer(p ui.Palette)     { Label("Codex", TextColorVec(p.Muted)) }
 func contextDrawer(p ui.Palette)   { Label("Context", TextColorVec(p.Muted)) }
 func graphDrawer(p ui.Palette)     { Label("Graph", TextColorVec(p.Muted)) }
 func worldDrawer(p ui.Palette)     { Label("Living World", TextColorVec(p.Muted)) }

@@ -22,8 +22,13 @@ func openCampaign(gameID string) {
 		return
 	}
 	go func() {
-		turns := loadChronicle(context.Background(), svc, gameID)
-		WithFrameLock(func() { appState.Turns = turns })
+		ctx := context.Background()
+		turns := loadChronicle(ctx, svc, gameID)
+		entities := loadEntities(ctx, svc, gameID)
+		WithFrameLock(func() {
+			appState.Turns = turns
+			appState.Entities = entities
+		})
 		RequestNextFrame()
 	}()
 }

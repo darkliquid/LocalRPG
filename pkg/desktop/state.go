@@ -63,6 +63,13 @@ type State struct {
 	// Drawer is the active side drawer name, or empty.
 	Drawer string
 
+	// Codex state.
+	Entities       []gui.EntitySummaryDTO
+	Entity         *gui.EntityDTO
+	EntityMarkdown string
+	EntityQuery    string
+	EntityType     string
+
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
 	WorldArt map[string]Art

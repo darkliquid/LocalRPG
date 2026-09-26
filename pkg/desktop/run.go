@@ -63,6 +63,9 @@ func Run(cfg Config) error {
 		deleteGame = func(ctx context.Context, svc *gui.Service, gameID string) error {
 			return svc.DeleteGame(ctx, gameID)
 		}
+		saveEntity = func(ctx context.Context, svc *gui.Service, gameID, entityID, markdown string) error {
+			return svc.SaveEntity(ctx, gameID, entityID, markdown)
+		}
 	} else {
 		liveService = nil
 		createGame = nil
@@ -71,6 +74,7 @@ func Run(cfg Config) error {
 		saveGameSettings = nil
 		restartGame = nil
 		deleteGame = nil
+		saveEntity = nil
 	}
 
 	if cfg.PNGPath != "" {

@@ -63,6 +63,24 @@ func loadAll(ctx context.Context, svc *gui.Service) *State {
 	return st
 }
 
+// loadEntities reads the campaign's entity summaries.
+func loadEntities(ctx context.Context, svc *gui.Service, gameID string) []gui.EntitySummaryDTO {
+	entities, err := svc.ListEntities(ctx, gameID)
+	if err != nil || entities == nil {
+		return []gui.EntitySummaryDTO{}
+	}
+	return entities
+}
+
+// loadEntity reads one entity note and its raw markdown.
+func loadEntity(ctx context.Context, svc *gui.Service, gameID, entityID string) (*gui.EntityDTO, string) {
+	entity, err := svc.GetEntity(ctx, gameID, entityID)
+	if err != nil || entity == nil {
+		return nil, ""
+	}
+	return entity, entity.Markdown
+}
+
 // loadChronicle reads the campaign's turn history.
 func loadChronicle(ctx context.Context, svc *gui.Service, gameID string) []gui.TurnDTO {
 	turns, err := svc.GetChronicle(ctx, gameID)
