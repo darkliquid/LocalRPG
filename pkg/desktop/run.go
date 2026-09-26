@@ -76,6 +76,18 @@ func Run(cfg Config) error {
 			return err
 		}
 		portraitPath = writePortrait
+		playTurnAudio = func(ctx context.Context, svc *gui.Service, gameID string, turn int, force bool) error {
+			return svc.PlayTurnAudio(ctx, gameID, turn, force)
+		}
+		playSegmentAudio = func(ctx context.Context, svc *gui.Service, gameID string, turn, index int, force bool) error {
+			return svc.PlaySegmentAudio(ctx, gameID, turn, index, force)
+		}
+		stopAudioFn = func(svc *gui.Service) { svc.StopAudio() }
+		audioPlayingFn = func(svc *gui.Service) bool { return svc.AudioPlaying() }
+		locationArt = func(ctx context.Context, svc *gui.Service, gameID, locationID string) (string, error) {
+			path, _, err := svc.GetLocationArt(ctx, gameID, locationID, false)
+			return path, err
+		}
 		saveSettings = func(ctx context.Context, svc *gui.Service, cfg config.Config) error {
 			_, err := svc.SaveSettings(ctx, cfg)
 			return err
@@ -125,6 +137,11 @@ func Run(cfg Config) error {
 		mergeEntities = nil
 		portraitPath = nil
 		saveSettings = nil
+		playTurnAudio = nil
+		playSegmentAudio = nil
+		stopAudioFn = nil
+		audioPlayingFn = nil
+		locationArt = nil
 		testProvider = nil
 		inspectTTS = nil
 		downloadModel = nil

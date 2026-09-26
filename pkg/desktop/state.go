@@ -73,15 +73,22 @@ type State struct {
 	CharacterAnswers map[string]string
 
 	// Chronicle state.
-	OpenGame      string
-	Turns         []gui.TurnDTO
-	Prose         string
-	TurnInFlight  bool
-	PendingAction string
-	ToolActivity  string
-	TurnError     string
-	ConsoleMode   string
-	ConsoleText   string
+	Portraits         map[string]string
+	SceneArt          map[string]string
+	AudioState        string
+	AudioTurn         int
+	AudioMessage      string
+	ProloguePrompt    string
+	PrologueDismissed bool
+	OpenGame          string
+	Turns             []gui.TurnDTO
+	Prose             string
+	TurnInFlight      bool
+	PendingAction     string
+	ToolActivity      string
+	TurnError         string
+	ConsoleMode       string
+	ConsoleText       string
 
 	// Drawer is the active side drawer name, or empty.
 	Drawer string
@@ -230,6 +237,11 @@ func (s *State) SystemName(id string) string {
 
 // GameName returns the selected campaign's name, or a default.
 func (s *State) GameName() string {
+	for i := range s.Games {
+		if s.Games[i].ID == s.OpenGame && s.Games[i].Name != "" {
+			return s.Games[i].Name
+		}
+	}
 	if game := s.SelectedGame(); game != nil && game.Name != "" {
 		return game.Name
 	}

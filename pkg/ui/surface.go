@@ -31,6 +31,9 @@ var (
 	AccentBorder   = shirei.Vec4{0, 0, 100, 0.20}
 	VignetteTop    = shirei.Vec4{20, 13, 4, 0.55}
 	VignetteBottom = shirei.Vec4{20, 13, 4, 0.85}
+	InputBG        = shirei.Vec4{20, 13, 4, 0.55}
+	PlayerTone     = shirei.Vec4{199, 89, 60, 1} // sky-400
+	PartialTone    = shirei.Vec4{38, 92, 50, 1}  // amber-500
 )
 
 // System font stacks. Shirei falls back per rune, so an unavailable face falls
