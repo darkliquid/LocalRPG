@@ -807,10 +807,34 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		ToolCalls:    result.Provenance,
 	}
 
-	turn.Entities = harness.ResolveEntityMentions(o.store, o.playerID, locationID, turn.Narration, actionInput)
-
 	structured := result.Submission != nil
 	extraction := harness.Extraction{}
+	var extractionErr error
+	extractionDone := make(chan struct{})
+	// Extraction is a model call, so start it before the local mention and
+	// segment work and await it just before segments are built. A failed
+	// extractor must not lose the turn.
+	if !structured && o.extractor != nil {
+		go func() {
+			defer close(extractionDone)
+			extractCtx, extractSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "extract.entities")
+			defer extractSpan.End()
+			if extracted, err := o.extractor.Extract(extractCtx, turn.Narration); err == nil {
+				extraction = *extracted
+			} else {
+				extractionErr = err
+				extractSpan.RecordError(err)
+				extractSpan.SetStatus(codes.Error, string(harness.ClassifyProviderError(err)))
+				o.logger.Event("extract.error", map[string]interface{}{"error": err.Error()})
+			}
+			extractSpan.SetAttributes(attribute.Int("localrpg.entities.extracted", len(extraction.Entities)))
+		}()
+	} else {
+		close(extractionDone)
+	}
+
+	turn.Entities = harness.ResolveEntityMentions(o.store, o.playerID, locationID, turn.Narration, actionInput)
+
 	var personae []harness.PersonaDecl
 	var memories []harness.MemoryDecl
 	if structured {
@@ -825,20 +849,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 				turn.Personae = append(turn.Personae, id)
 			}
 		}
-	} else if o.extractor != nil {
-		extractCtx, extractSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "extract.entities")
-		// A failed extractor must not lose the turn; the mentions above still stand.
-		if extracted, err := o.extractor.Extract(extractCtx, turn.Narration); err == nil {
-			extraction = *extracted
-		} else {
-			extractSpan.RecordError(err)
-			extractSpan.SetStatus(codes.Error, string(harness.ClassifyProviderError(err)))
-			o.logger.Event("extract.error", map[string]interface{}{"error": err.Error()})
-		}
-		extractSpan.SetAttributes(
-			attribute.Int("localrpg.entities.extracted", len(extraction.Entities)),
-		)
-		extractSpan.End()
+	}
+
+	<-extractionDone
+	if extractionErr != nil {
+		o.logger.Event("extract.error", map[string]interface{}{"error": extractionErr.Error()})
 	}
 
 	if structured {
