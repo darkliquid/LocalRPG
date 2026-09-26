@@ -41,6 +41,17 @@ func Run(cfg Config) error {
 		return errors.New("desktop: Config needs State or Service")
 	}
 
+	if cfg.Service != nil {
+		liveService = cfg.Service
+		createGame = func(ctx context.Context, svc *gui.Service, req gui.CreateGameRequestDTO) error {
+			_, err := svc.CreateGame(ctx, req)
+			return err
+		}
+	} else {
+		liveService = nil
+		createGame = nil
+	}
+
 	if cfg.PNGPath != "" {
 		return shirei.RenderToPNG(cfg.PNGPath, cfg.Width, cfg.Height, shirei.FrameFn(RootView))
 	}

@@ -1,6 +1,11 @@
 package desktop
 
-// RootView renders the application frame. Later plans add the other screens.
+// RootView renders the application frame for the active screen.
 func RootView() {
-	launcherView()
+	switch appState.Screen {
+	case ScreenNewCampaign:
+		newCampaignView()
+	default:
+		launcherView()
+	}
 }
