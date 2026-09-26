@@ -22,6 +22,7 @@ func (s stubPortraitImageClient) GenerateImage(context.Context, string) ([]byte,
 func TestRegenerateCharacterPortraitEndpoint(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewService(tmpDir)
+	t.Cleanup(svc.Close)
 	setupFreeformSystem(t, svc)
 	game, err := svc.CreateGame(context.Background(), CreateGameRequestDTO{
 		Name: "Portrait Regen", SystemID: "freeform", WorldID: "harbour-realm",
@@ -59,6 +60,8 @@ func TestRegenerateCharacterPortraitEndpoint(t *testing.T) {
 	if dto.PortraitURL == "" {
 		t.Fatalf("expected a portrait URL, got %+v", dto)
 	}
+	// Drain background enrichment so its portrait write cannot race this check.
+	svc.Close()
 	if _, err := os.Stat(filepath.Join(svc.GetResolver().GameDir(game.ID), "assets", "portraits", "hero-vance.png")); err != nil {
 		t.Fatalf("expected the regenerated portrait on disk: %v", err)
 	}

@@ -81,6 +81,7 @@ func handleDebugCommand(args []string) {
 		}()
 
 		svc := gui.NewService(".")
+		defer svc.Close()
 		defer func() { _ = storage.CloseGameStores() }()
 		appHandler := gui.ProtectCrossOrigin(gui.NewServer(svc, gui.AssetHandler()))
 

@@ -54,6 +54,10 @@ func turnFixture(t *testing.T) (string, *Service) {
 	}
 	_ = session.Close()
 
+	// Background work (enrichment, playback warm-up, retro-summary) writes into
+	// the campaign directory; drain it before TempDir cleanup runs.
+	t.Cleanup(svc.Close)
+
 	return "campaign-01", svc
 }
 
