@@ -362,6 +362,9 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			}
 			force := r.URL.Query().Get("force") == "1" || r.URL.Query().Get("force") == "true"
 			if err := s.service.PlayTurnAudio(r.Context(), gameID, turnNumber, force); err != nil {
+				if writeGenerationFailure(w, err) {
+					return
+				}
 				writeGameError(w, err)
 				return
 			}
@@ -383,6 +386,9 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			}
 			force := r.URL.Query().Get("force") == "1" || r.URL.Query().Get("force") == "true"
 			if err := s.service.PlaySegmentAudio(r.Context(), gameID, turnNumber, segmentIndex, force); err != nil {
+				if writeGenerationFailure(w, err) {
+					return
+				}
 				writeGameError(w, err)
 				return
 			}
@@ -1008,6 +1014,9 @@ func (s *Server) handleSTTRoute(w http.ResponseWriter, r *http.Request) {
 
 	text, err := s.service.TranscribeAudio(r.Context(), audioData)
 	if err != nil {
+		if writeGenerationFailure(w, err) {
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

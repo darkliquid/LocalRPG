@@ -8,11 +8,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
@@ -277,13 +279,15 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, provider.MaxProviderDetailBytes))
+		detail := provider.TruncateDetail(body)
 		h.logger.Event("provider.error", map[string]interface{}{
 			"role":   h.id,
 			"status": resp.Status,
 			"url":    url,
+			"detail": detail,
 		})
 		if allowTools && len(req.Tools) > 0 && resp.StatusCode == http.StatusBadRequest {
-			resp.Body.Close()
 			h.logger.Event("provider.tools", map[string]interface{}{
 				"role":     h.id,
 				"offered":  len(req.Tools),
@@ -291,6 +295,9 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 				"reason":   "the provider rejected the tools field",
 			})
 			return h.streamOnce(ctx, req, out, false)
+		}
+		if detail != "" {
+			return fmt.Errorf("http error %s from %s: %s", resp.Status, url, detail)
 		}
 		return fmt.Errorf("http error %s from %s", resp.Status, url)
 	}

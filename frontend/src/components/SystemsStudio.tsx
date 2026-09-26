@@ -3,6 +3,7 @@ import { APIClient } from '../api/client';
 import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure } from '../types';
 import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2 } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
+import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_SYSTEM_TEMPLATE } from '../templates/referenceTemplates';
 
@@ -47,7 +48,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const markDirty = () => setDraft((d) => (d ? { ...d, dirty: true } : d));
 
   const reportGenerationError = (failure: GenerationFailure) =>
-    setToast({ type: 'error', message: `${failure.code}: ${failure.message}` });
+    setToast({ type: 'error', message: formatGenerationError(failure) });
   const errorMessage = (err: unknown): string =>
     err instanceof Error ? err.message : 'Unexpected error';
 

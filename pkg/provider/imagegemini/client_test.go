@@ -208,3 +208,10 @@ func TestGeminiImageErrorMapping(t *testing.T) {
 		}
 	}
 }
+
+func TestMapGeminiImageErrorKeepsOriginal(t *testing.T) {
+	err := imagegemini.MapGeminiImageErrorForTest(fmt.Errorf("status 429: quota exceeded"))
+	if !strings.Contains(err.Error(), "quota exceeded") {
+		t.Fatalf("error %q dropped the provider message", err.Error())
+	}
+}

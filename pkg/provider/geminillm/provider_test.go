@@ -367,6 +367,13 @@ func TestGeminiErrorMapping(t *testing.T) {
 	}
 }
 
+func TestMapGeminiErrorKeepsOriginal(t *testing.T) {
+	err := geminillm.MapGeminiErrorForTest(errors.New("status 401: API key not valid"))
+	if !strings.Contains(err.Error(), "API key not valid") {
+		t.Fatalf("error %q dropped the provider message", err.Error())
+	}
+}
+
 func TestGeminiProviderInteractionsSession(t *testing.T) {
 	var receivedRequests []map[string]interface{}
 	var authHeaders []string

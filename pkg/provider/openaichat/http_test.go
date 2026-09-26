@@ -347,3 +347,21 @@ func TestHTTPProviderDegradesOnceWhenToolsAreRejected(t *testing.T) {
 		t.Errorf("rejected = %v, want true", event.Fields["rejected"])
 	}
 }
+
+func TestStreamIncludesProviderBodyInError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"message":"bad model name"}}`))
+	}))
+	defer srv.Close()
+
+	p := NewHTTPProvider("openai-test", srv.URL, "test-model", "")
+	out := make(chan harness.StreamChunk, 1)
+	err := p.Stream(context.Background(), harness.GenerateRequest{Prompt: "hi"}, out)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if !strings.Contains(err.Error(), "bad model name") {
+		t.Fatalf("error %q does not include the provider body", err.Error())
+	}
+}

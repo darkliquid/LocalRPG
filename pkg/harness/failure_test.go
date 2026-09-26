@@ -49,3 +49,26 @@ func TestGenerationFailureError(t *testing.T) {
 		t.Fatal("failure message not returned by Error()")
 	}
 }
+
+func TestSummarizeAttemptsPrefersLastDetail(t *testing.T) {
+	attempts := []Attempt{
+		{Role: "gm", Provider: "a", Code: FailureProviderError, Detail: "first"},
+		{Role: "gm", Provider: "b", Code: FailureEmptyResponse, Detail: "second"},
+	}
+	if got := SummarizeAttempts(attempts, "generic"); got != "second" {
+		t.Fatalf("got %q, want %q", got, "second")
+	}
+	if got := SummarizeAttempts(nil, "generic"); got != "generic" {
+		t.Fatalf("got %q, want %q", got, "generic")
+	}
+}
+
+func TestGenerationFailureSummary(t *testing.T) {
+	if got := (&GenerationFailure{Code: FailureTimeout}).Summary(); got != "timeout" {
+		t.Fatalf("got %q, want %q", got, "timeout")
+	}
+	f := &GenerationFailure{Message: "boom"}
+	if got := f.Summary(); got != "boom" {
+		t.Fatalf("got %q, want %q", got, "boom")
+	}
+}

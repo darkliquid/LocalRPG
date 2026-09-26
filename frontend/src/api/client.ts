@@ -259,13 +259,13 @@ export class APIClient {
   static async playTurnAudio(gameID: string, turnNumber: number, force = false): Promise<void> {
     const url = `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/play${force ? '?force=1' : ''}`;
     const res = await fetch(url, { method: 'POST' });
-    if (!res.ok) throw new Error(`playTurnAudio: ${res.statusText}`);
+    if (!res.ok) return throwGenerationError(res);
   }
 
   static async playSegmentAudio(gameID: string, turnNumber: number, segmentIndex: number, force = false): Promise<void> {
     const url = `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/segment/${segmentIndex}/play${force ? '?force=1' : ''}`;
     const res = await fetch(url, { method: 'POST' });
-    if (!res.ok) throw new Error(`playSegmentAudio: ${res.statusText}`);
+    if (!res.ok) return throwGenerationError(res);
   }
 
   static async traceEvents(limit = 200, gameID?: string): Promise<TraceEvent[]> {

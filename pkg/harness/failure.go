@@ -104,3 +104,30 @@ func NewFailure(code FailureCode, message, role, provider string, elapsed time.D
 		}},
 	}
 }
+
+// SummarizeAttempts picks the most informative detail from an attempt chain,
+// falling back to a caller-provided sentence when every attempt is silent. It is
+// what lifts a provider's own words into the top-level failure message.
+func SummarizeAttempts(attempts []Attempt, fallback string) string {
+	for i := len(attempts) - 1; i >= 0; i-- {
+		if detail := strings.TrimSpace(attempts[i].Detail); detail != "" {
+			return detail
+		}
+	}
+	if strings.TrimSpace(fallback) != "" {
+		return fallback
+	}
+	return "generation failed"
+}
+
+// Summary returns the most informative description of the failure: its message
+// when set, otherwise the last non-empty attempt detail, otherwise the code.
+func (f *GenerationFailure) Summary() string {
+	if f == nil {
+		return ""
+	}
+	if strings.TrimSpace(f.Message) != "" {
+		return f.Message
+	}
+	return SummarizeAttempts(f.Attempts, string(f.Code))
+}

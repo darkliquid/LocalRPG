@@ -1359,7 +1359,7 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 	}
 
 	cfg := s.configMgr.Get()
-	client, err := media.NewSceneImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
+	client, err := media.NewSceneImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey, s.logger)
 	if err != nil {
 		return "", "", fmt.Errorf("build image client: %w", err)
 	}
@@ -2737,7 +2737,12 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		audio, err := client.Synthesize(ctx, spoken, voice)
 		latency := time.Since(start).Milliseconds()
 		if err != nil {
-			return &TestProviderResponseDTO{Success: false, LatencyMS: latency, Message: err.Error()}, nil
+			return &TestProviderResponseDTO{
+				Success:   false,
+				LatencyMS: latency,
+				Message:   err.Error(),
+				Failure:   &harness.GenerationFailure{Code: harness.ClassifyProviderError(err), Message: err.Error(), Cause: err},
+			}, nil
 		}
 		if len(audio) == 0 {
 			return &TestProviderResponseDTO{
@@ -2765,7 +2770,12 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		text, err := client.Transcribe(ctx, media.GenerateToneWAV(440, 0.1))
 		latency := time.Since(start).Milliseconds()
 		if err != nil {
-			return &TestProviderResponseDTO{Success: false, LatencyMS: latency, Message: err.Error()}, nil
+			return &TestProviderResponseDTO{
+				Success:   false,
+				LatencyMS: latency,
+				Message:   err.Error(),
+				Failure:   &harness.GenerationFailure{Code: harness.ClassifyProviderError(err), Message: err.Error(), Cause: err},
+			}, nil
 		}
 		return &TestProviderResponseDTO{
 			Success:   true,
@@ -2811,12 +2821,16 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string, error) {
 	cfg := s.configMgr.Get()
 	if cfg.Media.STT.Type == "" || cfg.Media.STT.Type == "disabled" {
-		return "", fmt.Errorf("STT engine is disabled or unconfigured")
+		return "", &harness.GenerationFailure{Code: harness.FailureProviderUnavailable, Message: "STT engine is disabled or unconfigured"}
 	}
 
 	client, err := media.NewSTTClient(cfg.Media.STT)
 	if err != nil {
-		return "", fmt.Errorf("initialize STT client: %w", err)
+		return "", &harness.GenerationFailure{
+			Code:    harness.FailureProviderUnavailable,
+			Message: fmt.Sprintf("initialize STT client: %v", err),
+			Cause:   err,
+		}
 	}
 
 	start := time.Now()
@@ -2826,7 +2840,7 @@ func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string
 		"bytes":    len(audioData),
 	})
 
-	text, err := client.Transcribe(ctx, audioData)
+	text, err := media.NewSTTProvider(client).TranscribeAudio(ctx, audioData)
 	if err != nil {
 		s.logger.Event("provider.error", map[string]interface{}{"role": "stt", "error": err.Error()})
 		return "", err

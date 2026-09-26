@@ -344,6 +344,9 @@ type TestProviderResponseDTO struct {
 	AudioDataURI string `json:"audio_data_uri,omitempty"`
 	ModelMissing bool   `json:"model_missing,omitempty"`
 	ModelID      string `json:"model_id,omitempty"`
+	// Failure carries the structured reason a probe failed, so a client can show
+	// the provider's own message rather than only Success=false.
+	Failure *harness.GenerationFailure `json:"failure,omitempty"`
 }
 
 // ModelCatalogueRequestDTO asks the provider what models a key can reach. The

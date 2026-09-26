@@ -13,6 +13,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
 
@@ -126,8 +127,8 @@ func (c *comfyUIImageClient) GenerateImage(ctx context.Context, prompt string) (
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("comfyui prompt failed (%d): %s", resp.StatusCode, string(b))
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, provider.MaxProviderDetailBytes))
+		return nil, fmt.Errorf("comfyui prompt failed (%d): %s", resp.StatusCode, provider.TruncateDetail(b))
 	}
 
 	var promptResp struct {
@@ -220,8 +221,8 @@ func (c *comfyUIImageClient) GenerateImage(ctx context.Context, prompt string) (
 			defer viewResp.Body.Close()
 
 			if viewResp.StatusCode != http.StatusOK {
-				b, _ := io.ReadAll(viewResp.Body)
-				return nil, fmt.Errorf("comfyui view failed (%d): %s", viewResp.StatusCode, string(b))
+				b, _ := io.ReadAll(io.LimitReader(viewResp.Body, provider.MaxProviderDetailBytes))
+				return nil, fmt.Errorf("comfyui view failed (%d): %s", viewResp.StatusCode, provider.TruncateDetail(b))
 			}
 
 			return io.ReadAll(viewResp.Body)
@@ -281,8 +282,8 @@ func (h *httpImageClient) GenerateImage(ctx context.Context, prompt string) ([]b
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("http image failed (%d): %s", resp.StatusCode, string(b))
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, provider.MaxProviderDetailBytes))
+		return nil, fmt.Errorf("http image failed (%d): %s", resp.StatusCode, provider.TruncateDetail(b))
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
@@ -338,7 +339,8 @@ func (h *httpImageClient) GenerateImage(ctx context.Context, prompt string) ([]b
 				}
 				defer getResp.Body.Close()
 				if getResp.StatusCode != http.StatusOK {
-					return nil, fmt.Errorf("fetch image url failed (%d)", getResp.StatusCode)
+					body, _ := io.ReadAll(io.LimitReader(getResp.Body, provider.MaxProviderDetailBytes))
+					return nil, fmt.Errorf("fetch image url failed (%d): %s", getResp.StatusCode, provider.TruncateDetail(body))
 				}
 				return io.ReadAll(getResp.Body)
 			}

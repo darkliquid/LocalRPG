@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -84,7 +85,7 @@ func (c *CLIProvider) Generate(ctx context.Context, req harness.GenerateRequest)
 
 	if err := cmd.Run(); err != nil {
 		c.logger.Event("provider.error", map[string]interface{}{"role": c.id, "error": err.Error()})
-		return nil, fmt.Errorf("cli provider %q failed: %w (stderr: %s)", c.id, err, stderr.String())
+		return nil, fmt.Errorf("cli provider %q failed: %w (stderr: %s)", c.id, err, provider.TruncateDetailString(stderr.String()))
 	}
 
 	text := strings.TrimSpace(stdout.String())
@@ -134,7 +135,7 @@ func (c *CLIProvider) Stream(ctx context.Context, req harness.GenerateRequest, o
 
 	if err := cmd.Wait(); err != nil {
 		c.logger.Event("provider.error", map[string]interface{}{"role": c.id, "error": err.Error()})
-		return fmt.Errorf("cli process finished with error: %w (stderr: %s)", err, stderr.String())
+		return fmt.Errorf("cli process finished with error: %w (stderr: %s)", err, provider.TruncateDetailString(stderr.String()))
 	}
 
 	c.logger.Event("provider.response", map[string]interface{}{

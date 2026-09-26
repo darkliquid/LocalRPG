@@ -13,6 +13,7 @@ import (
 	"google.golang.org/genai"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
@@ -184,7 +185,7 @@ func (g *GeminiProvider) callInteractions(ctx context.Context, prevInteractionID
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, provider.MaxProviderDetailBytes))
 	if err != nil {
 		return "", "", 0, fmt.Errorf("gemini interactions: read response: %w", err)
 	}
@@ -580,15 +581,15 @@ func mapGeminiError(err error) error {
 	if err == nil {
 		return nil
 	}
-	errStr := err.Error()
+	errStr := provider.TruncateDetailString(err.Error())
 	if strings.Contains(errStr, "401") || strings.Contains(errStr, "403") || strings.Contains(errStr, "PERMISSION_DENIED") {
-		return errors.New("gemini: invalid API key or permission denied; check providers.gemini.api_key or GEMINI_API_KEY")
+		return fmt.Errorf("gemini: invalid API key or permission denied; check providers.gemini.api_key or GEMINI_API_KEY (provider: %s)", errStr)
 	}
 	if strings.Contains(errStr, "429") || strings.Contains(errStr, "RESOURCE_EXHAUSTED") {
-		return errors.New("gemini: quota exceeded or rate limit reached; check your Google AI Studio plan and credits")
+		return fmt.Errorf("gemini: quota exceeded or rate limit reached; check your Google AI Studio plan and credits (provider: %s)", errStr)
 	}
 	if strings.Contains(errStr, "404") || strings.Contains(errStr, "NOT_FOUND") {
-		return fmt.Errorf("gemini: model not found: %w", err)
+		return fmt.Errorf("gemini: model not found (provider: %s)", errStr)
 	}
 	return fmt.Errorf("gemini: request failed: %w", err)
 }

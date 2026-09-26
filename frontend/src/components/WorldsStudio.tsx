@@ -3,6 +3,7 @@ import { APIClient, WorldExistsError } from '../api/client';
 import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail, GenerationFailure } from '../types';
 import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
+import { formatGenerationError } from '../lib/generationError';
 import { useLightbox } from '../hooks/useLightbox';
 import { ImageLightbox } from './ImageLightbox';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
@@ -76,7 +77,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const savedID = selection?.kind === 'saved' ? selection.id : null;
   const markDirty = () => setDraft((d) => (d ? { ...d, dirty: true } : d));
   const reportGenerationError = (failure: GenerationFailure) =>
-    setToast({ type: 'error', message: `${failure.code}: ${failure.message}` });
+    setToast({ type: 'error', message: formatGenerationError(failure) });
 
   const loadWorldsRef = React.useRef<((selectID?: string, mode?: 'new' | 'browse') => Promise<void>) | null>(null);
 

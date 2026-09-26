@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { APIClient, HTTPError } from './api/client';
+import { APIClient, HTTPError, GenerationError } from './api/client';
 import { GameState, Turn, EntityNote, EntitySummary, Recap, GraphData, AppConfig } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
@@ -18,6 +18,7 @@ import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
 import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers } from 'lucide-react';
+import { formatGenerationError } from './lib/generationError';
 
 // Mirrors entity.Slugify in the Go backend: lowercase, [a-z0-9] kept, runs of
 // spaces/hyphens/underscores collapse to a single hyphen, trailing hyphen trimmed.
@@ -244,7 +245,7 @@ export const App: React.FC = () => {
             }
           } else if (event.type === 'error') {
             const reason = event.failure
-              ? `${event.failure.code}: ${event.failure.message}`
+              ? formatGenerationError(event.failure)
               : (event.detail || event.message || 'The turn failed.');
             setTurnError(reason);
             console.error('turn failed:', event.message);
@@ -254,6 +255,7 @@ export const App: React.FC = () => {
       );
     } catch (err) {
       console.error('turn failed:', err);
+      setTurnError(err instanceof Error ? err.message : String(err));
     } finally {
       abortRef.current = null;
       setTurnInFlight(false);
@@ -330,7 +332,8 @@ export const App: React.FC = () => {
         audioPollingRef.current[pollKey] = intervalId;
       })
       .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
+        const message =
+          err instanceof GenerationError ? err.failure.message : err instanceof Error ? err.message : String(err);
         setStatus({ state: 'error', message });
       });
   };

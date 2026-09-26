@@ -15,6 +15,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/dialogue"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -284,7 +285,23 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 
 	audioBytes, err := p.client.Synthesize(ctx, text, voice)
 	if err != nil {
-		return "", fmt.Errorf("synthesize utterance: %w", err)
+		code := harness.ClassifyProviderError(err)
+		p.logger.Event("media.tts.error", map[string]interface{}{
+			"speaker":  speakerID,
+			"provider": provider,
+			"code":     string(code),
+			"error":    err.Error(),
+		})
+		mediaMetrics().providerErrors.Add(ctx, 1, otelmetric.WithAttributes(
+			attribute.String("localrpg.role", "tts"),
+			attribute.String("error.kind", string(code)),
+			attribute.String("gen_ai.system", provider),
+		))
+		return "", &harness.GenerationFailure{
+			Code:    code,
+			Message: fmt.Sprintf("synthesize utterance: %v", err),
+			Cause:   err,
+		}
 	}
 
 	mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "miss")))

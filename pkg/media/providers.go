@@ -7,7 +7,9 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/provider"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 var ErrProviderDisabled = errors.New("provider is disabled")
@@ -95,14 +97,36 @@ func NewSTTClient(cfg config.STTConfig) (STTClient, error) {
 type fallbackImageClient struct {
 	primary  ImageClient
 	fallback ImageClient
+	logger   trace.Logger
 }
 
+// GenerateImage covers a failing primary with the built-in generator. A fallback
+// success is logged as a degraded path; a double failure reports both errors.
 func (c *fallbackImageClient) GenerateImage(ctx context.Context, prompt string) ([]byte, error) {
 	data, err := c.primary.GenerateImage(ctx, prompt)
 	if err == nil {
 		return data, nil
 	}
-	return c.fallback.GenerateImage(ctx, prompt)
+	if c.logger != nil {
+		c.logger.Event("provider.error", map[string]interface{}{
+			"role":     "image",
+			"fallback": true,
+			"error":    err.Error(),
+		})
+	}
+	fbData, fbErr := c.fallback.GenerateImage(ctx, prompt)
+	if fbErr == nil {
+		return fbData, nil
+	}
+	return nil, &harness.GenerationFailure{
+		Code:    harness.FailureProviderError,
+		Message: fmt.Sprintf("image provider failed: %v; built-in fallback failed: %v", err, fbErr),
+		Cause:   err,
+		Attempts: []harness.Attempt{
+			{Role: "image", Provider: "primary", Code: harness.ClassifyProviderError(err), Detail: err.Error()},
+			{Role: "image", Provider: "builtin", Code: harness.ClassifyProviderError(fbErr), Detail: fbErr.Error()},
+		},
+	}
 }
 
 // NewSceneImageClient builds the image client used for scene art: the configured
@@ -111,7 +135,7 @@ func NewSceneImageClient(cfg config.ImageConfig) (ImageClient, error) {
 	return NewSceneImageClientWithSharedKey(cfg, "")
 }
 
-func NewSceneImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string) (ImageClient, error) {
+func NewSceneImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string, logger ...trace.Logger) (ImageClient, error) {
 	primary, err := NewImageClientWithSharedKey(cfg, sharedKey)
 	if err != nil {
 		return nil, err
@@ -124,7 +148,11 @@ func NewSceneImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string) 
 	if err != nil {
 		return nil, err
 	}
-	return &fallbackImageClient{primary: primary, fallback: fallback}, nil
+	var sink trace.Logger
+	if len(logger) > 0 {
+		sink = trace.OrNil(logger[0])
+	}
+	return &fallbackImageClient{primary: primary, fallback: fallback, logger: sink}, nil
 }
 
 func NewImageClient(cfg config.ImageConfig) (ImageClient, error) {

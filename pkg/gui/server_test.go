@@ -757,8 +757,8 @@ func TestSTTEndpoint_RejectsWhenDisabled(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	server.ServeHTTP(w, req)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 Bad Request, got %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 Service Unavailable for a disabled STT provider, got %d", w.Code)
 	}
 }
 func TestCampaignLifecycleRoutes(t *testing.T) {

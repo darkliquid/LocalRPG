@@ -186,7 +186,7 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 		resp.GeneratedBy = "none"
 		failure := &harness.GenerationFailure{
 			Code:        pickFailureCode(attempts),
-			Message:     "the model did not return any usable text",
+			Message:     harness.SummarizeAttempts(attempts, "the model did not return any usable text"),
 			Attempts:    attempts,
 			PromptChars: len([]rune(request.PromptText())),
 			ElapsedMS:   time.Since(started).Milliseconds(),

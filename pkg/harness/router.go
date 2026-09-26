@@ -129,7 +129,7 @@ func (r *Router) GenerateForRole(ctx context.Context, role string, req GenerateR
 
 	return nil, &GenerationFailure{
 		Code:      attempts[len(attempts)-1].Code,
-		Message:   fmt.Sprintf("role %q produced no usable response", role),
+		Message:   SummarizeAttempts(attempts, fmt.Sprintf("role %q produced no usable response", role)),
 		Attempts:  attempts,
 		ElapsedMS: time.Since(started).Milliseconds(),
 	}
@@ -171,7 +171,7 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 	close(out)
 	return &GenerationFailure{
 		Code:      attempts[len(attempts)-1].Code,
-		Message:   fmt.Sprintf("role %q streamed no text", role),
+		Message:   SummarizeAttempts(attempts, fmt.Sprintf("role %q streamed no text", role)),
 		Attempts:  attempts,
 		ElapsedMS: time.Since(started).Milliseconds(),
 	}

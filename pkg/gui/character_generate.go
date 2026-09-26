@@ -119,7 +119,7 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 		resp.GeneratedBy = "none"
 		failure := &harness.GenerationFailure{
 			Code:        pickFailureCode(attempts),
-			Message:     "the model did not return any usable character values",
+			Message:     harness.SummarizeAttempts(attempts, "the model did not return any usable character values"),
 			Attempts:    attempts,
 			PromptChars: len([]rune(request.PromptText())),
 			ElapsedMS:   time.Since(started).Milliseconds(),

@@ -13,6 +13,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
 
@@ -110,8 +111,8 @@ func (h *httpTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("http tts failed (%d): %s", resp.StatusCode, string(b))
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, provider.MaxProviderDetailBytes))
+		return nil, fmt.Errorf("http tts failed (%d): %s", resp.StatusCode, provider.TruncateDetail(b))
 	}
 	return io.ReadAll(resp.Body)
 }
@@ -150,8 +151,8 @@ func (h *httpTTSClient) ListVoices(ctx context.Context) ([]media.ProviderVoice, 
 		return []media.ProviderVoice{}, nil
 	}
 	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("http voices failed (%d): %s", resp.StatusCode, string(b))
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, provider.MaxProviderDetailBytes))
+		return nil, fmt.Errorf("http voices failed (%d): %s", resp.StatusCode, provider.TruncateDetail(b))
 	}
 
 	var rawData json.RawMessage
