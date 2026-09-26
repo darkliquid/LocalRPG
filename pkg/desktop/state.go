@@ -18,7 +18,16 @@ const (
 	ScreenWorldGallery
 	ScreenChronicle
 	ScreenSettings
+	ScreenSystemsStudio
+	ScreenWorldsStudio
 )
+
+// Selection identifies the studio's current item: a saved record or a local
+// draft, mirroring how the studios guard unsaved work.
+type Selection struct {
+	Kind string
+	ID   string
+}
 
 // State is the desktop application's cached data. It is replaced wholesale by
 // loadAll/reload and read by every view during a frame.
@@ -110,6 +119,12 @@ type State struct {
 
 	// Bundled model statuses.
 	Models []models.ModelStatus
+
+	// Studio state.
+	Studio          Selection
+	PendingStudio   Selection
+	StudioDirty     bool
+	ConfirmDiscard  bool
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art

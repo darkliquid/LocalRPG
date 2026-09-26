@@ -16,4 +16,5 @@ func RootView() {
 	}
 	lightbox()
 	campaignSettingsModal()
+	confirmDiscardModal()
 }
