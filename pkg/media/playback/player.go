@@ -196,7 +196,7 @@ func (p *Player) PlayFiles(paths []string) error {
 	gain := p.gain
 	p.mu.Unlock()
 
-	logger.Event("audio.play", map[string]interface{}{
+	logger.Event("audio.play", map[string]any{
 		"clips":  len(streamers),
 		"volume": gain,
 	})

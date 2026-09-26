@@ -54,7 +54,7 @@ func TestGeminiTTSSynthesizeAppliesDirection(t *testing.T) {
 
 	_, err = ttsClient.Synthesize(ctx, "Hold the line.", &entity.VoiceConfig{
 		VoiceID: "Kore",
-		Options: map[string]interface{}{"direction": "weary and guarded, speaking slowly"},
+		Options: map[string]any{"direction": "weary and guarded, speaking slowly"},
 	})
 	if err != nil {
 		t.Fatalf("Synthesize failed: %v", err)

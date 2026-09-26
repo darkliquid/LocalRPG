@@ -21,12 +21,12 @@ func init() {
 			Presets: []provider.Preset{
 				{ID: "narrative-oracle", Order: 7, Label: "Narrative Oracle (Built-in Zero-GPU)",
 					Description: "Deterministic pure-Go procedural storyteller with rule-based narrative outcomes.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "builtin", "builtin_name": "narrative-oracle",
 					}},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			id := "narrative-oracle"
 			var payload harness.ModelBuildPayload
 			if len(raw) > 0 {

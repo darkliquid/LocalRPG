@@ -16,17 +16,17 @@ import (
 // catalog maps into, so the picker and the matcher never learn a provider's own
 // vocabulary.
 type ProviderVoice struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Language    string                 `json:"language,omitempty"`
-	Gender      string                 `json:"gender,omitempty"`
-	Accent      string                 `json:"accent,omitempty"`
-	Categories  []string               `json:"categories,omitempty"`
-	Tags        []string               `json:"tags,omitempty"`
-	Description string                 `json:"description,omitempty"`
-	PreviewURL  string                 `json:"preview_url,omitempty"`
-	Defaults    map[string]interface{} `json:"defaults,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Language    string         `json:"language,omitempty"`
+	Gender      string         `json:"gender,omitempty"`
+	Accent      string         `json:"accent,omitempty"`
+	Categories  []string       `json:"categories,omitempty"`
+	Tags        []string       `json:"tags,omitempty"`
+	Description string         `json:"description,omitempty"`
+	PreviewURL  string         `json:"preview_url,omitempty"`
+	Defaults    map[string]any `json:"defaults,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 
 // VoiceCatalog is implemented by providers that can enumerate their voices. A
@@ -135,12 +135,12 @@ func KeyPresentWithSharedKey(cfg config.TTSConfig, sharedKey string) bool {
 
 // VoiceOptionsOf returns a voice's provider options, or nil when it carries
 // none. It is the exported form the provider packages use.
-func VoiceOptionsOf(voice *entity.VoiceConfig) map[string]interface{} {
+func VoiceOptionsOf(voice *entity.VoiceConfig) map[string]any {
 	return voiceOptions(voice)
 }
 
 // voiceOptions is a voice's provider options, or nil when it carries none.
-func voiceOptions(voice *entity.VoiceConfig) map[string]interface{} {
+func voiceOptions(voice *entity.VoiceConfig) map[string]any {
 	if voice == nil {
 		return nil
 	}

@@ -21,14 +21,14 @@ func init() {
 			Presets: []provider.Preset{
 				{ID: "piper", Order: 4, Label: "Piper TTS (Local CLI)",
 					Description: "Fast, lightweight neural TTS running directly via the piper binary.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "cli", "command": "piper",
-						"args":  []interface{}{"--model", "en_US-lessac-medium.onnx", "--output_file", "-"},
+						"args":  []any{"--model", "en_US-lessac-medium.onnx", "--output_file", "-"},
 						"pitch": 1.0, "speech_rate": 1.0, "auto_play": true, "master_volume": 1.0,
 					}},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var payload media.TTSBuildPayload
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &payload); err != nil {

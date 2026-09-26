@@ -20,12 +20,12 @@ func TestArcStatusFallsBackToOpen(t *testing.T) {
 	}
 
 	// A typo degrades rather than breaking the section that counts unresolved arcs.
-	typo := &entity.Entity{Type: "arc", State: state.NewState(map[string]interface{}{"status": "compleated"})}
+	typo := &entity.Entity{Type: "arc", State: state.NewState(map[string]any{"status": "compleated"})}
 	if got := ArcStatus(typo); got != "open" {
 		t.Errorf("ArcStatus(typo) = %q, want open", got)
 	}
 
-	resolved := &entity.Entity{Type: "arc", State: state.NewState(map[string]interface{}{"status": "resolved"})}
+	resolved := &entity.Entity{Type: "arc", State: state.NewState(map[string]any{"status": "resolved"})}
 	if got := ArcStatus(resolved); got != "resolved" {
 		t.Errorf("ArcStatus(resolved) = %q", got)
 	}
@@ -38,7 +38,7 @@ func TestOpenThreadsReportsIdleUnresolvedArcs(t *testing.T) {
 	}
 	if err := store.SaveEntity(&entity.Entity{
 		ID: "the-siege", Name: "The Iron Siege", Type: "arc", Body: "The siege grinds on.",
-		State: state.NewState(map[string]interface{}{"status": "resolved"}),
+		State: state.NewState(map[string]any{"status": "resolved"}),
 	}); err != nil {
 		t.Fatal(err)
 	}

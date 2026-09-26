@@ -21,20 +21,20 @@ func init() {
 			Presets: []provider.Preset{
 				{ID: "llama-cli", Order: 5, Label: "llama-cli (Local Executable)",
 					Description: "Direct llama.cpp command execution without a background server.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "cli", "command": "llama-cli",
-						"args":        []interface{}{"-m", "models/model.gguf", "-p"},
+						"args":        []any{"-m", "models/model.gguf", "-p"},
 						"temperature": 0.7, "max_tokens": 1024,
 					}},
 				{ID: "claude-cli", Order: 6, Label: "Claude Code CLI",
 					Description: "Executes Anthropic Claude CLI directly from command line.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "cli", "command": "claude",
-						"args": []interface{}{"-p"},
+						"args": []any{"-p"},
 					}},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var payload harness.ModelBuildPayload
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &payload); err != nil {

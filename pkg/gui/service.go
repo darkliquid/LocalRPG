@@ -398,7 +398,7 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		return nil, fmt.Errorf("parse player entity: %w", err)
 	}
 
-	var stateMap map[string]interface{}
+	var stateMap map[string]any
 	if ent.State != nil {
 		stateMap = ent.State.Raw()
 	}
@@ -493,7 +493,7 @@ func (s *Service) gameCorpus(gameID string) ([]NarrativeArcDTO, []FactionClockDT
 	return arcs, clocks, locations
 }
 
-func (s *Service) entityState(store *storage.Store, entityID string) map[string]interface{} {
+func (s *Service) entityState(store *storage.Store, entityID string) map[string]any {
 	entity, err := store.GetEntity(entityID)
 	if err != nil || entity == nil || entity.State == nil {
 		return nil
@@ -503,7 +503,7 @@ func (s *Service) entityState(store *storage.Store, entityID string) map[string]
 
 // arcProgress reads an arc's clock. A note may express it as `progress: 3/6` or
 // as separate `clock_ticks`/`clock_max` fields, and both are honoured.
-func arcProgress(raw map[string]interface{}) (int, int) {
+func arcProgress(raw map[string]any) (int, int) {
 	if ticks, maxTicks, ok := stateFraction(raw, "progress"); ok {
 		return ticks, maxTicks
 	}
@@ -512,14 +512,14 @@ func arcProgress(raw map[string]interface{}) (int, int) {
 	return ticks, maxInt(maxTicks, 1)
 }
 
-func clockTicks(raw map[string]interface{}) (int, int) {
+func clockTicks(raw map[string]any) (int, int) {
 	ticks := stateNumber(raw, "clock_ticks", "ticks")
 	maxTicks := stateNumber(raw, "clock_max", "max_ticks", "max")
 	return ticks, maxInt(maxTicks, 1)
 }
 
 // stateFraction reads an "a/b" style value.
-func stateFraction(raw map[string]interface{}, key string) (int, int, bool) {
+func stateFraction(raw map[string]any, key string) (int, int, bool) {
 	value, ok := raw[key]
 	if !ok {
 		return 0, 0, false
@@ -545,7 +545,7 @@ func stateFraction(raw map[string]interface{}, key string) (int, int, bool) {
 
 // stateNumber coerces the first present key to an int. YAML and JSON disagree on
 // numeric types, so every plausible one is accepted.
-func stateNumber(raw map[string]interface{}, keys ...string) int {
+func stateNumber(raw map[string]any, keys ...string) int {
 	for _, key := range keys {
 		value, ok := raw[key]
 		if !ok {
@@ -571,7 +571,7 @@ func stateNumber(raw map[string]interface{}, keys ...string) int {
 	return 0
 }
 
-func stateString(raw map[string]interface{}, key string) string {
+func stateString(raw map[string]any, key string) string {
 	if raw == nil {
 		return ""
 	}
@@ -661,7 +661,7 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 		}, nil
 	}
 
-	var stateMap map[string]interface{}
+	var stateMap map[string]any
 	if ent.State != nil {
 		stateMap = ent.State.Raw()
 	}
@@ -1197,7 +1197,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	if !loaded {
 		loader := rules.NewRuleLoader(s.resolver, jsEngine)
 		if err := loader.LoadRules(manifest.SystemID, manifest.WorldID); err != nil {
-			logger.Event("rules.load_error", map[string]interface{}{"error": err.Error()})
+			logger.Event("rules.load_error", map[string]any{"error": err.Error()})
 		}
 		s.rulesMu.Lock()
 		s.rulesLoaded[manifest.ID] = true
@@ -1372,7 +1372,7 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 
 	start := time.Now()
 	s.logger = trace.OrNil(s.logger)
-	s.logger.Event("media.image.request", map[string]interface{}{
+	s.logger.Event("media.image.request", map[string]any{
 		"location": locationID,
 		"provider": providerParams,
 		"force":    force,
@@ -1380,12 +1380,12 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 
 	path, err := store.SceneArt(ctx, location, force)
 	if err != nil {
-		s.logger.Event("provider.error", map[string]interface{}{"role": "image", "error": err.Error()})
+		s.logger.Event("provider.error", map[string]any{"role": "image", "error": err.Error()})
 		return "", "", err
 	}
 
 	if data, err := os.ReadFile(path); err == nil {
-		s.logger.Event("media.image.result", map[string]interface{}{
+		s.logger.Event("media.image.result", map[string]any{
 			"bytes":       len(data),
 			"duration_ms": time.Since(start).Milliseconds(),
 		})
@@ -1588,7 +1588,7 @@ func (s *Service) TraceEvents(limit int, gameID string) ([]TraceEventDTO, error)
 
 	events := make([]TraceEventDTO, 0, len(lines))
 	for _, line := range lines {
-		var raw map[string]interface{}
+		var raw map[string]any
 		if err := json.Unmarshal([]byte(line), &raw); err != nil {
 			continue // a torn final line is not a failure
 		}
@@ -2186,12 +2186,12 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 	_ = session.Close()
 
 	if strings.TrimSpace(req.NarratorVoice) != "" {
-		_ = s.UpdateGameSettings(ctx, gameID, map[string]interface{}{
+		_ = s.UpdateGameSettings(ctx, gameID, map[string]any{
 			"narrator_voice": strings.TrimSpace(req.NarratorVoice),
 		})
 	}
 	if strings.TrimSpace(req.StartLocation) != "" {
-		_ = s.UpdateGameSettings(ctx, gameID, map[string]interface{}{
+		_ = s.UpdateGameSettings(ctx, gameID, map[string]any{
 			engine.StartLocationSetting: strings.TrimSpace(req.StartLocation),
 		})
 	}
@@ -2247,14 +2247,14 @@ func (s *Service) assignPlayerVoice(gameID, playerName string) error {
 
 // UpdateGameSettings merges a patch into a campaign's settings and writes the
 // manifest. The caller supplies whole values; nothing is inferred or coerced.
-func (s *Service) UpdateGameSettings(ctx context.Context, gameID string, patch map[string]interface{}) error {
+func (s *Service) UpdateGameSettings(ctx context.Context, gameID string, patch map[string]any) error {
 	path := filepath.Join(s.resolver.GameDir(gameID), "game.yaml")
 	manifest, err := core.LoadGameManifest(path)
 	if err != nil {
 		return fmt.Errorf("load game manifest: %w", err)
 	}
 	if manifest.Settings == nil {
-		manifest.Settings = map[string]interface{}{}
+		manifest.Settings = map[string]any{}
 	}
 	for key, value := range patch {
 		manifest.Settings[key] = value
@@ -2353,7 +2353,7 @@ func (s *Service) RestartGame(ctx context.Context, gameID string) (*GameSummaryD
 	}
 	_ = session.Close()
 
-	settings := map[string]interface{}{}
+	settings := map[string]any{}
 	if startLocation != "" {
 		settings[engine.StartLocationSetting] = startLocation
 	}
@@ -2909,18 +2909,18 @@ func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string
 
 	start := time.Now()
 	s.logger = trace.OrNil(s.logger)
-	s.logger.Event("media.stt.request", map[string]interface{}{
+	s.logger.Event("media.stt.request", map[string]any{
 		"provider": cfg.Media.STT.Type,
 		"bytes":    len(audioData),
 	})
 
 	text, err := media.NewSTTProvider(client).TranscribeAudio(ctx, audioData)
 	if err != nil {
-		s.logger.Event("provider.error", map[string]interface{}{"role": "stt", "error": err.Error()})
+		s.logger.Event("provider.error", map[string]any{"role": "stt", "error": err.Error()})
 		return "", err
 	}
 
-	s.logger.Event("media.stt.result", map[string]interface{}{
+	s.logger.Event("media.stt.result", map[string]any{
 		"chars":       len([]rune(text)),
 		"duration_ms": time.Since(start).Milliseconds(),
 	})
@@ -3217,7 +3217,6 @@ func toTurnContextDTO(tc *harness.TurnContext, prompt string) *TurnContextDTO {
 		Prompt:          prompt,
 	}
 }
-
 
 // ListEntityMemories returns an entity's memories newest-first for the codex
 // timeline.

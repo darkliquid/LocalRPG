@@ -45,7 +45,7 @@ func NewProviderFromConfig(cfg config.EmbeddingsConfig) (Provider, error) {
 		if model == "" {
 			model = cfg.Model
 		}
-		raw, _ := json.Marshal(map[string]interface{}{
+		raw, _ := json.Marshal(map[string]any{
 			"endpoint":   url,
 			"api_key":    pCfg.APIKey,
 			"model":      model,
@@ -65,7 +65,7 @@ func NewProviderFromConfig(cfg config.EmbeddingsConfig) (Provider, error) {
 		if model == "" {
 			model = cfg.Model
 		}
-		raw, _ := json.Marshal(map[string]interface{}{
+		raw, _ := json.Marshal(map[string]any{
 			"api_key": pCfg.APIKey,
 			"model":   model,
 		})

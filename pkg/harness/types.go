@@ -24,9 +24,9 @@ type Message struct {
 
 // ToolSpec is one tool offered to a model, with its JSON Schema parameters.
 type ToolSpec struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Parameters  map[string]interface{} `json:"parameters"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Parameters  map[string]any `json:"parameters"`
 }
 
 // ToolCall is a model's request to run a tool. Arguments is the raw JSON the
@@ -77,11 +77,11 @@ type GenerationOptions struct {
 }
 
 type GenerateRequest struct {
-	Prompt      string                 `json:"prompt"`
-	System      string                 `json:"system,omitempty"`
-	Temperature float64                `json:"temperature,omitempty"`
-	MaxTokens   int                    `json:"max_tokens,omitempty"`
-	Extra       map[string]interface{} `json:"extra,omitempty"`
+	Prompt      string         `json:"prompt"`
+	System      string         `json:"system,omitempty"`
+	Temperature float64        `json:"temperature,omitempty"`
+	MaxTokens   int            `json:"max_tokens,omitempty"`
+	Extra       map[string]any `json:"extra,omitempty"`
 	// Messages is authoritative when set. Prompt remains for providers that only
 	// accept a single string.
 	Messages []Message  `json:"messages,omitempty"`

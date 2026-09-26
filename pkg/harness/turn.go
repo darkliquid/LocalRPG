@@ -23,8 +23,8 @@ type ActionVerdict struct {
 
 // SegmentSpec is one authored narration or speech segment.
 type SegmentSpec struct {
-	Kind     string `json:"kind"`               // "narration" | "speech"
-	Speaker  string `json:"speaker,omitempty"`  // name or id, speech only
+	Kind     string `json:"kind"`              // "narration" | "speech"
+	Speaker  string `json:"speaker,omitempty"` // name or id, speech only
 	Text     string `json:"text"`
 	CheckRef string `json:"check_ref,omitempty"`
 }
@@ -52,11 +52,11 @@ type MemoryDecl struct {
 
 // StateChangeDecl is a proposed change to an entity's state.
 type StateChangeDecl struct {
-	Entity string      `json:"entity"`
-	Path   string      `json:"path"`
-	Op     string      `json:"op"` // set|add|sub
-	Value  interface{} `json:"value"`
-	Reason string      `json:"reason,omitempty"`
+	Entity string `json:"entity"`
+	Path   string `json:"path"`
+	Op     string `json:"op"` // set|add|sub
+	Value  any    `json:"value"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // CheckRequest is a mid-turn request to resolve a check.
@@ -82,14 +82,14 @@ type RollSummary struct {
 
 // CheckResult is the resolved outcome of a CheckRequest.
 type CheckResult struct {
-	CheckID   string                 `json:"check_id"`
-	Actor     string                 `json:"actor,omitempty"`
-	Target    string                 `json:"target,omitempty"`
-	CheckKind string                 `json:"check_kind,omitempty"`
-	Stakes    string                 `json:"stakes,omitempty"`
-	Roll      *RollSummary           `json:"roll"`
-	Outcome   string                 `json:"outcome"`
-	Breakdown map[string]interface{} `json:"breakdown,omitempty"`
+	CheckID   string         `json:"check_id"`
+	Actor     string         `json:"actor,omitempty"`
+	Target    string         `json:"target,omitempty"`
+	CheckKind string         `json:"check_kind,omitempty"`
+	Stakes    string         `json:"stakes,omitempty"`
+	Roll      *RollSummary   `json:"roll"`
+	Outcome   string         `json:"outcome"`
+	Breakdown map[string]any `json:"breakdown,omitempty"`
 }
 
 // DismissedCheck records a player-proposed check the GM chose not to resolve.

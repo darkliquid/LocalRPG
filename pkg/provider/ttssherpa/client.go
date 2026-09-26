@@ -100,7 +100,7 @@ func (s *SherpaTTSClient) Synthesize(ctx context.Context, text string, voice *en
 	}
 
 	if s.logger != nil {
-		s.logger.Event("tts.synthesize", map[string]interface{}{
+		s.logger.Event("tts.synthesize", map[string]any{
 			"engine":      "sherpa-onnx",
 			"sid":         sid,
 			"samples":     len(audio.Samples),

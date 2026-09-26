@@ -21,13 +21,13 @@ func init() {
 			Presets: []provider.Preset{
 				{ID: "whisper-cli", Order: 3, Label: "Whisper.cpp (Local CLI)",
 					Description: "Whisper.cpp command-line tool with GGML model.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "cli", "command": "whisper-cli",
-						"args": []interface{}{"-m", "models/ggml-base.bin", "-f", "%INPUT%", "-nt"},
+						"args": []any{"-m", "models/ggml-base.bin", "-f", "%INPUT%", "-nt"},
 					}},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var cfg config.STTConfig
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &cfg); err != nil {

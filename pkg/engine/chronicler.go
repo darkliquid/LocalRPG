@@ -116,7 +116,7 @@ func (c *Chronicler) Regenerate(ctx context.Context, gameID string) (bool, error
 	}
 
 	c.logger = trace.OrNil(c.logger)
-	c.logger.Event("summary.written", map[string]interface{}{
+	c.logger.Event("summary.written", map[string]any{
 		"from_turn": chronicle.ThroughTurn + 1,
 		"to_turn":   through,
 		"chars":     len([]rune(summary)),

@@ -77,7 +77,7 @@ var secretFields = map[string]bool{
 // Sanitize prepares fields for writing: secrets are replaced, payloads are
 // dropped below full, and every string is capped. It is applied by the sink so a
 // careless call site cannot leak a key.
-func Sanitize(fields map[string]interface{}, level Level, payloadChars int) map[string]interface{} {
+func Sanitize(fields map[string]any, level Level, payloadChars int) map[string]any {
 	if payloadChars <= 0 {
 		payloadChars = defaultPayloadChars
 	}
@@ -87,12 +87,12 @@ func Sanitize(fields map[string]interface{}, level Level, payloadChars int) map[
 // SanitizeFields redacts and caps fields for a sink with no configured level,
 // such as the OpenTelemetry log bridge. It reuses the same policy as the file
 // sink so there is exactly one redaction implementation.
-func SanitizeFields(fields map[string]interface{}) map[string]interface{} {
+func SanitizeFields(fields map[string]any) map[string]any {
 	return Sanitize(fields, LevelFull, defaultPayloadChars)
 }
 
-func sanitizeMap(fields map[string]interface{}, level Level, payloadChars int) map[string]interface{} {
-	clean := make(map[string]interface{}, len(fields))
+func sanitizeMap(fields map[string]any, level Level, payloadChars int) map[string]any {
+	clean := make(map[string]any, len(fields))
 	for key, value := range fields {
 		lower := strings.ToLower(key)
 
@@ -109,14 +109,14 @@ func sanitizeMap(fields map[string]interface{}, level Level, payloadChars int) m
 	return clean
 }
 
-func sanitizeValue(value interface{}, level Level, payloadChars int) interface{} {
+func sanitizeValue(value any, level Level, payloadChars int) any {
 	switch typed := value.(type) {
 	case string:
 		return truncate(redactSecrets(typed), payloadChars)
-	case map[string]interface{}:
+	case map[string]any:
 		return sanitizeMap(typed, level, payloadChars)
-	case []interface{}:
-		items := make([]interface{}, 0, len(typed))
+	case []any:
+		items := make([]any, 0, len(typed))
 		for _, item := range typed {
 			items = append(items, sanitizeValue(item, level, payloadChars))
 		}

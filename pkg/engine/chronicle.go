@@ -55,7 +55,7 @@ func WriteChronicle(store *storage.Store, entitiesDir string, chronicle Chronicl
 		Name:  "Story So Far",
 		Type:  "chronicle",
 		Body:  strings.TrimSpace(chronicle.Summary),
-		State: state.NewState(map[string]interface{}{ChronicleThroughTurnKey: chronicle.ThroughTurn}),
+		State: state.NewState(map[string]any{ChronicleThroughTurnKey: chronicle.ThroughTurn}),
 	}
 
 	data, err := note.SerializeMarkdown()
@@ -78,7 +78,7 @@ func WriteChronicle(store *storage.Store, entitiesDir string, chronicle Chronicl
 
 // intFromAny converts a state value to an int. YAML and JSON disagree on numeric
 // types, and the store decodes frontmatter from JSON.
-func intFromAny(value interface{}) int {
+func intFromAny(value any) int {
 	switch typed := value.(type) {
 	case int:
 		return typed

@@ -134,7 +134,7 @@ func (g *GeminiProvider) ContinueSession(ctx context.Context, session *harness.S
 
 func (g *GeminiProvider) callInteractions(ctx context.Context, prevInteractionID string, req harness.GenerateRequest) (string, string, int, error) {
 	promptText := req.PromptText()
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"model": g.model,
 		"input": promptText,
 	}
@@ -144,7 +144,7 @@ func (g *GeminiProvider) callInteractions(ctx context.Context, prevInteractionID
 	if req.System != "" {
 		payload["system_instruction"] = req.System
 	}
-	genConfig := make(map[string]interface{})
+	genConfig := make(map[string]any)
 	if req.Temperature > 0 {
 		genConfig["temperature"] = req.Temperature
 	} else if g.temperature != nil {
@@ -385,7 +385,7 @@ func (g *GeminiProvider) buildContents(req harness.GenerateRequest) []*genai.Con
 				parts = append(parts, &genai.Part{Text: msg.Content})
 			}
 			for _, tc := range msg.ToolCalls {
-				var args map[string]interface{}
+				var args map[string]any
 				_ = json.Unmarshal([]byte(tc.Arguments), &args)
 				sig := tc.Signature
 				if len(sig) == 0 {
@@ -412,9 +412,9 @@ func (g *GeminiProvider) buildContents(req harness.GenerateRequest) []*genai.Con
 				}
 			}
 		case "tool":
-			var respMap map[string]interface{}
+			var respMap map[string]any
 			if err := json.Unmarshal([]byte(msg.Content), &respMap); err != nil {
-				respMap = map[string]interface{}{"result": msg.Content}
+				respMap = map[string]any{"result": msg.Content}
 			}
 
 			// Recover the function name from the matching call. Prefer an id
@@ -538,7 +538,7 @@ func (g *GeminiProvider) Stream(ctx context.Context, req harness.GenerateRequest
 
 				if part.Thought {
 					if g.logger != nil && part.Text != "" {
-						g.logger.Event("gemini_thought", map[string]interface{}{
+						g.logger.Event("gemini_thought", map[string]any{
 							"text": part.Text,
 						})
 					}

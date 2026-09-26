@@ -125,7 +125,7 @@ type VoiceProfile struct {
 	// Options holds provider-declared tunables, keyed by VoiceOption.Key. It is
 	// opaque to the engine the same way entity State is: only the provider
 	// interprets it, and an empty map is omitted.
-	Options map[string]interface{} `yaml:"options,omitempty" json:"options,omitempty"`
+	Options map[string]any `yaml:"options,omitempty" json:"options,omitempty"`
 }
 
 type TTSConfig struct {
@@ -152,7 +152,7 @@ type TTSConfig struct {
 	Metered *bool `yaml:"metered,omitempty" json:"metered,omitempty"`
 	// Options holds provider-declared tunables for the default voice, keyed by
 	// VoiceOption.Key. Absent means the provider's own defaults.
-	Options map[string]interface{} `yaml:"options,omitempty" json:"options,omitempty"`
+	Options map[string]any `yaml:"options,omitempty" json:"options,omitempty"`
 	// SpeechCues configures vocal performance steering tags and transcript display.
 	SpeechCues SpeechCuesConfig `yaml:"speech_cues,omitempty" json:"speech_cues,omitempty"`
 	// OpusBitrate is the target bitrate for stored Ogg/Opus clips, in bits per
@@ -195,7 +195,6 @@ type ImageConfig struct {
 	AspectRatio      string `yaml:"aspect_ratio,omitempty" json:"aspect_ratio,omitempty"`
 	PersonGeneration string `yaml:"person_generation,omitempty" json:"person_generation,omitempty"`
 }
-
 
 type MediaConfig struct {
 	TTS   TTSConfig   `yaml:"tts" json:"tts"`

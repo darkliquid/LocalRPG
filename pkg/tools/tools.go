@@ -76,7 +76,7 @@ func (e *Executor) AssignedVoices() map[string]config.VoiceProfile {
 // when the call failed, but the result is still a readable message: a tool error
 // must never become a failed turn.
 func (e *Executor) Execute(ctx context.Context, call harness.ToolCall) (string, bool) {
-	arguments := map[string]interface{}{}
+	arguments := map[string]any{}
 	if strings.TrimSpace(call.Arguments) != "" {
 		if err := json.Unmarshal([]byte(call.Arguments), &arguments); err != nil {
 			return e.cap(fmt.Sprintf("error: could not parse the arguments for %s: %v", call.Name, err)), false
@@ -105,7 +105,7 @@ func (e *Executor) Execute(ctx context.Context, call harness.ToolCall) (string, 
 	}
 }
 
-func (e *Executor) searchEntities(ctx context.Context, arguments map[string]interface{}) (string, bool) {
+func (e *Executor) searchEntities(ctx context.Context, arguments map[string]any) (string, bool) {
 	rawQuery := stringArgument(arguments, "query")
 	match := stringArgument(arguments, "match")
 	if match == "" {
@@ -176,7 +176,7 @@ func (e *Executor) searchEntities(ctx context.Context, arguments map[string]inte
 	return e.cap(sb.String()), true
 }
 
-func (e *Executor) getEntity(arguments map[string]interface{}) (string, bool) {
+func (e *Executor) getEntity(arguments map[string]any) (string, bool) {
 	ref := stringArgument(arguments, "id_or_name")
 	if ref == "" {
 		return "error: get_entity needs id_or_name", false
@@ -225,7 +225,7 @@ func (e *Executor) findEntity(ref string) (*entity.Entity, error) {
 	return nil, fmt.Errorf("no entity matching %q", ref)
 }
 
-func (e *Executor) graphNeighbours(arguments map[string]interface{}) (string, bool) {
+func (e *Executor) graphNeighbours(arguments map[string]any) (string, bool) {
 	id := stringArgument(arguments, "id")
 	if id == "" {
 		return "error: graph_neighbours needs an id", false
@@ -269,7 +269,7 @@ func (e *Executor) graphNeighbours(arguments map[string]interface{}) (string, bo
 	return e.cap(sb.String()), true
 }
 
-func (e *Executor) searchTimeline(ctx context.Context, arguments map[string]interface{}) (string, bool) {
+func (e *Executor) searchTimeline(ctx context.Context, arguments map[string]any) (string, bool) {
 	rawQuery := stringArgument(arguments, "query")
 	match := stringArgument(arguments, "match")
 	if match == "" {
@@ -364,12 +364,12 @@ func (e *Executor) cap(text string) string {
 	return string(runes[:e.maxChars]) + fmt.Sprintf("\n... (truncated at %d characters; narrow the query to see more)", e.maxChars)
 }
 
-func stringArgument(arguments map[string]interface{}, key string) string {
+func stringArgument(arguments map[string]any, key string) string {
 	value, _ := arguments[key].(string)
 	return strings.TrimSpace(value)
 }
 
-func intArgument(arguments map[string]interface{}, key string, fallback int) int {
+func intArgument(arguments map[string]any, key string, fallback int) int {
 	switch value := arguments[key].(type) {
 	case float64:
 		if value > 0 {
@@ -383,7 +383,7 @@ func intArgument(arguments map[string]interface{}, key string, fallback int) int
 	return fallback
 }
 
-func (e *Executor) searchVoiceProfiles(arguments map[string]interface{}) (string, bool) {
+func (e *Executor) searchVoiceProfiles(arguments map[string]any) (string, bool) {
 	query := strings.TrimSpace(stringArgument(arguments, "query"))
 	if query == "" {
 		return "error: search_voice_profiles needs a query describing desired traits", false
@@ -457,7 +457,7 @@ func (e *Executor) searchVoiceProfiles(arguments map[string]interface{}) (string
 	return e.cap(sb.String()), true
 }
 
-func (e *Executor) assignVoice(arguments map[string]interface{}) (string, bool) {
+func (e *Executor) assignVoice(arguments map[string]any) (string, bool) {
 	idOrName := strings.TrimSpace(stringArgument(arguments, "entity"))
 	profileID := strings.TrimSpace(stringArgument(arguments, "profile_id"))
 	if idOrName == "" || profileID == "" {
@@ -518,4 +518,3 @@ func (e *Executor) assignVoice(arguments map[string]interface{}) (string, bool) 
 
 	return fmt.Sprintf("Voice profile %q (%s) staged for %q. It will be assigned when the character note is created.", targetProfile.ID, targetProfile.Description, idOrName), true
 }
-

@@ -53,7 +53,7 @@ func (d *Driver) Run(ctx context.Context, s *Scenario, cb StepCallback) ([]debug
 	var mu sync.Mutex
 
 	// Intercept outbound network requests to inject X-LocalRPG-Action-ID
-	chromedp.ListenTarget(taskCtx, func(ev interface{}) {
+	chromedp.ListenTarget(taskCtx, func(ev any) {
 		switch ev.(type) {
 		case *network.EventRequestWillBeSent:
 			mu.Lock()

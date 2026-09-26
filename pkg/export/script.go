@@ -155,7 +155,7 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		Audio:          c.audio,
 		WorldStyle:     worldStyle,
 		ProviderParams: c.config.Media.Image.Type + ":" + c.config.Media.Image.Model,
-		OnProgress: func(format string, args ...interface{}) {
+		OnProgress: func(format string, args ...any) {
 			fmt.Fprintf(os.Stderr, "export: "+format+"\n", args...)
 		},
 	})

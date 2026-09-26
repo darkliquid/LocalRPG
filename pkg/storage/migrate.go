@@ -204,7 +204,7 @@ func columnExists(db *sql.DB, table, column string) (bool, error) {
 			name         string
 			ctype        string
 			notNull      int
-			defaultValue interface{}
+			defaultValue any
 			pk           int
 		)
 		if err := rows.Scan(&cid, &name, &ctype, &notNull, &defaultValue, &pk); err != nil {

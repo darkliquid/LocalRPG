@@ -109,7 +109,7 @@ func TestAppearanceHashIgnoresProseAndTracksState(t *testing.T) {
 	}
 
 	// Structured state does.
-	location.InitState(map[string]interface{}{"burned": true})
+	location.InitState(map[string]any{"burned": true})
 	if AppearanceHash(location, providerParams) == original {
 		t.Errorf("state changes must move the cache key")
 	}

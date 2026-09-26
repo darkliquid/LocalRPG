@@ -12,7 +12,7 @@ import (
 func geminiImagePreset(id string, order int, label, description, model string) provider.Preset {
 	return provider.Preset{
 		ID: id, Order: order, Label: label, Description: description,
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"type": "gemini", "model": model, "aspect_ratio": "16:9",
 			"person_generation": "ALLOW_ADULT", "auto_generate": false,
 		},
@@ -49,7 +49,7 @@ func init() {
 					"gemini-2.5-flash-image"),
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var payload media.ImageBuildPayload
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &payload); err != nil {

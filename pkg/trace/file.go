@@ -83,7 +83,7 @@ func (s *FileSink) SetGame(gameID string) {
 	s.game = gameID
 }
 
-func (s *FileSink) Event(name string, fields map[string]interface{}) {
+func (s *FileSink) Event(name string, fields map[string]any) {
 	if s == nil || s.opts.Level == LevelOff {
 		return
 	}
@@ -91,7 +91,7 @@ func (s *FileSink) Event(name string, fields map[string]interface{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	line := map[string]interface{}{
+	line := map[string]any{
 		"ts":    time.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
 		"event": name,
 		"level": s.opts.Level.String(),
@@ -223,7 +223,7 @@ func (m multiLogger) Enabled(level Level) bool {
 	return false
 }
 
-func (m multiLogger) Event(name string, fields map[string]interface{}) {
+func (m multiLogger) Event(name string, fields map[string]any) {
 	for _, logger := range m {
 		logger.Event(name, fields)
 	}

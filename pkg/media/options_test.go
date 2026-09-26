@@ -17,7 +17,7 @@ func optionSchema() []VoiceOption {
 
 func TestValidateVoiceOptions(t *testing.T) {
 	t.Run("clamps a float to the declared range", func(t *testing.T) {
-		got, warnings := ValidateVoiceOptions(optionSchema(), map[string]interface{}{"stability": 1.7})
+		got, warnings := ValidateVoiceOptions(optionSchema(), map[string]any{"stability": 1.7})
 		if len(warnings) != 0 {
 			t.Fatalf("warnings = %v", warnings)
 		}
@@ -27,46 +27,46 @@ func TestValidateVoiceOptions(t *testing.T) {
 	})
 
 	t.Run("rounds an int", func(t *testing.T) {
-		got, _ := ValidateVoiceOptions(optionSchema(), map[string]interface{}{"seed": 12.6})
+		got, _ := ValidateVoiceOptions(optionSchema(), map[string]any{"seed": 12.6})
 		if got["seed"] != 13 {
 			t.Errorf("seed = %v (%T), want 13", got["seed"], got["seed"])
 		}
 	})
 
 	t.Run("accepts a bool and a string", func(t *testing.T) {
-		got, _ := ValidateVoiceOptions(optionSchema(), map[string]interface{}{"use_speaker_boost": true, "note": "warm"})
+		got, _ := ValidateVoiceOptions(optionSchema(), map[string]any{"use_speaker_boost": true, "note": "warm"})
 		if got["use_speaker_boost"] != true || got["note"] != "warm" {
 			t.Errorf("got %v", got)
 		}
 	})
 
 	t.Run("rejects an enum value outside the list", func(t *testing.T) {
-		got, warnings := ValidateVoiceOptions(optionSchema(), map[string]interface{}{"model": "c"})
+		got, warnings := ValidateVoiceOptions(optionSchema(), map[string]any{"model": "c"})
 		if len(warnings) != 1 || got != nil {
 			t.Errorf("got %v, warnings %v", got, warnings)
 		}
 	})
 
 	t.Run("drops an unknown key with a warning", func(t *testing.T) {
-		got, warnings := ValidateVoiceOptions(optionSchema(), map[string]interface{}{"banana": 1})
+		got, warnings := ValidateVoiceOptions(optionSchema(), map[string]any{"banana": 1})
 		if got != nil || len(warnings) != 1 {
 			t.Errorf("got %v, warnings %v", got, warnings)
 		}
 	})
 
 	t.Run("an empty value map is omitted", func(t *testing.T) {
-		got, warnings := ValidateVoiceOptions(optionSchema(), map[string]interface{}{})
+		got, warnings := ValidateVoiceOptions(optionSchema(), map[string]any{})
 		if got != nil || len(warnings) != 0 {
 			t.Errorf("got %v, warnings %v", got, warnings)
 		}
 	})
 
 	t.Run("keeps one good value and warns about the bad one", func(t *testing.T) {
-		got, warnings := ValidateVoiceOptions(optionSchema(), map[string]interface{}{"stability": 0.4, "seed": "abc"})
+		got, warnings := ValidateVoiceOptions(optionSchema(), map[string]any{"stability": 0.4, "seed": "abc"})
 		if len(warnings) != 1 {
 			t.Errorf("warnings = %v", warnings)
 		}
-		want := map[string]interface{}{"stability": 0.4}
+		want := map[string]any{"stability": 0.4}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("got %v, want %v", got, want)
 		}

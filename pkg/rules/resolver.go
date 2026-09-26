@@ -82,7 +82,7 @@ func statValue(bridge GameHostAPI, actor *entity.Entity, stat string) (int, bool
 	return 0, false
 }
 
-func toInt(value interface{}) (int, bool) {
+func toInt(value any) (int, bool) {
 	switch typed := value.(type) {
 	case int:
 		return typed, true

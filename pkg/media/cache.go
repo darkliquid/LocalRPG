@@ -38,11 +38,11 @@ func ComputeAudioCacheKeyForVoice(speakerID string, voice *entity.VoiceConfig, t
 	// encoding/json sorts map keys, so the options hash is deterministic
 	// regardless of insertion order.
 	payload := struct {
-		Provider   string                 `json:"provider"`
-		VoiceID    string                 `json:"voice_id"`
-		Pitch      float64                `json:"pitch"`
-		SpeechRate float64                `json:"speech_rate"`
-		Options    map[string]interface{} `json:"options"`
+		Provider   string         `json:"provider"`
+		VoiceID    string         `json:"voice_id"`
+		Pitch      float64        `json:"pitch"`
+		SpeechRate float64        `json:"speech_rate"`
+		Options    map[string]any `json:"options"`
 	}{
 		Provider:   voice.Provider,
 		VoiceID:    voice.VoiceID,

@@ -32,14 +32,14 @@ func (b *bridgeLogger) Enabled(level trace.Level) bool { return b.local.Enabled(
 func (b *bridgeLogger) SetGame(gameID string) { b.local.SetGame(gameID) }
 
 // Event records the event locally and as an OTel log record.
-func (b *bridgeLogger) Event(name string, fields map[string]interface{}) {
+func (b *bridgeLogger) Event(name string, fields map[string]any) {
 	b.local.Event(name, fields)
 	b.emit(context.Background(), name, fields)
 }
 
 // EventCtx is Event with a context, so the same event also lands on the active
 // span. It is reached through trace.LogEvent.
-func (b *bridgeLogger) EventCtx(ctx context.Context, name string, fields map[string]interface{}) {
+func (b *bridgeLogger) EventCtx(ctx context.Context, name string, fields map[string]any) {
 	b.local.Event(name, fields)
 	b.emit(ctx, name, fields)
 	span := oteltrace.SpanFromContext(ctx)
@@ -48,7 +48,7 @@ func (b *bridgeLogger) EventCtx(ctx context.Context, name string, fields map[str
 	}
 }
 
-func (b *bridgeLogger) emit(ctx context.Context, name string, fields map[string]interface{}) {
+func (b *bridgeLogger) emit(ctx context.Context, name string, fields map[string]any) {
 	logger := logglobal.GetLoggerProvider().Logger(MeterName)
 	var record otellog.Record
 	record.SetEventName(name)
@@ -60,7 +60,7 @@ func (b *bridgeLogger) emit(ctx context.Context, name string, fields map[string]
 // attributesFromFields turns sanitized event fields into span/log attributes,
 // encoding anything nested as JSON so a map never reaches the wire as a Go
 // stringification.
-func attributesFromFields(fields map[string]interface{}) []attribute.KeyValue {
+func attributesFromFields(fields map[string]any) []attribute.KeyValue {
 	clean := trace.SanitizeFields(fields)
 	attrs := make([]attribute.KeyValue, 0, len(clean))
 	for key, value := range clean {

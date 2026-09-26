@@ -18,7 +18,7 @@ func TestBridgeForwardsToLocalAndOTel(t *testing.T) {
 
 	local := trace.NewMemory(trace.LevelFull)
 	bridge := provider.Logger(local)
-	bridge.Event("tool.call", map[string]interface{}{"name": "search_entities"})
+	bridge.Event("tool.call", map[string]any{"name": "search_entities"})
 
 	if _, ok := local.Find("tool.call"); !ok {
 		t.Fatal("local sink must still receive the event")
@@ -42,7 +42,7 @@ func TestEventCtxAttachesSpanEvent(t *testing.T) {
 	}
 
 	ctx, span := telemetry.Tracer("test").Start(context.Background(), "probe")
-	contextual.EventCtx(ctx, "tool.call", map[string]interface{}{"name": "search_entities"})
+	contextual.EventCtx(ctx, "tool.call", map[string]any{"name": "search_entities"})
 	span.End()
 
 	found := false

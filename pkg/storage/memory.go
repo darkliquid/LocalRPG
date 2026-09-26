@@ -135,7 +135,7 @@ func (s *Store) attachMemoryLinks(memories []entity.Memory, ids []int64) error {
 	return nil
 }
 
-func nullIfEmpty(s string) interface{} {
+func nullIfEmpty(s string) any {
 	if s == "" {
 		return nil
 	}
@@ -177,7 +177,7 @@ func (s *Store) SearchMemories(match, entityID, kind string, minImportance, limi
 		FROM memories_fts
 		JOIN memories m ON m.id = memories_fts.rowid
 		WHERE memories_fts MATCH ?`
-	args := []interface{}{match}
+	args := []any{match}
 	if kind != "" {
 		query += " AND m.kind = ?"
 		args = append(args, kind)

@@ -53,7 +53,7 @@ type frameWriter struct {
 	dir      string
 	fps      int
 	still    bool
-	progress func(format string, args ...interface{})
+	progress func(format string, args ...any)
 }
 
 // write renders every beat's frames in order, numbering them so FFmpeg can read
@@ -202,7 +202,7 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 		dir:      framesDir,
 		fps:      v.fps,
 		still:    v.still,
-		progress: func(format string, args ...interface{}) {
+		progress: func(format string, args ...any) {
 			fmt.Fprintf(os.Stderr, "export: "+format+"\n", args...)
 		},
 	}

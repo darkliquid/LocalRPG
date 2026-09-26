@@ -217,7 +217,7 @@ func geminiVoiceToProviderVoice(v geminiVoiceEntry) ProviderVoice {
 		categories = append(categories, context)
 	}
 
-	metadata := map[string]interface{}{}
+	metadata := map[string]any{}
 	for key, value := range map[string]string{
 		"type":          v.Type,
 		"region_code":   v.RegionCode,
@@ -253,7 +253,7 @@ func requireGeminiKey(apiKey string) (string, error) {
 
 // geminiGET issues one authenticated GET against the Gemini API and decodes the
 // JSON body into out.
-func geminiGET(ctx context.Context, path, apiKey string, query url.Values, out interface{}) error {
+func geminiGET(ctx context.Context, path, apiKey string, query url.Values, out any) error {
 	ctx, cancel := context.WithTimeout(ctx, geminiCatalogTimeout)
 	defer cancel()
 

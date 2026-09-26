@@ -16,8 +16,8 @@ func TestFileSinkWritesOneJSONObjectPerLine(t *testing.T) {
 	}
 	defer func() { _ = sink.Close() }()
 
-	sink.Event("turn.begin", map[string]interface{}{"game": "test-campaign", "number": 2})
-	sink.Event("provider.response", map[string]interface{}{"finish_reason": "stop"})
+	sink.Event("turn.begin", map[string]any{"game": "test-campaign", "number": 2})
+	sink.Event("provider.response", map[string]any{"finish_reason": "stop"})
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -29,7 +29,7 @@ func TestFileSinkWritesOneJSONObjectPerLine(t *testing.T) {
 		t.Fatalf("expected 2 lines, got %d: %q", len(lines), data)
 	}
 
-	var first map[string]interface{}
+	var first map[string]any
 	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil {
 		t.Fatalf("line is not JSON: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestFileSinkStampsTheCampaign(t *testing.T) {
 	defer func() { _ = sink.Close() }()
 
 	sink.SetGame("test-campaign")
-	sink.Event("turn.begin", map[string]interface{}{"number": 1})
+	sink.Event("turn.begin", map[string]any{"number": 1})
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -95,7 +95,7 @@ func TestFileSinkRotatesAndKeepsTheNewestFiles(t *testing.T) {
 	defer func() { _ = sink.Close() }()
 
 	for i := 0; i < 12; i++ {
-		sink.Event("turn.begin", map[string]interface{}{"number": i, "padding": "0123456789012345678901234567890123456789"})
+		sink.Event("turn.begin", map[string]any{"number": i, "padding": "0123456789012345678901234567890123456789"})
 	}
 
 	if _, err := os.Stat(path); err != nil {
@@ -133,7 +133,7 @@ func TestFileSinkCountsFailuresInsteadOfFailingTheTurn(t *testing.T) {
 	}
 
 	// A write after close must not panic and must be counted.
-	sink.Event("turn.begin", map[string]interface{}{"number": 1})
+	sink.Event("turn.begin", map[string]any{"number": 1})
 	if sink.Failures() == 0 {
 		t.Errorf("expected the failure to be counted")
 	}
@@ -160,7 +160,7 @@ func TestMultiSendsToEveryLogger(t *testing.T) {
 		t.Errorf("expected multi to be enabled when any sink is")
 	}
 	multi.SetGame("test-campaign")
-	multi.Event("turn.begin", map[string]interface{}{"number": 1})
+	multi.Event("turn.begin", map[string]any{"number": 1})
 
 	if len(first.Names()) != 1 || len(second.Names()) != 1 {
 		t.Errorf("expected both sinks to record, got %v and %v", first.Names(), second.Names())

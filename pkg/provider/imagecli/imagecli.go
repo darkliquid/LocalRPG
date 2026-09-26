@@ -21,13 +21,13 @@ func init() {
 			Presets: []provider.Preset{
 				{ID: "sd-cli", Order: 4, Label: "stable-diffusion.cpp (Local CLI)",
 					Description: "Direct SD inference binary using quantized GGUF weights.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "cli", "command": "sd",
-						"args": []interface{}{"-m", "models/sd-v1-5.gguf", "-p"}, "auto_generate": false,
+						"args": []any{"-m", "models/sd-v1-5.gguf", "-p"}, "auto_generate": false,
 					}},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var payload media.ImageBuildPayload
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &payload); err != nil {

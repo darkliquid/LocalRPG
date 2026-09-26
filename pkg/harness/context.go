@@ -771,7 +771,7 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 	// The prompt is recorded here and nowhere else. Everything downstream refers
 	// to it by hash, so the trace holds one copy rather than one per call site.
 	c.logger = trace.OrNil(c.logger)
-	c.logger.Event("context.assembled", map[string]interface{}{
+	c.logger.Event("context.assembled", map[string]any{
 		"estimated_tokens": result.EstimatedTokens,
 		"budget":           budget,
 		"trimmed":          trimmed,
@@ -992,7 +992,7 @@ func estimateTokens(text string) int {
 // RenderState prints an entity's state in a stable order, so the same note always
 // produces the same prompt. It is exported because the continuity checks compare
 // narration against the same rendering.
-func RenderState(raw map[string]interface{}) string {
+func RenderState(raw map[string]any) string {
 	if len(raw) == 0 {
 		return ""
 	}

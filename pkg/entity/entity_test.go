@@ -95,7 +95,7 @@ func TestSerializeMarkdownEntity(t *testing.T) {
 		Tags: []string{"tavern", "safehouse"},
 		Body: "A quiet tavern at the edge of the woods.\n",
 	}
-	e.InitState(map[string]interface{}{"capacity": 40})
+	e.InitState(map[string]any{"capacity": 40})
 
 	data, err := e.SerializeMarkdown()
 	if err != nil {
@@ -170,7 +170,7 @@ func TestVoiceOptionsRoundTripThroughFrontmatter(t *testing.T) {
 			Provider:   "builtin:elevenlabs",
 			VoiceID:    "EXAVITQu4vr4xnSDxMaL",
 			SpeechRate: 1,
-			Options:    map[string]interface{}{"stability": 0.35, "similarity_boost": 0.8},
+			Options:    map[string]any{"stability": 0.35, "similarity_boost": 0.8},
 		},
 	}
 

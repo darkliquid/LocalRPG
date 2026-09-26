@@ -222,7 +222,7 @@ func (p *TTSPipeline) SynthesizeSegmentForce(ctx context.Context, segment entity
 	}
 	if spoken != segment.Text {
 		p.logger = trace.OrNil(p.logger)
-		p.logger.Event("media.tts.reduced", map[string]interface{}{
+		p.logger.Event("media.tts.reduced", map[string]any{
 			"chars_raw":    len([]rune(segment.Text)),
 			"chars_spoken": len([]rune(spoken)),
 		})
@@ -274,7 +274,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 		}
 	}
 	p.logger = trace.OrNil(p.logger)
-	p.logger.Event("media.tts.request", map[string]interface{}{
+	p.logger.Event("media.tts.request", map[string]any{
 		"speaker":   speakerID,
 		"voice_id":  voiceID,
 		"provider":  provider,
@@ -290,7 +290,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 			mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "hit")))
 			mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
 				otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", true)))
-			p.logger.Event("media.tts.result", map[string]interface{}{
+			p.logger.Event("media.tts.result", map[string]any{
 				"cache_hit":   true,
 				"duration_ms": time.Since(start).Milliseconds(),
 			})
@@ -301,7 +301,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 	audioBytes, err := p.client.Synthesize(ctx, text, voice)
 	if err != nil {
 		code := harness.ClassifyProviderError(err)
-		p.logger.Event("media.tts.error", map[string]interface{}{
+		p.logger.Event("media.tts.error", map[string]any{
 			"speaker":  speakerID,
 			"provider": provider,
 			"code":     string(code),
@@ -343,7 +343,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 	mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
 		otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", false)))
 
-	p.logger.Event("media.tts.result", map[string]interface{}{
+	p.logger.Event("media.tts.result", map[string]any{
 		"cache_hit":    false,
 		"bytes":        len(encoded),
 		"content_type": "audio/ogg",

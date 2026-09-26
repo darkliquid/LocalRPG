@@ -22,7 +22,7 @@ func TestJSEngineExecution(t *testing.T) {
 		Name: "Sean",
 		Type: "character",
 	}
-	player.InitState(map[string]interface{}{"hp": 20})
+	player.InitState(map[string]any{"hp": 20})
 	store.SaveEntity(player)
 
 	bridge := NewHostBridge(store, nil, "")
@@ -45,7 +45,7 @@ onAction("attack", function(ctx) {
 		t.Fatalf("LoadScript failed: %v", err)
 	}
 
-	result, err := engine.ExecuteAction("attack", map[string]interface{}{"target": "goblin"})
+	result, err := engine.ExecuteAction("attack", map[string]any{"target": "goblin"})
 	if err != nil {
 		t.Fatalf("ExecuteAction failed: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestExecuteActionReadsTheOutcomeLabel(t *testing.T) {
 		t.Fatalf("LoadScript failed: %v", err)
 	}
 
-	res, err := engine.ExecuteAction("attack", map[string]interface{}{"action": "swing"})
+	res, err := engine.ExecuteAction("attack", map[string]any{"action": "swing"})
 	if err != nil {
 		t.Fatalf("ExecuteAction failed: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestExecuteActionReadsTheOutcomeLabel(t *testing.T) {
 	}
 
 	// A label alone does not imply success: the engine never invents semantics.
-	truce, err := engine.ExecuteAction("parley", map[string]interface{}{"action": "talk"})
+	truce, err := engine.ExecuteAction("parley", map[string]any{"action": "talk"})
 	if err != nil {
 		t.Fatalf("ExecuteAction failed: %v", err)
 	}

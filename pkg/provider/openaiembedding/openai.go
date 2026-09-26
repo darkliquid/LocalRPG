@@ -38,7 +38,7 @@ func init() {
 			Description: "Vector embeddings via standard OpenAI-compatible /v1/embeddings endpoint",
 			Source:      "http",
 		},
-		Build: func(ctx context.Context, raw []byte) (interface{}, error) {
+		Build: func(ctx context.Context, raw []byte) (any, error) {
 			var cfg ClientConfig
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &cfg); err != nil {

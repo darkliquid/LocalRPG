@@ -176,7 +176,7 @@ func TestCompileResolvesAudioAndCountsSilence(t *testing.T) {
 
 	script, err := compiler.Compile(context.Background(), "campaign-01", Options{
 		Audio:      true,
-		OnProgress: func(format string, args ...interface{}) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
+		OnProgress: func(format string, args ...any) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
 	})
 	if err != nil {
 		t.Fatalf("Compile failed: %v", err)
@@ -221,7 +221,7 @@ func TestCompileWarnsWhenAResolverReportsNoAudio(t *testing.T) {
 	var warnings []string
 	script, err := compiler.Compile(context.Background(), "campaign-01", Options{
 		Audio:      true,
-		OnProgress: func(format string, args ...interface{}) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
+		OnProgress: func(format string, args ...any) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
 	})
 	if err != nil {
 		t.Fatalf("Compile failed: %v", err)

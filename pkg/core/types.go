@@ -50,13 +50,13 @@ type WorldManifest struct {
 }
 
 type GameManifest struct {
-	ID         string                 `yaml:"id"`
-	Name       string                 `yaml:"name"`
-	SystemID   string                 `yaml:"system"`
-	WorldID    string                 `yaml:"world"`
-	Player     string                 `yaml:"player"`
-	PlayerName string                 `yaml:"player_name,omitempty"`
-	Settings   map[string]interface{} `yaml:"settings,omitempty"`
+	ID         string         `yaml:"id"`
+	Name       string         `yaml:"name"`
+	SystemID   string         `yaml:"system"`
+	WorldID    string         `yaml:"world"`
+	Player     string         `yaml:"player"`
+	PlayerName string         `yaml:"player_name,omitempty"`
+	Settings   map[string]any `yaml:"settings,omitempty"`
 }
 
 // SaveGameManifest writes a campaign manifest. It creates no directories, so a

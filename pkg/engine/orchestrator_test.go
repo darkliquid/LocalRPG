@@ -44,7 +44,7 @@ func TestTurnOrchestrator(t *testing.T) {
 	// Seed location and player
 	store.SaveEntity(&entity.Entity{ID: "tavern", Name: "Alden Tavern", Type: "location", Body: "Cozy tavern."})
 	player := &entity.Entity{ID: "player", Name: "Sean", Type: "character"}
-	player.InitState(map[string]interface{}{"hp": 25})
+	player.InitState(map[string]any{"hp": 25})
 	store.SaveEntity(player)
 
 	history := NewHistoryLogger(filepath.Join(tempDir, "history.jsonl"))

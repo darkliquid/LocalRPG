@@ -191,7 +191,7 @@ func decodeGeneratedValues(text string) map[string]string {
 		}
 	}
 
-	var raw map[string]interface{}
+	var raw map[string]any
 	if err := json.Unmarshal([]byte(cleaned), &raw); err != nil {
 		return map[string]string{}
 	}

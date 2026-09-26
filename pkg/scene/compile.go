@@ -24,7 +24,7 @@ type Options struct {
 	Audio          bool
 	WorldStyle     string
 	ProviderParams string
-	OnProgress     func(format string, args ...interface{})
+	OnProgress     func(format string, args ...any)
 }
 
 // ErrAudioUnavailable means no TTS provider is configured, which is a normal

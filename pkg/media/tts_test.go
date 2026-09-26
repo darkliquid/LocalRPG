@@ -348,7 +348,7 @@ func TestTTSPipelineNamesTheProviderInTheTrace(t *testing.T) {
 	voice := &entity.VoiceConfig{
 		Provider: "builtin:elevenlabs",
 		VoiceID:  "v1",
-		Options:  map[string]interface{}{"model": "eleven_turbo_v2_5"},
+		Options:  map[string]any{"model": "eleven_turbo_v2_5"},
 	}
 	if _, err := pipeline.SynthesizeUtterance(context.Background(), "elena", voice, "Hello."); err != nil {
 		t.Fatalf("SynthesizeUtterance: %v", err)
@@ -403,4 +403,3 @@ func TestSynthesizeUtteranceForceBypassesCache(t *testing.T) {
 		t.Fatal("expected non-empty third path")
 	}
 }
-

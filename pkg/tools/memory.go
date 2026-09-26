@@ -11,7 +11,7 @@ import (
 
 // searchMemories answers search_memories: FTS and vector similarity over memory
 // text, fused via Reciprocal Rank Fusion, ranked by importance and recency.
-func (e *Executor) searchMemories(ctx context.Context, arguments map[string]interface{}) (string, bool) {
+func (e *Executor) searchMemories(ctx context.Context, arguments map[string]any) (string, bool) {
 	rawQuery := stringArgument(arguments, "query")
 	match := BuildMatch(rawQuery)
 	if match == "" && rawQuery == "" {
@@ -106,7 +106,7 @@ func (e *Executor) searchMemories(ctx context.Context, arguments map[string]inte
 }
 
 // getEntityTimeline answers get_entity_timeline: an entity's memories newest-first.
-func (e *Executor) getEntityTimeline(arguments map[string]interface{}) (string, bool) {
+func (e *Executor) getEntityTimeline(arguments map[string]any) (string, bool) {
 	ref := stringArgument(arguments, "entity")
 	if ref == "" {
 		return "error: get_entity_timeline needs an entity", false

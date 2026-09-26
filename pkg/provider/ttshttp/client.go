@@ -74,7 +74,7 @@ func (h *httpTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 
 	var payload []byte
 	if strings.Contains(h.endpoint, "/api/tts-generate") || strings.Contains(h.endpoint, "alltalk") {
-		payload, _ = json.Marshal(map[string]interface{}{
+		payload, _ = json.Marshal(map[string]any{
 			"text_input":          text,
 			"character_voice_gen": voiceID,
 			"narrator_voice_gen":  voiceID,
@@ -83,7 +83,7 @@ func (h *httpTTSClient) Synthesize(ctx context.Context, text string, voice *enti
 		})
 	} else {
 		isKokoro := strings.Contains(strings.ToLower(h.model), "kokoro") || strings.Contains(h.endpoint, "8880")
-		payloadMap := map[string]interface{}{
+		payloadMap := map[string]any{
 			"model": h.model,
 			"input": text,
 			"voice": voiceID,
@@ -280,7 +280,7 @@ func formatKokoroVoice(item kokoroVoiceItem) media.ProviderVoice {
 		Gender:   gender,
 		Accent:   accent,
 		Tags:     tags,
-		Defaults: map[string]interface{}{
+		Defaults: map[string]any{
 			"pitch":       1.0,
 			"speech_rate": 1.0,
 		},

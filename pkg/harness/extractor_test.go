@@ -494,7 +494,7 @@ func TestAssignVoiceProfileCopiesOptions(t *testing.T) {
 		ID:      "gruff",
 		VoiceID: "am_adam",
 		Tags:    []string{"gruff", "mercenary"},
-		Options: map[string]interface{}{"stability": 0.2},
+		Options: map[string]any{"stability": 0.2},
 	}}
 
 	AssignVoiceProfile(ent, profiles)

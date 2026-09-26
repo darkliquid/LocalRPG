@@ -64,7 +64,7 @@ func TestHTTPProviderStreaming(t *testing.T) {
 }
 
 func TestHTTPProviderSendsGenerationOptionsAndReportsFinish(t *testing.T) {
-	var gotBody map[string]interface{}
+	var gotBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&gotBody)
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -248,7 +248,7 @@ func TestHTTPProviderHonoursTheChunkLimit(t *testing.T) {
 
 func TestHTTPProviderAccumulatesStreamedToolCalls(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]interface{}
+		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		if _, ok := body["tools"]; !ok {
 			t.Errorf("expected a tools field, got %v", body)
@@ -284,7 +284,7 @@ func TestHTTPProviderAccumulatesStreamedToolCalls(t *testing.T) {
 
 	req := harness.GenerateRequest{
 		Messages: []harness.Message{{Role: "user", Content: "who is Kael?"}},
-		Tools:    []harness.ToolSpec{{Name: "search_entities", Description: "search", Parameters: map[string]interface{}{"type": "object"}}},
+		Tools:    []harness.ToolSpec{{Name: "search_entities", Description: "search", Parameters: map[string]any{"type": "object"}}},
 	}
 	if err := provider.Stream(context.Background(), req, out); err != nil {
 		t.Fatalf("Stream: %v", err)
@@ -306,7 +306,7 @@ func TestHTTPProviderDegradesOnceWhenToolsAreRejected(t *testing.T) {
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
-		var body map[string]interface{}
+		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		if _, ok := body["tools"]; ok {
 			w.WriteHeader(http.StatusBadRequest)

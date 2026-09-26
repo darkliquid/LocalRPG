@@ -18,7 +18,7 @@ type elevenLabsServer struct {
 	lastPath   string
 	lastQuery  string
 	lastHeader string
-	lastBody   map[string]interface{}
+	lastBody   map[string]any
 	status     int
 	response   []byte
 }
@@ -82,7 +82,7 @@ func TestElevenLabsSynthesizeMapsTheRequest(t *testing.T) {
 	voice := &entity.VoiceConfig{
 		VoiceID:    "EXAVITQu4vr4xnSDxMaL",
 		SpeechRate: 1.2,
-		Options: map[string]interface{}{
+		Options: map[string]any{
 			"stability":         0.35,
 			"similarity_boost":  0.8,
 			"style":             0.2,
@@ -109,7 +109,7 @@ func TestElevenLabsSynthesizeMapsTheRequest(t *testing.T) {
 	if server.lastBody["model_id"] != "eleven_multilingual_v2" {
 		t.Errorf("model_id = %v", server.lastBody["model_id"])
 	}
-	settings, ok := server.lastBody["voice_settings"].(map[string]interface{})
+	settings, ok := server.lastBody["voice_settings"].(map[string]any)
 	if !ok {
 		t.Fatalf("voice_settings missing: %v", server.lastBody)
 	}
@@ -143,11 +143,11 @@ func TestElevenLabsClampsOutOfRangeOptions(t *testing.T) {
 	httpServer := server.start(t)
 	client := newTestElevenLabsClient(t, httpServer)
 
-	voice := &entity.VoiceConfig{VoiceID: "v", Options: map[string]interface{}{"stability": 4.0}}
+	voice := &entity.VoiceConfig{VoiceID: "v", Options: map[string]any{"stability": 4.0}}
 	if _, err := client.Synthesize(context.Background(), "Hello.", voice); err != nil {
 		t.Fatalf("Synthesize: %v", err)
 	}
-	settings, _ := server.lastBody["voice_settings"].(map[string]interface{})
+	settings, _ := server.lastBody["voice_settings"].(map[string]any)
 	if settings["stability"] != 1.0 {
 		t.Errorf("stability = %v, want the clamped 1.0", settings["stability"])
 	}

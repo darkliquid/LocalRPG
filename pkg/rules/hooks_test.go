@@ -12,10 +12,10 @@ func TestTurnBeginAndEndHooks(t *testing.T) {
 	if err := engine.LoadScript(script); err != nil {
 		t.Fatal(err)
 	}
-	if err := engine.ExecuteTurnBegin(map[string]interface{}{"turn": 4, "location": "hall"}); err != nil {
+	if err := engine.ExecuteTurnBegin(map[string]any{"turn": 4, "location": "hall"}); err != nil {
 		t.Fatalf("ExecuteTurnBegin: %v", err)
 	}
-	if err := engine.ExecuteTurnEnd(map[string]interface{}{"turn": 4, "verdict": "uncertain"}); err != nil {
+	if err := engine.ExecuteTurnEnd(map[string]any{"turn": 4, "verdict": "uncertain"}); err != nil {
 		t.Fatalf("ExecuteTurnEnd: %v", err)
 	}
 	if len(bridge.GetLogs()) != 2 {

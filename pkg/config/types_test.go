@@ -226,7 +226,7 @@ func TestVoiceProfileOptionsAndMeteredRoundTrip(t *testing.T) {
 	profile := VoiceProfile{
 		ID:      "hushed",
 		VoiceID: "bf_emma",
-		Options: map[string]interface{}{"stability": 0.35, "model": "eleven_multilingual_v2"},
+		Options: map[string]any{"stability": 0.35, "model": "eleven_multilingual_v2"},
 	}
 	encoded, err := yaml.Marshal(profile)
 	if err != nil {
@@ -265,7 +265,7 @@ func TestVoiceProfileOptionsAndMeteredRoundTrip(t *testing.T) {
 }
 
 func TestTTSConfigOptionsRoundTrip(t *testing.T) {
-	cfg := TTSConfig{Options: map[string]interface{}{"stability": 0.4, "model": "eleven_multilingual_v2"}}
+	cfg := TTSConfig{Options: map[string]any{"stability": 0.4, "model": "eleven_multilingual_v2"}}
 	encoded, err := yaml.Marshal(cfg)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)

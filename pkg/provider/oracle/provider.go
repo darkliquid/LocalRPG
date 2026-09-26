@@ -34,7 +34,7 @@ func (n *narrativeOracleProvider) SetLogger(logger trace.Logger) {
 // logResponse records the crafted reply's size and that no model was called.
 func (n *narrativeOracleProvider) logResponse(text string, start time.Time) {
 	n.logger = trace.OrNil(n.logger)
-	n.logger.Event("provider.response", map[string]interface{}{
+	n.logger.Event("provider.response", map[string]any{
 		"role":          n.id,
 		"kind":          "oracle",
 		"finish_reason": "stop",

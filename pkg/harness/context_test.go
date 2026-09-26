@@ -321,7 +321,7 @@ func saveEntity(t *testing.T, store *storage.Store, ent *entity.Entity) {
 }
 
 func TestRenderStateIsDeterministic(t *testing.T) {
-	raw := map[string]interface{}{"brazier_lit": true, "danger_level": float64(2), "name": "The Ashen Bastion"}
+	raw := map[string]any{"brazier_lit": true, "danger_level": float64(2), "name": "The Ashen Bastion"}
 
 	first := RenderState(raw)
 	second := RenderState(raw)
@@ -340,7 +340,7 @@ func TestCanonRendersStateAndKeepsItWhenTiny(t *testing.T) {
 	store := newTestEntityStore(t)
 	saveEntity(t, store, &entity.Entity{
 		ID: "aldon-harbour", Name: "Aldon Harbour", Type: "location", Body: "Salt air.",
-		State: state.NewState(map[string]interface{}{"danger_level": float64(2), "brazier_lit": true}),
+		State: state.NewState(map[string]any{"danger_level": float64(2), "brazier_lit": true}),
 		Hash:  "h1",
 	})
 

@@ -96,13 +96,13 @@ func (s *Summariser) Summarise(ctx context.Context, previous string, turns []Sum
 
 	response, err := s.provider.Generate(ctx, GenerateRequest{Prompt: prompt})
 	if err != nil {
-		s.logger.Event("provider.error", map[string]interface{}{"role": "summariser", "error": err.Error()})
+		s.logger.Event("provider.error", map[string]any{"role": "summariser", "error": err.Error()})
 		return "", fmt.Errorf("summarise %d turn(s): %w", len(turns), err)
 	}
 
 	summary := truncateForCap(strings.TrimSpace(response.Text), s.charLimit)
 
-	s.logger.Event("summary.regenerate", map[string]interface{}{
+	s.logger.Event("summary.regenerate", map[string]any{
 		"turns":       len(turns),
 		"chars":       len([]rune(summary)),
 		"char_limit":  s.charLimit,

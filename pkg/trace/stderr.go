@@ -42,14 +42,14 @@ func (l *StderrLogger) Enabled(level Level) bool {
 	return l.level != LevelOff && level <= l.level
 }
 
-func (l *StderrLogger) Event(name string, fields map[string]interface{}) {
+func (l *StderrLogger) Event(name string, fields map[string]any) {
 	if !l.Enabled(LevelSummary) {
 		return
 	}
 
 	stamped := fields
 	if l.game != "" {
-		stamped = make(map[string]interface{}, len(fields)+1)
+		stamped = make(map[string]any, len(fields)+1)
 		for key, value := range fields {
 			stamped[key] = value
 		}

@@ -28,14 +28,14 @@ func init() {
 			Presets: []provider.Preset{
 				{ID: "gemini", Order: 8, Label: "Google Gemini (Cloud API)",
 					Description: "Cloud model with a shared key from the Providers tab. Pick the exact model after loading.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "gemini", "model": "gemini-3.8-flash",
 						"temperature": 0.7, "max_tokens": 4096,
 						"thinking_budget": 0, "top_p": 0.95, "top_k": 40,
 					}},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var payload harness.ModelBuildPayload
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &payload); err != nil {

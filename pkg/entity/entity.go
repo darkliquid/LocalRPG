@@ -21,25 +21,25 @@ type VoiceConfig struct {
 	SpeechRate float64 `yaml:"speech_rate,omitempty" json:"speech_rate,omitempty"`
 	// Options carries provider-declared tunables for this voice, keyed by the
 	// provider's VoiceOption.Key. Absent means the provider's own defaults.
-	Options map[string]interface{} `yaml:"options,omitempty" json:"options,omitempty"`
+	Options map[string]any `yaml:"options,omitempty" json:"options,omitempty"`
 }
 
 type EntityFrontmatter struct {
-	ID         string                 `yaml:"id"`
-	Name       string                 `yaml:"name"`
-	Type       string                 `yaml:"type"`
-	Tags       []string               `yaml:"tags,omitempty"`
-	Voice      *VoiceConfig           `yaml:"voice,omitempty"`
-	Portrait   string                 `yaml:"portrait,omitempty"`
-	Location   string                 `yaml:"location,omitempty"`
-	Appearance string                 `yaml:"appearance,omitempty" json:"appearance,omitempty"`
-	Gender     string                 `yaml:"gender,omitempty" json:"gender,omitempty"`
-	Age        string                 `yaml:"age,omitempty" json:"age,omitempty"`
-	Aliases    []string               `yaml:"aliases,omitempty" json:"aliases,omitempty"`
-	Faction    string                 `yaml:"faction,omitempty"`
-	History    []int                  `yaml:"history,omitempty" json:"history,omitempty"`
-	State      map[string]interface{} `yaml:"state,omitempty"`
-	ExtraMeta  map[string]interface{} `yaml:",inline"`
+	ID         string         `yaml:"id"`
+	Name       string         `yaml:"name"`
+	Type       string         `yaml:"type"`
+	Tags       []string       `yaml:"tags,omitempty"`
+	Voice      *VoiceConfig   `yaml:"voice,omitempty"`
+	Portrait   string         `yaml:"portrait,omitempty"`
+	Location   string         `yaml:"location,omitempty"`
+	Appearance string         `yaml:"appearance,omitempty" json:"appearance,omitempty"`
+	Gender     string         `yaml:"gender,omitempty" json:"gender,omitempty"`
+	Age        string         `yaml:"age,omitempty" json:"age,omitempty"`
+	Aliases    []string       `yaml:"aliases,omitempty" json:"aliases,omitempty"`
+	Faction    string         `yaml:"faction,omitempty"`
+	History    []int          `yaml:"history,omitempty" json:"history,omitempty"`
+	State      map[string]any `yaml:"state,omitempty"`
+	ExtraMeta  map[string]any `yaml:",inline"`
 }
 
 type Entity struct {
@@ -60,13 +60,13 @@ type Entity struct {
 	Aliases   []string
 	History   []int
 	State     *state.State
-	ExtraMeta map[string]interface{}
+	ExtraMeta map[string]any
 	Body      string
 	Wikilinks []string
 	Hash      string
 }
 
-func (e *Entity) InitState(data map[string]interface{}) {
+func (e *Entity) InitState(data map[string]any) {
 	e.State = state.NewState(data)
 }
 
@@ -220,7 +220,7 @@ func (e *Entity) SerializeMarkdown() ([]byte, error) {
 		History:    e.History,
 	}
 	if len(e.ExtraMeta) > 0 {
-		extra := make(map[string]interface{}, len(e.ExtraMeta))
+		extra := make(map[string]any, len(e.ExtraMeta))
 		for k, v := range e.ExtraMeta {
 			switch strings.ToLower(k) {
 			case "id", "name", "type", "tags", "voice", "portrait", "location", "faction", "appearance", "gender", "age", "aliases", "history", "state":

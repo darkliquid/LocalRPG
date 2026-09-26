@@ -30,7 +30,7 @@ func generationStatus(code harness.FailureCode) int {
 
 // writeGenerationError writes a structured failure body and status.
 func writeGenerationError(w http.ResponseWriter, failure *harness.GenerationFailure) {
-	writeJSONStatus(w, generationStatus(failure.Code), map[string]interface{}{"error": failure})
+	writeJSONStatus(w, generationStatus(failure.Code), map[string]any{"error": failure})
 }
 
 // writeInvalidRequest writes a 400 in the same shape as every other generation
@@ -45,7 +45,7 @@ func writeInvalidRequest(w http.ResponseWriter, message string) {
 // writeJSONError writes a JSON error envelope with an explicit status, for
 // non-generation failures such as a world conflict.
 func writeJSONError(w http.ResponseWriter, status int, message string) {
-	writeJSONStatus(w, status, map[string]interface{}{"error": map[string]string{"message": message}})
+	writeJSONStatus(w, status, map[string]any{"error": map[string]string{"message": message}})
 }
 
 // writeGenerationFailure recognises a generation failure and writes it, so

@@ -73,10 +73,10 @@ type vectorMinHeap []VectorHit
 func (h vectorMinHeap) Len() int           { return len(h) }
 func (h vectorMinHeap) Less(i, j int) bool { return h[i].Score < h[j].Score } // smallest score at root
 func (h vectorMinHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
-func (h *vectorMinHeap) Push(x interface{}) {
+func (h *vectorMinHeap) Push(x any) {
 	*h = append(*h, x.(VectorHit))
 }
-func (h *vectorMinHeap) Pop() interface{} {
+func (h *vectorMinHeap) Pop() any {
 	old := *h
 	n := len(old)
 	x := old[n-1]
@@ -95,7 +95,7 @@ func (s *Store) SearchSimilarVectors(ctx context.Context, targetTypes []string, 
 	}
 
 	placeholders := make([]string, len(targetTypes))
-	args := make([]interface{}, 0, len(targetTypes)+1)
+	args := make([]any, 0, len(targetTypes)+1)
 	args = append(args, modelID)
 	for i, tt := range targetTypes {
 		placeholders[i] = "?"

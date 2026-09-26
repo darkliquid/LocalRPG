@@ -32,7 +32,7 @@ func TestEveryPresetConfigUnmarshals(t *testing.T) {
 			if err != nil {
 				t.Fatalf("preset %s/%s: encode: %v", desc.ID, preset.ID, err)
 			}
-			var target interface{}
+			var target any
 			switch desc.Family {
 			case provider.FamilyLLM:
 				target = &harness.ProviderConfig{}

@@ -35,7 +35,7 @@ func continuityStore(t *testing.T) *storage.Store {
 	mustSave(&entity.Entity{ID: "oakhaven-tavern", Name: "Oakhaven Tavern", Type: "location", Body: "Ale."})
 	mustSave(&entity.Entity{
 		ID: "the-bastion", Name: "The Ashen Bastion", Type: "location", Body: "A sanctuary.",
-		State: state.NewState(map[string]interface{}{"brazier_lit": true}),
+		State: state.NewState(map[string]any{"brazier_lit": true}),
 	})
 	return store
 }

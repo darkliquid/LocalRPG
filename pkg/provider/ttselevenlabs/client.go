@@ -126,7 +126,7 @@ func (c *ElevenLabsTTSClient) Synthesize(ctx context.Context, text string, voice
 		outputFormat = value
 	}
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"text":     text,
 		"model_id": model,
 	}
@@ -155,7 +155,7 @@ func (c *ElevenLabsTTSClient) Synthesize(ctx context.Context, text string, voice
 }
 
 // voiceOptions is a voice's provider options, or nil when it carries none.
-func voiceOptions(voice *entity.VoiceConfig) map[string]interface{} {
+func voiceOptions(voice *entity.VoiceConfig) map[string]any {
 	if voice == nil {
 		return nil
 	}
@@ -165,8 +165,8 @@ func voiceOptions(voice *entity.VoiceConfig) map[string]interface{} {
 // voiceSettings maps the declared options onto ElevenLabs' voice_settings. It
 // returns an empty map when nothing was tuned, so the voice's stored server-side
 // settings apply unchanged.
-func voiceSettings(voice *entity.VoiceConfig, options map[string]interface{}) map[string]interface{} {
-	settings := make(map[string]interface{})
+func voiceSettings(voice *entity.VoiceConfig, options map[string]any) map[string]any {
+	settings := make(map[string]any)
 	for _, key := range []string{"stability", "similarity_boost", "style", "use_speaker_boost"} {
 		if value, ok := options[key]; ok {
 			settings[key] = value
@@ -308,14 +308,14 @@ func extractElevenLabsErrorMessage(body []byte) string {
 // elevenLabsVoice is one entry of the /v2/voices response. Labels are free-form
 // strings, never enums, so they are carried as a map.
 type elevenLabsVoice struct {
-	VoiceID           string                 `json:"voice_id"`
-	Name              string                 `json:"name"`
-	Category          string                 `json:"category"`
-	Description       string                 `json:"description"`
-	PreviewURL        string                 `json:"preview_url"`
-	Labels            map[string]string      `json:"labels"`
-	Settings          map[string]interface{} `json:"settings"`
-	AvailableForTiers []string               `json:"available_for_tiers"`
+	VoiceID           string            `json:"voice_id"`
+	Name              string            `json:"name"`
+	Category          string            `json:"category"`
+	Description       string            `json:"description"`
+	PreviewURL        string            `json:"preview_url"`
+	Labels            map[string]string `json:"labels"`
+	Settings          map[string]any    `json:"settings"`
+	AvailableForTiers []string          `json:"available_for_tiers"`
 	VerifiedLanguages []struct {
 		Language string `json:"language"`
 	} `json:"verified_languages"`
@@ -395,7 +395,7 @@ func mapElevenLabsVoice(voice elevenLabsVoice) media.ProviderVoice {
 		voice.Labels["accent"],
 		voice.Category,
 	)
-	mapped.Metadata = map[string]interface{}{
+	mapped.Metadata = map[string]any{
 		"category":            voice.Category,
 		"available_for_tiers": voice.AvailableForTiers,
 		"verified_languages":  voice.VerifiedLanguages,

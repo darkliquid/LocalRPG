@@ -17,13 +17,13 @@ func TestHTTPImageClient_DecodesA1111Base64(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString(rawPng)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req map[string]interface{}
+		var req map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		if req["prompt"] != "a misty graveyard" {
 			t.Errorf("unexpected prompt: %v", req["prompt"])
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"images": []string{encoded},
 		})
 	}))
@@ -49,7 +49,7 @@ func TestHTTPImageClient_DecodesOpenAIBase64(t *testing.T) {
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"data": []map[string]string{
 				{"b64_json": encoded},
 			},
@@ -81,10 +81,10 @@ func TestComfyUIImageClient_GeneratesImage(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]string{"prompt_id": "prompt-123"})
 		case "/history/prompt-123":
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"prompt-123": map[string]interface{}{
-					"outputs": map[string]interface{}{
-						"9": map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"prompt-123": map[string]any{
+					"outputs": map[string]any{
+						"9": map[string]any{
 							"images": []map[string]string{
 								{"filename": "out_001.png", "subfolder": "", "type": "output"},
 							},

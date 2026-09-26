@@ -236,7 +236,7 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		values := map[string]interface{}{}
+		values := map[string]any{}
 		if patch.OpeningPrompt != nil {
 			values[engine.OpeningPromptSetting] = strings.TrimSpace(*patch.OpeningPrompt)
 		}
@@ -584,14 +584,14 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func writeJSON(w http.ResponseWriter, data interface{}) {
+func writeJSON(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(data)
 }
 
 // writeJSONStatus writes a JSON body with an explicit status, so header
 // handling stays in one place for error envelopes.
-func writeJSONStatus(w http.ResponseWriter, status int, data interface{}) {
+func writeJSONStatus(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(data)

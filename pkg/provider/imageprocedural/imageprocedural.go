@@ -20,12 +20,12 @@ func init() {
 			Presets: []provider.Preset{
 				{ID: "procedural-art", Order: 5, Label: "Procedural Dark Fantasy (Built-in Zero-GPU)",
 					Description: "Pure-Go vector landscape and fortress generator creating atmospheric SVG illustrations.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "builtin", "builtin_name": "procedural-art", "auto_generate": false,
 					}},
 			},
 		},
-		Build: func(_ context.Context, _ []byte) (interface{}, error) {
+		Build: func(_ context.Context, _ []byte) (any, error) {
 			return media.NewProceduralImageProvider(), nil
 		},
 	})

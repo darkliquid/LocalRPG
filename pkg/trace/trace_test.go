@@ -48,7 +48,7 @@ func TestNopRecordsNothingAndNeverEnabled(t *testing.T) {
 func TestMemoryStampsTheCampaign(t *testing.T) {
 	memory := NewMemory(LevelSummary)
 	memory.SetGame("test-campaign")
-	memory.Event("turn.begin", map[string]interface{}{"number": 1})
+	memory.Event("turn.begin", map[string]any{"number": 1})
 
 	event, ok := memory.Find("turn.begin")
 	if !ok {
@@ -72,8 +72,8 @@ func TestMemoryOnlyRecordsEnabledEvents(t *testing.T) {
 		t.Errorf("expected full to be disabled at summary level")
 	}
 
-	memory.Event("turn.begin", map[string]interface{}{"number": 1})
-	memory.Event("context.assembled", map[string]interface{}{"tokens": 2610})
+	memory.Event("turn.begin", map[string]any{"number": 1})
+	memory.Event("context.assembled", map[string]any{"tokens": 2610})
 
 	if got := memory.Names(); len(got) != 2 || got[0] != "turn.begin" {
 		t.Fatalf("Names() = %v, want the two events in order", got)

@@ -8,25 +8,25 @@ import (
 
 type State struct {
 	mu   sync.RWMutex
-	data map[string]interface{}
+	data map[string]any
 }
 
-func NewState(initial map[string]interface{}) *State {
+func NewState(initial map[string]any) *State {
 	if initial == nil {
-		initial = make(map[string]interface{})
+		initial = make(map[string]any)
 	}
 	return &State{data: initial}
 }
 
-func (s *State) Get(path string) (interface{}, bool) {
+func (s *State) Get(path string) (any, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	parts := strings.Split(path, ".")
-	var current interface{} = s.data
+	var current any = s.data
 
 	for _, part := range parts {
-		m, ok := current.(map[string]interface{})
+		m, ok := current.(map[string]any)
 		if !ok {
 			return nil, false
 		}
@@ -39,7 +39,7 @@ func (s *State) Get(path string) (interface{}, bool) {
 	return current, true
 }
 
-func (s *State) Set(path string, val interface{}) error {
+func (s *State) Set(path string, val any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -53,12 +53,12 @@ func (s *State) Set(path string, val interface{}) error {
 		part := parts[i]
 		next, exists := current[part]
 		if !exists {
-			newMap := make(map[string]interface{})
+			newMap := make(map[string]any)
 			current[part] = newMap
 			current = newMap
 			continue
 		}
-		nextMap, ok := next.(map[string]interface{})
+		nextMap, ok := next.(map[string]any)
 		if !ok {
 			return fmt.Errorf("path component %q is not a map", part)
 		}
@@ -70,11 +70,11 @@ func (s *State) Set(path string, val interface{}) error {
 	return nil
 }
 
-func (s *State) Raw() map[string]interface{} {
+func (s *State) Raw() map[string]any {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	clone := make(map[string]interface{}, len(s.data))
+	clone := make(map[string]any, len(s.data))
 	for k, v := range s.data {
 		clone[k] = v
 	}

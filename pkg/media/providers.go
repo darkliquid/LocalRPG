@@ -110,7 +110,7 @@ func (c *fallbackImageClient) GenerateImage(ctx context.Context, prompt string) 
 		return data, nil
 	}
 	if c.logger != nil {
-		c.logger.Event("provider.error", map[string]interface{}{
+		c.logger.Event("provider.error", map[string]any{
 			"role":     "image",
 			"fallback": true,
 			"error":    err.Error(),

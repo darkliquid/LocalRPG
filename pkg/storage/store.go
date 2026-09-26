@@ -43,7 +43,7 @@ func (s *Store) SaveEntity(e *entity.Entity) error {
 	}
 	defer tx.Rollback()
 
-	fmMeta := map[string]interface{}{
+	fmMeta := map[string]any{
 		"tags":       e.Tags,
 		"voice":      e.Voice,
 		"portrait":   e.Portrait,
@@ -103,9 +103,9 @@ func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 		return nil, err
 	}
 
-	var meta map[string]interface{}
+	var meta map[string]any
 	if err := json.Unmarshal([]byte(fmJSON), &meta); err == nil {
-		if stateData, ok := meta["state"].(map[string]interface{}); ok {
+		if stateData, ok := meta["state"].(map[string]any); ok {
 			ent.InitState(stateData)
 		}
 		if voiceData, ok := meta["voice"]; ok && voiceData != nil {
@@ -127,14 +127,14 @@ func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 		if port, ok := meta["portrait"].(string); ok {
 			ent.Portrait = port
 		}
-		if aliases, ok := meta["aliases"].([]interface{}); ok {
+		if aliases, ok := meta["aliases"].([]any); ok {
 			for _, value := range aliases {
 				if alias, ok := value.(string); ok {
 					ent.Aliases = append(ent.Aliases, alias)
 				}
 			}
 		}
-		if history, ok := meta["history"].([]interface{}); ok {
+		if history, ok := meta["history"].([]any); ok {
 			for _, value := range history {
 				if number, ok := value.(float64); ok {
 					ent.History = append(ent.History, int(number))

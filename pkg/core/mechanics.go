@@ -15,12 +15,12 @@ type MechanicsSpec struct {
 
 // StatSpec declares one stat.
 type StatSpec struct {
-	ID      string      `yaml:"id"`
-	Label   string      `yaml:"label,omitempty"`
-	Type    string      `yaml:"type,omitempty"` // number | string | bool
-	Default interface{} `yaml:"default,omitempty"`
-	Min     *int        `yaml:"min,omitempty"`
-	Max     *int        `yaml:"max,omitempty"`
+	ID      string `yaml:"id"`
+	Label   string `yaml:"label,omitempty"`
+	Type    string `yaml:"type,omitempty"` // number | string | bool
+	Default any    `yaml:"default,omitempty"`
+	Min     *int   `yaml:"min,omitempty"`
+	Max     *int   `yaml:"max,omitempty"`
 }
 
 // SkillSpec declares one skill and the stat that governs it.

@@ -177,7 +177,7 @@ func (j *JSEngine) LoadScript(script string) error {
 	return nil
 }
 
-func (j *JSEngine) ExecuteAction(actionType string, ctx map[string]interface{}) (*ActionResult, error) {
+func (j *JSEngine) ExecuteAction(actionType string, ctx map[string]any) (*ActionResult, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
@@ -196,13 +196,13 @@ func (j *JSEngine) ExecuteAction(actionType string, ctx map[string]interface{}) 
 		return nil, nil
 	}
 
-	m, ok := exported.(map[string]interface{})
+	m, ok := exported.(map[string]any)
 	if !ok {
 		return &ActionResult{Success: true, Message: fmt.Sprint(exported)}, nil
 	}
 
 	res := &ActionResult{
-		Data: make(map[string]interface{}),
+		Data: make(map[string]any),
 	}
 	if s, ok := m["success"].(bool); ok {
 		res.Success = s
@@ -217,7 +217,7 @@ func (j *JSEngine) ExecuteAction(actionType string, ctx map[string]interface{}) 
 	}
 	if r, ok := m["roll"].(*RollResult); ok {
 		res.Roll = r
-	} else if rMap, ok := m["roll"].(map[string]interface{}); ok {
+	} else if rMap, ok := m["roll"].(map[string]any); ok {
 		data, _ := json.Marshal(rMap)
 		var rr RollResult
 		json.Unmarshal(data, &rr)
@@ -234,7 +234,7 @@ func (j *JSEngine) ExecuteAction(actionType string, ctx map[string]interface{}) 
 	return res, nil
 }
 
-func (j *JSEngine) ExecuteTurnEnd(ctx map[string]interface{}) error {
+func (j *JSEngine) ExecuteTurnEnd(ctx map[string]any) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
@@ -246,7 +246,7 @@ func (j *JSEngine) ExecuteTurnEnd(ctx map[string]interface{}) error {
 	return nil
 }
 
-func (j *JSEngine) ExecuteWorldTick(ctx map[string]interface{}) error {
+func (j *JSEngine) ExecuteWorldTick(ctx map[string]any) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
@@ -264,7 +264,7 @@ func (j *JSEngine) Resolve(ctx context.Context, req harness.CheckRequest, actor 
 	j.mu.Lock()
 	fn, hasResolver := j.checkResolvers[req.CheckKind]
 	if hasResolver {
-		arg := j.vm.ToValue(map[string]interface{}{
+		arg := j.vm.ToValue(map[string]any{
 			"actor": req.Actor, "target": req.Target, "check_kind": req.CheckKind,
 			"stat": req.Stat, "difficulty": req.Difficulty, "stakes": req.Stakes,
 		})
@@ -274,7 +274,7 @@ func (j *JSEngine) Resolve(ctx context.Context, req harness.CheckRequest, actor 
 			return nil, fmt.Errorf("check resolver %q: %w", req.CheckKind, err)
 		}
 		result := &harness.CheckResult{CheckID: newCheckID(), Actor: req.Actor, Target: req.Target, Outcome: "fail"}
-		if mapped, ok := value.Export().(map[string]interface{}); ok {
+		if mapped, ok := value.Export().(map[string]any); ok {
 			if outcome, ok := mapped["outcome"].(string); ok && outcome != "" {
 				result.Outcome = outcome
 			}
@@ -294,7 +294,7 @@ func (j *JSEngine) Resolve(ctx context.Context, req harness.CheckRequest, actor 
 }
 
 // ExecuteTurnBegin runs every onTurnBegin hook.
-func (j *JSEngine) ExecuteTurnBegin(ctx map[string]interface{}) error {
+func (j *JSEngine) ExecuteTurnBegin(ctx map[string]any) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	for _, hook := range j.turnBeginHooks {
