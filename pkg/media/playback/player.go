@@ -11,6 +11,7 @@
 package playback
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -142,8 +143,8 @@ func (p *Player) SetVolume(volume float64) {
 }
 
 // PlayFiles replaces the current queue with the given clips, which are decoded
-// as they are consumed. It returns once playback has started. A clip that cannot
-// be decoded is skipped rather than silencing the rest of the turn.
+// up front. It returns once playback has started. A clip that cannot be decoded
+// is skipped rather than silencing the rest of the turn.
 func (p *Player) PlayFiles(paths []string) error {
 	if !p.Available() {
 		return ErrUnavailable
@@ -171,6 +172,25 @@ func (p *Player) PlayFiles(paths []string) error {
 		queue = beep.Seq(streamers...)
 	}
 
+	return p.playStreamer(queue, closers, len(streamers))
+}
+
+// PlayQueue starts playback and pulls clip paths from clips as each previous
+// clip drains, so the first completed clip is heard while the rest are still
+// synthesized. It returns once playback has started; closing the channel ends
+// the queue.
+func (p *Player) PlayQueue(ctx context.Context, clips <-chan string) error {
+	if !p.Available() {
+		return ErrUnavailable
+	}
+	queue := newQueueStreamer(ctx, clips)
+	return p.playStreamer(queue, []io.Closer{queue}, 0)
+}
+
+// playStreamer installs a streamer as the current queue. It returns once
+// playback has started. closers are released when the queue drains or is
+// replaced.
+func (p *Player) playStreamer(queue beep.Streamer, closers []io.Closer, clipCount int) error {
 	p.mu.Lock()
 	previousClosers := p.closers
 	if p.otoPlayer != nil {
@@ -197,7 +217,7 @@ func (p *Player) PlayFiles(paths []string) error {
 	p.mu.Unlock()
 
 	logger.Event("audio.play", map[string]interface{}{
-		"clips":  len(streamers),
+		"clips":  clipCount,
 		"volume": gain,
 	})
 

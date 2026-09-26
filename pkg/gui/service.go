@@ -1851,32 +1851,26 @@ func (s *Service) PlayTurnAudio(ctx context.Context, gameID string, turnNumber i
 
 	isForce := len(force) > 0 && force[0]
 
-	rawPaths := make([]string, len(turn.Segments))
-	var wg sync.WaitGroup
-	for i := range turn.Segments {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, idx, isForce)
-			if err == nil && path != "" {
-				rawPaths[idx] = path
+	// Synthesize in order and feed the player as each clip lands, so playback
+	// starts on the first completed clip instead of waiting for the whole turn.
+	clips := make(chan string)
+	go func() {
+		defer close(clips)
+		for i := range turn.Segments {
+			path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, i, isForce)
+			if err != nil || path == "" {
+				continue
 			}
-		}(i)
-	}
-	wg.Wait()
-
-	paths := make([]string, 0, len(turn.Segments))
-	for _, p := range rawPaths {
-		if p != "" {
-			paths = append(paths, p)
+			select {
+			case clips <- path:
+			case <-ctx.Done():
+				return
+			}
 		}
-	}
-	if len(paths) == 0 {
-		return scene.ErrAudioUnavailable
-	}
+	}()
 
 	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
-	return player.PlayFiles(paths)
+	return player.PlayQueue(ctx, clips)
 }
 
 // PlaySegmentAudio plays one beat, which is what a speaker chip triggers.
