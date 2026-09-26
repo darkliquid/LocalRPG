@@ -56,3 +56,7 @@ run = "npm run dev"
 [tasks.clean]
 description = "Clean up build outputs"
 run = "rm -rf bin/ dist/ frontend/dist"
+
+[tasks."desktop:snapshots"]
+description = "Regenerate desktop golden snapshots"
+run = "UPDATE_SNAPSHOTS=1 go test ./pkg/desktop/... -run Snapshot -count=1"

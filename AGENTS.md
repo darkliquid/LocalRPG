@@ -18,6 +18,7 @@ mise run lint           # go vet ./...
 mise run dev:gui        # go run ./cmd/localrpg gui --port 8080
 mise run dev:frontend   # vite dev server on :3000, proxies /api -> localhost:8080
 mise run clean
+mise run desktop:snapshots # regenerate shirei golden snapshots in pkg/desktop
 ```
 
 Run a single Go test: `go test -run TestTurnOrchestrator ./pkg/engine/`.
