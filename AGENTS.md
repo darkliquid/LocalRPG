@@ -64,7 +64,9 @@ Notable built-ins that need no server or GPU: `narrative-oracle` (LLM), `native-
 
 ## Configuration
 
-Resolution order (`pkg/config/manager.go`): `$LOCALRPG_CONFIG_DIR`, else `$XDG_CONFIG_HOME/localrpg`, else `~/.config/localrpg`, for `config.yaml`; then an optional `./localrpg.yaml` merged on top, which flips `IsLocalOverride`. `Save` writes to the local override when one exists, otherwise to the user config. `gui.NewService(rootDir)` has its own twist: when `--dir` is set to anything other than `.`, it treats `<rootDir>/config.yaml` as the user config and resolves relative `paths.*` against `rootDir`.
+Resolution order (`pkg/config/manager.go`): `$LOCALRPG_CONFIG_DIR`, else the XDG config search path (`$XDG_CONFIG_HOME` then `$XDG_CONFIG_DIRS`), for `config.yaml`; then an optional `./localrpg.yaml` merged on top, which flips `IsLocalOverride`. `Save` writes to the local override when one exists, otherwise to the user config. `gui.NewService(rootDir)` has its own twist: when `--dir` is set to anything other than `.`, it treats `<rootDir>/config.yaml` as the user config and resolves relative `paths.*` against `rootDir`.
+
+Storage paths are resolved by `pkg/paths.Resolve` from the XDG bases (`github.com/adrg/xdg`), which fall back to native per-OS directories: `systems`/`worlds`/`games` under `DataHome/localrpg`, `cache` under `CacheHome/localrpg`. An empty `paths.*` uses those defaults, an absolute value is used verbatim, and a relative value joins the category base — unless `--dir` or `./localrpg.yaml` puts the process in project mode, where relative values resolve against the project root (the previous behaviour). Nothing is migrated; the GUI logs a `paths.legacy_relative` warning when a legacy working-directory folder exists and the resolved XDG directory is empty.
 
 ## Conventions
 

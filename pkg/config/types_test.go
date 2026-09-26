@@ -490,3 +490,10 @@ func TestCompletionModeDefaultsToTrim(t *testing.T) {
 		t.Errorf("CompletionMode() = %q, want the configured auto", got)
 	}
 }
+
+func TestDefaultPathsAreEmptySoResolutionSuppliesThem(t *testing.T) {
+	paths := DefaultConfig().Paths
+	if paths.Systems != "" || paths.Worlds != "" || paths.Games != "" || paths.Cache != "" {
+		t.Fatalf("default paths = %+v, want empty", paths)
+	}
+}
