@@ -5,12 +5,20 @@ package theater
 import "github.com/darkliquid/localrpg/pkg/scene"
 
 // Frame is one rendered moment: which beat is showing and how far through it
-// playback has reached.
+// playback has reached, plus the stage presentation the live window and the
+// exporter share.
 type Frame struct {
 	Script   *scene.Script
 	SceneIdx int
 	BeatIdx  int
 	Progress float64
+
+	PlayerPortrait string
+	NPCPortrait    string
+	PlayerLabel    string
+	NPCLabel       string
+	PlayerActive   bool
+	NPCActive      bool
 }
 
 // BeatAt returns the scene and beat a frame points at.

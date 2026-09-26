@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"image"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
@@ -172,10 +173,12 @@ type State struct {
 	WorldEntityID  string
 
 	// Live theatre.
-	TheaterTurn    int
-	TheaterBeat    int
-	TheaterPlaying bool
-	TheaterSpeed   float64
+	TheaterTurn      int
+	TheaterBeat      int
+	TheaterPlaying   bool
+	TheaterSpeed     float64
+	TheaterBeatKey   string
+	TheaterBeatStart time.Time
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
