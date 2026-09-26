@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -138,6 +139,11 @@ type TTSPipeline struct {
 	logger      trace.Logger
 	policy      TextPolicy
 	opusBitrate int
+
+	// flights serialize synthesis per cache key, so concurrent requests for the
+	// same utterance synthesize and encode once instead of racing.
+	flightMu sync.Mutex
+	flights  map[string]*sync.Mutex
 }
 
 // SetOpusBitrate selects the on-disk Opus bitrate. Out-of-range values fall back
@@ -221,8 +227,8 @@ func (p *TTSPipeline) SynthesizeSegmentForce(ctx context.Context, segment entity
 		return "", ErrNoSpeakableText
 	}
 	if spoken != segment.Text {
-		p.logger = trace.OrNil(p.logger)
-		p.logger.Event("media.tts.reduced", map[string]interface{}{
+		logger := trace.OrNil(p.logger)
+		logger.Event("media.tts.reduced", map[string]interface{}{
 			"chars_raw":    len([]rune(segment.Text)),
 			"chars_spoken": len([]rune(spoken)),
 		})
@@ -253,7 +259,23 @@ func NewTTSPipeline(client TTSClient, cache *ContentCache) *TTSPipeline {
 		client:      client,
 		cache:       cache,
 		opusBitrate: opus.DefaultBitrate,
+		flights:     map[string]*sync.Mutex{},
 	}
+}
+
+// keyLock returns the mutex for one cache key, creating it on first use.
+func (p *TTSPipeline) keyLock(key string) *sync.Mutex {
+	p.flightMu.Lock()
+	defer p.flightMu.Unlock()
+	if p.flights == nil {
+		p.flights = map[string]*sync.Mutex{}
+	}
+	lock, ok := p.flights[key]
+	if !ok {
+		lock = &sync.Mutex{}
+		p.flights[key] = lock
+	}
+	return lock
 }
 
 func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string, voice *entity.VoiceConfig, text string) (string, error) {
@@ -273,8 +295,8 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 			model = value
 		}
 	}
-	p.logger = trace.OrNil(p.logger)
-	p.logger.Event("media.tts.request", map[string]interface{}{
+	logger := trace.OrNil(p.logger)
+	logger.Event("media.tts.request", map[string]interface{}{
 		"speaker":   speakerID,
 		"voice_id":  voiceID,
 		"provider":  provider,
@@ -290,7 +312,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 			mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "hit")))
 			mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
 				otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", true)))
-			p.logger.Event("media.tts.result", map[string]interface{}{
+			logger.Event("media.tts.result", map[string]interface{}{
 				"cache_hit":   true,
 				"duration_ms": time.Since(start).Milliseconds(),
 			})
@@ -298,10 +320,21 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 		}
 	}
 
+	// Serialize per cache key: a concurrent request for the same utterance waits,
+	// then takes the clip the first one wrote instead of synthesizing again.
+	keyLock := p.keyLock(base)
+	keyLock.Lock()
+	defer keyLock.Unlock()
+	if !force {
+		if path, ok := p.cachedClip(base); ok {
+			return path, nil
+		}
+	}
+
 	audioBytes, err := p.client.Synthesize(ctx, text, voice)
 	if err != nil {
 		code := harness.ClassifyProviderError(err)
-		p.logger.Event("media.tts.error", map[string]interface{}{
+		logger.Event("media.tts.error", map[string]interface{}{
 			"speaker":  speakerID,
 			"provider": provider,
 			"code":     string(code),
@@ -343,7 +376,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 	mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
 		otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", false)))
 
-	p.logger.Event("media.tts.result", map[string]interface{}{
+	logger.Event("media.tts.result", map[string]interface{}{
 		"cache_hit":    false,
 		"bytes":        len(encoded),
 		"content_type": "audio/ogg",

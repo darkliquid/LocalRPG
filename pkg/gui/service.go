@@ -56,6 +56,11 @@ type Service struct {
 	// queue of overlapping ones.
 	summaryMu      sync.Mutex
 	summaryPending map[string]bool
+	// The audio pipeline is shared and rebuilt only when the configuration
+	// object changes, so a built-in TTS model is loaded once, not per segment.
+	ttsMu       sync.Mutex
+	ttsConfig   *config.Config
+	ttsPipeline *media.TTSPipeline
 }
 
 // Config returns the configuration the service is running with, so a command can
@@ -1690,22 +1695,40 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 	}
 
 	cfg := s.configMgr.Get()
+	narratorVoice := s.narratorVoiceFor(gameID, cfg)
+
+	pipeline, err := s.audioPipeline()
+	if err != nil {
+		return "", err
+	}
+	isForce := len(force) > 0 && force[0]
+	return pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
+}
+
+// audioPipeline returns the shared TTS pipeline, building it when the current
+// configuration object differs from the one it was built from. Sharing it means a
+// built-in TTS model is loaded once, not once per segment.
+func (s *Service) audioPipeline() (*media.TTSPipeline, error) {
+	cfg := s.configMgr.Get()
 	if cfg.Media.TTS.Type == "" || cfg.Media.TTS.Type == "disabled" {
-		return "", ErrAudioUnavailable
+		return nil, ErrAudioUnavailable
+	}
+
+	s.ttsMu.Lock()
+	defer s.ttsMu.Unlock()
+	if s.ttsPipeline != nil && s.ttsConfig == cfg {
+		return s.ttsPipeline, nil
 	}
 
 	client, err := s.ttsClientFor(cfg.Media.TTS)
 	if err != nil {
-		return "", fmt.Errorf("build tts client: %w", err)
+		return nil, fmt.Errorf("build tts client: %w", err)
 	}
-
-	narratorVoice := s.narratorVoiceFor(gameID, cfg)
-
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
-	isForce := len(force) > 0 && force[0]
-	return pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
+	s.ttsConfig, s.ttsPipeline = cfg, pipeline
+	return pipeline, nil
 }
 
 // narratorVoiceFor resolves the narrator voice for a campaign, preferring any
@@ -1828,32 +1851,26 @@ func (s *Service) PlayTurnAudio(ctx context.Context, gameID string, turnNumber i
 
 	isForce := len(force) > 0 && force[0]
 
-	rawPaths := make([]string, len(turn.Segments))
-	var wg sync.WaitGroup
-	for i := range turn.Segments {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, idx, isForce)
-			if err == nil && path != "" {
-				rawPaths[idx] = path
+	// Synthesize in order and feed the player as each clip lands, so playback
+	// starts on the first completed clip instead of waiting for the whole turn.
+	clips := make(chan string)
+	go func() {
+		defer close(clips)
+		for i := range turn.Segments {
+			path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, i, isForce)
+			if err != nil || path == "" {
+				continue
 			}
-		}(i)
-	}
-	wg.Wait()
-
-	paths := make([]string, 0, len(turn.Segments))
-	for _, p := range rawPaths {
-		if p != "" {
-			paths = append(paths, p)
+			select {
+			case clips <- path:
+			case <-ctx.Done():
+				return
+			}
 		}
-	}
-	if len(paths) == 0 {
-		return scene.ErrAudioUnavailable
-	}
+	}()
 
 	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
-	return player.PlayFiles(paths)
+	return player.PlayQueue(ctx, clips)
 }
 
 // PlaySegmentAudio plays one beat, which is what a speaker chip triggers.
