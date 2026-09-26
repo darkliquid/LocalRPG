@@ -75,6 +75,10 @@ type State struct {
 	MergeOpen      bool
 	MergeTarget    string
 
+	// Context drawer state.
+	TurnContext *gui.TurnContextDTO
+	WorkingSet  []gui.WorkingEntryDTO
+
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
 	WorldArt map[string]Art

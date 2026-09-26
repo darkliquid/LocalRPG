@@ -15,6 +15,10 @@ func toggleDrawer(name string) {
 		return
 	}
 	appState.Drawer = name
+	switch name {
+	case "context":
+		refreshContext()
+	}
 }
 
 // drawerToolbar offers the drawer entry points in the chronicle.
@@ -89,7 +93,6 @@ func drawerTitle() string {
 	}
 }
 
-func contextDrawer(p ui.Palette)   { Label("Context", TextColorVec(p.Muted)) }
 func graphDrawer(p ui.Palette)     { Label("Graph", TextColorVec(p.Muted)) }
 func worldDrawer(p ui.Palette)     { Label("Living World", TextColorVec(p.Muted)) }
 func characterDrawer(p ui.Palette) { Label("Character Sheet", TextColorVec(p.Muted)) }

@@ -90,6 +90,19 @@ func loadMemories(svc *gui.Service, gameID, entityID string) []gui.MemoryDTO {
 	return memories
 }
 
+// loadContext reads the last turn's context report and the working set.
+func loadContext(svc *gui.Service, gameID string) (*gui.TurnContextDTO, []gui.WorkingEntryDTO) {
+	var tc *gui.TurnContextDTO
+	if got, err := svc.GetTurnContext(gameID); err == nil {
+		tc = got
+	}
+	working, err := svc.GetWorkingSet(gameID)
+	if err != nil || working == nil {
+		working = []gui.WorkingEntryDTO{}
+	}
+	return tc, working
+}
+
 // loadChronicle reads the campaign's turn history.
 func loadChronicle(ctx context.Context, svc *gui.Service, gameID string) []gui.TurnDTO {
 	turns, err := svc.GetChronicle(ctx, gameID)
