@@ -34,74 +34,44 @@ export const REFERENCE_SYSTEM_TEMPLATE: ReferenceSystemTemplate = {
   rules_prompt: `You are the Game Master adjudicating a campaign governed by the **Narrative 2d6 Engine**.
 
 ### 1. Core Resolution Ladder
-When player actions face meaningful risk, adversity, or uncertainty, outcomes are adjudicated using two six-sided dice (2d6):
-- **10+ (Strong Hit / Full Success)**: The protagonist accomplishes their goal cleanly without complication, resource expenditure, or collateral harm.
-- **7–9 (Weak Hit / Partial Success)**: The protagonist accomplishes their goal, but at a tangible cost: minor damage or stress, a dangerous complication, a trade-off, or diminished effect.
-- **6- (Miss / Hard Move)**: The action falters. Escalate the immediate threat, introduce an ambush or sudden turn of fortune, deplete a vital resource, or put the protagonist in immediate peril.
+Call \`request_check\` when an action is uncertain and failure would change the story; the engine rolls 2d6 and returns the result. Do not roll for safe or trivial actions.
+- **10+ (Strong Hit / Full Success)**: The protagonist accomplishes their goal cleanly.
+- **7–9 (Weak Hit / Partial Success)**: They succeed at a tangible cost: damage, stress, a complication, a trade-off, or diminished effect.
+- **6- (Miss / Hard Move)**: Escalate the threat, introduce a twist, deplete a resource, or put the protagonist in peril.
 
-### 2. Action Modes & Mechanics Hooks
-The engine runs JavaScript hooks before generating your GM narrative:
-- \`do\`: General active intent (physical feats, athletics, stealth, lockpicking). Invokes the \`onAction("do", ctx)\` hook.
-- \`attack\`: Direct violent conflict against adversaries. Invokes \`onAction("attack", ctx)\`, dealing damage and modifying character health stats.
-- \`say\`: Social dialogue, persuasion, interrogation, or intimidation.
-- \`roll\`: Direct arbitrary dice expressions (e.g., 1d20, 2d6+2).
+### 2. Action Modes
+- \`do\`: general active intent (physical feats, athletics, stealth, lockpicking).
+- \`say\`: social dialogue, persuasion, interrogation, intimidation.
+- \`story\`: narrative or reflective action that still carries risk.
+- \`roll\`: the player's explicit request for a check; resolve it or state why no roll is needed.
+
+NPCs do not roll; resolve opposition through the protagonist's check.
 
 ### 3. Handling Mechanics Results
-When the prompt contains a \`[MECHANICS RESULT: ...]\` tag:
-- You **must** honor the outcome described in the message.
-- Weave any damage dealt, wounds suffered, or tactical shifts directly into the narrative prose.
-- Never contradict the numerical roll total, damage numbers, or state changes reported by the mechanics engine.
+When the prompt contains a \`[MECHANICS RESULT: ...]\` tag, honour it and weave it into the prose. Never contradict the roll total, damage, or state changes the engine reports.
 `,
   script: `// ==========================================
 // Narrative 2d6 Engine - Mechanics Script
 // ==========================================
 
-// Handle active "do" actions (physical feats, infiltration, survival)
-onAction("do", function(ctx) {
+function resolve2d6(ctx) {
   var r = roll("2d6");
   var message = "";
-
   if (r.total >= 10) {
-    message = "Strong Hit (Total: " + r.total + ") - Complete triumph with no complications.";
+    message = "Strong Hit (Total: " + r.total + ") - complete triumph, no complications.";
   } else if (r.total >= 7) {
-    message = "Weak Hit (Total: " + r.total + ") - Success achieved, but at a cost or complication.";
+    message = "Weak Hit (Total: " + r.total + ") - success at a cost or complication.";
   } else {
-    message = "Miss (Total: " + r.total + ") - The attempt falters; danger escalates.";
+    message = "Miss (Total: " + r.total + ") - the attempt falters; danger escalates.";
     injectGMDirection("The action failed. Introduce an immediate complication or escalate danger.");
   }
+  return { success: r.total >= 7, message: message, roll: r };
+}
 
-  return {
-    success: r.total >= 7,
-    message: message,
-    roll: r
-  };
-});
+onAction("do", resolve2d6);
+onAction("say", resolve2d6);
+onAction("story", resolve2d6);
 
-// Handle combat "attack" actions
-onAction("attack", function(ctx) {
-  var r = roll("2d6");
-  var msg = "";
-
-  if (r.total >= 10) {
-    msg = "Critical Strike (Total: " + r.total + ")! Target takes 4 damage.";
-  } else if (r.total >= 7) {
-    msg = "Glancing Hit (Total: " + r.total + ")! Target takes 2 damage, but counters for 1 damage.";
-    var hp = getStat(ctx.player, "health");
-    if (hp === null || hp === undefined) hp = 10;
-    setStat(ctx.player, "health", Math.max(0, hp - 1));
-  } else {
-    msg = "Attack Deflected (Total: " + r.total + ")! The adversary seizes the upper hand.";
-    injectGMDirection("The enemy retaliates swiftly. Put the protagonist on the defensive.");
-  }
-
-  return {
-    success: r.total >= 7,
-    message: msg,
-    roll: r
-  };
-});
-
-// Lifecycle hook executed at the end of each turn
 onTurnEnd(function(ctx) {
   log("Turn " + ctx.turn + " completed in Narrative 2d6 Engine.");
 });
