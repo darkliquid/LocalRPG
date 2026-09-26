@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/desktop"
 	"github.com/darkliquid/localrpg/pkg/gui"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
@@ -62,6 +63,16 @@ func handleGUICommand(args []string) {
 
 	svc := gui.NewService(cfg.Dir)
 	defer func() { _ = storage.CloseGameStores() }()
+
+	// Transitional escape hatch: run the in-process shirei GUI instead of the
+	// Wails window or the HTTP daemon. Removed at teardown.
+	if os.Getenv("LOCALRPG_UI") == "shirei" {
+		if err := desktop.Run(desktop.Config{Dir: cfg.Dir, Service: svc}); err != nil {
+			fmt.Fprintf(os.Stderr, "shirei GUI failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	telemetryProvider, err := telemetry.New(context.Background(), svc.Config().Telemetry, telemetry.BuildInfo{
 		Version: Version,
