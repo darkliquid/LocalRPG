@@ -20,4 +20,11 @@ func TestLoadAllIgnoresServiceErrors(t *testing.T) {
 	if st.Err != nil {
 		t.Fatalf("loadAll reported %v", st.Err)
 	}
+	if st.GameArt == nil || st.WorldArt == nil {
+		t.Fatal("loadAll must initialise the artwork maps")
+	}
+	// A campaign with no assets resolves to an empty Art, not an error.
+	if got := st.gameArt("missing"); got.Banner != "" || got.Icon != "" {
+		t.Fatalf("missing campaign art = %+v, want empty", got)
+	}
 }

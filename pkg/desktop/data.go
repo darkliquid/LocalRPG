@@ -30,6 +30,29 @@ func loadAll(ctx context.Context, svc *gui.Service) *State {
 		st.Systems = []gui.SystemSummaryDTO{}
 	}
 
+	st.GameArt = make(map[string]Art, len(st.Games))
+	for _, game := range st.Games {
+		var art Art
+		if path, _, err := svc.GetGameAsset(game.ID, "banner"); err == nil {
+			art.Banner = path
+		}
+		if path, _, err := svc.GetGameAsset(game.ID, "icon"); err == nil {
+			art.Icon = path
+		}
+		st.GameArt[game.ID] = art
+	}
+	st.WorldArt = make(map[string]Art, len(st.Worlds))
+	for _, world := range st.Worlds {
+		var art Art
+		if path, _, err := svc.GetWorldAsset(world.ID, "banner"); err == nil {
+			art.Banner = path
+		}
+		if path, _, err := svc.GetWorldAsset(world.ID, "icon"); err == nil {
+			art.Icon = path
+		}
+		st.WorldArt[world.ID] = art
+	}
+
 	// Keep a selection that still exists; otherwise select the first campaign.
 	if st.SelectedGame() == nil {
 		st.Selected = ""

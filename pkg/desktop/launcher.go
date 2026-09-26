@@ -11,7 +11,7 @@ import (
 
 const (
 	dockWidth  = 72.0
-	heroHeight = 220.0
+	heroHeight = 300.0
 )
 
 // launcherView is the campaign launcher: a dock of campaigns, a hero panel for
@@ -51,7 +51,12 @@ func dockView(p ui.Palette) {
 					appState.Selected = game.ID
 				}
 				AssignAccess()
-				Label(initial(game.Name), FontSize(18), FontWeight(WeightBold), TextColorVec(p.Text))
+				art := appState.gameArt(game.ID)
+				if art.Icon != "" {
+					Image(art.Icon, Vec2{48, 48})
+				} else {
+					Label(initial(game.Name), FontSize(18), FontWeight(WeightBold), TextColorVec(p.Text))
+				}
 			})
 		}
 	})
@@ -65,6 +70,8 @@ func heroView(p ui.Palette) {
 			Label("Create one with the + button.", FontSize(13), TextColorVec(p.Muted))
 			return
 		}
+		art := appState.gameArt(game.ID)
+		artTile(p, art.Banner, initial(game.Name), heroHeight/2)
 		Label(game.Name, FontSize(28), FontWeight(WeightBold), TextColorVec(p.Text))
 		Label(appState.WorldName(game.WorldID)+" · "+appState.SystemName(game.SystemID), FontSize(14), TextColorVec(p.Muted))
 		Spacer(8)
@@ -103,6 +110,20 @@ func campaignListView(p ui.Palette) {
 	}
 }
 
+// artTile draws an image at a fixed height, preserving aspect ratio, or falls
+// back to a labelled tile when no file exists.
+func artTile(p ui.Palette, path, fallback string, height float32) {
+	Container(Attrs(Expand, FixHeight(height), Corners(8), Clip, BackgroundVec(p.Border)), func() {
+		if path != "" {
+			Image(path, Vec2{GetContentWidth(), height})
+			return
+		}
+		Container(Attrs(Expand, FixHeight(height), Center), func() {
+			Label(fallback, FontSize(height/3), FontWeight(WeightBold), TextColorVec(p.Muted))
+		})
+	})
+}
+
 // initial returns the first rune of a name for the dock tile.
 func initial(name string) string {
 	for _, r := range name {
@@ -111,6 +132,7 @@ func initial(name string) string {
 	return "?"
 }
 
+// turnLabel renders a turn count.
 func turnLabel(n int) string {
 	if n == 1 {
 		return "1 turn"

@@ -25,6 +25,30 @@ type State struct {
 	Screen Screen
 	// PendingWorld is the world chosen for a new campaign.
 	PendingWorld string
+
+	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
+	GameArt  map[string]Art
+	WorldArt map[string]Art
+}
+
+// Art holds the on-disk paths of a campaign's or world's banner and icon.
+type Art struct {
+	Banner string
+	Icon   string
+}
+
+func (s *State) gameArt(id string) Art {
+	if s.GameArt == nil {
+		return Art{}
+	}
+	return s.GameArt[id]
+}
+
+func (s *State) worldArt(id string) Art {
+	if s.WorldArt == nil {
+		return Art{}
+	}
+	return s.WorldArt[id]
 }
 
 // appState is read by views and replaced under the frame lock by the loader.
