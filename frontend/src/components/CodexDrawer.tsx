@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EntityMemory, EntityNote, EntitySummary, TTSConfig, VoiceProfile } from '../types';
-import { APIClient } from '../api/client';
-import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X, Loader2 } from 'lucide-react';
+import { EntityMemory, EntityNote, EntitySummary, TTSConfig, VoiceProfile, GenerationFailure } from '../types';
+import { APIClient, GenerationError } from '../api/client';
+import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X, Loader2, RotateCw, AlertCircle } from 'lucide-react';
+import { formatGenerationError } from '../lib/generationError';
 import { TurnHistoryList } from './TurnHistoryList';
 import { ImageLightbox } from './ImageLightbox';
 
@@ -45,6 +46,10 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const [previewProfileId, setPreviewProfileId] = useState('');
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
+  const [sidebarTab, setSidebarTab] = useState<'notes' | 'memories'>('notes');
+  const [portraitVersion, setPortraitVersion] = useState(0);
+  const [isRegeneratingPortrait, setIsRegeneratingPortrait] = useState(false);
+  const [portraitError, setPortraitError] = useState<GenerationFailure | null>(null);
 
   const profiles = voiceProfiles ?? [];
 
@@ -54,6 +59,8 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
     } else {
       setIsSidebarOpen(true);
     }
+    setPortraitVersion(0);
+    setPortraitError(null);
   }, [entity]);
 
   // The entity's memory timeline is read-only and fetched on selection.
@@ -163,17 +170,64 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
     }
   };
 
+  const handleRegeneratePortrait = () => {
+    if (!gameID || !entity || isRegeneratingPortrait) return;
+    setIsRegeneratingPortrait(true);
+    setPortraitError(null);
+    APIClient.regenerateCharacterPortrait(gameID, entity.id)
+      .then((dto) => {
+        const parsed = dto.generated_at ? Date.parse(dto.generated_at) : NaN;
+        setPortraitVersion(Number.isFinite(parsed) ? parsed : Date.now());
+      })
+      .catch((err: unknown) => {
+        setPortraitError(
+          err instanceof GenerationError
+            ? err.failure
+            : { code: 'provider_error', message: err instanceof Error ? err.message : String(err) }
+        );
+      })
+      .finally(() => setIsRegeneratingPortrait(false));
+  };
+
   const mergeCandidates = (entities ?? []).filter((candidate) => candidate.id !== entity?.id);
+
+  const portraitURL =
+    gameID && entity
+      ? `/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(entity.id)}/portrait${
+          portraitVersion ? `?v=${portraitVersion}` : ''
+        }`
+      : '';
 
   return (
     <div className="flex flex-col md:flex-row gap-4 h-full min-h-0 overflow-x-hidden">
       {/* Corpus browser: collapsible sidebar */}
       {isSidebarOpen && (
         <aside className="w-full md:w-72 shrink-0 flex flex-col gap-2 min-h-0 border-b md:border-b-0 md:border-r border-white/10 pb-4 md:pb-0 md:pr-4">
-          <div className="flex items-center justify-between pb-1">
-            <span className="text-xs font-sans text-stone-400 font-bold uppercase tracking-wider">
-              Notes ({entities?.length ?? 0})
-            </span>
+          <div className="flex items-center justify-between gap-2 pb-1">
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                onClick={() => setSidebarTab('notes')}
+                className={`text-[10px] font-sans font-bold uppercase tracking-wider px-2 py-1 rounded border transition-colors cursor-pointer ${
+                  sidebarTab === 'notes'
+                    ? 'bg-purple-600/30 border-purple-500/50 text-purple-200'
+                    : 'bg-black/40 border-white/10 text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                Notes ({entities?.length ?? 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSidebarTab('memories')}
+                className={`text-[10px] font-sans font-bold uppercase tracking-wider px-2 py-1 rounded border transition-colors cursor-pointer ${
+                  sidebarTab === 'memories'
+                    ? 'bg-purple-600/30 border-purple-500/50 text-purple-200'
+                    : 'bg-black/40 border-white/10 text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                Memories ({memories.length})
+              </button>
+            </div>
             {entity && (
               <button
                 onClick={() => setIsSidebarOpen(false)}
@@ -185,50 +239,83 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
             )}
           </div>
 
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-500" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search the codex..."
-              className="w-full bg-black/50 border border-white/10 rounded-lg pl-8 pr-2 py-1.5 text-xs text-stone-200 placeholder-stone-500 focus:outline-none focus:border-purple-500/60"
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-1">
-            <button
-              onClick={() => setTypeFilter('all')}
-              className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                typeFilter === 'all'
-                  ? 'bg-purple-600/30 border-purple-500/50 text-purple-200'
-                  : 'bg-black/40 border-white/10 text-stone-400 hover:text-stone-200'
-              }`}
-            >
-              all ({entities?.length ?? 0})
-            </button>
-            {types.map(([type, count]) => (
-              <button
-                key={type}
-                onClick={() => setTypeFilter(type)}
-                className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                  typeFilter === type
-                    ? 'bg-purple-600/30 border-purple-500/50 text-purple-200'
-                    : 'bg-black/40 border-white/10 text-stone-400 hover:text-stone-200'
-                }`}
-              >
-                {type} ({count})
-              </button>
-            ))}
-          </div>
-
-          {entity && memories.length > 0 && (
-            <div className="border-t border-white/10 pt-2">
-              <div className="text-[10px] font-sans text-stone-400 font-bold uppercase tracking-wider mb-1">
-                Memories
+          {sidebarTab === 'notes' && (
+            <>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-500" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search the codex..."
+                  className="w-full bg-black/50 border border-white/10 rounded-lg pl-8 pr-2 py-1.5 text-xs text-stone-200 placeholder-stone-500 focus:outline-none focus:border-purple-500/60"
+                />
               </div>
-              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                {memories.map((memory, index) => (
+
+              <div className="flex flex-wrap gap-1">
+                <button
+                  onClick={() => setTypeFilter('all')}
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                    typeFilter === 'all'
+                      ? 'bg-purple-600/30 border-purple-500/50 text-purple-200'
+                      : 'bg-black/40 border-white/10 text-stone-400 hover:text-stone-200'
+                  }`}
+                >
+                  all ({entities?.length ?? 0})
+                </button>
+                {types.map(([type, count]) => (
+                  <button
+                    key={type}
+                    onClick={() => setTypeFilter(type)}
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                      typeFilter === type
+                        ? 'bg-purple-600/30 border-purple-500/50 text-purple-200'
+                        : 'bg-black/40 border-white/10 text-stone-400 hover:text-stone-200'
+                    }`}
+                  >
+                    {type} ({count})
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex-1 min-h-[160px] overflow-y-auto space-y-1 pr-1">
+                {filtered.length === 0 ? (
+                  <p className="text-stone-500 text-xs italic p-2">
+                    {(entities?.length ?? 0) === 0 ? 'No notes yet. Play a turn and the world will grow.' : 'No notes match.'}
+                  </p>
+                ) : (
+                  filtered.map((candidate) => (
+                    <button
+                      key={candidate.id}
+                      onClick={() => {
+                        onSelect(candidate.id);
+                      }}
+                      className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors cursor-pointer ${
+                        entity?.id === candidate.id
+                          ? 'bg-purple-600/20 border-purple-500/40'
+                          : 'bg-black/30 border-white/5 hover:border-purple-500/30'
+                      }`}
+                    >
+                      <div className="text-xs text-stone-200 truncate font-medium">{candidate.name}</div>
+                      <div className="text-[10px] font-mono text-stone-500 truncate">
+                        {candidate.type || 'note'}
+                        {candidate.location ? ` · ${candidate.location.replace(/\[\[|\]\]/g, '')}` : ''}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+
+          {sidebarTab === 'memories' && (
+            <div className="flex-1 min-h-[160px] overflow-y-auto space-y-1 pr-1">
+              {!entity ? (
+                <p className="text-stone-500 text-xs italic p-2">Select a note to see its memories.</p>
+              ) : memories.length === 0 ? (
+                <p className="text-stone-500 text-xs italic p-2">No memories yet.</p>
+              ) : (
+                memories.map((memory, index) => (
                   <div
                     key={`${memory.turn}-${index}`}
                     className="text-[11px] text-stone-300 bg-black/30 border border-white/5 rounded px-2 py-1"
@@ -236,38 +323,10 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                     <span className="font-mono text-stone-500 mr-1">t{memory.turn}</span>
                     {memory.text}
                   </div>
-                ))}
-              </div>
+                ))
+              )}
             </div>
           )}
-
-          <div className="flex-1 min-h-[160px] overflow-y-auto space-y-1 pr-1">
-            {filtered.length === 0 ? (
-              <p className="text-stone-500 text-xs italic p-2">
-                {(entities?.length ?? 0) === 0 ? 'No notes yet. Play a turn and the world will grow.' : 'No notes match.'}
-              </p>
-            ) : (
-              filtered.map((candidate) => (
-                <button
-                  key={candidate.id}
-                  onClick={() => {
-                    onSelect(candidate.id);
-                  }}
-                  className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors cursor-pointer ${
-                    entity?.id === candidate.id
-                      ? 'bg-purple-600/20 border-purple-500/40'
-                      : 'bg-black/30 border-white/5 hover:border-purple-500/30'
-                  }`}
-                >
-                  <div className="text-xs text-stone-200 truncate font-medium">{candidate.name}</div>
-                  <div className="text-[10px] font-mono text-stone-500 truncate">
-                    {candidate.type || 'note'}
-                    {candidate.location ? ` · ${candidate.location.replace(/\[\[|\]\]/g, '')}` : ''}
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
         </aside>
       )}
 
@@ -293,20 +352,28 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                   </button>
                 )}
                 {entity.type === 'character' && gameID && (
-                  <div
-                    onClick={() => setLightbox({
-                      src: `/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(entity.id)}/portrait`,
-                      alt: entity.name,
-                    })}
-                    className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border-2 border-purple-500/30 shadow-lg bg-black/40 cursor-zoom-in transition-transform hover:scale-105"
-                    title={`View portrait of ${entity.name}`}
-                  >
-                    <img
-                      src={`/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(entity.id)}/portrait`}
-                      alt={entity.name}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div
+                      onClick={() => setLightbox({ src: portraitURL, alt: entity.name })}
+                      className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border-2 border-purple-500/30 shadow-lg bg-black/40 cursor-zoom-in transition-transform hover:scale-105"
+                      title={`View portrait of ${entity.name}`}
+                    >
+                      <img src={portraitURL} alt={entity.name} className="w-full h-full object-cover" loading="lazy" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRegeneratePortrait}
+                      disabled={isRegeneratingPortrait}
+                      className="p-1.5 rounded-lg bg-stone-900/80 border border-purple-500/30 text-purple-300 hover:text-purple-100 hover:border-purple-400 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Regenerate portrait"
+                      aria-label="Regenerate portrait"
+                    >
+                      {isRegeneratingPortrait ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RotateCw className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
                 )}
                 <div className="min-w-0">
@@ -343,6 +410,13 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                 {saveError
                   ? `Save failed: ${saveError}`
                   : 'This note could not be parsed. Fix its frontmatter, then save to restore it.'}
+              </div>
+            )}
+
+            {portraitError && (
+              <div className="text-xs rounded-lg border border-red-500/40 bg-red-950/40 text-red-200 px-3 py-2 flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                <span>{formatGenerationError(portraitError)}</span>
               </div>
             )}
 

@@ -114,6 +114,13 @@ type EntityDTO struct {	ID         string                 `json:"id"`
 	ParseError bool                   `json:"parse_error,omitempty"`
 }
 
+// CharacterPortraitDTO reports a freshly written portrait so the Codex can bust
+// its image cache without reloading the note.
+type CharacterPortraitDTO struct {
+	PortraitURL string `json:"portrait_url"`
+	GeneratedAt string `json:"generated_at"`
+}
+
 // MergeEntityRequestDTO names the note that should survive a merge.
 type MergeEntityRequestDTO struct {
 	Into string `json:"into"`

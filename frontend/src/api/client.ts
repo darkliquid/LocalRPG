@@ -15,6 +15,7 @@ import {
   GenerateCharacterResponse,
   GenerateTextRequest,
   GenerateTextResponse,
+  CharacterPortraitDTO,
   SystemDetail,
   CreateSystemRequest,
   WorldDetail,
@@ -169,6 +170,17 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    if (!res.ok) return throwGenerationError(res);
+    return res.json();
+  }
+
+  // regenerateCharacterPortrait asks the backend for a fresh portrait and
+  // returns its cache-busted URL.
+  static async regenerateCharacterPortrait(gameID: string, characterID: string): Promise<CharacterPortraitDTO> {
+    const res = await fetch(
+      `/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(characterID)}/portrait`,
+      { method: 'POST' }
+    );
     if (!res.ok) return throwGenerationError(res);
     return res.json();
   }

@@ -88,46 +88,98 @@ func (w *PortraitWorker) Enqueue(gameID string, ent *entity.Entity, artStyle str
 			w.mu.Unlock()
 		}()
 
-		prompt := BuildPortraitPrompt(entCopy.Name, entCopy.Gender, entCopy.Age, entCopy.Appearance, artStyle)
-		imgBytes, err := w.generator.GenerateImage(context.Background(), prompt)
-		if err != nil || len(imgBytes) == 0 {
-			return
-		}
-
-		ext := media.ArtExtension(imgBytes)
-		if ext == "" {
-			ext = ".png"
-		}
-		relPath := filepath.Join("assets", "portraits", entCopy.ID+ext)
-		fullPath := filepath.Join(w.resolver.GameDir(gameID), relPath)
-
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-			return
-		}
-		if err := os.WriteFile(fullPath, imgBytes, 0644); err != nil {
-			return
-		}
-
-		notePath := filepath.Join(w.resolver.GameDir(gameID), "entities", entCopy.ID+".md")
-		if existingData, err := os.ReadFile(notePath); err == nil {
-			if existingEnt, err := entity.ParseMarkdownEntity(existingData); err == nil {
-				existingEnt.Portrait = relPath
-				if data, err := existingEnt.SerializeMarkdown(); err == nil {
-					_ = os.WriteFile(notePath, data, 0644)
-					if w.store != nil {
-						_ = storage.NewSyncer(w.store).SyncFile(notePath)
-					}
-					return
-				}
-			}
-		}
-
-		entCopy.Portrait = relPath
-		if data, err := entCopy.SerializeMarkdown(); err == nil {
-			_ = os.WriteFile(notePath, data, 0644)
-			if w.store != nil {
-				_ = storage.NewSyncer(w.store).SyncFile(notePath)
-			}
-		}
+		_, _ = w.writePortrait(context.Background(), gameID, &entCopy, artStyle)
 	}()
+}
+
+// Regenerate generates a fresh portrait for ent regardless of any existing
+// Portrait value and returns the game-relative path written. Unlike Enqueue it
+// runs synchronously and reports failures so a caller can surface them.
+func (w *PortraitWorker) Regenerate(ctx context.Context, gameID string, ent *entity.Entity, artStyle string) (string, error) {
+	if w.generator == nil {
+		return "", fmt.Errorf("portrait generator is not configured")
+	}
+	if ent == nil || ent.ID == "" || ent.Type != "character" {
+		return "", fmt.Errorf("portrait regeneration requires a character entity")
+	}
+	return w.writePortrait(ctx, gameID, ent, artStyle)
+}
+
+// portraitExtensions are the file names a generated portrait may carry, used to
+// remove a stale clip when the provider changes format.
+var portraitExtensions = []string{".png", ".jpg", ".jpeg", ".webp", ".svg"}
+
+func (w *PortraitWorker) writePortrait(ctx context.Context, gameID string, ent *entity.Entity, artStyle string) (string, error) {
+	prompt := BuildPortraitPrompt(ent.Name, ent.Gender, ent.Age, ent.Appearance, artStyle)
+	imgBytes, err := w.generator.GenerateImage(ctx, prompt)
+	if err != nil {
+		return "", fmt.Errorf("generate portrait: %w", err)
+	}
+	if len(imgBytes) == 0 {
+		return "", fmt.Errorf("portrait generator returned no image")
+	}
+
+	ext := media.ArtExtension(imgBytes)
+	if ext == "" {
+		ext = ".png"
+	}
+	relPath := filepath.Join("assets", "portraits", ent.ID+ext)
+	fullPath := filepath.Join(w.resolver.GameDir(gameID), relPath)
+
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		return "", fmt.Errorf("create portrait dir: %w", err)
+	}
+	if err := os.WriteFile(fullPath, imgBytes, 0644); err != nil {
+		return "", fmt.Errorf("write portrait: %w", err)
+	}
+	w.removeStalePortraits(gameID, ent.ID, ext)
+
+	if err := w.updateNote(gameID, ent, relPath); err != nil {
+		return "", err
+	}
+	return relPath, nil
+}
+
+func (w *PortraitWorker) removeStalePortraits(gameID, id, keepExt string) {
+	dir := filepath.Join(w.resolver.GameDir(gameID), "assets", "portraits")
+	for _, ext := range portraitExtensions {
+		if ext == keepExt {
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, id+ext))
+	}
+}
+
+// updateNote writes the portrait path into the entity's note frontmatter,
+// preferring the on-disk note so a hand edit is not clobbered.
+func (w *PortraitWorker) updateNote(gameID string, ent *entity.Entity, relPath string) error {
+	notePath := filepath.Join(w.resolver.GameDir(gameID), "entities", ent.ID+".md")
+	if existingData, err := os.ReadFile(notePath); err == nil {
+		if existingEnt, err := entity.ParseMarkdownEntity(existingData); err == nil {
+			existingEnt.Portrait = relPath
+			if data, err := existingEnt.SerializeMarkdown(); err == nil {
+				if err := os.WriteFile(notePath, data, 0644); err != nil {
+					return fmt.Errorf("write note: %w", err)
+				}
+				if w.store != nil {
+					_ = storage.NewSyncer(w.store).SyncFile(notePath)
+				}
+				return nil
+			}
+		}
+	}
+
+	updated := *ent
+	updated.Portrait = relPath
+	data, err := updated.SerializeMarkdown()
+	if err != nil {
+		return fmt.Errorf("serialize note: %w", err)
+	}
+	if err := os.WriteFile(notePath, data, 0644); err != nil {
+		return fmt.Errorf("write note: %w", err)
+	}
+	if w.store != nil {
+		_ = storage.NewSyncer(w.store).SyncFile(notePath)
+	}
+	return nil
 }

@@ -292,6 +292,11 @@ export interface GenerateTextResponse {
   warning?: GenerationFailure;
 }
 
+export interface CharacterPortraitDTO {
+  portrait_url: string;
+  generated_at: string;
+}
+
 export interface SystemDetail {
   id: string;
   name: string;

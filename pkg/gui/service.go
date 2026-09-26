@@ -1425,6 +1425,76 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 	return svg, "image/svg+xml", nil
 }
 
+// RegenerateCharacterPortrait generates a fresh portrait for a character and
+// overwrites any existing one, returning a cache-busted URL.
+func (s *Service) RegenerateCharacterPortrait(ctx context.Context, gameID, characterID string) (CharacterPortraitDTO, error) {
+	s.ensureIndexed(gameID)
+	store, err := s.store(gameID)
+	if err != nil {
+		return CharacterPortraitDTO{}, err
+	}
+
+	ent, err := store.GetEntity(characterID)
+	if err != nil || ent == nil {
+		notePath := filepath.Join(s.resolver.GameDir(gameID), "entities", characterID+".md")
+		if data, readErr := os.ReadFile(notePath); readErr == nil {
+			if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
+				ent = parsed
+			}
+		}
+	}
+	if ent == nil {
+		return CharacterPortraitDTO{}, fmt.Errorf("character %q not found", characterID)
+	}
+	if ent.Type != "character" {
+		return CharacterPortraitDTO{}, &harness.GenerationFailure{
+			Code:    harness.FailureInvalidRequest,
+			Message: fmt.Sprintf("%q is not a character", characterID),
+		}
+	}
+
+	cfg := s.configMgr.Get()
+	if cfg.Media.Image.Type == "" || cfg.Media.Image.Type == "disabled" {
+		return CharacterPortraitDTO{}, &harness.GenerationFailure{
+			Code:    harness.FailureProviderUnavailable,
+			Message: "image generation is disabled or unconfigured",
+		}
+	}
+	client, err := imageClientFactory(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
+	if err != nil {
+		return CharacterPortraitDTO{}, &harness.GenerationFailure{
+			Code:    harness.FailureProviderUnavailable,
+			Message: fmt.Sprintf("image provider: %v", err),
+			Cause:   err,
+		}
+	}
+
+	provider := cfg.Media.Image.BuiltinName
+	if provider == "" {
+		provider = cfg.Media.Image.Type
+	}
+	started := time.Now()
+	ctx, span := startImageSpan(ctx, s.logger, "portrait")
+	defer span.End()
+
+	worker := engine.NewPortraitWorker(s.resolver, store, client)
+	if _, err := worker.Regenerate(ctx, gameID, ent, s.worldArtStyle(gameID)); err != nil {
+		failure := &harness.GenerationFailure{
+			Code:    harness.ClassifyProviderError(err),
+			Message: fmt.Sprintf("generate portrait: %v", err),
+			Cause:   err,
+		}
+		s.recordImage(ctx, span, "portrait", provider, 0, started, failure)
+		return CharacterPortraitDTO{}, failure
+	}
+	s.recordImage(ctx, span, "portrait", provider, 0, started, nil)
+
+	return CharacterPortraitDTO{
+		PortraitURL: fmt.Sprintf("/api/game/%s/character/%s/portrait?t=%d", gameID, characterID, time.Now().UnixNano()),
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+	}, nil
+}
+
 // worldArtStyle reads the art style and genre of the campaign's world, which keeps a
 // setting's imagery visually consistent.
 func (s *Service) worldArtStyle(gameID string) string {

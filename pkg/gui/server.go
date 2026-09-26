@@ -462,16 +462,30 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		characterID := parts[2]
-		if len(parts) >= 4 && parts[3] == "portrait" && r.Method == http.MethodGet {
-			data, contentType, err := s.service.GetCharacterPortrait(r.Context(), gameID, characterID)
-			if err != nil {
-				writeGameError(w, err)
+		if len(parts) >= 4 && parts[3] == "portrait" {
+			if r.Method == http.MethodPost {
+				dto, err := s.service.RegenerateCharacterPortrait(r.Context(), gameID, characterID)
+				if err != nil {
+					if writeGenerationFailure(w, err) {
+						return
+					}
+					writeGameError(w, err)
+					return
+				}
+				writeJSON(w, dto)
 				return
 			}
-			w.Header().Set("Content-Type", contentType)
-			w.Header().Set("Cache-Control", "no-cache")
-			_, _ = w.Write(data)
-			return
+			if r.Method == http.MethodGet {
+				data, contentType, err := s.service.GetCharacterPortrait(r.Context(), gameID, characterID)
+				if err != nil {
+					writeGameError(w, err)
+					return
+				}
+				w.Header().Set("Content-Type", contentType)
+				w.Header().Set("Cache-Control", "no-cache")
+				_, _ = w.Write(data)
+				return
+			}
 		}
 		http.NotFound(w, r)
 		return

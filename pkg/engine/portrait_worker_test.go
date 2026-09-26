@@ -99,3 +99,52 @@ func TestPortraitWorker_Enqueue(t *testing.T) {
 		t.Errorf("expected portrait path to be updated in entity note, got: %s", parsed.Portrait)
 	}
 }
+
+func TestPortraitWorker_RegenerateOverwritesExisting(t *testing.T) {
+	tmpDir := t.TempDir()
+	resolver := core.NewPathResolver(tmpDir)
+	gameID := "regen-game"
+	gameDir := resolver.GameDir(gameID)
+	entitiesDir := filepath.Join(gameDir, "entities")
+	if err := os.MkdirAll(entitiesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	portraitsDir := filepath.Join(gameDir, "assets", "portraits")
+	if err := os.MkdirAll(portraitsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	char := &entity.Entity{
+		ID: "elena", Name: "Elena", Type: "character",
+		Gender: "female", Age: "28", Appearance: "Silver hair",
+		Portrait: filepath.Join("assets", "portraits", "elena.jpg"),
+	}
+	data, err := char.SerializeMarkdown()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(entitiesDir, "elena.md"), data, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(portraitsDir, "elena.jpg"), []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	pngBytes := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00}
+	gen := &mockPortraitGenerator{returnBytes: pngBytes}
+	worker := NewPortraitWorker(resolver, nil, gen)
+
+	relPath, err := worker.Regenerate(context.Background(), gameID, char, "oil painting")
+	if err != nil {
+		t.Fatalf("Regenerate failed: %v", err)
+	}
+	if relPath != filepath.Join("assets", "portraits", "elena.png") {
+		t.Fatalf("relPath = %q, want elena.png", relPath)
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, relPath)); err != nil {
+		t.Fatalf("expected the new portrait on disk: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(portraitsDir, "elena.jpg")); !os.IsNotExist(err) {
+		t.Fatalf("expected the stale .jpg to be removed, stat err = %v", err)
+	}
+}
