@@ -12,6 +12,7 @@ require (
 	github.com/pion/opus v0.1.1-0.20260923000601-86ced7318333
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/wailsapp/wails/v3 v3.0.0-beta.24
+	github.com/yuin/goldmark v1.7.16
 	go.hasen.dev/shirei v0.8.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0
 	go.opentelemetry.io/otel v1.46.0
