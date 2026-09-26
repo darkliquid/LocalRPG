@@ -5,9 +5,28 @@ import (
 	"testing"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/gui"
 	"github.com/darkliquid/localrpg/pkg/ui"
 )
+
+func TestCharacterSubmitFieldsUsesSystemFields(t *testing.T) {
+	appState = &State{
+		CharacterFields: []core.CharacterCreationField{
+			{ID: "name", Label: "Name"},
+			{ID: "class", Label: "Class", Kind: "select"},
+			{ID: "voice", Label: "Voice", Kind: "voice"},
+		},
+		CharacterAnswers: map[string]string{"name": "Vance", "class": "Rogue", "voice": "af_bella"},
+	}
+	got := characterSubmitFields()
+	if got["name"] != "Vance" || got["class"] != "Rogue" {
+		t.Fatalf("answers = %#v", got)
+	}
+	if _, ok := got["voice"]; ok {
+		t.Fatal("voice fields must not be submitted as character text")
+	}
+}
 
 func TestNewCampaignSnapshot(t *testing.T) {
 	appState = &State{

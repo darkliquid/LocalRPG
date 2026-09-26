@@ -64,6 +64,10 @@ type State struct {
 	FormBannerPreview string
 	FormIconPreview   string
 
+	// Character creation, driven by the chosen system.
+	CharacterFields  []core.CharacterCreationField
+	CharacterAnswers map[string]string
+
 	// Chronicle state.
 	OpenGame      string
 	Turns         []gui.TurnDTO

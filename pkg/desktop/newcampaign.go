@@ -8,6 +8,7 @@ import (
 	. "go.hasen.dev/shirei"
 	. "go.hasen.dev/shirei/widgets"
 
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/gui"
 	"github.com/darkliquid/localrpg/pkg/ui"
 )
@@ -85,6 +86,7 @@ func newCampaignView() {
 					NextAccessName("new-campaign.system." + system.ID)
 					if PressAction() {
 						newForm.SystemID = system.ID
+						loadCharacterFields(system.ID)
 					}
 					AssignAccess()
 					Label(system.Name, FontSize(14), TextColorVec(p.Text))
@@ -98,6 +100,8 @@ func newCampaignView() {
 		TextInput(&newForm.PlayerName)
 		Label("Opening prompt", FontSize(13), FontWeight(WeightBold), TextColorVec(p.Muted))
 		TextInput(&newForm.Opening)
+
+		characterForm(p)
 
 		Label("Artwork", FontSize(13), FontWeight(WeightBold), TextColorVec(p.Muted))
 		Container(Attrs(Row, CrossMid, Gap(10)), func() {
@@ -189,6 +193,94 @@ func saveFormAssets(ctx context.Context, svc *gui.Service, gameID string) {
 	}
 }
 
+// loadCharacterFields pulls the chosen system's character-creation spec.
+func loadCharacterFields(systemID string) {
+	svc := liveService
+	if svc == nil || systemID == "" {
+		return
+	}
+	go func() {
+		detail := loadSystemDetail(context.Background(), svc, systemID)
+		var fields []core.CharacterCreationField
+		if detail != nil {
+			fields = detail.CharacterCreation.Fields
+		}
+		WithFrameLock(func() {
+			appState.CharacterFields = fields
+			if appState.CharacterAnswers == nil {
+				appState.CharacterAnswers = map[string]string{}
+			}
+		})
+		RequestNextFrame()
+	}()
+}
+
+// characterSubmitFields returns the system answers, excluding voice fields
+// which carry a voice profile rather than text.
+func characterSubmitFields() map[string]string {
+	out := map[string]string{}
+	for _, field := range appState.CharacterFields {
+		if field.Kind == "voice" {
+			continue
+		}
+		if value, ok := appState.CharacterAnswers[field.ID]; ok && value != "" {
+			out[field.ID] = value
+		}
+	}
+	return out
+}
+
+// characterForm renders the system-driven fields.
+func characterForm(p ui.Palette) {
+	if len(appState.CharacterFields) == 0 {
+		return
+	}
+	if appState.CharacterAnswers == nil {
+		appState.CharacterAnswers = map[string]string{}
+	}
+	Label("Character", FontSize(13), FontWeight(WeightBold), TextColorVec(p.Muted))
+	for _, field := range appState.CharacterFields {
+		field := field
+		Label(field.Label, FontSize(12), TextColorVec(p.Muted))
+		value := appState.CharacterAnswers[field.ID]
+		switch field.Kind {
+		case "voice":
+			MenuButton(NoIcon, voiceLabel(value), func() {
+				for _, voice := range appState.VoiceProfiles {
+					voice := voice
+					if MenuItem(NoIcon, voice.Name) {
+						appState.CharacterAnswers[field.ID] = voice.ID
+					}
+				}
+			})
+		case "long":
+			TextArea(&value)
+		case "select":
+			MenuButton(NoIcon, selectLabel(value), func() {
+				for _, option := range field.Options {
+					option := option
+					if MenuItem(NoIcon, option) {
+						appState.CharacterAnswers[field.ID] = option
+					}
+				}
+			})
+		default:
+			TextInput(&value)
+		}
+		if appState.CharacterAnswers[field.ID] == "" && field.Default != "" {
+			appState.CharacterAnswers[field.ID] = field.Default
+		}
+		appState.CharacterAnswers[field.ID] = value
+	}
+}
+
+func selectLabel(value string) string {
+	if value == "" {
+		return "(choose)"
+	}
+	return value
+}
+
 func submitCreate() {
 	req := gui.CreateGameRequestDTO{
 		Name:          newForm.Name,
@@ -196,6 +288,7 @@ func submitCreate() {
 		SystemID:      newForm.SystemID,
 		PlayerName:    newForm.PlayerName,
 		OpeningPrompt: newForm.Opening,
+		Player:        gui.PlayerCharacterDTO{Extra: characterSubmitFields()},
 	}
 	svc := liveService
 	if createGame == nil || svc == nil {
