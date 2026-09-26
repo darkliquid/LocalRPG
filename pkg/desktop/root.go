@@ -15,6 +15,8 @@ func RootView() {
 		systemsStudioView()
 	case ScreenWorldsStudio:
 		worldsStudioView()
+	case ScreenTheater:
+		theaterScreen()
 	default:
 		launcherView()
 	}

@@ -41,7 +41,16 @@ func chronicleView() {
 				ScrollOnInput()
 				ScrollBars()
 				Container(Attrs(Expand, Pad(20), Gap(12)), func() {
-					drawerToolbar(p)
+					Container(Attrs(Row, CrossMid, Gap(10)), func() {
+		Label(appState.GameName(), FontSize(15), FontWeight(WeightBold), TextColorVec(p.Text))
+		Filler(1)
+		NextAccessName("chronicle.theater")
+		if Button(NoIcon, "Theater") {
+			openTheater()
+		}
+		AssignAccess()
+	})
+	drawerToolbar(p)
 					if len(appState.Turns) == 0 {
 						prologuePanel()
 						return

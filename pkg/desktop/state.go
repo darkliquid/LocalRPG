@@ -21,6 +21,7 @@ const (
 	ScreenSettings
 	ScreenSystemsStudio
 	ScreenWorldsStudio
+	ScreenTheater
 )
 
 // Selection identifies the studio's current item: a saved record or a local
@@ -159,6 +160,12 @@ type State struct {
 	WorldSaved     bool
 	WorldTab       string
 	WorldEntityID  string
+
+	// Live theatre.
+	TheaterTurn    int
+	TheaterBeat    int
+	TheaterPlaying bool
+	TheaterSpeed   float64
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
