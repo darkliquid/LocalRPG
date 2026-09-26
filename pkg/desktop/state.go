@@ -57,6 +57,8 @@ type State struct {
 	PendingAction string
 	ToolActivity  string
 	TurnError     string
+	ConsoleMode   string
+	ConsoleText   string
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art

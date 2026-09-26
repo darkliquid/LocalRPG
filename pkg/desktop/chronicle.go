@@ -35,7 +35,7 @@ func chronicleView() {
 		ScrollBars()
 		Container(Attrs(Expand, Pad(20), Gap(12)), func() {
 			if len(appState.Turns) == 0 {
-				Label("The story has not begun yet.", FontSize(14), TextColorVec(p.Muted))
+				prologuePanel()
 				return
 			}
 			prevLocation := ""
@@ -48,6 +48,7 @@ func chronicleView() {
 			if appState.TurnInFlight {
 				inFlightView(p)
 			}
+			actionConsole()
 		})
 	})
 }
