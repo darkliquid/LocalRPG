@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"image"
-	"image/png"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/scene"
+	"github.com/darkliquid/localrpg/pkg/theater"
 )
 
 // VideoPipeline renders a script to a video file.
@@ -49,9 +48,10 @@ func (v *VideoPipeline) SetStill(still bool) { v.still = still }
 
 // frameWriter renders a script's frames into a directory as PNGs.
 type frameWriter struct {
-	renderer *scene.Renderer
 	dir      string
 	fps      int
+	width    int
+	height   int
 	still    bool
 	progress func(format string, args ...any)
 }
@@ -59,60 +59,33 @@ type frameWriter struct {
 // write renders every beat's frames in order, numbering them so FFmpeg can read
 // the directory as a sequence.
 func (w *frameWriter) write(script *scene.Script) (int, error) {
-	number := 0
-	previousArt := ""
-
-	for i := range script.Scenes {
-		sc := script.Scenes[i]
-
-		for _, beat := range sc.Beats {
-			frames := scene.FramesFor(beat.Duration, w.fps)
-			if w.still {
-				frames = 1
-			}
-
-			for f := 0; f < frames; f++ {
-				progress := 1.0
-				if frames > 1 {
-					progress = float64(f) / float64(frames-1)
-				}
-
-				img := w.renderer.Frame(scene.FrameRequest{
-					Scene:       sc,
-					Beat:        beat,
-					Progress:    progress,
-					PreviousArt: previousArt,
-				})
-
-				path := filepath.Join(w.dir, fmt.Sprintf("frame-%06d.png", number))
-				if err := writePNG(path, img); err != nil {
+	if w.still {
+		number := 0
+		for si := range script.Scenes {
+			for bi := range script.Scenes[si].Beats {
+				frame := theater.Frame{Script: script, SceneIdx: si, BeatIdx: bi, Progress: 1}
+				if err := w.writeFrame(number, frame); err != nil {
 					return 0, err
 				}
 				number++
 			}
 		}
+		return number, nil
+	}
 
-		previousArt = sc.ArtPath
-		if w.progress != nil {
-			w.progress("rendered scene %d/%d", i+1, len(script.Scenes))
+	total := theater.FrameCount(script, w.fps)
+	for number := 0; number < total; number++ {
+		if err := w.writeFrame(number, theater.BeatProgress(script, number, w.fps)); err != nil {
+			return 0, err
 		}
 	}
-
-	return number, nil
+	return total, nil
 }
 
-// writePNG encodes one frame. BestSpeed matters here: a 1080p frame is slow to
-// compress, and the file size is irrelevant beside x264's encoding time.
-func writePNG(path string, img image.Image) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("create frame %q: %w", path, err)
-	}
-	defer file.Close()
-
-	encoder := png.Encoder{CompressionLevel: png.BestSpeed}
-	if err := encoder.Encode(file, img); err != nil {
-		return fmt.Errorf("encode frame %q: %w", path, err)
+func (w *frameWriter) writeFrame(number int, frame theater.Frame) error {
+	path := filepath.Join(w.dir, fmt.Sprintf("frame-%06d.png", number))
+	if err := theater.WriteFramePNG(path, frame, w.width, w.height); err != nil {
+		return fmt.Errorf("write frame %q: %w", path, err)
 	}
 	return nil
 }
@@ -186,11 +159,6 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 		return fmt.Errorf("ffmpeg is required for video export: %w", err)
 	}
 
-	renderer, err := scene.NewRenderer(v.width, v.height)
-	if err != nil {
-		return fmt.Errorf("build renderer: %w", err)
-	}
-
 	framesDir, err := os.MkdirTemp("", "localrpg-frames-")
 	if err != nil {
 		return fmt.Errorf("create frames dir: %w", err)
@@ -198,9 +166,10 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 	defer os.RemoveAll(framesDir)
 
 	writer := &frameWriter{
-		renderer: renderer,
 		dir:      framesDir,
 		fps:      v.fps,
+		width:    v.width,
+		height:   v.height,
 		still:    v.still,
 		progress: func(format string, args ...any) {
 			fmt.Fprintf(os.Stderr, "export: "+format+"\n", args...)

@@ -31,13 +31,8 @@ func smallScript() *scene.Script {
 }
 
 func TestFrameWriterRendersOneFramePerBeatWhenStill(t *testing.T) {
-	renderer, err := scene.NewRenderer(160, 90)
-	if err != nil {
-		t.Fatalf("NewRenderer failed: %v", err)
-	}
-
 	dir := t.TempDir()
-	writer := &frameWriter{renderer: renderer, dir: dir, fps: 5, still: true}
+	writer := &frameWriter{dir: dir, fps: 5, width: 160, height: 90, still: true}
 
 	count, err := writer.write(smallScript())
 	if err != nil {
@@ -63,13 +58,8 @@ func TestFrameWriterRendersOneFramePerBeatWhenStill(t *testing.T) {
 }
 
 func TestFrameWriterFollowsPacingWhenAnimating(t *testing.T) {
-	renderer, err := scene.NewRenderer(64, 36)
-	if err != nil {
-		t.Fatalf("NewRenderer failed: %v", err)
-	}
-
 	dir := t.TempDir()
-	writer := &frameWriter{renderer: renderer, dir: dir, fps: 10}
+	writer := &frameWriter{dir: dir, fps: 10, width: 64, height: 36}
 
 	count, err := writer.write(smallScript())
 	if err != nil {
