@@ -43,8 +43,14 @@ func Run(cfg Config) error {
 
 	if cfg.Service != nil {
 		liveService = cfg.Service
-		createGame = func(ctx context.Context, svc *gui.Service, req gui.CreateGameRequestDTO) error {
-			_, err := svc.CreateGame(ctx, req)
+		createGame = func(ctx context.Context, svc *gui.Service, req gui.CreateGameRequestDTO) (*gui.GameSummaryDTO, error) {
+			return svc.CreateGame(ctx, req)
+		}
+		generatePreview = func(ctx context.Context, svc *gui.Service, req gui.GenerateAssetPreviewRequestDTO) ([]byte, string, error) {
+			return svc.GenerateAssetPreview(ctx, req)
+		}
+		saveAsset = func(ctx context.Context, svc *gui.Service, gameID, kind string, data []byte, ext string) error {
+			_, err := svc.SaveGameAsset(gameID, kind, data, ext)
 			return err
 		}
 		saveGameSettings = func(ctx context.Context, svc *gui.Service, gameID string, patch map[string]any) error {
@@ -60,6 +66,8 @@ func Run(cfg Config) error {
 	} else {
 		liveService = nil
 		createGame = nil
+		generatePreview = nil
+		saveAsset = nil
 		saveGameSettings = nil
 		restartGame = nil
 		deleteGame = nil

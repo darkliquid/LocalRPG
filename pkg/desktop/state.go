@@ -44,6 +44,10 @@ type State struct {
 	SettingsConfirm bool
 	VoiceProfiles   []config.VoiceProfile
 
+	// FormBannerPreview and FormIconPreview are temp PNGs for the create form.
+	FormBannerPreview string
+	FormIconPreview   string
+
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
 	WorldArt map[string]Art

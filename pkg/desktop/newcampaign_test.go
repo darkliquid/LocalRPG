@@ -3,6 +3,7 @@ package desktop
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/gui"
 	"github.com/darkliquid/localrpg/pkg/ui"
@@ -22,12 +23,14 @@ func TestNewCampaignSnapshot(t *testing.T) {
 
 func TestNewCampaignCreateInvokesCallback(t *testing.T) {
 	appState = &State{Loaded: true, Screen: ScreenNewCampaign, PendingWorld: "realm"}
-	liveService = nil
+	liveService = gui.NewService(t.TempDir())
+	t.Cleanup(func() { liveService = nil })
 	newForm = newCampaignForm{Name: "Test", PlayerName: "Hero", SystemID: "dnd5e"}
+
 	called := false
-	createGame = func(context.Context, *gui.Service, gui.CreateGameRequestDTO) error {
+	createGame = func(context.Context, *gui.Service, gui.CreateGameRequestDTO) (*gui.GameSummaryDTO, error) {
 		called = true
-		return nil
+		return &gui.GameSummaryDTO{ID: "test"}, nil
 	}
 	t.Cleanup(func() { createGame = nil })
 
@@ -35,8 +38,29 @@ func TestNewCampaignCreateInvokesCallback(t *testing.T) {
 	if appState.Screen != ScreenLauncher {
 		t.Fatal("submitCreate must return to the launcher")
 	}
+	deadline := time.Now().Add(time.Second)
+	for !called && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
 	if !called {
-		// With no service the callback is not invoked: documented snapshot path.
-		t.Log("no live service; create callback not invoked (expected for the snapshot path)")
+		t.Fatal("create callback was not invoked")
+	}
+}
+
+func TestPreviewGenerationStoresTempFile(t *testing.T) {
+	appState = &State{Loaded: true, PendingWorld: "realm"}
+	liveService = gui.NewService(t.TempDir())
+	t.Cleanup(func() { liveService = nil })
+
+	generatePreview = func(context.Context, *gui.Service, gui.GenerateAssetPreviewRequestDTO) ([]byte, string, error) {
+		return []byte{0x89, 'P', 'N', 'G'}, "image/png", nil
+	}
+	t.Cleanup(func() { generatePreview = nil })
+
+	if err := generateFormPreview(context.Background(), liveService, "banner"); err != nil {
+		t.Fatalf("generateFormPreview: %v", err)
+	}
+	if appState.FormBannerPreview == "" {
+		t.Fatal("expected a preview path to be stored")
 	}
 }
