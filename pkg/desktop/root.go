@@ -8,4 +8,5 @@ func RootView() {
 	default:
 		launcherView()
 	}
+	lightbox()
 }

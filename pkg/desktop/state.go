@@ -26,6 +26,9 @@ type State struct {
 	// PendingWorld is the world chosen for a new campaign.
 	PendingWorld string
 
+	// LightboxPath is the image shown full-window, or empty.
+	LightboxPath string
+
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
 	WorldArt map[string]Art

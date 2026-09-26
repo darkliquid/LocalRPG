@@ -115,6 +115,9 @@ func campaignListView(p ui.Palette) {
 func artTile(p ui.Palette, path, fallback string, height float32) {
 	Container(Attrs(Expand, FixHeight(height), Corners(8), Clip, BackgroundVec(p.Border)), func() {
 		if path != "" {
+			if IsClicked() {
+				appState.LightboxPath = path
+			}
 			Image(path, Vec2{GetContentWidth(), height})
 			return
 		}
