@@ -80,6 +80,9 @@ func Run(cfg Config) error {
 			_, err := svc.SaveSettings(ctx, cfg)
 			return err
 		}
+		testProvider = func(ctx context.Context, svc *gui.Service, req gui.TestProviderRequestDTO) (*gui.TestProviderResponseDTO, error) {
+			return svc.TestProvider(ctx, req)
+		}
 	} else {
 		liveService = nil
 		createGame = nil
@@ -93,6 +96,7 @@ func Run(cfg Config) error {
 		mergeEntities = nil
 		portraitPath = nil
 		saveSettings = nil
+		testProvider = nil
 	}
 
 	if cfg.PNGPath != "" {

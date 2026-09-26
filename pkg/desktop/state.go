@@ -5,6 +5,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/gui"
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
 // Screen identifies which top-level view the shell renders.
@@ -96,6 +97,11 @@ type State struct {
 	ConfigIsOverride bool
 	SettingsSaved    bool
 	SettingsTab      string
+
+	// Providers / agents settings.
+	Providers    []provider.Descriptor
+	SelectedRole string
+	TestResult   *gui.TestProviderResponseDTO
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art

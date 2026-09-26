@@ -31,7 +31,10 @@ func openGlobalSettings() {
 		return
 	}
 	go func() {
-		loadSettings(context.Background(), svc)
+		ctx := context.Background()
+		loadSettings(ctx, svc)
+		providers := loadProviders(ctx, svc)
+		WithFrameLock(func() { appState.Providers = providers })
 		RequestNextFrame()
 	}()
 }
@@ -123,6 +126,10 @@ func settingsView() {
 		switch settingsTab() {
 		case "paths":
 			settingsPaths(p)
+		case "providers":
+			settingsProviders(p)
+		case "agents":
+			settingsAgents(p)
 		case "preferences":
 			settingsPreferences(p)
 		case "debug":

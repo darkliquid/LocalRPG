@@ -6,6 +6,7 @@ import (
 	"go.hasen.dev/shirei"
 
 	"github.com/darkliquid/localrpg/pkg/gui"
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
 // loadAll reads the launcher data from the service. Directory-level failures
@@ -88,6 +89,15 @@ func loadMemories(svc *gui.Service, gameID, entityID string) []gui.MemoryDTO {
 		return []gui.MemoryDTO{}
 	}
 	return memories
+}
+
+// loadProviders reads the registered provider catalogue.
+func loadProviders(ctx context.Context, svc *gui.Service) []provider.Descriptor {
+	catalog, err := svc.ListProviders(ctx)
+	if err != nil || catalog == nil {
+		return nil
+	}
+	return catalog.Providers
 }
 
 // loadWorld reads the campaign state and recap.
