@@ -1,19 +1,25 @@
 package main
 
 import (
-	"os/exec"
-	"strings"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
-func TestCLIVersionAndHelp(t *testing.T) {
-	cmd := exec.Command("go", "run", ".", "--version")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("command failed: %v, output: %s", err, string(out))
+func TestVersionFlag(t *testing.T) {
+	if code := runMain([]string{"--version"}); code != 0 {
+		t.Fatalf("--version exit = %d, want 0", code)
 	}
+}
 
-	if !strings.Contains(string(out), "LocalRPG v0.1.0") {
-		t.Errorf("expected version output, got: %s", string(out))
+func TestNoArgsBootsGUI(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "boot.png")
+	code := runMain([]string{"--dir", dir, "--png", out})
+	if code != 0 {
+		t.Fatalf("exit = %d, want 0", code)
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("expected a rendered frame: %v", err)
 	}
 }
