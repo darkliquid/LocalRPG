@@ -55,6 +55,8 @@ type State struct {
 	Prose         string
 	TurnInFlight  bool
 	PendingAction string
+	ToolActivity  string
+	TurnError     string
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
