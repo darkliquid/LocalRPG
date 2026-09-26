@@ -26,6 +26,7 @@ interface ChronicleViewProps {
   streamedProse?: string;
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
   turnAudioStatus?: Record<number, { state: TurnAudioState; message?: string }>;
+  segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
@@ -41,6 +42,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   streamedProse,
   displayMode,
   turnAudioStatus = {},
+  segmentAudioStatus = {},
 }) => {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const { lightbox, openLightbox, closeLightbox } = useLightbox();
@@ -142,6 +144,8 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 onStopTurn={onStopAudio}
                 turnAudioState={audioStatus?.state}
                 turnAudioMessage={audioStatus?.message}
+                turnNumber={turn.turn_number}
+                segmentAudioStatus={segmentAudioStatus}
               />
 
               {turn.rejected && (

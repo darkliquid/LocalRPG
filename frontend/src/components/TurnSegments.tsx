@@ -4,6 +4,10 @@ import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { MarkdownProse } from './MarkdownProse';
 import { ImageLightbox } from './ImageLightbox';
 import { Play, Square, RotateCw, Loader2 } from 'lucide-react';
+import { SegmentAudioControls } from './SegmentAudioControls';
+
+export const segmentAudioKey = (turnNumber: number, segmentIndex: number): string =>
+  `${turnNumber}:${segmentIndex}`;
 
 export type TurnAudioState = 'idle' | 'generating' | 'playing' | 'error';
 
@@ -21,6 +25,8 @@ interface TurnSegmentsProps {
   // Managed externally by App when serverPlayback is true
   turnAudioState?: TurnAudioState;
   turnAudioMessage?: string;
+  turnNumber?: number;
+  segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
 }
 
@@ -35,11 +41,13 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   onStopTurn,
   turnAudioState = 'idle',
   turnAudioMessage,
+  turnNumber,
+  segmentAudioStatus,
   displayMode = 'stage_directions',
 }) => {
   const ordered = segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: fallback }];
   const hasAudio = (segments ?? []).some((segment) => !!segment.audio_url);
-  const { playing, blocked, play, playFrom, stop } = useSegmentPlayback(
+  const { playing, blocked, playingIndex, play, playFrom, regenerateFrom, stop } = useSegmentPlayback(
     segments,
     autoPlay && hasAudio && !serverPlayback,
     volume
@@ -52,6 +60,28 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   const isPlaying = turnAudioState === 'playing';
   const isError = turnAudioState === 'error';
 
+  const segmentState = (index: number): { state: TurnAudioState; message?: string } => {
+    if (serverPlayback) {
+      const key = turnNumber !== undefined ? segmentAudioKey(turnNumber, index) : '';
+      return segmentAudioStatus?.[key] ?? { state: 'idle' };
+    }
+    return playingIndex === index ? { state: 'playing' } : { state: 'idle' };
+  };
+
+  const segmentControls = (index: number) => {
+    if (!ordered[index]?.audio_url) return null;
+    const status = segmentState(index);
+    return (
+      <SegmentAudioControls
+        state={status.state}
+        message={status.message}
+        onPlay={() => (serverPlayback ? startServerPlayback(index) : playFrom(index))}
+        onStop={() => (serverPlayback ? stopServerPlayback() : stop())}
+        onRegenerate={() => (serverPlayback ? startServerPlayback(index, true) : regenerateFrom(index))}
+      />
+    );
+  };
+
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
 
   return (
@@ -60,10 +90,11 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
         segment.kind === 'speech' ? (
           <div
             key={i}
-            className={`bg-glass-card border-l-4 pl-4 py-3 pr-4 rounded-r-xl shadow-lg space-y-2 ${
+            className={`group relative bg-glass-card border-l-4 pl-4 py-3 pr-4 rounded-r-xl shadow-lg space-y-2 ${
               segment.player ? 'border-sky-400/90' : 'border-purple-500/90'
             }`}
           >
+            {segmentControls(i)}
             <div className="flex items-center gap-3">
               {segment.portrait_url && (
                 <div
@@ -110,13 +141,15 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             />
           </div>
         ) : (
-          <MarkdownProse
-            key={i}
-            text={segment.text}
-            onEntityClick={onEntityClick}
-            displayMode={displayMode}
-            className="text-stone-200 text-xl leading-relaxed tracking-wide font-serif space-y-4"
-          />
+          <div key={i} className="group relative">
+            {segmentControls(i)}
+            <MarkdownProse
+              text={segment.text}
+              onEntityClick={onEntityClick}
+              displayMode={displayMode}
+              className="text-stone-200 text-xl leading-relaxed tracking-wide font-serif space-y-4"
+            />
+          </div>
         )
       )}
 

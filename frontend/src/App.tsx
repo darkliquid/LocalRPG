@@ -3,7 +3,7 @@ import { APIClient, HTTPError } from './api/client';
 import { GameState, Turn, EntityNote, EntitySummary, Recap, GraphData, AppConfig } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
-import { TurnAudioState } from './components/TurnSegments';
+import { TurnAudioState, segmentAudioKey } from './components/TurnSegments';
 import { ActionConsole } from './components/ActionConsole';
 import { Drawers } from './components/Drawers';
 import { CharacterSheetDrawer } from './components/CharacterSheetDrawer';
@@ -66,6 +66,8 @@ export const App: React.FC = () => {
   const [serverAudio, setServerAudio] = useState(false);
   // Per-turn audio status: generating → playing → idle (or error)
   const [turnAudioStatus, setTurnAudioStatus] = useState<Record<number, { state: TurnAudioState; message?: string }>>({});
+  // Per-segment audio status, keyed `${turn}:${index}`.
+  const [segmentAudioStatus, setSegmentAudioStatus] = useState<Record<string, { state: TurnAudioState; message?: string }>>({});
 
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
@@ -284,50 +286,61 @@ export const App: React.FC = () => {
     document.getElementById('action-console-input')?.focus();
   };
 
-  const audioPollingRef = useRef<Record<number, ReturnType<typeof setInterval>>>({});
+  const audioPollingRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
   const handlePlayTurnAudio = (turnNumber: number, segmentIndex?: number, force = false) => {
     if (!activeGameID) return;
+    const key = segmentIndex === undefined ? null : segmentAudioKey(turnNumber, segmentIndex);
+    const setStatus = (entry: { state: TurnAudioState; message?: string }) => {
+      if (key === null) {
+        setTurnAudioStatus((prev) => ({ ...prev, [turnNumber]: entry }));
+      } else {
+        setSegmentAudioStatus((prev) => ({ ...prev, [key]: entry }));
+      }
+    };
+
     // Transition to 'generating' immediately so the spinner shows
-    setTurnAudioStatus((prev) => ({ ...prev, [turnNumber]: { state: 'generating' } }));
+    setStatus({ state: 'generating' });
 
     const call = segmentIndex === undefined
       ? APIClient.playTurnAudio(activeGameID, turnNumber, force)
       : APIClient.playSegmentAudio(activeGameID, turnNumber, segmentIndex, force);
 
+    const pollKey = key ?? `turn:${turnNumber}`;
+
     call
       .then(() => {
-        setTurnAudioStatus((prev) => ({ ...prev, [turnNumber]: { state: 'playing' } }));
+        setStatus({ state: 'playing' });
         // Poll until server reports playback finished
         const intervalId = setInterval(() => {
           APIClient.audioStatus()
             .then((status) => {
               if (!status.playing) {
                 clearInterval(intervalId);
-                delete audioPollingRef.current[turnNumber];
-                setTurnAudioStatus((prev) => ({ ...prev, [turnNumber]: { state: 'idle' } }));
+                delete audioPollingRef.current[pollKey];
+                setStatus({ state: 'idle' });
               }
             })
             .catch(() => {
               clearInterval(intervalId);
-              delete audioPollingRef.current[turnNumber];
-              setTurnAudioStatus((prev) => ({ ...prev, [turnNumber]: { state: 'idle' } }));
+              delete audioPollingRef.current[pollKey];
+              setStatus({ state: 'idle' });
             });
         }, 500);
-        audioPollingRef.current[turnNumber] = intervalId;
+        audioPollingRef.current[pollKey] = intervalId;
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
-        setTurnAudioStatus((prev) => ({ ...prev, [turnNumber]: { state: 'error', message } }));
+        setStatus({ state: 'error', message });
       });
   };
 
   const handleStopAudio = () => {
     APIClient.stopAudio().catch(console.error);
     // Clear all polling and reset all turns that are playing
-    for (const [turnNum, intervalId] of Object.entries(audioPollingRef.current)) {
+    for (const [key, intervalId] of Object.entries(audioPollingRef.current)) {
       clearInterval(intervalId);
-      delete audioPollingRef.current[Number(turnNum)];
+      delete audioPollingRef.current[key];
     }
     setTurnAudioStatus((prev) => {
       const next = { ...prev };
@@ -338,6 +351,7 @@ export const App: React.FC = () => {
       }
       return next;
     });
+    setSegmentAudioStatus({});
   };
 
   const handleSaveEntity = async (entityId: string, markdown: string) => {
@@ -621,6 +635,7 @@ export const App: React.FC = () => {
                     streamedProse={streamedProse}
                     displayMode={config?.media.tts.speech_cues?.display_mode}
                     turnAudioStatus={turnAudioStatus}
+                    segmentAudioStatus={segmentAudioStatus}
                   />
                 </>
               )}

@@ -16,12 +16,38 @@ export const useSegmentPlayback = (
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
 
   const stop = useCallback(() => {
     audioRef.current?.pause();
     audioRef.current = null;
     setPlaying(false);
+    setPlayingIndex(null);
   }, []);
+
+  const playUrl = useCallback(
+    (url: string, index: number, onEnded?: () => void) => {
+      audioRef.current?.pause();
+      const audio = new Audio(url);
+      audio.volume = volume;
+      audio.onended = () => {
+        setPlayingIndex(null);
+        onEnded?.();
+      };
+      audioRef.current = audio;
+      setPlaying(true);
+      setPlayingIndex(index);
+      audio
+        .play()
+        .then(() => setBlocked(false))
+        .catch(() => {
+          setPlaying(false);
+          setPlayingIndex(null);
+          setBlocked(true);
+        });
+    },
+    [volume]
+  );
 
   const playFrom = useCallback(
     (index: number) => {
@@ -32,14 +58,6 @@ export const useSegmentPlayback = (
         return;
       }
 
-      audioRef.current?.pause();
-
-      const audio = new Audio(urls[next] as string);
-      audio.volume = volume;
-      audio.onended = () => playFrom(next + 1);
-      audioRef.current = audio;
-      setPlaying(true);
-
       // Preload subsequent segment audio so playback flows continuously without delays
       const following = urls.findIndex((url, i) => i > next && !!url);
       if (following !== -1) {
@@ -47,15 +65,21 @@ export const useSegmentPlayback = (
         prefetch.preload = 'auto';
       }
 
-      audio
-        .play()
-        .then(() => setBlocked(false))
-        .catch(() => {
-          setPlaying(false);
-          setBlocked(true);
-        });
+      playUrl(urls[next] as string, next, () => playFrom(next + 1));
     },
-    [segments, stop, volume]
+    [segments, stop, playUrl]
+  );
+
+  // regenerateFrom re-synthesizes one segment on demand. The server accepts
+  // force=1 on the audio GET; the timestamp defeats the browser cache.
+  const regenerateFrom = useCallback(
+    (index: number) => {
+      const url = (segments ?? [])[index]?.audio_url;
+      if (!url) return;
+      const separator = url.includes('?') ? '&' : '?';
+      playUrl(`${url}${separator}force=1&t=${Date.now()}`, index);
+    },
+    [segments, playUrl]
   );
 
   useEffect(() => {
@@ -69,5 +93,5 @@ export const useSegmentPlayback = (
     playFrom(0);
   }, [playFrom]);
 
-  return { playing, blocked, play, playFrom, stop };
+  return { playing, blocked, playingIndex, play, playFrom, regenerateFrom, stop };
 };
