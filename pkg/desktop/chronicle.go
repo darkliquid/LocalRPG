@@ -110,16 +110,20 @@ func chronicleView() {
 }
 
 func chronicleHeader() {
-	Container(Attrs(Row, CrossMid, Gap(12)), func() {
+	Container(Attrs(Row, CrossMid, Gap(12), Expand), func() {
+		iconButton("chronicle.home", SymHome, func() {
+			appState.Screen = ScreenLauncher
+			appState.CampaignGalleryOpen = false
+		})
 		Label(appState.GameName(), Fonts(ui.SansStack...), FontSize(20), FontWeight(WeightBold), TextColorVec(ui.TextMain))
 		Filler(1)
+		drawerToolbar(ui.DefaultPalette())
 		NextAccessName("chronicle.theater")
 		if Button(NoIcon, "Theater") {
 			openTheater()
 		}
 		AssignAccess()
 	})
-	drawerToolbar(ui.DefaultPalette())
 }
 
 func sceneArtPath(turn *gui.TurnDTO) string {

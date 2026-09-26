@@ -150,11 +150,6 @@ func heroStage() {
 				fillGradient()
 			}
 		})
-		// Vignette: bottom-to-top and edge darkening, approximated by bands.
-		Container(Attrs(FixSize(w, h), Float(0, 0), NoAnimate), func() {
-			Element(Attrs(Expand, Grow(1), BackgroundVec(ui.VignetteTop)))
-			Element(Attrs(Expand, FixHeight(h*0.45), BackgroundVec(ui.VignetteBottom)))
-		})
 
 		// Overlay content.
 		Container(Attrs(FixSize(w, h), Float(0, 0), Pad(32)), func() {
