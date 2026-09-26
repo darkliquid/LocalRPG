@@ -32,6 +32,8 @@ Always build the frontend before the backend, or use `mise run build`, which enf
 
 ## Architecture
 
+> Planned change: the Wails window, React SPA, Bubbletea TUI, and HTTP/socket daemon are being retired in favour of an in-process pure-Go GUI built on `go.hasen.dev/shirei`. See `docs/superpowers/specs/2026-09-26-pure-go-shirei-gui-design.md` for the approved direction and phased plan.
+
 Three-tier on-disk separation, resolved through `core.PathResolver` (`pkg/core/types.go`). A campaign has exactly one database, `games/<id>/cache/index.db`, and it is only ever opened through `storage.OpenGameStore(paths, gameID)` — which resolves `PathResolver.GameDBPath`, retires any legacy `game.db` to `game.db.legacy`, and returns a pooled handle (`storage.Pool`, `shared` stores whose `Close` is a no-op; `Pool.Close` owns their lifetime). Do not call `storage.NewStore` for a game.
 
 - `systems/<id>/` — mechanics: `system.yaml`, `mechanics.js`, `prompts/rules.md`
@@ -68,9 +70,9 @@ Resolution order (`pkg/config/manager.go`): `$LOCALRPG_CONFIG_DIR`, else `$XDG_C
 
 ## Conventions
 
-- Go: standard library only for tests (`testing`, `t.TempDir()`); no testify. Errors wrapped with `fmt.Errorf("...: %w", err)`. Use `interface{}`, not `any` — the codebase is uniform on this even though gopls suggests otherwise; `go vet` must stay clean.
+- Go: standard library only for tests (`testing`, `t.TempDir()`); no testify. Errors wrapped with `fmt.Errorf("...: %w", err)`. Prefer `any` over `interface{}`, and current-Go idioms the pinned toolchain affords (`min`/`max`, `slices`/`maps`, `for i := range n`, typed `sync/atomic`, `errors.Join`, `log/slog`, `clear`). `go vet` must stay clean.
 - Identifiers: `entity.Slugify` (display name -> kebab-case ID) and `entity.WikilinkTarget` (unwraps `[[target|label]]`) are the shared helpers — reuse them instead of writing local slug/link parsing.
-- TypeScript: React 19 + Tailwind v4 (config lives in CSS via `@import "tailwindcss"` in `frontend/src/index.css`, there is no `tailwind.config.js`). `tsconfig.json` has `strict`, `noUnusedLocals`, `noUnusedParameters`, so `npm run build`/`tsc --noEmit` fails on unused imports — that is the frontend lint gate. Components live in `frontend/src/components/`, icons come from `lucide-react`.
+- TypeScript: React 19 + Tailwind v4 (config lives in CSS via `@import "tailwindcss"` in `frontend/src/index.css`, there is no `tailwind.config.js`). `tsconfig.json` has `strict`, `noUnusedLocals`, `noUnusedParameters`, so `npm run build`/`tsc --noEmit` fails on unused imports — that is the frontend lint gate. Components live in `frontend/src/components/`, icons come from `lucide-react`. **The frontend is being retired** (see the pure-Go shirei GUI spec); treat it as reference-only until deleted and do not add new features to it.
 - Commits: Conventional Commits with a scope, e.g. `feat(harness): …`, `fix(frontend): …`, `docs: …`. Keep the subject under 72 chars.
 - Design work is spec-first: `docs/superpowers/specs/` holds approved design docs and `docs/superpowers/plans/` holds task-by-task implementation plans with `- [ ]` checkboxes, including a "File Map" listing files to create/modify per feature. Read the relevant spec before changing a subsystem; the plans reference the superpowers skills workflow. Note `.superpowers/` is gitignored while `docs/superpowers/` is tracked.
 
