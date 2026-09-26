@@ -63,6 +63,15 @@ func loadAll(ctx context.Context, svc *gui.Service) *State {
 	return st
 }
 
+// loadChronicle reads the campaign's turn history.
+func loadChronicle(ctx context.Context, svc *gui.Service, gameID string) []gui.TurnDTO {
+	turns, err := svc.GetChronicle(ctx, gameID)
+	if err != nil || turns == nil {
+		return []gui.TurnDTO{}
+	}
+	return turns
+}
+
 // reload refreshes the cached state from a background goroutine and asks the UI
 // to redraw, preserving the current screen and pending world.
 func reload(ctx context.Context, svc *gui.Service) {

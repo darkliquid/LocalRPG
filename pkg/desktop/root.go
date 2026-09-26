@@ -7,6 +7,8 @@ func RootView() {
 		newCampaignView()
 	case ScreenWorldGallery:
 		worldsView()
+	case ScreenChronicle:
+		chronicleView()
 	default:
 		launcherView()
 	}

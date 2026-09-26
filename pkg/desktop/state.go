@@ -12,6 +12,7 @@ const (
 	ScreenLauncher Screen = iota
 	ScreenNewCampaign
 	ScreenWorldGallery
+	ScreenChronicle
 )
 
 // State is the desktop application's cached data. It is replaced wholesale by
@@ -47,6 +48,13 @@ type State struct {
 	// FormBannerPreview and FormIconPreview are temp PNGs for the create form.
 	FormBannerPreview string
 	FormIconPreview   string
+
+	// Chronicle state.
+	OpenGame      string
+	Turns         []gui.TurnDTO
+	Prose         string
+	TurnInFlight  bool
+	PendingAction string
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
