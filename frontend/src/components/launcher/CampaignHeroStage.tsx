@@ -2,6 +2,8 @@ import React from 'react';
 import { GameSummary } from '../../types';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
 import { Play, Settings, Compass, Sparkles, Clock, Calendar, Globe, BookOpen } from 'lucide-react';
+import { useLightbox } from '../../hooks/useLightbox';
+import { ImageLightbox } from '../ImageLightbox';
 
 interface CampaignHeroStageProps {
   game: GameSummary | null;
@@ -48,6 +50,8 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
   onCreateWorld,
   onBrowseSystems,
 }) => {
+  const iconURL = game?.icon_url;
+  const { lightbox, openLightbox, closeLightbox } = useLightbox();
   return (
     <main className="relative flex-1 h-full overflow-hidden select-none flex flex-col justify-between p-8 bg-stone-950">
       {/* Background Banner */}
@@ -168,8 +172,16 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
           {/* Bottom Left: Title Card */}
           <div className="flex items-center gap-4 bg-stone-900/85 backdrop-blur-2xl border border-white/15 rounded-2xl p-4 shadow-2xl max-w-xl">
             <div className="w-[52px] h-[52px] rounded-xl overflow-hidden flex-shrink-0 shadow-lg border border-white/10">
-              {game.icon_url ? (
-                <img src={game.icon_url} alt={game.name} className="w-full h-full object-cover" />
+              {iconURL ? (
+                <button
+                  type="button"
+                  onClick={() => openLightbox(iconURL, game.name)}
+                  className="w-full h-full cursor-zoom-in"
+                  title={`View full size: ${game.name}`}
+                  aria-label={`View full size: ${game.name}`}
+                >
+                  <img src={iconURL} alt={game.name} className="w-full h-full object-cover" />
+                </button>
               ) : (
                 <ProceduralIcon id={game.id} name={game.name} size={52} className="w-full h-full rounded-none" />
               )}
@@ -213,6 +225,10 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
       )}
     </main>
   );

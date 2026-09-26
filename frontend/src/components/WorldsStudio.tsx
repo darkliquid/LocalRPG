@@ -3,6 +3,8 @@ import { APIClient, WorldExistsError } from '../api/client';
 import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail, GenerationFailure } from '../types';
 import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
+import { useLightbox } from '../hooks/useLightbox';
+import { ImageLightbox } from './ImageLightbox';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
 
@@ -60,6 +62,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
   const [generatingKind, setGeneratingKind] = useState<'banner' | 'icon' | null>(null);
+  const { lightbox, openLightbox, closeLightbox } = useLightbox();
 
   const bannerInputRef = React.useRef<HTMLInputElement>(null);
   const iconInputRef = React.useRef<HTMLInputElement>(null);
@@ -857,8 +860,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                     className="hidden"
                   />
                   <div
-                    onClick={() => bannerInputRef.current?.click()}
-                    className="h-24 rounded-lg overflow-hidden border border-stone-800 bg-stone-900/40 flex items-center justify-center cursor-pointer"
+                    onClick={() =>
+                      bannerPreview ? openLightbox(bannerPreview, 'World banner') : bannerInputRef.current?.click()
+                    }
+                    className={`h-24 rounded-lg overflow-hidden border border-stone-800 bg-stone-900/40 flex items-center justify-center ${
+                      bannerPreview ? 'cursor-zoom-in' : 'cursor-pointer'
+                    }`}
                   >
                     {bannerPreview ? (
                       <img
@@ -910,8 +917,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                     className="hidden"
                   />
                   <div
-                    onClick={() => iconInputRef.current?.click()}
-                    className="h-24 rounded-lg overflow-hidden border border-stone-800 bg-stone-900/40 flex items-center justify-center cursor-pointer"
+                    onClick={() =>
+                      iconPreview ? openLightbox(iconPreview, 'World icon') : iconInputRef.current?.click()
+                    }
+                    className={`h-24 rounded-lg overflow-hidden border border-stone-800 bg-stone-900/40 flex items-center justify-center ${
+                      iconPreview ? 'cursor-zoom-in' : 'cursor-pointer'
+                    }`}
                   >
                     {iconPreview ? (
                       <img
@@ -1110,6 +1121,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
             </div>
           </div>
         </div>
+      )}
+
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
       )}
     </div>
   );

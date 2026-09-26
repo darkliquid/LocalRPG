@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { Turn } from '../types';
 import { TurnSegments, TurnAudioState } from './TurnSegments';
 import { Sparkles } from 'lucide-react';
+import { useLightbox } from '../hooks/useLightbox';
+import { ImageLightbox } from './ImageLightbox';
 
 interface PendingAction {
   mode: string;
@@ -41,6 +43,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   turnAudioStatus = {},
 }) => {
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const { lightbox, openLightbox, closeLightbox } = useLightbox();
 
   // Auto-scroll when a new turn is added, turn starts, or prose streams in
   useEffect(() => {
@@ -67,6 +70,8 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
       ) : (
         beats.map(({ turn, isSceneChange }, index) => {
           const audioStatus = turnAudioStatus[turn.turn_number];
+          const imageURL = turn.image_url;
+          const locationArtURL = turn.location_art_url;
           return (
             <div key={turn.turn_number} className="space-y-4 pb-6 border-b border-white/5 last:border-0">
               {/* Player Input Block. A spoken line is rendered as speech below, so
@@ -84,20 +89,36 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               )}
 
               {/* Scene Illustration if available */}
-              {turn.image_url && (
+              {imageURL && (
                 <div className="my-4 rounded-xl overflow-hidden border border-white/10 shadow-2xl">
-                  <img src={turn.image_url} alt="Scene illustration" className="w-full object-cover max-h-96" />
+                  <button
+                    type="button"
+                    onClick={() => openLightbox(imageURL, 'Scene illustration')}
+                    className="block w-full cursor-zoom-in"
+                    title="View full size scene illustration"
+                    aria-label="View full size scene illustration"
+                  >
+                    <img src={imageURL} alt="Scene illustration" className="w-full object-cover max-h-96" />
+                  </button>
                 </div>
               )}
 
               {/* Scene art, when the party has moved somewhere new */}
-              {turn.location_art_url && isSceneChange && (
+              {locationArtURL && isSceneChange && (
                 <div className="my-4 rounded-xl overflow-hidden border border-white/10 shadow-2xl">
-                  <img
-                    src={turn.location_art_url}
-                    alt={turn.location_name || 'Scene'}
-                    className="w-full object-cover max-h-96"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => openLightbox(locationArtURL, turn.location_name || 'Scene')}
+                    className="block w-full cursor-zoom-in"
+                    title="View full size scene art"
+                    aria-label="View full size scene art"
+                  >
+                    <img
+                      src={locationArtURL}
+                      alt={turn.location_name || 'Scene'}
+                      className="w-full object-cover max-h-96"
+                    />
+                  </button>
                   {turn.location_name && (
                     <div className="px-3 py-2 text-xs font-sans tracking-widest text-stone-400 uppercase">
                       {turn.location_name}
@@ -222,6 +243,10 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
       )}
 
       <div ref={bottomRef} />

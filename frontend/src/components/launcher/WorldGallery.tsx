@@ -1,7 +1,9 @@
 import React from 'react';
 import { WorldInfo } from '../../types';
 import { ProceduralBanner, ProceduralIcon, getGenreIcon } from './ProceduralAsset';
-import { X, Plus, Globe } from 'lucide-react';
+import { X, Plus, Globe, Maximize2 } from 'lucide-react';
+import { useLightbox } from '../../hooks/useLightbox';
+import { ImageLightbox } from '../ImageLightbox';
 
 interface WorldGalleryProps {
   isOpen: boolean;
@@ -17,69 +19,92 @@ const WorldCard: React.FC<{
 }> = ({ world, onSelect }) => {
   const GenreIcon = getGenreIcon(world.genre) || getGenreIcon(world.name);
   const tags = world.tags ?? [];
+  const { lightbox, openLightbox, closeLightbox } = useLightbox();
+  const artworkURL = world.banner_url || world.icon_url;
 
   return (
-    <button
-      onClick={onSelect}
-      className="group relative flex flex-col text-left rounded-3xl overflow-hidden border border-white/10 hover:border-purple-400/70 bg-stone-900/60 hover:bg-stone-900 shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
-      aria-label={`Create a campaign in ${world.name}`}
-    >
-      {/* Banner */}
-      <div className="relative h-44 w-full overflow-hidden shrink-0">
-        {world.banner_url ? (
-          <img
-            src={world.banner_url}
-            alt={world.name}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-        ) : (
-          <ProceduralBanner id={world.id} name={world.name} className="w-full h-full" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/30 to-transparent pointer-events-none" />
+    <div className="group relative">
+      <button
+        onClick={onSelect}
+        className="w-full flex flex-col text-left rounded-3xl overflow-hidden border border-white/10 hover:border-purple-400/70 bg-stone-900/60 hover:bg-stone-900 shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+        aria-label={`Create a campaign in ${world.name}`}
+      >
+        {/* Banner */}
+        <div className="relative h-44 w-full overflow-hidden shrink-0">
+          {world.banner_url ? (
+            <img
+              src={world.banner_url}
+              alt={world.name}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            <ProceduralBanner id={world.id} name={world.name} className="w-full h-full" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/30 to-transparent pointer-events-none" />
 
-        {/* Icon + Name overlay */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center gap-3.5">
-          <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-white/25 shadow-2xl shrink-0 bg-stone-900">
-            {world.icon_url ? (
-              <img src={world.icon_url} alt={world.name} className="w-full h-full object-cover" />
-            ) : (
-              <ProceduralIcon id={world.id} name={world.name} genre={world.genre} size={64} className="w-full h-full rounded-none border-0" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-lg font-sans font-extrabold text-white tracking-tight truncate">
-              {world.name}
-            </h3>
-            {world.genre && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-sans font-semibold uppercase tracking-wider text-purple-300">
-                {GenreIcon && <GenreIcon className="w-3 h-3" />}
-                {world.genre}
-              </span>
-            )}
+          {/* Icon + Name overlay */}
+          <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center gap-3.5">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-white/25 shadow-2xl shrink-0 bg-stone-900">
+              {world.icon_url ? (
+                <img src={world.icon_url} alt={world.name} className="w-full h-full object-cover" />
+              ) : (
+                <ProceduralIcon id={world.id} name={world.name} genre={world.genre} size={64} className="w-full h-full rounded-none border-0" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-lg font-sans font-extrabold text-white tracking-tight truncate">
+                {world.name}
+              </h3>
+              {world.genre && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-sans font-semibold uppercase tracking-wider text-purple-300">
+                  {GenreIcon && <GenreIcon className="w-3 h-3" />}
+                  {world.genre}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Body */}
-      <div className="flex-1 flex flex-col gap-3 p-5">
-        <p className="text-sm font-sans text-stone-300 leading-relaxed whitespace-pre-line">
-          {world.description || 'Explore uncharted territory and shape the fate of this realm.'}
-        </p>
+        {/* Body */}
+        <div className="flex-1 flex flex-col gap-3 p-5">
+          <p className="text-sm font-sans text-stone-300 leading-relaxed whitespace-pre-line">
+            {world.description || 'Explore uncharted territory and shape the fate of this realm.'}
+          </p>
 
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-auto pt-2">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="text-[11px] font-sans font-medium px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-stone-300"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    </button>
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-auto pt-2">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="text-[11px] font-sans font-medium px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-stone-300"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </button>
+
+      {artworkURL && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            openLightbox(artworkURL, world.name);
+          }}
+          className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-black/60 hover:bg-black/80 border border-white/15 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-zoom-in"
+          title={`View full size: ${world.name}`}
+          aria-label={`View full size: ${world.name}`}
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+      )}
+
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
+      )}
+    </div>
   );
 };
 

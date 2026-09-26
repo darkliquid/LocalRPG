@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ImageLightboxProps {
@@ -17,7 +18,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({ src, alt, onClose 
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
@@ -39,6 +40,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({ src, alt, onClose 
           <X className="w-5 h-5" />
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

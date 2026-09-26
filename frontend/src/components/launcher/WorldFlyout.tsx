@@ -1,7 +1,9 @@
 import React from 'react';
 import { WorldInfo } from '../../types';
 import { ProceduralIcon } from './ProceduralAsset';
-import { Plus, LayoutGrid } from 'lucide-react';
+import { Plus, LayoutGrid, Maximize2 } from 'lucide-react';
+import { useLightbox } from '../../hooks/useLightbox';
+import { ImageLightbox } from '../ImageLightbox';
 
 interface WorldFlyoutProps {
   isOpen: boolean;
@@ -18,6 +20,7 @@ export const WorldFlyout: React.FC<WorldFlyoutProps> = ({
   onCreateWorld,
   onExpand,
 }) => {
+  const { lightbox, openLightbox, closeLightbox } = useLightbox();
   if (!isOpen) return null;
 
   return (
@@ -48,6 +51,17 @@ export const WorldFlyout: React.FC<WorldFlyoutProps> = ({
                 <ProceduralIcon id={world.id} name={world.name} genre={world.genre} size={42} className="w-full h-full rounded-none" />
               )}
             </button>
+            {world.icon_url && (
+              <button
+                type="button"
+                onClick={() => openLightbox(world.icon_url!, `${world.name} icon`)}
+                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-black/80 border border-white/20 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-zoom-in"
+                title={`View full size: ${world.name}`}
+                aria-label={`View full size: ${world.name}`}
+              >
+                <Maximize2 className="w-2.5 h-2.5" />
+              </button>
+            )}
           </div>
         ))}
 
@@ -75,6 +89,10 @@ export const WorldFlyout: React.FC<WorldFlyoutProps> = ({
           <LayoutGrid className="w-4 h-4" />
         </button>
       </div>
+
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
+      )}
     </div>
   );
 };

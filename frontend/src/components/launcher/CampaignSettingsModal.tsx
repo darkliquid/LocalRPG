@@ -4,6 +4,8 @@ import { APIClient } from '../../api/client';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
 import { X, Upload, Sparkles, AlertTriangle, Volume2, MapPin, Check, Save } from 'lucide-react';
 import { AIGenerateButton } from '../ui/AIGenerateButton';
+import { useLightbox } from '../../hooks/useLightbox';
+import { ImageLightbox } from '../ImageLightbox';
 
 interface CampaignSettingsModalProps {
   isOpen: boolean;
@@ -28,6 +30,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   const [confirmAction, setConfirmAction] = useState<'restart' | 'delete' | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const { lightbox, openLightbox, closeLightbox } = useLightbox();
 
   // Settings State
   const [narratorVoice, setNarratorVoice] = useState('');
@@ -65,6 +68,9 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   }, [isOpen, game]);
 
   if (!isOpen || !game) return null;
+
+  const bannerURL = game.banner_url;
+  const iconURL = game.icon_url;
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -292,8 +298,16 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
               <div className="p-3 bg-stone-950 border border-white/10 rounded-2xl flex flex-col justify-between gap-3">
                 <span className="text-[11px] font-sans font-semibold text-stone-300">Main Banner</span>
                 <div className="h-24 rounded-xl overflow-hidden relative border border-white/10">
-                  {game.banner_url ? (
-                    <img src={game.banner_url} alt="Banner" className="w-full h-full object-cover" />
+                  {bannerURL ? (
+                    <button
+                      type="button"
+                      onClick={() => openLightbox(bannerURL, 'Campaign banner')}
+                      className="w-full h-full cursor-zoom-in"
+                      title="View full size banner"
+                      aria-label="View full size banner"
+                    >
+                      <img src={bannerURL} alt="Banner" className="w-full h-full object-cover" />
+                    </button>
                   ) : (
                     <ProceduralBanner id={game.id} name={game.name} className="w-full h-full" />
                   )}
@@ -331,8 +345,16 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
               <div className="p-3 bg-stone-950 border border-white/10 rounded-2xl flex flex-col justify-between gap-3">
                 <span className="text-[11px] font-sans font-semibold text-stone-300">Campaign Icon</span>
                 <div className="h-24 rounded-xl overflow-hidden relative border border-white/10 flex items-center justify-center bg-stone-900">
-                  {game.icon_url ? (
-                    <img src={game.icon_url} alt="Icon" className="w-16 h-16 rounded-xl object-cover" />
+                  {iconURL ? (
+                    <button
+                      type="button"
+                      onClick={() => openLightbox(iconURL, 'Campaign icon')}
+                      className="w-16 h-16 rounded-xl overflow-hidden cursor-zoom-in"
+                      title="View full size icon"
+                      aria-label="View full size icon"
+                    >
+                      <img src={iconURL} alt="Icon" className="w-full h-full object-cover" />
+                    </button>
                   ) : (
                     <ProceduralIcon id={game.id} name={game.name} size={64} />
                   )}
@@ -453,6 +475,10 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
           </button>
         </div>
       </div>
+
+      {lightbox && (
+        <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />
+      )}
     </div>
   );
 };
