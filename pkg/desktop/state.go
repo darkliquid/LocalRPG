@@ -5,6 +5,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/gui"
+	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
@@ -106,6 +107,9 @@ type State struct {
 	// TTS inspection.
 	Inspect    *gui.TTSInspectResponseDTO
 	InspectSig string
+
+	// Bundled model statuses.
+	Models []models.ModelStatus
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art

@@ -158,6 +158,10 @@ func settingsMedia(p ui.Palette) {
 	}
 
 	CheckBox(&cfg.Media.TTS.SpeechCues.Enabled, "Speak speech cues")
+
+	settingsSTT(p)
+	settingsImage(p)
+	modelsSection(p)
 }
 
 func engineLabel(cfg config.TTSConfig) string {

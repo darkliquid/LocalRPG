@@ -6,9 +6,18 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/gui"
+	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/ui"
 )
+
+func TestApplyModelStatusReplacesByID(t *testing.T) {
+	appState = &State{Models: []models.ModelStatus{{ID: "kokoro-tts", Name: "Kokoro", Progress: 0}}}
+	applyModelStatus(models.ModelStatus{ID: "kokoro-tts", Name: "Kokoro", Downloading: true, Progress: 0.5})
+	if len(appState.Models) != 1 || appState.Models[0].Progress != 0.5 {
+		t.Fatalf("models = %+v", appState.Models)
+	}
+}
 
 func TestProvidersForFamilyFilters(t *testing.T) {
 	appState = &State{Providers: []provider.Descriptor{

@@ -86,6 +86,11 @@ func Run(cfg Config) error {
 		inspectTTS = func(ctx context.Context, svc *gui.Service, req gui.TTSInspectRequestDTO) (*gui.TTSInspectResponseDTO, error) {
 			return svc.InspectTTS(ctx, req)
 		}
+		downloadModel = func(ctx context.Context, svc *gui.Service, id string) error {
+			return svc.DownloadModel(ctx, id)
+		}
+		refreshModels(cfg.Service)
+		startModelEvents(cfg.Service)
 	} else {
 		liveService = nil
 		createGame = nil
@@ -101,6 +106,7 @@ func Run(cfg Config) error {
 		saveSettings = nil
 		testProvider = nil
 		inspectTTS = nil
+		downloadModel = nil
 	}
 
 	if cfg.PNGPath != "" {
