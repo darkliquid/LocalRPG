@@ -1,45 +1,63 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Turn } from '../types';
-import { TurnSegments } from './TurnSegments';
-import { Play, Pause, SkipBack, SkipForward, X } from 'lucide-react';
+import { TurnAudioState, segmentAudioKey } from './TurnSegments';
+import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
+import { TheaterStage } from './theater/TheaterStage';
+import { TheaterDialogue } from './theater/TheaterDialogue';
+import { TheaterTransport } from './theater/TheaterTransport';
+import { X } from 'lucide-react';
 
 interface StoryTheaterProps {
   turns: Turn[];
   isOpen: boolean;
   onClose: () => void;
-  autoPlay?: boolean;
   volume?: number;
   gameId?: string;
   playerId?: string;
   playerPortrait?: string;
+  campaignImage?: string;
+  serverPlayback?: boolean;
+  onPlayAudio?: (turnNumber: number, segmentIndex?: number, force?: boolean) => void;
+  onStopAudio?: () => void;
+  segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
+  onEntityClick?: (entityId: string) => void;
+  displayMode?: 'stage_directions' | 'hidden' | 'raw';
 }
+
+// BEAT_GAP_MS is the buffer between one voice clip finishing and the next line
+// appearing, so the spoken word always leads the text.
+const BEAT_GAP_MS = 300;
 
 export const StoryTheater: React.FC<StoryTheaterProps> = ({
   turns,
   isOpen,
   onClose,
-  autoPlay = false,
   volume = 1,
   gameId,
   playerId,
   playerPortrait: propPlayerPortrait,
+  campaignImage,
+  serverPlayback = false,
+  onPlayAudio,
+  onStopAudio,
+  segmentAudioStatus = {},
+  onEntityClick,
+  displayMode,
 }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
+  const [activeSegment, setActiveSegment] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [speed, setSpeed] = useState<number>(1);
 
   const currentTurn = turns[currentIdx];
+  const segments = useMemo(() => {
+    if (currentTurn?.segments && currentTurn.segments.length > 0) return currentTurn.segments;
+    return [{ kind: 'narration' as const, text: currentTurn?.prose ?? '' }];
+  }, [currentTurn]);
 
-  // A turn is held for the reading time its segments report, so the in-app player
-  // and a rendered bundle hold a line for the same length of time. The fixed span
-  // remains as the fallback for a turn recorded before durations existed.
-  const reportedMs = (currentTurn?.segments ?? []).reduce(
-    (total, segment) => total + (segment.duration ?? 0) * 1000,
-    0
-  );
-  const turnDurationMs = reportedMs > 0 ? reportedMs : 4000;
+  const activeIndex = Math.min(activeSegment, segments.length - 1);
+  const active = segments[activeIndex];
 
-  // Resolve player portrait from props, segments across chronicle, or fallback endpoint
   const playerPortrait = useMemo(() => {
     if (propPlayerPortrait) return propPlayerPortrait;
     for (const turn of turns) {
@@ -52,156 +70,210 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     return undefined;
   }, [propPlayerPortrait, turns, gameId, playerId]);
 
-  // Active speech and speaker identification
-  const speechSegments = currentTurn?.segments?.filter((s) => s.kind === 'speech') ?? [];
-  const activeSpeech = speechSegments[0]; // primary speech segment for the turn if present
-  const isPlayerSpeaking = Boolean(activeSpeech?.player);
-  const isNpcSpeaking = Boolean(activeSpeech && !activeSpeech.player);
+  const npcSegment = useMemo(
+    () => segments.find((s) => s.kind === 'speech' && !s.player && s.portrait_url),
+    [segments]
+  );
+  const npcPortrait = npcSegment?.portrait_url;
 
-  const npcPortrait = useMemo(() => {
-    const npcSeg = currentTurn?.segments?.find((s) => !s.player && s.portrait_url);
-    return npcSeg?.portrait_url;
-  }, [currentTurn]);
+  const playerLabel = useMemo(() => {
+    for (const turn of turns) {
+      const pSeg = turn.segments?.find((s) => s.player && s.kind === 'speech' && s.speaker);
+      if (pSeg?.speaker) return pSeg.speaker;
+    }
+    return 'You';
+  }, [turns]);
+  const npcLabel = npcSegment?.speaker || 'Unknown';
 
+  const playerSpeaking = active?.kind === 'speech' && !!active.player;
+  const npcSpeaking = active?.kind === 'speech' && !active.player;
+
+  // Two copies of one image must never share the stage: the right sprite is a
+  // mirror of the left, so when both resolve to the same source only the left
+  // is drawn and it carries the active-speaker emphasis.
+  const normalizeImage = (url?: string) => (url ? url.split('?')[0] : '');
+  const sharedPortrait =
+    !!playerPortrait && !!npcPortrait && normalizeImage(playerPortrait) === normalizeImage(npcPortrait);
+  const showPlayerPortrait = !!playerPortrait;
+  const showNpcPortrait = !!npcPortrait && !sharedPortrait;
+  const playerActive = playerSpeaking || (npcSpeaking && !showNpcPortrait);
+  const npcActive = npcSpeaking && showNpcPortrait;
+
+  // The scene's own art wins; otherwise the campaign banner fills the stage.
+  const backgroundURL = currentTurn?.image_url || campaignImage;
+
+  const hasAudio = segments.some((segment) => !!segment.audio_url);
+  const voiceEnabled = hasAudio;
+
+  const browser = useSegmentPlayback(segments, isPlaying && !serverPlayback && voiceEnabled, volume);
+
+  const beatKey = currentTurn ? segmentAudioKey(currentTurn.turn_number, activeIndex) : '';
+  const beatStatus = serverPlayback ? segmentAudioStatus[beatKey] : undefined;
+  const beatState: TurnAudioState = beatStatus?.state ?? 'idle';
+
+  const goNext = useCallback(() => {
+    if (currentIdx < turns.length - 1) {
+      setCurrentIdx((prev) => prev + 1);
+    } else {
+      setIsPlaying(false);
+    }
+  }, [currentIdx, turns.length]);
+
+  const advanceBeat = useCallback(() => {
+    if (activeIndex < segments.length - 1) {
+      setActiveSegment(activeIndex + 1);
+    } else {
+      goNext();
+    }
+  }, [activeIndex, segments.length, goNext]);
+
+  // Reset the beat whenever the turn changes.
   useEffect(() => {
-    if (!isOpen || !isPlaying || turns.length === 0) return;
+    setActiveSegment(0);
+  }, [currentIdx]);
 
-    const interval = setTimeout(() => {
-      if (currentIdx < turns.length - 1) {
-        setCurrentIdx((prev) => prev + 1);
-      } else {
-        setIsPlaying(false);
-      }
-    }, turnDurationMs / speed);
+  // Native voice: request the current beat's clip once, then wait for the device
+  // to report it finished before the next line appears.
+  const startedBeatRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isOpen || !isPlaying || !serverPlayback || !voiceEnabled || !currentTurn) return;
+    if (startedBeatRef.current === beatKey) return;
+    startedBeatRef.current = beatKey;
+    onPlayAudio?.(currentTurn.turn_number, activeIndex);
+  }, [isOpen, isPlaying, serverPlayback, voiceEnabled, currentTurn, activeIndex, beatKey, onPlayAudio]);
 
-    return () => clearTimeout(interval);
-  }, [isOpen, isPlaying, currentIdx, turns.length, speed, turnDurationMs]);
+  const previousBeatState = useRef<TurnAudioState>('idle');
+  useEffect(() => {
+    if (!serverPlayback || !voiceEnabled) return;
+    const previous = previousBeatState.current;
+    previousBeatState.current = beatState;
+    if (previous !== 'playing' || (beatState !== 'idle' && beatState !== 'error') || !isPlaying) return;
+    const timer = setTimeout(advanceBeat, BEAT_GAP_MS);
+    return () => clearTimeout(timer);
+  }, [beatState, serverPlayback, voiceEnabled, isPlaying, advanceBeat]);
+
+  // Browser voice: mirror the clip the browser is actually playing, with the
+  // same buffer so the text trails the voice.
+  useEffect(() => {
+    if (serverPlayback || !voiceEnabled) return;
+    if (browser.playingIndex === null) return;
+    const timer = setTimeout(() => setActiveSegment(browser.playingIndex as number), BEAT_GAP_MS);
+    return () => clearTimeout(timer);
+  }, [browser.playingIndex, serverPlayback, voiceEnabled]);
+
+  // Browser voice: the turn is finished once its clips stop playing.
+  const browserWasPlaying = useRef(false);
+  useEffect(() => {
+    if (serverPlayback || !voiceEnabled) return;
+    const was = browserWasPlaying.current;
+    browserWasPlaying.current = browser.playing;
+    if (was && !browser.playing && isPlaying) {
+      const timer = setTimeout(goNext, BEAT_GAP_MS);
+      return () => clearTimeout(timer);
+    }
+  }, [browser.playing, serverPlayback, voiceEnabled, isPlaying, goNext]);
+
+  // Without voice, the text paces itself on the recorded reading time.
+  useEffect(() => {
+    if (!isOpen || !isPlaying || turns.length === 0 || voiceEnabled) return;
+    const dwell = Math.max(1200, (active?.duration ?? 0) * 1000) / speed;
+    const timer = setTimeout(advanceBeat, dwell);
+    return () => clearTimeout(timer);
+  }, [isOpen, isPlaying, turns.length, voiceEnabled, active?.duration, speed, advanceBeat]);
+
+  const togglePlay = useCallback(() => {
+    const next = !isPlaying;
+    setIsPlaying(next);
+    if (!next) {
+      onStopAudio?.();
+      startedBeatRef.current = null;
+      previousBeatState.current = 'idle';
+      browserWasPlaying.current = false;
+    }
+  }, [isPlaying, onStopAudio]);
+
+  const advanceDialogue = () => {
+    if (activeIndex < segments.length - 1) {
+      setActiveSegment(activeIndex + 1);
+    } else {
+      goNext();
+    }
+  };
+
+  const changeTurn = (delta: number) => {
+    onStopAudio?.();
+    startedBeatRef.current = null;
+    previousBeatState.current = 'idle';
+    browserWasPlaying.current = false;
+    setActiveSegment(0);
+    setCurrentIdx((prev) => Math.min(Math.max(0, prev + delta), turns.length - 1));
+  };
 
   if (!isOpen || turns.length === 0) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-stone-950 text-stone-100 overflow-hidden select-none">
-      {/* Dynamic Background */}
-      <div
-        className="absolute inset-0 bg-cover bg-center transition-all duration-700 pointer-events-none"
-        style={{
-          backgroundImage: currentTurn?.image_url ? `url(${currentTurn.image_url})` : 'radial-gradient(ellipse at center, #261e1b 0%, #0c0a09 100%)',
-        }}
-      />
-      <div className="absolute inset-0 bg-radial-[circle_at_center] from-black/40 via-black/70 to-black/95 pointer-events-none" />
+  const progress = ((currentIdx + (activeIndex + 1) / segments.length) / turns.length) * 100;
 
-      {/* Top Controls */}
-      <header className="relative z-10 p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
-        <div className="flex items-center gap-3">
-          <span className="font-sans text-purple-400 font-bold tracking-widest text-lg">STORY THEATER</span>
-          <span className="text-xs font-mono text-stone-400 bg-stone-900/60 px-2 py-1 rounded border border-white/10">
+  return (
+    <div
+      className="fixed inset-0 z-50 overflow-hidden select-none bg-stone-950 text-stone-100"
+      role="dialog"
+      aria-label="Story theater"
+    >
+      <TheaterStage
+        backgroundURL={backgroundURL}
+        playerPortrait={showPlayerPortrait ? playerPortrait : undefined}
+        npcPortrait={showNpcPortrait ? npcPortrait : undefined}
+        playerLabel={playerLabel}
+        npcLabel={npcLabel}
+        playerActive={playerActive}
+        npcActive={npcActive}
+      />
+
+      <header className="absolute top-0 inset-x-0 z-20 px-6 py-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="font-sans text-purple-300 font-bold tracking-[0.2em] text-sm">STORY THEATER</span>
+          {currentTurn?.location_name && (
+            <span className="text-xs font-sans text-stone-300 bg-black/50 px-2.5 py-1 rounded-full border border-white/10">
+              {currentTurn.location_name}
+            </span>
+          )}
+          <span className="text-xs font-mono text-stone-400 bg-black/50 px-2 py-1 rounded border border-white/10">
             Turn {currentIdx + 1} of {turns.length}
           </span>
         </div>
         <button
           onClick={onClose}
-          className="p-2 rounded-full hover:bg-white/10 text-stone-400 hover:text-white transition-colors cursor-pointer"
+          className="p-2 rounded-full hover:bg-white/10 text-stone-300 hover:text-white transition-colors cursor-pointer"
+          aria-label="Close theater"
         >
           <X className="w-6 h-6" />
         </button>
       </header>
 
-      {/* Visual Novel Character Stage */}
-      <main className="relative z-10 flex-1 flex flex-col justify-end items-center max-w-5xl mx-auto w-full px-8 pb-4 pointer-events-none">
-        <div className="w-full flex items-end justify-between px-8 mb-2">
-          {/* Protagonist (Stage Left, facing Right) */}
-          {playerPortrait ? (
-            <div
-              className={`relative w-64 h-80 transition-all duration-500 transform origin-bottom ${
-                isPlayerSpeaking
-                  ? 'opacity-100 scale-105 drop-shadow-[0_10px_25px_rgba(56,189,248,0.35)] z-20'
-                  : 'opacity-40 brightness-75 scale-95 z-10'
-              }`}
-            >
-              <img
-                src={playerPortrait}
-                alt="Protagonist"
-                className="w-full h-full object-contain filter drop-shadow-md"
-              />
-            </div>
-          ) : (
-            <div className="w-64" />
-          )}
-
-          {/* NPC Interlocutor (Stage Right, flipped facing Left) */}
-          {npcPortrait ? (
-            <div
-              className={`relative w-64 h-80 transition-all duration-500 transform origin-bottom scale-x-[-1] ${
-                isNpcSpeaking
-                  ? 'opacity-100 scale-105 drop-shadow-[0_10px_25px_rgba(168,85,247,0.35)] z-20'
-                  : 'opacity-40 brightness-75 scale-95 z-10'
-              }`}
-            >
-              <img
-                src={npcPortrait}
-                alt="Interlocutor"
-                className="w-full h-full object-contain filter drop-shadow-md"
-              />
-            </div>
-          ) : (
-            <div className="w-64" />
-          )}
-        </div>
-
-        {/* Main Dialogue Card */}
-        <div className="w-full pointer-events-auto bg-stone-900/85 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/10 space-y-4 max-h-[38vh] overflow-y-auto">
-          <TurnSegments
-            segments={currentTurn?.segments}
-            fallback={currentTurn?.prose ?? ''}
-            autoPlay={autoPlay}
-            volume={volume}
-          />
-        </div>
-      </main>
-
-      {/* Bottom Transport Controls */}
-      <footer className="relative z-10 p-6 bg-gradient-to-t from-black/90 to-transparent flex flex-col items-center gap-4">
-        {/* Progress Bar */}
-        <div className="w-full max-w-2xl h-1.5 bg-stone-900 rounded-full overflow-hidden border border-white/5">
-          <div
-            className="h-full bg-purple-500 transition-all duration-300"
-            style={{ width: `${((currentIdx + 1) / turns.length) * 100}%` }}
-          />
-        </div>
-
-        {/* Buttons */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setCurrentIdx((p) => Math.max(0, p - 1))}
-            disabled={currentIdx === 0}
-            className="p-2.5 rounded-full hover:bg-white/10 disabled:opacity-30 cursor-pointer"
-          >
-            <SkipBack className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={() => setIsPlaying(!isPlaying)}
-            className="p-4 rounded-full bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg transition-transform hover:scale-105 cursor-pointer"
-          >
-            {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
-          </button>
-
-          <button
-            onClick={() => setCurrentIdx((p) => Math.min(turns.length - 1, p + 1))}
-            disabled={currentIdx === turns.length - 1}
-            className="p-2.5 rounded-full hover:bg-white/10 disabled:opacity-30 cursor-pointer"
-          >
-            <SkipForward className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={() => setSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1))}
-            className="px-3 py-1 rounded-lg bg-stone-900 border border-white/10 text-xs font-mono font-bold text-purple-400 hover:bg-stone-800"
-          >
-            {speed}x
-          </button>
-        </div>
-      </footer>
+      <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 pb-5 px-4">
+        <TheaterDialogue
+          segment={active}
+          fallback={currentTurn?.prose ?? ''}
+          speaker={active?.speaker}
+          isPlayer={playerSpeaking}
+          onEntityClick={onEntityClick}
+          displayMode={displayMode}
+          onAdvance={advanceDialogue}
+        />
+        <TheaterTransport
+          progress={progress}
+          isPlaying={isPlaying}
+          speed={speed}
+          audioState={beatState}
+          audioMessage={beatStatus?.message}
+          blocked={browser.blocked && !browser.playing}
+          onToggle={togglePlay}
+          onPrev={() => changeTurn(-1)}
+          onNext={() => changeTurn(1)}
+          onCycleSpeed={() => setSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1))}
+          onUnblock={browser.play}
+        />
+      </div>
     </div>
   );
 };

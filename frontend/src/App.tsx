@@ -745,11 +745,20 @@ export const App: React.FC = () => {
           <StoryTheater
             turns={chronicle}
             isOpen={isTheaterOpen}
-            onClose={() => setIsTheaterOpen(false)}
-            autoPlay={serverAudio ? false : config?.media.tts.auto_play ?? false}
+            onClose={() => {
+              handleStopAudio();
+              setIsTheaterOpen(false);
+            }}
             volume={config?.media.tts.master_volume ?? 1}
             gameId={activeGameID ?? undefined}
             playerId={gameState?.player?.id}
+            campaignImage={gameState?.banner_url}
+            serverPlayback={serverAudio}
+            onPlayAudio={handlePlayTurnAudio}
+            onStopAudio={handleStopAudio}
+            segmentAudioStatus={segmentAudioStatus}
+            onEntityClick={handleOpenWikilink}
+            displayMode={config?.media.tts.speech_cues?.display_mode}
           />
 
           {/* Add Entity Modal */}
