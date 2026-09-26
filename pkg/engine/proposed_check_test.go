@@ -10,7 +10,7 @@ import (
 
 func TestRollModeBecomesProposedCheck(t *testing.T) {
 	provider := &toolScriptProvider{replies: []toolReply{
-		{tools: []harness.ToolCall{{ID: "1", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"automatic","reason":"no uncertainty"},"segments":[{"kind":"narration","text":"No need to roll."}],"dismissed_checks":[{"check_ref":"proposed_1","reason":"no uncertainty"}]}`}}},
+		{tools: []harness.ToolCall{{ID: "1", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"automatic","reason":"no uncertainty"},"segments":[{"kind":"narration","text":"No need to roll."}],"dismissed_checks":[{"check_ref":"player-roll","reason":"no uncertainty"}]}`}}},
 	}}
 	o, _ := toolLoopOrchestrator(t, provider)
 	o.SetTools(&fakeExecutor{}, "yes")

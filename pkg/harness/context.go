@@ -86,10 +86,13 @@ type ContextRequest struct {
 	ActionEcho  bool
 	RulesPrompt string
 	LorePrompt  string
-	Profiles    []config.VoiceProfile
-	Recent      []RecentTurn
-	TurnNumber  int
-	Mode        string
+	// MechanicsPrompt is the engine's instruction on when to roll, generated
+	// from the loaded system. Empty when the system ships no mechanics.
+	MechanicsPrompt string
+	Profiles        []config.VoiceProfile
+	Recent          []RecentTurn
+	TurnNumber      int
+	Mode            string
 	// Summary is the campaign's recollection of everything older than the recall
 	// window. It is lossy, so it is stated as subordinate to canon.
 	Summary        string
@@ -259,6 +262,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 
 	return []section{
 		{name: "rules", source: "rules_prompt", text: rulesSection(req.RulesPrompt)},
+		{name: "mechanics", source: "mechanics_prompt", text: mechanicsSection(req.MechanicsPrompt)},
 		{name: "lore", source: "lore_prompt", text: loreSection(req.LorePrompt)},
 		{name: "instructions", source: "speech_cues", text: FormatSpeechFormattingInstructions(req.SpeechCues) + "\n\n"},
 		{name: "action_echo", source: "action_echo", text: actionEchoSection(req.ActionEcho, req.Action)},
@@ -313,6 +317,13 @@ func rulesSection(prompt string) string {
 		return ""
 	}
 	return "## SYSTEM RULES & RESOLUTION MECHANICS\n" + strings.TrimSpace(prompt) + "\n\n"
+}
+
+func mechanicsSection(prompt string) string {
+	if strings.TrimSpace(prompt) == "" {
+		return ""
+	}
+	return strings.TrimSpace(prompt) + "\n\n"
 }
 
 func loreSection(prompt string) string {
