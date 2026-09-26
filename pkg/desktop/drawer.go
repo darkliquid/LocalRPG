@@ -18,6 +18,8 @@ func toggleDrawer(name string) {
 	switch name {
 	case "context":
 		refreshContext()
+	case "graph":
+		refreshGraph()
 	}
 }
 
@@ -93,6 +95,5 @@ func drawerTitle() string {
 	}
 }
 
-func graphDrawer(p ui.Palette)     { Label("Graph", TextColorVec(p.Muted)) }
 func worldDrawer(p ui.Palette)     { Label("Living World", TextColorVec(p.Muted)) }
 func characterDrawer(p ui.Palette) { Label("Character Sheet", TextColorVec(p.Muted)) }

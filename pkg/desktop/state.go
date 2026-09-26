@@ -1,6 +1,8 @@
 package desktop
 
 import (
+	"image"
+
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/gui"
 )
@@ -78,6 +80,10 @@ type State struct {
 	// Context drawer state.
 	TurnContext *gui.TurnContextDTO
 	WorkingSet  []gui.WorkingEntryDTO
+
+	// Graph drawer state.
+	Graph      *gui.GraphDTO
+	GraphImage *image.RGBA
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art

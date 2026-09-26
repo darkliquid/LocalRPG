@@ -90,6 +90,15 @@ func loadMemories(svc *gui.Service, gameID, entityID string) []gui.MemoryDTO {
 	return memories
 }
 
+// loadGraph reads the campaign's entity graph.
+func loadGraph(ctx context.Context, svc *gui.Service, gameID string) *gui.GraphDTO {
+	graph, err := svc.GetGraph(ctx, gameID)
+	if err != nil {
+		return nil
+	}
+	return graph
+}
+
 // loadContext reads the last turn's context report and the working set.
 func loadContext(svc *gui.Service, gameID string) (*gui.TurnContextDTO, []gui.WorkingEntryDTO) {
 	var tc *gui.TurnContextDTO
