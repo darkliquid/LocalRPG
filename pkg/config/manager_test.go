@@ -15,8 +15,8 @@ func TestConfigManager_Defaults(t *testing.T) {
 		t.Fatalf("unexpected error loading defaults: %v", err)
 	}
 
-	if cfg.Paths.Systems != "./systems" {
-		t.Errorf("expected default systems path ./systems, got %q", cfg.Paths.Systems)
+	if cfg.Paths.Systems != "" {
+		t.Errorf("expected an empty default systems path (filled by resolution), got %q", cfg.Paths.Systems)
 	}
 	if cfg.Agents.DefaultRole != "gm" {
 		t.Errorf("expected default role gm, got %q", cfg.Agents.DefaultRole)

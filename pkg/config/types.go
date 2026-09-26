@@ -269,12 +269,7 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Version: "1",
-		Paths: PathsConfig{
-			Systems: "./systems",
-			Worlds:  "./worlds",
-			Games:   "./games",
-			Cache:   "./cache",
-		},
+		Paths: PathsConfig{},
 		Agents: AgentsConfig{
 			DefaultRole:         "gm",
 			TurnTimeoutSeconds:  300,
