@@ -789,3 +789,34 @@ func TestOpenThreadsAreAlwaysInThePrompt(t *testing.T) {
 		}
 	}
 }
+
+func TestActionEchoSection(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+
+	on, err := assembler.Assemble(ContextRequest{
+		PlayerName: "Stretch Layabout",
+		Action:     "I jump into my ship.",
+		ActionEcho: true,
+	})
+	if err != nil {
+		t.Fatalf("Assemble: %v", err)
+	}
+	if !strings.Contains(on.Prompt, "PLAYER ACTION ECHO") {
+		t.Fatal("expected the echo instruction when enabled")
+	}
+	if !strings.Contains(on.Prompt, "Stretch Layabout: I jump into my ship.") {
+		t.Fatalf("expected the named action block:\n%s", on.Prompt)
+	}
+
+	off, err := assembler.Assemble(ContextRequest{
+		PlayerName: "Stretch Layabout",
+		Action:     "I jump.",
+		ActionEcho: false,
+	})
+	if err != nil {
+		t.Fatalf("Assemble off: %v", err)
+	}
+	if strings.Contains(off.Prompt, "PLAYER ACTION ECHO") {
+		t.Fatal("echo instruction must be absent when disabled")
+	}
+}

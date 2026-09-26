@@ -433,3 +433,20 @@ embeddings:
 		t.Errorf("unexpected openai provider config: %+v", pCfg)
 	}
 }
+
+func TestActionEchoDefaultsOn(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.ActionEcho() {
+		t.Fatal("ActionEcho() should default to true")
+	}
+	off := false
+	cfg.Agents.ActionEcho = &off
+	if cfg.ActionEcho() {
+		t.Fatal("ActionEcho() should honour an explicit false")
+	}
+	on := true
+	cfg.Agents.ActionEcho = &on
+	if !cfg.ActionEcho() {
+		t.Fatal("ActionEcho() should honour an explicit true")
+	}
+}

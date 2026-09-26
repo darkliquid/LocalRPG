@@ -76,9 +76,14 @@ type SpeechCueContext struct {
 // parameter list because recall needs the turn number, and a summary and more will
 // follow, at which point the list stops being readable.
 type ContextRequest struct {
-	LocationID  string
-	PlayerID    string
-	Action      string
+	LocationID string
+	PlayerID   string
+	Action     string
+	// PlayerName is the protagonist's display name, so the narrator can name
+	// them when restating the action.
+	PlayerName string
+	// ActionEcho asks for a leading third-person restatement of the action.
+	ActionEcho  bool
 	RulesPrompt string
 	LorePrompt  string
 	Profiles    []config.VoiceProfile
@@ -192,6 +197,28 @@ func (c *ContextAssembler) Assemble(req ContextRequest) (AssembleResult, error) 
 	return result, nil
 }
 
+// actionEchoInstruction tells the narrator to re-anchor the scene on the player's
+// action before resolving it.
+const actionEchoInstruction = `## PLAYER ACTION ECHO
+Open every turn with one short narration segment that restates the player's action
+in the third person, using the character's name or a pronoun, before anything else
+happens. Do not change what they did, invent intent they did not state, or resolve
+it in that sentence; re-anchor the scene on their action, then continue.
+
+Example:
+  Player (Stretch Layabout): I jump into my ship, blasting my pursuers as the hatch closes.
+  Opening narration: Stretch jumps into their ship, firing blaster shots at their pursuers until the canopy seals shut.
+`
+
+// actionEchoSection renders the echo instruction, or nothing when the turn is
+// not an echoed action.
+func actionEchoSection(enabled bool, action string) string {
+	if !enabled || strings.TrimSpace(action) == "" {
+		return ""
+	}
+	return actionEchoInstruction + "\n"
+}
+
 // buildSections composes the prompt in order. Everything a section needs is read
 // here, so trimming never re-reads the store.
 func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) {
@@ -224,10 +251,17 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 		actionRefs = append(actionRefs, Ref{Kind: RefEntity, ID: req.PlayerID, Relation: "action"})
 	}
 
+	actionText := "\n## PLAYER ACTION\n"
+	if name := strings.TrimSpace(req.PlayerName); name != "" {
+		actionText += name + ": "
+	}
+	actionText += req.Action + "\n"
+
 	return []section{
 		{name: "rules", source: "rules_prompt", text: rulesSection(req.RulesPrompt)},
 		{name: "lore", source: "lore_prompt", text: loreSection(req.LorePrompt)},
 		{name: "instructions", source: "speech_cues", text: FormatSpeechFormattingInstructions(req.SpeechCues) + "\n\n"},
+		{name: "action_echo", source: "action_echo", text: actionEchoSection(req.ActionEcho, req.Action)},
 		{name: "canon", source: "canon", text: canonText, refs: canonRefs},
 		{name: "working_set", source: "working_set", text: workingSetText, refs: workingSetRefs, droppable: true, rank: 5},
 		{name: "summary", source: "summary", text: summaryText, refs: summaryRefs, droppable: true, rank: 6},
@@ -235,7 +269,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 		{name: "recall", source: "scene_recall", text: recallText, refs: recallRefs, droppable: true, rank: 3},
 		{name: "retrieval", source: "retrieval", text: retrievalText, refs: retrievalRefs, droppable: true, rank: 2},
 		{name: "catalogue", source: "profiles", text: catalogue, refs: catalogueRefs, droppable: true, rank: 1},
-		{name: "action", source: "player_action", text: "\n## PLAYER ACTION\n" + req.Action + "\n", refs: actionRefs},
+		{name: "action", source: "player_action", text: actionText, refs: actionRefs},
 	}, nil
 }
 

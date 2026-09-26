@@ -142,6 +142,7 @@ func handlePlayCommand(args []string) {
 	}
 	orchestrator.SetTools(toolExecutor, cfg.RoleSupportsTools("gm"))
 	orchestrator.SetToolRounds(cfg.ToolRounds())
+	orchestrator.SetActionEcho(cfg.ActionEcho())
 	orchestrator.LoadPrompts(paths, manifest.SystemID, manifest.WorldID)
 
 	if ttsCli, err := media.NewTTSClient(cfg.Media.TTS); err == nil {

@@ -19,7 +19,7 @@ func TurnToolSpecs() []ToolSpec {
 	return []ToolSpec{
 		{
 			Name:        "submit_turn",
-			Description: "Submit the finished turn: your verdict on the player's action, ordered narration/speech segments, any new personae, memories, and state changes. This ends the turn; call it last.",
+			Description: "Submit the finished turn: your verdict on the player's action, ordered narration/speech segments, any new personae, memories, and state changes. Begin with a short third-person restatement of the player's action before resolving it. This ends the turn; call it last.",
 			Parameters: objectSchema(map[string]interface{}{
 				"action_verdict": objectSchema(map[string]interface{}{
 					"feasibility": stringProperty("'automatic', 'uncertain', or 'impossible'."),

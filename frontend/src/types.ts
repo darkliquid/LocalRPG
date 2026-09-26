@@ -424,6 +424,7 @@ export interface AgentsConfig {
   thread_idle_turns?: number;
   threads_max?: number;
   continuity_checks?: boolean;
+  action_echo?: boolean;
 }
 
 export interface VoiceProfile {

@@ -582,6 +582,20 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       {/* Tab 2: AI Agents & Roles */}
       {activeSubTab === 'agents' && (
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          <label className="flex items-center justify-between gap-3 p-4 rounded-xl bg-glass-card border border-stone-800 cursor-pointer">
+            <span className="text-sm font-sans text-stone-200">
+              Restate the player's action
+              <span className="block text-xs text-stone-400 font-normal">
+                The narrator opens each turn by restating what the player did in the third person.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={config.agents.action_echo !== false}
+              onChange={(e) => setConfig({ ...config, agents: { ...config.agents, action_echo: e.target.checked } })}
+              className="w-4 h-4 accent-purple-600 cursor-pointer"
+            />
+          </label>
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">

@@ -89,6 +89,9 @@ type TurnOrchestrator struct {
 	chronicler       *Chronicler
 	threadsMax       int
 	continuityChecks *bool
+	// actionEcho asks the narrator to restate the player's action before resolving
+	// it; on unless SetActionEcho turns it off.
+	actionEcho       bool
 	completion       harness.ModelProvider
 	completionPolicy CompletionPolicy
 	toolExecutor     ToolExecutor
@@ -225,6 +228,9 @@ func NewTurnOrchestrator(
 		startLocation: startLocation,
 		playerID:      playerID,
 		assembler:     harness.NewContextAssembler(store),
+		// The action echo is on by default, matching the config default; a caller
+		// that read the config overrides it with SetActionEcho.
+		actionEcho: true,
 	}
 	// A loaded rules engine resolves checks from the system's declared schema and
 	// its own js resolvers; otherwise the deterministic default stands in.
@@ -309,6 +315,12 @@ func (o *TurnOrchestrator) threadsCap() int {
 // SetContinuityChecks turns the deterministic continuity pass on or off.
 func (o *TurnOrchestrator) SetContinuityChecks(enabled bool) {
 	o.continuityChecks = &enabled
+}
+
+// SetActionEcho asks the narrator to open each action turn with a third-person
+// restatement of the player's action.
+func (o *TurnOrchestrator) SetActionEcho(enabled bool) {
+	o.actionEcho = enabled
 }
 
 // continuityEnabled reports whether the pass should run.
@@ -617,11 +629,19 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 	canCallTools := o.offersTools(isCaller)
 
+	echoAction := o.actionEcho &&
+		!isOpening && !isCorrection &&
+		!strings.EqualFold(mode, "Roll") &&
+		!strings.EqualFold(mode, "Say") &&
+		strings.TrimSpace(actionInput) != ""
+
 	assembly, err := o.assembler.Assemble(harness.ContextRequest{
 		Context:          ctx,
 		LocationID:       locationID,
 		PlayerID:         o.playerID,
 		Action:           generationPrompt,
+		PlayerName:       o.playerDisplayName(),
+		ActionEcho:       echoAction,
 		RulesPrompt:      o.rulesPrompt,
 		LorePrompt:       o.lorePrompt,
 		Profiles:         o.timeline.VoiceProfiles(),

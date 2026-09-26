@@ -84,6 +84,10 @@ type AgentsConfig struct {
 	// ContinuityChecks runs the deterministic drift pass. A pointer distinguishes
 	// "not configured" from "switched off", because the default is on.
 	ContinuityChecks *bool `yaml:"continuity_checks" json:"continuity_checks,omitempty"`
+	// ActionEcho prepends the narrator's third-person restatement of the player's
+	// action to each turn. A pointer distinguishes "not configured" (on) from
+	// "switched off".
+	ActionEcho *bool `yaml:"action_echo" json:"action_echo,omitempty"`
 	// Completion governs how a narrator reply that stops mid-thought is repaired.
 	Completion CompletionConfig `yaml:"completion" json:"completion"`
 	// ToolRounds caps how many times a turn may call tools before tools are
@@ -560,6 +564,12 @@ func (c *Config) ThreadsMax() int {
 // ContinuityChecks runs the deterministic drift pass when explicitly configured on.
 func (c *Config) ContinuityChecks() bool {
 	return c.Agents.ContinuityChecks != nil && *c.Agents.ContinuityChecks
+}
+
+// ActionEcho reports whether the narrator should restate the player's action.
+// The default is on, so a configuration that never mentions it keeps echoing.
+func (c *Config) ActionEcho() bool {
+	return c.Agents.ActionEcho == nil || *c.Agents.ActionEcho
 }
 
 // CompletionMode is the recovery policy: "auto", "continue", "trim", or "off".
