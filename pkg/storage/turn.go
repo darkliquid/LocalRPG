@@ -17,15 +17,16 @@ type TurnEntityRef struct {
 // TurnRecord is the row shape of one timeline entry. Timestamps are stored as
 // RFC3339 text so the value does not depend on driver time handling.
 type TurnRecord struct {
-	Number    int
-	Timestamp time.Time
-	Mode      string
-	Input     string
-	Narration string
-	Location  string
-	Outcome   string
-	RollJSON  string
-	Entities  []TurnEntityRef
+	Number     int
+	Timestamp  time.Time
+	Mode       string
+	Input      string
+	Narration  string
+	Location   string
+	Outcome    string
+	RollJSON   string
+	ChecksJSON string
+	Entities   []TurnEntityRef
 }
 
 // SaveTurn upserts one turn and replaces its entity links in a single transaction.
@@ -37,20 +38,21 @@ func (s *Store) SaveTurn(rec TurnRecord) error {
 	defer tx.Rollback()
 
 	const upsert = `
-	INSERT INTO turns (number, timestamp, mode, input, narration, roll_json, location, outcome)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO turns (number, timestamp, mode, input, narration, roll_json, checks_json, location, outcome)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(number) DO UPDATE SET
 		timestamp = excluded.timestamp,
 		mode = excluded.mode,
 		input = excluded.input,
 		narration = excluded.narration,
 		roll_json = excluded.roll_json,
+		checks_json = excluded.checks_json,
 		location = excluded.location,
 		outcome = excluded.outcome
 	`
 	stamp := rec.Timestamp.UTC().Format(time.RFC3339Nano)
 	if _, err := tx.Exec(upsert, rec.Number, stamp, rec.Mode, rec.Input, rec.Narration,
-		emptyToNull(rec.RollJSON), emptyToNull(rec.Location), emptyToNull(rec.Outcome)); err != nil {
+		emptyToNull(rec.RollJSON), emptyToNull(rec.ChecksJSON), emptyToNull(rec.Location), emptyToNull(rec.Outcome)); err != nil {
 		return fmt.Errorf("upsert turn %d: %w", rec.Number, err)
 	}
 
@@ -74,13 +76,13 @@ func (s *Store) SaveTurn(rec TurnRecord) error {
 func (s *Store) GetTurn(number int) (*TurnRecord, error) {
 	const query = `
 	SELECT number, timestamp, mode, input, narration,
-	       COALESCE(roll_json, ''), COALESCE(location, ''), COALESCE(outcome, '')
+	       COALESCE(roll_json, ''), COALESCE(checks_json, ''), COALESCE(location, ''), COALESCE(outcome, '')
 	FROM turns WHERE number = ?`
 
 	var rec TurnRecord
 	var stamp string
 	if err := s.db.QueryRow(query, number).Scan(&rec.Number, &stamp, &rec.Mode, &rec.Input,
-		&rec.Narration, &rec.RollJSON, &rec.Location, &rec.Outcome); err != nil {
+		&rec.Narration, &rec.RollJSON, &rec.ChecksJSON, &rec.Location, &rec.Outcome); err != nil {
 		return nil, fmt.Errorf("get turn %d: %w", number, err)
 	}
 
@@ -158,7 +160,7 @@ func emptyToNull(value string) interface{} {
 func (s *Store) ListTurns(limit, offset int) ([]TurnRecord, error) {
 	query := `
 	SELECT number, timestamp, mode, input, narration,
-	       COALESCE(roll_json, ''), COALESCE(location, ''), COALESCE(outcome, '')
+	       COALESCE(roll_json, ''), COALESCE(checks_json, ''), COALESCE(location, ''), COALESCE(outcome, '')
 	FROM turns ORDER BY number`
 	args := make([]interface{}, 0, 2)
 	if limit > 0 {
@@ -177,7 +179,7 @@ func (s *Store) ListTurns(limit, offset int) ([]TurnRecord, error) {
 		var rec TurnRecord
 		var stamp string
 		if err := rows.Scan(&rec.Number, &stamp, &rec.Mode, &rec.Input, &rec.Narration,
-			&rec.RollJSON, &rec.Location, &rec.Outcome); err != nil {
+			&rec.RollJSON, &rec.ChecksJSON, &rec.Location, &rec.Outcome); err != nil {
 			return nil, err
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, stamp)

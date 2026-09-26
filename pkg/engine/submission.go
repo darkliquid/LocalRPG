@@ -19,7 +19,7 @@ func buildSegments(sub *harness.TurnSubmission, resolve func(string) (string, bo
 			id, ok := resolve(spec.Speaker)
 			if !ok {
 				appendNarration(&narration, spec.Text)
-				segments = append(segments, entity.TurnSegment{Kind: entity.SegmentNarration, Text: spec.Text})
+				segments = append(segments, entity.TurnSegment{Kind: entity.SegmentNarration, Text: spec.Text, CheckRef: spec.CheckRef})
 				continue
 			}
 			segments = append(segments, entity.TurnSegment{
@@ -27,11 +27,12 @@ func buildSegments(sub *harness.TurnSubmission, resolve func(string) (string, bo
 				Speaker:   spec.Speaker,
 				SpeakerID: id,
 				Text:      spec.Text,
+				CheckRef:  spec.CheckRef,
 			})
 			continue
 		}
 		appendNarration(&narration, spec.Text)
-		segments = append(segments, entity.TurnSegment{Kind: entity.SegmentNarration, Text: spec.Text})
+		segments = append(segments, entity.TurnSegment{Kind: entity.SegmentNarration, Text: spec.Text, CheckRef: spec.CheckRef})
 	}
 	return strings.TrimSpace(narration.String()), segments
 }

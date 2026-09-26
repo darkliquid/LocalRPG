@@ -19,6 +19,7 @@ var migrations = []migration{
 	{version: 4, apply: addWorkingSetTable},
 	{version: 5, apply: addMemoriesTables},
 	{version: 6, apply: addEmbeddingsTable},
+	{version: 7, apply: addChecksColumn},
 }
 
 // addEmbeddingsTable creates the table and indexes for vector embeddings.
@@ -151,6 +152,22 @@ func addTimelineColumns(db *sql.DB) error {
 		if _, err := db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", c.table, c.column, c.definition)); err != nil {
 			return fmt.Errorf("add %s.%s: %w", c.table, c.column, err)
 		}
+	}
+	return nil
+}
+
+// addChecksColumn stores the checks a turn resolved so the index mirrors
+// history.jsonl and a rebuilt database regains them.
+func addChecksColumn(db *sql.DB) error {
+	exists, err := columnExists(db, "turns", "checks_json")
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	if _, err := db.Exec("ALTER TABLE turns ADD COLUMN checks_json TEXT"); err != nil {
+		return fmt.Errorf("add turns.checks_json: %w", err)
 	}
 	return nil
 }

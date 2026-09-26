@@ -26,6 +26,8 @@ export interface TurnSegment {
   speaker?: string;
   speaker_id?: string;
   text: string;
+  // Names the check whose roll this segment narrates, so the dice render inline.
+  check_ref?: string;
   audio_url?: string;
   portrait_url?: string;
   // Version token for the clip, which changes when the speaker's voice changes.
@@ -69,8 +71,12 @@ export interface Turn {
 
 export interface TurnCheck {
   check_id: string;
+  actor?: string;
+  target?: string;
+  check_kind?: string;
+  stakes?: string;
   outcome: string;
-  roll?: { notation: string; total: number };
+  roll?: { notation: string; total: number; successes?: number; roll_count?: number };
 }
 
 export interface EntityMemory {

@@ -504,6 +504,11 @@ func turnRecord(turn Turn) storage.TurnRecord {
 			rec.RollJSON = string(data)
 		}
 	}
+	if len(turn.Checks) > 0 {
+		if data, err := json.Marshal(turn.Checks); err == nil {
+			rec.ChecksJSON = string(data)
+		}
+	}
 	for _, mention := range turn.Entities {
 		rec.Entities = append(rec.Entities, storage.TurnEntityRef{
 			EntityID: mention.ID,

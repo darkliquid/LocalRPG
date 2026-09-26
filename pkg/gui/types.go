@@ -58,6 +58,7 @@ type SegmentDTO struct {
 	AudioURL  string  `json:"audio_url,omitempty"`
 	AudioKey  string  `json:"audio_key,omitempty"`
 	PortraitURL string  `json:"portrait_url,omitempty"`
+	CheckRef    string  `json:"check_ref,omitempty"`
 	Player      bool    `json:"player,omitempty"`
 	Duration    float64 `json:"duration"`
 }

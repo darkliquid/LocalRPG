@@ -296,6 +296,7 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, a
 			Speaker:   segment.Speaker,
 			SpeakerID: segment.SpeakerID,
 			Text:      text,
+			CheckRef:  segment.CheckRef,
 			Player:    segment.Player,
 			// The reading estimate is the same one the exports pace with, so the
 			// app and a rendered bundle hold a line for the same length of time.

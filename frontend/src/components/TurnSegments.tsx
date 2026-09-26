@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { TurnSegment } from '../types';
+import { TurnSegment, TurnCheck } from '../types';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { MarkdownProse } from './MarkdownProse';
 import { ImageLightbox } from './ImageLightbox';
+import { DiceCheckCard } from './DiceCheckCard';
 import { Play, Square, RotateCw, Loader2 } from 'lucide-react';
 import { SegmentAudioControls } from './SegmentAudioControls';
 
@@ -27,6 +28,8 @@ interface TurnSegmentsProps {
   turnAudioMessage?: string;
   turnNumber?: number;
   segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
+  // Checks resolved this turn, rendered inline at the segment that narrates them.
+  checks?: TurnCheck[];
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
 }
 
@@ -43,6 +46,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   turnAudioMessage,
   turnNumber,
   segmentAudioStatus,
+  checks,
   displayMode = 'stage_directions',
 }) => {
   const ordered = segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: fallback }];
@@ -84,12 +88,36 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
 
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
 
+  // Merge checks into the segment stream so a roll renders immediately before the
+  // line it produced; any check the GM did not attach renders after the prose.
+  const checkByID = new Map((checks ?? []).map((check) => [check.check_id, check]));
+  const usedChecks = new Set<string>();
+  const stream: Array<{ segment?: TurnSegment; check?: TurnCheck; index?: number }> = [];
+  ordered.forEach((segment, index) => {
+    if (segment.check_ref) {
+      const check = checkByID.get(segment.check_ref);
+      if (check && !usedChecks.has(check.check_id)) {
+        usedChecks.add(check.check_id);
+        stream.push({ check });
+      }
+    }
+    stream.push({ segment, index });
+  });
+  for (const check of checks ?? []) {
+    if (!usedChecks.has(check.check_id)) stream.push({ check });
+  }
+
   return (
     <div className="space-y-3">
-      {ordered.map((segment, i) =>
-        segment.kind === 'speech' ? (
+      {stream.map((item, streamIndex) => {
+        if (item.check) {
+          return <DiceCheckCard key={`check-${item.check.check_id}`} check={item.check} />;
+        }
+        const segment = item.segment as TurnSegment;
+        const i = item.index as number;
+        return segment.kind === 'speech' ? (
           <div
-            key={i}
+            key={streamIndex}
             className={`group relative bg-glass-card border-l-4 pl-4 py-3 pr-4 rounded-r-xl shadow-lg space-y-2 ${
               segment.player ? 'border-sky-400/90' : 'border-purple-500/90'
             }`}
@@ -141,7 +169,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             />
           </div>
         ) : (
-          <div key={i} className="group relative">
+          <div key={streamIndex} className="group relative">
             {segmentControls(i)}
             <MarkdownProse
               text={segment.text}
@@ -150,8 +178,8 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
               className="text-stone-200 text-xl leading-relaxed tracking-wide font-serif space-y-4"
             />
           </div>
-        )
-      )}
+        );
+      })}
 
       {/* Server-side playback controls */}
       {hasAudio && serverPlayback && (

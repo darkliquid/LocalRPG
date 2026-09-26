@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS turns (
     input        TEXT NOT NULL,
     narration    TEXT NOT NULL,
     roll_json    TEXT,
+    checks_json  TEXT,
     location     TEXT,
     outcome      TEXT
 );

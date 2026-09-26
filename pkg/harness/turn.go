@@ -85,6 +85,8 @@ type CheckResult struct {
 	CheckID   string                 `json:"check_id"`
 	Actor     string                 `json:"actor,omitempty"`
 	Target    string                 `json:"target,omitempty"`
+	CheckKind string                 `json:"check_kind,omitempty"`
+	Stakes    string                 `json:"stakes,omitempty"`
 	Roll      *RollSummary           `json:"roll"`
 	Outcome   string                 `json:"outcome"`
 	Breakdown map[string]interface{} `json:"breakdown,omitempty"`

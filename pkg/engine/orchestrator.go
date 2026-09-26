@@ -164,7 +164,17 @@ func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRe
 	if resolver == nil {
 		resolver = defaultCheckResolver{}
 	}
-	return resolver.Resolve(ctx, req, actor)
+	resolved, err := resolver.Resolve(ctx, req, actor)
+	if err != nil {
+		return nil, err
+	}
+	if resolved.CheckKind == "" {
+		resolved.CheckKind = req.CheckKind
+	}
+	if resolved.Stakes == "" {
+		resolved.Stakes = req.Stakes
+	}
+	return resolved, nil
 }
 
 // SetToolObserver receives tool activity as it happens, so a client can show it
