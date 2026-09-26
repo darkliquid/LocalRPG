@@ -66,6 +66,15 @@ func Run(cfg Config) error {
 		saveEntity = func(ctx context.Context, svc *gui.Service, gameID, entityID, markdown string) error {
 			return svc.SaveEntity(ctx, gameID, entityID, markdown)
 		}
+		regeneratePortrait = func(ctx context.Context, svc *gui.Service, gameID, characterID string) error {
+			_, err := svc.RegenerateCharacterPortrait(ctx, gameID, characterID)
+			return err
+		}
+		mergeEntities = func(ctx context.Context, svc *gui.Service, gameID, sourceID, targetID string) error {
+			_, err := svc.MergeEntities(ctx, gameID, sourceID, targetID)
+			return err
+		}
+		portraitPath = writePortrait
 	} else {
 		liveService = nil
 		createGame = nil
@@ -75,6 +84,9 @@ func Run(cfg Config) error {
 		restartGame = nil
 		deleteGame = nil
 		saveEntity = nil
+		regeneratePortrait = nil
+		mergeEntities = nil
+		portraitPath = nil
 	}
 
 	if cfg.PNGPath != "" {

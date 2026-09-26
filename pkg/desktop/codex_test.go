@@ -27,3 +27,18 @@ func TestFilteredEntitiesByQueryAndType(t *testing.T) {
 		t.Fatalf("type filter = %v", got)
 	}
 }
+
+func TestMergeTargetsExcludeSelf(t *testing.T) {
+	appState = &State{
+		Loaded: true,
+		Entities: []gui.EntitySummaryDTO{
+			{ID: "hero", Name: "Vance"},
+			{ID: "vance-alias", Name: "The Traveller"},
+		},
+		Entity: &gui.EntityDTO{ID: "hero", Name: "Vance"},
+	}
+	targets := mergeTargets()
+	if len(targets) != 1 || targets[0].ID != "vance-alias" {
+		t.Fatalf("mergeTargets = %+v", targets)
+	}
+}

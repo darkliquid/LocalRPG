@@ -81,6 +81,15 @@ func loadEntity(ctx context.Context, svc *gui.Service, gameID, entityID string) 
 	return entity, entity.Markdown
 }
 
+// loadMemories reads an entity's memory timeline.
+func loadMemories(svc *gui.Service, gameID, entityID string) []gui.MemoryDTO {
+	memories, err := svc.ListEntityMemories(gameID, entityID, 20)
+	if err != nil || memories == nil {
+		return []gui.MemoryDTO{}
+	}
+	return memories
+}
+
 // loadChronicle reads the campaign's turn history.
 func loadChronicle(ctx context.Context, svc *gui.Service, gameID string) []gui.TurnDTO {
 	turns, err := svc.GetChronicle(ctx, gameID)

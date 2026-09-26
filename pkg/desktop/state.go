@@ -69,6 +69,11 @@ type State struct {
 	EntityMarkdown string
 	EntityQuery    string
 	EntityType     string
+	CodexTab       string
+	Memories       []gui.MemoryDTO
+	PortraitPath   string
+	MergeOpen      bool
+	MergeTarget    string
 
 	// GameArt and WorldArt hold resolved on-disk banner/icon paths.
 	GameArt  map[string]Art
