@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Turn } from '../types';
+import { Turn, LimitState } from '../types';
 import { TurnAudioState, segmentAudioKey } from './TurnSegments';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { TheaterStage } from './theater/TheaterStage';
@@ -7,6 +7,7 @@ import { TheaterDialogue } from './theater/TheaterDialogue';
 import { TheaterTransport } from './theater/TheaterTransport';
 import { X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
+import { LimitChip } from './LimitChip';
 
 interface StoryTheaterProps {
   turns: Turn[];
@@ -24,6 +25,7 @@ interface StoryTheaterProps {
   segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
   onEntityClick?: (entityId: string) => void;
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
+  limits?: LimitState[];
 }
 
 // BEAT_GAP_MS is the buffer between one voice clip finishing and the next line
@@ -46,6 +48,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   segmentAudioStatus = {},
   onEntityClick,
   displayMode,
+  limits,
 }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [activeSegment, setActiveSegment] = useState(0);
@@ -249,6 +252,9 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
           <span className="text-xs font-mono text-stone-400 bg-black/50 px-2 py-1 rounded border border-white/10">
             Turn {currentIdx + 1} of {turns.length}
           </span>
+          {limits?.map((block, idx) => (
+            <LimitChip key={idx} block={block} />
+          ))}
         </div>
         <button
           onClick={onClose}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { APIClient, HTTPError, GenerationError } from './api/client';
-import { GameState, Turn, EntityNote, EntitySummary, Recap, GraphData, AppConfig } from './types';
+import { GameState, Turn, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { TurnAudioState, segmentAudioKey } from './components/TurnSegments';
@@ -18,27 +18,10 @@ import { SettingsStudio } from './components/SettingsStudio';
 import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
-import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers } from 'lucide-react';
+import { LimitChip } from './components/LimitChip';
+import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, AlertTriangle } from 'lucide-react';
 import { formatGenerationError } from './lib/generationError';
-
-// Mirrors entity.Slugify in the Go backend: lowercase, [a-z0-9] kept, runs of
-// spaces/hyphens/underscores collapse to a single hyphen, trailing hyphen trimmed.
-const slugify = (name: string): string => {
-  let out = '';
-  let precededBySeparator = true;
-  for (const ch of name.toLowerCase().trim()) {
-    if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) {
-      out += ch;
-      precededBySeparator = false;
-    } else if (ch === ' ' || ch === '-' || ch === '_') {
-      if (out.length > 0 && !precededBySeparator) {
-        out += '-';
-        precededBySeparator = true;
-      }
-    }
-  }
-  return out.endsWith('-') ? out.slice(0, -1) : out;
-};
+import { slugify } from './lib/slug';
 
 export const App: React.FC = () => {
   // Always open in the launcher hub view rather than directly entering a campaign.
@@ -85,6 +68,54 @@ export const App: React.FC = () => {
   // Advancement spending: the drawer disables its buttons and shows the refusal.
   const [advancementSpending, setAdvancementSpending] = useState(false);
   const [advancementError, setAdvancementError] = useState<string | null>(null);
+
+  // Rate limits & funds failures
+  const [limits, setLimits] = useState<LimitState[]>([]);
+  const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null);
+  const [fundsError, setFundsError] = useState<{ provider?: string; message: string } | null>(null);
+  const [now, setNow] = useState<number>(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const fetchLimits = useCallback(async () => {
+    try {
+      const res = await APIClient.getLimits();
+      setLimits(res.blocks || []);
+      const fundsBlock = res.blocks?.find((b) => b.funds_failure);
+      if (fundsBlock && fundsBlock.funds_failure) {
+        setFundsError({
+          provider: fundsBlock.provider,
+          message: fundsBlock.funds_failure,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to poll limits:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLimits();
+    const interval = setInterval(fetchLimits, 15000);
+    return () => clearInterval(interval);
+  }, [fetchLimits]);
+
+  const activeRateLimitSeconds = useMemo(() => {
+    if (rateLimitUntil && rateLimitUntil > now) {
+      return Math.ceil((rateLimitUntil - now) / 1000);
+    }
+    const gmBlock = limits.find(
+      (b) => (b.role === 'gm' || b.role === 'extractor') && b.until && new Date(b.until).getTime() > now
+    );
+    if (gmBlock && gmBlock.until) {
+      return Math.ceil((new Date(gmBlock.until).getTime() - now) / 1000);
+    }
+    return 0;
+  }, [rateLimitUntil, limits, now]);
+
+  const isRateLimited = activeRateLimitSeconds > 0;
 
   useEffect(() => {
     APIClient.getSettings()
@@ -252,6 +283,9 @@ export const App: React.FC = () => {
             const turn = event.turn;
             setChronicle((prev) => [...prev, turn]);
             setStreamedProse('');
+            setFundsError(null);
+            setRateLimitUntil(null);
+            fetchLimits();
             // A turn can introduce characters, so the graph and the character
             // view are refreshed rather than left showing the state before it.
             refreshCorpus();
@@ -268,6 +302,18 @@ export const App: React.FC = () => {
               ? formatGenerationError(event.failure)
               : (event.detail || event.message || 'The turn failed.');
             setTurnError(reason);
+            if (event.code === 'rate_limited' || event.failure?.code === 'rate_limited') {
+              const retryMs = event.retry_after_ms ?? event.failure?.retry_after_ms ?? 30000;
+              setRateLimitUntil(Date.now() + retryMs);
+              fetchLimits();
+            } else if (event.code === 'insufficient_funds' || event.failure?.code === 'insufficient_funds') {
+              const provider = event.failure?.attempts?.[0]?.provider || 'AI';
+              setFundsError({
+                provider,
+                message: event.failure?.message || event.detail || event.message || 'Insufficient funds/credits',
+              });
+              fetchLimits();
+            }
             console.error('turn failed:', event.message);
           }
         },
@@ -525,6 +571,9 @@ export const App: React.FC = () => {
                     mechanics: {gameState.mechanics_engagement}
                   </span>
                 )}
+                {limits.map((block, idx) => (
+                  <LimitChip key={idx} block={block} />
+                ))}
               </div>
             </div>
 
@@ -697,15 +746,43 @@ export const App: React.FC = () => {
                   </div>
                   <button
                     onClick={() => handleActionSubmit('Roll', '', pendingCheck.ref)}
-                    disabled={turnInFlight}
+                    disabled={turnInFlight || isRateLimited}
                     className="shrink-0 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-sans font-bold cursor-pointer"
                   >
                     Roll
                   </button>
                 </div>
               )}
+
+              {fundsError && (
+                <div className="mx-4 mb-2 p-3 bg-red-950/80 border border-red-500/50 text-red-200 text-xs rounded-xl flex items-center justify-between shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                    <span>
+                      Provider {fundsError.provider || 'AI'} rejected the request: insufficient funds/credits. Add funds and retry — no other work is blocked.
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setFundsError(null)}
+                    className="text-stone-400 hover:text-white p-1 rounded hover:bg-white/10 ml-2 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {isRateLimited && (
+                <div className="mx-4 mb-2 p-3 bg-amber-950/80 border border-amber-500/50 text-amber-200 text-xs rounded-xl flex items-center gap-2 shadow-lg">
+                  <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+                  <span>
+                    Rate limit backoff active. Submitting turns paused for {activeRateLimitSeconds}s.
+                  </span>
+                </div>
+              )}
+
               <ActionConsole
                 onSubmit={handleActionSubmit}
+                disabled={isRateLimited}
                 streaming={turnInFlight}
                 onStop={handleStopTurn}
                 sttType={config?.media.stt?.type}
@@ -797,6 +874,7 @@ export const App: React.FC = () => {
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto p-6">
                   <SettingsStudio
+                    activeGameID={activeGameID ?? undefined}
                     onSaved={() =>
                       APIClient.getSettings()
                         .then((res) => setConfig(res.config))
@@ -827,6 +905,7 @@ export const App: React.FC = () => {
             segmentAudioStatus={segmentAudioStatus}
             onEntityClick={handleOpenWikilink}
             displayMode={config?.media.tts.speech_cues?.display_mode}
+            limits={limits}
           />
 
           {/* Add Entity Modal */}

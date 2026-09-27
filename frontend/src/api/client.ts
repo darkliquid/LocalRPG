@@ -39,6 +39,8 @@ import {
   WorkingEntry,
   GenerationFailure,
   EntityMemory,
+  Usage,
+  LimitsDTO,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -247,12 +249,13 @@ export class APIClient {
     name: string,
     description: string,
     artStyle: string,
-    genre: string = ''
+    genre: string = '',
+    usageToken?: string
   ): Promise<Blob> {
     const res = await fetch('/api/generate-asset-preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind, name, description, art_style: artStyle, genre }),
+      body: JSON.stringify({ kind, name, description, art_style: artStyle, genre, usage_token: usageToken }),
     });
     if (!res.ok) return throwGenerationError(res);
     return res.blob();
@@ -502,7 +505,23 @@ export class APIClient {
     });
 
     if (!res.ok) {
-      throw new Error(`streamTurn: ${res.status} ${await res.text()}`);
+      const text = await res.text();
+      if (res.status === 429) {
+        let retryAfterMs: number | undefined;
+        const retryHeader = res.headers.get('Retry-After');
+        if (retryHeader) {
+          const secs = parseInt(retryHeader, 10);
+          if (!isNaN(secs) && secs > 0) retryAfterMs = secs * 1000;
+        }
+        onEvent({
+          type: 'error',
+          code: 'rate_limited',
+          message: text,
+          retry_after_ms: retryAfterMs,
+        });
+        return;
+      }
+      throw new Error(`streamTurn: ${res.status} ${text}`);
     }
     if (!res.body) {
       throw new Error('streamTurn: response has no body');
@@ -623,6 +642,28 @@ export class APIClient {
 
   async getWorkingSet(): Promise<WorkingEntry[]> {
     return APIClient.getWorkingSet(this.gameID);
+  }
+
+  static async getGameUsage(gameID: string): Promise<Usage> {
+    const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/usage`);
+    if (!res.ok) throw new Error(`getGameUsage: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async getGlobalUsage(): Promise<Usage> {
+    const res = await fetch('/api/usage');
+    if (!res.ok) throw new Error(`getGlobalUsage: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async getLimits(): Promise<LimitsDTO> {
+    const res = await fetch('/api/limits');
+    if (!res.ok) throw new Error(`getLimits: ${res.statusText}`);
+    return res.json();
+  }
+
+  async getGameUsage(): Promise<Usage> {
+    return APIClient.getGameUsage(this.gameID);
   }
 }
 

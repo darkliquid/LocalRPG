@@ -5,6 +5,7 @@ import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
 import { X, Upload, Check, Volume2, MapPin, Sparkles, User, Wand2 } from 'lucide-react';
 import { AIGenerateButton } from '../ui/AIGenerateButton';
 import { useMountTransition } from '../../hooks/useMountTransition';
+import { slugify } from '../../lib/slug';
 
 interface NewCampaignModalProps {
   isOpen: boolean;
@@ -164,13 +165,16 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
     if (!world) return;
     setGeneratingKind(kind);
     setGenError(null);
+    const effectiveName = campaignName.trim() || world.name;
+    const token = slugify(effectiveName);
     try {
       const blob = await APIClient.generateAssetPreview(
         kind,
-        campaignName.trim() || world.name,
+        effectiveName,
         world.description || '',
         world.art_style || '',
-        world.genre || ''
+        world.genre || '',
+        token
       );
       const file = new File([blob], `${kind}.png`, { type: blob.type });
       if (kind === 'banner') {
