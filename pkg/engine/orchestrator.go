@@ -110,6 +110,7 @@ type TurnOrchestrator struct {
 	toolRounds       int
 	toolObserver     func(ToolActivity)
 	speechCues       harness.SpeechCueContext
+	usageCtx         *harness.UsageContext
 }
 
 // SetSpeechCues sets the vocal steering hints passed to the GM prompt.
@@ -185,6 +186,10 @@ func (o *TurnOrchestrator) SetLorePrompt(prompt string) { o.lorePrompt = prompt 
 // SetMechanicsPrompt sets the formatted mechanics instruction without rebuilding
 // it, so a cached runtime can hand it over directly.
 func (o *TurnOrchestrator) SetMechanicsPrompt(prompt string) { o.mechanicsPrompt = prompt }
+
+// SetUsageContext attaches the per-turn usage sink, so provider calls made
+// during the turn are stamped with its number.
+func (o *TurnOrchestrator) SetUsageContext(ctx *harness.UsageContext) { o.usageCtx = ctx }
 
 // checkResolverOrDefault returns the configured resolver.
 func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error) {
@@ -467,6 +472,9 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		return nil, fmt.Errorf("load history: %w", err)
 	}
 	turnNum := len(pastTurns) + 1
+	if o.usageCtx != nil {
+		o.usageCtx.SetTurn(turnNum)
+	}
 
 	// The engagement cadence floor: after enough quiet turns, force a check.
 	o.forceToolChoice = false

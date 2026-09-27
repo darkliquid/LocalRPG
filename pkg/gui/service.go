@@ -82,6 +82,13 @@ type Service struct {
 	historyCache map[string][]engine.Turn
 	historySize  map[string]int64
 	historyMtime map[string]int64
+	// The shared usage ledger holds spend that belongs to no campaign, plus the
+	// pending rows a creation flow produces before its campaign exists.
+	globalUsageMu sync.Mutex
+	globalUsage   *storage.Store
+	// limits holds in-memory provider rate-limit blocks and funds failures, so a
+	// 429 backs a provider off rather than being retried blindly.
+	limits *harness.LimitRegistry
 }
 
 // Config returns the configuration the service is running with, so a command can
@@ -120,6 +127,7 @@ func NewService(rootDir string) *Service {
 		locks:          make(map[string]*sync.Mutex),
 		modelsManager:  models.NewManager(dirs.Cache),
 		summaryPending: make(map[string]bool),
+		limits:         harness.NewLimitRegistry(),
 	}
 	if !projectMode {
 		if warning := paths.LegacyWarning(paths.System(), cfg.Paths); warning != "" {
@@ -163,6 +171,14 @@ func (s *Service) Close() {
 	s.mu.Unlock()
 	for _, worker := range workers {
 		worker.Stop()
+	}
+
+	s.globalUsageMu.Lock()
+	ledger := s.globalUsage
+	s.globalUsage = nil
+	s.globalUsageMu.Unlock()
+	if ledger != nil {
+		_ = ledger.Close()
 	}
 }
 
@@ -1066,6 +1082,12 @@ func (s *Service) BeginTurn(gameID string) (*TurnSession, error) {
 	}
 	release := lock.Unlock
 
+	// Refuse a turn while the GM's provider is backed off, before taking any work.
+	if err := s.guardRole("gm"); err != nil {
+		release()
+		return nil, err
+	}
+
 	session, err := s.prepareTurn(gameID)
 	if err != nil {
 		release()
@@ -1245,6 +1267,11 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	}
 	router := runtime.router
 
+	// One usage context per turn stamps every provider call the turn makes with
+	// the campaign and turn number, including a concurrent extraction.
+	usageCtx := harness.NewUsageContext(s, gameID)
+	router.SetUsageRecorder(usageCtx)
+
 	jsEngine := rules.NewJSEngine(rules.NewHostBridge(store, timeline, playerID))
 
 	// The VM is rebuilt every turn, so its hooks must be re-registered every
@@ -1267,7 +1294,12 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator := engine.NewTurnOrchestrator(store, timeline, jsEngine, router, startLocation, playerID)
 	orchestrator.SetLogger(logger)
 	orchestrator.SetChronicler(chronicler)
-	orchestrator.SetExtractor(harness.ExtractorFromConfigWithLogger(cfg, router, logger))
+	orchestrator.SetUsageContext(usageCtx)
+	extractor := harness.ExtractorFromConfigWithLogger(cfg, router, logger)
+	if extractor != nil {
+		extractor.SetUsageRecorder(usageCtx)
+	}
+	orchestrator.SetExtractor(extractor)
 	orchestrator.SetCompletionProvider(harness.CompletionFromConfig(cfg, router, logger))
 	orchestrator.SetCompletionPolicy(engine.CompletionPolicy{
 		Mode:        cfg.CompletionMode(),
@@ -1356,8 +1388,10 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		return emit(TurnEvent{Type: "chunk", Text: text})
 	})
 	if err != nil {
+		t.service.noteFailure("gm", err)
 		return err
 	}
+	t.service.noteSuccess("gm")
 
 	dto := t.service.turnDTO(*turn, t.store, t.cfg, t.gameID)
 	if err := emit(TurnEvent{Type: "turn", Turn: &dto}); err != nil {
@@ -1764,7 +1798,25 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 		return "", err
 	}
 	isForce := len(force) > 0 && force[0]
-	return pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
+	path, err := pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
+	if err != nil {
+		s.noteFailure("tts", err)
+		return "", err
+	}
+	s.noteSuccess("tts")
+	// A cache hit reports nothing, so only a real synthesis is recorded.
+	if u := pipeline.LastUsage(); u.Characters != 0 || u.InputTokens != 0 || u.OutputTokens != 0 || u.Requests != 0 {
+		s.RecordUsage(gameID, turnNumber, "tts", harness.Usage{
+			Provider:     media.ProviderKey(cfg.Media.TTS),
+			Model:        cfg.Media.TTS.Model,
+			InputTokens:  u.InputTokens,
+			OutputTokens: u.OutputTokens,
+			Characters:   u.Characters,
+			Requests:     u.Requests,
+			Estimated:    u.Estimated,
+		})
+	}
+	return path, nil
 }
 
 // audioPipeline returns the shared TTS pipeline, building it when the current
@@ -2249,6 +2301,12 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 		return nil, fmt.Errorf("init game: %w", err)
 	}
 	_ = session.Close()
+
+	// Spend the client deferred while building this campaign now belongs to it.
+	// Nothing is recorded under this token unless the client asked for deferral.
+	if err := s.CommitDeferredUsage(gameID, gameID); err != nil {
+		trace.OrNil(s.logger).Event("usage.commit_error", map[string]interface{}{"game": gameID, "error": err.Error()})
+	}
 
 	if strings.TrimSpace(req.NarratorVoice) != "" {
 		_ = s.UpdateGameSettings(ctx, gameID, map[string]interface{}{
@@ -2932,6 +2990,13 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		}
 		text, err := client.Transcribe(ctx, media.GenerateToneWAV(440, 0.1))
 		latency := time.Since(start).Milliseconds()
+		if reporter, ok := client.(media.UsageReporter); ok {
+			provider := sttCfg.BuiltinName
+			if provider == "" {
+				provider = sttCfg.Type
+			}
+			s.RecordUsageGlobal("stt", mediaUsage(reporter.LastUsage(), provider, sttCfg.Model))
+		}
 		if err != nil {
 			return &TestProviderResponseDTO{
 				Success:   false,
@@ -3121,6 +3186,9 @@ type GenerateAssetPreviewRequestDTO struct {
 	Description string `json:"description"`
 	ArtStyle    string `json:"art_style"`
 	Genre       string `json:"genre,omitempty"`
+	// UsageToken defers the spend this preview incurs onto a campaign that is
+	// still being created. Without it the preview is shared studio spend.
+	UsageToken string `json:"usage_token,omitempty"`
 }
 
 // guardImageBytes rejects a provider that returned success with no image data,
@@ -3138,7 +3206,7 @@ func guardImageBytes(imgBytes []byte) ([]byte, *harness.GenerationFailure) {
 // GenerateAssetPreview renders banner or icon image bytes in memory and returns
 // them with a MIME type detected from the bytes.
 func (s *Service) GenerateAssetPreview(ctx context.Context, req GenerateAssetPreviewRequestDTO) ([]byte, string, error) {
-	imgBytes, failure := s.generateImage(ctx, req.Kind, buildAssetPrompt(req.Kind, req.Name, req.Description, req.ArtStyle, req.Genre))
+	imgBytes, failure := s.generateImage(ctx, req.Kind, buildAssetPrompt(req.Kind, req.Name, req.Description, req.ArtStyle, req.Genre), usageScope{token: req.UsageToken})
 	if failure != nil {
 		return nil, "", failure
 	}
@@ -3165,7 +3233,7 @@ func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req Gene
 		}
 		prompt = buildAssetPrompt(req.Kind, gameName, worldName, artStyle, "")
 	}
-	imgBytes, failure := s.generateImage(ctx, req.Kind, prompt)
+	imgBytes, failure := s.generateImage(ctx, req.Kind, prompt, usageScope{gameID: gameID})
 	if failure != nil {
 		return "", failure
 	}
@@ -3191,7 +3259,7 @@ func (s *Service) GenerateWorldAsset(ctx context.Context, worldID string, req Ge
 		}
 		prompt = buildAssetPrompt(req.Kind, worldName, desc, artStyle, genre)
 	}
-	imgBytes, failure := s.generateImage(ctx, req.Kind, prompt)
+	imgBytes, failure := s.generateImage(ctx, req.Kind, prompt, usageScope{})
 	if failure != nil {
 		return "", failure
 	}

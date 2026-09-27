@@ -21,6 +21,24 @@ var migrations = []migration{
 	{version: 6, apply: addEmbeddingsTable},
 	{version: 7, apply: addChecksColumn},
 	{version: 8, apply: addUsageTable},
+	{version: 9, apply: addUsageScopeColumn},
+}
+
+// addUsageScopeColumn lets one ledger hold both campaign rows and the shared
+// "global" rows a studio generation produces, so nothing has to invent a
+// campaign to record spend against.
+func addUsageScopeColumn(db *sql.DB) error {
+	exists, err := columnExists(db, "usage_records", "game_id")
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	if _, err := db.Exec("ALTER TABLE usage_records ADD COLUMN game_id TEXT NOT NULL DEFAULT ''"); err != nil {
+		return fmt.Errorf("add usage_records.game_id: %w", err)
+	}
+	return nil
 }
 
 // addUsageTable records what each provider call cost, per campaign, so spend can

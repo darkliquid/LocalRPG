@@ -2,6 +2,7 @@ package gui
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
 )
@@ -21,6 +22,10 @@ func generationStatus(code harness.FailureCode) int {
 		return http.StatusServiceUnavailable
 	case harness.FailureTimeout:
 		return http.StatusGatewayTimeout
+	case harness.FailureRateLimited:
+		return http.StatusTooManyRequests
+	case harness.FailureInsufficientFunds:
+		return http.StatusPaymentRequired
 	case harness.FailureProviderError, harness.FailureEmptyResponse:
 		return http.StatusBadGateway
 	default:
@@ -30,6 +35,9 @@ func generationStatus(code harness.FailureCode) int {
 
 // writeGenerationError writes a structured failure body and status.
 func writeGenerationError(w http.ResponseWriter, failure *harness.GenerationFailure) {
+	if failure.RetryAfterMS > 0 {
+		w.Header().Set("Retry-After", strconv.Itoa(int(failure.RetryAfterMS/1000)+1))
+	}
 	writeJSONStatus(w, generationStatus(failure.Code), map[string]interface{}{"error": failure})
 }
 
