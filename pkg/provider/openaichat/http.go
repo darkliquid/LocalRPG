@@ -79,14 +79,20 @@ func (h *HTTPProvider) ID() string {
 func (h *HTTPProvider) ToolCallerCapable() bool { return true }
 
 type openAIChatRequest struct {
-	Model       string           `json:"model"`
-	Messages    []openAIMessage  `json:"messages"`
-	Stream      bool             `json:"stream"`
-	Temperature float64          `json:"temperature,omitempty"`
-	MaxTokens   int              `json:"max_tokens,omitempty"`
-	Stop        []string         `json:"stop,omitempty"`
-	Tools       []openAIToolSpec `json:"tools,omitempty"`
-	ToolChoice  string           `json:"tool_choice,omitempty"`
+	Model         string                   `json:"model"`
+	Messages      []openAIMessage          `json:"messages"`
+	Stream        bool                     `json:"stream"`
+	Temperature   float64                  `json:"temperature,omitempty"`
+	MaxTokens     int                      `json:"max_tokens,omitempty"`
+	Stop          []string                 `json:"stop,omitempty"`
+	Tools         []openAIToolSpec         `json:"tools,omitempty"`
+	ToolChoice    string                   `json:"tool_choice,omitempty"`
+	StreamOptions *openAIChatStreamOptions `json:"stream_options,omitempty"`
+}
+
+// openAIChatStreamOptions asks the provider to send a final usage frame.
+type openAIChatStreamOptions struct {
+	IncludeUsage bool `json:"include_usage"`
 }
 
 type openAIToolSpec struct {
@@ -116,6 +122,11 @@ type openAIToolCall struct {
 	} `json:"function"`
 }
 
+type openAIChatUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+}
+
 type openAIChatChunk struct {
 	Choices []struct {
 		Delta struct {
@@ -132,6 +143,7 @@ type openAIChatChunk struct {
 		} `json:"delta"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
+	Usage *openAIChatUsage `json:"usage,omitempty"`
 }
 
 // toolCallAccumulator reassembles streamed tool calls. Arguments arrive split
@@ -176,6 +188,7 @@ func (a *toolCallAccumulator) result() []harness.ToolCall {
 func (h *HTTPProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
 	out := make(chan harness.StreamChunk, 20)
 	var sb strings.Builder
+	var usage *harness.Usage
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -187,13 +200,16 @@ func (h *HTTPProvider) Generate(ctx context.Context, req harness.GenerateRequest
 			return nil, chunk.Error
 		}
 		sb.WriteString(chunk.Text)
+		if chunk.Usage != nil {
+			usage = chunk.Usage
+		}
 	}
 
 	if err := <-errCh; err != nil {
 		return nil, err
 	}
 
-	return &harness.GenerateResponse{Text: sb.String()}, nil
+	return &harness.GenerateResponse{Text: sb.String(), Usage: usage}, nil
 }
 
 func (h *HTTPProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
@@ -219,14 +235,15 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 	}
 
 	payload := openAIChatRequest{
-		Model:       h.model,
-		Messages:    messages,
-		Stream:      true,
-		Temperature: temperature,
-		MaxTokens:   maxTokens,
-		Stop:        h.opts.Stop,
-		Tools:       tools,
-		ToolChoice:  req.ToolChoice,
+		Model:         h.model,
+		Messages:      messages,
+		Stream:        true,
+		Temperature:   temperature,
+		MaxTokens:     maxTokens,
+		Stop:          h.opts.Stop,
+		Tools:         tools,
+		ToolChoice:    req.ToolChoice,
+		StreamOptions: &openAIChatStreamOptions{IncludeUsage: true},
 	}
 
 	data, err := json.Marshal(payload)
@@ -305,6 +322,7 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 	}
 
 	var finishReason string
+	var usage *harness.Usage
 	accumulator := newToolCallAccumulator()
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
@@ -330,6 +348,14 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 		var chunk openAIChatChunk
 		if err := json.Unmarshal([]byte(eventData), &chunk); err != nil {
 			continue
+		}
+		if chunk.Usage != nil {
+			usage = &harness.Usage{
+				Provider:     "openaichat",
+				Model:        h.model,
+				InputTokens:  chunk.Usage.PromptTokens,
+				OutputTokens: chunk.Usage.CompletionTokens,
+			}
 		}
 		if len(chunk.Choices) > 0 {
 			for _, call := range chunk.Choices[0].Delta.ToolCalls {
@@ -364,7 +390,7 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 		"chunks":         chunkCount,
 		"bytes":          byteCount,
 	})
-	out <- harness.StreamChunk{Done: true, FinishReason: finishReason, ToolCalls: accumulator.result()}
+	out <- harness.StreamChunk{Done: true, FinishReason: finishReason, ToolCalls: accumulator.result(), Usage: usage}
 	return nil
 }
 

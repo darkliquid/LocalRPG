@@ -144,6 +144,9 @@ type TTSPipeline struct {
 	// same utterance synthesize and encode once instead of racing.
 	flightMu sync.Mutex
 	flights  map[string]*sync.Mutex
+	// lastUsage is what the most recent synthesis consumed; a cache hit reports
+	// zero so the caller records nothing.
+	lastUsage Usage
 }
 
 // SetOpusBitrate selects the on-disk Opus bitrate. Out-of-range values fall back
@@ -254,6 +257,20 @@ func (p *TTSPipeline) CountUncached(segments []entity.TurnSegment, narratorVoice
 	return cached, uncached
 }
 
+// LastUsage reports what the most recent synthesis consumed. A cache hit or a
+// provider that reports nothing yields the zero value.
+func (p *TTSPipeline) LastUsage() Usage {
+	p.flightMu.Lock()
+	defer p.flightMu.Unlock()
+	return p.lastUsage
+}
+
+func (p *TTSPipeline) setLastUsage(u Usage) {
+	p.flightMu.Lock()
+	defer p.flightMu.Unlock()
+	p.lastUsage = u
+}
+
 func NewTTSPipeline(client TTSClient, cache *ContentCache) *TTSPipeline {
 	return &TTSPipeline{
 		client:      client,
@@ -316,6 +333,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 				"cache_hit":   true,
 				"duration_ms": time.Since(start).Milliseconds(),
 			})
+			p.setLastUsage(Usage{})
 			return path, nil
 		}
 	}
@@ -327,6 +345,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 	defer keyLock.Unlock()
 	if !force {
 		if path, ok := p.cachedClip(base); ok {
+			p.setLastUsage(Usage{})
 			return path, nil
 		}
 	}
@@ -383,7 +402,19 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 		"duration_ms":  time.Since(start).Milliseconds(),
 	})
 
+	p.setLastUsage(p.usageFor(text))
 	return p.cache.Put("audio", base+".opus", encoded)
+}
+
+// usageFor reports what a synthesis consumed: the client's own report when it
+// has one, otherwise an estimate from the spoken text.
+func (p *TTSPipeline) usageFor(text string) Usage {
+	if reporter, ok := p.client.(UsageReporter); ok {
+		if u := reporter.LastUsage(); u != (Usage{}) {
+			return u
+		}
+	}
+	return Usage{Characters: len([]rune(text)), Requests: 1, Estimated: true}
 }
 
 // cachedClip finds a clip under any known extension, so a cache written under an

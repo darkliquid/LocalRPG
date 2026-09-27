@@ -8,9 +8,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/embeddings"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
@@ -27,6 +29,9 @@ type Client struct {
 	model      string
 	dimensions int
 	httpClient *http.Client
+
+	mu        sync.Mutex
+	lastUsage harness.Usage
 }
 
 func init() {
@@ -99,6 +104,18 @@ type embeddingResponse struct {
 	Error *struct {
 		Message string `json:"message"`
 	} `json:"error,omitempty"`
+	Usage struct {
+		PromptTokens int `json:"prompt_tokens"`
+		TotalTokens  int `json:"total_tokens"`
+	} `json:"usage"`
+}
+
+// LastUsage reports the token usage of the most recent request, so the caller
+// can price and record it. A zero value means nothing was reported.
+func (c *Client) LastUsage() harness.Usage {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.lastUsage
 }
 
 func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error) {
@@ -158,6 +175,15 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 			result[item.Index] = item.Embedding
 		}
 	}
+
+	c.mu.Lock()
+	c.lastUsage = harness.Usage{
+		Provider:    c.ID(),
+		Model:       c.model,
+		InputTokens: parsed.Usage.PromptTokens,
+		Requests:    1,
+	}
+	c.mu.Unlock()
 	return result, nil
 }
 

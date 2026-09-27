@@ -1,6 +1,6 @@
 # Usage & Limits Integration Implementation Plan
 
-> **Status:** Not implemented as of 2026-09-27.
+> **Status:** In progress as of 2026-09-27. Task 1 (LLM and embedding usage) is done, and the media TTS pipeline's usage tracking (Task 2's `pkg/media` half) is done. Task 2's provider `LastUsage` implementations (ElevenLabs, Gemini TTS, Whisper, image providers) and Tasks 3 through 6 remain. Branch: `feat/usage-limits-integration`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
