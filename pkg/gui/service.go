@@ -3172,6 +3172,9 @@ type GenerateAssetPreviewRequestDTO struct {
 	Description string `json:"description"`
 	ArtStyle    string `json:"art_style"`
 	Genre       string `json:"genre,omitempty"`
+	// UsageToken defers the spend this preview incurs onto a campaign that is
+	// still being created. Without it the preview is shared studio spend.
+	UsageToken string `json:"usage_token,omitempty"`
 }
 
 // guardImageBytes rejects a provider that returned success with no image data,
@@ -3189,7 +3192,7 @@ func guardImageBytes(imgBytes []byte) ([]byte, *harness.GenerationFailure) {
 // GenerateAssetPreview renders banner or icon image bytes in memory and returns
 // them with a MIME type detected from the bytes.
 func (s *Service) GenerateAssetPreview(ctx context.Context, req GenerateAssetPreviewRequestDTO) ([]byte, string, error) {
-	imgBytes, failure := s.generateImage(ctx, req.Kind, buildAssetPrompt(req.Kind, req.Name, req.Description, req.ArtStyle, req.Genre), "")
+	imgBytes, failure := s.generateImage(ctx, req.Kind, buildAssetPrompt(req.Kind, req.Name, req.Description, req.ArtStyle, req.Genre), usageScope{token: req.UsageToken})
 	if failure != nil {
 		return nil, "", failure
 	}
@@ -3216,7 +3219,7 @@ func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req Gene
 		}
 		prompt = buildAssetPrompt(req.Kind, gameName, worldName, artStyle, "")
 	}
-	imgBytes, failure := s.generateImage(ctx, req.Kind, prompt, gameID)
+	imgBytes, failure := s.generateImage(ctx, req.Kind, prompt, usageScope{gameID: gameID})
 	if failure != nil {
 		return "", failure
 	}
@@ -3242,7 +3245,7 @@ func (s *Service) GenerateWorldAsset(ctx context.Context, worldID string, req Ge
 		}
 		prompt = buildAssetPrompt(req.Kind, worldName, desc, artStyle, genre)
 	}
-	imgBytes, failure := s.generateImage(ctx, req.Kind, prompt, "")
+	imgBytes, failure := s.generateImage(ctx, req.Kind, prompt, usageScope{})
 	if failure != nil {
 		return "", failure
 	}

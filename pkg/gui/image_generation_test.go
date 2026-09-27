@@ -53,13 +53,16 @@ func TestRecordImageFailureEmitsGenerateError(t *testing.T) {
 }
 
 type stubImageClient struct {
-	data []byte
-	err  error
+	data  []byte
+	err   error
+	usage media.Usage
 }
 
 func (c stubImageClient) GenerateImage(context.Context, string) ([]byte, error) {
 	return c.data, c.err
 }
+
+func (c stubImageClient) LastUsage() media.Usage { return c.usage }
 
 func TestGenerateImageRejectsEmptyBytes(t *testing.T) {
 	_, svc := setupTestGame(t)
@@ -69,7 +72,7 @@ func TestGenerateImageRejectsEmptyBytes(t *testing.T) {
 		return stubImageClient{data: nil}, nil
 	}
 
-	_, failure := svc.generateImage(context.Background(), "banner", "a banner", "")
+	_, failure := svc.generateImage(context.Background(), "banner", "a banner", usageScope{})
 	if failure == nil || failure.Code != harness.FailureProviderError {
 		t.Fatalf("generateImage failure = %v, want provider_error", failure)
 	}

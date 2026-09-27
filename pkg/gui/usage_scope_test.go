@@ -1,9 +1,12 @@
 package gui
 
 import (
+	"context"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/media"
 )
 
 func TestStudioUsageIsRecordedGlobally(t *testing.T) {
@@ -77,5 +80,32 @@ func TestDiscardedDeferredUsageBecomesSharedSpend(t *testing.T) {
 	}
 	if len(rows) != 1 || rows[0].Role != "stt" {
 		t.Fatalf("global rows = %+v", rows)
+	}
+}
+
+func TestPreviewDefersUsageToToken(t *testing.T) {
+	_, svc := setupTestGame(t)
+	original := imageClientFactory
+	defer func() { imageClientFactory = original }()
+	png := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0}
+	imageClientFactory = func(config.ImageConfig, string) (media.ImageClient, error) {
+		return stubImageClient{data: png, usage: media.Usage{Requests: 1, Estimated: true}}, nil
+	}
+
+	req := GenerateAssetPreviewRequestDTO{Kind: "banner", Name: "Harbour", UsageToken: "campaign-99"}
+	if _, _, err := svc.GenerateAssetPreview(context.Background(), req); err != nil {
+		t.Fatalf("GenerateAssetPreview: %v", err)
+	}
+
+	ledger, err := svc.usageLedger()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ledger.UsageByGame(usageScopePending + "campaign-99")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Role != "image" {
+		t.Fatalf("pending rows = %+v", rows)
 	}
 }
