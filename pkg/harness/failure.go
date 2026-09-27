@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
 // FailureCode is the bounded reason a generation failed. It is the single key
@@ -20,6 +22,8 @@ const (
 	FailureTimeout             FailureCode = "timeout"
 	FailureContextTooLarge     FailureCode = "context_too_large"
 	FailureInvalidRequest      FailureCode = "invalid_request"
+	FailureRateLimited         FailureCode = "rate_limited"
+	FailureInsufficientFunds   FailureCode = "insufficient_funds"
 )
 
 // Attempt records one provider invocation in a fallback chain.
@@ -40,6 +44,8 @@ type GenerationFailure struct {
 	PromptChars  int         `json:"prompt_chars,omitempty"`
 	ContextChars int         `json:"context_chars,omitempty"`
 	ElapsedMS    int64       `json:"elapsed_ms,omitempty"`
+	// RetryAfterMS is the provider's advertised backoff, 0 when none was given.
+	RetryAfterMS int64 `json:"retry_after_ms,omitempty"`
 	// Cause is the underlying provider error, kept out of JSON so callers can
 	// still errors.Is/As through the failure.
 	Cause error `json:"-"`
@@ -70,7 +76,29 @@ func ClassifyProviderError(err error) FailureCode {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return FailureTimeout
 	}
+	var rateLimited *provider.RateLimitedError
+	if errors.As(err, &rateLimited) {
+		return FailureRateLimited
+	}
+	var funds *provider.InsufficientFundsError
+	if errors.As(err, &funds) {
+		return FailureInsufficientFunds
+	}
 	lower := strings.ToLower(err.Error())
+	for _, marker := range []string{
+		"insufficient_quota", "insufficient_credits", "payment_required", "out of credits", "not enough credits",
+	} {
+		if strings.Contains(lower, marker) {
+			return FailureInsufficientFunds
+		}
+	}
+	for _, marker := range []string{
+		"429", "too many requests", "rate limit", "rate_limit", "resource_exhausted",
+	} {
+		if strings.Contains(lower, marker) {
+			return FailureRateLimited
+		}
+	}
 	for _, marker := range []string{
 		"context length", "maximum context", "too many tokens", "token limit", "context window",
 	} {

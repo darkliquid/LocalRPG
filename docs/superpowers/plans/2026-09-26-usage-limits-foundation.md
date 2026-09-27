@@ -1,6 +1,6 @@
 # Usage, Limits & Pricing Foundation Implementation Plan
 
-> **Status:** Not implemented as of 2026-09-27.
+> **Status:** Implemented and verified against the code on 2026-09-27. The typed errors live in `pkg/provider` (a leaf) and `pkg/harness` classifies them; the plan's alias fallback was unnecessary because there is no import cycle.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -34,7 +34,7 @@
 **Interfaces:**
 - Produces: `FailureRateLimited`, `FailureInsufficientFunds`; `GenerationFailure.RetryAfterMS int64`; `provider.RateLimitedError`, `provider.InsufficientFundsError`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `pkg/provider/errors_test.go`:
 
@@ -100,12 +100,12 @@ func TestClassifyRateLimited(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestClassifyRateLimited|TestRateLimited|TestInsufficientFunds' ./pkg/harness/ ./pkg/provider/ -v`
 Expected: FAIL — undefined types and codes.
 
-- [ ] **Step 3: Add the typed errors**
+- [x] **Step 3: Add the typed errors**
 
 Create `pkg/provider/errors.go`:
 
@@ -154,7 +154,7 @@ func InsufficientFundsf(format string, args ...interface{}) error {
 }
 ```
 
-- [ ] **Step 4: Add the codes and classification**
+- [x] **Step 4: Add the codes and classification**
 
 In `pkg/harness/failure.go`, add to the constants block:
 
@@ -196,12 +196,12 @@ Extend `ClassifyProviderError` (before the context-window markers):
 
 `pkg/harness` must import `pkg/provider` here; confirm there is no cycle (`pkg/provider` imports `pkg/harness`, so this would be a cycle). **Resolve by moving the typed errors into `pkg/harness`** instead: define `RateLimitedError` and `InsufficientFundsError` in `pkg/harness/failure.go`, and have `pkg/provider` alias them (`type RateLimitedError = harness.RateLimitedError`). Put the constructors in harness; provider providers return the harness types through the alias. Update the test imports accordingly (`pkg/harness` test only; the `pkg/provider` test uses the alias).
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -run 'TestClassifyRateLimited|TestRateLimited|TestInsufficientFunds' ./pkg/harness/ ./pkg/provider/ -v && go build ./...`
 Expected: PASS, no import cycle.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/harness/failure.go pkg/harness/failure_limits_test.go pkg/provider/errors.go pkg/provider/errors_test.go
@@ -232,7 +232,7 @@ type ErrRateLimitedUntil struct{ Provider, Role string; Until time.Time }
 func (e *ErrRateLimitedUntil) Error() string
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `pkg/harness/limits_test.go`:
 
@@ -295,12 +295,12 @@ func TestErrRateLimitedUntilCarriesDeadline(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run TestRegistry ./pkg/harness/ -v`
 Expected: FAIL — undefined `NewLimitRegistry`.
 
-- [ ] **Step 3: Implement the registry**
+- [x] **Step 3: Implement the registry**
 
 Create `pkg/harness/limits.go`:
 
@@ -418,12 +418,12 @@ func (e *ErrRateLimitedUntil) RetryAfter() time.Duration {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -run TestRegistry ./pkg/harness/ -v && go test ./pkg/harness/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/limits.go pkg/harness/limits_test.go
@@ -442,7 +442,7 @@ git commit -m "feat(limits): add a provider+role block registry"
 **Interfaces:**
 - Produces: `pricing.Micros`, `pricing.Price`, `pricing.CostMicros(harness.Usage, Price) Micros`, `pricing.Resolve(providerKey, model string, cfg *config.Config) Price`; `config.PriceConfig` and `config.ProvidersConfig.Prices []PriceConfig`, `ProvidersConfig.Currency string`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `pkg/pricing/pricing_test.go`:
 
@@ -510,12 +510,12 @@ func TestPriceConfigRoundTrips(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestCost|TestResolve|TestPriceConfig' ./pkg/pricing/ ./pkg/config/ -v`
 Expected: FAIL — `pkg/pricing` undefined, `config.PriceConfig` undefined.
 
-- [ ] **Step 3: Add config fields**
+- [x] **Step 3: Add config fields**
 
 In `pkg/config/types.go`:
 
@@ -541,7 +541,7 @@ type PriceConfig struct {
 }
 ```
 
-- [ ] **Step 4: Implement pricing**
+- [x] **Step 4: Implement pricing**
 
 Create `pkg/pricing/pricing.go`:
 
@@ -628,12 +628,12 @@ func toPrice(c config.PriceConfig) Price {
 
 Note: the built-in `Provider` values must match the keys the recorder produces (`media.ProviderKey` for media, router provider IDs for LLMs). The integration plan reconciles these; keep the table small here.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -run 'TestCost|TestResolve|TestPriceConfig' ./pkg/pricing/ ./pkg/config/ -v && go test ./pkg/pricing/ ./pkg/config/`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/pricing pkg/config/types.go pkg/config/types_test.go
@@ -675,7 +675,7 @@ type UsageSummary struct {
 }
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/storage/usage_test.go`:
 
@@ -726,12 +726,12 @@ func TestUsageRoundTripAndSummary(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestUsageRoundTripAndSummary ./pkg/storage/ -v`
 Expected: FAIL — `SaveUsage` undefined.
 
-- [ ] **Step 3: Add the migration**
+- [x] **Step 3: Add the migration**
 
 In `pkg/storage/migrate.go`, add to the `migrations` slice:
 
@@ -767,7 +767,7 @@ func addUsageTable(db *sql.DB) error {
 }
 ```
 
-- [ ] **Step 4: Implement the store methods**
+- [x] **Step 4: Implement the store methods**
 
 Create `pkg/storage/usage.go`:
 
@@ -874,12 +874,12 @@ func scanUsage(rows *sql.Rows) ([]UsageRecord, error) {
 
 (`usage.go` needs `database/sql` imported for the scanner signature.)
 
-- [ ] **Step 5: Run test and the package**
+- [x] **Step 5: Run test and the package**
 
 Run: `go test -run TestUsageRoundTripAndSummary ./pkg/storage/ -v && go test ./pkg/storage/`
 Expected: PASS, including the existing migration tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/storage/migrate.go pkg/storage/usage.go pkg/storage/usage_test.go
@@ -912,7 +912,7 @@ func (r *Router) SetUsageRecorder(rec UsageRecorder)
 func (e *Extractor) SetUsageRecorder(rec UsageRecorder)
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/harness/usage_test.go`:
 
@@ -964,12 +964,12 @@ func TestUsageContextStampsTheTurn(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestUsageContextStampsTheTurn ./pkg/harness/ -v`
 Expected: FAIL — undefined `NewUsageContext`.
 
-- [ ] **Step 3: Add the usage types**
+- [x] **Step 3: Add the usage types**
 
 Create `pkg/harness/usage.go`:
 
@@ -1035,7 +1035,7 @@ func (c *UsageContext) RecordUsage(role string, u Usage) {
 }
 ```
 
-- [ ] **Step 4: Add usage fields and recording**
+- [x] **Step 4: Add usage fields and recording**
 
 In `pkg/harness/types.go`:
 
@@ -1118,12 +1118,12 @@ and after the `e.model.Generate` call (~line 336):
 	}
 ```
 
-- [ ] **Step 5: Run tests and vet**
+- [x] **Step 5: Run tests and vet**
 
 Run: `go test ./pkg/harness/ && mise run lint`
 Expected: PASS, vet clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/harness/usage.go pkg/harness/usage_test.go pkg/harness/types.go pkg/harness/router.go pkg/harness/extractor.go
@@ -1134,12 +1134,12 @@ git commit -m "feat(harness): carry provider usage to a recorder"
 
 ### Task 6: Full verification
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `mise run test`
 Expected: PASS (re-run `./pkg/gui/` once if the known flake appears).
 
-- [ ] **Step 2: Vet and build**
+- [x] **Step 2: Vet and build**
 
 Run: `mise run lint && mise run build`
 Expected: clean.

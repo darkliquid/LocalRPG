@@ -20,6 +20,33 @@ var migrations = []migration{
 	{version: 5, apply: addMemoriesTables},
 	{version: 6, apply: addEmbeddingsTable},
 	{version: 7, apply: addChecksColumn},
+	{version: 8, apply: addUsageTable},
+}
+
+// addUsageTable records what each provider call cost, per campaign, so spend can
+// be broken down by provider, role, and turn without re-deriving it.
+func addUsageTable(db *sql.DB) error {
+	const ddl = `
+	CREATE TABLE IF NOT EXISTS usage_records (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		turn_number INTEGER NOT NULL DEFAULT 0,
+		role TEXT NOT NULL,
+		provider TEXT NOT NULL,
+		model TEXT NOT NULL DEFAULT '',
+		input_tokens INTEGER NOT NULL DEFAULT 0,
+		output_tokens INTEGER NOT NULL DEFAULT 0,
+		characters INTEGER NOT NULL DEFAULT 0,
+		requests INTEGER NOT NULL DEFAULT 0,
+		estimated INTEGER NOT NULL DEFAULT 0,
+		cost_micros INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_usage_turn ON usage_records(turn_number);
+	CREATE INDEX IF NOT EXISTS idx_usage_provider ON usage_records(provider, role);`
+	if _, err := db.Exec(ddl); err != nil {
+		return fmt.Errorf("create usage table: %w", err)
+	}
+	return nil
 }
 
 // addEmbeddingsTable creates the table and indexes for vector embeddings.

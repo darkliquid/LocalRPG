@@ -13,6 +13,7 @@ type Router struct {
 	providers map[string]ModelProvider
 	roleMap   map[string]string // role -> providerID
 	fallbacks map[string]string // role -> fallback providerID
+	recorder  UsageRecorder
 }
 
 func NewRouter() *Router {
@@ -27,6 +28,26 @@ func (r *Router) RegisterProvider(p ModelProvider) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.providers[p.ID()] = p
+}
+
+// SetUsageRecorder installs the sink LLM usage is reported to.
+func (r *Router) SetUsageRecorder(rec UsageRecorder) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.recorder = rec
+}
+
+// recordUsage reports a provider's usage to the recorder, if any.
+func (r *Router) recordUsage(role string, u *Usage) {
+	if u == nil {
+		return
+	}
+	r.mu.RLock()
+	rec := r.recorder
+	r.mu.RUnlock()
+	if rec != nil {
+		rec.RecordUsage(role, *u)
+	}
 }
 
 func (r *Router) AssignRole(role, providerID string) {
@@ -107,6 +128,7 @@ func (r *Router) GenerateForRole(ctx context.Context, role string, req GenerateR
 	res, callErr := primary.Generate(ctx, req)
 	code, detail := attemptOutcome(res, callErr)
 	if code == "" {
+		r.recordUsage(role, res.Usage)
 		return res, nil
 	}
 	attempts = append(attempts, Attempt{
@@ -119,6 +141,7 @@ func (r *Router) GenerateForRole(ctx context.Context, role string, req GenerateR
 		fbRes, fbErr := fallback.Generate(ctx, req)
 		fbCode, fbDetail := attemptOutcome(fbRes, fbErr)
 		if fbCode == "" {
+			r.recordUsage(role, fbRes.Usage)
 			return fbRes, nil
 		}
 		attempts = append(attempts, Attempt{
@@ -148,7 +171,7 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 	attempts := make([]Attempt, 0, 2)
 	started := time.Now()
 
-	streamed, code, detail := r.forwardStream(ctx, primary, req, out)
+	streamed, code, detail := r.forwardStream(ctx, role, primary, req, out)
 	if streamed {
 		return nil
 	}
@@ -158,7 +181,7 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 	})
 
 	if fallback, ok := r.FallbackForRole(role); ok && fallback != nil {
-		streamed, code, detail = r.forwardStream(ctx, fallback, req, out)
+		streamed, code, detail = r.forwardStream(ctx, role, fallback, req, out)
 		if streamed {
 			return nil
 		}
@@ -182,7 +205,7 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 // out without the two loops deadlocking. A terminal provider error is relayed as
 // a final StreamChunk with Error set. When nothing usable arrives it returns the
 // classified failure code so the caller can fall back and explain why.
-func (r *Router) forwardStream(ctx context.Context, provider ModelProvider, req GenerateRequest, out chan<- StreamChunk) (bool, FailureCode, string) {
+func (r *Router) forwardStream(ctx context.Context, role string, provider ModelProvider, req GenerateRequest, out chan<- StreamChunk) (bool, FailureCode, string) {
 	chunks := make(chan StreamChunk, 32)
 	errCh := make(chan error, 1)
 	go func() {
@@ -208,6 +231,7 @@ func (r *Router) forwardStream(ctx context.Context, provider ModelProvider, req 
 	go func() {
 		defer close(out)
 		out <- first
+		r.recordUsage(role, first.Usage)
 		for {
 			select {
 			case chunk, ok := <-chunks:
@@ -217,6 +241,7 @@ func (r *Router) forwardStream(ctx context.Context, provider ModelProvider, req 
 					}
 					return
 				}
+				r.recordUsage(role, chunk.Usage)
 				out <- chunk
 			case <-ctx.Done():
 				return

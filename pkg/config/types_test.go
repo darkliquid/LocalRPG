@@ -512,3 +512,20 @@ func TestMechanicsEngagementDefaults(t *testing.T) {
 		t.Errorf("MechanicsCadenceTurns() = %d, want 3", got)
 	}
 }
+
+func TestPriceConfigRoundTrips(t *testing.T) {
+	cfg := &Config{Providers: ProvidersConfig{Currency: "USD", Prices: []PriceConfig{{
+		Provider: "builtin:elevenlabs", PerCharacter: 30,
+	}}}}
+	raw, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back Config
+	if err := yaml.Unmarshal(raw, &back); err != nil {
+		t.Fatal(err)
+	}
+	if len(back.Providers.Prices) != 1 || back.Providers.Prices[0].PerCharacter != 30 || back.Providers.Currency != "USD" {
+		t.Fatalf("round trip lost prices: %+v", back.Providers)
+	}
+}
