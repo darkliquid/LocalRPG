@@ -46,6 +46,27 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 	}
 }
 
+func TestEncodeSkipsResampleAt48k(t *testing.T) {
+	source := tone(SampleRate, 0.5)
+	encoded, err := Encode(source, SampleRate, 1, DefaultBitrate)
+	if err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	if !bytes.HasPrefix(encoded, []byte("OggS")) {
+		t.Fatal("encoded bytes are not a valid Ogg stream")
+	}
+	pcm, rate, _, err := Decode(encoded)
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if rate != SampleRate {
+		t.Fatalf("rate = %d, want %d", rate, SampleRate)
+	}
+	if diff := len(pcm) - len(source); diff > FrameSamples || diff < -FrameSamples {
+		t.Fatalf("decoded %d samples, want about %d", len(pcm), len(source))
+	}
+}
+
 func TestMuxerWritesAParseableOggStream(t *testing.T) {
 	data, err := Encode(tone(48000, 0.5), 48000, 1, DefaultBitrate)
 	if err != nil {

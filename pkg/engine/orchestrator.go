@@ -175,6 +175,17 @@ func (o *TurnOrchestrator) SetAllowFreeformState(allow bool) {
 	o.allowFreeform = allow
 }
 
+// SetRulesPrompt sets the system's rules text without re-reading it, so a caller
+// that already cached it does not pay for the file again.
+func (o *TurnOrchestrator) SetRulesPrompt(prompt string) { o.rulesPrompt = prompt }
+
+// SetLorePrompt sets the world's lore text without re-reading it.
+func (o *TurnOrchestrator) SetLorePrompt(prompt string) { o.lorePrompt = prompt }
+
+// SetMechanicsPrompt sets the formatted mechanics instruction without rebuilding
+// it, so a cached runtime can hand it over directly.
+func (o *TurnOrchestrator) SetMechanicsPrompt(prompt string) { o.mechanicsPrompt = prompt }
+
 // checkResolverOrDefault returns the configured resolver.
 func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error) {
 	resolver := o.checkResolver
@@ -744,6 +755,21 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		o.pendingCheckRef = ""
 	}
 
+	if onChunk != nil {
+		started := time.Now()
+		first := true
+		inner := onChunk
+		onChunk = func(text string) error {
+			if first {
+				first = false
+				elapsed := time.Since(started).Milliseconds()
+				engineMetrics().turnTTFT.Record(ctx, float64(elapsed))
+				o.logger.Event("turn.ttft", map[string]interface{}{"ms": elapsed})
+			}
+			return inner(text)
+		}
+	}
+
 	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, proposedCheck, resolvedPending, validationEngagement, onChunk)
 	if err != nil {
 		outcome = "error"
@@ -782,6 +808,9 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		o.logger.Event("generation.error", fields)
 		return nil, fmt.Errorf("gm generation failed: %w", err)
 	}
+
+	_, finaliseSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "turn.finalise")
+	defer finaliseSpan.End()
 
 	turnSpan.SetAttributes(
 		attribute.String("turn.raw_completion", result.Text),

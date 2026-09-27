@@ -1,6 +1,6 @@
 # Turn Latency Structural Caching Implementation Plan
 
-> **Status:** Not implemented as of 2026-09-27.
+> **Status:** Implemented and verified against the code on 2026-09-27; Task 4 was already in place from the quick-wins branch, and Task 7 Step 3 (recording timings) remains.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -34,7 +34,7 @@
 **Interfaces:**
 - Produces: `(*ConfigManager).Revision() uint64`, incremented on every `Load` and `Save`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/config/manager_test.go`:
 
@@ -53,12 +53,12 @@ func TestRevisionIncrementsOnSave(t *testing.T) {
 
 Follow the constructor used by existing tests in the file if the signature differs.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestRevisionIncrementsOnSave ./pkg/config/ -v`
 Expected: FAIL — `Revision` undefined.
 
-- [ ] **Step 3: Add the counter**
+- [x] **Step 3: Add the counter**
 
 In `pkg/config/manager.go`, add `"sync/atomic"` to the imports and a field to `ConfigManager`:
 
@@ -78,12 +78,12 @@ func (m *ConfigManager) Revision() uint64 { return m.revision.Load() }
 
 Call `m.revision.Add(1)` at the end of a successful `Load` and `Save`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestRevisionIncrementsOnSave ./pkg/config/ -v && go test ./pkg/config/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/manager.go pkg/config/manager_test.go
@@ -102,7 +102,7 @@ git commit -m "feat(config): expose a revision counter for cache keys"
 - Produces: `type turnRuntime struct { router *harness.Router; rulesPrompt, lorePrompt, mechanicsPrompt string; declaredStats map[string]core.StatSpec; allowFreeform bool }` and `(*Service).runtimeFor(gameID string, manifest *core.GameManifest) (*turnRuntime, error)`.
 - Refinement vs the spec: the `rules.JSEngine` stays per turn because its host bridge is bound to that turn's `Timeline` and player id. Only the immutable, config-derived wiring is cached; `LoadRules` still runs per turn (it is a small file eval), which the mechanics design depends on.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/runtime_cache_test.go`:
 
@@ -152,12 +152,12 @@ func TestRuntimeIsReusedUntilSomethingChanges(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestRuntimeIsReusedUntilSomethingChanges ./pkg/gui/ -v`
 Expected: FAIL — `runtimeFor` undefined.
 
-- [ ] **Step 3: Add the runtime cache**
+- [x] **Step 3: Add the runtime cache**
 
 In `pkg/gui/service.go`, add types and fields:
 
@@ -286,12 +286,12 @@ func (o *TurnOrchestrator) SetMechanicsPrompt(prompt string) { o.mechanicsPrompt
 
 Remove the now-unused `orchestrator.LoadPrompts(...)` call from `prepareTurn` (keep the method; `cmd/localrpg/play.go` still uses it).
 
-- [ ] **Step 4: Run test and package**
+- [x] **Step 4: Run test and package**
 
 Run: `go test -run TestRuntimeIsReusedUntilSomethingChanges ./pkg/gui/ -v && go test ./pkg/gui/`
 Expected: PASS (re-run once if the known flake appears).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/runtime_cache_test.go pkg/engine/orchestrator.go
@@ -309,7 +309,7 @@ git commit -m "perf(gui): cache the per-turn router and prompts"
 **Interfaces:**
 - Produces: `(*Service).cachedHistory(gameID string) ([]engine.Turn, error)` — a read-through cache keyed by `history.jsonl` size and mtime.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/history_cache_test.go`:
 
@@ -349,12 +349,12 @@ func TestCachedHistoryReflectsNewTurns(t *testing.T) {
 
 Replace the placeholder append with a real one: use `engine.NewHistoryLogger(path).AppendTurn(turn)` with a minimal `engine.Turn{Number: 1, Narration: "x"}`, and drop the `MasterVolumeIsUnusedForThisTest` line (it exists only to show where to put the append). Assert the cache sees turn 1.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestCachedHistoryReflectsNewTurns ./pkg/gui/ -v`
 Expected: FAIL — `cachedHistory` undefined.
 
-- [ ] **Step 3: Add the cache**
+- [x] **Step 3: Add the cache**
 
 Add to `Service`:
 
@@ -404,12 +404,12 @@ func (s *Service) cachedHistory(gameID string) ([]engine.Turn, error) {
 
 Replace the `LoadHistory` call at the top of `GetSegmentAudio` with `s.cachedHistory(gameID)`.
 
-- [ ] **Step 4: Run test and package**
+- [x] **Step 4: Run test and package**
 
 Run: `go test -run TestCachedHistoryReflectsNewTurns ./pkg/gui/ -v && go test ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/history_cache_test.go
@@ -427,7 +427,7 @@ git commit -m "perf(gui): read history once per turn for audio"
 **Interfaces:**
 - Produces: concurrent calls for the same cache key synthesize once; the others wait and return the same clip.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/media/tts_flight_test.go`:
 
@@ -481,12 +481,12 @@ func TestSynthesisIsSingleFlightPerKey(t *testing.T) {
 
 `silentWAVBytes()` / `ProviderVoice` / `TextPolicy{}` — use the existing test helpers and types in `pkg/media`; the interface method set is in `pkg/media/providers.go` (`TTSClient`). Drop the unused `config` import if it is not needed.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -race -run TestSynthesisIsSingleFlightPerKey ./pkg/media/ -v`
 Expected: FAIL — 5 synthesis calls (and a race under `-race`).
 
-- [ ] **Step 3: Add the per-key flight**
+- [x] **Step 3: Add the per-key flight**
 
 In `pkg/media/tts.go`, add to `TTSPipeline`:
 
@@ -528,12 +528,12 @@ In `SynthesizeUtteranceForce`, after the cache-hit check and before `p.client.Sy
 	}
 ```
 
-- [ ] **Step 4: Run the test with the race detector**
+- [x] **Step 4: Run the test with the race detector**
 
 Run: `go test -race -run TestSynthesisIsSingleFlightPerKey ./pkg/media/ -v && go test ./pkg/media/`
 Expected: PASS, exactly one synthesis call.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/tts.go pkg/media/tts_flight_test.go
@@ -551,7 +551,7 @@ git commit -m "perf(media): synthesize a cache key once under concurrency"
 **Interfaces:**
 - Produces: `Encode` skips resampling when the input is already 48 kHz and uses a lower default complexity; output stays valid Ogg/Opus.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/media/opus/opus_test.go`:
 
@@ -574,12 +574,12 @@ func TestEncodeSkipsResampleAt48k(t *testing.T) {
 
 Use the package's existing validity helper if one exists (the file already tests encode/decode); otherwise assert the bytes start with `OggS`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestEncodeSkipsResampleAt48k ./pkg/media/opus/ -v`
 Expected: FAIL only if a helper is missing; otherwise PASS. The behavioural change is verified by Step 3 keeping it green and by the timing note. (This task is a measured constant change, guarded by the existing round-trip tests.)
 
-- [ ] **Step 3: Skip the resample and lower complexity**
+- [x] **Step 3: Skip the resample and lower complexity**
 
 In `pkg/media/opus/opus.go` `Encode`, only resample when the sample rate differs from the target:
 
@@ -603,12 +603,12 @@ In the encoder options, lower `WithComplexity` from 10 to a documented middle va
 
 Confirm the exact option API in the file (it currently calls `WithComplexity(10)`, `WithVBR(true)`) and keep the change minimal and equivalent.
 
-- [ ] **Step 4: Run the opus package**
+- [x] **Step 4: Run the opus package**
 
 Run: `go test ./pkg/media/opus/`
 Expected: PASS (round-trip and mux tests still valid).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/opus/opus.go pkg/media/opus/opus_test.go
@@ -627,7 +627,7 @@ git commit -m "perf(opus): skip the 48k resample and ease complexity"
 **Interfaces:**
 - Produces: spans `turn.prepare`, `turn.ttft`, `turn.finalise` emitted around the corresponding phases.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The repo already records traces in a memory sink for tests; assert a span name appears.
 
@@ -657,12 +657,12 @@ func TestTurnRecordsFinaliseSpan(t *testing.T) {
 
 Use the trace test recorder already used elsewhere (`pkg/trace`); if none exposes `HasSpan`, assert on the memory logger's events as the existing trace tests do, or add a minimal `HasSpan` to the test sink.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestTurnRecordsFinaliseSpan ./pkg/engine/ -v`
 Expected: FAIL — no `turn.finalise` span.
 
-- [ ] **Step 3: Add the spans**
+- [x] **Step 3: Add the spans**
 
 Wrap the post-generation assembly (from just after `runGenerationLoop` returns to just before `return &turn, nil`) in `pkg/engine/orchestrator.go`:
 
@@ -697,12 +697,12 @@ and record TTFT on the first chunk in the existing `onChunk` closure:
 
 Add `telemetry.RecordTTFT` (a counter/histogram `turn.ttft.ms`) in `pkg/telemetry`, matching the existing metric helpers there.
 
-- [ ] **Step 4: Run test and suite**
+- [x] **Step 4: Run test and suite**
 
 Run: `go test -run TestTurnRecordsFinaliseSpan ./pkg/engine/ -v && mise run test`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/turn_spans_test.go pkg/gui/service.go pkg/telemetry/
@@ -713,12 +713,12 @@ git commit -m "feat(telemetry): instrument the turn phases"
 
 ### Task 7: Full verification
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `mise run test`
 Expected: PASS.
 
-- [ ] **Step 2: Vet and build**
+- [x] **Step 2: Vet and build**
 
 Run: `mise run lint && mise run build`
 Expected: clean.

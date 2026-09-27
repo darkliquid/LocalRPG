@@ -22,7 +22,7 @@ func TestTurnRecordsMetrics(t *testing.T) {
 	orchestrator, _ := toolLoopOrchestrator(t, provider)
 	orchestrator.SetTools(&fakeExecutor{}, "yes")
 
-	if _, err := orchestrator.ProcessActionStream(context.Background(), "Do", "look around", nil); err != nil {
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Do", "look around", func(string) error { return nil }); err != nil {
 		t.Fatalf("ProcessActionStream: %v", err)
 	}
 
@@ -34,6 +34,7 @@ func TestTurnRecordsMetrics(t *testing.T) {
 	for _, want := range []string{
 		"localrpg.turn.completed",
 		"localrpg.turn.duration",
+		"localrpg.turn.ttft",
 		"localrpg.provider.request.duration",
 		"localrpg.context.tokens",
 	} {

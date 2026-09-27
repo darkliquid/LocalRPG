@@ -29,6 +29,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/tools"
 	"github.com/darkliquid/localrpg/pkg/trace"
 	"gopkg.in/yaml.v3"
@@ -68,6 +69,19 @@ type Service struct {
 	bgMu   sync.Mutex
 	bg     sync.WaitGroup
 	closed bool
+	// The turn runtime is the config-derived wiring that does not change from
+	// turn to turn. It is rebuilt only when the config revision or a source
+	// file's mtime changes, so a hand edit still takes effect next turn.
+	runtimeMu   sync.Mutex
+	runtime     *turnRuntime
+	runtimeKey  runtimeKey
+	runtimeGame string
+	// The canonical timeline is re-read only when history.jsonl changes size or
+	// mtime, so serving one beat's audio does not re-parse the whole log.
+	historyMu    sync.Mutex
+	historyCache map[string][]engine.Turn
+	historySize  map[string]int64
+	historyMtime map[string]int64
 }
 
 // Config returns the configuration the service is running with, so a command can
@@ -1188,6 +1202,9 @@ func (s *Service) GetRecap(ctx context.Context, gameID string) (*RecapDTO, error
 func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	s.ensureIndexed(gameID)
 
+	_, prepareSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/gui").Start(context.Background(), "turn.prepare")
+	defer prepareSpan.End()
+
 	gameDir := s.resolver.GameDir(gameID)
 	manifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
 	if err != nil {
@@ -1222,10 +1239,11 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		playerID = resolved
 	}
 
-	router, err := harness.RouterFromConfigWithLogger(cfg, logger)
+	runtime, err := s.runtimeFor(gameID, manifest)
 	if err != nil {
-		return nil, fmt.Errorf("build router: %w", err)
+		return nil, err
 	}
+	router := runtime.router
 
 	jsEngine := rules.NewJSEngine(rules.NewHostBridge(store, timeline, playerID))
 
@@ -1267,22 +1285,22 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator.SetTools(toolExecutor, cfg.RoleSupportsTools("gm"))
 	orchestrator.SetToolRounds(cfg.ToolRounds())
 
-	// Hand the engine the declared stats so it can validate a state change.
 	// Hand the engine the declared stats so it can validate a state change, and
-	// the engagement policy so the mechanics instruction reflects it.
-	sm, _ := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml"))
-	if sm != nil && sm.Mechanics != nil {
-		stats := make(map[string]core.StatSpec, len(sm.Mechanics.Stats))
-		for _, stat := range sm.Mechanics.Stats {
-			stats[stat.ID] = stat
-		}
-		orchestrator.SetDeclaredStats(stats)
-		orchestrator.SetAllowFreeformState(sm.Mechanics.AllowFreeformState)
-		orchestrator.SetMechanics(sm.Mechanics)
+	// the engagement policy so the mechanics instruction reflects it. All of it
+	// comes from the cached runtime, which is keyed on the config revision and
+	// the source mtimes.
+	if runtime.declaredStats != nil {
+		orchestrator.SetDeclaredStats(runtime.declaredStats)
+		orchestrator.SetAllowFreeformState(runtime.allowFreeform)
 	}
-	orchestrator.SetMechanicsEngagement(engine.ResolveEngagement(manifest, sm, cfg))
+	if runtime.mechanics != nil {
+		orchestrator.SetMechanics(runtime.mechanics)
+	}
+	orchestrator.SetMechanicsEngagement(runtime.engagement)
 	orchestrator.SetMechanicsCadence(cfg.MechanicsCadenceTurns())
-	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
+	orchestrator.SetRulesPrompt(runtime.rulesPrompt)
+	orchestrator.SetLorePrompt(runtime.lorePrompt)
+	orchestrator.SetMechanicsPrompt(runtime.mechanicsPrompt)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
 	orchestrator.SetContextLimits(harness.ContextLimits{
@@ -1719,8 +1737,7 @@ func tailLines(path string, want int) ([]string, error) {
 // GetSegmentAudio synthesizes one segment on demand and returns the cached clip,
 // reusing it for every later request.
 func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber, segmentIndex int, force ...bool) (string, error) {
-	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
-	turns, err := engine.NewHistoryLogger(historyPath).LoadHistory()
+	turns, err := s.cachedHistory(gameID)
 	if err != nil {
 		return "", fmt.Errorf("load history: %w", err)
 	}
@@ -1843,8 +1860,7 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 		return 0, 0, fmt.Errorf("build tts client: %w", err)
 	}
 
-	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
-	turns, err := engine.NewHistoryLogger(historyPath).LoadHistory()
+	turns, err := s.cachedHistory(gameID)
 	if err != nil {
 		return 0, 0, fmt.Errorf("load history: %w", err)
 	}
@@ -1868,8 +1884,7 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 
 // findTurn reads one turn from the canonical log.
 func (s *Service) findTurn(gameID string, turnNumber int) (*engine.Turn, error) {
-	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
-	turns, err := engine.NewHistoryLogger(historyPath).LoadHistory()
+	turns, err := s.cachedHistory(gameID)
 	if err != nil {
 		return nil, fmt.Errorf("load history: %w", err)
 	}

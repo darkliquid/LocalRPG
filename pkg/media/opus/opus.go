@@ -47,7 +47,7 @@ func Encode(pcm []int16, sampleRate, channels, bitrate int) ([]byte, error) {
 		pionopus.WithSampleRate(SampleRate),
 		pionopus.WithChannels(1),
 		pionopus.WithBitrate(bitrate),
-		pionopus.WithComplexity(10),
+		pionopus.WithComplexity(5),
 		pionopus.WithApplication(pionopus.ApplicationVoIP),
 		pionopus.WithVBR(true),
 	)
