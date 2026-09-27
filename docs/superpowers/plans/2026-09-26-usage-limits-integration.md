@@ -1,6 +1,6 @@
 # Usage & Limits Integration Implementation Plan
 
-> **Status:** In progress as of 2026-09-27. Tasks 1-5 are done. Usage: LLM, embedding, media, image, and transcription calls all price and record; studio work lands in a shared ledger at `<cache>/usage.db` under the `global` scope, game assets record against their campaign, and a creation flow defers under `pending:<token>` (`POST /api/generate-asset-preview` accepts `usage_token`; `CreateGame` commits it). Limits: a provider+role is blocked on a 429, funds failures are recorded, `BeginTurn` refuses while the GM is blocked, generation failures map to 429/402, and the turn route returns 429 with `Retry-After`. API: `GET /api/game/{id}/usage` (rows plus totals), `GET /api/usage` (installation total plus per-campaign and shared drilldown), `GET /api/limits`, and `TurnEvent.RetryAfterMS`. Remaining: Task 6 (Usage UI, and sending the preview `usage_token` from the new-campaign flow). Branch: `feat/usage-limits-recording`.
+> **Status:** Tasks 1-6 are done as of 2026-09-27. Usage: LLM, embedding, media, image, and transcription calls all price and record; studio work lands in a shared ledger at `<cache>/usage.db` under the `global` scope, game assets record against their campaign, and a creation flow defers under `pending:<token>` (`POST /api/generate-asset-preview` accepts `usage_token`; `CreateGame` commits it). Limits: a provider+role is blocked on a 429, funds failures are recorded, `BeginTurn` refuses while the GM is blocked, generation failures map to 429/402, and the turn route returns 429 with `Retry-After`. API: `GET /api/game/{id}/usage` (rows plus totals), `GET /api/usage` (installation total plus per-campaign and shared drilldown), `GET /api/limits`, and `TurnEvent.RetryAfterMS`. Usage UI: Usage panel tab added to Settings Studio with breakdowns, drilldown, filtering, and currency formatting; header rate-limit chips with live countdown; action console turn rate-limit disabling and countdown banner; persistent insufficient funds banner; story theater preview chip mirroring; creation flow `usage_token` forwarding. Branch: `feat/usage-ui`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -658,28 +658,28 @@ git commit -m "feat(usage): expose usage and limit state over the API"
 **Interfaces:**
 - Consumes: `GET /api/game/{id}/usage`, `/api/usage`, `/api/limits`; `TurnEvent.retry_after_ms`.
 
-- [ ] **Step 1: Add the API client and types**
+- [x] **Step 1: Add the API client and types**
 
 Mirror the DTOs in `frontend/src/types.ts` and add `APIClient.getGameUsage`, `getGlobalUsage`, `getLimits` in `client.ts` (matching the existing fetch style).
 
-- [ ] **Step 2: Build the Usage panel**
+- [x] **Step 2: Build the Usage panel**
 
 `UsagePanel.tsx`: totals for the current campaign, an "All campaigns" toggle showing `campaigns` then a per-campaign turn table, a provider breakdown, a role breakdown, the currency, and an "estimated" badge per row. A "no price configured" label where `cost_micros == 0` but usage is present.
 
-- [ ] **Step 3: Wire the tab**
+- [x] **Step 3: Wire the tab**
 
 Add `'usage'` to the `activeSubTab` union and the tab button row; render `<UsagePanel />` for it. Place it after `preferences`.
 
-- [ ] **Step 4: Inline status**
+- [x] **Step 4: Inline status**
 
 Poll `/api/limits` every 15 s (and once on mount) in `App.tsx`; render a header chip per block with a countdown from `until`. When a turn fails with `code == "rate_limited"`, show the countdown from `retry_after_ms` and disable the submit button until it expires. When `code == "insufficient_funds"`, render the persistent banner and do not disable submitting. Mirror the chip in `StoryTheater.tsx` for previews.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `mise run test:frontend && mise run build`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src
@@ -690,12 +690,12 @@ git commit -m "feat(usage): add the Usage panel and inline limit status"
 
 ### Task 7: Full verification
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `mise run test`
 Expected: PASS (re-run `./pkg/gui/` on the known flake).
 
-- [ ] **Step 2: Vet and build**
+- [x] **Step 2: Vet and build**
 
 Run: `mise run lint && mise run build`
 Expected: clean.
