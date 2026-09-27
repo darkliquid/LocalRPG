@@ -1411,7 +1411,11 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		// tools reads Messages instead.
 		request := harness.GenerateRequest{Messages: messages, Prompt: contextPrompt}
 		if offerTools {
-			request.Tools = append(harness.ToolSpecs(), harness.TurnToolSpecs()...)
+			engagement := o.mechanicsEngagement
+			if engagement == "" {
+				engagement = "auto"
+			}
+			request.Tools = append(harness.ToolSpecs(), harness.TurnToolSpecsFor(engagement)...)
 		}
 		o.logger.Event("tool.round", map[string]interface{}{
 			"round":               round,
@@ -1552,7 +1556,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
 						continue
 					}
-					if vErr := validateSubmission(sub, checks, o.declaredStats, proposed); vErr != nil {
+					if vErr := validateSubmission(sub, checks, o.declaredStats, proposed, o.mechanicsEngagement); vErr != nil {
 						o.logger.Event("turn.protocol_error", map[string]interface{}{"detail": vErr.Error()})
 						submitAttempts++
 						if submitAttempts >= 2 {
@@ -1570,6 +1574,9 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					result.Provenance = provenance
 					result.ToolCalls = nil
 					return result, nil
+				default:
+					messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: unsupported turn tool " + call.Name})
+					continue
 				}
 			}
 
