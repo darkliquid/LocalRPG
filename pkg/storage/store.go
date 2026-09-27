@@ -145,6 +145,13 @@ func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 				}
 			}
 		}
+		if tags, ok := meta["tags"].([]interface{}); ok {
+			for _, value := range tags {
+				if tag, ok := value.(string); ok {
+					ent.Tags = append(ent.Tags, tag)
+				}
+			}
+		}
 		if history, ok := meta["history"].([]interface{}); ok {
 			for _, value := range history {
 				if number, ok := value.(float64); ok {

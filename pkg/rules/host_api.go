@@ -27,6 +27,7 @@ type GameHostAPI interface {
 	GetStat(entityID string, path string) (interface{}, error)
 	SetStat(entityID string, path string, value interface{}) error
 	GetEntity(entityID string) (*entity.Entity, error)
+	SaveEntity(ent *entity.Entity) error
 	InjectGMDirection(directive string)
 	GetDirectives() []string
 	Log(message string)
@@ -146,6 +147,12 @@ func (h *DefaultHostBridge) persist(ent *entity.Entity) error {
 
 func (h *DefaultHostBridge) GetEntity(entityID string) (*entity.Entity, error) {
 	return h.store.GetEntity(entityID)
+}
+
+// SaveEntity persists an entity through the bridge's writer, the same path the
+// engine's own writes take, so edited Markdown stays canonical.
+func (h *DefaultHostBridge) SaveEntity(ent *entity.Entity) error {
+	return h.persist(ent)
 }
 
 func (h *DefaultHostBridge) InjectGMDirection(directive string) {
