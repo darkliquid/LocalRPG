@@ -50,3 +50,23 @@ func TestOpenAIEmbeddingProvider(t *testing.T) {
 		t.Errorf("unexpected vector 0: %+v", vecs[0])
 	}
 }
+
+func TestEmbeddingReportsUsage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := embeddingResponse{Data: []embeddingData{{Index: 0, Embedding: []float32{0.1}}}}
+		resp.Usage.PromptTokens = 9
+		resp.Usage.TotalTokens = 9
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewClient(ClientConfig{Endpoint: server.URL + "/v1", Model: "text-embedding-3-small"})
+	if _, err := client.Embed(context.Background(), []string{"hello"}); err != nil {
+		t.Fatalf("Embed: %v", err)
+	}
+	u := client.LastUsage()
+	if u.InputTokens != 9 || u.Requests != 1 {
+		t.Fatalf("usage = %+v, want 9 input tokens", u)
+	}
+}

@@ -512,7 +512,7 @@ func (g *GeminiProvider) Generate(ctx context.Context, req harness.GenerateReque
 		}
 	}
 
-	return &harness.GenerateResponse{Text: sb.String()}, nil
+	return &harness.GenerateResponse{Text: sb.String(), Usage: usageFromMetadata(g.model, resp.UsageMetadata)}, nil
 }
 
 func (g *GeminiProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
@@ -524,11 +524,15 @@ func (g *GeminiProvider) Stream(ctx context.Context, req harness.GenerateRequest
 	iter := g.client.Models.GenerateContentStream(ctx, g.model, contents, cfg)
 
 	var lastThoughtSignature []byte
+	var usage *harness.Usage
 	for resp, err := range iter {
 		if err != nil {
 			mappedErr := mapGeminiError(err)
 			out <- harness.StreamChunk{Error: mappedErr, Done: true}
 			return mappedErr
+		}
+		if u := usageFromMetadata(g.model, resp.UsageMetadata); u != nil {
+			usage = u
 		}
 
 		for _, cand := range resp.Candidates {
@@ -581,8 +585,22 @@ func (g *GeminiProvider) Stream(ctx context.Context, req harness.GenerateRequest
 		}
 	}
 
-	out <- harness.StreamChunk{Done: true}
+	out <- harness.StreamChunk{Done: true, Usage: usage}
 	return nil
+}
+
+// usageFromMetadata maps a genai usage block into the harness shape, so a
+// provider's token counts reach the usage ledger.
+func usageFromMetadata(model string, meta *genai.GenerateContentResponseUsageMetadata) *harness.Usage {
+	if meta == nil {
+		return nil
+	}
+	return &harness.Usage{
+		Provider:     "gemini",
+		Model:        model,
+		InputTokens:  int(meta.PromptTokenCount),
+		OutputTokens: int(meta.CandidatesTokenCount),
+	}
 }
 
 func mapGeminiError(err error) error {
