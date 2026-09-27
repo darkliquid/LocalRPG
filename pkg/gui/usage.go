@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 
@@ -158,4 +159,101 @@ func mediaUsage(u media.Usage, provider, model string) harness.Usage {
 		Requests:     u.Requests,
 		Estimated:    u.Estimated,
 	}
+}
+
+// usageCurrency is the configured display currency for cost figures.
+func (s *Service) usageCurrency() string {
+	return s.configMgr.Get().Providers.Currency
+}
+
+func usageRowDTO(rec storage.UsageRecord) UsageRowDTO {
+	return UsageRowDTO{
+		TurnNumber:   rec.TurnNumber,
+		Role:         rec.Role,
+		Provider:     rec.Provider,
+		Model:        rec.Model,
+		InputTokens:  rec.InputTokens,
+		OutputTokens: rec.OutputTokens,
+		Characters:   rec.Characters,
+		Requests:     rec.Requests,
+		Estimated:    rec.Estimated,
+		CostMicros:   rec.CostMicros,
+	}
+}
+
+func mergeUsage(dto *UsageDTO, summary storage.UsageSummary) {
+	dto.TotalCost += summary.TotalCostMicros
+	for provider, cost := range summary.ByProvider {
+		dto.ByProvider[provider] += cost
+	}
+	for role, cost := range summary.ByRole {
+		dto.ByRole[role] += cost
+	}
+}
+
+// GameUsage reports one campaign's spend, with the underlying rows.
+func (s *Service) GameUsage(ctx context.Context, gameID string) (*UsageDTO, error) {
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, err
+	}
+	summary, err := store.UsageSummary()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := store.UsageAll()
+	if err != nil {
+		return nil, err
+	}
+	dto := &UsageDTO{
+		ByProvider: summary.ByProvider,
+		ByRole:     summary.ByRole,
+		TotalCost:  summary.TotalCostMicros,
+		Currency:   s.usageCurrency(),
+	}
+	for _, row := range rows {
+		dto.Rows = append(dto.Rows, usageRowDTO(row))
+	}
+	return dto, nil
+}
+
+// GlobalUsage totals every campaign plus the shared ledger, with a per-campaign
+// drilldown so a spend view can break the total down.
+func (s *Service) GlobalUsage(ctx context.Context) (*UsageDTO, error) {
+	dto := &UsageDTO{
+		ByProvider: map[string]int64{},
+		ByRole:     map[string]int64{},
+		Currency:   s.usageCurrency(),
+	}
+	games, err := s.ListGames(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, game := range games {
+		store, err := s.store(game.ID)
+		if err != nil {
+			continue
+		}
+		summary, err := store.UsageSummary()
+		if err != nil {
+			continue
+		}
+		mergeUsage(dto, summary)
+		dto.Campaigns = append(dto.Campaigns, CampaignUsageDTO{
+			GameID:    game.ID,
+			Name:      game.Name,
+			TotalCost: summary.TotalCostMicros,
+		})
+	}
+	if ledger, err := s.usageLedger(); err == nil {
+		if summary, err := ledger.UsageSummaryByGame(); err == nil {
+			mergeUsage(dto, summary)
+			dto.Campaigns = append(dto.Campaigns, CampaignUsageDTO{
+				GameID:    UsageScopeGlobal,
+				Name:      "Shared",
+				TotalCost: summary.ByGame[UsageScopeGlobal],
+			})
+		}
+	}
+	return dto, nil
 }

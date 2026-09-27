@@ -125,6 +125,19 @@ func (s *Store) UsageByGame(gameID string) ([]UsageRecord, error) {
 	return scanUsage(rows)
 }
 
+// UsageAll returns every row in the ledger, in insertion order.
+func (s *Store) UsageAll() ([]UsageRecord, error) {
+	const query = `
+	SELECT turn_number, role, provider, model, input_tokens, output_tokens, characters, requests, estimated, cost_micros
+	FROM usage_records ORDER BY id`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanUsage(rows)
+}
+
 // DeleteUsageByGame removes every row for one scope, so a committed campaign's
 // deferred spend stops appearing twice.
 func (s *Store) DeleteUsageByGame(gameID string) error {

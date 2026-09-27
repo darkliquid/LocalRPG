@@ -66,6 +66,43 @@ type AdvancementDTO struct {
 	Pending  bool        `json:"pending"`
 }
 
+// UsageRowDTO is one provider call's consumption and cost.
+type UsageRowDTO struct {
+	TurnNumber   int    `json:"turn_number"`
+	Role         string `json:"role"`
+	Provider     string `json:"provider"`
+	Model        string `json:"model,omitempty"`
+	InputTokens  int    `json:"input_tokens,omitempty"`
+	OutputTokens int    `json:"output_tokens,omitempty"`
+	Characters   int    `json:"characters,omitempty"`
+	Requests     int    `json:"requests,omitempty"`
+	Estimated    bool   `json:"estimated,omitempty"`
+	CostMicros   int64  `json:"cost_micros,omitempty"`
+}
+
+// CampaignUsageDTO is one campaign's total in a global drilldown.
+type CampaignUsageDTO struct {
+	GameID    string `json:"game_id"`
+	Name      string `json:"name,omitempty"`
+	TotalCost int64  `json:"total_cost_micros"`
+}
+
+// UsageDTO is the spend view: rows for one campaign, or totals and a per-campaign
+// drilldown for the whole installation.
+type UsageDTO struct {
+	Rows       []UsageRowDTO      `json:"rows,omitempty"`
+	ByProvider map[string]int64   `json:"by_provider,omitempty"`
+	ByRole     map[string]int64   `json:"by_role,omitempty"`
+	TotalCost  int64              `json:"total_cost_micros"`
+	Currency   string             `json:"currency,omitempty"`
+	Campaigns  []CampaignUsageDTO `json:"campaigns,omitempty"`
+}
+
+// LimitsDTO is the live rate-limit and funds state, for the header chip.
+type LimitsDTO struct {
+	Blocks []harness.LimitState `json:"blocks"`
+}
+
 type GameStateDTO struct {
 	GameID        string            `json:"game_id"`
 	GameName      string            `json:"game_name"`
@@ -455,6 +492,8 @@ type TurnEvent struct {
 	Code    string                     `json:"code,omitempty"`
 	Detail  string                     `json:"detail,omitempty"`
 	Failure *harness.GenerationFailure `json:"failure,omitempty"`
+	// RetryAfterMS is the provider's advertised backoff, when it gave one.
+	RetryAfterMS int64 `json:"retry_after_ms,omitempty"`
 }
 
 // turnModes maps the mode names a client may send to the engine's casing.

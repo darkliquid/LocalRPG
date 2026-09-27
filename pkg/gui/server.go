@@ -82,6 +82,8 @@ func routePattern(path string) string {
 func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/game/", s.handleGameRoutes)
 	s.mux.HandleFunc("/api/games", s.handleGamesRoutes)
+	s.mux.HandleFunc("/api/usage", s.handleUsageRoute)
+	s.mux.HandleFunc("/api/limits", s.handleLimitsRoute)
 	s.mux.HandleFunc("/api/character/generate", s.handleCharacterGenerateRoute)
 	s.mux.HandleFunc("/api/generate-text", s.handleGenerateTextRoute)
 	s.mux.HandleFunc("/api/generate-asset-preview", s.handleGenerateAssetPreview)
@@ -131,6 +133,30 @@ func writeGameError(w http.ResponseWriter, err error) {
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// handleUsageRoute serves GET /api/usage: installation-wide spend with a
+// per-campaign drilldown.
+func (s *Server) handleUsageRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	dto, err := s.service.GlobalUsage(r.Context())
+	if err != nil {
+		writeGameError(w, err)
+		return
+	}
+	writeJSON(w, dto)
+}
+
+// handleLimitsRoute serves GET /api/limits: the live blocks and funds failures.
+func (s *Server) handleLimitsRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	writeJSON(w, LimitsDTO{Blocks: s.service.Limits()})
 }
 
 func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
@@ -351,6 +377,19 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, chronicle)
+
+	case "usage":
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		dto, err := s.service.GameUsage(r.Context(), gameID)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, dto)
+		return
 
 	case "advance":
 		if r.Method != http.MethodPost {
