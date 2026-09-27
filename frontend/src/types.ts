@@ -141,6 +141,7 @@ export interface TurnEvent {
   code?: string;
   detail?: string;
   failure?: GenerationFailure;
+  retry_after_ms?: number;
 }
 
 export interface ModelStatus {
@@ -284,7 +285,8 @@ export interface PlayerCharacter {
 
 export type GenerationFailureCode =
   | 'provider_unavailable' | 'provider_error' | 'empty_response'
-  | 'parse_error' | 'timeout' | 'context_too_large' | 'invalid_request';
+  | 'parse_error' | 'timeout' | 'context_too_large' | 'invalid_request'
+  | 'rate_limited' | 'insufficient_funds';
 
 export interface GenerationAttempt {
   role: string;
@@ -302,6 +304,7 @@ export interface GenerationFailure {
   prompt_chars?: number;
   context_chars?: number;
   elapsed_ms?: number;
+  retry_after_ms?: number;
 }
 
 export interface GenerateCharacterRequest {
@@ -787,6 +790,45 @@ export interface WorkingEntry {
   weight: number;
   last_turn: number;
   role?: string;
+}
+
+export interface UsageRow {
+  turn_number: number;
+  role: string;
+  provider: string;
+  model?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  characters?: number;
+  requests?: number;
+  estimated?: boolean;
+  cost_micros?: number;
+}
+
+export interface CampaignUsage {
+  game_id: string;
+  name?: string;
+  total_cost_micros: number;
+}
+
+export interface Usage {
+  rows?: UsageRow[];
+  by_provider?: Record<string, number>;
+  by_role?: Record<string, number>;
+  total_cost_micros: number;
+  currency?: string;
+  campaigns?: CampaignUsage[];
+}
+
+export interface LimitState {
+  provider: string;
+  role: string;
+  until?: string;
+  funds_failure?: string;
+}
+
+export interface LimitsDTO {
+  blocks: LimitState[];
 }
 
 
