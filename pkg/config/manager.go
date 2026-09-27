@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	"github.com/adrg/xdg"
 	"gopkg.in/yaml.v3"
@@ -16,7 +17,14 @@ type ConfigManager struct {
 	localConfigPath string
 	activeConfig    *Config
 	isOverride      bool
+	// revision advances on every successful Load and Save, so callers can key
+	// caches on the configuration without diffing it.
+	revision atomic.Uint64
 }
+
+// Revision is a monotonic counter that changes whenever the configuration is
+// loaded or saved.
+func (m *ConfigManager) Revision() uint64 { return m.revision.Load() }
 
 // DetectConfigFile returns the config file to read and where to write one. An
 // explicit LOCALRPG_CONFIG_DIR wins; otherwise the XDG config search path is
@@ -85,6 +93,7 @@ func (m *ConfigManager) Load() (*Config, error) {
 	}
 
 	m.activeConfig = merged
+	m.revision.Add(1)
 	return m.activeConfig, nil
 }
 
@@ -114,6 +123,7 @@ func (m *ConfigManager) Save(cfg *Config) error {
 	}
 
 	m.activeConfig = cfg
+	m.revision.Add(1)
 	return nil
 }
 

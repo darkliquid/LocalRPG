@@ -92,3 +92,17 @@ func TestDetectConfigFileHonoursConfigDirOverride(t *testing.T) {
 		t.Fatalf("DetectConfigFile = %q, want the override path", read)
 	}
 }
+
+func TestRevisionIncrementsOnSave(t *testing.T) {
+	m := config.NewConfigManagerWithPaths(
+		filepath.Join(t.TempDir(), "user.yaml"),
+		filepath.Join(t.TempDir(), "local.yaml"),
+	)
+	start := m.Revision()
+	if err := m.Save(config.DefaultConfig()); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if m.Revision() <= start {
+		t.Fatalf("Revision did not advance: start %d, now %d", start, m.Revision())
+	}
+}
