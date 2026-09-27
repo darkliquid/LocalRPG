@@ -1,5 +1,7 @@
 # Usage & Limits Integration Implementation Plan
 
+> **Status:** Not implemented as of 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make providers report usage, record it with cost into the ledger, enforce provider+role rate-limit blocks, surface funds failures, and add the Usage UI.

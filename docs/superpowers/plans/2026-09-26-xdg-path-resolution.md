@@ -1,5 +1,7 @@
 # XDG Path Resolution Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Derive storage and config paths from the XDG base directories, with a single resolution point used by the GUI, CLI, and export.
@@ -41,7 +43,7 @@ func Resolve(bases Bases, paths config.PathsConfig, rootDir string) Dirs
 func ConfigFile() (read, write string, err error)
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/paths/paths_test.go`:
 
@@ -118,12 +120,12 @@ func TestResolveProjectMode(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/paths/ -v`
 Expected: FAIL — package does not exist.
 
-- [ ] **Step 3: Implement the package**
+- [x] **Step 3: Implement the package**
 
 Create `pkg/paths/paths.go`:
 
@@ -214,17 +216,17 @@ func ConfigFile() (read, write string, err error) {
 }
 ```
 
-- [ ] **Step 4: Promote the dependency**
+- [x] **Step 4: Promote the dependency**
 
 Run: `go mod edit -require=github.com/adrg/xdg@v0.5.3 && go mod tidy`
 Expected: `go.mod` lists `github.com/adrg/xdg v0.5.3` in the direct require block; `go.sum` unchanged.
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `go test ./pkg/paths/ -v`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/paths go.mod go.sum
@@ -242,7 +244,7 @@ git commit -m "feat(paths): resolve storage locations from the XDG bases"
 **Interfaces:**
 - Produces: `DefaultConfig().Paths` is all empty strings; resolution supplies defaults.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/config/types_test.go`:
 
@@ -255,12 +257,12 @@ func TestDefaultPathsAreEmptySoResolutionSuppliesThem(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestDefaultPathsAreEmpty ./pkg/config/ -v`
 Expected: FAIL — defaults are `./systems` etc.
 
-- [ ] **Step 3: Change the defaults**
+- [x] **Step 3: Change the defaults**
 
 In `pkg/config/types.go`:
 
@@ -271,12 +273,12 @@ In `pkg/config/types.go`:
 Leave `PathsConfig` as-is. Check for other assertions on the old defaults:
 `grep -rn "\./systems\|\./worlds\|\./games\|\./cache" pkg --include=*_test.go` and update any that assert the old defaults (they now assert empty or a resolved value).
 
-- [ ] **Step 4: Run the package**
+- [x] **Step 4: Run the package**
 
 Run: `go test ./pkg/config/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/config/types_test.go
@@ -295,7 +297,7 @@ git commit -m "refactor(config): leave path defaults to resolution"
 - Consumes: `paths.ConfigFile()`.
 - Produces: config discovery honours `XDG_CONFIG_HOME` and `XDG_CONFIG_DIRS`; `LOCALRPG_CONFIG_DIR` still wins.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/config/manager_test.go`:
 
@@ -318,12 +320,12 @@ func TestConfigManagerFindsTheXDGConfig(t *testing.T) {
 
 Add `github.com/adrg/xdg` and `path/filepath` to the test imports; it must be a direct requirement (done in Task 1).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestConfigManagerFindsTheXDGConfig ./pkg/config/ -v`
 Expected: FAIL — the manager builds the path by hand and ignores the library (and `XDG_CONFIG_DIRS`).
 
-- [ ] **Step 3: Use the package**
+- [x] **Step 3: Use the package**
 
 In `pkg/config/manager.go`:
 
@@ -370,12 +372,12 @@ func NewConfigManager() *ConfigManager {
 
 (`write` is unused here because `Save` writes to `userConfigPath`; when no file exists, `read` is already the application config path, which is where a new file should go.)
 
-- [ ] **Step 4: Run test and the package**
+- [x] **Step 4: Run test and the package**
 
 Run: `go test -run TestConfigManagerFindsTheXDGConfig ./pkg/config/ -v && go test ./pkg/config/ ./pkg/paths/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/manager.go pkg/config/manager_test.go
@@ -394,7 +396,7 @@ git commit -m "feat(config): discover config.yaml on the XDG search path"
 - Consumes: `paths.System`, `paths.Resolve`.
 - Produces: `NewService` classifies `""`/`"."` as global mode and anything else as project mode.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/paths_test.go`:
 
@@ -443,12 +445,12 @@ func TestServiceProjectModeStaysRelative(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestServiceGlobalMode|TestServiceProjectMode' ./pkg/gui/ -v`
 Expected: FAIL — global mode still resolves `./systems`.
 
-- [ ] **Step 3: Replace the discovery and join logic**
+- [x] **Step 3: Replace the discovery and join logic**
 
 In `pkg/gui/service.go`, replace the config-dir block and the `IsAbs` joins with:
 
@@ -497,12 +499,12 @@ Keep `s.rootDir` for the project-mode flag. Update `SaveSettings`'s path block t
 	_ = os.MkdirAll(dirs.Cache, 0755)
 ```
 
-- [ ] **Step 4: Run tests and the package**
+- [x] **Step 4: Run tests and the package**
 
 Run: `go test -run 'TestServiceGlobalMode|TestServiceProjectMode' ./pkg/gui/ -v && go test ./pkg/gui/`
 Expected: PASS (re-run once on the known flake).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/paths_test.go
@@ -522,7 +524,7 @@ git commit -m "feat(gui): resolve paths from XDG unless a project root is set"
 **Interfaces:**
 - Consumes: `paths.Resolve`, `config.DetectConfigFile`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/export/paths_test.go`:
 
@@ -543,12 +545,12 @@ func TestScriptCompilerUsesTheResolvedCache(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails or passes for the right reason**
+- [x] **Step 2: Run test to verify it fails or passes for the right reason**
 
 Run: `go test -run TestScriptCompilerUsesTheResolvedCache ./pkg/export/ -v`
 Expected: PASS against the current `NewPathResolver(rootDir)`; keep it green after Step 3 (the resolved project cache is `rootDir/cache`, unchanged).
 
-- [ ] **Step 3: Switch the entry points**
+- [x] **Step 3: Switch the entry points**
 
 `pkg/export/script.go`:
 
@@ -589,12 +591,12 @@ func NewScriptCompiler(rootDir string) *ScriptCompiler {
 
 Check each command's `cfg` load order so the config is loaded before resolution (play and media already load it).
 
-- [ ] **Step 4: Build and run tests**
+- [x] **Step 4: Build and run tests**
 
 Run: `go build ./... && go test ./pkg/export/ ./cmd/...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cmd/localrpg/play.go cmd/localrpg/media.go pkg/export/script.go pkg/export/paths_test.go
@@ -614,7 +616,7 @@ git commit -m "feat(cli): resolve command paths from the XDG bases"
 **Interfaces:**
 - Produces: `paths.LegacyWarning(bases Bases, paths config.PathsConfig) string` — a non-empty message when a legacy cwd directory exists and the resolved XDG directory is empty, else "".
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/paths/paths_test.go`:
 
@@ -637,12 +639,12 @@ func TestLegacyWarningPointsAtTheWorkingDirectory(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestLegacyWarning ./pkg/paths/ -v`
 Expected: FAIL — undefined.
 
-- [ ] **Step 3: Implement the warning**
+- [x] **Step 3: Implement the warning**
 
 In `pkg/paths/paths.go`:
 
@@ -689,16 +691,16 @@ In `NewService`, after resolving dirs, log it once:
 
 (Use the logger the service already owns; `NewService` runs before a logger is set in some paths, so guard with `trace.OrNil`.)
 
-- [ ] **Step 4: Document the change**
+- [x] **Step 4: Document the change**
 
 Append to `AGENTS.md` under a path/config note: global config paths are resolved against the XDG bases; a relative path means "relative to the XDG category base" unless `--dir` or `./localrpg.yaml` puts the process in project mode; no content is migrated.
 
-- [ ] **Step 5: Run tests and the suite**
+- [x] **Step 5: Run tests and the suite**
 
 Run: `go test ./pkg/paths/ ./pkg/gui/ && mise run test`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/paths/paths.go pkg/paths/paths_test.go pkg/gui/service.go AGENTS.md
@@ -709,17 +711,17 @@ git commit -m "feat(paths): warn about legacy paths that moved under XDG"
 
 ### Task 7: Full verification
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `mise run test`
 Expected: PASS (re-run `./pkg/gui/` on the known flake).
 
-- [ ] **Step 2: Vet and build**
+- [x] **Step 2: Vet and build**
 
 Run: `mise run lint && mise run build`
 Expected: clean.
 
-- [ ] **Step 3: Manual smoke**
+- [x] **Step 3: Manual smoke**
 
 Run `mise run dev:gui` from a directory with no config: confirm it does not create `./systems` and that content lands under the XDG data dir. Then run it with `--dir .` and confirm the old project-relative behaviour.
 

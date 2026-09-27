@@ -1,5 +1,7 @@
 # World Creation Draft Entry Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make a new world a real, visible, selectable draft entry in the Worlds Studio sidebar with empty forms, persisted only on save, and make every "Create New World" entry point open the studio in new-world mode instead of editing the first saved world.
@@ -48,7 +50,7 @@
 - Consumes: `core.LoadWorldManifest`, `core.WorldManifest`, `slugify`.
 - Produces: `gui.ErrWorldExists`, `gui.ErrWorldNotFound`, `(*Service).CreateWorld(ctx, req CreateWorldRequestDTO) (*WorldDetailDTO, error)`, `(*Service).UpdateWorld(ctx, req CreateWorldRequestDTO) (*WorldDetailDTO, error)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/world_crud_test.go`:
 ```go
@@ -108,12 +110,12 @@ func newWorldTestService(t *testing.T) *Service {
 ```
 Adjust the constructor name to the real one used by `pkg/gui` (search `func NewService` in `pkg/gui/service.go` and the test helpers in `pkg/gui/server_test.go`).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestCreateWorldRefusesDuplicate|TestUpdateWorldRequiresExisting' ./pkg/gui/`
 Expected: FAIL (`undefined: ErrWorldExists`, `undefined: CreateWorld`).
 
-- [ ] **Step 3: Implement the split**
+- [x] **Step 3: Implement the split**
 
 In `pkg/gui/service.go`, add the sentinels above `SaveWorld` and replace the method with three functions:
 ```go
@@ -183,12 +185,12 @@ func (s *Service) UpdateWorld(ctx context.Context, req CreateWorldRequestDTO) (*
 ```
 Add `errors` to the imports if absent. Remove `SaveWorld` (the server is its only caller; the next task updates it).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestCreateWorldRefusesDuplicate|TestUpdateWorldRequiresExisting' ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/world_crud_test.go
@@ -207,7 +209,7 @@ git commit -m "feat(gui): refuse duplicate world creation and missing updates"
 - Consumes: `ErrWorldExists`, `ErrWorldNotFound`, `CreateWorld`, `UpdateWorld`.
 - Produces: `POST /api/worlds` -> 201 or 409; `PUT /api/world/{id}` -> 200 or 404.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/world_crud_test.go` a handler-level test using the existing server test harness (search `httptest.NewServer` / `NewServer(` in `pkg/gui/server_test.go` for the pattern):
 ```go
@@ -228,12 +230,12 @@ func TestWorldCreateDuplicateIsConflict(t *testing.T) {
 ```
 Use the real helper names from `server_test.go` (`newTestServer`, and whichever helper posts JSON). If the harness uses a different shape, mirror the closest existing test verbatim.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestWorldCreateDuplicateIsConflict ./pkg/gui/`
 Expected: FAIL (duplicate returns 400 or overwrites with 201, not 409).
 
-- [ ] **Step 3: Implement the route changes**
+- [x] **Step 3: Implement the route changes**
 
 In `handleWorldsRoutes`, replace the POST branch body (lines 628-641):
 ```go
@@ -278,12 +280,12 @@ In `handleWorldRoutes`, replace the PUT branch (lines 762-774):
 ```
 Ensure `errors` is imported in `server.go`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestWorldCreateDuplicateIsConflict ./pkg/gui/` and `go test ./pkg/gui/`
 Expected: PASS. Update any existing test that calls `/api/worlds` twice with the same name or expects `SaveWorld`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/server.go pkg/gui/server_test.go pkg/gui/world_crud_test.go
@@ -302,7 +304,7 @@ git commit -m "feat(gui): return 409/404 for world create and update conflicts"
 - Consumes: the backend statuses from Task 2.
 - Produces: `WorldSelection`, `WorldDraft`; `APIClient.createWorld`, `APIClient.updateWorld`; a `WorldExistsError extends HTTPError`.
 
-- [ ] **Step 1: Add the types**
+- [x] **Step 1: Add the types**
 
 In `frontend/src/types.ts`:
 ```ts
@@ -317,7 +319,7 @@ export interface WorldDraft {
 }
 ```
 
-- [ ] **Step 2: Replace `saveWorld` with explicit methods**
+- [x] **Step 2: Replace `saveWorld` with explicit methods**
 
 In `frontend/src/api/client.ts`, add above `APIClient`:
 ```ts
@@ -354,7 +356,7 @@ Replace `saveWorld` with:
   }
 ```
 
-- [ ] **Step 3: Verify it compiles**
+- [x] **Step 3: Verify it compiles**
 
 Run: `mise run test:frontend`
 Expected: PASS. `WorldsStudio.tsx` still calls `saveWorld`, so it will fail to compile; that is expected and fixed in Task 5. To keep this task self-contained, leave a temporary compatibility shim on the client:
@@ -365,7 +367,7 @@ Expected: PASS. `WorldsStudio.tsx` still calls `saveWorld`, so it will fail to c
 ```
 Remove the shim in Task 5 once `WorldsStudio` migrates.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/api/client.ts
@@ -383,7 +385,7 @@ git commit -m "feat(frontend): add world selection types and explicit create/upd
 - Consumes: nothing.
 - Produces: `DiscardDraftConfirm` with props `{ isOpen: boolean; onCancel: () => void; onDiscard: () => void }`.
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 Create `frontend/src/components/launcher/DiscardDraftConfirm.tsx`:
 ```tsx
@@ -428,12 +430,12 @@ export const DiscardDraftConfirm: React.FC<DiscardDraftConfirmProps> = ({ isOpen
 };
 ```
 
-- [ ] **Step 2: Verify it compiles**
+- [x] **Step 2: Verify it compiles**
 
 Run: `mise run test:frontend`
 Expected: PASS (the component is unused until Task 5, but `noUnusedLocals` applies to locals, not exports, so an exported component is fine).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/launcher/DiscardDraftConfirm.tsx
@@ -451,7 +453,7 @@ git commit -m "feat(frontend): add a discard-draft confirmation"
 - Consumes: `WorldSelection`, `WorldDraft`, `DiscardDraftConfirm`, `APIClient.createWorld`/`updateWorld`.
 - Produces: `WorldsStudioProps` gains `startMode?: 'new' | 'browse'`; draft sidebar row; empty lore for saved worlds without a lore prompt.
 
-- [ ] **Step 1: Update props, imports, and state**
+- [x] **Step 1: Update props, imports, and state**
 
 At the top of `WorldsStudio.tsx`:
 ```tsx
@@ -479,7 +481,7 @@ Remove `const [selectedID, setSelectedID] = useState<string | null>(null);`. Add
   const markDirty = () => setDraft((d) => (d ? { ...d, dirty: true } : d));
 ```
 
-- [ ] **Step 2: Rewrite load/select/new functions**
+- [x] **Step 2: Rewrite load/select/new functions**
 
 Replace `useEffect`, `loadWorlds`, `loadWorldDetail`, `handleSelectEntity`'s API branch, `handleNewWorld`, and add selection helpers:
 ```tsx
@@ -572,7 +574,7 @@ Replace `useEffect`, `loadWorlds`, `loadWorldDetail`, `handleSelectEntity`'s API
 ```
 The only change to `loadWorldDetail`'s unchanged block is line 99, now `setLorePrompt(detail.lore_prompt || '')`.
 
-- [ ] **Step 3: Replace every `selectedID` check**
+- [x] **Step 3: Replace every `selectedID` check**
 
 Apply these substitutions throughout the file:
 - `if (selectedID) { ... getWorldEntity(selectedID, ...) }` in `handleSelectEntity` -> `if (savedID)`.
@@ -589,7 +591,7 @@ Apply these substitutions throughout the file:
 
 Add `markDirty()` to the `onChange` of the name, genre, art_style, tags, description, and lorePrompt inputs, and to the entity create/delete/save handlers when `isDraft`.
 
-- [ ] **Step 4: Migrate save to create/update**
+- [x] **Step 4: Migrate save to create/update**
 
 Replace the `payload` construction and save call in `handleSaveWorld`:
 ```tsx
@@ -620,7 +622,7 @@ In the `catch`, special-case the duplicate id:
 ```
 The success path already calls `loadWorlds(saved.id)`, which now sets a saved selection.
 
-- [ ] **Step 5: Render the draft row and confirmation**
+- [x] **Step 5: Render the draft row and confirmation**
 
 In the sidebar list, before `worlds.map(...)`, add the draft row:
 ```tsx
@@ -653,13 +655,13 @@ Render the confirm overlay near the toast block:
       />
 ```
 
-- [ ] **Step 6: Remove the client shim and verify**
+- [x] **Step 6: Remove the client shim and verify**
 
 Remove the temporary `saveWorld` shim added in Task 3. Run:
 `mise run test:frontend && mise run build:frontend`
 Expected: PASS. `noUnusedLocals` will flag any leftover `selectedID` reference; fix each.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/components/WorldsStudio.tsx frontend/src/api/client.ts
@@ -677,7 +679,7 @@ git commit -m "feat(frontend): add a persisted-on-save world draft entry"
 - Consumes: `WorldsStudioProps.startMode`.
 - Produces: `activeStudio` becomes a discriminated studio state; create tiles open `mode: 'new'`, the dock opens `mode: 'browse'`.
 
-- [ ] **Step 1: Change the studio state**
+- [x] **Step 1: Change the studio state**
 
 Replace `const [activeStudio, setActiveStudio] = useState<'worlds' | 'systems' | null>(null);` with:
 ```tsx
@@ -691,7 +693,7 @@ Declare the type above the component (module scope) and use:
   const [activeStudio, setActiveStudio] = useState<StudioState>(null);
 ```
 
-- [ ] **Step 2: Update the render branches**
+- [x] **Step 2: Update the render branches**
 
 Worlds overlay condition:
 ```tsx
@@ -710,7 +712,7 @@ Systems overlay condition:
 ```
 (The `onWorldSaved` prop for the systems branch is unchanged.)
 
-- [ ] **Step 3: Update every entry point**
+- [x] **Step 3: Update every entry point**
 
 - Dock: `onOpenWorldsStudio={() => setActiveStudio({ studio: 'worlds', mode: 'browse' })}`.
 - Hero `onCreateWorld`: `() => setActiveStudio({ studio: 'worlds', mode: 'new' })`.
@@ -720,12 +722,12 @@ Systems overlay condition:
 
 Because the studio unmounts when `activeStudio` clears, `startMode` is read on mount and no nonce is needed.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `mise run test:frontend && mise run build:frontend`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/LauncherHub.tsx
@@ -736,12 +738,12 @@ git commit -m "feat(frontend): open Worlds Studio in new-world mode from create 
 
 ### Task 7: Full verification
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `mise run test` and `mise run lint`
 Expected: PASS (`go test -v -count=1 ./...`, `npx tsc --noEmit`, `go vet ./...`).
 
-- [ ] **Step 2: Manual checklist**
+- [x] **Step 2: Manual checklist**
 
 1. With at least one saved world, open the dock's Worlds Studio and confirm it opens the first saved world (browse behaviour unchanged).
 2. Open Worlds Studio from a "Create New World" tile and confirm a dashed "Untitled World / unsaved" row appears, forms are empty, and no saved world is highlighted.
@@ -750,7 +752,7 @@ Expected: PASS (`go test -v -count=1 ./...`, `npx tsc --noEmit`, `go vet ./...`)
 5. Open a saved world whose `prompts/lore.md` is absent; confirm the lore field is empty and that "Load Reference Template" still fills Ashen Reach.
 6. Create a world whose derived slug matches an existing world; confirm a clear "already exists" toast and that the existing world on disk is untouched.
 
-- [ ] **Step 3: Commit any fixups**
+- [x] **Step 3: Commit any fixups**
 
 ```bash
 git add -A

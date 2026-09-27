@@ -1,5 +1,7 @@
 # Mechanics Engagement & Visibility Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make mechanics engagement tunable (`off`/`auto`/`ask`), make the prompt reflect the policy, force a check when the model goes quiet, and make resolved checks legible in the chronicle.
@@ -32,7 +34,7 @@
 **Interfaces:**
 - Produces: `core.MechanicsSpec.Engagement string`; `config.MechanicsConfig{Engagement, CadenceTurns}`; `(*Config).MechanicsEngagement()`, `(*Config).MechanicsCadenceTurns()`; `engine.ResolveEngagement(manifest, system, cfg) string`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/config/types_test.go`:
 
@@ -85,12 +87,12 @@ func TestResolveEngagementOrder(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestMechanicsEngagement|TestResolveEngagement' ./pkg/config/ ./pkg/engine/ -v`
 Expected: FAIL — undefined field/method.
 
-- [ ] **Step 3: Add the types and accessors**
+- [x] **Step 3: Add the types and accessors**
 
 In `pkg/core/mechanics.go`, add to `MechanicsSpec`:
 
@@ -134,7 +136,7 @@ func (c *Config) MechanicsCadenceTurns() int {
 }
 ```
 
-- [ ] **Step 4: Add the resolver**
+- [x] **Step 4: Add the resolver**
 
 Create `pkg/engine/engagement.go`:
 
@@ -179,7 +181,7 @@ func normalizeEngagement(value string) string {
 }
 ```
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 Run: `go test -run 'TestMechanicsEngagement|TestResolveEngagement' ./pkg/config/ ./pkg/engine/ -v && go test ./pkg/config/ ./pkg/engine/`
 
@@ -202,7 +204,7 @@ git commit -m "feat(mechanics): add a tunable engagement policy"
 - Produces: `harness.FormatMechanicsInstructions(spec *core.MechanicsSpec, engagement string) string`; `(*TurnOrchestrator).SetMechanicsEngagement(string)`.
 - Consumes: `engine.ResolveEngagement`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `pkg/harness/mechanics_instructions_test.go`, change the existing calls to pass a policy and add:
 
@@ -235,12 +237,12 @@ In `pkg/engine/mechanics_prompt_test.go`, update `o.LoadPrompts(...)` tests to s
 	}
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run TestFormatMechanicsInstructions ./pkg/harness/ -v`
 Expected: FAIL — signature mismatch.
 
-- [ ] **Step 3: Make the formatter policy-aware**
+- [x] **Step 3: Make the formatter policy-aware**
 
 In `pkg/harness/mechanics_instructions.go`, change the signature and split the header by policy (keep the declared notation/outcome/difficulty tail shared):
 
@@ -287,7 +289,7 @@ In `pkg/gui/service.go` prepareTurn, after `orchestrator.LoadPrompts(...)`:
 
 (`sm` is the system manifest already loaded there; reuse it. If it is only loaded for stats, load it once into a variable used by both.)
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `go test ./pkg/harness/ ./pkg/engine/ ./pkg/gui/`
 
@@ -309,7 +311,7 @@ git commit -m "feat(mechanics): make the instruction reflect the policy"
 **Interfaces:**
 - Produces: `harness.TurnToolSpecsFor(engagement string) []ToolSpec`; `validateSubmission(sub, checks, declaredStats, proposed, engagement)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/engagement_tools_test.go`:
 
@@ -368,12 +370,12 @@ func TestToolSpecsPerPolicy(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestValidation* ./pkg/engine/ -v`
 Expected: FAIL — signatures/undefined.
 
-- [ ] **Step 3: Policy-aware tools and validation**
+- [x] **Step 3: Policy-aware tools and validation**
 
 In `pkg/harness/turn_tools.go`, add a `propose_check` spec modelled on `request_check` (same parameters, description: "Propose a check to the player: state the stakes and possible outcomes, then stop. The player rolls."), and:
 
@@ -413,7 +415,7 @@ func validateSubmission(sub *harness.TurnSubmission, checks []harness.CheckResul
 
 Update the one production caller (`orchestrator.go:1543`) and every test caller to pass the policy (`nil`/`"auto"` in existing tests preserves behaviour).
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `go test ./pkg/harness/ ./pkg/engine/`
 
@@ -435,7 +437,7 @@ git commit -m "feat(mechanics): offer and accept tools by policy"
 **Interfaces:**
 - Produces: `harness.GenerateRequest.ToolChoice string` (`""`, `"required"`, `"none"`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `openaichat`, assert the marshalled body carries `tool_choice` when `ToolChoice: "required"`:
 
@@ -450,12 +452,12 @@ func TestToolChoiceRequiredMarshals(t *testing.T) {
 
 (If there is no `buildChatBody` helper, add the mapping inside the existing request construction and assert on the captured request body as the usage test does.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestToolChoiceRequired ./pkg/provider/openaichat/ -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Add the field and mappings**
+- [x] **Step 3: Add the field and mappings**
 
 `pkg/harness/types.go`: add `ToolChoice string` to `GenerateRequest` with a comment that providers may ignore it.
 
@@ -465,7 +467,7 @@ Expected: FAIL.
 
 Other providers ignore the field.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `go test ./pkg/provider/... && mise run lint`
 
@@ -485,7 +487,7 @@ git commit -m "feat(providers): support forcing a tool call"
 **Interfaces:**
 - Produces: `(*TurnOrchestrator).SetMechanicsCadence(int)`; behaviour: after N turns with no checks, the first assistant round carries `ToolChoice: "required"` (or a prompt nudge when unsupported), capped at once per turn.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/cadence_test.go` using `toolLoopOrchestrator` and a scripted provider that records the generation request's `ToolChoice`:
 
@@ -504,12 +506,12 @@ func TestCadenceForcesACheckAfterQuietTurns(t *testing.T) {
 
 Build `cadenceOrchestrator` from the existing test scaffolding used by `toolLoopOrchestrator`; the history is written with `NewHistoryLogger(...).AppendTurn(engine.Turn{Number: n, Checks: nil})` three times, and the orchestrator is given a tool-capable provider.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestCadenceForcesACheck ./pkg/engine/ -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement the floor**
+- [x] **Step 3: Implement the floor**
 
 In `ProcessActionStream`, before the generation loop, when the resolved policy is `auto` and the cadence is reached:
 
@@ -544,7 +546,7 @@ In `runGenerationLoop`, for round 0 only, if `o.forceToolChoice`, set `ToolChoic
 
 Reset `forceToolChoice` at the end of the turn so it never applies twice.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `go test ./pkg/engine/`
 
@@ -568,7 +570,7 @@ git commit -m "feat(mechanics): force a check when the model goes quiet"
 **Interfaces:**
 - Produces: `harness.PendingCheck{Ref, Request, ProposedBy}`; `history.Turn.PendingCheck`; `TurnRequest.PendingCheckRef`; a `propose_check` tool that ends the turn pending; a roll that resolves it and continues.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/pending_check_test.go`:
 
@@ -598,12 +600,12 @@ func TestRollingAPendingCheckResolvesAndContinues(t *testing.T) {
 
 Fill the second test by writing a turn with `PendingCheck` to history, then invoking `ProcessActionStream` with a request whose `PendingCheckRef` matches; assert `turn.Checks` is non-empty and `turn.PendingCheck == nil`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestProposeCheck|TestRollingAPendingCheck' ./pkg/engine/ -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement pending checks**
+- [x] **Step 3: Implement pending checks**
 
 `pkg/harness/turn.go`:
 
@@ -628,7 +630,7 @@ type PendingCheck struct {
 
 `pkg/gui/types.go` and `TurnRequest.validate`: carry `PendingCheckRef` through to the orchestrator (`ProcessActionStream` needs a variant that accepts it, or the service sets it on the orchestrator before the call; choose the latter to avoid changing the hot signature: `orchestrator.SetPendingCheckRef(ref)`).
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `go test ./pkg/engine/ ./pkg/gui/`
 
@@ -649,23 +651,23 @@ git commit -m "feat(mechanics): let the GM propose a check and the player roll i
 **Interfaces:**
 - Consumes: `TurnDTO.Checks`, `SegmentDTO.CheckRef`, `GameStateDTO.MechanicsEngagement`.
 
-- [ ] **Step 1: Add the engagement to the DTO**
+- [x] **Step 1: Add the engagement to the DTO**
 
 `pkg/gui/types.go`: `MechanicsEngagement string \`json:"mechanics_engagement,omitempty"\`` on `GameStateDTO`. In `GetGameState`, set it from `engine.ResolveEngagement(gameManifest, systemManifest, cfg)`.
 
-- [ ] **Step 2: Causal placement**
+- [x] **Step 2: Causal placement**
 
 In `frontend/src/components/TurnSegments.tsx`, when a check has no referencing segment, insert it **before** the first narration segment rather than after the prose (change the append at the end of the stream builder to an unshift at the start).
 
-- [ ] **Step 3: Richer check card**
+- [x] **Step 3: Richer check card**
 
 In `DiceCheckCard.tsx`, render the `stakes` line, the outcome label (`check.outcome`), and the notation (`check.roll?.notation`), keeping the tone colours.
 
-- [ ] **Step 4: Mechanics strip and header indicator**
+- [x] **Step 4: Mechanics strip and header indicator**
 
 Add a small component (e.g. `MechanicsStrip.tsx`) rendered above `ActionConsole` showing `engagement` and the turn's check count/outcome; add a header chip/dot bound to `gameState.mechanics_engagement`.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: `mise run test:frontend && mise run build`
 
@@ -678,9 +680,9 @@ git commit -m "feat(mechanics): surface engagement and check outcomes"
 
 ### Task 8: Full verification
 
-- [ ] **Step 1:** `mise run test`
-- [ ] **Step 2:** `mise run lint && mise run build`
-- [ ] **Step 3:** Manual: play a turn in each policy; confirm prompt/tools/validation change, a cadence check fires, and an `ask` turn ends pending and rolls through.
+- [x] **Step 1:** `mise run test`
+- [x] **Step 2:** `mise run lint && mise run build`
+- [x] **Step 3:** Manual: play a turn in each policy; confirm prompt/tools/validation change, a cadence check fires, and an `ask` turn ends pending and rolls through.
 
 ---
 

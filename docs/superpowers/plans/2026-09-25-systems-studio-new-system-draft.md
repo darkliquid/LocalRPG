@@ -1,5 +1,7 @@
 # Systems Studio New System Draft Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ensure adding a new system in Systems Studio adds an unsaved blank system draft tile into the sidebar and initializes the editor with a blank slate, with discard protection when navigating away.
@@ -27,7 +29,7 @@
 **Files:**
 - Modify: `frontend/src/components/SystemsStudio.tsx`
 
-- [ ] **Step 1: Add types, selection/draft state, and discard handlers**
+- [x] **Step 1: Add types, selection/draft state, and discard handlers**
 
 In `frontend/src/components/SystemsStudio.tsx`:
 1. Import `DiscardDraftConfirm` from `./launcher/DiscardDraftConfirm`.
@@ -106,7 +108,7 @@ In `frontend/src/components/SystemsStudio.tsx`:
    };
    ```
 
-- [ ] **Step 2: Update Sidebar and Form JSX in `SystemsStudio.tsx`**
+- [x] **Step 2: Update Sidebar and Form JSX in `SystemsStudio.tsx`**
 
 1. In the sidebar list, render the draft tile at the top when `draft` exists:
    ```tsx
@@ -161,12 +163,12 @@ In `frontend/src/components/SystemsStudio.tsx`:
    />
    ```
 
-- [ ] **Step 3: Run `mise run test:frontend` to verify compilation**
+- [x] **Step 3: Run `mise run test:frontend` to verify compilation**
 
 Run: `mise run test:frontend`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 4: Commit `SystemsStudio.tsx` changes**
+- [x] **Step 4: Commit `SystemsStudio.tsx` changes**
 
 ```bash
 git add frontend/src/components/SystemsStudio.tsx
@@ -180,12 +182,12 @@ git commit -m "feat(studio): add sidebar draft tile and blank slate for new syst
 **Files:**
 - None (verification phase)
 
-- [ ] **Step 1: Run frontend build**
+- [x] **Step 1: Run frontend build**
 
 Run: `mise run build:frontend`
 Expected: PASS.
 
-- [ ] **Step 2: Run full test and lint suite**
+- [x] **Step 2: Run full test and lint suite**
 
 Run: `mise run test && mise run lint`
 Expected: PASS with 0 errors.

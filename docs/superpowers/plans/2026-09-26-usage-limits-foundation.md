@@ -1,5 +1,7 @@
 # Usage, Limits & Pricing Foundation Implementation Plan
 
+> **Status:** Not implemented as of 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Land the shared types the usage/limits feature needs: a rate-limit and insufficient-funds taxonomy, a provider+role block registry, a pricing calculator, a per-campaign usage ledger, and the harness usage plumbing.

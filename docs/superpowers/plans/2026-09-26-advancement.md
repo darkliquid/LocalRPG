@@ -1,5 +1,7 @@
 # Advancement & XP Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27; the manual browser check in Task 8 remains.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A schema-agnostic advancement system: declarative earn triggers, a currency, a catalog of unlocks with three cost modes, a spend API, and the character-drawer surface.

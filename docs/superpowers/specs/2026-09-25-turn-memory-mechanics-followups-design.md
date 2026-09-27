@@ -1,5 +1,7 @@
 # Turn, Memory & Mechanics Follow-ups Design
 
+> **Status:** No implementation plan written as of 2026-09-27.
+
 **Date:** 2026-09-25
 **Status:** Proposed
 **Scope:** Close the residual gaps left by the structured turn, memory, and mechanics work: an end-to-end GUI rules-loading test, the engine-side health-zero effect, and automated coverage for the codex memory timeline

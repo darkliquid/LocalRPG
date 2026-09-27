@@ -1,5 +1,7 @@
 # Character Portrait Generation, Backfill, and Visual Novel Theater Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Implement automated character metadata enrichment (age, gender, appearance), 3/4 bust portrait generation with procedural SVG fallback, speech segment avatar badges in the Chronicle, and a two-sided Visual Novel Story Theater.
@@ -40,7 +42,7 @@
 - Modify: `pkg/entity/entity.go:27-65`
 - Test: `pkg/entity/entity_test.go`
 
-- [ ] **Step 1: Write the failing test in `pkg/entity/entity_test.go`**
+- [x] **Step 1: Write the failing test in `pkg/entity/entity_test.go`**
 
 ```go
 func TestEntityFrontmatterGenderAgeAndPortrait(t *testing.T) {
@@ -88,12 +90,12 @@ Experienced navigator of the Maw.`
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestEntityFrontmatterGenderAgeAndPortrait ./pkg/entity`
 Expected: FAIL (unknown field `Gender`, `Age` on `Entity`)
 
-- [ ] **Step 3: Update `pkg/entity/entity.go`**
+- [x] **Step 3: Update `pkg/entity/entity.go`**
 
 Add `Gender` and `Age` to `EntityFrontmatter` and `Entity`:
 ```go

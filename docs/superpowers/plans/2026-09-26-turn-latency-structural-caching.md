@@ -1,5 +1,7 @@
 # Turn Latency Structural Caching Implementation Plan
 
+> **Status:** Not implemented as of 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remove the per-turn rebuild of configuration-derived wiring, stop re-parsing `history.jsonl` per segment, make synthesis single-flight, and move Opus encoding off the request path, with phase instrumentation.

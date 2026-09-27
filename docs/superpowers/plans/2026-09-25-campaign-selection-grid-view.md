@@ -1,5 +1,7 @@
 # Campaign Selection Grid View Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add an expanded full-window Campaign Gallery grid view to the desktop launcher hub, accessible via an anchored grid icon on the dock, displaying rich campaign cards with instant launch, settings management, search, and sorting.
@@ -31,7 +33,7 @@
 **Files:**
 - Create: `frontend/src/components/launcher/CampaignGallery.tsx`
 
-- [ ] **Step 1: Create `frontend/src/components/launcher/CampaignGallery.tsx`**
+- [x] **Step 1: Create `frontend/src/components/launcher/CampaignGallery.tsx`**
 
 Write the complete `CampaignGallery` component with `CampaignCard`, search filtering, sort options, empty state, and keyboard shortcuts.
 
@@ -387,12 +389,12 @@ export const CampaignGallery: React.FC<CampaignGalleryProps> = ({
 };
 ```
 
-- [ ] **Step 2: Run `mise run test:frontend` to verify component compilation**
+- [x] **Step 2: Run `mise run test:frontend` to verify component compilation**
 
 Run: `mise run test:frontend`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 3: Commit `CampaignGallery.tsx`**
+- [x] **Step 3: Commit `CampaignGallery.tsx`**
 
 ```bash
 git add frontend/src/components/launcher/CampaignGallery.tsx
@@ -406,7 +408,7 @@ git commit -m "feat(launcher): add CampaignGallery component"
 **Files:**
 - Modify: `frontend/src/components/launcher/LauncherDock.tsx:1-55`
 
-- [ ] **Step 1: Update `LauncherDockProps` and render `LayoutGrid` button**
+- [x] **Step 1: Update `LauncherDockProps` and render `LayoutGrid` button**
 
 In `frontend/src/components/launcher/LauncherDock.tsx`:
 1. Import `LayoutGrid` from `lucide-react`.
@@ -460,12 +462,12 @@ And in the JSX below the divider:
       </div>
 ```
 
-- [ ] **Step 2: Run `mise run test:frontend` to verify compilation**
+- [x] **Step 2: Run `mise run test:frontend` to verify compilation**
 
 Run: `mise run test:frontend`
 Expected: FAIL in `LauncherHub.tsx` (missing required props `isCampaignGalleryOpen` and `onToggleCampaignGallery`).
 
-- [ ] **Step 3: Commit `LauncherDock.tsx` changes**
+- [x] **Step 3: Commit `LauncherDock.tsx` changes**
 
 ```bash
 git add frontend/src/components/launcher/LauncherDock.tsx
@@ -479,7 +481,7 @@ git commit -m "feat(launcher): add campaign gallery grid button to LauncherDock"
 **Files:**
 - Modify: `frontend/src/components/LauncherHub.tsx`
 
-- [ ] **Step 1: Import `CampaignGallery` and wire state in `LauncherHub.tsx`**
+- [x] **Step 1: Import `CampaignGallery` and wire state in `LauncherHub.tsx`**
 
 1. Import `CampaignGallery` from `./launcher/CampaignGallery`.
 2. Add state:
@@ -518,12 +520,12 @@ git commit -m "feat(launcher): add campaign gallery grid button to LauncherDock"
    />
    ```
 
-- [ ] **Step 2: Run `mise run test:frontend` to verify strict typing**
+- [x] **Step 2: Run `mise run test:frontend` to verify strict typing**
 
 Run: `mise run test:frontend`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 3: Commit `LauncherHub.tsx` changes**
+- [x] **Step 3: Commit `LauncherHub.tsx` changes**
 
 ```bash
 git add frontend/src/components/LauncherHub.tsx
@@ -537,17 +539,17 @@ git commit -m "feat(launcher): integrate CampaignGallery in LauncherHub"
 **Files:**
 - None (verification phase)
 
-- [ ] **Step 1: Run frontend build**
+- [x] **Step 1: Run frontend build**
 
 Run: `mise run build:frontend`
 Expected: PASS (generates production bundle in `pkg/gui/dist`).
 
-- [ ] **Step 2: Run backend tests**
+- [x] **Step 2: Run backend tests**
 
 Run: `mise run test:backend`
 Expected: PASS with 0 test failures.
 
-- [ ] **Step 3: Run full suite and linter**
+- [x] **Step 3: Run full suite and linter**
 
 Run: `mise run test && mise run lint`
 Expected: PASS with clean `go vet`.

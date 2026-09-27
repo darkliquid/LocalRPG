@@ -1,5 +1,7 @@
 # Generation and World Studio Follow-ups Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close the deferred review findings: complete the OpenTelemetry surface on one unified `generate.*` event family, make generation routes return one JSON error shape, surface errors at every frontend call site, remove the world-draft selection race, and add the tests the first pass skipped.
@@ -56,7 +58,7 @@
 - Consumes: `harness.GenerationFailure`, `harness.FailureFrom`, `harness.FailureCode`; `decodeGeneratedValuesChecked`.
 - Produces: `type generationOutcome struct { Values map[string]string; Attempts []harness.Attempt; GeneratedBy string }`; `func collectTextAttempts(ctx context.Context, router *harness.Router, roles []string, request harness.GenerateRequest) generationOutcome`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/generation_attempts_test.go`:
 ```go
@@ -166,12 +168,12 @@ func TestCollectTextAttempts(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestCollectTextAttempts ./pkg/gui/`
 Expected: FAIL (`undefined: collectTextAttempts`).
 
-- [ ] **Step 3: Implement the helper**
+- [x] **Step 3: Implement the helper**
 
 Create `pkg/gui/generation_attempts.go`:
 ```go
@@ -244,7 +246,7 @@ func collectTextAttempts(ctx context.Context, router *harness.Router, roles []st
 }
 ```
 
-- [ ] **Step 4: Refactor `GenerateText` and `GenerateCharacter` to use it**
+- [x] **Step 4: Refactor `GenerateText` and `GenerateCharacter` to use it**
 
 In `pkg/gui/text_generate.go`, replace the `roles`/`attempts`/`for` loop in `GenerateText` with:
 ```go
@@ -273,12 +275,12 @@ In `pkg/gui/character_generate.go`, replace the `roles`/`attempts`/`values` loop
 ```
 Keep the `for _, field := range generatable` copy, `recordGenerationAttempts`, failure, and warning blocks.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `go test -run 'TestCollectTextAttempts|TestGenerateText|TestGenerateCharacter|TestPickFailureCode' ./pkg/gui/` and `go build ./...`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/generation_attempts.go pkg/gui/generation_attempts_test.go pkg/gui/text_generate.go pkg/gui/character_generate.go
@@ -298,7 +300,7 @@ git commit -m "refactor(gui): share the role fallback loop between generators"
 - Consumes: `generationOutcome` (Task 1).
 - Produces: `startGenerationSpan(ctx context.Context, logger trace.Logger, name, formType, fieldName string) (context.Context, oteltrace.Span)`; `startImageSpan(ctx context.Context, logger trace.Logger, kind string) (context.Context, oteltrace.Span)`; `(*Service).recordGeneration(ctx, span, formType, role string, started time.Time, failure *harness.GenerationFailure)`; `(*Service).setTextOutcome(span oteltrace.Span, outcome generationOutcome, fieldCount int)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Replace the direct-method calls in `pkg/gui/generation_telemetry_test.go` and add:
 ```go
@@ -369,12 +371,12 @@ func TestSetTextOutcomeAttributes(t *testing.T) {
 ```
 Add imports `go.opentelemetry.io/otel/sdk/metric/metricdata` and `go.opentelemetry.io/otel/attribute` to the test file. Note: the metric assertion assumes a `Sum[int64]`; if `localrpg.generation.errors` is the first metric, adjust the type switch to handle histograms by skipping them. If the type assertion is brittle, instead assert by iterating `m.Data` with a type switch and only checking `Sum[int64]`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestRecordGenerationCarriesRole|TestSetTextOutcomeAttributes' ./pkg/gui/`
 Expected: FAIL (`undefined: startGenerationSpan` as a free function, `undefined: setTextOutcome`, wrong `recordGeneration` arity).
 
-- [ ] **Step 3: Update `generation_telemetry.go`**
+- [x] **Step 3: Update `generation_telemetry.go`**
 
 Replace `startGenerationSpan` with free functions and add the role parameter and outcome setter:
 ```go
@@ -450,7 +452,7 @@ func (s *Service) setTextOutcome(span oteltrace.Span, outcome generationOutcome,
 }
 ```
 
-- [ ] **Step 4: Update the callers**
+- [x] **Step 4: Update the callers**
 
 In `GenerateText`: `ctx, span := startGenerationSpan(ctx, s.logger, "generate.text", req.FormType, req.FieldName)`; after building `resp.Fields`, call `s.setTextOutcome(span, outcome, len(resp.Fields))`; change every `s.recordGeneration(ctx, span, req.FormType, started, ...)` to pass a role (`outcome.GeneratedBy` on success, `roleForAttempts(attempts)` on failure).
 Add to `generation_telemetry.go`:
@@ -466,12 +468,12 @@ func roleForAttempts(attempts []harness.Attempt) string {
 ```
 In `GenerateCharacter`: same, with `startGenerationSpan(ctx, s.logger, "generate.text", "character", "_all")`, `s.setTextOutcome(span, outcome, len(resp.Values))`, and role `outcome.GeneratedBy`/`roleForAttempts(attempts)`.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `go test ./pkg/gui/` and `go build ./...`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/generation_telemetry.go pkg/gui/generation_telemetry_test.go pkg/gui/text_generate.go pkg/gui/character_generate.go
@@ -491,7 +493,7 @@ git commit -m "feat(gui): complete text generation span and metric attributes"
 - Consumes: `startImageSpan`, `guardImageBytes`.
 - Produces: `(*Service).generateImage(ctx context.Context, kind, prompt string) ([]byte, *harness.GenerationFailure)`; `(*Service).recordImage(ctx context.Context, span oteltrace.Span, kind, provider string, bytes int, started time.Time, failure *harness.GenerationFailure)`; a `media.image.duration` instrument.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/image_generation_test.go`:
 ```go
@@ -546,12 +548,12 @@ func TestRecordImageFailureEmitsGenerateError(t *testing.T) {
 ```
 Add the `trace` import. This tests the new `recordImage` directly; `generateImage` (which needs a real client) is covered by `guardImageBytes` and by inspection.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestRecordImage' ./pkg/gui/`
 Expected: FAIL (`undefined: recordImage`).
 
-- [ ] **Step 3: Add image instruments and `recordImage`**
+- [x] **Step 3: Add image instruments and `recordImage`**
 
 In `pkg/gui/generation_telemetry.go`, add `imageDuration otelmetric.Float64Histogram` to `generationInstruments` and build it:
 ```go
@@ -606,7 +608,7 @@ func (s *Service) recordImage(ctx context.Context, span oteltrace.Span, kind, pr
 }
 ```
 
-- [ ] **Step 4: Implement `generateImage` and delegate**
+- [x] **Step 4: Implement `generateImage` and delegate**
 
 Create `pkg/gui/image_generation.go`:
 ```go
@@ -670,12 +672,12 @@ Add `imageContentType([]byte) string` (move the existing `switch media.ArtExtens
 
 This also closes D7: because every asset path records through `recordImage`, the `generate.error` event is emitted once by the service, and `writeGenerationFailure` stays body-only (no double event). A test asserts exactly one `generate.error` for a text failure in Task 6.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `go test ./pkg/gui/` and `go build ./...`
 Expected: PASS. Existing asset tests (`TestBuildAssetPrompt`, `TestGuardImageBytes`) still pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/image_generation.go pkg/gui/image_generation_test.go pkg/gui/generation_telemetry.go pkg/gui/service.go
@@ -694,7 +696,7 @@ git commit -m "feat(gui): unify generation events and instrument image generatio
 - Consumes: `harness.GenerationFailure`.
 - Produces: `streamResult.ChunkCount int`; `generation.error` events carrying `code`, `role`, `provider`, `prompt_chars`, `context_chars`, `elapsed_ms`, `chunk_count`, `partial_chars`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/engine/orchestrator_failure_test.go`:
 ```go
@@ -727,12 +729,12 @@ func (c *countingProvider) Stream(_ context.Context, _ harness.GenerateRequest, 
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestStreamCountsChunks ./pkg/engine/`
 Expected: FAIL (`undefined: ChunkCount`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/engine/orchestrator.go`:
 - Add `ChunkCount int` to `streamResult`.
@@ -765,12 +767,12 @@ In `pkg/engine/orchestrator.go`:
 		})
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `go test ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/orchestrator_failure_test.go
@@ -788,7 +790,7 @@ git commit -m "feat(engine): complete turn generation failure diagnostics"
 **Interfaces:**
 - Produces: `StreamForRole` returns a `*GenerationFailure` when every provider closes without a chunk and records an `Attempt` for each.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/harness/router_failure_test.go`:
 ```go
@@ -851,12 +853,12 @@ func TestStreamForRoleEmptyEverywhereIsFailure(t *testing.T) {
 ```
 Add `streamsSend` handling: the current `StreamForRole` closes `out` itself in each path; the tests range over it, so that contract must be preserved.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestStreamForRole ./pkg/harness/`
 Expected: FAIL (empty-everywhere returns a nil/raw error, not a typed failure).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Rewrite `StreamForRole` in `pkg/harness/router.go`:
 ```go
@@ -936,12 +938,12 @@ func (r *Router) forwardStream(ctx context.Context, role string, provider ModelP
 ```
 Note: `forwardStream` is called for the primary with `first=false`, and for the fallback with `first=true`; the `first` flag is documentation only here (both paths close `out` on success). Simplify by dropping the parameter if `go vet` flags it, and keep the closing contract consistent: on fallback success the goroutine closes `out`.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `go test ./pkg/harness/` and `go build ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/router.go pkg/harness/router_failure_test.go
@@ -959,7 +961,7 @@ git commit -m "fix(harness): report stream failures with the shared failure type
 **Interfaces:**
 - Produces: `writeInvalidRequest(w http.ResponseWriter, message string)`; `writeJSONError(w http.ResponseWriter, status int, message string)`; `writeGenerationError` uses `writeJSON`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/gui/generation_errors_test.go`:
 ```go
@@ -993,12 +995,12 @@ func TestWriteJSONError(t *testing.T) {
 ```
 Add `strings` to the test imports.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestWriteInvalidRequest|TestWriteJSONError' ./pkg/gui/`
 Expected: FAIL (`undefined: writeInvalidRequest`, `undefined: writeJSONError`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `pkg/gui/generation_errors.go`:
 ```go
@@ -1035,12 +1037,12 @@ In `pkg/gui/text_generate.go`, `pkg/gui/character_generate.go`, and `pkg/gui/ser
 
 In `pkg/gui/server.go`, replace the world create duplicate `http.Error(w, err.Error(), http.StatusConflict)` with `writeJSONError(w, http.StatusConflict, err.Error())`; leave the update `404` as-is or convert it to `writeJSONError` for consistency.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `go test ./pkg/gui/` and `go build ./...`
 Expected: PASS. Update the turn test `TestHandleGenerateTextRoute_FailureIsStructured` only if it asserts a text body. Extend `TestGenerateTextEmitsTraceEvents` to assert exactly one `generate.error` event (closes D7 by proving no duplicate).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/generation_errors.go pkg/gui/generation_errors_test.go pkg/gui/text_generate.go pkg/gui/character_generate.go pkg/gui/server.go pkg/gui/world_crud_test.go
@@ -1058,7 +1060,7 @@ git commit -m "feat(gui): return one JSON error shape for generation routes"
 - Consumes: `AIGenerateButtonProps.onError`, `GenerationFailure`.
 - Produces: a toast on every button failure and a red slug field on conflict.
 
-- [ ] **Step 1: Wire `onError` in WorldsStudio and SystemsStudio**
+- [x] **Step 1: Wire `onError` in WorldsStudio and SystemsStudio**
 
 Add a shared reporter beside each `setToast`:
 ```tsx
@@ -1067,12 +1069,12 @@ const reportGenerationError = (failure: GenerationFailure) =>
 ```
 Import `GenerationFailure` from `../types`. Add `onError={reportGenerationError}` to every `<AIGenerateButton>` (WorldsStudio: name, genre, art_style, description, lore_prompt; SystemsStudio: name, description, rules_prompt).
 
-- [ ] **Step 2: Wire `onError` in the launcher modals**
+- [x] **Step 2: Wire `onError` in the launcher modals**
 
 `NewCampaignModal.tsx` already has `genError`; add
 `onError={(failure) => setGenError(`${failure.code}: ${failure.message}`)}` to its buttons and import `GenerationFailure` if the inline type is needed. `CampaignSettingsModal.tsx` has its own error state; wire the same way (inspect it first to confirm the state setter name).
 
-- [ ] **Step 3: Highlight the slug field**
+- [x] **Step 3: Highlight the slug field**
 
 In `WorldsStudio.tsx`: add `const [slugError, setSlugError] = useState(false)`; set `setSlugError(true)` in the `WorldExistsError` catch; clear it in the slug and name `onChange` handlers and in `handleNewWorld`. On the slug input add:
 ```tsx
@@ -1085,12 +1087,12 @@ and below it:
 )}
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `mise run test:frontend && mise run build:frontend`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/WorldsStudio.tsx frontend/src/components/SystemsStudio.tsx frontend/src/components/launcher/NewCampaignModal.tsx frontend/src/components/launcher/CampaignSettingsModal.tsx
@@ -1107,7 +1109,7 @@ git commit -m "feat(frontend): surface generation errors at every AI button"
 **Interfaces:**
 - Produces: a last-click-wins `loadWorldDetail`; a `startMode` ref; typed `catch`.
 
-- [ ] **Step 1: Add the request token**
+- [x] **Step 1: Add the request token**
 
 ```tsx
 const detailRequest = React.useRef(0);
@@ -1122,7 +1124,7 @@ if (token !== detailRequest.current) return;
 ```
 Bump `detailRequest.current += 1` at the start of `handleNewWorld`.
 
-- [ ] **Step 2: Capture `startMode` in a ref**
+- [x] **Step 2: Capture `startMode` in a ref**
 
 ```tsx
 const startModeRef = React.useRef(startMode);
@@ -1133,7 +1135,7 @@ useEffect(() => {
 ```
 (If the repo's lint does not run `react-hooks`, the disable comment is harmless; keep it.)
 
-- [ ] **Step 3: Type the catches**
+- [x] **Step 3: Type the catches**
 
 Add:
 ```tsx
@@ -1142,12 +1144,12 @@ const errorMessage = (err: unknown): string =>
 ```
 Replace `catch (err: any) { ... err.message ... }` with `catch (err) { ... errorMessage(err) ... }` throughout the file. Keep the `WorldExistsError` branch (it is an `Error`).
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `mise run test:frontend && mise run build:frontend`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/WorldsStudio.tsx
@@ -1158,12 +1160,12 @@ git commit -m "fix(frontend): make world selection last-click-wins"
 
 ### Task 9: Full verification
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 Run: `mise run test` and `mise run lint`
 Expected: PASS (`go test -v -count=1 ./...`, `npx tsc --noEmit`, `go vet ./...`).
 
-- [ ] **Step 2: Manual checklist**
+- [x] **Step 2: Manual checklist**
 
 1. Configure the `gm`/`character` roles as a CLI provider that prints nothing; confirm the inline error and the form toast fire at every call site.
 2. Create a world with a duplicate name; confirm the red slug field and the conflict toast.
@@ -1172,7 +1174,7 @@ Expected: PASS (`go test -v -count=1 ./...`, `npx tsc --noEmit`, `go vet ./...`)
 5. Run a turn against a stalling provider; confirm `generation.error` logs `code`, `chunk_count`, and `partial_chars`, and the banner names the timeout.
 6. Confirm a malformed `POST /api/generate-text` returns `400` with `{"error":{"code":"invalid_request"}}`.
 
-- [ ] **Step 3: Commit any fixups**
+- [x] **Step 3: Commit any fixups**
 
 ```bash
 git add -A

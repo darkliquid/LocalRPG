@@ -1,5 +1,7 @@
 # Automated App Driver & In-Debugger OTel Collector Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build an automated end-to-end browser driver using Chrome DevTools Protocol (`chromedp`) paired with an embedded in-process OpenTelemetry collector and real-time debugger dashboard to diagnose turn and generation failures.
@@ -42,7 +44,7 @@
 - Create: `pkg/debugger/types.go`
 - Create: `pkg/debugger/types_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 package debugger_test
@@ -100,12 +102,12 @@ func TestActionRecordJSON(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/debugger/`
 Expected: FAIL due to package `pkg/debugger` not existing.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/debugger/types.go`:
 ```go
@@ -187,12 +189,12 @@ type TestReport struct {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/debugger/`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/debugger/types.go pkg/debugger/types_test.go
@@ -207,7 +209,7 @@ git commit -m "feat(debugger): define core telemetry and action diagnostic types
 - Create: `pkg/debugger/collector.go`
 - Create: `pkg/debugger/collector_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 package debugger_test
@@ -271,12 +273,12 @@ func TestCollectorFindByActionID(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/debugger/ -run TestCollector`
 Expected: FAIL due to `NewCollector` not defined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/debugger/collector.go`:
 ```go
@@ -455,12 +457,12 @@ func (c *Collector) Clear() {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/debugger/ -run TestCollector`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/debugger/collector.go pkg/debugger/collector_test.go
@@ -476,7 +478,7 @@ git commit -m "feat(debugger): implement in-process OpenTelemetry collector ring
 - Modify: `pkg/gui/server.go`
 - Create: `pkg/gui/middleware_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/middleware_test.go`:
 ```go
@@ -537,12 +539,12 @@ func TestActionIDMiddleware(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/gui/ -run TestActionIDMiddleware`
 Expected: FAIL due to `ActionCorrelationMiddleware` undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Edit `pkg/gui/middleware.go` to add:
 ```go
@@ -580,12 +582,12 @@ func ActionIDFromContext(ctx context.Context) string {
 
 And in `pkg/gui/server.go`, wrap `s.handler = ProtectCrossOrigin(ActionCorrelationMiddleware(otelhttp.NewHandler(...)))`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/gui/ -run TestActionIDMiddleware`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/middleware.go pkg/gui/middleware_test.go pkg/gui/server.go
@@ -600,7 +602,7 @@ git commit -m "feat(gui): propagate action ID header to trace context and span a
 - Create: `pkg/debugger/correlator.go`
 - Create: `pkg/debugger/correlator_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/debugger/correlator_test.go`:
 ```go
@@ -669,12 +671,12 @@ func TestCorrelateActionSpansAndDiagnostics(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/debugger/ -run TestCorrelateActionSpansAndDiagnostics`
 Expected: FAIL due to `NewCorrelator` undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/debugger/correlator.go`:
 ```go
@@ -757,12 +759,12 @@ func extractDiagnostics(root SpanSummary, allSpans []SpanSummary) *TurnDiagnosti
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/debugger/ -run TestCorrelateActionSpansAndDiagnostics`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/debugger/correlator.go pkg/debugger/correlator_test.go
@@ -779,7 +781,7 @@ git commit -m "feat(debugger): add action-telemetry correlator and turn diagnost
 - Create: `pkg/driver/scenario_test.go`
 - Create: `scenarios/smoke-test.yaml`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/driver/scenario_test.go`:
 ```go
@@ -845,12 +847,12 @@ steps: []
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/driver/ -run TestParseScenario`
 Expected: FAIL due to `driver` package not existing.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/driver/types.go`:
 ```go
@@ -965,12 +967,12 @@ steps:
     timeout_ms: 5000
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/driver/ -run TestParseScenario`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/driver/types.go pkg/driver/scenario.go pkg/driver/scenario_test.go scenarios/smoke-test.yaml
@@ -986,7 +988,7 @@ git commit -m "feat(driver): add declarative scenario schema and YAML parser"
 - Create: `pkg/driver/driver.go`
 - Create: `pkg/driver/driver_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/driver/driver_test.go`:
 ```go
@@ -1048,12 +1050,12 @@ func TestDriverExecution(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/driver/ -run TestDriverExecution`
 Expected: FAIL due to missing `driver.New` implementation.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Run: `go get github.com/chromedp/chromedp@latest github.com/chromedp/cdproto@latest`
 
@@ -1234,12 +1236,12 @@ func (d *Driver) executeStep(ctx context.Context, step Step) error {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/driver/ -run TestDriverExecution`
 Expected: PASS (if headless Chrome is available in system environment, otherwise skip or stub allocator in test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add go.mod go.sum pkg/driver/driver.go pkg/driver/driver_test.go
@@ -1254,7 +1256,7 @@ git commit -m "feat(driver): implement Chrome DevTools Protocol scenario driver 
 - Create: `pkg/debugger/server.go`
 - Create: `pkg/debugger/server_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/debugger/server_test.go`:
 ```go
@@ -1298,12 +1300,12 @@ func TestDebuggerServerEndpoints(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/debugger/ -run TestDebuggerServerEndpoints`
 Expected: FAIL due to `NewServer` undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/debugger/server.go`:
 ```go
@@ -1493,12 +1495,12 @@ refresh();
 </html>`
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/debugger/ -run TestDebuggerServerEndpoints`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/debugger/server.go pkg/debugger/server_test.go
@@ -1513,7 +1515,7 @@ git commit -m "feat(debugger): add embedded live dashboard and telemetry query A
 - Create: `pkg/debugger/report.go`
 - Create: `pkg/debugger/report_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/debugger/report_test.go`:
 ```go
@@ -1568,12 +1570,12 @@ func TestGenerateReport(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/debugger/ -run TestGenerateReport`
 Expected: FAIL due to `ExportHTMLReport` undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `pkg/debugger/report.go`:
 ```go
@@ -1661,12 +1663,12 @@ func ExportJSON(v interface{}, destPath string) error {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/debugger/ -run TestGenerateReport`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/debugger/report.go pkg/debugger/report_test.go
@@ -1682,7 +1684,7 @@ git commit -m "feat(debugger): implement standalone HTML report and JSON artifac
 - Create: `cmd/localrpg/debug_test.go`
 - Modify: `cmd/localrpg/main.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `cmd/localrpg/debug_test.go`:
 ```go
@@ -1706,12 +1708,12 @@ func TestParseDebugFlags(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./cmd/localrpg/ -run TestParseDebugFlags`
 Expected: FAIL due to `parseDebugArgs` undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `cmd/localrpg/debug.go`:
 ```go
@@ -1849,12 +1851,12 @@ In `cmd/localrpg/main.go`, add:
 		handleDebugCommand(args[1:])
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./cmd/localrpg/ -run TestParseDebugFlags`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cmd/localrpg/debug.go cmd/localrpg/debug_test.go cmd/localrpg/main.go
@@ -1868,7 +1870,7 @@ git commit -m "feat(cli): add 'localrpg debug test-run' and 'server' CLI command
 **Files:**
 - Create: `scenarios/turn-failure-recovery.yaml`
 
-- [ ] **Step 1: Write fault injection scenario**
+- [x] **Step 1: Write fault injection scenario**
 
 Create `scenarios/turn-failure-recovery.yaml`:
 ```yaml
@@ -1882,12 +1884,12 @@ steps:
     timeout_ms: 3000
 ```
 
-- [ ] **Step 2: Run full build and test suite**
+- [x] **Step 2: Run full build and test suite**
 
 Run: `mise run test && mise run lint`
 Expected: All tests pass, zero linter warnings, zero TypeScript errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add scenarios/turn-failure-recovery.yaml

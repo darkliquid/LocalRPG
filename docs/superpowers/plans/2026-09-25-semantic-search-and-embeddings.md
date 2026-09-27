@@ -1,5 +1,7 @@
 # Semantic Search & Vector Embeddings Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add first-class semantic search and vector embeddings to LocalRPG with pluggable providers (OpenAI/Ollama HTTP, Google Gemini, Builtin Hash Projection, Mock), SQLite vector storage with memory-bounded streaming min-heap matching ($O(K)$ memory, zero CGO), asynchronous background indexing, and Reciprocal Rank Fusion (RRF) hybrid search.
@@ -69,7 +71,7 @@ pkg/
 - Create: `pkg/embeddings/builtin.go`
 - Create: `pkg/embeddings/builtin_test.go`
 
-- [ ] **Step 1: Write the failing tests for vector math and mock provider**
+- [x] **Step 1: Write the failing tests for vector math and mock provider**
 
 Create `pkg/embeddings/math_test.go`:
 ```go
@@ -215,12 +217,12 @@ func TestBuiltinHashProjectionProvider(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/embeddings/...`
 Expected: FAIL with compilation error (package and functions undefined).
 
-- [ ] **Step 3: Implement `pkg/embeddings/provider.go`, `math.go`, `mock.go`, and `builtin.go`**
+- [x] **Step 3: Implement `pkg/embeddings/provider.go`, `math.go`, `mock.go`, and `builtin.go`**
 
 Create `pkg/embeddings/provider.go`:
 ```go
@@ -465,12 +467,12 @@ func (p *BuiltinHashProjectionProvider) projectText(text string) []float32 {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/embeddings/...`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/embeddings/
@@ -486,7 +488,7 @@ git commit -m "feat(embeddings): add core Provider interface, vector math, and b
 - Create: `pkg/storage/embeddings.go`
 - Create: `pkg/storage/embeddings_test.go`
 
-- [ ] **Step 1: Write the failing tests for vector storage and top-K streaming min-heap matching**
+- [x] **Step 1: Write the failing tests for vector storage and top-K streaming min-heap matching**
 
 Create `pkg/storage/embeddings_test.go`:
 ```go
@@ -594,12 +596,12 @@ func TestDeleteEmbeddingsFor(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/storage/ -run TestEmbedding`
 Expected: FAIL (schema migration and methods undefined).
 
-- [ ] **Step 3: Implement migration version 6 and `pkg/storage/embeddings.go`**
+- [x] **Step 3: Implement migration version 6 and `pkg/storage/embeddings.go`**
 
 Update `pkg/storage/migrate.go` to add migration 6:
 ```go
@@ -801,12 +803,12 @@ func (s *Store) SearchSimilarVectors(ctx context.Context, targetTypes []string, 
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/storage/ -run "TestEmbedding|TestMigrate"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/migrate.go pkg/storage/embeddings.go pkg/storage/embeddings_test.go
@@ -825,7 +827,7 @@ git commit -m "feat(storage): add embeddings table migration and streaming O(K) 
 - Create: `pkg/provider/geminiembedding/gemini_test.go`
 - Modify: `pkg/provider/all/all.go`
 
-- [ ] **Step 1: Write the failing tests for OpenAI-compatible and Gemini embedding providers**
+- [x] **Step 1: Write the failing tests for OpenAI-compatible and Gemini embedding providers**
 
 Create `pkg/provider/openaiembedding/openai_test.go`:
 ```go
@@ -905,12 +907,12 @@ func TestGeminiEmbeddingConfig(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/provider/openaiembedding/... ./pkg/provider/geminiembedding/...`
 Expected: FAIL with compilation error (packages not found).
 
-- [ ] **Step 3: Implement `pkg/provider/descriptor.go`, `openaiembedding`, `geminiembedding`, and register in `pkg/provider/all/all.go`**
+- [x] **Step 3: Implement `pkg/provider/descriptor.go`, `openaiembedding`, `geminiembedding`, and register in `pkg/provider/all/all.go`**
 
 In `pkg/provider/descriptor.go`:
 Add:
@@ -1207,12 +1209,12 @@ _ "github.com/darkliquid/localrpg/pkg/provider/openaiembedding"
 _ "github.com/darkliquid/localrpg/pkg/provider/geminiembedding"
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/provider/openaiembedding/... ./pkg/provider/geminiembedding/... ./pkg/provider/...`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/provider/
@@ -1227,7 +1229,7 @@ git commit -m "feat(provider): add openai and gemini embedding provider adapters
 - Create: `pkg/storage/embedding_worker.go`
 - Create: `pkg/storage/embedding_worker_test.go`
 
-- [ ] **Step 1: Write the failing tests for background batch indexing worker**
+- [x] **Step 1: Write the failing tests for background batch indexing worker**
 
 Create `pkg/storage/embedding_worker_test.go`:
 ```go
@@ -1320,12 +1322,12 @@ func TestEmbeddingWorkerBatchingAndDeduplication(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/storage/ -run TestEmbeddingWorker`
 Expected: FAIL (EmbeddingWorker undefined).
 
-- [ ] **Step 3: Implement `pkg/storage/embedding_worker.go`**
+- [x] **Step 3: Implement `pkg/storage/embedding_worker.go`**
 
 Create `pkg/storage/embedding_worker.go`:
 ```go
@@ -1584,12 +1586,12 @@ func (w *EmbeddingWorker) Stop() {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/storage/ -run TestEmbeddingWorker`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/embedding_worker.go pkg/storage/embedding_worker_test.go
@@ -1608,7 +1610,7 @@ git commit -m "feat(storage): add asynchronous background embedding worker with 
 - Modify: `pkg/tools/tools_test.go`
 - Modify: `pkg/tools/memory_test.go`
 
-- [ ] **Step 1: Write the failing tests for Reciprocal Rank Fusion**
+- [x] **Step 1: Write the failing tests for Reciprocal Rank Fusion**
 
 Create `pkg/tools/rrf_test.go`:
 ```go
@@ -1669,12 +1671,12 @@ func TestReciprocalRankFusionEmptyLists(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/tools/ -run TestReciprocalRankFusion`
 Expected: FAIL (FuseRankings undefined).
 
-- [ ] **Step 3: Implement `pkg/tools/rrf.go` and update `pkg/tools/tools.go` and `pkg/tools/memory.go`**
+- [x] **Step 3: Implement `pkg/tools/rrf.go` and update `pkg/tools/tools.go` and `pkg/tools/memory.go`**
 
 Create `pkg/tools/rrf.go`:
 ```go
@@ -1752,12 +1754,12 @@ Update `pkg/tools/memory.go`:
   - When `embeddingsProvider != nil`, combine FTS memory hits with `target_type = "memory"` vector hits using `FuseRankings`.
   - Apply `storage.RankMemoryHits` on fused results.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/tools/...`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/tools/
@@ -1776,7 +1778,7 @@ git commit -m "feat(tools): add Reciprocal Rank Fusion hybrid search to entities
 - Modify: `pkg/gui/service.go`
 - Modify: `cmd/localrpg/play.go`
 
-- [ ] **Step 1: Write the failing tests for configuration and end-to-end hybrid search**
+- [x] **Step 1: Write the failing tests for configuration and end-to-end hybrid search**
 
 Create `pkg/embeddings/hybrid_search_e2e_test.go`:
 ```go
@@ -1863,12 +1865,12 @@ func TestHybridSearchEndToEnd(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/embeddings/ -run TestHybridSearchEndToEnd`
 Expected: FAIL (types / methods missing).
 
-- [ ] **Step 3: Implement `pkg/config/types.go`, `pkg/embeddings/factory.go`, and wire into `pkg/gui/service.go` and `cmd/localrpg/play.go`**
+- [x] **Step 3: Implement `pkg/config/types.go`, `pkg/embeddings/factory.go`, and wire into `pkg/gui/service.go` and `cmd/localrpg/play.go`**
 
 In `pkg/config/types.go`:
 Add:
@@ -1973,12 +1975,12 @@ Wire into `pkg/gui/service.go` and `cmd/localrpg/play.go`:
   - Pass embedding provider to `executor.SetEmbeddingsProvider(provider)`.
   - On turn completion, memory creation, or entity sync, enqueue items into the worker.
 
-- [ ] **Step 4: Run all tests and linter to verify complete system integrity**
+- [x] **Step 4: Run all tests and linter to verify complete system integrity**
 
 Run: `mise run test && mise run lint`
 Expected: PASS (Zero test failures, zero lint errors, clean frontend typecheck).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config/ pkg/embeddings/ pkg/gui/ cmd/localrpg/

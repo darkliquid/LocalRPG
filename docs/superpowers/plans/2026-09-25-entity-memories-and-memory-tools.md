@@ -1,5 +1,7 @@
 # Entity Memories & Memory Tools Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give every entity searchable memories: GM-declared narrative memories and engine-derived mechanical memories, stored and FTS-indexed in SQLite and reachable through `search_memories` and `get_entity_timeline`.
@@ -56,7 +58,7 @@
 **Interfaces:**
 - Produces: `Memory{ID,Turn,Kind,EntityRefs,Text,Importance,Tags,Source,CheckID,CreatedAt}`; `MemorySource`; kind constants `MemoryEvent`, `MemoryRelationship`, `MemoryDiscovery`, `MemoryDialogue`, `MemoryMechanical`; `ValidateMemory(m *Memory) error`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 package entity
@@ -79,21 +81,21 @@ func TestValidateMemory(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestValidateMemory ./pkg/entity/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `pkg/entity/memory.go` with the struct from spec §3, the kind/source constants, and `ValidateMemory` rejecting empty text, no entity refs, and importance outside 1–5.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestValidateMemory ./pkg/entity/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/entity/memory.go pkg/entity/memory_test.go
@@ -112,7 +114,7 @@ git commit -m "feat(entity): add the memory record type"
 **Interfaces:**
 - Produces: migration v5; `(*Store).SaveMemory(m *entity.Memory) (int64, error)`; `(*Store).ListMemoriesForEntity(entityID string, limit int) ([]entity.Memory, error)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 package storage
@@ -147,22 +149,22 @@ func TestSaveAndListMemories(t *testing.T) {
 
 `openTestStore(t)` opens a `storage.Store` on `t.TempDir()` (reuse the helper from existing storage tests).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestSaveAndListMemories ./pkg/storage/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - `migrate.go`: append `{version: 5, apply: addMemoriesTables}`; the function runs the DDL and triggers from spec §4.1 and creates `memories_fts`.
 - `pkg/storage/memory.go`: `SaveMemory` inserts `memories`, `memory_entities`, `memory_tags`, and the FTS row in one transaction; `ListMemoriesForEntity` joins `memory_entities`, ordered by turn then id.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestSaveAndListMemories ./pkg/storage/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/migrate.go pkg/storage/memory.go pkg/storage/memory_test.go
@@ -180,7 +182,7 @@ git commit -m "feat(storage): add the memories tables and writes"
 **Interfaces:**
 - Produces: `type MemoryHit struct { ID int64; Turn int; Kind string; Snippet string; Importance int }`; `(*Store).SearchMemories(match, entityID, kind string, minImportance, limit int) ([]MemoryHit, error)`; `rankMemoryHits(hits []MemoryHit, currentTurn int, halfLife int) []MemoryHit`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestSearchMemoriesAndRank(t *testing.T) {
@@ -207,23 +209,23 @@ func TestRankPrefersImportantRecent(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestSearchMemoriesAndRank|TestRankPrefersImportantRecent' ./pkg/storage/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - `SearchMemories` uses `BuildMatch`-style sanitisation for `match` and queries `memories_fts` joined to `memories`, with optional `entityID` (via `memory_entities`), `kind`, and `minImportance` filters; returns `bm25`-ordered hits.
 - `rankMemoryHits` re-ranks by `importance * 0.5^((currentTurn-turn)/halfLife)` (with `halfLife` guarded ≥ 1); used by the tool layer.
 - `EnsureFTS` backfills `memories_fts` for rows missing an index entry.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestSearchMemoriesAndRank|TestRankPrefersImportantRecent' ./pkg/storage/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/storage/memory.go pkg/storage/fts.go pkg/storage/memory_search_test.go
@@ -243,7 +245,7 @@ git commit -m "feat(storage): search and rank entity memories"
 - Consumes: `store.SearchMemories`, `store.ListMemoriesForEntity`, `rankMemoryHits`.
 - Produces: `searchMemories(args map[string]interface{}) (string, bool)`; `getEntityTimeline(args map[string]interface{}) (string, bool)`; the two `ToolSpec`s.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestSearchMemoriesTool(t *testing.T) {
@@ -271,22 +273,22 @@ func TestGetEntityTimelineTool(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestSearchMemoriesTool|TestGetEntityTimelineTool' ./pkg/tools/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - Add two `ToolSpec`s to `harness.ToolSpecs()` (`search_memories` with `query` required, `entity`/`kind`/`min_importance`/`limit` optional; `get_entity_timeline` with `entity` required, `limit` optional default 20).
 - Add cases to the dispatch switch and implement in `pkg/tools/memory.go`, reusing `BuildMatch`, `cap`, and the existing argument helpers.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestSearchMemoriesTool|TestGetEntityTimelineTool' ./pkg/tools/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/tools.go pkg/tools/tools.go pkg/tools/memory.go pkg/tools/memory_test.go
@@ -305,7 +307,7 @@ git commit -m "feat(tools): add memory search and entity timeline tools"
 - Consumes: `harness.TurnSubmission.Memories`, `harness.CheckResult`, `entity.Memory`, `store.SaveMemory`.
 - Produces: `Turn.Memories []entity.Memory`; `Timeline.stageMemories(turn *Turn, decls []harness.MemoryDecl) error`; `Timeline.writeMechanicalMemories(turn *Turn, checks []harness.CheckResult) error`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestTurnWritesDeclaredAndMechanicalMemories(t *testing.T) {
@@ -317,24 +319,24 @@ func TestTurnWritesDeclaredAndMechanicalMemories(t *testing.T) {
 
 Use `toolLoopOrchestrator(t, provider)`; assert via `store.ListMemoriesForEntity`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestTurnWritesDeclaredAndMechanicalMemories ./pkg/engine/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - `Turn.Memories []entity.Memory json:"memories,omitempty"`.
 - `RecordTurnContext` gains, before the history append: resolve each `MemoryDecl`'s entity refs through `MatchExistingEntity`, `ValidateMemory`, `SaveMemory`, and attach the stored memory to `turn.Memories` (so `history.jsonl` carries it).
 - After checks are known, `writeMechanicalMemories` writes one `mechanical` memory per `CheckResult` with `entity_refs = [actor] (+ target)`, `check_id`, mapped importance, and tags `[check_kind, stat]`.
 - A memory that fails validation is dropped and logged `memory.dropped`; a storage failure fails the turn.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestTurnWritesDeclaredAndMechanicalMemories ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/history.go pkg/engine/timeline.go pkg/engine/orchestrator.go pkg/engine/memories_test.go
@@ -349,7 +351,7 @@ git commit -m "feat(engine): persist declared and mechanical memories per turn"
 - Modify: `pkg/engine/timeline.go` (`EnsureIndexed`), `pkg/storage/memory.go`
 - Test: `pkg/engine/memories_rebuild_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestEnsureIndexedRebuildsMemories(t *testing.T) {
@@ -358,22 +360,22 @@ func TestEnsureIndexedRebuildsMemories(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestEnsureIndexedRebuildsMemories ./pkg/engine/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - `EnsureIndexed`'s replay, when it reprocesses a `Turn`, re-saves `turn.Memories` and re-derives mechanical memories from `turn.Checks` if a `mechanical` memory for that `check_id` is absent.
 - Rebuild keys on `(turn, kind, text, check_id)`, since memory ids are volatile.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestEnsureIndexedRebuildsMemories ./pkg/engine/` and `go test ./pkg/...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/timeline.go pkg/storage/memory.go pkg/engine/memories_rebuild_test.go
@@ -388,15 +390,15 @@ git commit -m "feat(engine): rebuild memories from the turn history"
 - Modify: `pkg/gui/types.go`, `pkg/gui/server.go`, `pkg/gui/service.go`, `frontend/src/types.ts`, `frontend/src/api/client.ts`, `frontend/src/components/Codex.tsx`
 - Test: `go test ./pkg/gui/`, `mise run test:frontend`
 
-- [ ] **Step 1: Backend**
+- [x] **Step 1: Backend**
 
 Add `GET /api/game/{id}/entity/{entityID}/memories` returning `[]MemoryDTO{Turn, Kind, Text, Importance, Tags}` via `store.ListMemoriesForEntity`. Map the route in `routePattern` and `handleGameRoutes`.
 
-- [ ] **Step 2: Frontend**
+- [x] **Step 2: Frontend**
 
 Fetch and render a "Memories" timeline in the codex for the selected entity: newest-first, kind + importance, turn link. Read-only.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 go test ./pkg/gui/ && mise run test:frontend
@@ -408,19 +410,19 @@ git commit -m "feat(gui): show an entity memory timeline"
 
 ### Task 8: Full verification
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 Run: `mise run test` and `mise run lint`
 Expected: PASS.
 
-- [ ] **Step 2: Manual checks**
+- [x] **Step 2: Manual checks**
 
 1. A declared memory is findable by `search_memories` on a distinctive word.
 2. One resolved check produces exactly one `mechanical` memory on the actor's timeline.
 3. Deleting `cache/index.db` and restarting restores memories from `history.jsonl` (rebuild covers declared + mechanical).
 4. A campaign with no memories renders the codex exactly as before.
 
-- [ ] **Step 3: Commit fixups**
+- [x] **Step 3: Commit fixups**
 
 ```bash
 git add -A

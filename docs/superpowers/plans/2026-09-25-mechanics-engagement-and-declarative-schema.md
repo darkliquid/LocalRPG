@@ -1,5 +1,7 @@
 # Mechanics Engagement & Declarative Schema Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add an optional declarative `mechanics` schema to `system.yaml`, expose it to `mechanics.js`, resolve checks through schema-or-js, apply the GM's `state_changes` authoritatively, add `onTurnBegin`, enrich `onTurnEnd`, and fix the GUI so it loads rules.
@@ -53,7 +55,7 @@
 **Interfaces:**
 - Produces: `MechanicsSpec`, `StatSpec`, `SkillSpec`, `HealthSpec`, `CheckConventions`, `DifficultySpec`; `SystemManifest.Mechanics *MechanicsSpec`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 package core
@@ -114,21 +116,21 @@ func TestLoadSystemManifestWithoutMechanics(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestLoadSystemManifestMechanics|TestLoadSystemManifestWithoutMechanics' ./pkg/core/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `pkg/core/mechanics.go` with the structs from spec §3; add `Mechanics *MechanicsSpec \`yaml:"mechanics,omitempty"\`` to `SystemManifest`. All fields optional.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestLoadSystemManifestMechanics|TestLoadSystemManifestWithoutMechanics' ./pkg/core/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/core/mechanics.go pkg/core/types.go pkg/core/mechanics_test.go
@@ -146,7 +148,7 @@ git commit -m "feat(core): add the optional mechanics schema"
 **Interfaces:**
 - Produces: `GameHostAPI.ListStats() []core.StatSpec`, `ListSkills() []core.SkillSpec`, `CheckConventions() core.CheckConventions`; `(*RuleLoader).SetManifest(m *core.SystemManifest)`; `DefaultHostBridge` implements the accessors from a stored manifest.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestHostBridgeExposesSchema(t *testing.T) {
@@ -164,22 +166,22 @@ func TestHostBridgeExposesSchema(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestHostBridgeExposesSchema ./pkg/rules/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - Add the three accessors to `GameHostAPI` and `DefaultHostBridge` (nil manifest → empty results).
 - `RuleLoader.LoadRules` gains the manifest (from `core.LoadSystemManifest`) and calls `SetManifest` before loading scripts, so `mechanics.js` can read the schema during load.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestHostBridgeExposesSchema ./pkg/rules/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/rules/host_api.go pkg/rules/loader.go pkg/rules/host_api_test.go
@@ -199,7 +201,7 @@ git commit -m "feat(rules): expose the mechanics schema to mechanics.js"
 - Consumes: `core.CheckConventions`, `rules.RollResult`, `entity.Entity`.
 - Produces: `type SchemaResolver struct { engine *JSEngine; conventions core.CheckConventions }` with `Resolve(ctx, req, actor) (*harness.CheckResult, error)`; `(*JSEngine).onCheck` binding; `(*JSEngine).ResolveCheck(ctx, req, actor)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestSchemaResolverUsesDifficulty(t *testing.T) {
@@ -233,23 +235,23 @@ func TestJSCheckResolverOverridesSchema(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestSchemaResolverUsesDifficulty|TestJSCheckResolverOverridesSchema' ./pkg/rules/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - Bind `onCheck(kind, fn)` in `NewJSEngine`, storing resolvers in a `checkResolvers` map (mirroring `actionHandlers`).
 - `JSEngine.Resolve(ctx, req, actor)`: if a resolver exists for `kind`, call it with the request as a JS object, normalise `{outcome, roll, breakdown}` into `harness.CheckResult`; else use `SchemaResolver.Resolve`. (`Resolve` is the method name that satisfies `engine.CheckResolver`.)
 - `SchemaResolver.Resolve`: roll `conventions.Notation` (or the request's notation), add the actor's stat bonus when a skill/stat is named and declared, compare to the matched difficulty target, and map to a declared outcome (`pass` when total ≥ target, else the last declared outcome or `fail`). Assign a `CheckID`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestSchemaResolverUsesDifficulty|TestJSCheckResolverOverridesSchema' ./pkg/rules/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/rules/resolver.go pkg/rules/js_engine.go pkg/rules/resolver_test.go
@@ -268,7 +270,7 @@ git commit -m "feat(rules): resolve checks by schema with a js override"
 - Consumes: `rules.JSEngine` (satisfying `engine.CheckResolver`).
 - Produces: the orchestrator prefers a `rules`-backed resolver when the rules engine is set, else `defaultCheckResolver`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestOrchestratorPrefersRulesResolver(t *testing.T) {
@@ -279,22 +281,22 @@ func TestOrchestratorPrefersRulesResolver(t *testing.T) {
 
 Assert the recorded `CheckResult.Outcome` matches the js resolver's hardcoded value.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestOrchestratorPrefersRulesResolver ./pkg/engine/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - When `o.rulesEngine != nil`, set the check resolver to it via `SetCheckResolver(o.rulesEngine)` (the JSEngine's `Resolve` method satisfies `engine.CheckResolver`); otherwise keep `defaultCheckResolver{}`.
 - Do this in the same place the orchestrator already wires `rulesEngine`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestOrchestratorPrefersRulesResolver ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/check_resolver.go pkg/engine/orchestrator.go pkg/engine/check_wiring_test.go
@@ -313,7 +315,7 @@ git commit -m "feat(engine): use the rules check resolver when available"
 **Interfaces:**
 - Produces: `ApplyStateChanges(bridge GameHostAPI, changes []harness.StateChangeDecl, declared map[string]core.StatSpec) error`; engine calls it during turn recording.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestApplyStateChanges(t *testing.T) {
@@ -346,22 +348,22 @@ func TestApplyStateChangesRejectsUndeclared(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestApplyStateChanges ./pkg/rules/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - `ApplyStateChanges` walks the changes: `set` writes, `add`/`sub` coerce numerics and mutate, all through `bridge.SetStat`; rejects an undeclared path when `declared` is non-empty (unless the system sets `allow_freeform_state`).
 - In `ProcessActionStream`, after a submission is accepted and before/with `RecordTurnContext`, call `ApplyStateChanges` with the manifest's declared stats.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestApplyStateChanges ./pkg/rules/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/rules/state_changes.go pkg/engine/orchestrator.go pkg/rules/state_changes_test.go
@@ -376,7 +378,7 @@ git commit -m "feat(rules): apply GM state changes through the host layer"
 - Modify: `pkg/rules/state_changes.go`, `pkg/rules/js_engine.go`
 - Test: `pkg/rules/health_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestHealthZeroEffectRunsHook(t *testing.T) {
@@ -394,22 +396,22 @@ func TestHealthZeroEffectRunsHook(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestHealthZeroEffectRunsHook ./pkg/rules/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - Bind `onHealthZero(fn)`; `EvaluateHealthZero(effect string) (string, error)` calls the hook if registered, else returns the free-text effect.
 - After `ApplyStateChanges`, the engine checks `health.stat` against 0 and calls `EvaluateHealthZero`, recording the result on the turn (`Turn.HealthEffect string`).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestHealthZeroEffectRunsHook ./pkg/rules/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/rules/state_changes.go pkg/rules/js_engine.go pkg/rules/health_test.go
@@ -424,7 +426,7 @@ git commit -m "feat(rules): evaluate declared health-zero effects"
 - Modify: `pkg/rules/js_engine.go`, `pkg/engine/orchestrator.go`
 - Test: `pkg/rules/hooks_test.go`, `pkg/engine/hooks_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestTurnBeginAndEndHooks(t *testing.T) {
@@ -448,22 +450,22 @@ func TestTurnBeginAndEndHooks(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestTurnBeginAndEndHooks ./pkg/rules/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - Bind `onTurnBegin(fn)`; add `ExecuteTurnBegin(ctx map[string]interface{}) error`.
 - In `ProcessActionStream`, call `ExecuteTurnBegin({turn, location})` after context assembly; call `ExecuteTurnEnd` with `{turn, verdict, checks, entities, narration}` and log (`turn.end_hook_error`) rather than discard its error.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestTurnBeginAndEndHooks ./pkg/rules/` and `go test ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/rules/js_engine.go pkg/engine/orchestrator.go pkg/rules/hooks_test.go
@@ -478,7 +480,7 @@ git commit -m "feat(rules): add onTurnBegin and enrich onTurnEnd"
 - Modify: `pkg/gui/service.go`
 - Test: `pkg/gui/rules_loading_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestGUILoadsRulesForCampaign(t *testing.T) {
@@ -489,22 +491,22 @@ func TestGUILoadsRulesForCampaign(t *testing.T) {
 
 (Use a temp rig with a hand-written `mechanics.js`.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestGUILoadsRulesForCampaign ./pkg/gui/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - Where `pkg/gui/service.go` builds the `JSEngine` (around line 1110), also build `rules.NewRuleLoader(paths, engine)` and call `LoadRules(systemID, worldID)` when the campaign is prepared (first turn / `ensureIndexed`), mirroring `cmd/localrpg/play.go:94`.
 - Guard against reloading for every turn (once per campaign per process).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestGUILoadsRulesForCampaign ./pkg/gui/` and `go test ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/rules_loading_test.go
@@ -515,12 +517,12 @@ git commit -m "fix(gui): load system rules for web campaigns"
 
 ### Task 9: Full verification
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 Run: `mise run test` and `mise run lint`
 Expected: PASS.
 
-- [ ] **Step 2: Manual checks**
+- [x] **Step 2: Manual checks**
 
 1. A system with a `mechanics` block resolves a check to a declared outcome and validates `state_changes`.
 2. A js `onCheck` resolver overrides the schema convention.
@@ -529,7 +531,7 @@ Expected: PASS.
 5. A web campaign with a `mechanics.js` runs an `onAction` hook.
 6. A system with no `mechanics` block behaves exactly as before.
 
-- [ ] **Step 3: Commit fixups**
+- [x] **Step 3: Commit fixups**
 
 ```bash
 git add -A

@@ -1,5 +1,7 @@
 # Mechanics Trigger & Cadence Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make a system's mechanics run on every relevant turn and make the GM actually call checks.
@@ -32,7 +34,7 @@
 - Consumes: `rules.NewRuleLoader(paths, jsEngine)`, `loader.LoadRules(systemID, worldID)` (existing).
 - Produces: nothing new; the per-turn `JSEngine` now has hooks registered.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/mechanics_turn_test.go`:
 
@@ -85,12 +87,12 @@ func TestMechanicsHookRunsOnEveryTurn(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestMechanicsHookRunsOnEveryTurn ./pkg/gui/ -v`
 Expected: FAIL on turn 2 with `outcome = ""` (turn 1 passes; the VM is empty afterwards).
 
-- [ ] **Step 3: Remove the once-per-campaign guard**
+- [x] **Step 3: Remove the once-per-campaign guard**
 
 In `pkg/gui/service.go`, delete the `rulesLoaded` field and the `rulesMu` mutex (they exist only for this guard):
 
@@ -117,17 +119,17 @@ Then replace the guarded load in `prepareTurn`:
 
 Leave `sync` imported (other mutexes in the file still use it). Confirm with `go build ./pkg/gui/`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestMechanicsHookRunsOnEveryTurn ./pkg/gui/ -v`
 Expected: PASS (both turns report `system-ran`).
 
-- [ ] **Step 5: Run the package and the full suite**
+- [x] **Step 5: Run the package and the full suite**
 
 Run: `go test ./pkg/gui/` then `mise run test`
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/mechanics_turn_test.go
@@ -147,7 +149,7 @@ git commit -m "fix(rules): reload mechanics hooks on every turn"
 - Produces: `harness.FormatMechanicsInstructions(spec *core.MechanicsSpec) string`; `harness.ContextRequest.MechanicsPrompt string`.
 - Consumes: `core.MechanicsSpec` (`pkg/core/mechanics.go`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `pkg/harness/mechanics_instructions_test.go`:
 
@@ -214,12 +216,12 @@ func TestContextRendersMechanicsPrompt(t *testing.T) {
 
 If no `newTestStore` helper exists in the package, inline the store setup used by `TestContextAssembler` (`pkg/harness/context_test.go:15-21`): `storage.NewStore(filepath.Join(tempDir, "index.db"))` with `defer store.Close()`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestFormatMechanicsInstructions|TestContextRendersMechanicsPrompt' ./pkg/harness/ -v`
 Expected: FAIL — `FormatMechanicsInstructions` undefined; `ContextRequest` has no field `MechanicsPrompt`.
 
-- [ ] **Step 3: Add the formatter**
+- [x] **Step 3: Add the formatter**
 
 Create `pkg/harness/mechanics_instructions.go`:
 
@@ -269,7 +271,7 @@ func FormatMechanicsInstructions(spec *core.MechanicsSpec) string {
 }
 ```
 
-- [ ] **Step 4: Add the request field and render it**
+- [x] **Step 4: Add the request field and render it**
 
 In `pkg/harness/context.go`, add to `ContextRequest` (next to `LorePrompt`):
 
@@ -296,17 +298,17 @@ Add the section to the returned slice, immediately after `rules`:
 		{name: "mechanics", source: "mechanics_prompt", text: mechanicsSection(req.MechanicsPrompt)},
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -run 'TestFormatMechanicsInstructions|TestContextRendersMechanicsPrompt' ./pkg/harness/ -v`
 Expected: PASS.
 
-- [ ] **Step 6: Run the harness package**
+- [x] **Step 6: Run the harness package**
 
 Run: `go test ./pkg/harness/`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/harness/mechanics_instructions.go pkg/harness/mechanics_instructions_test.go pkg/harness/context.go
@@ -325,7 +327,7 @@ git commit -m "feat(harness): tell the GM when to call a check"
 - Consumes: `harness.FormatMechanicsInstructions`, `core.LoadSystemManifest`, `core.PathResolver`.
 - Produces: `TurnOrchestrator.mechanicsPrompt` (unexported), forwarded as `ContextRequest.MechanicsPrompt`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `pkg/engine/mechanics_prompt_test.go`:
 
@@ -385,12 +387,12 @@ func TestLoadPromptsOmitsMechanicsWhenNoneShipped(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestLoadPromptsBuildsMechanicsInstruction|TestLoadPromptsOmitsMechanicsWhenNoneShipped' ./pkg/engine/ -v`
 Expected: FAIL — `o.mechanicsPrompt` undefined.
 
-- [ ] **Step 3: Add the field and detection**
+- [x] **Step 3: Add the field and detection**
 
 In `pkg/engine/orchestrator.go`, add to the `TurnOrchestrator` struct (next to `rulesPrompt`):
 
@@ -428,7 +430,7 @@ func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, world
 }
 ```
 
-- [ ] **Step 4: Pass it into the assembled request**
+- [x] **Step 4: Pass it into the assembled request**
 
 In the `ContextRequest{...}` literal passed to `o.assembler.Assemble...` (around line 641-657), add:
 
@@ -436,17 +438,17 @@ In the `ContextRequest{...}` literal passed to `o.assembler.Assemble...` (around
 		MechanicsPrompt:  o.mechanicsPrompt,
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -run 'TestLoadPrompts' ./pkg/engine/ -v`
 Expected: PASS.
 
-- [ ] **Step 6: Run the package and vet**
+- [x] **Step 6: Run the package and vet**
 
 Run: `go test ./pkg/engine/ && mise run lint`
 Expected: PASS, vet clean.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/mechanics_prompt_test.go
@@ -467,7 +469,7 @@ git commit -m "feat(engine): load mechanics guidance into the turn prompt"
 - Produces: `harness.ProposedCheck{ Ref, Actor, Description string }`.
 - Changes: `validateSubmission(sub *harness.TurnSubmission, checks []harness.CheckResult, declaredStats map[string]core.StatSpec, proposed *harness.ProposedCheck) error`; `(*TurnOrchestrator).runGenerationLoop(..., proposed *harness.ProposedCheck, onChunk ...)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/engine/submission_test.go` (and update the five existing `validateSubmission(...)` calls to pass a final `nil`):
 
@@ -530,12 +532,12 @@ func TestProposedCheckCarriesItsRef(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestValidateSubmissionProposedCheck|TestProposedCheckCarriesItsRef' ./pkg/engine/ ./pkg/harness/ -v`
 Expected: FAIL — compile errors (`harness.ProposedCheck` undefined; `validateSubmission` takes 3 args).
 
-- [ ] **Step 3: Add the type**
+- [x] **Step 3: Add the type**
 
 In `pkg/harness/turn.go`, after `DismissedCheck`:
 
@@ -550,7 +552,7 @@ type ProposedCheck struct {
 }
 ```
 
-- [ ] **Step 4: Thread it through the orchestrator**
+- [x] **Step 4: Thread it through the orchestrator**
 
 In `pkg/engine/orchestrator.go`, next to `var gmDirective string` (line ~433):
 
@@ -592,7 +594,7 @@ Update the validation call inside the loop (line ~1500):
 					if vErr := validateSubmission(sub, checks, o.declaredStats, proposed); vErr != nil {
 ```
 
-- [ ] **Step 5: Add the enforcement rule**
+- [x] **Step 5: Add the enforcement rule**
 
 In `pkg/engine/submission.go`, change the signature and add the rule before the `return nil`:
 
@@ -617,17 +619,17 @@ After the existing `DismissedChecks` loop:
 	}
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `go test -run 'TestValidateSubmission|TestProposedCheck' ./pkg/engine/ ./pkg/harness/ -v`
 Expected: PASS (existing updated calls plus the new cases).
 
-- [ ] **Step 7: Run the packages and vet**
+- [x] **Step 7: Run the packages and vet**
 
 Run: `go test ./pkg/engine/ ./pkg/harness/ && mise run lint`
 Expected: PASS, vet clean.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add pkg/harness/turn.go pkg/harness/turn_test.go pkg/engine/orchestrator.go pkg/engine/submission.go pkg/engine/submission_test.go
@@ -645,7 +647,7 @@ git commit -m "feat(engine): require a roll or dismissal for a proposed check"
 **Interfaces:**
 - Produces: a template whose script hooks the modes clients send (`do`, `say`, `story`) and whose prompt no longer advertises an unreachable `attack` mode.
 
-- [ ] **Step 1: Replace the template's `rules_prompt`**
+- [x] **Step 1: Replace the template's `rules_prompt`**
 
 In `frontend/src/templates/referenceTemplates.ts`, replace the `rules_prompt` value (lines 34-54) with:
 
@@ -671,7 +673,7 @@ When the prompt contains a \`[MECHANICS RESULT: ...]\` tag, honour it and weave 
 `,
 ```
 
-- [ ] **Step 2: Replace the template's `script`**
+- [x] **Step 2: Replace the template's `script`**
 
 Replace the `script` value (lines 55-108) with a version that hooks the modes clients send (the same body for `do`/`say`/`story`) and drops `attack`:
 
@@ -706,16 +708,16 @@ onTurnEnd(function(ctx) {
 
 Verify the JS engine supports passing a named function to `onAction` (it stores the value and calls it); if it requires an inline function literal, wrap each call as `onAction("do", function(ctx) { return resolve2d6(ctx); });`.
 
-- [ ] **Step 3: Mirror the change into the local system (not committed)**
+- [x] **Step 3: Mirror the change into the local system (not committed)**
 
 Update `systems/narrative_2d6/mechanics.js` and `systems/narrative_2d6/prompts/rules.md` with the same content. Confirm they are ignored: `git status --short` must not list either.
 
-- [ ] **Step 4: Typecheck and build the frontend**
+- [x] **Step 4: Typecheck and build the frontend**
 
 Run: `mise run test:frontend && mise run build:frontend`
 Expected: PASS.
 
-- [ ] **Step 5: Commit (tracked file only)**
+- [x] **Step 5: Commit (tracked file only)**
 
 ```bash
 git add frontend/src/templates/referenceTemplates.ts
@@ -728,21 +730,21 @@ git commit -m "docs(systems): hook do/say/story and drop the unreachable attack 
 
 **Files:** none.
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `mise run test`
 Expected: PASS (Go tests + `tsc --noEmit`).
 
-- [ ] **Step 2: Vet and build**
+- [x] **Step 2: Vet and build**
 
 Run: `mise run lint && mise run build`
 Expected: clean, binary built.
 
-- [ ] **Step 3: Manual smoke (optional but recommended)**
+- [x] **Step 3: Manual smoke (optional but recommended)**
 
 Run: `mise run dev:gui`, play three `Do` turns against `narrative_2d6`, and confirm a mechanics result appears on each, plus a `Roll` turn yields a check or a stated dismissal.
 
-- [ ] **Step 4: Commit any remaining changes**
+- [x] **Step 4: Commit any remaining changes**
 
 ```bash
 git status --short

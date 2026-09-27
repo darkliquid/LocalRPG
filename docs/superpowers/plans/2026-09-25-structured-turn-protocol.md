@@ -1,5 +1,7 @@
 # Structured Turn Protocol Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the GM author a typed turn through a terminal `submit_turn` tool call, with mid-stream `request_check` calls and an explicit action verdict, so narration, speech, personae, checks, and outcomes stop being reconstructed from prose.
@@ -52,7 +54,7 @@
 - Consumes: `pkg/rules.RollResult`.
 - Produces: the types listed in spec §3.2.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 package harness
@@ -89,12 +91,12 @@ func TestTurnSubmissionRoundTrip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestTurnSubmissionRoundTrip ./pkg/harness/`
 Expected: FAIL (`undefined: ParseSubmission`).
 
-- [ ] **Step 3: Implement the types**
+- [x] **Step 3: Implement the types**
 
 Create `pkg/harness/turn.go` with the type definitions from spec §3.2 plus:
 
@@ -115,12 +117,12 @@ func ParseSubmission(args string) (*TurnSubmission, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestTurnSubmissionRoundTrip ./pkg/harness/` and `go build ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/turn.go pkg/harness/turn_test.go
@@ -138,7 +140,7 @@ git commit -m "feat(harness): add structured turn protocol types"
 **Interfaces:**
 - Produces: `TurnToolSpecs() []ToolSpec`; `TurnToolNames() []string`; `IsTurnTool(name string) bool`; `ParseCheckRequest(args string) (*CheckRequest, error)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 package harness
@@ -174,21 +176,21 @@ func TestParseCheckRequest(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run 'TestTurnToolSpecs|TestParseCheckRequest' ./pkg/harness/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `pkg/harness/turn_tools.go` with `ToolSpec` entries whose JSON Schema mirror the structs (properties for each field; `submit_turn` requires `action_verdict` and `segments`; `request_check` requires `actor`, `check_kind`, `stakes`, `outcomes`), plus `ParseCheckRequest` as in Task 1. `IsTurnTool` checks membership in `TurnToolNames()`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run 'TestTurnToolSpecs|TestParseCheckRequest' ./pkg/harness/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness/turn_tools.go pkg/harness/turn_tools_test.go
@@ -209,7 +211,7 @@ git commit -m "feat(harness): add submit_turn and request_check tool specs"
 
 The mechanics spec replaces the default with a schema/js resolver; the interface is the seam.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestDefaultCheckResolver(t *testing.T) {
@@ -230,12 +232,12 @@ func TestDefaultCheckResolver(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestDefaultCheckResolver ./pkg/engine/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```go
 type CheckResolver interface {
@@ -263,12 +265,12 @@ func (defaultCheckResolver) Resolve(_ context.Context, req harness.CheckRequest,
 func newCheckID() string { return "chk_" + strconv.FormatInt(time.Now().UnixNano(), 36) }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestDefaultCheckResolver ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/check_resolver.go pkg/engine/check_resolver_test.go
@@ -287,7 +289,7 @@ git commit -m "feat(engine): add a check resolver boundary"
 - Consumes: `harness.ParseSubmission`, `harness.ParseCheckRequest`, `IsTurnTool`, `CheckResolver`.
 - Produces: `streamResult.Submission *harness.TurnSubmission`, `streamResult.Checks []harness.CheckResult`; `(*TurnOrchestrator).SetCheckResolver(CheckResolver)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Use `toolLoopOrchestrator(t, provider)` and a scripted provider that returns a `request_check` call then a `submit_turn` call:
 
@@ -316,12 +318,12 @@ func TestLoopResolvesCheckThenSubmits(t *testing.T) {
 
 Provide `runGenerationLoopForTest` as a thin wrapper in a `_test.go` file that builds a minimal `AssembleResult` and calls `runGenerationLoop`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestLoopResolvesCheckThenSubmits ./pkg/engine/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - Add `Submission *harness.TurnSubmission` and `Checks []harness.CheckResult` to `streamResult`.
 - Add `checkResolver CheckResolver` to `TurnOrchestrator` (default `defaultCheckResolver{}`) and `SetCheckResolver`.
@@ -331,12 +333,12 @@ Expected: FAIL.
 - Keep query tools going to `o.toolExecutor` as today.
 - Add `submit_turn`/`request_check` to the offered tools only when `offerTools` (turn tools are withheld with the rest after the cap).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestLoopResolvesCheckThenSubmits ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/structured_turn_test.go
@@ -354,7 +356,7 @@ git commit -m "feat(engine): handle submit_turn and request_check in the loop"
 **Interfaces:**
 - Produces: `validateSubmission(sub *harness.TurnSubmission, checks []harness.CheckResult, declaredStats map[string]bool) error`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestValidateSubmission(t *testing.T) {
@@ -380,21 +382,21 @@ func TestValidateSubmission(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestValidateSubmission ./pkg/engine/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `validateSubmission` returns a typed `submissionError{Code, Detail}` (implementing `error`) for: `no_check`, `impossible_with_check`, `unknown_check`, `unknown_speaker` (speaker unresolved and not declared), `undeclared_stat`, `unjustified_dismissal`. The engine retries once with `"protocol validation failed: <code>: <detail>"` appended as a system reminder.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestValidateSubmission ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/submission.go pkg/engine/submission_test.go
@@ -412,7 +414,7 @@ git commit -m "feat(engine): validate structured turn submissions"
 **Interfaces:**
 - Produces: `buildSegments(sub *harness.TurnSubmission, resolve func(string) (string, bool)) (string, []entity.TurnSegment)`; `stagePersonae(sub *harness.TurnSubmission) []entity.Entity`; `Turn.Personae []string`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestBuildSegmentsFromSubmission(t *testing.T) {
@@ -435,12 +437,12 @@ func TestBuildSegmentsFromSubmission(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestBuildSegmentsFromSubmission ./pkg/engine/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - `buildSegments` maps `SegmentSpec` to `entity.TurnSegment` (narration joins into `narration`), resolving speakers via the resolver; an unresolved declared-new persona resolves to its slugified id.
 - `stagePersonae` turns `new` personae into `entity.Entity` stubs (`ID: entity.Slugify(Name)`, Type, State seeded from gender/pronouns/role tags under `state`, Body = description).
@@ -448,12 +450,12 @@ Expected: FAIL.
 - Add `Personae []string json:"personae,omitempty"` to `Turn` and thread the created ids.
 - Keep the extractor path for `result.Submission == nil`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestBuildSegmentsFromSubmission ./pkg/engine/` and `go test ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/submission.go pkg/engine/orchestrator.go pkg/engine/timeline.go pkg/engine/history.go pkg/engine/submission_segments_test.go
@@ -468,7 +470,7 @@ git commit -m "feat(engine): build segments and personae from a submission"
 - Modify: `pkg/engine/history.go`, `pkg/engine/orchestrator.go`, `pkg/gui/types.go`, `pkg/gui/service.go`
 - Test: `pkg/engine/submission_verdict_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestImpossibleVerdictRejectsAction(t *testing.T) {
@@ -488,22 +490,22 @@ func TestImpossibleVerdictRejectsAction(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestImpossibleVerdictRejectsAction ./pkg/engine/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - `Turn.Verdict *harness.ActionVerdict`, `Turn.Rejected bool`, `Turn.Checks []harness.CheckResult`; populate in `ProcessActionStream`; `Rejected` true iff feasibility is `impossible`.
 - These fields persist via `history.jsonl` automatically (whole `Turn` marshalled). Extend `TurnDTO` (`pkg/gui/types.go`) with `Verdict`/`Rejected`/`Checks` and map them in the DTO builder (`pkg/gui/service.go`).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestImpossibleVerdictRejectsAction ./pkg/engine/` and `go test ./pkg/gui/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/history.go pkg/engine/orchestrator.go pkg/gui/types.go pkg/gui/service.go pkg/engine/submission_verdict_test.go
@@ -518,7 +520,7 @@ git commit -m "feat(engine): persist action verdict and rejection"
 - Modify: `pkg/engine/orchestrator.go`, `pkg/engine/history.go`
 - Test: `pkg/engine/proposed_check_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestRollModeBecomesProposedCheck(t *testing.T) {
@@ -540,23 +542,23 @@ func TestRollModeBecomesProposedCheck(t *testing.T) {
 
 (Add a small test-only accessor recording the last assembled context.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestRollModeBecomesProposedCheck ./pkg/engine/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - Parse `Roll`/skill input into a `proposed_check` line added to the GM's context (`assembly.Prompt` prefix or an extra context section), e.g. `[PROPOSED CHECK: stealth 2d6 by player]`.
 - `Do`/`Say`/`Story` share one pipeline; `/gm` sets `verdict` enforcement off for the turn and logs `gm.override`; `System` stays non-narrative.
 - Validate `dismissed_checks` reasons in Task 5's validator.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestRollModeBecomesProposedCheck ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/history.go pkg/engine/proposed_check_test.go
@@ -571,7 +573,7 @@ git commit -m "feat(engine): support player-proposed checks and mode mapping"
 - Modify: `pkg/engine/orchestrator.go`
 - Test: `pkg/engine/submission_fallback_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestMalformedSubmissionFallsBackToProse(t *testing.T) {
@@ -594,23 +596,23 @@ func TestMalformedSubmissionFallsBackToProse(t *testing.T) {
 
 (This relies on the scripted provider's prose fallback; if no prose is produced the existing no-narration error path applies. Adjust the script to include a prose reply between the two malformed calls.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestMalformedSubmissionFallsBackToProse ./pkg/engine/`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - On a validation failure, retry once with a system reminder; on a second failure, accept provisional prose (if any) as narration, skip personae/memories/state, leave `Verdict` nil, emit `turn.protocol_fallback` with the reason.
 - The extractor runs only when the provider is tool-incapable or a fallback occurred.
 - Emit `turn.protocol_error` on each rejected attempt and `turn.protocol_fallback` on acceptance.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestMalformedSubmissionFallsBackToProse ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/submission_fallback_test.go
@@ -625,22 +627,22 @@ git commit -m "feat(engine): fall back to prose on a malformed submission"
 - Modify: `frontend/src/types.ts`, `frontend/src/components/Chronicle.tsx` (and its turn renderer), `frontend/src/api/client.ts` if needed
 - Test: `mise run test:frontend`
 
-- [ ] **Step 1: Extend types**
+- [x] **Step 1: Extend types**
 
 Add to the turn DTO type: `verdict?: { feasibility: 'automatic'|'uncertain'|'impossible'; reason?: string }`, `rejected?: boolean`, and ensure `segments` is present.
 
-- [ ] **Step 2: Render**
+- [x] **Step 2: Render**
 
 - If `segments` is present, render them in order: narration as prose, speech as a speaker-attributed block; else fall back to `narration`.
 - Show a rejected-action banner when `rejected` is true.
 - Show inline check results (notation, total, outcome) when `checks` is present.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `mise run test:frontend && mise run build:frontend`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/Chronicle.tsx
@@ -651,19 +653,19 @@ git commit -m "feat(frontend): render structured turn segments and verdicts"
 
 ### Task 11: Full verification
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 Run: `mise run test` and `mise run lint`
 Expected: PASS.
 
-- [ ] **Step 2: Manual checks**
+- [x] **Step 2: Manual checks**
 
 1. With a tool-capable provider, one turn produces typed segments, a verdict, and any checks, with no extractor pass in the trace.
 2. A speech line from a new persona creates exactly one stub entity.
 3. An impossible action is stored rejected and does not resolve.
 4. A tool-incapable provider still produces a usable turn via the extractor.
 
-- [ ] **Step 3: Commit fixups**
+- [x] **Step 3: Commit fixups**
 
 ```bash
 git add -A

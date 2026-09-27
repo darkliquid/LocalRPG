@@ -1,5 +1,7 @@
 # Turn Latency Quick Wins Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Cut the avoidable per-turn latency: bounded tool rounds, a trim default, targeted entity indexing, overlapped extraction, one shared TTS pipeline, and playback that starts on the first clip.
@@ -30,7 +32,7 @@
 **Interfaces:**
 - Produces: `Config.ToolRounds() int` returns `3` when unset; `Config.CompletionMode()` returns `"trim"` when unset.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/config/types_test.go`:
 
@@ -59,12 +61,12 @@ func TestCompletionModeDefaultsToTrim(t *testing.T) {
 
 If `AgentsConfig`/`CompletionConfig` field names differ, use the names in `pkg/config/types.go`; the nested type is what `DefaultConfig` uses at line ~287.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestToolRoundsDefaults|TestCompletionModeDefaults' ./pkg/config/ -v`
 Expected: FAIL — both return the old defaults (`0` unbounded, `auto`).
 
-- [ ] **Step 3: Change the defaults**
+- [x] **Step 3: Change the defaults**
 
 In `pkg/config/types.go`:
 
@@ -103,12 +105,12 @@ func (c *Config) CompletionMode() string {
 
 In `DefaultConfig` (~line 287) change the completion `Mode: "auto"` to `Mode: "trim"`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -run 'TestToolRoundsDefaults|TestCompletionModeDefaults' ./pkg/config/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Run the package and commit**
+- [x] **Step 5: Run the package and commit**
 
 Run: `go test ./pkg/config/`
 
@@ -129,7 +131,7 @@ git commit -m "perf(config): bound tool rounds and default completion to trim"
 - Consumes: `storage.Syncer.SyncFile(path string) error` (`pkg/storage/sync.go:81`).
 - Produces: no signature change; `writeEntities` no longer re-indexes the whole entities directory.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/timeline_sync_test.go`:
 
@@ -180,12 +182,12 @@ Use the package's existing scaffold helpers: `writeTestCampaignScaffold` (`pkg/e
 
 and construct `entity.Entity` directly with `&entity.Entity{ID: "mira", Name: "Mira", Type: "character", Body: "A scout.", Hash: "mira-hash"}`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestWriteEntitiesIndexesWrittenEntities ./pkg/engine/ -v`
 Expected: FAIL to compile (`writeTestCampaignScaffoldWithStore`/`newTestEntity` undefined) if using the helper form — then inline it as above and confirm it PASSES against current code (it is the correctness guard, not the bug). Proceed once green; the change in Step 3 must keep it green.
 
-- [ ] **Step 3: Replace the full-directory sync**
+- [x] **Step 3: Replace the full-directory sync**
 
 In `pkg/engine/timeline.go`, change `writeEntities` so each written file is indexed individually:
 
@@ -211,12 +213,12 @@ In `pkg/engine/timeline.go`, change `writeEntities` so each written file is inde
 
 Delete the trailing `storage.NewSyncer(t.store).Sync(dir)` block.
 
-- [ ] **Step 4: Run the test and the engine package**
+- [x] **Step 4: Run the test and the engine package**
 
 Run: `go test -run TestWriteEntitiesIndexesWrittenEntities ./pkg/engine/ -v && go test ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/timeline.go pkg/engine/timeline_sync_test.go
@@ -235,7 +237,7 @@ git commit -m "perf(engine): index only the entities a turn writes"
 - Consumes: `harness.Extractor.Extract(ctx, narration) (*harness.Extraction, error)`.
 - Produces: no signature change; extraction runs concurrently with mention resolution and structured-turn bookkeeping and is awaited before segments are built.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 A concurrency change is not observable from a single-turn assertion, so the test guards the contract the overlap must preserve: a non-structured turn still merges extraction into its segments.
 
@@ -275,12 +277,12 @@ func TestNonStructuredTurnStillUsesExtraction(t *testing.T) {
 
 Adjust the `harness.Extraction`/`ExtractedEntity` field names to match `pkg/harness/extractor.go`; `buildTurnSegments` is in `pkg/engine/segments.go`. If building segments needs a resolver, construct the orchestrator with the same scaffold as `toolLoopOrchestrator` and use its store.
 
-- [ ] **Step 2: Run test to verify it fails or passes for the right reason**
+- [x] **Step 2: Run test to verify it fails or passes for the right reason**
 
 Run: `go test -run TestNonStructuredTurnStillUsesExtraction ./pkg/engine/ -v`
 Expected: PASS once the test compiles against current code (contract guard). Keep it green through Step 3.
 
-- [ ] **Step 3: Overlap extraction with local work**
+- [x] **Step 3: Overlap extraction with local work**
 
 In `pkg/engine/orchestrator.go`, immediately after the `turn` struct is built (around line 808, before `turn.Entities = harness.ResolveEntityMentions(...)`):
 
@@ -324,12 +326,12 @@ Then replace the existing `structured := result.Submission != nil` / `extraction
 
 Leave the `if structured { ... }` branch that reads `result.Submission` unchanged, and ensure the `buildTurnSegments(o.store, turn.Narration, extraction)` call at ~line 851 happens after `<-extractionDone`.
 
-- [ ] **Step 4: Verify with the race detector and the package**
+- [x] **Step 4: Verify with the race detector and the package**
 
 Run: `go test -race -run TestNonStructuredTurnStillUsesExtraction ./pkg/engine/ -v && go test -race ./pkg/engine/`
 Expected: PASS, no data race (the channel close orders the writes before the read).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/engine/extract_overlap_test.go
@@ -348,7 +350,7 @@ git commit -m "perf(engine): overlap entity extraction with local turn work"
 - Produces: `(*Service).audioPipeline() (*media.TTSPipeline, error)` — one pipeline per `*config.Config` identity, carrying the client and content cache.
 - Consumes: `s.configMgr.Get()` returns the same `*Config` until the next `Load`/`Save`, so pointer identity is the cache key.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/audio_pipeline_test.go`:
 
@@ -389,12 +391,12 @@ func TestAudioPipelineIsBuiltOnce(t *testing.T) {
 
 Add a minimal `stubTTSClient` in the test file implementing `media.TTSClient` (methods `Synthesize`, `ListVoices`, `PreviewURL`, `MarkdownAware`, `Name` — copy the interface from `pkg/media/providers.go`). Import `config` and `media`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestAudioPipelineIsBuiltOnce ./pkg/gui/ -v`
 Expected: FAIL — `svc.audioPipeline` undefined (and `newTTSClient` may not be exported for assignment in the package test; it is a field, so this is fine).
 
-- [ ] **Step 3: Add the cached pipeline**
+- [x] **Step 3: Add the cached pipeline**
 
 In `pkg/gui/service.go`, add to the `Service` struct:
 
@@ -449,12 +451,12 @@ Update `GetSegmentAudio` to use it, keeping the narrator voice lookup per call:
 
 Remove the now-unused `client, err := s.ttsClientFor(...)` and `pipeline := media.NewTTSPipeline(...)` lines from `GetSegmentAudio`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -run TestAudioPipelineIsBuiltOnce ./pkg/gui/ -v`
 Expected: PASS.
 
-- [ ] **Step 5: Run the package and commit**
+- [x] **Step 5: Run the package and commit**
 
 Run: `go test ./pkg/gui/`
 
@@ -476,7 +478,7 @@ git commit -m "perf(media): share one TTS pipeline across segments"
 - Produces: `(*Player).PlayQueue(ctx context.Context, clips <-chan string) error`; internal `playStreamer(queue beep.Streamer, closers []io.Closer) error`.
 - Consumes: `decodeFile(path) (beep.Streamer, io.Closer, error)` (existing, `pkg/media/playback/player.go`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/media/playback/queue_test.go`:
 
@@ -540,12 +542,12 @@ func TestQueueStreamerPullsClipsLazilyInOrder(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestQueueStreamerPullsClipsLazilyInOrder ./pkg/media/playback/ -v`
 Expected: FAIL — `newQueueStreamer` undefined.
 
-- [ ] **Step 3: Add the lazy queue streamer and refactor playback**
+- [x] **Step 3: Add the lazy queue streamer and refactor playback**
 
 In `pkg/media/playback/player.go`, add:
 
@@ -688,12 +690,12 @@ func (p *Player) PlayQueue(ctx context.Context, clips <-chan string) error {
 }
 ```
 
-- [ ] **Step 4: Run the queue test**
+- [x] **Step 4: Run the queue test**
 
 Run: `go test -run TestQueueStreamer ./pkg/media/playback/ -v && go test ./pkg/media/playback/`
 Expected: PASS.
 
-- [ ] **Step 5: Use PlayQueue for whole-turn playback**
+- [x] **Step 5: Use PlayQueue for whole-turn playback**
 
 In `pkg/gui/service.go`, rewrite `PlayTurnAudio` so synthesis feeds a channel while playback starts on the first clip:
 
@@ -731,7 +733,7 @@ func (s *Service) PlayTurnAudio(ctx context.Context, gameID string, turnNumber i
 }
 ```
 
-- [ ] **Step 6: Run the gui package and commit**
+- [x] **Step 6: Run the gui package and commit**
 
 Run: `go test ./pkg/gui/ ./pkg/media/playback/ && mise run lint`
 
@@ -752,7 +754,7 @@ git commit -m "perf(playback): start narration on the first completed clip"
 **Interfaces:**
 - Produces: clip responses carry an `ETag` derived from the bytes and a cacheable `Cache-Control`, replacing `no-store`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/server_clip_cache_test.go`. Reuse the route test harness in `pkg/gui/server_test.go`; the test calls the clip route for a synthesized segment and asserts:
 
@@ -777,12 +779,12 @@ func TestClipResponseIsCacheableWithETag(t *testing.T) {
 
 Follow the existing route-test setup in `pkg/gui/server_test.go` for constructing the handler and a game with audio; if audio cannot be synthesized in-test, assert on the header logic by extracting the header-setting into a small helper `setClipHeaders(w http.ResponseWriter, data []byte)` and testing that helper directly.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestClipResponseIsCacheableWithETag ./pkg/gui/ -v`
 Expected: FAIL — `Cache-Control: no-store`, no `ETag`.
 
-- [ ] **Step 3: Set cacheable headers**
+- [x] **Step 3: Set cacheable headers**
 
 In `pkg/gui/server.go`, replace the `no-store` line with an ETag from the bytes and a cacheable policy. The URL already carries the audio key as `?v=`, so a changed clip changes the URL:
 
@@ -798,7 +800,7 @@ In `pkg/gui/server.go`, replace the `no-store` line with an ETag from the bytes 
 
 Add `crypto/sha256` to the imports if absent.
 
-- [ ] **Step 4: Retain the prefetch element**
+- [x] **Step 4: Retain the prefetch element**
 
 In `frontend/src/hooks/useSegmentPlayback.ts`, keep the prefetched element and reuse it for the next clip:
 
@@ -822,12 +824,12 @@ and in `playFrom`:
       }
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `go test -run TestClipResponseIsCacheableWithETag ./pkg/gui/ -v && mise run test:frontend && mise run lint`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/server.go pkg/gui/server_clip_cache_test.go frontend/src/hooks/useSegmentPlayback.ts
@@ -838,21 +840,21 @@ git commit -m "perf(audio): cache clips with an ETag and reuse the prefetch"
 
 ### Task 7: Full verification
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `mise run test`
 Expected: PASS (Go + `tsc`). Re-run `./pkg/gui/` once if the known TempDir flake appears.
 
-- [ ] **Step 2: Vet and build**
+- [x] **Step 2: Vet and build**
 
 Run: `mise run lint && mise run build`
 Expected: clean, binary built.
 
-- [ ] **Step 3: Measure**
+- [x] **Step 3: Measure**
 
 Play a 3-beat turn and compare TTFT, time-to-first-audio, and total against the pre-change trace. Record the numbers on the spec.
 
-- [ ] **Step 4: Commit anything remaining**
+- [x] **Step 4: Commit anything remaining**
 
 ```bash
 git status --short

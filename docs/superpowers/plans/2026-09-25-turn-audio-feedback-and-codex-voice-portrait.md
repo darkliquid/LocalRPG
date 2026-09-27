@@ -1,5 +1,7 @@
 # Turn Audio Feedback, Regeneration, and Codex Voice & Portrait Enhancements Implementation Plan
 
+> **Status:** Implemented and verified against the code on 2026-09-27.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Provide dynamic feedback during TTS generation and playback (spinners, cache vs provider status, error display, proper button states), force regeneration support, unified high-resolution character portrait display in the Codex, and streamlined voice UI with demographic tags and audition previews.
@@ -30,7 +32,7 @@
 - Modify: `pkg/media/tts.go`
 - Modify: `pkg/media/tts_test.go`
 
-- [ ] **Step 1: Write unit test in `pkg/media/tts_test.go`**
+- [x] **Step 1: Write unit test in `pkg/media/tts_test.go`**
 
 Add `TestSynthesizeUtteranceForceBypassesCache`:
 ```go
@@ -72,12 +74,12 @@ func TestSynthesizeUtteranceForceBypassesCache(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestSynthesizeUtteranceForceBypassesCache ./pkg/media`
 Expected: FAIL (`SynthesizeUtteranceForce` undefined)
 
-- [ ] **Step 3: Implement `SynthesizeUtteranceForce` and `SynthesizeSegmentForce` in `pkg/media/tts.go`**
+- [x] **Step 3: Implement `SynthesizeUtteranceForce` and `SynthesizeSegmentForce` in `pkg/media/tts.go`**
 
 ```go
 func (p *TTSPipeline) SynthesizeSegmentForce(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig, force bool) (string, error) {
@@ -104,12 +106,12 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 	// Continue normal synthesis and cache storage...
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestSynthesizeUtteranceForceBypassesCache ./pkg/media`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/tts.go pkg/media/tts_test.go
@@ -125,7 +127,7 @@ git commit -m "feat(media): add force cache bypass to TTSPipeline"
 - Modify: `pkg/gui/server.go`
 - Create: `pkg/gui/turn_audio_force_test.go`
 
-- [ ] **Step 1: Write integration test in `pkg/gui/turn_audio_force_test.go`**
+- [x] **Step 1: Write integration test in `pkg/gui/turn_audio_force_test.go`**
 
 ```go
 package gui
@@ -164,12 +166,12 @@ func TestPlayTurnAudioEndpoint_ForceParameter(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it passes/fails**
+- [x] **Step 2: Run test to verify it passes/fails**
 
 Run: `go test -v -run TestPlayTurnAudioEndpoint_ForceParameter ./pkg/gui`
 Expected: PASS
 
-- [ ] **Step 3: Update `pkg/gui/service.go` and `pkg/gui/server.go`**
+- [x] **Step 3: Update `pkg/gui/service.go` and `pkg/gui/server.go`**
 
 1. In `pkg/gui/service.go`:
    - Update `GetSegmentAudio(ctx context.Context, gameID string, turnNumber, segmentIndex int, force bool) (string, error)`
@@ -188,12 +190,12 @@ Expected: PASS
      path, err := s.service.GetSegmentAudio(r.Context(), gameID, turnNumber, segmentIndex, force)
      ```
 
-- [ ] **Step 4: Run all gui tests to verify compatibility**
+- [x] **Step 4: Run all gui tests to verify compatibility**
 
 Run: `go test -v ./pkg/gui`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/server.go pkg/gui/turn_audio_force_test.go
@@ -209,7 +211,7 @@ git commit -m "feat(gui): support force regeneration query parameter for turn an
 - Modify: `frontend/src/components/TurnSegments.tsx`
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Update `frontend/src/api/client.ts`**
+- [x] **Step 1: Update `frontend/src/api/client.ts`**
 
 Update `playTurnAudio` and `playSegmentAudio` to accept optional `force?: boolean`:
 ```typescript
@@ -220,7 +222,7 @@ static async playTurnAudio(gameID: string, turnNumber: number, force = false): P
 }
 ```
 
-- [ ] **Step 2: Update `frontend/src/components/TurnSegments.tsx`**
+- [x] **Step 2: Update `frontend/src/components/TurnSegments.tsx`**
 
 1. Introduce `turnAudioState: 'idle' | 'generating' | 'playing' | 'error'`.
 2. Add `statusMessage?: string`.
@@ -237,7 +239,7 @@ static async playTurnAudio(gameID: string, turnNumber: number, force = false): P
 7. Render Status Chip:
    - Inline badge indicating `"Rendering speech (calling provider)..."` (purple pulse), `"Audio loaded from cache"` (green), or `"Error: ..."` (red).
 
-- [ ] **Step 3: Update `frontend/src/App.tsx`**
+- [x] **Step 3: Update `frontend/src/App.tsx`**
 
 1. Manage `turnAudioStatus: Record<number, { state: 'idle' | 'generating' | 'playing' | 'error'; message?: string; fromCache?: boolean }>`
 2. When `handlePlayTurnAudio(turnNumber, segmentIndex, force)` is called:
@@ -249,12 +251,12 @@ static async playTurnAudio(gameID: string, turnNumber: number, force = false): P
    - Call `APIClient.stopAudio()`.
    - Reset state to `'idle'`.
 
-- [ ] **Step 4: Run frontend build to verify compilation**
+- [x] **Step 4: Run frontend build to verify compilation**
 
 Run: `npm --prefix frontend run build`
 Expected: PASS with 0 type errors
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/api/client.ts frontend/src/components/TurnSegments.tsx frontend/src/App.tsx
@@ -268,7 +270,7 @@ git commit -m "feat(frontend): add stateful playback controls with spinners, sta
 **Files:**
 - Modify: `frontend/src/components/CodexDrawer.tsx`
 
-- [ ] **Step 1: Update `frontend/src/components/CodexDrawer.tsx` header**
+- [x] **Step 1: Update `frontend/src/components/CodexDrawer.tsx` header**
 
 When `entity.type === 'character'`:
 Render high-resolution portrait thumbnail in the note header directly beside `entity.name`:
@@ -285,12 +287,12 @@ Render high-resolution portrait thumbnail in the note header directly beside `en
 )}
 ```
 
-- [ ] **Step 2: Run frontend build to verify compilation**
+- [x] **Step 2: Run frontend build to verify compilation**
 
 Run: `npm --prefix frontend run build`
 Expected: PASS with 0 type errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/CodexDrawer.tsx
@@ -304,13 +306,13 @@ git commit -m "feat(frontend): display character portrait in codex note header"
 **Files:**
 - Modify: `frontend/src/components/CodexDrawer.tsx`
 
-- [ ] **Step 1: Remove redundant `VoiceCatalogPicker` from `CodexDrawer.tsx`**
+- [x] **Step 1: Remove redundant `VoiceCatalogPicker` from `CodexDrawer.tsx`**
 
 - Remove `import { VoiceCatalogPicker } from './VoiceCatalogPicker';`
 - Remove `<VoiceCatalogPicker ttsConfig={ttsConfig} onAddProfile={onAddProfile} />` JSX block.
 - Remove unused props/imports related to the catalog modal.
 
-- [ ] **Step 2: Update Archetype Dropdown with demographic tags and overflow protection**
+- [x] **Step 2: Update Archetype Dropdown with demographic tags and overflow protection**
 
 1. Constrain dropdown with `max-w-[280px] truncate`.
 2. Format option text:
@@ -325,7 +327,7 @@ git commit -m "feat(frontend): display character portrait in codex note header"
 })}
 ```
 
-- [ ] **Step 3: Add Voice Preview Button next to Archetype Dropdown**
+- [x] **Step 3: Add Voice Preview Button next to Archetype Dropdown**
 
 1. Add state `previewingVoice: boolean` and `selectedArchetype: string`.
 2. Add `<button>` with `<Volume2 className={previewingVoice ? "animate-pulse" : ""} />`.
@@ -334,12 +336,12 @@ git commit -m "feat(frontend): display character portrait in codex note header"
    - Call `APIClient.testProvider({ category: 'tts', provider: { ...ttsConfig, default_voice: profile.voice_id, pitch: profile.pitch, speech_rate: profile.speech_rate }, test_prompt: `Greetings. I am ${entity.name}, ready for the journey.` })`.
    - On success, play via `audioPreview.ts`.
 
-- [ ] **Step 4: Run frontend build to verify compilation**
+- [x] **Step 4: Run frontend build to verify compilation**
 
 Run: `npm --prefix frontend run build`
 Expected: PASS with 0 type errors
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/CodexDrawer.tsx
@@ -353,14 +355,14 @@ git commit -m "feat(frontend): streamline codex voice controls with demographic 
 **Files:**
 - Run full test suites and binary build
 
-- [ ] **Step 1: Run all Go tests and vet**
+- [x] **Step 1: Run all Go tests and vet**
 
 Run: `go test -count=1 ./... && go vet ./...`
 Expected: PASS with 0 failures and clean vet
 
-- [ ] **Step 2: Run full build**
+- [x] **Step 2: Run full build**
 
 Run: `npm --prefix frontend run build && go build ./cmd/localrpg`
 Expected: PASS
 
-- [ ] **Step 3: Verification Complete**
+- [x] **Step 3: Verification Complete**
