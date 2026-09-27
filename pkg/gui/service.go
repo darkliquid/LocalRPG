@@ -975,6 +975,7 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		Verdict:         turn.Verdict,
 		Rejected:        turn.Rejected,
 		Checks:          turn.Checks,
+		PendingCheck:    turn.PendingCheck,
 		Segments: segmentDTOs(turn.Segments, gameID, turn.Number, audioAvailable, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
 		}, func(ref string) *entity.VoiceConfig {
@@ -1323,6 +1324,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		_ = emit(toolEvent(activity))
 	})
 
+	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)
 	turn, err := t.orchestrator.ProcessActionStream(runCtx, req.Mode, req.Input, func(text string) error {
 		return emit(TurnEvent{Type: "chunk", Text: text})
 	})

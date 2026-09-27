@@ -54,7 +54,9 @@ type Turn struct {
 	Verdict  *harness.ActionVerdict `json:"verdict,omitempty"`
 	Rejected bool                   `json:"rejected,omitempty"`
 	Checks   []harness.CheckResult  `json:"checks,omitempty"`
-	Personae []string               `json:"personae,omitempty"`
+	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
+	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
+	Personae     []string              `json:"personae,omitempty"`
 	// Memories are the accepted memory records, so the timeline stays canonical
 	// and the index can be rebuilt from history.jsonl.
 	Memories []entity.Memory `json:"memories,omitempty"`

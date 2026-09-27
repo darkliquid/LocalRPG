@@ -86,7 +86,9 @@ type TurnOrchestrator struct {
 	mechanicsEngagement string
 	mechanicsCadence    int
 	// forceToolChoice is set for a turn whose cadence floor requires a check.
-	forceToolChoice  bool
+	forceToolChoice bool
+	// pendingCheckRef continues a turn whose GM proposed a check (ask policy).
+	pendingCheckRef  string
 	extractor        *harness.Extractor
 	chunkTimeout     time.Duration
 	openingPrompt    string
@@ -399,6 +401,12 @@ func (o *TurnOrchestrator) SetMechanicsCadence(turns int) {
 	o.mechanicsCadence = turns
 }
 
+// SetPendingCheckRef continues the turn whose pending check has this ref: the
+// engine resolves it and the GM adjudicates the result.
+func (o *TurnOrchestrator) SetPendingCheckRef(ref string) {
+	o.pendingCheckRef = ref
+}
+
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
 	if paths != nil {
 		if systemID != "" {
@@ -709,7 +717,26 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	turnSpan.SetAttributes(attribute.String("turn.assembled_prompt", assembly.Prompt))
-	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, proposedCheck, onChunk)
+	// A pending GM-proposed check is resolved here, before generation, so the
+	// model narrates its outcome rather than proposing it again.
+	var resolvedPending *harness.CheckResult
+	validationEngagement := o.mechanicsEngagement
+	if o.pendingCheckRef != "" {
+		if pending := findPendingCheck(pastTurns, o.pendingCheckRef); pending != nil {
+			if resolved, resolveErr := o.resolveCheck(ctx, pending.Request, nil); resolveErr == nil {
+				resolved.CheckID = pending.Ref
+				resolvedPending = resolved
+				validationEngagement = "auto"
+				directive := fmt.Sprintf("[PLAYER ROLL: %s — %s]", resolved.Outcome, strings.TrimSpace(pending.Request.Stakes))
+				gmDirective = strings.TrimSpace(directive + "\n" + gmDirective)
+			} else {
+				o.logger.Event("pending.resolve_error", map[string]interface{}{"error": resolveErr.Error()})
+			}
+		}
+		o.pendingCheckRef = ""
+	}
+
+	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, proposedCheck, resolvedPending, validationEngagement, onChunk)
 	if err != nil {
 		outcome = "error"
 		turnSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
@@ -774,7 +801,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	var narration string
 	var recovery RecoveryOutcome
 	var stillIncomplete bool
-	if result.Submission == nil {
+	if result.Submission == nil && result.PendingCheck == nil {
 		cause = o.classifyCut(result)
 		narration, recovery, stillIncomplete = o.recoverReply(ctx, result.Text, cause, onChunk)
 		if strings.TrimSpace(narration) == "" {
@@ -830,6 +857,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Context:      &assembly.Context,
 		Prompt:       contextPrompt,
 		ToolCalls:    result.Provenance,
+		PendingCheck: result.PendingCheck,
 	}
 
 	structured := result.Submission != nil
@@ -1072,6 +1100,9 @@ type streamResult struct {
 	Submission     *harness.TurnSubmission
 	Checks         []harness.CheckResult
 	FallbackReason string
+	// PendingCheck is set when the model proposed a check under the ask policy and
+	// the turn ends awaiting the player's roll.
+	PendingCheck *harness.PendingCheck
 }
 
 // generationCode reads a bounded failure code for logging, defaulting to a
@@ -1275,7 +1306,7 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 // answer. The result is the last reply that carried no tool calls. With no
 // executor attached the loop makes exactly one call, shaped as it was before
 // tools existed, so nothing changes for a provider that cannot call them.
-func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harness.AssembleResult, gmDirective string, proposed *harness.ProposedCheck, onChunk func(string) error) (streamResult, error) {
+func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harness.AssembleResult, gmDirective string, proposed *harness.ProposedCheck, resolvedPending *harness.CheckResult, engagement string, onChunk func(string) error) (streamResult, error) {
 	contextPrompt := assembly.Prompt
 	if gmDirective != "" {
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
@@ -1414,6 +1445,9 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 
 	var provenance []ToolCallRecord
 	var checks []harness.CheckResult
+	if resolvedPending != nil {
+		checks = append(checks, *resolvedPending)
+	}
 	submitAttempts := 0
 	withdrawn := false
 
@@ -1426,13 +1460,13 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		// tools reads Messages instead.
 		request := harness.GenerateRequest{Messages: messages, Prompt: contextPrompt}
 		if offerTools {
-			engagement := o.mechanicsEngagement
-			if engagement == "" {
-				engagement = "auto"
+			mode := engagement
+			if mode == "" {
+				mode = "auto"
 			}
-			request.Tools = append(harness.ToolSpecs(), harness.TurnToolSpecsFor(engagement)...)
+			request.Tools = append(harness.ToolSpecs(), harness.TurnToolSpecsFor(mode)...)
 		}
-		if round == 0 && o.forceToolChoice {
+		if round == 0 && o.forceToolChoice && resolvedPending == nil {
 			// Force a tool call when the provider can, otherwise nudge the prompt.
 			if offerTools {
 				request.ToolChoice = "required"
@@ -1584,7 +1618,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
 						continue
 					}
-					if vErr := validateSubmission(sub, checks, o.declaredStats, proposed, o.mechanicsEngagement); vErr != nil {
+					if vErr := validateSubmission(sub, checks, o.declaredStats, proposed, engagement); vErr != nil {
 						o.logger.Event("turn.protocol_error", map[string]interface{}{"detail": vErr.Error()})
 						submitAttempts++
 						if submitAttempts >= 2 {
@@ -1599,6 +1633,20 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					}
 					result.Submission = sub
 					result.Checks = checks
+					result.Provenance = provenance
+					result.ToolCalls = nil
+					return result, nil
+				case "propose_check":
+					if o.mechanicsEngagement != "ask" {
+						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: propose_check is only available when mechanics are set to ask"})
+						continue
+					}
+					req, parseErr := harness.ParseCheckRequest(call.Arguments)
+					if parseErr != nil {
+						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
+						continue
+					}
+					result.PendingCheck = &harness.PendingCheck{Ref: call.ID, Request: *req, ProposedBy: "gm"}
 					result.Provenance = provenance
 					result.ToolCalls = nil
 					return result, nil
