@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
@@ -30,6 +31,25 @@ func isComfyUI(endpoint string) bool {
 	return strings.Contains(endpoint, ":8188") || strings.HasSuffix(endpoint, "/prompt")
 }
 
+// usageFromBody overrides the estimated usage when the JSON body carries one.
+func (h *httpImageClient) usageFromBody(body map[string]interface{}) {
+	usage, ok := body["usage"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	input, output := 0, 0
+	if value, ok := usage["input_tokens"].(float64); ok {
+		input = int(value)
+	}
+	if value, ok := usage["output_tokens"].(float64); ok {
+		output = int(value)
+	}
+	if input == 0 && output == 0 {
+		return
+	}
+	h.setLastUsage(media.Usage{InputTokens: input, OutputTokens: output, Requests: 1})
+}
+
 func getComfyBaseURL(endpoint string) string {
 	ep := strings.TrimRight(endpoint, "/")
 	ep = strings.TrimSuffix(ep, "/prompt")
@@ -42,6 +62,22 @@ func getComfyBaseURL(endpoint string) string {
 type comfyUIImageClient struct {
 	endpoint string
 	client   *http.Client
+
+	usageMu   sync.Mutex
+	lastUsage media.Usage
+}
+
+// LastUsage reports one request; ComfyUI advertises no token or character count.
+func (c *comfyUIImageClient) LastUsage() media.Usage {
+	c.usageMu.Lock()
+	defer c.usageMu.Unlock()
+	return c.lastUsage
+}
+
+func (c *comfyUIImageClient) setLastUsage(u media.Usage) {
+	c.usageMu.Lock()
+	c.lastUsage = u
+	c.usageMu.Unlock()
 }
 
 func (c *comfyUIImageClient) GenerateImage(ctx context.Context, prompt string) ([]byte, error) {
@@ -235,15 +271,35 @@ type httpImageClient struct {
 	model    string
 	apiKey   string
 	client   *http.Client
+
+	usageMu   sync.Mutex
+	lastUsage media.Usage
+}
+
+// LastUsage reports what the last image generation consumed: the provider's own
+// counts when the body carried a usage block, otherwise one estimated request.
+func (h *httpImageClient) LastUsage() media.Usage {
+	h.usageMu.Lock()
+	defer h.usageMu.Unlock()
+	return h.lastUsage
+}
+
+func (h *httpImageClient) setLastUsage(u media.Usage) {
+	h.usageMu.Lock()
+	h.lastUsage = u
+	h.usageMu.Unlock()
 }
 
 func (h *httpImageClient) GenerateImage(ctx context.Context, prompt string) ([]byte, error) {
+	h.setLastUsage(media.Usage{Requests: 1, Estimated: true})
 	if isComfyUI(h.endpoint) {
 		comfyClient := &comfyUIImageClient{
 			endpoint: h.endpoint,
 			client:   h.client,
 		}
-		return comfyClient.GenerateImage(ctx, prompt)
+		image, err := comfyClient.GenerateImage(ctx, prompt)
+		h.setLastUsage(comfyClient.LastUsage())
+		return image, err
 	}
 
 	var payload []byte
@@ -303,6 +359,7 @@ func (h *httpImageClient) GenerateImage(ctx context.Context, prompt string) ([]b
 	if err := json.Unmarshal(bodyBytes, &respData); err != nil {
 		return bodyBytes, nil
 	}
+	h.usageFromBody(respData)
 
 	// AUTOMATIC1111 / Forge WebUI: {"images": ["base64..."]}
 	if images, ok := respData["images"].([]interface{}); ok && len(images) > 0 {

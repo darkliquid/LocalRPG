@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 
 	"google.golang.org/genai"
 
@@ -22,6 +23,22 @@ type GeminiImageClient struct {
 	model            string
 	aspectRatio      string
 	personGeneration string
+
+	usageMu   sync.Mutex
+	lastUsage media.Usage
+}
+
+// LastUsage reports one request; Imagen advertises no token count.
+func (g *GeminiImageClient) LastUsage() media.Usage {
+	g.usageMu.Lock()
+	defer g.usageMu.Unlock()
+	return g.lastUsage
+}
+
+func (g *GeminiImageClient) setLastUsage(u media.Usage) {
+	g.usageMu.Lock()
+	g.lastUsage = u
+	g.usageMu.Unlock()
 }
 
 // NewGeminiImageClient initializes a new GeminiImageClient using credentials from
@@ -75,6 +92,7 @@ func (g *GeminiImageClient) GenerateImage(ctx context.Context, prompt string) ([
 	if strings.TrimSpace(prompt) == "" {
 		return nil, errors.New("gemini image: prompt cannot be empty")
 	}
+	g.setLastUsage(media.Usage{Requests: 1, Estimated: true})
 
 	if g.client.ClientConfig().Backend == genai.BackendVertexAI && strings.HasPrefix(g.model, "imagen-") {
 		return g.generateImagen(ctx, prompt)
