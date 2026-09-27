@@ -84,13 +84,16 @@ type TurnOrchestrator struct {
 	lorePrompt          string
 	mechanicsPrompt     string
 	mechanicsEngagement string
-	extractor           *harness.Extractor
-	chunkTimeout        time.Duration
-	openingPrompt       string
-	logger              trace.Logger
-	chronicler          *Chronicler
-	threadsMax          int
-	continuityChecks    *bool
+	mechanicsCadence    int
+	// forceToolChoice is set for a turn whose cadence floor requires a check.
+	forceToolChoice  bool
+	extractor        *harness.Extractor
+	chunkTimeout     time.Duration
+	openingPrompt    string
+	logger           trace.Logger
+	chronicler       *Chronicler
+	threadsMax       int
+	continuityChecks *bool
 	// actionEcho asks the narrator to restate the player's action before resolving
 	// it; on unless SetActionEcho turns it off.
 	actionEcho       bool
@@ -391,6 +394,11 @@ func (o *TurnOrchestrator) SetMechanicsEngagement(engagement string) {
 	o.mechanicsEngagement = engagement
 }
 
+// SetMechanicsCadence sets how many quiet turns force a check; 0 disables.
+func (o *TurnOrchestrator) SetMechanicsCadence(turns int) {
+	o.mechanicsCadence = turns
+}
+
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
 	if paths != nil {
 		if systemID != "" {
@@ -432,6 +440,13 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		return nil, fmt.Errorf("load history: %w", err)
 	}
 	turnNum := len(pastTurns) + 1
+
+	// The engagement cadence floor: after enough quiet turns, force a check.
+	o.forceToolChoice = false
+	if shouldForceCheck(o.mechanicsEngagement, o.mechanicsCadence, pastTurns) {
+		o.forceToolChoice = true
+		o.logger.Event("mechanics.cadence", map[string]interface{}{"quiet_turns": quietTurns(pastTurns)})
+	}
 
 	o.logger = trace.OrNil(o.logger)
 	o.logger.Event("turn.begin", map[string]interface{}{
@@ -1416,6 +1431,19 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				engagement = "auto"
 			}
 			request.Tools = append(harness.ToolSpecs(), harness.TurnToolSpecsFor(engagement)...)
+		}
+		if round == 0 && o.forceToolChoice {
+			// Force a tool call when the provider can, otherwise nudge the prompt.
+			if offerTools {
+				request.ToolChoice = "required"
+			} else {
+				contextPrompt = forceCheckNudge + "\n\n" + contextPrompt
+				request.Prompt = contextPrompt
+				if len(messages) > 0 {
+					last := &messages[len(messages)-1]
+					last.Content = strings.TrimSpace(last.Content + "\n\n" + forceCheckNudge)
+				}
+			}
 		}
 		o.logger.Event("tool.round", map[string]interface{}{
 			"round":               round,

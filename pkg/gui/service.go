@@ -1271,6 +1271,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		orchestrator.SetAllowFreeformState(sm.Mechanics.AllowFreeformState)
 	}
 	orchestrator.SetMechanicsEngagement(engine.ResolveEngagement(manifest, sm, cfg))
+	orchestrator.SetMechanicsCadence(cfg.MechanicsCadenceTurns())
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
