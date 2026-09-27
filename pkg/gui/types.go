@@ -606,3 +606,18 @@ type WorkingEntryDTO struct {
 	Role     string  `json:"role,omitempty"`
 }
 
+// DocArticleSummaryDTO describes an article in documentation navigation and search.
+type DocArticleSummaryDTO struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Category    string `json:"category"`
+	Order       int    `json:"order"`
+	Description string `json:"description"`
+}
+
+// DocArticleDTO contains the full article content including markdown prose.
+type DocArticleDTO struct {
+	DocArticleSummaryDTO
+	Content string `json:"content"`
+}
+

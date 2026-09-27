@@ -74,6 +74,8 @@ func routePattern(path string) string {
 		return "/api/world/{id}"
 	case strings.HasPrefix(path, "/api/audio/"):
 		return "/api/audio"
+	case strings.HasPrefix(path, "/api/docs"):
+		return "/api/docs"
 	default:
 		return "http.request"
 	}
@@ -102,6 +104,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/trace", s.handleTraceRoute)
 	s.mux.HandleFunc("/api/models", s.handleModelsRoutes)
 	s.mux.HandleFunc("/api/models/", s.handleModelsRoutes)
+	s.mux.HandleFunc("/api/docs", s.handleDocsRoutes)
+	s.mux.HandleFunc("/api/docs/", s.handleDocsRoutes)
 	if s.assetServer != nil {
 		s.mux.Handle("/", s.assetServer)
 	}
@@ -1326,4 +1330,35 @@ func setClipHeaders(w http.ResponseWriter, data []byte) {
 	w.Header().Set("ETag", fmt.Sprintf(`"%x"`, sum[:8]))
 	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
 	w.Header().Set("Content-Type", media.AudioContentType(data))
+}
+
+func (s *Server) handleDocsRoutes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/docs")
+	path = strings.Trim(path, "/")
+
+	if path == "" {
+		docs, err := s.service.GetDocsList(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, docs)
+		return
+	}
+
+	article, err := s.service.GetDocArticle(r.Context(), path)
+	if err != nil {
+		if errors.Is(err, ErrDocNotFound) {
+			http.Error(w, "document not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, article)
 }
