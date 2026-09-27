@@ -56,3 +56,45 @@ func TestUsageRoundTripAndSummary(t *testing.T) {
 		t.Fatalf("UsageTotal = %d, want 76", total)
 	}
 }
+
+func TestUsageScopeGroupsAndDeletes(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "usage.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	rows := []UsageRecord{
+		{GameID: "global", Role: "image", Provider: "imagen", CostMicros: 5},
+		{GameID: "global", Role: "stt", Provider: "whisper", CostMicros: 7},
+		{GameID: "pending:abc", Role: "image", Provider: "imagen", CostMicros: 3},
+	}
+	for _, row := range rows {
+		if err := store.SaveUsage(row); err != nil {
+			t.Fatalf("SaveUsage: %v", err)
+		}
+	}
+
+	summary, err := store.UsageSummaryByGame()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.ByGame["global"] != 12 || summary.ByGame["pending:abc"] != 3 || summary.TotalCostMicros != 15 {
+		t.Fatalf("by-game summary = %+v", summary)
+	}
+
+	pending, err := store.UsageByGame("pending:abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pending) != 1 || pending[0].Role != "image" {
+		t.Fatalf("pending rows = %+v", pending)
+	}
+
+	if err := store.DeleteUsageByGame("pending:abc"); err != nil {
+		t.Fatal(err)
+	}
+	if remaining, _ := store.UsageByGame("pending:abc"); len(remaining) != 0 {
+		t.Fatalf("pending rows survived the delete: %+v", remaining)
+	}
+}

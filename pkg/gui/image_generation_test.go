@@ -69,7 +69,7 @@ func TestGenerateImageRejectsEmptyBytes(t *testing.T) {
 		return stubImageClient{data: nil}, nil
 	}
 
-	_, failure := svc.generateImage(context.Background(), "banner", "a banner")
+	_, failure := svc.generateImage(context.Background(), "banner", "a banner", "")
 	if failure == nil || failure.Code != harness.FailureProviderError {
 		t.Fatalf("generateImage failure = %v, want provider_error", failure)
 	}
