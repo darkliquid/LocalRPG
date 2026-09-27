@@ -31,6 +31,11 @@ func (s *Service) generateImage(ctx context.Context, kind, prompt string, scope 
 	ctx, span := startImageSpan(ctx, s.logger, kind)
 	defer span.End()
 
+	if err := s.guardRole("image"); err != nil {
+		failure := &harness.GenerationFailure{Code: harness.FailureRateLimited, Message: err.Error(), Cause: err}
+		return nil, failure
+	}
+
 	cfg := s.configMgr.Get()
 	client, err := imageClientFactory(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
 	if err != nil {
@@ -46,10 +51,12 @@ func (s *Service) generateImage(ctx context.Context, kind, prompt string, scope 
 
 	imgBytes, err := client.GenerateImage(ctx, prompt)
 	if err != nil {
-		failure := &harness.GenerationFailure{Code: harness.ClassifyProviderError(err), Message: fmt.Sprintf("generate image: %v", err)}
+		s.noteFailure("image", err)
+		failure := &harness.GenerationFailure{Code: harness.ClassifyProviderError(err), Message: fmt.Sprintf("generate image: %v", err), Cause: err}
 		s.recordImage(ctx, span, kind, provider, 0, started, failure)
 		return nil, failure
 	}
+	s.noteSuccess("image")
 	checked, failure := guardImageBytes(imgBytes)
 	if failure != nil {
 		s.recordImage(ctx, span, kind, provider, 0, started, failure)

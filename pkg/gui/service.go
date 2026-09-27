@@ -86,6 +86,9 @@ type Service struct {
 	// pending rows a creation flow produces before its campaign exists.
 	globalUsageMu sync.Mutex
 	globalUsage   *storage.Store
+	// limits holds in-memory provider rate-limit blocks and funds failures, so a
+	// 429 backs a provider off rather than being retried blindly.
+	limits *harness.LimitRegistry
 }
 
 // Config returns the configuration the service is running with, so a command can
@@ -124,6 +127,7 @@ func NewService(rootDir string) *Service {
 		locks:          make(map[string]*sync.Mutex),
 		modelsManager:  models.NewManager(dirs.Cache),
 		summaryPending: make(map[string]bool),
+		limits:         harness.NewLimitRegistry(),
 	}
 	if !projectMode {
 		if warning := paths.LegacyWarning(paths.System(), cfg.Paths); warning != "" {
@@ -1078,6 +1082,12 @@ func (s *Service) BeginTurn(gameID string) (*TurnSession, error) {
 	}
 	release := lock.Unlock
 
+	// Refuse a turn while the GM's provider is backed off, before taking any work.
+	if err := s.guardRole("gm"); err != nil {
+		release()
+		return nil, err
+	}
+
 	session, err := s.prepareTurn(gameID)
 	if err != nil {
 		release()
@@ -1378,8 +1388,10 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		return emit(TurnEvent{Type: "chunk", Text: text})
 	})
 	if err != nil {
+		t.service.noteFailure("gm", err)
 		return err
 	}
+	t.service.noteSuccess("gm")
 
 	dto := t.service.turnDTO(*turn, t.store, t.cfg, t.gameID)
 	if err := emit(TurnEvent{Type: "turn", Turn: &dto}); err != nil {
@@ -1788,8 +1800,10 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 	isForce := len(force) > 0 && force[0]
 	path, err := pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
 	if err != nil {
+		s.noteFailure("tts", err)
 		return "", err
 	}
+	s.noteSuccess("tts")
 	// A cache hit reports nothing, so only a real synthesis is recorded.
 	if u := pipeline.LastUsage(); u.Characters != 0 || u.InputTokens != 0 || u.OutputTokens != 0 || u.Requests != 0 {
 		s.RecordUsage(gameID, turnNumber, "tts", harness.Usage{

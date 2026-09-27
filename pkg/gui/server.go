@@ -122,6 +122,13 @@ func writeGameError(w http.ResponseWriter, err error) {
 	case errors.Is(err, fs.ErrNotExist), errors.Is(err, os.ErrNotExist):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	default:
+		var limited *harness.ErrRateLimitedUntil
+		if errors.As(err, &limited) {
+			seconds := int(limited.RetryAfter().Seconds()) + 1
+			w.Header().Set("Retry-After", strconv.Itoa(seconds))
+			writeJSONError(w, http.StatusTooManyRequests, limited.Error())
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -1143,6 +1150,13 @@ func (s *Server) handleTurnSubmit(w http.ResponseWriter, r *http.Request, gameID
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	case err != nil:
+		var limited *harness.ErrRateLimitedUntil
+		if errors.As(err, &limited) {
+			seconds := int(limited.RetryAfter().Seconds()) + 1
+			w.Header().Set("Retry-After", strconv.Itoa(seconds))
+			writeJSONError(w, http.StatusTooManyRequests, limited.Error())
+			return
+		}
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
