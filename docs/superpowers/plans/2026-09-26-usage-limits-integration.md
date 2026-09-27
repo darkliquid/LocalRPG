@@ -1,6 +1,6 @@
 # Usage & Limits Integration Implementation Plan
 
-> **Status:** In progress as of 2026-09-27. Task 1 (LLM and embedding usage) is done, and the media TTS pipeline's usage tracking (Task 2's `pkg/media` half) is done. Task 2's provider `LastUsage` implementations (ElevenLabs, Gemini TTS, Whisper, image providers) and Tasks 3 through 6 remain. Branch: `feat/usage-limits-integration`.
+> **Status:** In progress as of 2026-09-27. Tasks 1 and 2 are done: LLM/embedding usage, the media `Usage`/`UsageReporter` pipeline, and `LastUsage` on the ElevenLabs, Gemini TTS, Whisper, ComfyUI/A1111 image, and Imagen clients. Tasks 3 (service records usage with cost), 4 (rate-limit blocks and funds failures), 5 (usage API), and 6 (Usage UI) remain. Branch: `feat/usage-limits-provider-usage`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
