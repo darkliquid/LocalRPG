@@ -7,6 +7,31 @@ export interface PlayerState {
   voice?: VoiceProfile;
 }
 
+export interface AdvancementTrack {
+  filled: number;
+  size: number;
+}
+
+export interface AdvancementUnlock {
+  id: string;
+  label: string;
+  description?: string;
+  cost: number;
+  affordable: boolean;
+  requires_met: boolean;
+  gate_open: boolean;
+}
+
+export interface Advancement {
+  currency: string;
+  label?: string;
+  value: number;
+  mode?: string;
+  track?: AdvancementTrack;
+  unlocks?: AdvancementUnlock[];
+  pending: boolean;
+}
+
 export interface GameState {
   game_id: string;
   game_name: string;
@@ -21,6 +46,8 @@ export interface GameState {
   banner_url?: string;
   // The resolved mechanics policy in force: off, auto, or ask.
   mechanics_engagement?: 'off' | 'auto' | 'ask';
+  // The campaign's progression summary, when the system declares advancement.
+  advancement?: Advancement;
 }
 
 export interface TurnSegment {

@@ -1,5 +1,6 @@
 import {
   GameState,
+  Advancement,
   Turn,
   TurnEvent,
   EntityNote,
@@ -295,6 +296,21 @@ export class APIClient {
 
   async updateGameSettings(patch: GameSettingsPatch): Promise<void> {
     return APIClient.updateGameSettings(this.gameID, patch);
+  }
+
+  async advanceUnlock(unlockID: string): Promise<Advancement> {
+    return APIClient.advanceUnlock(this.gameID, unlockID);
+  }
+
+  static async advanceUnlock(gameID: string, unlockID: string): Promise<Advancement> {
+    const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/advance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unlock_id: unlockID }),
+    });
+    if (!res.ok) throw new Error(`advanceUnlock: ${res.statusText}`);
+    const data = await res.json();
+    return data.advancement as Advancement;
   }
 
   static async updateGameSettings(gameID: string, patch: GameSettingsPatch): Promise<void> {
