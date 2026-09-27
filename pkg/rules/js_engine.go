@@ -23,6 +23,7 @@ type JSEngine struct {
 	worldTickHooks  []goja.Callable
 	checkResolvers  map[string]goja.Callable
 	healthZeroHooks []goja.Callable
+	manifest        *core.SystemManifest
 }
 
 func NewJSEngine(bridge GameHostAPI) *JSEngine {
@@ -100,6 +101,21 @@ func (j *JSEngine) bindHostAPI() {
 		return goja.Undefined()
 	})
 
+	j.vm.Set("grantXP", func(call goja.FunctionCall) goja.Value {
+		if j.manifest == nil || j.manifest.Mechanics == nil || j.manifest.Mechanics.Advancement == nil {
+			return j.vm.ToValue(false)
+		}
+		amount, _ := toInt(call.Argument(0).Export())
+		playerID := ""
+		if id, ok := j.bridge.(interface{ PlayerID() string }); ok {
+			playerID = id.PlayerID()
+		}
+		if err := ApplyEarn(j.bridge, j.manifest.Mechanics.Advancement, playerID, amount); err != nil {
+			panic(j.vm.ToValue(fmt.Sprintf("grantXP error: %v", err)))
+		}
+		return j.vm.ToValue(true)
+	})
+
 	j.vm.Set("onAction", func(call goja.FunctionCall) goja.Value {
 		actionType := call.Argument(0).String()
 		fn, ok := goja.AssertFunction(call.Argument(1))
@@ -157,8 +173,10 @@ func (j *JSEngine) bindHostAPI() {
 	})
 }
 
-// SetManifest hands the declarative schema to the host bridge if it accepts one.
+// SetManifest hands the declarative schema to the host bridge if it accepts one,
+// and keeps it so bindings such as grantXP can read the advancement spec.
 func (j *JSEngine) SetManifest(manifest *core.SystemManifest) {
+	j.manifest = manifest
 	if setter, ok := j.bridge.(interface {
 		SetManifest(*core.SystemManifest)
 	}); ok {

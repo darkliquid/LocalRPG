@@ -82,6 +82,9 @@ export const App: React.FC = () => {
   // campaign list, so the play shell can tell "loading" from "gone".
   const [campaignStatus, setCampaignStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
   const [campaignError, setCampaignError] = useState<string | null>(null);
+  // Advancement spending: the drawer disables its buttons and shows the refusal.
+  const [advancementSpending, setAdvancementSpending] = useState(false);
+  const [advancementError, setAdvancementError] = useState<string | null>(null);
 
   useEffect(() => {
     APIClient.getSettings()
@@ -121,6 +124,22 @@ export const App: React.FC = () => {
     client.listEntities().then(setEntities).catch(console.error);
     client.getRecap().then(setRecap).catch(console.error);
   }, [client, handleGameStateFailure]);
+
+  // A spend applies through the API and then refreshes the corpus, so the
+  // drawer and the notification dot both reflect the new balance.
+  const handleSpendAdvancement = useCallback(async (unlockID: string) => {
+    if (!client) return;
+    setAdvancementSpending(true);
+    setAdvancementError(null);
+    try {
+      await client.advanceUnlock(unlockID);
+      refreshCorpus();
+    } catch (err) {
+      setAdvancementError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAdvancementSpending(false);
+    }
+  }, [client, refreshCorpus]);
 
   // A campaign deletion, or a change of --dir, leaves a dangling id in storage.
   // It is verified against the campaign list before it is trusted; a list that
@@ -513,12 +532,16 @@ export const App: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setActiveDrawer('character')}
-                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                className={`relative flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                   activeDrawer === 'character' ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
                 }`}
               >
                 <User className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Character</span>
+                {(gameState?.advancement?.pending ||
+                  gameState?.advancement?.unlocks?.some((u) => u.affordable && u.requires_met && u.gate_open)) && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_6px_rgba(168,85,247,0.9)]" />
+                )}
               </button>
               <button
                 onClick={() => setActiveDrawer('graph')}
@@ -702,7 +725,15 @@ export const App: React.FC = () => {
               activeDrawer === 'context' ? 'Turn Context & Continuity' : 'Living World Arcs & Clocks'
             }
           >
-            {activeDrawer === 'character' && <CharacterSheetDrawer player={gameState?.player} />}
+            {activeDrawer === 'character' && (
+              <CharacterSheetDrawer
+                player={gameState?.player}
+                advancement={gameState?.advancement}
+                onSpend={handleSpendAdvancement}
+                spending={advancementSpending}
+                spendError={advancementError}
+              />
+            )}
             {activeDrawer === 'graph' && <GraphDrawer data={graph || undefined} onSelectNode={handleOpenWikilink} />}
             {activeDrawer === 'context' && (
               <ContextDrawer

@@ -30,7 +30,7 @@
 **Interfaces:**
 - Produces: `AdvancementSpec`, `CurrencySpec`, `EarnRule`, `UnlockSpec`, `EffectSpec`, `LevelSpec`; `MechanicsSpec.Advancement *AdvancementSpec`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/core/mechanics_test.go`:
 
@@ -85,12 +85,12 @@ mechanics:
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestAdvancementSpecRoundTrips ./pkg/core/ -v`
 Expected: FAIL — `Advancement` undefined.
 
-- [ ] **Step 3: Add the types**
+- [x] **Step 3: Add the types**
 
 In `pkg/core/mechanics.go`:
 
@@ -151,7 +151,7 @@ type LevelSpec struct {
 
 Add `Advancement *AdvancementSpec \`yaml:"advancement,omitempty"\`` to `MechanicsSpec`.
 
-- [ ] **Step 4: Run test and commit**
+- [x] **Step 4: Run test and commit**
 
 Run: `go test ./pkg/core/`
 
@@ -172,7 +172,7 @@ git commit -m "feat(advancement): declare progression in system.yaml"
 - Produces: `rules.EarnFromTurn(spec *core.AdvancementSpec, turn *harness.Turn) int`; `rules.ApplyEarn(bridge GameHostAPI, spec *core.AdvancementSpec, playerID string, amount int) error`.
 - Consumes: `GameHostAPI.GetStat/SetStat`, `harness.Turn.Checks`/`Outcome`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/rules/advancement_test.go`:
 
@@ -208,12 +208,12 @@ func TestEarnFromTurnRecognisesEvents(t *testing.T) {
 
 Add an `ApplyEarn` test using the package's fake host bridge (the one `state_changes_test.go` uses) asserting the currency stat increments.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestEarnFromTurn ./pkg/rules/ -v`
 Expected: FAIL — undefined.
 
-- [ ] **Step 3: Implement earning**
+- [x] **Step 3: Implement earning**
 
 Create `pkg/rules/advancement.go`:
 
@@ -281,7 +281,7 @@ func ApplyEarn(bridge GameHostAPI, spec *core.AdvancementSpec, playerID string, 
 
 Note: `isFailureOutcome` needs the system's declared outcome vocabulary; the function takes the `CheckConventions` from `spec` — since `AdvancementSpec` does not carry it, pass the outcomes in from the caller, or move the helper to the engine where the `MechanicsSpec` is in scope. Choose: define `EarnFromTurn(spec *core.AdvancementSpec, outcomes []string, turn *harness.Turn) int` and pass `mechanics.Checks.Outcome`.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `go test ./pkg/rules/`
 
@@ -301,7 +301,7 @@ git commit -m "feat(advancement): recognise earn events and award the currency"
 **Interfaces:**
 - Produces: `grantXP(amount)` callable from `mechanics.js`; awards to the manifest's advancement currency.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `pkg/rules/js_engine_test.go`:
 
@@ -324,12 +324,12 @@ func TestGrantXPAwardsTheCurrency(t *testing.T) {
 
 If there is no `RunScript`, execute via the loader path used by existing tests (`LoadRules` on a temp system) and assert through the bridge.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestGrantXP ./pkg/rules/ -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement the binding**
+- [x] **Step 3: Implement the binding**
 
 In `bindHostAPI` (`pkg/rules/js_engine.go`):
 
@@ -350,7 +350,7 @@ In `bindHostAPI` (`pkg/rules/js_engine.go`):
 
 Store the manifest so `advancement()` can read it (`SetManifest` already stores it for the host bridge; keep a copy on the engine, or read it back through the bridge). `playerID` comes from the bridge/timeline the engine was built with; if the engine does not hold it, thread it through `NewJSEngine` (it already takes a `HostBridge` bound to a player).
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `go test ./pkg/rules/`
 
@@ -370,7 +370,7 @@ git commit -m "feat(advancement): let mechanics.js grant experience"
 **Interfaces:**
 - Produces: `ApplyUnlock(bridge, spec, unlock, playerID, tags []string, gateOpen bool) error`; `Affordable(spec, value, unlock) bool`; `RequirementsMet(spec, unlock, owned []string, tags []string) bool`; `NextThreshold(spec, value) (core.LevelSpec, bool)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `pkg/rules/advancement_test.go`:
 
@@ -410,12 +410,12 @@ func TestApplyUnlockHonoursCapAndGate(t *testing.T) {
 
 Use the existing test bridge helper from `host_api_test.go`/`state_changes_test.go`; if it has no GetStat seeding, extend it.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run TestApplyUnlock ./pkg/rules/ -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement spending**
+- [x] **Step 3: Implement spending**
 
 In `pkg/rules/advancement.go`:
 
@@ -485,7 +485,7 @@ func NextThreshold(spec *core.AdvancementSpec, value int) (core.LevelSpec, bool)
 
 `grantTag` reads the entity, appends the tag, and writes it back through the bridge's entity access (use `GameHostAPI.GetEntity` and the timeline/EntityWriter to persist, so Markdown stays canonical). `runAdvanceHook` is wired in Task 5 with the JS engine.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `go test ./pkg/rules/`
 
@@ -507,7 +507,7 @@ git commit -m "feat(advancement): apply unlocks with effects, caps, and gates"
 - Consumes: `rules.EarnFromTurn`, `rules.ApplyEarn`, `rules.NextThreshold`, `rules.ApplyUnlock`.
 - Produces: awards applied once per turn; threshold levels auto-applied; track ticks incremented.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/engine/advancement_test.go`:
 
@@ -521,12 +521,12 @@ func TestTurnAwardsExperienceOnAMiss(t *testing.T) {
 
 Build the fixture by extending the existing `toolLoopOrchestrator` to accept a `*core.SystemManifest` with an `Advancement` spec and a submission that resolves a `miss`; assert the player entity's `state.xp` became 1 and an `advancement` memory exists.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestTurnAwardsExperience ./pkg/engine/ -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Award during the turn**
+- [x] **Step 3: Award during the turn**
 
 In `ProcessActionStream`, after `turn.Checks` is set and before `RecordTurnContextStructured`:
 
@@ -556,7 +556,7 @@ Track mode increments a `track` stat and, at `track_size`, clears it and records
 
 Record a memory (kind `advancement`, importance 4) alongside `writeMechanicalMemories` so the chronicle can mention the award.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `go test ./pkg/engine/`
 
@@ -578,7 +578,7 @@ git commit -m "feat(advancement): award experience during a turn"
 **Interfaces:**
 - Produces: `GameStateDTO.Advancement *AdvancementDTO`; `(*Service).AdvanceUnlock(ctx, gameID, unlockID) (*AdvancementDTO, error)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `pkg/gui/advancement_test.go`:
 
@@ -604,12 +604,12 @@ func TestAdvanceEndpointSpendsAnUnlock(t *testing.T) {
 
 Add a negative case: an unaffordable unlock returns 400 and leaves the currency unchanged.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestAdvanceEndpoint ./pkg/gui/ -v`
 Expected: FAIL (404).
 
-- [ ] **Step 3: Implement the DTO and route**
+- [x] **Step 3: Implement the DTO and route**
 
 `pkg/gui/types.go`:
 
@@ -643,7 +643,7 @@ Add `Advancement *AdvancementDTO \`json:"advancement,omitempty"\`` to `GameState
 
 Route in `pkg/gui/server.go`: `case "advance":` on the `POST /api/game/{id}/...` switch, decoding `{"unlock_id": "..."}`.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `go test ./pkg/gui/`
 
@@ -664,19 +664,19 @@ git commit -m "feat(advancement): expose and spend unlocks over the API"
 **Interfaces:**
 - Consumes: `GameState.Advancement`; `POST /api/game/{id}/advance`.
 
-- [ ] **Step 1: Types and client**
+- [x] **Step 1: Types and client**
 
 Mirror `AdvancementDTO` in `types.ts` and add `APIClient.advanceUnlock(gameId, unlockID)` in the existing fetch style.
 
-- [ ] **Step 2: Spend section**
+- [x] **Step 2: Spend section**
 
 In `CharacterSheetDrawer.tsx`, add an Advancement section: the currency and label, the track when present, and the unlock list with cost and a Spend button; disable with a reason ("not affordable", "requirements unmet", "needs downtime"). On success, call the parent refresh.
 
-- [ ] **Step 3: Notification dot**
+- [x] **Step 3: Notification dot**
 
 In `App.tsx`, on the Character trigger button (`:504-512`), render a small dot when `gameState?.advancement` has any affordable unlock or `pending`, using the existing dot style (`:495`). The refresh already runs after each turn via `refreshCorpus()` (`:237`).
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `mise run test:frontend && mise run build`
 
@@ -689,8 +689,8 @@ git commit -m "feat(advancement): spend unlocks from the character drawer"
 
 ### Task 8: Full verification
 
-- [ ] **Step 1:** `mise run test`
-- [ ] **Step 2:** `mise run lint && mise run build`
+- [x] **Step 1:** `mise run test`
+- [x] **Step 2:** `mise run lint && mise run build`
 - [ ] **Step 3:** Manual: declare an `advancement` block in `systems/narrative_2d6/system.yaml`, play a turn that misses, and confirm the currency rises, the drawer lists the unlock, the dot appears, and a spend applies.
 
 ---

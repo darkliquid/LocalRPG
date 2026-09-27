@@ -37,6 +37,35 @@ type FactionClockDTO struct {
 	MaxTicks int    `json:"max_ticks"`
 }
 
+// TrackDTO is a track-mode advancement's fill, for the character drawer.
+type TrackDTO struct {
+	Filled int `json:"filled"`
+	Size   int `json:"size"`
+}
+
+// UnlockDTO is one thing the advancement currency can buy.
+type UnlockDTO struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
+	Cost        int    `json:"cost"`
+	Affordable  bool   `json:"affordable"`
+	RequiresMet bool   `json:"requires_met"`
+	GateOpen    bool   `json:"gate_open"`
+}
+
+// AdvancementDTO summarises a campaign's progression for the UI. Nil means the
+// system declares no advancement.
+type AdvancementDTO struct {
+	Currency string      `json:"currency"`
+	Label    string      `json:"label,omitempty"`
+	Value    int         `json:"value"`
+	Mode     string      `json:"mode,omitempty"`
+	Track    *TrackDTO   `json:"track,omitempty"`
+	Unlocks  []UnlockDTO `json:"unlocks,omitempty"`
+	Pending  bool        `json:"pending"`
+}
+
 type GameStateDTO struct {
 	GameID        string            `json:"game_id"`
 	GameName      string            `json:"game_name"`
@@ -50,6 +79,8 @@ type GameStateDTO struct {
 	BannerURL     string            `json:"banner_url,omitempty"`
 	// MechanicsEngagement is the resolved policy in force: off, auto, or ask.
 	MechanicsEngagement string `json:"mechanics_engagement,omitempty"`
+	// Advancement is the campaign's progression summary, when the system has one.
+	Advancement *AdvancementDTO `json:"advancement,omitempty"`
 }
 
 type SegmentDTO struct {

@@ -27,6 +27,7 @@ type GameHostAPI interface {
 	GetStat(entityID string, path string) (interface{}, error)
 	SetStat(entityID string, path string, value interface{}) error
 	GetEntity(entityID string) (*entity.Entity, error)
+	SaveEntity(ent *entity.Entity) error
 	InjectGMDirection(directive string)
 	GetDirectives() []string
 	Log(message string)
@@ -148,6 +149,12 @@ func (h *DefaultHostBridge) GetEntity(entityID string) (*entity.Entity, error) {
 	return h.store.GetEntity(entityID)
 }
 
+// SaveEntity persists an entity through the bridge's writer, the same path the
+// engine's own writes take, so edited Markdown stays canonical.
+func (h *DefaultHostBridge) SaveEntity(ent *entity.Entity) error {
+	return h.persist(ent)
+}
+
 func (h *DefaultHostBridge) InjectGMDirection(directive string) {
 	h.directives = append(h.directives, directive)
 }
@@ -163,6 +170,10 @@ func (h *DefaultHostBridge) Log(message string) {
 func (h *DefaultHostBridge) GetLogs() []string {
 	return h.logs
 }
+
+// PlayerID is the entity ID the bridge treats as the player, so script
+// bindings that award or spend the advancement currency know who to credit.
+func (h *DefaultHostBridge) PlayerID() string { return h.playerID }
 
 // SetManifest gives the bridge the system's declarative mechanics schema, so
 // scripts can read it through ListStats/ListSkills/CheckConventions.

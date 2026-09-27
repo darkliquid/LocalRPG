@@ -601,6 +601,33 @@ func (t *Timeline) writeMechanicalMemories(turn *Turn, checks []harness.CheckRes
 	return nil
 }
 
+// RecordAdvancement records an engine-owned memory for an advancement event, so
+// the chronicle can show the award alongside the turn that earned it.
+func (t *Timeline) RecordAdvancement(turn *Turn, playerID string, text string) error {
+	if t.store == nil || playerID == "" {
+		return nil
+	}
+	memory := entity.Memory{
+		Turn:       turn.Number,
+		Kind:       "advancement",
+		EntityRefs: []string{playerID},
+		Text:       text,
+		Importance: 4,
+		Tags:       []string{"advancement"},
+		Source:     entity.SourceEngine,
+	}
+	if err := entity.ValidateMemory(&memory); err != nil {
+		return nil
+	}
+	id, err := t.store.SaveMemory(&memory)
+	if err != nil {
+		return fmt.Errorf("save advancement memory: %w", err)
+	}
+	memory.ID = id
+	turn.Memories = append(turn.Memories, memory)
+	return nil
+}
+
 // resolveMemoryRef turns an id or a name into an entity id, preferring an
 // existing entity and falling back to the slug of the name.
 func (t *Timeline) resolveMemoryRef(raw string) string {
