@@ -15,11 +15,12 @@ import { ContextDrawer } from './components/ContextDrawer';
 import { StoryTheater } from './components/StoryTheater';
 import { LauncherHub } from './components/LauncherHub';
 import { SettingsStudio } from './components/SettingsStudio';
+import { DocsModal } from './components/DocsModal';
 import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
 import { LimitChip } from './components/LimitChip';
-import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, AlertTriangle } from 'lucide-react';
+import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, AlertTriangle, HelpCircle } from 'lucide-react';
 import { formatGenerationError } from './lib/generationError';
 import { slugify } from './lib/slug';
 
@@ -57,6 +58,7 @@ export const App: React.FC = () => {
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [addressed, setAddressed] = useState<Set<number>>(new Set());
   const [modalEntity, setModalEntity] = useState<{ name: string; turnNumber: number } | null>(null);
   const [missingModel, setMissingModel] = useState<{ id: string; name: string; sizeBytes: number } | null>(null);
@@ -647,6 +649,16 @@ export const App: React.FC = () => {
                 <Settings className="w-3.5 h-3.5 text-purple-400" />
                 <span className="hidden sm:inline">Settings</span>
               </button>
+              <button
+                onClick={() => setIsDocsOpen(true)}
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  isDocsOpen ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
+                }`}
+                title="Help & Documentation"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-purple-400" />
+                <span className="hidden sm:inline">Docs</span>
+              </button>
             </div>
           </header>
 
@@ -940,6 +952,12 @@ export const App: React.FC = () => {
               setMissingModel(null);
               setDismissedModelPrompt(true);
             }}
+          />
+
+          {/* Built-in Help and Documentation Modal */}
+          <DocsModal
+            isOpen={isDocsOpen}
+            onClose={() => setIsDocsOpen(false)}
           />
         </>
       )}

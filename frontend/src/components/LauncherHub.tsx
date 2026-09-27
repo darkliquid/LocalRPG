@@ -11,6 +11,7 @@ import { CampaignSettingsModal } from './launcher/CampaignSettingsModal';
 import { WorldsStudio } from './WorldsStudio';
 import { SystemsStudio } from './SystemsStudio';
 import { SettingsStudio } from './SettingsStudio';
+import { DocsModal } from './DocsModal';
 import { ArrowLeft, X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
 
@@ -54,6 +55,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
     { studio: 'worlds'; mode: 'new' | 'browse' } | { studio: 'systems' } | null
   >(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDocsOpen, setIsDocsOpen] = useState(false);
   const { mounted: settingsMounted, state: settingsState } = useMountTransition(isSettingsOpen, 200);
 
   const loadData = useCallback(async () => {
@@ -221,6 +223,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         onOpenWorldsStudio={() => setActiveStudio({ studio: 'worlds', mode: 'browse' })}
         onOpenSystemsStudio={() => setActiveStudio({ studio: 'systems' })}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenDocs={() => setIsDocsOpen(true)}
       />
 
       {/* Horizontal World Flyout */}
@@ -331,6 +334,9 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
           </div>
         </div>
       )}
+
+      {/* Built-in Help and Documentation Modal */}
+      <DocsModal isOpen={isDocsOpen} onClose={() => setIsDocsOpen(false)} />
     </div>
   );
 };

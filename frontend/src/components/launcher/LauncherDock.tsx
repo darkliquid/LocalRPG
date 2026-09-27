@@ -1,7 +1,7 @@
 import React from 'react';
 import { GameSummary } from '../../types';
 import { ProceduralIcon } from './ProceduralAsset';
-import { Plus, Globe, BookOpen, Settings, LayoutGrid } from 'lucide-react';
+import { Plus, Globe, BookOpen, Settings, LayoutGrid, HelpCircle } from 'lucide-react';
 
 interface LauncherDockProps {
   games: GameSummary[];
@@ -14,6 +14,7 @@ interface LauncherDockProps {
   onOpenWorldsStudio: () => void;
   onOpenSystemsStudio: () => void;
   onOpenSettings: () => void;
+  onOpenDocs?: () => void;
 }
 
 export const LauncherDock: React.FC<LauncherDockProps> = ({
@@ -27,6 +28,7 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
   onOpenWorldsStudio,
   onOpenSystemsStudio,
   onOpenSettings,
+  onOpenDocs,
 }) => {
   const [hoveredGame, setHoveredGame] = React.useState<{ game: GameSummary; top: number } | null>(null);
 
@@ -161,6 +163,20 @@ export const LauncherDock: React.FC<LauncherDockProps> = ({
           </button>
           <div className="pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 px-2.5 py-1 bg-stone-900 border border-white/15 rounded-lg text-xs font-sans text-stone-200 whitespace-nowrap shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-50">
             Settings
+          </div>
+        </div>
+
+        <div className="relative group">
+          <button
+            onClick={onOpenDocs}
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-stone-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer"
+            title="Help & Documentation"
+            aria-label="Help & Documentation"
+          >
+            <HelpCircle className="w-5 h-5" />
+          </button>
+          <div className="pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 px-2.5 py-1 bg-stone-900 border border-white/15 rounded-lg text-xs font-sans text-stone-200 whitespace-nowrap shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-50">
+            Help & Documentation
           </div>
         </div>
       </div>
