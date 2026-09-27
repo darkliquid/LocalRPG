@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 
 	"google.golang.org/genai"
 
@@ -57,8 +58,11 @@ type GeminiTTSClient struct {
 	client       *genai.Client
 	model        string
 	defaultVoice string
-	apiKey       string
-	logger       trace.Logger
+
+	usageMu   sync.Mutex
+	lastUsage media.Usage
+	apiKey    string
+	logger    trace.Logger
 }
 
 // NewGeminiTTSClient builds a GeminiTTSClient using the configured or shared API key.
@@ -129,6 +133,25 @@ func (c *GeminiTTSClient) SetLogger(logger trace.Logger) {
 // Metered reports that Gemini TTS charges per character.
 func (c *GeminiTTSClient) Metered() bool {
 	return true
+}
+
+// LastUsage reports the token usage of the last synthesis, so the caller can
+// price it. A request Gemini could not meter still counts as one request.
+func (c *GeminiTTSClient) LastUsage() media.Usage {
+	c.usageMu.Lock()
+	defer c.usageMu.Unlock()
+	return c.lastUsage
+}
+
+func (c *GeminiTTSClient) setLastUsage(meta *genai.GenerateContentResponseUsageMetadata) {
+	usage := media.Usage{Requests: 1}
+	if meta != nil {
+		usage.InputTokens = int(meta.PromptTokenCount)
+		usage.OutputTokens = int(meta.CandidatesTokenCount)
+	}
+	c.usageMu.Lock()
+	c.lastUsage = usage
+	c.usageMu.Unlock()
 }
 
 // SupportsMarkdown reports whether this provider natively interprets Markdown emphasis.
@@ -224,6 +247,7 @@ func (c *GeminiTTSClient) Synthesize(ctx context.Context, text string, voice *en
 	if resp == nil || len(resp.Candidates) == 0 {
 		return nil, errors.New("gemini tts: no candidates returned from model")
 	}
+	c.setLastUsage(resp.UsageMetadata)
 
 	cand := resp.Candidates[0]
 	if cand.Content == nil || len(cand.Content.Parts) == 0 {

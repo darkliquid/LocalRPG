@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
@@ -31,6 +32,29 @@ type httpSTTClient struct {
 	model    string
 	apiKey   string
 	client   *http.Client
+
+	usageMu   sync.Mutex
+	lastUsage media.Usage
+}
+
+// LastUsage reports what the last transcription consumed. OpenAI-style response
+// bodies may carry a usage block; when they do not, one request is the honest
+// estimate.
+func (h *httpSTTClient) LastUsage() media.Usage {
+	h.usageMu.Lock()
+	defer h.usageMu.Unlock()
+	return h.lastUsage
+}
+
+func (h *httpSTTClient) setLastUsage(totalTokens int) {
+	usage := media.Usage{Requests: 1, Estimated: true}
+	if totalTokens > 0 {
+		usage.InputTokens = totalTokens
+		usage.Estimated = false
+	}
+	h.usageMu.Lock()
+	h.lastUsage = usage
+	h.usageMu.Unlock()
 }
 
 func (h *httpSTTClient) Transcribe(ctx context.Context, audioData []byte) (string, error) {
@@ -77,11 +101,20 @@ func (h *httpSTTClient) Transcribe(ctx context.Context, audioData []byte) (strin
 	}
 
 	var res struct {
-		Text string `json:"text"`
+		Text  string `json:"text"`
+		Usage *struct {
+			TotalTokens int `json:"total_tokens"`
+		} `json:"usage,omitempty"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 		return "", fmt.Errorf("decode stt response: %w", err)
 	}
+
+	totalTokens := 0
+	if res.Usage != nil {
+		totalTokens = res.Usage.TotalTokens
+	}
+	h.setLastUsage(totalTokens)
 
 	return strings.TrimSpace(res.Text), nil
 }

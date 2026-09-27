@@ -11,7 +11,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
@@ -43,6 +45,9 @@ type ElevenLabsTTSClient struct {
 	outputFmt string
 	client    *http.Client
 	logger    trace.Logger
+
+	usageMu   sync.Mutex
+	lastUsage media.Usage
 }
 
 // NewElevenLabsTTSClient builds a client, preferring the configured key and
@@ -80,6 +85,27 @@ func (c *ElevenLabsTTSClient) SetLogger(logger trace.Logger) {
 
 // Metered reports that ElevenLabs charges per request.
 func (c *ElevenLabsTTSClient) Metered() bool { return true }
+
+// LastUsage reports the characters the last synthesis was billed for. ElevenLabs
+// returns the billed count in a response header; a missing header falls back to
+// the request's own character count.
+func (c *ElevenLabsTTSClient) LastUsage() media.Usage {
+	c.usageMu.Lock()
+	defer c.usageMu.Unlock()
+	return c.lastUsage
+}
+
+func (c *ElevenLabsTTSClient) setLastUsage(text string, resp *http.Response) {
+	characters := len([]rune(text))
+	if header := resp.Header.Get("character-cost"); header != "" {
+		if billed, err := strconv.Atoi(strings.TrimSpace(header)); err == nil {
+			characters = billed
+		}
+	}
+	c.usageMu.Lock()
+	c.lastUsage = media.Usage{Characters: characters, Requests: 1}
+	c.usageMu.Unlock()
+}
 
 // VoiceOptions declares the tunables ElevenLabs accepts. Pitch is deliberately
 // absent: the API exposes speed but no pitch, and speech rate is the portable
@@ -151,6 +177,7 @@ func (c *ElevenLabsTTSClient) Synthesize(ctx context.Context, text string, voice
 	if err := elevenLabsError(resp); err != nil {
 		return nil, err
 	}
+	c.setLastUsage(text, resp)
 	return io.ReadAll(resp.Body)
 }
 
