@@ -175,6 +175,17 @@ func (o *TurnOrchestrator) SetAllowFreeformState(allow bool) {
 	o.allowFreeform = allow
 }
 
+// SetRulesPrompt sets the system's rules text without re-reading it, so a caller
+// that already cached it does not pay for the file again.
+func (o *TurnOrchestrator) SetRulesPrompt(prompt string) { o.rulesPrompt = prompt }
+
+// SetLorePrompt sets the world's lore text without re-reading it.
+func (o *TurnOrchestrator) SetLorePrompt(prompt string) { o.lorePrompt = prompt }
+
+// SetMechanicsPrompt sets the formatted mechanics instruction without rebuilding
+// it, so a cached runtime can hand it over directly.
+func (o *TurnOrchestrator) SetMechanicsPrompt(prompt string) { o.mechanicsPrompt = prompt }
+
 // checkResolverOrDefault returns the configured resolver.
 func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error) {
 	resolver := o.checkResolver
