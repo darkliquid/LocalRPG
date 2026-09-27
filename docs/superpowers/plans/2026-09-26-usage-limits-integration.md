@@ -1,6 +1,6 @@
 # Usage & Limits Integration Implementation Plan
 
-> **Status:** In progress as of 2026-09-27. Tasks 1 and 2 are done: LLM/embedding usage, the media `Usage`/`UsageReporter` pipeline, and `LastUsage` on the ElevenLabs, Gemini TTS, Whisper, ComfyUI/A1111 image, and Imagen clients. Tasks 3 (service records usage with cost), 4 (rate-limit blocks and funds failures), 5 (usage API), and 6 (Usage UI) remain. Branch: `feat/usage-limits-provider-usage`.
+> **Status:** In progress as of 2026-09-27. Tasks 1, 2, and 3 are done: LLM/embedding/media provider usage, and the service's `RecordUsage` sink with pricing, wired through a per-turn `harness.UsageContext` for the GM/extractor and TTS. Deferred within Task 3: image and transcription calls are not yet recorded, because `generateImage` is not campaign-scoped; thread a gameID through it when Tasks 5's routes need per-campaign image spend. Task 4 (rate-limit blocks and funds failures), Task 5 (usage API), and Task 6 (Usage UI) remain. Branch: `feat/usage-limits-recording`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
