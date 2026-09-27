@@ -15,6 +15,7 @@ import (
 type engineInstruments struct {
 	turnDuration     otelmetric.Float64Histogram
 	turnCompleted    otelmetric.Int64Counter
+	turnTTFT         otelmetric.Float64Histogram
 	providerDuration otelmetric.Float64Histogram
 	providerErrors   otelmetric.Int64Counter
 	toolDuration     otelmetric.Float64Histogram
@@ -38,6 +39,7 @@ func engineMetrics() engineInstruments {
 	instruments = engineInstruments{
 		turnDuration:     telemetry.Float64Histogram(meter, "localrpg.turn.duration", "ms", "Wall-clock duration of one turn."),
 		turnCompleted:    telemetry.Int64Counter(meter, "localrpg.turn.completed", "1", "Turns that completed."),
+		turnTTFT:         telemetry.Float64Histogram(meter, "localrpg.turn.ttft", "ms", "Time to the first streamed chunk of a turn."),
 		providerDuration: telemetry.Float64Histogram(meter, "localrpg.provider.request.duration", "ms", "Duration of one provider round."),
 		providerErrors:   telemetry.Int64Counter(meter, "localrpg.provider.errors", "1", "Provider rounds that failed."),
 		toolDuration:     telemetry.Float64Histogram(meter, "localrpg.tool.call.duration", "ms", "Duration of one tool call."),

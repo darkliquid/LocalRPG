@@ -29,6 +29,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/tools"
 	"github.com/darkliquid/localrpg/pkg/trace"
 	"gopkg.in/yaml.v3"
@@ -1200,6 +1201,9 @@ func (s *Service) GetRecap(ctx context.Context, gameID string) (*RecapDTO, error
 // failure this codebase has already produced twice.
 func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	s.ensureIndexed(gameID)
+
+	_, prepareSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/gui").Start(context.Background(), "turn.prepare")
+	defer prepareSpan.End()
 
 	gameDir := s.resolver.GameDir(gameID)
 	manifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
