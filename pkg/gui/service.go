@@ -456,6 +456,11 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		}
 	}
 
+	var systemManifest *core.SystemManifest
+	if sm, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(gameManifest.SystemID), "system.yaml")); err == nil {
+		systemManifest = sm
+	}
+
 	return &GameStateDTO{
 		GameID:   gameID,
 		GameName: gameManifest.Name,
@@ -474,6 +479,8 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		NarratorVoice: narratorVoice,
 		StartLocation: startLocation,
 		BannerURL:     bannerURL,
+
+		MechanicsEngagement: engine.ResolveEngagement(gameManifest, systemManifest, s.configMgr.Get()),
 	}, nil
 }
 

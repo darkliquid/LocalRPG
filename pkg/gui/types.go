@@ -48,6 +48,8 @@ type GameStateDTO struct {
 	NarratorVoice string            `json:"narrator_voice,omitempty"`
 	StartLocation string            `json:"start_location,omitempty"`
 	BannerURL     string            `json:"banner_url,omitempty"`
+	// MechanicsEngagement is the resolved policy in force: off, auto, or ask.
+	MechanicsEngagement string `json:"mechanics_engagement,omitempty"`
 }
 
 type SegmentDTO struct {

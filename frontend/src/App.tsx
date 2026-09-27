@@ -5,6 +5,7 @@ import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { TurnAudioState, segmentAudioKey } from './components/TurnSegments';
 import { ActionConsole } from './components/ActionConsole';
+import { MechanicsStrip } from './components/MechanicsStrip';
 import { Drawers } from './components/Drawers';
 import { CharacterSheetDrawer } from './components/CharacterSheetDrawer';
 import { GraphDrawer } from './components/GraphDrawer';
@@ -202,7 +203,7 @@ export const App: React.FC = () => {
   const [turnError, setTurnError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const handleActionSubmit = async (mode: string, text: string) => {
+  const handleActionSubmit = async (mode: string, text: string, pendingCheckRef?: string) => {
     if (!client || !activeGameID || turnInFlight) return;
 
     setTurnInFlight(true);
@@ -217,7 +218,7 @@ export const App: React.FC = () => {
     try {
       await APIClient.streamTurn(
         activeGameID,
-        { mode, input: text },
+        { mode, input: text, pending_check_ref: pendingCheckRef },
         (event) => {
           if (event.type === 'chunk') {
             setToolActivity(null);
@@ -454,6 +455,10 @@ export const App: React.FC = () => {
   // Find latest scene image for full-window atmospheric background, falling back to campaign banner
   const activeBgImage = chronicle.slice().reverse().find((t) => t.image_url)?.image_url || gameState?.banner_url;
 
+  // A pending check the GM proposed under the ask policy, awaiting the player's roll.
+  const pendingCheck = chronicle.length > 0 ? chronicle[chronicle.length - 1].pending_check : undefined;
+  const lastTurnChecks = chronicle.length > 0 ? chronicle[chronicle.length - 1].checks ?? [] : [];
+
   return (
     <div className="relative flex flex-col h-screen overflow-hidden text-stone-200">
       {/* Full-window atmospheric background layer */}
@@ -496,6 +501,11 @@ export const App: React.FC = () => {
                 <h1 className="font-sans text-base md:text-lg font-bold text-white tracking-tight">
                   {gameState?.game_name || activeGameID}
                 </h1>
+                {gameState?.mechanics_engagement && (
+                  <span className="text-xs font-sans uppercase tracking-wider px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.05] text-stone-400">
+                    mechanics: {gameState.mechanics_engagement}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -648,6 +658,28 @@ export const App: React.FC = () => {
               )}
               {toolActivity && (
                 <div className="text-xs font-mono text-purple-400/80 px-4 pb-1">{toolActivity}</div>
+              )}
+              <MechanicsStrip
+                engagement={gameState?.mechanics_engagement}
+                checks={lastTurnChecks.length}
+                outcome={lastTurnChecks[lastTurnChecks.length - 1]?.outcome}
+              />
+              {pendingCheck && (
+                <div className="mx-4 mb-2 rounded-xl border border-purple-500/40 bg-purple-950/30 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-sans font-bold uppercase tracking-wider text-purple-300">Roll required</div>
+                    <div className="text-xs font-sans text-stone-300 truncate">
+                      {pendingCheck.request?.stakes || pendingCheck.request?.check_kind || 'The GM has called for a check.'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleActionSubmit('Roll', '', pendingCheck.ref)}
+                    disabled={turnInFlight}
+                    className="shrink-0 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-sans font-bold cursor-pointer"
+                  >
+                    Roll
+                  </button>
+                </div>
               )}
               <ActionConsole
                 onSubmit={handleActionSubmit}
