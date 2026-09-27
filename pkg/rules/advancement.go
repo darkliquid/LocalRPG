@@ -141,6 +141,20 @@ func ApplyUnlock(bridge GameHostAPI, spec *core.AdvancementSpec, unlock core.Unl
 	return nil
 }
 
+// ApplyEffects applies a list of unlock or level effects to the player. sourceID
+// names the unlock or level an effect came from, for hooks.
+func ApplyEffects(bridge GameHostAPI, playerID string, effects []core.EffectSpec, sourceID string) error {
+	if bridge == nil {
+		return fmt.Errorf("apply effects: no host bridge")
+	}
+	for _, effect := range effects {
+		if err := applyEffect(bridge, playerID, effect, sourceID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func applyEffect(bridge GameHostAPI, playerID string, effect core.EffectSpec, unlockID string) error {
 	switch effect.Type {
 	case "stat_increase":

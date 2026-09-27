@@ -104,6 +104,7 @@ type TurnOrchestrator struct {
 	toolExecutor     ToolExecutor
 	checkResolver    harness.CheckResolver
 	declaredStats    map[string]core.StatSpec
+	mechanics        *core.MechanicsSpec
 	allowFreeform    bool
 	toolCapability   string
 	toolRounds       int
@@ -160,6 +161,12 @@ func (o *TurnOrchestrator) SetCheckResolver(resolver harness.CheckResolver) {
 // state changes. Nil means the system declares no stats.
 func (o *TurnOrchestrator) SetDeclaredStats(stats map[string]core.StatSpec) {
 	o.declaredStats = stats
+}
+
+// SetMechanics hands the orchestrator the system's full mechanics schema, so it
+// can earn advancement and check thresholds after a turn. Nil disables it.
+func (o *TurnOrchestrator) SetMechanics(spec *core.MechanicsSpec) {
+	o.mechanics = spec
 }
 
 // SetAllowFreeformState permits state changes to undeclared paths even when the
@@ -420,6 +427,7 @@ func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, world
 			if manifest, err := core.LoadSystemManifest(filepath.Join(sysDir, "system.yaml")); err == nil {
 				spec = manifest.Mechanics
 			}
+			o.mechanics = spec
 			_, scriptErr := os.Stat(filepath.Join(sysDir, "mechanics.js"))
 			if scriptErr == nil || spec != nil {
 				engagement := o.mechanicsEngagement
@@ -999,6 +1007,10 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			return nil, fmt.Errorf("apply state changes: %w", err)
 		}
 	}
+
+	// Earn advancement after the turn's own state changes, so the award is part
+	// of the same record and a threshold level sees the final values.
+	o.applyAdvancement(ctx, &turn)
 
 	if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)

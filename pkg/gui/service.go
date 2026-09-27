@@ -1277,6 +1277,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		}
 		orchestrator.SetDeclaredStats(stats)
 		orchestrator.SetAllowFreeformState(sm.Mechanics.AllowFreeformState)
+		orchestrator.SetMechanics(sm.Mechanics)
 	}
 	orchestrator.SetMechanicsEngagement(engine.ResolveEngagement(manifest, sm, cfg))
 	orchestrator.SetMechanicsCadence(cfg.MechanicsCadenceTurns())
