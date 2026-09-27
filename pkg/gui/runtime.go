@@ -97,3 +97,36 @@ func (s *Service) runtimeFor(gameID string, manifest *core.GameManifest) (*turnR
 	s.runtime, s.runtimeKey, s.runtimeGame = runtime, key, gameID
 	return runtime, nil
 }
+
+// cachedHistory returns the parsed timeline, re-reading history.jsonl only when
+// its size or mtime changed. The log stays canonical; this is a read-through.
+func (s *Service) cachedHistory(gameID string) ([]engine.Turn, error) {
+	path := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	s.historyMu.Lock()
+	defer s.historyMu.Unlock()
+	if s.historyCache == nil {
+		s.historyCache = map[string][]engine.Turn{}
+		s.historySize = map[string]int64{}
+		s.historyMtime = map[string]int64{}
+	}
+	if turns, ok := s.historyCache[gameID]; ok && s.historySize[gameID] == info.Size() && s.historyMtime[gameID] == info.ModTime().UnixNano() {
+		return turns, nil
+	}
+
+	turns, err := engine.NewHistoryLogger(path).LoadHistory()
+	if err != nil {
+		return nil, fmt.Errorf("load history: %w", err)
+	}
+	s.historyCache[gameID] = turns
+	s.historySize[gameID] = info.Size()
+	s.historyMtime[gameID] = info.ModTime().UnixNano()
+	return turns, nil
+}

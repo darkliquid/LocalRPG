@@ -75,6 +75,12 @@ type Service struct {
 	runtime     *turnRuntime
 	runtimeKey  runtimeKey
 	runtimeGame string
+	// The canonical timeline is re-read only when history.jsonl changes size or
+	// mtime, so serving one beat's audio does not re-parse the whole log.
+	historyMu    sync.Mutex
+	historyCache map[string][]engine.Turn
+	historySize  map[string]int64
+	historyMtime map[string]int64
 }
 
 // Config returns the configuration the service is running with, so a command can
@@ -1727,8 +1733,7 @@ func tailLines(path string, want int) ([]string, error) {
 // GetSegmentAudio synthesizes one segment on demand and returns the cached clip,
 // reusing it for every later request.
 func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber, segmentIndex int, force ...bool) (string, error) {
-	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
-	turns, err := engine.NewHistoryLogger(historyPath).LoadHistory()
+	turns, err := s.cachedHistory(gameID)
 	if err != nil {
 		return "", fmt.Errorf("load history: %w", err)
 	}
@@ -1851,8 +1856,7 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 		return 0, 0, fmt.Errorf("build tts client: %w", err)
 	}
 
-	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
-	turns, err := engine.NewHistoryLogger(historyPath).LoadHistory()
+	turns, err := s.cachedHistory(gameID)
 	if err != nil {
 		return 0, 0, fmt.Errorf("load history: %w", err)
 	}
@@ -1876,8 +1880,7 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 
 // findTurn reads one turn from the canonical log.
 func (s *Service) findTurn(gameID string, turnNumber int) (*engine.Turn, error) {
-	historyPath := filepath.Join(s.resolver.GameDir(gameID), "history.jsonl")
-	turns, err := engine.NewHistoryLogger(historyPath).LoadHistory()
+	turns, err := s.cachedHistory(gameID)
 	if err != nil {
 		return nil, fmt.Errorf("load history: %w", err)
 	}
