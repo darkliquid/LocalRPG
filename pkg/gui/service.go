@@ -1245,6 +1245,11 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	}
 	router := runtime.router
 
+	// One usage context per turn stamps every provider call the turn makes with
+	// the campaign and turn number, including a concurrent extraction.
+	usageCtx := harness.NewUsageContext(s, gameID)
+	router.SetUsageRecorder(usageCtx)
+
 	jsEngine := rules.NewJSEngine(rules.NewHostBridge(store, timeline, playerID))
 
 	// The VM is rebuilt every turn, so its hooks must be re-registered every
@@ -1267,7 +1272,12 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator := engine.NewTurnOrchestrator(store, timeline, jsEngine, router, startLocation, playerID)
 	orchestrator.SetLogger(logger)
 	orchestrator.SetChronicler(chronicler)
-	orchestrator.SetExtractor(harness.ExtractorFromConfigWithLogger(cfg, router, logger))
+	orchestrator.SetUsageContext(usageCtx)
+	extractor := harness.ExtractorFromConfigWithLogger(cfg, router, logger)
+	if extractor != nil {
+		extractor.SetUsageRecorder(usageCtx)
+	}
+	orchestrator.SetExtractor(extractor)
 	orchestrator.SetCompletionProvider(harness.CompletionFromConfig(cfg, router, logger))
 	orchestrator.SetCompletionPolicy(engine.CompletionPolicy{
 		Mode:        cfg.CompletionMode(),
@@ -1764,7 +1774,23 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 		return "", err
 	}
 	isForce := len(force) > 0 && force[0]
-	return pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
+	path, err := pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
+	if err != nil {
+		return "", err
+	}
+	// A cache hit reports nothing, so only a real synthesis is recorded.
+	if u := pipeline.LastUsage(); u.Characters != 0 || u.InputTokens != 0 || u.OutputTokens != 0 || u.Requests != 0 {
+		s.RecordUsage(gameID, turnNumber, "tts", harness.Usage{
+			Provider:     media.ProviderKey(cfg.Media.TTS),
+			Model:        cfg.Media.TTS.Model,
+			InputTokens:  u.InputTokens,
+			OutputTokens: u.OutputTokens,
+			Characters:   u.Characters,
+			Requests:     u.Requests,
+			Estimated:    u.Estimated,
+		})
+	}
+	return path, nil
 }
 
 // audioPipeline returns the shared TTS pipeline, building it when the current
