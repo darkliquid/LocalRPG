@@ -117,6 +117,8 @@ func writeGameError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrTurnInFlight):
 		w.Header().Set("Retry-After", "1")
 		http.Error(w, err.Error(), http.StatusConflict)
+	case errors.Is(err, ErrAdvancementRefused):
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, fs.ErrNotExist), errors.Is(err, os.ErrNotExist):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	default:
@@ -342,6 +344,26 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, chronicle)
+
+	case "advance":
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			UnlockID string `json:"unlock_id"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64*1024)).Decode(&req); err != nil {
+			writeInvalidRequest(w, "invalid request body")
+			return
+		}
+		advancement, err := s.service.AdvanceUnlock(r.Context(), gameID, req.UnlockID)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, map[string]interface{}{"advancement": advancement})
+		return
 
 	case "turn":
 		// POST /api/game/{id}/turn submits a turn. GET

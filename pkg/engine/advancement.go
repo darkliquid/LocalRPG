@@ -12,8 +12,8 @@ import (
 // Engine-owned stats that track advancement bookkeeping. They ride the entity's
 // state so the existing sheet shows them without a new frontmatter section.
 const (
-	advancementLevelStat   = "advancement_level"
-	advancementPendingStat = "advancement_pending"
+	AdvancementLevelStat   = "advancement_level"
+	AdvancementPendingStat = "advancement_pending"
 )
 
 // applyAdvancement awards the currency a turn earned, then advances the track or
@@ -76,7 +76,7 @@ func (o *TurnOrchestrator) currencyValue(bridge rules.GameHostAPI, spec *core.Ad
 // applyThreshold applies every level the value has crossed that has not been
 // applied yet, remembering the highest applied threshold on the entity.
 func (o *TurnOrchestrator) applyThreshold(turn *Turn, bridge rules.GameHostAPI, spec *core.AdvancementSpec, value int) {
-	applied := o.stateInt(bridge, advancementLevelStat)
+	applied := o.stateInt(bridge, AdvancementLevelStat)
 	for _, level := range spec.Levels {
 		if level.At <= applied || value < level.At {
 			continue
@@ -88,7 +88,7 @@ func (o *TurnOrchestrator) applyThreshold(turn *Turn, bridge rules.GameHostAPI, 
 			})
 			continue
 		}
-		if err := bridge.SetStat(o.playerID, advancementLevelStat, level.At); err != nil {
+		if err := bridge.SetStat(o.playerID, AdvancementLevelStat, level.At); err != nil {
 			o.logger.Event("advancement.threshold_error", map[string]interface{}{"error": err.Error()})
 			continue
 		}
@@ -116,7 +116,7 @@ func (o *TurnOrchestrator) tickTrack(turn *Turn, bridge rules.GameHostAPI, spec 
 			return
 		}
 		value -= spec.TrackSize
-		if err := bridge.SetStat(o.playerID, advancementPendingStat, 1); err != nil {
+		if err := bridge.SetStat(o.playerID, AdvancementPendingStat, 1); err != nil {
 			o.logger.Event("advancement.track_error", map[string]interface{}{"error": err.Error()})
 			return
 		}

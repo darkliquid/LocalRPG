@@ -481,6 +481,7 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		BannerURL:     bannerURL,
 
 		MechanicsEngagement: engine.ResolveEngagement(gameManifest, systemManifest, s.configMgr.Get()),
+		Advancement:         s.computeAdvancement(gameID, systemManifest),
 	}, nil
 }
 
