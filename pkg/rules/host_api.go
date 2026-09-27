@@ -164,6 +164,10 @@ func (h *DefaultHostBridge) GetLogs() []string {
 	return h.logs
 }
 
+// PlayerID is the entity ID the bridge treats as the player, so script
+// bindings that award or spend the advancement currency know who to credit.
+func (h *DefaultHostBridge) PlayerID() string { return h.playerID }
+
 // SetManifest gives the bridge the system's declarative mechanics schema, so
 // scripts can read it through ListStats/ListSkills/CheckConventions.
 func (h *DefaultHostBridge) SetManifest(manifest *core.SystemManifest) {

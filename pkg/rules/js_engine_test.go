@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
@@ -103,5 +104,23 @@ func TestExecuteActionReadsTheOutcomeLabel(t *testing.T) {
 	}
 	if truce.Outcome != "uneasy_truce" || truce.Success {
 		t.Errorf("expected the label with success false, got %+v", truce)
+	}
+}
+
+func TestGrantXPAwardsTheCurrency(t *testing.T) {
+	store := newRulesTestStore(t)
+	bridge := NewHostBridge(store, nil, "player")
+	engine := NewJSEngine(bridge)
+	engine.SetManifest(&core.SystemManifest{
+		ID: "sys",
+		Mechanics: &core.MechanicsSpec{
+			Advancement: &core.AdvancementSpec{Currency: core.CurrencySpec{Stat: "xp"}},
+		},
+	})
+	if err := engine.LoadScript(`grantXP(3);`); err != nil {
+		t.Fatalf("LoadScript: %v", err)
+	}
+	if got, _ := bridge.GetStat("player", "xp"); mustInt(t, got) != 3 {
+		t.Fatalf("xp = %v, want 3", got)
 	}
 }
