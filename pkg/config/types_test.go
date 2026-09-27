@@ -497,3 +497,18 @@ func TestDefaultPathsAreEmptySoResolutionSuppliesThem(t *testing.T) {
 		t.Fatalf("default paths = %+v, want empty", paths)
 	}
 }
+
+func TestMechanicsEngagementDefaults(t *testing.T) {
+	if got := (&Config{}).MechanicsEngagement(); got != "auto" {
+		t.Errorf("MechanicsEngagement() = %q, want auto", got)
+	}
+	if got := (&Config{Mechanics: MechanicsConfig{Engagement: "ask"}}).MechanicsEngagement(); got != "ask" {
+		t.Errorf("MechanicsEngagement() = %q, want ask", got)
+	}
+	if got := (&Config{Mechanics: MechanicsConfig{Engagement: "banana"}}).MechanicsEngagement(); got != "auto" {
+		t.Errorf("unknown engagement = %q, want auto", got)
+	}
+	if got := (&Config{}).MechanicsCadenceTurns(); got != 3 {
+		t.Errorf("MechanicsCadenceTurns() = %d, want 3", got)
+	}
+}

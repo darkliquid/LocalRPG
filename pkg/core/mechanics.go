@@ -11,6 +11,9 @@ type MechanicsSpec struct {
 	// AllowFreeformState permits state changes to undeclared paths even when the
 	// system declares stats.
 	AllowFreeformState bool `yaml:"allow_freeform_state,omitempty"`
+	// Engagement is the system's default mechanics policy: "off", "auto", or
+	// "ask". Empty means the configured default.
+	Engagement string `yaml:"engagement,omitempty"`
 }
 
 // StatSpec declares one stat.
