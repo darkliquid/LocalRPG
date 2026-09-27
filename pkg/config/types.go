@@ -231,6 +231,22 @@ type TelemetryConfig struct {
 // ProvidersConfig groups shared credentials and defaults for external ecosystem providers.
 type ProvidersConfig struct {
 	Gemini GeminiProviderConfig `yaml:"gemini,omitempty" json:"gemini,omitempty"`
+	// Currency is the display currency for cost figures. Prices are expressed in
+	// this currency; no conversion is performed.
+	Currency string `yaml:"currency,omitempty" json:"currency,omitempty"`
+	// Prices override the built-in price table, matched by provider then model.
+	Prices []PriceConfig `yaml:"prices,omitempty" json:"prices,omitempty"`
+}
+
+// PriceConfig is one provider's price. A zero model matches every model of the
+// provider. Values are in micros (1e-6 currency units).
+type PriceConfig struct {
+	Provider         string `yaml:"provider" json:"provider"`
+	Model            string `yaml:"model,omitempty" json:"model,omitempty"`
+	PerMillionInput  int64  `yaml:"per_million_input,omitempty" json:"per_million_input,omitempty"`
+	PerMillionOutput int64  `yaml:"per_million_output,omitempty" json:"per_million_output,omitempty"`
+	PerCharacter     int64  `yaml:"per_character,omitempty" json:"per_character,omitempty"`
+	PerRequest       int64  `yaml:"per_request,omitempty" json:"per_request,omitempty"`
 }
 
 type GeminiProviderConfig struct {
