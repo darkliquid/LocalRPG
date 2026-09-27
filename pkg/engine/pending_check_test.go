@@ -1,0 +1,55 @@
+package engine
+
+import (
+	"context"
+	"testing"
+
+	"github.com/darkliquid/localrpg/pkg/harness"
+)
+
+func TestProposeCheckEndsTheTurnPending(t *testing.T) {
+	provider := &toolScriptProvider{replies: []toolReply{
+		{tools: []harness.ToolCall{{ID: "p1", Name: "propose_check", Arguments: `{"actor":"player","check_kind":"skill","stakes":"the bridge","outcomes":{"pass":"cross","fail":"fall"}}`}}},
+	}}
+	o, _ := toolLoopOrchestrator(t, provider)
+	o.SetMechanicsEngagement("ask")
+	o.SetTools(&fakeExecutor{}, "yes")
+
+	turn, err := o.ProcessActionStream(context.Background(), "Do", "cross the rope bridge", nil)
+	if err != nil {
+		t.Fatalf("turn: %v", err)
+	}
+	if turn.PendingCheck == nil || turn.PendingCheck.Ref != "p1" {
+		t.Fatalf("expected a pending check, got %+v", turn.PendingCheck)
+	}
+}
+
+func TestRollingAPendingCheckResolvesAndContinues(t *testing.T) {
+	provider := &toolScriptProvider{replies: []toolReply{
+		{tools: []harness.ToolCall{{ID: "s1", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"automatic","reason":"rolled"},"segments":[{"kind":"narration","text":"You cross the bridge."}]}`}}},
+	}}
+	o, timeline := toolLoopOrchestrator(t, provider)
+	o.SetMechanicsEngagement("ask")
+	o.SetTools(&fakeExecutor{}, "yes")
+
+	pending := &harness.PendingCheck{
+		Ref:        "p1",
+		ProposedBy: "gm",
+		Request:    harness.CheckRequest{Actor: "player", CheckKind: "skill", Stakes: "the bridge"},
+	}
+	if err := timeline.history.AppendTurn(Turn{Number: 1, Mode: "Do", PendingCheck: pending}); err != nil {
+		t.Fatal(err)
+	}
+	o.SetPendingCheckRef("p1")
+
+	turn, err := o.ProcessActionStream(context.Background(), "Roll", "roll", nil)
+	if err != nil {
+		t.Fatalf("turn: %v", err)
+	}
+	if len(turn.Checks) != 1 {
+		t.Fatalf("expected the pending check resolved, got %+v", turn.Checks)
+	}
+	if turn.PendingCheck != nil {
+		t.Fatalf("the continuation must not be pending: %+v", turn.PendingCheck)
+	}
+}

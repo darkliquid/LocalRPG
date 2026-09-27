@@ -365,3 +365,14 @@ func TestStreamIncludesProviderBodyInError(t *testing.T) {
 		t.Fatalf("error %q does not include the provider body", err.Error())
 	}
 }
+
+func TestToolChoiceRequiredMarshals(t *testing.T) {
+	payload := openAIChatRequest{Model: "m", Stream: true, ToolChoice: "required"}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"tool_choice":"required"`) {
+		t.Fatalf("body omitted tool_choice: %s", data)
+	}
+}

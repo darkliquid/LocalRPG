@@ -86,6 +86,10 @@ type GenerateRequest struct {
 	// accept a single string.
 	Messages []Message  `json:"messages,omitempty"`
 	Tools    []ToolSpec `json:"tools,omitempty"`
+	// ToolChoice asks the provider to force a tool call: "required" forces at
+	// least one, "none" forbids them, and "" leaves it to the model. Providers
+	// that cannot force tool use ignore it.
+	ToolChoice string `json:"tool_choice,omitempty"`
 }
 
 // PromptText is the request as a single string: the explicit Prompt when a caller

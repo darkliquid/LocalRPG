@@ -90,7 +90,8 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
 
   // Merge checks into the segment stream so a roll renders immediately before the
-  // line it produced; any check the GM did not attach renders after the prose.
+  // line it produced. A check the GM did not attach leads the prose instead of
+  // trailing it, so cause reads before effect.
   const checkByID = new Map((checks ?? []).map((check) => [check.check_id, check]));
   const usedChecks = new Set<string>();
   const stream: Array<{ segment?: TurnSegment; check?: TurnCheck; index?: number }> = [];
@@ -104,8 +105,9 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
     }
     stream.push({ segment, index });
   });
-  for (const check of checks ?? []) {
-    if (!usedChecks.has(check.check_id)) stream.push({ check });
+  const unattached = (checks ?? []).filter((check) => !usedChecks.has(check.check_id));
+  if (unattached.length > 0) {
+    stream.unshift(...unattached.map((check) => ({ check })));
   }
 
   return (

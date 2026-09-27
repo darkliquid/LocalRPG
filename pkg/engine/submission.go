@@ -97,13 +97,23 @@ func (e *submissionError) Error() string {
 // validateSubmission audits a structured turn against the checks it resolved.
 // declaredStats is the mechanics schema's declared stats (nil when the system
 // declares none, in which case any state path is allowed). proposed is the
-// player's explicit roll, when this turn had one.
-func validateSubmission(sub *harness.TurnSubmission, checks []harness.CheckResult, declaredStats map[string]core.StatSpec, proposed *harness.ProposedCheck) error {
+// player's explicit roll, when this turn had one. engagement is the resolved
+// mechanics policy, which decides whether resolved checks are allowed at all.
+func validateSubmission(sub *harness.TurnSubmission, checks []harness.CheckResult, declaredStats map[string]core.StatSpec, proposed *harness.ProposedCheck, engagement string) error {
 	if sub == nil {
 		return &submissionError{Code: "no_submission", Detail: "empty submission"}
 	}
 	if len(sub.Segments) == 0 {
 		return &submissionError{Code: "no_segments", Detail: "submission has no segments"}
+	}
+
+	// The off policy resolves nothing; the ask policy leaves resolution to the
+	// player's roll, so a model-resolved check in either is a protocol error.
+	if engagement == "off" && len(checks) > 0 {
+		return &submissionError{Code: "checks_disabled", Detail: "mechanics are off"}
+	}
+	if engagement == "ask" && len(checks) > 0 {
+		return &submissionError{Code: "check_not_player_rolled", Detail: "checks are resolved by the player's roll"}
 	}
 
 	switch sub.Verdict.Feasibility {

@@ -456,6 +456,11 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		}
 	}
 
+	var systemManifest *core.SystemManifest
+	if sm, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(gameManifest.SystemID), "system.yaml")); err == nil {
+		systemManifest = sm
+	}
+
 	return &GameStateDTO{
 		GameID:   gameID,
 		GameName: gameManifest.Name,
@@ -474,6 +479,8 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		NarratorVoice: narratorVoice,
 		StartLocation: startLocation,
 		BannerURL:     bannerURL,
+
+		MechanicsEngagement: engine.ResolveEngagement(gameManifest, systemManifest, s.configMgr.Get()),
 	}, nil
 }
 
@@ -975,6 +982,7 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		Verdict:         turn.Verdict,
 		Rejected:        turn.Rejected,
 		Checks:          turn.Checks,
+		PendingCheck:    turn.PendingCheck,
 		Segments: segmentDTOs(turn.Segments, gameID, turn.Number, audioAvailable, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
 		}, func(ref string) *entity.VoiceConfig {
@@ -1259,7 +1267,10 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator.SetToolRounds(cfg.ToolRounds())
 
 	// Hand the engine the declared stats so it can validate a state change.
-	if sm, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml")); err == nil && sm.Mechanics != nil {
+	// Hand the engine the declared stats so it can validate a state change, and
+	// the engagement policy so the mechanics instruction reflects it.
+	sm, _ := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml"))
+	if sm != nil && sm.Mechanics != nil {
 		stats := make(map[string]core.StatSpec, len(sm.Mechanics.Stats))
 		for _, stat := range sm.Mechanics.Stats {
 			stats[stat.ID] = stat
@@ -1267,6 +1278,8 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		orchestrator.SetDeclaredStats(stats)
 		orchestrator.SetAllowFreeformState(sm.Mechanics.AllowFreeformState)
 	}
+	orchestrator.SetMechanicsEngagement(engine.ResolveEngagement(manifest, sm, cfg))
+	orchestrator.SetMechanicsCadence(cfg.MechanicsCadenceTurns())
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
@@ -1318,6 +1331,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		_ = emit(toolEvent(activity))
 	})
 
+	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)
 	turn, err := t.orchestrator.ProcessActionStream(runCtx, req.Mode, req.Input, func(text string) error {
 		return emit(TurnEvent{Type: "chunk", Text: text})
 	})

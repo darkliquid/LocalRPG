@@ -48,6 +48,8 @@ type GameStateDTO struct {
 	NarratorVoice string            `json:"narrator_voice,omitempty"`
 	StartLocation string            `json:"start_location,omitempty"`
 	BannerURL     string            `json:"banner_url,omitempty"`
+	// MechanicsEngagement is the resolved policy in force: off, auto, or ask.
+	MechanicsEngagement string `json:"mechanics_engagement,omitempty"`
 }
 
 type SegmentDTO struct {
@@ -87,6 +89,8 @@ type TurnDTO struct {
 	Verdict  *harness.ActionVerdict `json:"verdict,omitempty"`
 	Rejected bool                   `json:"rejected,omitempty"`
 	Checks   []harness.CheckResult  `json:"checks,omitempty"`
+	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
+	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
 }
 
 // ToolCallDTO is one tool a turn called, with only its name and result size: the
@@ -398,6 +402,9 @@ type ProviderCatalogDTO struct {
 type TurnRequest struct {
 	Mode  string `json:"mode"`
 	Input string `json:"input"`
+	// PendingCheckRef continues a turn whose GM proposed a check (ask policy):
+	// the engine resolves it and adjudicates the result.
+	PendingCheckRef string `json:"pending_check_ref,omitempty"`
 }
 
 // TurnEvent is one NDJSON line sent while a turn runs.

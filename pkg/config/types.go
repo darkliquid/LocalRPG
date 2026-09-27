@@ -264,6 +264,38 @@ type Config struct {
 	Embeddings  EmbeddingsConfig  `yaml:"embeddings,omitempty" json:"embeddings,omitempty"`
 	Preferences PreferencesConfig `yaml:"preferences" json:"preferences"`
 	Telemetry   TelemetryConfig   `yaml:"telemetry,omitempty" json:"telemetry,omitempty"`
+	Mechanics   MechanicsConfig   `yaml:"mechanics,omitempty" json:"mechanics,omitempty"`
+}
+
+// MechanicsConfig tunes how mechanics are engaged during play.
+type MechanicsConfig struct {
+	// Engagement is "off", "auto", or "ask". Empty means auto.
+	Engagement string `yaml:"engagement,omitempty" json:"engagement,omitempty"`
+	// CadenceTurns forces a check after this many turns without one. Unset (0)
+	// uses the default; a negative value disables the floor.
+	CadenceTurns int `yaml:"cadence_turns,omitempty" json:"cadence_turns,omitempty"`
+}
+
+// MechanicsEngagement is the configured policy, defaulting to "auto".
+func (c *Config) MechanicsEngagement() string {
+	switch mode := strings.ToLower(strings.TrimSpace(c.Mechanics.Engagement)); mode {
+	case "off", "auto", "ask":
+		return mode
+	default:
+		return "auto"
+	}
+}
+
+// MechanicsCadenceTurns is how many turns without a check force one; a negative
+// value disables the floor.
+func (c *Config) MechanicsCadenceTurns() int {
+	if c.Mechanics.CadenceTurns < 0 {
+		return 0
+	}
+	if c.Mechanics.CadenceTurns == 0 {
+		return 3
+	}
+	return c.Mechanics.CadenceTurns
 }
 
 func DefaultConfig() *Config {

@@ -86,6 +86,7 @@ type openAIChatRequest struct {
 	MaxTokens   int              `json:"max_tokens,omitempty"`
 	Stop        []string         `json:"stop,omitempty"`
 	Tools       []openAIToolSpec `json:"tools,omitempty"`
+	ToolChoice  string           `json:"tool_choice,omitempty"`
 }
 
 type openAIToolSpec struct {
@@ -225,6 +226,7 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 		MaxTokens:   maxTokens,
 		Stop:        h.opts.Stop,
 		Tools:       tools,
+		ToolChoice:  req.ToolChoice,
 	}
 
 	data, err := json.Marshal(payload)

@@ -107,6 +107,14 @@ type ProposedCheck struct {
 	Description string `json:"description,omitempty"`
 }
 
+// PendingCheck is a check the GM proposed under the ask policy and the player
+// has not yet rolled. It is stored on the turn so a later roll can resolve it.
+type PendingCheck struct {
+	Ref        string       `json:"ref"`
+	Request    CheckRequest `json:"request"`
+	ProposedBy string       `json:"proposed_by,omitempty"`
+}
+
 // TurnSubmission is the terminal payload the GM authors for one turn.
 type TurnSubmission struct {
 	Verdict         ActionVerdict     `json:"action_verdict"`

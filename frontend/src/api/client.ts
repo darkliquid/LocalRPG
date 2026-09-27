@@ -474,7 +474,7 @@ export class APIClient {
   // response produces the same events in the same order.
   static async streamTurn(
     gameID: string,
-    body: { mode: string; input: string },
+    body: { mode: string; input: string; pending_check_ref?: string },
     onEvent: (event: TurnEvent) => void,
     signal?: AbortSignal
   ): Promise<void> {

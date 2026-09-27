@@ -19,6 +19,8 @@ export interface GameState {
   narrator_voice?: string;
   start_location?: string;
   banner_url?: string;
+  // The resolved mechanics policy in force: off, auto, or ask.
+  mechanics_engagement?: 'off' | 'auto' | 'ask';
 }
 
 export interface TurnSegment {
@@ -67,6 +69,12 @@ export interface Turn {
   verdict?: { feasibility: 'automatic' | 'uncertain' | 'impossible'; reason?: string };
   rejected?: boolean;
   checks?: TurnCheck[];
+  // A GM-proposed check awaiting the player's roll (ask policy).
+  pending_check?: {
+    ref: string;
+    proposed_by?: string;
+    request?: { actor?: string; check_kind?: string; stat?: string; stakes?: string; notation?: string };
+  };
 }
 
 export interface TurnCheck {

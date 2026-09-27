@@ -11,7 +11,7 @@ import (
 // runLoopForTest drives the generation loop with a minimal assembled context.
 func runLoopForTest(o *TurnOrchestrator) (streamResult, error) {
 	o.logger = trace.Nop()
-	return o.runGenerationLoop(context.Background(), &harness.AssembleResult{Prompt: "context"}, "", nil, nil)
+	return o.runGenerationLoop(context.Background(), &harness.AssembleResult{Prompt: "context"}, "", nil, nil, "auto", nil)
 }
 
 func TestLoopResolvesCheckThenSubmits(t *testing.T) {
