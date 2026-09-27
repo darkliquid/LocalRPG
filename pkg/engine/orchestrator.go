@@ -73,23 +73,24 @@ func openingDirective(prompt string) string {
 }
 
 type TurnOrchestrator struct {
-	store            *storage.Store
-	timeline         *Timeline
-	rulesEngine      *rules.JSEngine
-	router           *harness.Router
-	startLocation    string
-	playerID         string
-	assembler        *harness.ContextAssembler
-	rulesPrompt      string
-	lorePrompt       string
-	mechanicsPrompt  string
-	extractor        *harness.Extractor
-	chunkTimeout     time.Duration
-	openingPrompt    string
-	logger           trace.Logger
-	chronicler       *Chronicler
-	threadsMax       int
-	continuityChecks *bool
+	store               *storage.Store
+	timeline            *Timeline
+	rulesEngine         *rules.JSEngine
+	router              *harness.Router
+	startLocation       string
+	playerID            string
+	assembler           *harness.ContextAssembler
+	rulesPrompt         string
+	lorePrompt          string
+	mechanicsPrompt     string
+	mechanicsEngagement string
+	extractor           *harness.Extractor
+	chunkTimeout        time.Duration
+	openingPrompt       string
+	logger              trace.Logger
+	chronicler          *Chronicler
+	threadsMax          int
+	continuityChecks    *bool
 	// actionEcho asks the narrator to restate the player's action before resolving
 	// it; on unless SetActionEcho turns it off.
 	actionEcho       bool
@@ -385,6 +386,11 @@ func (o *TurnOrchestrator) previousLocation() string {
 	return ""
 }
 
+// SetMechanicsEngagement selects the policy the mechanics instruction reflects.
+func (o *TurnOrchestrator) SetMechanicsEngagement(engagement string) {
+	o.mechanicsEngagement = engagement
+}
+
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
 	if paths != nil {
 		if systemID != "" {
@@ -400,7 +406,11 @@ func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, world
 			}
 			_, scriptErr := os.Stat(filepath.Join(sysDir, "mechanics.js"))
 			if scriptErr == nil || spec != nil {
-				o.mechanicsPrompt = harness.FormatMechanicsInstructions(spec)
+				engagement := o.mechanicsEngagement
+				if engagement == "" {
+					engagement = "auto"
+				}
+				o.mechanicsPrompt = harness.FormatMechanicsInstructions(spec, engagement)
 			}
 		}
 		if worldID != "" {
@@ -951,7 +961,9 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		return nil, fmt.Errorf("record turn: %w", err)
 	}
 
-	if exec, ok := o.toolExecutor.(interface{ AssignedVoices() map[string]config.VoiceProfile }); ok {
+	if exec, ok := o.toolExecutor.(interface {
+		AssignedVoices() map[string]config.VoiceProfile
+	}); ok {
 		assigned := exec.AssignedVoices()
 		for _, persona := range personae {
 			slugID := entity.Slugify(persona.Name)

@@ -10,7 +10,7 @@ import (
 )
 
 func TestFormatMechanicsInstructions(t *testing.T) {
-	generic := FormatMechanicsInstructions(nil)
+	generic := FormatMechanicsInstructions(nil, "auto")
 	if !strings.Contains(generic, "## RESOLVING UNCERTAINTY") {
 		t.Fatalf("missing header in %q", generic)
 	}
@@ -24,11 +24,28 @@ func TestFormatMechanicsInstructions(t *testing.T) {
 			Outcome:    []string{"strong", "weak", "miss"},
 			Difficulty: []core.DifficultySpec{{ID: "standard", Label: "Standard", Target: 8}},
 		},
-	})
+	}, "auto")
 	for _, want := range []string{"2d6", "strong, weak, miss", "Standard 8"} {
 		if !strings.Contains(declared, want) {
 			t.Errorf("declared instruction missing %q: %q", want, declared)
 		}
+	}
+}
+
+func TestFormatMechanicsInstructionsPerPolicy(t *testing.T) {
+	spec := &core.MechanicsSpec{Checks: core.CheckConventions{Notation: "2d6", Outcome: []string{"strong", "weak", "miss"}}}
+
+	off := FormatMechanicsInstructions(spec, "off")
+	if !strings.Contains(off, "disabled") || strings.Contains(off, "Resolve with request_check") {
+		t.Errorf("off text = %q", off)
+	}
+	auto := FormatMechanicsInstructions(spec, "auto")
+	if !strings.Contains(auto, "request_check") || !strings.Contains(auto, "2d6") {
+		t.Errorf("auto text = %q", auto)
+	}
+	ask := FormatMechanicsInstructions(spec, "ask")
+	if !strings.Contains(ask, "propose_check") || strings.Contains(ask, "Resolve with request_check") {
+		t.Errorf("ask text = %q", ask)
 	}
 }
 

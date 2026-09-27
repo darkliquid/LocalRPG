@@ -1259,7 +1259,10 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator.SetToolRounds(cfg.ToolRounds())
 
 	// Hand the engine the declared stats so it can validate a state change.
-	if sm, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml")); err == nil && sm.Mechanics != nil {
+	// Hand the engine the declared stats so it can validate a state change, and
+	// the engagement policy so the mechanics instruction reflects it.
+	sm, _ := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml"))
+	if sm != nil && sm.Mechanics != nil {
 		stats := make(map[string]core.StatSpec, len(sm.Mechanics.Stats))
 		for _, stat := range sm.Mechanics.Stats {
 			stats[stat.ID] = stat
@@ -1267,6 +1270,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		orchestrator.SetDeclaredStats(stats)
 		orchestrator.SetAllowFreeformState(sm.Mechanics.AllowFreeformState)
 	}
+	orchestrator.SetMechanicsEngagement(engine.ResolveEngagement(manifest, sm, cfg))
 	orchestrator.LoadPrompts(s.resolver, manifest.SystemID, manifest.WorldID)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
