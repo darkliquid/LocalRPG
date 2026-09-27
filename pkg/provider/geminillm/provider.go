@@ -296,6 +296,14 @@ func (g *GeminiProvider) buildGenerateConfig(req harness.GenerateRequest) *genai
 		topP := float32(*g.topP)
 		cfg.TopP = &topP
 	}
+
+	// Forced tool use, for the mechanics cadence floor.
+	switch req.ToolChoice {
+	case "required":
+		cfg.ToolConfig = &genai.ToolConfig{FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingConfigModeAny}}
+	case "none":
+		cfg.ToolConfig = &genai.ToolConfig{FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingConfigModeNone}}
+	}
 	if g.topK != nil {
 		topK := float32(*g.topK)
 		cfg.TopK = &topK
