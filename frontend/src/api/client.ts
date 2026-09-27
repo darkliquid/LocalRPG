@@ -41,6 +41,8 @@ import {
   EntityMemory,
   Usage,
   LimitsDTO,
+  DocArticleSummary,
+  DocArticle,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -659,6 +661,18 @@ export class APIClient {
   static async getLimits(): Promise<LimitsDTO> {
     const res = await fetch('/api/limits');
     if (!res.ok) throw new Error(`getLimits: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async getDocsList(): Promise<DocArticleSummary[]> {
+    const res = await fetch('/api/docs');
+    if (!res.ok) throw new HTTPError(res.status, `getDocsList: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async getDocArticle(id: string): Promise<DocArticle> {
+    const res = await fetch(`/api/docs/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new HTTPError(res.status, `getDocArticle: ${res.statusText}`);
     return res.json();
   }
 

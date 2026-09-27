@@ -831,5 +831,17 @@ export interface LimitsDTO {
   blocks: LimitState[];
 }
 
+export interface DocArticleSummary {
+  id: string;
+  title: string;
+  category: string;
+  order: number;
+  description: string;
+}
+
+export interface DocArticle extends DocArticleSummary {
+  content: string;
+}
+
 
 
