@@ -11,6 +11,8 @@ type StreamChunk struct {
 	Done         bool
 	FinishReason string
 	Error        error
+	// Usage is set on the final chunk by a provider that reports it.
+	Usage *Usage
 }
 
 // Message is one turn of the conversation a tool-capable provider is given.
@@ -106,6 +108,8 @@ type GenerateResponse struct {
 	Text         string `json:"text"`
 	CachedTokens int    `json:"cached_tokens,omitempty"`
 	SessionID    string `json:"session_id,omitempty"`
+	// Usage is set by a provider that reports token usage.
+	Usage *Usage
 }
 
 type ModelProvider interface {

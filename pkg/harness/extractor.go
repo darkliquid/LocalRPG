@@ -42,6 +42,7 @@ type Extractor struct {
 	voiceProfiles []config.VoiceProfile
 	id            string
 	logger        trace.Logger
+	recorder      UsageRecorder
 }
 
 func NewExtractor(model ModelProvider) *Extractor {
@@ -56,6 +57,9 @@ func (e *Extractor) SetLogger(logger trace.Logger) {
 func (e *Extractor) SetVoiceProfiles(profiles []config.VoiceProfile) {
 	e.voiceProfiles = profiles
 }
+
+// SetUsageRecorder installs the sink extraction usage is reported to.
+func (e *Extractor) SetUsageRecorder(rec UsageRecorder) { e.recorder = rec }
 
 func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 	if len(profiles) == 0 || ent == nil || !entity.IsCharacterType(ent.Type) || ent.Voice != nil {
@@ -337,6 +341,9 @@ func (e *Extractor) Extract(ctx context.Context, narrativeOutput string) (*Extra
 	if err != nil {
 		e.logger.Event("provider.error", map[string]interface{}{"role": e.id, "error": err.Error()})
 		return nil, fmt.Errorf("extractor model failed: %w", err)
+	}
+	if res != nil && res.Usage != nil && e.recorder != nil {
+		e.recorder.RecordUsage("extractor", *res.Usage)
 	}
 
 	cleaned := strings.TrimSpace(res.Text)
