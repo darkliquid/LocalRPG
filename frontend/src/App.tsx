@@ -12,9 +12,7 @@ import { GraphDrawer } from './components/GraphDrawer';
 import { CodexDrawer } from './components/CodexDrawer';
 import { LivingWorldDrawer } from './components/LivingWorldDrawer';
 import { ContextDrawer } from './components/ContextDrawer';
-import { StoryTheater } from './components/StoryTheater';
 import { LauncherHub } from './components/LauncherHub';
-import { SettingsStudio } from './components/SettingsStudio';
 import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
@@ -23,9 +21,12 @@ import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, Ale
 import { formatGenerationError } from './lib/generationError';
 import { slugify } from './lib/slug';
 
-// The docs reader and its Markdown pipeline are only needed once the reader is
-// opened, so they load on demand instead of in the first bundle.
+// Everything below the campaign shell is only needed once its overlay is
+// opened, so it loads on demand instead of in the first bundle. The chronicle,
+// its drawers, and the launcher stay eager because they are the first paint.
 const DocsModal = lazy(() => import('./components/DocsModal').then((m) => ({ default: m.DocsModal })));
+const SettingsStudio = lazy(() => import('./components/SettingsStudio').then((m) => ({ default: m.SettingsStudio })));
+const StoryTheater = lazy(() => import('./components/StoryTheater').then((m) => ({ default: m.StoryTheater })));
 
 export const App: React.FC = () => {
   // Always open in the launcher hub view rather than directly entering a campaign.
@@ -897,41 +898,45 @@ export const App: React.FC = () => {
                   </button>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto p-6">
-                  <SettingsStudio
-                    activeGameID={activeGameID ?? undefined}
-                    onOpenDocs={openDocs}
-                    onSaved={() =>
-                      APIClient.getSettings()
-                        .then((res) => setConfig(res.config))
-                        .catch(console.error)
-                    }
-                  />
+                  <Suspense fallback={null}>
+                    <SettingsStudio
+                      activeGameID={activeGameID ?? undefined}
+                      onOpenDocs={openDocs}
+                      onSaved={() =>
+                        APIClient.getSettings()
+                          .then((res) => setConfig(res.config))
+                          .catch(console.error)
+                      }
+                    />
+                  </Suspense>
                 </div>
               </div>
             </div>
           )}
 
           {/* Full-Screen Visual Novel Story Theater */}
-          <StoryTheater
-            turns={chronicle}
-            isOpen={isTheaterOpen}
-            onClose={() => {
-              handleStopAudio();
-              setIsTheaterOpen(false);
-            }}
-            volume={config?.media.tts.master_volume ?? 1}
-            gameId={activeGameID ?? undefined}
-            playerId={gameState?.player?.id}
-            playerName={gameState?.player?.name}
-            campaignImage={gameState?.banner_url}
-            serverPlayback={serverAudio}
-            onPlayAudio={handlePlayTurnAudio}
-            onStopAudio={handleStopAudio}
-            segmentAudioStatus={segmentAudioStatus}
-            onEntityClick={handleOpenWikilink}
-            displayMode={config?.media.tts.speech_cues?.display_mode}
-            limits={limits}
-          />
+          <Suspense fallback={null}>
+            <StoryTheater
+              turns={chronicle}
+              isOpen={isTheaterOpen}
+              onClose={() => {
+                handleStopAudio();
+                setIsTheaterOpen(false);
+              }}
+              volume={config?.media.tts.master_volume ?? 1}
+              gameId={activeGameID ?? undefined}
+              playerId={gameState?.player?.id}
+              playerName={gameState?.player?.name}
+              campaignImage={gameState?.banner_url}
+              serverPlayback={serverAudio}
+              onPlayAudio={handlePlayTurnAudio}
+              onStopAudio={handleStopAudio}
+              segmentAudioStatus={segmentAudioStatus}
+              onEntityClick={handleOpenWikilink}
+              displayMode={config?.media.tts.speech_cues?.display_mode}
+              limits={limits}
+            />
+          </Suspense>
 
           {/* Add Entity Modal */}
           <AddEntityModal

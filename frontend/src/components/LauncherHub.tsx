@@ -8,15 +8,16 @@ import { CampaignGallery } from './launcher/CampaignGallery';
 import { CampaignHeroStage } from './launcher/CampaignHeroStage';
 import { NewCampaignModal } from './launcher/NewCampaignModal';
 import { CampaignSettingsModal } from './launcher/CampaignSettingsModal';
-import { WorldsStudio } from './WorldsStudio';
-import { SystemsStudio } from './SystemsStudio';
-import { SettingsStudio } from './SettingsStudio';
 import { ArrowLeft, X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
 
-// The docs reader loads on demand, so its Markdown pipeline stays out of the
-// launcher's first bundle.
+// The launcher's overlays and the docs reader load on demand, so neither the
+// studios, the settings editor, nor the Markdown pipeline sits in the first
+// bundle.
 const DocsModal = lazy(() => import('./DocsModal').then((m) => ({ default: m.DocsModal })));
+const WorldsStudio = lazy(() => import('./WorldsStudio').then((m) => ({ default: m.WorldsStudio })));
+const SystemsStudio = lazy(() => import('./SystemsStudio').then((m) => ({ default: m.SystemsStudio })));
+const SettingsStudio = lazy(() => import('./SettingsStudio').then((m) => ({ default: m.SettingsStudio })));
 
 export function isWorkingGame(
   game: GameSummary,
@@ -332,7 +333,9 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              <SettingsStudio onSaved={() => setIsSettingsOpen(false)} isCompact={false} />
+              <Suspense fallback={null}>
+                <SettingsStudio onSaved={() => setIsSettingsOpen(false)} isCompact={false} />
+              </Suspense>
             </div>
           </div>
         </div>
