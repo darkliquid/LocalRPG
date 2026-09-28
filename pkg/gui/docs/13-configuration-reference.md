@@ -129,6 +129,7 @@ choose; the ledger and provider identifiers are listed in the
 | `media.tts.speech_cues.markdown_emphasis` | bool |
 | `media.tts.speech_cues.display_mode` | string |
 | `media.tts.opus_bitrate` | int |
+| `media.tts.stream_sentences` | bool |
 | `media.stt.type` | string |
 | `media.stt.builtin_name` | string |
 | `media.stt.command` | string |

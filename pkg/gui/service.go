@@ -1422,8 +1422,19 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	})
 
 	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)
+
+	// Sentences are synthesized while the model is still writing, so a finished
+	// segment whose text is one of them is a cache hit at finalise rather than a
+	// second provider call. Nil when disabled or no provider is configured.
+	streamer := t.service.sentenceStreamerFor(runCtx, t.gameID, t.cfg)
+	defer streamer.Close()
+
 	turn, err := t.orchestrator.ProcessActionStream(runCtx, req.Mode, req.Input, func(text string) error {
-		return emit(TurnEvent{Type: "chunk", Text: text})
+		if emitErr := emit(TurnEvent{Type: "chunk", Text: text}); emitErr != nil {
+			return emitErr
+		}
+		streamer.Feed(text)
+		return nil
 	})
 	if err != nil {
 		t.service.noteFailure("gm", err)

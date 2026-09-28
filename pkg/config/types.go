@@ -161,6 +161,10 @@ type TTSConfig struct {
 	// OpusBitrate is the target bitrate for stored Ogg/Opus clips, in bits per
 	// second. Zero means the default.
 	OpusBitrate int `yaml:"opus_bitrate,omitempty" json:"opus_bitrate,omitempty"`
+	// StreamSentences synthesizes sentences while the model is still generating,
+	// so the first beat is ready sooner. Nil means enabled, except for a provider
+	// the operator has marked metered.
+	StreamSentences *bool `yaml:"stream_sentences,omitempty" json:"stream_sentences,omitempty"`
 }
 
 // SpeechCuesConfig controls how vocal acting and steering hints are used and rendered.
@@ -683,6 +687,16 @@ func (c *Config) OpusBitrate() int {
 	default:
 		return bitrate
 	}
+}
+
+// TTSStreamSentences reports whether sentence-level pre-synthesis is enabled. It
+// defaults on, and off for a provider the operator marked metered, so a metered
+// provider is never charged for a clip a finished segment may not reuse.
+func (c *Config) TTSStreamSentences() bool {
+	if c.Media.TTS.StreamSentences != nil {
+		return *c.Media.TTS.StreamSentences
+	}
+	return !(c.Media.TTS.Metered != nil && *c.Media.TTS.Metered)
 }
 
 // CompletionMode is the recovery policy: "auto", "continue", "trim", or "off".

@@ -50,13 +50,22 @@ batch synthesis of individual sentences, overlapped with generation, is enough.
 
 - During a turn, the first narrator sentence is synthesized before the final
   `turn` event, for a provider that streams text.
-- Every sentence pre-synthesized mid-stream is a cache hit when
-  `SynthesizeSegments` runs at finalize; no duplicate provider call for the same
-  narration text.
+- A final narration segment whose text is a pre-synthesized sentence is a cache
+  hit at finalize, so the common line-per-beat case makes no duplicate provider
+  call.
 - A metered TTS provider does not pre-synthesize unless
   `media.tts.stream_sentences` is explicitly enabled.
 - Clip bytes and cache keys are byte-for-byte identical to the current
   non-streaming result for the same text and voice.
+
+> **Implementation note (2026-09-28):** final TTS remains per turn *segment*, and
+> a segment's text can contain several sentences. The cache-hit criterion holds
+> therefore for a segment that is one sentence, which is the common shape of
+> line-per-beat narration. A multi-sentence segment re-synthesizes and its
+> provisional clips are unused cache entries. Making reuse total requires
+> sentence-scoped clips end to end (a per-segment clip *list*, or concatenation
+> at finalize), which is a larger contract change and is not part of this
+> iteration. This is why the metered default is off.
 
 ## 2. Investigation Findings
 

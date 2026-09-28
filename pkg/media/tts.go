@@ -223,6 +223,17 @@ func (p *TTSPipeline) SynthesizeSegment(ctx context.Context, segment entity.Turn
 	return p.SynthesizeSegmentForce(ctx, segment, narratorVoice, voiceFor, false)
 }
 
+// SynthesizeProvisional renders a sentence of prose before the turn's final
+// segments exist. It builds the same synthetic segment the finaliser will, so it
+// applies the same reduction and writes the same cache entry: when the finished
+// segment's text is that sentence, the final synthesis is a cache hit rather
+// than a second provider call. text that reduces to nothing returns
+// ErrNoSpeakableText.
+func (p *TTSPipeline) SynthesizeProvisional(ctx context.Context, kind, speakerID, text string, voice *entity.VoiceConfig) (string, error) {
+	segment := entity.TurnSegment{Kind: kind, SpeakerID: speakerID, Text: text}
+	return p.SynthesizeSegmentForce(ctx, segment, voice, nil, false)
+}
+
 // SynthesizeSegmentForce renders one segment with optional force cache bypass.
 func (p *TTSPipeline) SynthesizeSegmentForce(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig, force bool) (string, error) {
 	speakerID, voice, spoken := p.prepareSegment(segment, narratorVoice, voiceFor)
