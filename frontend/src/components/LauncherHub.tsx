@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { APIClient } from '../api/client';
 import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types';
 import { LauncherDock } from './launcher/LauncherDock';
@@ -11,9 +11,12 @@ import { CampaignSettingsModal } from './launcher/CampaignSettingsModal';
 import { WorldsStudio } from './WorldsStudio';
 import { SystemsStudio } from './SystemsStudio';
 import { SettingsStudio } from './SettingsStudio';
-import { DocsModal } from './DocsModal';
 import { ArrowLeft, X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
+
+// The docs reader loads on demand, so its Markdown pipeline stays out of the
+// launcher's first bundle.
+const DocsModal = lazy(() => import('./DocsModal').then((m) => ({ default: m.DocsModal })));
 
 export function isWorkingGame(
   game: GameSummary,
@@ -336,7 +339,9 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
       )}
 
       {/* Built-in Help and Documentation Modal */}
-      <DocsModal isOpen={isDocsOpen} onClose={() => setIsDocsOpen(false)} />
+      <Suspense fallback={null}>
+        <DocsModal isOpen={isDocsOpen} onClose={() => setIsDocsOpen(false)} />
+      </Suspense>
     </div>
   );
 };

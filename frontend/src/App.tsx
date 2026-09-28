@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
 import { APIClient, HTTPError, GenerationError } from './api/client';
 import { GameState, Turn, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState } from './types';
 import { ChronicleView } from './components/ChronicleView';
@@ -15,7 +15,6 @@ import { ContextDrawer } from './components/ContextDrawer';
 import { StoryTheater } from './components/StoryTheater';
 import { LauncherHub } from './components/LauncherHub';
 import { SettingsStudio } from './components/SettingsStudio';
-import { DocsModal } from './components/DocsModal';
 import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
@@ -23,6 +22,10 @@ import { LimitChip } from './components/LimitChip';
 import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, AlertTriangle, HelpCircle } from 'lucide-react';
 import { formatGenerationError } from './lib/generationError';
 import { slugify } from './lib/slug';
+
+// The docs reader and its Markdown pipeline are only needed once the reader is
+// opened, so they load on demand instead of in the first bundle.
+const DocsModal = lazy(() => import('./components/DocsModal').then((m) => ({ default: m.DocsModal })));
 
 export const App: React.FC = () => {
   // Always open in the launcher hub view rather than directly entering a campaign.
@@ -965,14 +968,16 @@ export const App: React.FC = () => {
           />
 
           {/* Built-in Help and Documentation Modal */}
-          <DocsModal
-            isOpen={isDocsOpen}
-            initialArticleID={docsArticleID}
-            onClose={() => {
-              setIsDocsOpen(false);
-              setDocsArticleID(undefined);
-            }}
-          />
+          <Suspense fallback={null}>
+            <DocsModal
+              isOpen={isDocsOpen}
+              initialArticleID={docsArticleID}
+              onClose={() => {
+                setIsDocsOpen(false);
+                setDocsArticleID(undefined);
+              }}
+            />
+          </Suspense>
         </>
       )}
       </div>
