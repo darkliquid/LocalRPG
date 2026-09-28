@@ -35,38 +35,38 @@ that key.
 
 | Provider ID | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- |
-| `cli` | cli | `not reported` | `claude-cli`, `llama-cli` |
-| `gemini` | gemini | `gemini` | `gemini-3.8-flash` |
-| `narrative-oracle` | builtin | `not reported` | `narrative-oracle` |
-| `openaichat` | http | `openaichat` | `default`, `gpt-4`, `llama3.2` |
+| `llm:cli` | cli | `not reported` | `claude-cli`, `llama-cli` |
+| `llm:gemini` | gemini | `not reported` | `gemini-3.8-flash` |
+| `llm:narrative-oracle` | builtin | `not reported` | `narrative-oracle` |
+| `llm:openaichat` | http | `not reported` | `default`, `gpt-4`, `llama3.2` |
 
 ## Speech (TTS) providers
 
 | Provider ID | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- |
-| `tts-elevenlabs` | builtin | `builtin:elevenlabs` | `eleven_multilingual_v2` |
-| `tts-gemini` | gemini | `gemini:tts` | `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`, `gemini-3.1-flash-tts-preview`, `gemini-3.8-flash-lite-tts`, `gemini-3.8-flash-tts` |
-| `tts-native-os` | builtin | `builtin:native-os` | `native-os` |
-| `tts-openai-http` | http | `http:localhost:8880` | `alltalk`, `kokoro`, `tts-1` |
-| `tts-piper` | cli | `cli:piper` | `piper` |
-| `tts-sherpa-onnx` | builtin | `builtin:sherpa-onnx` | `sherpa-onnx` |
+| `tts:elevenlabs` | builtin | `tts:elevenlabs` | `eleven_multilingual_v2` |
+| `tts:gemini` | gemini | `tts:gemini` | `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`, `gemini-3.1-flash-tts-preview`, `gemini-3.8-flash-lite-tts`, `gemini-3.8-flash-tts` |
+| `tts:http` | http | `tts:http@localhost:8880` | `alltalk`, `kokoro`, `tts-1` |
+| `tts:native-os` | builtin | `tts:native-os` | `native-os` |
+| `tts:piper` | cli | `tts:piper@piper` | `piper` |
+| `tts:sherpa-onnx` | builtin | `tts:sherpa-onnx` | `sherpa-onnx` |
 
 ## Transcription (STT) providers
 
 | Provider ID | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- |
-| `stt-webspeech` | builtin | `web-speech` | `web-speech` |
-| `stt-whisper-cli` | cli | `cli` | `whisper-cli` |
-| `stt-whisper-http` | http | `http` | `whisper-1` |
+| `stt:web-speech` | builtin | `web-speech` | `web-speech` |
+| `stt:whisper-cli` | cli | `cli` | `whisper-cli` |
+| `stt:whisper-http` | http | `http` | `whisper-1` |
 
 ## Image providers
 
 | Provider ID | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- |
-| `image-cli` | cli | `cli` | `sd-cli` |
-| `image-gemini` | gemini | `gemini` | `gemini-2.5-flash-image`, `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`, `imagen-3.0-fast-generate-001`, `imagen-3.0-generate-002` |
-| `image-http` | http | `http` | `automatic1111`, `comfyui`, `dall-e-3`, `stablediffusion` |
-| `image-procedural-art` | builtin | `procedural-art` | `procedural-art` |
+| `image:cli` | cli | `cli` | `sd-cli` |
+| `image:gemini` | gemini | `gemini` | `gemini-2.5-flash-image`, `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`, `imagen-3.0-fast-generate-001`, `imagen-3.0-generate-002` |
+| `image:http` | http | `http` | `automatic1111`, `comfyui`, `dall-e-3`, `stablediffusion` |
+| `image:procedural-art` | builtin | `procedural-art` | `procedural-art` |
 
 ## Built-in default prices
 

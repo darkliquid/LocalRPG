@@ -22,7 +22,7 @@ func geminiImagePreset(id string, order int, label, description, model string) p
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "image-gemini",
+			ID:          string(provider.KeyImageGemini),
 			Family:      provider.FamilyImage,
 			Label:       "Google Gemini / Imagen (Cloud)",
 			Description: "Imagen and native Gemini image models, with shared-key support.",

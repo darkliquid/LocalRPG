@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "tts-piper",
+			ID:          string(provider.KeyTTSPiper),
 			Family:      provider.FamilyTTS,
 			Label:       "Piper TTS (CLI)",
 			Description: "Fast, lightweight neural TTS via the piper binary.",

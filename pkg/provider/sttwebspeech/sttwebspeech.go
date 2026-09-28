@@ -11,7 +11,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "stt-webspeech",
+			ID:          string(provider.KeySTTWebSpeech),
 			Family:      provider.FamilySTT,
 			Label:       "Web Speech API (Browser Native)",
 			Description: "Real-time in-browser recognition; the backend client is a placeholder.",

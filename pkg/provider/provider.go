@@ -73,14 +73,25 @@ func IDs() []string {
 	return ids
 }
 
-// Validate reports registrations that are malformed.
+// Validate reports registrations that are malformed, not canonical keys, or
+// sharing a family/adapter pair.
 func Validate() error {
 	mu.RLock()
 	defer mu.RUnlock()
+	pairs := map[string]string{}
 	for id, reg := range byID {
 		if id == "" || reg.Descriptor.Family == "" || reg.Build == nil {
 			return fmt.Errorf("provider: malformed registration %q", id)
 		}
+		key, err := ParseKey(id)
+		if err != nil {
+			return fmt.Errorf("provider: registration %q is not a canonical key: %w", id, err)
+		}
+		pair := string(key.Family()) + "/" + key.Adapter()
+		if other, dup := pairs[pair]; dup {
+			return fmt.Errorf("provider: %q and %q share family/adapter %s", other, id, pair)
+		}
+		pairs[pair] = id
 	}
 	return nil
 }

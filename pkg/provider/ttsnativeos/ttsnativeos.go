@@ -10,7 +10,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "tts-native-os",
+			ID:          string(provider.KeyTTSNativeOS),
 			Family:      provider.FamilyTTS,
 			Label:       "Native OS Speech (Built-in)",
 			Description: "Uses spd-say, say, or PowerShell with a procedural fallback.",

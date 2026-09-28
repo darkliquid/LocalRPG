@@ -25,7 +25,7 @@ type Client struct {
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "gemini-embedding",
+			ID:          string(provider.KeyEmbeddingGemini),
 			Family:      provider.FamilyEmbedding,
 			Label:       "Google Gemini Embeddings",
 			Description: "Vector embeddings via Google GenAI embedding API (text-embedding-004)",

@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "image-http",
+			ID:          string(provider.KeyImageHTTP),
 			Family:      provider.FamilyImage,
 			Label:       "Image HTTP Endpoint",
 			Description: "Stable Diffusion WebUI, ComfyUI, or any compatible image endpoint.",

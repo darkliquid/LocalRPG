@@ -2,9 +2,7 @@ package media
 
 import (
 	"context"
-	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
@@ -53,46 +51,28 @@ type MeteredProvider interface {
 	Metered() bool
 }
 
-// ProviderKey derives a stable identifier from a TTS configuration, used for
-// catalog filenames, API parameters, and diagnostics:
-// "builtin:elevenlabs", "builtin:sherpa-onnx", "http:localhost:8880", "cli:piper".
+// ProviderKey derives the canonical instance key from a TTS configuration, used
+// for catalog filenames, voice-profile filtering, API parameters, and
+// diagnostics: "tts:elevenlabs", "tts:sherpa-onnx", "tts:http@localhost:8880",
+// "tts:piper@piper". A disabled provider reports "disabled"; a configuration
+// with no registered adapter (an unnamed builtin or an unknown type) falls back
+// to a stable local name so distinct configurations never share a cache entry.
 func ProviderKey(cfg config.TTSConfig) string {
+	if key, ok := TTSKeyFor(cfg); ok {
+		return string(key)
+	}
 	switch strings.ToLower(strings.TrimSpace(cfg.Type)) {
 	case "", "disabled":
 		return "disabled"
-	case "gemini":
-		return "gemini:tts"
 	case "builtin":
 		name := strings.ToLower(strings.TrimSpace(cfg.BuiltinName))
 		if name == "" {
 			name = "echo"
 		}
 		return "builtin:" + sanitiseKey(name)
-	case "cli":
-		command := strings.ToLower(strings.TrimSpace(cfg.Command))
-		if command == "" {
-			return "cli"
-		}
-		return "cli:" + sanitiseKey(filepath.Base(command))
-	case "http":
-		return "http:" + sanitiseKey(endpointHost(cfg.Endpoint))
 	default:
 		return sanitiseKey(strings.ToLower(strings.TrimSpace(cfg.Type)))
 	}
-}
-
-// endpointHost is the host and port of an endpoint, or the raw value when it does
-// not parse, so an odd URL still names a distinct provider.
-func endpointHost(endpoint string) string {
-	trimmed := strings.TrimSpace(endpoint)
-	if trimmed == "" {
-		return "endpoint"
-	}
-	parsed, err := url.Parse(trimmed)
-	if err != nil || parsed.Host == "" {
-		return strings.TrimPrefix(strings.TrimPrefix(trimmed, "http://"), "https://")
-	}
-	return parsed.Host
 }
 
 // sanitiseKey lowercases and reduces a fragment to characters that are safe in an

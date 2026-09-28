@@ -22,7 +22,7 @@ func geminiPreset(id string, order int, label, description, model string) provid
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "tts-gemini",
+			ID:          string(provider.KeyTTSGemini),
 			Family:      provider.FamilyTTS,
 			Label:       "Google Gemini TTS (Cloud, metered)",
 			Description: "Expressive cloud synthesis with prebuilt and extended voices.",

@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "gemini",
+			ID:          string(provider.KeyLLMGemini),
 			Family:      provider.FamilyLLM,
 			Label:       "Google Gemini",
 			Description: "Cloud model with shared-key support and a live model catalogue.",

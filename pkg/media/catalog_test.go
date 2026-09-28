@@ -14,11 +14,11 @@ func TestProviderKey(t *testing.T) {
 	}{
 		{"disabled", config.TTSConfig{Type: "disabled"}, "disabled"},
 		{"empty", config.TTSConfig{}, "disabled"},
-		{"builtin named", config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs"}, "builtin:elevenlabs"},
-		{"builtin sherpa", config.TTSConfig{Type: "builtin", BuiltinName: "sherpa-onnx"}, "builtin:sherpa-onnx"},
+		{"builtin named", config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs"}, "tts:elevenlabs"},
+		{"builtin sherpa", config.TTSConfig{Type: "builtin", BuiltinName: "sherpa-onnx"}, "tts:sherpa-onnx"},
 		{"builtin unnamed", config.TTSConfig{Type: "builtin"}, "builtin:echo"},
-		{"http host and port", config.TTSConfig{Type: "http", Endpoint: "http://localhost:8880/v1/audio/speech"}, "http:localhost:8880"},
-		{"cli basename", config.TTSConfig{Type: "cli", Command: "/usr/local/bin/piper"}, "cli:piper"},
+		{"http host and port", config.TTSConfig{Type: "http", Endpoint: "http://localhost:8880/v1/audio/speech"}, "tts:http@localhost:8880"},
+		{"cli basename", config.TTSConfig{Type: "cli", Command: "/usr/local/bin/piper"}, "tts:piper@piper"},
 		{"unknown type", config.TTSConfig{Type: "Foo Bar"}, "foo-bar"},
 	}
 	for _, tc := range cases {
@@ -52,13 +52,13 @@ func TestKeyPresent(t *testing.T) {
 func TestGeminiTTSProviderKeyAndKeyPresent(t *testing.T) {
 	// ProviderKey test
 	geminiCfg := config.TTSConfig{Type: "gemini"}
-	if key := ProviderKey(geminiCfg); key != "gemini:tts" {
-		t.Errorf("expected ProviderKey 'gemini:tts', got %q", key)
+	if key := ProviderKey(geminiCfg); key != "tts:gemini" {
+		t.Errorf("expected ProviderKey 'tts:gemini', got %q", key)
 	}
 
 	builtinGeminiCfg := config.TTSConfig{Type: "builtin", BuiltinName: "gemini"}
-	if key := ProviderKey(builtinGeminiCfg); key != "builtin:gemini" {
-		t.Errorf("expected ProviderKey 'builtin:gemini', got %q", key)
+	if key := ProviderKey(builtinGeminiCfg); key != "tts:gemini" {
+		t.Errorf("expected ProviderKey 'tts:gemini', got %q", key)
 	}
 
 	// KeyPresentWithSharedKey test

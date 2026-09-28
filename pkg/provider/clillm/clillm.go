@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "cli",
+			ID:          string(provider.KeyLLMCLI),
 			Family:      provider.FamilyLLM,
 			Label:       "Command Line (CLI)",
 			Description: "Runs a local binary such as llama-cli or claude and reads its output.",

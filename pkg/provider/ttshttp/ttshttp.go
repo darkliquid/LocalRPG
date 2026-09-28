@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "tts-openai-http",
+			ID:          string(provider.KeyTTSHTTP),
 			Family:      provider.FamilyTTS,
 			Label:       "OpenAI-Compatible Speech (HTTP)",
 			Description: "Any OpenAI-compatible speech endpoint, local or cloud.",

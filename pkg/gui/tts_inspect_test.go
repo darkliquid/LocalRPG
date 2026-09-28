@@ -50,7 +50,7 @@ func TestInspectTTSReportsCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InspectTTS: %v", err)
 	}
-	if res.ProviderKey != "http:localhost:8880" {
+	if res.ProviderKey != "tts:http@localhost:8880" {
 		t.Errorf("ProviderKey = %q", res.ProviderKey)
 	}
 	if !res.Metered {

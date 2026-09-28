@@ -37,7 +37,7 @@ type Client struct {
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "openai-embedding",
+			ID:          string(provider.KeyEmbeddingOpenAI),
 			Family:      provider.FamilyEmbedding,
 			Label:       "OpenAI / Ollama Embedding API",
 			Description: "Vector embeddings via standard OpenAI-compatible /v1/embeddings endpoint",

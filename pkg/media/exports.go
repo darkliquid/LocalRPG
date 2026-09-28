@@ -16,29 +16,40 @@ type TTSBuildPayload struct {
 	SharedKey string           `json:"shared_key,omitempty"`
 }
 
-// TTSProviderIDFor maps a TTS configuration to the registry ID a facade should
-// build. An empty result means the configuration has no registry provider.
-func TTSProviderIDFor(cfg config.TTSConfig) string {
+// TTSKeyFor maps a TTS configuration to its canonical key. ok is false when the
+// configuration has no registered adapter.
+func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 	switch cfg.Type {
 	case "gemini":
-		return "tts-gemini"
+		return provider.KeyTTSGemini, true
 	case "builtin":
 		switch cfg.BuiltinName {
 		case "gemini":
-			return "tts-gemini"
+			return provider.KeyTTSGemini, true
 		case "sherpa-onnx", "kokoro":
-			return "tts-sherpa-onnx"
+			return provider.KeyTTSSherpaONNX, true
 		case "native-os":
-			return "tts-native-os"
+			return provider.KeyTTSNativeOS, true
 		case "elevenlabs":
-			return "tts-elevenlabs"
+			return provider.KeyTTSElevenLabs, true
 		}
+		return "", false
 	case "cli":
-		return "tts-piper"
+		return provider.InstanceOrSelf(provider.KeyTTSPiper, provider.CommandDiscriminator(cfg.Command)), true
 	case "http":
-		return "tts-openai-http"
+		return provider.InstanceOrSelf(provider.KeyTTSHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
 	}
-	return ""
+	return "", false
+}
+
+// TTSProviderIDFor maps a TTS configuration to the registry ID a facade should
+// build. It is the adapter half of TTSKeyFor.
+func TTSProviderIDFor(cfg config.TTSConfig) string {
+	key, ok := TTSKeyFor(cfg)
+	if !ok {
+		return ""
+	}
+	return string(key.Parent())
 }
 
 // BuildTTS constructs a TTS client from the registry by ID.
@@ -62,16 +73,26 @@ func BuildTTS(id string, cfg config.TTSConfig, sharedKey string) (TTSClient, err
 	return client, nil
 }
 
-// STTProviderIDFor maps an STT configuration to the registry ID a facade should
-// build.
-func STTProviderIDFor(cfg config.STTConfig) string {
+// STTKeyFor maps an STT configuration to its canonical key. Browser-only values
+// have no key: they never reach the server-side factory.
+func STTKeyFor(cfg config.STTConfig) (provider.Key, bool) {
 	switch cfg.Type {
-	case "cli":
-		return "stt-whisper-cli"
 	case "http":
-		return "stt-whisper-http"
+		return provider.InstanceOrSelf(provider.KeySTTWhisperHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
+	case "cli":
+		return provider.InstanceOrSelf(provider.KeySTTWhisperCLI, provider.CommandDiscriminator(cfg.Command)), true
 	}
-	return ""
+	return "", false
+}
+
+// STTProviderIDFor maps an STT configuration to the registry ID a facade should
+// build. It is the adapter half of STTKeyFor.
+func STTProviderIDFor(cfg config.STTConfig) string {
+	key, ok := STTKeyFor(cfg)
+	if !ok {
+		return ""
+	}
+	return string(key.Parent())
 }
 
 // BuildSTT constructs an STT client from the registry by ID.
@@ -101,22 +122,32 @@ type ImageBuildPayload struct {
 	SharedKey string             `json:"shared_key,omitempty"`
 }
 
-// ImageProviderIDFor maps an image configuration to the registry ID a facade
-// should build.
-func ImageProviderIDFor(cfg config.ImageConfig) string {
+// ImageKeyFor maps an image configuration to its canonical key.
+func ImageKeyFor(cfg config.ImageConfig) (provider.Key, bool) {
 	switch cfg.Type {
 	case "gemini":
-		return "image-gemini"
+		return provider.KeyImageGemini, true
 	case "builtin":
 		if cfg.BuiltinName == "procedural-art" {
-			return "image-procedural-art"
+			return provider.KeyImageProceduralArt, true
 		}
+		return "", false
 	case "cli":
-		return "image-cli"
+		return provider.InstanceOrSelf(provider.KeyImageCLI, provider.CommandDiscriminator(cfg.Command)), true
 	case "comfyui", "http":
-		return "image-http"
+		return provider.InstanceOrSelf(provider.KeyImageHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
 	}
-	return ""
+	return "", false
+}
+
+// ImageProviderIDFor maps an image configuration to the registry ID a facade
+// should build. It is the adapter half of ImageKeyFor.
+func ImageProviderIDFor(cfg config.ImageConfig) string {
+	key, ok := ImageKeyFor(cfg)
+	if !ok {
+		return ""
+	}
+	return string(key.Parent())
 }
 
 // BuildImage constructs an image client from the registry by ID.
