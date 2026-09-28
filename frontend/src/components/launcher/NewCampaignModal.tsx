@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { WorldInfo, SystemInfo, CreateGameRequest, VoiceProfile } from '../../types';
+import { WorldInfo, SystemInfo, CreateGameRequest, TTSConfig, VoiceProfile } from '../../types';
 import { APIClient } from '../../api/client';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
 import { X, Upload, Check, Volume2, MapPin, Sparkles, User, Wand2 } from 'lucide-react';
 import { AIGenerateButton } from '../ui/AIGenerateButton';
+import { VoiceProfileSelect } from '../VoiceProfileSelect';
 import { useMountTransition } from '../../hooks/useMountTransition';
 import { slugify } from '../../lib/slug';
 
@@ -32,8 +33,8 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   const [playerGender, setPlayerGender] = useState('');
   const [playerPronouns, setPlayerPronouns] = useState('');
   const [playerBackground, setPlayerBackground] = useState('');
-  const [playerVoiceID, setPlayerVoiceID] = useState('');
-  const [narratorVoice, setNarratorVoice] = useState('');
+  const [playerProfile, setPlayerProfile] = useState<VoiceProfile | null>(null);
+  const [narratorProfile, setNarratorProfile] = useState<VoiceProfile | null>(null);
   const [openingPrompt, setOpeningPrompt] = useState('');
   const [startLocation, setStartLocation] = useState('');
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
@@ -43,6 +44,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
     err instanceof Error ? err.message : 'Unexpected error';
 
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
+  const [ttsConfig, setTtsConfig] = useState<TTSConfig | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
@@ -59,6 +61,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
     APIClient.getSettings()
       .then((res) => {
         setVoiceProfiles(res.config.media.tts.voice_profiles || []);
+        setTtsConfig(res.config.media.tts);
       })
       .catch((err) => console.error('Failed to load voice profiles', err));
   }, []);
@@ -74,8 +77,8 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
       setPlayerGender('');
       setPlayerPronouns('');
       setPlayerBackground('');
-      setPlayerVoiceID('');
-      setNarratorVoice('');
+      setPlayerProfile(null);
+      setNarratorProfile(null);
       setOpeningPrompt('');
       setStartLocation('');
       setBannerFile(null);
@@ -202,7 +205,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
         system_id: selectedSystemID,
         world_id: world.id,
         player_name: playerName.trim(),
-        narrator_voice: narratorVoice.trim() || undefined,
+        narrator_voice: narratorProfile?.voice_id || undefined,
         start_location: startLocation.trim() || undefined,
         opening_prompt: openingPrompt.trim() || undefined,
         player: {
@@ -211,7 +214,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
           gender: playerGender.trim() || undefined,
           pronouns: playerPronouns.trim() || undefined,
           background: playerBackground.trim() || undefined,
-          voice: voiceProfiles.find((p) => p.voice_id === playerVoiceID),
+          voice: playerProfile ?? undefined,
         },
       },
       bannerFile || undefined,
@@ -359,18 +362,14 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 <label className="text-xs font-sans text-stone-300">
                   Narrator Voice
                 </label>
-                <select
-                  value={narratorVoice}
-                  onChange={(e) => setNarratorVoice(e.target.value)}
-                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500 cursor-pointer"
-                >
-                  <option value="">Default (Provider Setting)</option>
-                  {voiceProfiles.map((p) => (
-                    <option key={p.id} value={p.voice_id}>
-                      {p.name} ({p.voice_id})
-                    </option>
-                  ))}
-                </select>
+                <VoiceProfileSelect
+                  profiles={voiceProfiles}
+                  value={narratorProfile?.id ?? ''}
+                  onChange={setNarratorProfile}
+                  ttsConfig={ttsConfig ?? undefined}
+                  allowDefault
+                  placeholder="Default (Provider Setting)"
+                />
               </div>
 
               {/* Character Voice */}
@@ -378,18 +377,15 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 <label className="text-xs font-sans text-stone-300">
                   Protagonist Voice
                 </label>
-                <select
-                  value={playerVoiceID}
-                  onChange={(e) => setPlayerVoiceID(e.target.value)}
-                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500 cursor-pointer"
-                >
-                  <option value="">Auto-Assign from Character</option>
-                  {voiceProfiles.map((p) => (
-                    <option key={p.id} value={p.voice_id}>
-                      {p.name} ({p.voice_id})
-                    </option>
-                  ))}
-                </select>
+                <VoiceProfileSelect
+                  profiles={voiceProfiles}
+                  value={playerProfile?.id ?? ''}
+                  onChange={setPlayerProfile}
+                  ttsConfig={ttsConfig ?? undefined}
+                  allowDefault
+                  defaultLabel="Auto-Assign from Character"
+                  placeholder="Auto-Assign from Character"
+                />
               </div>
             </div>
           </div>

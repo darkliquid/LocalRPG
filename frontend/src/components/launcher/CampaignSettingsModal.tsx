@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { GameSummary, ProviderVoice, TTSConfig, VoiceProfile } from '../../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { GameSummary, TTSConfig, VoiceProfile } from '../../types';
 import { APIClient } from '../../api/client';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
 import { X, Upload, Sparkles, AlertTriangle, Volume2, MapPin, Check, Save } from 'lucide-react';
@@ -7,8 +7,7 @@ import { AIGenerateButton } from '../ui/AIGenerateButton';
 import { useLightbox } from '../../hooks/useLightbox';
 import { useMountTransition } from '../../hooks/useMountTransition';
 import { ImageLightbox } from '../ImageLightbox';
-import { VoiceCombobox } from '../VoiceCombobox';
-import { playVoicePreview } from '../../lib/audioPreview';
+import { VoiceProfileSelect } from '../VoiceProfileSelect';
 
 interface CampaignSettingsModalProps {
   isOpen: boolean;
@@ -43,7 +42,6 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [ttsConfig, setTtsConfig] = useState<TTSConfig | null>(null);
-  const [auditioningVoiceId, setAuditioningVoiceId] = useState<string | null>(null);
 
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
@@ -77,51 +75,14 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
     setSettingsSaved(false);
   }, [isOpen, game]);
 
-  // The narrator picker lists configured archetypes, plus an explicit Default.
-  // Shaped as catalog voices so it shares the combobox that already dedupes the
-  // label, shows tags, and portals its menu clear of the modal's scroll area.
-  const narratorVoiceOptions = useMemo<ProviderVoice[]>(() => {
-    const options: ProviderVoice[] = [{ id: '', name: 'Default (Provider Setting)' }];
-    for (const profile of voiceProfiles) {
-      options.push({
-        id: profile.voice_id,
-        name: profile.name,
-        tags: profile.tags,
-        description: profile.description,
-      });
-    }
-    return options;
-  }, [voiceProfiles]);
-
   if (!mounted || !game) return null;
+
+  // The campaign stores the narrator as a voice id, so resolve it back to the
+  // profile that produced it for the picker.
+  const narratorProfile = voiceProfiles.find((p) => p.voice_id === narratorVoice) ?? null;
 
   const bannerURL = game.banner_url;
   const iconURL = game.icon_url;
-
-  const handleAuditionVoice = async (voice: ProviderVoice) => {
-    setAuditioningVoiceId(voice.id);
-    setGenError(null);
-    try {
-      const provider: TTSConfig = {
-        ...(ttsConfig ?? { type: 'disabled', auto_play: false, master_volume: 1 }),
-        default_voice: voice.id || ttsConfig?.default_voice || '',
-      };
-      const res = await APIClient.testProvider({
-        category: 'tts',
-        provider,
-        test_prompt: 'This is how your narrator will sound.',
-      });
-      if (res.success && res.audio_data_uri) {
-        playVoicePreview(res.audio_data_uri, ttsConfig?.master_volume ?? 1);
-      } else {
-        setGenError(res.message || 'Voice preview failed.');
-      }
-    } catch (err) {
-      setGenError(err instanceof Error ? err.message : 'Voice preview failed.');
-    } finally {
-      setAuditioningVoiceId(null);
-    }
-  };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -267,12 +228,13 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
               <label className="text-xs font-sans text-stone-300">
                 Narrator Voice
               </label>
-              <VoiceCombobox
-                value={narratorVoice}
-                onChange={setNarratorVoice}
-                voices={narratorVoiceOptions}
-                onAudition={handleAuditionVoice}
-                auditioningId={auditioningVoiceId}
+              <VoiceProfileSelect
+                profiles={voiceProfiles}
+                value={narratorProfile?.id ?? ''}
+                onChange={(profile) => setNarratorVoice(profile?.voice_id ?? '')}
+                ttsConfig={ttsConfig ?? undefined}
+                previewText="This is how your narrator will sound."
+                allowDefault
                 placeholder="Default (Provider Setting)"
               />
               <p className="text-xs font-sans text-stone-500">

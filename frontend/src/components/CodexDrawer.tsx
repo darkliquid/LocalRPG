@@ -6,6 +6,7 @@ import { formatGenerationError } from '../lib/generationError';
 import { TurnHistoryList } from './TurnHistoryList';
 import { ImageLightbox } from './ImageLightbox';
 import { useLightbox } from '../hooks/useLightbox';
+import { VoiceProfileSelect } from './VoiceProfileSelect';
 
 interface CodexDrawerProps {
   gameID?: string;
@@ -45,7 +46,6 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const [saveError, setSaveError] = useState('');
   const [memories, setMemories] = useState<EntityMemory[]>([]);
   const [previewProfileId, setPreviewProfileId] = useState('');
-  const [isPreviewing, setIsPreviewing] = useState(false);
   const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
   const [sidebarTab, setSidebarTab] = useState<'notes' | 'memories'>('notes');
   const [portraitVersion, setPortraitVersion] = useState(0);
@@ -138,27 +138,6 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
     }
 
     setMarkdown(`---\n${voiceSnippet}\n---\n\n${markdown}`);
-  };
-
-  const handlePreviewVoice = () => {
-    const profile = profiles.find((p) => p.id === previewProfileId);
-    if (!profile || !ttsConfig || isPreviewing) return;
-    setIsPreviewing(true);
-    const greetingText = `Greetings. I am ${entity?.name ?? 'ready for the journey'}.`;
-    APIClient.testProvider({
-      category: 'tts',
-      provider: { ...ttsConfig, default_voice: profile.voice_id, pitch: profile.pitch, speech_rate: profile.speech_rate },
-      test_prompt: greetingText,
-      voice_id: profile.voice_id,
-    })
-      .then((result) => {
-        if (result.audio_data_uri) {
-          const audio = new Audio(result.audio_data_uri);
-          audio.play().catch(console.error);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setIsPreviewing(false));
   };
 
   const handleSave = async () => {
@@ -426,44 +405,20 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                 <Volume2 className="w-3.5 h-3.5 text-purple-400" />
                 <span>Apply Voice Archetype:</span>
               </label>
-              <select
+              <VoiceProfileSelect
+                profiles={profiles}
                 value={previewProfileId}
-                onChange={(e) => {
-                  setPreviewProfileId(e.target.value);
-                  if (e.target.value) {
-                    applyVoiceArchetype(e.target.value);
-                  }
+                onChange={(profile) => {
+                  setPreviewProfileId(profile?.id ?? '');
+                  if (profile) applyVoiceArchetype(profile.id);
                 }}
-                disabled={profiles.length === 0}
-                className="max-w-[280px] truncate bg-stone-900 border border-purple-500/30 rounded-lg pl-2.5 pr-8 py-1 text-xs font-mono text-purple-300 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">
-                  {profiles.length === 0 ? 'Configure voices in Settings' : 'Select Archetype…'}
-                </option>
-                {profiles.map((p) => {
-                  const tags = (p.tags ?? []).join(', ');
-                  const suffix = tags ? ` [${tags}]` : '';
-                  return (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.voice_id}){suffix}
-                    </option>
-                  );
-                })}
-              </select>
-              {ttsConfig && previewProfileId && (
-                <button
-                  onClick={handlePreviewVoice}
-                  disabled={isPreviewing}
-                  title="Preview this voice with a greeting"
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-stone-900/80 border border-purple-500/30 text-purple-300 hover:text-purple-100 hover:border-purple-400 text-xs cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isPreviewing
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <Volume2 className="w-3.5 h-3.5" />
-                  }
-                  <span>{isPreviewing ? 'Playing…' : 'Preview'}</span>
-                </button>
-              )}
+                ttsConfig={ttsConfig ?? undefined}
+                previewText={`Greetings. I am ${entity?.name ?? 'ready for the journey'}.`}
+                placeholder={profiles.length === 0 ? 'Configure voices in Settings' : 'Select Archetype...'}
+                allowDefault
+                defaultLabel="Select Archetype..."
+                className="max-w-[320px] flex-1"
+              />
             </div>
 
             <textarea
