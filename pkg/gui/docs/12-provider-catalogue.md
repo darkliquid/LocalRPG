@@ -75,8 +75,7 @@ ledger key matches exactly. Add a config entry to override or extend them.
 
 | Ledger key | Input (per 1M) | Output (per 1M) | Per character | Per request |
 | --- | --- | --- | --- | --- |
-| `gemini` | 125000 | 500000 | 0 | 0 |
-| `openaichat` | 150000 | 600000 | 0 | 0 |
-| `elevenlabs` | 0 | 0 | 0 | 0 |
+| `llm:gemini` | 125000 | 500000 | 0 | 0 |
+| `llm:openaichat` | 150000 | 600000 | 0 | 0 |
 
 Prices are micros: one millionth of a currency unit, so `2500000` is 2.50.

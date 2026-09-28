@@ -10,9 +10,9 @@ import (
 func TestTurnUsageIsRecordedWithCost(t *testing.T) {
 	gameID, svc := turnFixture(t)
 	svc.configMgr.Get().Providers.Prices = []config.PriceConfig{
-		{Provider: "gemini", PerMillionInput: 1_000_000, PerMillionOutput: 2_000_000},
+		{Provider: "llm:gemini", PerMillionInput: 1_000_000, PerMillionOutput: 2_000_000},
 	}
-	svc.RecordUsage(gameID, 1, "gm", harness.Usage{Provider: "gemini", Model: "m", InputTokens: 1000, OutputTokens: 500})
+	svc.RecordUsage(gameID, 1, "gm", harness.Usage{Provider: "llm:gemini", Model: "m", InputTokens: 1000, OutputTokens: 500})
 
 	store, err := svc.store(gameID)
 	if err != nil {

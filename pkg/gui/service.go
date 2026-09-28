@@ -134,6 +134,9 @@ func NewService(rootDir string) *Service {
 			trace.OrNil(svc.logger).Event("paths.legacy_relative", map[string]interface{}{"detail": warning})
 		}
 	}
+	for _, problem := range mgr.Warnings() {
+		trace.OrNil(svc.logger).Event("config.problem", map[string]interface{}{"problem": problem})
+	}
 	return svc
 }
 

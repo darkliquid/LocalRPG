@@ -1,8 +1,11 @@
 package config
 
 import (
+	"fmt"
 	"strings"
 	"time"
+
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
 type PathsConfig struct {
@@ -283,6 +286,35 @@ type Config struct {
 	Mechanics   MechanicsConfig   `yaml:"mechanics,omitempty" json:"mechanics,omitempty"`
 }
 
+// CurrentVersion is the config schema version. Version "2" introduced canonical
+// provider keys, so providers.prices entries are validated against the grammar.
+const CurrentVersion = "2"
+
+// Validate reports human-readable problems with a configuration. It never fails
+// a load: a bad entry is reported so it can be surfaced while the rest of the
+// configuration keeps working. An entry with a malformed provider key matches
+// nothing, so silencing it would hide the reason a price is not applied.
+func (c *Config) Validate() []string {
+	var problems []string
+	if c.Version != CurrentVersion {
+		problems = append(problems, fmt.Sprintf(
+			"config version %q predates canonical provider keys; providers.prices must use <family>:<adapter> (for example %s)",
+			c.Version, provider.KeyLLMOpenAIChat))
+	}
+	for i, price := range c.Providers.Prices {
+		if price.Provider == "" {
+			problems = append(problems, fmt.Sprintf("providers.prices[%d]: provider is required", i))
+			continue
+		}
+		if _, err := provider.ParseKey(price.Provider); err != nil {
+			problems = append(problems, fmt.Sprintf(
+				"providers.prices[%d].provider %q is not a canonical key (for example %s, %s, %s): %v",
+				i, price.Provider, provider.KeyLLMOpenAIChat, provider.KeyLLMGemini, provider.KeyTTSHTTP, err))
+		}
+	}
+	return problems
+}
+
 // MechanicsConfig tunes how mechanics are engaged during play.
 type MechanicsConfig struct {
 	// Engagement is "off", "auto", or "ask". Empty means auto.
@@ -316,7 +348,7 @@ func (c *Config) MechanicsCadenceTurns() int {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Version: "1",
+		Version: CurrentVersion,
 		Paths: PathsConfig{},
 		Agents: AgentsConfig{
 			DefaultRole:         "gm",

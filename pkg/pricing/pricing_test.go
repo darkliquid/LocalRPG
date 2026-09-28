@@ -31,16 +31,60 @@ func TestCostOfAnUnpricedCallIsZero(t *testing.T) {
 
 func TestResolvePrefersModelThenProviderThenZero(t *testing.T) {
 	cfg := &config.Config{Providers: config.ProvidersConfig{Prices: []config.PriceConfig{
-		{Provider: "builtin:gemini", PerMillionInput: 1},
-		{Provider: "builtin:gemini", Model: "gemini-2.5-pro", PerMillionInput: 2},
+		{Provider: "tts:gemini", PerMillionInput: 1},
+		{Provider: "tts:gemini", Model: "gemini-2.5-pro", PerMillionInput: 2},
 	}}}
-	if got := Resolve("builtin:gemini", "gemini-2.5-pro", cfg); got.PerMillionInput != 2 {
+	if got := Resolve("tts:gemini", "gemini-2.5-pro", cfg); got.PerMillionInput != 2 {
 		t.Fatalf("model override not used: %+v", got)
 	}
-	if got := Resolve("builtin:gemini", "other", cfg); got.PerMillionInput != 1 {
+	if got := Resolve("tts:gemini", "other", cfg); got.PerMillionInput != 1 {
 		t.Fatalf("provider fallback not used: %+v", got)
 	}
 	if got := Resolve("unknown", "", cfg); got != (Price{}) {
 		t.Fatalf("unknown provider = %+v, want zero", got)
+	}
+}
+
+func TestResolveFallsBackFromInstanceToAdapter(t *testing.T) {
+	cfg := &config.Config{Providers: config.ProvidersConfig{Prices: []config.PriceConfig{
+		{Provider: "tts:http", PerRequest: 10},
+		{Provider: "tts:http@host-a", PerRequest: 99},
+	}}}
+	if got := Resolve("tts:http@host-a", "", cfg); got.PerRequest != 99 {
+		t.Errorf("instance price = %d, want 99", got.PerRequest)
+	}
+	if got := Resolve("tts:http@host-b", "", cfg); got.PerRequest != 10 {
+		t.Errorf("fallback price = %d, want 10", got.PerRequest)
+	}
+}
+
+func TestResolvePrefersInstanceModelOverAdapterWide(t *testing.T) {
+	cfg := &config.Config{Providers: config.ProvidersConfig{Prices: []config.PriceConfig{
+		{Provider: "llm:openaichat", PerMillionInput: 1},
+		{Provider: "llm:openaichat@host", PerMillionInput: 5},
+		{Provider: "llm:openaichat@host", Model: "gpt-4o-mini", PerMillionInput: 9},
+	}}}
+	if got := Resolve("llm:openaichat@host", "gpt-4o-mini", cfg); got.PerMillionInput != 9 {
+		t.Errorf("instance+model = %d, want 9", got.PerMillionInput)
+	}
+	if got := Resolve("llm:openaichat@host", "other", cfg); got.PerMillionInput != 5 {
+		t.Errorf("instance-wide = %d, want 5", got.PerMillionInput)
+	}
+	if got := Resolve("llm:openaichat@other", "other", cfg); got.PerMillionInput != 1 {
+		t.Errorf("adapter fallback = %d, want 1", got.PerMillionInput)
+	}
+}
+
+func TestResolveSkipsLegacyKeys(t *testing.T) {
+	cfg := &config.Config{Providers: config.ProvidersConfig{Prices: []config.PriceConfig{
+		{Provider: "openaichat", PerMillionInput: 1},
+	}}}
+	if got := Resolve("openaichat", "", cfg); got.PerMillionInput != 1 {
+		// A legacy key still matches its own literal entry, but a canonical key
+		// never resolves to it.
+		t.Errorf("legacy literal = %d, want 1", got.PerMillionInput)
+	}
+	if got := Resolve("llm:openaichat", "", cfg); got.PerMillionInput != 150_000 {
+		t.Errorf("canonical key must not match a legacy entry; got %d", got.PerMillionInput)
 	}
 }
