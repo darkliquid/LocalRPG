@@ -178,7 +178,6 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 
 	c.mu.Lock()
 	c.lastUsage = harness.Usage{
-		Provider:    c.ID(),
 		Model:       c.model,
 		InputTokens: parsed.Usage.PromptTokens,
 		Requests:    1,

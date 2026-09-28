@@ -33,6 +33,35 @@ type Executor struct {
 	embeddingsProvider embeddings.Provider
 	voiceProfiles      []config.VoiceProfile
 	assignedVoices     map[string]config.VoiceProfile
+
+	embeddingUsage EmbeddingUsageFunc
+	embeddingKey   string
+	embeddingModel string
+}
+
+// EmbeddingUsageFunc reports one embedding-backed search's usage to a sink, so
+// semantic recall appears in the spend ledger like every other provider call.
+type EmbeddingUsageFunc func(providerKey, model string, inputTokens, requests int)
+
+// SetEmbeddingUsage installs the sink embedding-backed searches report to.
+func (e *Executor) SetEmbeddingUsage(fn EmbeddingUsageFunc, providerKey, model string) {
+	e.embeddingUsage = fn
+	e.embeddingKey = providerKey
+	e.embeddingModel = model
+}
+
+// reportEmbeddingUsage files one embedding call, if a sink is installed. It is
+// best effort: a missing sink or a provider that reports nothing never fails a
+// tool call.
+func (e *Executor) reportEmbeddingUsage() {
+	if e.embeddingUsage == nil {
+		return
+	}
+	tokens := 0
+	if reporter, ok := e.embeddingsProvider.(interface{ LastUsage() harness.Usage }); ok {
+		tokens = reporter.LastUsage().InputTokens
+	}
+	e.embeddingUsage(e.embeddingKey, e.embeddingModel, tokens, 1)
 }
 
 // NewExecutor builds an executor. maxChars is agents.tool_result_chars; a
@@ -128,6 +157,9 @@ func (e *Executor) searchEntities(ctx context.Context, arguments map[string]inte
 	var vecIDs []string
 	if e.embeddingsProvider != nil && rawQuery != "" {
 		vecs, err := e.embeddingsProvider.Embed(ctx, []string{rawQuery})
+		if err == nil {
+			e.reportEmbeddingUsage()
+		}
 		if err == nil && len(vecs) > 0 {
 			vHits, err := e.store.SearchSimilarVectors(ctx, []string{"entity"}, e.embeddingsProvider.ID(), vecs[0], limit*2)
 			if err == nil {
@@ -292,6 +324,9 @@ func (e *Executor) searchTimeline(ctx context.Context, arguments map[string]inte
 	var vecTurnNumbers []string
 	if e.embeddingsProvider != nil && rawQuery != "" {
 		vecs, err := e.embeddingsProvider.Embed(ctx, []string{rawQuery})
+		if err == nil {
+			e.reportEmbeddingUsage()
+		}
 		if err == nil && len(vecs) > 0 {
 			vHits, err := e.store.SearchSimilarVectors(ctx, []string{"turn"}, e.embeddingsProvider.ID(), vecs[0], limit*2)
 			if err == nil {

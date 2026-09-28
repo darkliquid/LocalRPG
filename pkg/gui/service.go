@@ -276,6 +276,12 @@ func (s *Service) ensureEmbeddingWorker(gameID string, store *storage.Store) *st
 		worker = storage.NewEmbeddingWorker(store, embProvider, storage.EmbeddingWorkerOptions{
 			BatchSize: cfg.Embeddings.BatchSize,
 		})
+		if key, hasKey := embeddings.KeyFor(cfg.Embeddings); hasKey {
+			model := cfg.Embeddings.Model
+			worker.SetUsageReporting(func(u storage.EmbeddingUsage) {
+				s.RecordEmbeddingUsage(string(key), model, u.InputTokens, u.Requests)
+			}, storage.EmbeddingUsage{ProviderKey: string(key), Model: model})
+		}
 		worker.Start()
 		s.embWorkers[gameID] = worker
 	}
@@ -1316,6 +1322,9 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	toolExecutor.SetEntityWriter(timeline)
 	if embProvider, err := embeddings.NewProviderFromConfig(cfg.Embeddings); err == nil && embProvider != nil {
 		toolExecutor.SetEmbeddingsProvider(embProvider)
+		if key, hasKey := embeddings.KeyFor(cfg.Embeddings); hasKey {
+			toolExecutor.SetEmbeddingUsage(s.RecordEmbeddingUsage, string(key), cfg.Embeddings.Model)
+		}
 	}
 	orchestrator.SetTools(toolExecutor, cfg.RoleSupportsTools("gm"))
 	orchestrator.SetToolRounds(cfg.ToolRounds())

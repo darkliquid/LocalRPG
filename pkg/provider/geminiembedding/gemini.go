@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/darkliquid/localrpg/pkg/embeddings"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/provider"
 	"google.golang.org/genai"
 )
@@ -20,6 +22,17 @@ type Client struct {
 	apiKey     string
 	model      string
 	dimensions int
+
+	mu        sync.Mutex
+	lastUsage harness.Usage
+}
+
+// LastUsage reports the token usage of the most recent request, so the caller
+// can price and record it. A zero value means nothing was reported.
+func (c *Client) LastUsage() harness.Usage {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.lastUsage
 }
 
 func init() {
@@ -98,6 +111,13 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 			result[i] = emb.Values
 		}
 	}
+
+	c.mu.Lock()
+	// The Gemini embedContent response carries no token counts, so only the
+	// request is reported and the row is marked estimated. A per-request price
+	// still makes the spend visible.
+	c.lastUsage = harness.Usage{Model: c.model, Requests: 1, Estimated: true}
+	c.mu.Unlock()
 	return result, nil
 }
 

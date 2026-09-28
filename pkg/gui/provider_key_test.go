@@ -76,3 +76,29 @@ func TestMediaRoleKeyFallsBackToTheRoleName(t *testing.T) {
 		t.Errorf("disabled image key = %q, want the role name", got)
 	}
 }
+
+func TestEmbeddingUsageIsRecorded(t *testing.T) {
+	svc := NewService(t.TempDir())
+	svc.RecordEmbeddingUsage("embedding:gemini@default", "text-embedding-004", 12, 1)
+
+	ledger, err := svc.usageLedger()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ledger.UsageByGame(UsageScopeGlobal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, row := range rows {
+		if row.Provider == "embedding:gemini@default" && row.Role == "embedding" {
+			found = true
+			if row.InputTokens != 12 {
+				t.Errorf("input tokens = %d, want 12", row.InputTokens)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("no embedding row in %+v", rows)
+	}
+}
