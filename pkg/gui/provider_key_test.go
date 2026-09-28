@@ -79,7 +79,7 @@ func TestMediaRoleKeyFallsBackToTheRoleName(t *testing.T) {
 
 func TestEmbeddingUsageIsRecorded(t *testing.T) {
 	svc := NewService(t.TempDir())
-	svc.RecordEmbeddingUsage("embedding:gemini@default", "text-embedding-004", 12, 1)
+	svc.RecordEmbeddingUsage("embedding:gemini@default", "text-embedding-004", 12, 0, 1)
 
 	ledger, err := svc.usageLedger()
 	if err != nil {

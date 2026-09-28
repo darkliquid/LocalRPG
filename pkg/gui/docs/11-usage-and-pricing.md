@@ -135,5 +135,13 @@ historical totals do not drift.
 - Providers that report no usage metadata still get an **estimated** row where a
   count can be derived (for example characters spoken), so spend is at least
   visible.
-- Local, unmetered providers (procedural art, native OS speech) have no price
-  and need none.
+- Local, unmetered providers (procedural art, native OS speech, a local model
+  server) have no price and need none. Built-in rates are keyed to the vendor
+  endpoint for exactly this reason: `tts:http@api.openai.com` is priced, while
+  `tts:http@localhost:8880` is not.
+- Some metered services ship no built-in rate because none is published, or none
+  the ledger can express. Gemini speech has no published character rate, and
+  transcription is billed per minute while the ledger records requests. Add a
+  `providers.prices` entry if you know your own rate.
+- The [Provider & Model Catalogue](12-provider-catalogue) lists the built-in
+  rates with their models, so you can see what is priced before adding anything.

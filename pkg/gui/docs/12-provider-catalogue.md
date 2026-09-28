@@ -79,11 +79,27 @@ that key.
 ## Built-in default prices
 
 These rates apply when no `providers.prices` entry matches, and only when the
-ledger key matches exactly. Add a config entry to override or extend them.
+ledger key matches exactly. A row with no model applies to every model of that
+key. Add a config entry to override or extend them. Local and built-in adapters
+are absent on purpose: they are not metered.
 
-| Ledger key | Input (per 1M) | Output (per 1M) | Per character | Per request |
-| --- | --- | --- | --- | --- |
-| `llm:gemini` | 125000 | 500000 | 0 | 0 |
-| `llm:openaichat` | 150000 | 600000 | 0 | 0 |
+| Ledger key | Model | Input (per 1M) | Output (per 1M) | Per character | Per request |
+| --- | --- | --- | --- | --- | --- |
+| `llm:gemini` | `gemini-3.8-flash` | 750000 | 3750000 | 0 | 0 |
+| `llm:gemini` | `gemini-3.5-flash-lite` | 300000 | 2500000 | 0 | 0 |
+| `llm:gemini` | `gemini-3.1-flash-lite` | 250000 | 1500000 | 0 | 0 |
+| `llm:gemini` | `gemini-2.5-flash` | 300000 | 2500000 | 0 | 0 |
+| `llm:gemini` | `gemini-2.5-flash-lite` | 100000 | 400000 | 0 | 0 |
+| `llm:gemini` | `gemini-2.0-flash` | 150000 | 600000 | 0 | 0 |
+| `llm:gemini` | `any` | 750000 | 3750000 | 0 | 0 |
+| `llm:openaichat@api.openai.com` | `gpt-4o` | 2500000 | 10000000 | 0 | 0 |
+| `llm:openaichat@api.openai.com` | `gpt-4o-mini` | 150000 | 600000 | 0 | 0 |
+| `llm:openaichat@api.openai.com` | `any` | 150000 | 600000 | 0 | 0 |
+| `tts:elevenlabs` | `any` | 0 | 0 | 80 | 0 |
+| `tts:http@api.openai.com` | `any` | 0 | 0 | 15 | 0 |
+| `image:gemini` | `imagen-3.0-generate-002` | 0 | 0 | 0 | 40000 |
+| `image:gemini` | `imagen-3.0-fast-generate-001` | 0 | 0 | 0 | 20000 |
+| `embedding:openai@api.openai.com` | `text-embedding-3-small` | 20000 | 0 | 0 | 0 |
+| `embedding:openai@api.openai.com` | `text-embedding-3-large` | 130000 | 0 | 0 | 0 |
 
 Prices are micros: one millionth of a currency unit, so `2500000` is 2.50.

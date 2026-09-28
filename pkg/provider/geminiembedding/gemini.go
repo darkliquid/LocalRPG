@@ -113,12 +113,20 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 	}
 
 	c.mu.Lock()
-	// The Gemini embedContent response carries no token counts, so only the
-	// request is reported and the row is marked estimated. A per-request price
-	// still makes the spend visible.
-	c.lastUsage = harness.Usage{Model: c.model, Requests: 1, Estimated: true}
+	c.lastUsage = embeddingUsage(c.model, resp)
 	c.mu.Unlock()
 	return result, nil
+}
+
+// embeddingUsage maps a response to what the ledger records. Agent Platform
+// returns the billable character count embeddings are billed on there; the
+// Gemini Developer API returns no usage at all, so only the request is reported
+// and the row is marked estimated.
+func embeddingUsage(model string, resp *genai.EmbedContentResponse) harness.Usage {
+	if resp != nil && resp.Metadata != nil && resp.Metadata.BillableCharacterCount > 0 {
+		return harness.Usage{Model: model, Characters: int(resp.Metadata.BillableCharacterCount)}
+	}
+	return harness.Usage{Model: model, Requests: 1, Estimated: true}
 }
 
 var _ embeddings.Provider = (*Client)(nil)

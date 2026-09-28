@@ -232,8 +232,14 @@ func (w *EmbeddingWorker) processBatch(items []EmbeddingItem) {
 
 	if w.usageFn != nil {
 		usage := w.usageMeta
-		usage.Requests = 1
-		usage.InputTokens = reporterTokens(w.provider)
+		reported := reporterUsage(w.provider)
+		usage.InputTokens = reported.InputTokens
+		usage.Characters = reported.Characters
+		usage.Requests = reported.Requests
+		if usage.InputTokens == 0 && usage.Characters == 0 && usage.Requests == 0 {
+			// A provider that reports nothing still contributes a request.
+			usage.Requests = 1
+		}
 		w.usageFn(usage)
 	}
 }
@@ -243,6 +249,7 @@ type EmbeddingUsage struct {
 	ProviderKey string
 	Model       string
 	InputTokens int
+	Characters  int
 	Requests    int
 }
 
@@ -258,14 +265,16 @@ type usageReportingProvider interface {
 
 type usageTokens struct {
 	InputTokens int
+	Characters  int
+	Requests    int
 }
 
-func reporterTokens(provider embeddings.Provider) int {
+func reporterUsage(provider embeddings.Provider) usageTokens {
 	reporter, ok := provider.(usageReportingProvider)
 	if !ok {
-		return 0
+		return usageTokens{}
 	}
-	return reporter.LastUsage().InputTokens
+	return reporter.LastUsage()
 }
 
 // Drain blocks until all currently queued items are processed.

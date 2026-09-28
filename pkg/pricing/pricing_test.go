@@ -82,7 +82,22 @@ func TestResolveIgnoresAKeyThatIsNotCanonical(t *testing.T) {
 	if got := Resolve("openaichat", "", cfg); got != (Price{}) {
 		t.Errorf("a non-canonical key must match nothing, got %+v", got)
 	}
-	if got := Resolve("llm:openaichat", "", cfg); got.PerMillionInput != 150_000 {
+	if got := Resolve("llm:gemini", "", cfg); got.PerMillionInput != 750_000 {
 		t.Errorf("canonical key must use the built-in rate, got %d", got.PerMillionInput)
+	}
+}
+
+func TestBuiltinsAreScopedToTheVendorEndpoint(t *testing.T) {
+	if got := Resolve("llm:openaichat@api.openai.com", "gpt-4o", nil); got.PerMillionInput != 2_500_000 {
+		t.Errorf("endpoint-scoped built-in input = %d, want 2500000", got.PerMillionInput)
+	}
+	if got := Resolve("llm:openaichat@localhost:11434", "gpt-4o", nil); got != (Price{}) {
+		t.Errorf("a local endpoint must not be billed at vendor rates, got %+v", got)
+	}
+	if got := Resolve("tts:http@api.openai.com", "", nil); got.PerCharacter != 15 {
+		t.Errorf("OpenAI speech per character = %d, want 15", got.PerCharacter)
+	}
+	if got := Resolve("tts:http@localhost:8880", "", nil); got != (Price{}) {
+		t.Errorf("a local speech server must not be billed, got %+v", got)
 	}
 }

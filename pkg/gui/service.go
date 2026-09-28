@@ -279,7 +279,7 @@ func (s *Service) ensureEmbeddingWorker(gameID string, store *storage.Store) *st
 		if key, hasKey := embeddings.KeyFor(cfg.Embeddings); hasKey {
 			model := cfg.Embeddings.Model
 			worker.SetUsageReporting(func(u storage.EmbeddingUsage) {
-				s.RecordEmbeddingUsage(string(key), model, u.InputTokens, u.Requests)
+				s.RecordEmbeddingUsage(string(key), model, u.InputTokens, u.Characters, u.Requests)
 			}, storage.EmbeddingUsage{ProviderKey: string(key), Model: model})
 		}
 		worker.Start()

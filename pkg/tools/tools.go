@@ -41,7 +41,7 @@ type Executor struct {
 
 // EmbeddingUsageFunc reports one embedding-backed search's usage to a sink, so
 // semantic recall appears in the spend ledger like every other provider call.
-type EmbeddingUsageFunc func(providerKey, model string, inputTokens, requests int)
+type EmbeddingUsageFunc func(providerKey, model string, inputTokens, characters, requests int)
 
 // SetEmbeddingUsage installs the sink embedding-backed searches report to.
 func (e *Executor) SetEmbeddingUsage(fn EmbeddingUsageFunc, providerKey, model string) {
@@ -57,11 +57,16 @@ func (e *Executor) reportEmbeddingUsage() {
 	if e.embeddingUsage == nil {
 		return
 	}
-	tokens := 0
+	inputTokens, characters, requests := 0, 0, 1
 	if reporter, ok := e.embeddingsProvider.(interface{ LastUsage() harness.Usage }); ok {
-		tokens = reporter.LastUsage().InputTokens
+		usage := reporter.LastUsage()
+		inputTokens = usage.InputTokens
+		characters = usage.Characters
+		if usage.Requests > 0 {
+			requests = usage.Requests
+		}
 	}
-	e.embeddingUsage(e.embeddingKey, e.embeddingModel, tokens, 1)
+	e.embeddingUsage(e.embeddingKey, e.embeddingModel, inputTokens, characters, requests)
 }
 
 // NewExecutor builds an executor. maxChars is agents.tool_result_chars; a

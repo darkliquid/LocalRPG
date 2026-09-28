@@ -86,12 +86,18 @@ func renderProviderCatalogue() string {
 
 	b.WriteString("## Built-in default prices\n\n")
 	b.WriteString("These rates apply when no `providers.prices` entry matches, and only when the\n")
-	b.WriteString("ledger key matches exactly. Add a config entry to override or extend them.\n\n")
-	b.WriteString("| Ledger key | Input (per 1M) | Output (per 1M) | Per character | Per request |\n")
-	b.WriteString("| --- | --- | --- | --- | --- |\n")
+	b.WriteString("ledger key matches exactly. A row with no model applies to every model of that\n")
+	b.WriteString("key. Add a config entry to override or extend them. Local and built-in adapters\n")
+	b.WriteString("are absent on purpose: they are not metered.\n\n")
+	b.WriteString("| Ledger key | Model | Input (per 1M) | Output (per 1M) | Per character | Per request |\n")
+	b.WriteString("| --- | --- | --- | --- | --- | --- |\n")
 	for _, price := range pricingBuiltinPrices() {
-		fmt.Fprintf(&b, "| `%s` | %d | %d | %d | %d |\n",
-			price.Provider, price.PerMillionInput, price.PerMillionOutput, price.PerCharacter, price.PerRequest)
+		model := price.Model
+		if model == "" {
+			model = "any"
+		}
+		fmt.Fprintf(&b, "| `%s` | `%s` | %d | %d | %d | %d |\n",
+			price.Provider, model, price.PerMillionInput, price.PerMillionOutput, price.PerCharacter, price.PerRequest)
 	}
 	b.WriteString("\nPrices are micros: one millionth of a currency unit, so `2500000` is 2.50.\n")
 

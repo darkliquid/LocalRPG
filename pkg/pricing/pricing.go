@@ -17,11 +17,56 @@ type Price struct {
 	PerRequest       Micros
 }
 
-// BuiltinPrices are the known rates for adapters LocalRPG ships presets for.
-// They are deliberately conservative defaults; a config price always wins.
+// BuiltinPrices are published list rates for the metered adapters LocalRPG ships
+// presets for. A config price always wins. Local and built-in adapters are absent
+// on purpose: they run on the user's own machine and are not metered.
+//
+// Rates are USD micros, captured on 2026-09-28 from Google Cloud "Agent Platform
+// Pricing" and the OpenAI pricing page; see
+// docs/proposals/2026-09-28-provider-costs-and-usage-research.md. A model with no
+// row here falls back to its adapter-wide row when one exists.
 var BuiltinPrices = []config.PriceConfig{
-	{Provider: string(provider.KeyLLMGemini), PerMillionInput: 125_000, PerMillionOutput: 500_000},
-	{Provider: string(provider.KeyLLMOpenAIChat), PerMillionInput: 150_000, PerMillionOutput: 600_000},
+	// Gemini text. The 3.8 Flash row is the introductory rate, which doubles on
+	// 2027-01-01; the adapter-wide row follows the shipped preset model.
+	{Provider: string(provider.KeyLLMGemini), Model: "gemini-3.8-flash", PerMillionInput: 750_000, PerMillionOutput: 3_750_000},
+	{Provider: string(provider.KeyLLMGemini), Model: "gemini-3.5-flash-lite", PerMillionInput: 300_000, PerMillionOutput: 2_500_000},
+	{Provider: string(provider.KeyLLMGemini), Model: "gemini-3.1-flash-lite", PerMillionInput: 250_000, PerMillionOutput: 1_500_000},
+	{Provider: string(provider.KeyLLMGemini), Model: "gemini-2.5-flash", PerMillionInput: 300_000, PerMillionOutput: 2_500_000},
+	{Provider: string(provider.KeyLLMGemini), Model: "gemini-2.5-flash-lite", PerMillionInput: 100_000, PerMillionOutput: 400_000},
+	{Provider: string(provider.KeyLLMGemini), Model: "gemini-2.0-flash", PerMillionInput: 150_000, PerMillionOutput: 600_000},
+	{Provider: string(provider.KeyLLMGemini), PerMillionInput: 750_000, PerMillionOutput: 3_750_000},
+
+	// OpenAI chat, keyed by the OpenAI endpoint because llm:openaichat is a
+	// generic adapter that usually points at a local server.
+	{Provider: string(openAI('l', "api.openai.com")), Model: "gpt-4o", PerMillionInput: 2_500_000, PerMillionOutput: 10_000_000},
+	{Provider: string(openAI('l', "api.openai.com")), Model: "gpt-4o-mini", PerMillionInput: 150_000, PerMillionOutput: 600_000},
+	{Provider: string(openAI('l', "api.openai.com")), PerMillionInput: 150_000, PerMillionOutput: 600_000},
+
+	// Speech, billed per character. ElevenLabs is a cloud-only adapter; the
+	// generic HTTP adapter is priced at the OpenAI endpoint only.
+	{Provider: string(provider.KeyTTSElevenLabs), PerCharacter: 80},
+	{Provider: string(openAI('t', "api.openai.com")), PerCharacter: 15},
+
+	// Gemini image generation, billed per image.
+	{Provider: string(provider.KeyImageGemini), Model: "imagen-3.0-generate-002", PerRequest: 40_000},
+	{Provider: string(provider.KeyImageGemini), Model: "imagen-3.0-fast-generate-001", PerRequest: 20_000},
+
+	// OpenAI embeddings, keyed by endpoint for the same reason as chat.
+	{Provider: string(openAI('e', "api.openai.com")), Model: "text-embedding-3-small", PerMillionInput: 20_000},
+	{Provider: string(openAI('e', "api.openai.com")), Model: "text-embedding-3-large", PerMillionInput: 130_000},
+}
+
+// openAI builds the endpoint-scoped key for an OpenAI adapter: 'l' for chat, 't'
+// for speech, 'e' for embeddings.
+func openAI(kind rune, host string) provider.Key {
+	base := provider.KeyLLMOpenAIChat
+	switch kind {
+	case 't':
+		base = provider.KeyTTSHTTP
+	case 'e':
+		base = provider.KeyEmbeddingOpenAI
+	}
+	return provider.InstanceOrSelf(base, host)
 }
 
 // CostMicros returns the cost of one usage record under a price. A zero price

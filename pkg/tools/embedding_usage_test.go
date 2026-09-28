@@ -24,16 +24,16 @@ func TestSearchEntitiesReportsEmbeddingUsage(t *testing.T) {
 	exec.SetEmbeddingsProvider(&usageEmbedder{})
 
 	var gotKey, gotModel string
-	var gotTokens, gotRequests int
-	exec.SetEmbeddingUsage(func(providerKey, model string, inputTokens, requests int) {
-		gotKey, gotModel, gotTokens, gotRequests = providerKey, model, inputTokens, requests
+	var gotTokens, gotCharacters, gotRequests int
+	exec.SetEmbeddingUsage(func(providerKey, model string, inputTokens, characters, requests int) {
+		gotKey, gotModel, gotTokens, gotCharacters, gotRequests = providerKey, model, inputTokens, characters, requests
 	}, "embedding:gemini@default", "text-embedding-004")
 
 	if _, ok := exec.Execute(context.Background(), call("search_entities", `{"query":"warden"}`)); !ok {
 		t.Fatal("Execute reported failure")
 	}
-	if gotKey != "embedding:gemini@default" || gotModel != "text-embedding-004" || gotTokens != 11 || gotRequests != 1 {
-		t.Fatalf("usage = %q/%q/%d/%d, want the resolved key, model, 11 tokens, 1 request", gotKey, gotModel, gotTokens, gotRequests)
+	if gotKey != "embedding:gemini@default" || gotModel != "text-embedding-004" || gotTokens != 11 || gotCharacters != 0 || gotRequests != 1 {
+		t.Fatalf("usage = %q/%q/%d/%d/%d, want the resolved key, model, 11 tokens, 0 characters, 1 request", gotKey, gotModel, gotTokens, gotCharacters, gotRequests)
 	}
 }
 
