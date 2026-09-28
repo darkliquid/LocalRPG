@@ -1,9 +1,13 @@
 import React, { memo, useState } from 'react';
-import { Copy, Check, Info, Lightbulb, AlertTriangle, AlertCircle } from 'lucide-react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { remarkAlert } from 'remark-github-blockquote-alert';
+import { Copy, Check } from 'lucide-react';
 
 interface MarkdownDocViewerProps {
   content: string;
   className?: string;
+  onNavigate?: (articleID: string) => void;
 }
 
 interface CodeBlockProps {
@@ -53,253 +57,141 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
   );
 };
 
-const inlinePattern = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(_[^_]+_)|(\[[^\]]+\]\([^)]+\))/g;
-
-const renderInlineProse = (text: string): React.ReactNode[] => {
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let key = 0;
-  let match: RegExpExecArray | null;
-
-  inlinePattern.lastIndex = 0;
-  while ((match = inlinePattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
-    }
-
-    const token = match[0];
-    if (token.startsWith('`')) {
-      nodes.push(
-        <code key={key++} className="px-1.5 py-0.5 rounded bg-white/[0.08] border border-white/10 font-mono text-[0.88em] text-purple-300">
-          {token.slice(1, -1)}
-        </code>
-      );
-    } else if (token.startsWith('**')) {
-      nodes.push(
-        <strong key={key++} className="font-semibold text-white">
-          {token.slice(2, -2)}
-        </strong>
-      );
-    } else if (token.startsWith('*') || token.startsWith('_')) {
-      nodes.push(
-        <em key={key++} className="italic text-stone-300">
-          {token.slice(1, -1)}
-        </em>
-      );
-    } else if (token.startsWith('[')) {
-      const linkMatch = token.match(/\[([^\]]+)\]\(([^)]+)\)/);
-      if (linkMatch) {
-        nodes.push(
-          <a
-            key={key++}
-            href={linkMatch[2]}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-purple-400 hover:text-purple-300 underline font-medium"
-          >
-            {linkMatch[1]}
-          </a>
-        );
-      } else {
-        nodes.push(token);
-      }
-    }
-
-    lastIndex = match.index + token.length;
-  }
-
-  if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
-  }
-  return nodes;
+// GitHub alert styling, keyed by the `markdown-alert-<type>` class the plugin
+// emits. The descendant variant recolours the generated title.
+const ALERT_STYLES: Record<string, string> = {
+  note: 'border-blue-500/40 bg-blue-950/20 [&_.markdown-alert-title]:text-blue-300',
+  tip: 'border-emerald-500/40 bg-emerald-950/20 [&_.markdown-alert-title]:text-emerald-300',
+  important: 'border-purple-500/40 bg-purple-950/20 [&_.markdown-alert-title]:text-purple-300',
+  warning: 'border-amber-500/40 bg-amber-950/20 [&_.markdown-alert-title]:text-amber-300',
+  caution: 'border-red-500/40 bg-red-950/20 [&_.markdown-alert-title]:text-red-300',
 };
 
-export const MarkdownDocViewer: React.FC<MarkdownDocViewerProps> = memo(({ content, className = '' }) => {
-  const normalized = (content ?? '').replace(/\r\n/g, '\n');
-  if (!normalized.trim()) return null;
+const baseComponents: Components = {
+  h1: ({ children }) => (
+    <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight pt-4 pb-2 border-b border-white/10">
+      {children}
+    </h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="text-xl sm:text-2xl font-bold text-purple-300 tracking-tight pt-4 pb-1">{children}</h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="text-lg font-semibold text-stone-100 tracking-tight pt-2">{children}</h3>
+  ),
+  h4: ({ children }) => (
+    <h4 className="text-base font-semibold text-purple-200/90 pt-1">{children}</h4>
+  ),
+  p: ({ className, children, ...props }) => {
+    const isAlertTitle = className?.includes('markdown-alert-title') ?? false;
+    return (
+      <p
+        className={isAlertTitle ? `${className} flex items-center gap-2 font-semibold text-sm mb-1.5` : 'leading-relaxed'}
+        {...props}
+      >
+        {children}
+      </p>
+    );
+  },
+  ul: ({ children }) => (
+    <ul className="list-disc list-outside ml-6 space-y-1 text-stone-300 marker:text-stone-500">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="list-decimal list-outside ml-6 space-y-1 text-stone-300 marker:text-stone-500">{children}</ol>
+  ),
+  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+  em: ({ children }) => <em className="italic text-stone-300">{children}</em>,
+  hr: () => <hr className="my-6 border-white/10" />,
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-2 border-purple-500/50 pl-4 py-1 italic text-stone-300">{children}</blockquote>
+  ),
+  div: ({ className, children, ...props }) => {
+    if (className?.includes('markdown-alert')) {
+      const type = Object.keys(ALERT_STYLES).find((t) => className.includes(`markdown-alert-${t}`)) ?? 'note';
+      return (
+        <div
+          className={`my-4 p-4 rounded-xl border text-sm text-stone-300 [&_svg]:w-4 [&_svg]:h-4 [&_svg]:shrink-0 ${ALERT_STYLES[type]} ${className}`}
+          {...props}
+        >
+          {children}
+        </div>
+      );
+    }
+    return (
+      <div className={className} {...props}>
+        {children}
+      </div>
+    );
+  },
+  pre: ({ children }) => <>{children}</>,
+  code: ({ className, children }) => {
+    const text = String(children ?? '');
+    const isBlock = Boolean(className) || text.includes('\n');
+    if (!isBlock) {
+      return (
+        <code className="px-1.5 py-0.5 rounded bg-white/[0.08] border border-white/10 font-mono text-[0.88em] text-purple-300">
+          {children}
+        </code>
+      );
+    }
+    const language = /language-(\w+)/.exec(className ?? '')?.[1];
+    return <CodeBlock code={text.replace(/\n$/, '')} language={language} />;
+  },
+  table: ({ children }) => (
+    <div className="my-4 overflow-x-auto rounded-xl border border-white/10 bg-black/40">
+      <table className="w-full text-left border-collapse text-xs sm:text-sm">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => <thead className="border-b border-white/10 bg-white/[0.04]">{children}</thead>,
+  tr: ({ children }) => <tr className="border-b border-white/5 hover:bg-white/[0.02]">{children}</tr>,
+  th: ({ children }) => <th className="py-2.5 px-4 font-semibold text-stone-200">{children}</th>,
+  td: ({ children }) => <td className="py-2.5 px-4 text-stone-300">{children}</td>,
+};
 
-  // Split content by fenced code blocks first
-  const parts = normalized.split(/(```[\s\S]*?```)/g);
+export const MarkdownDocViewer: React.FC<MarkdownDocViewerProps> = memo(({ content, className = '', onNavigate }) => {
+  if (!content?.trim()) return null;
+
+  // A link with no scheme is a cross-reference to another embedded article,
+  // so it switches the open document instead of opening a new tab.
+  const isInternal = (href: string): boolean => !/^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith('#');
+
+  const markdownComponents: Components = {
+    ...baseComponents,
+    a: ({ href, children }) => {
+      const target = href ?? '';
+      if (isInternal(target) && onNavigate) {
+        return (
+          <a
+            href={target}
+            onClick={(event) => {
+              event.preventDefault();
+              onNavigate(target.replace(/\.md$/, ''));
+            }}
+            className="text-purple-400 hover:text-purple-300 underline font-medium cursor-pointer"
+          >
+            {children}
+          </a>
+        );
+      }
+      return (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-purple-400 hover:text-purple-300 underline font-medium"
+        >
+          {children}
+        </a>
+      );
+    },
+  };
 
   return (
     <div className={`space-y-4 text-stone-300 font-sans leading-relaxed text-sm sm:text-base ${className}`}>
-      {parts.map((part, partIndex) => {
-        if (part.startsWith('```') && part.endsWith('```')) {
-          const firstLineEnd = part.indexOf('\n');
-          const language = part.slice(3, firstLineEnd).trim();
-          const code = part.slice(firstLineEnd + 1, -3);
-          return <CodeBlock key={partIndex} code={code} language={language} />;
-        }
-
-        // Process standard markdown blocks
-        const blocks = part.split(/\n{2,}/);
-        return blocks.map((block, blockIndex) => {
-          const trimmed = block.trim();
-          if (!trimmed) return null;
-
-          // Headings
-          if (trimmed.startsWith('# ')) {
-            return (
-              <h1 key={`${partIndex}-${blockIndex}`} className="text-2xl sm:text-3xl font-bold text-white tracking-tight pt-4 pb-2 border-b border-white/10">
-                {renderInlineProse(trimmed.slice(2))}
-              </h1>
-            );
-          }
-          if (trimmed.startsWith('## ')) {
-            return (
-              <h2 key={`${partIndex}-${blockIndex}`} className="text-xl sm:text-2xl font-bold text-purple-300 tracking-tight pt-4 pb-1">
-                {renderInlineProse(trimmed.slice(3))}
-              </h2>
-            );
-          }
-          if (trimmed.startsWith('### ')) {
-            return (
-              <h3 key={`${partIndex}-${blockIndex}`} className="text-lg font-semibold text-stone-100 tracking-tight pt-2">
-                {renderInlineProse(trimmed.slice(4))}
-              </h3>
-            );
-          }
-          if (trimmed.startsWith('#### ')) {
-            return (
-              <h4 key={`${partIndex}-${blockIndex}`} className="text-base font-semibold text-purple-200/90 pt-1">
-                {renderInlineProse(trimmed.slice(5))}
-              </h4>
-            );
-          }
-
-          // Horizontal rule
-          if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
-            return <hr key={`${partIndex}-${blockIndex}`} className="my-6 border-white/10" />;
-          }
-
-          // Callouts: > [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING]
-          if (trimmed.startsWith('>')) {
-            const lines = trimmed.split('\n').map((l) => l.replace(/^>\s?/, ''));
-            const header = lines[0]?.trim() || '';
-
-            let calloutType: 'note' | 'tip' | 'important' | 'warning' | null = null;
-            let title = '';
-            let bodyLines = lines;
-
-            if (header.startsWith('[!NOTE]')) {
-              calloutType = 'note';
-              title = 'Note';
-              bodyLines = lines.slice(1);
-            } else if (header.startsWith('[!TIP]')) {
-              calloutType = 'tip';
-              title = 'Tip';
-              bodyLines = lines.slice(1);
-            } else if (header.startsWith('[!IMPORTANT]')) {
-              calloutType = 'important';
-              title = 'Important';
-              bodyLines = lines.slice(1);
-            } else if (header.startsWith('[!WARNING]')) {
-              calloutType = 'warning';
-              title = 'Warning';
-              bodyLines = lines.slice(1);
-            }
-
-            if (calloutType) {
-              const styles = {
-                note: { border: 'border-blue-500/40', bg: 'bg-blue-950/20', text: 'text-blue-300', icon: Info },
-                tip: { border: 'border-emerald-500/40', bg: 'bg-emerald-950/20', text: 'text-emerald-300', icon: Lightbulb },
-                important: { border: 'border-purple-500/40', bg: 'bg-purple-950/20', text: 'text-purple-300', icon: AlertCircle },
-                warning: { border: 'border-amber-500/40', bg: 'bg-amber-950/20', text: 'text-amber-300', icon: AlertTriangle },
-              }[calloutType];
-              const IconComponent = styles.icon;
-
-              return (
-                <div key={`${partIndex}-${blockIndex}`} className={`my-4 p-4 rounded-xl border ${styles.border} ${styles.bg}`}>
-                  <div className={`flex items-center gap-2 font-semibold text-sm ${styles.text} mb-1.5`}>
-                    <IconComponent className="w-4 h-4" />
-                    <span>{title}</span>
-                  </div>
-                  <div className="text-sm text-stone-300 space-y-1">
-                    {bodyLines.map((line, li) => (
-                      <p key={li}>{renderInlineProse(line)}</p>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-
-            // Standard blockquote
-            return (
-              <blockquote key={`${partIndex}-${blockIndex}`} className="border-l-2 border-purple-500/50 pl-4 py-1 italic text-stone-300">
-                {lines.map((l, li) => (
-                  <p key={li}>{renderInlineProse(l)}</p>
-                ))}
-              </blockquote>
-            );
-          }
-
-          // Tables
-          const lines = trimmed.split('\n');
-          if (lines.length >= 2 && lines[0].includes('|') && lines[1].includes('|') && lines[1].includes('-')) {
-            const headerCells = lines[0].split('|').map((c) => c.trim()).filter(Boolean);
-            const rowLines = lines.slice(2);
-
-            return (
-              <div key={`${partIndex}-${blockIndex}`} className="my-4 overflow-x-auto rounded-xl border border-white/10 bg-black/40">
-                <table className="w-full text-left border-collapse text-xs sm:text-sm">
-                  <thead>
-                    <tr className="border-b border-white/10 bg-white/[0.04]">
-                      {headerCells.map((cell, ci) => (
-                        <th key={ci} className="py-2.5 px-4 font-semibold text-stone-200">
-                          {renderInlineProse(cell)}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rowLines.map((row, ri) => {
-                      const cells = row.split('|').map((c) => c.trim()).filter(Boolean);
-                      return (
-                        <tr key={ri} className="border-b border-white/5 hover:bg-white/[0.02]">
-                          {cells.map((cell, ci) => (
-                            <td key={ci} className="py-2.5 px-4 text-stone-300">
-                              {renderInlineProse(cell)}
-                            </td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            );
-          }
-
-          // Bulleted list
-          if (lines.every((line) => /^\s*[-*]\s+/.test(line))) {
-            return (
-              <ul key={`${partIndex}-${blockIndex}`} className="list-disc list-outside ml-6 space-y-1 text-stone-300">
-                {lines.map((line, li) => (
-                  <li key={li}>{renderInlineProse(line.replace(/^\s*[-*]\s+/, ''))}</li>
-                ))}
-              </ul>
-            );
-          }
-
-          // Numbered list
-          if (lines.every((line) => /^\s*\d+\.\s+/.test(line))) {
-            return (
-              <ol key={`${partIndex}-${blockIndex}`} className="list-decimal list-outside ml-6 space-y-1 text-stone-300">
-                {lines.map((line, li) => (
-                  <li key={li}>{renderInlineProse(line.replace(/^\s*\d+\.\s+/, ''))}</li>
-                ))}
-              </ol>
-            );
-          }
-
-          // Regular paragraph
-          return (
-            <p key={`${partIndex}-${blockIndex}`} className="leading-relaxed">
-              {renderInlineProse(trimmed)}
-            </p>
-          );
-        });
-      })}
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkAlert]} components={markdownComponents}>
+        {content}
+      </ReactMarkdown>
     </div>
   );
 });

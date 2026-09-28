@@ -14,7 +14,7 @@ A **World** defines the setting, lore, aesthetics, and starting conditions for c
 
 Each world directory (`worlds/<id>/`) contains:
 
-```
+```text
 worlds/eldoria/
 ├── world.yaml                  # Identity, tags, and settings
 ├── prompts/

@@ -47,8 +47,15 @@ run = "npx tsc --noEmit"
 description = "Run all tests across the project"
 depends = ["test:backend", "test:frontend"]
 
+[tasks."lint:docs"]
+description = "Lint the embedded documentation Markdown"
+dir = "frontend"
+depends = ["install:frontend"]
+run = "npm run lint:docs"
+
 [tasks.lint]
 description = "Run code analysis and linting"
+depends = ["lint:docs"]
 run = "go vet ./..."
 
 [tasks."dev:gui"]

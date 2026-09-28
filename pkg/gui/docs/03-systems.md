@@ -12,7 +12,7 @@ A **System** defines how actions are resolved, what dice are rolled, how charact
 
 ## System Structure
 
-```
+```text
 systems/classic-d20/
 ├── system.yaml         # System metadata, modes, and dice definitions
 ├── mechanics.js        # Sandboxed JavaScript mechanics engine
@@ -32,6 +32,7 @@ LocalRPG supports four fundamental action modes configured in `system.yaml`:
 ## Dice Expressions
 
 LocalRPG features a built-in dice evaluation engine supporting standard tabletop notations:
+
 - `1d20 + 5`: Roll a 20-sided die and add 5.
 - `2d6`: Roll two six-sided dice and sum the results.
 - `4dF`: Fate/Fudge dice (values -1, 0, +1).

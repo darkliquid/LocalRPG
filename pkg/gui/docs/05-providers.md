@@ -35,7 +35,9 @@ providers:
 ## LLM Providers
 
 ### Ollama (Local)
+
 Run models locally with zero external network access:
+
 ```yaml
 providers:
   local-llama:
@@ -45,6 +47,7 @@ providers:
 ```
 
 ### Gemini API (Cloud)
+
 ```yaml
 providers:
   gemini-flash:
@@ -55,17 +58,20 @@ providers:
 ```
 
 ### Narrative Oracle (Built-in)
+
 Zero-setup built-in fallback model that generates narrative choices using procedural oracle tables.
 
 ## Media Providers
 
 ### Voice (TTS)
+
 - **ElevenLabs**: High-fidelity AI speech (`type: http`, `base_url: https://api.elevenlabs.io`).
 - **Gemini Voice**: Multimodal speech synthesis.
 - **Native OS (`builtin_name: native-os`)**: Built-in speech using your operating system's native synthesizer (`say` on macOS, `spd-say` on Linux, PowerShell SAPI on Windows).
 - **Sherpa / Piper**: High quality local neural speech synthesis.
 
 ### Image Generation
+
 - **Procedural Art (`builtin_name: procedural-art`)**: Pure-Go SVG generator creating heraldic banners, landscape silhouettes, and item icons without a GPU.
 - **ComfyUI / Automatic1111**: Local Stable Diffusion web APIs.
 - **Google Imagen**: Cloud image synthesis.
@@ -73,6 +79,12 @@ Zero-setup built-in fallback model that generates narrative choices using proced
 ## Spend Ledger & Rate Limit Handling
 
 LocalRPG protects you from runaway API costs and service interruptions:
+
 - **Rate Limits (HTTP 429)**: The engine automatically applies exponential backoff with jitter.
 - **Insufficient Funds (HTTP 402)**: Instantly pauses background generation and displays a warning chip in the interface.
 - **Spend Ledger**: Tracks exact token usage, estimated costs, and requests per model, viewable in Global Settings.
+
+See [Usage, Cost & Pricing](11-usage-and-pricing) for the ledger keys and price
+fields, the [Provider & Model Catalogue](12-provider-catalogue) for the full
+list of provider IDs, presets, and models, and the
+[Configuration Reference](13-configuration-reference) for every config key.

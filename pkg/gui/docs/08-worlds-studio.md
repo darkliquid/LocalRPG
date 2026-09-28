@@ -45,6 +45,7 @@ Describe the drip of brackish water, the squeal of rusted iron pulleys, and the 
 ## Creating Starter Entities
 
 In the **Entities** panel of the Worlds Studio, add key starter notes:
+
 - **Locations**: Create at least one primary location (e.g. `the-diving-dock.md`) and set `type: location`.
 - **Factions**: Create founding groups and allegiances.
 - **Key Figures**: Add memorable NPCs with distinctive mannerisms and voice tags.

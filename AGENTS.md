@@ -14,13 +14,18 @@ mise run build:backend  # depends on build:frontend
 mise run test           # go test -v -count=1 ./...  AND  npx tsc --noEmit
 mise run test:backend   # go test -v -count=1 ./...
 mise run test:frontend  # npx tsc --noEmit (in frontend/)
-mise run lint           # go vet ./...
+mise run lint           # markdownlint on pkg/gui/docs, then go vet ./...
+mise run lint:docs      # markdownlint-cli2 on the embedded help articles
 mise run dev:gui        # go run ./cmd/localrpg gui --port 8080
 mise run dev:frontend   # vite dev server on :3000, proxies /api -> localhost:8080
 mise run clean
 ```
 
 Run a single Go test: `go test -run TestTurnOrchestrator ./pkg/engine/`.
+
+Regenerate the generated embedded docs (provider catalogue, config reference)
+after changing a provider, preset, or config struct:
+`go test ./pkg/gui -update-docs`.
 
 CLI surface (`localrpg <cmd>`): `roll <notation>`, `prompt`, `play <game-id>`, `tts`, `image`, `gui`, `export <web|video>`, `debug <test-run|server>`, `version`.
 

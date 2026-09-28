@@ -15,6 +15,7 @@ LocalRPG is a local-first, turn-based tabletop RPG client built in Go and TypeSc
 Traditional digital RPGs hardcode character classes, hit points, mana bars, and spell slots directly into their engine databases. LocalRPG takes an entirely different approach: **it has zero hardcoded RPG stats or mechanics**.
 
 Instead, LocalRPG is **schema-agnostic**:
+
 - Every character, location, faction, and item is a plain Markdown file with a YAML frontmatter block.
 - Game mechanics (dice rolls, stats, inventories, fatigue, spell slots) are defined by sandboxed JavaScript/Wasm rules engines.
 - The AI Game Master (GM) and Narrator read these rules and lore directly from structured prompt contexts, adapting to any genre or ruleset.

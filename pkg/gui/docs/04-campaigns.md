@@ -14,7 +14,7 @@ A **Campaign** is an active instance of a World played under a System. It preser
 
 Every turn passes through a disciplined multi-step pipeline:
 
-```
+```text
 [Player Action] ──> [GM Directives / Undo Check]
                           │
                           ▼
@@ -50,6 +50,7 @@ Every turn passes through a disciplined multi-step pipeline:
 ## The `history.jsonl` Canonical Log
 
 Campaign history is stored as append-only newline-delimited JSON (`games/<id>/history.jsonl`). Each record captures:
+
 - Sequential turn number.
 - Raw player prompt.
 - Narrator's rewritten output.
@@ -60,6 +61,7 @@ Campaign history is stored as append-only newline-delimited JSON (`games/<id>/hi
 ## Non-Destructive Rewind (`/undo`)
 
 Because `history.jsonl` is the source of truth, invoking `/undo` rewinds the campaign cleanly:
+
 - The log is truncated back to the chosen turn number.
 - `cache/index.db` turn entries are pruned.
 - Entity history turn markers are rolled back, while authored entity lore and character sheets remain intact.

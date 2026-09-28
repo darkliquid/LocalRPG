@@ -38,6 +38,7 @@ interface SettingsStudioProps {
   isCompact?: boolean;
   onSaved?: () => void;
   activeGameID?: string;
+  onOpenDocs?: (articleID?: string) => void;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -104,7 +105,7 @@ const presetsToMap = <T,>(
 const defaultRoleConfig = (role: string): AgentRoleConfig =>
   role === 'extractor' ? { type: 'inherit', inherit_from: 'gm' } : { type: 'disabled' };
 
-export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSaved, activeGameID }) => {
+export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSaved, activeGameID, onOpenDocs }) => {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [activeFilePath, setActiveFilePath] = useState<string>('');
   const [isOverride, setIsOverride] = useState(false);
@@ -2893,7 +2894,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       )}
 
       {/* Tab: Usage & Spend */}
-      {activeSubTab === 'usage' && <UsagePanel activeGameID={activeGameID} />}
+      {activeSubTab === 'usage' && <UsagePanel activeGameID={activeGameID} onOpenDocs={onOpenDocs} />}
 
       {/* Tab: Debug (developer view over the trace) */}
       {activeSubTab === 'debug' && <DebugPanel config={config} setConfig={setConfig} />}

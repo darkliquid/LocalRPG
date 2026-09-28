@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -101,5 +103,55 @@ func TestServer_DocsEndpoints(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("GET /api/docs/non-existent-doc expected 404, got %d", w.Code)
+	}
+}
+
+// The Usage panel links unpriced rows to this article by ID, so the contract is
+// asserted here rather than only in the frontend.
+func TestDocsService_UsagePricingArticle(t *testing.T) {
+	svc := &Service{}
+	article, err := svc.GetDocArticle(context.Background(), "11-usage-and-pricing")
+	if err != nil {
+		t.Fatalf("GetDocArticle(11-usage-and-pricing) failed: %v", err)
+	}
+	if article.Category != "Configuration & Providers" {
+		t.Errorf("unexpected category: %s", article.Category)
+	}
+	if !strings.Contains(article.Content, "providers.prices") {
+		t.Errorf("expected article to document the providers.prices config key")
+	}
+}
+
+// Cross-references between articles are navigated by article ID, so a link to a
+// mistyped or removed article would silently fail in the viewer.
+func TestDocsService_InternalLinksResolve(t *testing.T) {
+	svc := &Service{}
+	ctx := context.Background()
+
+	list, err := svc.GetDocsList(ctx)
+	if err != nil {
+		t.Fatalf("GetDocsList failed: %v", err)
+	}
+	known := make(map[string]bool, len(list))
+	for _, summary := range list {
+		known[summary.ID] = true
+	}
+
+	linkPattern := regexp.MustCompile(`\]\(([^)\s]+)\)`)
+	for _, summary := range list {
+		article, err := svc.GetDocArticle(ctx, summary.ID)
+		if err != nil {
+			t.Fatalf("GetDocArticle(%s) failed: %v", summary.ID, err)
+		}
+		for _, match := range linkPattern.FindAllStringSubmatch(article.Content, -1) {
+			target := match[1]
+			if strings.Contains(target, "://") || strings.HasPrefix(target, "#") || strings.HasPrefix(target, "mailto:") {
+				continue
+			}
+			ref := strings.TrimSuffix(strings.TrimPrefix(target, "/"), ".md")
+			if !known[ref] {
+				t.Errorf("article %s links to unknown article %q", summary.ID, target)
+			}
+		}
 	}
 }

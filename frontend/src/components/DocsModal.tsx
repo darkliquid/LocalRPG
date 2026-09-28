@@ -312,7 +312,10 @@ export const DocsModal: React.FC<DocsModalProps> = ({
                       {currentArticle.description}
                     </p>
                   </div>
-                  <MarkdownDocViewer content={currentArticle.content} />
+                  <MarkdownDocViewer
+                    content={currentArticle.content}
+                    onNavigate={(articleID) => setSelectedArticleID(articleID)}
+                  />
                 </>
               ) : (
                 <div className="text-stone-500 text-center py-12">

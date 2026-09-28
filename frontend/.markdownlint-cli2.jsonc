@@ -1,0 +1,11 @@
+{
+  // Documentation is authored as prose that wraps naturally in the viewer, so
+  // line length is not enforced.
+  "config": {
+    "MD013": false,
+    // Each article carries its title in frontmatter and repeats it as the H1.
+    "MD025": { "front_matter_title": "" },
+    // MarkdownDocViewer renders a small, known set of inline HTML.
+    "MD033": false
+  }
+}

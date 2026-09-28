@@ -49,6 +49,7 @@ agents:
 ## Token Budgets & Context Management
 
 The orchestrator dynamically fits prompt layers into the configured `context_window` limit:
+
 - Priority is given to system rules and character sheet state.
 - Entity memories and living-world notes are prioritized based on proximity in the knowledge graph.
 - Historical turns are compressed or truncated using sliding-window recaps when context headroom is low.

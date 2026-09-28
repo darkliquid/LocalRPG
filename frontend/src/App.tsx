@@ -59,6 +59,7 @@ export const App: React.FC = () => {
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
+  const [docsArticleID, setDocsArticleID] = useState<string | undefined>(undefined);
   const [addressed, setAddressed] = useState<Set<number>>(new Set());
   const [modalEntity, setModalEntity] = useState<{ name: string; turnNumber: number } | null>(null);
   const [missingModel, setMissingModel] = useState<{ id: string; name: string; sizeBytes: number } | null>(null);
@@ -526,6 +527,14 @@ export const App: React.FC = () => {
   const pendingCheck = chronicle.length > 0 ? chronicle[chronicle.length - 1].pending_check : undefined;
   const lastTurnChecks = chronicle.length > 0 ? chronicle[chronicle.length - 1].checks ?? [] : [];
 
+  // Open the built-in docs, optionally jumping straight to an article. Callers
+  // that explain a setting (for example an unpriced usage row) link a reader to
+  // the exact reference instead of leaving them to search.
+  const openDocs = (articleID?: string) => {
+    setDocsArticleID(articleID);
+    setIsDocsOpen(true);
+  };
+
   return (
     <div className="relative flex flex-col h-screen overflow-hidden text-stone-200">
       {/* Full-window atmospheric background layer */}
@@ -650,7 +659,7 @@ export const App: React.FC = () => {
                 <span className="hidden sm:inline">Settings</span>
               </button>
               <button
-                onClick={() => setIsDocsOpen(true)}
+                onClick={() => openDocs()}
                 className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                   isDocsOpen ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
                 }`}
@@ -887,6 +896,7 @@ export const App: React.FC = () => {
                 <div className="flex-1 min-h-0 overflow-y-auto p-6">
                   <SettingsStudio
                     activeGameID={activeGameID ?? undefined}
+                    onOpenDocs={openDocs}
                     onSaved={() =>
                       APIClient.getSettings()
                         .then((res) => setConfig(res.config))
@@ -957,7 +967,11 @@ export const App: React.FC = () => {
           {/* Built-in Help and Documentation Modal */}
           <DocsModal
             isOpen={isDocsOpen}
-            onClose={() => setIsDocsOpen(false)}
+            initialArticleID={docsArticleID}
+            onClose={() => {
+              setIsDocsOpen(false);
+              setDocsArticleID(undefined);
+            }}
           />
         </>
       )}

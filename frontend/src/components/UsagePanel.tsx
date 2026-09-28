@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Usage, UsageRow } from '../types';
 import { APIClient } from '../api/client';
-import { Coins, RefreshCw, Filter, ArrowLeft, AlertCircle, Cpu, ShieldAlert } from 'lucide-react';
+import { Coins, RefreshCw, Filter, ArrowLeft, AlertCircle, Cpu, ShieldAlert, BookOpen } from 'lucide-react';
 
 interface UsagePanelProps {
   activeGameID?: string;
+  onOpenDocs?: (articleID?: string) => void;
 }
 
 export const formatCost = (micros: number, currency: string = 'USD'): string => {
@@ -35,7 +36,7 @@ export const formatConsumption = (row: UsageRow): string[] => {
   return parts;
 };
 
-export const UsagePanel: React.FC<UsagePanelProps> = ({ activeGameID }) => {
+export const UsagePanel: React.FC<UsagePanelProps> = ({ activeGameID, onOpenDocs }) => {
   const [isAllCampaigns, setIsAllCampaigns] = useState<boolean>(!activeGameID);
   const [selectedDrilldownGameID, setSelectedDrilldownGameID] = useState<string | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
@@ -348,9 +349,15 @@ export const UsagePanel: React.FC<UsagePanelProps> = ({ activeGameID }) => {
                         </td>
                         <td className="py-2.5 px-3 text-right font-bold">
                           {isUnpriced ? (
-                            <span className="px-2 py-0.5 rounded text-[11px] bg-amber-950/40 border border-amber-800/40 text-amber-300">
+                            <button
+                              type="button"
+                              onClick={() => onOpenDocs?.('11-usage-and-pricing')}
+                              title="No price is configured for this provider, so usage is recorded without a cost. Open the Usage & Pricing guide to set one."
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-amber-950/40 border border-amber-800/40 text-amber-300 hover:bg-amber-900/50 hover:border-amber-600 transition-colors cursor-pointer"
+                            >
+                              <BookOpen className="w-3 h-3" />
                               no price configured
-                            </span>
+                            </button>
                           ) : (
                             <span className="text-stone-200">
                               {formatCost(row.cost_micros ?? 0, currency)}

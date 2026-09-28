@@ -64,11 +64,14 @@ Evelyn is the second daughter of the Vance merchant dynasty. While outwardly man
 LocalRPG automatically converts wikilinks into dynamic relationship edges in the campaign knowledge graph:
 
 - **Frontmatter references**:
+
   ```yaml
   location: "[[sunken-spire]]"
   faction: "[[salvage-guild]]"
   ```
+
 - **Prose references with labels**:
+
   ```markdown
   Evelyn was apprenticed to [[master-corvus|Arch-Mage Corvus]] before the fall.
   ```
