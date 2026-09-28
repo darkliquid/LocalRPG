@@ -10,37 +10,42 @@ import (
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
-// providerKeyForRole resolves the provider identity a role currently uses, so a
-// backoff follows the provider and is lifted by a configuration change.
+// providerKeyForRole resolves the canonical key a role's traffic belongs to, so
+// a backoff follows the provider and is lifted by a configuration change. A role
+// whose configuration names no registered adapter falls back to its own name,
+// which no canonical key can collide with.
 func (s *Service) providerKeyForRole(role string) string {
+	key, ok := s.providerKey(role)
+	if !ok || key == "" {
+		return role
+	}
+	return string(key)
+}
+
+// providerKey resolves the canonical key a role's provider records under.
+func (s *Service) providerKey(role string) (provider.Key, bool) {
 	cfg := s.configMgr.Get()
 	switch role {
 	case "tts":
-		return media.ProviderKey(cfg.Media.TTS)
+		return media.TTSKeyFor(cfg.Media.TTS)
 	case "stt":
-		if cfg.Media.STT.BuiltinName != "" {
-			return cfg.Media.STT.BuiltinName
-		}
-		return cfg.Media.STT.Type
+		return media.STTKeyFor(cfg.Media.STT)
 	case "image":
-		if cfg.Media.Image.BuiltinName != "" {
-			return cfg.Media.Image.BuiltinName
-		}
-		return cfg.Media.Image.Type
+		return media.ImageKeyFor(cfg.Media.Image)
 	default:
-		return roleProviderKey(cfg, role)
+		return llmKeyForRole(cfg, role)
 	}
 }
 
-// roleProviderKey names the LLM provider a role resolves to, following an
-// inherit chain so a backoff lands on the provider that actually serves it.
-func roleProviderKey(cfg *config.Config, role string) string {
+// llmKeyForRole resolves the LLM key a role uses, following an inherit chain so
+// a backoff lands on the provider that actually serves it.
+func llmKeyForRole(cfg *config.Config, role string) (provider.Key, bool) {
 	if cfg == nil {
-		return role
+		return "", false
 	}
 	roleCfg, ok := cfg.Agents.Roles[role]
 	if !ok {
-		return role
+		return "", false
 	}
 	seen := map[string]bool{role: true}
 	for roleCfg.Type == "inherit" && roleCfg.InheritFrom != "" && !seen[roleCfg.InheritFrom] {
@@ -51,13 +56,12 @@ func roleProviderKey(cfg *config.Config, role string) string {
 		}
 		roleCfg = next
 	}
-	if roleCfg.BuiltinName != "" {
-		return roleCfg.BuiltinName
-	}
-	if roleCfg.Type != "" {
-		return roleCfg.Type
-	}
-	return role
+	return harness.KeyFor(harness.ProviderConfig{
+		Type:        roleCfg.Type,
+		BuiltinName: roleCfg.BuiltinName,
+		Command:     roleCfg.Command,
+		Endpoint:    roleCfg.Endpoint,
+	})
 }
 
 // guardRole refuses work while the provider behind a role is backed off.
