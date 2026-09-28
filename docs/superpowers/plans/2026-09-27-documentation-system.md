@@ -54,7 +54,7 @@ Create all 10 Markdown files under `pkg/gui/docs/` with complete, accurate front
 - Create: `pkg/gui/docs/09-systems-studio.md`
 - Create: `pkg/gui/docs/10-codex-yaml.md`
 
-- [ ] **Step 1: Create `pkg/gui/docs/01-overview.md`**
+- [x] **Step 1: Create `pkg/gui/docs/01-overview.md`**
 
 ```markdown
 ---
@@ -112,7 +112,7 @@ Three specialized AI agent roles collaborate to create each turn:
 - **Extractor (`extractor`)**: Inspects narrative prose to discover newly introduced NPCs, places, and relationship changes, updating the campaign Codex.
 ```
 
-- [ ] **Step 2: Create `pkg/gui/docs/02-worlds.md`**
+- [x] **Step 2: Create `pkg/gui/docs/02-worlds.md`**
 
 ```markdown
 ---
@@ -171,7 +171,7 @@ When a new campaign begins, LocalRPG determines the opening scene using a determ
 Sometimes a world introduces setting-specific mechanics (e.g. sanity in a Lovecraftian setting or oxygen consumption in hard sci-fi). Worlds can provide custom JavaScript hooks inside `system_overrides/<system-id>/hooks.js`. When a campaign runs with that specific system, these hooks merge with the base system mechanics.
 ```
 
-- [ ] **Step 3: Create `pkg/gui/docs/03-systems.md`**
+- [x] **Step 3: Create `pkg/gui/docs/03-systems.md`**
 
 ```markdown
 ---
@@ -245,7 +245,7 @@ function resolveAction(ctx) {
 The mechanics engine exposes hooks including `onTurnStart`, `resolveAction`, and `onTurnEnd`.
 ```
 
-- [ ] **Step 4: Create `pkg/gui/docs/04-campaigns.md`**
+- [x] **Step 4: Create `pkg/gui/docs/04-campaigns.md`**
 
 ```markdown
 ---
@@ -315,7 +315,7 @@ Because `history.jsonl` is the source of truth, invoking `/undo` rewinds the cam
 - Entity history turn markers are rolled back, while authored entity lore and character sheets remain intact.
 ```
 
-- [ ] **Step 5: Create `pkg/gui/docs/05-providers.md`**
+- [x] **Step 5: Create `pkg/gui/docs/05-providers.md`**
 
 ```markdown
 ---
@@ -398,7 +398,7 @@ LocalRPG protects you from runaway API costs and service interruptions:
 - **Spend Ledger**: Tracks exact token usage, estimated costs, and requests per model, viewable in Global Settings.
 ```
 
-- [ ] **Step 6: Create `pkg/gui/docs/06-agents.md`**
+- [x] **Step 6: Create `pkg/gui/docs/06-agents.md`**
 
 ```markdown
 ---
@@ -457,7 +457,7 @@ The orchestrator dynamically fits prompt layers into the configured `context_win
 - Historical turns are compressed or truncated using sliding-window recaps when context headroom is low.
 ```
 
-- [ ] **Step 7: Create `pkg/gui/docs/07-storage-paths.md`**
+- [x] **Step 7: Create `pkg/gui/docs/07-storage-paths.md`**
 
 ```markdown
 ---
@@ -511,7 +511,7 @@ Each campaign directory contains a SQLite database at `games/<id>/cache/index.db
 - Never edit `index.db` directly; always edit the Markdown files in `entities/`.
 ```
 
-- [ ] **Step 8: Create `pkg/gui/docs/08-worlds-studio.md`**
+- [x] **Step 8: Create `pkg/gui/docs/08-worlds-studio.md`**
 
 ```markdown
 ---
@@ -570,7 +570,7 @@ In the **Entities** panel of the Worlds Studio, add key starter notes:
 Click the **Generate Artwork** button on your world card to generate procedural SVG heraldry or trigger an image generation prompt based on your genre tags.
 ```
 
-- [ ] **Step 9: Create `pkg/gui/docs/09-systems-studio.md`**
+- [x] **Step 9: Create `pkg/gui/docs/09-systems-studio.md`**
 
 ```markdown
 ---
@@ -663,7 +663,7 @@ function resolveAction(ctx) {
 Use the built-in **Dice & Rules Tester** at the bottom of the Systems Studio to execute trial actions, verify dice formulas, and inspect returned state patches before deploying your system to a campaign.
 ```
 
-- [ ] **Step 10: Create `pkg/gui/docs/10-codex-yaml.md`**
+- [x] **Step 10: Create `pkg/gui/docs/10-codex-yaml.md`**
 
 ```markdown
 ---
@@ -744,12 +744,12 @@ LocalRPG automatically converts wikilinks into dynamic relationship edges in the
 Edges are bidirectional in search queries: when the player visits `[[sunken-spire]]`, the context assembler automatically loads all characters whose `location` points to `sunken-spire`.
 ```
 
-- [ ] **Step 11: Verify markdown files exist**
+- [x] **Step 11: Verify markdown files exist**
 
 Run: `ls -la pkg/gui/docs/`
 Expected: 10 files listed from `01-overview.md` to `10-codex-yaml.md`.
 
-- [ ] **Step 12: Commit Task 1**
+- [x] **Step 12: Commit Task 1**
 
 ```bash
 git add pkg/gui/docs/
@@ -768,7 +768,7 @@ Define DTOs in `pkg/gui/types.go`, embed and parse articles in `pkg/gui/docs.go`
 - Modify: `pkg/gui/server.go`
 - Test: `pkg/gui/docs_test.go`
 
-- [ ] **Step 1: Write failing unit test in `pkg/gui/docs_test.go`**
+- [x] **Step 1: Write failing unit test in `pkg/gui/docs_test.go`**
 
 ```go
 package gui
@@ -878,12 +878,12 @@ func TestServer_DocsEndpoints(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestDocs ./pkg/gui/`
 Expected: FAIL (compilation errors: undefined `DocArticleSummaryDTO`, `GetDocsList`, etc.)
 
-- [ ] **Step 3: Add DTOs to `pkg/gui/types.go`**
+- [x] **Step 3: Add DTOs to `pkg/gui/types.go`**
 
 Append to `pkg/gui/types.go`:
 
@@ -904,7 +904,7 @@ type DocArticleDTO struct {
 }
 ```
 
-- [ ] **Step 4: Create `pkg/gui/docs.go`**
+- [x] **Step 4: Create `pkg/gui/docs.go`**
 
 ```go
 package gui
@@ -1056,7 +1056,7 @@ func (s *Service) GetDocArticle(_ context.Context, id string) (*DocArticleDTO, e
 }
 ```
 
-- [ ] **Step 5: Register HTTP routes in `pkg/gui/server.go`**
+- [x] **Step 5: Register HTTP routes in `pkg/gui/server.go`**
 
 In `pkg/gui/server.go`:
 1. In `routeMetricLabel(path string) string`:
@@ -1103,17 +1103,17 @@ func (s *Server) handleDocsRoutes(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `go test -v -run TestDocs ./pkg/gui/`
 Expected: PASS for all tests.
 
-- [ ] **Step 7: Run `go vet ./...` to verify clean linter**
+- [x] **Step 7: Run `go vet ./...` to verify clean linter**
 
 Run: `go vet ./pkg/gui/...`
 Expected: Clean exit code 0.
 
-- [ ] **Step 8: Commit Task 2**
+- [x] **Step 8: Commit Task 2**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/docs.go pkg/gui/server.go pkg/gui/docs_test.go
@@ -1130,7 +1130,7 @@ Expose TypeScript types and client fetchers for documentation.
 - Modify: `frontend/src/types.ts`
 - Modify: `frontend/src/api/client.ts`
 
-- [ ] **Step 1: Add types to `frontend/src/types.ts`**
+- [x] **Step 1: Add types to `frontend/src/types.ts`**
 
 Add to `frontend/src/types.ts`:
 
@@ -1148,7 +1148,7 @@ export interface DocArticle extends DocArticleSummary {
 }
 ```
 
-- [ ] **Step 2: Add API methods to `frontend/src/api/client.ts`**
+- [x] **Step 2: Add API methods to `frontend/src/api/client.ts`**
 
 Import `DocArticleSummary` and `DocArticle` from `../types`.
 In `APIClient` class, add static and instance methods:
@@ -1167,12 +1167,12 @@ In `APIClient` class, add static and instance methods:
   }
 ```
 
-- [ ] **Step 3: Verify TypeScript compilation**
+- [x] **Step 3: Verify TypeScript compilation**
 
 Run: `npx tsc --noEmit`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 4: Commit Task 3**
+- [x] **Step 4: Commit Task 3**
 
 ```bash
 git add frontend/src/types.ts frontend/src/api/client.ts
@@ -1192,7 +1192,7 @@ Create `frontend/src/components/MarkdownDocViewer.tsx` to render rich documentat
 **Files:**
 - Create: `frontend/src/components/MarkdownDocViewer.tsx`
 
-- [ ] **Step 1: Create `frontend/src/components/MarkdownDocViewer.tsx`**
+- [x] **Step 1: Create `frontend/src/components/MarkdownDocViewer.tsx`**
 
 ```tsx
 import React, { memo, useState } from 'react';
@@ -1504,12 +1504,12 @@ export const MarkdownDocViewer: React.FC<MarkdownDocViewerProps> = memo(({ conte
 MarkdownDocViewer.displayName = 'MarkdownDocViewer';
 ```
 
-- [ ] **Step 2: Verify TypeScript compilation**
+- [x] **Step 2: Verify TypeScript compilation**
 
 Run: `npx tsc --noEmit`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 3: Commit Task 4**
+- [x] **Step 3: Commit Task 4**
 
 ```bash
 git add frontend/src/components/MarkdownDocViewer.tsx
@@ -1530,7 +1530,7 @@ Build the two-pane studio modal featuring:
 **Files:**
 - Create: `frontend/src/components/DocsModal.tsx`
 
-- [ ] **Step 1: Create `frontend/src/components/DocsModal.tsx`**
+- [x] **Step 1: Create `frontend/src/components/DocsModal.tsx`**
 
 ```tsx
 import React, { useState, useEffect, useMemo } from 'react';
@@ -1904,12 +1904,12 @@ export const DocsModal: React.FC<DocsModalProps> = ({
 };
 ```
 
-- [ ] **Step 2: Verify TypeScript compilation**
+- [x] **Step 2: Verify TypeScript compilation**
 
 Run: `npx tsc --noEmit`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 3: Commit Task 5**
+- [x] **Step 3: Commit Task 5**
 
 ```bash
 git add frontend/src/components/DocsModal.tsx
@@ -1930,7 +1930,7 @@ Wire entry points:
 - Modify: `frontend/src/components/LauncherHub.tsx`
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Add `onOpenDocs` to `LauncherDock.tsx`**
+- [x] **Step 1: Add `onOpenDocs` to `LauncherDock.tsx`**
 
 In `frontend/src/components/launcher/LauncherDock.tsx`:
 1. Import `HelpCircle` from `lucide-react`.
@@ -1953,7 +1953,7 @@ In `frontend/src/components/launcher/LauncherDock.tsx`:
         </div>
 ```
 
-- [ ] **Step 2: Connect `DocsModal` in `LauncherHub.tsx`**
+- [x] **Step 2: Connect `DocsModal` in `LauncherHub.tsx`**
 
 In `frontend/src/components/LauncherHub.tsx`:
 1. Import `DocsModal` from `./DocsModal`.
@@ -1961,7 +1961,7 @@ In `frontend/src/components/LauncherHub.tsx`:
 3. Pass `onOpenDocs={() => setIsDocsOpen(true)}` to `<LauncherDock />`.
 4. Render `<DocsModal isOpen={isDocsOpen} onClose={() => setIsDocsOpen(false)} />` at the bottom of `LauncherHub`.
 
-- [ ] **Step 3: Connect `DocsModal` in `App.tsx`**
+- [x] **Step 3: Connect `DocsModal` in `App.tsx`**
 
 In `frontend/src/App.tsx`:
 1. Import `HelpCircle` from `lucide-react`.
@@ -1984,12 +1984,12 @@ In `frontend/src/App.tsx`:
 
 5. Render `<DocsModal isOpen={isDocsOpen} onClose={() => setIsDocsOpen(false)} />` alongside other modals at the root of `App.tsx`.
 
-- [ ] **Step 4: Verify TypeScript compilation**
+- [x] **Step 4: Verify TypeScript compilation**
 
 Run: `npx tsc --noEmit`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 5: Commit Task 6**
+- [x] **Step 5: Commit Task 6**
 
 ```bash
 git add frontend/src/components/launcher/LauncherDock.tsx frontend/src/components/LauncherHub.tsx frontend/src/App.tsx
@@ -2004,32 +2004,32 @@ Verify backend unit tests, frontend builds, embedding integrity, and linter gate
 
 **Files:** None (verification commands)
 
-- [ ] **Step 1: Run backend tests**
+- [x] **Step 1: Run backend tests**
 
 Run: `go test -v -count=1 ./pkg/gui/...`
 Expected: PASS with 0 failures.
 
-- [ ] **Step 2: Run all backend tests**
+- [x] **Step 2: Run all backend tests**
 
 Run: `go test -v -count=1 ./...`
 Expected: PASS with 0 failures across all packages.
 
-- [ ] **Step 3: Run backend linter**
+- [x] **Step 3: Run backend linter**
 
 Run: `go vet ./...`
 Expected: Clean exit code 0.
 
-- [ ] **Step 4: Run frontend type checks**
+- [x] **Step 4: Run frontend type checks**
 
 Run: `npx tsc --noEmit`
 Expected: Clean exit code 0.
 
-- [ ] **Step 5: Run full frontend and backend build**
+- [x] **Step 5: Run full frontend and backend build**
 
 Run: `mise run build`
 Expected: Vite build succeeds, touches `pkg/gui/dist/.gitkeep`, Go binary builds `bin/localrpg` cleanly with embedded docs.
 
-- [ ] **Step 6: Commit and tag if necessary**
+- [x] **Step 6: Commit and tag if necessary**
 
 ```bash
 git status

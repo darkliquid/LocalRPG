@@ -37,7 +37,7 @@
 - Consumes: `harness.Usage`, `harness.StreamChunk.Usage`, `harness.GenerateResponse.Usage`.
 - Produces: providers populate usage; no signature changes.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 For `openaichat`, build a stream from a `httptest.Server` that emits two SSE chunks: one text chunk with no usage and a final chunk `{"choices":[],"usage":{"prompt_tokens":11,"completion_tokens":4,"total_tokens":15}}`. Assert the last `StreamChunk` has `Usage.InputTokens == 11` and `Usage.OutputTokens == 4`, and that the request body contained `"stream_options":{"include_usage":true}`.
 
@@ -68,12 +68,12 @@ For `geminillm`, a unit test on the usage mapping function: `usageFromMetadata(&
 
 For `openaiembedding`, a test that a response body `{"data":[],"usage":{"prompt_tokens":9,"total_tokens":9}}` surfaces into whatever the client returns (add a `LastUsage()` on the embedding client or return usage from `Embed`).
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run TestStreamReportsTokenUsage ./pkg/provider/openaichat/ -v` and the gemini/embedding tests.
 Expected: FAIL / behaviour absent.
 
-- [ ] **Step 3: openaichat**
+- [x] **Step 3: openaichat**
 
 Add to the request body struct and marshal an options object:
 
@@ -105,7 +105,7 @@ type openAIChatUsage struct {
 
 with `Usage *openAIChatUsage \`json:"usage,omitempty"\`` on `openAIChatChunk`. In the parse loop, when a chunk carries usage, emit a `StreamChunk{Done: true, Usage: &harness.Usage{Provider: "openaichat", Model: providerModel, InputTokens: …, OutputTokens: …}}` (do not emit empty text). This final chunk may be lost if the stream is cancelled; that is expected.
 
-- [ ] **Step 4: geminillm**
+- [x] **Step 4: geminillm**
 
 Add a mapper:
 
@@ -125,7 +125,7 @@ func usageFromMetadata(model string, meta *genai.GenerateContentResponseUsageMet
 
 Use it in the non-stream genai `Generate` (set `resp.Usage` on the returned `GenerateResponse`) and in `GenerateContentStream`: capture `resp.UsageMetadata` per chunk and emit the final non-nil one as a `StreamChunk{Usage: …}`.
 
-- [ ] **Step 5: openaiembedding**
+- [x] **Step 5: openaiembedding**
 
 Add a `usage` field to the response struct and expose it:
 
@@ -142,12 +142,12 @@ type embeddingResponse struct {
 
 Return the usage from the client (add `LastUsage() harness.Usage` on the embedding client, mirroring `MeteredProvider`). Embedding usage is attributed to role `embedding` in Task 3.
 
-- [ ] **Step 6: Run tests and vet**
+- [x] **Step 6: Run tests and vet**
 
 Run: `go test ./pkg/provider/... && mise run lint`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/provider/openaichat pkg/provider/geminillm pkg/provider/openaiembedding
@@ -186,7 +186,7 @@ type Usage struct {
 
 and convert to `harness.Usage` at the service boundary (Task 3). This keeps `pkg/media` free of `pkg/harness`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `pkg/media/usage_test.go`: a stub TTS client implementing `Synthesize` and `LastUsage() Usage{Characters: 42}`; after one `pipeline.SynthesizeUtterance`, assert the pipeline exposes the usage (add `(p *TTSPipeline) LastUsage() Usage` that returns the last reported client usage, zero on a cache hit).
 
@@ -213,12 +213,12 @@ func TestPipelineReportsUsageOnMissOnly(t *testing.T) {
 
 Provider tests: ElevenLabs `Synthesize` sets `LastUsage().Characters` from the `character-cost` response header; Whisper sends a body that requests usage and reads `usage.seconds` (duration model) or `usage.total_tokens`; `ttsgemini` sets tokens from `UsageMetadata`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run TestPipelineReportsUsage ./pkg/media/ -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Add the media capability**
+- [x] **Step 3: Add the media capability**
 
 In `pkg/media/capabilities.go` (or a new `pkg/media/usage.go`):
 
@@ -240,7 +240,7 @@ type UsageReporter interface {
 }
 ```
 
-- [ ] **Step 4: Track usage in the pipeline**
+- [x] **Step 4: Track usage in the pipeline**
 
 Add to `TTSPipeline` a `lastUsage Usage` guarded by the existing `flightMu` (or a small mutex). Reset it to zero at the start of a request that resolves from cache; set it from the client after a successful synthesis:
 
@@ -254,19 +254,19 @@ func (p *TTSPipeline) LastUsage() Usage {
 
 On the cache-hit path set `p.lastUsage = Usage{}`; on a miss, after `cache.Put`, if `reporter, ok := p.client.(UsageReporter); ok { p.lastUsage = reporter.LastUsage() }` else `p.lastUsage = Usage{Characters: len([]rune(spoken)), Requests: 1, Estimated: true}`. The `spoken` text is available in `SynthesizeUtteranceForce`'s caller; pass the character count into the utterance function or set it in `SynthesizeSegmentForce`.
 
-- [ ] **Step 5: Provider parsing**
+- [x] **Step 5: Provider parsing**
 
 - `ttselevenlabs`: in `do`, after the response is returned, read `resp.Header.Get("character-cost")` (fallback to counting the request text) and store it; add `LastUsage() media.Usage` returning `{Characters: n}`. Keep `Metered() == true`.
 - `ttsgemini`: map `UsageMetadata` to `Usage{InputTokens, OutputTokens}` and add `LastUsage()`.
 - `sttwhisperhttp`: add `response_format` (`verbose_json` for `whisper-1`) so `usage` is returned; parse `usage.type == "duration"` (`seconds`) or `usage.total_tokens`; add `LastUsage()` returning the appropriate unit (characters = 0; use `Requests: 1` plus durations recorded as characters * 0 — represent duration as `Characters` only if you also price per second; simplest is `Requests: 1` and `Estimated: false`, with the duration carried in the failure-free log).
 - `imagehttp`: when the JSON body contains `usage`, read `input_tokens`/`output_tokens`; otherwise `Usage{Requests: 1, Estimated: true}`. Imagen (`imagegemini`) returns no usage: `LastUsage() == Usage{Requests: 1, Estimated: true}`.
 
-- [ ] **Step 6: Run tests and vet**
+- [x] **Step 6: Run tests and vet**
 
 Run: `go test ./pkg/media/ ./pkg/provider/... && mise run lint`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/media pkg/provider/ttsgemini pkg/provider/ttselevenlabs pkg/provider/sttwhisperhttp pkg/provider/imagehttp pkg/provider/imagegemini
@@ -288,7 +288,7 @@ git commit -m "feat(usage): report speech, transcription, and image usage"
 - Produces: `(*Service).RecordUsage(gameID string, turn int, role string, u harness.Usage)` (a `harness.UsageSink`); `(*Service).GameUsage` / `GlobalUsage` (Task 5).
 - `(*engine.TurnOrchestrator).SetUsageContext(ctx *harness.UsageContext)` which calls `ctx.SetTurn(turnNum)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestTurnUsageIsRecordedWithCost(t *testing.T) {
@@ -312,12 +312,12 @@ func TestTurnUsageIsRecordedWithCost(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestTurnUsageIsRecordedWithCost ./pkg/gui/ -v`
 Expected: FAIL — `RecordUsage` undefined.
 
-- [ ] **Step 3: Implement the sink**
+- [x] **Step 3: Implement the sink**
 
 Create `pkg/gui/usage.go`:
 
@@ -356,7 +356,7 @@ func (s *Service) RecordUsage(gameID string, turn int, role string, u harness.Us
 }
 ```
 
-- [ ] **Step 4: Create one UsageContext per turn**
+- [x] **Step 4: Create one UsageContext per turn**
 
 In `prepareTurn`, after `jsEngine` is built:
 
@@ -389,7 +389,7 @@ and in `ProcessActionStream`, once `turnNum` is known:
 
 Because the orchestrator and the router share the same `UsageContext`, extraction (which may run concurrently) is stamped with the same turn.
 
-- [ ] **Step 5: Record media usage**
+- [x] **Step 5: Record media usage**
 
 In `GetSegmentAudio`, after `pipeline.SynthesizeSegmentForce` returns a path:
 
@@ -411,12 +411,12 @@ In `GetSegmentAudio`, after `pipeline.SynthesizeSegmentForce` returns a path:
 
 (A cache hit reports zero and records nothing.) Apply the same pattern to image generation and transcription call sites with roles `image` and `stt`, and turn `0` for previews/auditions.
 
-- [ ] **Step 6: Run test and the package**
+- [x] **Step 6: Run test and the package**
 
 Run: `go test -run TestTurnUsageIsRecordedWithCost ./pkg/gui/ -v && go test ./pkg/gui/ ./pkg/engine/`
 Expected: PASS (re-run once on the known flake).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/gui/usage.go pkg/gui/service.go pkg/gui/usage_record_test.go pkg/engine/orchestrator.go
@@ -436,7 +436,7 @@ git commit -m "feat(usage): record per-turn usage with cost"
 - Consumes: `harness.LimitRegistry`, `harness.ErrRateLimitedUntil`.
 - Produces: `(*Service).Limits(ctx) *LimitsDTO` (Task 5); enforcement at turn/preview/synth boundaries.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestRateLimitBlocksTurnsForThatRoleOnly(t *testing.T) {
@@ -470,12 +470,12 @@ func TestChangingTheProviderClearsTheBlock(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -run 'TestRateLimit|TestChangingTheProvider' ./pkg/gui/ -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Enforce at the boundaries**
+- [x] **Step 3: Enforce at the boundaries**
 
 Add `limits *harness.LimitRegistry` to `Service`, initialised in `NewService`. Add a helper:
 
@@ -529,7 +529,7 @@ func (s *Service) noteFailure(role string, err error) {
 
 `retryAfterFor` extracts `RetryAfterMS` from a `*harness.GenerationFailure` or `RetryAfter()` from `*harness.RateLimitedError`.
 
-- [ ] **Step 4: Map to HTTP**
+- [x] **Step 4: Map to HTTP**
 
 In `pkg/gui/server.go`, in the turn route and preview routes, translate the sentinel:
 
@@ -544,12 +544,12 @@ In `pkg/gui/server.go`, in the turn route and preview routes, translate the sent
 
 `BeginTurn` must return the wrapped error from the route, so the existing turn handler maps it (it already has a failure-response path).
 
-- [ ] **Step 5: Run tests and the suite**
+- [x] **Step 5: Run tests and the suite**
 
 Run: `go test -run 'TestRateLimit|TestChangingTheProvider' ./pkg/gui/ -v && mise run test`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/service.go pkg/gui/server.go pkg/gui/limits_test.go
@@ -602,7 +602,7 @@ type LimitsDTO struct {
 }
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestUsageEndpointReturnsTurnRows(t *testing.T) {
@@ -626,21 +626,21 @@ func TestUsageEndpointReturnsTurnRows(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestUsageEndpointReturnsTurnRows ./pkg/gui/ -v`
 Expected: FAIL (404).
 
-- [ ] **Step 3: Implement the service methods and routes**
+- [x] **Step 3: Implement the service methods and routes**
 
 `GameUsage` reads the campaign store's rows and summary; `GlobalUsage` iterates campaigns (from the games directory), sums totals, and builds the per-campaign drilldown; `Limits` returns `s.limits.Snapshot()`. Add routes `/api/game/{id}/usage`, `/api/usage`, `/api/limits` alongside the existing `/api/game/{id}/...` handling, calling `GET`-only handlers. Set `RetryAfterMS` on `TurnEvent` from `GenerationFailure.RetryAfterMS` where turn errors are emitted.
 
-- [ ] **Step 4: Run test and suite**
+- [x] **Step 4: Run test and suite**
 
 Run: `go test -run TestUsageEndpointReturnsTurnRows ./pkg/gui/ -v && mise run test`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/server.go pkg/gui/usage_api_test.go
