@@ -4,9 +4,13 @@ LocalRPG identifies every provider with one canonical key. `providers.prices`
 entries must use the new form. An entry with an old key is reported as a
 configuration problem when the config loads and matches nothing.
 
-Prices are also matched most-specific-first, so an instance key such as
+Prices are matched most-specific-first, so an instance key such as
 `tts:http@localhost:8880` can override an adapter-wide `tts:http` price. The same
 rule applies to rate-limit and funds blocks.
+
+The maintained guide is the in-app article
+[Migrating Provider Keys](../../pkg/gui/docs/14-migrating-provider-keys.md); this
+note is the release-time record.
 
 ## Migrating a price
 

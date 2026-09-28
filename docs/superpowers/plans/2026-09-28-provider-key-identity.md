@@ -77,7 +77,7 @@
 - Consumes: existing `Family` type and `FamilyLLM`/`FamilyTTS`/`FamilySTT`/`FamilyImage`/`FamilyEmbedding` constants (`pkg/provider/descriptor.go`).
 - Produces: `type Key string`; `func NewKey(Family, string) (Key, error)`; `func ParseKey(string) (Key, error)`; `func NewInstanceKey(Key, string) (Key, error)`; `func InstanceOrSelf(Key, string) Key`; `(Key) Family() Family`; `(Key) Adapter() string`; `(Key) Instance() (string, bool)`; `(Key) Parent() Key`; `func HostDiscriminator(string) string`; `func CommandDiscriminator(string) string`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 package provider
@@ -155,12 +155,12 @@ func TestDiscriminators(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/provider/ -run 'TestParseKey|TestInstanceOrSelf|TestDiscriminators' -v`
 Expected: FAIL — `undefined: ParseKey` and friends.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```go
 package provider
@@ -314,12 +314,12 @@ func sanitiseDiscriminator(s string) string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/provider/ -run 'TestParseKey|TestInstanceOrSelf|TestDiscriminators' -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/provider/key.go pkg/provider/key_test.go
@@ -340,7 +340,7 @@ git commit -m "feat(provider): add the canonical provider key type"
 - Consumes: `Key`, `ParseKey`, `NewKey` from Task 1; `Descriptor`, `Registration`, `List`, `Lookup` from `pkg/provider`.
 - Produces: exported `Key` constants used by adapters and resolvers in later tasks, e.g. `provider.KeyLLMOpenAIChat`, `provider.KeyLLMGemini`, `provider.KeyLLMCLI`, `provider.KeyLLMNarrativeOracle`, `provider.KeyTTSGemini`, `provider.KeyTTSElevenLabs`, `provider.KeyTTSNativeOS`, `provider.KeyTTSSherpaONNX`, `provider.KeyTTSPiper`, `provider.KeyTTSHTTP`, `provider.KeySTTWhisperHTTP`, `provider.KeySTTWhisperCLI`, `provider.KeySTTWebSpeech`, `provider.KeyImageGemini`, `provider.KeyImageHTTP`, `provider.KeyImageCLI`, `provider.KeyImageProceduralArt`, `provider.KeyEmbeddingBuiltin`, `provider.KeyEmbeddingOpenAI`, `provider.KeyEmbeddingGemini`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 package provider_test
@@ -386,12 +386,12 @@ func TestDescriptorKeyIsUniquePerFamily(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/provider/ -run 'TestEveryRegisteredIDIsACanonicalKey|TestDescriptorKeyIsUniquePerFamily' -v`
 Expected: FAIL — many `registered ID "tts-elevenlabs" is not a canonical key`.
 
-- [ ] **Step 3: Add the constants**
+- [x] **Step 3: Add the constants**
 
 ```go
 package provider
@@ -438,7 +438,7 @@ func AllKeys() []Key {
 }
 ```
 
-- [ ] **Step 4: Rename every descriptor ID**
+- [x] **Step 4: Rename every descriptor ID**
 
 Edit each descriptor's `ID:` to the matching constant. One example, then apply to all 19:
 
@@ -478,7 +478,7 @@ Mapping to apply:
 
 `pkg/provider/*` imports `pkg/provider` is not possible (same package); inside the package the constant is used directly as `KeyTTSElevenLabs`, and the descriptor field is `string(KeyTTSElevenLabs)`. Adjust accordingly.
 
-- [ ] **Step 5: Extend `Validate` and the duplicate guard**
+- [x] **Step 5: Extend `Validate` and the duplicate guard**
 
 ```go
 // pkg/provider/provider.go — replace Validate
@@ -506,7 +506,7 @@ func Validate() error {
 
 `Register`'s existing duplicate-ID panic is sufficient; no change needed there.
 
-- [ ] **Step 6: Add a constants/registry agreement test**
+- [x] **Step 6: Add a constants/registry agreement test**
 
 ```go
 // append to pkg/provider/registry_test.go
@@ -526,14 +526,14 @@ func TestAllKeysAreRegisteredOrReserved(t *testing.T) {
 }
 ```
 
-- [ ] **Step 7: Run the tests and the suite**
+- [x] **Step 7: Run the tests and the suite**
 
 Run: `go test ./pkg/provider/... ./pkg/provider/all/... -v`
 Expected: PASS
 Run: `mise run test:backend`
 Expected: PASS. Some `pkg/harness` and `pkg/media` tests will fail because the resolvers still return the old IDs; those are fixed in Task 3. If they fail here, run only `./pkg/provider/...` and note the failure for Task 3.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add pkg/provider
@@ -554,7 +554,7 @@ git commit -m "refactor(provider): name adapters with canonical family keys"
 - Consumes: `provider.Key` constants and helpers (Tasks 1-2).
 - Produces: `harness.KeyFor(ProviderConfig) (provider.Key, bool)`; `media.TTSKeyFor(config.TTSConfig) (provider.Key, bool)`; `media.STTKeyFor(config.STTConfig) (provider.Key, bool)`; `media.ImageKeyFor(config.ImageConfig) (provider.Key, bool)`; `media.EndpointDiscriminator(string) string`; `embeddings.KeyFor(config.EmbeddingsConfig) (provider.Key, bool)`.
 
-- [ ] **Step 1: Write the failing table tests**
+- [x] **Step 1: Write the failing table tests**
 
 ```go
 // pkg/media/key_test.go
@@ -711,12 +711,12 @@ func TestKeyFor(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./pkg/harness/ ./pkg/media/ ./pkg/embeddings/ -run TestKeyFor -v`
 Expected: FAIL — `undefined: KeyFor`.
 
-- [ ] **Step 3: Implement `harness.KeyFor`**
+- [x] **Step 3: Implement `harness.KeyFor`**
 
 ```go
 // pkg/harness/exports.go — replace ProviderIDFor's body with a key resolver.
@@ -750,7 +750,7 @@ func KeyFor(cfg ProviderConfig) (provider.Key, bool) {
 }
 ```
 
-- [ ] **Step 4: Implement the media resolvers and delete `ProviderKey`**
+- [x] **Step 4: Implement the media resolvers and delete `ProviderKey`**
 
 ```go
 // pkg/media/exports.go — add, above the builders.
@@ -831,7 +831,7 @@ func ProviderKey(cfg config.TTSConfig) string {
 `grep -rn "sanitiseKey" pkg/media` result becomes empty. `endpointHost` moves
 into `provider.HostDiscriminator` and is removed here.
 
-- [ ] **Step 5: Implement `embeddings.KeyFor`**
+- [x] **Step 5: Implement `embeddings.KeyFor`**
 
 ```go
 // pkg/embeddings/factory.go — add.
@@ -866,7 +866,7 @@ func KeyFor(cfg config.EmbeddingsConfig) (provider.Key, bool) {
 }
 ```
 
-- [ ] **Step 6: Keep the old wrappers for one commit**
+- [x] **Step 6: Keep the old wrappers for one commit**
 
 `harness.ProviderIDFor`, `media.TTSProviderIDFor`, `STTProviderIDFor`, and `ImageProviderIDFor` must keep working while consumers are still on them:
 
@@ -883,14 +883,14 @@ func ProviderIDFor(cfg ProviderConfig) string {
 
 `media.ImageProviderIDFor` previously accepted `comfyui` as well as `http`; the new `ImageKeyFor` preserves that. `stt-webspeech` returning `""` from `STTProviderIDFor` matches today's behaviour where the inline switch already failed for it.
 
-- [ ] **Step 7: Run the tests and the suite**
+- [x] **Step 7: Run the tests and the suite**
 
 Run: `go test ./pkg/harness/ ./pkg/media/ ./pkg/embeddings/ -v`
 Expected: PASS
 Run: `mise run test:backend`
 Expected: PASS except tests asserting old IDs; update those assertions to the canonical keys in this step (search `grep -rn 'tts-\|image-\|openaichat\|narrative-oracle\|openai-embedding\|gemini-embedding' pkg --include=*_test.go`).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add pkg/harness pkg/media pkg/embeddings
@@ -915,7 +915,7 @@ git commit -m "feat(provider): resolve config to canonical keys"
 - Consumes: `KeyFor`, `TTSKeyFor`, `STTKeyFor`, `ImageKeyFor` (Task 3).
 - Produces: `Router.AssignRoleKey(role string, key provider.Key)`; `Extractor.SetProviderKey(key provider.Key)`; `mediaUsage(harness.Usage, provider.Key, string) harness.Usage`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 // pkg/harness/router_key_test.go
@@ -962,12 +962,12 @@ func TestRouterStampsTheResolvedKey(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/harness/ -run TestRouterStampsTheResolvedKey -v`
 Expected: FAIL — `router.AssignRoleKey undefined`.
 
-- [ ] **Step 3: Add the role-key map and stamp it**
+- [x] **Step 3: Add the role-key map and stamp it**
 
 ```go
 // pkg/harness/router.go
@@ -1010,7 +1010,7 @@ func (r *Router) recordUsage(role string, u *Usage) {
 
 Initialise `roleKeys: make(map[string]provider.Key)` in `NewRouter`, and add the `provider` import to `pkg/harness/router.go`.
 
-- [ ] **Step 4: Assign keys in `RouterFromConfigWithLogger`**
+- [x] **Step 4: Assign keys in `RouterFromConfigWithLogger`**
 
 Inside the `for role, roleCfg := range cfg.Agents.Roles` loop, after a successful build:
 
@@ -1025,11 +1025,11 @@ if key, ok := KeyFor(ProviderConfig{
 }
 ```
 
-- [ ] **Step 5: Delete the adapters' hardcoded `Provider`**
+- [x] **Step 5: Delete the adapters' hardcoded `Provider`**
 
 `pkg/provider/openaichat/http.go` around the final-chunk usage: remove the `Provider: "openaichat",` line. `pkg/provider/geminillm/provider.go`: remove `Provider: "gemini",`. Leave `Model`, tokens, and `Estimated` untouched. The recorder now stamps the key.
 
-- [ ] **Step 6: Point media recording at the resolvers**
+- [x] **Step 6: Point media recording at the resolvers**
 
 ```go
 // pkg/gui/usage.go
@@ -1074,7 +1074,7 @@ if hasKey {
 
 Change `recordImageUsage`'s signature to `(scope usageScope, key provider.Key, model string, client media.ImageClient)` and call `mediaUsage(reporter.LastUsage(), key, model)`.
 
-- [ ] **Step 7: Assign the extractor key**
+- [x] **Step 7: Assign the extractor key**
 
 `Extractor` gains a key field and a setter:
 
@@ -1115,7 +1115,7 @@ extractor.SetProviderKey(roleKey)
 
 For the `.Type == "inherit"` path, resolve the source role's config from `cfg.Agents.Roles[source]` and call `KeyFor` on it.
 
-- [ ] **Step 8: Write the gui agreement test**
+- [x] **Step 8: Write the gui agreement test**
 
 ```go
 // pkg/gui/provider_key_test.go
@@ -1141,14 +1141,14 @@ func TestLedgerAndLimitKeysAgreeForMedia(t *testing.T) {
 }
 ```
 
-- [ ] **Step 9: Run the tests and the suite**
+- [x] **Step 9: Run the tests and the suite**
 
 Run: `go test ./pkg/harness/ ./pkg/gui/ -v`
 Expected: PASS
 Run: `mise run test:backend`
 Expected: PASS
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add pkg/harness pkg/gui pkg/provider/openaichat pkg/provider/geminillm
@@ -1169,7 +1169,7 @@ git commit -m "feat(usage): record spend under the canonical provider key"
 - Consumes: `provider.ParseKey`, `provider.Key.Parent()`, key constants.
 - Produces: `pricing.Resolve(string, string, *config.Config) Price` with fallback; `config.Config.Validate() []string`; `config.Manager.Warnings() []string`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 // append to pkg/pricing/pricing_test.go
@@ -1236,12 +1236,12 @@ func TestValidateAcceptsCanonicalKeys(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./pkg/pricing/ ./pkg/config/ -run 'TestResolve|TestValidate' -v`
 Expected: FAIL — `cfg.Validate undefined` and fallback assertions.
 
-- [ ] **Step 3: Add candidate-list resolution and rekey built-ins**
+- [x] **Step 3: Add candidate-list resolution and rekey built-ins**
 
 ```go
 // pkg/pricing/pricing.go
@@ -1286,7 +1286,7 @@ func candidateKeys(key string) []string {
 }
 ```
 
-- [ ] **Step 4: Add `Config.Validate` and bump the version**
+- [x] **Step 4: Add `Config.Validate` and bump the version**
 
 ```go
 // pkg/config/types.go
@@ -1321,7 +1321,7 @@ func (c *Config) Validate() []string {
 
 Add `fmt` and the `provider` import to `pkg/config/types.go`, and set `Version: CurrentVersion` in `DefaultConfig` (`pkg/config/types.go:319`).
 
-- [ ] **Step 5: Collect warnings in `ConfigManager.Load`**
+- [x] **Step 5: Collect warnings in `ConfigManager.Load`**
 
 ```go
 // pkg/config/manager.go
@@ -1351,7 +1351,7 @@ if len(m.warnings) > 0 && m.logger != nil {
 
 If `ConfigManager` has no logger, add `func (m *ConfigManager) SetLogger(logger trace.Logger)` and wire it where the manager is constructed in `pkg/gui`; otherwise leave the warnings accessible via `Warnings()` and log them from `gui.NewService`.
 
-- [ ] **Step 6: Surface the warnings in the GUI log**
+- [x] **Step 6: Surface the warnings in the GUI log**
 
 In `pkg/gui` where the config manager is created and first loaded, after `Load`:
 
@@ -1361,7 +1361,7 @@ for _, problem := range s.configMgr.Warnings() {
 }
 ```
 
-- [ ] **Step 7: Run the tests and the suite**
+- [x] **Step 7: Run the tests and the suite**
 
 Run: `go test ./pkg/pricing/ ./pkg/config/ ./pkg/gui/ -v`
 Expected: PASS
@@ -1370,7 +1370,7 @@ Expected: PASS. Tests asserting `BuiltinPrices` keys, and any test using an old
 literal such as `Provider: "gemini"` (`pkg/gui/usage_record_test.go:13`), must be
 updated to the canonical keys in this step.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add pkg/pricing pkg/config pkg/gui
@@ -1389,7 +1389,7 @@ git commit -m "feat(pricing): resolve prices by canonical key with adapter fallb
 - Consumes: `harness.KeyFor`, `media.TTSKeyFor`/`STTKeyFor`/`ImageKeyFor`.
 - Produces: `Service.providerKeyForRole(role string) provider.Key` (same name, new return type and body).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 // append to pkg/gui/provider_key_test.go
@@ -1416,12 +1416,12 @@ func TestLimitKeyMatchesLedgerKeyForLLM(t *testing.T) {
 existing pattern in this package (`pkg/gui/usage_record_test.go:12`,
 `pkg/gui/audio_pipeline_test.go:20`).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/gui/ -run TestLimitKeyMatchesLedgerKeyForLLM -v`
 Expected: FAIL — `providerKeyForRole` returns the old string, or the helper is missing.
 
-- [ ] **Step 3: Replace the derivations**
+- [x] **Step 3: Replace the derivations**
 
 ```go
 // pkg/gui/limits.go
@@ -1487,14 +1487,14 @@ if until, ok := s.limits.Blocked(key, role); ok {
 
 Do this for both `guardRole` and `noteFailure` and any other `providerKeyForRole` caller.
 
-- [ ] **Step 4: Run the tests and the suite**
+- [x] **Step 4: Run the tests and the suite**
 
 Run: `go test ./pkg/gui/ -v`
 Expected: PASS
 Run: `mise run test:backend`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui/limits.go pkg/gui/provider_key_test.go
@@ -1515,7 +1515,7 @@ git commit -m "fix(limits): key backoffs by canonical provider key"
 - Consumes: `RoleKey` from Task 4.
 - Produces: `Router.ProviderKeyForRole(role string) (provider.Key, bool)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 // append to pkg/harness/router_key_test.go
@@ -1546,12 +1546,12 @@ func (p *failingKeyProvider) Stream(context.Context, harness.GenerateRequest, ch
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/harness/ -run TestFailureAttemptUsesTheCanonicalKey -v`
 Expected: FAIL — attempt provider is `gm`.
 
-- [ ] **Step 3: Add the accessor and use it**
+- [x] **Step 3: Add the accessor and use it**
 
 ```go
 // pkg/harness/router.go
@@ -1586,14 +1586,14 @@ providerKey, _ := router.ProviderKeyForRole(role)
 // use string(providerKey) for the Provider field
 ```
 
-- [ ] **Step 4: Run the tests and the suite**
+- [x] **Step 4: Run the tests and the suite**
 
 Run: `go test ./pkg/harness/ ./pkg/gui/ -v`
 Expected: PASS
 Run: `mise run test:backend`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness pkg/gui/generation_attempts.go
@@ -1621,7 +1621,7 @@ git commit -m "fix(failures): name the attempt by canonical provider key"
 small local struct rather than a `harness.Usage`. The caller (`pkg/gui`)
 supplies the key and model; the worker supplies the request count.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 // pkg/storage/embedding_usage_test.go
@@ -1722,12 +1722,12 @@ func toolsToolCall() harness.ToolCall {
 
 Import `harness` in that test file. The positive path (a provider that reports usage, the sink fires with `requests == 1` and the resolved key) is asserted by `TestEmbeddingUsageIsRecorded` in `pkg/gui` (Task 8 Step 7), where a `Service` owns the ledger.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./pkg/storage/ ./pkg/tools/ -run 'TestEmbeddingWorkerReportsUsage|TestEmbeddingUsageFuncIsCalled' -v`
 Expected: FAIL — `SetUsageReporting` and `SetEmbeddingUsage` undefined.
 
-- [ ] **Step 3: Implement the worker hook**
+- [x] **Step 3: Implement the worker hook**
 
 ```go
 // pkg/storage/embedding_worker.go
@@ -1789,7 +1789,7 @@ if reporter, ok := w.provider.(usageReportingProvider); ok {
 
 `openaiembedding.Client.LastUsage()` returns `harness.Usage`, which structurally has `InputTokens int`, so it satisfies `usageReportingProvider`. `geminiembedding` gains the same method in Step 6. Providers without it still report `Requests`.
 
-- [ ] **Step 4: Implement the tools hook**
+- [x] **Step 4: Implement the tools hook**
 
 ```go
 // pkg/tools/tools.go
@@ -1818,7 +1818,7 @@ if e.embeddingUsage != nil {
 
 `pkg/tools` already imports `pkg/harness`, so the assertion needs no local shim.
 
-- [ ] **Step 5: Wire the sink in `pkg/gui`**
+- [x] **Step 5: Wire the sink in `pkg/gui`**
 
 ```go
 // pkg/gui/embedding_usage.go
@@ -1862,7 +1862,7 @@ if embProvider, err := embeddings.NewProviderFromConfig(cfg.Embeddings); err == 
 }
 ```
 
-- [ ] **Step 6: Extend `geminiembedding` and fix `openaiembedding`**
+- [x] **Step 6: Extend `geminiembedding` and fix `openaiembedding`**
 
 ```go
 // pkg/provider/geminiembedding/gemini.go
@@ -1887,9 +1887,9 @@ func (c *Client) LastUsage() harness.Usage {
 
 `pkg/provider/openaiembedding/openai.go`: delete `Provider: c.ID()` from the `lastUsage` assignment; leave `Model`, `InputTokens`, `Requests`.
 
-- [ ] **Step 7: Run the tests and the suite**
+- [x] **Step 7: Run the tests and the suite**
 
-- [ ] **Step 7: Add the gui integration test, then run the tests and the suite**
+- [x] **Step 7: Add the gui integration test, then run the tests and the suite**
 
 ```go
 // append to pkg/gui/provider_key_test.go
@@ -1923,7 +1923,7 @@ Expected: PASS
 Run: `mise run test:backend`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add pkg/storage pkg/tools pkg/gui pkg/provider/openaiembedding pkg/provider/geminiembedding
@@ -1943,7 +1943,7 @@ git commit -m "feat(usage): record embedding spend under a canonical key"
 - Consumes: everything from Tasks 1-8.
 - Produces: a codebase where no key is derived outside the resolvers.
 
-- [ ] **Step 1: Write the failing scan test**
+- [x] **Step 1: Write the failing scan test**
 
 ```go
 // pkg/provider/noderivation_test.go
@@ -1988,25 +1988,25 @@ func TestNoSecondKeyDerivation(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/provider/ -run TestNoSecondKeyDerivation -v`
 Expected: FAIL, naming `pkg/harness/exports.go` and `pkg/media/exports.go`.
 
-- [ ] **Step 3: Delete the wrappers**
+- [x] **Step 3: Delete the wrappers**
 
 Remove `ProviderIDFor` (`pkg/harness/exports.go`), `TTSProviderIDFor`, `STTProviderIDFor`, `ImageProviderIDFor` (`pkg/media/exports.go`), and any `media.ProviderKey` remnants. Replace remaining callers with the key resolvers; a caller that only needed an ID uses `string(key.Parent())`.
 
 Find them with `grep -rn "ProviderIDFor\|media.ProviderKey" pkg cmd`.
 
-- [ ] **Step 4: Run the tests and the suite**
+- [x] **Step 4: Run the tests and the suite**
 
 Run: `go test ./pkg/provider/ -run TestNoSecondKeyDerivation -v`
 Expected: PASS
 Run: `mise run test`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/provider pkg/harness pkg/media
@@ -2027,7 +2027,7 @@ git commit -m "refactor(provider): delete the duplicate key derivations"
 - Consumes: `harness.KeyFor`, `media.TTSKeyFor`/`STTKeyFor`/`ImageKeyFor`, `embeddings.KeyFor`.
 - Produces: docs whose keys match the runtime.
 
-- [ ] **Step 1: Point the generator at the resolvers**
+- [x] **Step 1: Point the generator at the resolvers**
 
 Replace the `ledgerKey`, `ttsConfigFromPreset`, and `presetSummary` helpers in `pkg/gui/docs_catalogue_test.go` with the resolvers. For each descriptor, build its preset config into the family config and call the matching resolver:
 
@@ -2098,13 +2098,13 @@ func ledgerKey(family provider.Family, desc provider.Descriptor) string {
 
 Delete the `desc.ID == "openaichat" || desc.ID == "gemini"` special case; the resolver decides.
 
-- [ ] **Step 2: Regenerate and lint**
+- [x] **Step 2: Regenerate and lint**
 
 Run: `go test ./pkg/gui -update-docs`
 Run: `mise run lint:docs`
 Expected: catalogue and reference regenerate; markdownlint clean. Inspect `12-provider-catalogue.md` and confirm every "Ledger key" is either a canonical key or `not reported`, and that `TTS providers` shows `tts:http@localhost:8880`.
 
-- [ ] **Step 3: Update the pricing article**
+- [x] **Step 3: Update the pricing article**
 
 In `pkg/gui/docs/11-usage-and-pricing.md`, replace the "Ledger key" rules table with the canonical form and the fallback ladder:
 
@@ -2123,7 +2123,7 @@ for that endpoint only. The [Provider & Model Catalogue](12-provider-catalogue)
 lists every key.
 ```
 
-- [ ] **Step 4: Write the release note**
+- [x] **Step 4: Write the release note**
 
 ```markdown
 # Provider keys changed to `<family>:<adapter>`
@@ -2154,12 +2154,12 @@ Historical spend keeps its old key and shows **no price configured**; old rows a
 never rewritten or re-priced.
 ```
 
-- [ ] **Step 5: Run the full gate**
+- [x] **Step 5: Run the full gate**
 
 Run: `mise run lint && mise run test && mise run build`
 Expected: all clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/gui/docs pkg/gui/docs_catalogue_test.go docs/releases/provider-keys.md
@@ -2199,3 +2199,53 @@ git commit -m "docs(provider): publish canonical keys and the migration table"
 catalogue and cache name (`pkg/gui/service.go:1255,2361`, `pkg/gui/tts_inspect.go:30`),
 not dead code. Task 3 no longer deletes it; it becomes the canonical instance key,
 which is exactly what §5.8 requires.
+
+---
+
+## Deviations Taken During Implementation
+
+Both deviations exist so the suite stays green at every commit.
+
+**Tasks 2 and 3 landed as one commit (`215e06e`).** Renaming a descriptor ID
+breaks every `provider.Lookup` in the tree until the resolvers return the new
+value, so the constants and the resolvers cannot be separated by a green commit.
+Task 1 (`dfd0d34`) and Task 4 onwards are separate as planned.
+
+**Embeddings resolve through `embeddings.KeyFor` from the start.** Task 8 as
+written expected `geminiembedding` to parse `UsageMetadata`, but `genai`
+v1.71.0's `EmbedContentResponse` exposes no usage field, so Gemini embedding rows
+record the request count and are marked `estimated`. `openaiembedding` still
+reports its parsed token count.
+
+**Task 3 keeps `media.ProviderKey`** rather than deleting it: it names the voice
+catalogue and the audio cache, and now returns the canonical instance key. Its
+legacy local fallback (`disabled`, `builtin:echo`, a sanitised type) is retained
+for configurations with no registered adapter, so two such configurations never
+share a cache entry.
+
+**The voice catalogue's persisted `Provider` is the canonical key**, as §5.8
+requires; existing voice profiles keep the string they were saved with, which is
+a one-time audio cache miss and no more.
+
+**Not met from the spec:** the Gemini embedding token count above. Everything
+else in §3 through §11 is implemented.
+
+§10's tests landed under these names, which differ from the plan where a
+behaviour is covered by an existing table test rather than a new one:
+
+| §10 test | Actual test |
+| --- | --- |
+| `TestAllRegistryIDsAreCanonicalKeys` | `TestEveryRegisteredIDIsACanonicalKey` |
+| `TestDescriptorKeysAreUniquePerFamily` | `TestDescriptorKeyIsUniquePerFamily` |
+| `TestResolverIsTotalForCatalogue` | `TestKeyFor` (per resolver) plus the catalogue freshness test, which resolves every preset |
+| `TestResolverMatchesRecordingPaths` | `TestLimitKeyMatchesLedgerKeyForLLM` and `TestLimitKeyFollowsAnInheritChain` |
+| `TestInstanceKeyFallbackPrecedence` | `TestResolveFallsBackFromInstanceToAdapter`, `TestResolvePrefersInstanceModelOverAdapterWide` |
+| `TestLimitsAndLedgerShareProviderKey` | `TestLimitKeyMatchesLedgerKeyForLLM` |
+| `TestInstanceBlocksDoNotLeak` | `TestInstanceBlocksDoNotLeak` |
+| `TestEmbeddingUsageIsRecorded` | `TestEmbeddingWorkerReportsUsage`, `TestSearchEntitiesReportsEmbeddingUsage`, `TestEmbeddingUsageIsRecorded` |
+| `TestEmbeddingDefaultInstanceKey` | `TestKeyFor` in `pkg/embeddings` |
+| `TestBrowserOnlyProvidersHaveNoKey` | `TestSTTKeyForSkipsBrowserOnly` |
+| `TestInstanceKeysHaveRegisteredParents` | `TestAllKeysAreRegisteredOrReserved`, `TestInstanceBlocksDoNotLeak` (asserts the parent) |
+| `TestNoSecondKeyDerivation` | `TestNoSecondKeyDerivation` |
+| `TestPriceConfigRejectsLegacyKey` | `TestValidateRejectsLegacyPriceKey` |
+| `TestProviderCatalogueIsCurrent` | `TestProviderCatalogueIsCurrent` |
