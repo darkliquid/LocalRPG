@@ -204,7 +204,7 @@ unlisted value is either rejected or falls back to the documented default.
 | Key | Accepted values |
 | --- | --- |
 | `agents.default_role` | `gm`, `narrator`, `extractor`, `completion`, or any role defined in `agents.roles` |
-| `agents.roles.<role>.type` | `builtin`, `http`, `cli`, `gemini`, `mock` (LLM only), `inherit`, `disabled` |
+| `agents.roles.<role>.type` | `builtin`, `http`, `cli`, `gemini`, `inherit`, `disabled` |
 | `agents.roles.<role>.supports_tools` | `auto`, `yes`, `no` |
 | `agents.completion.mode` | `auto`, `continue`, `trim`, `off` |
 | `media.tts.type` | `builtin`, `http`, `cli`, `gemini`, `disabled` |

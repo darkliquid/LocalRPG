@@ -2999,6 +2999,12 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		if err := json.Unmarshal(data, &sttCfg); err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}
+		if sttCfg.Type == "web-speech" {
+			return &TestProviderResponseDTO{
+				Success: false,
+				Message: "web-speech runs in the browser; choose an HTTP or CLI Whisper provider",
+			}, nil
+		}
 		client, err := media.NewSTTClient(sttCfg)
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
@@ -3063,6 +3069,12 @@ func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string
 	cfg := s.configMgr.Get()
 	if cfg.Media.STT.Type == "" || cfg.Media.STT.Type == "disabled" {
 		return "", &harness.GenerationFailure{Code: harness.FailureProviderUnavailable, Message: "STT engine is disabled or unconfigured"}
+	}
+	if cfg.Media.STT.Type == "web-speech" {
+		return "", &harness.GenerationFailure{
+			Code:    harness.FailureProviderUnavailable,
+			Message: "the web-speech STT provider runs in the browser; configure an HTTP or CLI Whisper provider",
+		}
 	}
 
 	client, err := media.NewSTTClient(cfg.Media.STT)

@@ -33,6 +33,7 @@ import { useTTSInspect } from '../hooks/useTTSInspect';
 import { VoiceCombobox } from './VoiceCombobox';
 import { VoiceCatalogModal } from './VoiceCatalogModal';
 import { UsagePanel } from './UsagePanel';
+import { hasWebSpeechSupport } from '../lib/webSpeech';
 
 interface SettingsStudioProps {
   isCompact?: boolean;
@@ -107,6 +108,9 @@ const defaultRoleConfig = (role: string): AgentRoleConfig =>
 
 export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSaved, activeGameID, onOpenDocs }) => {
   const [config, setConfig] = useState<AppConfig | null>(null);
+  // Web Speech runs in the browser, not the backend, so its availability is a
+  // property of this window rather than of the provider catalogue.
+  const webSpeechAvailable = hasWebSpeechSupport();
   const [activeFilePath, setActiveFilePath] = useState<string>('');
   const [isOverride, setIsOverride] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'paths' | 'providers' | 'agents' | 'media' | 'preferences' | 'usage' | 'debug'>('paths');
@@ -2470,11 +2474,18 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
-                  <option value="web-speech">Web Speech API (Browser Native)</option>
+                  <option value="web-speech" disabled={!webSpeechAvailable}>
+                    Web Speech API (Browser Native){webSpeechAvailable ? '' : ' — unavailable in this window'}
+                  </option>
                   <option value="http">HTTP (Faster-Whisper, OpenAI Whisper)</option>
                   <option value="cli">CLI Command (e.g. whisper-cli)</option>
-                  <option value="builtin">Builtin / Mock</option>
+                  <option value="builtin">Builtin</option>
                 </select>
+                {!webSpeechAvailable && (
+                  <p className="text-xs text-amber-300/80">
+                    Web Speech is not available in this window. Choose an HTTP or CLI Whisper provider for voice input.
+                  </p>
+                )}
               </div>
 
               {config.media.stt?.type === 'http' && (

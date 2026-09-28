@@ -1,10 +1,13 @@
 import { useState, useRef, useCallback } from 'react';
 import { APIClient } from '../api/client';
+import { hasWebSpeechSupport } from '../lib/webSpeech';
 
 interface UseVoiceInputOptions {
   onTranscribed: (text: string) => void;
   sttType?: string;
 }
+
+export type VoiceMode = 'web-speech' | 'backend' | 'unavailable';
 
 interface SpeechRecognitionErrorEvent extends Event {
   error: string;
@@ -31,6 +34,9 @@ interface BrowserSpeechRecognition extends EventTarget {
   onend: (() => void) | null;
 }
 
+const WEB_SPEECH_UNAVAILABLE =
+  "Web Speech isn't available in this window. Choose a Whisper STT provider in Settings, or run the app in a Chromium browser.";
+
 export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -40,48 +46,65 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
   const audioChunksRef = useRef<Blob[]>([]);
   const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
 
-  const startRecording = useCallback(async () => {
-    setError(null);
+  // Web Speech runs in the browser, not the Go backend. When it is selected but
+  // this window does not expose it, recording must not silently fall through to
+  // a backend that cannot transcribe a "web-speech" blob.
+  const webSpeechSupported = hasWebSpeechSupport();
+  const mode: VoiceMode =
+    sttType === 'web-speech' ? (webSpeechSupported ? 'web-speech' : 'unavailable') : 'backend';
 
-    // 1. Web Speech Mode
-    const SpeechRecognition =
-      (window as unknown as { SpeechRecognition?: new () => BrowserSpeechRecognition; webkitSpeechRecognition?: new () => BrowserSpeechRecognition }).SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition?: new () => BrowserSpeechRecognition }).webkitSpeechRecognition;
-
-    if (sttType === 'web-speech' && SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = navigator.language || 'en-US';
-
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-          const transcript = event.results[0]?.[0]?.transcript;
-          if (transcript) {
-            onTranscribed(transcript);
-          }
-        };
-
-        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          console.error('Speech recognition error:', event.error);
-          setError(`Speech recognition: ${event.error}`);
-          setIsRecording(false);
-        };
-
-        recognition.onend = () => {
-          setIsRecording(false);
-        };
-
-        recognition.start();
-        speechRecognitionRef.current = recognition;
-        setIsRecording(true);
-        return;
-      } catch (err: unknown) {
-        console.warn('Web speech failed to start, falling back to MediaRecorder:', err);
+  const startWebSpeech = useCallback(() => {
+    const SpeechRecognition = (
+      window as unknown as {
+        SpeechRecognition?: new () => BrowserSpeechRecognition;
+        webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
       }
+    ).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: new () => BrowserSpeechRecognition })
+        .webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError(WEB_SPEECH_UNAVAILABLE);
+      return;
     }
 
-    // 2. MediaRecorder Mode
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = navigator.language || 'en-US';
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const transcript = event.results[0]?.[0]?.transcript;
+        if (transcript) {
+          onTranscribed(transcript);
+        }
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        setError(`Speech recognition: ${event.error}`);
+        setIsRecording(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognition.start();
+      speechRecognitionRef.current = recognition;
+      setIsRecording(true);
+    } catch (err: unknown) {
+      console.warn('Web speech failed to start:', err);
+      setError(
+        err instanceof Error
+          ? `Speech recognition could not start: ${err.message}`
+          : 'Speech recognition could not start'
+      );
+      setIsRecording(false);
+    }
+  }, [onTranscribed]);
+
+  const startBackendRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
@@ -134,7 +157,21 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
       setError(err instanceof Error && err.name === 'NotAllowedError' ? 'Microphone permission denied' : (err instanceof Error ? err.message : 'Microphone access failed'));
       setIsRecording(false);
     }
-  }, [onTranscribed, sttType]);
+  }, [onTranscribed]);
+
+  const startRecording = useCallback(async () => {
+    setError(null);
+
+    if (mode === 'unavailable') {
+      setError(WEB_SPEECH_UNAVAILABLE);
+      return;
+    }
+    if (mode === 'web-speech') {
+      startWebSpeech();
+      return;
+    }
+    await startBackendRecording();
+  }, [mode, startWebSpeech, startBackendRecording]);
 
   const stopRecording = useCallback(() => {
     if (speechRecognitionRef.current) {
@@ -168,6 +205,8 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
     isRecording,
     isTranscribing,
     error,
+    mode,
+    available: mode !== 'unavailable',
     toggleRecording,
     startRecording,
     stopRecording,

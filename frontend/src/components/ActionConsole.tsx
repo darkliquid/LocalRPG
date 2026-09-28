@@ -24,7 +24,7 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({
     setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
   };
 
-  const { isRecording, isTranscribing, error: voiceError, toggleRecording } = useVoiceInput({
+  const { isRecording, isTranscribing, error: voiceError, toggleRecording, available, mode: voiceMode } = useVoiceInput({
     onTranscribed: handleVoiceTranscribed,
     sttType,
   });
@@ -126,14 +126,18 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({
         <button
           type="button"
           onClick={toggleRecording}
-          disabled={isInputDisabled || isTranscribing}
+          disabled={isInputDisabled || isTranscribing || !available}
           className={`shrink-0 p-2.5 rounded-xl border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
             isRecording
               ? 'bg-red-900/60 text-red-300 border-red-500/80 animate-pulse shadow-lg shadow-red-900/40'
               : 'bg-stone-900/70 border-white/5 hover:bg-stone-800 text-stone-400 hover:text-purple-400'
           }`}
           title={
-            isRecording
+            !available
+              ? voiceMode === 'unavailable'
+                ? 'Web Speech is unavailable in this window; choose a Whisper STT provider in Settings'
+                : 'Voice input unavailable'
+              : isRecording
               ? 'Recording speech... Click to stop and transcribe'
               : isTranscribing
               ? 'Transcribing audio...'

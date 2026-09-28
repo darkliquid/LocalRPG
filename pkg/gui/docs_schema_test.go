@@ -63,7 +63,7 @@ func renderConfigurationReference() string {
 	b.WriteString("| Key | Accepted values |\n")
 	b.WriteString("| --- | --- |\n")
 	b.WriteString("| `agents.default_role` | `gm`, `narrator`, `extractor`, `completion`, or any role defined in `agents.roles` |\n")
-	b.WriteString("| `agents.roles.<role>.type` | `builtin`, `http`, `cli`, `gemini`, `mock` (LLM only), `inherit`, `disabled` |\n")
+	b.WriteString("| `agents.roles.<role>.type` | `builtin`, `http`, `cli`, `gemini`, `inherit`, `disabled` |\n")
 	b.WriteString("| `agents.roles.<role>.supports_tools` | `auto`, `yes`, `no` |\n")
 	b.WriteString("| `agents.completion.mode` | `auto`, `continue`, `trim`, `off` |\n")
 	b.WriteString("| `media.tts.type` | `builtin`, `http`, `cli`, `gemini`, `disabled` |\n")
