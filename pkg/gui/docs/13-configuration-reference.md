@@ -195,6 +195,7 @@ choose; the ledger and provider identifiers are listed in the
 | --- | --- |
 | `mechanics.engagement` | string |
 | `mechanics.cadence_turns` | int |
+| `mechanics.world_tick_turns` | int |
 
 ## Value sets
 

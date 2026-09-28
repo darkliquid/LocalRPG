@@ -60,6 +60,11 @@ type Turn struct {
 	// Memories are the accepted memory records, so the timeline stays canonical
 	// and the index can be rebuilt from history.jsonl.
 	Memories []entity.Memory `json:"memories,omitempty"`
+	// HealthEffects record a declared health stat reaching zero this turn, and
+	// WorldTick records the directive an onWorldTick run injected, so the
+	// chronicle can show the mechanical consequence beside the prose.
+	HealthEffects []HealthEffect `json:"health_effects,omitempty"`
+	WorldTick     string         `json:"world_tick,omitempty"`
 
 	// LegacyOutput is only populated when reading records written before the
 	// narration rename. New records must not set it.

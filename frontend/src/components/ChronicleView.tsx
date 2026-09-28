@@ -155,6 +155,20 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 </div>
               )}
 
+              {turn.health_effects && turn.health_effects.length > 0 && (
+                <div className="text-xs font-sans text-rose-300 bg-rose-950/40 border border-rose-500/30 rounded-lg px-3 py-2">
+                  {turn.health_effects.map((effect, effectIndex) => (
+                    <div key={effectIndex}>{effect.effect}</div>
+                  ))}
+                </div>
+              )}
+
+              {turn.world_tick && (
+                <div className="text-xs font-sans text-purple-300/90 bg-purple-950/30 border border-purple-500/25 rounded-lg px-3 py-2">
+                  {turn.world_tick}
+                </div>
+              )}
+
               {turn.recovery === 'trimmed' && (
                 <div className="text-xs font-mono text-purple-400/80 pt-1">
                   The narrator's reply ended mid-thought; the unfinished tail was dropped.

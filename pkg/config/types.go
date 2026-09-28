@@ -329,6 +329,9 @@ type MechanicsConfig struct {
 	// CadenceTurns forces a check after this many turns without one. Unset (0)
 	// uses the default; a negative value disables the floor.
 	CadenceTurns int `yaml:"cadence_turns,omitempty" json:"cadence_turns,omitempty"`
+	// WorldTickTurns how often onWorldTick runs, in turns. Unset (0) or negative
+	// disables it, so a campaign that ships no world tick is unaffected.
+	WorldTickTurns int `yaml:"world_tick_turns,omitempty" json:"world_tick_turns,omitempty"`
 }
 
 // MechanicsEngagement is the configured policy, defaulting to "auto".
@@ -351,6 +354,15 @@ func (c *Config) MechanicsCadenceTurns() int {
 		return 3
 	}
 	return c.Mechanics.CadenceTurns
+}
+
+// MechanicsWorldTickTurns is how often onWorldTick runs, in turns. Zero or a
+// negative value disables it.
+func (c *Config) MechanicsWorldTickTurns() int {
+	if c.Mechanics.WorldTickTurns < 0 {
+		return 0
+	}
+	return c.Mechanics.WorldTickTurns
 }
 
 func DefaultConfig() *Config {

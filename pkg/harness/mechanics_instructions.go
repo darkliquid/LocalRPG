@@ -7,12 +7,21 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 )
 
+// StatValue is one of the player's declared stats and its current value, so the
+// resolution instruction can name what a check may test.
+type StatValue struct {
+	ID    string
+	Label string
+	Value int
+}
+
 // FormatMechanicsInstructions is the engine's standing instruction to the GM
 // about when to roll. It is generated whenever a system ships mechanics, it
 // reflects the engagement policy, and it cites the system's declared resolution
 // when it has one. It is deliberately system-agnostic: the engine still knows no
-// rules, only how to ask for a check.
-func FormatMechanicsInstructions(spec *core.MechanicsSpec, engagement string) string {
+// rules, only how to ask for a check. stats, when supplied, are the player's
+// declared stats and their current values.
+func FormatMechanicsInstructions(spec *core.MechanicsSpec, engagement string, stats []StatValue) string {
 	var sb strings.Builder
 	switch engagement {
 	case "off":
@@ -29,7 +38,20 @@ func FormatMechanicsInstructions(spec *core.MechanicsSpec, engagement string) st
 		sb.WriteString("harm, resources, standing, or a lasting change. ")
 		sb.WriteString("State the stakes and the possible outcomes first. Do not roll for safe or trivial actions. ")
 		sb.WriteString("NPCs do not roll; resolve opposition through the protagonist's check. ")
+		sb.WriteString("Call request_check before submit_turn for any uncertain action; never narrate a resolution the engine has not given you. ")
 		sb.WriteString("Honour the outcome the engine returns.\n")
+	}
+
+	if len(stats) > 0 {
+		parts := make([]string, 0, len(stats))
+		for _, stat := range stats {
+			label := stat.Label
+			if label == "" {
+				label = stat.ID
+			}
+			parts = append(parts, label+" "+strconv.Itoa(stat.Value))
+		}
+		sb.WriteString("Player stats: " + strings.Join(parts, ", ") + ".\n")
 	}
 
 	if spec == nil {

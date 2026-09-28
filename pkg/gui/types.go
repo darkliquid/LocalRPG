@@ -159,6 +159,17 @@ type TurnDTO struct {
 	Checks   []harness.CheckResult  `json:"checks,omitempty"`
 	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
 	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
+	// HealthEffects record a declared health stat reaching zero this turn, and
+	// WorldTick the directive an on-world-tick run injected, so the chronicle can
+	// show the mechanical consequence beside the prose.
+	HealthEffects []HealthEffectDTO `json:"health_effects,omitempty"`
+	WorldTick     string            `json:"world_tick,omitempty"`
+}
+
+// HealthEffectDTO is one resolved health-zero effect on a turn.
+type HealthEffectDTO struct {
+	Entity string `json:"entity"`
+	Effect string `json:"effect"`
 }
 
 // ToolCallDTO is one tool a turn called, with only its name and result size: the

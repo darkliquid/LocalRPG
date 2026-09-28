@@ -89,9 +89,11 @@ func (s *Service) runtimeFor(gameID string, manifest *core.GameManifest) (*turnR
 			runtime.declaredStats[stat.ID] = stat
 		}
 		runtime.allowFreeform = sm.Mechanics.AllowFreeformState
-		runtime.mechanicsPrompt = harness.FormatMechanicsInstructions(sm.Mechanics, runtime.engagement)
+		// The prompt is rebuilt per turn from the player's current stats, so the
+		// cached copy here is only a fallback for a caller without a schema.
+		runtime.mechanicsPrompt = harness.FormatMechanicsInstructions(sm.Mechanics, runtime.engagement, nil)
 	} else if _, err := os.Stat(filepath.Join(sysDir, "mechanics.js")); err == nil {
-		runtime.mechanicsPrompt = harness.FormatMechanicsInstructions(nil, runtime.engagement)
+		runtime.mechanicsPrompt = harness.FormatMechanicsInstructions(nil, runtime.engagement, nil)
 	}
 
 	s.runtime, s.runtimeKey, s.runtimeGame = runtime, key, gameID

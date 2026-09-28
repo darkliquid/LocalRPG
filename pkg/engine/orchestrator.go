@@ -103,9 +103,19 @@ type TurnOrchestrator struct {
 	completionPolicy CompletionPolicy
 	toolExecutor     ToolExecutor
 	checkResolver    harness.CheckResolver
-	declaredStats    map[string]core.StatSpec
-	mechanics        *core.MechanicsSpec
-	allowFreeform    bool
+	declaredStats map[string]core.StatSpec
+	mechanics     *core.MechanicsSpec
+	// health is the declared health schema, resolved to an effect when the stat
+	// reaches zero.
+	health *core.HealthSpec
+	// worldTickTurns is how often onWorldTick runs, in turns. Zero disables it.
+	worldTickTurns int
+	// worldTick records the directive an onWorldTick run injected this turn.
+	worldTick string
+	// rebuildMechanicsPrompt makes the resolution instruction reflect the
+	// player's current stats, rebuilt each turn rather than cached.
+	rebuildMechanicsPrompt bool
+	allowFreeform          bool
 	toolCapability   string
 	toolRounds       int
 	toolObserver     func(ToolActivity)
@@ -186,6 +196,31 @@ func (o *TurnOrchestrator) SetLorePrompt(prompt string) { o.lorePrompt = prompt 
 // SetMechanicsPrompt sets the formatted mechanics instruction without rebuilding
 // it, so a cached runtime can hand it over directly.
 func (o *TurnOrchestrator) SetMechanicsPrompt(prompt string) { o.mechanicsPrompt = prompt }
+
+// SetMechanicsSchema hands the orchestrator the spec and engagement so the
+// resolution instruction is rebuilt each turn with the player's current stats.
+func (o *TurnOrchestrator) SetMechanicsSchema(spec *core.MechanicsSpec, engagement string) {
+	o.mechanics = spec
+	if engagement != "" {
+		o.mechanicsEngagement = engagement
+	}
+	o.rebuildMechanicsPrompt = true
+	o.mechanicsPrompt = o.mechanicsInstruction()
+}
+
+// SetHealthSpec sets the declared health schema, resolved to an effect when the
+// player's health stat reaches zero.
+func (o *TurnOrchestrator) SetHealthSpec(health *core.HealthSpec) {
+	o.health = health
+}
+
+// SetWorldTickTurns sets how often onWorldTick runs, in turns. Zero disables it.
+func (o *TurnOrchestrator) SetWorldTickTurns(turns int) {
+	if turns < 0 {
+		turns = 0
+	}
+	o.worldTickTurns = turns
+}
 
 // SetUsageContext attaches the per-turn usage sink, so provider calls made
 // during the turn are stamped with its number.
@@ -450,7 +485,7 @@ func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, world
 				if engagement == "" {
 					engagement = "auto"
 				}
-				o.mechanicsPrompt = harness.FormatMechanicsInstructions(spec, engagement)
+				o.SetMechanicsSchema(spec, engagement)
 			}
 		}
 		if worldID != "" {
@@ -651,6 +686,10 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// source of truth, never from a value pinned at campaign open.
 	locationID := o.currentLocation()
 
+	// The living world advances on its own cadence, before the prompt is built,
+	// so a tick's injected directive reaches the turn that triggered it.
+	o.runWorldTick(turnNum, locationID)
+
 	// Assemble context with system rules, world lore prompts, and a window of
 	// recent turns, which is what keeps the narrator in the same conversation.
 	recent := make([]harness.RecentTurn, 0, len(pastTurns))
@@ -718,7 +757,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		ActionEcho:       echoAction,
 		RulesPrompt:      o.rulesPrompt,
 		LorePrompt:       o.lorePrompt,
-		MechanicsPrompt:  o.mechanicsPrompt,
+		MechanicsPrompt:  o.mechanicsInstruction(),
 		Profiles:         o.timeline.VoiceProfiles(),
 		OmitVoiceCatalog: canCallTools,
 		Recent:           recent,
@@ -740,6 +779,15 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			"location": locationID,
 		}); err != nil {
 			o.logger.Event("turn.begin_hook_error", map[string]interface{}{"error": err.Error()})
+		}
+	}
+
+	// Directives hooks injected (onAction, onWorldTick, onTurnBegin) reach the
+	// prompt here. Without draining them, injectGMDirection had no effect.
+	if directives := o.drainDirectives(); len(directives) > 0 {
+		gmDirective = applyDirectives(gmDirective, directives)
+		if o.worldTickDue(turnNum) {
+			o.worldTick = strings.Join(directives, "\n")
 		}
 	}
 
@@ -1049,6 +1097,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// of the same record and a threshold level sees the final values.
 	o.applyAdvancement(ctx, &turn)
 
+	// Resolve health-zero after every state change this turn, so the effect is
+	// part of the same record. A health change made by an onTurnEnd hook is seen
+	// on the next turn instead, because hooks run after the turn is recorded.
+	if effect := o.healthOutcome(); effect != "" {
+		turn.HealthEffects = append(turn.HealthEffects, HealthEffect{Entity: o.playerID, Effect: effect})
+	}
+	turn.WorldTick = o.worldTick
+
 	if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
 	}
@@ -1098,10 +1154,12 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			entityIDs = append(entityIDs, mention.ID)
 		}
 		hookCtx := map[string]interface{}{
-			"turn":      turnNum,
-			"narration": turn.Narration,
-			"entities":  entityIDs,
-			"checks":    len(turn.Checks),
+			"turn":           turnNum,
+			"narration":      turn.Narration,
+			"entities":       entityIDs,
+			"checks":         len(turn.Checks),
+			"health_effects": turn.HealthEffects,
+			"world_tick":     turn.WorldTick,
 		}
 		if turn.Verdict != nil {
 			hookCtx["verdict"] = string(turn.Verdict.Feasibility)

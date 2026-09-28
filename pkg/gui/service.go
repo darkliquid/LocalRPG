@@ -1030,6 +1030,8 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		Rejected:        turn.Rejected,
 		Checks:          turn.Checks,
 		PendingCheck:    turn.PendingCheck,
+		HealthEffects:   healthEffectDTOs(turn.HealthEffects),
+		WorldTick:       turn.WorldTick,
 		Segments: segmentDTOs(turn.Segments, gameID, turn.Number, audioAvailable, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
 		}, func(ref string) *entity.VoiceConfig {
@@ -1052,9 +1054,20 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 	return dto
 }
 
+// healthEffectDTOs maps the engine's resolved health effects to the wire shape.
+func healthEffectDTOs(effects []engine.HealthEffect) []HealthEffectDTO {
+	if len(effects) == 0 {
+		return nil
+	}
+	out := make([]HealthEffectDTO, 0, len(effects))
+	for _, effect := range effects {
+		out = append(out, HealthEffectDTO{Entity: effect.Entity, Effect: effect.Effect})
+	}
+	return out
+}
+
 // ErrTurnInFlight means another turn is already running for this campaign.
 var ErrTurnInFlight = errors.New("a turn is already in flight")
-
 // ErrCampaignNotPlayable means the campaign's files are not ready for a turn, so
 // the caller can answer before any bytes are sent.
 var ErrCampaignNotPlayable = errors.New("campaign cannot be prepared")
@@ -1344,14 +1357,20 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		orchestrator.SetDeclaredStats(runtime.declaredStats)
 		orchestrator.SetAllowFreeformState(runtime.allowFreeform)
 	}
+	orchestrator.SetMechanicsEngagement(runtime.engagement)
 	if runtime.mechanics != nil {
 		orchestrator.SetMechanics(runtime.mechanics)
+		orchestrator.SetHealthSpec(runtime.mechanics.Health)
+		// The resolution instruction is rebuilt each turn from the player's
+		// current stats, so it names values the player actually has.
+		orchestrator.SetMechanicsSchema(runtime.mechanics, runtime.engagement)
+	} else {
+		orchestrator.SetMechanicsPrompt(runtime.mechanicsPrompt)
 	}
-	orchestrator.SetMechanicsEngagement(runtime.engagement)
 	orchestrator.SetMechanicsCadence(cfg.MechanicsCadenceTurns())
+	orchestrator.SetWorldTickTurns(cfg.MechanicsWorldTickTurns())
 	orchestrator.SetRulesPrompt(runtime.rulesPrompt)
 	orchestrator.SetLorePrompt(runtime.lorePrompt)
-	orchestrator.SetMechanicsPrompt(runtime.mechanicsPrompt)
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
 	orchestrator.SetContextLimits(harness.ContextLimits{

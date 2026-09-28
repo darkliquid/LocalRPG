@@ -96,6 +96,10 @@ export interface Turn {
   verdict?: { feasibility: 'automatic' | 'uncertain' | 'impossible'; reason?: string };
   rejected?: boolean;
   checks?: TurnCheck[];
+  // A declared health stat reaching zero this turn, and the directive an
+  // on-world-tick run injected, so the mechanical consequence is visible.
+  health_effects?: { entity: string; effect: string }[];
+  world_tick?: string;
   // A GM-proposed check awaiting the player's roll (ask policy).
   pending_check?: {
     ref: string;
