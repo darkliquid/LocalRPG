@@ -92,6 +92,9 @@ type Service struct {
 	// exports serialises story exports per campaign and fans progress to the
 	// settings/theater UI.
 	exports *exportManager
+	// directoryPicker is the desktop window's native directory chooser. It is
+	// nil in browser/socket mode, where the UI falls back to a path field.
+	directoryPicker func(defaultDir string) (string, error)
 }
 
 // Config returns the configuration the service is running with, so a command can

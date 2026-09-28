@@ -58,7 +58,8 @@ func routePattern(path string) string {
 		return path
 	case path == "/api/models" || strings.HasPrefix(path, "/api/models/"):
 		return "/api/models"
-	case path == "/api/export" || path == "/api/export/capabilities" || path == "/api/export/events":
+	case path == "/api/export" || path == "/api/export/capabilities" || path == "/api/export/events" ||
+		path == "/api/export/choose-directory":
 		return path
 	case strings.HasPrefix(path, "/api/export/"):
 		return "/api/export/{gameID}"
@@ -1311,6 +1312,20 @@ func (s *Server) handleExportRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if path == "choose-directory" && r.Method == http.MethodPost {
+		chosen, err := s.service.ChooseExportDirectory(r.Context())
+		switch {
+		case errors.Is(err, ErrNoNativeDialog):
+			http.Error(w, err.Error(), http.StatusNotImplemented)
+			return
+		case err != nil:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]interface{}{"path": chosen})
+		return
+	}
+
 	if path == "events" && r.Method == http.MethodGet {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -1350,7 +1365,7 @@ func (s *Server) handleExportRoutes(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrExportInFlight):
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
-		case errors.Is(err, ErrExportFormat), errors.Is(err, ErrExportNoFFmpeg):
+		case errors.Is(err, ErrExportFormat), errors.Is(err, ErrExportNoFFmpeg), errors.Is(err, ErrExportDirRequired):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		case err != nil:

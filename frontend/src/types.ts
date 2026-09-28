@@ -638,6 +638,7 @@ export interface SettingsResponse {
 export interface ExportRequest {
   game_id: string;
   format: 'web' | 'video';
+  out_dir: string;
   art: boolean;
   audio: boolean;
   still?: boolean;
@@ -666,6 +667,8 @@ export interface ExportEvent {
 export interface ExportCapabilities {
   ffmpeg: boolean;
   ffmpeg_path?: string;
+  default_dir?: string;
+  native_dialog: boolean;
 }
 
 export interface TestProviderRequest {

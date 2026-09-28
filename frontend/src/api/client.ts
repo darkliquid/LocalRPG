@@ -145,6 +145,16 @@ export class APIClient {
     if (!res.ok) throw new Error(`cancelExport: ${res.statusText}`);
   }
 
+  static async chooseExportDirectory(): Promise<string> {
+    const res = await fetch('/api/export/choose-directory', { method: 'POST' });
+    if (!res.ok) {
+      if (res.status === 501) throw new HTTPError(res.status, 'No native directory dialog is available');
+      throw new HTTPError(res.status, `chooseExportDirectory: ${res.statusText}`);
+    }
+    const data = (await res.json()) as { path?: string };
+    return data.path ?? '';
+  }
+
   static subscribeExportEvents(onEvent: (event: ExportEvent) => void): () => void {
     const eventSource = new EventSource('/api/export/events');
     eventSource.onmessage = (event) => {

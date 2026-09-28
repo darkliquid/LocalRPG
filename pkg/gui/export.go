@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/adrg/xdg"
+
 	"github.com/darkliquid/localrpg/pkg/export"
 	"github.com/darkliquid/localrpg/pkg/scene"
 )
@@ -22,12 +24,20 @@ var (
 	ErrExportFormat = errors.New("export format must be web or video")
 	// ErrExportNoFFmpeg reports that video export needs ffmpeg, which is absent.
 	ErrExportNoFFmpeg = errors.New("ffmpeg is required for video export")
+	// ErrExportDirRequired reports that no destination was provided.
+	ErrExportDirRequired = errors.New("an export destination directory is required")
+	// ErrNoNativeDialog reports that no native directory picker is available, so
+	// the UI must fall back to a path field.
+	ErrNoNativeDialog = errors.New("native directory dialog is not available")
 )
 
-// ExportRequestDTO asks for a story replay to be generated for a campaign.
+// ExportRequestDTO asks for a story replay to be generated for a campaign. OutDir
+// is the destination directory and is required: the server never guesses where a
+// user's artifact should land.
 type ExportRequestDTO struct {
 	GameID string `json:"game_id"`
 	Format string `json:"format"` // "web" | "video"
+	OutDir string `json:"out_dir"`
 	Art    bool   `json:"art"`
 	Audio  bool   `json:"audio"`
 	Still  bool   `json:"still,omitempty"`
@@ -55,10 +65,13 @@ type ExportEvent struct {
 	Error      string `json:"error,omitempty"`
 }
 
-// ExportCapabilitiesDTO reports what this machine can export.
+// ExportCapabilitiesDTO reports what this machine can export and where the UI
+// should start a destination picker.
 type ExportCapabilitiesDTO struct {
-	FFmpeg     bool   `json:"ffmpeg"`
-	FFmpegPath string `json:"ffmpeg_path,omitempty"`
+	FFmpeg       bool   `json:"ffmpeg"`
+	FFmpegPath   string `json:"ffmpeg_path,omitempty"`
+	DefaultDir   string `json:"default_dir,omitempty"`
+	NativeDialog bool   `json:"native_dialog"`
 }
 
 // exportJob is the running export for one campaign.
@@ -141,11 +154,57 @@ func (m *exportManager) unsubscribe(ch chan ExportEvent) {
 	m.subMu.Unlock()
 }
 
-// ExportCapabilities reports the ffmpeg availability the UI needs to decide
-// whether a video export is possible.
+// SetDirectoryPicker installs a native directory chooser, used only by the Wails
+// desktop window. Without one the UI falls back to a path field.
+func (s *Service) SetDirectoryPicker(picker func(defaultDir string) (string, error)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.directoryPicker = picker
+}
+
+// defaultExportDir is where a picker should open: the XDG Videos folder, then
+// Documents, then the home directory. Only existing directories are offered.
+func (s *Service) defaultExportDir() string {
+	for _, candidate := range []string{xdg.UserDirs.Videos, xdg.UserDirs.Documents} {
+		if candidate == "" {
+			continue
+		}
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return home
+	}
+	return ""
+}
+
+// ChooseExportDirectory opens the native picker, or reports that none is
+// available so the UI can fall back to a text field. An empty path with no error
+// means the user cancelled.
+func (s *Service) ChooseExportDirectory(ctx context.Context) (string, error) {
+	s.mu.RLock()
+	picker := s.directoryPicker
+	s.mu.RUnlock()
+	if picker == nil {
+		return "", ErrNoNativeDialog
+	}
+	return picker(s.defaultExportDir())
+}
+
+// ExportCapabilities reports ffmpeg availability, the default destination, and
+// whether a native picker exists.
 func (s *Service) ExportCapabilities() ExportCapabilitiesDTO {
 	path, ok := export.FFmpegAvailable()
-	return ExportCapabilitiesDTO{FFmpeg: ok, FFmpegPath: path}
+	s.mu.RLock()
+	native := s.directoryPicker != nil
+	s.mu.RUnlock()
+	return ExportCapabilitiesDTO{
+		FFmpeg:       ok,
+		FFmpegPath:   path,
+		DefaultDir:   s.defaultExportDir(),
+		NativeDialog: native,
+	}
 }
 
 // SubscribeExportEvents registers a channel for export progress.
@@ -168,6 +227,14 @@ func (s *Service) StartExport(ctx context.Context, req ExportRequestDTO) (*Expor
 	if strings.TrimSpace(req.GameID) == "" {
 		return nil, fmt.Errorf("export: game id is required")
 	}
+	outDir := strings.TrimSpace(req.OutDir)
+	if outDir == "" {
+		return nil, ErrExportDirRequired
+	}
+	absOut, err := filepath.Abs(outDir)
+	if err != nil {
+		return nil, fmt.Errorf("export: resolve destination: %w", err)
+	}
 	if format == "video" {
 		if _, ok := export.FFmpegAvailable(); !ok {
 			return nil, ErrExportNoFFmpeg
@@ -180,7 +247,8 @@ func (s *Service) StartExport(ctx context.Context, req ExportRequestDTO) (*Expor
 	}
 
 	req.Format = format
-	outPath := s.exportOutputPath(req.GameID, format)
+	req.OutDir = absOut
+	outPath := uniquePath(exportArtifactPath(absOut, req.GameID, format))
 
 	s.goBackground(func() {
 		defer s.exports.finish(req.GameID)
@@ -190,15 +258,24 @@ func (s *Service) StartExport(ctx context.Context, req ExportRequestDTO) (*Expor
 	return &ExportJobDTO{GameID: req.GameID, Format: format, OutputPath: outPath, Running: true}, nil
 }
 
-// exportOutputPath names a fresh artifact per run so repeated exports never
-// overwrite one another.
-func (s *Service) exportOutputPath(gameID, format string) string {
-	dir := s.GetResolver().ExportsDir(gameID)
-	stamp := time.Now().UTC().Format("20060102-150405")
+// exportArtifactPath names the artifact inside a chosen directory: a bundle
+// directory for the web player, a video file otherwise.
+func exportArtifactPath(outDir, gameID, format string) string {
 	if format == "web" {
-		return filepath.Join(dir, "web-"+stamp)
+		return filepath.Join(outDir, gameID+"-web")
 	}
-	return filepath.Join(dir, gameID+"-"+stamp+".mp4")
+	return filepath.Join(outDir, gameID+".mp4")
+}
+
+// uniquePath appends a timestamp when a destination already exists, so an export
+// never overwrites a previous one.
+func uniquePath(path string) string {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return path
+	}
+	ext := filepath.Ext(path)
+	base := strings.TrimSuffix(path, ext)
+	return fmt.Sprintf("%s-%s%s", base, time.Now().UTC().Format("20060102-150405"), ext)
 }
 
 // runExport compiles and renders one export, publishing every phase.

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Download, X, AlertCircle, Loader2, Film, Globe, Ban } from 'lucide-react';
+import { Download, X, AlertCircle, Loader2, Film, Globe, Ban, FolderOpen } from 'lucide-react';
 import { APIClient } from '../api/client';
 import type { ExportCapabilities, ExportEvent, ExportJob } from '../types';
 
@@ -21,6 +21,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
   const [still, setStill] = useState(false);
   const [fps, setFps] = useState(15);
   const [size, setSize] = useState('1920x1080');
+  const [outDir, setOutDir] = useState('');
 
   const [capabilities, setCapabilities] = useState<ExportCapabilities | null>(null);
   const [running, setRunning] = useState(false);
@@ -31,7 +32,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
   useEffect(() => {
     if (!isOpen) return;
     APIClient.exportCapabilities()
-      .then(setCapabilities)
+      .then((caps) => {
+        setCapabilities(caps);
+        setOutDir((current) => current || caps.default_dir || '');
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to check export support'));
   }, [isOpen]);
 
@@ -56,7 +60,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
   }, [isOpen, gameID]);
 
   const handleStart = useCallback(async () => {
-    if (!gameID) return;
+    if (!gameID || !outDir.trim()) return;
     setError(null);
     setProgress(null);
     setJob(null);
@@ -64,6 +68,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
       const started = await APIClient.startExport({
         game_id: gameID,
         format,
+        out_dir: outDir.trim(),
         art,
         audio,
         still: format === 'video' ? still : undefined,
@@ -75,7 +80,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start export');
     }
-  }, [gameID, format, art, audio, still, fps, size]);
+  }, [gameID, format, outDir, art, audio, still, fps, size]);
+
+  const handleBrowse = useCallback(async () => {
+    setError(null);
+    try {
+      const chosen = await APIClient.chooseExportDirectory();
+      if (chosen) setOutDir(chosen);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to open the directory dialog');
+    }
+  }, []);
 
   const handleCancel = useCallback(async () => {
     if (!gameID) return;
@@ -148,6 +163,30 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
               Video export needs <code className="text-stone-200">ffmpeg</code>, which was not found on this machine.
             </div>
           )}
+
+          <div className="space-y-1">
+            <label className="text-stone-400">Destination folder</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={outDir}
+                disabled={running}
+                placeholder={capabilities?.default_dir || '/path/to/folder'}
+                onChange={(e) => setOutDir(e.target.value)}
+                className="flex-1 bg-stone-950 border border-stone-800 rounded-lg px-2 py-1.5 text-stone-200"
+              />
+              {capabilities?.native_dialog && (
+                <button
+                  onClick={handleBrowse}
+                  disabled={running}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-700 text-stone-200 hover:bg-stone-800 cursor-pointer disabled:opacity-50"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  Browse…
+                </button>
+              )}
+            </div>
+          </div>
 
           <div className="flex flex-wrap gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -233,7 +272,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
             ) : (
               <button
                 onClick={handleStart}
-                disabled={!gameID || (format === 'video' && ffmpegMissing)}
+                disabled={!gameID || !outDir.trim() || (format === 'video' && ffmpegMissing)}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 text-white font-bold hover:bg-purple-500 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}

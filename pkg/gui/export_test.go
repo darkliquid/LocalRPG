@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -49,8 +51,16 @@ func TestExportManagerPublishesToSubscribers(t *testing.T) {
 func TestStartExportRejectsBadFormat(t *testing.T) {
 	svc := NewService(t.TempDir())
 
-	if _, err := svc.StartExport(context.Background(), ExportRequestDTO{GameID: "g", Format: "pdf"}); !errors.Is(err, ErrExportFormat) {
+	if _, err := svc.StartExport(context.Background(), ExportRequestDTO{GameID: "g", Format: "pdf", OutDir: t.TempDir()}); !errors.Is(err, ErrExportFormat) {
 		t.Fatalf("StartExport = %v, want ErrExportFormat", err)
+	}
+}
+
+func TestStartExportRequiresDestination(t *testing.T) {
+	svc := NewService(t.TempDir())
+
+	if _, err := svc.StartExport(context.Background(), ExportRequestDTO{GameID: "g", Format: "web"}); !errors.Is(err, ErrExportDirRequired) {
+		t.Fatalf("StartExport = %v, want ErrExportDirRequired", err)
 	}
 }
 
@@ -58,21 +68,72 @@ func TestStartExportVideoRequiresFFmpeg(t *testing.T) {
 	t.Setenv("PATH", "")
 	svc := NewService(t.TempDir())
 
-	if _, err := svc.StartExport(context.Background(), ExportRequestDTO{GameID: "g", Format: "video"}); !errors.Is(err, ErrExportNoFFmpeg) {
+	if _, err := svc.StartExport(context.Background(), ExportRequestDTO{GameID: "g", Format: "video", OutDir: t.TempDir()}); !errors.Is(err, ErrExportNoFFmpeg) {
 		t.Fatalf("StartExport = %v, want ErrExportNoFFmpeg", err)
 	}
 }
 
-func TestExportOutputPathIsUnderCampaignExports(t *testing.T) {
+func TestChooseExportDirectoryWithoutPicker(t *testing.T) {
 	svc := NewService(t.TempDir())
 
-	path := svc.exportOutputPath("campaign-01", "web")
-	want := svc.GetResolver().ExportsDir("campaign-01")
-	if !strings.HasPrefix(path, want) {
-		t.Fatalf("output path %q is not under %q", path, want)
+	if _, err := svc.ChooseExportDirectory(context.Background()); !errors.Is(err, ErrNoNativeDialog) {
+		t.Fatalf("ChooseExportDirectory = %v, want ErrNoNativeDialog", err)
 	}
-	if strings.Contains(path, "dist") {
-		t.Fatalf("output path must not use the SPA dist directory: %q", path)
+}
+
+func TestChooseExportDirectoryUsesThePicker(t *testing.T) {
+	svc := NewService(t.TempDir())
+	want := t.TempDir()
+	var seenDefault string
+	svc.SetDirectoryPicker(func(defaultDir string) (string, error) {
+		seenDefault = defaultDir
+		return want, nil
+	})
+
+	got, err := svc.ChooseExportDirectory(context.Background())
+	if err != nil {
+		t.Fatalf("ChooseExportDirectory: %v", err)
+	}
+	if got != want {
+		t.Fatalf("path = %q, want %q", got, want)
+	}
+	if seenDefault == "" {
+		t.Fatalf("expected a default directory to be offered")
+	}
+
+	if !svc.ExportCapabilities().NativeDialog {
+		t.Fatalf("expected capabilities to report a native dialog")
+	}
+}
+
+func TestStartExportWritesIntoTheChosenDirectory(t *testing.T) {
+	svc := NewService(t.TempDir())
+	outDir := t.TempDir()
+
+	job, err := svc.StartExport(context.Background(), ExportRequestDTO{
+		GameID: "campaign-01", Format: "web", OutDir: outDir,
+	})
+	if err != nil {
+		t.Fatalf("StartExport: %v", err)
+	}
+	if job.OutputPath == "" || !strings.HasPrefix(job.OutputPath, outDir) {
+		t.Fatalf("output path %q is not under the chosen directory %q", job.OutputPath, outDir)
+	}
+}
+
+func TestUniquePathAvoidsOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "campaign-01-web")
+	if err := os.MkdirAll(existing, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	got := uniquePath(existing)
+	if got == existing {
+		t.Fatalf("uniquePath returned the existing path unchanged")
+	}
+	if !strings.HasPrefix(got, existing) {
+		t.Fatalf("uniquePath = %q, want a variant of %q", got, existing)
 	}
 }
 
@@ -91,13 +152,46 @@ func TestExportCapabilitiesRoute(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &caps); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
+	if caps.DefaultDir == "" {
+		t.Errorf("expected a default export directory")
+	}
+	if caps.NativeDialog {
+		t.Errorf("a headless service must not report a native dialog")
+	}
+}
+
+func TestChooseDirectoryRouteWithoutPicker(t *testing.T) {
+	svc := NewService(t.TempDir())
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/export/choose-directory", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotImplemented {
+		t.Fatalf("status = %d, want 501", rec.Code)
+	}
 }
 
 func TestStartExportRouteRejectsBadFormat(t *testing.T) {
 	svc := NewService(t.TempDir())
 	server := NewServer(svc, http.NotFoundHandler())
 
-	body := strings.NewReader(`{"game_id":"g","format":"pdf"}`)
+	body := strings.NewReader(`{"game_id":"g","format":"pdf","out_dir":"/tmp"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/export", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestStartExportRouteRejectsMissingDestination(t *testing.T) {
+	svc := NewService(t.TempDir())
+	server := NewServer(svc, http.NotFoundHandler())
+
+	body := strings.NewReader(`{"game_id":"g","format":"web"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/export", body)
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
@@ -112,7 +206,8 @@ func TestStartExportRouteAcceptsAJob(t *testing.T) {
 	t.Cleanup(svc.Close)
 	server := NewServer(svc, http.NotFoundHandler())
 
-	body := strings.NewReader(`{"game_id":"campaign-01","format":"web"}`)
+	outDir := t.TempDir()
+	body := strings.NewReader(`{"game_id":"campaign-01","format":"web","out_dir":"` + outDir + `"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/export", body)
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)

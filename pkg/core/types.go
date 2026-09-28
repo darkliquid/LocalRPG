@@ -145,13 +145,6 @@ func (p *PathResolver) GameDBPath(gameID string) string {
 	return filepath.Join(p.GameDir(gameID), "cache", "index.db")
 }
 
-// ExportsDir is where a campaign's generated exports live. It sits inside the
-// campaign directory, so an export travels with the campaign it came from and
-// never mixes with the SPA build output.
-func (p *PathResolver) ExportsDir(gameID string) string {
-	return filepath.Join(p.GameDir(gameID), "exports")
-}
-
 func (p *PathResolver) CacheDir() string {
 	if p.cacheDir != "" {
 		return p.cacheDir

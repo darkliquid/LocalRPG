@@ -19,7 +19,7 @@
 - Routes must be added to `routePattern` (`pkg/gui/server.go:50-82`).
 - `frontend/` `tsc --noEmit` must pass (`strict`, `noUnusedLocals`).
 - No new dependencies.
-- **Deviation from the spec:** the exports directory is `<game>/exports/` under the campaigns root, not a new `paths` category. This keeps one campaign's artifacts with the campaign and avoids a config-schema change; the spec's requirement ("never `dist/`, per-campaign, no overwrite") is still met.
+- **Deviation from the spec:** the export destination is **required and user-chosen**, not a server-computed `<game>/exports/` directory. The request carries `out_dir`; the UI defaults it to the XDG Videos folder (then Documents, then home) and offers a native Wails directory dialog where one exists, falling back to a text field in browser/socket mode. An existing target gets a timestamp suffix so an export never overwrites a previous one. `core.PathResolver.ExportsDir` was removed as dead code.
 
 ---
 
