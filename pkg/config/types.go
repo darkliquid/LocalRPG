@@ -286,8 +286,7 @@ type Config struct {
 	Mechanics   MechanicsConfig   `yaml:"mechanics,omitempty" json:"mechanics,omitempty"`
 }
 
-// CurrentVersion is the config schema version. Version "2" introduced canonical
-// provider keys, so providers.prices entries are validated against the grammar.
+// CurrentVersion is the config schema version.
 const CurrentVersion = "2"
 
 // Validate reports human-readable problems with a configuration. It never fails
@@ -296,11 +295,6 @@ const CurrentVersion = "2"
 // nothing, so silencing it would hide the reason a price is not applied.
 func (c *Config) Validate() []string {
 	var problems []string
-	if c.Version != CurrentVersion {
-		problems = append(problems, fmt.Sprintf(
-			"config version %q predates canonical provider keys; providers.prices must use <family>:<adapter> (for example %s)",
-			c.Version, provider.KeyLLMOpenAIChat))
-	}
 	for i, price := range c.Providers.Prices {
 		if price.Provider == "" {
 			problems = append(problems, fmt.Sprintf("providers.prices[%d]: provider is required", i))

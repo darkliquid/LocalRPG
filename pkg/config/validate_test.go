@@ -31,16 +31,6 @@ func TestValidateAcceptsCanonicalKeys(t *testing.T) {
 	}
 }
 
-func TestValidateWarnsOnAnOldConfigVersion(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.Version = "1"
-	cfg.Providers.Prices = nil
-	problems := cfg.Validate()
-	if len(problems) != 1 || !strings.Contains(problems[0], "canonical provider keys") {
-		t.Fatalf("problems = %v, want the version warning", problems)
-	}
-}
-
 func TestDefaultConfigIsCurrentVersion(t *testing.T) {
 	if got := config.DefaultConfig().Version; got != config.CurrentVersion {
 		t.Fatalf("DefaultConfig version = %q, want %q", got, config.CurrentVersion)

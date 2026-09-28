@@ -75,16 +75,14 @@ func TestResolvePrefersInstanceModelOverAdapterWide(t *testing.T) {
 	}
 }
 
-func TestResolveSkipsLegacyKeys(t *testing.T) {
+func TestResolveIgnoresAKeyThatIsNotCanonical(t *testing.T) {
 	cfg := &config.Config{Providers: config.ProvidersConfig{Prices: []config.PriceConfig{
 		{Provider: "openaichat", PerMillionInput: 1},
 	}}}
-	if got := Resolve("openaichat", "", cfg); got.PerMillionInput != 1 {
-		// A legacy key still matches its own literal entry, but a canonical key
-		// never resolves to it.
-		t.Errorf("legacy literal = %d, want 1", got.PerMillionInput)
+	if got := Resolve("openaichat", "", cfg); got != (Price{}) {
+		t.Errorf("a non-canonical key must match nothing, got %+v", got)
 	}
 	if got := Resolve("llm:openaichat", "", cfg); got.PerMillionInput != 150_000 {
-		t.Errorf("canonical key must not match a legacy entry; got %d", got.PerMillionInput)
+		t.Errorf("canonical key must use the built-in rate, got %d", got.PerMillionInput)
 	}
 }

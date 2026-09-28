@@ -123,9 +123,7 @@ first match:
 6. Nothing, which yields a zero cost and the **no price configured** badge.
 
 A `providers.prices` entry whose `provider` is not a canonical key is reported as
-a configuration problem on load and matches nothing. If you are updating a
-configuration written before canonical keys existed, see
-[Migrating Provider Keys](14-migrating-provider-keys) for the old-to-new mapping.
+a configuration problem on load and matches nothing.
 
 Costs are computed and stored at write time. Editing a price therefore changes
 future turns only; existing rows keep the figure they were recorded with, so

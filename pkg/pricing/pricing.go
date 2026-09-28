@@ -60,7 +60,7 @@ func Resolve(providerKey, model string, cfg *config.Config) Price {
 func candidateKeys(key string) []string {
 	parsed, err := provider.ParseKey(key)
 	if err != nil {
-		return []string{key}
+		return nil
 	}
 	if _, ok := parsed.Instance(); ok {
 		return []string{string(parsed), string(parsed.Parent())}
