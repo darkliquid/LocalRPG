@@ -188,7 +188,7 @@ The dashboard on `http://localhost:8089` exposes:
 - Shows parent/child relationships, start times, durations, and HTTP status codes.
 
 ### 3. Prompt & LLM Inspector (Right Pane - Tab 2)
-- Displays the complete text of the prompt assembled by `harness.AssembleContextWithProfiles`.
+- Displays the complete text of the prompt assembled by `harness.ContextAssembler.Assemble(ContextRequest)`.
 - Displays the exact raw text returned by the LLM provider.
 - Displays error status and failure code if generation failed.
 

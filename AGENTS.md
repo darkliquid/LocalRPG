@@ -47,7 +47,7 @@ Three-tier on-disk separation, resolved through `core.PathResolver` (`pkg/core/t
 
 Turn lifecycle: `cmd/localrpg/play.go` wires `storage.Store` + `engine.Timeline` + `rules.JSEngine` + `harness.Router` into `engine.TurnOrchestrator`. `ProcessAction` (`pkg/engine/orchestrator.go`) loads history, handles `/undo` and `/gm <directive>`, evaluates `Roll`-mode dice or JS action hooks, assembles a 4-layer context prompt, calls `router.GenerateForRole(ctx, "gm", …)`, resolves entity mentions and dialogue segments, then hands the turn to `Timeline.RecordTurn`, which owns every write (see below). `onTurnEnd` hooks run last.
 
-Context prompt layering lives in `pkg/harness/context.go:AssembleContextWithProfiles`: system rules, world lore, voice-profile catalog, then scene scope, living-world arcs, present characters, and the player action (entities reachable from the current location via `edges`).
+Context prompt layering lives in `pkg/harness/context.go:ContextAssembler.Assemble(ContextRequest)`: system rules, world lore, voice-profile catalog, then scene scope, living-world arcs, present characters, and the player action (entities reachable from the current location via `edges`).
 
 The opening location is never hardcoded: `engine.ResolveStartLocation` (`pkg/engine/startlocation.go`) prefers a pinned `settings.start_location`, then the player's own `location`/wikilink reference, then any indexed `location`, and only then derives a location from the world manifest's name and description into `games/<id>/entities/opening-scene.md`. `engine.InitGame` resolves once at campaign creation and records the result in `game.yaml`; `localrpg play` re-resolves and reindexes the game's `entities/` directory at startup so it picks up hand edits.
 

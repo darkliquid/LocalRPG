@@ -4452,7 +4452,7 @@ Deviations from the task steps as written:
 - **`Turn.Entities` is `[]entity.Mention`, not `[]string`.** Provenance (`turn_entities.mention`) is only rebuildable from the log if the log records it.
 - **`DialogueLine` became `entity.TurnSegment`.** A list of speech lines cannot say where in the prose each line sits, so playback would either double-read dialogue or drop prose. Segments cover narration *and* speech, in order.
 - **`media.UtteranceSegment` was deleted, not deprecated.** `entity.TurnSegment` replaces it outright; `LegacySegments` covers pre-`segments` records.
-- **`pkg/export/video.go` was left unchanged**, as the task predicted: it renders a silent still image and never reads audio. Per-segment audio remains with the story-theater export effort.
+- **`pkg/export/video.go` was left unchanged**, as the task predicted: it renders a silent still image and never reads audio. Per-segment audio remains with the story-theater export effort. **[Erratum 2026-09-28: the follow-up landed. `pkg/export/video.go` now animates and muxes per-beat audio; see `2026-09-21-animated-export-and-video.md`.]**
 
 Test files landed under the names below rather than the plan's single-file predictions: `pkg/engine/{timeline,record_turn,rewind,segments,startlocation}_test.go`, `pkg/engine/orchestrator_{input,timeline}_test.go`, `pkg/entity/history_test.go`, `pkg/storage/{db,pool,game,turn,entity_history}_test.go`, `pkg/export/legacy_script_test.go`, `pkg/gui/middleware_test.go`, `pkg/dialogue/dialogue_test.go`.
 

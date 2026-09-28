@@ -18,7 +18,6 @@ require (
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/k2-fsa/sherpa-onnx-go v1.13.8
 	github.com/pion/opus v0.1.1-0.20260923000601-86ced7318333
-	github.com/tetratelabs/wazero v1.12.0
 	github.com/wailsapp/wails/v3 v3.0.0-beta.24
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0
 	go.opentelemetry.io/otel v1.46.0

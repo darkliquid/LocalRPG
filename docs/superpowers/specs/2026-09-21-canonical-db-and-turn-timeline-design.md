@@ -389,7 +389,7 @@ Rules:
 - Playback walks the segments in order. A `speech` segment with a `speaker_id` looks up that entity's `voice:` frontmatter (per-character override or the archetype assigned by `harness.AssignVoiceProfile`) and synthesizes with it; narration and unresolved speech use the narrator's configured voice.
 - The existing cache key already isolates speaker, voice, pitch, rate, and text, so two characters sharing a voice choice still get distinct clips.
 - `export.SceneBeat` replaces its single `Speaker`/`Dialogue` pair with `Segments []entity.TurnSegment`, compiled from the turn record. The embedded player template in `pkg/export/web.go` currently renders one `beat.speaker` plus `beat.dialogue` per beat (`web.go:129-130`) and becomes a per-segment list with the speaker label per segment.
-- `pkg/export/video.go` stays a silent still-image renderer for now: it never reads audio, so per-segment audio and timed frame changes belong to the story-theater export effort. The segments now travel on the beat for that work.
+- `pkg/export/video.go` stays a silent still-image renderer for now: it never reads audio, so per-segment audio and timed frame changes belong to the story-theater export effort. The segments now travel on the beat for that work. **[Erratum 2026-09-28: no longer true. `pkg/export/video.go` now animates frames and interleaves each beat's audio; see `docs/superpowers/plans/2026-09-21-animated-export-and-video.md`.]**
 - The Story Theater component consumes the same segment data, so in-app replay, the standalone web bundle, and the rendered video all agree on who is speaking.
 
 ---
