@@ -134,6 +134,9 @@ func NewService(rootDir string) *Service {
 			trace.OrNil(svc.logger).Event("paths.legacy_relative", map[string]interface{}{"detail": warning})
 		}
 	}
+	for _, problem := range mgr.Warnings() {
+		trace.OrNil(svc.logger).Event("config.problem", map[string]interface{}{"problem": problem})
+	}
 	return svc
 }
 
@@ -273,6 +276,12 @@ func (s *Service) ensureEmbeddingWorker(gameID string, store *storage.Store) *st
 		worker = storage.NewEmbeddingWorker(store, embProvider, storage.EmbeddingWorkerOptions{
 			BatchSize: cfg.Embeddings.BatchSize,
 		})
+		if key, hasKey := embeddings.KeyFor(cfg.Embeddings); hasKey {
+			model := cfg.Embeddings.Model
+			worker.SetUsageReporting(func(u storage.EmbeddingUsage) {
+				s.RecordEmbeddingUsage(string(key), model, u.InputTokens, u.Requests)
+			}, storage.EmbeddingUsage{ProviderKey: string(key), Model: model})
+		}
 		worker.Start()
 		s.embWorkers[gameID] = worker
 	}
@@ -1313,6 +1322,9 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	toolExecutor.SetEntityWriter(timeline)
 	if embProvider, err := embeddings.NewProviderFromConfig(cfg.Embeddings); err == nil && embProvider != nil {
 		toolExecutor.SetEmbeddingsProvider(embProvider)
+		if key, hasKey := embeddings.KeyFor(cfg.Embeddings); hasKey {
+			toolExecutor.SetEmbeddingUsage(s.RecordEmbeddingUsage, string(key), cfg.Embeddings.Model)
+		}
 	}
 	orchestrator.SetTools(toolExecutor, cfg.RoleSupportsTools("gm"))
 	orchestrator.SetToolRounds(cfg.ToolRounds())
@@ -1805,16 +1817,10 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 	}
 	s.noteSuccess("tts")
 	// A cache hit reports nothing, so only a real synthesis is recorded.
-	if u := pipeline.LastUsage(); u.Characters != 0 || u.InputTokens != 0 || u.OutputTokens != 0 || u.Requests != 0 {
-		s.RecordUsage(gameID, turnNumber, "tts", harness.Usage{
-			Provider:     media.ProviderKey(cfg.Media.TTS),
-			Model:        cfg.Media.TTS.Model,
-			InputTokens:  u.InputTokens,
-			OutputTokens: u.OutputTokens,
-			Characters:   u.Characters,
-			Requests:     u.Requests,
-			Estimated:    u.Estimated,
-		})
+	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
+		if u := pipeline.LastUsage(); u.Characters != 0 || u.InputTokens != 0 || u.OutputTokens != 0 || u.Requests != 0 {
+			s.RecordUsage(gameID, turnNumber, "tts", mediaUsage(u, key, cfg.Media.TTS.Model))
+		}
 	}
 	return path, nil
 }
@@ -2990,12 +2996,10 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		}
 		text, err := client.Transcribe(ctx, media.GenerateToneWAV(440, 0.1))
 		latency := time.Since(start).Milliseconds()
-		if reporter, ok := client.(media.UsageReporter); ok {
-			provider := sttCfg.BuiltinName
-			if provider == "" {
-				provider = sttCfg.Type
+		if key, ok := media.STTKeyFor(sttCfg); ok {
+			if reporter, ok := client.(media.UsageReporter); ok {
+				s.RecordUsageGlobal("stt", mediaUsage(reporter.LastUsage(), key, sttCfg.Model))
 			}
-			s.RecordUsageGlobal("stt", mediaUsage(reporter.LastUsage(), provider, sttCfg.Model))
 		}
 		if err != nil {
 			return &TestProviderResponseDTO{

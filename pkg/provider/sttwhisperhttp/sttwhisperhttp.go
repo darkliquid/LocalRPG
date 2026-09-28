@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "stt-whisper-http",
+			ID:          string(provider.KeySTTWhisperHTTP),
 			Family:      provider.FamilySTT,
 			Label:       "Whisper (HTTP)",
 			Description: "OpenAI-compatible transcription endpoint, local or cloud.",

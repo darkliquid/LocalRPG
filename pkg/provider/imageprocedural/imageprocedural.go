@@ -11,7 +11,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "image-procedural-art",
+			ID:          string(provider.KeyImageProceduralArt),
 			Family:      provider.FamilyImage,
 			Label:       "Procedural Dark Fantasy (Built-in)",
 			Description: "Pure-Go vector landscape generator that needs no model or network.",

@@ -62,9 +62,9 @@ func NewTTSClient(cfg config.TTSConfig) (TTSClient, error) {
 func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClient, error) {
 	// The registry is authoritative when the binary imported pkg/provider/all;
 	// otherwise the inline switch below still builds the client.
-	if regID := TTSProviderIDFor(cfg); regID != "" {
-		if _, ok := provider.Lookup(regID); ok {
-			return BuildTTS(regID, cfg, sharedKey)
+	if key, ok := TTSKeyFor(cfg); ok {
+		if _, found := provider.Lookup(string(key.Parent())); found {
+			return BuildTTS(string(key.Parent()), cfg, sharedKey)
 		}
 	}
 	switch cfg.Type {
@@ -79,9 +79,9 @@ func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClien
 
 func NewSTTClient(cfg config.STTConfig) (STTClient, error) {
 	// Registry-first when pkg/provider/all was imported; inline otherwise.
-	if regID := STTProviderIDFor(cfg); regID != "" {
-		if _, ok := provider.Lookup(regID); ok {
-			return BuildSTT(regID, cfg)
+	if key, ok := STTKeyFor(cfg); ok {
+		if _, found := provider.Lookup(string(key.Parent())); found {
+			return BuildSTT(string(key.Parent()), cfg)
 		}
 	}
 	switch cfg.Type {
@@ -163,9 +163,9 @@ func NewImageClient(cfg config.ImageConfig) (ImageClient, error) {
 
 func NewImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string) (ImageClient, error) {
 	// Registry-first when pkg/provider/all was imported; inline otherwise.
-	if regID := ImageProviderIDFor(cfg); regID != "" {
-		if _, ok := provider.Lookup(regID); ok {
-			return BuildImage(regID, cfg, sharedKey)
+	if key, ok := ImageKeyFor(cfg); ok {
+		if _, found := provider.Lookup(string(key.Parent())); found {
+			return BuildImage(string(key.Parent()), cfg, sharedKey)
 		}
 	}
 	switch cfg.Type {

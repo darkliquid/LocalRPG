@@ -6,12 +6,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
 type Router struct {
 	mu        sync.RWMutex
 	providers map[string]ModelProvider
 	roleMap   map[string]string // role -> providerID
+	roleKeys  map[string]provider.Key
 	fallbacks map[string]string // role -> fallback providerID
 	recorder  UsageRecorder
 }
@@ -20,6 +23,7 @@ func NewRouter() *Router {
 	return &Router{
 		providers: make(map[string]ModelProvider),
 		roleMap:   make(map[string]string),
+		roleKeys:  make(map[string]provider.Key),
 		fallbacks: make(map[string]string),
 	}
 }
@@ -37,17 +41,48 @@ func (r *Router) SetUsageRecorder(rec UsageRecorder) {
 	r.recorder = rec
 }
 
-// recordUsage reports a provider's usage to the recorder, if any.
+// AssignRoleKey records the canonical key a role's provider reports usage
+// under, so adapters never name themselves.
+func (r *Router) AssignRoleKey(role string, key provider.Key) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.roleKeys[role] = key
+}
+
+// ProviderKeyForRole reports the canonical key a role's provider records under.
+func (r *Router) ProviderKeyForRole(role string) (provider.Key, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	key, ok := r.roleKeys[role]
+	return key, ok
+}
+
+// attemptProvider names the provider an attempt ran against: the role's
+// canonical key when one is set, else the provider ID.
+func (r *Router) attemptProvider(role, providerID string) string {
+	if key, ok := r.ProviderKeyForRole(role); ok && key != "" {
+		return string(key)
+	}
+	return providerID
+}
+
+// recordUsage reports a provider's usage to the recorder, stamped with the
+// role's canonical key when one is set.
 func (r *Router) recordUsage(role string, u *Usage) {
 	if u == nil {
 		return
 	}
 	r.mu.RLock()
 	rec := r.recorder
+	key := r.roleKeys[role]
 	r.mu.RUnlock()
-	if rec != nil {
-		rec.RecordUsage(role, *u)
+	if rec == nil {
+		return
 	}
+	if key != "" {
+		u.Provider = string(key)
+	}
+	rec.RecordUsage(role, *u)
 }
 
 func (r *Router) AssignRole(role, providerID string) {
@@ -132,7 +167,7 @@ func (r *Router) GenerateForRole(ctx context.Context, role string, req GenerateR
 		return res, nil
 	}
 	attempts = append(attempts, Attempt{
-		Role: role, Provider: primary.ID(), Code: code, Detail: detail,
+		Role: role, Provider: r.attemptProvider(role, primary.ID()), Code: code, Detail: detail,
 		DurationMS: time.Since(primaryStarted).Milliseconds(),
 	})
 
@@ -145,7 +180,7 @@ func (r *Router) GenerateForRole(ctx context.Context, role string, req GenerateR
 			return fbRes, nil
 		}
 		attempts = append(attempts, Attempt{
-			Role: role, Provider: fallback.ID(), Code: fbCode, Detail: fbDetail,
+			Role: role, Provider: r.attemptProvider(role, fallback.ID()), Code: fbCode, Detail: fbDetail,
 			DurationMS: time.Since(fallbackStarted).Milliseconds(),
 		})
 	}
@@ -176,7 +211,7 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 		return nil
 	}
 	attempts = append(attempts, Attempt{
-		Role: role, Provider: primary.ID(), Code: code, Detail: detail,
+		Role: role, Provider: r.attemptProvider(role, primary.ID()), Code: code, Detail: detail,
 		DurationMS: time.Since(started).Milliseconds(),
 	})
 
@@ -186,7 +221,7 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 			return nil
 		}
 		attempts = append(attempts, Attempt{
-			Role: role, Provider: fallback.ID(), Code: code, Detail: detail,
+			Role: role, Provider: r.attemptProvider(role, fallback.ID()), Code: code, Detail: detail,
 			DurationMS: time.Since(started).Milliseconds(),
 		})
 	}

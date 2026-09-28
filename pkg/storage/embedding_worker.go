@@ -35,6 +35,18 @@ type EmbeddingWorker struct {
 	drainReq chan chan struct{}
 	mu       sync.Mutex
 	running  bool
+
+	// usageFn and usageMeta are set by SetUsageReporting; nil means no usage is
+	// recorded, which is the case for every existing caller.
+	usageFn   EmbeddingUsageFunc
+	usageMeta EmbeddingUsage
+}
+
+// SetUsageReporting installs the sink a completed batch reports to, plus the
+// static key and model the worker cannot know. It is a no-op until called.
+func (w *EmbeddingWorker) SetUsageReporting(fn EmbeddingUsageFunc, meta EmbeddingUsage) {
+	w.usageFn = fn
+	w.usageMeta = meta
 }
 
 // ComputeContentHash returns the hex-encoded SHA-256 hash of text.
@@ -217,6 +229,43 @@ func (w *EmbeddingWorker) processBatch(items []EmbeddingItem) {
 		}
 	}
 	_ = tx.Commit()
+
+	if w.usageFn != nil {
+		usage := w.usageMeta
+		usage.Requests = 1
+		usage.InputTokens = reporterTokens(w.provider)
+		w.usageFn(usage)
+	}
+}
+
+// EmbeddingUsage is one embedding call's consumption, reported after a batch.
+type EmbeddingUsage struct {
+	ProviderKey string
+	Model       string
+	InputTokens int
+	Requests    int
+}
+
+// EmbeddingUsageFunc receives a usage record for each completed batch.
+type EmbeddingUsageFunc func(u EmbeddingUsage)
+
+// usageReportingProvider is the opt-in interface an embedding provider
+// implements to report token usage. pkg/storage cannot import pkg/harness, so
+// the method set is matched structurally.
+type usageReportingProvider interface {
+	LastUsage() usageTokens
+}
+
+type usageTokens struct {
+	InputTokens int
+}
+
+func reporterTokens(provider embeddings.Provider) int {
+	reporter, ok := provider.(usageReportingProvider)
+	if !ok {
+		return 0
+	}
+	return reporter.LastUsage().InputTokens
 }
 
 // Drain blocks until all currently queued items are processed.

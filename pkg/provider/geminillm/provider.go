@@ -596,7 +596,6 @@ func usageFromMetadata(model string, meta *genai.GenerateContentResponseUsageMet
 		return nil
 	}
 	return &harness.Usage{
-		Provider:     "gemini",
 		Model:        model,
 		InputTokens:  int(meta.PromptTokenCount),
 		OutputTokens: int(meta.CandidatesTokenCount),

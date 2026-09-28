@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "narrative-oracle",
+			ID:          string(provider.KeyLLMNarrativeOracle),
 			Family:      provider.FamilyLLM,
 			Label:       "Narrative Oracle (Built-in)",
 			Description: "Deterministic pure-Go storyteller that needs no model or network.",

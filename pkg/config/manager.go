@@ -17,6 +17,9 @@ type ConfigManager struct {
 	localConfigPath string
 	activeConfig    *Config
 	isOverride      bool
+	// warnings holds the problems Validate found in the last loaded config, so
+	// the caller can surface them without the load failing.
+	warnings []string
 	// revision advances on every successful Load and Save, so callers can key
 	// caches on the configuration without diffing it.
 	revision atomic.Uint64
@@ -25,6 +28,14 @@ type ConfigManager struct {
 // Revision is a monotonic counter that changes whenever the configuration is
 // loaded or saved.
 func (m *ConfigManager) Revision() uint64 { return m.revision.Load() }
+
+// Warnings returns the problems found during the last Load, newest first
+// replaced wholesale each time.
+func (m *ConfigManager) Warnings() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return append([]string(nil), m.warnings...)
+}
 
 // DetectConfigFile returns the config file to read and where to write one. An
 // explicit LOCALRPG_CONFIG_DIR wins; otherwise the XDG config search path is
@@ -92,6 +103,7 @@ func (m *ConfigManager) Load() (*Config, error) {
 		m.isOverride = false
 	}
 
+	m.warnings = merged.Validate()
 	m.activeConfig = merged
 	m.revision.Add(1)
 	return m.activeConfig, nil

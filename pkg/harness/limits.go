@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
 // LimitKey is one provider+role pair.
@@ -43,20 +45,40 @@ func (r *LimitRegistry) Block(providerKey, role string, until time.Time) {
 }
 
 // Blocked reports whether the pair is currently backed off, expiring a stale
-// block on read.
+// block on read. It consults the instance key first, then the adapter key, so a
+// block on one endpoint does not stop another while a block on the adapter stops
+// all of them.
 func (r *LimitRegistry) Blocked(providerKey, role string) (time.Time, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	key := LimitKey{providerKey, role}
-	until, ok := r.blocks[key]
-	if !ok {
-		return time.Time{}, false
+	now := time.Now()
+	for _, candidate := range limitKeys(providerKey) {
+		key := LimitKey{candidate, role}
+		until, ok := r.blocks[key]
+		if !ok {
+			continue
+		}
+		if now.After(until) {
+			delete(r.blocks, key)
+			continue
+		}
+		return until, true
 	}
-	if time.Now().After(until) {
-		delete(r.blocks, key)
-		return time.Time{}, false
+	return time.Time{}, false
+}
+
+// limitKeys is the key ladder for a provider key: the key itself, then its
+// adapter parent when it is an instance key. A key that does not parse is used
+// verbatim, so a legacy value still matches a block recorded against it.
+func limitKeys(providerKey string) []string {
+	parsed, err := provider.ParseKey(providerKey)
+	if err != nil {
+		return []string{providerKey}
 	}
-	return until, true
+	if _, ok := parsed.Instance(); ok {
+		return []string{string(parsed), string(parsed.Parent())}
+	}
+	return []string{string(parsed)}
 }
 
 func (r *LimitRegistry) Clear(providerKey, role string) {

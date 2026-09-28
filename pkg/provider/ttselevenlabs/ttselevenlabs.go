@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "tts-elevenlabs",
+			ID:          string(provider.KeyTTSElevenLabs),
 			Family:      provider.FamilyTTS,
 			Label:       "ElevenLabs (Cloud, metered)",
 			Description: "Cloud voices fetched from your account; charges per request.",

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/pricing"
 	"github.com/darkliquid/localrpg/pkg/provider"
@@ -43,17 +44,18 @@ func renderProviderCatalogue() string {
 	b.WriteString("that key.\n\n")
 
 	b.WriteString("> [!NOTE]\n")
-	b.WriteString("> Provider IDs such as `openaichat` are the built-in adapter names, not the keys\n")
+	b.WriteString("> A provider ID such as `llm:openaichat` is the built-in adapter name, not the key\n")
 	b.WriteString("> you choose for `providers.<your-id>`. The ledger key is fixed by the adapter;\n")
 	b.WriteString("> the config key under `providers:` is yours to name.\n\n")
 
 	b.WriteString("## Ledger key rules\n\n")
 	b.WriteString("| Family | Ledger key | Example |\n")
 	b.WriteString("| --- | --- | --- |\n")
-	b.WriteString("| LLM | the provider ID, for adapters that report usage | `openaichat`, `gemini` |\n")
-	b.WriteString("| Speech (TTS) | `gemini:tts`, `builtin:<name>`, `cli:<command>`, `http:<host>` | `builtin:elevenlabs` |\n")
-	b.WriteString("| Transcription (STT) | `<builtin_name>`, else `<type>` | `http` |\n")
-	b.WriteString("| Image | `<builtin_name>`, else `<type>` | `gemini` |\n\n")
+	b.WriteString("| LLM | the adapter key | `llm:openaichat`, `llm:gemini` |\n")
+	b.WriteString("| Speech (TTS) | `tts:gemini`, `tts:<name>`, `tts:piper@<command>`, `tts:http@<host>` | `tts:http@localhost:8880` |\n")
+	b.WriteString("| Transcription (STT) | `stt:whisper-http@<host>`, `stt:whisper-cli@<command>` | `stt:whisper-http@localhost:8000` |\n")
+	b.WriteString("| Image | `image:gemini`, `image:http@<host>`, `image:cli@<command>` | `image:http@127.0.0.1:8188` |\n")
+	b.WriteString("| Embedding | `embedding:openai`, `embedding:gemini`, `embedding:builtin` | `embedding:gemini@default` |\n\n")
 
 	families := []struct {
 		family provider.Family
@@ -63,6 +65,7 @@ func renderProviderCatalogue() string {
 		{provider.FamilyTTS, "Speech (TTS) providers"},
 		{provider.FamilySTT, "Transcription (STT) providers"},
 		{provider.FamilyImage, "Image providers"},
+		{provider.FamilyEmbedding, "Embedding providers"},
 	}
 
 	for _, entry := range families {
@@ -122,36 +125,96 @@ func presetSummary(desc provider.Descriptor) string {
 	return strings.Join(models, ", ")
 }
 
-// ledgerKey mirrors how each family attributes usage in pkg/gui and pkg/media.
+// ledgerKey reports the canonical key a descriptor's first preset records
+// under, by asking the same resolvers the runtime uses.
 func ledgerKey(family provider.Family, desc provider.Descriptor) string {
-	switch family {
-	case provider.FamilyLLM:
-		if desc.ID == "openaichat" || desc.ID == "gemini" {
-			return desc.ID
-		}
-		return "not reported"
-	case provider.FamilyTTS:
-		if len(desc.Presets) == 0 {
-			return "builtin:" + desc.ID
-		}
-		return media.ProviderKey(ttsConfigFromPreset(desc.Presets[0]))
-	default:
-		if len(desc.Presets) == 0 {
-			return desc.ID
-		}
-		cfg := desc.Presets[0].Config
-		if name, _ := cfg["builtin_name"].(string); name != "" {
-			return name
-		}
-		if typ, _ := cfg["type"].(string); typ != "" {
-			return typ
-		}
+	if family == provider.FamilyEmbedding {
+		// The embedding descriptors are already canonical keys and carry no
+		// presets, so the adapter key is the ledger key.
 		return desc.ID
 	}
+	if len(desc.Presets) == 0 {
+		return "not reported"
+	}
+	preset := desc.Presets[0]
+	switch family {
+	case provider.FamilyLLM:
+		key, ok := harness.KeyFor(ProviderConfigFromPreset(preset.Config))
+		if ok {
+			return string(key)
+		}
+	case provider.FamilyTTS:
+		if key, ok := media.TTSKeyFor(ttsConfigFromPreset(preset)); ok {
+			return string(key)
+		}
+	case provider.FamilySTT:
+		if key, ok := media.STTKeyFor(sttConfigFromPreset(preset)); ok {
+			return string(key)
+		}
+	case provider.FamilyImage:
+		if key, ok := media.ImageKeyFor(imageConfigFromPreset(preset)); ok {
+			return string(key)
+		}
+	case provider.FamilyEmbedding:
+		// The embedding descriptors are already canonical keys and carry no
+		// presets, so the adapter key is the ledger key.
+		return desc.ID
+	}
+	return "not reported"
+}
+
+// ProviderConfigFromPreset builds a harness provider config from a preset's
+// config map, so the catalogue and the runtime resolve the same key.
+func ProviderConfigFromPreset(cfg map[string]interface{}) harness.ProviderConfig {
+	out := harness.ProviderConfig{}
+	if v, ok := cfg["type"].(string); ok {
+		out.Type = v
+	}
+	if v, ok := cfg["builtin_name"].(string); ok {
+		out.BuiltinName = v
+	}
+	if v, ok := cfg["command"].(string); ok {
+		out.Command = v
+	}
+	if v, ok := cfg["endpoint"].(string); ok {
+		out.Endpoint = v
+	}
+	return out
 }
 
 func ttsConfigFromPreset(preset provider.Preset) config.TTSConfig {
 	cfg := config.TTSConfig{}
+	if v, ok := preset.Config["type"].(string); ok {
+		cfg.Type = v
+	}
+	if v, ok := preset.Config["builtin_name"].(string); ok {
+		cfg.BuiltinName = v
+	}
+	if v, ok := preset.Config["command"].(string); ok {
+		cfg.Command = v
+	}
+	if v, ok := preset.Config["endpoint"].(string); ok {
+		cfg.Endpoint = v
+	}
+	return cfg
+}
+
+func sttConfigFromPreset(preset provider.Preset) config.STTConfig {
+	cfg := config.STTConfig{}
+	if v, ok := preset.Config["type"].(string); ok {
+		cfg.Type = v
+	}
+	if v, ok := preset.Config["command"].(string); ok {
+		cfg.Command = v
+	}
+	if v, ok := preset.Config["endpoint"].(string); ok {
+		cfg.Endpoint = v
+	}
+	return cfg
+}
+
+func imageConfigFromPreset(preset provider.Preset) config.ImageConfig {
+	cfg := config.ImageConfig{}
 	if v, ok := preset.Config["type"].(string); ok {
 		cfg.Type = v
 	}

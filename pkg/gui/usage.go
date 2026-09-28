@@ -8,6 +8,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/pricing"
+	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
@@ -148,10 +149,11 @@ func (s *Service) usageLedger() (*storage.Store, error) {
 }
 
 // mediaUsage converts a media provider's own usage shape into the harness one,
-// which is where pricing and the ledger live.
-func mediaUsage(u media.Usage, provider, model string) harness.Usage {
+// which is where pricing and the ledger live. key is the provider's canonical
+// identity, resolved from its configuration.
+func mediaUsage(u media.Usage, key provider.Key, model string) harness.Usage {
 	return harness.Usage{
-		Provider:     provider,
+		Provider:     string(key),
 		Model:        model,
 		InputTokens:  u.InputTokens,
 		OutputTokens: u.OutputTokens,

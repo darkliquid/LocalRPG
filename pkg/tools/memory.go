@@ -39,6 +39,9 @@ func (e *Executor) searchMemories(ctx context.Context, arguments map[string]inte
 	var vecMemoryIDs []string
 	if e.embeddingsProvider != nil && rawQuery != "" {
 		vecs, err := e.embeddingsProvider.Embed(ctx, []string{rawQuery})
+		if err == nil {
+			e.reportEmbeddingUsage()
+		}
 		if err == nil && len(vecs) > 0 {
 			vHits, err := e.store.SearchSimilarVectors(ctx, []string{"memory"}, e.embeddingsProvider.ID(), vecs[0], limit*2)
 			if err == nil {

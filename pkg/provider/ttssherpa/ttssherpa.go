@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "tts-sherpa-onnx",
+			ID:          string(provider.KeyTTSSherpaONNX),
 			Family:      provider.FamilyTTS,
 			Label:       "Sherpa-ONNX Kokoro (Built-in)",
 			Description: "High-quality Kokoro TTS in-process, downloading the model on demand.",

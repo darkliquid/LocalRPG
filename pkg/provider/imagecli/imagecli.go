@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "image-cli",
+			ID:          string(provider.KeyImageCLI),
 			Family:      provider.FamilyImage,
 			Label:       "Image CLI",
 			Description: "Runs an image binary such as stable-diffusion.cpp.",

@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "openaichat",
+			ID:          string(provider.KeyLLMOpenAIChat),
 			Family:      provider.FamilyLLM,
 			Label:       "OpenAI-Compatible (HTTP)",
 			Description: "Any OpenAI-compatible chat completions endpoint, local or cloud.",

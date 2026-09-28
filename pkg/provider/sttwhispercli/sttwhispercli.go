@@ -12,7 +12,7 @@ import (
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "stt-whisper-cli",
+			ID:          string(provider.KeySTTWhisperCLI),
 			Family:      provider.FamilySTT,
 			Label:       "Whisper.cpp (CLI)",
 			Description: "Runs whisper-cli directly with a GGML model.",

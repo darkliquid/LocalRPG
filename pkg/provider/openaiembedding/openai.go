@@ -37,7 +37,7 @@ type Client struct {
 func init() {
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{
-			ID:          "openai-embedding",
+			ID:          string(provider.KeyEmbeddingOpenAI),
 			Family:      provider.FamilyEmbedding,
 			Label:       "OpenAI / Ollama Embedding API",
 			Description: "Vector embeddings via standard OpenAI-compatible /v1/embeddings endpoint",
@@ -178,7 +178,6 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 
 	c.mu.Lock()
 	c.lastUsage = harness.Usage{
-		Provider:    c.ID(),
 		Model:       c.model,
 		InputTokens: parsed.Usage.PromptTokens,
 		Requests:    1,

@@ -8,6 +8,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
 // imageClientFactory builds the image client. It is a package variable so a
@@ -44,9 +45,13 @@ func (s *Service) generateImage(ctx context.Context, kind, prompt string, scope 
 		return nil, failure
 	}
 
-	provider := cfg.Media.Image.BuiltinName
-	if provider == "" {
-		provider = cfg.Media.Image.Type
+	key, hasKey := media.ImageKeyFor(cfg.Media.Image)
+	provider := string(key)
+	if !hasKey {
+		provider = cfg.Media.Image.BuiltinName
+		if provider == "" {
+			provider = cfg.Media.Image.Type
+		}
 	}
 
 	imgBytes, err := client.GenerateImage(ctx, prompt)
@@ -63,18 +68,20 @@ func (s *Service) generateImage(ctx context.Context, kind, prompt string, scope 
 		return nil, failure
 	}
 	s.recordImage(ctx, span, kind, provider, len(checked), started, nil)
-	s.recordImageUsage(scope, provider, cfg.Media.Image.Model, client)
+	if hasKey {
+		s.recordImageUsage(scope, key, cfg.Media.Image.Model, client)
+	}
 	return checked, nil
 }
 
 // recordImageUsage prices what the image provider reported and files it against
 // the campaign, a deferred token, or shared spend.
-func (s *Service) recordImageUsage(scope usageScope, provider, model string, client media.ImageClient) {
+func (s *Service) recordImageUsage(scope usageScope, key provider.Key, model string, client media.ImageClient) {
 	reporter, ok := client.(media.UsageReporter)
 	if !ok {
 		return
 	}
-	usage := mediaUsage(reporter.LastUsage(), provider, model)
+	usage := mediaUsage(reporter.LastUsage(), key, model)
 	if usage.Requests == 0 && usage.InputTokens == 0 && usage.OutputTokens == 0 {
 		return
 	}

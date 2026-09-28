@@ -46,7 +46,7 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 	case "disabled":
 		return &disabledModelProvider{id: id}, nil
 	case "builtin", "mock", "cli", "http", "gemini", "":
-		if ProviderIDFor(cfg) == "" {
+		if _, ok := KeyFor(cfg); !ok {
 			// A builtin with no command or known name is the debug echo.
 			return &builtinEchoModelProvider{id: id}, nil
 		}
@@ -66,10 +66,11 @@ type ModelBuildPayload struct {
 // BuildModelFor builds the provider for cfg's registry id, named id, so role
 // routing keeps working when construction goes through the registry.
 func BuildModelFor(id string, cfg ProviderConfig) (ModelProvider, error) {
-	regID := ProviderIDFor(cfg)
-	if regID == "" {
+	key, ok := KeyFor(cfg)
+	if !ok {
 		return nil, fmt.Errorf("harness: no registry provider for type %q", cfg.Type)
 	}
+	regID := string(key.Parent())
 	reg, ok := provider.Lookup(regID)
 	if !ok {
 		return nil, fmt.Errorf("harness: provider %q is not registered", regID)
@@ -166,6 +167,14 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 
 		router.RegisterProvider(provider)
 		router.AssignRole(role, role)
+		if key, ok := KeyFor(ProviderConfig{
+			Type:        roleCfg.Type,
+			BuiltinName: roleCfg.BuiltinName,
+			Command:     roleCfg.Command,
+			Endpoint:    roleCfg.Endpoint,
+		}); ok {
+			router.AssignRoleKey(role, key)
+		}
 	}
 
 	for role, fallback := range cfg.Agents.Fallbacks {
@@ -216,6 +225,9 @@ func ExtractorFromConfigWithLogger(cfg *config.Config, router *Router, logger tr
 		}
 		extractor := NewExtractor(provider)
 		extractor.SetLogger(logger)
+		if key, ok := router.ProviderKeyForRole(source); ok {
+			extractor.SetProviderKey(key)
+		}
 		return extractor
 	}
 
@@ -239,6 +251,14 @@ func ExtractorFromConfigWithLogger(cfg *config.Config, router *Router, logger tr
 	}
 	extractor := NewExtractor(provider)
 	extractor.SetLogger(logger)
+	if key, ok := KeyFor(ProviderConfig{
+		Type:        roleCfg.Type,
+		BuiltinName: roleCfg.BuiltinName,
+		Command:     roleCfg.Command,
+		Endpoint:    roleCfg.Endpoint,
+	}); ok {
+		extractor.SetProviderKey(key)
+	}
 	return extractor
 }
 
