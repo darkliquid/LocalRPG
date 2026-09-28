@@ -29,14 +29,3 @@ func KeyFor(cfg ProviderConfig) (provider.Key, bool) {
 		return "", false
 	}
 }
-
-// ProviderIDFor maps a role configuration to the registry ID a facade should
-// build. It is the adapter half of KeyFor, kept for callers that only need a
-// descriptor ID.
-func ProviderIDFor(cfg ProviderConfig) string {
-	key, ok := KeyFor(cfg)
-	if !ok {
-		return ""
-	}
-	return string(key.Parent())
-}

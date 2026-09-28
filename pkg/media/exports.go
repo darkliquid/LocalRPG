@@ -42,16 +42,6 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 	return "", false
 }
 
-// TTSProviderIDFor maps a TTS configuration to the registry ID a facade should
-// build. It is the adapter half of TTSKeyFor.
-func TTSProviderIDFor(cfg config.TTSConfig) string {
-	key, ok := TTSKeyFor(cfg)
-	if !ok {
-		return ""
-	}
-	return string(key.Parent())
-}
-
 // BuildTTS constructs a TTS client from the registry by ID.
 func BuildTTS(id string, cfg config.TTSConfig, sharedKey string) (TTSClient, error) {
 	reg, ok := provider.Lookup(id)
@@ -83,16 +73,6 @@ func STTKeyFor(cfg config.STTConfig) (provider.Key, bool) {
 		return provider.InstanceOrSelf(provider.KeySTTWhisperCLI, provider.CommandDiscriminator(cfg.Command)), true
 	}
 	return "", false
-}
-
-// STTProviderIDFor maps an STT configuration to the registry ID a facade should
-// build. It is the adapter half of STTKeyFor.
-func STTProviderIDFor(cfg config.STTConfig) string {
-	key, ok := STTKeyFor(cfg)
-	if !ok {
-		return ""
-	}
-	return string(key.Parent())
 }
 
 // BuildSTT constructs an STT client from the registry by ID.
@@ -138,16 +118,6 @@ func ImageKeyFor(cfg config.ImageConfig) (provider.Key, bool) {
 		return provider.InstanceOrSelf(provider.KeyImageHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
 	}
 	return "", false
-}
-
-// ImageProviderIDFor maps an image configuration to the registry ID a facade
-// should build. It is the adapter half of ImageKeyFor.
-func ImageProviderIDFor(cfg config.ImageConfig) string {
-	key, ok := ImageKeyFor(cfg)
-	if !ok {
-		return ""
-	}
-	return string(key.Parent())
 }
 
 // BuildImage constructs an image client from the registry by ID.
