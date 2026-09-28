@@ -166,6 +166,14 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 
 		router.RegisterProvider(provider)
 		router.AssignRole(role, role)
+		if key, ok := KeyFor(ProviderConfig{
+			Type:        roleCfg.Type,
+			BuiltinName: roleCfg.BuiltinName,
+			Command:     roleCfg.Command,
+			Endpoint:    roleCfg.Endpoint,
+		}); ok {
+			router.AssignRoleKey(role, key)
+		}
 	}
 
 	for role, fallback := range cfg.Agents.Fallbacks {
@@ -216,6 +224,9 @@ func ExtractorFromConfigWithLogger(cfg *config.Config, router *Router, logger tr
 		}
 		extractor := NewExtractor(provider)
 		extractor.SetLogger(logger)
+		if key, ok := router.ProviderKeyForRole(source); ok {
+			extractor.SetProviderKey(key)
+		}
 		return extractor
 	}
 
@@ -239,6 +250,14 @@ func ExtractorFromConfigWithLogger(cfg *config.Config, router *Router, logger tr
 	}
 	extractor := NewExtractor(provider)
 	extractor.SetLogger(logger)
+	if key, ok := KeyFor(ProviderConfig{
+		Type:        roleCfg.Type,
+		BuiltinName: roleCfg.BuiltinName,
+		Command:     roleCfg.Command,
+		Endpoint:    roleCfg.Endpoint,
+	}); ok {
+		extractor.SetProviderKey(key)
+	}
 	return extractor
 }
 

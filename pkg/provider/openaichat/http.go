@@ -351,7 +351,6 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 		}
 		if chunk.Usage != nil {
 			usage = &harness.Usage{
-				Provider:     "openaichat",
 				Model:        h.model,
 				InputTokens:  chunk.Usage.PromptTokens,
 				OutputTokens: chunk.Usage.CompletionTokens,

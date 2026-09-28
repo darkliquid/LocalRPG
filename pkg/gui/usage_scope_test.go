@@ -85,6 +85,8 @@ func TestDiscardedDeferredUsageBecomesSharedSpend(t *testing.T) {
 
 func TestPreviewDefersUsageToToken(t *testing.T) {
 	_, svc := setupTestGame(t)
+	// A canonical key only exists for a configured adapter, so name one.
+	svc.configMgr.Get().Media.Image.Type = "gemini"
 	original := imageClientFactory
 	defer func() { imageClientFactory = original }()
 	png := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0}

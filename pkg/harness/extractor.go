@@ -10,6 +10,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
@@ -43,6 +44,7 @@ type Extractor struct {
 	id            string
 	logger        trace.Logger
 	recorder      UsageRecorder
+	key           provider.Key
 }
 
 func NewExtractor(model ModelProvider) *Extractor {
@@ -60,6 +62,10 @@ func (e *Extractor) SetVoiceProfiles(profiles []config.VoiceProfile) {
 
 // SetUsageRecorder installs the sink extraction usage is reported to.
 func (e *Extractor) SetUsageRecorder(rec UsageRecorder) { e.recorder = rec }
+
+// SetProviderKey names the canonical key extraction usage is recorded under, so
+// it agrees with the role's own spend.
+func (e *Extractor) SetProviderKey(key provider.Key) { e.key = key }
 
 func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 	if len(profiles) == 0 || ent == nil || !entity.IsCharacterType(ent.Type) || ent.Voice != nil {
@@ -343,6 +349,9 @@ func (e *Extractor) Extract(ctx context.Context, narrativeOutput string) (*Extra
 		return nil, fmt.Errorf("extractor model failed: %w", err)
 	}
 	if res != nil && res.Usage != nil && e.recorder != nil {
+		if e.key != "" {
+			res.Usage.Provider = string(e.key)
+		}
 		e.recorder.RecordUsage("extractor", *res.Usage)
 	}
 

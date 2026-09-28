@@ -1805,16 +1805,10 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 	}
 	s.noteSuccess("tts")
 	// A cache hit reports nothing, so only a real synthesis is recorded.
-	if u := pipeline.LastUsage(); u.Characters != 0 || u.InputTokens != 0 || u.OutputTokens != 0 || u.Requests != 0 {
-		s.RecordUsage(gameID, turnNumber, "tts", harness.Usage{
-			Provider:     media.ProviderKey(cfg.Media.TTS),
-			Model:        cfg.Media.TTS.Model,
-			InputTokens:  u.InputTokens,
-			OutputTokens: u.OutputTokens,
-			Characters:   u.Characters,
-			Requests:     u.Requests,
-			Estimated:    u.Estimated,
-		})
+	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
+		if u := pipeline.LastUsage(); u.Characters != 0 || u.InputTokens != 0 || u.OutputTokens != 0 || u.Requests != 0 {
+			s.RecordUsage(gameID, turnNumber, "tts", mediaUsage(u, key, cfg.Media.TTS.Model))
+		}
 	}
 	return path, nil
 }
@@ -2990,12 +2984,10 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 		}
 		text, err := client.Transcribe(ctx, media.GenerateToneWAV(440, 0.1))
 		latency := time.Since(start).Milliseconds()
-		if reporter, ok := client.(media.UsageReporter); ok {
-			provider := sttCfg.BuiltinName
-			if provider == "" {
-				provider = sttCfg.Type
+		if key, ok := media.STTKeyFor(sttCfg); ok {
+			if reporter, ok := client.(media.UsageReporter); ok {
+				s.RecordUsageGlobal("stt", mediaUsage(reporter.LastUsage(), key, sttCfg.Model))
 			}
-			s.RecordUsageGlobal("stt", mediaUsage(reporter.LastUsage(), provider, sttCfg.Model))
 		}
 		if err != nil {
 			return &TestProviderResponseDTO{
