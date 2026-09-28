@@ -28,7 +28,9 @@ const (
 
 // Attempt records one provider invocation in a fallback chain.
 type Attempt struct {
-	Role       string      `json:"role"`
+	Role string `json:"role"`
+	// Provider is the canonical provider key the attempt ran against, so a
+	// failure, a backoff, and a ledger row name the same provider.
 	Provider   string      `json:"provider"`
 	Code       FailureCode `json:"code"`
 	Detail     string      `json:"detail,omitempty"`

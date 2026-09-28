@@ -39,3 +39,29 @@ func TestRouterStampsTheResolvedKey(t *testing.T) {
 		t.Errorf("provider = %q, want the resolved key", sink.got[0].Provider)
 	}
 }
+
+type failingKeyProvider struct{ id string }
+
+func (p *failingKeyProvider) ID() string { return p.id }
+func (p *failingKeyProvider) Generate(context.Context, harness.GenerateRequest) (*harness.GenerateResponse, error) {
+	return nil, context.DeadlineExceeded
+}
+func (p *failingKeyProvider) Stream(context.Context, harness.GenerateRequest, chan<- harness.StreamChunk) error {
+	return nil
+}
+
+func TestFailureAttemptUsesTheCanonicalKey(t *testing.T) {
+	router := harness.NewRouter()
+	router.RegisterProvider(&failingKeyProvider{id: "gm"})
+	router.AssignRole("gm", "gm")
+	router.AssignRoleKey("gm", "llm:gemini")
+
+	_, err := router.GenerateForRole(context.Background(), "gm", harness.GenerateRequest{})
+	failure, ok := harness.FailureFrom(err)
+	if !ok {
+		t.Fatalf("want a GenerationFailure, got %v", err)
+	}
+	if len(failure.Attempts) == 0 || failure.Attempts[0].Provider != "llm:gemini" {
+		t.Fatalf("attempt provider = %+v, want llm:gemini", failure.Attempts)
+	}
+}

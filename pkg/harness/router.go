@@ -57,6 +57,15 @@ func (r *Router) ProviderKeyForRole(role string) (provider.Key, bool) {
 	return key, ok
 }
 
+// attemptProvider names the provider an attempt ran against: the role's
+// canonical key when one is set, else the provider ID.
+func (r *Router) attemptProvider(role, providerID string) string {
+	if key, ok := r.ProviderKeyForRole(role); ok && key != "" {
+		return string(key)
+	}
+	return providerID
+}
+
 // recordUsage reports a provider's usage to the recorder, stamped with the
 // role's canonical key when one is set.
 func (r *Router) recordUsage(role string, u *Usage) {
@@ -158,7 +167,7 @@ func (r *Router) GenerateForRole(ctx context.Context, role string, req GenerateR
 		return res, nil
 	}
 	attempts = append(attempts, Attempt{
-		Role: role, Provider: primary.ID(), Code: code, Detail: detail,
+		Role: role, Provider: r.attemptProvider(role, primary.ID()), Code: code, Detail: detail,
 		DurationMS: time.Since(primaryStarted).Milliseconds(),
 	})
 
@@ -171,7 +180,7 @@ func (r *Router) GenerateForRole(ctx context.Context, role string, req GenerateR
 			return fbRes, nil
 		}
 		attempts = append(attempts, Attempt{
-			Role: role, Provider: fallback.ID(), Code: fbCode, Detail: fbDetail,
+			Role: role, Provider: r.attemptProvider(role, fallback.ID()), Code: fbCode, Detail: fbDetail,
 			DurationMS: time.Since(fallbackStarted).Milliseconds(),
 		})
 	}
@@ -202,7 +211,7 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 		return nil
 	}
 	attempts = append(attempts, Attempt{
-		Role: role, Provider: primary.ID(), Code: code, Detail: detail,
+		Role: role, Provider: r.attemptProvider(role, primary.ID()), Code: code, Detail: detail,
 		DurationMS: time.Since(started).Milliseconds(),
 	})
 
@@ -212,7 +221,7 @@ func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateReq
 			return nil
 		}
 		attempts = append(attempts, Attempt{
-			Role: role, Provider: fallback.ID(), Code: code, Detail: detail,
+			Role: role, Provider: r.attemptProvider(role, fallback.ID()), Code: code, Detail: detail,
 			DurationMS: time.Since(started).Milliseconds(),
 		})
 	}
