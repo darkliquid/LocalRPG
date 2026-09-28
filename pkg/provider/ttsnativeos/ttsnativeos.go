@@ -13,7 +13,7 @@ func init() {
 			ID:          string(provider.KeyTTSNativeOS),
 			Family:      provider.FamilyTTS,
 			Label:       "Native OS Speech (Built-in)",
-			Description: "Uses spd-say, say, or PowerShell with a procedural fallback.",
+			Description: "Uses spd-say, espeak-ng, say, or PowerShell with a procedural fallback.",
 			Source:      "builtin",
 			Features:    []provider.Feature{provider.FeatureOffline},
 			Presets: []provider.Preset{

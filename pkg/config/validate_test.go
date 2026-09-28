@@ -36,3 +36,29 @@ func TestDefaultConfigIsCurrentVersion(t *testing.T) {
 		t.Fatalf("DefaultConfig version = %q, want %q", got, config.CurrentVersion)
 	}
 }
+
+func TestValidateReportsRoleProblems(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Agents.Roles["gm"] = config.AgentRoleConfig{Type: "bogus"}
+	cfg.Agents.Roles["narrator"] = config.AgentRoleConfig{Type: "http"}
+	cfg.Agents.Roles["extractor"] = config.AgentRoleConfig{Type: "cli"}
+	cfg.Agents.Roles["completion"] = config.AgentRoleConfig{Type: "builtin", BuiltinName: "nope"}
+
+	problems := strings.Join(cfg.Validate(), "\n")
+	for _, want := range []string{
+		`agents.roles["gm"]: unknown type "bogus"`,
+		`agents.roles["narrator"]: endpoint is required`,
+		`agents.roles["extractor"]: command is required`,
+		`agents.roles["completion"]: unknown builtin "nope"`,
+	} {
+		if !strings.Contains(problems, want) {
+			t.Errorf("missing %q in:\n%s", want, problems)
+		}
+	}
+}
+
+func TestValidateDefaultsAreClean(t *testing.T) {
+	if problems := config.DefaultConfig().Validate(); len(problems) != 0 {
+		t.Errorf("default config should validate cleanly, got: %v", problems)
+	}
+}

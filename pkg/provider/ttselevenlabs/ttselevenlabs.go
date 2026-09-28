@@ -16,7 +16,7 @@ func init() {
 			Family:      provider.FamilyTTS,
 			Label:       "ElevenLabs (Cloud, metered)",
 			Description: "Cloud voices fetched from your account; charges per request.",
-			Source:      "builtin",
+			Source:      "http",
 			Features: []provider.Feature{
 				provider.FeatureMetered,
 				provider.FeatureKeyRequired,

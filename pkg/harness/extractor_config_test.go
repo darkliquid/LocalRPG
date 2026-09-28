@@ -60,7 +60,7 @@ func TestExtractorFromConfigWithAMissingInheritTarget(t *testing.T) {
 
 func TestExtractorFromConfigUsesAConcreteProvider(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.Agents.Roles[config.RoleExtractor] = config.AgentRoleConfig{Type: "builtin"}
+	cfg.Agents.Roles[config.RoleExtractor] = config.AgentRoleConfig{Type: "builtin", BuiltinName: "echo"}
 
 	if ExtractorFromConfig(cfg, routerWithGM(t)) == nil {
 		t.Errorf("expected a configured builtin extractor")

@@ -632,6 +632,7 @@ export interface SettingsResponse {
   config: AppConfig;
   config_file_path: string;
   is_local_override: boolean;
+  warnings?: string[];
 }
 
 export interface TestProviderRequest {

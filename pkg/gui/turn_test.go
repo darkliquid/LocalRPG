@@ -19,7 +19,7 @@ func turnFixture(t *testing.T) (string, *Service) {
 	t.Helper()
 
 	root := t.TempDir()
-	configYAML := "agents:\n  roles:\n    gm:\n      type: builtin\n"
+	configYAML := "agents:\n  roles:\n    gm:\n      type: builtin\n      builtin_name: echo\n"
 	if err := os.WriteFile(filepath.Join(root, "config.yaml"), []byte(configYAML), 0644); err != nil {
 		t.Fatal(err)
 	}

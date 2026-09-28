@@ -113,6 +113,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [configWarnings, setConfigWarnings] = useState<string[]>([]);
 
   // Diagnostics test state
   const [testingCategory, setTestingCategory] = useState<string | null>(null);
@@ -225,6 +226,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       setConfig(res.config);
       setActiveFilePath(res.config_file_path);
       setIsOverride(res.is_local_override);
+      setConfigWarnings(res.warnings ?? []);
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Failed to load settings' });
     } finally {
@@ -241,6 +243,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       setConfig(res.config);
       setActiveFilePath(res.config_file_path);
       setIsOverride(res.is_local_override);
+      setConfigWarnings(res.warnings ?? []);
       setFeedback({ type: 'success', message: 'Settings saved and live-reloaded successfully.' });
       if (onSaved) onSaved();
     } catch (err: any) {
@@ -442,6 +445,20 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
         >
           {feedback.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
           <span>{feedback.message}</span>
+        </div>
+      )}
+
+      {configWarnings.length > 0 && (
+        <div className="p-3 rounded-xl text-xs flex items-start gap-2 bg-amber-950/50 border border-amber-500/40 text-amber-200">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div className="space-y-1">
+            <span className="font-semibold">Configuration problems</span>
+            <ul className="list-disc list-inside space-y-0.5">
+              {configWarnings.map((warning, index) => (
+                <li key={index}>{warning}</li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
 

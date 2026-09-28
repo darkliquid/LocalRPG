@@ -135,6 +135,7 @@ func (m *ConfigManager) Save(cfg *Config) error {
 	}
 
 	m.activeConfig = cfg
+	m.warnings = cfg.Validate()
 	m.revision.Add(1)
 	return nil
 }

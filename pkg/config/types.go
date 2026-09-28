@@ -306,6 +306,19 @@ func (c *Config) Validate() []string {
 				i, price.Provider, provider.KeyLLMOpenAIChat, provider.KeyLLMGemini, provider.KeyTTSHTTP, err))
 		}
 	}
+
+	for role, roleCfg := range c.Agents.Roles {
+		problems = append(problems, providerProblems(
+			fmt.Sprintf("agents.roles[%q]", role),
+			roleCfg.Type, roleCfg.BuiltinName, roleCfg.Command, roleCfg.Endpoint, llmShape)...)
+	}
+	problems = append(problems, providerProblems(
+		"media.tts", c.Media.TTS.Type, c.Media.TTS.BuiltinName, c.Media.TTS.Command, c.Media.TTS.Endpoint, ttsShape)...)
+	problems = append(problems, providerProblems(
+		"media.stt", c.Media.STT.Type, c.Media.STT.BuiltinName, c.Media.STT.Command, c.Media.STT.Endpoint, sttShape)...)
+	problems = append(problems, providerProblems(
+		"media.image", c.Media.Image.Type, c.Media.Image.BuiltinName, c.Media.Image.Command, c.Media.Image.Endpoint, imageShape)...)
+
 	return problems
 }
 

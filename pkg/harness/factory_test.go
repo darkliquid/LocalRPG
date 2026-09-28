@@ -145,6 +145,18 @@ func TestCompletionDisabledReturnsNil(t *testing.T) {
 	}
 }
 
+func TestMockTypeIsRetired(t *testing.T) {
+	for _, cfg := range []ProviderConfig{
+		{Type: "mock"},
+		{Type: "builtin", BuiltinName: "does-not-exist"},
+		{Type: "builtin"},
+	} {
+		if _, err := NewModelProvider("p", cfg); err == nil {
+			t.Errorf("cfg %+v: expected an error", cfg)
+		}
+	}
+}
+
 func TestNewModelProviderBuildsGemini(t *testing.T) {
 	t.Setenv("GEMINI_API_KEY", "test-key")
 	provider, err := NewModelProvider("gm", ProviderConfig{

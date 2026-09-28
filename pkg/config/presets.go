@@ -83,6 +83,15 @@ var AgentPresets = map[string]AgentRoleConfig{
 		TopP:        floatPtr(0.95),
 		TopK:        intPtr(40),
 	},
+	"gemini": {
+		Type:           "gemini",
+		Model:          "gemini-3.8-flash",
+		Temperature:    0.7,
+		MaxTokens:      4096,
+		ThinkingBudget: intPtr(0),
+		TopP:           floatPtr(0.95),
+		TopK:           intPtr(40),
+	},
 }
 
 func intPtr(i int) *int { return &i }
@@ -196,6 +205,9 @@ var TTSPresets = map[string]TTSConfig{
 }
 
 var STTPresets = map[string]STTConfig{
+	"web-speech": {
+		Type: "web-speech",
+	},
 	"faster-whisper": {
 		Type:     "http",
 		Endpoint: "http://localhost:8000/v1/audio/transcriptions",

@@ -2833,6 +2833,7 @@ func (s *Service) GetSettings(ctx context.Context) (*SettingsResponseDTO, error)
 		Config:          *cfg,
 		ConfigFilePath:  s.configMgr.ActiveFilePath(),
 		IsLocalOverride: s.configMgr.IsLocalOverride(),
+		Warnings:        s.configMgr.Warnings(),
 	}, nil
 }
 
@@ -2858,6 +2859,7 @@ func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*Setting
 		Config:          cfg,
 		ConfigFilePath:  s.configMgr.ActiveFilePath(),
 		IsLocalOverride: s.configMgr.IsLocalOverride(),
+		Warnings:        s.configMgr.Warnings(),
 	}, nil
 }
 

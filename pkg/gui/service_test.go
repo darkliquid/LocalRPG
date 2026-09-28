@@ -838,7 +838,7 @@ func TestArcProgressReadsBothConventions(t *testing.T) {
 
 func TestPrepareTurnAppliesTheRecallLimits(t *testing.T) {
 	root := t.TempDir()
-	configYAML := "agents:\n  roles:\n    gm:\n      type: builtin\n  scene_recall_turns: 9\n  retrieval_halflife_turns: 30\n"
+	configYAML := "agents:\n  roles:\n    gm:\n      type: builtin\n      builtin_name: echo\n  scene_recall_turns: 9\n  retrieval_halflife_turns: 30\n"
 	if err := os.WriteFile(filepath.Join(root, "config.yaml"), []byte(configYAML), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -887,7 +887,7 @@ func TestPrepareTurnAppliesTheRecallLimits(t *testing.T) {
 func TestAServiceRegeneratesTheSummaryBehindTheTurn(t *testing.T) {
 	root := t.TempDir()
 	// A cadence of one, so the very first turn makes a regeneration due.
-	configYAML := "agents:\n  roles:\n    gm:\n      type: builtin\n  summary_every: 1\n"
+	configYAML := "agents:\n  roles:\n    gm:\n      type: builtin\n      builtin_name: echo\n  summary_every: 1\n"
 	if err := os.WriteFile(filepath.Join(root, "config.yaml"), []byte(configYAML), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -954,7 +954,7 @@ func TestRecapIsDisabledWhenSummariesAreOff(t *testing.T) {
 	root := t.TempDir()
 	// An omitted key inherits the shipped default of ten turns, so switching
 	// summaries off is explicit.
-	configYAML := "agents:\n  roles:\n    gm:\n      type: builtin\n  summary_every: 0\n"
+	configYAML := "agents:\n  roles:\n    gm:\n      type: builtin\n      builtin_name: echo\n  summary_every: 0\n"
 	if err := os.WriteFile(filepath.Join(root, "config.yaml"), []byte(configYAML), 0644); err != nil {
 		t.Fatal(err)
 	}

@@ -369,6 +369,7 @@ type SettingsResponseDTO struct {
 	Config          config.Config `json:"config"`
 	ConfigFilePath  string        `json:"config_file_path"`
 	IsLocalOverride bool          `json:"is_local_override"`
+	Warnings        []string      `json:"warnings,omitempty"`
 }
 
 type TestProviderRequestDTO struct {

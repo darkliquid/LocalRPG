@@ -45,7 +45,7 @@ that key.
 
 | Provider ID | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- |
-| `tts:elevenlabs` | builtin | `tts:elevenlabs` | `eleven_multilingual_v2` |
+| `tts:elevenlabs` | http | `tts:elevenlabs` | `eleven_multilingual_v2` |
 | `tts:gemini` | gemini | `tts:gemini` | `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`, `gemini-3.1-flash-tts-preview`, `gemini-3.8-flash-lite-tts`, `gemini-3.8-flash-tts` |
 | `tts:http` | http | `tts:http@localhost:8880` | `alltalk`, `kokoro`, `tts-1` |
 | `tts:native-os` | builtin | `tts:native-os` | `native-os` |

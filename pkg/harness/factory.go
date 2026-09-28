@@ -45,11 +45,12 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 	switch cfg.Type {
 	case "disabled":
 		return &disabledModelProvider{id: id}, nil
-	case "builtin", "mock", "cli", "http", "gemini", "":
-		if _, ok := KeyFor(cfg); !ok {
-			// A builtin with no command or known name is the debug echo.
+	case "builtin":
+		if cfg.BuiltinName == "echo" {
 			return &builtinEchoModelProvider{id: id}, nil
 		}
+		return BuildModelFor(id, cfg)
+	case "cli", "http", "gemini", "":
 		return BuildModelFor(id, cfg)
 	default:
 		return nil, fmt.Errorf("unknown model provider type: %s", cfg.Type)
@@ -140,9 +141,13 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 
 	router := NewRouter()
 
+	gmConfigured := false
 	for role, roleCfg := range cfg.Agents.Roles {
 		if roleCfg.Type == "inherit" {
 			continue
+		}
+		if role == config.RoleGM {
+			gmConfigured = true
 		}
 
 		provider, err := NewModelProviderWithLogger(role, ProviderConfig{
@@ -161,6 +166,13 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 			SharedAPIKey:   cfg.Providers.Gemini.APIKey,
 		}, logger)
 		if err != nil {
+			name := roleCfg.BuiltinName
+			if name == "" {
+				name = roleCfg.Command
+			}
+			router.recordBuildError(RoleBuildError{
+				Role: role, Type: roleCfg.Type, Name: name, Err: err,
+			})
 			continue
 		}
 		setProviderChunkLimit(provider, cfg.TraceChunkLimit())
@@ -183,9 +195,13 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 		}
 	}
 
-	if _, err := router.GetProviderForRole(config.RoleGM); err != nil {
-		router.RegisterProvider(&builtinEchoModelProvider{id: "default-echo"})
-		router.AssignRole(config.RoleGM, "default-echo")
+	// The echo default exists for an intentionally unconfigured gm, not to mask a
+	// gm that was configured and then failed to build.
+	if !gmConfigured {
+		if _, err := router.GetProviderForRole(config.RoleGM); err != nil {
+			router.RegisterProvider(&builtinEchoModelProvider{id: "default-echo"})
+			router.AssignRole(config.RoleGM, "default-echo")
+		}
 	}
 
 	return router, nil

@@ -124,7 +124,7 @@ type ToolCaller interface {
 }
 
 type ProviderConfig struct {
-	Type           string   `yaml:"type"` // "builtin", "cli", "http", "mock", "disabled"
+	Type           string   `yaml:"type"` // "builtin", "cli", "http", "gemini", "disabled"
 	BuiltinName    string   `yaml:"builtin_name,omitempty"`
 	Command        string   `yaml:"command,omitempty"`
 	Args           []string `yaml:"args,omitempty"`

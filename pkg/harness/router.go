@@ -11,12 +11,21 @@ import (
 )
 
 type Router struct {
-	mu        sync.RWMutex
-	providers map[string]ModelProvider
-	roleMap   map[string]string // role -> providerID
-	roleKeys  map[string]provider.Key
-	fallbacks map[string]string // role -> fallback providerID
-	recorder  UsageRecorder
+	mu          sync.RWMutex
+	providers   map[string]ModelProvider
+	roleMap     map[string]string // role -> providerID
+	roleKeys    map[string]provider.Key
+	fallbacks   map[string]string // role -> fallback providerID
+	recorder    UsageRecorder
+	buildErrors []RoleBuildError
+}
+
+// RoleBuildError records a configured role whose provider could not be built.
+type RoleBuildError struct {
+	Role string
+	Type string
+	Name string // builtin_name or command, when set
+	Err  error
 }
 
 func NewRouter() *Router {
@@ -26,6 +35,25 @@ func NewRouter() *Router {
 		roleKeys:  make(map[string]provider.Key),
 		fallbacks: make(map[string]string),
 	}
+}
+
+// recordBuildError appends a role build failure so callers can surface it
+// instead of silently falling back.
+func (r *Router) recordBuildError(e RoleBuildError) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.buildErrors = append(r.buildErrors, e)
+}
+
+// BuildErrors returns the per-role build failures from the configuration this
+// router was built from, or nil when every configured role built.
+func (r *Router) BuildErrors() []RoleBuildError {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if len(r.buildErrors) == 0 {
+		return nil
+	}
+	return append([]RoleBuildError(nil), r.buildErrors...)
 }
 
 func (r *Router) RegisterProvider(p ModelProvider) {
