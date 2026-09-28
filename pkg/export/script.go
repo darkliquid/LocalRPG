@@ -80,6 +80,7 @@ type ScriptCompiler struct {
 	config   *config.Config
 	art      bool
 	audio    bool
+	progress scene.ProgressFunc
 }
 
 // NewScriptCompiler builds a compiler for one campaign root. Imagery and speech
@@ -92,19 +93,34 @@ func NewScriptCompiler(rootDir string) *ScriptCompiler {
 		projectRoot = rootDir
 	}
 	dirs := paths.Resolve(paths.System(), cfg.Paths, projectRoot)
-	return &ScriptCompiler{
-		rootDir:  rootDir,
-		resolver: core.NewCustomPathResolver(dirs.Systems, dirs.Worlds, dirs.Games, dirs.Cache),
-		config:   cfg,
-		art:      true,
-		audio:    true,
+	return NewScriptCompilerWithResolver(
+		core.NewCustomPathResolver(dirs.Systems, dirs.Worlds, dirs.Games, dirs.Cache), cfg)
+}
+
+// NewScriptCompilerWithResolver builds a compiler against an already-resolved
+// resolver and configuration, so a server exports from the same locations it
+// serves rather than re-deriving them from the working directory.
+func NewScriptCompilerWithResolver(resolver *core.PathResolver, cfg *config.Config) *ScriptCompiler {
+	if cfg == nil {
+		cfg, _ = config.NewConfigManager().Load()
 	}
+	if resolver == nil {
+		resolver = core.NewPathResolver(".")
+	}
+	return &ScriptCompiler{resolver: resolver, config: cfg, art: true, audio: true}
 }
 
 // SetMedia disables art or audio resolution for an export.
 func (c *ScriptCompiler) SetMedia(art, audio bool) {
 	c.art = art
 	c.audio = audio
+}
+
+// SetProgress routes structured progress to fn. When set, the compiler stops
+// writing its human-readable progress to stderr, so a server-side export stays
+// quiet in the logs.
+func (c *ScriptCompiler) SetProgress(fn scene.ProgressFunc) {
+	c.progress = fn
 }
 
 // Compile resolves a campaign's turns, art and audio into a playable script.
@@ -156,15 +172,20 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		}
 	}
 
-	script, err := compiler.Compile(ctx, gameID, scene.Options{
+	opts := scene.Options{
 		Art:            c.art,
 		Audio:          c.audio,
 		WorldStyle:     worldStyle,
 		ProviderParams: c.config.Media.Image.Type + ":" + c.config.Media.Image.Model,
-		OnProgress: func(format string, args ...interface{}) {
+		Progress:       c.progress,
+	}
+	if c.progress == nil {
+		opts.OnProgress = func(format string, args ...interface{}) {
 			fmt.Fprintf(os.Stderr, "export: "+format+"\n", args...)
-		},
-	})
+		}
+	}
+
+	script, err := compiler.Compile(ctx, gameID, opts)
 	if err != nil {
 		return nil, err
 	}

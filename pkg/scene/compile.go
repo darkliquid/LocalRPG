@@ -25,6 +25,9 @@ type Options struct {
 	WorldStyle     string
 	ProviderParams string
 	OnProgress     func(format string, args ...interface{})
+	// Progress reports structured progress for a caller that wants a bar or an
+	// event stream. OnProgress is kept for the CLI's line output.
+	Progress ProgressFunc
 }
 
 // ErrAudioUnavailable means no TTS provider is configured, which is a normal
@@ -75,7 +78,7 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 	script := &Script{GameID: gameID, WorldStyle: opts.WorldStyle}
 	silent := 0
 
-	for _, turn := range turns {
+	for i, turn := range turns {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -108,6 +111,8 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 			current.Beats = append(current.Beats, beat)
 			current.Duration += beat.Duration
 		}
+
+		emitProgress(opts.Progress, Progress{Phase: "compile", Done: i + 1, Total: len(turns)})
 	}
 
 	// Sum the scenes rather than tracking a running total beside them, so the card
@@ -116,8 +121,12 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 		script.TotalDuration += sc.Duration
 	}
 
-	if silent > 0 && opts.OnProgress != nil {
-		opts.OnProgress("%d beats have no audio clip and will play silently", silent)
+	if silent > 0 {
+		message := fmt.Sprintf("%d beats have no audio clip and will play silently", silent)
+		if opts.OnProgress != nil {
+			opts.OnProgress("%s", message)
+		}
+		emitProgress(opts.Progress, Progress{Phase: "compile", Message: message})
 	}
 	return script, nil
 }

@@ -43,6 +43,10 @@ import {
   LimitsDTO,
   DocArticleSummary,
   DocArticle,
+  ExportRequest,
+  ExportJob,
+  ExportEvent,
+  ExportCapabilities,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -115,6 +119,39 @@ export class APIClient {
         onEvent(data);
       } catch (err) {
         console.error('Failed to parse model event:', err);
+      }
+    };
+    return () => eventSource.close();
+  }
+
+  static async exportCapabilities(): Promise<ExportCapabilities> {
+    const res = await fetch('/api/export/capabilities');
+    if (!res.ok) throw new Error(`exportCapabilities: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async startExport(req: ExportRequest): Promise<ExportJob> {
+    const res = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new HTTPError(res.status, `startExport: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async cancelExport(gameID: string): Promise<void> {
+    const res = await fetch(`/api/export/${encodeURIComponent(gameID)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`cancelExport: ${res.statusText}`);
+  }
+
+  static subscribeExportEvents(onEvent: (event: ExportEvent) => void): () => void {
+    const eventSource = new EventSource('/api/export/events');
+    eventSource.onmessage = (event) => {
+      try {
+        onEvent(JSON.parse(event.data) as ExportEvent);
+      } catch (err) {
+        console.error('Failed to parse export event:', err);
       }
     };
     return () => eventSource.close();

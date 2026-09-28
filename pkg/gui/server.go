@@ -58,6 +58,10 @@ func routePattern(path string) string {
 		return path
 	case path == "/api/models" || strings.HasPrefix(path, "/api/models/"):
 		return "/api/models"
+	case path == "/api/export" || path == "/api/export/capabilities" || path == "/api/export/events":
+		return path
+	case strings.HasPrefix(path, "/api/export/"):
+		return "/api/export/{gameID}"
 	case strings.HasPrefix(path, "/api/game/"):
 		rest := strings.TrimPrefix(path, "/api/game/")
 		if _, suffix, ok := strings.Cut(rest, "/"); ok {
@@ -101,6 +105,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/tts/voices/search", s.handleVoiceSearchRoute)
 	s.mux.HandleFunc("/api/audio/", s.handleAudioRoutes)
 	s.mux.HandleFunc("/api/stt", s.handleSTTRoute)
+	s.mux.HandleFunc("/api/export", s.handleExportRoutes)
+	s.mux.HandleFunc("/api/export/", s.handleExportRoutes)
 	s.mux.HandleFunc("/api/trace", s.handleTraceRoute)
 	s.mux.HandleFunc("/api/models", s.handleModelsRoutes)
 	s.mux.HandleFunc("/api/models/", s.handleModelsRoutes)
@@ -1288,6 +1294,78 @@ func (s *Server) handleModelsRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusAccepted)
 		_ = json.NewEncoder(w).Encode(map[string]string{"status": "downloading"})
+		return
+	}
+
+	http.NotFound(w, r)
+}
+
+// handleExportRoutes serves the story-export API. Progress streams over SSE,
+// mirroring the model-download events.
+func (s *Server) handleExportRoutes(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/export")
+	path = strings.TrimPrefix(path, "/")
+
+	if path == "capabilities" && r.Method == http.MethodGet {
+		writeJSON(w, s.service.ExportCapabilities())
+		return
+	}
+
+	if path == "events" && r.Method == http.MethodGet {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		ch := s.service.SubscribeExportEvents()
+		defer s.service.UnsubscribeExportEvents(ch)
+
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case event, ok := <-ch:
+				if !ok {
+					return
+				}
+				data, _ := json.Marshal(event)
+				_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
+				flusher.Flush()
+			}
+		}
+	}
+
+	if path == "" && r.Method == http.MethodPost {
+		var req ExportRequestDTO
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		job, err := s.service.StartExport(r.Context(), req)
+		switch {
+		case errors.Is(err, ErrExportInFlight):
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		case errors.Is(err, ErrExportFormat), errors.Is(err, ErrExportNoFFmpeg):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		case err != nil:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(job)
+		return
+	}
+
+	if path != "" && r.Method == http.MethodDelete {
+		s.service.CancelExport(path)
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "cancelling"})
 		return
 	}
 

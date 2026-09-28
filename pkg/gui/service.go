@@ -89,6 +89,9 @@ type Service struct {
 	// limits holds in-memory provider rate-limit blocks and funds failures, so a
 	// 429 backs a provider off rather than being retried blindly.
 	limits *harness.LimitRegistry
+	// exports serialises story exports per campaign and fans progress to the
+	// settings/theater UI.
+	exports *exportManager
 }
 
 // Config returns the configuration the service is running with, so a command can
@@ -128,6 +131,7 @@ func NewService(rootDir string) *Service {
 		modelsManager:  models.NewManager(dirs.Cache),
 		summaryPending: make(map[string]bool),
 		limits:         harness.NewLimitRegistry(),
+		exports:        newExportManager(),
 	}
 	if !projectMode {
 		if warning := paths.LegacyWarning(paths.System(), cfg.Paths); warning != "" {

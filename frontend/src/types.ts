@@ -635,6 +635,39 @@ export interface SettingsResponse {
   warnings?: string[];
 }
 
+export interface ExportRequest {
+  game_id: string;
+  format: 'web' | 'video';
+  art: boolean;
+  audio: boolean;
+  still?: boolean;
+  fps?: number;
+  size?: string;
+}
+
+export interface ExportJob {
+  game_id: string;
+  format: string;
+  output_path?: string;
+  running: boolean;
+}
+
+export interface ExportEvent {
+  game_id: string;
+  format: string;
+  phase: string;
+  done: number;
+  total: number;
+  message?: string;
+  output_path?: string;
+  error?: string;
+}
+
+export interface ExportCapabilities {
+  ffmpeg: boolean;
+  ffmpeg_path?: string;
+}
+
 export interface TestProviderRequest {
   category: 'llm' | 'tts' | 'stt' | 'image';
   provider: AgentRoleConfig | TTSConfig | STTConfig | ImageConfig;

@@ -17,11 +17,12 @@ import (
 
 // VideoPipeline renders a script to a video file.
 type VideoPipeline struct {
-	rootDir string
-	width   int
-	height  int
-	fps     int
-	still   bool
+	rootDir  string
+	width    int
+	height   int
+	fps      int
+	still    bool
+	progress scene.ProgressFunc
 }
 
 // NewVideoPipeline builds a renderer rooted at a campaign directory.
@@ -47,13 +48,26 @@ func (v *VideoPipeline) SetFPS(fps int) {
 // export on a weak machine.
 func (v *VideoPipeline) SetStill(still bool) { v.still = still }
 
+// SetProgress routes structured frame and encode progress to fn. When set, the
+// pipeline stops writing human-readable progress to stderr.
+func (v *VideoPipeline) SetProgress(fn scene.ProgressFunc) { v.progress = fn }
+
+// FFmpegAvailable reports the ffmpeg binary path, or ok=false when it is absent.
+func FFmpegAvailable() (string, bool) {
+	path, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return "", false
+	}
+	return path, true
+}
+
 // frameWriter renders a script's frames into a directory as PNGs.
 type frameWriter struct {
 	renderer *scene.Renderer
 	dir      string
 	fps      int
 	still    bool
-	progress func(format string, args ...interface{})
+	progress scene.ProgressFunc
 }
 
 // write renders every beat's frames in order, numbering them so FFmpeg can read
@@ -94,7 +108,7 @@ func (w *frameWriter) write(script *scene.Script) (int, error) {
 
 		previousArt = sc.ArtPath
 		if w.progress != nil {
-			w.progress("rendered scene %d/%d", i+1, len(script.Scenes))
+			w.progress(scene.Progress{Phase: "frames", Done: i + 1, Total: len(script.Scenes)})
 		}
 	}
 
@@ -197,14 +211,18 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 	}
 	defer os.RemoveAll(framesDir)
 
+	writerProgress := v.progress
+	if writerProgress == nil {
+		writerProgress = func(p scene.Progress) {
+			fmt.Fprintf(os.Stderr, "export: %s %d/%d\n", p.Phase, p.Done, p.Total)
+		}
+	}
 	writer := &frameWriter{
 		renderer: renderer,
 		dir:      framesDir,
 		fps:      v.fps,
 		still:    v.still,
-		progress: func(format string, args ...interface{}) {
-			fmt.Fprintf(os.Stderr, "export: "+format+"\n", args...)
-		},
+		progress: writerProgress,
 	}
 
 	count, err := writer.write(script)
@@ -213,6 +231,10 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 	}
 	if count == 0 {
 		return fmt.Errorf("render video: no frames were rendered")
+	}
+
+	if v.progress != nil {
+		v.progress(scene.Progress{Phase: "encode"})
 	}
 
 	part := stagingPath(outputFile)
@@ -231,6 +253,9 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 	if err := os.Rename(part, outputFile); err != nil {
 		os.Remove(part)
 		return fmt.Errorf("publish video: %w", err)
+	}
+	if v.progress != nil {
+		v.progress(scene.Progress{Phase: "done"})
 	}
 	return nil
 }

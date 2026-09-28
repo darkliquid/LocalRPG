@@ -17,9 +17,10 @@ import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
 import { LimitChip } from './components/LimitChip';
-import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, AlertTriangle, HelpCircle } from 'lucide-react';
+import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, AlertTriangle, HelpCircle, Download } from 'lucide-react';
 import { formatGenerationError } from './lib/generationError';
 import { slugify } from './lib/slug';
+import { CinematicOverlay } from './components/CinematicOverlay';
 
 // Everything below the campaign shell is only needed once its overlay is
 // opened, so it loads on demand instead of in the first bundle. The chronicle,
@@ -27,6 +28,7 @@ import { slugify } from './lib/slug';
 const DocsModal = lazy(() => import('./components/DocsModal').then((m) => ({ default: m.DocsModal })));
 const SettingsStudio = lazy(() => import('./components/SettingsStudio').then((m) => ({ default: m.SettingsStudio })));
 const StoryTheater = lazy(() => import('./components/StoryTheater').then((m) => ({ default: m.StoryTheater })));
+const ExportModal = lazy(() => import('./components/ExportModal').then((m) => ({ default: m.ExportModal })));
 
 export const App: React.FC = () => {
   // Always open in the launcher hub view rather than directly entering a campaign.
@@ -61,6 +63,7 @@ export const App: React.FC = () => {
 
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [docsArticleID, setDocsArticleID] = useState<string | undefined>(undefined);
@@ -653,6 +656,14 @@ export const App: React.FC = () => {
                 <span className="hidden sm:inline">Theater</span>
               </button>
               <button
+                onClick={() => setIsExportOpen(true)}
+                className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer text-stone-300 hover:text-white hover:bg-white/10"
+                title="Export this story as a web player or video"
+              >
+                <Download className="w-3.5 h-3.5 text-purple-400" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+              <button
                 onClick={() => setIsSettingsOpen(true)}
                 className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                   isSettingsOpen ? 'bg-purple-600 text-white font-bold shadow-md' : 'text-stone-300 hover:text-white hover:bg-white/10'
@@ -983,6 +994,19 @@ export const App: React.FC = () => {
               }}
             />
           </Suspense>
+
+          {/* Story Export Modal */}
+          <Suspense fallback={null}>
+            <ExportModal
+              isOpen={isExportOpen}
+              gameID={activeGameID}
+              onClose={() => setIsExportOpen(false)}
+            />
+          </Suspense>
+
+          {/* Cinematic backdrop overlays honour the preference. The layer is
+              inert and sits below the modals. */}
+          <CinematicOverlay enabled={config?.preferences?.cinematic_effects ?? false} />
         </>
       )}
       </div>
