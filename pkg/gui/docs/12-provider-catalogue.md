@@ -18,7 +18,7 @@ Provider column of the Usage tab. A price with no `model` matches every model of
 that key.
 
 > [!NOTE]
-> Provider IDs such as `openaichat` are the built-in adapter names, not the keys
+> A provider ID such as `llm:openaichat` is the built-in adapter name, not the key
 > you choose for `providers.<your-id>`. The ledger key is fixed by the adapter;
 > the config key under `providers:` is yours to name.
 
@@ -26,19 +26,20 @@ that key.
 
 | Family | Ledger key | Example |
 | --- | --- | --- |
-| LLM | the provider ID, for adapters that report usage | `openaichat`, `gemini` |
-| Speech (TTS) | `gemini:tts`, `builtin:<name>`, `cli:<command>`, `http:<host>` | `builtin:elevenlabs` |
-| Transcription (STT) | `<builtin_name>`, else `<type>` | `http` |
-| Image | `<builtin_name>`, else `<type>` | `gemini` |
+| LLM | the adapter key | `llm:openaichat`, `llm:gemini` |
+| Speech (TTS) | `tts:gemini`, `tts:<name>`, `tts:piper@<command>`, `tts:http@<host>` | `tts:http@localhost:8880` |
+| Transcription (STT) | `stt:whisper-http@<host>`, `stt:whisper-cli@<command>` | `stt:whisper-http@localhost:8000` |
+| Image | `image:gemini`, `image:http@<host>`, `image:cli@<command>` | `image:http@127.0.0.1:8188` |
+| Embedding | `embedding:openai`, `embedding:gemini`, `embedding:builtin` | `embedding:gemini@default` |
 
 ## LLM providers
 
 | Provider ID | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- |
-| `llm:cli` | cli | `not reported` | `claude-cli`, `llama-cli` |
-| `llm:gemini` | gemini | `not reported` | `gemini-3.8-flash` |
-| `llm:narrative-oracle` | builtin | `not reported` | `narrative-oracle` |
-| `llm:openaichat` | http | `not reported` | `default`, `gpt-4`, `llama3.2` |
+| `llm:cli` | cli | `llm:cli@llama-cli` | `claude-cli`, `llama-cli` |
+| `llm:gemini` | gemini | `llm:gemini` | `gemini-3.8-flash` |
+| `llm:narrative-oracle` | builtin | `llm:narrative-oracle` | `narrative-oracle` |
+| `llm:openaichat` | http | `llm:openaichat@localhost:11434` | `default`, `gpt-4`, `llama3.2` |
 
 ## Speech (TTS) providers
 
@@ -55,18 +56,25 @@ that key.
 
 | Provider ID | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- |
-| `stt:web-speech` | builtin | `web-speech` | `web-speech` |
-| `stt:whisper-cli` | cli | `cli` | `whisper-cli` |
-| `stt:whisper-http` | http | `http` | `whisper-1` |
+| `stt:web-speech` | builtin | `not reported` | `web-speech` |
+| `stt:whisper-cli` | cli | `stt:whisper-cli@whisper-cli` | `whisper-cli` |
+| `stt:whisper-http` | http | `stt:whisper-http@localhost:8000` | `whisper-1` |
 
 ## Image providers
 
 | Provider ID | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- |
-| `image:cli` | cli | `cli` | `sd-cli` |
-| `image:gemini` | gemini | `gemini` | `gemini-2.5-flash-image`, `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`, `imagen-3.0-fast-generate-001`, `imagen-3.0-generate-002` |
-| `image:http` | http | `http` | `automatic1111`, `comfyui`, `dall-e-3`, `stablediffusion` |
-| `image:procedural-art` | builtin | `procedural-art` | `procedural-art` |
+| `image:cli` | cli | `image:cli@sd` | `sd-cli` |
+| `image:gemini` | gemini | `image:gemini` | `gemini-2.5-flash-image`, `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`, `imagen-3.0-fast-generate-001`, `imagen-3.0-generate-002` |
+| `image:http` | http | `image:http@127.0.0.1:8188` | `automatic1111`, `comfyui`, `dall-e-3`, `stablediffusion` |
+| `image:procedural-art` | builtin | `image:procedural-art` | `procedural-art` |
+
+## Embedding providers
+
+| Provider ID | Source | Ledger key | Presets and models |
+| --- | --- | --- | --- |
+| `embedding:gemini` | gemini | `embedding:gemini` | - |
+| `embedding:openai` | http | `embedding:openai` | - |
 
 ## Built-in default prices
 

@@ -28,20 +28,37 @@ can turn it into a cost at any time by adding a price below.
 ## Which provider key?
 
 The `provider` field is not the name you gave the block under `providers:`. It is
-the **ledger key** the adapter records usage under, which is fixed by LocalRPG:
+the **canonical key** the adapter records usage under, which is fixed by
+LocalRPG. A key is `<family>:<adapter>`, and an adapter that names an endpoint or
+command also has an instance form:
 
-| Family | Ledger key |
+- adapter: `llm:openaichat`, `tts:http`, `image:gemini`, `embedding:gemini`
+- instance: `tts:http@localhost:8880`, `stt:whisper-http@localhost:8000`
+
+| Family | Key |
 | --- | --- |
-| LLM | the adapter ID, e.g. `openaichat` or `gemini` |
-| Speech (TTS) | `gemini:tts`, `builtin:<builtin_name>`, `cli:<command>`, or `http:<host>` |
-| Transcription (STT) | `<builtin_name>`, else `<type>` |
-| Image | `<builtin_name>`, else `<type>` |
+| LLM | `llm:openaichat`, `llm:gemini`, `llm:cli@<command>` |
+| Speech (TTS) | `tts:gemini`, `tts:elevenlabs`, `tts:piper@<command>`, `tts:http@<host>` |
+| Transcription (STT) | `stt:whisper-http@<host>`, `stt:whisper-cli@<command>` |
+| Image | `image:gemini`, `image:http@<host>`, `image:cli@<command>` |
+| Embedding | `embedding:openai`, `embedding:gemini`, `embedding:builtin` |
 
 An unpriced row in the Usage tab shows exactly the key to use, and the
-[Provider & Model Catalogue](12-provider-catalogue) lists them all. Keys are
-shared where adapters are shared: `provider: http` prices every HTTP image
-endpoint, and `provider: gemini` covers both Gemini tokens (LLM) and Gemini
-requests (image).
+[Provider & Model Catalogue](12-provider-catalogue) lists them all.
+
+### The fallback ladder
+
+A recorded key is matched most specific first, stopping at the first match:
+
+1. the instance key and model, e.g. `tts:http@localhost:8880` + `kokoro`
+2. the instance key, e.g. `tts:http@localhost:8880`
+3. the adapter key and model, e.g. `tts:http` + `kokoro`
+4. the adapter key, e.g. `tts:http`
+
+So a price on `tts:http` covers every HTTP speech endpoint, and a price on
+`tts:http@hostA` overrides it for that endpoint only. The same ladder decides
+which rate-limit block applies: a block on one endpoint does not stop another,
+while a block on the adapter stops them all.
 
 The field names below are also listed, with every other config key, in the
 [Configuration Reference](13-configuration-reference).
@@ -57,23 +74,27 @@ providers:
   currency: USD
   prices:
     # An LLM adapter: token rates for every model of the adapter.
-    - provider: openaichat
+    - provider: llm:openaichat
       per_million_input: 2500000   # 2.50 USD per 1M input tokens
       per_million_output: 10000000 # 10.00 USD per 1M output tokens
 
     # One specific model wins over the adapter-wide entry above.
-    - provider: openaichat
+    - provider: llm:openaichat
       model: gpt-4o-mini
       per_million_input: 150000
       per_million_output: 600000
 
-    # Speech is billed per character; the key is builtin:<name>.
-    - provider: builtin:elevenlabs
+    # Speech is billed per character.
+    - provider: tts:elevenlabs
       per_character: 30            # 0.00003 USD per character
 
-    # Request-billed image endpoints share the http key.
-    - provider: http
+    # Every request-billed HTTP image endpoint shares the adapter key.
+    - provider: image:http
       per_request: 40000           # 0.04 USD per image
+
+    # One endpoint overrides the adapter-wide image price.
+    - provider: image:http@127.0.0.1:8188
+      per_request: 0
 ```
 
 ### Price fields
@@ -94,10 +115,15 @@ price of `2.50`, write `2500000` (2.50 x 1,000,000). The display currency is
 For each usage row LocalRPG looks for a price in this order, stopping at the
 first match:
 
-1. A config entry with the same provider **and** model.
-2. A config entry with the same provider and no model.
-3. A built-in default shipped in `pkg/pricing` (for the common presets).
-4. Nothing, which yields a zero cost and the **no price configured** badge.
+1. A config entry with the same **instance key** and model.
+2. A config entry with the same instance key and no model.
+3. A config entry with the same **adapter key** and model.
+4. A config entry with the same adapter key and no model.
+5. A built-in default shipped in `pkg/pricing`, matched the same way.
+6. Nothing, which yields a zero cost and the **no price configured** badge.
+
+A `providers.prices` entry whose `provider` is not a canonical key is reported as
+a configuration problem on load and matches nothing.
 
 Costs are computed and stored at write time. Editing a price therefore changes
 future turns only; existing rows keep the figure they were recorded with, so
