@@ -95,7 +95,7 @@ func TestBuildCommandKeepsPictureAndSoundInStep(t *testing.T) {
 	pipeline.SetFPS(10)
 
 	script := smallScript()
-	script.Scenes[0].Beats[1].AudioPath = "/cache/welcome.wav"
+	script.Scenes[0].Beats[1].AudioPaths = []string{"/cache/welcome.wav"}
 	script.Scenes[0].Beats[1].AudioDuration = 1500 * time.Millisecond
 	script.Scenes[0].Beats[1].Duration = 1900 * time.Millisecond
 
@@ -127,6 +127,31 @@ func TestBuildCommandKeepsPictureAndSoundInStep(t *testing.T) {
 	// matches the frame count.
 	if !strings.Contains(args, "-t 2.000") {
 		t.Errorf("expected the card's duration as a silence length:\n%s", args)
+	}
+}
+
+func TestBuildCommandAddsOneInputPerClip(t *testing.T) {
+	pipeline := NewVideoPipeline(".")
+
+	script := smallScript()
+	script.Scenes[0].Beats[1].AudioPaths = []string{"/cache/one.wav", "/cache/two.wav"}
+	script.Scenes[0].Beats[1].AudioDuration = 1500 * time.Millisecond
+	script.Scenes[0].Beats[1].Duration = 1900 * time.Millisecond
+
+	cmd, err := pipeline.BuildCommand(context.Background(), script, "/frames", "/out.mp4")
+	if err != nil {
+		t.Fatalf("BuildCommand failed: %v", err)
+	}
+
+	args := strings.Join(cmd.Args, " ")
+	for _, want := range []string{
+		"-i /cache/one.wav",
+		"-i /cache/two.wav",
+		"concat=n=3:v=0:a=1[a]",
+	} {
+		if !strings.Contains(args, want) {
+			t.Errorf("expected %q in the ffmpeg invocation:\n%s", want, args)
+		}
 	}
 }
 

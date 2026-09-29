@@ -56,8 +56,8 @@ func TestPipelineStripsMarkdownByDefault(t *testing.T) {
 	client := &markdownFake{}
 	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
 
-	if _, err := pipeline.SynthesizeSegment(context.Background(),
-		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "A *soft* word."}, nil, nil); err != nil {
+	if _, err := pipeline.SynthesizeSegmentClips(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "A *soft* word."}, nil, nil, false); err != nil {
 		t.Fatal(err)
 	}
 	if len(client.got) != 1 || client.got[0] != "A soft word." {
@@ -69,8 +69,8 @@ func TestPipelineKeepsMarkdownForAwareClient(t *testing.T) {
 	client := &markdownFake{aware: true}
 	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
 
-	if _, err := pipeline.SynthesizeSegment(context.Background(),
-		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "A *soft* word."}, nil, nil); err != nil {
+	if _, err := pipeline.SynthesizeSegmentClips(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "A *soft* word."}, nil, nil, false); err != nil {
 		t.Fatal(err)
 	}
 	if len(client.got) != 1 || client.got[0] != "A *soft* word." {
@@ -83,8 +83,8 @@ func TestPipelineKeepPolicySendsRawText(t *testing.T) {
 	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
 	pipeline.SetTextPolicy(TextPolicyKeep)
 
-	if _, err := pipeline.SynthesizeSegment(context.Background(),
-		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "A *soft* word."}, nil, nil); err != nil {
+	if _, err := pipeline.SynthesizeSegmentClips(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "A *soft* word."}, nil, nil, false); err != nil {
 		t.Fatal(err)
 	}
 	if len(client.got) != 1 || client.got[0] != "A *soft* word." {
@@ -96,8 +96,8 @@ func TestPipelineSkipsEmptyAfterStrip(t *testing.T) {
 	client := &markdownFake{}
 	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
 
-	_, err := pipeline.SynthesizeSegment(context.Background(),
-		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "---"}, nil, nil)
+	_, err := pipeline.SynthesizeSegmentClips(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "---"}, nil, nil, false)
 	if !errors.Is(err, ErrNoSpeakableText) {
 		t.Fatalf("expected ErrNoSpeakableText, got %v", err)
 	}
@@ -118,7 +118,7 @@ func TestSynthesizeSegmentsSkipsUnspeakableBeats(t *testing.T) {
 		t.Fatalf("SynthesizeSegments failed: %v", err)
 	}
 	if len(clips) != 1 {
-		t.Fatalf("expected one clip, got %d", len(clips))
+		t.Fatalf("expected one clip list, got %d", len(clips))
 	}
 }
 
@@ -126,17 +126,17 @@ func TestPipelineSharesCacheForEquivalentText(t *testing.T) {
 	client := &markdownFake{}
 	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
 
-	first, err := pipeline.SynthesizeSegment(context.Background(),
-		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "**bold**"}, nil, nil)
+	first, err := pipeline.SynthesizeSegmentClips(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "**bold**"}, nil, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := pipeline.SynthesizeSegment(context.Background(),
-		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "bold"}, nil, nil)
+	second, err := pipeline.SynthesizeSegmentClips(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "bold"}, nil, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second {
+	if len(first) != 1 || len(second) != 1 || first[0] != second[0] {
 		t.Errorf("equivalent text produced different clips: %q vs %q", first, second)
 	}
 	if len(client.got) != 1 {

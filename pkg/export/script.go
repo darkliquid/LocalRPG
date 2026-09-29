@@ -56,17 +56,23 @@ type speechResolver struct {
 	narrator *entity.VoiceConfig
 }
 
-func (r *speechResolver) SegmentAudio(ctx context.Context, segment entity.TurnSegment) (string, time.Duration, error) {
-	path, err := r.pipeline.SynthesizeSegment(ctx, segment, r.narrator, r.voiceFor)
+func (r *speechResolver) SegmentAudio(ctx context.Context, segment entity.TurnSegment) ([]string, time.Duration, error) {
+	clips, err := r.pipeline.SynthesizeSegmentClips(ctx, segment, r.narrator, r.voiceFor, false)
 	if err != nil {
-		return "", 0, err
+		return nil, 0, err
 	}
 
-	duration, err := media.ProbeAudioDuration(ctx, path)
-	if err != nil {
-		return path, 0, nil
+	// A clip whose length cannot be probed contributes nothing rather than
+	// throwing the beat's pacing away; the beat falls back to the reading estimate.
+	var total time.Duration
+	for _, clip := range clips {
+		duration, err := media.ProbeAudioDuration(ctx, clip)
+		if err != nil {
+			continue
+		}
+		total += duration
 	}
-	return path, duration, nil
+	return clips, total, nil
 }
 
 func (r *speechResolver) voiceFor(speakerID string) *entity.VoiceConfig {

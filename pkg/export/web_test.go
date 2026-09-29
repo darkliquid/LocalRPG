@@ -47,7 +47,7 @@ func fixtureScript(t *testing.T, dir string) *scene.Script {
 				{Kind: scene.BeatSceneCard, Text: "Alden Tavern", ArtPath: art, Duration: 2 * time.Second},
 				{Kind: scene.BeatNarration, Text: "Warm light.", ArtPath: art, Duration: 2 * time.Second},
 				{Kind: scene.BeatSpeech, Speaker: "Garrick", SpeakerID: "garrick", Text: "Welcome.", ArtPath: art,
-					AudioPath: clip, AudioDuration: time.Second, Duration: 1400 * time.Millisecond},
+					AudioPaths: []string{clip}, AudioDuration: time.Second, Duration: 1400 * time.Millisecond},
 			},
 		}},
 		TotalDuration: 5 * time.Second,
@@ -118,7 +118,7 @@ func TestWebExportEmbedsBeatDurations(t *testing.T) {
 				Kind     string  `json:"kind"`
 				Speaker  string  `json:"speaker"`
 				Text     string  `json:"text"`
-				Audio    string  `json:"audio"`
+				Audio    string  `json:"-"`
 				Duration float64 `json:"duration"`
 			} `json:"beats"`
 		} `json:"scenes"`
@@ -134,11 +134,83 @@ func TestWebExportEmbedsBeatDurations(t *testing.T) {
 	if len(beats) != 3 {
 		t.Fatalf("expected 3 beats, got %d", len(beats))
 	}
-	if beats[2].Kind != "speech" || beats[2].Speaker != "Garrick" || beats[2].Audio != "audio/beat-0001.wav" {
+	if beats[2].Kind != "speech" || beats[2].Speaker != "Garrick" {
 		t.Errorf("unexpected speech beat: %+v", beats[2])
 	}
 	if beats[2].Duration < 1.3 || beats[2].Duration > 1.5 {
 		t.Errorf("duration = %v, want seconds not nanoseconds", beats[2].Duration)
+	}
+
+	payloadClips := readWebPayload(t, out)
+	if got := payloadClips.Scenes[0].Beats[2].Audio; len(got) != 1 || got[0] != "audio/beat-0001.wav" {
+		t.Errorf("audio = %#v, want the beat's copied clip", got)
+	}
+}
+
+// readWebPayload decodes the script embedded in an exported player, which is how a
+// bundle's own view of its beats is asserted.
+type webPayloadFixture struct {
+	GameName string `json:"game_name"`
+	Scenes   []struct {
+		Location string `json:"location"`
+		Art      string `json:"art"`
+		Beats    []struct {
+			Kind     string   `json:"kind"`
+			Speaker  string   `json:"speaker"`
+			Text     string   `json:"text"`
+			Art      string   `json:"art"`
+			Audio    []string `json:"audio"`
+			Duration float64  `json:"duration"`
+		} `json:"beats"`
+	} `json:"scenes"`
+	Total float64 `json:"total_duration"`
+}
+
+func readWebPayload(t *testing.T, outDir string) webPayloadFixture {
+	t.Helper()
+	page, err := os.ReadFile(filepath.Join(outDir, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const marker = "const SCRIPT = "
+	idx := strings.Index(string(page), marker)
+	if idx == -1 {
+		t.Fatal("expected the script to be embedded")
+	}
+	rest := string(page)[idx+len(marker):]
+	rest = rest[:strings.Index(rest, ";\n")]
+
+	var payload webPayloadFixture
+	if err := json.Unmarshal([]byte(rest), &payload); err != nil {
+		t.Fatalf("decode embedded script: %v", err)
+	}
+	return payload
+}
+
+func TestWebExportCopiesEveryClipOfABeat(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "bundle")
+	dir := t.TempDir()
+
+	script := fixtureScript(t, dir)
+	second := filepath.Join(dir, "walk.wav")
+	if err := os.WriteFile(second, []byte("RIFF....WAVEfmt ....data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	script.Scenes[0].Beats[2].AudioPaths = append(script.Scenes[0].Beats[2].AudioPaths, second)
+
+	if _, err := NewWebExporter(".").Export(context.Background(), script, out); err != nil {
+		t.Fatalf("Export failed: %v", err)
+	}
+
+	payload := readWebPayload(t, out)
+	audio := payload.Scenes[0].Beats[2].Audio
+	if len(audio) != 2 {
+		t.Fatalf("audio = %#v, want both clips", audio)
+	}
+	for _, relative := range audio {
+		if _, err := os.Stat(filepath.Join(out, filepath.FromSlash(relative))); err != nil {
+			t.Errorf("expected %s in the bundle: %v", relative, err)
+		}
 	}
 }
 

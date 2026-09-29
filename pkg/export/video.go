@@ -149,9 +149,9 @@ func (v *VideoPipeline) BuildCommand(ctx context.Context, script *scene.Script, 
 	index := 1
 
 	for _, beat := range script.Beats() {
-		if beat.AudioPath != "" {
-			args = append(args, "-i", beat.AudioPath)
-		} else {
+		// One input per unit: a multi-clip beat gets finer pacing than the beat's
+		// own reading estimate, and a clip-less beat still gets its silence.
+		if len(beat.AudioPaths) == 0 {
 			silence := beat.Duration.Seconds()
 			if silence <= 0 {
 				silence = scene.MinimumBeatDuration.Seconds()
@@ -161,10 +161,16 @@ func (v *VideoPipeline) BuildCommand(ctx context.Context, script *scene.Script, 
 				"-t", strconv.FormatFloat(silence, 'f', 3, 64),
 				"-i", "anullsrc=r=44100:cl=stereo",
 			)
+			streams = append(streams, fmt.Sprintf("[%d:a]", index))
+			index++
+			continue
 		}
 
-		streams = append(streams, fmt.Sprintf("[%d:a]", index))
-		index++
+		for _, clip := range beat.AudioPaths {
+			args = append(args, "-i", clip)
+			streams = append(streams, fmt.Sprintf("[%d:a]", index))
+			index++
+		}
 	}
 
 	if len(streams) > 0 {

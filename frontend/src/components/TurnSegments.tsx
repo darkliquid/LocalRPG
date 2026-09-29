@@ -1,6 +1,7 @@
 import React from 'react';
 import { TurnSegment, TurnCheck } from '../types';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
+import { anySegmentHasAudio } from '../lib/audio';
 import { MarkdownProse } from './MarkdownProse';
 import { ImageLightbox } from './ImageLightbox';
 import { useLightbox } from '../hooks/useLightbox';
@@ -28,10 +29,13 @@ interface TurnSegmentsProps {
   turnAudioState?: TurnAudioState;
   turnAudioMessage?: string;
   turnNumber?: number;
+  gameId?: string;
   segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
   // Checks resolved this turn, rendered inline at the segment that narrates them.
   checks?: TurnCheck[];
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
+  // Clips already heard while the turn streamed, which playback must skip.
+  skipAudioKeys?: ReadonlySet<string>;
 }
 
 export const TurnSegments: React.FC<TurnSegmentsProps> = ({
@@ -46,16 +50,23 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   turnAudioState = 'idle',
   turnAudioMessage,
   turnNumber,
+  gameId,
   segmentAudioStatus,
   checks,
   displayMode = 'stage_directions',
+  skipAudioKeys,
 }) => {
   const ordered = segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: fallback }];
-  const hasAudio = (segments ?? []).some((segment) => !!segment.audio_url);
+  const hasAudio = anySegmentHasAudio(segments);
   const { playing, blocked, playingIndex, play, playFrom, regenerateFrom, stop } = useSegmentPlayback(
     segments,
-    autoPlay && hasAudio && !serverPlayback,
-    volume
+    {
+      autoPlay: autoPlay && hasAudio && !serverPlayback,
+      volume,
+      skipKeys: skipAudioKeys,
+      gameId,
+      turnNumber,
+    }
   );
 
   const startServerPlayback = (segmentIndex?: number, force?: boolean) => onPlayTurn?.(segmentIndex, force);
@@ -74,7 +85,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   };
 
   const segmentControls = (index: number) => {
-    if (!ordered[index]?.audio_url) return null;
+    if (!ordered[index]?.audio_urls?.length) return null;
     const status = segmentState(index);
     return (
       <SegmentAudioControls

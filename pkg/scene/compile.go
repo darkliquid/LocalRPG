@@ -41,9 +41,10 @@ type ArtResolver interface {
 	SceneArt(ctx context.Context, location *entity.Entity, force bool) (string, error)
 }
 
-// SpeechResolver returns a clip's path and duration, or ErrAudioUnavailable.
+// SpeechResolver returns a beat's clip paths and their total duration, or
+// ErrAudioUnavailable. A beat is several clips when it is several sentences.
 type SpeechResolver interface {
-	SegmentAudio(ctx context.Context, segment entity.TurnSegment) (string, time.Duration, error)
+	SegmentAudio(ctx context.Context, segment entity.TurnSegment) ([]string, time.Duration, error)
 }
 
 // Compiler turns a campaign's timeline into a playable script.
@@ -159,16 +160,16 @@ func (c *Compiler) openScene(locationID string, opts Options) Scene {
 	return sc
 }
 
-// resolveAudio attaches a beat's clip when one can be resolved. A missing clip is
+// resolveAudio attaches a beat's clips when they can be resolved. A missing clip is
 // counted and skipped so one silent line cannot abandon the export.
 func (c *Compiler) resolveAudio(ctx context.Context, beat *Beat, segment entity.TurnSegment, silent *int) {
-	path, duration, err := c.speech.SegmentAudio(ctx, segment)
-	if err != nil {
+	paths, duration, err := c.speech.SegmentAudio(ctx, segment)
+	if err != nil || len(paths) == 0 {
 		*silent++
 		return
 	}
 
-	beat.AudioPath = path
+	beat.AudioPaths = paths
 	beat.AudioDuration = duration
 }
 

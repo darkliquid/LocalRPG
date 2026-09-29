@@ -146,20 +146,20 @@ func TestCompileTotalsDurations(t *testing.T) {
 
 type fakeSpeech struct {
 	clips map[string]struct {
-		path     string
+		paths    []string
 		duration time.Duration
 	}
 	unavailable bool
 }
 
-func (f *fakeSpeech) SegmentAudio(ctx context.Context, segment entity.TurnSegment) (string, time.Duration, error) {
+func (f *fakeSpeech) SegmentAudio(ctx context.Context, segment entity.TurnSegment) ([]string, time.Duration, error) {
 	if f.unavailable {
-		return "", 0, ErrAudioUnavailable
+		return nil, 0, ErrAudioUnavailable
 	}
 	if clip, ok := f.clips[segment.Text]; ok {
-		return clip.path, clip.duration, nil
+		return clip.paths, clip.duration, nil
 	}
-	return "", 0, ErrAudioUnavailable
+	return nil, 0, ErrAudioUnavailable
 }
 
 func TestCompileResolvesAudioAndCountsSilence(t *testing.T) {
@@ -168,10 +168,10 @@ func TestCompileResolvesAudioAndCountsSilence(t *testing.T) {
 
 	var warnings []string
 	compiler.SetSpeechResolver(&fakeSpeech{clips: map[string]struct {
-		path     string
+		paths    []string
 		duration time.Duration
 	}{
-		"Welcome.": {path: "/cache/welcome.wav", duration: 3 * time.Second},
+		"Welcome.": {paths: []string{"/cache/welcome.wav"}, duration: 3 * time.Second},
 	}})
 
 	script, err := compiler.Compile(context.Background(), "campaign-01", Options{
@@ -189,7 +189,7 @@ func TestCompileResolvesAudioAndCountsSilence(t *testing.T) {
 			speech = &beats[i]
 		}
 	}
-	if speech == nil || speech.AudioPath != "/cache/welcome.wav" {
+	if speech == nil || len(speech.AudioPaths) != 1 || speech.AudioPaths[0] != "/cache/welcome.wav" {
 		t.Fatalf("expected the clip on the speech beat, got %+v", speech)
 	}
 	if speech.Duration != 3*time.Second+BeatGap {
@@ -208,9 +208,45 @@ func TestCompileWithoutSpeechResolverIsSilent(t *testing.T) {
 		t.Fatalf("Compile failed: %v", err)
 	}
 	for _, beat := range script.Beats() {
-		if beat.AudioPath != "" {
+		if len(beat.AudioPaths) != 0 {
 			t.Errorf("expected silence without a resolver, got %+v", beat)
 		}
+	}
+}
+
+func TestCompileKeepsEveryClipOfABeatInOrder(t *testing.T) {
+	source := twoLocationSource()
+	compiler := NewCompiler(source)
+	compiler.SetSpeechResolver(&fakeSpeech{clips: map[string]struct {
+		paths    []string
+		duration time.Duration
+	}{
+		"Welcome.": {paths: []string{"/cache/welcome-1.wav", "/cache/welcome-2.wav"}, duration: 3 * time.Second},
+	}})
+
+	script, err := compiler.Compile(context.Background(), "campaign-01", Options{Audio: true})
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	var found bool
+	for _, beat := range script.Beats() {
+		if beat.Text != "Welcome." {
+			continue
+		}
+		found = true
+		if len(beat.AudioPaths) != 2 || beat.AudioPaths[0] != "/cache/welcome-1.wav" || beat.AudioPaths[1] != "/cache/welcome-2.wav" {
+			t.Errorf("AudioPaths = %#v, want both clips in order", beat.AudioPaths)
+		}
+		if beat.AudioDuration != 3*time.Second {
+			t.Errorf("AudioDuration = %v, want the summed clip duration", beat.AudioDuration)
+		}
+		if want := 3*time.Second + BeatGap; beat.Duration != want {
+			t.Errorf("Duration = %v, want %v", beat.Duration, want)
+		}
+	}
+	if !found {
+		t.Fatal("the fixture no longer contains the audio beat")
 	}
 }
 
@@ -228,7 +264,7 @@ func TestCompileWarnsWhenAResolverReportsNoAudio(t *testing.T) {
 	}
 
 	for _, beat := range script.Beats() {
-		if beat.AudioPath != "" {
+		if len(beat.AudioPaths) != 0 {
 			t.Errorf("expected silence when audio is unavailable, got %+v", beat)
 		}
 	}

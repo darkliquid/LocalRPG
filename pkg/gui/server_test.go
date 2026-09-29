@@ -502,29 +502,17 @@ func TestLocationArtRoute(t *testing.T) {
 	}
 }
 
-func TestSegmentAudioRoute(t *testing.T) {
+func TestClipRouteSniffsTheContentType(t *testing.T) {
 	gameID, svc := setupTestGame(t)
 	writeSegmentTurn(t, svc, gameID)
-	server := NewServer(svc, http.NotFoundHandler())
 
-	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/turn/1/segment/1/audio", nil)
-	rec := httptest.NewRecorder()
-	server.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	clips, err := svc.GetSegmentClips(context.Background(), gameID, 1, 1)
+	if err != nil || len(clips) == 0 {
+		t.Fatalf("GetSegmentClips = %#v, %v", clips, err)
 	}
-	if rec.Body.Len() == 0 {
-		t.Errorf("expected audio bytes")
-	}
-}
 
-func TestSegmentAudioRouteSniffsTheContentType(t *testing.T) {
-	gameID, svc := setupTestGame(t)
-	writeSegmentTurn(t, svc, gameID)
 	server := NewServer(svc, http.NotFoundHandler())
-
-	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/turn/1/segment/1/audio", nil)
+	req := httptest.NewRequest("GET", "/api/audio/clip/"+media.ClipKeyForPath(clips[0]), nil)
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
 
@@ -543,12 +531,17 @@ func TestSegmentAudioRouteSniffsTheContentType(t *testing.T) {
 	}
 }
 
-func TestSegmentAudioRouteIsCacheable(t *testing.T) {
+func TestClipRouteIsCacheable(t *testing.T) {
 	gameID, svc := setupTestGame(t)
 	writeSegmentTurn(t, svc, gameID)
-	server := NewServer(svc, http.NotFoundHandler())
 
-	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/turn/1/segment/1/audio", nil)
+	clips, err := svc.GetSegmentClips(context.Background(), gameID, 1, 1)
+	if err != nil || len(clips) == 0 {
+		t.Fatalf("GetSegmentClips = %#v, %v", clips, err)
+	}
+
+	server := NewServer(svc, http.NotFoundHandler())
+	req := httptest.NewRequest("GET", "/api/audio/clip/"+media.ClipKeyForPath(clips[0]), nil)
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
 
@@ -560,7 +553,7 @@ func TestSegmentAudioRouteIsCacheable(t *testing.T) {
 	}
 }
 
-func TestSegmentAudioRouteReportsAnUnavailableProvider(t *testing.T) {
+func TestRegenerateSegmentAudioWithoutAProvider(t *testing.T) {
 	// A service whose config never enabled TTS.
 	gameID, svc := setupTestGame(t)
 	writeSegmentTurn(t, svc, gameID)
@@ -578,7 +571,7 @@ func TestSegmentAudioRouteReportsAnUnavailableProvider(t *testing.T) {
 	}
 
 	server := NewServer(quiet, http.NotFoundHandler())
-	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/turn/1/segment/1/audio", nil)
+	req := httptest.NewRequest("POST", "/api/game/"+gameID+"/turn/1/segment/1/audio", nil)
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
 

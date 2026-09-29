@@ -1,5 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TurnSegment } from '../types';
+import { clipKeyFromURL, segmentClipURLs } from '../lib/audio';
+import { APIClient } from '../api/client';
+
+// Clip names one unit of a segment's audio and the segment it belongs to, so
+// playback can walk a flattened running order while the UI still speaks in beats.
+interface Clip {
+  segmentIndex: number;
+  url: string;
+}
+
+interface SegmentPlaybackOptions {
+  autoPlay: boolean;
+  volume?: number;
+  // Clips already heard while the turn streamed, so the finalise pass plays only
+  // the rest of the turn: the played set is exact because a clip is one unit.
+  skipKeys?: ReadonlySet<string>;
+  // Needed only to regenerate a beat, which is a request rather than playback.
+  gameId?: string;
+  turnNumber?: number;
+}
 
 // useSegmentPlayback plays a turn's segments in order, skipping any without a
 // clip. It is the one playback implementation, shared by the chronicle and the
@@ -10,15 +30,28 @@ import { TurnSegment } from '../types';
 // then offer a Play control, and that click is the gesture that starts playback.
 export const useSegmentPlayback = (
   segments: TurnSegment[] | undefined,
-  autoPlay: boolean,
-  volume: number
+  options: SegmentPlaybackOptions
 ) => {
+  const { autoPlay, volume = 1, skipKeys, gameId, turnNumber } = options;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prefetchRef = useRef<HTMLAudioElement | null>(null);
   const prefetchedUrlRef = useRef<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+
+  // The turn's clips in play order, one entry per unit of every segment, minus
+  // whatever has already been heard.
+  const clipsFor = useCallback((): Clip[] => {
+    const clips: Clip[] = [];
+    (segments ?? []).forEach((segment, segmentIndex) => {
+      segmentClipURLs(segment).forEach((url) => {
+        if (skipKeys?.has(clipKeyFromURL(url))) return;
+        clips.push({ segmentIndex, url });
+      });
+    });
+    return clips;
+  }, [segments, skipKeys]);
 
   const stop = useCallback(() => {
     audioRef.current?.pause();
@@ -53,8 +86,8 @@ export const useSegmentPlayback = (
 
   const playFrom = useCallback(
     (index: number) => {
-      const urls = (segments ?? []).map((segment) => segment.audio_url);
-      const next = urls.findIndex((url, i) => i >= index && !!url);
+      const clips = clipsFor();
+      const next = clips.findIndex((clip) => clip.segmentIndex >= index);
       if (next === -1) {
         stop();
         return;
@@ -62,32 +95,33 @@ export const useSegmentPlayback = (
 
       // Preload the next clip and keep it, so the browser has it ready when the
       // current one ends. Discarding the element let it be collected unplayed.
-      const following = urls.findIndex((url, i) => i > next && !!url);
-      if (following !== -1) {
-        const nextUrl = urls[following] as string;
-        if (prefetchedUrlRef.current !== nextUrl) {
-          const prefetch = new Audio(nextUrl);
-          prefetch.preload = 'auto';
-          prefetchRef.current = prefetch;
-          prefetchedUrlRef.current = nextUrl;
-        }
+      const following = clips[next + 1];
+      if (following && prefetchedUrlRef.current !== following.url) {
+        const prefetch = new Audio(following.url);
+        prefetch.preload = 'auto';
+        prefetchRef.current = prefetch;
+        prefetchedUrlRef.current = following.url;
       }
 
-      playUrl(urls[next] as string, next, () => playFrom(next + 1));
+      playUrl(clips[next].url, clips[next].segmentIndex, () => playFrom(clips[next].segmentIndex + 1));
     },
-    [segments, stop, playUrl]
+    [clipsFor, stop, playUrl]
   );
 
-  // regenerateFrom re-synthesizes one segment on demand. The server accepts
-  // force=1 on the audio GET; the timestamp defeats the browser cache.
+  // regenerateFrom re-synthesizes one beat and plays its refreshed clips: the
+  // server bypasses the cache, so the keys, and therefore the URLs, can change.
   const regenerateFrom = useCallback(
-    (index: number) => {
-      const url = (segments ?? [])[index]?.audio_url;
-      if (!url) return;
-      const separator = url.includes('?') ? '&' : '?';
-      playUrl(`${url}${separator}force=1&t=${Date.now()}`, index);
+    async (index: number) => {
+      if (!gameId || turnNumber === undefined) return;
+      try {
+        const urls = await APIClient.regenerateSegmentAudio(gameId, turnNumber, index);
+        if (urls.length === 0) return;
+        playUrl(urls[0], index);
+      } catch (err) {
+        console.error('regenerate segment audio:', err);
+      }
     },
-    [segments, playUrl]
+    [gameId, turnNumber, playUrl]
   );
 
   useEffect(() => {

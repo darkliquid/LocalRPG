@@ -169,25 +169,85 @@ func (p *TTSPipeline) SetTextPolicy(policy TextPolicy) {
 	p.policy = policy
 }
 
-// SynthesizeSegments renders every segment with its speaker's voice, falling back
-// to the narrator voice for narration and unresolved speech. Cached clips are
-// reused; audio references stay out of the turn record because the cache key is a
-// pure function of speaker, voice, prosody, and text. A segment that reduces to no
-// speakable text is skipped rather than treated as a failure.
-func (p *TTSPipeline) SynthesizeSegments(ctx context.Context, segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) ([]string, error) {
-	clips := make([]string, 0, len(segments))
+// SynthesizeSegments renders every segment as a list of clips, skipping a segment
+// that reduces to no speakable text rather than treating it as a failure. Cached
+// clips are reused; audio references stay out of the turn record because the cache
+// key is a pure function of speaker, voice, prosody, and text.
+func (p *TTSPipeline) SynthesizeSegments(ctx context.Context, segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) ([][]string, error) {
+	clips := make([][]string, 0, len(segments))
 
 	for _, segment := range segments {
-		clip, err := p.SynthesizeSegment(ctx, segment, narratorVoice, voiceFor)
+		list, err := p.SynthesizeSegmentClips(ctx, segment, narratorVoice, voiceFor, false)
 		if errors.Is(err, ErrNoSpeakableText) {
 			continue
 		}
 		if err != nil {
 			return nil, err
 		}
-		clips = append(clips, clip)
+		clips = append(clips, list)
 	}
 
+	return clips, nil
+}
+
+// clipUnits resolves a segment to the units synthesis reads: one sentence of the
+// text this client is sent, or the whole text when splitting could corrupt it. It
+// is the single definition of what a clip reads, shared by key computation and
+// synthesis so the two can never disagree about which clip a segment needs.
+func (p *TTSPipeline) clipUnits(segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (speakerID string, voice *entity.VoiceConfig, units []string, err error) {
+	speakerID, voice, spoken := p.prepareSegment(segment, narratorVoice, voiceFor)
+	if strings.TrimSpace(spoken) == "" {
+		return speakerID, voice, nil, ErrNoSpeakableText
+	}
+	if spoken != segment.Text {
+		logger := trace.OrNil(p.logger)
+		logger.Event("media.tts.reduced", map[string]interface{}{
+			"chars_raw":    len([]rune(segment.Text)),
+			"chars_spoken": len([]rune(spoken)),
+		})
+	}
+	return speakerID, voice, p.sentencesFor(spoken), nil
+}
+
+// SegmentClipKeys reports the keys a segment's clips will have, without
+// synthesizing anything, so a caller can name a clip before it exists.
+func (p *TTSPipeline) SegmentClipKeys(segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) ([]string, error) {
+	speakerID, voice, units, err := p.clipUnits(segment, narratorVoice, voiceFor)
+	if err != nil {
+		return nil, err
+	}
+
+	keys := make([]string, 0, len(units))
+	for _, unit := range units {
+		keys = append(keys, ComputeAudioCacheKeyForVoice(speakerID, voice, unit))
+	}
+	return keys, nil
+}
+
+// SynthesizeSegmentClips renders a segment as one clip per unit, in order. A unit
+// that fails is skipped so its neighbours still play; only a segment that produced
+// no clip at all reports the failure.
+func (p *TTSPipeline) SynthesizeSegmentClips(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig, force bool) ([]string, error) {
+	speakerID, voice, units, err := p.clipUnits(segment, narratorVoice, voiceFor)
+	if err != nil {
+		return nil, err
+	}
+
+	clips := make([]string, 0, len(units))
+	var firstErr error
+	for _, unit := range units {
+		clip, err := p.SynthesizeUtteranceForce(ctx, speakerID, voice, unit, force)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		clips = append(clips, clip)
+	}
+	if len(clips) == 0 && firstErr != nil {
+		return nil, firstErr
+	}
 	return clips, nil
 }
 
@@ -216,63 +276,18 @@ func (p *TTSPipeline) prepareSegment(segment entity.TurnSegment, narratorVoice *
 	return speakerID, voice, spoken
 }
 
-// SynthesizeSegment renders one segment: narration and unresolved speech read in
-// the narrator voice, resolved speech in the speaker's own. Legacy records carry a
-// speaker name but no entity ID, so the name is tried as a voice key too.
-func (p *TTSPipeline) SynthesizeSegment(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (string, error) {
-	return p.SynthesizeSegmentForce(ctx, segment, narratorVoice, voiceFor, false)
-}
-
 // SynthesizeProvisional renders a sentence of prose before the turn's final
-// segments exist. It builds the same synthetic segment the finaliser will, so it
-// applies the same reduction and writes the same cache entry: when the finished
-// segment's text is that sentence, the final synthesis is a cache hit rather
-// than a second provider call. text that reduces to nothing returns
+// segments exist. It reads the same unit the finaliser will, so when the finished
+// segment's text contains that sentence the final synthesis is a cache hit rather
+// than a second provider call. Text that reduces to nothing returns
 // ErrNoSpeakableText.
 func (p *TTSPipeline) SynthesizeProvisional(ctx context.Context, kind, speakerID, text string, voice *entity.VoiceConfig) (string, error) {
 	segment := entity.TurnSegment{Kind: kind, SpeakerID: speakerID, Text: text}
-	return p.SynthesizeSegmentForce(ctx, segment, voice, nil, false)
-}
-
-// SynthesizeSegmentForce renders one segment with optional force cache bypass.
-// A multi-sentence segment is synthesized sentence by sentence, so a clip the
-// streaming path already wrote is reused, and the sentences are concatenated
-// into the single clip the rest of the app expects.
-func (p *TTSPipeline) SynthesizeSegmentForce(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig, force bool) (string, error) {
-	speakerID, voice, spoken := p.prepareSegment(segment, narratorVoice, voiceFor)
+	speaker, resolved, spoken := p.prepareSegment(segment, voice, nil)
 	if strings.TrimSpace(spoken) == "" {
 		return "", ErrNoSpeakableText
 	}
-	if spoken != segment.Text {
-		logger := trace.OrNil(p.logger)
-		logger.Event("media.tts.reduced", map[string]interface{}{
-			"chars_raw":    len([]rune(segment.Text)),
-			"chars_spoken": len([]rune(spoken)),
-		})
-	}
-
-	sentences := p.sentencesFor(spoken)
-	if len(sentences) <= 1 {
-		return p.SynthesizeUtteranceForce(ctx, speakerID, voice, spoken, force)
-	}
-
-	base := ComputeAudioCacheKeyForVoice(speakerID, voice, spoken)
-	if !force {
-		if path, ok := p.cachedClip(base); ok {
-			p.setLastUsage(Usage{})
-			return path, nil
-		}
-	}
-
-	clips := make([]string, 0, len(sentences))
-	for _, sentence := range sentences {
-		clip, err := p.SynthesizeUtteranceForce(ctx, speakerID, voice, sentence, force)
-		if err != nil {
-			return "", err
-		}
-		clips = append(clips, clip)
-	}
-	return p.concatenateSentences(base, clips)
+	return p.SynthesizeUtteranceForce(ctx, speaker, resolved, spoken, false)
 }
 
 // sentencesFor splits reduced text into sentences when doing so cannot change
@@ -299,57 +314,23 @@ func (p *TTSPipeline) markdownPreserved() bool {
 	return ok && aware.SupportsMarkdown()
 }
 
-// concatenateSentences decodes the sentence clips, joins them, and encodes one
-// segment clip under base, so a repeat read never re-concatenates.
-func (p *TTSPipeline) concatenateSentences(base string, clips []string) (string, error) {
-	keyLock := p.keyLock(base)
-	keyLock.Lock()
-	defer keyLock.Unlock()
-	if path, ok := p.cachedClip(base); ok {
-		return path, nil
-	}
-
-	var pcm []int16
-	rate, channels := 48000, 1
-	for _, clip := range clips {
-		data, err := os.ReadFile(clip)
-		if err != nil {
-			return "", fmt.Errorf("read sentence clip: %w", err)
-		}
-		decoded, decodedRate, decodedChannels, err := opus.Decode(data)
-		if err != nil {
-			return "", fmt.Errorf("decode sentence clip %q: %w", clip, err)
-		}
-		if len(pcm) == 0 {
-			rate, channels = decodedRate, decodedChannels
-		}
-		pcm = append(pcm, decoded...)
-	}
-	if len(pcm) == 0 {
-		return "", ErrNoSpeakableText
-	}
-
-	encoded, err := opus.Encode(pcm, rate, channels, p.opusBitrate)
-	if err != nil {
-		return "", &harness.GenerationFailure{
-			Code:    harness.FailureProviderError,
-			Message: fmt.Sprintf("encode concatenated speech: %v", err),
-			Cause:   err,
-		}
-	}
-	return p.cache.Put("audio", base+".opus", encoded)
-}
-
-// CountUncached reports how many speakable segments already have a clip and how
-// many would need synthesis, so a bulk operation can warn before spending money
-// on a metered provider. It mutates nothing.
+// CountUncached reports how many speakable segments already have every clip and
+// how many would need synthesis, so a bulk operation can warn before spending
+// money on a metered provider. It mutates nothing.
 func (p *TTSPipeline) CountUncached(segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (cached, uncached int) {
 	for _, segment := range segments {
-		speakerID, voice, spoken := p.prepareSegment(segment, narratorVoice, voiceFor)
-		if strings.TrimSpace(spoken) == "" {
+		keys, err := p.SegmentClipKeys(segment, narratorVoice, voiceFor)
+		if err != nil || len(keys) == 0 {
 			continue
 		}
-		if _, ok := p.cachedClip(ComputeAudioCacheKeyForVoice(speakerID, voice, spoken)); ok {
+		complete := true
+		for _, key := range keys {
+			if _, ok := p.cachedClip(key); !ok {
+				complete = false
+				break
+			}
+		}
+		if complete {
 			cached++
 		} else {
 			uncached++

@@ -2,6 +2,7 @@ package media
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -61,89 +62,113 @@ func TestSynthesizeProvisionalSharesTheFinalSegmentCacheKey(t *testing.T) {
 	}
 
 	segment := entity.TurnSegment{Kind: entity.SegmentNarration, Text: "The hall is quiet."}
-	if _, err := pipeline.SynthesizeSegment(context.Background(), segment, voice, nil); err != nil {
-		t.Fatalf("SynthesizeSegment: %v", err)
+	if _, err := pipeline.SynthesizeSegmentClips(context.Background(), segment, voice, nil, false); err != nil {
+		t.Fatalf("SynthesizeSegmentClips: %v", err)
 	}
 	if client.calls != 1 {
 		t.Fatalf("calls = %d, want the final segment to reuse the provisional clip", client.calls)
 	}
 }
 
-func TestEvictingTheSegmentClipReconcatenatesFromSentenceClips(t *testing.T) {
+func TestSegmentClipKeysNamesTheClipsSynthesisWrites(t *testing.T) {
+	client := &recordingTTSClient{}
+	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
+	voice := &entity.VoiceConfig{VoiceID: "v1", Pitch: 1, SpeechRate: 1}
+	segment := entity.TurnSegment{Kind: entity.SegmentNarration, Text: "One. Two."}
+
+	keys, err := pipeline.SegmentClipKeys(segment, voice, nil)
+	if err != nil {
+		t.Fatalf("SegmentClipKeys: %v", err)
+	}
+	if len(keys) != 2 {
+		t.Fatalf("keys = %d, want one per sentence", len(keys))
+	}
+
+	clips, err := pipeline.SynthesizeSegmentClips(context.Background(), segment, voice, nil, false)
+	if err != nil {
+		t.Fatalf("SynthesizeSegmentClips: %v", err)
+	}
+	if len(clips) != len(keys) {
+		t.Fatalf("clips = %d, keys = %d", len(clips), len(keys))
+	}
+	for i, clip := range clips {
+		if got := ClipKeyForPath(clip); got != keys[i] {
+			t.Errorf("clip %d is named %q, want the key %q of its unit", i, got, keys[i])
+		}
+	}
+	if client.calls != 2 {
+		t.Errorf("calls = %d, want one per sentence", client.calls)
+	}
+}
+
+func TestStreamedSentenceIsReusedByTheFinalSegment(t *testing.T) {
+	client := &recordingTTSClient{}
+	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
+	voice := &entity.VoiceConfig{VoiceID: "v1", Pitch: 1, SpeechRate: 1}
+
+	if _, err := pipeline.SynthesizeProvisional(context.Background(), entity.SegmentNarration, "", "The hall is quiet.", voice); err != nil {
+		t.Fatalf("SynthesizeProvisional: %v", err)
+	}
+
+	segment := entity.TurnSegment{Kind: entity.SegmentNarration, Text: "The hall is quiet. Garrick nods."}
+	clips, err := pipeline.SynthesizeSegmentClips(context.Background(), segment, voice, nil, false)
+	if err != nil {
+		t.Fatalf("SynthesizeSegmentClips: %v", err)
+	}
+	if len(clips) != 2 {
+		t.Fatalf("clips = %d, want one per sentence", len(clips))
+	}
+	// One call for the streamed sentence, one for the second: the first is reused.
+	if client.calls != 2 {
+		t.Errorf("calls = %d, want the streamed sentence reused", client.calls)
+	}
+
+	again, err := pipeline.SynthesizeSegmentClips(context.Background(), segment, voice, nil, false)
+	if err != nil {
+		t.Fatalf("second SynthesizeSegmentClips: %v", err)
+	}
+	if client.calls != 2 {
+		t.Errorf("calls = %d, want both clips cached", client.calls)
+	}
+	if len(again) != 2 || again[0] != clips[0] || again[1] != clips[1] {
+		t.Errorf("second read = %#v, want the cached clips %#v", again, clips)
+	}
+}
+
+func TestNoClipIsWrittenUnderTheWholeSegmentKey(t *testing.T) {
 	client := &recordingTTSClient{}
 	cache := NewContentCache(t.TempDir())
 	pipeline := NewTTSPipeline(client, cache)
 	voice := &entity.VoiceConfig{VoiceID: "v1", Pitch: 1, SpeechRate: 1}
 	segment := entity.TurnSegment{Kind: entity.SegmentNarration, Text: "One. Two."}
 
-	if _, err := pipeline.SynthesizeSegment(context.Background(), segment, voice, nil); err != nil {
-		t.Fatalf("SynthesizeSegment: %v", err)
-	}
-	if client.calls != 2 {
-		t.Fatalf("calls = %d, want one per sentence", client.calls)
+	if _, err := pipeline.SynthesizeSegmentClips(context.Background(), segment, voice, nil, false); err != nil {
+		t.Fatalf("SynthesizeSegmentClips: %v", err)
 	}
 
-	// Evict only the concatenated clip. The sentence clips are what reuse depends
-	// on, and they must satisfy the segment again without a provider call.
 	base := ComputeAudioCacheKeyForVoice(narratorSpeaker, voice, segment.Text)
-	segmentPath := filepath.Join(cache.Subdir("audio"), base+".opus")
-	if err := os.Remove(segmentPath); err != nil {
-		t.Fatalf("remove segment clip: %v", err)
-	}
-
-	if _, err := pipeline.SynthesizeSegment(context.Background(), segment, voice, nil); err != nil {
-		t.Fatalf("re-synthesize: %v", err)
-	}
-	if client.calls != 2 {
-		t.Fatalf("calls = %d, want re-concatenation with no new provider calls", client.calls)
+	if _, err := os.Stat(filepath.Join(cache.Subdir("audio"), base+".opus")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a clip is stored under the whole-segment key %q; nothing concatenates any more", base)
 	}
 }
 
-func TestMultiSentenceSegmentReusesSentenceClips(t *testing.T) {
-	client := &recordingTTSClient{}
+func TestSynthesizeSegmentClipsSkipsAFailedUnit(t *testing.T) {
+	client := &testTTSClient{onSynthesize: func(_ context.Context, text string, _ *entity.VoiceConfig) ([]byte, error) {
+		if text == "Two." {
+			return nil, errors.New("provider said no")
+		}
+		return GenerateToneWAV(440, 0.02), nil
+	}}
 	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
-	voice := &entity.VoiceConfig{VoiceID: "v1", Pitch: 1, SpeechRate: 1}
 
-	// The streaming path writes the first sentence as its own clip.
-	if _, err := pipeline.SynthesizeProvisional(context.Background(), entity.SegmentNarration, "", "The hall is quiet.", voice); err != nil {
-		t.Fatalf("SynthesizeProvisional: %v", err)
-	}
-
-	segment := entity.TurnSegment{Kind: entity.SegmentNarration, Text: "The hall is quiet. Garrick nods."}
-	if _, err := pipeline.SynthesizeSegment(context.Background(), segment, voice, nil); err != nil {
-		t.Fatalf("SynthesizeSegment: %v", err)
-	}
-	// One call for the provisional sentence and one for the second; the first is
-	// reused rather than synthesized again.
-	if client.calls != 2 {
-		t.Fatalf("calls = %d, want 2 (the first sentence reused)", client.calls)
-	}
-
-	// A second read is served from the concatenated segment clip.
-	if _, err := pipeline.SynthesizeSegment(context.Background(), segment, voice, nil); err != nil {
-		t.Fatalf("second SynthesizeSegment: %v", err)
-	}
-	if client.calls != 2 {
-		t.Fatalf("calls = %d, want the segment clip to be cached", client.calls)
-	}
-}
-
-func TestSingleSentenceSegmentTakesTheDirectPath(t *testing.T) {
-	client := &recordingTTSClient{}
-	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
-	voice := &entity.VoiceConfig{VoiceID: "v1"}
-
-	path, err := pipeline.SynthesizeSegment(context.Background(), entity.TurnSegment{
-		Kind: entity.SegmentNarration, Text: "One line.",
-	}, voice, nil)
+	clips, err := pipeline.SynthesizeSegmentClips(context.Background(), entity.TurnSegment{
+		Kind: entity.SegmentNarration, Text: "One. Two.",
+	}, nil, nil, false)
 	if err != nil {
-		t.Fatalf("SynthesizeSegment: %v", err)
+		t.Fatalf("a single failed unit must not fail the segment: %v", err)
 	}
-	if client.calls != 1 {
-		t.Fatalf("calls = %d, want 1", client.calls)
-	}
-	if path == "" {
-		t.Fatal("expected a clip path")
+	if len(clips) != 1 {
+		t.Fatalf("clips = %d, want the one unit that succeeded", len(clips))
 	}
 }
 
@@ -164,10 +189,14 @@ func TestMarkdownAwareClientIsNotSplit(t *testing.T) {
 	pipeline := NewTTSPipeline(client, NewContentCache(t.TempDir()))
 	voice := &entity.VoiceConfig{VoiceID: "v1"}
 
-	if _, err := pipeline.SynthesizeSegment(context.Background(), entity.TurnSegment{
+	clips, err := pipeline.SynthesizeSegmentClips(context.Background(), entity.TurnSegment{
 		Kind: entity.SegmentNarration, Text: "A *long* breath. Then another.",
-	}, voice, nil); err != nil {
-		t.Fatalf("SynthesizeSegment: %v", err)
+	}, voice, nil, false)
+	if err != nil {
+		t.Fatalf("SynthesizeSegmentClips: %v", err)
+	}
+	if len(clips) != 1 {
+		t.Fatalf("clips = %d, want the whole segment as one unit", len(clips))
 	}
 	if client.calls != 1 {
 		t.Fatalf("calls = %d, want the whole segment synthesized once", client.calls)

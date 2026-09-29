@@ -57,10 +57,10 @@ export interface TurnSegment {
   text: string;
   // Names the check whose roll this segment narrates, so the dice render inline.
   check_ref?: string;
-  audio_url?: string;
+  // The segment's clips in play order, one per sentence of reduced text. Each URL
+  // is content-addressed, so the key in it is what identifies the audio.
+  audio_urls?: string[];
   portrait_url?: string;
-  // Version token for the clip, which changes when the speaker's voice changes.
-  audio_key?: string;
   // True for the protagonist's own line, which renders as speech but suppresses
   // the duplicate action block for the turn.
   player?: boolean;
@@ -132,9 +132,14 @@ export interface ToolCall {
 }
 
 export interface TurnEvent {
-  type: 'chunk' | 'turn' | 'tool' | 'error' | 'model_missing';
+  type: 'chunk' | 'speech' | 'turn' | 'tool' | 'error' | 'model_missing';
   text?: string;
   turn?: Turn;
+  // Streamed narration, present when type is 'speech': the unit's ordinal within
+  // the turn, and the clip written for it.
+  index?: number;
+  audio_key?: string;
+  audio_url?: string;
   message?: string;
   model_id?: string;
   name?: string;

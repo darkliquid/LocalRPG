@@ -159,15 +159,18 @@ func TestSynthesizeSegmentsUsesPerSpeakerVoicesAndCaches(t *testing.T) {
 		t.Fatalf("SynthesizeSegments failed: %v", err)
 	}
 	if len(first) != 2 {
-		t.Fatalf("expected 2 clips, got %d", len(first))
+		t.Fatalf("expected a clip list per segment, got %d", len(first))
+	}
+	if len(first[1]) != 1 {
+		t.Fatalf("expected one clip for the single-sentence line, got %d", len(first[1]))
 	}
 
 	second, err := pipeline.SynthesizeSegments(context.Background(), segments, nil, voiceFor)
 	if err != nil {
 		t.Fatalf("second SynthesizeSegments failed: %v", err)
 	}
-	if first[1] != second[1] {
-		t.Errorf("expected the cached clip to be reused, got %q then %q", first[1], second[1])
+	if len(second) != 2 || len(second[1]) != 1 || first[1][0] != second[1][0] {
+		t.Errorf("expected the cached clip to be reused, got %#v then %#v", first, second)
 	}
 	if client.calls != 2 {
 		t.Errorf("expected 2 synthesis calls across both runs, got %d", client.calls)
@@ -271,26 +274,26 @@ func TestSynthesizeSegmentPicksTheRightVoice(t *testing.T) {
 	}
 	voiceFor := func(key string) *entity.VoiceConfig { return voices[key] }
 
-	if _, err := pipeline.SynthesizeSegment(context.Background(),
-		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "The hall is quiet."}, narrator, voiceFor); err != nil {
-		t.Fatalf("SynthesizeSegment failed: %v", err)
+	if _, err := pipeline.SynthesizeSegmentClips(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentNarration, Text: "The hall is quiet."}, narrator, voiceFor, false); err != nil {
+		t.Fatalf("SynthesizeSegmentClips failed: %v", err)
 	}
 	if client.lastVoice == nil || client.lastVoice.VoiceID != "narrator-voice" {
 		t.Errorf("narration should use the narrator voice, got %+v", client.lastVoice)
 	}
 
-	if _, err := pipeline.SynthesizeSegment(context.Background(),
-		entity.TurnSegment{Kind: entity.SegmentSpeech, SpeakerID: "garrick", Text: "Keep walking."}, narrator, voiceFor); err != nil {
-		t.Fatalf("SynthesizeSegment failed: %v", err)
+	if _, err := pipeline.SynthesizeSegmentClips(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentSpeech, SpeakerID: "garrick", Text: "Keep walking."}, narrator, voiceFor, false); err != nil {
+		t.Fatalf("SynthesizeSegmentClips failed: %v", err)
 	}
 	if client.lastVoice == nil || client.lastVoice.VoiceID != "bm_george" {
 		t.Errorf("speech should use the speaker's voice, got %+v", client.lastVoice)
 	}
 
 	// A legacy record has a name but no ID; the name still resolves a voice.
-	if _, err := pipeline.SynthesizeSegment(context.Background(),
-		entity.TurnSegment{Kind: entity.SegmentSpeech, Speaker: "Sean", Text: "Hello."}, narrator, voiceFor); err != nil {
-		t.Fatalf("SynthesizeSegment failed: %v", err)
+	if _, err := pipeline.SynthesizeSegmentClips(context.Background(),
+		entity.TurnSegment{Kind: entity.SegmentSpeech, Speaker: "Sean", Text: "Hello."}, narrator, voiceFor, false); err != nil {
+		t.Fatalf("SynthesizeSegmentClips failed: %v", err)
 	}
 	if client.lastVoice == nil || client.lastVoice.VoiceID != "player-voice" {
 		t.Errorf("legacy speech should resolve by name, got %+v", client.lastVoice)

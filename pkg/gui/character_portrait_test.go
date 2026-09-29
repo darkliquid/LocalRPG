@@ -118,7 +118,7 @@ func TestSegmentDTO_IncludesPortraitURLForSpeech(t *testing.T) {
 		},
 	}
 
-	dtos := segmentDTOs(segments, "test-game", 1, false, nil, nil)
+	dtos := segmentDTOs(segments, "test-game", nil, nil)
 	if len(dtos) != 2 {
 		t.Fatalf("expected 2 dtos, got %d", len(dtos))
 	}

@@ -121,16 +121,17 @@ type GameStateDTO struct {
 }
 
 type SegmentDTO struct {
-	Kind      string  `json:"kind"`
-	Speaker   string  `json:"speaker,omitempty"`
-	SpeakerID string  `json:"speaker_id,omitempty"`
-	Text      string  `json:"text"`
-	AudioURL  string  `json:"audio_url,omitempty"`
-	AudioKey  string  `json:"audio_key,omitempty"`
-	PortraitURL string  `json:"portrait_url,omitempty"`
-	CheckRef    string  `json:"check_ref,omitempty"`
-	Player      bool    `json:"player,omitempty"`
-	Duration    float64 `json:"duration"`
+	Kind      string `json:"kind"`
+	Speaker   string `json:"speaker,omitempty"`
+	SpeakerID string `json:"speaker_id,omitempty"`
+	Text      string `json:"text"`
+	// AudioURLs is the segment's clips in play order, one per sentence of reduced
+	// text. Each URL is content-addressed, so the key in it names the audio.
+	AudioURLs   []string `json:"audio_urls,omitempty"`
+	PortraitURL string   `json:"portrait_url,omitempty"`
+	CheckRef    string   `json:"check_ref,omitempty"`
+	Player      bool     `json:"player,omitempty"`
+	Duration    float64  `json:"duration"`
 }
 
 type TurnDTO struct {
@@ -489,13 +490,18 @@ type TurnRequest struct {
 
 // TurnEvent is one NDJSON line sent while a turn runs.
 type TurnEvent struct {
-	Type    string   `json:"type"`                 // "chunk", "turn", "tool", "error", or "model_missing"
-	Text    string   `json:"text,omitempty"`       // narration delta
+	Type    string   `json:"type"`                 // "chunk", "speech", "turn", "tool", "error", or "model_missing"
+	Text    string   `json:"text,omitempty"`       // narration delta, or a streamed sentence's text
 	Turn    *TurnDTO `json:"turn,omitempty"`       // the persisted turn
 	Message string   `json:"message,omitempty"`    // failure detail
 	ModelID string   `json:"model_id,omitempty"`   // missing model ID
 	Name    string   `json:"name,omitempty"`       // friendly model name
 	Size    int64    `json:"size_bytes,omitempty"` // model size in bytes
+	// Streamed narration, present when Type is "speech": which unit it is, and the
+	// clip that was written for it.
+	Index    int    `json:"index,omitempty"`
+	AudioKey string `json:"audio_key,omitempty"`
+	AudioURL string `json:"audio_url,omitempty"`
 	// Tool activity, present when Type is "tool".
 	ToolName    string `json:"tool_name,omitempty"`
 	ToolStatus  string `json:"tool_status,omitempty"`

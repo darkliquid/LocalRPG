@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
@@ -65,6 +66,12 @@ func ComputeAudioCacheKeyForVoice(speakerID string, voice *entity.VoiceConfig, t
 	// v2 were shared between utterances and are deliberately abandoned.
 	hash := sha256.Sum256([]byte("v3:" + speakerID + ":" + string(encoded)))
 	return hex.EncodeToString(hash[:])
+}
+
+// ClipKeyForPath names the key a stored clip was written under: the file name is
+// the key, so nothing else has to be consulted to name the audio it holds.
+func ClipKeyForPath(path string) string {
+	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 }
 
 func ComputeArtCacheKey(entityID, appearanceHash, worldStyleHash string) string {

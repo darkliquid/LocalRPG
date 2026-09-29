@@ -19,6 +19,7 @@ import { ModelDownloadModal } from './components/ModelDownloadModal';
 import { LimitChip } from './components/LimitChip';
 import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, AlertTriangle, HelpCircle, Download } from 'lucide-react';
 import { formatGenerationError } from './lib/generationError';
+import { useStreamedSpeech } from './hooks/useStreamedSpeech';
 import { slugify } from './lib/slug';
 import { CinematicOverlay } from './components/CinematicOverlay';
 
@@ -60,6 +61,13 @@ export const App: React.FC = () => {
   const [turnAudioStatus, setTurnAudioStatus] = useState<Record<number, { state: TurnAudioState; message?: string }>>({});
   // Per-segment audio status, keyed `${turn}:${index}`.
   const [segmentAudioStatus, setSegmentAudioStatus] = useState<Record<string, { state: TurnAudioState; message?: string }>>({});
+  // Narration plays while the turn streams when the browser owns the sound. The
+  // clips already heard are handed to the chronicle so nothing repeats.
+  const streamedSpeech = useStreamedSpeech(
+    !serverAudio && (config?.media.tts.auto_play ?? false),
+    config?.media.tts.master_volume ?? 1
+  );
+  const [streamedKeys, setStreamedKeys] = useState<ReadonlySet<string>>(new Set());
 
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
@@ -271,6 +279,8 @@ export const App: React.FC = () => {
     setStreamedProse('');
     setToolActivity(null);
     setTurnError(null);
+    streamedSpeech.reset();
+    setStreamedKeys(new Set());
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -283,6 +293,10 @@ export const App: React.FC = () => {
           if (event.type === 'chunk') {
             setToolActivity(null);
             setStreamedProse((prev) => prev + (event.text ?? ''));
+          } else if (event.type === 'speech') {
+            // A sentence the server synthesized mid-stream, played here while the
+            // rest of the prose is still arriving.
+            streamedSpeech.enqueue(event.audio_url ?? '', event.audio_key ?? '');
           } else if (event.type === 'tool') {
             setToolActivity(
               event.tool_status === 'running'
@@ -290,6 +304,9 @@ export const App: React.FC = () => {
                 : `${event.tool_name}: ${event.tool_summary ?? 'done'}`,
             );
           } else if (event.type === 'turn' && event.turn) {
+            // The authoritative turn arrives with the same clips; the ones already
+            // heard are remembered so the chronicle plays only the rest.
+            setStreamedKeys(streamedSpeech.playedKeys());
             const turn = event.turn;
             setChronicle((prev) => [...prev, turn]);
             setStreamedProse('');
@@ -337,11 +354,13 @@ export const App: React.FC = () => {
       setTurnInFlight(false);
       setPendingAction(null);
       setToolActivity(null);
+      streamedSpeech.stop();
     }
   };
 
   const handleStopTurn = () => {
     abortRef.current?.abort();
+    streamedSpeech.stop();
     setStreamedProse('');
     setPendingAction(null);
   };
@@ -761,6 +780,8 @@ export const App: React.FC = () => {
                     displayMode={config?.media.tts.speech_cues?.display_mode}
                     turnAudioStatus={turnAudioStatus}
                     segmentAudioStatus={segmentAudioStatus}
+                    gameId={activeGameID ?? undefined}
+                    skipAudioKeys={streamedKeys}
                   />
                 </>
               )}
@@ -946,6 +967,7 @@ export const App: React.FC = () => {
               onEntityClick={handleOpenWikilink}
               displayMode={config?.media.tts.speech_cues?.display_mode}
               limits={limits}
+              skipAudioKeys={streamedKeys}
             />
           </Suspense>
 

@@ -327,6 +327,21 @@ export class APIClient {
     if (!res.ok) return throwGenerationError(res);
   }
 
+  // regenerateSegmentAudio re-synthesizes one beat and answers with its refreshed
+  // clip URLs. The keys are unchanged when nothing about the line changed.
+  static async regenerateSegmentAudio(
+    gameID: string,
+    turnNumber: number,
+    segmentIndex: number
+  ): Promise<string[]> {
+    const url = `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/segment/${segmentIndex}/audio`;
+    const res = await fetch(url, { method: 'POST' });
+    if (res.status === 204) return [];
+    if (!res.ok) return throwGenerationError(res);
+    const body = (await res.json()) as { audio_urls?: string[] };
+    return body.audio_urls ?? [];
+  }
+
   static async playSegmentAudio(gameID: string, turnNumber: number, segmentIndex: number, force = false): Promise<void> {
     const url = `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/segment/${segmentIndex}/play${force ? '?force=1' : ''}`;
     const res = await fetch(url, { method: 'POST' });

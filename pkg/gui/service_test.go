@@ -14,6 +14,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
@@ -249,24 +250,40 @@ func TestVoiceForResolvesDisplayName(t *testing.T) {
 	}
 }
 
-func TestSegmentAudioURLChangesWithVoice(t *testing.T) {
+func TestSegmentClipURLsChangeWithVoice(t *testing.T) {
 	segments := []entity.TurnSegment{{
 		Kind: entity.SegmentSpeech, Speaker: "Captain Kaelen", SpeakerID: "captain-kaelen", Text: "Halt!",
 	}}
 
-	first := segmentDTOs(segments, "game", 1, true, func(string) string { return "" },
-		func(string) *entity.VoiceConfig { return &entity.VoiceConfig{VoiceID: "af_bella"} })
-	second := segmentDTOs(segments, "game", 1, true, func(string) string { return "" },
-		func(string) *entity.VoiceConfig { return &entity.VoiceConfig{VoiceID: "am_adam"} })
+	first := segmentDTOs(segments, "game", clipKeysFromVoice(t, func(string) *entity.VoiceConfig {
+		return &entity.VoiceConfig{VoiceID: "af_bella"}
+	}), func(string) string { return "" })
+	second := segmentDTOs(segments, "game", clipKeysFromVoice(t, func(string) *entity.VoiceConfig {
+		return &entity.VoiceConfig{VoiceID: "am_adam"}
+	}), func(string) string { return "" })
 
-	if first[0].AudioURL == second[0].AudioURL {
-		t.Fatalf("audio url did not change with the voice: %q", first[0].AudioURL)
+	if len(first[0].AudioURLs) != 1 || len(second[0].AudioURLs) != 1 {
+		t.Fatalf("audio_urls = %#v / %#v, want one clip each", first[0].AudioURLs, second[0].AudioURLs)
 	}
-	if !strings.Contains(first[0].AudioURL, "?v=") {
-		t.Errorf("expected a version query, got %q", first[0].AudioURL)
+	if first[0].AudioURLs[0] == second[0].AudioURLs[0] {
+		t.Fatalf("audio url did not change with the voice: %q", first[0].AudioURLs[0])
 	}
-	if first[0].AudioKey == second[0].AudioKey {
-		t.Errorf("audio key did not change with the voice")
+	if !strings.HasPrefix(first[0].AudioURLs[0], "/api/audio/clip/") {
+		t.Errorf("expected a content-addressed clip URL, got %q", first[0].AudioURLs[0])
+	}
+}
+
+// clipKeysFromVoice names clips through a real pipeline, so a DTO test exercises
+// the same key computation the app uses.
+func clipKeysFromVoice(t *testing.T, voiceFor func(string) *entity.VoiceConfig) func(entity.TurnSegment) []string {
+	t.Helper()
+	pipeline := media.NewTTSPipeline(&bareClient{}, media.NewContentCache(t.TempDir()))
+	return func(segment entity.TurnSegment) []string {
+		keys, err := pipeline.SegmentClipKeys(segment, nil, voiceFor)
+		if err != nil {
+			return nil
+		}
+		return keys
 	}
 }
 
@@ -394,35 +411,38 @@ func writeSegmentTurn(t *testing.T, svc *Service, gameID string) {
 	}
 }
 
-func TestGetSegmentAudioSynthesizesAndCaches(t *testing.T) {
+func TestGetSegmentClipsSynthesizesAndCaches(t *testing.T) {
 	gameID, svc := setupTestGame(t)
 	writeSegmentTurn(t, svc, gameID)
 
-	path, err := svc.GetSegmentAudio(context.Background(), gameID, 1, 1)
+	first, err := svc.GetSegmentClips(context.Background(), gameID, 1, 1)
 	if err != nil {
-		t.Fatalf("GetSegmentAudio failed: %v", err)
+		t.Fatalf("GetSegmentClips failed: %v", err)
 	}
-	if _, err := os.Stat(path); err != nil {
+	if len(first) != 1 {
+		t.Fatalf("clips = %d, want one for the single-sentence line", len(first))
+	}
+	if _, err := os.Stat(first[0]); err != nil {
 		t.Fatalf("expected a clip on disk: %v", err)
 	}
 
-	again, err := svc.GetSegmentAudio(context.Background(), gameID, 1, 1)
+	again, err := svc.GetSegmentClips(context.Background(), gameID, 1, 1)
 	if err != nil {
-		t.Fatalf("second GetSegmentAudio failed: %v", err)
+		t.Fatalf("second GetSegmentClips failed: %v", err)
 	}
-	if again != path {
-		t.Errorf("expected the cached clip %q, got %q", path, again)
+	if len(again) != 1 || again[0] != first[0] {
+		t.Errorf("expected the cached clip %q, got %#v", first[0], again)
 	}
 
-	if _, err := svc.GetSegmentAudio(context.Background(), gameID, 1, 9); err == nil {
+	if _, err := svc.GetSegmentClips(context.Background(), gameID, 1, 9); err == nil {
 		t.Errorf("expected an error for an out-of-range segment")
 	}
-	if _, err := svc.GetSegmentAudio(context.Background(), gameID, 42, 0); err == nil {
+	if _, err := svc.GetSegmentClips(context.Background(), gameID, 42, 0); err == nil {
 		t.Errorf("expected an error for an unknown turn")
 	}
 }
 
-func TestGetSegmentAudioWithoutTTSIsUnavailable(t *testing.T) {
+func TestGetSegmentClipsWithoutTTSIsUnavailable(t *testing.T) {
 	// A service whose config never enabled TTS.
 	quiet := NewService(t.TempDir())
 	gameID, svc := setupTestGame(t)
@@ -435,7 +455,7 @@ func TestGetSegmentAudioWithoutTTSIsUnavailable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := quiet.GetSegmentAudio(context.Background(), gameID, 1, 1); !errors.Is(err, ErrAudioUnavailable) {
+	if _, err := quiet.GetSegmentClips(context.Background(), gameID, 1, 1); !errors.Is(err, ErrAudioUnavailable) {
 		t.Errorf("expected ErrAudioUnavailable, got %v", err)
 	}
 }
@@ -451,8 +471,8 @@ func TestChronicleOffersAudioURLsWhenTTSIsConfigured(t *testing.T) {
 	if len(turns) != 1 || len(turns[0].Segments) != 2 {
 		t.Fatalf("unexpected chronicle: %+v", turns)
 	}
-	if turns[0].Segments[0].AudioURL == "" || turns[0].Segments[1].AudioURL == "" {
-		t.Errorf("expected audio URLs on both segments, got %+v", turns[0].Segments)
+	if len(turns[0].Segments[0].AudioURLs) == 0 || len(turns[0].Segments[1].AudioURLs) == 0 {
+		t.Errorf("expected clip URLs on both segments, got %+v", turns[0].Segments)
 	}
 }
 
@@ -1111,22 +1131,57 @@ func TestResolvedThreadsAreNotOpen(t *testing.T) {
 	}
 }
 
-func TestSegmentDTOKeysFollowVoiceOptions(t *testing.T) {
-	voices := map[string]*entity.VoiceConfig{
-		"aldric": {VoiceID: "af_bella", Options: map[string]interface{}{"stability": 0.35}},
+func TestSegmentClipURLsFollowVoiceOptions(t *testing.T) {
+	stability := 0.35
+	voiceFor := func(string) *entity.VoiceConfig {
+		return &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]interface{}{"stability": stability}}
 	}
-	voiceFor := func(ref string) *entity.VoiceConfig { return voices[ref] }
 
 	segments := []entity.TurnSegment{{Kind: entity.SegmentSpeech, SpeakerID: "aldric", Text: "Hello there."}}
-	before := segmentDTOs(segments, "campaign", 1, true, func(name string) string { return name }, voiceFor)
+	before := segmentDTOs(segments, "campaign", clipKeysFromVoice(t, voiceFor), func(name string) string { return name })
 
-	voices["aldric"] = &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]interface{}{"stability": 0.8}}
-	after := segmentDTOs(segments, "campaign", 1, true, func(name string) string { return name }, voiceFor)
+	stability = 0.8
+	after := segmentDTOs(segments, "campaign", clipKeysFromVoice(t, voiceFor), func(name string) string { return name })
 
-	if before[0].AudioKey == after[0].AudioKey {
-		t.Errorf("expected a changed option to change the value token")
+	if len(before[0].AudioURLs) != 1 || len(after[0].AudioURLs) != 1 {
+		t.Fatalf("audio_urls = %#v / %#v, want one clip each", before[0].AudioURLs, after[0].AudioURLs)
 	}
-	if before[0].AudioURL == after[0].AudioURL {
-		t.Errorf("expected a changed option to change the audio URL")
+	if before[0].AudioURLs[0] == after[0].AudioURLs[0] {
+		t.Errorf("expected a changed option to change the clip URL")
+	}
+}
+
+// mustStore opens a campaign's store for a test that needs the same wiring the
+// service uses.
+func mustStore(t *testing.T, svc *Service, gameID string) *storage.Store {
+	t.Helper()
+	store, err := svc.store(gameID)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	return store
+}
+
+func TestTurnDTOOffersOrderedClipURLs(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+
+	turn, err := svc.findTurn(gameID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dto := svc.turnDTO(*turn, mustStore(t, svc, gameID), svc.configMgr.Get(), gameID)
+	if len(dto.Segments) != 2 {
+		t.Fatalf("segments = %d", len(dto.Segments))
+	}
+	if len(dto.Segments[1].AudioURLs) != 1 {
+		t.Fatalf("audio_urls = %#v, want one URL for the line", dto.Segments[1].AudioURLs)
+	}
+	url := dto.Segments[1].AudioURLs[0]
+	if !strings.HasPrefix(url, "/api/audio/clip/") {
+		t.Errorf("url = %q, want a content-addressed clip URL", url)
+	}
+	if key := strings.TrimPrefix(url, "/api/audio/clip/"); media.ClipKeyForPath(key) != key {
+		t.Errorf("url key %q is not a clip name", key)
 	}
 }

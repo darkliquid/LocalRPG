@@ -24,8 +24,8 @@ func TestCountUncached(t *testing.T) {
 	}
 
 	// Synthesising one segment brings the count down by exactly one.
-	if _, err := pipeline.SynthesizeSegment(context.Background(), segments[0], narrator, nil); err != nil {
-		t.Fatalf("SynthesizeSegment: %v", err)
+	if _, err := pipeline.SynthesizeSegmentClips(context.Background(), segments[0], narrator, nil, false); err != nil {
+		t.Fatalf("SynthesizeSegmentClips: %v", err)
 	}
 	cached, uncached = pipeline.CountUncached(segments, narrator, nil)
 	if cached != 1 || uncached != 1 {

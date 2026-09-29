@@ -457,7 +457,7 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if len(parts) < 6 || parts[3] != "segment" || parts[5] != "audio" || r.Method != http.MethodGet {
+		if len(parts) < 6 || parts[3] != "segment" || parts[5] != "audio" || r.Method != http.MethodPost {
 			http.NotFound(w, r)
 			return
 		}
@@ -473,29 +473,19 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		force := r.URL.Query().Get("force") == "1" || r.URL.Query().Get("force") == "true"
-		path, err := s.service.GetSegmentAudio(r.Context(), gameID, turnNumber, segmentIndex, force)
+		// POST /api/game/{id}/turn/{n}/segment/{i}/audio re-synthesizes one beat
+		// and answers with its refreshed clip URLs. Playback itself reads clips by
+		// content key, so this is only what a regenerate control needs.
+		clips, err := s.service.GetSegmentClips(r.Context(), gameID, turnNumber, segmentIndex, true)
 		switch {
 		case errors.Is(err, ErrAudioUnavailable):
 			w.WriteHeader(http.StatusNoContent)
-		case errors.Is(err, os.ErrNotExist):
-			http.Error(w, err.Error(), http.StatusNotFound)
 		case err != nil:
-			http.Error(w, err.Error(), http.StatusNotFound)
+			writeGameError(w, err)
 		default:
-			// The clip's type comes from its bytes: a provider returns whatever its
-			// engine produces, which is not necessarily what the configuration says.
-			data, err := os.ReadFile(path)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			// The clip URL embeds the audio cache key, so a voice or text change
-			// yields a new URL and the old one can be cached hard. The ETag is
-			// derived from the bytes, so it changes if the clip is regenerated.
-			setClipHeaders(w, data)
-			_, _ = w.Write(data)
+			writeJSON(w, map[string]interface{}{"audio_urls": clipURLs(clips)})
 		}
+		return
 
 	case "location":
 		if len(parts) < 3 {
@@ -1123,8 +1113,35 @@ func (s *Server) handleAudioRoutes(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 
 	default:
+		if r.Method == http.MethodGet && strings.HasPrefix(action, "clip/") {
+			s.serveClip(w, r, strings.TrimPrefix(action, "clip/"))
+			return
+		}
 		http.NotFound(w, r)
 	}
+}
+
+// serveClip serves one stored clip by its content key. The key names the file and
+// nothing else does, so a malformed or unknown key is a 404 rather than a lookup.
+func (s *Server) serveClip(w http.ResponseWriter, r *http.Request, key string) {
+	path, ok := s.service.ClipPath(key)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// The clip's type comes from its bytes: a provider returns whatever its engine
+	// produces, which is not necessarily what the configuration says. The key is
+	// content-addressed, so the URL can be cached hard and the ETag follows the
+	// bytes in case a clip is ever rewritten.
+	setClipHeaders(w, data)
+	_, _ = w.Write(data)
 }
 
 // handleTraceRoute serves the recorded trace. It is a developer view, so it can be

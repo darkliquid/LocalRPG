@@ -364,9 +364,9 @@ func resolveWikilinks(text string, resolve func(string) string) string {
 	})
 }
 
-func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, audioAvailable bool, resolve func(string) string, voiceFor func(string) *entity.VoiceConfig) []SegmentDTO {
+func segmentDTOs(segments []entity.TurnSegment, gameID string, clipKeys func(entity.TurnSegment) []string, resolve func(string) string) []SegmentDTO {
 	dtos := make([]SegmentDTO, 0, len(segments))
-	for i, segment := range segments {
+	for _, segment := range segments {
 		text := resolveWikilinks(segment.Text, resolve)
 		dto := SegmentDTO{
 			Kind:      segment.Kind,
@@ -391,26 +391,36 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, turnNumber int, a
 				dto.PortraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait", gameID, refID)
 			}
 		}
-		if audioAvailable {
-			// The ref is what the synthesis pipeline uses to find a voice, so the
-			// same value is used here to derive a voice-sensitive version token. A
-			// changed voice or provider option changes the URL, which keeps the
-			// browser from serving a clip read under the previous tuning.
-			ref := segment.SpeakerID
-			if ref == "" {
-				ref = segment.Speaker
-			}
-			var voice *entity.VoiceConfig
-			if voiceFor != nil {
-				voice = voiceFor(ref)
-			}
-			key := media.ComputeAudioCacheKeyForVoice(ref, voice, segment.Text)
-			dto.AudioKey = key
-			dto.AudioURL = fmt.Sprintf("/api/game/%s/turn/%d/segment/%d/audio?v=%s", gameID, turnNumber, i, key[:12])
+		if clipKeys != nil {
+			// The keys come from the pipeline, so the URL a client is handed is the
+			// URL of the audio synthesis writes: one sound, one name.
+			dto.AudioURLs = clipURLs(clipKeys(segment))
 		}
 		dtos = append(dtos, dto)
 	}
 	return dtos
+}
+
+// clipKeyResolver names a segment's clips from the shared pipeline, or nil when no
+// TTS provider is configured. Building the pipeline is cheap: a provider loads its
+// model at first synthesis, not at construction.
+func (s *Service) clipKeyResolver(cfg *config.Config, gameID string) func(entity.TurnSegment) []string {
+	if cfg.Media.TTS.Type == "" || cfg.Media.TTS.Type == "disabled" {
+		return nil
+	}
+	pipeline, err := s.audioPipeline()
+	if err != nil {
+		return nil
+	}
+	narrator := s.narratorVoiceFor(gameID, cfg)
+	voiceFor := s.voiceFor(gameID)
+	return func(segment entity.TurnSegment) []string {
+		keys, err := pipeline.SegmentClipKeys(segment, narrator, voiceFor)
+		if err != nil {
+			return nil
+		}
+		return keys
+	}
 }
 
 // turnToolCallDTOs renders a turn's provenance for a client.
@@ -1011,7 +1021,7 @@ func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, e
 // share it so a live turn and a replayed one are the same shape, which is what
 // lets the client render both with one code path.
 func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID string) TurnDTO {
-	audioAvailable := cfg.Media.TTS.Type != "" && cfg.Media.TTS.Type != "disabled"
+	clipKeys := s.clipKeyResolver(cfg, gameID)
 	artAvailable := cfg.Media.Image.BuiltinFallback || cfg.Media.Image.Type != "disabled"
 
 	dto := TurnDTO{
@@ -1032,10 +1042,8 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		PendingCheck:    turn.PendingCheck,
 		HealthEffects:   healthEffectDTOs(turn.HealthEffects),
 		WorldTick:       turn.WorldTick,
-		Segments: segmentDTOs(turn.Segments, gameID, turn.Number, audioAvailable, func(name string) string {
+		Segments: segmentDTOs(turn.Segments, gameID, clipKeys, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
-		}, func(ref string) *entity.VoiceConfig {
-			return harness.ResolveSpeakerVoice(store, ref)
 		}),
 	}
 
@@ -1414,23 +1422,58 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	runCtx, cancel := context.WithTimeout(ctx, t.cfg.TurnTimeout())
 	defer cancel()
 
+	// Every emission passes this lock: tool activity arrives from the orchestrator
+	// while a streamer worker announces a finished sentence, and the wire is one
+	// newline-delimited stream.
+	var emitMu sync.Mutex
+	announce := func(event TurnEvent) error {
+		emitMu.Lock()
+		defer emitMu.Unlock()
+		return emit(event)
+	}
+
 	// Tool activity is streamed as it happens, so a lookup reads as progress
 	// rather than as a stall. A failed emit is ignored: the turn still records,
 	// and a disconnected client is handled by the chunk listener below.
 	t.orchestrator.SetToolObserver(func(activity engine.ToolActivity) {
-		_ = emit(toolEvent(activity))
+		_ = announce(toolEvent(activity))
 	})
 
 	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)
 
+	// Application playback runs on one queue opened before generation: a sentence
+	// the streamer synthesizes is heard as soon as it lands, and the finalise pass
+	// adds only what the stream has not already played. A session with no player
+	// still warms the clips, because the URLs a client is handed are
+	// content-addressed and cannot synthesize on demand.
+	audioEnabled := t.cfg.Media.TTS.Type != "" && t.cfg.Media.TTS.Type != "disabled"
+	plan := &turnAudioPlan{played: newClipSet()}
+	if audioEnabled && t.cfg.Media.TTS.AutoPlay {
+		if player := t.service.audioPlayer(); player != nil && player.Available() {
+			plan.queue = make(chan string, sentenceQueueDepth)
+			player.SetVolume(t.cfg.Media.TTS.MasterVolume)
+			// Playback is the application's own responsibility, detached from the
+			// request: the queue is fed while the turn streams and drains after it,
+			// so it must outlive the request context. StopAudio ends it early.
+			t.service.goBackground(func() {
+				if err := player.PlayQueue(context.Background(), plan.queue); err != nil && !errors.Is(err, playback.ErrUnavailable) {
+					fmt.Fprintf(os.Stderr, "Warning: narration playback stopped: %v\n", err)
+				}
+			})
+		}
+	}
+
 	// Sentences are synthesized while the model is still writing, so a finished
 	// segment whose text is one of them is a cache hit at finalise rather than a
 	// second provider call. Nil when disabled or no provider is configured.
-	streamer := t.service.sentenceStreamerFor(runCtx, t.gameID, t.cfg)
+	streamer := t.service.sentenceStreamerFor(runCtx, t.gameID, t.cfg, func(speech provisionalSpeech) {
+		plan.enqueueClip(speech.AudioKey, t.service.clipPath(speech.AudioKey))
+		_ = announce(speechEvent(speech))
+	})
 	defer streamer.Close()
 
 	turn, err := t.orchestrator.ProcessActionStream(runCtx, req.Mode, req.Input, func(text string) error {
-		if emitErr := emit(TurnEvent{Type: "chunk", Text: text}); emitErr != nil {
+		if emitErr := announce(TurnEvent{Type: "chunk", Text: text}); emitErr != nil {
 			return emitErr
 		}
 		streamer.Feed(text)
@@ -1438,12 +1481,22 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	})
 	if err != nil {
 		t.service.noteFailure("gm", err)
+		// Nothing more will be announced, so the queue can close without a worker
+		// sending into it on its way out.
+		streamer.StopEmitting()
+		plan.close()
 		return err
 	}
 	t.service.noteSuccess("gm")
 
+	// The turn is authoritative from here, so a sentence still in flight is no
+	// longer announced: it is synthesized all the same, and the finalise pass plays
+	// it with the rest of the turn. That keeps the played set the client holds in
+	// step with the audio it actually heard.
+	streamer.StopEmitting()
+
 	dto := t.service.turnDTO(*turn, t.store, t.cfg, t.gameID)
-	if err := emit(TurnEvent{Type: "turn", Turn: &dto}); err != nil {
+	if err := announce(TurnEvent{Type: "turn", Turn: &dto}); err != nil {
 		return err
 	}
 
@@ -1452,7 +1505,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	if t.cfg.Media.TTS.Type == "builtin" && (t.cfg.Media.TTS.BuiltinName == "sherpa-onnx" || t.cfg.Media.TTS.BuiltinName == "kokoro") {
 		status := t.service.modelsManager.Status("kokoro-tts")
 		if !status.Installed {
-			_ = emit(TurnEvent{
+			_ = announce(TurnEvent{
 				Type:    "model_missing",
 				ModelID: "kokoro-tts",
 				Name:    status.Name,
@@ -1461,19 +1514,16 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		}
 	}
 
-	// Narration is the application's own responsibility, detached from the
-	// request: the turn is already recorded - and its entities, with their voices,
-	// persisted - so a slow synthesis must not hold the stream open.
-	if t.cfg.Media.TTS.AutoPlay {
+	// The rest of the turn's clips are synthesized behind the turn and appended to
+	// the same queue, so playback continues without a second start and a clip that
+	// failed mid-stream is retried here. The played set makes the handover exact.
+	if audioEnabled {
 		t.service.goBackground(func() {
-			_ = t.service.PlayTurnAudio(context.Background(), t.gameID, turn.Number)
+			t.finishTurnAudio(context.Background(), *turn, plan)
+			plan.close()
 		})
-	} else if t.cfg.Media.TTS.Type != "" && t.cfg.Media.TTS.Type != "disabled" {
-		t.service.goBackground(func() {
-			for i := range turn.Segments {
-				_, _ = t.service.GetSegmentAudio(context.Background(), t.gameID, turn.Number, i)
-			}
-		})
+	} else {
+		plan.close()
 	}
 
 	// Memory is repaired behind the turn, on the same principle as playback: the
@@ -1481,6 +1531,21 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	t.service.summariseBehind(t.gameID, t.chronicler)
 	t.service.goBackground(func() { t.service.scanAndEnrichCharacters(t.gameID, t.store) })
 	return nil
+}
+
+// finishTurnAudio synthesizes every clip the turn still needs once it is recorded,
+// appending to the plan only what the streamed sentences did not already play, so
+// no line is heard twice and none is missed.
+func (t *TurnSession) finishTurnAudio(ctx context.Context, turn engine.Turn, plan *turnAudioPlan) {
+	for i := range turn.Segments {
+		clips, err := t.service.GetSegmentClips(ctx, t.gameID, turn.Number, i)
+		if err != nil {
+			continue
+		}
+		for _, clip := range clips {
+			plan.enqueueClip(media.ClipKeyForPath(clip), clip)
+		}
+	}
 }
 
 // GetLocationArt returns a location's scene image and its content type, drawing it
@@ -1817,12 +1882,35 @@ func tailLines(path string, want int) ([]string, error) {
 	return lines, nil
 }
 
-// GetSegmentAudio synthesizes one segment on demand and returns the cached clip,
-// reusing it for every later request.
-func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber, segmentIndex int, force ...bool) (string, error) {
+// ClipPath resolves a clip key to its stored file. The key is the clip's whole
+// name and nothing else is consulted, so a key that is not one resolves to
+// nothing rather than to a path.
+func (s *Service) ClipPath(key string) (string, bool) {
+	if !clipKeyPattern.MatchString(key) {
+		return "", false
+	}
+	path := filepath.Join(s.resolver.CacheDir(), "audio", key+".opus")
+	if info, err := os.Stat(path); err != nil || info.IsDir() {
+		return "", false
+	}
+	return path, true
+}
+
+// clipPath names the file a clip key is stored under. The player plays files, and
+// the key is the file name, so no lookup is needed.
+func (s *Service) clipPath(key string) string {
+	if key == "" {
+		return ""
+	}
+	return filepath.Join(s.resolver.CacheDir(), "audio", key+".opus")
+}
+
+// GetSegmentClips synthesizes one segment on demand and returns its ordered clips,
+// reusing every clip the cache already holds.
+func (s *Service) GetSegmentClips(ctx context.Context, gameID string, turnNumber, segmentIndex int, force ...bool) ([]string, error) {
 	turns, err := s.cachedHistory(gameID)
 	if err != nil {
-		return "", fmt.Errorf("load history: %w", err)
+		return nil, fmt.Errorf("load history: %w", err)
 	}
 
 	var turn *engine.Turn
@@ -1833,10 +1921,10 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 		}
 	}
 	if turn == nil {
-		return "", fmt.Errorf("turn %d not found", turnNumber)
+		return nil, fmt.Errorf("turn %d not found", turnNumber)
 	}
 	if segmentIndex < 0 || segmentIndex >= len(turn.Segments) {
-		return "", fmt.Errorf("segment %d out of range for turn %d", segmentIndex, turnNumber)
+		return nil, fmt.Errorf("segment %d out of range for turn %d", segmentIndex, turnNumber)
 	}
 
 	cfg := s.configMgr.Get()
@@ -1844,13 +1932,13 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 
 	pipeline, err := s.audioPipeline()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	isForce := len(force) > 0 && force[0]
-	path, err := pipeline.SynthesizeSegmentForce(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
+	clips, err := pipeline.SynthesizeSegmentClips(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
 	if err != nil {
 		s.noteFailure("tts", err)
-		return "", err
+		return nil, err
 	}
 	s.noteSuccess("tts")
 	// A cache hit reports nothing, so only a real synthesis is recorded.
@@ -1859,7 +1947,7 @@ func (s *Service) GetSegmentAudio(ctx context.Context, gameID string, turnNumber
 			s.RecordUsage(gameID, turnNumber, "tts", mediaUsage(u, key, cfg.Media.TTS.Model))
 		}
 	}
-	return path, nil
+	return clips, nil
 }
 
 // audioPipeline returns the shared TTS pipeline, building it when the current
@@ -2012,14 +2100,16 @@ func (s *Service) PlayTurnAudio(ctx context.Context, gameID string, turnNumber i
 	go func() {
 		defer close(clips)
 		for i := range turn.Segments {
-			path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, i, isForce)
-			if err != nil || path == "" {
+			list, err := s.GetSegmentClips(ctx, gameID, turnNumber, i, isForce)
+			if err != nil {
 				continue
 			}
-			select {
-			case clips <- path:
-			case <-ctx.Done():
-				return
+			for _, path := range list {
+				select {
+				case clips <- path:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}()
@@ -2035,13 +2125,13 @@ func (s *Service) PlaySegmentAudio(ctx context.Context, gameID string, turnNumbe
 		return playback.ErrUnavailable
 	}
 
-	path, err := s.GetSegmentAudio(ctx, gameID, turnNumber, segmentIndex, force...)
+	clips, err := s.GetSegmentClips(ctx, gameID, turnNumber, segmentIndex, force...)
 	if err != nil {
 		return err
 	}
 
 	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
-	return player.PlayFiles([]string{path})
+	return player.PlayFiles(clips)
 }
 
 // voiceFor resolves a speaker entity's configured voice, if it has one.

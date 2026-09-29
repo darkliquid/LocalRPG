@@ -3,23 +3,37 @@ package gui
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-func TestSegmentAudioRouteWithForce(t *testing.T) {
+func TestRegenerateSegmentAudioReturnsClipURLs(t *testing.T) {
 	gameID, svc := setupTestGame(t)
 	writeSegmentTurn(t, svc, gameID)
 	server := NewServer(svc, http.NotFoundHandler())
 
-	req := httptest.NewRequest("GET", "/api/game/"+gameID+"/turn/1/segment/1/audio?force=1", nil)
+	req := httptest.NewRequest("POST", "/api/game/"+gameID+"/turn/1/segment/1/audio", nil)
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+		t.Fatalf("status = %d, body %s", rec.Code, rec.Body.String())
 	}
-	if rec.Body.Len() == 0 {
-		t.Errorf("expected audio bytes")
+	if !strings.Contains(rec.Body.String(), "/api/audio/clip/") {
+		t.Errorf("body = %s, want content-addressed clip URLs", rec.Body.String())
+	}
+}
+
+func TestSegmentAudioRouteIsNotAGet(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	// Playback reads content-addressed clips now; a GET of the old route is gone.
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, httptest.NewRequest("GET", "/api/game/"+gameID+"/turn/1/segment/1/audio", nil))
+	if rec.Code != http.StatusNotFound && rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET segment audio = %d, want it no longer served", rec.Code)
 	}
 }
 

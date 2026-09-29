@@ -21,6 +21,7 @@ const (
 )
 
 // Beat is one unit of playback: a span of text, its imagery, and its audio.
+// AudioPaths is ordered, one clip per sentence of reduced text.
 type Beat struct {
 	Kind          BeatKind
 	TurnNumber    int
@@ -28,7 +29,7 @@ type Beat struct {
 	SpeakerID     string
 	Text          string
 	ArtPath       string
-	AudioPath     string
+	AudioPaths    []string
 	AudioDuration time.Duration
 	Duration      time.Duration
 }

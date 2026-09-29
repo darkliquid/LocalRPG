@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Turn, LimitState } from '../types';
 import { TurnAudioState, segmentAudioKey } from './TurnSegments';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
+import { anySegmentHasAudio } from '../lib/audio';
 import { TheaterStage } from './theater/TheaterStage';
 import { TheaterDialogue } from './theater/TheaterDialogue';
 import { TheaterTransport } from './theater/TheaterTransport';
@@ -26,6 +27,8 @@ interface StoryTheaterProps {
   onEntityClick?: (entityId: string) => void;
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
   limits?: LimitState[];
+  // Clips already heard while the turn streamed, which playback must skip.
+  skipAudioKeys?: ReadonlySet<string>;
 }
 
 // BEAT_GAP_MS is the buffer between one voice clip finishing and the next line
@@ -49,6 +52,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   onEntityClick,
   displayMode,
   limits,
+  skipAudioKeys,
 }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [activeSegment, setActiveSegment] = useState(0);
@@ -109,10 +113,16 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   // The scene's own art wins; otherwise the campaign banner fills the stage.
   const backgroundURL = currentTurn?.image_url || campaignImage;
 
-  const hasAudio = segments.some((segment) => !!segment.audio_url);
+  const hasAudio = anySegmentHasAudio(segments);
   const voiceEnabled = hasAudio;
 
-  const browser = useSegmentPlayback(segments, isPlaying && !serverPlayback && voiceEnabled, volume);
+  const browser = useSegmentPlayback(segments, {
+    autoPlay: isPlaying && !serverPlayback && voiceEnabled,
+    volume,
+    gameId,
+    turnNumber: currentTurn?.turn_number,
+    skipKeys: skipAudioKeys,
+  });
 
   const beatKey = currentTurn ? segmentAudioKey(currentTurn.turn_number, activeIndex) : '';
   const beatStatus = serverPlayback ? segmentAudioStatus[beatKey] : undefined;

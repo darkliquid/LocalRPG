@@ -27,6 +27,10 @@ interface ChronicleViewProps {
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
   turnAudioStatus?: Record<number, { state: TurnAudioState; message?: string }>;
   segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
+  // The campaign whose clips the beat controls regenerate.
+  gameId?: string;
+  // Clips already heard while the turn streamed, which playback must skip.
+  skipAudioKeys?: ReadonlySet<string>;
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
@@ -43,6 +47,8 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   displayMode,
   turnAudioStatus = {},
   segmentAudioStatus = {},
+  gameId,
+  skipAudioKeys,
 }) => {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
@@ -147,6 +153,8 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 turnNumber={turn.turn_number}
                 segmentAudioStatus={segmentAudioStatus}
                 checks={turn.checks}
+                gameId={gameId}
+                skipAudioKeys={skipAudioKeys}
               />
 
               {turn.rejected && (

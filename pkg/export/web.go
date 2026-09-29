@@ -22,14 +22,15 @@ func NewWebExporter(rootDir string) *WebExporter {
 }
 
 // webBeat is one beat as the browser sees it: durations in seconds and paths
-// relative to the bundle root.
+// relative to the bundle root. Audio is the beat's clips in play order, one per
+// sentence of reduced text.
 type webBeat struct {
-	Kind     string  `json:"kind"`
-	Speaker  string  `json:"speaker,omitempty"`
-	Text     string  `json:"text"`
-	Art      string  `json:"art,omitempty"`
-	Audio    string  `json:"audio,omitempty"`
-	Duration float64 `json:"duration"`
+	Kind     string   `json:"kind"`
+	Speaker  string   `json:"speaker,omitempty"`
+	Text     string   `json:"text"`
+	Art      string   `json:"art,omitempty"`
+	Audio    []string `json:"audio,omitempty"`
+	Duration float64  `json:"duration"`
 }
 
 type webScene struct {
@@ -85,14 +86,14 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outDir s
 				Duration: beat.Duration.Seconds(),
 			}
 
-			if beat.AudioPath != "" {
+			for _, clip := range beat.AudioPaths {
 				// Clips are numbered in the order they appear, so a bundle's audio
 				// directory is a readable running order rather than beat numbers
 				// with holes in them.
 				beatNumber++
-				name := fmt.Sprintf("beat-%04d%s", beatNumber, filepath.Ext(beat.AudioPath))
-				if err := copyFile(beat.AudioPath, filepath.Join(outDir, "audio", name)); err == nil {
-					jsBeat.Audio = "audio/" + name
+				name := fmt.Sprintf("beat-%04d%s", beatNumber, filepath.Ext(clip))
+				if err := copyFile(clip, filepath.Join(outDir, "audio", name)); err == nil {
+					jsBeat.Audio = append(jsBeat.Audio, "audio/"+name)
 				}
 			}
 
@@ -185,6 +186,26 @@ let index = 0;
 let timer = null;
 let audio = null;
 let paused = false;
+// audioGeneration invalidates a beat's clip chain when the beat is left early.
+let audioGeneration = 0;
+
+// playClips plays a beat's clips in order, so a multi-sentence beat is heard in
+// full rather than only its first sentence.
+function playClips(clips) {
+  const generation = ++audioGeneration;
+  let nextClip = 0;
+
+  const step = () => {
+    if (generation !== audioGeneration || nextClip >= clips.length) return;
+    const clip = new Audio(clips[nextClip++]);
+    audio = clip;
+    clip.onended = step;
+    clip.onerror = step;
+    clip.play().catch(() => { pause(); });
+  };
+
+  step();
+}
 
 function render(index) {
   const beat = beats[index];
@@ -196,10 +217,7 @@ function render(index) {
   textEl.textContent = '';
 
   if (audio) { audio.pause(); audio = null; }
-  if (beat.audio) {
-    audio = new Audio(beat.audio);
-    audio.play().catch(() => { pause(); });
-  }
+  if (beat.audio && beat.audio.length) playClips(beat.audio);
 
   startReveal(beat, performance.now());
 }
@@ -224,6 +242,7 @@ function startReveal(beat, startedAt) {
 function stop() {
   if (timer) cancelAnimationFrame(timer);
   timer = null;
+  audioGeneration++;
   if (audio) { audio.pause(); audio = null; }
 }
 
