@@ -422,7 +422,7 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			force := r.URL.Query().Get("force") == "1" || r.URL.Query().Get("force") == "true"
-			if err := s.service.PlayTurnAudio(r.Context(), gameID, turnNumber, force); err != nil {
+			if err := s.service.PlayTurnAudio(gameID, turnNumber, force); err != nil {
 				if writeGenerationFailure(w, err) {
 					return
 				}

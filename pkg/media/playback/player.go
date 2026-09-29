@@ -11,7 +11,6 @@
 package playback
 
 import (
-	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -178,12 +177,13 @@ func (p *Player) PlayFiles(paths []string) error {
 // PlayQueue starts playback and pulls clip paths from clips as each previous
 // clip drains, so the first completed clip is heard while the rest are still
 // synthesized. It returns once playback has started; closing the channel ends
-// the queue.
-func (p *Player) PlayQueue(ctx context.Context, clips <-chan string) error {
+// the queue, and Stop ends it early. Playback is never tied to a caller's
+// context, so a request that triggered narration finishing does not silence it.
+func (p *Player) PlayQueue(clips <-chan string) error {
 	if !p.Available() {
 		return ErrUnavailable
 	}
-	queue := newQueueStreamer(ctx, clips)
+	queue := newQueueStreamer(clips)
 	return p.playStreamer(queue, []io.Closer{queue}, 0)
 }
 

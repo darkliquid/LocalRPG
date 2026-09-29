@@ -1,7 +1,6 @@
 package playback
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,7 +48,7 @@ func TestQueueStreamerPullsClipsLazilyInOrder(t *testing.T) {
 	clips <- second
 	close(clips)
 
-	q := newQueueStreamer(context.Background(), clips)
+	q := newQueueStreamer(clips)
 	defer q.Close()
 
 	if total := drainQueue(t, q); total != want {
@@ -72,7 +71,7 @@ func TestQueueStreamerSkipsUndecodableClips(t *testing.T) {
 	clips <- good
 	close(clips)
 
-	q := newQueueStreamer(context.Background(), clips)
+	q := newQueueStreamer(clips)
 	defer q.Close()
 
 	if total := drainQueue(t, q); total != want {

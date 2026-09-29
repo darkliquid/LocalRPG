@@ -1,7 +1,6 @@
 package playback
 
 import (
-	"context"
 	"io"
 	"sync"
 
@@ -13,8 +12,11 @@ import (
 // them. A clip that cannot be decoded is skipped, as PlayFiles does. While the
 // queue is open but empty it blocks the audio callback until the next clip
 // arrives, which is a gap rather than silence.
+//
+// The queue ends when clips closes or the player is stopped. It is deliberately
+// not bound to a caller's context: narration belongs to the application, so a
+// request that asked for it finishing must not cut it short.
 type queueStreamer struct {
-	ctx   context.Context
 	clips <-chan string
 
 	mu      sync.Mutex
@@ -23,29 +25,24 @@ type queueStreamer struct {
 	done    bool
 }
 
-func newQueueStreamer(ctx context.Context, clips <-chan string) *queueStreamer {
-	return &queueStreamer{ctx: ctx, clips: clips}
+func newQueueStreamer(clips <-chan string) *queueStreamer {
+	return &queueStreamer{clips: clips}
 }
 
 // next decodes the next usable clip. It is called with mu held.
 func (q *queueStreamer) next() bool {
 	for {
-		select {
-		case <-q.ctx.Done():
+		path, ok := <-q.clips
+		if !ok {
 			q.done = true
 			return false
-		case path, ok := <-q.clips:
-			if !ok {
-				q.done = true
-				return false
-			}
-			streamer, closer, err := decodeFile(path)
-			if err != nil {
-				continue
-			}
-			q.current, q.closer = streamer, closer
-			return true
 		}
+		streamer, closer, err := decodeFile(path)
+		if err != nil {
+			continue
+		}
+		q.current, q.closer = streamer, closer
+		return true
 	}
 }
 

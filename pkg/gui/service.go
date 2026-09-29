@@ -1453,10 +1453,10 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 			plan.queue = make(chan string, sentenceQueueDepth)
 			player.SetVolume(t.cfg.Media.TTS.MasterVolume)
 			// Playback is the application's own responsibility, detached from the
-			// request: the queue is fed while the turn streams and drains after it,
-			// so it must outlive the request context. StopAudio ends it early.
+			// request: the queue is fed while the turn streams and drains after it.
+			// StopAudio ends it early.
 			t.service.goBackground(func() {
-				if err := player.PlayQueue(context.Background(), plan.queue); err != nil && !errors.Is(err, playback.ErrUnavailable) {
+				if err := player.PlayQueue(plan.queue); err != nil && !errors.Is(err, playback.ErrUnavailable) {
 					fmt.Fprintf(os.Stderr, "Warning: narration playback stopped: %v\n", err)
 				}
 			})
@@ -2081,41 +2081,51 @@ func (s *Service) findTurn(gameID string, turnNumber int) (*engine.Turn, error) 
 
 // PlayTurnAudio synthesizes any beat the turn has not already cached and plays
 // the whole turn in order. Clips are content-addressed, so a replay is instant.
-func (s *Service) PlayTurnAudio(ctx context.Context, gameID string, turnNumber int, force ...bool) error {
+// It takes no context on purpose: narration belongs to the application, so the
+// request that asked for it finishing must not silence it. StopAudio ends it.
+func (s *Service) PlayTurnAudio(gameID string, turnNumber int, force ...bool) error {
 	player := s.audioPlayer()
 	if player == nil || !player.Available() {
 		return playback.ErrUnavailable
 	}
 
-	turn, err := s.findTurn(gameID, turnNumber)
-	if err != nil {
+	if _, err := s.findTurn(gameID, turnNumber); err != nil {
 		return err
 	}
 
-	isForce := len(force) > 0 && force[0]
+	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
+	return player.PlayQueue(s.turnClipStream(gameID, turnNumber, len(force) > 0 && force[0]))
+}
 
-	// Synthesize in order and feed the player as each clip lands, so playback
-	// starts on the first completed clip instead of waiting for the whole turn.
+// turnClipStream yields a turn's clips in order, synthesizing each one as its
+// predecessor is consumed, so playback starts on the first completed clip instead
+// of waiting for the whole turn. The stream is deliberately not bound to the
+// caller's context: a request that triggered narration finishing must not silence
+// it, and the queue ends when the channel closes or the player is stopped.
+func (s *Service) turnClipStream(gameID string, turnNumber int, force bool) <-chan string {
 	clips := make(chan string)
+
+	turn, err := s.findTurn(gameID, turnNumber)
+	if err != nil {
+		close(clips)
+		return clips
+	}
+
 	go func() {
 		defer close(clips)
+		ctx := context.Background()
 		for i := range turn.Segments {
-			list, err := s.GetSegmentClips(ctx, gameID, turnNumber, i, isForce)
+			list, err := s.GetSegmentClips(ctx, gameID, turnNumber, i, force)
 			if err != nil {
 				continue
 			}
 			for _, path := range list {
-				select {
-				case clips <- path:
-				case <-ctx.Done():
-					return
-				}
+				clips <- path
 			}
 		}
 	}()
 
-	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
-	return player.PlayQueue(ctx, clips)
+	return clips
 }
 
 // PlaySegmentAudio plays one beat, which is what a speaker chip triggers.

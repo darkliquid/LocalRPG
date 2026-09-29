@@ -80,3 +80,32 @@ func TestSpeechEventNamesTheClip(t *testing.T) {
 		t.Errorf("event = %+v, want the clip named", event)
 	}
 }
+
+func TestTurnClipStreamYieldsEveryClipInOrder(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+
+	clips := drainClips(svc.turnClipStream(gameID, 1, false))
+	if len(clips) != 2 {
+		t.Fatalf("clips = %#v, want one per segment", clips)
+	}
+	for i, clip := range clips {
+		if clip == "" {
+			t.Errorf("clip %d is empty", i)
+		}
+	}
+
+	// A second run is a cache hit, in the same order.
+	again := drainClips(svc.turnClipStream(gameID, 1, false))
+	if len(again) != 2 || again[0] != clips[0] || again[1] != clips[1] {
+		t.Errorf("second run = %#v, want the cached clips %#v", again, clips)
+	}
+}
+
+func TestTurnClipStreamForAnUnknownTurnEndsImmediately(t *testing.T) {
+	_, svc := setupTestGame(t)
+
+	if clips := drainClips(svc.turnClipStream("test-campaign", 42, false)); len(clips) != 0 {
+		t.Errorf("clips = %#v, want an empty stream", clips)
+	}
+}
