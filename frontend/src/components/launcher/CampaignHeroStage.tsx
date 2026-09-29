@@ -75,9 +75,12 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
       </div>
 
       {/* Top Row: Stats Badge */}
-      <div key={game?.id ?? 'none'} className="relative z-10 flex justify-end anim-slide-in-up">
+      <div className="relative z-10 flex justify-end anim-slide-in-up">
         {game && (
-          <div className="flex items-center gap-6 bg-stone-900/80 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-2.5 shadow-2xl">
+          <div
+            key={game.id}
+            className="flex items-center gap-6 bg-stone-900/80 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-2.5 shadow-2xl"
+          >
             <div className="flex items-center gap-2.5">
               <Clock className="w-4 h-4 text-purple-400" />
               <div>
