@@ -67,3 +67,45 @@ func TestHostBridgeMovesThePlayerThroughItsWriter(t *testing.T) {
 		t.Errorf("expected SetStat to persist through the writer, got %d saves", len(writer.saved))
 	}
 }
+
+// A script or a GM may name an entity the way the prose does, so the bridge
+// resolves a display name to the entity the index holds.
+func TestHostBridgeResolvesDisplayNames(t *testing.T) {
+	store, err := storage.NewStore(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if err := store.SaveEntity(&entity.Entity{ID: "ser-griswald", Name: "Ser Griswald", Type: "character"}); err != nil {
+		t.Fatal(err)
+	}
+
+	bridge := NewHostBridge(store, nil, "player")
+
+	if err := bridge.SetStat("Ser Griswald", "resolve", 4); err != nil {
+		t.Fatalf("SetStat by name: %v", err)
+	}
+	got, err := bridge.GetStat("ser-griswald", "resolve")
+	if err != nil {
+		t.Fatalf("GetStat: %v", err)
+	}
+	if value, _ := toInt(got); value != 4 {
+		t.Fatalf("resolve = %v, want 4 written through the name", got)
+	}
+
+	byName, err := bridge.GetStat("Ser Griswald", "resolve")
+	if err != nil {
+		t.Fatalf("GetStat by name: %v", err)
+	}
+	if value, _ := toInt(byName); value != 4 {
+		t.Fatalf("resolve = %v, want the name to read the same state", byName)
+	}
+
+	if _, err := bridge.GetStat("Nobody At All", "resolve"); err == nil {
+		t.Error("an unknown reference must not resolve to anything")
+	}
+	if err := bridge.SetStat("Nobody At All", "resolve", 1); err == nil {
+		t.Error("an unknown reference must not be written")
+	}
+}

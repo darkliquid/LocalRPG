@@ -1088,8 +1088,15 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// must not begin until this returns, or a character invented in this turn
 	// would be read in the narrator's voice.
 	if structured && len(result.Submission.StateChanges) > 0 && o.rulesEngine != nil {
-		if err := rules.ApplyStateChanges(o.rulesEngine.HostAPI(), result.Submission.StateChanges, o.declaredStats, o.allowFreeform); err != nil {
+		notes, err := rules.ApplyStateChanges(o.rulesEngine.HostAPI(), result.Submission.StateChanges, o.declaredStats, o.allowFreeform)
+		if err != nil {
 			return nil, fmt.Errorf("apply state changes: %w", err)
+		}
+		// A change the engine could not apply is recorded rather than fatal: the GM
+		// has already narrated its consequence, and a reference the index does not
+		// hold must not cost the player the turn they just played.
+		for _, note := range notes {
+			trace.OrNil(o.logger).Event("mechanics.state_change_skipped", map[string]interface{}{"note": note})
 		}
 	}
 

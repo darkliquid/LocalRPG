@@ -2,9 +2,11 @@ package rules
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
@@ -68,9 +70,9 @@ func (h *DefaultHostBridge) Roll(notation string) (*RollResult, error) {
 }
 
 func (h *DefaultHostBridge) GetStat(entityID string, path string) (interface{}, error) {
-	ent, err := h.store.GetEntity(entityID)
+	ent, err := h.resolve(entityID)
 	if err != nil {
-		return nil, fmt.Errorf("entity %q not found: %w", entityID, err)
+		return nil, err
 	}
 	if ent.State == nil {
 		return nil, nil
@@ -83,9 +85,9 @@ func (h *DefaultHostBridge) GetStat(entityID string, path string) (interface{}, 
 }
 
 func (h *DefaultHostBridge) SetStat(entityID string, path string, value interface{}) error {
-	ent, err := h.store.GetEntity(entityID)
+	ent, err := h.resolve(entityID)
 	if err != nil {
-		return fmt.Errorf("entity %q not found: %w", entityID, err)
+		return err
 	}
 	if ent.State == nil {
 		ent.InitState(make(map[string]interface{}))
@@ -94,6 +96,25 @@ func (h *DefaultHostBridge) SetStat(entityID string, path string, value interfac
 		return fmt.Errorf("set stat %q: %w", path, err)
 	}
 	return h.persist(ent)
+}
+
+// resolve finds the entity a reference names. The turn protocol lets a GM write
+// an entity's name as well as its id, so a name, an alias, and an id all resolve
+// to the same entity. A miss reports the reference rather than creating anything:
+// a typo must not conjure an entity the campaign never described.
+func (h *DefaultHostBridge) resolve(ref string) (*entity.Entity, error) {
+	if h.store == nil {
+		return nil, fmt.Errorf("entity %q not found: no store", ref)
+	}
+	if ent, err := h.store.GetEntity(ref); err == nil && ent != nil {
+		return ent, nil
+	}
+	if id := harness.ResolveSpeakerID(h.store, ref); id != "" {
+		if ent, err := h.store.GetEntity(id); err == nil && ent != nil {
+			return ent, nil
+		}
+	}
+	return nil, fmt.Errorf("entity %q not found", strings.TrimSpace(ref))
 }
 
 // SetLocation moves the player, writing through the same path the engine uses.
