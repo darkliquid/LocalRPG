@@ -54,7 +54,8 @@ func routePattern(path string) string {
 		path == "/api/providers" || path == "/api/providers/models" ||
 		path == "/api/tts/inspect" || path == "/api/tts/voices/search" ||
 		path == "/api/stt" || path == "/api/trace" || path == "/api/character/generate" ||
-		path == "/api/generate-text" || path == "/api/generate-asset-preview":
+		path == "/api/generate-text" || path == "/api/generate-asset-preview" ||
+		path == "/api/usage" || path == "/api/limits":
 		return path
 	case path == "/api/models" || strings.HasPrefix(path, "/api/models/"):
 		return "/api/models"
@@ -87,32 +88,12 @@ func routePattern(path string) string {
 }
 
 func (s *Server) registerRoutes() {
-	s.mux.HandleFunc("/api/game/", s.handleGameRoutes)
-	s.mux.HandleFunc("/api/games", s.handleGamesRoutes)
-	s.mux.HandleFunc("/api/usage", s.handleUsageRoute)
-	s.mux.HandleFunc("/api/limits", s.handleLimitsRoute)
-	s.mux.HandleFunc("/api/character/generate", s.handleCharacterGenerateRoute)
-	s.mux.HandleFunc("/api/generate-text", s.handleGenerateTextRoute)
-	s.mux.HandleFunc("/api/generate-asset-preview", s.handleGenerateAssetPreview)
-	s.mux.HandleFunc("/api/systems", s.handleSystemsRoutes)
-	s.mux.HandleFunc("/api/system/", s.handleSystemRoutes)
-	s.mux.HandleFunc("/api/worlds", s.handleWorldsRoutes)
-	s.mux.HandleFunc("/api/world/", s.handleWorldRoutes)
-	s.mux.HandleFunc("/api/settings", s.handleSettingsRoutes)
-	s.mux.HandleFunc("/api/settings/test-provider", s.handleTestProviderRoute)
-	s.mux.HandleFunc("/api/providers", s.handleProviderCatalogRoute)
-	s.mux.HandleFunc("/api/providers/models", s.handleModelCatalogueRoute)
-	s.mux.HandleFunc("/api/tts/inspect", s.handleTTSInspectRoute)
-	s.mux.HandleFunc("/api/tts/voices/search", s.handleVoiceSearchRoute)
-	s.mux.HandleFunc("/api/audio/", s.handleAudioRoutes)
-	s.mux.HandleFunc("/api/stt", s.handleSTTRoute)
-	s.mux.HandleFunc("/api/export", s.handleExportRoutes)
-	s.mux.HandleFunc("/api/export/", s.handleExportRoutes)
-	s.mux.HandleFunc("/api/trace", s.handleTraceRoute)
-	s.mux.HandleFunc("/api/models", s.handleModelsRoutes)
-	s.mux.HandleFunc("/api/models/", s.handleModelsRoutes)
-	s.mux.HandleFunc("/api/docs", s.handleDocsRoutes)
-	s.mux.HandleFunc("/api/docs/", s.handleDocsRoutes)
+	for _, mount := range mounts {
+		serve := mount.serve
+		s.mux.HandleFunc(mount.Pattern, func(w http.ResponseWriter, r *http.Request) {
+			serve(s, w, r)
+		})
+	}
 	if s.assetServer != nil {
 		s.mux.Handle("/", s.assetServer)
 	}

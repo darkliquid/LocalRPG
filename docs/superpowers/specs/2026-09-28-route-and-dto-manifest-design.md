@@ -1,7 +1,7 @@
 # Route and DTO Manifest Design
 
 **Date:** 2026-09-28
-**Status:** Proposed
+**Status:** Implemented (routes) on 2026-09-28; the lighter DTO-name guard is deferred
 **Scope:** Make the API route table data rather than imperative registrations, check it in, and fail a test when the frontend drifts from it
 **Related:** `pkg/gui/server.go`, `pkg/gui/types.go`, `frontend/src/api/client.ts`, `frontend/src/types.ts`; implements finding P2.8 of `docs/architecture/review-2026-09-24.md`
 
