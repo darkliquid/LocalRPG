@@ -1,7 +1,7 @@
 # Export Directory Dialog Thread Safety Design
 
 **Date:** 2026-09-28
-**Status:** Proposed
+**Status:** Implemented (2026-09-28); manual desktop verification outstanding
 **Scope:** Make the Wails directory picker safe to call from an HTTP handler goroutine, or move it behind a service binding
 **Related:** `cmd/localrpg/gui.go`, `pkg/gui/export.go`, `pkg/gui/server.go`, `frontend/src/components/ExportModal.tsx`; follows `docs/superpowers/specs/2026-09-28-story-export-reachability-design.md`
 

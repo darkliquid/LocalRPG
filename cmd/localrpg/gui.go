@@ -157,22 +157,26 @@ func handleGUICommand(args []string) {
 	})
 
 	// The desktop window gets a native directory chooser for exports. Browser and
-	// socket modes have no dialog, so the UI falls back to a path field. A
-	// dismissed dialog is reported as a cancellation, not a failure.
+	// socket modes have no dialog, so the UI falls back to a path field. Wails
+	// dialogs must run on the application's main thread, and this callback is
+	// reached from an HTTP handler goroutine, so the dialog is marshalled over.
+	// A dismissed dialog is reported as a cancellation, not a failure.
 	svc.SetDirectoryPicker(func(defaultDir string) (string, error) {
-		dialog := app.Dialog.OpenFile().
-			CanChooseDirectories(true).
-			CanChooseFiles(false).
-			CanCreateDirectories(true).
-			SetTitle("Choose an export destination")
-		if defaultDir != "" {
-			dialog = dialog.SetDirectory(defaultDir)
-		}
-		chosen, err := dialog.PromptForSingleSelection()
-		if err != nil {
-			return "", nil
-		}
-		return chosen, nil
+		return application.InvokeSyncWithResultAndError(func() (string, error) {
+			dialog := app.Dialog.OpenFile().
+				CanChooseDirectories(true).
+				CanChooseFiles(false).
+				CanCreateDirectories(true).
+				SetTitle("Choose an export destination")
+			if defaultDir != "" {
+				dialog = dialog.SetDirectory(defaultDir)
+			}
+			chosen, err := dialog.PromptForSingleSelection()
+			if err != nil {
+				return "", nil
+			}
+			return chosen, nil
+		})
 	})
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
