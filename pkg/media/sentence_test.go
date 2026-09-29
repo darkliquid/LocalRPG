@@ -2,6 +2,8 @@ package media
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -64,6 +66,36 @@ func TestSynthesizeProvisionalSharesTheFinalSegmentCacheKey(t *testing.T) {
 	}
 	if client.calls != 1 {
 		t.Fatalf("calls = %d, want the final segment to reuse the provisional clip", client.calls)
+	}
+}
+
+func TestEvictingTheSegmentClipReconcatenatesFromSentenceClips(t *testing.T) {
+	client := &recordingTTSClient{}
+	cache := NewContentCache(t.TempDir())
+	pipeline := NewTTSPipeline(client, cache)
+	voice := &entity.VoiceConfig{VoiceID: "v1", Pitch: 1, SpeechRate: 1}
+	segment := entity.TurnSegment{Kind: entity.SegmentNarration, Text: "One. Two."}
+
+	if _, err := pipeline.SynthesizeSegment(context.Background(), segment, voice, nil); err != nil {
+		t.Fatalf("SynthesizeSegment: %v", err)
+	}
+	if client.calls != 2 {
+		t.Fatalf("calls = %d, want one per sentence", client.calls)
+	}
+
+	// Evict only the concatenated clip. The sentence clips are what reuse depends
+	// on, and they must satisfy the segment again without a provider call.
+	base := ComputeAudioCacheKeyForVoice(narratorSpeaker, voice, segment.Text)
+	segmentPath := filepath.Join(cache.Subdir("audio"), base+".opus")
+	if err := os.Remove(segmentPath); err != nil {
+		t.Fatalf("remove segment clip: %v", err)
+	}
+
+	if _, err := pipeline.SynthesizeSegment(context.Background(), segment, voice, nil); err != nil {
+		t.Fatalf("re-synthesize: %v", err)
+	}
+	if client.calls != 2 {
+		t.Fatalf("calls = %d, want re-concatenation with no new provider calls", client.calls)
 	}
 }
 

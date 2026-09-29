@@ -1,7 +1,16 @@
 # Health-Zero Hook Ordering Design
 
 **Date:** 2026-09-28
-**Status:** Implemented (2026-09-28)
+**Status:** Implemented (2026-09-28); extended to per-NPC health the same day.
+
+**Follow-up settled (2026-09-28): per-NPC health.** `healthOutcomes` now resolves
+the effect for the player and for every character named in the turn, deduplicated
+and player-first, and the two passes are unioned by entity
+(`mergeHealthEffects`). An entity that has no numeric value for the declared stat
+never fires, which also fixes a latent player bug: the old check treated a missing
+stat as zero. A hook's context receives the pass-1 effects. Per-entity idempotence
+matches the player's existing behaviour: an entity still at zero when a later turn
+ends records the effect again.
 **Scope:** See a health change made by an `onTurnEnd` hook in the same turn, by evaluating health-zero after the hook while keeping the recorded effect and the turn-end context consistent
 **Related:** `pkg/engine/orchestrator.go`, `pkg/engine/mechanics_engagement.go`, `pkg/rules/js_engine.go`; implements the residual gap in `docs/superpowers/specs/2026-09-25-turn-memory-mechanics-followups-design.md` and follows `docs/superpowers/specs/2026-09-28-mechanics-engagement-depth-design.md`
 

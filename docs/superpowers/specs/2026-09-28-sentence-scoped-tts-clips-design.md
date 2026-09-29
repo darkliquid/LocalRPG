@@ -4,6 +4,23 @@
 **Status:** Implemented (2026-09-28). Deviation: a Markdown-consuming client is
 never split, rather than undergoing the per-sentence balance scan; this can only
 forgo a reuse opportunity, never corrupt markup.
+
+**Open questions settled (2026-09-28):**
+
+- *Namespace or cascade?* **No.** Reuse depends on key identity: a single-sentence
+  segment's clip and a sentence clip are the same artifact under the same key, so
+  splitting them into categories would break the very reuse this design exists
+  for. There is also no eviction API to cascade (`ContentCache` has no delete;
+  only `cachedClip` drops a corrupt file). The property that matters is proved
+  instead: evicting a segment clip re-concatenates from the sentence clips with no
+  provider call (`TestEvictingTheSegmentClipReconcatenatesFromSentenceClips`).
+- *Write the concatenated segment clip?* **Yes.** It costs a little disk and saves
+  a decode/re-encode on every later read.
+- *Is the markup-safety scan worth it?* **Deferred**; the conservative rule
+  (never split a Markdown-consuming client) stands.
+- *Why not an ordered clip list?* Kept as a future option, but it changes the
+  player, the HTTP route, and the video mux, for no gain the concatenation does
+  not already provide.
 **Scope:** Make per-sentence synthesis the unit of caching end to end, so streamed sentence clips are reused by the finalised segment and no provider call is wasted
 **Related:** `pkg/media` (`tts.go`, `sentence.go`, `opus`), `pkg/gui` (`service.go`, `streaming_tts.go`, `types.go`), `pkg/export` (`script.go`), `pkg/media/playback`; follows `docs/superpowers/specs/2026-09-28-streaming-tts-design.md`
 

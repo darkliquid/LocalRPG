@@ -1100,15 +1100,13 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	turn.WorldTick = o.worldTick
 
 	// Health is resolved twice around the post-turn hooks: once before them, so
-	// the hook context carries the effect the turn's own changes caused, and once
-	// after, so a hook that drives the stat to zero is seen on this same turn
-	// rather than the next.
-	pendingEffect := o.healthOutcome()
-	o.runTurnEndHooks(turnNum, &turn, pendingEffect)
-	finalEffect := o.healthOutcome()
-	if effect := firstNonEmpty(pendingEffect, finalEffect); effect != "" {
-		turn.HealthEffects = append(turn.HealthEffects, HealthEffect{Entity: o.playerID, Effect: effect})
-	}
+	// the hook context carries the effects the turn's own changes caused, and once
+	// after, so a hook that drives a stat to zero is seen on this same turn rather
+	// than the next.
+	pendingEffects := o.healthOutcomes(&turn)
+	o.runTurnEndHooks(turnNum, &turn, pendingEffects)
+	finalEffects := o.healthOutcomes(&turn)
+	turn.HealthEffects = append(turn.HealthEffects, mergeHealthEffects(pendingEffects, finalEffects)...)
 
 	if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)

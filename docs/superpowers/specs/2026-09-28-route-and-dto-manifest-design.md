@@ -1,7 +1,19 @@
 # Route and DTO Manifest Design
 
 **Date:** 2026-09-28
-**Status:** Implemented (routes) on 2026-09-28; the lighter DTO-name guard is deferred
+**Status:** Implemented (routes) on 2026-09-28; the DTO-name guard is **rejected**.
+
+**DTO guard rejected (2026-09-28).** The inventory shows the two sides share
+almost no names: of 60 exported Go types, only 3 match `frontend/src/types.ts`
+exactly (`CharacterPortraitDTO`, `TurnEvent`, `LimitsDTO`). Everything else is
+renamed (`PlayerDTO`→`PlayerState`, `EntityDTO`→`EntityNote`,
+`SegmentDTO`→`TurnSegment`) or exists on one side only (TS has `ExportJob`,
+`PathsConfig`, `GenerateCharacterRequest`; Go has `MergeEntityRequestDTO`,
+`STTResponse`, `RequestCheckDTO`). A real guard needs an alias map plus
+Go-only/TS-only exemption lists, which would rot, to catch the weaker of the two
+drifts: the route guards already catch path drift, and `tsc` catches a missing
+import. Deriving `types.ts` from the Go DTOs is the only version worth doing, and
+it is a separate ambition.
 **Scope:** Make the API route table data rather than imperative registrations, check it in, and fail a test when the frontend drifts from it
 **Related:** `pkg/gui/server.go`, `pkg/gui/types.go`, `frontend/src/api/client.ts`, `frontend/src/types.ts`; implements finding P2.8 of `docs/architecture/review-2026-09-24.md`
 

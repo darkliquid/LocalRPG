@@ -65,17 +65,20 @@ func numericValue(raw interface{}) (int, bool) {
 	return intValue(raw), true
 }
 
-// healthOutcome resolves the declared health-zero effect for the player, or ""
-// when health is positive or no health schema is declared.
-func (o *TurnOrchestrator) healthOutcome() string {
-	if o.health == nil || o.health.Stat == "" || o.rulesEngine == nil || o.playerID == "" {
+// healthEffectFor resolves the declared health-zero effect for one entity, or ""
+// when the entity has no numeric health stat, is above zero, or no schema is
+// declared. Requiring a real number means an entity that never had the stat does
+// not fire the effect.
+func (o *TurnOrchestrator) healthEffectFor(entityID string) string {
+	if o.health == nil || o.health.Stat == "" || o.rulesEngine == nil || entityID == "" {
 		return ""
 	}
-	value, err := o.rulesEngine.HostAPI().GetStat(o.playerID, o.health.Stat)
+	raw, err := o.rulesEngine.HostAPI().GetStat(entityID, o.health.Stat)
 	if err != nil {
 		return ""
 	}
-	if intValue(value) > 0 {
+	value, ok := numericValue(raw)
+	if !ok || value > 0 {
 		return ""
 	}
 	if strings.TrimSpace(o.health.ZeroEffect) == "" {
@@ -87,6 +90,61 @@ func (o *TurnOrchestrator) healthOutcome() string {
 		return o.health.ZeroEffect
 	}
 	return effect
+}
+
+// healthOutcome resolves the player's health-zero effect, for callers that only
+// care about the protagonist.
+func (o *TurnOrchestrator) healthOutcome() string {
+	return o.healthEffectFor(o.playerID)
+}
+
+// healthOutcomes resolves a health-zero effect for the player and for every
+// character named in the turn, so a downed ally is visible rather than only the
+// protagonist. Entities are deduplicated and ordered player-first.
+func (o *TurnOrchestrator) healthOutcomes(turn *Turn) []HealthEffect {
+	if o.health == nil || o.health.Stat == "" || o.rulesEngine == nil {
+		return nil
+	}
+
+	ids := make([]string, 0, len(turn.Entities)+1)
+	if o.playerID != "" {
+		ids = append(ids, o.playerID)
+	}
+	for _, mention := range turn.Entities {
+		if mention.ID != "" && mention.ID != o.playerID {
+			ids = append(ids, mention.ID)
+		}
+	}
+
+	effects := make([]HealthEffect, 0, len(ids))
+	seen := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		if effect := o.healthEffectFor(id); effect != "" {
+			effects = append(effects, HealthEffect{Entity: id, Effect: effect})
+		}
+	}
+	return effects
+}
+
+// mergeHealthEffects unions two passes, keeping the first effect per entity so a
+// turn never records the same entity twice.
+func mergeHealthEffects(passes ...[]HealthEffect) []HealthEffect {
+	var out []HealthEffect
+	seen := map[string]bool{}
+	for _, effects := range passes {
+		for _, effect := range effects {
+			if seen[effect.Entity] {
+				continue
+			}
+			seen[effect.Entity] = true
+			out = append(out, effect)
+		}
+	}
+	return out
 }
 
 // worldTickDue reports whether this turn should run onWorldTick. The first turn
@@ -144,11 +202,11 @@ func applyDirectives(gmDirective string, directives []string) string {
 	return gmDirective
 }
 
-// runTurnEndHooks runs the onTurnEnd hooks with the turn's facts. pendingEffect
-// is the health-zero effect already resolved from the turn's own state changes,
-// so a hook can react to it; a health change the hook itself makes is resolved by
+// runTurnEndHooks runs the onTurnEnd hooks with the turn's facts. pending is the
+// health-zero effects already resolved from the turn's own state changes, so a
+// hook can react to them; a health change the hook itself makes is resolved by
 // the caller afterwards.
-func (o *TurnOrchestrator) runTurnEndHooks(turnNum int, turn *Turn, pendingEffect string) {
+func (o *TurnOrchestrator) runTurnEndHooks(turnNum int, turn *Turn, pending []HealthEffect) {
 	if o.rulesEngine == nil {
 		return
 	}
@@ -158,17 +216,12 @@ func (o *TurnOrchestrator) runTurnEndHooks(turnNum int, turn *Turn, pendingEffec
 		entityIDs = append(entityIDs, mention.ID)
 	}
 
-	var healthEffects []HealthEffect
-	if pendingEffect != "" {
-		healthEffects = []HealthEffect{{Entity: o.playerID, Effect: pendingEffect}}
-	}
-
 	hookCtx := map[string]interface{}{
 		"turn":           turnNum,
 		"narration":      turn.Narration,
 		"entities":       entityIDs,
 		"checks":         len(turn.Checks),
-		"health_effects": healthEffects,
+		"health_effects": pending,
 		"world_tick":     turn.WorldTick,
 	}
 	if turn.Verdict != nil {
@@ -177,12 +230,4 @@ func (o *TurnOrchestrator) runTurnEndHooks(turnNum int, turn *Turn, pendingEffec
 	if err := o.rulesEngine.ExecuteTurnEnd(hookCtx); err != nil {
 		o.logger.Event("turn.end_hook_error", map[string]interface{}{"error": err.Error()})
 	}
-}
-
-// firstNonEmpty returns a when it is non-empty, otherwise b.
-func firstNonEmpty(a, b string) string {
-	if a != "" {
-		return a
-	}
-	return b
 }

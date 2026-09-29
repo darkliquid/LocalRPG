@@ -50,12 +50,12 @@
   `frontend/src/api/client.ts` resolves to a mount, with a seeded negative case.
 - [x] **Step 5:** Generate `testdata/routes.json` and re-run without the flag.
 
-### Task 4: Deferred — DTO name guard
+### Task 4: DTO name guard — rejected
 
-- [ ] **Step 1:** Extract exported type names from `pkg/gui/types.go` and
-  `frontend/src/types.ts` and assert every DTO the client imports exists. Deferred
-  because it needs a small parser for both sources and the route guards already
-  cover the higher-risk drift.
+- [x] **Step 1:** Until the DTO inventory was taken, the guard looked cheap. It is
+  not: only 3 of 60 Go type names match `types.ts` exactly, so a real guard needs
+  a rotting alias map to catch the weaker drift. Rejected; the reason is recorded
+  in the spec. Deriving `types.ts` from Go is the only version worth doing.
 
 ### Task 5: Full verification
 

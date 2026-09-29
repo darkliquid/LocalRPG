@@ -38,8 +38,9 @@
 - [x] **Step 4:** `sentencesFor`/`markdownPreserved` keep the whole segment when
   the client receives Markdown.
 - [x] **Step 5:** Tests: multi-sentence reuse (2 calls, second read cached),
-  single-sentence direct path, provisional-to-final reuse, and a Markdown-aware
-  client not split.
+  single-sentence direct path, provisional-to-final reuse, a Markdown-aware client
+  not split, and evicting the segment clip re-concatenating from sentence clips
+  with no provider call.
 - [x] **Step 6:** `go test ./pkg/media/`.
 
 ---

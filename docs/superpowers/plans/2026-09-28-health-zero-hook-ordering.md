@@ -43,7 +43,7 @@
 
 ### Task 3: Tests
 
-**Files:** `pkg/engine/turn_end_health_test.go`.
+**Files:** `pkg/engine/turn_end_health_test.go`, `pkg/engine/mechanics_engagement_test.go`.
 
 - [x] **Step 1:** A hook that drives health to zero records the resolved effect on
   the same turn.
@@ -51,6 +51,15 @@
   effect.
 - [x] **Step 3:** The hook context receives the pass-1 effect.
 - [x] **Step 4:** `go test ./pkg/engine/`.
+
+### Task 3b: Per-NPC health (follow-up, 2026-09-28)
+
+- [x] **Step 1:** `healthOutcomes(turn)` resolves the player and every character
+  named in the turn, requiring a real numeric value so an entity without the stat
+  never fires.
+- [x] **Step 2:** `mergeHealthEffects` unions the two passes, deduped by entity.
+- [x] **Step 3:** Tests: a downed ally records its effect; an entity without the
+  stat records none; the merge dedupes and keeps pass order.
 
 ### Task 4: Full verification
 

@@ -28,6 +28,7 @@ func engagementOrchestrator(t *testing.T) (*TurnOrchestrator, *rules.JSEngine) {
 	entitiesDir := timeline.EntitiesDir()
 	writeTestEntityNote(t, entitiesDir, &entity.Entity{ID: "tavern", Name: "Alden Tavern", Type: "location", Body: "Cozy."})
 	writeTestEntityNote(t, entitiesDir, &entity.Entity{ID: "player", Name: "Sean", Type: "character", Body: "A traveller.", Location: "[[tavern]]"})
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{ID: "garrick", Name: "Garrick", Type: "character", Body: "An ally.", Location: "[[tavern]]"})
 	if _, err := storage.NewSyncer(store).Sync(entitiesDir); err != nil {
 		t.Fatal(err)
 	}
@@ -102,8 +103,7 @@ func TestHealthOutcomeWithoutSpecIsEmpty(t *testing.T) {
 	}
 }
 
-func TestMechanicsInstructionIncludesPlayerStats(t *testing.T) {
-	o, jsEngine := engagementOrchestrator(t)
+func TestMechanicsInstructionIncludesPlayerStats(t *testing.T) {	o, jsEngine := engagementOrchestrator(t)
 	if err := jsEngine.HostAPI().SetStat("player", "body", 3); err != nil {
 		t.Fatal(err)
 	}
@@ -128,5 +128,49 @@ func TestWorldTickHookInjectsDirective(t *testing.T) {
 	directives := o.drainDirectives()
 	if len(directives) != 1 || !strings.Contains(directives[0], "tide turns") {
 		t.Fatalf("drained directives = %v, want the world-tick directive", directives)
+	}
+}
+
+func TestHealthOutcomesIncludeADownedAlly(t *testing.T) {
+	o, jsEngine := engagementOrchestrator(t)
+	if err := jsEngine.HostAPI().SetStat("player", "hp", 5); err != nil {
+		t.Fatal(err)
+	}
+	if err := jsEngine.HostAPI().SetStat("garrick", "hp", 0); err != nil {
+		t.Fatal(err)
+	}
+	o.SetHealthSpec(&core.HealthSpec{Stat: "hp", ZeroEffect: "Garrick falls."})
+
+	turn := &Turn{Number: 1, Entities: []entity.Mention{{ID: "garrick"}}}
+	effects := o.healthOutcomes(turn)
+	if len(effects) != 1 || effects[0].Entity != "garrick" || effects[0].Effect != "Garrick falls." {
+		t.Fatalf("healthOutcomes = %#v, want the ally's effect", effects)
+	}
+}
+
+func TestHealthOutcomesSkipEntitiesWithoutTheStat(t *testing.T) {
+	o, jsEngine := engagementOrchestrator(t)
+	if err := jsEngine.HostAPI().SetStat("player", "hp", 5); err != nil {
+		t.Fatal(err)
+	}
+	// Garrick exists but has no health stat at all.
+	o.SetHealthSpec(&core.HealthSpec{Stat: "hp", ZeroEffect: "Someone falls."})
+
+	turn := &Turn{Number: 1, Entities: []entity.Mention{{ID: "garrick"}}}
+	if effects := o.healthOutcomes(turn); len(effects) != 0 {
+		t.Fatalf("healthOutcomes = %#v, want none for an entity without the stat", effects)
+	}
+}
+
+func TestMergeHealthEffectsDedupesByEntity(t *testing.T) {
+	merged := mergeHealthEffects(
+		[]HealthEffect{{Entity: "player", Effect: "down"}, {Entity: "garrick", Effect: "down"}},
+		[]HealthEffect{{Entity: "garrick", Effect: "down"}, {Entity: "mara", Effect: "down"}},
+	)
+	if len(merged) != 3 {
+		t.Fatalf("merged = %#v, want three entities", merged)
+	}
+	if merged[1].Entity != "garrick" || merged[2].Entity != "mara" {
+		t.Fatalf("merged order = %#v, want the first pass first", merged)
 	}
 }
