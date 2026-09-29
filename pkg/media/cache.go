@@ -36,28 +36,34 @@ func ComputeAudioCacheKeyForVoice(speakerID string, voice *entity.VoiceConfig, t
 	}
 
 	// encoding/json sorts map keys, so the options hash is deterministic
-	// regardless of insertion order.
+	// regardless of insertion order. Text is part of the payload: without it
+	// every utterance under a voice with options shares one key and serves the
+	// same clip, which is what a narrated turn did.
 	payload := struct {
 		Provider   string                 `json:"provider"`
 		VoiceID    string                 `json:"voice_id"`
 		Pitch      float64                `json:"pitch"`
 		SpeechRate float64                `json:"speech_rate"`
 		Options    map[string]interface{} `json:"options"`
+		Text       string                 `json:"text"`
 	}{
 		Provider:   voice.Provider,
 		VoiceID:    voice.VoiceID,
 		Pitch:      voice.Pitch,
 		SpeechRate: voice.SpeechRate,
 		Options:    voice.Options,
+		Text:       text,
 	}
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		// A map of canonical scalars cannot fail to marshal; degrade rather than
 		// panic so a hand-edited note never loses a turn.
-		encoded = []byte(voice.Provider + "|" + voice.VoiceID)
+		encoded = []byte(voice.Provider + "|" + voice.VoiceID + "|" + text)
 	}
 
-	hash := sha256.Sum256([]byte("v2:" + speakerID + ":" + string(encoded)))
+	// v3: the options-aware key gained the utterance text, so keys written under
+	// v2 were shared between utterances and are deliberately abandoned.
+	hash := sha256.Sum256([]byte("v3:" + speakerID + ":" + string(encoded)))
 	return hex.EncodeToString(hash[:])
 }
 

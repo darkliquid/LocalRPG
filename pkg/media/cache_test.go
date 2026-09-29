@@ -101,6 +101,20 @@ func TestComputeAudioCacheKeyForVoice(t *testing.T) {
 			t.Errorf("expected the provider to separate the keys")
 		}
 	})
+
+	t.Run("different text with the same options has a different key", func(t *testing.T) {
+		// A narrator with options set is the normal case for a styled voice, and
+		// every utterance under it must still get its own clip.
+		voice := &entity.VoiceConfig{
+			Provider: "gemini:tts", VoiceID: "Orus", Pitch: 1, SpeechRate: 1,
+			Options: map[string]interface{}{"direction": "audiobook narration, sultry"},
+		}
+		first := ComputeAudioCacheKeyForVoice("narrator", voice, "The hall is quiet.")
+		second := ComputeAudioCacheKeyForVoice("narrator", voice, "Garrick nods slowly.")
+		if first == second {
+			t.Fatalf("two utterances share the key %q; every line would reuse the first clip", first)
+		}
+	})
 }
 
 func TestPipelineKeyFollowsVoiceOptions(t *testing.T) {
