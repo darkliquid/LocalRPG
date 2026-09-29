@@ -71,13 +71,22 @@ type CheckRequest struct {
 	Notation   string            `json:"notation,omitempty"`
 }
 
+// DieFace is one die as it landed. Symbol is the notation's own way of showing
+// that face, so a Fate die reads as a blank or a plus rather than as 0 or 1.
+type DieFace struct {
+	Value  int    `json:"value"`
+	Symbol string `json:"symbol,omitempty"`
+}
+
 // RollSummary is harness's view of a die roll, so the protocol types never
-// import pkg/rules (rules imports harness and would cycle).
+// import pkg/rules (rules imports harness and would cycle). Dice carries the
+// individual faces, because a total alone cannot be shown honestly.
 type RollSummary struct {
-	Notation  string `json:"notation"`
-	Total     int    `json:"total"`
-	Successes int    `json:"successes"`
-	RollCount int    `json:"roll_count"`
+	Notation  string    `json:"notation"`
+	Total     int       `json:"total"`
+	Successes int       `json:"successes"`
+	RollCount int       `json:"roll_count"`
+	Dice      []DieFace `json:"dice,omitempty"`
 }
 
 // CheckResult is the resolved outcome of a CheckRequest.

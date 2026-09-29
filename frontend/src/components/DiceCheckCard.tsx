@@ -15,19 +15,6 @@ export function classifyCheckOutcome(outcome: string): CheckTone {
   return 'neutral';
 }
 
-function diceCount(notation?: string): number {
-  if (!notation) return 1;
-  const match = notation.match(/(\d*)\s*d\s*(\d+)/i);
-  if (!match) return 1;
-  const count = match[1] ? parseInt(match[1], 10) : 1;
-  return Number.isFinite(count) && count > 0 ? count : 1;
-}
-
-function dieSize(notation?: string): string {
-  const match = notation?.match(/d\s*(\d+)/i);
-  return match ? match[1] : '?';
-}
-
 const TONE_STYLES: Record<CheckTone, { border: string; chip: string }> = {
   success: { border: 'border-emerald-500/60', chip: 'text-emerald-300' },
   partial: { border: 'border-amber-500/60', chip: 'text-amber-300' },
@@ -35,14 +22,18 @@ const TONE_STYLES: Record<CheckTone, { border: string; chip: string }> = {
   neutral: { border: 'border-stone-500/50', chip: 'text-stone-300' },
 };
 
+// MAX_SHOWN_DICE keeps a large pool readable: the rest is a count.
+const MAX_SHOWN_DICE = 6;
+
 export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
   const tone = classifyCheckOutcome(check.outcome);
   const style = TONE_STYLES[tone];
   const roll = check.roll;
   const notation = roll?.notation ?? 'check';
-  const count = Math.max(1, roll?.roll_count && roll.roll_count > 0 ? roll.roll_count : diceCount(roll?.notation));
-  const shown = Math.min(count, 6);
-  const size = dieSize(roll?.notation);
+  // Only the faces that landed can be drawn. A record written before the engine
+  // carried them has a total and no dice, and a guessed face would be a lie.
+  const faces = roll?.dice ?? [];
+  const shown = Math.min(faces.length, MAX_SHOWN_DICE);
   const stakes =
     (check.stakes ?? '').trim() ||
     [check.actor, check.target].filter(Boolean).join(' vs ') ||
@@ -54,27 +45,39 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
   return (
     <div className={`my-3 rounded-xl border-l-4 ${style.border} bg-black/30 px-3 py-2 space-y-1`} aria-label={label}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="flex items-center gap-1" aria-hidden="true">
-          {Array.from({ length: shown }).map((_, index) => (
-            <svg key={index} viewBox="0 0 24 24" className="w-5 h-5 text-stone-300">
-              <rect
-                x="2"
-                y="2"
-                width="20"
-                height="20"
-                rx="5"
-                fill="currentColor"
-                opacity="0.12"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              />
-              <text x="12" y="15.5" textAnchor="middle" fontSize="9" fill="currentColor" fontFamily="monospace">
-                {size}
-              </text>
-            </svg>
-          ))}
-          {count > shown && <span className="text-xs font-mono text-stone-400">+{count - shown}</span>}
-        </span>
+        {shown > 0 && (
+          <span className="flex items-center gap-1" aria-hidden="true">
+            {faces.slice(0, shown).map((die, index) => {
+              const face = die.symbol || String(die.value);
+              return (
+                <svg key={index} viewBox="0 0 24 24" className="w-5 h-5 text-stone-300">
+                  <rect
+                    x="2"
+                    y="2"
+                    width="20"
+                    height="20"
+                    rx="5"
+                    fill="currentColor"
+                    opacity="0.12"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <text
+                    x="12"
+                    y="15.5"
+                    textAnchor="middle"
+                    fontSize={face.length > 2 ? 7 : 9}
+                    fill="currentColor"
+                    fontFamily="monospace"
+                  >
+                    {face}
+                  </text>
+                </svg>
+              );
+            })}
+            {faces.length > shown && <span className="text-xs font-mono text-stone-400">+{faces.length - shown}</span>}
+          </span>
+        )}
         <span className="text-xs font-mono text-stone-300">{notation}</span>
         {roll && <span className="text-xs font-mono text-stone-400">&rarr; {roll.total}</span>}
         {roll && roll.successes !== undefined && roll.successes > 0 && (

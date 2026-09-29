@@ -108,6 +108,13 @@ export interface Turn {
   };
 }
 
+// DieFace is one die as it landed. Symbol is the notation's own way of showing
+// that face, so a Fate die reads as a blank or a plus rather than as 0 or 1.
+export interface DieFace {
+  value: number;
+  symbol?: string;
+}
+
 export interface TurnCheck {
   check_id: string;
   actor?: string;
@@ -115,7 +122,9 @@ export interface TurnCheck {
   check_kind?: string;
   stakes?: string;
   outcome: string;
-  roll?: { notation: string; total: number; successes?: number; roll_count?: number };
+  // dice are the faces that landed, which is what a die can be drawn from: a
+  // total of 4 from 2d6 says nothing about the individual dice.
+  roll?: { notation: string; total: number; successes?: number; roll_count?: number; dice?: DieFace[] };
 }
 
 export interface EntityMemory {

@@ -30,12 +30,7 @@ func (defaultCheckResolver) Resolve(_ context.Context, req harness.CheckRequest,
 	}
 	return &harness.CheckResult{
 		CheckID: newCheckID(),
-		Roll: &harness.RollSummary{
-			Notation:  roll.Notation,
-			Total:     roll.Total,
-			Successes: roll.Successes,
-			RollCount: roll.RollCount,
-		},
+		Roll:    roll.Summary(roll.Total),
 		Outcome: outcome,
 	}, nil
 }

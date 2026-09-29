@@ -53,12 +53,7 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 		CheckID: newCheckID(),
 		Actor:   req.Actor,
 		Target:  req.Target,
-		Roll: &harness.RollSummary{
-			Notation:  roll.Notation,
-			Total:     total,
-			Successes: roll.Successes,
-			RollCount: roll.RollCount,
-		},
+		Roll:    roll.Summary(total),
 		Outcome: outcome,
 	}, nil
 }
