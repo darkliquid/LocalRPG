@@ -235,6 +235,9 @@ func (p *TTSPipeline) SynthesizeProvisional(ctx context.Context, kind, speakerID
 }
 
 // SynthesizeSegmentForce renders one segment with optional force cache bypass.
+// A multi-sentence segment is synthesized sentence by sentence, so a clip the
+// streaming path already wrote is reused, and the sentences are concatenated
+// into the single clip the rest of the app expects.
 func (p *TTSPipeline) SynthesizeSegmentForce(ctx context.Context, segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig, force bool) (string, error) {
 	speakerID, voice, spoken := p.prepareSegment(segment, narratorVoice, voiceFor)
 	if strings.TrimSpace(spoken) == "" {
@@ -247,7 +250,94 @@ func (p *TTSPipeline) SynthesizeSegmentForce(ctx context.Context, segment entity
 			"chars_spoken": len([]rune(spoken)),
 		})
 	}
-	return p.SynthesizeUtteranceForce(ctx, speakerID, voice, spoken, force)
+
+	sentences := p.sentencesFor(spoken)
+	if len(sentences) <= 1 {
+		return p.SynthesizeUtteranceForce(ctx, speakerID, voice, spoken, force)
+	}
+
+	base := ComputeAudioCacheKeyForVoice(speakerID, voice, spoken)
+	if !force {
+		if path, ok := p.cachedClip(base); ok {
+			p.setLastUsage(Usage{})
+			return path, nil
+		}
+	}
+
+	clips := make([]string, 0, len(sentences))
+	for _, sentence := range sentences {
+		clip, err := p.SynthesizeUtteranceForce(ctx, speakerID, voice, sentence, force)
+		if err != nil {
+			return "", err
+		}
+		clips = append(clips, clip)
+	}
+	return p.concatenateSentences(base, clips)
+}
+
+// sentencesFor splits reduced text into sentences when doing so cannot change
+// what a client hears. A client that is being sent Markdown keeps the whole
+// segment, because emphasis or an audio tag can span what the splitter sees as a
+// sentence boundary.
+func (p *TTSPipeline) sentencesFor(reduced string) []string {
+	if p.markdownPreserved() {
+		return []string{reduced}
+	}
+	return SplitSentences(reduced)
+}
+
+// markdownPreserved reports whether the client receives the text's Markdown. It
+// mirrors SpeakableTextFor's policy decision.
+func (p *TTSPipeline) markdownPreserved() bool {
+	switch p.policy {
+	case TextPolicyKeep:
+		return true
+	case TextPolicyStrip:
+		return false
+	}
+	aware, ok := p.client.(MarkdownAware)
+	return ok && aware.SupportsMarkdown()
+}
+
+// concatenateSentences decodes the sentence clips, joins them, and encodes one
+// segment clip under base, so a repeat read never re-concatenates.
+func (p *TTSPipeline) concatenateSentences(base string, clips []string) (string, error) {
+	keyLock := p.keyLock(base)
+	keyLock.Lock()
+	defer keyLock.Unlock()
+	if path, ok := p.cachedClip(base); ok {
+		return path, nil
+	}
+
+	var pcm []int16
+	rate, channels := 48000, 1
+	for _, clip := range clips {
+		data, err := os.ReadFile(clip)
+		if err != nil {
+			return "", fmt.Errorf("read sentence clip: %w", err)
+		}
+		decoded, decodedRate, decodedChannels, err := opus.Decode(data)
+		if err != nil {
+			return "", fmt.Errorf("decode sentence clip %q: %w", clip, err)
+		}
+		if len(pcm) == 0 {
+			rate, channels = decodedRate, decodedChannels
+		}
+		pcm = append(pcm, decoded...)
+	}
+	if len(pcm) == 0 {
+		return "", ErrNoSpeakableText
+	}
+
+	encoded, err := opus.Encode(pcm, rate, channels, p.opusBitrate)
+	if err != nil {
+		return "", &harness.GenerationFailure{
+			Code:    harness.FailureProviderError,
+			Message: fmt.Sprintf("encode concatenated speech: %v", err),
+			Cause:   err,
+		}
+	}
+	return p.cache.Put("audio", base+".opus", encoded)
 }
 
 // CountUncached reports how many speakable segments already have a clip and how

@@ -1,7 +1,9 @@
 # Sentence-Scoped TTS Clips Design
 
 **Date:** 2026-09-28
-**Status:** Proposed
+**Status:** Implemented (2026-09-28). Deviation: a Markdown-consuming client is
+never split, rather than undergoing the per-sentence balance scan; this can only
+forgo a reuse opportunity, never corrupt markup.
 **Scope:** Make per-sentence synthesis the unit of caching end to end, so streamed sentence clips are reused by the finalised segment and no provider call is wasted
 **Related:** `pkg/media` (`tts.go`, `sentence.go`, `opus`), `pkg/gui` (`service.go`, `streaming_tts.go`, `types.go`), `pkg/export` (`script.go`), `pkg/media/playback`; follows `docs/superpowers/specs/2026-09-28-streaming-tts-design.md`
 
