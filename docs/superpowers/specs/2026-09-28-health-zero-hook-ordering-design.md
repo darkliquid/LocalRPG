@@ -1,7 +1,7 @@
 # Health-Zero Hook Ordering Design
 
 **Date:** 2026-09-28
-**Status:** Proposed
+**Status:** Implemented (2026-09-28)
 **Scope:** See a health change made by an `onTurnEnd` hook in the same turn, by evaluating health-zero after the hook while keeping the recorded effect and the turn-end context consistent
 **Related:** `pkg/engine/orchestrator.go`, `pkg/engine/mechanics_engagement.go`, `pkg/rules/js_engine.go`; implements the residual gap in `docs/superpowers/specs/2026-09-25-turn-memory-mechanics-followups-design.md` and follows `docs/superpowers/specs/2026-09-28-mechanics-engagement-depth-design.md`
 

@@ -1097,13 +1097,18 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// of the same record and a threshold level sees the final values.
 	o.applyAdvancement(ctx, &turn)
 
-	// Resolve health-zero after every state change this turn, so the effect is
-	// part of the same record. A health change made by an onTurnEnd hook is seen
-	// on the next turn instead, because hooks run after the turn is recorded.
-	if effect := o.healthOutcome(); effect != "" {
+	turn.WorldTick = o.worldTick
+
+	// Health is resolved twice around the post-turn hooks: once before them, so
+	// the hook context carries the effect the turn's own changes caused, and once
+	// after, so a hook that drives the stat to zero is seen on this same turn
+	// rather than the next.
+	pendingEffect := o.healthOutcome()
+	o.runTurnEndHooks(turnNum, &turn, pendingEffect)
+	finalEffect := o.healthOutcome()
+	if effect := firstNonEmpty(pendingEffect, finalEffect); effect != "" {
 		turn.HealthEffects = append(turn.HealthEffects, HealthEffect{Entity: o.playerID, Effect: effect})
 	}
-	turn.WorldTick = o.worldTick
 
 	if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
@@ -1146,28 +1151,6 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		"outcome":         turn.Outcome,
 		"narration_chars": len([]rune(turn.Narration)),
 	})
-
-	// Trigger post-turn hooks
-	if o.rulesEngine != nil {
-		entityIDs := make([]string, 0, len(turn.Entities))
-		for _, mention := range turn.Entities {
-			entityIDs = append(entityIDs, mention.ID)
-		}
-		hookCtx := map[string]interface{}{
-			"turn":           turnNum,
-			"narration":      turn.Narration,
-			"entities":       entityIDs,
-			"checks":         len(turn.Checks),
-			"health_effects": turn.HealthEffects,
-			"world_tick":     turn.WorldTick,
-		}
-		if turn.Verdict != nil {
-			hookCtx["verdict"] = string(turn.Verdict.Feasibility)
-		}
-		if err := o.rulesEngine.ExecuteTurnEnd(hookCtx); err != nil {
-			o.logger.Event("turn.end_hook_error", map[string]interface{}{"error": err.Error()})
-		}
-	}
 
 	return &turn, nil
 }

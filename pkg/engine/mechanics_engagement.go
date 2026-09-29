@@ -3,7 +3,6 @@ package engine
 import (
 	"strings"
 
-	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
@@ -145,5 +144,45 @@ func applyDirectives(gmDirective string, directives []string) string {
 	return gmDirective
 }
 
-// healthSpec returns the declared health schema, or nil.
-func (o *TurnOrchestrator) healthSpec() *core.HealthSpec { return o.health }
+// runTurnEndHooks runs the onTurnEnd hooks with the turn's facts. pendingEffect
+// is the health-zero effect already resolved from the turn's own state changes,
+// so a hook can react to it; a health change the hook itself makes is resolved by
+// the caller afterwards.
+func (o *TurnOrchestrator) runTurnEndHooks(turnNum int, turn *Turn, pendingEffect string) {
+	if o.rulesEngine == nil {
+		return
+	}
+
+	entityIDs := make([]string, 0, len(turn.Entities))
+	for _, mention := range turn.Entities {
+		entityIDs = append(entityIDs, mention.ID)
+	}
+
+	var healthEffects []HealthEffect
+	if pendingEffect != "" {
+		healthEffects = []HealthEffect{{Entity: o.playerID, Effect: pendingEffect}}
+	}
+
+	hookCtx := map[string]interface{}{
+		"turn":           turnNum,
+		"narration":      turn.Narration,
+		"entities":       entityIDs,
+		"checks":         len(turn.Checks),
+		"health_effects": healthEffects,
+		"world_tick":     turn.WorldTick,
+	}
+	if turn.Verdict != nil {
+		hookCtx["verdict"] = string(turn.Verdict.Feasibility)
+	}
+	if err := o.rulesEngine.ExecuteTurnEnd(hookCtx); err != nil {
+		o.logger.Event("turn.end_hook_error", map[string]interface{}{"error": err.Error()})
+	}
+}
+
+// firstNonEmpty returns a when it is non-empty, otherwise b.
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
+}
