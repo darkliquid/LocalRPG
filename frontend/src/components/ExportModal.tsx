@@ -14,6 +14,10 @@ interface ExportModalProps {
  * model-download flow: the request returns as soon as the job is accepted and
  * progress arrives on the export event stream.
  */
+// maxReportedLines bounds the log: a long campaign reports a lot, and the last few lines
+// are the ones that matter.
+const maxReportedLines = 8;
+
 export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClose }) => {
   const [format, setFormat] = useState<'web' | 'video'>('web');
   const [art, setArt] = useState(true);
@@ -27,6 +31,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
   const [running, setRunning] = useState(false);
   const [job, setJob] = useState<ExportJob | null>(null);
   const [progress, setProgress] = useState<ExportEvent | null>(null);
+  // What the export said as it went: coverage, beats it could not speak, clips it repaired.
+  // The phase line only ever shows the latest event, so without this a diagnostic is
+  // overwritten the moment the next phase starts.
+  const [messages, setMessages] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,6 +52,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
     const close = APIClient.subscribeExportEvents((event) => {
       if (event.game_id !== gameID) return;
       setProgress(event);
+      if (event.message) {
+        setMessages((prev) => (prev[prev.length - 1] === event.message ? prev : [...prev, event.message as string].slice(-maxReportedLines)));
+      }
       if (event.phase === 'done') {
         setRunning(false);
         setJob((current) =>
@@ -63,6 +74,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
     if (!gameID || !outDir.trim()) return;
     setError(null);
     setProgress(null);
+    setMessages([]);
     setJob(null);
     try {
       const started = await APIClient.startExport({
@@ -229,6 +241,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
                   className="w-28 bg-stone-950 border border-stone-800 rounded-lg px-2 py-1 text-stone-200"
                 />
               </label>
+            </div>
+          )}
+
+          {messages.length > 0 && (
+            <div className="max-h-28 overflow-y-auto rounded-lg bg-stone-950/70 border border-stone-800 px-3 py-2 space-y-0.5">
+              {messages.map((message, index) => (
+                <div key={index} className="text-xs font-mono text-stone-400">
+                  {message}
+                </div>
+              ))}
             </div>
           )}
 

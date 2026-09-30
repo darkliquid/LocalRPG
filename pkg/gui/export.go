@@ -16,6 +16,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/export"
 	"github.com/darkliquid/localrpg/pkg/scene"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 var (
@@ -259,11 +260,23 @@ func (s *Service) StartExport(ctx context.Context, req ExportRequestDTO) (*Expor
 	return &ExportJobDTO{GameID: req.GameID, Format: format, OutputPath: outPath, Running: true}, nil
 }
 
-// exportArtifactPath names the artifact inside a chosen directory: a bundle
-// directory for the web player, a video file otherwise.
+// humanBytes reports a file size the way a person reads it.
+func humanBytes(size int64) string {
+	switch {
+	case size >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(size)/(1<<20))
+	case size >= 1<<10:
+		return fmt.Sprintf("%.0f KB", float64(size)/(1<<10))
+	default:
+		return fmt.Sprintf("%d bytes", size)
+	}
+}
+
+// exportArtifactPath names the artifact inside a chosen directory: one
+// self-contained page for the web player, a video file otherwise.
 func exportArtifactPath(outDir, gameID, format string) string {
 	if format == "web" {
-		return filepath.Join(outDir, gameID+"-web")
+		return filepath.Join(outDir, gameID+"-web.html")
 	}
 	return filepath.Join(outDir, gameID+".mp4")
 }
@@ -319,10 +332,33 @@ func (s *Service) runExport(ctx context.Context, req ExportRequestDTO, outPath s
 	compiler.SetMedia(req.Art, req.Audio)
 	compiler.SetProgress(emit)
 
+	// The export uses the app's own pipelines: the same narrator voice, the same image
+	// client and world style, and the same speech pipeline the chronicle plays through.
+	// Anything else is a cache miss, and a miss is what made an export silent and
+	// imageless while the app itself had both.
+	narrator := s.narratorVoiceFor(req.GameID, s.Config())
+	compiler.SetNarratorVoice(narrator)
+	if art := s.sceneArtResolver(req.GameID); art != nil {
+		compiler.SetArtResolver(art)
+	}
+	if pipeline, pipelineErr := s.audioPipeline(); pipelineErr == nil {
+		if store, storeErr := s.store(req.GameID); storeErr == nil {
+			compiler.SetSpeechResolver(export.NewSpeechResolver(pipeline, store, narrator))
+		}
+	}
+
 	script, err := compiler.Compile(ctx, req.GameID)
 	if err != nil {
 		fail(err)
 		return
+	}
+
+	// A beat that resolved no clip is reported with the voice and keys it was looked for
+	// under: a bundle that is silent for one character looks the same as a bundle whose
+	// cache key does not match the app's, and this is what tells them apart.
+	for _, miss := range compiler.SpeechMisses() {
+		trace.OrNil(s.logger).Event("export.speech_miss", map[string]interface{}{"game": req.GameID, "detail": miss})
+		emit(scene.Progress{Phase: "compile", Message: "no clip: " + miss})
 	}
 
 	switch req.Format {
@@ -340,6 +376,10 @@ func (s *Service) runExport(ctx context.Context, req ExportRequestDTO, outPath s
 		if _, err := exporter.Export(ctx, script, outPath); err != nil {
 			fail(err)
 			return
+		}
+		// A bundle carries its clips, so its size is worth saying out loud.
+		if info, statErr := os.Stat(outPath); statErr == nil {
+			emit(scene.Progress{Phase: "encode", Message: fmt.Sprintf("wrote %s (%s)", filepath.Base(outPath), humanBytes(info.Size()))})
 		}
 	case "video":
 		pipeline := export.NewVideoPipeline(s.rootDir)

@@ -1080,6 +1080,7 @@ func healthEffectDTOs(effects []engine.HealthEffect) []HealthEffectDTO {
 
 // ErrTurnInFlight means another turn is already running for this campaign.
 var ErrTurnInFlight = errors.New("a turn is already in flight")
+
 // ErrCampaignNotPlayable means the campaign's files are not ready for a turn, so
 // the caller can answer before any bytes are sent.
 var ErrCampaignNotPlayable = errors.New("campaign cannot be prepared")
@@ -1568,21 +1569,17 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 		return "", "", fmt.Errorf("parse location %q: %w", locationID, err)
 	}
 
-	cfg := s.configMgr.Get()
-	client, err := media.NewSceneImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey, s.logger)
-	if err != nil {
-		return "", "", fmt.Errorf("build image client: %w", err)
+	store := s.sceneArtResolver(gameID)
+	if store == nil {
+		return "", "", fmt.Errorf("build image client")
 	}
 
-	worldStyle := s.worldArtStyle(gameID)
-	providerParams := cfg.Media.Image.Type + ":" + cfg.Media.Image.Model
-	store := media.NewArtStore(client, media.NewContentCache(s.resolver.CacheDir()), worldStyle, providerParams)
-
+	cfg := s.configMgr.Get()
 	start := time.Now()
 	s.logger = trace.OrNil(s.logger)
 	s.logger.Event("media.image.request", map[string]interface{}{
 		"location": locationID,
-		"provider": providerParams,
+		"provider": cfg.Media.Image.Type + ":" + cfg.Media.Image.Model,
 		"force":    force,
 	})
 
@@ -1718,6 +1715,20 @@ func (s *Service) worldArtStyle(gameID string) string {
 		return ""
 	}
 	return strings.TrimSpace(strings.Join([]string{world.ArtStyle, world.Genre}, ", "))
+}
+
+// sceneArtResolver builds the one scene-art resolver for a campaign: the image client
+// with the shared key, the world's art style, and the campaign's cache. The route that
+// serves scene art and an export that carries it both use it, so a bundle shows the
+// images the app already has rather than generating its own.
+func (s *Service) sceneArtResolver(gameID string) *media.ArtStore {
+	cfg := s.configMgr.Get()
+	client, err := media.NewSceneImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey, s.logger)
+	if err != nil {
+		return nil
+	}
+	params := cfg.Media.Image.Type + ":" + cfg.Media.Image.Model
+	return media.NewArtStore(client, media.NewContentCache(s.resolver.CacheDir()), s.worldArtStyle(gameID), params)
 }
 
 // scanAndEnrichCharacters scans a campaign's character entities, enriching missing attributes and generating portraits.
@@ -3533,7 +3544,6 @@ func toTurnContextDTO(tc *harness.TurnContext, prompt string) *TurnContextDTO {
 		Prompt:          prompt,
 	}
 }
-
 
 // ListEntityMemories returns an entity's memories newest-first for the codex
 // timeline.

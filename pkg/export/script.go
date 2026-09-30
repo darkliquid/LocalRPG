@@ -2,10 +2,13 @@ package export
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
@@ -49,18 +52,83 @@ func (s *campaignSource) Location(id string) (*entity.Entity, error) {
 }
 
 // speechResolver synthesizes one segment at a time and probes the clip's length,
-// falling back to the reading estimate when probing fails.
+// falling back to the reading estimate when probing fails. It also remembers every beat
+// it could not resolve, because a bundle that is silent for one character is otherwise
+// indistinguishable from one whose cache key does not match the app's.
 type speechResolver struct {
 	pipeline *media.TTSPipeline
 	store    *storage.Store
 	narrator *entity.VoiceConfig
+
+	mu      sync.Mutex
+	misses  []string
+	repairs []string
+}
+
+// noteRepair records a clip that was not in the cache's format: one that was re-encoded, or
+// one that could not be and was therefore left out.
+func (r *speechResolver) noteRepair(note string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.repairs) < maxReportedMisses {
+		r.repairs = append(r.repairs, note)
+	}
+}
+
+// Repairs reports the clips that were not in the cache's format, so an export says what it
+// had to fix rather than quietly carrying something a browser might refuse. It includes
+// what the pipeline repaired while it was resolving the clips, and what this resolver
+// found itself.
+func (r *speechResolver) Repairs() []string {
+	r.mu.Lock()
+	own := append([]string(nil), r.repairs...)
+	r.mu.Unlock()
+
+	return append(r.pipeline.Repairs(), own...)
 }
 
 func (r *speechResolver) SegmentAudio(ctx context.Context, segment entity.TurnSegment) ([]string, time.Duration, error) {
 	clips, err := r.pipeline.SynthesizeSegmentClips(ctx, segment, r.narrator, r.voiceFor, false)
+	if errors.Is(err, media.ErrNoSpeakableText) {
+		// The beat reduces to nothing - a stage direction, say - so it is never spoken. It
+		// is not a beat that should have audio, and nothing is reported about it.
+		return nil, 0, scene.ErrNoSpeakableText
+	}
+	if err != nil || len(clips) == 0 {
+		r.noteMiss(segment, err)
+	}
 	if err != nil {
 		return nil, 0, err
 	}
+
+	// Every clip is checked before it leaves: the cache's one format is Ogg/Opus, whole and
+	// properly ended, and a file that reached it another way - a campaign cached before the
+	// Opus migration, or one written before a stream marked its own end - is decoded and
+	// re-encoded rather than shipped as audio a browser will refuse. The repaired file
+	// replaces the original under its key.
+	checked := make([]string, 0, len(clips))
+	for _, clip := range clips {
+		data, err := os.ReadFile(clip)
+		if err != nil {
+			r.noteRepair(fmt.Sprintf("%s could not be read and was left out: %v", filepath.Base(clip), err))
+			continue
+		}
+
+		problem := media.ClipProblem(data)
+		if problem == nil {
+			checked = append(checked, clip)
+			continue
+		}
+
+		fixed, err := r.pipeline.NormalizeClip(clip)
+		if err != nil {
+			r.noteRepair(fmt.Sprintf("%s was left out: %v (%v)", filepath.Base(clip), err, problem))
+			continue
+		}
+		r.noteRepair(fmt.Sprintf("%s was re-encoded: %v", filepath.Base(clip), problem))
+		checked = append(checked, fixed)
+	}
+	clips = checked
 
 	// A clip whose length cannot be probed contributes nothing rather than
 	// throwing the beat's pacing away; the beat falls back to the reading estimate.
@@ -78,6 +146,54 @@ func (r *speechResolver) SegmentAudio(ctx context.Context, segment entity.TurnSe
 func (r *speechResolver) voiceFor(speakerID string) *entity.VoiceConfig {
 	return harness.ResolveSpeakerVoice(r.store, speakerID)
 }
+
+// noteMiss records what a beat that produced no clip was read as: the speaker, the voice
+// it resolved to, the keys the pipeline looked for, and why nothing came back. Keys that
+// are absent from the cache mean the app cached the clip under something else.
+func (r *speechResolver) noteMiss(segment entity.TurnSegment, err error) {
+	speaker := strings.TrimSpace(segment.Speaker)
+	if speaker == "" {
+		speaker = "narrator"
+	}
+
+	voice := r.narrator
+	ref := ""
+	if segment.Kind == entity.SegmentSpeech {
+		ref = segment.SpeakerID
+		if ref == "" {
+			ref = segment.Speaker
+		}
+		if resolved := r.voiceFor(ref); resolved != nil {
+			voice = resolved
+		}
+	}
+
+	keys, _ := r.pipeline.SegmentClipKeys(segment, r.narrator, r.voiceFor)
+	reason := "no clip was produced"
+	if err != nil {
+		reason = err.Error()
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.misses) < maxReportedMisses {
+		r.misses = append(r.misses, fmt.Sprintf(
+			"%s %q (ref %q) voice %q: %d keys %v: %s",
+			segment.Kind, speaker, ref, voice.VoiceID, len(keys), keys, reason))
+	}
+}
+
+// Misses reports the beats that resolved no clip, most recent first, so an export can say
+// which lines it could not speak and what it looked for.
+func (r *speechResolver) Misses() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.misses...)
+}
+
+// maxReportedMisses bounds the report: a campaign with no provider would otherwise list
+// every line it has.
+const maxReportedMisses = 5
 
 // portraitResolver serves a character's portrait: the note's own file when it has
 // one, otherwise the procedural bust the app serves for a character without art.
@@ -114,6 +230,66 @@ func (r *portraitResolver) Portrait(_ context.Context, characterID string) (stri
 	return r.cache.Put("export-portraits", characterID+".svg", media.GenerateProceduralBustSVG(ent.ID, name, ent.Gender))
 }
 
+// NewSpeechResolver builds a speech resolver over an existing pipeline, so an export
+// reuses the clips the app plays: the same pipeline means the same text policy, the same
+// cache, and therefore the same keys.
+func NewSpeechResolver(pipeline *media.TTSPipeline, store *storage.Store, narrator *entity.VoiceConfig) scene.SpeechResolver {
+	return &speechResolver{pipeline: pipeline, store: store, narrator: narrator}
+}
+
+// narratorVoice resolves the voice narration is read in: the campaign's own setting when
+// it has one, otherwise the configuration's default. It is the voice the app narrates
+// with, so the clips an export needs are the clips the app already cached.
+func (c *ScriptCompiler) narratorVoice(manifest *core.GameManifest) *entity.VoiceConfig {
+	if c.narrator != nil {
+		return c.narrator
+	}
+
+	voiceID := ""
+	if c.config != nil {
+		voiceID = c.config.Media.TTS.DefaultVoice
+	}
+	if manifest != nil && manifest.Settings != nil {
+		if nv, ok := manifest.Settings["narrator_voice"].(string); ok && strings.TrimSpace(nv) != "" {
+			voiceID = strings.TrimSpace(nv)
+		}
+	}
+
+	voice := &entity.VoiceConfig{VoiceID: voiceID}
+	if c.config != nil {
+		voice.Pitch = c.config.Media.TTS.Pitch
+		voice.SpeechRate = c.config.Media.TTS.SpeechRate
+		voice.Options = c.config.Media.TTS.Options
+	}
+	return voice
+}
+
+// bannerPath finds a campaign's own image: its banner when it has one, otherwise its
+// world's, which is the fallback the app's launcher and theatre use.
+func bannerPath(resolver *core.PathResolver, manifest *core.GameManifest) string {
+	if path, _ := findBanner(resolver.GameDir(manifest.ID)); path != "" {
+		return path
+	}
+	if manifest.WorldID != "" {
+		if path, _ := findBanner(resolver.WorldDir(manifest.WorldID)); path != "" {
+			return path
+		}
+	}
+	return ""
+}
+
+// findBanner looks for a banner image in a directory's assets, in the order the app
+// serves them.
+func findBanner(dir string) (string, string) {
+	for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+		path := filepath.Join(dir, "assets", "banner"+ext)
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return path, ext
+		}
+	}
+	return "", ""
+}
+
 // ScriptCompiler builds a scene script for a campaign.
 type ScriptCompiler struct {
 	rootDir  string
@@ -122,6 +298,19 @@ type ScriptCompiler struct {
 	art      bool
 	audio    bool
 	progress scene.ProgressFunc
+	// art and speech are the app's own resolvers when a caller supplies them, so an
+	// export reuses the images and clips the app already has rather than building its
+	// own clients and missing the cache. narrator is the campaign's narrator voice,
+	// which decides the key every narration clip is cached under. banner is the
+	// campaign's own image, which the theatre shows when a scene has none.
+	artResolver  scene.ArtResolver
+	speech       scene.SpeechResolver
+	speechReport interface {
+		Misses() []string
+		Repairs() []string
+	}
+	narrator *entity.VoiceConfig
+	banner   string
 }
 
 // NewScriptCompiler builds a compiler for one campaign root. Imagery and speech
@@ -150,6 +339,47 @@ func NewScriptCompilerWithResolver(resolver *core.PathResolver, cfg *config.Conf
 	}
 	return &ScriptCompiler{resolver: resolver, config: cfg, art: true, audio: true}
 }
+
+// SetArtResolver supplies the app's own scene art, so an export serves the images the
+// app already has. Without one the compiler builds its own client.
+func (c *ScriptCompiler) SetArtResolver(art scene.ArtResolver) { c.artResolver = art }
+
+// SetSpeechResolver supplies the app's own speech pipeline, so an export reuses the
+// clips the app plays instead of synthesizing its own.
+func (c *ScriptCompiler) SetSpeechResolver(speech scene.SpeechResolver) {
+	c.speech = speech
+	if reporter, ok := speech.(interface {
+		Misses() []string
+		Repairs() []string
+	}); ok {
+		c.speechReport = reporter
+	}
+}
+
+// SpeechMisses reports the beats that resolved no clip, with the voice and keys each was
+// looked for under. It is empty until Compile has run.
+func (c *ScriptCompiler) SpeechMisses() []string {
+	if c.speechReport == nil {
+		return nil
+	}
+	return c.speechReport.Misses()
+}
+
+// SpeechRepairs reports the clips that were not Ogg/Opus and were re-encoded, or left out
+// when they could not be. It is empty until Compile has run.
+func (c *ScriptCompiler) SpeechRepairs() []string {
+	if c.speechReport == nil {
+		return nil
+	}
+	return c.speechReport.Repairs()
+}
+
+// SetNarratorVoice supplies the campaign's narrator voice. It must be the voice the app
+// narrates with, or every narration clip is a cache miss.
+func (c *ScriptCompiler) SetNarratorVoice(voice *entity.VoiceConfig) { c.narrator = voice }
+
+// SetBanner supplies the campaign's own image for a scene that has none.
+func (c *ScriptCompiler) SetBanner(path string) { c.banner = path }
 
 // SetMedia disables art or audio resolution for an export.
 func (c *ScriptCompiler) SetMedia(art, audio bool) {
@@ -192,7 +422,15 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 
 	compiler := scene.NewCompiler(&campaignSource{resolver: c.resolver, store: store, gameID: gameID})
 
-	if c.art && (c.config.Media.Image.BuiltinFallback || c.config.Media.Image.Type != "disabled") {
+	narrator := c.narratorVoice(manifest)
+	banner := c.banner
+	if banner == "" {
+		banner = bannerPath(c.resolver, manifest)
+	}
+
+	if c.artResolver != nil {
+		compiler.SetArtResolver(c.artResolver)
+	} else if c.art && (c.config.Media.Image.BuiltinFallback || c.config.Media.Image.Type != "disabled") {
 		if client, err := media.NewSceneImageClient(c.config.Media.Image); err == nil {
 			cache := media.NewContentCache(c.resolver.CacheDir())
 			params := c.config.Media.Image.Type + ":" + c.config.Media.Image.Model
@@ -200,22 +438,15 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		}
 	}
 
-	if c.audio && c.config.Media.TTS.Type != "" && c.config.Media.TTS.Type != "disabled" {
+	if c.speech != nil {
+		compiler.SetSpeechResolver(c.speech)
+	} else if c.audio && c.config.Media.TTS.Type != "" && c.config.Media.TTS.Type != "disabled" {
 		if client, err := media.NewTTSClient(c.config.Media.TTS); err == nil {
 			cache := media.NewContentCache(c.resolver.CacheDir())
 			pipeline := media.NewTTSPipeline(client, cache)
 			pipeline.SetTextPolicy(media.TextPolicyFromConfig(c.config.Media.TTS))
 			pipeline.SetOpusBitrate(c.config.OpusBitrate())
-			compiler.SetSpeechResolver(&speechResolver{
-				pipeline: pipeline,
-				store:    store,
-				narrator: &entity.VoiceConfig{
-					VoiceID:    c.config.Media.TTS.DefaultVoice,
-					Pitch:      c.config.Media.TTS.Pitch,
-					SpeechRate: c.config.Media.TTS.SpeechRate,
-					Options:    c.config.Media.TTS.Options,
-				},
-			})
+			compiler.SetSpeechResolver(NewSpeechResolver(pipeline, store, narrator))
 		}
 	}
 
@@ -234,6 +465,7 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		WorldStyle:     worldStyle,
 		ProviderParams: c.config.Media.Image.Type + ":" + c.config.Media.Image.Model,
 		PlayerID:       manifest.Player,
+		BannerPath:     banner,
 		Progress:       c.progress,
 	}
 	if c.progress == nil {
@@ -248,5 +480,74 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 	}
 
 	script.GameName = manifest.Name
+	script.PlayerName = c.playerName(store, manifest)
+
+	// A bundle carries no codex and no navigation, so a link in its prose is noise:
+	// [[the-quay]] reads as "The Quay", and an authored label wins over the name.
+	names := c.entityName(store)
+	for i := range script.Scenes {
+		for j := range script.Scenes[i].Beats {
+			beat := &script.Scenes[i].Beats[j]
+			beat.Text = displayText(beat.Text, names)
+		}
+	}
+
 	return script, nil
+}
+
+// wikilinkPattern matches [[Target]] and [[Target|Label]].
+var wikilinkPattern = regexp.MustCompile(`\[\[([^\]|]+)(?:\|([^\]]+))?\]\]`)
+
+// displayText rewrites an entity link to the name a reader sees. An authored label is kept
+// as written; a bare target becomes the entity's name, or the target itself when nothing
+// resolves, because a bundle has nothing to open.
+func displayText(text string, name func(string) string) string {
+	if name == nil || !strings.Contains(text, "[[") {
+		return text
+	}
+
+	return wikilinkPattern.ReplaceAllStringFunc(text, func(match string) string {
+		groups := wikilinkPattern.FindStringSubmatch(match)
+		target := strings.TrimSpace(groups[1])
+		if label := strings.TrimSpace(groups[2]); label != "" {
+			return label
+		}
+		if resolved := name(target); resolved != "" {
+			return resolved
+		}
+		return target
+	})
+}
+
+// entityName resolves a link target to the name it is shown by, by id, name, or alias.
+func (c *ScriptCompiler) entityName(store *storage.Store) func(string) string {
+	return func(ref string) string {
+		if strings.TrimSpace(ref) == "" || store == nil {
+			return ""
+		}
+		if ent, err := store.GetEntity(ref); err == nil && ent != nil && strings.TrimSpace(ent.Name) != "" {
+			return ent.Name
+		}
+		if id := harness.ResolveSpeakerID(store, ref); id != "" {
+			if ent, err := store.GetEntity(id); err == nil && ent != nil {
+				return ent.Name
+			}
+		}
+		return ""
+	}
+}
+
+// playerName resolves the protagonist's name, so a player shows it under their portrait as
+// the theatre does. The note is canonical and the manifest's name is a copy taken at
+// creation, so the entity wins: a hand-edited character is named as they are now.
+func (c *ScriptCompiler) playerName(store *storage.Store, manifest *core.GameManifest) string {
+	if manifest == nil {
+		return ""
+	}
+	if manifest.Player != "" {
+		if ent, err := store.GetEntity(manifest.Player); err == nil && ent != nil && strings.TrimSpace(ent.Name) != "" {
+			return ent.Name
+		}
+	}
+	return strings.TrimSpace(manifest.PlayerName)
 }

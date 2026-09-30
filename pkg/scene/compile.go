@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/engine"
@@ -26,7 +27,10 @@ type Options struct {
 	ProviderParams string
 	// PlayerID is the protagonist, whose portrait stays on stage for the whole
 	// story rather than per beat.
-	PlayerID   string
+	PlayerID string
+	// BannerPath is the campaign's own image, which a player shows when a scene has
+	// no art: the theatre falls back to it rather than to nothing.
+	BannerPath string
 	OnProgress func(format string, args ...interface{})
 	// Progress reports structured progress for a caller that wants a bar or an
 	// event stream. OnProgress is kept for the CLI's line output.
@@ -38,6 +42,11 @@ type Options struct {
 // in pkg/gui because every consumer of a script needs it; pkg/gui keeps its
 // exported alias.
 var ErrAudioUnavailable = errors.New("audio unavailable")
+
+// ErrNoSpeakableText means a beat reduces to nothing once its Markdown and performance
+// tags are removed: a stage direction, say. Such a beat is deliberately never spoken, so it
+// is not a beat that needs a clip and its absence is not a silence to report.
+var ErrNoSpeakableText = errors.New("beat has no speakable text")
 
 // ArtResolver returns a scene's image path, generating it when needed.
 type ArtResolver interface {
@@ -90,8 +99,13 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 		return nil, fmt.Errorf("campaign %q has no turns to export", gameID)
 	}
 
-	script := &Script{GameID: gameID, WorldStyle: opts.WorldStyle}
-	silent := 0
+	script := &Script{GameID: gameID, WorldStyle: opts.WorldStyle, Banner: opts.BannerPath}
+	var silent silence
+	// Spoken beats are the ones that can speak at all: a beat that reduces to nothing is
+	// never spoken, so it is not one of them. The split by kind is kept as the script is
+	// built, so the report never has to guess what a beat turned out to be.
+	spoken, withAudio := 0, 0
+	byKind := map[BeatKind][2]int{}
 
 	// The protagonist's portrait is resolved once: the theatre keeps it on stage for
 	// the whole story rather than per beat.
@@ -127,8 +141,30 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 				Player:     segment.Player,
 			}
 
-			if opts.Audio && c.speech != nil {
-				c.resolveAudio(ctx, &beat, segment, &silent)
+			if opts.Audio {
+				outcome := outcomeUnspoken
+				if c.speech == nil {
+					// Audio was asked for and no provider can give it: the most common
+					// silent bundle, and the one most worth explaining.
+					silent.note(errNoSpeechProvider)
+					outcome = outcomeSilent
+				} else {
+					outcome = c.resolveAudio(ctx, &beat, segment, &silent)
+				}
+
+				switch outcome {
+				case outcomeClips:
+					spoken++
+					withAudio++
+					entry := byKind[beat.Kind]
+					entry[0]++
+					byKind[beat.Kind] = entry
+				case outcomeSilent:
+					spoken++
+					entry := byKind[beat.Kind]
+					entry[1]++
+					byKind[beat.Kind] = entry
+				}
 			}
 			c.resolvePortrait(ctx, &beat, segment)
 
@@ -146,8 +182,21 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 		script.TotalDuration += sc.Duration
 	}
 
-	if silent > 0 {
-		message := fmt.Sprintf("%d beats have no audio clip and will play silently", silent)
+	// What the script can actually say, split by kind: a bundle whose characters are silent
+	// looks the same as one whose narration is, unless the export says which.
+	coverage := coverageReport(spoken, withAudio, byKind)
+	if opts.OnProgress != nil {
+		opts.OnProgress("%s", coverage)
+	}
+	emitProgress(opts.Progress, Progress{Phase: "compile", Message: coverage})
+
+	if silent.beats > 0 {
+		message := fmt.Sprintf("%d beats have no audio clip and will play silently", silent.beats)
+		if silent.first != nil {
+			// A bundle that cannot speak should say why it is quiet: the reason is the
+			// difference between a campaign with no clips and a provider that failed.
+			message = fmt.Sprintf("%d beats have no audio clip (first failure: %v) and will play silently", silent.beats, silent.first)
+		}
 		if opts.OnProgress != nil {
 			opts.OnProgress("%s", message)
 		}
@@ -185,16 +234,68 @@ func (c *Compiler) openScene(locationID string, opts Options) Scene {
 }
 
 // resolveAudio attaches a beat's clips when they can be resolved. A missing clip is
-// counted and skipped so one silent line cannot abandon the export.
-func (c *Compiler) resolveAudio(ctx context.Context, beat *Beat, segment entity.TurnSegment, silent *int) {
+// counted and skipped so one silent line cannot abandon the export, and the first
+// failure is remembered so the export can say why it could not speak.
+func (c *Compiler) resolveAudio(ctx context.Context, beat *Beat, segment entity.TurnSegment, silent *silence) audioOutcome {
 	paths, duration, err := c.speech.SegmentAudio(ctx, segment)
+	if errors.Is(err, ErrNoSpeakableText) {
+		// The beat is deliberately not spoken, so it is not counted as a beat that should
+		// have audio and nothing is reported about it.
+		return outcomeUnspoken
+	}
 	if err != nil || len(paths) == 0 {
-		*silent++
-		return
+		silent.note(err)
+		return outcomeSilent
 	}
 
 	beat.AudioPaths = paths
 	beat.AudioDuration = duration
+	return outcomeClips
+}
+
+// audioOutcome is what resolving one beat's audio produced.
+type audioOutcome int
+
+const (
+	// outcomeClips is a beat with audio.
+	outcomeClips audioOutcome = iota
+	// outcomeUnspoken is a beat that is never spoken, so it needs no clip.
+	outcomeUnspoken
+	// outcomeSilent is a beat that should speak and has no clip.
+	outcomeSilent
+)
+
+// errNoSpeechProvider reports an export that asked for audio and has no provider to
+// synthesize it, which is the commonest reason a bundle is silent.
+var errNoSpeechProvider = errors.New("no TTS provider is configured")
+
+// coverageReport says how many beats that can speak have a clip, split by kind, so a caller
+// can see whether a silence is narration or a character's own line. Only beats that can speak
+// are counted: a scene card is a title rather than a line and is never spoken, so it is not a
+// spoken beat and has no place in the total.
+func coverageReport(spoken, withAudio int, byKind map[BeatKind][2]int) string {
+	parts := make([]string, 0, 2)
+	for _, kind := range []BeatKind{BeatNarration, BeatSpeech} {
+		if entry, ok := byKind[kind]; ok {
+			parts = append(parts, fmt.Sprintf("%s %d/%d", kind, entry[0], entry[0]+entry[1]))
+		}
+	}
+
+	return fmt.Sprintf("audio: %d of %d spoken beats have clips (%s)", withAudio, spoken, strings.Join(parts, ", "))
+}
+
+// silence counts the beats that resolved no clip and remembers why, so an export reports
+// what it could not speak rather than only how much.
+type silence struct {
+	beats int
+	first error
+}
+
+func (s *silence) note(err error) {
+	s.beats++
+	if s.first == nil && err != nil {
+		s.first = err
+	}
 }
 
 // resolvePortrait attaches the speaker's portrait to a speech beat. Only a line

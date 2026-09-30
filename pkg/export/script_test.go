@@ -2,6 +2,7 @@ package export
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
@@ -227,5 +229,448 @@ func TestCompileResolvesPortraits(t *testing.T) {
 	}
 	if !strings.HasSuffix(portraits["garrick"], ".svg") {
 		t.Errorf("garrick's portrait = %q, want the procedural bust", portraits["garrick"])
+	}
+}
+
+// A campaign names its own narrator voice, and the clips on disk are keyed by it. An
+// export that narrates with the configuration's default instead is a cache miss for
+// every line, which is what made an export silent while the app played instantly.
+func TestCompileUsesTheCampaignsNarratorVoice(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "voiced")
+	if err := os.MkdirAll(filepath.Join(gameDir, "entities"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := "id: voiced\nname: Voiced\nsystem: freeform\nworld: harbour\nplayer: sean\nsettings:\n  narrator_voice: am_adam\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"), []byte(manifest), 0644); err != nil {
+		t.Fatal(err)
+	}
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"look","narration":"The quay is quiet.","segments":[{"kind":"narration","text":"The quay is quiet."}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// The clip the app would have cached, under the campaign's voice: a real Opus clip,
+	// because the cache holds one format and checks it.
+	voice := &entity.VoiceConfig{VoiceID: "am_adam"}
+	cache := media.NewContentCache(core.NewPathResolver(root).CacheDir())
+	if _, err := media.NewTTSPipeline(&toneTTS{}, cache).
+		SynthesizeUtterance(context.Background(), "narrator", voice, "The quay is quiet."); err != nil {
+		t.Fatal(err)
+	}
+
+	// A pipeline whose provider cannot synthesize: only a cache hit can resolve a clip.
+	compiler := NewScriptCompiler(root)
+	compiler.SetSpeechResolver(NewSpeechResolver(
+		media.NewTTSPipeline(deadTTS{}, cache), nil, voice))
+
+	script, err := compiler.Compile(context.Background(), "voiced")
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	var clips int
+	for _, beat := range script.Beats() {
+		clips += len(beat.AudioPaths)
+	}
+	if clips != 1 {
+		t.Fatalf("clips = %d, want the cached narration clip reused", clips)
+	}
+}
+
+// toneTTS makes a real clip, so a test can seed a cache the way the app does.
+type toneTTS struct{}
+
+func (toneTTS) Synthesize(context.Context, string, *entity.VoiceConfig) ([]byte, error) {
+	return media.GenerateToneWAV(440, 0.02), nil
+}
+
+// deadTTS cannot synthesize anything, so only a cache hit resolves a clip.
+type deadTTS struct{}
+
+func (deadTTS) Synthesize(context.Context, string, *entity.VoiceConfig) ([]byte, error) {
+	return nil, errors.New("no provider available")
+}
+
+// A bundle carries the campaign's own image, which is what the theatre shows behind a
+// scene that has no art of its own.
+func TestCompileResolvesTheCampaignBanner(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "bannered")
+	if err := os.MkdirAll(filepath.Join(gameDir, "assets"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"), []byte("id: bannered\nname: Bannered\nworld: harbour\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	banner := filepath.Join(gameDir, "assets", "banner.png")
+	if err := os.WriteFile(banner, []byte("png-bytes"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"look","narration":"Quiet.","segments":[{"kind":"narration","text":"Quiet."}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	script, err := NewScriptCompiler(root).Compile(context.Background(), "bannered")
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	if filepath.Base(script.Banner) != "banner.png" {
+		t.Errorf("banner = %q, want the campaign's own image", script.Banner)
+	}
+}
+
+// A bundle that is silent for one character looks the same as a bundle whose cache key
+// does not match the app's, so the export reports the voice and keys it looked for.
+func TestCompileReportsASpeechBeatWithNoClip(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "silent")
+	if err := os.MkdirAll(filepath.Join(gameDir, "entities"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"),
+		[]byte("id: silent\nname: Silent\nworld: harbour\nplayer: sean\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Say","input":"hello","narration":"A guard speaks.","segments":[{"kind":"speech","speaker":"Garrick","speaker_id":"garrick","text":"Keep moving."}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewScriptCompiler(root)
+	compiler.SetSpeechResolver(NewSpeechResolver(
+		media.NewTTSPipeline(deadTTS{}, media.NewContentCache(core.NewPathResolver(root).CacheDir())),
+		nil, &entity.VoiceConfig{VoiceID: "am_adam"}))
+
+	if _, err := compiler.Compile(context.Background(), "silent"); err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	misses := compiler.SpeechMisses()
+	if len(misses) != 1 {
+		t.Fatalf("misses = %v, want the speech beat reported", misses)
+	}
+	for _, want := range []string{"Garrick", "garrick", "am_adam", "no provider available"} {
+		if !strings.Contains(misses[0], want) {
+			t.Errorf("miss %q does not mention %q", misses[0], want)
+		}
+	}
+}
+
+// A clip that reached the cache in another format is repaired on the way into an export,
+// so a bundle never carries audio a browser will refuse, and the repair is reported.
+func TestCompileRepairsAClipThatIsNotOpus(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "legacy")
+	if err := os.MkdirAll(filepath.Join(gameDir, "entities"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"),
+		[]byte("id: legacy\nname: Legacy\nworld: harbour\nplayer: sean\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"look","narration":"The quay is quiet.","segments":[{"kind":"narration","text":"The quay is quiet."}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A WAV clip cached under the key the narration resolves to, as a campaign cached
+	// before the Opus migration left it.
+	cache := media.NewContentCache(core.NewPathResolver(root).CacheDir())
+	narrator := &entity.VoiceConfig{VoiceID: "am_adam"}
+	key := media.ComputeAudioCacheKeyForVoice("narrator", narrator, "The quay is quiet.")
+	if _, err := cache.Put("audio", key+".opus", media.GenerateToneWAV(440, 0.02)); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewScriptCompiler(root)
+	compiler.SetNarratorVoice(narrator)
+	compiler.SetSpeechResolver(NewSpeechResolver(
+		media.NewTTSPipeline(deadTTS{}, cache), nil, narrator))
+
+	script, err := compiler.Compile(context.Background(), "legacy")
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	var clips []string
+	for _, beat := range script.Beats() {
+		clips = append(clips, beat.AudioPaths...)
+	}
+	if len(clips) != 1 {
+		t.Fatalf("clips = %v, want the repaired clip", clips)
+	}
+
+	data, err := os.ReadFile(clips[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !media.IsOpusClip(data) {
+		t.Error("the exported clip is not Ogg/Opus")
+	}
+
+	repairs := compiler.SpeechRepairs()
+	if len(repairs) != 1 || !strings.Contains(repairs[0], "re-encoded") {
+		t.Errorf("repairs = %v, want the re-encoded clip reported", repairs)
+	}
+}
+
+// A bundle carries no codex, so its prose reads with names rather than links: an authored
+// label is kept, a bare target becomes the entity's name, and an unknown target stays as
+// the author wrote it.
+func TestCompileReadsProseWithNamesNotLinks(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "linked")
+	if err := os.MkdirAll(filepath.Join(gameDir, "entities"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"),
+		[]byte("id: linked\nname: Linked\nworld: harbour\nplayer: sean\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	note := "---\nid: the-quay\nname: The Quay\ntype: location\n---\nSalt air.\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "entities", "the-quay.md"), []byte(note), 0644); err != nil {
+		t.Fatal(err)
+	}
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"look","narration":"x","segments":[{"kind":"narration","text":"You reach [[the-quay]] and see [[the-quay|the harbour]] and [[nobody|a stranger]]."}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	script, err := NewScriptCompiler(root).Compile(context.Background(), "linked")
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	var text string
+	for _, beat := range script.Beats() {
+		if strings.Contains(beat.Text, "You reach") {
+			text = beat.Text
+		}
+	}
+	if strings.Contains(text, "[[") {
+		t.Fatalf("the bundle still carries a link: %q", text)
+	}
+	for _, want := range []string{"The Quay", "the harbour", "a stranger"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("text %q does not read %q", text, want)
+		}
+	}
+}
+
+// The protagonist's name travels with their portrait, so a player labels it as the theatre
+// does.
+func TestCompileCarriesTheProtagonistsName(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "named")
+	if err := os.MkdirAll(filepath.Join(gameDir, "entities"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"),
+		[]byte("id: named\nname: Named\nworld: harbour\nplayer: sean\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "entities", "sean.md"),
+		[]byte("---\nid: sean\nname: Sean O'Malley\ntype: character\n---\nA traveller.\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"look","narration":"Quiet.","segments":[{"kind":"narration","text":"Quiet."}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	script, err := NewScriptCompiler(root).Compile(context.Background(), "named")
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	if script.PlayerName != "Sean O'Malley" {
+		t.Errorf("PlayerName = %q, want the protagonist's name", script.PlayerName)
+	}
+}
+
+// A clip whose write was interrupted is refused by a browser, so an export must never carry
+// one: it is replaced when a provider can, and left out (with a report) when it cannot.
+func TestCompileNeverCarriesATruncatedClip(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "cut")
+	if err := os.MkdirAll(filepath.Join(gameDir, "entities"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"),
+		[]byte("id: cut\nname: Cut\nworld: harbour\nplayer: sean\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"look","narration":"Quiet.","segments":[{"kind":"narration","text":"Quiet."}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A whole clip, cut short, under the key the narration resolves to.
+	cache := media.NewContentCache(core.NewPathResolver(root).CacheDir())
+	narrator := &entity.VoiceConfig{VoiceID: "am_adam"}
+	whole, err := media.NewTTSPipeline(&toneTTS{}, cache).
+		SynthesizeUtterance(context.Background(), "narrator", narrator, "Quiet.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(whole)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(whole, data[:len(data)*2/3], 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// With no provider, the broken clip cannot be replaced, so it is left out rather than
+	// shipped as audio a browser will refuse.
+	compiler := NewScriptCompiler(root)
+	compiler.SetNarratorVoice(narrator)
+	compiler.SetSpeechResolver(NewSpeechResolver(media.NewTTSPipeline(deadTTS{}, cache), nil, narrator))
+
+	script, err := compiler.Compile(context.Background(), "cut")
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	for _, beat := range script.Beats() {
+		for _, clip := range beat.AudioPaths {
+			raw, err := os.ReadFile(clip)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !media.IsCompleteOpusStream(raw) {
+				t.Errorf("the export carries a clip that is not whole: %s", clip)
+			}
+		}
+	}
+
+	if repairs := compiler.SpeechRepairs(); len(repairs) == 0 {
+		t.Error("the broken clip was not reported")
+	}
+}
+
+// A campaign cached by an older build holds clips that do not mark the end of their stream.
+// An export re-encodes them, without a provider, so a bundle is playable in a browser that
+// is strict about it.
+func TestCompileRepairsAClipThatDoesNotEndProperly(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "older")
+	if err := os.MkdirAll(filepath.Join(gameDir, "entities"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"),
+		[]byte("id: older\nname: Older\nworld: harbour\nplayer: sean\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"look","narration":"Quiet.","segments":[{"kind":"narration","text":"Quiet."}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cache := media.NewContentCache(core.NewPathResolver(root).CacheDir())
+	narrator := &entity.VoiceConfig{VoiceID: "am_adam"}
+	whole, err := media.NewTTSPipeline(&toneTTS{}, cache).
+		SynthesizeUtterance(context.Background(), "narrator", narrator, "Quiet.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	older, err := media.WithoutEndOfStreamMarker(whole)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(whole, older, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// No provider: only re-muxing the audio that is already cached can make it playable.
+	compiler := NewScriptCompiler(root)
+	compiler.SetNarratorVoice(narrator)
+	compiler.SetSpeechResolver(NewSpeechResolver(media.NewTTSPipeline(deadTTS{}, cache), nil, narrator))
+
+	script, err := compiler.Compile(context.Background(), "older")
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	var clips []string
+	for _, beat := range script.Beats() {
+		clips = append(clips, beat.AudioPaths...)
+	}
+	if len(clips) != 1 {
+		t.Fatalf("clips = %v, want the repaired clip", clips)
+	}
+	data, err := os.ReadFile(clips[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := media.ClipProblem(data); err != nil {
+		t.Errorf("the exported clip is still not playable: %v", err)
+	}
+	if repairs := compiler.SpeechRepairs(); len(repairs) == 0 {
+		t.Error("the re-encoded clip was not reported")
+	}
+}
+
+// A beat that reduces to nothing is never spoken, so an export neither counts it nor reports
+// it as a beat missing audio.
+func TestCompileDoesNotReportUnspokenBeats(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "unspoken")
+	if err := os.MkdirAll(filepath.Join(gameDir, "entities"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"),
+		[]byte("id: unspoken\nname: Unspoken\nworld: harbour\nplayer: sean\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	// A speech segment that is only a performance tag, with a provider that cannot act on
+	// tags: it reduces to nothing, so it is never spoken.
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Say","input":"hello","narration":"x","segments":[{"kind":"speech","speaker":"Garrick","speaker_id":"garrick","text":"[whispers]"}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cache := media.NewContentCache(core.NewPathResolver(root).CacheDir())
+	narrator := &entity.VoiceConfig{VoiceID: "am_adam"}
+	compiler := NewScriptCompiler(root)
+	compiler.SetNarratorVoice(narrator)
+	compiler.SetSpeechResolver(NewSpeechResolver(media.NewTTSPipeline(deadTTS{}, cache), nil, narrator))
+
+	var messages []string
+	compiler.SetProgress(func(p scene.Progress) {
+		if p.Message != "" {
+			messages = append(messages, p.Message)
+		}
+	})
+
+	if _, err := compiler.Compile(context.Background(), "unspoken"); err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	for _, message := range messages {
+		if strings.Contains(message, "no audio clip") {
+			t.Errorf("an unspoken beat was reported as missing audio: %q", message)
+		}
+	}
+	if misses := compiler.SpeechMisses(); len(misses) != 0 {
+		t.Errorf("misses = %v, want an unspoken beat reported as nothing at all", misses)
 	}
 }

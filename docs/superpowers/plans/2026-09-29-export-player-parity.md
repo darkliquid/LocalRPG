@@ -536,6 +536,13 @@ git commit -m "feat(export): play a bundle through the theatre's own components"
 
 ## Implementation Notes (added during execution)
 
+**Follow-up (2026-09-30):** an export now uses the app's own pipelines — the campaign's
+narrator voice, the shared scene-art resolver, and the shared speech pipeline — because
+building its own clients made every clip a cache miss (silent bundles) and left the
+campaign banner out entirely. The banner travels with the bundle, and the portrait images
+carry their own rounding so a mirrored portrait is clipped in every engine. See the spec's
+§10 for the symptoms and their causes.
+
 Three deviations from the tasks above, all recorded in the spec as well:
 
 1. **The player is its own build, not a second entry.** A second `input` beside the app

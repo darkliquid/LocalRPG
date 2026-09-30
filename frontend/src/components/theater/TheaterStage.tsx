@@ -44,7 +44,12 @@ export const TheaterStage: React.FC<TheaterStageProps> = ({
                 : 'border-white/30'
             }`}
           >
-            <img src={playerPortrait} alt="" aria-hidden="true" className="w-full h-full object-cover object-top" />
+            <img
+              src={playerPortrait}
+              alt=""
+              aria-hidden="true"
+              className="w-full h-full object-cover object-top rounded-2xl"
+            />
           </div>
           {playerLabel && (
             <span
@@ -72,7 +77,7 @@ export const TheaterStage: React.FC<TheaterStageProps> = ({
               src={npcPortrait}
               alt=""
               aria-hidden="true"
-              className="w-full h-full object-cover object-top scale-x-[-1]"
+              className="w-full h-full object-cover object-top scale-x-[-1] rounded-2xl"
             />
           </div>
           {npcLabel && (

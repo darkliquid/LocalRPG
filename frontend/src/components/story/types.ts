@@ -10,7 +10,11 @@ export interface StoryBeat {
   portrait?: string;
   // audio is the beat's clips in play order, one file per sentence.
   audio?: string[];
+  // duration is the pace the script was compiled with; reading is what a viewer needs
+  // to read the line. A beat is held for the longer of the two, plus a buffer, so
+  // audio can never shorten it.
   duration: number;
+  reading?: number;
   // player marks the protagonist's own line, which glows on the left.
   player?: boolean;
 }
@@ -24,7 +28,12 @@ export interface StoryScene {
 export interface Story {
   game_name: string;
   display_mode?: 'stage_directions' | 'hidden' | 'raw';
+  // banner is the campaign's own image, which the theatre shows behind a scene that
+  // has no art of its own.
+  banner?: string;
   player_portrait?: string;
+  // player_name labels the protagonist's portrait, as the theatre's does.
+  player_name?: string;
   scenes: StoryScene[];
 }
 

@@ -1,17 +1,19 @@
 package export
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 
-	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
@@ -19,8 +21,11 @@ import (
 // build's root.
 const playerPage = "player/player.html"
 
-// WebExporter writes a self-contained player bundle: the theatre's own page plus the
-// campaign's art, portraits, and clips, with nothing left to fetch.
+// assetRefPattern finds the assets a built page references.
+var assetRefPattern = regexp.MustCompile(`(?:src|href)="([^"]+)"`)
+
+// WebExporter writes a bundle as one self-contained page: the theatre's own player, the
+// story, and every asset in a single file, so it opens by being opened.
 type WebExporter struct {
 	rootDir string
 	assets  fs.FS
@@ -35,15 +40,15 @@ func NewWebExporter(rootDir string) *WebExporter {
 }
 
 // SetAssets supplies the built player (the frontend's dist directory). Without it an
-// export cannot produce a page anyone can watch, so Export refuses rather than
-// writing a bundle that opens to nothing.
+// export cannot produce a page anyone can watch, so Export refuses rather than writing
+// a bundle that opens to nothing.
 func (w *WebExporter) SetAssets(assets fs.FS) { w.assets = assets }
 
 // SetDisplayMode records how the campaign renders performance tags.
 func (w *WebExporter) SetDisplayMode(mode string) { w.displayMode = mode }
 
-// webBeat is one beat as the player sees it: durations in seconds and paths relative
-// to the bundle root. Audio is the beat's clips in play order, one per sentence.
+// webBeat is one beat as the player sees it: durations in seconds, and art, portraits,
+// and clips as data URIs, because a bundle carries everything it needs.
 type webBeat struct {
 	Kind     string   `json:"kind"`
 	Speaker  string   `json:"speaker,omitempty"`
@@ -52,7 +57,11 @@ type webBeat struct {
 	Portrait string   `json:"portrait,omitempty"`
 	Audio    []string `json:"audio,omitempty"`
 	Duration float64  `json:"duration"`
-	Player   bool     `json:"player,omitempty"`
+	// Reading is what a viewer needs to read the line. A player holds a beat for the
+	// longer of this and its compiled pace, so audio can never shorten a beat and a
+	// clip that cannot play leaves the reading time.
+	Reading float64 `json:"reading"`
+	Player  bool    `json:"player,omitempty"`
 }
 
 type webScene struct {
@@ -62,17 +71,22 @@ type webScene struct {
 }
 
 type webPayload struct {
-	GameName       string     `json:"game_name"`
-	DisplayMode    string     `json:"display_mode,omitempty"`
-	PlayerPortrait string     `json:"player_portrait,omitempty"`
-	Scenes         []webScene `json:"scenes"`
+	GameName       string `json:"game_name"`
+	DisplayMode    string `json:"display_mode,omitempty"`
+	PlayerPortrait string `json:"player_portrait,omitempty"`
+	// Banner is the campaign's own image, which the player shows behind a scene that
+	// has no art of its own, exactly as the theatre does.
+	Banner string `json:"banner,omitempty"`
+	// PlayerName labels the protagonist's portrait, as the theatre does.
+	PlayerName string     `json:"player_name,omitempty"`
+	Scenes     []webScene `json:"scenes"`
 	// Total is the script's own pacing, kept for a reader of the payload; the player
 	// paces itself per beat.
 	Total float64 `json:"total_duration"`
 }
 
-// Export writes a self-contained player bundle and returns its directory.
-func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outDir string) (string, error) {
+// Export writes one self-contained page to outPath and returns it.
+func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath string) (string, error) {
 	if script == nil || len(script.Scenes) == 0 {
 		return "", fmt.Errorf("script has no scenes to export")
 	}
@@ -83,40 +97,28 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outDir s
 		return "", fmt.Errorf("web export needs the built player: run `mise run build:frontend`")
 	}
 
-	if err := os.MkdirAll(filepath.Join(outDir, "assets"), 0755); err != nil {
-		return "", fmt.Errorf("create assets dir: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Join(outDir, "audio"), 0755); err != nil {
-		return "", fmt.Errorf("create audio dir: %w", err)
-	}
-
-	// The player comes first: the bundle's index.html is that page with the story in
-	// it, so a bundle and the app cannot drift apart.
-	if err := w.copyPlayer(outDir); err != nil {
-		return "", err
-	}
-
 	payload := &webPayload{
 		GameName:    script.GameName,
 		DisplayMode: w.displayMode,
 		Total:       script.TotalDuration.Seconds(),
 	}
-	if script.PlayerPortrait != "" {
-		if name, err := copyInto(outDir, "assets", "portrait-player", script.PlayerPortrait); err == nil {
-			payload.PlayerPortrait = name
-		}
-	}
 
-	beatNumber := 0
+	// A missing asset costs a face or a clip, never the bundle: the beat keeps the
+	// pacing it was compiled with.
+	if uri, err := dataURI(script.PlayerPortrait); err == nil {
+		payload.PlayerPortrait = uri
+	}
+	if uri, err := dataURI(script.Banner); err == nil {
+		payload.Banner = uri
+	}
+	payload.PlayerName = script.PlayerName
+
 	for i := range script.Scenes {
 		sc := script.Scenes[i]
 		entry := webScene{Location: sc.LocationName}
 
-		if sc.ArtPath != "" {
-			name := fmt.Sprintf("scene-%03d%s", i+1, filepath.Ext(sc.ArtPath))
-			if err := copyFile(sc.ArtPath, filepath.Join(outDir, "assets", name)); err == nil {
-				entry.Art = "assets/" + name
-			}
+		if uri, err := dataURI(sc.ArtPath); err == nil {
+			entry.Art = uri
 		}
 
 		for j := range sc.Beats {
@@ -128,31 +130,17 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outDir s
 				Text:     beat.Text,
 				Art:      entry.Art,
 				Duration: beat.Duration.Seconds(),
+				Reading:  scene.ReadingDuration(beat.Text).Seconds(),
 				Player:   beat.Player,
 			}
 
-			// A face travels with the bundle: the portrait the exporter resolved, or
-			// nothing, which leaves the player to show the stage without one.
-			if beat.PortraitPath != "" {
-				key := beat.SpeakerID
-				if key == "" {
-					key = entity.Slugify(beat.Speaker)
-				}
-				if key != "" {
-					if name, err := copyInto(outDir, "assets", "portrait-"+key, beat.PortraitPath); err == nil {
-						jsBeat.Portrait = name
-					}
-				}
+			if uri, err := dataURI(beat.PortraitPath); err == nil {
+				jsBeat.Portrait = uri
 			}
 
 			for _, clip := range beat.AudioPaths {
-				// Clips are numbered in the order they appear, so a bundle's audio
-				// directory is a readable running order rather than beat numbers
-				// with holes in them.
-				beatNumber++
-				name := fmt.Sprintf("beat-%04d%s", beatNumber, filepath.Ext(clip))
-				if err := copyFile(clip, filepath.Join(outDir, "audio", name)); err == nil {
-					jsBeat.Audio = append(jsBeat.Audio, "audio/"+name)
+				if uri, err := dataURI(clip); err == nil {
+					jsBeat.Audio = append(jsBeat.Audio, uri)
 				}
 			}
 
@@ -166,81 +154,214 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outDir s
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(filepath.Join(outDir, "index.html"), page, 0644); err != nil {
-		return "", fmt.Errorf("write index.html: %w", err)
+	if dir := filepath.Dir(outPath); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return "", fmt.Errorf("create export dir: %w", err)
+		}
+	}
+	if err := os.WriteFile(outPath, page, 0644); err != nil {
+		return "", fmt.Errorf("write bundle: %w", err)
 	}
 
-	return outDir, nil
+	return outPath, nil
 }
 
-// copyPlayer copies the built player into the bundle, so the page the bundle opens is
-// the page the app builds. The player's own entry document becomes index.html.
-func (w *WebExporter) copyPlayer(outDir string) error {
-	return fs.WalkDir(w.assets, "player", func(name string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || name == playerPage {
-			return nil
-		}
-
-		relative := strings.TrimPrefix(name, "player/")
-		data, err := fs.ReadFile(w.assets, name)
-		if err != nil {
-			return fmt.Errorf("read player asset %q: %w", name, err)
-		}
-
-		target := filepath.Join(outDir, filepath.FromSlash(relative))
-		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-			return fmt.Errorf("create %q: %w", filepath.Dir(target), err)
-		}
-		if err := os.WriteFile(target, data, 0644); err != nil {
-			return fmt.Errorf("write %q: %w", target, err)
-		}
-		return nil
-	})
-}
-
-// bundlePage is the built player page with the story inlined and the title named
-// after the campaign. Module scripts are deferred, so a payload anywhere before the
-// document ends is in place before the player runs.
+// bundlePage is the built player with its stylesheet, its script, and the story in one
+// compressed bundle, and a bootstrap that inflates it. A page opened from disk can fetch
+// nothing beside it — a module script and a stylesheet over file:// are both refused by
+// CORS — and the page's own code is a fixed third of a megabyte, so the whole bundle is
+// compressed rather than the story alone.
 func (w *WebExporter) bundlePage(payload *webPayload) ([]byte, error) {
 	raw, err := fs.ReadFile(w.assets, playerPage)
 	if err != nil {
 		return nil, fmt.Errorf("read player page: %w", err)
 	}
-	encoded, err := json.Marshal(payload)
+
+	story, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("encode story: %w", err)
 	}
+
+	bundle := pageBundle{Story: story}
+	for _, ref := range pageAssetRefs(string(raw)) {
+		content, err := fs.ReadFile(w.assets, "player/"+ref)
+		if err != nil {
+			return nil, fmt.Errorf("read player asset %q: %w", ref, err)
+		}
+		switch strings.ToLower(filepath.Ext(ref)) {
+		case ".css":
+			bundle.CSS = string(content)
+		case ".js":
+			bundle.JS = string(content)
+		default:
+			return nil, fmt.Errorf("player asset %q is neither a stylesheet nor a script", ref)
+		}
+	}
+	if bundle.JS == "" {
+		return nil, fmt.Errorf("the player page references no script: run `mise run build:frontend`")
+	}
+
+	encoded, err := compressBundle(bundle)
+	if err != nil {
+		return nil, err
+	}
+
+	// The page keeps the build's own skeleton, and replaces the references it cannot
+	// load from disk with the bundle and the bootstrap that reads it.
+	page := string(raw)
+	page = regexp.MustCompile(`<link[^>]*rel="stylesheet"[^>]*>`).ReplaceAllString(page, "")
+	page = regexp.MustCompile(`<script[^>]*src="[^"]*"[^>]*></script>`).ReplaceAllString(page, "")
+	page = strings.Replace(page, "</body>", bundleHolder(encoded)+bootstrapScript+"\n</body>", 1)
 
 	title := strings.TrimSpace(payload.GameName)
 	if title == "" {
 		title = "Story Theater"
 	}
-
-	page := string(raw)
 	page = strings.Replace(page, "<title>Story Theater</title>", "<title>"+html.EscapeString(title)+"</title>", 1)
-	page = strings.Replace(page, "</head>", fmt.Sprintf("<script>window.__LOCALRPG_STORY__ = %s;</script>\n</head>", encoded), 1)
+
 	return []byte(page), nil
 }
 
-// copyInto copies a source file into a bundle directory under a chosen name and
-// returns its path relative to the bundle root, so nothing refers outside the bundle.
-func copyInto(outDir, dir, base, src string) (string, error) {
-	name := base + filepath.Ext(src)
-	if err := copyFile(src, filepath.Join(outDir, dir, name)); err != nil {
-		return "", err
-	}
-	return path.Join(dir, name), nil
+// pageBundle is everything a page needs, compressed together: the player's script and
+// stylesheet, and the story they render.
+type pageBundle struct {
+	JS    string          `json:"js"`
+	CSS   string          `json:"css"`
+	Story json.RawMessage `json:"story"`
 }
 
-// copyFile copies a bundle asset, so the export never depends on the original
-// cache or campaign directory still existing.
-func copyFile(src, dst string) error {
-	data, err := os.ReadFile(src)
+// compressBundle encodes the bundle for the page to carry: gzipped, then base64, since a
+// page is text. Prose, art, and the player's own code compress well; the clips are Opus
+// and already compressed, so they are along for the ride.
+func compressBundle(bundle pageBundle) (string, error) {
+	raw, err := json.Marshal(bundle)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("encode bundle: %w", err)
 	}
-	return os.WriteFile(dst, data, 0644)
+
+	var packed bytes.Buffer
+	writer := gzip.NewWriter(&packed)
+	if _, err := writer.Write(raw); err != nil {
+		return "", fmt.Errorf("compress bundle: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return "", fmt.Errorf("compress bundle: %w", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(packed.Bytes()), nil
+}
+
+// bundleHolder is the compressed bundle, kept in a script element the bootstrap reads
+// rather than in the page's own script, so nothing tries to run it.
+func bundleHolder(encoded string) string {
+	return `<script id="localrpg-bundle" type="application/octet-stream">` + encoded + "</script>\n"
+}
+
+// bootstrapScript inflates the bundle and starts the player. It is deliberately plain and
+// small: it is the one part of a page that cannot itself be compressed.
+const bootstrapScript = `<script>
+(async function () {
+  function fail(why) {
+    document.body.innerHTML = '<p style="font:16px system-ui;color:#d6d3d1;padding:2rem">This story could not be opened (' + why + '). Open it in a current browser.</p>';
+  }
+  var holder = document.getElementById('localrpg-bundle');
+  if (!holder) { fail('no story in the file'); return; }
+  if (typeof DecompressionStream !== 'function') { fail('this browser cannot decompress it'); return; }
+  try {
+    var bytes = Uint8Array.from(atob(holder.textContent.trim()), function (c) { return c.charCodeAt(0); });
+    var text = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    var bundle = JSON.parse(text);
+    var style = document.createElement('style');
+    style.textContent = bundle.css;
+    document.head.appendChild(style);
+    window.__LOCALRPG_STORY__ = bundle.story;
+    var script = document.createElement('script');
+    script.textContent = bundle.js;
+    document.body.appendChild(script);
+  } catch (err) {
+    fail(err && err.message ? err.message : 'the story is unreadable');
+  }
+})();
+</script>`
+
+// pageAssetRefs returns the player's own asset paths a page references, relative to the
+// player build's root, so the build's hashed names are read rather than assumed.
+func pageAssetRefs(page string) []string {
+	refs := make([]string, 0, 2)
+	for _, match := range assetRefPattern.FindAllStringSubmatch(page, -1) {
+		ref := strings.TrimPrefix(strings.TrimPrefix(match[1], "./"), "/")
+		if strings.HasPrefix(ref, "assets/") {
+			refs = append(refs, ref)
+		}
+	}
+	return refs
+}
+
+// replaceTag swaps the first tag matching pattern for replacement, and refuses a page
+// whose referenced asset it cannot find.
+func replaceTag(page, pattern, replacement string) string {
+	return regexp.MustCompile(pattern).ReplaceAllString(page, replacement)
+}
+
+// dataURI encodes an asset for the page to carry. An empty path, or one that cannot be
+// read, has no encoding: the caller degrades the beat instead.
+func dataURI(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("no asset")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return "data:" + mimeTypeFor(path, data) + ";base64," + base64.StdEncoding.EncodeToString(data), nil
+}
+
+// mimeTypeFor reports what an asset is, from its bytes first: a provider returns whatever
+// its engine produces, so a clip cached under one name can hold another format, and a
+// browser refuses a data URI whose type does not match its contents. The extension is the
+// fallback for a format this does not recognise.
+func mimeTypeFor(path string, data []byte) string {
+	switch {
+	case bytes.HasPrefix(data, []byte("OggS")):
+		return "audio/ogg"
+	case bytes.HasPrefix(data, []byte("fLaC")):
+		return "audio/flac"
+	case bytes.HasPrefix(data, []byte("ID3")):
+		return "audio/mpeg"
+	case len(data) > 1 && data[0] == 0xFF && data[1]&0xE0 == 0xE0:
+		return "audio/mpeg"
+	case len(data) > 11 && bytes.HasPrefix(data, []byte("RIFF")) && bytes.Equal(data[8:12], []byte("WEBP")):
+		return "image/webp"
+	case bytes.HasPrefix(data, []byte("RIFF")):
+		return "audio/wav"
+	case bytes.HasPrefix(data, []byte("\x89PNG")):
+		return "image/png"
+	case bytes.HasPrefix(data, []byte("\xFF\xD8\xFF")):
+		return "image/jpeg"
+	case bytes.HasPrefix(data, []byte("GIF8")):
+		return "image/gif"
+	case bytes.Contains(data[:min(len(data), 512)], []byte("<svg")):
+		return "image/svg+xml"
+	}
+
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".svg":
+		return "image/svg+xml"
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".webp":
+		return "image/webp"
+	case ".opus", ".ogg":
+		return "audio/ogg"
+	case ".wav":
+		return "audio/wav"
+	case ".mp3":
+		return "audio/mpeg"
+	case ".flac":
+		return "audio/flac"
+	default:
+		return "application/octet-stream"
+	}
 }

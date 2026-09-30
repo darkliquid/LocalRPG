@@ -32,10 +32,14 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
   }, [story]);
 
   const [index, setIndex] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  // A story never starts itself. The play button is the gesture a browser needs before
+  // it will play audio, so one control does both jobs.
+  const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [reveal, setReveal] = useState(1);
-  const [blocked, setBlocked] = useState(false);
+  // Clips the browser would not play. A player cannot fix a clip the browser refuses, but
+  // it can say so instead of leaving a line silently missing.
+  const [unplayable, setUnplayable] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const generationRef = useRef(0);
@@ -60,7 +64,11 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
   const next = useCallback(() => setIndex((prev) => Math.min(prev + 1, Math.max(0, total - 1))), [total]);
   const prev = useCallback(() => setIndex((prev) => Math.max(prev - 1, 0)), []);
 
-  // Show the current beat: reveal its text, play its clips, then advance.
+  // Show the current beat: reveal its text, play its clips, and hold it for as long as
+  // it needs. A beat is never shorter than its compiled pace or the time a viewer needs
+  // to read it, whichever is longer, plus the buffer between beats; a clip that cannot
+  // play (a browser that wants a gesture) therefore leaves the reading time rather than
+  // skipping the line.
   useEffect(() => {
     if (!current || !playing) return;
 
@@ -73,54 +81,56 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
     const beat = current.beat;
     const clips = beat.audio ?? [];
     const revealMs = Math.max(1, beat.duration * 1000 * TYPEWRITER_FRACTION);
+    const holdMs = Math.max(beat.duration * 1000, (beat.reading ?? 0) * 1000 + BEAT_GAP_MS);
 
-    // The gap belongs between beats, so a beat's own end waits for it before the
-    // next line appears, exactly as the theatre waits after a clip finishes.
-    const finish = () => {
+    const advance = () => {
       if (generation !== generationRef.current || beatDoneRef.current) return;
       beatDoneRef.current = true;
-      window.setTimeout(() => {
-        if (generation === generationRef.current) next();
-      }, BEAT_GAP_MS);
+      next();
     };
 
-    // The reveal is a prefix of the text, paced by the beat's own reading time. A
-    // beat with no clips is advanced by that same reading time once it is spent.
-    const revealTimer = window.setInterval(() => {
+    // The reveal is a prefix of the text, paced by the beat's own reading time, and the
+    // same clock holds the beat: the buffer is inside the hold, so nothing is counted
+    // twice and no beat can flash past.
+    let clipsDone = clips.length === 0;
+    const tick = window.setInterval(() => {
       elapsedRef.current += REVEAL_TICK_MS * speed;
       if (!reducedMotion) {
         setReveal(Math.min(1, elapsedRef.current / revealMs));
       }
-      if (clips.length === 0 && elapsedRef.current >= beat.duration * 1000) finish();
+      if (clipsDone && elapsedRef.current >= holdMs) advance();
     }, REVEAL_TICK_MS);
 
-    // The clips, in order. A browser that refuses to start them leaves the beat to
-    // the reading time, so a muted story still plays end to end.
     if (clips.length > 0) {
       let clipIndex = 0;
       const step = () => {
         if (generation !== generationRef.current) return;
         if (clipIndex >= clips.length) {
-          finish();
+          clipsDone = true;
           return;
         }
         const audio = new Audio(clips[clipIndex++]);
         audioRef.current = audio;
         audio.onended = step;
-        audio.onerror = step;
-        audio
-          .play()
-          .then(() => setBlocked(false))
-          .catch(() => {
-            setBlocked(true);
-            finish();
-          });
+        audio.onerror = () => {
+          setUnplayable((prev) => prev + 1);
+          step();
+        };
+        audio.play().catch((err: unknown) => {
+          // Audio the browser refuses to start must not shorten the beat: the line is
+          // still held for its reading time. A refusal is counted, because a line that
+          // plays nothing is otherwise indistinguishable from one with no clip.
+          if (err instanceof Error && err.name !== 'NotAllowedError') {
+            setUnplayable((prev) => prev + 1);
+          }
+          clipsDone = true;
+        });
       };
       step();
     }
 
     return () => {
-      window.clearInterval(revealTimer);
+      window.clearInterval(tick);
       stopAudio();
     };
   }, [current, playing, speed, reducedMotion, next, stopAudio]);
@@ -133,11 +143,6 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
       return !prev;
     });
   }, [stopAudio]);
-
-  const enableAudio = useCallback(() => {
-    setBlocked(false);
-    setPlaying(true);
-  }, []);
 
   if (!current) {
     return (
@@ -158,7 +163,8 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
   const npcPortrait = isSpeech && !isPlayer ? beat.portrait : undefined;
   const npcLabel = isSpeech && !isPlayer ? beat.speaker ?? 'Unknown' : undefined;
 
-  const backgroundURL = beat.art || scene.art;
+  // The theatre falls back to the campaign's own image rather than to nothing.
+  const backgroundURL = beat.art || scene.art || story.banner;
   const progress = total > 0 ? ((index + 1) / total) * 100 : 0;
 
   return (
@@ -166,6 +172,7 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
       <TheaterStage
         backgroundURL={backgroundURL}
         playerPortrait={story.player_portrait}
+        playerLabel={story.player_name}
         npcPortrait={npcPortrait}
         npcLabel={npcLabel}
         playerActive={isPlayer}
@@ -184,6 +191,11 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
         <span className="text-xs font-mono text-stone-400 bg-black/50 px-2 py-1 rounded border border-white/10">
           Scene {current.sceneIndex + 1} of {story.scenes.length}
         </span>
+        {unplayable > 0 && (
+          <span className="text-xs font-sans text-amber-300 bg-amber-950/60 px-2 py-1 rounded border border-amber-500/40">
+            {unplayable} {unplayable === 1 ? 'line' : 'lines'} could not play
+          </span>
+        )}
       </header>
 
       <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 pb-5 px-4">
@@ -219,13 +231,11 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
           isPlaying={playing}
           speed={speed}
           audioState="idle"
-          blocked={blocked}
           labels={{ prev: 'Previous line', next: 'Next line' }}
           onToggle={togglePlay}
           onPrev={prev}
           onNext={next}
           onCycleSpeed={() => setSpeed((prev) => (prev === 1 ? 1.5 : prev === 1.5 ? 2 : 1))}
-          onUnblock={enableAudio}
         />
       </div>
     </div>

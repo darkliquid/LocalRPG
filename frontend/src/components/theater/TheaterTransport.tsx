@@ -16,7 +16,9 @@ interface TheaterTransportProps {
   onPrev: () => void;
   onNext: () => void;
   onCycleSpeed: () => void;
-  onUnblock: () => void;
+  // onUnblock is offered only where playback can start itself: a player that never
+  // auto-starts does not need a second control for the same gesture.
+  onUnblock?: () => void;
 }
 
 // TheaterTransport is deliberately just transport: the single play/pause button
@@ -86,7 +88,7 @@ export const TheaterTransport: React.FC<TheaterTransportProps> = ({
           </span>
         )}
 
-        {blocked && (
+        {blocked && onUnblock && (
           <button
             onClick={onUnblock}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-sans font-bold cursor-pointer"

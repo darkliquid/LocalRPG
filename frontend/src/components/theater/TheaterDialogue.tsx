@@ -54,7 +54,12 @@ export const TheaterDialogue: React.FC<TheaterDialogueProps> = ({
               isPlayer ? 'border-sky-400/80' : 'border-purple-400/80'
             }`}
           >
-            <img src={segment.portrait_url} alt="" aria-hidden="true" className="w-full h-full object-cover" />
+            <img
+              src={segment.portrait_url}
+              alt=""
+              aria-hidden="true"
+              className="w-full h-full object-cover rounded-lg"
+            />
           </div>
         )}
         <div

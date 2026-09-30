@@ -35,6 +35,14 @@ func handleExportCommand(args []string) {
 	}
 
 	format := args[0]
+	if format == "inspect" {
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "Error: missing bundle path")
+			os.Exit(1)
+		}
+		handleExportInspect(args[1])
+		return
+	}
 	if len(args) < 2 {
 		fmt.Fprintln(os.Stderr, "Error: missing game ID")
 		fs.Usage()
@@ -51,12 +59,15 @@ func handleExportCommand(args []string) {
 		fmt.Fprintf(os.Stderr, "Failed to compile replay script: %v\n", err)
 		os.Exit(1)
 	}
+	for _, miss := range compiler.SpeechMisses() {
+		fmt.Fprintf(os.Stderr, "No clip for a beat: %s\n", miss)
+	}
 
 	switch format {
 	case "web":
 		target := *out
 		if target == "" {
-			target = fmt.Sprintf("dist/%s-web", gameID)
+			target = fmt.Sprintf("dist/%s-web.html", gameID)
 		}
 		exporter := export.NewWebExporter(*dir)
 		// A bundle is the theatre's own player, so it ships the frontend build and
@@ -74,6 +85,10 @@ func handleExportCommand(args []string) {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Web export failed: %v\n", err)
 			os.Exit(1)
+		}
+		if info, statErr := os.Stat(path); statErr == nil {
+			fmt.Printf("Exported web replay bundle to %s (%d KB)\n", path, info.Size()/1024)
+			break
 		}
 		fmt.Printf("Exported web replay bundle to %s\n", path)
 
@@ -124,4 +139,40 @@ func parseSize(value string) (int, int, error) {
 		return 0, 0, fmt.Errorf("dimensions must be at least 16x16")
 	}
 	return width, height, nil
+}
+
+// handleExportInspect reports what a bundle's beats can play, so a bundle a browser refuses
+// can be diagnosed without the app that made it.
+func handleExportInspect(path string) {
+	beats, err := export.InspectBundle(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Inspect failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	var clips, playable int
+	var problems int
+	for index, beat := range beats {
+		speaker := beat.Speaker
+		if speaker == "" {
+			speaker = "-"
+		}
+		line := fmt.Sprintf("%3d %-10s %-16s clips %d", index+1, beat.Kind, speaker, len(beat.Clips))
+		for _, clip := range beat.Clips {
+			clips++
+			if clip.Complete && clip.Decodable {
+				playable++
+				line += fmt.Sprintf(" [%d bytes, plays]", clip.Bytes)
+				continue
+			}
+			problems++
+			line += fmt.Sprintf(" [%d bytes, UNPLAYABLE: %s]", clip.Bytes, clip.Problem)
+		}
+		fmt.Println(line)
+	}
+
+	fmt.Printf("\n%d beats, %d clips, %d playable, %d unplayable\n", len(beats), clips, playable, problems)
+	if problems > 0 {
+		os.Exit(1)
+	}
 }

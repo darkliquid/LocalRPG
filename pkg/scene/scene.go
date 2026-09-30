@@ -53,8 +53,14 @@ type Script struct {
 	GameName string
 
 	// PlayerPortrait is the protagonist's portrait, which the theatre keeps on
-	// stage for the whole story rather than per beat.
+	// stage for the whole story rather than per beat, and PlayerName is the label
+	// that goes under it.
 	PlayerPortrait string
+	PlayerName     string
+
+	// Banner is the campaign's own image, which the theatre shows behind everything
+	// when a scene has no art of its own.
+	Banner string
 
 	WorldStyle    string
 	Scenes        []Scene
