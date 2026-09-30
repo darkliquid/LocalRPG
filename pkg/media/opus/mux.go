@@ -13,6 +13,9 @@ import (
 // maxSegments is the number of lacing values one Ogg page may carry.
 const maxSegments = 255
 
+// oggEndOfStream is the page header flag that marks the last page of a logical stream.
+const oggEndOfStream = 0x04
+
 // Writer muxes Opus packets into a standard Ogg stream (RFC 7845): an OpusHead
 // page, an OpusTags page, then audio pages.
 type Writer struct {
@@ -74,7 +77,7 @@ func (w *Writer) WritePacket(packet []byte, granule uint64, eos bool) error {
 	}
 	segments := len(packet)/255 + 1
 	if len(w.lacing)+segments > maxSegments {
-		if err := w.flush(w.granule); err != nil {
+		if err := w.flush(w.granule, false); err != nil {
 			return err
 		}
 	}
@@ -82,7 +85,7 @@ func (w *Writer) WritePacket(packet []byte, granule uint64, eos bool) error {
 	w.data.Write(packet)
 	w.granule = granule
 	if eos {
-		return w.flush(granule)
+		return w.flush(granule, true)
 	}
 	return nil
 }
@@ -96,14 +99,22 @@ func (w *Writer) Close() error {
 	if len(w.lacing) == 0 {
 		return nil
 	}
-	return w.flush(w.granule)
+	// A stream that ends without the end-of-stream flag is malformed: Chrome plays it
+	// anyway, and a stricter demuxer refuses the whole file.
+	return w.flush(w.granule, true)
 }
 
-func (w *Writer) flush(granule uint64) error {
+// flush writes the buffered packets as one page. eos marks the last page of the stream.
+func (w *Writer) flush(granule uint64, eos bool) error {
 	if len(w.lacing) == 0 {
 		return nil
 	}
-	page := buildPage(0, granule, w.serial, w.seq, w.lacing, w.data.Bytes())
+
+	headerType := byte(0x00)
+	if eos {
+		headerType = oggEndOfStream
+	}
+	page := buildPage(headerType, granule, w.serial, w.seq, w.lacing, w.data.Bytes())
 	if _, err := w.w.Write(page); err != nil {
 		return fmt.Errorf("opus: write page: %w", err)
 	}
@@ -135,7 +146,7 @@ func buildPage(headerType byte, granule uint64, serial, seq uint32, lacing, data
 	page[26] = byte(len(lacing))
 	copy(page[27:], lacing)
 	copy(page[27+len(lacing):], data)
-	binary.LittleEndian.PutUint32(page[22:26], oggCRC(page))
+	binary.LittleEndian.PutUint32(page[22:26], OggCRC(page))
 	return page
 }
 
@@ -155,8 +166,9 @@ var crcTable = func() *[256]uint32 {
 	return table
 }()
 
-// oggCRC is the Ogg page checksum: CRC-32, polynomial 0x04c11db7, no reflection.
-func oggCRC(data []byte) uint32 {
+// OggCRC is the Ogg page checksum: CRC-32, polynomial 0x04c11db7, no reflection. It is
+// exported so a reader can verify a page the way a browser does.
+func OggCRC(data []byte) uint32 {
 	var crc uint32
 	for _, b := range data {
 		crc = (crc << 8) ^ crcTable[byte(crc>>24)^b]

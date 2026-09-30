@@ -100,11 +100,38 @@ func (c *ContentCache) Exists(category, filename string) bool {
 	return err == nil && !info.IsDir()
 }
 
+// Put stores a cache file by writing it beside its name and renaming it into place, so a
+// reader never sees a half-written file. The cache is read while it is written: two
+// goroutines synthesizing the same utterance, or an export reading clips the app is
+// generating, would otherwise see a partial clip and mistake it for a broken one.
 func (c *ContentCache) Put(category, filename string, data []byte) (string, error) {
-	path := filepath.Join(c.Subdir(category), filename)
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	dir := c.Subdir(category)
+	path := filepath.Join(dir, filename)
+
+	temp, err := os.CreateTemp(dir, filename+".*.part")
+	if err != nil {
 		return "", fmt.Errorf("write cache file: %w", err)
 	}
+	name := temp.Name()
+
+	if _, err := temp.Write(data); err != nil {
+		_ = temp.Close()
+		_ = os.Remove(name)
+		return "", fmt.Errorf("write cache file: %w", err)
+	}
+	if err := temp.Close(); err != nil {
+		_ = os.Remove(name)
+		return "", fmt.Errorf("write cache file: %w", err)
+	}
+	if err := os.Chmod(name, 0644); err != nil {
+		_ = os.Remove(name)
+		return "", fmt.Errorf("write cache file: %w", err)
+	}
+	if err := os.Rename(name, path); err != nil {
+		_ = os.Remove(name)
+		return "", fmt.Errorf("write cache file: %w", err)
+	}
+
 	return path, nil
 }
 

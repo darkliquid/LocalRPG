@@ -2,10 +2,14 @@ package media
 
 import (
 	"context"
+	"encoding/binary"
+	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/media/opus"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
@@ -407,3 +411,219 @@ func TestSynthesizeUtteranceForceBypassesCache(t *testing.T) {
 	}
 }
 
+// The cache holds one format. A clip that reached it another way - a campaign cached
+// before the Opus migration, or a file placed by hand - is decoded and re-encoded, so a
+// bundle never carries audio a browser refuses.
+func TestNormalizeClipRepairsAFileThatIsNotOpus(t *testing.T) {
+	dir := t.TempDir()
+	cache := NewContentCache(dir)
+	pipeline := NewTTSPipeline(&recordingTTSClient{}, cache)
+
+	// A WAV clip sitting in the audio cache under an Opus key, as an older version left it.
+	wav := GenerateToneWAV(440, 0.02)
+	path, err := cache.Put("audio", "legacy-clip.opus", wav)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if IsOpusClip(wav) {
+		t.Fatal("the fixture is already Opus")
+	}
+
+	repaired, err := pipeline.NormalizeClip(path)
+	if err != nil {
+		t.Fatalf("NormalizeClip: %v", err)
+	}
+
+	data, err := os.ReadFile(repaired)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !IsOpusClip(data) {
+		t.Errorf("repaired clip is not Ogg/Opus")
+	}
+	if filepath.Ext(repaired) != ".opus" {
+		t.Errorf("repaired clip %q is not named for its format", repaired)
+	}
+}
+
+func TestNormalizeClipLeavesAnOpusClipAlone(t *testing.T) {
+	cache := NewContentCache(t.TempDir())
+	pipeline := NewTTSPipeline(&recordingTTSClient{}, cache)
+
+	path, err := pipeline.SynthesizeUtterance(context.Background(), "narrator", nil, "hello")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	again, err := pipeline.NormalizeClip(path)
+	if err != nil {
+		t.Fatalf("NormalizeClip: %v", err)
+	}
+	if again != path {
+		t.Errorf("NormalizeClip rewrote an Opus clip: %q", again)
+	}
+}
+
+// A clip whose write was interrupted keeps its header and loses its body: a browser refuses
+// it with "could not be decoded" while every header check passes. It must not be served.
+func TestATruncatedClipIsReplacedRatherThanServed(t *testing.T) {
+	dir := t.TempDir()
+	cache := NewContentCache(dir)
+
+	// A whole clip, cut short the way a killed write leaves it.
+	writer := NewTTSPipeline(&recordingTTSClient{}, cache)
+	whole, err := writer.SynthesizeUtterance(context.Background(), "garrick", &entity.VoiceConfig{VoiceID: "bm_george"}, "Keep your hood up.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(whole)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !IsCompleteOpusStream(data) {
+		t.Fatal("the fixture clip is not whole")
+	}
+	if err := os.WriteFile(whole, data[:len(data)*2/3], 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// The same key, read again: the truncated file is not a clip, so it is replaced by a
+	// fresh synthesis rather than handed to a player.
+	client := &recordingTTSClient{}
+	pipeline := NewTTSPipeline(client, cache)
+	replaced, err := pipeline.SynthesizeUtterance(context.Background(), "garrick", &entity.VoiceConfig{VoiceID: "bm_george"}, "Keep your hood up.")
+	if err != nil {
+		t.Fatalf("SynthesizeUtterance: %v", err)
+	}
+	if client.calls != 1 {
+		t.Errorf("synthesis calls = %d, want the truncated clip to be replaced", client.calls)
+	}
+
+	replacedData, err := os.ReadFile(replaced)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !IsCompleteOpusStream(replacedData) {
+		t.Error("the replaced clip is not whole")
+	}
+	if _, _, _, err := opus.Decode(replacedData); err != nil {
+		t.Errorf("the replaced clip does not decode: %v", err)
+	}
+}
+
+// The last page of a stream must mark the end of it (RFC 3533). Chrome plays a stream
+// without the flag; stricter demuxers refuse the file, so an export re-encodes it.
+func TestClipsEndProperly(t *testing.T) {
+	cache := NewContentCache(t.TempDir())
+	pipeline := NewTTSPipeline(&recordingTTSClient{}, cache)
+	path, err := pipeline.SynthesizeUtterance(context.Background(), "npc", &entity.VoiceConfig{VoiceID: "bm_george"}, "Keep your hood up.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !hasEndOfStream(fresh) {
+		t.Fatal("a freshly written clip does not mark the end of its stream")
+	}
+	if err := ClipProblem(fresh); err != nil {
+		t.Errorf("a freshly written clip is not acceptable: %v", err)
+	}
+
+	// What the previous muxer wrote: the same stream with the flag cleared.
+	older := append([]byte(nil), fresh...)
+	last := lastPageOffset(older)
+	older[last+5] &^= oggEndOfStream
+	if hasEndOfStream(older) {
+		t.Fatal("the fixture still marks the end of its stream")
+	}
+	if err := ClipProblem(older); err == nil {
+		t.Error("a stream that does not end properly should be reported")
+	}
+}
+
+// pageExtent reports where the page starting at offset ends.
+func pageExtent(data []byte, offset int) int {
+	segments := int(data[offset+26])
+	body := 0
+	for _, lacing := range data[offset+oggHeaderSize : offset+oggHeaderSize+segments] {
+		body += int(lacing)
+	}
+	return offset + oggHeaderSize + segments + body
+}
+
+// lastPageOffset finds the start of the final page in a stream.
+func lastPageOffset(data []byte) int {
+	last := 0
+	for offset := 0; offset < len(data); {
+		segments := int(data[offset+26])
+		body := 0
+		for _, lacing := range data[offset+oggHeaderSize : offset+oggHeaderSize+segments] {
+			body += int(lacing)
+		}
+		pageEnd := offset + oggHeaderSize + segments + body
+		if pageEnd >= len(data) {
+			return offset
+		}
+		last = pageEnd
+		offset = pageEnd
+	}
+	return last
+}
+
+// A campaign cached by an older build holds streams that do not mark their end. An export
+// must be able to repair those without a provider: the audio is already there, it only needs
+// re-muxing, which is what makes a bundle playable in a browser that is strict about it.
+func TestNormalizeClipRepairsAStreamThatDoesNotEndWithoutAProvider(t *testing.T) {
+	cache := NewContentCache(t.TempDir())
+	writer := NewTTSPipeline(&recordingTTSClient{}, cache)
+	path, err := writer.SynthesizeUtterance(context.Background(), "npc", &entity.VoiceConfig{VoiceID: "bm_george"}, "Keep your hood up.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Exactly what the older muxer wrote: the flag absent and the checksum still valid.
+	older := append([]byte(nil), fresh...)
+	last := lastPageOffset(older)
+	older[last+5] &^= oggEndOfStream
+	pageEnd := pageExtent(older, last)
+	declared := append([]byte(nil), older[last:pageEnd]...)
+	for i := 22; i < 26; i++ {
+		declared[i] = 0
+	}
+	binary.LittleEndian.PutUint32(older[last+22:last+26], opus.OggCRC(declared))
+	if err := os.WriteFile(path, older, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A pipeline whose provider cannot synthesize anything: only re-muxing can fix it.
+	repair := NewTTSPipeline(&deadTTS{}, cache)
+	fixed, err := repair.NormalizeClip(path)
+	if err != nil {
+		t.Fatalf("NormalizeClip: %v", err)
+	}
+
+	data, err := os.ReadFile(fixed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ClipProblem(data); err != nil {
+		t.Errorf("the repaired clip is still not playable: %v", err)
+	}
+	if _, _, _, err := opus.Decode(data); err != nil {
+		t.Errorf("the repaired clip does not decode: %v", err)
+	}
+}
+
+// deadTTS cannot synthesize anything, so only re-muxing an existing clip can succeed.
+type deadTTS struct{}
+
+func (deadTTS) Synthesize(context.Context, string, *entity.VoiceConfig) ([]byte, error) {
+	return nil, errors.New("no provider available")
+}

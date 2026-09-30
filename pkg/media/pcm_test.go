@@ -2,6 +2,7 @@ package media
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,7 +50,7 @@ func TestWrapPCMAsWAV(t *testing.T) {
 	}
 }
 
-func TestClipHasValidHeader(t *testing.T) {
+func TestClipIsValidRequiresAWholeStream(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name string, data []byte) string {
 		path := filepath.Join(dir, name)
@@ -59,13 +60,37 @@ func TestClipHasValidHeader(t *testing.T) {
 		return path
 	}
 
-	if !clipHasValidHeader(write("a.opus", []byte("OggS____")), ".opus") {
-		t.Error("an OggS header should be valid")
+	opusClip := func() []byte {
+		pipeline := NewTTSPipeline(&echoTTSClient{}, NewContentCache(t.TempDir()))
+		path, err := pipeline.SynthesizeUtterance(context.Background(), "narrator", nil, "Keep your hood up.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}()
+
+	if !clipIsValid(write("a.opus", opusClip)) {
+		t.Error("a whole Opus clip should be valid")
 	}
-	if clipHasValidHeader(write("b.opus", []byte{1, 2, 3, 4, 5, 6}), ".opus") {
+
+	// What an interrupted write leaves: the header, some audio, and no end-of-stream page.
+	// A browser refuses it, so it must not count as a clip.
+	truncated := opusClip[:len(opusClip)*2/3]
+	if clipIsValid(write("b.opus", truncated)) {
+		t.Error("a truncated Opus clip should be treated as broken")
+	}
+
+	if clipIsValid(write("c.opus", []byte("OggS____"))) {
+		t.Error("Ogg that is not Opus should be rejected: the cache stores Opus")
+	}
+	if clipIsValid(write("d.opus", []byte{1, 2, 3, 4, 5, 6})) {
 		t.Error("a headerless clip should be rejected")
 	}
-	if clipHasValidHeader(write("c.wav", []byte("RIFF____WAVE")), ".wav") {
+	if clipIsValid(write("e.wav", []byte("RIFF____WAVE"))) {
 		t.Error("only Ogg/Opus is a stored clip format")
 	}
 }

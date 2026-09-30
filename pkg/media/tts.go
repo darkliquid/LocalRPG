@@ -3,9 +3,9 @@ package media
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -147,7 +147,31 @@ type TTSPipeline struct {
 	// lastUsage is what the most recent synthesis consumed; a cache hit reports
 	// zero so the caller records nothing.
 	lastUsage Usage
+	// repairs records cached clips that were not in the cache's format: either one that
+	// was re-encoded in place, or one that was unreadable and discarded.
+	repairs []string
 }
+
+// Repairs reports the cached clips that were not Ogg/Opus, so a caller can say what it had
+// to fix rather than quietly serving something a browser might refuse.
+func (p *TTSPipeline) Repairs() []string {
+	p.flightMu.Lock()
+	defer p.flightMu.Unlock()
+	return append([]string(nil), p.repairs...)
+}
+
+// noteRepair records one clip that was not in the cache's format.
+func (p *TTSPipeline) noteRepair(note string) {
+	p.flightMu.Lock()
+	defer p.flightMu.Unlock()
+	if len(p.repairs) < maxReportedRepairs {
+		p.repairs = append(p.repairs, note)
+	}
+}
+
+// maxReportedRepairs bounds the report: a cache written by an older version could hold
+// hundreds of clips in another format.
+const maxReportedRepairs = 10
 
 // SetOpusBitrate selects the on-disk Opus bitrate. Out-of-range values fall back
 // to the default.
@@ -500,17 +524,23 @@ func (p *TTSPipeline) usageFor(text string) Usage {
 }
 
 // cachedClip finds a clip under any known extension, so a cache written under an
-// older naming scheme is reused rather than regenerated.
+// older naming scheme is reused rather than regenerated. A clip that is not in the cache's
+// format is repaired rather than thrown away: it may be the only copy of that audio, and
+// decoding it needs no provider. Only a clip that cannot be repaired is discarded, and
+// then it is re-synthesized.
 func (p *TTSPipeline) cachedClip(base string) (string, bool) {
 	for _, ext := range audioExtensions {
 		if p.cache.Exists("audio", base+ext) {
 			path := filepath.Join(p.cache.Subdir("audio"), base+ext)
-			if !clipHasValidHeader(path, ext) {
-				// A clip written before format sniffing (or by a provider that
-				// changed its output) would fail to decode; drop it so it is
-				// re-synthesized rather than served as broken audio.
-				_ = os.Remove(path)
-				continue
+			if !clipIsValid(path) {
+				repaired, err := p.NormalizeClip(path)
+				if err != nil {
+					p.noteRepair(fmt.Sprintf("%s was not Ogg/Opus and could not be re-encoded (%v), so it was discarded", filepath.Base(path), err))
+					_ = os.Remove(path)
+					continue
+				}
+				p.noteRepair(fmt.Sprintf("%s was not Ogg/Opus and was re-encoded in place", filepath.Base(path)))
+				return repaired, true
 			}
 			return path, true
 		}
@@ -518,26 +548,227 @@ func (p *TTSPipeline) cachedClip(base string) (string, bool) {
 	return "", false
 }
 
-// clipHasValidHeader reports whether a cached clip's leading bytes match its
-// extension, so a headerless or mistyped file is never served as audio.
-func clipHasValidHeader(path, ext string) bool {
-	f, err := os.Open(path)
+// IsOpusClip reports whether data is an Ogg/Opus stream, which is the one format the
+// cache stores. A file that is Ogg but not Opus (a Vorbis clip from an older cache, say)
+// is not one, so it is repaired rather than served as something it is not.
+func IsOpusClip(data []byte) bool {
+	if !bytes.HasPrefix(data, []byte("OggS")) {
+		return false
+	}
+	head := data[:min(len(data), opusHeadWindow)]
+	return bytes.Contains(head, []byte("OpusHead"))
+}
+
+// opusHeadWindow is how far into an Ogg stream its Opus identification header can be: the
+// first page carries it, well inside this.
+const opusHeadWindow = 1024
+
+// oggEndOfStream is the page header flag that marks the last page of a logical stream.
+const oggEndOfStream = 0x04
+
+// oggHeaderSize is one Ogg page header: capture pattern, version, flags, granule position,
+// stream serial, page sequence, CRC, and the segment count.
+const oggHeaderSize = 27
+
+// IsCompleteOpusStream reports whether data is a single, whole, uncorrupted Ogg/Opus stream:
+// every page is present and its checksum matches, all pages belong to one logical stream, and
+// the page sequence runs from zero without gaps. A clip that fails this is refused by a
+// browser - sometimes with "could not be decoded" - so it is treated as broken rather than
+// served or exported. A write cut short by a killed process, and two writers interleaving
+// their pages into one file, are both caught here.
+//
+// The end-of-stream flag is deliberately not required: this pipeline's own encoder does not
+// set it, and browsers play those clips.
+func IsCompleteOpusStream(data []byte) bool {
+	if !IsOpusClip(data) {
+		return false
+	}
+
+	var serial, sequence uint32
+	for offset := 0; offset < len(data); {
+		page := data[offset:]
+		if len(page) < oggHeaderSize || !bytes.HasPrefix(page, []byte("OggS")) {
+			return false
+		}
+
+		pageSerial := binary.LittleEndian.Uint32(page[14:18])
+		pageSequence := binary.LittleEndian.Uint32(page[18:22])
+		if offset == 0 {
+			serial = pageSerial
+		} else if pageSerial != serial {
+			// A second logical stream in one file: a browser sees a chimeric stream.
+			return false
+		}
+		if pageSequence != sequence {
+			return false
+		}
+		sequence++
+
+		segments := int(page[26])
+		tableEnd := oggHeaderSize + segments
+		if len(page) < tableEnd {
+			return false
+		}
+
+		body := 0
+		for _, lacing := range page[oggHeaderSize:tableEnd] {
+			body += int(lacing)
+		}
+		pageEnd := tableEnd + body
+		if len(page) < pageEnd {
+			return false
+		}
+
+		// The checksum covers this page alone, with its own field zeroed, which is how
+		// the muxer writes it.
+		declared := binary.LittleEndian.Uint32(page[22:26])
+		checksummed := append([]byte(nil), page[:pageEnd]...)
+		for i := 22; i < 26; i++ {
+			checksummed[i] = 0
+		}
+		if opus.OggCRC(checksummed) != declared {
+			return false
+		}
+
+		offset += pageEnd
+	}
+
+	// The walk consumed the buffer exactly, so the stream ends on a page boundary.
+	return true
+}
+
+// hasEndOfStream reports whether a stream's last page marks the end of the stream.
+func hasEndOfStream(data []byte) bool {
+	for offset := 0; offset < len(data); {
+		page := data[offset:]
+		if len(page) < oggHeaderSize {
+			return false
+		}
+		segments := int(page[26])
+		if len(page) < oggHeaderSize+segments {
+			return false
+		}
+		body := 0
+		for _, lacing := range page[oggHeaderSize : oggHeaderSize+segments] {
+			body += int(lacing)
+		}
+		pageEnd := oggHeaderSize + segments + body
+		if len(page) < pageEnd {
+			return false
+		}
+		if offset+pageEnd >= len(data) {
+			return page[5]&oggEndOfStream != 0
+		}
+		offset += pageEnd
+	}
+	return false
+}
+
+// WithoutEndOfStreamMarker returns the same clip as a build that did not mark the end of a
+// stream wrote it: the flag cleared and the page's checksum kept valid. It exists for tests
+// that need a clip an export must re-mux.
+func WithoutEndOfStreamMarker(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	last := 0
+	for offset := 0; offset < len(data); {
+		segments := int(data[offset+26])
+		body := 0
+		for _, lacing := range data[offset+oggHeaderSize : offset+oggHeaderSize+segments] {
+			body += int(lacing)
+		}
+		pageEnd := offset + oggHeaderSize + segments + body
+		if pageEnd >= len(data) {
+			last = offset
+			break
+		}
+		offset = pageEnd
+	}
+
+	data[last+5] &^= oggEndOfStream
+	page := append([]byte(nil), data[last:]...)
+	for i := 22; i < 26; i++ {
+		page[i] = 0
+	}
+	binary.LittleEndian.PutUint32(data[last+22:last+26], opus.OggCRC(page))
+	return data, nil
+}
+
+// NormalizeClip returns a clip in the cache's one format, rewriting the file when it holds
+// something else. Every clip this pipeline writes is already Ogg/Opus; this is for a file
+// that reached the cache another way, such as a campaign cached before the Opus migration.
+// A bundle must never carry audio a browser will refuse, and the repaired file is written
+// back under its key so the app is fixed too.
+func (p *TTSPipeline) NormalizeClip(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read clip %q: %w", filepath.Base(path), err)
+	}
+	if ClipProblem(data) == nil {
+		return path, nil
+	}
+
+	pcm, rate, channels, err := decodeClip(data)
+	if err != nil {
+		return "", fmt.Errorf("decode clip %q: %w", filepath.Base(path), err)
+	}
+	encoded, err := opus.Encode(pcm, rate, channels, p.opusBitrate)
+	if err != nil {
+		return "", fmt.Errorf("encode clip %q: %w", filepath.Base(path), err)
+	}
+
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)) + ".opus"
+	return p.cache.Put("audio", name, encoded)
+}
+
+// decodeClip reads whatever a clip file holds, so a file in another format and a truncated
+// Opus stream are both handled: Opus decodes page by page and reports a stream that ends
+// early, which is what makes an interrupted write visible.
+func decodeClip(data []byte) ([]int16, int, int, error) {
+	if bytes.HasPrefix(data, []byte("OggS")) {
+		return opus.Decode(data)
+	}
+	return DecodeProviderAudio(data, "")
+}
+
+// clipIsValid reports whether a cached clip is the one format the cache stores, whole and
+// ready to play. A header alone is not enough: a stream cut short by an interrupted write
+// still starts with a valid Opus header, and a browser refuses it.
+func clipIsValid(path string) bool {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	// The playback path pays for the structural checks and the checksum, not for a full
+	// decode: a clip that reaches a player is decoded there anyway, and a whole stream
+	// that fails to decode is vanishingly rare beside a write that was cut short.
+	return IsCompleteOpusStream(data)
+}
 
-	head := make([]byte, 12)
-	n, _ := io.ReadFull(f, head)
-	if n < 4 {
-		return false
+// ClipProblem reports what is wrong with a clip's bytes, or nil when they are a whole,
+// decodable Ogg/Opus clip. It is the one answer to "can this be played", shared by the
+// cache, an export, and an inspector, so all three agree about what a clip is.
+func ClipProblem(data []byte) error {
+	switch {
+	case len(data) == 0:
+		return errors.New("empty clip")
+	case !bytes.HasPrefix(data, []byte("OggS")):
+		return errors.New("not an Ogg stream")
+	case !IsOpusClip(data):
+		return errors.New("Ogg, but not Opus")
+	case !IsCompleteOpusStream(data):
+		return errors.New("Ogg/Opus stream is incomplete or corrupt")
+	case !hasEndOfStream(data):
+		// RFC 3533 requires the last page to mark the end of the stream. Chrome plays a
+		// stream without it; stricter demuxers refuse the file outright, so it is not
+		// "properly encoded" and an export re-encodes it.
+		return errors.New("Ogg/Opus stream does not end properly")
 	}
-	head = head[:n]
-
-	switch ext {
-	case ".opus":
-		return bytes.HasPrefix(head, []byte("OggS"))
-	default:
-		return false
+	if _, _, _, err := opus.Decode(data); err != nil {
+		return fmt.Errorf("Opus stream does not decode: %w", err)
 	}
+	return nil
 }
