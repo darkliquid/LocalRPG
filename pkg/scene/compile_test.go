@@ -272,3 +272,86 @@ func TestCompileWarnsWhenAResolverReportsNoAudio(t *testing.T) {
 		t.Errorf("expected exactly one silence warning, got %v", warnings)
 	}
 }
+
+// fakePortraits resolves a character to a portrait path from memory.
+type fakePortraits struct{ paths map[string]string }
+
+func (f *fakePortraits) Portrait(_ context.Context, characterID string) (string, error) {
+	if path, ok := f.paths[characterID]; ok {
+		return path, nil
+	}
+	return "", ErrAudioUnavailable
+}
+
+// The theatre keeps the protagonist on stage and shows the speaker's face beside
+// the line, so a compiled script has to carry both.
+func TestCompileCarriesPortraitsAndThePlayerFlag(t *testing.T) {
+	source := &fakeSource{
+		turns: []engine.Turn{
+			turn(1, "alden-tavern",
+				entity.TurnSegment{Kind: entity.SegmentSpeech, Speaker: "Sean", SpeakerID: "sean", Text: "Hello.", Player: true},
+				entity.TurnSegment{Kind: entity.SegmentSpeech, Speaker: "Garrick", SpeakerID: "garrick", Text: "Welcome."},
+				entity.TurnSegment{Kind: entity.SegmentNarration, Text: "Warm light."},
+			),
+		},
+		locations: map[string]*entity.Entity{
+			"alden-tavern": {ID: "alden-tavern", Name: "Alden Tavern", Type: "location"},
+		},
+	}
+
+	compiler := NewCompiler(source)
+	compiler.SetPortraitResolver(&fakePortraits{paths: map[string]string{
+		"sean":    "/cache/portrait-sean.svg",
+		"garrick": "/cache/portrait-garrick.svg",
+	}})
+
+	script, err := compiler.Compile(context.Background(), "campaign-01", Options{PlayerID: "sean"})
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	if script.PlayerPortrait != "/cache/portrait-sean.svg" {
+		t.Errorf("PlayerPortrait = %q, want the protagonist's", script.PlayerPortrait)
+	}
+
+	var speeches int
+	for _, beat := range script.Beats() {
+		switch {
+		case beat.Kind == BeatSpeech && beat.SpeakerID == "sean":
+			speeches++
+			if !beat.Player {
+				t.Errorf("the protagonist's line lost its player flag: %+v", beat)
+			}
+			if beat.PortraitPath != "/cache/portrait-sean.svg" {
+				t.Errorf("sean's portrait = %q", beat.PortraitPath)
+			}
+		case beat.Kind == BeatSpeech && beat.SpeakerID == "garrick":
+			speeches++
+			if beat.Player {
+				t.Errorf("an NPC line carries the player flag: %+v", beat)
+			}
+			if beat.PortraitPath != "/cache/portrait-garrick.svg" {
+				t.Errorf("garrick's portrait = %q", beat.PortraitPath)
+			}
+		case beat.Kind == BeatNarration && beat.PortraitPath != "":
+			t.Errorf("narration gained a portrait: %+v", beat)
+		}
+	}
+	if speeches != 2 {
+		t.Fatalf("speech beats = %d, want both lines", speeches)
+	}
+}
+
+func TestCompileWithoutAPortraitResolverCarriesNone(t *testing.T) {
+	script, err := NewCompiler(twoLocationSource()).Compile(context.Background(), "campaign-01", Options{PlayerID: "sean"})
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+	if script.PlayerPortrait != "" {
+		t.Errorf("PlayerPortrait = %q, want none without a resolver", script.PlayerPortrait)
+	}
+	for _, beat := range script.Beats() {
+		if beat.PortraitPath != "" {
+			t.Errorf("beat gained a portrait without a resolver: %+v", beat)
+		}
+	}
+}

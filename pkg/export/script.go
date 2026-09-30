@@ -79,6 +79,41 @@ func (r *speechResolver) voiceFor(speakerID string) *entity.VoiceConfig {
 	return harness.ResolveSpeakerVoice(r.store, speakerID)
 }
 
+// portraitResolver serves a character's portrait: the note's own file when it has
+// one, otherwise the procedural bust the app serves for a character without art.
+// A character with neither resolves to nothing, which is decoration lost rather
+// than an export lost.
+type portraitResolver struct {
+	resolver *core.PathResolver
+	store    *storage.Store
+	cache    *media.ContentCache
+	gameID   string
+}
+
+func (r *portraitResolver) Portrait(_ context.Context, characterID string) (string, error) {
+	if strings.TrimSpace(characterID) == "" || r.store == nil {
+		return "", scene.ErrAudioUnavailable
+	}
+
+	ent, err := r.store.GetEntity(characterID)
+	if err != nil || ent == nil {
+		return "", scene.ErrAudioUnavailable
+	}
+
+	if strings.TrimSpace(ent.Portrait) != "" {
+		path := filepath.Join(r.resolver.GameDir(r.gameID), ent.Portrait)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+
+	name := strings.TrimSpace(ent.Name)
+	if name == "" {
+		name = characterID
+	}
+	return r.cache.Put("export-portraits", characterID+".svg", media.GenerateProceduralBustSVG(ent.ID, name, ent.Gender))
+}
+
 // ScriptCompiler builds a scene script for a campaign.
 type ScriptCompiler struct {
 	rootDir  string
@@ -144,6 +179,12 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 	}
 	defer store.Close()
 
+	// Reindex from Markdown first, as playing a campaign does: an export should show
+	// the notes as they are on disk rather than as an earlier process happened to
+	// index them, and a portrait or a location it cannot see is a face or a place
+	// missing from the bundle.
+	_, _ = storage.NewSyncer(store).Sync(filepath.Join(gameDir, "entities"))
+
 	worldStyle := ""
 	if world, err := core.LoadWorldManifest(filepath.Join(c.resolver.WorldDir(manifest.WorldID), "world.yaml")); err == nil {
 		worldStyle = strings.TrimSpace(strings.Join([]string{world.ArtStyle, world.Genre}, ", "))
@@ -178,11 +219,21 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		}
 	}
 
+	// Portraits are always worth resolving: they are what makes an exported bundle
+	// look like the theatre, and a missing one costs a face, not the export.
+	compiler.SetPortraitResolver(&portraitResolver{
+		resolver: c.resolver,
+		store:    store,
+		cache:    media.NewContentCache(c.resolver.CacheDir()),
+		gameID:   gameID,
+	})
+
 	opts := scene.Options{
 		Art:            c.art,
 		Audio:          c.audio,
 		WorldStyle:     worldStyle,
 		ProviderParams: c.config.Media.Image.Type + ":" + c.config.Media.Image.Model,
+		PlayerID:       manifest.Player,
 		Progress:       c.progress,
 	}
 	if c.progress == nil {

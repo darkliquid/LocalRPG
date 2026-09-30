@@ -21,7 +21,9 @@ const (
 )
 
 // Beat is one unit of playback: a span of text, its imagery, and its audio.
-// AudioPaths is ordered, one clip per sentence of reduced text.
+// AudioPaths is ordered, one clip per sentence of reduced text. PortraitPath is a
+// character's portrait, which the theatre shows beside the dialogue and Player
+// marks the protagonist's own line.
 type Beat struct {
 	Kind          BeatKind
 	TurnNumber    int
@@ -29,6 +31,8 @@ type Beat struct {
 	SpeakerID     string
 	Text          string
 	ArtPath       string
+	PortraitPath  string
+	Player        bool
 	AudioPaths    []string
 	AudioDuration time.Duration
 	Duration      time.Duration
@@ -45,8 +49,13 @@ type Scene struct {
 
 // Script is the whole export.
 type Script struct {
-	GameID        string
-	GameName      string
+	GameID   string
+	GameName string
+
+	// PlayerPortrait is the protagonist's portrait, which the theatre keeps on
+	// stage for the whole story rather than per beat.
+	PlayerPortrait string
+
 	WorldStyle    string
 	Scenes        []Scene
 	TotalDuration time.Duration

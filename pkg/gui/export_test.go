@@ -109,6 +109,9 @@ func TestChooseExportDirectoryUsesThePicker(t *testing.T) {
 func TestStartExportWritesIntoTheChosenDirectory(t *testing.T) {
 	svc := NewService(t.TempDir())
 	outDir := t.TempDir()
+	// The export runs behind the service, which can still be creating its destination
+	// while the test's temporary directories are removed.
+	t.Cleanup(svc.Close)
 
 	job, err := svc.StartExport(context.Background(), ExportRequestDTO{
 		GameID: "campaign-01", Format: "web", OutDir: outDir,

@@ -8,7 +8,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/export"
+	"github.com/darkliquid/localrpg/pkg/gui"
 	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
@@ -57,6 +59,17 @@ func handleExportCommand(args []string) {
 			target = fmt.Sprintf("dist/%s-web", gameID)
 		}
 		exporter := export.NewWebExporter(*dir)
+		// A bundle is the theatre's own player, so it ships the frontend build and
+		// renders performance tags the way the campaign's settings ask for.
+		assets, assetErr := gui.AssetFS()
+		if assetErr != nil {
+			fmt.Fprintf(os.Stderr, "Web export failed: %v\n", assetErr)
+			os.Exit(1)
+		}
+		exporter.SetAssets(assets)
+		if cfg, cfgErr := config.NewConfigManager().Load(); cfgErr == nil && cfg != nil {
+			exporter.SetDisplayMode(cfg.Media.TTS.SpeechCues.DisplayMode)
+		}
 		path, err := exporter.Export(context.Background(), script, target)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Web export failed: %v\n", err)

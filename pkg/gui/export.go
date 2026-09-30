@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -278,6 +279,15 @@ func uniquePath(path string) string {
 	return fmt.Sprintf("%s-%s%s", base, time.Now().UTC().Format("20060102-150405"), ext)
 }
 
+// playerAssets returns the built player a web export ships, letting a test describe
+// a build the machine does not have.
+func (s *Service) playerAssets() (fs.FS, error) {
+	if s.exportAssets != nil {
+		return s.exportAssets()
+	}
+	return AssetFS()
+}
+
 // runExport compiles and renders one export, publishing every phase.
 func (s *Service) runExport(ctx context.Context, req ExportRequestDTO, outPath string) {
 	emit := func(p scene.Progress) {
@@ -317,7 +327,17 @@ func (s *Service) runExport(ctx context.Context, req ExportRequestDTO, outPath s
 
 	switch req.Format {
 	case "web":
-		if _, err := export.NewWebExporter(s.rootDir).Export(ctx, script, outPath); err != nil {
+		exporter := export.NewWebExporter(s.rootDir)
+		// A bundle is the theatre's own player, so it needs the build the app serves,
+		// and it renders performance tags the way this campaign's settings ask for.
+		assets, assetErr := s.playerAssets()
+		if assetErr != nil {
+			fail(assetErr)
+			return
+		}
+		exporter.SetAssets(assets)
+		exporter.SetDisplayMode(s.Config().Media.TTS.SpeechCues.DisplayMode)
+		if _, err := exporter.Export(ctx, script, outPath); err != nil {
 			fail(err)
 			return
 		}

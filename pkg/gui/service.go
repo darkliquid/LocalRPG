@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -95,6 +96,9 @@ type Service struct {
 	// directoryPicker is the desktop window's native directory chooser. It is
 	// nil in browser/socket mode, where the UI falls back to a path field.
 	directoryPicker func(defaultDir string) (string, error)
+	// exportAssets supplies the built player a web export ships. It is a field so a
+	// test can describe a build without one being present on the machine.
+	exportAssets func() (fs.FS, error)
 }
 
 // Config returns the configuration the service is running with, so a command can

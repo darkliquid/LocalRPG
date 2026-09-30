@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -161,5 +162,70 @@ func TestCompileResolvesTheLocationNameFromTheIndex(t *testing.T) {
 	}
 	if beats[1].Text != "Warm." {
 		t.Errorf("unexpected narration beat: %+v", beats[1])
+	}
+}
+
+// A bundle shows faces, so compilation has to resolve them: the note's own
+// portrait file when the campaign has one, and the procedural bust the app serves
+// when it does not.
+func TestCompileResolvesPortraits(t *testing.T) {
+	isolateConfig(t)
+
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "games", "portraits")
+	if err := os.MkdirAll(filepath.Join(gameDir, "assets", "portraits"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"),
+		[]byte("id: portraits\nname: Portraits\nsystem: freeform\nworld: harbour\nplayer: sean\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "assets", "portraits", "sean.png"), []byte("png-bytes"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	record := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Say","input":"hello","narration":"Sean speaks.","segments":[` +
+		`{"kind":"speech","speaker":"Sean","speaker_id":"sean","player":true,"text":"Hello."},` +
+		`{"kind":"speech","speaker":"Garrick","speaker_id":"garrick","text":"Welcome."}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "history.jsonl"), []byte(record), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := storage.OpenGameStore(core.NewPathResolver(root), "portraits")
+	if err != nil {
+		t.Fatalf("open game store: %v", err)
+	}
+	for _, ent := range []*entity.Entity{
+		{ID: "sean", Name: "Sean", Type: "character", Portrait: "assets/portraits/sean.png", Hash: "h1"},
+		{ID: "garrick", Name: "Garrick", Type: "character", Hash: "h2"},
+	} {
+		if err := store.SaveEntity(ent); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	script, err := NewScriptCompiler(root).Compile(context.Background(), "portraits")
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	if filepath.Base(script.PlayerPortrait) != "sean.png" {
+		t.Errorf("PlayerPortrait = %q, want the protagonist's own file", script.PlayerPortrait)
+	}
+
+	var portraits = map[string]string{}
+	for _, beat := range script.Beats() {
+		if beat.Kind == scene.BeatSpeech && beat.PortraitPath != "" {
+			portraits[beat.SpeakerID] = beat.PortraitPath
+		}
+	}
+	if filepath.Base(portraits["sean"]) != "sean.png" {
+		t.Errorf("sean's portrait = %q, want the note's file", portraits["sean"])
+	}
+	if _, err := os.Stat(portraits["garrick"]); err != nil {
+		t.Errorf("garrick's portrait %q is not a file: %v", portraits["garrick"], err)
+	}
+	if !strings.HasSuffix(portraits["garrick"], ".svg") {
+		t.Errorf("garrick's portrait = %q, want the procedural bust", portraits["garrick"])
 	}
 }

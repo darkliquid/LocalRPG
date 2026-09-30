@@ -17,14 +17,17 @@ type Source interface {
 	Location(id string) (*entity.Entity, error)
 }
 
-// Options controls what compilation resolves. Art and audio are decoration: a
-// failure to resolve either degrades a beat, never the export.
+// Options controls what compilation resolves. Art, audio, and portraits are
+// decoration: a failure to resolve any of them degrades a beat, never the export.
 type Options struct {
 	Art            bool
 	Audio          bool
 	WorldStyle     string
 	ProviderParams string
-	OnProgress     func(format string, args ...interface{})
+	// PlayerID is the protagonist, whose portrait stays on stage for the whole
+	// story rather than per beat.
+	PlayerID   string
+	OnProgress func(format string, args ...interface{})
 	// Progress reports structured progress for a caller that wants a bar or an
 	// event stream. OnProgress is kept for the CLI's line output.
 	Progress ProgressFunc
@@ -47,11 +50,19 @@ type SpeechResolver interface {
 	SegmentAudio(ctx context.Context, segment entity.TurnSegment) ([]string, time.Duration, error)
 }
 
+// PortraitResolver returns a character's portrait file, or ErrAudioUnavailable
+// when the character has none. A missing portrait is a normal state: the theatre
+// and the exported player both fall back to a procedural bust.
+type PortraitResolver interface {
+	Portrait(ctx context.Context, characterID string) (string, error)
+}
+
 // Compiler turns a campaign's timeline into a playable script.
 type Compiler struct {
-	source Source
-	art    ArtResolver
-	speech SpeechResolver
+	source    Source
+	art       ArtResolver
+	speech    SpeechResolver
+	portraits PortraitResolver
 }
 
 // NewCompiler builds a compiler that reads a campaign through source.
@@ -64,6 +75,9 @@ func (c *Compiler) SetArtResolver(art ArtResolver) { c.art = art }
 
 // SetSpeechResolver enables per-beat audio. Without one, every beat is silent.
 func (c *Compiler) SetSpeechResolver(speech SpeechResolver) { c.speech = speech }
+
+// SetPortraitResolver enables per-beat portraits. Without one, beats carry none.
+func (c *Compiler) SetPortraitResolver(portraits PortraitResolver) { c.portraits = portraits }
 
 // Compile walks the campaign's turns, grouping them into scenes by location and
 // flattening each turn's segments into beats.
@@ -78,6 +92,14 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 
 	script := &Script{GameID: gameID, WorldStyle: opts.WorldStyle}
 	silent := 0
+
+	// The protagonist's portrait is resolved once: the theatre keeps it on stage for
+	// the whole story rather than per beat.
+	if c.portraits != nil && opts.PlayerID != "" {
+		if path, err := c.portraits.Portrait(ctx, opts.PlayerID); err == nil {
+			script.PlayerPortrait = path
+		}
+	}
 
 	for i, turn := range turns {
 		if err := ctx.Err(); err != nil {
@@ -102,11 +124,13 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 				SpeakerID:  segment.SpeakerID,
 				Text:       segment.Text,
 				ArtPath:    current.ArtPath,
+				Player:     segment.Player,
 			}
 
 			if opts.Audio && c.speech != nil {
 				c.resolveAudio(ctx, &beat, segment, &silent)
 			}
+			c.resolvePortrait(ctx, &beat, segment)
 
 			beat.Duration = BeatDuration(beat)
 			current.Beats = append(current.Beats, beat)
@@ -171,6 +195,25 @@ func (c *Compiler) resolveAudio(ctx context.Context, beat *Beat, segment entity.
 
 	beat.AudioPaths = paths
 	beat.AudioDuration = duration
+}
+
+// resolvePortrait attaches the speaker's portrait to a speech beat. Only a line
+// someone says has a face: narration is the narrator's, and a failure is silent.
+func (c *Compiler) resolvePortrait(ctx context.Context, beat *Beat, segment entity.TurnSegment) {
+	if c.portraits == nil || beat.Kind != BeatSpeech {
+		return
+	}
+
+	ref := segment.SpeakerID
+	if ref == "" {
+		ref = entity.Slugify(segment.Speaker)
+	}
+	if ref == "" {
+		return
+	}
+	if path, err := c.portraits.Portrait(ctx, ref); err == nil {
+		beat.PortraitPath = path
+	}
 }
 
 func beatKind(kind string) BeatKind {

@@ -9,6 +9,9 @@ interface TheaterTransportProps {
   audioState: TurnAudioState;
   audioMessage?: string;
   blocked?: boolean;
+  // labels name what prev and next step through: a turn in the app, a scene in an
+  // exported bundle.
+  labels?: { prev?: string; next?: string };
   onToggle: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -25,6 +28,7 @@ export const TheaterTransport: React.FC<TheaterTransportProps> = ({
   audioState,
   audioMessage,
   blocked = false,
+  labels,
   onToggle,
   onPrev,
   onNext,
@@ -32,6 +36,8 @@ export const TheaterTransport: React.FC<TheaterTransportProps> = ({
   onUnblock,
 }) => {
   const generating = audioState === 'generating';
+  const prevLabel = labels?.prev ?? 'Previous turn';
+  const nextLabel = labels?.next ?? 'Next turn';
 
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col items-center gap-2 pointer-events-auto">
@@ -40,21 +46,33 @@ export const TheaterTransport: React.FC<TheaterTransportProps> = ({
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <button onClick={onPrev} className="p-2 rounded-full hover:bg-white/10 text-stone-300 cursor-pointer" title="Previous turn">
+        <button
+          onClick={onPrev}
+          data-transport="prev"
+          className="p-2 rounded-full hover:bg-white/10 text-stone-300 cursor-pointer"
+          title={prevLabel}
+        >
           <SkipBack className="w-5 h-5" />
         </button>
         <button
           onClick={onToggle}
+          data-transport="toggle"
           className="p-3.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg transition-transform hover:scale-105 cursor-pointer"
           title={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
         </button>
-        <button onClick={onNext} className="p-2 rounded-full hover:bg-white/10 text-stone-300 cursor-pointer" title="Next turn">
+        <button
+          onClick={onNext}
+          data-transport="next"
+          className="p-2 rounded-full hover:bg-white/10 text-stone-300 cursor-pointer"
+          title={nextLabel}
+        >
           <SkipForward className="w-5 h-5" />
         </button>
         <button
           onClick={onCycleSpeed}
+          data-transport="speed"
           className="px-3 py-1 rounded-lg bg-stone-900/80 border border-white/10 text-xs font-mono font-bold text-purple-300 hover:bg-stone-800 cursor-pointer"
           title="Playback speed"
         >

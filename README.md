@@ -13,7 +13,7 @@ A local-first, turn-based tabletop RPG client orchestrated by local and CLI LLMs
 - **Headless Terminal TUI:** Interactive Bubbletea client with Glamour Markdown rendering, dice rolling, and `/gm` steering.
 - **Multimodal Pipelines:** State-aware audio and art caching, per-character voice playback from recorded dialogue, ComfyUI image generator, and Whisper STT.
 - **Wails v3 Desktop GUI:** Twintail Launcher inspired glassmorphic aesthetic in React 19 + TypeScript + Tailwind CSS.
-- **Story Theater & Exporter:** In-app Visual Novel replay player, and two exports built from one scene script — an animated web bundle that runs itself and plays each line in the speaker's voice, and a video rendered frame by frame in Go.
+- **Story Theater & Exporter:** In-game Visual Novel replay player, and two exports built from one scene script — an animated web bundle that plays through the theatre's own player, and a video rendered frame by frame in Go.
 
 ---
 
@@ -125,7 +125,7 @@ localrpg export web <game-id> [--out DIR] [--no-art] [--no-audio]
 localrpg export video <game-id> [--out FILE] [--still] [--fps N] [--size WxH] [--no-art] [--no-audio]
 ```
 
-**Web bundle.** Writes a self-contained visual-novel player to `dist/<game-id>-web`. It runs itself, blending between locations, revealing each beat's text as it is read, and ducking into a click-to-play state when the browser refuses to start audio without a gesture. Art and audio are copied beside the page as sidecar assets and referenced by relative path, so the bundle works from a file:// URL with no server and no network access.
+**Web bundle.** Writes a self-contained visual-novel player to `dist/<game-id>-web`, rendered by the same player the app's theatre uses: the stage and its scrim, the protagonist and the speaker on either side with the active one lit, the dialogue panel with its name plate, and markdown prose. It runs itself, blending between locations, revealing each beat's text as it is read, and ducking into a click-to-play state when the browser refuses to start audio without a gesture. Art, portraits, and audio are copied beside the page as sidecar assets and referenced by relative path, so the bundle works from a file:// URL with no server and no network access.
 
 **Video.** Draws every frame in Go with the bundled Go fonts, so no browser or external rasteriser is involved. Frames are muxed against each beat's own clip, with silence generated for beats that have none, so picture and sound stay in step. The result is staged and renamed into place: a failed render leaves no file behind. `--still` renders one frame per beat instead of animating, which is the fast path on a weak machine.
 

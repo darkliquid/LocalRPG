@@ -5,15 +5,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
-// WebExporter writes a self-contained animated player bundle.
+// playerPage is the built player the bundle is made from, relative to the frontend
+// build's root.
+const playerPage = "player/player.html"
+
+// WebExporter writes a self-contained player bundle: the theatre's own page plus the
+// campaign's art, portraits, and clips, with nothing left to fetch.
 type WebExporter struct {
 	rootDir string
+	assets  fs.FS
+	// displayMode is the campaign's speech-cue display setting, baked into the bundle
+	// so an export shows performance tags and stage directions the way the app does.
+	displayMode string
 }
 
 // NewWebExporter builds an exporter rooted at a campaign directory.
@@ -21,16 +34,25 @@ func NewWebExporter(rootDir string) *WebExporter {
 	return &WebExporter{rootDir: rootDir}
 }
 
-// webBeat is one beat as the browser sees it: durations in seconds and paths
-// relative to the bundle root. Audio is the beat's clips in play order, one per
-// sentence of reduced text.
+// SetAssets supplies the built player (the frontend's dist directory). Without it an
+// export cannot produce a page anyone can watch, so Export refuses rather than
+// writing a bundle that opens to nothing.
+func (w *WebExporter) SetAssets(assets fs.FS) { w.assets = assets }
+
+// SetDisplayMode records how the campaign renders performance tags.
+func (w *WebExporter) SetDisplayMode(mode string) { w.displayMode = mode }
+
+// webBeat is one beat as the player sees it: durations in seconds and paths relative
+// to the bundle root. Audio is the beat's clips in play order, one per sentence.
 type webBeat struct {
 	Kind     string   `json:"kind"`
 	Speaker  string   `json:"speaker,omitempty"`
 	Text     string   `json:"text"`
 	Art      string   `json:"art,omitempty"`
+	Portrait string   `json:"portrait,omitempty"`
 	Audio    []string `json:"audio,omitempty"`
 	Duration float64  `json:"duration"`
+	Player   bool     `json:"player,omitempty"`
 }
 
 type webScene struct {
@@ -40,18 +62,25 @@ type webScene struct {
 }
 
 type webPayload struct {
-	GameName string     `json:"game_name"`
-	Scenes   []webScene `json:"scenes"`
-	Total    float64    `json:"total_duration"`
+	GameName       string     `json:"game_name"`
+	DisplayMode    string     `json:"display_mode,omitempty"`
+	PlayerPortrait string     `json:"player_portrait,omitempty"`
+	Scenes         []webScene `json:"scenes"`
+	// Total is the script's own pacing, kept for a reader of the payload; the player
+	// paces itself per beat.
+	Total float64 `json:"total_duration"`
 }
 
-// Export writes a self-contained animated player and returns its directory.
+// Export writes a self-contained player bundle and returns its directory.
 func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outDir string) (string, error) {
 	if script == nil || len(script.Scenes) == 0 {
 		return "", fmt.Errorf("script has no scenes to export")
 	}
 	if err := ctx.Err(); err != nil {
 		return "", err
+	}
+	if w.assets == nil {
+		return "", fmt.Errorf("web export needs the built player: run `mise run build:frontend`")
 	}
 
 	if err := os.MkdirAll(filepath.Join(outDir, "assets"), 0755); err != nil {
@@ -61,9 +90,24 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outDir s
 		return "", fmt.Errorf("create audio dir: %w", err)
 	}
 
-	payload := &webPayload{GameName: script.GameName, Total: script.TotalDuration.Seconds()}
-	beatNumber := 0
+	// The player comes first: the bundle's index.html is that page with the story in
+	// it, so a bundle and the app cannot drift apart.
+	if err := w.copyPlayer(outDir); err != nil {
+		return "", err
+	}
 
+	payload := &webPayload{
+		GameName:    script.GameName,
+		DisplayMode: w.displayMode,
+		Total:       script.TotalDuration.Seconds(),
+	}
+	if script.PlayerPortrait != "" {
+		if name, err := copyInto(outDir, "assets", "portrait-player", script.PlayerPortrait); err == nil {
+			payload.PlayerPortrait = name
+		}
+	}
+
+	beatNumber := 0
 	for i := range script.Scenes {
 		sc := script.Scenes[i]
 		entry := webScene{Location: sc.LocationName}
@@ -84,6 +128,21 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outDir s
 				Text:     beat.Text,
 				Art:      entry.Art,
 				Duration: beat.Duration.Seconds(),
+				Player:   beat.Player,
+			}
+
+			// A face travels with the bundle: the portrait the exporter resolved, or
+			// nothing, which leaves the player to show the stage without one.
+			if beat.PortraitPath != "" {
+				key := beat.SpeakerID
+				if key == "" {
+					key = entity.Slugify(beat.Speaker)
+				}
+				if key != "" {
+					if name, err := copyInto(outDir, "assets", "portrait-"+key, beat.PortraitPath); err == nil {
+						jsBeat.Portrait = name
+					}
+				}
 			}
 
 			for _, clip := range beat.AudioPaths {
@@ -103,17 +162,77 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outDir s
 		payload.Scenes = append(payload.Scenes, entry)
 	}
 
-	payloadJSON, err := json.Marshal(payload)
+	page, err := w.bundlePage(payload)
 	if err != nil {
-		return "", fmt.Errorf("marshal payload: %w", err)
+		return "", err
 	}
-
-	page := fmt.Sprintf(playerHTML, html.EscapeString(script.GameName), payloadJSON)
-	if err := os.WriteFile(filepath.Join(outDir, "index.html"), []byte(page), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "index.html"), page, 0644); err != nil {
 		return "", fmt.Errorf("write index.html: %w", err)
 	}
 
 	return outDir, nil
+}
+
+// copyPlayer copies the built player into the bundle, so the page the bundle opens is
+// the page the app builds. The player's own entry document becomes index.html.
+func (w *WebExporter) copyPlayer(outDir string) error {
+	return fs.WalkDir(w.assets, "player", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || name == playerPage {
+			return nil
+		}
+
+		relative := strings.TrimPrefix(name, "player/")
+		data, err := fs.ReadFile(w.assets, name)
+		if err != nil {
+			return fmt.Errorf("read player asset %q: %w", name, err)
+		}
+
+		target := filepath.Join(outDir, filepath.FromSlash(relative))
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			return fmt.Errorf("create %q: %w", filepath.Dir(target), err)
+		}
+		if err := os.WriteFile(target, data, 0644); err != nil {
+			return fmt.Errorf("write %q: %w", target, err)
+		}
+		return nil
+	})
+}
+
+// bundlePage is the built player page with the story inlined and the title named
+// after the campaign. Module scripts are deferred, so a payload anywhere before the
+// document ends is in place before the player runs.
+func (w *WebExporter) bundlePage(payload *webPayload) ([]byte, error) {
+	raw, err := fs.ReadFile(w.assets, playerPage)
+	if err != nil {
+		return nil, fmt.Errorf("read player page: %w", err)
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("encode story: %w", err)
+	}
+
+	title := strings.TrimSpace(payload.GameName)
+	if title == "" {
+		title = "Story Theater"
+	}
+
+	page := string(raw)
+	page = strings.Replace(page, "<title>Story Theater</title>", "<title>"+html.EscapeString(title)+"</title>", 1)
+	page = strings.Replace(page, "</head>", fmt.Sprintf("<script>window.__LOCALRPG_STORY__ = %s;</script>\n</head>", encoded), 1)
+	return []byte(page), nil
+}
+
+// copyInto copies a source file into a bundle directory under a chosen name and
+// returns its path relative to the bundle root, so nothing refers outside the bundle.
+func copyInto(outDir, dir, base, src string) (string, error) {
+	name := base + filepath.Ext(src)
+	if err := copyFile(src, filepath.Join(outDir, dir, name)); err != nil {
+		return "", err
+	}
+	return path.Join(dir, name), nil
 }
 
 // copyFile copies a bundle asset, so the export never depends on the original
@@ -125,155 +244,3 @@ func copyFile(src, dst string) error {
 	}
 	return os.WriteFile(dst, data, 0644)
 }
-
-// playerHTML is the exported player. `%s` is the game name and `%s` the embedded
-// script payload; it must reference nothing outside the bundle.
-const playerHTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>%s - Story Theater</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0c0a09; color: #e7e5e4; font-family: Georgia, serif; overflow: hidden; }
-  #stage { position: fixed; inset: 0; background-size: cover; background-position: center; transition: opacity 300ms ease; }
-  #scrim { position: fixed; inset: 0; background: linear-gradient(180deg, rgba(12,10,9,0.35), rgba(12,10,9,0.92)); }
-  #card { position: relative; height: 100vh; display: flex; flex-direction: column; justify-content: center;
-          align-items: center; padding: 6vh 8vw; text-align: center; gap: 1.5rem; }
-  #speaker { font-size: 0.9rem; letter-spacing: 0.2em; text-transform: uppercase; color: #f59e0b; min-height: 1.2rem; }
-  #text { font-size: clamp(1.25rem, 2.4vw, 2rem); line-height: 1.6; max-width: 46rem; }
-  #scene { position: fixed; top: 1.5rem; left: 1.5rem; font-size: 0.8rem; letter-spacing: 0.2em;
-           text-transform: uppercase; color: #a8a29e; }
-  #controls { position: fixed; bottom: 1.25rem; left: 50%%; transform: translateX(-50%%); display: flex;
-              gap: 0.75rem; align-items: center; }
-  button { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e7e5e4;
-           border-radius: 999px; padding: 0.35rem 0.9rem; font: inherit; font-size: 0.85rem; cursor: pointer; }
-  button:hover { border-color: #f59e0b; color: #fbbf24; }
-  #progress { position: fixed; bottom: 0; left: 0; height: 3px; background: #f59e0b; width: 0; }
-</style>
-</head>
-<body>
-<div id="stage"></div>
-<div id="scrim"></div>
-<div id="scene"></div>
-<div id="card">
-  <div id="speaker"></div>
-  <div id="text"></div>
-</div>
-<div id="controls">
-  <button data-action="play">Play</button>
-  <button data-action="prev">Previous</button>
-  <button data-action="next">Next</button>
-</div>
-<div id="progress"></div>
-<script>
-const SCRIPT = %s;
-
-const beats = [];
-SCRIPT.scenes.forEach((scene) => scene.beats.forEach((beat) => beats.push({ ...beat, scene: scene.location })));
-
-const stage = document.getElementById('stage');
-const sceneLabel = document.getElementById('scene');
-const speaker = document.getElementById('speaker');
-const textEl = document.getElementById('text');
-const progress = document.getElementById('progress');
-const playButton = document.querySelector('[data-action="play"]');
-
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-let index = 0;
-let timer = null;
-let audio = null;
-let paused = false;
-// audioGeneration invalidates a beat's clip chain when the beat is left early.
-let audioGeneration = 0;
-
-// playClips plays a beat's clips in order, so a multi-sentence beat is heard in
-// full rather than only its first sentence.
-function playClips(clips) {
-  const generation = ++audioGeneration;
-  let nextClip = 0;
-
-  const step = () => {
-    if (generation !== audioGeneration || nextClip >= clips.length) return;
-    const clip = new Audio(clips[nextClip++]);
-    audio = clip;
-    clip.onended = step;
-    clip.onerror = step;
-    clip.play().catch(() => { pause(); });
-  };
-
-  step();
-}
-
-function render(index) {
-  const beat = beats[index];
-  if (!beat) { finish(); return; }
-
-  if (beat.art) stage.style.backgroundImage = 'url("' + beat.art + '")';
-  sceneLabel.textContent = beat.scene || '';
-  speaker.textContent = beat.kind === 'speech' ? (beat.speaker || 'UNKNOWN') : '';
-  textEl.textContent = '';
-
-  if (audio) { audio.pause(); audio = null; }
-  if (beat.audio && beat.audio.length) playClips(beat.audio);
-
-  startReveal(beat, performance.now());
-}
-
-function startReveal(beat, startedAt) {
-  const revealMs = Math.max(1, beat.duration * 1000 * 0.6);
-  const characters = Array.from(beat.text);
-
-  const step = (now) => {
-    if (paused) return;
-    const elapsed = now - startedAt;
-    const revealCount = reducedMotion ? characters.length : Math.ceil((elapsed / revealMs) * characters.length);
-    textEl.textContent = characters.slice(0, Math.min(revealCount, characters.length)).join('');
-
-    if (elapsed >= beat.duration * 1000) { next(); return; }
-    timer = requestAnimationFrame(step);
-  };
-
-  timer = requestAnimationFrame(step);
-}
-
-function stop() {
-  if (timer) cancelAnimationFrame(timer);
-  timer = null;
-  audioGeneration++;
-  if (audio) { audio.pause(); audio = null; }
-}
-
-function schedule() {
-  stop();
-  const beat = beats[index];
-  if (!beat) { finish(); return; }
-  render(index);
-  progress.style.width = ((index + 1) / beats.length * 100) + '%%';
-}
-
-function next() { index = Math.min(index + 1, beats.length); schedule(); }
-function prev() { index = Math.max(index - 1, 0); schedule(); }
-function finish() { playButton.textContent = 'Replay'; sceneLabel.textContent = ''; speaker.textContent = ''; }
-function pause() { paused = true; stop(); playButton.textContent = 'Play'; }
-function play() { paused = false; playButton.textContent = 'Pause'; schedule(); }
-
-playButton.addEventListener('click', () => {
-  if (paused) { play(); return; }
-  if (index >= beats.length) { index = 0; play(); return; }
-  pause();
-});
-
-document.querySelector('[data-action="next"]').addEventListener('click', next);
-document.querySelector('[data-action="prev"]').addEventListener('click', prev);
-
-// Browsers refuse to start audio without a gesture; render the first beat and
-// wait for the click rather than running silently ahead.
-render(0);
-pause();
-</script>
-</body>
-</html>
-`

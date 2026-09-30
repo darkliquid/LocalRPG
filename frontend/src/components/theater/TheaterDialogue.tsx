@@ -9,6 +9,9 @@ interface TheaterDialogueProps {
   isPlayer?: boolean;
   onEntityClick?: (entityId: string) => void;
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
+  // reveal is the share of the line to show, so an exported bundle can type it out
+  // while the app shows it whole. The advance caret waits until it is complete.
+  reveal?: number;
   onAdvance: () => void;
 }
 
@@ -21,9 +24,11 @@ export const TheaterDialogue: React.FC<TheaterDialogueProps> = ({
   isPlayer = false,
   onEntityClick,
   displayMode,
+  reveal = 1,
   onAdvance,
 }) => {
   const text = segment?.text ?? fallback;
+  const shown = reveal >= 1 ? text : text.slice(0, Math.max(1, Math.round(text.length * reveal)));
   const isSpeech = segment?.kind === 'speech';
   const name = isSpeech ? segment?.speaker || speaker || 'Unknown' : 'Narrator';
 
@@ -65,7 +70,7 @@ export const TheaterDialogue: React.FC<TheaterDialogueProps> = ({
             {name}
           </span>
           <MarkdownProse
-            text={isSpeech ? `\u201c${text}\u201d` : text}
+            text={isSpeech ? `\u201c${shown}\u201d` : shown}
             onEntityClick={onEntityClick}
             displayMode={displayMode}
             className={
@@ -74,9 +79,11 @@ export const TheaterDialogue: React.FC<TheaterDialogueProps> = ({
                 : 'text-stone-200 text-xl leading-relaxed tracking-wide font-serif space-y-3'
             }
           />
-          <span className="absolute bottom-2 right-3 text-purple-300/70 animate-pulse text-xs" aria-hidden="true">
-            &#9662;
-          </span>
+          {reveal >= 1 && (
+            <span className="absolute bottom-2 right-3 text-purple-300/70 animate-pulse text-xs" aria-hidden="true">
+              &#9662;
+            </span>
+          )}
         </div>
       </div>
     </div>

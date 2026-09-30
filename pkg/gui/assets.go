@@ -2,6 +2,7 @@ package gui
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -11,6 +12,24 @@ import (
 
 //go:embed all:dist
 var embeddedDist embed.FS
+
+// AssetFS returns the built frontend, which is what an export ships as its player:
+// the embedded copy, or a local build during development. It resolves the build the
+// same way AssetHandler serves it, so the app and an export cannot disagree about
+// which player they have.
+func AssetFS() (fs.FS, error) {
+	if distFS, err := fs.Sub(embeddedDist, "dist"); err == nil {
+		if _, err := fs.Stat(distFS, "player/player.html"); err == nil {
+			return distFS, nil
+		}
+	}
+	for _, candidate := range []string{"frontend/dist", "pkg/gui/dist"} {
+		if _, err := os.Stat(filepath.Join(candidate, "player", "player.html")); err == nil {
+			return os.DirFS(candidate), nil
+		}
+	}
+	return nil, fmt.Errorf("no built player found: run `mise run build:frontend`")
+}
 
 // FallbackAssetHandler returns a fallback HTML handler when assets are not bundled
 func FallbackAssetHandler() http.Handler {
