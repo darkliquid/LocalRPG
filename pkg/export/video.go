@@ -17,6 +17,18 @@ import (
 // defaultQuality is the VP8 quality used when a caller asks for none.
 const defaultQuality = 80
 
+// DefaultEffort is the encoder effort a caller gets when it asks for none.
+const DefaultEffort = webm.DefaultMethod
+
+// Buffer defaults. The intro and outro hold the picture before the story starts
+// and after it ends, so a player does not open or close on a hard cut, and the
+// gap is held after every beat so one segment does not run into the next.
+const (
+	defaultIntro = 1500 * time.Millisecond
+	defaultOutro = 1500 * time.Millisecond
+	defaultGap   = 300 * time.Millisecond
+)
+
 // keyframeEvery is how often a keyframe is forced inside a beat. Inter frames
 // predict from the one before, so error accumulates across a run of them; a
 // keyframe resets it, keeps a seek close to where it was asked for, and is what
@@ -30,7 +42,11 @@ type VideoPipeline struct {
 	height      int
 	fps         int
 	quality     int
+	effort      int
 	still       bool
+	intro       time.Duration
+	outro       time.Duration
+	gap         time.Duration
 	displayMode scene.DisplayMode
 	progress    scene.ProgressFunc
 }
@@ -43,6 +59,10 @@ func NewVideoPipeline(rootDir string) *VideoPipeline {
 		height:      1080,
 		fps:         scene.DefaultFPS,
 		quality:     defaultQuality,
+		effort:      webm.DefaultMethod,
+		intro:       defaultIntro,
+		outro:       defaultOutro,
+		gap:         defaultGap,
 		displayMode: scene.DisplayStageDirections,
 	}
 }
@@ -65,6 +85,37 @@ func (v *VideoPipeline) SetFPS(fps int) {
 func (v *VideoPipeline) SetQuality(quality int) {
 	if quality > 0 && quality <= 100 {
 		v.quality = quality
+	}
+}
+
+// SetEffort changes the encoder's quality/speed trade-off, 0-6. Higher methods
+// search harder for the best mode, which is slower but cleaner on detailed art
+// and coloured text.
+func (v *VideoPipeline) SetEffort(effort int) {
+	if effort >= 0 && effort <= 6 {
+		v.effort = effort
+	}
+}
+
+// SetIntro holds the opening picture for d before the story starts.
+func (v *VideoPipeline) SetIntro(d time.Duration) {
+	if d >= 0 {
+		v.intro = d
+	}
+}
+
+// SetOutro holds the closing picture for d after the story ends.
+func (v *VideoPipeline) SetOutro(d time.Duration) {
+	if d >= 0 {
+		v.outro = d
+	}
+}
+
+// SetGap holds every beat for d longer than the script paces it, so one segment
+// does not run straight into the next.
+func (v *VideoPipeline) SetGap(d time.Duration) {
+	if d >= 0 {
+		v.gap = d
 	}
 }
 
@@ -136,15 +187,18 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 
 // opusTrack lays every beat's clips on one continuous timeline, padding the gaps
 // left by a beat with no clip.
+// opusTrack lays every beat's clips on one continuous timeline, holding each beat
+// for its own span and adding the intro and outro buffers.
 func (v *VideoPipeline) opusTrack(script *scene.Script) (*webm.OpusTrack, error) {
 	track := webm.NewOpusTrack(1)
-	for _, beat := range script.Beats() {
-		if len(beat.AudioPaths) == 0 {
-			if err := track.AppendSilence(beat.Duration); err != nil {
-				return nil, err
-			}
-			continue
+	if v.intro > 0 {
+		if err := track.AppendSilence(v.intro); err != nil {
+			return nil, err
 		}
+	}
+
+	for _, beat := range script.Beats() {
+		before := track.Duration()
 		for _, path := range beat.AudioPaths {
 			data, err := os.ReadFile(path)
 			if err != nil {
@@ -153,6 +207,22 @@ func (v *VideoPipeline) opusTrack(script *scene.Script) (*webm.OpusTrack, error)
 			if err := track.AppendClip(data); err != nil {
 				return nil, err
 			}
+		}
+
+		// Hold the beat for its whole span, not just the length of its clips. A
+		// beat is a clip plus a gap, and without the gap every spoken beat ends
+		// early and the whole track creeps ahead of the picture.
+		played := track.Duration() - before
+		if hold := beat.Duration - played + v.gap; hold > 0 {
+			if err := track.AppendSilence(hold); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if v.outro > 0 {
+		if err := track.AppendSilence(v.outro); err != nil {
+			return nil, err
 		}
 	}
 	return track, nil
@@ -166,9 +236,10 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 		return renderTotals{}, err
 	}
 	encoder := webm.NewEncoder(v.width, v.height, v.quality)
+	encoder.SetMethod(v.effort)
 
 	animate := !v.still
-	plan := NewRenderPlan(script, track, v.fps, animate)
+	plan := NewRenderPlan(script, track, v.fps, animate, v.intro, v.outro, v.gap)
 
 	started := time.Now()
 	elapsed := time.Duration(0)
@@ -206,7 +277,53 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 			Length:            plan.Length,
 		})
 	}
+
+	// emit encodes and writes one frame, advancing the timeline by span.
+	//
+	// The muxer is told exactly what the encoder produced: marking an inter frame
+	// as a keyframe starts a cluster a decoder cannot reconstruct, which corrupts
+	// the picture until the next real keyframe.
+	emit := func(img *image.RGBA, span time.Duration, forceKeyframe bool) error {
+		keyframe := forceKeyframe || elapsed-lastKeyframe >= keyframeEvery
+		data, err := encoder.Encode(img, keyframe)
+		if err != nil {
+			return err
+		}
+		if err := muxer.WriteVideo(data, keyframe, elapsed); err != nil {
+			return err
+		}
+		if keyframe {
+			lastKeyframe = elapsed
+		}
+		totals.frames++
+		elapsed += span
+		report(false)
+		return nil
+	}
+
 	report(true)
+
+	// The intro holds the opening stage before anything is written on it, so the
+	// video opens on a scene rather than on a line of dialogue.
+	if v.intro > 0 && len(script.Scenes) > 0 && len(script.Scenes[0].Beats) > 0 {
+		if err := ctx.Err(); err != nil {
+			return totals, err
+		}
+		opening := renderer.Frame(scene.FrameRequest{
+			Script:      script,
+			SceneIndex:  0,
+			Scene:       script.Scenes[0],
+			Beat:        script.Scenes[0].Beats[0],
+			Progress:    0,
+			Animate:     true,
+			DisplayMode: v.displayMode,
+		})
+		lastImage = opening
+		totals.imageFrames++
+		if err := emit(opening, v.intro, true); err != nil {
+			return totals, err
+		}
+	}
 
 	for index := range script.Scenes {
 		sc := script.Scenes[index]
@@ -240,31 +357,33 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 					totals.imageFrames++
 				}
 
-				// The muxer is told exactly what the encoder produced. Marking an
-				// inter frame as a keyframe starts a cluster a decoder cannot
-				// reconstruct, which corrupts the picture until the next keyframe.
-				//
 				// A scene's opening crossfade blends two pictures, which is the
 				// most an inter frame has to carry, so it gets keyframes too.
 				crossfading := sceneStart && step.Progress < scene.CrossfadeShare
-				keyframe := beatStart || crossfading || elapsed-lastKeyframe >= keyframeEvery
-				data, err := encoder.Encode(img, keyframe)
-				if err != nil {
+				if err := emit(img, step.Span, beatStart || crossfading); err != nil {
 					return totals, err
-				}
-				if err := muxer.WriteVideo(data, keyframe, elapsed); err != nil {
-					return totals, err
-				}
-				if keyframe {
-					lastKeyframe = elapsed
 				}
 				beatStart = false
-				totals.frames++
-				elapsed += step.Span
-				report(false)
+			}
+
+			// Hold the beat's closing picture for the extra gap, so one segment
+			// does not run straight into the next.
+			if v.gap > 0 && lastImage != nil {
+				totals.repeatFrames++
+				if err := emit(lastImage, v.gap, false); err != nil {
+					return totals, err
+				}
 			}
 		}
 		previousArt = sc.ArtPath
+	}
+
+	// The outro holds the closing picture after the last line.
+	if v.outro > 0 && lastImage != nil {
+		totals.repeatFrames++
+		if err := emit(lastImage, v.outro, false); err != nil {
+			return totals, err
+		}
 	}
 
 	if v.progress != nil {

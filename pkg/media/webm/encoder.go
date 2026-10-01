@@ -7,11 +7,12 @@ import (
 	"github.com/gen2brain/vpx/vp8"
 )
 
-// encodeMethod is the encoder's quality/speed trade-off, 0-6. Method 2 keeps the
+// DefaultMethod is the encoder's quality/speed trade-off, 0-6. Method 2 keeps the
 // encoder near its fastest: the higher methods add subblock and rate-distortion
 // search that cost about six times as much per frame for a marginal size gain,
-// and Quality is what actually governs how a frame looks.
-const encodeMethod = 2
+// and Quality is what actually governs how a frame looks. Raise it when coloured
+// text or fine art needs the extra mode search.
+const DefaultMethod = 2
 
 // Encoder turns RGBA frames into a VP8 bitstream. It keeps its reference frames
 // across calls, so a keyframe must precede any inter frame.
@@ -26,8 +27,15 @@ type Encoder struct {
 func NewEncoder(width, height, quality int) *Encoder {
 	return &Encoder{
 		quality: quality,
-		method:  encodeMethod,
+		method:  DefaultMethod,
 		picture: newPicture(width, height),
+	}
+}
+
+// SetMethod changes the quality/speed trade-off, 0-6.
+func (e *Encoder) SetMethod(method int) {
+	if method >= 0 && method <= 6 {
+		e.method = method
 	}
 }
 

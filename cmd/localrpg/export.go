@@ -31,6 +31,10 @@ func handleExportCommand(args []string) {
 	fps := fs.Int("fps", scene.DefaultFPS, "Video frame rate")
 	size := fs.String("size", "1920x1080", "Video size as WxH")
 	quality := fs.Int("quality", 80, "VP8 quality, 0-100")
+	effort := fs.Int("effort", export.DefaultEffort, "Encoder effort, 0-6 (higher is slower and cleaner)")
+	intro := fs.Duration("intro", 1500*time.Millisecond, "Hold the opening picture this long before the story starts")
+	outro := fs.Duration("outro", 1500*time.Millisecond, "Hold the closing picture this long after the story ends")
+	gap := fs.Duration("gap", 300*time.Millisecond, "Hold every segment this much longer than the script paces it")
 	showProgress := fs.Bool("progress", false, "Show a live progress bar while rendering")
 
 	if len(args) == 0 {
@@ -120,6 +124,10 @@ func handleExportCommand(args []string) {
 		pipeline.SetStill(*still)
 		pipeline.SetFPS(*fps)
 		pipeline.SetQuality(*quality)
+		pipeline.SetEffort(*effort)
+		pipeline.SetIntro(*intro)
+		pipeline.SetOutro(*outro)
+		pipeline.SetGap(*gap)
 		if cfg, cfgErr := config.NewConfigManager().Load(); cfgErr == nil && cfg != nil {
 			pipeline.SetDisplayMode(scene.DisplayMode(cfg.Media.TTS.SpeechCues.DisplayMode))
 		}

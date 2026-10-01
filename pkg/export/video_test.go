@@ -128,3 +128,40 @@ func TestRenderVideoRequiresScenes(t *testing.T) {
 		t.Fatal("expected an error for a script with no scenes")
 	}
 }
+
+func TestRenderPlanIncludesTheBuffers(t *testing.T) {
+	pipeline := NewVideoPipeline(".")
+	script := smallScript()
+	track, err := pipeline.opusTrack(script)
+	if err != nil {
+		t.Fatalf("opusTrack: %v", err)
+	}
+
+	plain := NewRenderPlan(script, track, 5, true, 0, 0, 0)
+	buffered := NewRenderPlan(script, track, 5, true, time.Second, time.Second, 500*time.Millisecond)
+
+	beats := len(script.Beats())
+	if got, want := buffered.Frames.Duration-plain.Frames.Duration, 2*time.Second+time.Duration(beats)*500*time.Millisecond; got != want {
+		t.Errorf("buffers add %v, want %v", got, want)
+	}
+	if got, want := buffered.Frames.Total-plain.Frames.Total, beats+2; got != want {
+		t.Errorf("buffers add %d frames, want %d", got, want)
+	}
+}
+
+// TestOpusTrackMatchesThePicture pins the sync fix: the audio timeline must be as
+// long as the picture. A beat is a clip plus a gap, so without holding the gap
+// every spoken beat ends early and the whole track creeps ahead of the video.
+func TestOpusTrackMatchesThePicture(t *testing.T) {
+	pipeline := NewVideoPipeline(".")
+	script := smallScript()
+	track, err := pipeline.opusTrack(script)
+	if err != nil {
+		t.Fatalf("opusTrack: %v", err)
+	}
+
+	plan := NewRenderPlan(script, track, 5, true, pipeline.intro, pipeline.outro, pipeline.gap)
+	if diff := plan.Length - track.Duration(); diff > 50*time.Millisecond || diff < -50*time.Millisecond {
+		t.Errorf("picture runs %v but audio runs %v", plan.Length, track.Duration())
+	}
+}

@@ -296,7 +296,7 @@ func (r *Renderer) drawPortraitBox(img *image.RGBA, path string, x, y, size int,
 	}
 	fillRoundRect(img, rect, radius, color.RGBA{28, 25, 23, 255})
 	if covered := r.art.cover(path, size, size); covered != nil {
-		drawCoverRect(img, covered, rect, mirror)
+		drawCoverRect(img, covered, rect, radius, mirror)
 	}
 	strokeRoundRect(img, rect, radius, 2, edge)
 
@@ -549,6 +549,9 @@ func (r *Renderer) drawSceneCard(img *image.RGBA, panel image.Rectangle, req Fra
 	textWidth := font.MeasureString(face, shown).Ceil()
 	x := (r.width - textWidth) / 2
 	baseline := panel.Min.Y + panel.Dy()/2 + face.Metrics().Ascent.Ceil()/2
+	// The theatre drops a shadow behind the title. It lifts the words off busy
+	// art, and gives the encoder a darker edge to carry than amber on a painting.
+	r.drawText(img, face, shown, x+2, baseline+2, color.RGBA{0, 0, 0, 170}, false)
 	// The theatre's scene card is not bold, and faking bold on letters this large
 	// puts a coloured fringe on every stroke.
 	r.drawText(img, face, shown, x, baseline, amberLabel, false)
@@ -737,11 +740,15 @@ func blendOver(dst, src color.RGBA) color.RGBA {
 	}
 }
 
-// drawCoverRect copies already-cover-fit art into a rectangle, optionally
-// mirrored. The art is scaled once by the cache, so this is a copy.
-func drawCoverRect(img *image.RGBA, art *image.RGBA, rect image.Rectangle, mirror bool) {
+// drawCoverRect copies already-cover-fit art into a rounded rectangle, optionally
+// mirrored. The art is scaled once by the cache, so this is a copy; the corners
+// are masked so the picture does not square off the box the border draws.
+func drawCoverRect(img *image.RGBA, art *image.RGBA, rect image.Rectangle, radius int, mirror bool) {
 	for y := 0; y < rect.Dy(); y++ {
 		for x := 0; x < rect.Dx(); x++ {
+			if !insideRounded(rect, radius, rect.Min.X+x, rect.Min.Y+y) {
+				continue
+			}
 			sx := x
 			if mirror {
 				sx = rect.Dx() - 1 - x

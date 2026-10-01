@@ -31,7 +31,7 @@ func BenchmarkEncode1080p(b *testing.B) {
 	b.Run("key", func(b *testing.B) {
 		var enc vp8.Encoder
 		for i := 0; i < b.N; i++ {
-			if _, err := enc.Encode(pic, vp8.EncodeOptions{Quality: 80, Method: encodeMethod}); err != nil {
+			if _, err := enc.Encode(pic, vp8.EncodeOptions{Quality: 80, Method: DefaultMethod}); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -39,12 +39,12 @@ func BenchmarkEncode1080p(b *testing.B) {
 
 	b.Run("inter", func(b *testing.B) {
 		var enc vp8.Encoder
-		if _, err := enc.Encode(pic, vp8.EncodeOptions{Quality: 80, Method: encodeMethod}); err != nil {
+		if _, err := enc.Encode(pic, vp8.EncodeOptions{Quality: 80, Method: DefaultMethod}); err != nil {
 			b.Fatal(err)
 		}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, err := enc.EncodeInter(pic, vp8.EncodeOptions{Quality: 80, Method: encodeMethod}); err != nil {
+			if _, err := enc.EncodeInter(pic, vp8.EncodeOptions{Quality: 80, Method: DefaultMethod}); err != nil {
 				b.Fatal(err)
 			}
 		}
