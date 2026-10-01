@@ -105,3 +105,13 @@ func TestFrameDrawsTheSceneCardInAmber(t *testing.T) {
 		t.Fatal("expected the scene card's amber title")
 	}
 }
+
+func TestFramesForBeatIsOneWhenStatic(t *testing.T) {
+	beat := Beat{Kind: BeatNarration, Text: "A line.", Duration: 2 * time.Second}
+	if got := FramesForBeat(beat, 15, false); got != 1 {
+		t.Errorf("static frames = %d, want 1", got)
+	}
+	if got := FramesForBeat(beat, 15, true); got != 30 {
+		t.Errorf("animated frames = %d, want 30", got)
+	}
+}

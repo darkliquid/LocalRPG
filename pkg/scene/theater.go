@@ -115,6 +115,15 @@ func lerpColour(a, b color.RGBA, t float64) color.RGBA {
 // upper is the theatre's label case: uppercase, trimmed.
 func upper(text string) string { return strings.ToUpper(strings.TrimSpace(text)) }
 
+// FramesForBeat is how many frames a beat occupies: one when animation is off,
+// and the beat's paced frame count when it is on.
+func FramesForBeat(beat Beat, fps int, animate bool) int {
+	if !animate {
+		return 1
+	}
+	return FramesFor(beat.Duration, fps)
+}
+
 // drawHeader is the theatre's top band: the campaign's name, the location pill,
 // and the scene counter.
 func (r *Renderer) drawHeader(img *image.RGBA, req FrameRequest) {
