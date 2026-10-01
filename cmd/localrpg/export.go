@@ -113,6 +113,23 @@ func handleExportCommand(args []string) {
 			fmt.Fprintf(os.Stderr, "export: ignoring --size %q: %v\n", *size, err)
 		}
 
+		// A render can take a while, so say where it is rather than going quiet
+		// until it finishes. One line per completed beat keeps it readable.
+		lastDone := -1
+		pipeline.SetProgress(func(p scene.Progress) {
+			if p.Phase == "frames" && p.Total > 0 {
+				if p.Done == lastDone {
+					return
+				}
+				lastDone = p.Done
+				fmt.Fprintf(os.Stderr, "export: %s %d/%d\n", p.Phase, p.Done, p.Total)
+				return
+			}
+			if p.Phase != "" {
+				fmt.Fprintf(os.Stderr, "export: %s\n", p.Phase)
+			}
+		})
+
 		if err := pipeline.RenderVideo(context.Background(), script, target); err != nil {
 			fmt.Fprintf(os.Stderr, "Video render failed: %v\n", err)
 			os.Exit(1)

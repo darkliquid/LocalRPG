@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
+	xdraw "golang.org/x/image/draw"
 
 	"github.com/darkliquid/localrpg/pkg/scene/fonts"
 )
@@ -43,6 +44,10 @@ type Renderer struct {
 	fonts  *fonts.Set
 	art    *artCache
 	faces  map[faceKey]font.Face
+
+	// gradient is the theatre's no-art background. It depends only on the frame
+	// size, so it is built once rather than per frame.
+	gradient *image.RGBA
 }
 
 // faceKey names a sized face so it is parsed once per renderer.
@@ -175,19 +180,12 @@ func drawCover(dst *image.RGBA, src image.Image, scale float64) {
 	draw.Draw(dst, image.Rect(offset.X, offset.Y, offset.X+targetW, offset.Y+targetH), scaled, image.Point{}, draw.Over)
 }
 
-// scaleImage resamples with nearest-neighbour, which is enough for a drifting
-// background and keeps the export dependency-free.
+// scaleImage resamples src to the given size. Nearest-neighbour keeps a drifting
+// background cheap; the art sits behind text and a scrim, so a finer filter would
+// cost more than it shows.
 func scaleImage(src image.Image, width, height int) *image.RGBA {
-	srcBounds := src.Bounds()
 	dst := image.NewRGBA(image.Rect(0, 0, width, height))
-
-	for y := 0; y < height; y++ {
-		sy := srcBounds.Min.Y + y*srcBounds.Dy()/height
-		for x := 0; x < width; x++ {
-			sx := srcBounds.Min.X + x*srcBounds.Dx()/width
-			dst.Set(x, y, src.At(sx, sy))
-		}
-	}
+	xdraw.NearestNeighbor.Scale(dst, dst.Bounds(), src, src.Bounds(), xdraw.Src, nil)
 	return dst
 }
 

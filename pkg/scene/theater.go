@@ -7,6 +7,7 @@ import (
 	"image/draw"
 	"math"
 	"strings"
+	"time"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
@@ -38,7 +39,7 @@ func (r *Renderer) drawBackground(img *image.RGBA, req FrameRequest) {
 
 	art := r.backgroundArt(req)
 	if art == nil {
-		drawRadialGradient(img, color.RGBA{38, 30, 27, 255}, baseColour)
+		draw.Draw(img, img.Bounds(), r.gradientImage(), image.Point{}, draw.Src)
 		return
 	}
 
@@ -89,6 +90,17 @@ func scrimAlpha(t float64) uint8 {
 	return uint8(a * 255)
 }
 
+// gradientImage is the theatre's no-art background, built once per renderer
+// because it depends only on the frame size.
+func (r *Renderer) gradientImage() *image.RGBA {
+	if r.gradient == nil {
+		gradient := image.NewRGBA(image.Rect(0, 0, r.width, r.height))
+		drawRadialGradient(gradient, color.RGBA{38, 30, 27, 255}, baseColour)
+		r.gradient = gradient
+	}
+	return r.gradient
+}
+
 // drawRadialGradient fills img with the theatre's no-art background: a warm
 // centre fading to the base colour.
 func drawRadialGradient(img *image.RGBA, centre, edge color.RGBA) {
@@ -115,13 +127,62 @@ func lerpColour(a, b color.RGBA, t float64) color.RGBA {
 // upper is the theatre's label case: uppercase, trimmed.
 func upper(text string) string { return strings.ToUpper(strings.TrimSpace(text)) }
 
-// FramesForBeat is how many frames a beat occupies: one when animation is off,
-// and the beat's paced frame count when it is on.
-func FramesForBeat(beat Beat, fps int, animate bool) int {
+// FrameStep is one frame of a beat: the reveal progress to draw and how long the
+// frame is held.
+type FrameStep struct {
+	Progress float64
+	Span     time.Duration
+}
+
+// holdFPS is the heartbeat rate for the tail of a beat. Once the reveal has
+// finished the picture barely changes, so a slow cadence keeps the background
+// drift alive without paying for frames nobody can tell apart.
+const holdFPS = 2
+
+// BeatFramePlan is the frames a beat occupies: one when animation is off, and a
+// fast reveal followed by a slow heartbeat when it is on. The spans sum to the
+// beat's duration, so picture and sound stay in step.
+func BeatFramePlan(beat Beat, fps int, animate bool) []FrameStep {
 	if !animate {
-		return 1
+		return []FrameStep{{Progress: 1, Span: beat.Duration}}
 	}
-	return FramesFor(beat.Duration, fps)
+	if beat.Duration <= 0 {
+		return []FrameStep{{Progress: 1}}
+	}
+
+	revealSpan := time.Duration(float64(beat.Duration) * TypewriterFraction)
+	holdSpan := beat.Duration - revealSpan
+
+	revealFrames := FramesFor(revealSpan, fps)
+	holdFrames := FramesFor(holdSpan, holdFPS)
+
+	steps := make([]FrameStep, 0, revealFrames+holdFrames)
+	revealStep := revealSpan / time.Duration(revealFrames)
+	for i := 0; i < revealFrames; i++ {
+		progress := TypewriterFraction
+		if revealFrames > 1 {
+			progress = float64(i) / float64(revealFrames-1) * TypewriterFraction
+		}
+		span := revealStep
+		if i == revealFrames-1 {
+			span = revealSpan - revealStep*time.Duration(revealFrames-1)
+		}
+		steps = append(steps, FrameStep{Progress: progress, Span: span})
+	}
+
+	holdStep := holdSpan / time.Duration(holdFrames)
+	for i := 0; i < holdFrames; i++ {
+		progress := 1.0
+		if holdFrames > 1 {
+			progress = TypewriterFraction + float64(i)/float64(holdFrames-1)*(1-TypewriterFraction)
+		}
+		span := holdStep
+		if i == holdFrames-1 {
+			span = holdSpan - holdStep*time.Duration(holdFrames-1)
+		}
+		steps = append(steps, FrameStep{Progress: progress, Span: span})
+	}
+	return steps
 }
 
 // drawHeader is the theatre's top band: the campaign's name, the location pill,

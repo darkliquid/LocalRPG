@@ -81,6 +81,44 @@ func TestRenderVideoLeavesNothingWhenCancelled(t *testing.T) {
 	}
 }
 
+func TestRenderVideoReportsProgress(t *testing.T) {
+	pipeline := NewVideoPipeline(".")
+	pipeline.SetSize(64, 48)
+	pipeline.SetFPS(5)
+
+	var events []scene.Progress
+	pipeline.SetProgress(func(p scene.Progress) { events = append(events, p) })
+
+	out := filepath.Join(t.TempDir(), "replay.webm")
+	if err := pipeline.RenderVideo(context.Background(), smallScript(), out); err != nil {
+		t.Fatalf("RenderVideo: %v", err)
+	}
+
+	// The render must say it started and say when each beat finished, or a long
+	// export looks like it has stalled.
+	sawStart := false
+	sawFinalBeat := false
+	for _, event := range events {
+		if event.Phase == "frames" && event.Total == 2 {
+			if event.Done == 0 {
+				sawStart = true
+			}
+			if event.Done == 2 {
+				sawFinalBeat = true
+			}
+		}
+	}
+	if !sawStart {
+		t.Error("expected an initial progress event")
+	}
+	if !sawFinalBeat {
+		t.Error("expected progress to reach the last beat")
+	}
+	if events[len(events)-1].Phase != "done" {
+		t.Errorf("last phase = %q, want done", events[len(events)-1].Phase)
+	}
+}
+
 func TestRenderVideoRequiresScenes(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "x.webm")
 	if err := NewVideoPipeline(".").RenderVideo(context.Background(), &scene.Script{}, out); err == nil {

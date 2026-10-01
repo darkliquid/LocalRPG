@@ -151,24 +151,39 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 	previousArt := ""
 	first := true
 
+	beats := script.Beats()
+	total := len(beats)
+	done := 0
+
+	// Progress is throttled so a long render reports steadily without flooding a
+	// subscriber, and always reports a completed beat.
+	lastReport := time.Time{}
+	report := func(force bool, message string) {
+		if v.progress == nil {
+			return
+		}
+		if !force && time.Since(lastReport) < 250*time.Millisecond {
+			return
+		}
+		lastReport = time.Now()
+		v.progress(scene.Progress{Phase: "frames", Done: done, Total: total, Message: message})
+	}
+	report(true, "starting")
+
 	for index := range script.Scenes {
 		sc := script.Scenes[index]
 		for _, beat := range sc.Beats {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			frames := scene.FramesForBeat(beat, v.fps, animate)
-			for f := 0; f < frames; f++ {
-				progress := 1.0
-				if frames > 1 {
-					progress = float64(f) / float64(frames-1)
-				}
+			plan := scene.BeatFramePlan(beat, v.fps, animate)
+			for _, step := range plan {
 				img := renderer.Frame(scene.FrameRequest{
 					Script:      script,
 					SceneIndex:  index,
 					Scene:       sc,
 					Beat:        beat,
-					Progress:    progress,
+					Progress:    step.Progress,
 					PreviousArt: previousArt,
 					Animate:     animate,
 					DisplayMode: v.displayMode,
@@ -181,13 +196,13 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 					return err
 				}
 				first = false
-				elapsed += beat.Duration / time.Duration(frames)
+				elapsed += step.Span
+				report(false, fmt.Sprintf("beat %d of %d", done+1, total))
 			}
+			done++
+			report(true, "")
 		}
 		previousArt = sc.ArtPath
-		if v.progress != nil {
-			v.progress(scene.Progress{Phase: "frames", Done: index + 1, Total: len(script.Scenes)})
-		}
 	}
 
 	if v.progress != nil {

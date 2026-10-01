@@ -106,12 +106,29 @@ func TestFrameDrawsTheSceneCardInAmber(t *testing.T) {
 	}
 }
 
-func TestFramesForBeatIsOneWhenStatic(t *testing.T) {
+func TestBeatFramePlanSplitsRevealAndHold(t *testing.T) {
 	beat := Beat{Kind: BeatNarration, Text: "A line.", Duration: 2 * time.Second}
-	if got := FramesForBeat(beat, 15, false); got != 1 {
-		t.Errorf("static frames = %d, want 1", got)
+
+	if plan := BeatFramePlan(beat, 15, false); len(plan) != 1 || plan[0].Progress != 1 {
+		t.Fatalf("static plan = %+v, want one fully revealed frame", plan)
 	}
-	if got := FramesForBeat(beat, 15, true); got != 30 {
-		t.Errorf("animated frames = %d, want 30", got)
+
+	plan := BeatFramePlan(beat, 15, true)
+	if len(plan) < 2 {
+		t.Fatalf("animated plan has %d frames, want a reveal and a hold", len(plan))
+	}
+	if plan[0].Progress != 0 {
+		t.Errorf("first frame at progress %v, want 0", plan[0].Progress)
+	}
+	if last := plan[len(plan)-1]; last.Progress != 1 {
+		t.Errorf("last frame at progress %v, want 1", last.Progress)
+	}
+
+	var total time.Duration
+	for _, step := range plan {
+		total += step.Span
+	}
+	if total != beat.Duration {
+		t.Errorf("plan spans %v, want %v", total, beat.Duration)
 	}
 }
