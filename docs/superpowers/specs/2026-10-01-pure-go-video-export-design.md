@@ -69,6 +69,7 @@ Settled by review:
 | Look | The full theatre look: stage, portraits, name plate, dialogue panel, markdown prose, scene card |
 | Animation | Optional, dual path: typewriter reveal, scene crossfade, and background drift when enabled; one fully revealed frame per beat when disabled |
 | Encoder | `github.com/gen2brain/vpx` (`vp8.Encoder`), pure Go, keyframes and inter frames |
+| Encoding mode | Inter-frame prediction (`Encode` + `EncodeInter`), not intra-only WebP keyframes; a heartbeat is a cheap predicted frame |
 | Muxer | `github.com/at-wat/ebml-go/webm`, pure Go, VP8 + Opus, SeekHead and Cues |
 | Container | WebM (`V_VP8` + `A_OPUS`). Playable in VLC; the acceptance bar |
 | Audio | The campaign's existing Ogg/Opus clips, laid onto one 48 kHz timeline; no re-encode of speech |
@@ -214,32 +215,41 @@ A new package with two responsibilities: encode VP8, and mux VP8 + Opus into Web
 
 The campaign's clips are already Ogg/Opus files produced by `pkg/media/opus` with one
 encoder configuration (mono, 48 kHz, pre-skip 312), which is what makes a lossless join
-possible. The pipeline assembles one continuous track from the beats:
+possible. The pipeline assembles one continuous track from the beats, without ever
+decoding speech back to PCM: an Opus packet carries no timestamp of its own, so only the
+container decides when it plays.
 
-- `AppendClip` demuxes a clip with `pion/opus/pkg/oggreader`, keeping each packet and
-  its sample length (from the granule deltas) and skipping the `OpusHead`/`OpusTags`
-  pages. It checks the clip's `OpusHead` against the track's and errors on a mismatch,
-  which cannot happen with our own clips.
-- Packets land on a single running sample position. `AppendSilence` advances the
-  position by a gap and fills it with a pre-encoded silent packet, so a beat with no
-  clips never starves the decoder.
-- Speech is copied, never re-encoded. The track's `CodecPrivate` is the standard
-  `OpusHead` (RFC 7845), with `CodecDelay = preSkip` in nanoseconds and
-  `SeekPreRoll = 80 ms`, `SamplingFrequency` 48000, and the clip channel count.
+- `AppendClip` streams a clip with `pion/opus/pkg/oggreader` in O(1) memory, keeping each
+  packet and skipping the `OpusHead`/`OpusTags` pages. It checks the clip's `OpusHead`
+  against the track's and errors on a mismatch, which cannot happen with our own clips.
+- Each packet's length comes from its own TOC byte (RFC 6716 §3.1): the config field
+  gives the frame duration (2.5/5/10/20/40/60 ms) and the frame-count code gives how many
+  frames it carries. No decoding, no granule arithmetic.
+- Packets land on a single running sample position. `AppendSilence` advances the position
+  by a gap: a short gap (under a second or two) is left to the container's timecodes, and
+  a longer one is filled with the canonical 20 ms Opus silence packet, `f8 ff fe` for
+  mono, so a beat with no clips never starves the decoder.
+- The track's `CodecPrivate` is the standard `OpusHead` (RFC 7845), with
+  `CodecDelay = preSkip` in nanoseconds, `SeekPreRoll = 80 ms`, `SamplingFrequency` 48000,
+  and the clip channel count.
 
 ### 5.3 Interleaving, clusters, cues, and duration
 
 - `webm.NewSimpleBlockWriter` returns one writer per track and merges them with its
-  multi-track sorter. The pipeline feeds video and audio in timestamp order so neither
-  track's blocks are ever dropped as out of date.
+  multi-track sorter. The pipeline keeps its own min-heap of timed video and audio
+  packets (`container/heap`) and drains it in strict non-decreasing timestamp order, so
+  neither track's blocks are ever dropped as out of date.
 - `WithSeekHead(true)` and `WithCues` build the seek index, with the reserve sized
   generously from the expected cluster count so cues are never downsampled; the muxer
   therefore requires an `io.WriteSeeker`, which the pipeline supplies as the temp
   `*os.File`.
 - `WithMaxKeyframeInterval` aligns cluster starts with video keyframes so every cluster
   begins on a keyframe and seeking lands on one.
-- The total duration is set from the audio/video timeline so a player knows the length
-  without reading to EOF, and `Close` flushes the last cluster and backfills the index.
+- The total duration is declared through `mkvcore.WithSegmentInfo` (`webm.Info` with
+  `SetDuration`), or written automatically once Cues are enabled, so a player knows the
+  length without reading to EOF. Note that current `ebml-go` has no `webm.WithDuration`
+  option; duration is a `SegmentInfo` field. `Close` flushes the last cluster and
+  backfills the index.
 
 ## 6. The Pipeline (`pkg/export`)
 
@@ -365,6 +375,7 @@ All tests are pure Go; none may invoke ffmpeg or ffprobe.
 | Risk | Mitigation |
 | --- | --- |
 | `gen2brain/vpx` is young (single maintainer, low adoption) | It is a libwebp port with conformance tests against libvpx; pin a version and keep it behind the `pkg/media/webm` interface so it can be swapped |
+| The inter-frame encoder is the least-proven path (libwebp has no inter-frame encoder; this is gen2brain's own, validated by libvpx decoding) | Pin the version, verify our own output by decoding it back with the same library, and keep the intra-only WebP-keyframe path (lossy WebP stripped to a VP8 keyframe) as the documented fallback if it proves faulty |
 | 1080p encode time and memory | `--size`, `--fps`, `--still`, `--quality`, and `Method`/`Threads`; `--still` is the fast path |
 | Safari's WebM support is partial | The acceptance bar is VLC; Chromium and Firefox play it. Noted, not blocking |
 | VP8 4:2:0 BT.601 differs slightly from the browser's sRGB rendering | Expected; the goal is "very close", not pixel-exact |
