@@ -64,8 +64,8 @@ func NewMuxer(w io.WriteSeeker, width, height int, track *OpusTrack) (*Muxer, er
 
 	writers, err := ebmlwebm.NewSimpleBlockWriter(closer, tracks,
 		mkvcore.WithSeekHead(true),
-		mkvcore.WithCues(8192),
-		mkvcore.WithMaxKeyframeInterval(1, maxClusterKeyframeGap),
+		mkvcore.WithCues(cueReserve),
+		mkvcore.WithMinMaxClusterDuration(1, minClusterDuration, maxClusterDuration),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("webm: open block writer: %w", err)
@@ -74,10 +74,22 @@ func NewMuxer(w io.WriteSeeker, width, height int, track *OpusTrack) (*Muxer, er
 	return &Muxer{video: writers[0], audio: writers[1], track: track}, nil
 }
 
-// maxClusterKeyframeGap is the longest a cluster may run without a keyframe. It
-// is a hint to the muxer's cluster rotation, not a policy: the caller decides
-// where keyframes go and must say so.
-const maxClusterKeyframeGap = 2000
+// Cluster bounds, in milliseconds. Clusters are kept short and started on a
+// keyframe so the seek index has a point near anywhere a viewer scrubs to.
+//
+// Note the shape of ebml-go's options: WithMaxKeyframeInterval is for sparse
+// streaming keyframes and sets a *minimum* cluster of about 32 seconds, which
+// leaves a file with almost no seek points. WithMinMaxClusterDuration is the one
+// that starts a new cluster at the first keyframe after the minimum.
+const (
+	minClusterDuration = 1000
+	maxClusterDuration = 4000
+)
+
+// cueReserve is the space left at the front of the file for the seek index. It
+// must hold one entry per cluster, and ebml-go silently drops entries that do not
+// fit, so it is generous: 32 KiB covers a few thousand clusters.
+const cueReserve = 32768
 
 // WriteVideo adds one encoded frame. The caller owns the keyframe policy and must
 // pass the same flag it gave the encoder: marking an inter frame as a keyframe

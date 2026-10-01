@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	// crossfadeShare is the share of a scene's first beat spent blending in.
-	crossfadeShare = 0.12
+	// CrossfadeShare is the share of a scene's first beat spent blending in.
+	CrossfadeShare = 0.12
 )
 
 // baseColour matches the app and the player's background.
@@ -131,10 +131,10 @@ func clamp01(v float64) float64 {
 // crossfadeAlpha is how opaque the incoming scene is: it rises across the first
 // share of a beat so a scene change reads as a transition, not a glitch.
 func crossfadeAlpha(progress float64) float64 {
-	if progress >= crossfadeShare {
+	if progress >= CrossfadeShare {
 		return 1
 	}
-	return clamp01(progress / crossfadeShare)
+	return clamp01(progress / CrossfadeShare)
 }
 
 // revealText shows the share of text a beat has reached, so the video's

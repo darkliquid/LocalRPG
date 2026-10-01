@@ -174,7 +174,13 @@ func BeatFramePlan(beat Beat, fps int, animate bool) []FrameStep {
 		return []FrameStep{{Progress: 1}}
 	}
 
+	// When a beat has a clip, that clip is the narration of this very text, so the
+	// reveal runs with it rather than finishing two fifths of the way in and
+	// leaving the words sitting there while the voice catches up.
 	revealSpan := time.Duration(float64(beat.Duration) * TypewriterFraction)
+	if beat.AudioDuration > 0 && beat.AudioDuration < beat.Duration {
+		revealSpan = beat.AudioDuration
+	}
 	holdSpan := beat.Duration - revealSpan
 
 	revealFrames := FramesFor(revealSpan, fps)
@@ -300,11 +306,12 @@ func (r *Renderer) drawPortraitBox(img *image.RGBA, path string, x, y, size int,
 }
 
 // drawDialogue draws the bottom panel: a scene card is a centred amber title,
-// anything else is the name plate, the prose, and the advance caret.
+// anything else is the name plate, the prose, and the advance caret. The panel is
+// sized from the laid-out prose, so a long beat makes a taller panel rather than
+// running past the bottom of a fixed one.
 func (r *Renderer) drawDialogue(img *image.RGBA, req FrameRequest) {
-	panel := r.dialogueRect()
 	if req.Beat.Kind == BeatSceneCard {
-		r.drawSceneCard(img, panel, req)
+		r.drawSceneCard(img, r.panelRect(r.minPanelHeight()), req)
 		return
 	}
 
@@ -332,11 +339,14 @@ func (r *Renderer) drawDialogue(img *image.RGBA, req FrameRequest) {
 		}
 	}
 
+	layout := r.layoutProse(shown, isSpeech, req.DisplayMode, r.panelWidth())
+	panel := r.panelRect(clampInt(layout.height(), r.minPanelHeight(), r.maxPanelHeight()))
+
 	radius := panel.Dy() / 10
 	fillRoundRect(img, panel, radius, panelFill)
 	strokeRoundRect(img, panel, radius, 2, edge)
 	r.drawNamePlate(img, panel, name, nameFill)
-	r.drawProse(img, panel, shown, isSpeech, req.DisplayMode)
+	r.drawProse(img, panel, layout, isSpeech)
 
 	if !req.Animate || req.Progress >= 1 {
 		caretX := panel.Max.X - panel.Dy()/8
@@ -345,14 +355,35 @@ func (r *Renderer) drawDialogue(img *image.RGBA, req FrameRequest) {
 	}
 }
 
-// dialogueRect is the theatre's panel: max-w-4xl, centred, min-h 20vh, above the
-// bottom edge.
-func (r *Renderer) dialogueRect() image.Rectangle {
-	width := int(math.Min(float64(r.width)*0.72, float64(r.height)*1.15))
-	height := int(math.Max(float64(r.height)*0.20, float64(r.height)*0.22))
+// panelWidth is the dialogue panel's width, which does not depend on its height.
+func (r *Renderer) panelWidth() int {
+	return int(math.Min(float64(r.width)*0.72, float64(r.height)*1.15))
+}
+
+// panelRect places a panel of the given height above the bottom edge.
+func (r *Renderer) panelRect(height int) image.Rectangle {
+	width := r.panelWidth()
 	left := (r.width - width) / 2
 	bottom := int(float64(r.height) * 0.94)
 	return image.Rect(left, bottom-height, left+width, bottom)
+}
+
+// minPanelHeight is the theatre's min-h of about a fifth of the frame, so a short
+// line still reads as a panel rather than a strip.
+func (r *Renderer) minPanelHeight() int { return int(float64(r.height) * 0.20) }
+
+// maxPanelHeight bounds the panel so it cannot swallow the portraits, which is
+// where the prose starts shrinking instead.
+func (r *Renderer) maxPanelHeight() int { return int(float64(r.height) * 0.46) }
+
+func clampInt(v, low, high int) int {
+	if v < low {
+		return low
+	}
+	if v > high {
+		return high
+	}
+	return v
 }
 
 // drawNamePlate draws the panel's name chip, straddling the top edge.
@@ -369,57 +400,109 @@ func (r *Renderer) drawNamePlate(img *image.RGBA, panel image.Rectangle, name st
 	r.drawText(img, face, name, rect.Min.X+padding, rect.Min.Y+face.Metrics().Ascent.Ceil()+padding/2, color.RGBA{255, 255, 255, 255}, true)
 }
 
-// drawProse lays out the beat's prose inside the panel, applying the inline
-// grammar the exported page applies.
-func (r *Renderer) drawProse(img *image.RGBA, panel image.Rectangle, text string, speech bool, mode DisplayMode) {
+// proseLayout is laid-out prose and the metrics needed to draw it and to size the
+// panel that holds it.
+type proseLayout struct {
+	lines      [][]Run // a nil line is a horizontal rule
+	base       font.Face
+	italic     font.Face
+	mono       font.Face
+	sans       font.Face
+	lineHeight int
+	padding    int
+	ascent     int
+}
+
+// height is how tall a panel must be to hold the text.
+func (l proseLayout) height() int { return len(l.lines)*l.lineHeight + 2*l.padding }
+
+// layoutProse wraps a beat's prose at the panel's width. It steps the type down
+// until the result fits the tallest panel the stage allows, so a long beat is not
+// silently cut off at the bottom of a fixed box.
+func (r *Renderer) layoutProse(text string, speech bool, mode DisplayMode, panelWidth int) proseLayout {
 	body := text
 	if speech {
 		body = "\u201c" + text + "\u201d"
 	}
 	blocks := ParseProse(body, mode)
 	if len(blocks) == 0 {
-		return
+		return proseLayout{}
 	}
 
-	size := max(16, r.height/26)
+	size := max(13, r.height/45)
+	maxHeight := r.maxPanelHeight()
+	for ; size > 11; size -= 2 {
+		if layout := r.proseAt(blocks, speech, size, panelWidth); layout.height() <= maxHeight {
+			return layout
+		}
+	}
+	return r.proseAt(blocks, speech, size, panelWidth)
+}
+
+// proseAt lays the blocks out at one type size.
+func (r *Renderer) proseAt(blocks []Block, speech bool, size, panelWidth int) proseLayout {
 	base := r.face("serif", size)
 	italic := r.face("serif-italic", size)
 	if speech {
 		base = italic
 	}
-	mono := r.face("mono", max(14, r.height/30))
-	sans := r.face("sans", max(13, r.height/34))
 	if base == nil {
+		return proseLayout{}
+	}
+
+	padding := size * 2
+	inner := max(1, panelWidth-2*padding)
+
+	lines := make([][]Run, 0, 8)
+	for _, block := range blocks {
+		if block.Kind == BlockRule {
+			lines = append(lines, nil)
+			continue
+		}
+		lines = append(lines, wrapRuns(block.Runs, base, inner)...)
+	}
+
+	return proseLayout{
+		lines:      lines,
+		base:       base,
+		italic:     italic,
+		mono:       r.face("mono", size),
+		sans:       r.face("sans", size),
+		lineHeight: base.Metrics().Height.Ceil() + size/3,
+		padding:    padding,
+		ascent:     base.Metrics().Ascent.Ceil(),
+	}
+}
+
+// drawProse draws laid-out prose inside the panel.
+func (r *Renderer) drawProse(img *image.RGBA, panel image.Rectangle, layout proseLayout, speech bool) {
+	if layout.base == nil {
 		return
 	}
 
-	padding := panel.Dy() / 8
-	left := panel.Min.X + padding
-	width := panel.Dx() - 2*padding
-	lineHeight := base.Metrics().Height.Ceil() + r.height/120
-	y := panel.Min.Y + padding + base.Metrics().Ascent.Ceil()
+	left := panel.Min.X + layout.padding
+	right := panel.Max.X - layout.padding
+	y := panel.Min.Y + layout.padding + layout.ascent
 
-	for _, block := range blocks {
-		if block.Kind == BlockRule {
-			draw.Draw(img, image.Rect(left, y, left+width, y+1), image.NewUniform(inactiveEdge), image.Point{}, draw.Over)
-			y += lineHeight
+	for _, line := range layout.lines {
+		if line == nil {
+			draw.Draw(img, image.Rect(left, y, right, y+1), image.NewUniform(inactiveEdge), image.Point{}, draw.Over)
+			y += layout.lineHeight
 			continue
 		}
-		for _, line := range wrapRuns(block.Runs, base, width) {
-			x := left
-			for _, run := range line {
-				face := r.runFace(run.Style, base, italic, mono, sans)
-				col := runColour(run.Style, stoneText)
-				if speech && run.Style == StyleRegular {
-					col = stoneBright
-				}
-				r.drawText(img, face, run.Text, x, y, col, run.Style == StyleBold)
-				x += font.MeasureString(face, run.Text).Ceil()
+		x := left
+		for _, run := range line {
+			face := r.runFace(run.Style, layout.base, layout.italic, layout.mono, layout.sans)
+			col := runColour(run.Style, stoneText)
+			if speech && run.Style == StyleRegular {
+				col = stoneBright
 			}
-			y += lineHeight
-			if y > panel.Max.Y-padding {
-				return
-			}
+			r.drawText(img, face, run.Text, x, y, col, run.Style == StyleBold)
+			x += font.MeasureString(face, run.Text).Ceil()
+		}
+		y += layout.lineHeight
+		if y > panel.Max.Y-layout.padding {
+			return
 		}
 	}
 }
@@ -455,7 +538,7 @@ func runColour(style RunStyle, body color.RGBA) color.RGBA {
 
 // drawSceneCard centres the location name in amber, the theatre's title beat.
 func (r *Renderer) drawSceneCard(img *image.RGBA, panel image.Rectangle, req FrameRequest) {
-	face := r.face("serif", max(22, r.height/16))
+	face := r.face("serif", max(18, r.height/30))
 	if face == nil {
 		return
 	}
@@ -466,7 +549,9 @@ func (r *Renderer) drawSceneCard(img *image.RGBA, panel image.Rectangle, req Fra
 	textWidth := font.MeasureString(face, shown).Ceil()
 	x := (r.width - textWidth) / 2
 	baseline := panel.Min.Y + panel.Dy()/2 + face.Metrics().Ascent.Ceil()/2
-	r.drawText(img, face, shown, x, baseline, amberLabel, true)
+	// The theatre's scene card is not bold, and faking bold on letters this large
+	// puts a coloured fringe on every stroke.
+	r.drawText(img, face, shown, x, baseline, amberLabel, false)
 }
 
 // drawDiamond draws the small advance caret as a rotated square.
@@ -525,16 +610,18 @@ func wrapRuns(runs []Run, face font.Face, width int) [][]Run {
 	return lines
 }
 
-// drawText draws a line, synthesising bold by drawing it twice a pixel apart
-// because the embedded families are variable fonts x/image cannot instance.
+// drawText draws a line, synthesising bold by drawing it a half pixel to the
+// right as well: the embedded families are variable fonts that x/image cannot
+// instance, and a whole-pixel double draw leaves a coloured fringe on the edges.
 func (r *Renderer) drawText(img *image.RGBA, face font.Face, text string, x, baseline int, col color.RGBA, bold bool) {
 	if face == nil || strings.TrimSpace(text) == "" {
 		return
 	}
-	drawer := &font.Drawer{Dst: img, Src: image.NewUniform(col), Face: face, Dot: fixed.P(x, baseline)}
+	dot := fixed.P(x, baseline)
+	drawer := &font.Drawer{Dst: img, Src: image.NewUniform(col), Face: face, Dot: dot}
 	drawer.DrawString(text)
 	if bold {
-		drawer.Dot = fixed.P(x+1, baseline)
+		drawer.Dot = fixed.Point26_6{X: dot.X + 32, Y: dot.Y}
 		drawer.DrawString(text)
 	}
 }

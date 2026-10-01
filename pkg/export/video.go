@@ -210,13 +210,14 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 
 	for index := range script.Scenes {
 		sc := script.Scenes[index]
-		for _, beat := range sc.Beats {
+		for beatIndex, beat := range sc.Beats {
 			if err := ctx.Err(); err != nil {
 				return totals, err
 			}
 			// A beat opens on new content, so it opens on a keyframe: prediction
 			// error from the beat before would otherwise smear the new text.
 			beatStart := true
+			sceneStart := beatIndex == 0
 			for _, step := range scene.BeatFramePlan(beat, v.fps, animate) {
 				// A repeat frame is the frame before it, so it is re-encoded rather
 				// than drawn again: the heartbeat costs an inter frame, not a render.
@@ -242,7 +243,11 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 				// The muxer is told exactly what the encoder produced. Marking an
 				// inter frame as a keyframe starts a cluster a decoder cannot
 				// reconstruct, which corrupts the picture until the next keyframe.
-				keyframe := beatStart || elapsed-lastKeyframe >= keyframeEvery
+				//
+				// A scene's opening crossfade blends two pictures, which is the
+				// most an inter frame has to carry, so it gets keyframes too.
+				crossfading := sceneStart && step.Progress < scene.CrossfadeShare
+				keyframe := beatStart || crossfading || elapsed-lastKeyframe >= keyframeEvery
 				data, err := encoder.Encode(img, keyframe)
 				if err != nil {
 					return totals, err

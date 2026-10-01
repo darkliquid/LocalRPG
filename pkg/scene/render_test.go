@@ -51,7 +51,7 @@ func TestCrossfadeIsDoneByTheEndOfItsShare(t *testing.T) {
 	if got := crossfadeAlpha(0); got != 0 {
 		t.Errorf("crossfadeAlpha(0) = %v, want 0", got)
 	}
-	if got := crossfadeAlpha(crossfadeShare); got != 1 {
+	if got := crossfadeAlpha(CrossfadeShare); got != 1 {
 		t.Errorf("crossfadeAlpha(share) = %v, want 1", got)
 	}
 	if got := crossfadeAlpha(1); got != 1 {

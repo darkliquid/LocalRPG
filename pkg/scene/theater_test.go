@@ -3,6 +3,7 @@ package scene
 import (
 	"image"
 	"image/color"
+	"strings"
 	"testing"
 	"time"
 
@@ -158,5 +159,49 @@ func TestBeatFramePlanSplitsRevealAndHold(t *testing.T) {
 	}
 	if total != beat.Duration {
 		t.Errorf("plan spans %v, want %v", total, beat.Duration)
+	}
+}
+
+// TestBeatFramePlanRevealsWithTheAudio pins the pacing fix: a beat whose clip is
+// the narration of its own text must reveal across the clip, not across the first
+// three fifths of the beat, or the words run ahead of the voice.
+func TestBeatFramePlanRevealsWithTheAudio(t *testing.T) {
+	beat := Beat{
+		Kind:          BeatNarration,
+		Text:          "A line.",
+		Duration:      4400 * time.Millisecond,
+		AudioDuration: 4 * time.Second,
+	}
+
+	var revealSpan time.Duration
+	for _, step := range BeatFramePlan(beat, 10, true) {
+		if !step.Repeat {
+			revealSpan += step.Span
+		}
+	}
+	if revealSpan < 3900*time.Millisecond {
+		t.Errorf("reveal spans %v, want about the clip's 4s", revealSpan)
+	}
+}
+
+// TestLayoutProseFitsThePanel pins the other half: a long beat must produce a
+// layout the panel can hold, rather than running off the bottom of a fixed box.
+func TestLayoutProseFitsThePanel(t *testing.T) {
+	renderer, err := NewRenderer(960, 540)
+	if err != nil {
+		t.Fatalf("NewRenderer: %v", err)
+	}
+
+	text := strings.Repeat("The hall is quiet and the candles gutter. ", 6)
+	layout := renderer.layoutProse(text, false, DisplayStageDirections, renderer.panelWidth())
+
+	if len(layout.lines) == 0 {
+		t.Fatal("expected the prose to lay out into lines")
+	}
+	if layout.height() > renderer.maxPanelHeight() {
+		t.Errorf("layout is %d tall, the tallest panel is %d", layout.height(), renderer.maxPanelHeight())
+	}
+	if layout.height() < renderer.minPanelHeight() {
+		t.Errorf("layout is %d tall, shorter than the minimum panel %d", layout.height(), renderer.minPanelHeight())
 	}
 }
