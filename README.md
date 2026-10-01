@@ -1,14 +1,14 @@
 # LocalRPG
 
-A local-first, turn-based tabletop RPG client orchestrated by local and CLI LLMs, built in Go, Wails v3, and React 19.
+A local-first, turn-based tabletop RPG client orchestrated by local and cloud AI models, built in Go, Wails v3, and React 19.
 
 ---
 
 ## Features
 
 - **Core Engine & Manifests:** Schema-agnostic YAML campaign manifests, path resolver, Markdown entity notes, and one canonical SQLite index per campaign.
-- **Rule Extensibility:** Deterministic dice roller (`github.com/darkliquid/roll`), sandboxed JavaScript rules via Goja, and Wasm runtime via Wazero.
-- **LLM Harness Router:** CLI subprocess integration (`claude`, `codex`, `agy`), streaming HTTP Ollama, 4-layer context assembler, and background entity extraction.
+- **Rule Extensibility:** Deterministic dice roller (`github.com/darkliquid/roll`) and sandboxed JavaScript rules and state hooks via Goja.
+- **LLM Harness Router:** Multi-engine role router (Ollama, LM Studio, vLLM, OpenAI-compatible HTTP endpoints, in-process procedural engines, plus experimental CLI subprocess support), 4-layer context assembler, and background entity extraction.
 - **Campaign Timeline:** Every turn is recorded with the player's prompt, the narrator's rewrite, the entities involved, and who spoke which line — so a campaign's history is queryable rather than re-inferred from prose.
 - **Headless Terminal TUI:** Interactive Bubbletea client with Glamour Markdown rendering, dice rolling, and `/gm` steering.
 - **Multimodal Pipelines:** State-aware audio and art caching, per-character voice playback from recorded dialogue, ComfyUI image generator, and Whisper STT.
@@ -85,7 +85,7 @@ LocalRPG features a unified global settings system that manages app-wide behavio
 
 - **Hierarchical Loading:** Settings are loaded from `~/.config/localrpg/config.yaml` (global user configuration) and can be overridden per workspace via `./localrpg.yaml`.
 - **Custom Storage Paths:** Configure directories for Rule Systems, Worlds, Campaigns, and Media Caches.
-- **AI Agent Role Routing:** Route `gm`, `narrator`, and `evaluator` roles across `http` (Ollama, vLLM, OpenAI), `cli` (local binaries like llama-cli), `builtin`, or `disabled`.
+- **AI Agent Role Routing:** Route `gm`, `narrator`, and `evaluator` roles across `http` (Ollama, LM Studio, vLLM, OpenAI-compatible APIs), `builtin` in-process engines, experimental `cli` subprocesses, or `disabled`.
 - **Multimodal Engines:** Configure TTS (Piper, Kokoro, AllTalk, native-os), STT (Whisper), and Image Generation (ComfyUI, Automatic1111, procedural-art) with master volume, auto-play, and auto-generate art toggles.
 - **Live Provider Diagnostics:** Test model and media engine connections directly from the UI with latency and preview feedback.
 - **Dual-Access UI:** Access settings anytime from the **Settings** studio tab in Launcher Hub, or via the in-game header gear icon without leaving an active session.
@@ -103,7 +103,7 @@ LocalRPG works completely out of the box with zero external dependencies, server
 
 ### 1-Click Quick Presets
 Settings Studio includes 1-click loaders that instantly prefill endpoint, model, and parameter defaults:
-- **LLM / Agents:** Ollama (`localhost:11434`), LM Studio (`localhost:1234`), LocalAI (`localhost:8080`), vLLM (`localhost:8000`), `llama-cli`, `claude-cli`, `narrative-oracle`.
+- **LLM / Agents:** Ollama (`localhost:11434`), LM Studio (`localhost:1234`), LocalAI (`localhost:8080`), vLLM (`localhost:8000`), `narrative-oracle` (built-in), and experimental CLI runners (`llama-cli`, `claude-cli`).
 - **TTS (Speech):** Kokoro-FastAPI (`localhost:8880`), AllTalk (`localhost:7851`), Piper (`piper`), `native-os`, OpenAI Audio.
 - **STT (Transcription):** Faster-Whisper (`localhost:8000`), Whisper.cpp (`whisper-cli`), OpenAI Whisper.
 - **Image Generation:** ComfyUI (`127.0.0.1:8188`), Automatic1111 (`127.0.0.1:7860`), LocalAI (`localhost:8080`), `sd-cli`, `procedural-art`, DALL-E 3.

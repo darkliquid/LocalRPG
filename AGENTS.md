@@ -1,6 +1,6 @@
 # AGENTS.md
 
-LocalRPG is a local-first, turn-based tabletop RPG client: a single Go binary that runs a Wails v3 desktop GUI, a Bubbletea terminal TUI, an HTTP/Unix-socket API daemon, plus media generation and story export. Module path: `github.com/darkliquid/localrpg`. The engine is **schema-agnostic** — no HP/Mana/classes are hardcoded anywhere; all RPG state is opaque YAML frontmatter plus sandboxed JS/Wasm hooks.
+LocalRPG is a local-first, turn-based tabletop RPG client: a single Go binary that runs a Wails v3 desktop GUI, a Bubbletea terminal TUI, an HTTP/Unix-socket API daemon, plus media generation and story export. Module path: `github.com/darkliquid/localrpg`. The engine is **schema-agnostic** — no HP/Mana/classes are hardcoded anywhere; all RPG state is opaque YAML frontmatter plus sandboxed JavaScript hooks.
 
 ## Commands
 

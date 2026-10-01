@@ -17,7 +17,7 @@ Traditional digital RPGs hardcode character classes, hit points, mana bars, and 
 Instead, LocalRPG is **schema-agnostic**:
 
 - Every character, location, faction, and item is a plain Markdown file with a YAML frontmatter block.
-- Game mechanics (dice rolls, stats, inventories, fatigue, spell slots) are defined by sandboxed JavaScript/Wasm rules engines.
+- Game mechanics (dice rolls, stats, inventories, fatigue, spell slots) are defined by sandboxed JavaScript rules engines.
 - The AI Game Master (GM) and Narrator read these rules and lore directly from structured prompt contexts, adapting to any genre or ruleset.
 
 ## Three-Tier On-Disk Separation
