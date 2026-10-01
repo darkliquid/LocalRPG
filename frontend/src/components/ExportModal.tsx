@@ -18,6 +18,25 @@ interface ExportModalProps {
 // are the ones that matter.
 const maxReportedLines = 8;
 
+// formatBytes reports a byte count the way a person reads it.
+const formatBytes = (size: number): string => {
+  if (size >= 1 << 20) return `${(size / (1 << 20)).toFixed(1)} MB`;
+  if (size >= 1 << 10) return `${Math.round(size / (1 << 10))} KB`;
+  return `${size} B`;
+};
+
+// formatDuration reports a render's elapsed time compactly.
+const formatDuration = (ms: number): string => {
+  const total = Math.round(ms / 1000);
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+};
+
+// hasFrameDetail reports whether an event carries the render's frame and audio
+// totals, which the compile phase does not.
+const hasFrameDetail = (phase: string): boolean => phase === 'frames' || phase === 'encode' || phase === 'done';
+
 export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClose }) => {
   const [format, setFormat] = useState<'web' | 'video'>('web');
   const [art, setArt] = useState(true);
@@ -258,6 +277,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
                   style={{ width: percent !== null ? `${percent}%` : '10%' }}
                 />
               </div>
+              {hasFrameDetail(progress.phase) && progress.total > 0 && (
+                <div className="flex flex-wrap justify-between gap-x-3 text-xs font-mono text-stone-500">
+                  <span>
+                    {progress.frames}/{progress.total} frames ({progress.image_frames} drawn, {progress.repeat_frames} repeats)
+                  </span>
+                  {progress.total_audio_packets > 0 && (
+                    <span>
+                      {progress.audio_packets}/{progress.total_audio_packets} audio ({formatBytes(progress.audio_bytes)}/
+                      {formatBytes(progress.total_audio_bytes)})
+                    </span>
+                  )}
+                  {progress.elapsed_ms > 0 && <span>{formatDuration(progress.elapsed_ms)}</span>}
+                </div>
+              )}
             </div>
           )}
 

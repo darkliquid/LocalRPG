@@ -53,7 +53,9 @@ type ExportJobDTO struct {
 	Running    bool   `json:"running"`
 }
 
-// ExportEvent is one progress update on the export stream.
+// ExportEvent is one progress update on the export stream. The frame and audio
+// detail is known before a render starts, so a UI can show an exact bar rather
+// than an estimate.
 type ExportEvent struct {
 	GameID     string `json:"game_id"`
 	Format     string `json:"format"`
@@ -63,6 +65,16 @@ type ExportEvent struct {
 	Message    string `json:"message,omitempty"`
 	OutputPath string `json:"output_path,omitempty"`
 	Error      string `json:"error,omitempty"`
+
+	Frames       int   `json:"frames"`
+	ImageFrames  int   `json:"image_frames"`
+	RepeatFrames int   `json:"repeat_frames"`
+	AudioPackets int   `json:"audio_packets"`
+	TotalAudio   int   `json:"total_audio_packets"`
+	AudioBytes   int64 `json:"audio_bytes"`
+	TotalBytes   int64 `json:"total_audio_bytes"`
+	ElapsedMs    int64 `json:"elapsed_ms"`
+	LengthMs     int64 `json:"length_ms"`
 }
 
 // ExportCapabilitiesDTO reports where the UI should start a destination picker.
@@ -292,12 +304,21 @@ func (s *Service) playerAssets() (fs.FS, error) {
 func (s *Service) runExport(ctx context.Context, req ExportRequestDTO, outPath string) {
 	emit := func(p scene.Progress) {
 		s.exports.publish(ExportEvent{
-			GameID:  req.GameID,
-			Format:  req.Format,
-			Phase:   p.Phase,
-			Done:    p.Done,
-			Total:   p.Total,
-			Message: p.Message,
+			GameID:       req.GameID,
+			Format:       req.Format,
+			Phase:        p.Phase,
+			Done:         p.Done,
+			Total:        p.Total,
+			Message:      p.Message,
+			Frames:       p.Frames,
+			ImageFrames:  p.ImageFrames,
+			RepeatFrames: p.RepeatFrames,
+			AudioPackets: p.AudioPackets,
+			TotalAudio:   p.TotalAudioPackets,
+			AudioBytes:   p.AudioBytes,
+			TotalBytes:   p.TotalAudioBytes,
+			ElapsedMs:    p.Elapsed.Milliseconds(),
+			LengthMs:     p.Length.Milliseconds(),
 		})
 	}
 	fail := func(err error) {

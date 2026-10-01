@@ -31,6 +31,9 @@ type Muxer struct {
 	audioPos int
 	started  bool
 
+	audioWritten int
+	audioBytes   int64
+
 	lastKeyframe time.Duration
 }
 
@@ -109,8 +112,15 @@ func (m *Muxer) flushAudio(until time.Duration) error {
 			return fmt.Errorf("webm: write audio packet: %w", err)
 		}
 		m.audioPos++
+		m.audioWritten++
+		m.audioBytes += int64(len(packet.Data))
 	}
 	return nil
+}
+
+// AudioWritten reports how many audio packets and bytes have been muxed so far.
+func (m *Muxer) AudioWritten() (packets int, bytes int64) {
+	return m.audioWritten, m.audioBytes
 }
 
 // Close flushes the trailing audio and writes the seek index. Both writers must

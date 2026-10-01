@@ -110,6 +110,20 @@ func (t *OpusTrack) AppendSilence(d time.Duration) error {
 // Duration is the length of the timeline so far.
 func (t *OpusTrack) Duration() time.Duration { return t.position }
 
+// PacketCount is how many packets the timeline carries, which a progress bar can
+// hold against the number muxed so far.
+func (t *OpusTrack) PacketCount() int { return len(t.Packets) }
+
+// ByteCount is the size of the timeline's packets. It is the campaign's own
+// audio, so it is an exact total rather than an estimate.
+func (t *OpusTrack) ByteCount() int64 {
+	var total int64
+	for _, packet := range t.Packets {
+		total += int64(len(packet.Data))
+	}
+	return total
+}
+
 // defaultOpusHead builds the RFC 7845 identification header for a channel count,
 // which is the WebM track's CodecPrivate.
 func defaultOpusHead(channels byte) []byte {

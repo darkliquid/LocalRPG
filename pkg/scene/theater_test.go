@@ -106,6 +106,34 @@ func TestFrameDrawsTheSceneCardInAmber(t *testing.T) {
 	}
 }
 
+func TestPlanFramesCountsRepeats(t *testing.T) {
+	script := &Script{Scenes: []Scene{{Beats: []Beat{
+		{Kind: BeatNarration, Text: "A line.", Duration: 2 * time.Second},
+	}}}}
+
+	plan := PlanFrames(script, 15, true)
+	if plan.Total != plan.Image+plan.Repeat {
+		t.Fatalf("total %d != image %d + repeat %d", plan.Total, plan.Image, plan.Repeat)
+	}
+	if plan.Repeat == 0 {
+		t.Error("expected the still tail of the beat to be repeat frames")
+	}
+	if plan.Image == 0 {
+		t.Error("expected the reveal to be image frames")
+	}
+	if plan.Duration != 2*time.Second {
+		t.Errorf("duration = %v, want 2s", plan.Duration)
+	}
+
+	static := PlanFrames(script, 15, false)
+	if static.Total != 1 || static.Repeat != 0 || static.Image != 1 {
+		t.Errorf("static plan = %+v, want one image frame", static)
+	}
+	if static.Duration != 2*time.Second {
+		t.Errorf("static duration = %v, want 2s", static.Duration)
+	}
+}
+
 func TestBeatFramePlanSplitsRevealAndHold(t *testing.T) {
 	beat := Beat{Kind: BeatNarration, Text: "A line.", Duration: 2 * time.Second}
 

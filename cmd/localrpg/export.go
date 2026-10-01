@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/export"
@@ -30,6 +31,7 @@ func handleExportCommand(args []string) {
 	fps := fs.Int("fps", scene.DefaultFPS, "Video frame rate")
 	size := fs.String("size", "1920x1080", "Video size as WxH")
 	quality := fs.Int("quality", 80, "VP8 quality, 0-100")
+	showProgress := fs.Bool("progress", false, "Show a live progress bar while rendering")
 
 	if len(args) == 0 {
 		fs.Usage()
@@ -80,10 +82,7 @@ func handleExportCommand(args []string) {
 
 	switch format {
 	case "web":
-		target := *out
-		if target == "" {
-			target = gameID + "-web.html"
-		}
+		target := resolveOutPath(*out, gameID, "-web.html")
 		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 			fmt.Fprintf(os.Stderr, "Web export failed: %v\n", err)
 			os.Exit(1)
@@ -112,10 +111,7 @@ func handleExportCommand(args []string) {
 		fmt.Printf("Exported web replay bundle to %s\n", absPath(path))
 
 	case "video":
-		target := *out
-		if target == "" {
-			target = gameID + ".webm"
-		}
+		target := resolveOutPath(*out, gameID, ".webm")
 		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 			fmt.Fprintf(os.Stderr, "Video export failed: %v\n", err)
 			os.Exit(1)
@@ -135,22 +131,11 @@ func handleExportCommand(args []string) {
 			fmt.Fprintf(os.Stderr, "export: ignoring --size %q: %v\n", *size, err)
 		}
 
-		// A render can take a while, so say where it is rather than going quiet
-		// until it finishes. One line per completed beat keeps it readable.
-		lastDone := -1
-		pipeline.SetProgress(func(p scene.Progress) {
-			if p.Phase == "frames" && p.Total > 0 {
-				if p.Done == lastDone {
-					return
-				}
-				lastDone = p.Done
-				fmt.Fprintf(os.Stderr, "export: %s %d/%d\n", p.Phase, p.Done, p.Total)
-				return
-			}
-			if p.Phase != "" {
-				fmt.Fprintf(os.Stderr, "export: %s\n", p.Phase)
-			}
-		})
+		// Progress is opt-in. A render can take a while, but a quiet default is
+		// what a script wants, so --progress draws a live bar instead.
+		if *showProgress {
+			pipeline.SetProgress(renderProgressBar)
+		}
 
 		if err := pipeline.RenderVideo(context.Background(), script, target); err != nil {
 			fmt.Fprintf(os.Stderr, "Video render failed: %v\n", err)
@@ -203,6 +188,83 @@ func absPath(path string) string {
 		return path
 	}
 	return absolute
+}
+
+// resolveOutPath turns --out into a file path. An empty value names the file
+// after the game in the working directory; a value that is an existing directory
+// (or ends with a separator) gets the same name inside it.
+func resolveOutPath(out, gameID, ext string) string {
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return gameID + ext
+	}
+	if info, err := os.Stat(out); err == nil && info.IsDir() {
+		return filepath.Join(out, gameID+ext)
+	}
+	if strings.HasSuffix(out, string(os.PathSeparator)) {
+		return filepath.Join(out, gameID+ext)
+	}
+	return out
+}
+
+// renderProgressBar draws a single line that overwrites itself, so an export
+// says where it is without filling a terminal. It is only installed when
+// --progress is passed.
+func renderProgressBar(p scene.Progress) {
+	switch p.Phase {
+	case "encode":
+		// Transient: the done line follows immediately.
+		return
+	case "done":
+		fmt.Fprintf(os.Stderr, "\r%s\n", formatProgress(p, progressBarWidth))
+	default:
+		fmt.Fprintf(os.Stderr, "\r%s", formatProgress(p, progressBarWidth))
+	}
+}
+
+// progressBarWidth is the number of cells the bar itself occupies.
+const progressBarWidth = 20
+
+// formatProgress is the bar's line: how far through, how many frames were drawn
+// against how many repeated the one before, how much audio was muxed, and how
+// long it has run.
+func formatProgress(p scene.Progress, barWidth int) string {
+	percent := 0
+	if p.Total > 0 {
+		percent = p.Done * 100 / p.Total
+	}
+	if percent > 100 {
+		percent = 100
+	}
+	filled := percent * barWidth / 100
+	bar := strings.Repeat("=", filled)
+	if filled < barWidth {
+		bar += ">" + strings.Repeat(" ", barWidth-filled-1)
+	}
+
+	line := fmt.Sprintf("export %3d%% [%s] %d/%d frames (%d new, %d repeat)",
+		percent, bar, p.Frames, p.Total, p.ImageFrames, p.RepeatFrames)
+	if p.TotalAudioPackets > 0 {
+		line += fmt.Sprintf(" %d/%d audio %s/%s",
+			p.AudioPackets, p.TotalAudioPackets,
+			humanSize(p.AudioBytes), humanSize(p.TotalAudioBytes))
+	}
+	if p.Elapsed > 0 {
+		line += fmt.Sprintf(" %s", p.Elapsed.Round(time.Second))
+	}
+	return line
+}
+
+// humanSize reports a byte count the way a person reads it.
+func humanSize(size int64) string {
+	switch {
+	case size >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(size)/(1<<20))
+	case size >= 1<<10:
+		return fmt.Sprintf("%.0f KB", float64(size)/(1<<10))
+	default:
+		return fmt.Sprintf("%d B", size)
+	}
 }
 
 // parseSize reads a WxH geometry.

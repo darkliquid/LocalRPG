@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,7 +98,8 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 		return fmt.Errorf("create video: %w", err)
 	}
 
-	if err := v.writeFrames(ctx, renderer, script, file, track); err != nil {
+	totals, err := v.writeFrames(ctx, renderer, script, file, track)
+	if err != nil {
 		closeQuietly(file)
 		os.Remove(part)
 		return err
@@ -108,7 +110,20 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 		return fmt.Errorf("publish video: %w", err)
 	}
 	if v.progress != nil {
-		v.progress(scene.Progress{Phase: "done"})
+		v.progress(scene.Progress{
+			Phase:             "done",
+			Done:              totals.frames,
+			Total:             totals.plan.Frames.Total,
+			Frames:            totals.frames,
+			ImageFrames:       totals.imageFrames,
+			RepeatFrames:      totals.repeatFrames,
+			AudioPackets:      totals.audioPackets,
+			TotalAudioPackets: totals.plan.AudioPackets,
+			AudioBytes:        totals.audioBytes,
+			TotalAudioBytes:   totals.plan.AudioBytes,
+			Elapsed:           totals.elapsed,
+			Length:            totals.plan.Length,
+		})
 	}
 	return nil
 }
@@ -139,26 +154,28 @@ func (v *VideoPipeline) opusTrack(script *scene.Script) (*webm.OpusTrack, error)
 
 // writeFrames walks the beats, renders and encodes each frame, and feeds the
 // muxer, which interleaves the audio it was given up front.
-func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Renderer, script *scene.Script, file *os.File, track *webm.OpusTrack) error {
+func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Renderer, script *scene.Script, file *os.File, track *webm.OpusTrack) (renderTotals, error) {
 	muxer, err := webm.NewMuxer(file, v.width, v.height, track)
 	if err != nil {
-		return err
+		return renderTotals{}, err
 	}
 	encoder := webm.NewEncoder(v.width, v.height, v.quality)
 
 	animate := !v.still
+	plan := NewRenderPlan(script, track, v.fps, animate)
+
+	started := time.Now()
 	elapsed := time.Duration(0)
 	previousArt := ""
 	first := true
 
-	beats := script.Beats()
-	total := len(beats)
-	done := 0
+	totals := renderTotals{plan: plan}
+	var lastImage *image.RGBA
 
 	// Progress is throttled so a long render reports steadily without flooding a
-	// subscriber, and always reports a completed beat.
+	// subscriber; a completed phase always reports.
 	lastReport := time.Time{}
-	report := func(force bool, message string) {
+	report := func(force bool) {
 		if v.progress == nil {
 			return
 		}
@@ -166,49 +183,103 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 			return
 		}
 		lastReport = time.Now()
-		v.progress(scene.Progress{Phase: "frames", Done: done, Total: total, Message: message})
+		packets, bytes := muxer.AudioWritten()
+		v.progress(scene.Progress{
+			Phase:             "frames",
+			Done:              totals.frames,
+			Total:             plan.Frames.Total,
+			Frames:            totals.frames,
+			ImageFrames:       totals.imageFrames,
+			RepeatFrames:      totals.repeatFrames,
+			AudioPackets:      packets,
+			TotalAudioPackets: plan.AudioPackets,
+			AudioBytes:        bytes,
+			TotalAudioBytes:   plan.AudioBytes,
+			Elapsed:           time.Since(started),
+			Length:            plan.Length,
+		})
 	}
-	report(true, "starting")
+	report(true)
 
 	for index := range script.Scenes {
 		sc := script.Scenes[index]
 		for _, beat := range sc.Beats {
 			if err := ctx.Err(); err != nil {
-				return err
+				return totals, err
 			}
-			plan := scene.BeatFramePlan(beat, v.fps, animate)
-			for _, step := range plan {
-				img := renderer.Frame(scene.FrameRequest{
-					Script:      script,
-					SceneIndex:  index,
-					Scene:       sc,
-					Beat:        beat,
-					Progress:    step.Progress,
-					PreviousArt: previousArt,
-					Animate:     animate,
-					DisplayMode: v.displayMode,
-				})
+			for _, step := range scene.BeatFramePlan(beat, v.fps, animate) {
+				// A repeat frame is the frame before it, so it is re-encoded rather
+				// than drawn again: the heartbeat costs an inter frame, not a render.
+				var img *image.RGBA
+				if step.Repeat && lastImage != nil {
+					img = lastImage
+					totals.repeatFrames++
+				} else {
+					img = renderer.Frame(scene.FrameRequest{
+						Script:      script,
+						SceneIndex:  index,
+						Scene:       sc,
+						Beat:        beat,
+						Progress:    step.Progress,
+						PreviousArt: previousArt,
+						Animate:     animate,
+						DisplayMode: v.displayMode,
+					})
+					lastImage = img
+					totals.imageFrames++
+				}
+
 				data, err := encoder.Encode(img, first)
 				if err != nil {
-					return err
+					return totals, err
 				}
 				if err := muxer.WriteVideo(data, first, elapsed); err != nil {
-					return err
+					return totals, err
 				}
 				first = false
+				totals.frames++
 				elapsed += step.Span
-				report(false, fmt.Sprintf("beat %d of %d", done+1, total))
+				report(false)
 			}
-			done++
-			report(true, "")
 		}
 		previousArt = sc.ArtPath
 	}
 
 	if v.progress != nil {
-		v.progress(scene.Progress{Phase: "encode"})
+		packets, bytes := muxer.AudioWritten()
+		v.progress(scene.Progress{
+			Phase:             "encode",
+			Done:              totals.frames,
+			Total:             plan.Frames.Total,
+			Frames:            totals.frames,
+			ImageFrames:       totals.imageFrames,
+			RepeatFrames:      totals.repeatFrames,
+			AudioPackets:      packets,
+			TotalAudioPackets: plan.AudioPackets,
+			AudioBytes:        bytes,
+			TotalAudioBytes:   plan.AudioBytes,
+			Elapsed:           time.Since(started),
+			Length:            plan.Length,
+		})
 	}
-	return muxer.Close()
+	if err := muxer.Close(); err != nil {
+		return totals, err
+	}
+	totals.audioPackets, totals.audioBytes = muxer.AudioWritten()
+	totals.elapsed = time.Since(started)
+	return totals, nil
+}
+
+// renderTotals is what a finished render produced, so the caller can publish a
+// final progress snapshot once the file is in place.
+type renderTotals struct {
+	plan         RenderPlan
+	frames       int
+	imageFrames  int
+	repeatFrames int
+	audioPackets int
+	audioBytes   int64
+	elapsed      time.Duration
 }
 
 // stagingPath names the file written before it is published.

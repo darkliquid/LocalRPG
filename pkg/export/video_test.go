@@ -93,29 +93,32 @@ func TestRenderVideoReportsProgress(t *testing.T) {
 	if err := pipeline.RenderVideo(context.Background(), smallScript(), out); err != nil {
 		t.Fatalf("RenderVideo: %v", err)
 	}
+	if len(events) == 0 {
+		t.Fatal("expected progress events")
+	}
 
-	// The render must say it started and say when each beat finished, or a long
-	// export looks like it has stalled.
-	sawStart := false
-	sawFinalBeat := false
-	for _, event := range events {
-		if event.Phase == "frames" && event.Total == 2 {
-			if event.Done == 0 {
-				sawStart = true
-			}
-			if event.Done == 2 {
-				sawFinalBeat = true
-			}
-		}
+	// The first event must already carry the totals, so a bar can be exact from
+	// the start rather than creeping towards an unknown end.
+	first := events[0]
+	if first.Phase != "frames" || first.Total == 0 || first.Done != 0 {
+		t.Fatalf("first event = %+v, want an initial frames event with a total", first)
 	}
-	if !sawStart {
-		t.Error("expected an initial progress event")
+	if first.ImageFrames != 0 || first.RepeatFrames != 0 {
+		t.Fatalf("first event = %+v, want no frames counted yet", first)
 	}
-	if !sawFinalBeat {
-		t.Error("expected progress to reach the last beat")
+
+	last := events[len(events)-1]
+	if last.Phase != "done" {
+		t.Fatalf("last phase = %q, want done", last.Phase)
 	}
-	if events[len(events)-1].Phase != "done" {
-		t.Errorf("last phase = %q, want done", events[len(events)-1].Phase)
+	if last.Frames != first.Total {
+		t.Errorf("finished %d frames, plan said %d", last.Frames, first.Total)
+	}
+	if last.ImageFrames+last.RepeatFrames != last.Frames {
+		t.Errorf("image %d + repeat %d != frames %d", last.ImageFrames, last.RepeatFrames, last.Frames)
+	}
+	if last.RepeatFrames == 0 {
+		t.Error("expected the still tail of each beat to be a repeat frame")
 	}
 }
 

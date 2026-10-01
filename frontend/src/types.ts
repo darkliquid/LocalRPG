@@ -680,6 +680,15 @@ export interface ExportEvent {
   message?: string;
   output_path?: string;
   error?: string;
+  frames: number;
+  image_frames: number;
+  repeat_frames: number;
+  audio_packets: number;
+  total_audio_packets: number;
+  audio_bytes: number;
+  total_audio_bytes: number;
+  elapsed_ms: number;
+  length_ms: number;
 }
 
 export interface ExportCapabilities {

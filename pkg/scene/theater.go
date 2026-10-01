@@ -128,20 +128,23 @@ func lerpColour(a, b color.RGBA, t float64) color.RGBA {
 func upper(text string) string { return strings.ToUpper(strings.TrimSpace(text)) }
 
 // FrameStep is one frame of a beat: the reveal progress to draw and how long the
-// frame is held.
+// frame is held. Repeat marks a frame that shows the same picture as the one
+// before it, which a renderer can reuse rather than draw again.
 type FrameStep struct {
 	Progress float64
 	Span     time.Duration
+	Repeat   bool
 }
 
 // holdFPS is the heartbeat rate for the tail of a beat. Once the reveal has
-// finished the picture barely changes, so a slow cadence keeps the background
-// drift alive without paying for frames nobody can tell apart.
+// finished the picture barely changes, so a slow cadence keeps the beat alive
+// without drawing frames nobody can tell apart.
 const holdFPS = 2
 
 // BeatFramePlan is the frames a beat occupies: one when animation is off, and a
 // fast reveal followed by a slow heartbeat when it is on. The spans sum to the
-// beat's duration, so picture and sound stay in step.
+// beat's duration, so picture and sound stay in step. Every heartbeat frame
+// repeats the last revealed one.
 func BeatFramePlan(beat Beat, fps int, animate bool) []FrameStep {
 	if !animate {
 		return []FrameStep{{Progress: 1, Span: beat.Duration}}
@@ -180,9 +183,40 @@ func BeatFramePlan(beat Beat, fps int, animate bool) []FrameStep {
 		if i == holdFrames-1 {
 			span = holdSpan - holdStep*time.Duration(holdFrames-1)
 		}
-		steps = append(steps, FrameStep{Progress: progress, Span: span})
+		steps = append(steps, FrameStep{Progress: progress, Span: span, Repeat: true})
 	}
 	return steps
+}
+
+// FramePlan is how many frames a script's render will produce, and how many of
+// them are new images rather than a repeat of the frame before. It is known
+// before rendering starts, which is what lets a progress bar be exact.
+type FramePlan struct {
+	Duration time.Duration
+	Total    int
+	Image    int
+	Repeat   int
+}
+
+// PlanFrames counts a script's frames without drawing any of them.
+func PlanFrames(script *Script, fps int, animate bool) FramePlan {
+	var plan FramePlan
+	if script == nil {
+		return plan
+	}
+	for _, beat := range script.Beats() {
+		steps := BeatFramePlan(beat, fps, animate)
+		plan.Total += len(steps)
+		for _, step := range steps {
+			if step.Repeat {
+				plan.Repeat++
+			} else {
+				plan.Image++
+			}
+			plan.Duration += step.Span
+		}
+	}
+	return plan
 }
 
 // drawHeader is the theatre's top band: the campaign's name, the location pill,
