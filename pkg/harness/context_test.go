@@ -857,5 +857,37 @@ func TestTurnProtocolInstruction(t *testing.T) {
 	if !foundProtocol {
 		t.Errorf("expected protocol section in result.Sections")
 	}
+
+	// Verify PrefixPrompt contains the protocol
+	if !strings.Contains(result.PrefixPrompt, "## TURN RESOLUTION PROTOCOL") {
+		t.Errorf("expected PrefixPrompt to contain '## TURN RESOLUTION PROTOCOL', got:\n%s", result.PrefixPrompt)
+	}
+
+	// Verify protocol survives tight budget trimming
+	longNarration := strings.Repeat("the cold wind sweeps across the ruined parapet ", 100)
+	recent := []RecentTurn{
+		{Number: 1, Mode: "Do", Narration: longNarration},
+		{Number: 2, Mode: "Do", Narration: longNarration},
+	}
+	tightAssembler := NewContextAssembler(newTestEntityStore(t))
+	tightAssembler.SetLimits(ContextLimits{TokenBudget: 150})
+	tightResult, err := tightAssembler.Assemble(ContextRequest{
+		Action: "I examine the locked chest.",
+		Recent: recent,
+	})
+	if err != nil {
+		t.Fatalf("Assemble under tight budget failed: %v", err)
+	}
+	if !strings.Contains(tightResult.Prompt, "## TURN RESOLUTION PROTOCOL") {
+		t.Errorf("protocol section was trimmed under tight budget, but must never be dropped")
+	}
+	if !strings.Contains(tightResult.PrefixPrompt, "## TURN RESOLUTION PROTOCOL") {
+		t.Errorf("tight PrefixPrompt missing protocol section")
+	}
+	for _, sec := range tightResult.Sections {
+		if sec.Name == "protocol" && !sec.Included {
+			t.Errorf("expected protocol section to be included in tightResult.Sections")
+		}
+	}
 }
 

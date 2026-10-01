@@ -852,7 +852,7 @@ func dedupeRefs(refs []Ref) []Ref {
 }
 
 func isPrefixSection(name string) bool {
-	return name == "rules" || name == "lore" || name == "instructions" || name == "catalogue"
+	return name == "protocol" || name == "rules" || name == "lore" || name == "instructions" || name == "catalogue"
 }
 
 func hashPrompt(prompt string) string {
