@@ -34,17 +34,32 @@ func NewEncoder(width, height, quality int) *Encoder {
 // Encode writes one frame. A keyframe stands alone and refreshes every reference;
 // an inter frame predicts from the frame before it and is far smaller when the
 // picture barely changes.
+//
+// The returned bytes are a fresh copy. The encoder reuses its output buffer
+// across calls, and a muxer holds a block for a while before writing it, so a
+// returned slice would be overwritten by the next frame and the file would carry
+// frames whose declared sizes do not match their contents.
 func (e *Encoder) Encode(img *image.RGBA, keyframe bool) ([]byte, error) {
 	toYUV420(img, e.picture)
 	opts := vp8.EncodeOptions{Quality: e.quality, Method: e.method}
+
+	var encoded []byte
+	var err error
 	if keyframe {
-		return e.enc.Encode(e.picture, opts)
+		encoded, err = e.enc.Encode(e.picture, opts)
+		if err != nil {
+			return nil, fmt.Errorf("webm: encode key frame: %w", err)
+		}
+	} else {
+		encoded, err = e.enc.EncodeInter(e.picture, opts)
+		if err != nil {
+			return nil, fmt.Errorf("webm: encode inter frame: %w", err)
+		}
 	}
-	data, err := e.enc.EncodeInter(e.picture, opts)
-	if err != nil {
-		return nil, fmt.Errorf("webm: encode inter frame: %w", err)
-	}
-	return data, nil
+
+	out := make([]byte, len(encoded))
+	copy(out, encoded)
+	return out, nil
 }
 
 // newPicture allocates 4:2:0 planes at their own strides.

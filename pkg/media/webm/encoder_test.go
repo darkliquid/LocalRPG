@@ -1,6 +1,7 @@
 package webm
 
 import (
+	"bytes"
 	"image"
 	"image/color"
 	"testing"
@@ -62,5 +63,26 @@ func TestEncoderWritesAnInterFrame(t *testing.T) {
 	}
 	if pic == nil {
 		t.Fatal("inter frame decoded to nothing")
+	}
+}
+
+// TestEncoderOutputSurvivesTheNextFrame pins the contract that a corrupted export
+// came from breaking: the encoder reuses its output buffer across calls, and a
+// muxer holds a block for a while before writing it, so a frame that has already
+// been handed over must not change.
+func TestEncoderOutputSurvivesTheNextFrame(t *testing.T) {
+	encoder := NewEncoder(64, 48, 80)
+	first, err := encoder.Encode(solidFrame(64, 48, color.RGBA{10, 10, 10, 255}), true)
+	if err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	snapshot := append([]byte(nil), first...)
+
+	if _, err := encoder.Encode(solidFrame(64, 48, color.RGBA{240, 240, 240, 255}), true); err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+
+	if !bytes.Equal(first, snapshot) {
+		t.Fatal("the encoder overwrote a frame it had already returned")
 	}
 }
