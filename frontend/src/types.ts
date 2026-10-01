@@ -683,8 +683,6 @@ export interface ExportEvent {
 }
 
 export interface ExportCapabilities {
-  ffmpeg: boolean;
-  ffmpeg_path?: string;
   default_dir?: string;
   native_dialog: boolean;
 }

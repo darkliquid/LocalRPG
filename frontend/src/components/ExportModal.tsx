@@ -115,7 +115,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
 
   if (!isOpen) return null;
 
-  const ffmpegMissing = capabilities !== null && !capabilities.ffmpeg;
   const percent =
     progress && progress.total > 0 ? Math.min(100, Math.round((progress.done / progress.total) * 100)) : null;
 
@@ -157,8 +156,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
             </button>
             <button
               onClick={() => setFormat('video')}
-              disabled={running || ffmpegMissing}
-              title={ffmpegMissing ? 'ffmpeg is not installed' : undefined}
+              disabled={running}
               className={`flex items-center justify-center gap-2 py-2 rounded-xl border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                 format === 'video'
                   ? 'bg-purple-600/80 border-purple-400 text-white font-bold'
@@ -169,12 +167,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
               Video
             </button>
           </div>
-
-          {ffmpegMissing && (
-            <div className="p-3 rounded-xl bg-stone-950/60 border border-stone-800 text-stone-400">
-              Video export needs <code className="text-stone-200">ffmpeg</code>, which was not found on this machine.
-            </div>
-          )}
 
           <div className="space-y-1">
             <label className="text-stone-400">Destination folder</label>
@@ -294,7 +286,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
             ) : (
               <button
                 onClick={handleStart}
-                disabled={!gameID || !outDir.trim() || (format === 'video' && ffmpegMissing)}
+                disabled={!gameID || !outDir.trim()}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 text-white font-bold hover:bg-purple-500 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}

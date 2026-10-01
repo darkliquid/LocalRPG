@@ -122,14 +122,14 @@ Both exports are built from the same scene script, so they group turns by locati
 
 ```bash
 localrpg export web <game-id> [--out DIR] [--no-art] [--no-audio]
-localrpg export video <game-id> [--out FILE] [--still] [--fps N] [--size WxH] [--no-art] [--no-audio]
+localrpg export video <game-id> [--out FILE] [--still] [--fps N] [--size WxH] [--quality N] [--no-art] [--no-audio]
 ```
 
 **Web bundle.** Writes a self-contained visual-novel player to `dist/<game-id>-web`, rendered by the same player the app's theatre uses: the stage and its scrim, the protagonist and the speaker on either side with the active one lit, the dialogue panel with its name plate, and markdown prose. It runs itself, blending between locations, revealing each beat's text as it is read, and ducking into a click-to-play state when the browser refuses to start audio without a gesture. Art, portraits, and audio are copied beside the page as sidecar assets and referenced by relative path, so the bundle works from a file:// URL with no server and no network access.
 
-**Video.** Draws every frame in Go with the bundled Go fonts, so no browser or external rasteriser is involved. Frames are muxed against each beat's own clip, with silence generated for beats that have none, so picture and sound stay in step. The result is staged and renamed into place: a failed render leaves no file behind. `--still` renders one frame per beat instead of animating, which is the fast path on a weak machine.
+**Video.** Draws every frame in Go with the theatre's own stage, portraits, and dialogue panel, then encodes VP8 video and the campaign's Opus clips into one `.webm` with a seek index. No browser, no external binary, and no `ffmpeg` is required. `--still` renders one fully revealed frame per beat instead of animating, which is the fast path on a weak machine. `--quality` sets the VP8 quality (0-100).
 
-**Requirements.** `ffmpeg` is required for video export, and `ffprobe` is used to measure clip lengths so pacing follows the audio; without `ffprobe` a beat falls back to the reading-time estimate. Both are checked at the point of use, and video export fails with a clear message rather than producing a half-written file.
+**Requirements.** Video export has no external requirements: the frames are composited, encoded, and muxed entirely in Go, and clip lengths are read from the Opus stream itself.
 
 ---
 
