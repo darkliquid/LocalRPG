@@ -14,9 +14,10 @@ mise run build:backend  # depends on build:frontend
 mise run test           # go test -v -count=1 ./...  AND  npx tsc --noEmit
 mise run test:backend   # go test -v -count=1 ./...
 mise run test:frontend  # npx tsc --noEmit (in frontend/)
-mise run lint           # markdownlint on pkg/gui/docs, goreleaser check, go vet ./...
+mise run lint           # markdownlint, goreleaser check, actionlint, go vet ./...
 mise run lint:docs      # markdownlint-cli2 on the embedded help articles
 mise run lint:goreleaser # goreleaser check
+mise run lint:actions   # actionlint over .github/workflows
 mise run secrets:scan   # gitleaks over the full git history and staged changes
 mise run site:build     # render the showcase site into website/dist
 mise run site:serve     # build it and preview at http://localhost:4173

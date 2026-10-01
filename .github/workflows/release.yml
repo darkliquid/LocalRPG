@@ -54,14 +54,19 @@ jobs:
         include:
           - runner: ubuntu-latest
             target: linux/amd64
+            artifact: linux-amd64
           - runner: ubuntu-24.04-arm
             target: linux/arm64
+            artifact: linux-arm64
           - runner: macos-latest
             target: darwin/arm64
+            artifact: darwin-arm64
           - runner: macos-latest
             target: darwin/amd64
+            artifact: darwin-amd64
           - runner: windows-latest
             target: windows/amd64
+            artifact: windows-amd64
     steps:
       - uses: actions/checkout@v7
         with:
@@ -96,7 +101,9 @@ jobs:
       - name: Upload archives
         uses: actions/upload-artifact@v7
         with:
-          name: dist-${{ replace(matrix.target, '/', '-') }}
+          # Artifact names cannot contain a slash, and the expression language
+          # has no replace(), so each matrix entry carries its own name.
+          name: dist-${{ matrix.artifact }}
           path: |
             dist/*.tar.gz
             dist/*.zip
