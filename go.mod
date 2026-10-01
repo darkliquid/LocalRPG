@@ -5,6 +5,7 @@ go 1.27.1
 require (
 	github.com/XSAM/otelsql v0.44.0
 	github.com/adrg/xdg v0.5.3
+	github.com/at-wat/ebml-go v0.19.4
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/glamour v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
