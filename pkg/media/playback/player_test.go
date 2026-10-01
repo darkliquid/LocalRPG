@@ -59,6 +59,44 @@ func getTestPlayer(t *testing.T) *Player {
 	return testPlayerInstance
 }
 
+// getPlayingPlayer returns a player the host can actually play through. Only the
+// tests that wait for a queue to finish need that; the rest just need a context
+// to queue against, so they use getTestPlayer and still run on a host with no
+// sound card.
+//
+// Opening a context is not proof that audio works. Without a device the context
+// still opens and then never runs, so a queue never advances and those tests
+// fail for a reason none of them is about. The only dependable check is to play
+// something and watch it finish.
+func getPlayingPlayer(t *testing.T) *Player {
+	t.Helper()
+
+	player := getTestPlayer(t)
+	if !devicePlays(t, player) {
+		t.Skip("host cannot play audio; skipping device test")
+	}
+
+	player.Stop()
+	player.SetVolume(0.5)
+	return player
+}
+
+// devicePlays plays a very short clip and reports whether it ran to completion.
+func devicePlays(t *testing.T, player *Player) bool {
+	t.Helper()
+
+	clip := writeToneWAV(t, t.TempDir(), "probe.wav", deviceSampleRate, 20*time.Millisecond)
+	if err := player.PlayFiles([]string{clip}); err != nil {
+		return false
+	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for player.Playing() && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	return !player.Playing()
+}
+
 func TestPlayerWithoutADeviceReportsUnavailable(t *testing.T) {
 	player := &Player{}
 
@@ -71,7 +109,7 @@ func TestPlayerWithoutADeviceReportsUnavailable(t *testing.T) {
 }
 
 func TestPlayerPlaysAQueue(t *testing.T) {
-	player := getTestPlayer(t)
+	player := getPlayingPlayer(t)
 
 	dir := t.TempDir()
 	first := writeToneWAV(t, dir, "first.wav", deviceSampleRate, 40*time.Millisecond)
@@ -123,7 +161,7 @@ func TestPlayFilesSkipsUndecodableClips(t *testing.T) {
 }
 
 func TestPlayFilesPlaysTheGoodClipsWhenOneIsBad(t *testing.T) {
-	player := getTestPlayer(t)
+	player := getPlayingPlayer(t)
 
 	dir := t.TempDir()
 	good := writeToneWAV(t, dir, "good.wav", deviceSampleRate, 30*time.Millisecond)

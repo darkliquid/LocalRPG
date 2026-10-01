@@ -39,10 +39,11 @@ func New(cfg Config) *Driver {
 // StepCallback is notified after each action step completes.
 type StepCallback func(rec debugger.ActionRecord)
 
-// Run executes all scenario steps sequentially, recording actions and telemetry tags.
-func (d *Driver) Run(ctx context.Context, s *Scenario, cb StepCallback) ([]debugger.ActionRecord, error) {
+// allocatorOptions is the browser launch configuration. Run and Available share
+// it so a capability check cannot disagree with an actual run.
+func allocatorOptions(cfg Config) []chromedp.ExecAllocatorOption {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", d.cfg.Headless),
+		chromedp.Flag("headless", cfg.Headless),
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("no-sandbox", true),
 	)
@@ -52,8 +53,30 @@ func (d *Driver) Run(ctx context.Context, s *Scenario, cb StepCallback) ([]debug
 	if browser := os.Getenv("CHROME_EXEC"); browser != "" {
 		opts = append(opts, chromedp.ExecPath(browser))
 	}
+	return opts
+}
 
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, opts...)
+// Available reports whether a browser can actually be launched here. Finding
+// the binary is not enough: a sandboxed or headless host can have Chrome
+// installed and still refuse to start it, which says something about the host
+// rather than about the driver. Callers that need a browser can ask first and
+// skip instead of failing.
+func Available(ctx context.Context) error {
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, allocatorOptions(Config{Headless: true})...)
+	defer cancelAlloc()
+
+	taskCtx, cancelTask := chromedp.NewContext(allocCtx)
+	defer cancelTask()
+
+	if err := chromedp.Run(taskCtx); err != nil {
+		return fmt.Errorf("start browser: %w", err)
+	}
+	return nil
+}
+
+// Run executes all scenario steps sequentially, recording actions and telemetry tags.
+func (d *Driver) Run(ctx context.Context, s *Scenario, cb StepCallback) ([]debugger.ActionRecord, error) {
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, allocatorOptions(d.cfg)...)
 	defer cancelAlloc()
 
 	taskCtx, cancelTask := chromedp.NewContext(allocCtx)
