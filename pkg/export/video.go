@@ -278,26 +278,34 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 		})
 	}
 
-	// emit encodes and writes one frame, advancing the timeline by span.
+	// writeFrame encodes and writes one frame at an explicit timestamp.
 	//
 	// The muxer is told exactly what the encoder produced: marking an inter frame
 	// as a keyframe starts a cluster a decoder cannot reconstruct, which corrupts
 	// the picture until the next real keyframe.
-	emit := func(img *image.RGBA, span time.Duration, forceKeyframe bool) error {
-		keyframe := forceKeyframe || elapsed-lastKeyframe >= keyframeEvery
+	writeFrame := func(img *image.RGBA, at time.Duration, forceKeyframe bool) error {
+		keyframe := forceKeyframe || at-lastKeyframe >= keyframeEvery
 		data, err := encoder.Encode(img, keyframe)
 		if err != nil {
 			return err
 		}
-		if err := muxer.WriteVideo(data, keyframe, elapsed); err != nil {
+		if err := muxer.WriteVideo(data, keyframe, at); err != nil {
 			return err
 		}
 		if keyframe {
-			lastKeyframe = elapsed
+			lastKeyframe = at
 		}
 		totals.frames++
-		elapsed += span
 		report(false)
+		return nil
+	}
+
+	// emit writes a frame at the current time and advances the timeline by span.
+	emit := func(img *image.RGBA, span time.Duration, forceKeyframe bool) error {
+		if err := writeFrame(img, elapsed, forceKeyframe); err != nil {
+			return err
+		}
+		elapsed += span
 		return nil
 	}
 
@@ -378,10 +386,18 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 		previousArt = sc.ArtPath
 	}
 
-	// The outro holds the closing picture after the last line.
-	if v.outro > 0 && lastImage != nil {
+	// The outro holds the closing picture after the last line, and then a closing
+	// block goes at the very end of the timeline.
+	//
+	// That last block is what gives the picture its time: a file's duration is its
+	// last block's timestamp, so without one the closing frame has no time to be
+	// shown at all and the video stops the moment it is drawn.
+	if v.outro > 0 {
+		elapsed += v.outro
+	}
+	if lastImage != nil {
 		totals.repeatFrames++
-		if err := emit(lastImage, v.outro, false); err != nil {
+		if err := writeFrame(lastImage, elapsed, false); err != nil {
 			return totals, err
 		}
 	}

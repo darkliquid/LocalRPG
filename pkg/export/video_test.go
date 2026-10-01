@@ -144,7 +144,9 @@ func TestRenderPlanIncludesTheBuffers(t *testing.T) {
 	if got, want := buffered.Frames.Duration-plain.Frames.Duration, 2*time.Second+time.Duration(beats)*500*time.Millisecond; got != want {
 		t.Errorf("buffers add %v, want %v", got, want)
 	}
-	if got, want := buffered.Frames.Total-plain.Frames.Total, beats+2; got != want {
+	// The intro, the closing block and the gaps are frames. Both plans carry the
+	// closing block, so only the intro and the gaps are a difference.
+	if got, want := buffered.Frames.Total-plain.Frames.Total, beats+1; got != want {
 		t.Errorf("buffers add %d frames, want %d", got, want)
 	}
 }
@@ -163,5 +165,47 @@ func TestOpusTrackMatchesThePicture(t *testing.T) {
 	plan := NewRenderPlan(script, track, 5, true, pipeline.intro, pipeline.outro, pipeline.gap)
 	if diff := plan.Length - track.Duration(); diff > 50*time.Millisecond || diff < -50*time.Millisecond {
 		t.Errorf("picture runs %v but audio runs %v", plan.Length, track.Duration())
+	}
+}
+
+// TestRenderedVideoKeepsItsClosingBuffer pins the outro. A file's duration is its
+// last block's timestamp, so the render must write a closing block at the end of
+// the outro; a block at the start of it leaves the final picture with no time to
+// be shown and the video stops the instant the last line is drawn.
+func TestRenderedVideoKeepsItsClosingBuffer(t *testing.T) {
+	pipeline := NewVideoPipeline(".")
+	pipeline.SetSize(64, 48)
+	pipeline.SetFPS(5)
+	pipeline.SetIntro(0)
+	pipeline.SetGap(0)
+	pipeline.SetOutro(2 * time.Second)
+
+	script := smallScript()
+	out := filepath.Join(t.TempDir(), "replay.webm")
+	if err := pipeline.RenderVideo(context.Background(), script, out); err != nil {
+		t.Fatalf("RenderVideo: %v", err)
+	}
+
+	file, err := os.Open(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	var header struct {
+		Segment struct {
+			Info struct {
+				Duration float64 `ebml:"Duration"`
+			} `ebml:"Info,stop"`
+		}
+	}
+	if err := ebml.Unmarshal(file, &header); err != nil && !errors.Is(err, ebml.ErrReadStopped) {
+		t.Fatalf("read back: %v", err)
+	}
+
+	got := time.Duration(header.Segment.Info.Duration) * time.Millisecond
+	want := script.TotalDuration + 2*time.Second
+	if got < want-100*time.Millisecond {
+		t.Errorf("video runs %v, want about %v", got, want)
 	}
 }

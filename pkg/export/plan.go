@@ -52,9 +52,14 @@ func NewRenderPlan(script *scene.Script, track *webm.OpusTrack, fps int, animate
 		plan.Frames.Repeat += beats
 		plan.Frames.Duration += gap * time.Duration(beats)
 	}
-	if outro > 0 && beats > 0 {
+	// The render always writes a closing block at the very end of the timeline, so
+	// the final picture has time to be shown rather than stopping the instant it
+	// is drawn. The outro is that block's span.
+	if beats > 0 {
 		plan.Frames.Total++
 		plan.Frames.Repeat++
+	}
+	if outro > 0 {
 		plan.Frames.Duration += outro
 	}
 
