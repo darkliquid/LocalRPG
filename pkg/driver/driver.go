@@ -1,9 +1,14 @@
 package driver
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
+	"image/jpeg"
+	"image/png"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -41,6 +46,12 @@ func (d *Driver) Run(ctx context.Context, s *Scenario, cb StepCallback) ([]debug
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("no-sandbox", true),
 	)
+	// Chrome is not always on PATH (a distribution package installs to
+	// /opt/google/chrome/chrome), so let the caller point at it, the same way
+	// the browser tests do.
+	if browser := os.Getenv("CHROME_EXEC"); browser != "" {
+		opts = append(opts, chromedp.ExecPath(browser))
+	}
 
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, opts...)
 	defer cancelAlloc()
@@ -87,7 +98,7 @@ func (d *Driver) Run(ctx context.Context, s *Scenario, cb StepCallback) ([]debug
 			rec.Status = "failed"
 			rec.FailureReason = fmt.Sprintf("set headers: %v", err)
 		} else {
-			err := d.executeStep(taskCtx, step)
+			err := d.executeStep(taskCtx, step, &rec)
 			if err != nil {
 				rec.Status = "failed"
 				rec.FailureReason = err.Error()
@@ -114,7 +125,7 @@ func (d *Driver) Run(ctx context.Context, s *Scenario, cb StepCallback) ([]debug
 	return records, nil
 }
 
-func (d *Driver) executeStep(ctx context.Context, step Step) error {
+func (d *Driver) executeStep(ctx context.Context, step Step, rec *debugger.ActionRecord) error {
 	timeout := 10 * time.Second
 	if step.TimeoutMs > 0 {
 		timeout = time.Duration(step.TimeoutMs) * time.Millisecond
@@ -159,11 +170,89 @@ func (d *Driver) executeStep(ctx context.Context, step Step) error {
 		}
 		return nil
 
+	case ActionScreenshot:
+		if step.Path == "" {
+			return fmt.Errorf("screenshot action requires a path")
+		}
+
+		// CaptureScreenshot writes a PNG of the viewport; the full-page variant
+		// only emits JPEG. A desktop app is captured at a fixed window size, so
+		// an optional width and height emulate the window it was designed for.
+		actions := make([]chromedp.Action, 0, 2)
+		if step.Width > 0 && step.Height > 0 {
+			actions = append(actions, chromedp.EmulateViewport(int64(step.Width), int64(step.Height)))
+		}
+		var pngData []byte
+		actions = append(actions, chromedp.CaptureScreenshot(&pngData))
+		if err := chromedp.Run(stepCtx, actions...); err != nil {
+			return err
+		}
+
+		data, err := encodeScreenshot(pngData, screenshotFormat(step), step.Quality)
+		if err != nil {
+			return err
+		}
+		if dir := filepath.Dir(step.Path); dir != "." {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return fmt.Errorf("create screenshot directory: %w", err)
+			}
+		}
+		if err := os.WriteFile(step.Path, data, 0o644); err != nil {
+			return fmt.Errorf("write screenshot: %w", err)
+		}
+		rec.ScreenshotB64 = base64.StdEncoding.EncodeToString(data)
+		return nil
+
 	case ActionSleep:
 		time.Sleep(timeout)
 		return nil
 
 	default:
 		return nil
+	}
+}
+
+// defaultScreenshotQuality keeps small UI text legible after JPEG encoding.
+const defaultScreenshotQuality = 88
+
+// screenshotFormat resolves the image format for a capture. An explicit format
+// wins; otherwise the file extension decides, so a ".jpg" path is never handed
+// PNG bytes.
+func screenshotFormat(step Step) string {
+	if step.Format != "" {
+		return strings.ToLower(step.Format)
+	}
+	switch strings.ToLower(filepath.Ext(step.Path)) {
+	case ".jpg", ".jpeg":
+		return "jpeg"
+	default:
+		return "png"
+	}
+}
+
+// encodeScreenshot converts a captured PNG into the requested format. Chrome
+// only ever hands back PNG, so a JPEG target is decoded and re-encoded here
+// rather than pulling an external image tool into the capture flow.
+func encodeScreenshot(pngData []byte, format string, quality int) ([]byte, error) {
+	switch strings.ToLower(format) {
+	case "", "png":
+		return pngData, nil
+
+	case "jpeg", "jpg":
+		img, err := png.Decode(bytes.NewReader(pngData))
+		if err != nil {
+			return nil, fmt.Errorf("decode screenshot: %w", err)
+		}
+		if quality <= 0 || quality > 100 {
+			quality = defaultScreenshotQuality
+		}
+		var buf bytes.Buffer
+		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality}); err != nil {
+			return nil, fmt.Errorf("encode screenshot: %w", err)
+		}
+		return buf.Bytes(), nil
+
+	default:
+		return nil, fmt.Errorf("unsupported screenshot format %q", format)
 	}
 }

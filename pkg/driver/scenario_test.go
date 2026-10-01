@@ -58,3 +58,39 @@ steps: []
 		t.Errorf("Expected error for empty scenario name and steps")
 	}
 }
+
+func TestParseScenarioScreenshot(t *testing.T) {
+	yamlContent := `
+name: "Showcase Capture"
+steps:
+  - action: "navigate"
+    url: "/"
+  - action: "screenshot"
+    path: "website/screenshots/01-launcher.png"
+`
+
+	sc, err := driver.ParseScenario(strings.NewReader(yamlContent))
+	if err != nil {
+		t.Fatalf("ParseScenario failed: %v", err)
+	}
+	if len(sc.Steps) != 2 {
+		t.Fatalf("Expected 2 steps, got %d", len(sc.Steps))
+	}
+	if sc.Steps[1].Action != driver.ActionScreenshot {
+		t.Errorf("Expected a screenshot action, got %q", sc.Steps[1].Action)
+	}
+	if sc.Steps[1].Path != "website/screenshots/01-launcher.png" {
+		t.Errorf("Unexpected screenshot path: %q", sc.Steps[1].Path)
+	}
+}
+
+func TestScreenshotRequiresPath(t *testing.T) {
+	badYaml := `
+name: "Missing Path"
+steps:
+  - action: "screenshot"
+`
+	if _, err := driver.ParseScenario(strings.NewReader(badYaml)); err == nil {
+		t.Error("Expected an error for a screenshot step without a path")
+	}
+}

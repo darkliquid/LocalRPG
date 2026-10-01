@@ -3,6 +3,7 @@ package driver
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -39,6 +40,16 @@ func ParseScenario(r io.Reader) (*Scenario, error) {
 		case ActionAssertTurnOutcome:
 			if step.Expected == "" {
 				return nil, fmt.Errorf("driver: step %d (assert_turn_outcome) requires 'expected'", i)
+			}
+		case ActionScreenshot:
+			if step.Path == "" {
+				return nil, fmt.Errorf("driver: step %d (screenshot) requires 'path'", i)
+			}
+			switch strings.ToLower(step.Format) {
+			case "", "png", "jpeg", "jpg":
+				// allowed
+			default:
+				return nil, fmt.Errorf("driver: step %d (screenshot) has unknown format '%s'", i, step.Format)
 			}
 		case ActionFaultInjection, ActionSleep:
 			// allowed

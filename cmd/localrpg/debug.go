@@ -127,7 +127,9 @@ func handleDebugCommand(args []string) {
 
 		fmt.Printf("Running Scenario: %s (%d steps)\n", scenario.Name, len(scenario.Steps))
 		d := driver.New(driver.Config{
-			BaseURL:  fmt.Sprintf("http://localhost:%d", cfg.Port),
+			// The app binds 127.0.0.1 explicitly, so address it the same way:
+			// "localhost" can resolve to ::1 first on some machines.
+			BaseURL:  fmt.Sprintf("http://127.0.0.1:%d", cfg.Port),
 			Headless: cfg.Headless,
 		})
 
