@@ -91,6 +91,17 @@ func (t *OpusTrack) AppendSilence(d time.Duration) error {
 		t.position += d
 		return nil
 	}
+	return t.AppendSilencePadded(d)
+}
+
+// AppendSilencePadded advances the timeline by d and always writes silence
+// packets, so the stream itself reaches the new position. It is what a trailing
+// hold needs: a player whose clock follows the audio otherwise reaches the end of
+// the audio's packets and stops, however much picture is left.
+func (t *OpusTrack) AppendSilencePadded(d time.Duration) error {
+	if d <= 0 {
+		return nil
+	}
 	frame := packetDuration(silenceMono)
 	if frame <= 0 {
 		t.position += d

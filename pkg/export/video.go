@@ -220,8 +220,11 @@ func (v *VideoPipeline) opusTrack(script *scene.Script) (*webm.OpusTrack, error)
 		}
 	}
 
+	// The outro is padded with real silence packets rather than left as a gap: a
+	// player whose clock follows the audio would otherwise reach the end of the
+	// audio's packets and stop, with the closing picture still to come.
 	if v.outro > 0 {
-		if err := track.AppendSilence(v.outro); err != nil {
+		if err := track.AppendSilencePadded(v.outro); err != nil {
 			return nil, err
 		}
 	}

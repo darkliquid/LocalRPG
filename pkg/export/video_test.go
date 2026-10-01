@@ -209,3 +209,24 @@ func TestRenderedVideoKeepsItsClosingBuffer(t *testing.T) {
 		t.Errorf("video runs %v, want about %v", got, want)
 	}
 }
+
+// TestOpusTrackPadsTheOutro pins the ending. A player whose clock follows the
+// audio stops when the audio's packets run out, so a trailing hold has to be real
+// silence packets rather than a gap in the timestamps.
+func TestOpusTrackPadsTheOutro(t *testing.T) {
+	pipeline := NewVideoPipeline(".")
+	pipeline.SetOutro(2 * time.Second)
+
+	track, err := pipeline.opusTrack(smallScript())
+	if err != nil {
+		t.Fatalf("opusTrack: %v", err)
+	}
+	if len(track.Packets) == 0 {
+		t.Fatal("expected the track to carry packets")
+	}
+
+	last := track.Packets[len(track.Packets)-1]
+	if end := last.Time + last.Duration; end < track.Duration()-50*time.Millisecond {
+		t.Errorf("the last packet ends at %v but the track runs to %v", end, track.Duration())
+	}
+}
