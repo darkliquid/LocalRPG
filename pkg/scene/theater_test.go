@@ -1,9 +1,12 @@
 package scene
 
 import (
+	"image"
 	"image/color"
 	"testing"
 	"time"
+
+	"github.com/darkliquid/localrpg/pkg/media"
 )
 
 func stageScript() *Script {
@@ -39,4 +42,42 @@ func TestFrameDrawsTheBackgroundAndScrim(t *testing.T) {
 	if frame.RGBAAt(10, 170).A != 255 {
 		t.Fatal("expected the scrim to be opaque at the base")
 	}
+}
+
+func TestFrameDrawsTheActiveSpeakerBorder(t *testing.T) {
+	renderer, err := NewRenderer(640, 360)
+	if err != nil {
+		t.Fatalf("NewRenderer: %v", err)
+	}
+	script := stageScript()
+	script.PlayerPortrait = writeArtFile(t, "player.svg", media.GenerateProceduralBustSVG("hero", "Hero", "female"))
+	beat := Beat{Kind: BeatSpeech, Speaker: "Hero", Player: true, Text: "Hello.", Duration: 2000 * time.Millisecond}
+
+	frame := renderer.Frame(FrameRequest{
+		Script: script, Scene: script.Scenes[0], Beat: beat, Progress: 1, Animate: false,
+	})
+
+	if !hasColourNear(frame, skyAccent, 60) {
+		t.Fatal("expected the player's active border colour somewhere in the frame")
+	}
+}
+
+// hasColourNear reports whether any pixel is within tolerance of want.
+func hasColourNear(img *image.RGBA, want color.RGBA, tolerance int) bool {
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			c := img.RGBAAt(x, y)
+			if absDiff(c.R, want.R) <= tolerance && absDiff(c.G, want.G) <= tolerance && absDiff(c.B, want.B) <= tolerance {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func absDiff(a, b uint8) int {
+	if a > b {
+		return int(a) - int(b)
+	}
+	return int(b) - int(a)
 }
