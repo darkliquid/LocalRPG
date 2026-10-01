@@ -51,10 +51,11 @@
           <a href="{{ .Root }}index.html#features">Features</a>
           <a href="{{ .Root }}index.html#screenshots">Screenshots</a>
           <a href="{{ .RepoURL }}/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="{{ .RepoURL }}/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
           <a href="{{ .RepoURL }}" target="_blank" rel="noopener">Source</a>
         </nav>
         <p class="footer__note">
-          {{ if .Version }}v{{ .Version }} · {{ end }}Built with Go, Wails v3 and React 19. © {{ .Year }}.
+          {{ if .Version }}v{{ .Version }} · {{ end }}MIT licensed · Built with Go, Wails v3 and React 19. © {{ .Year }} Andrew Montgomery.
         </p>
       </footer>
     </main>

@@ -141,3 +141,11 @@ LocalRPG includes an embedded debugging suite for diagnosing turn failures and i
 - **Automated Test Runner**: Run `localrpg debug test-run --scenario scenarios/smoke-test.yaml` to execute declarative browser scenarios headlessly and generate standalone HTML reports.
 
 See [docs/debugging.md](docs/debugging.md) for full instructions and scenario syntax.
+
+---
+
+## License
+
+LocalRPG is released under the [MIT License](LICENSE). It is built from
+open-source libraries and uses fonts and icons that carry their own terms;
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists them.
