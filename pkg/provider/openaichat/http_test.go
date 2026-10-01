@@ -376,3 +376,124 @@ func TestToolChoiceRequiredMarshals(t *testing.T) {
 		t.Fatalf("body omitted tool_choice: %s", data)
 	}
 }
+
+func TestHTTPProviderStructuredOutputCapable(t *testing.T) {
+	provider := NewHTTPProvider("test", "http://localhost:11434", "llama3.2", "")
+	if !provider.StructuredOutputCapable() {
+		t.Errorf("StructuredOutputCapable() = false, want true")
+	}
+	var _ harness.StructuredOutputProvider = provider
+}
+
+func TestHTTPProviderSendsResponseSchema(t *testing.T) {
+	var gotBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("expected flusher")
+		}
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"{\\\"name\\\":\\\"test\\\"}\"},\"finish_reason\":\"stop\"}]}\n\n")
+		flusher.Flush()
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+		flusher.Flush()
+	}))
+	defer server.Close()
+
+	provider := NewHTTPProvider("mock-openai", server.URL, "gpt-4o", "")
+
+	schema := map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"name": map[string]interface{}{"type": "string"},
+		},
+		"required": []interface{}{"name"},
+	}
+
+	req := harness.GenerateRequest{
+		Prompt: "Generate a character",
+		ResponseSchema: &harness.ResponseSchemaSpec{
+			Name:        "character",
+			Description: "A game character",
+			Schema:      schema,
+			Strict:      true,
+		},
+	}
+
+	out := make(chan harness.StreamChunk, 10)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- provider.Stream(context.Background(), req, out)
+	}()
+
+	for range out {
+	}
+
+	if err := <-errCh; err != nil {
+		t.Fatalf("Stream failed: %v", err)
+	}
+
+	rfRaw, ok := gotBody["response_format"]
+	if !ok {
+		t.Fatalf("expected response_format in request body, got %v", gotBody)
+	}
+
+	rf, ok := rfRaw.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected response_format to be an object, got %T: %v", rfRaw, rfRaw)
+	}
+
+	if got := rf["type"]; got != "json_schema" {
+		t.Errorf("response_format.type = %v, want 'json_schema'", got)
+	}
+
+	jsRaw, ok := rf["json_schema"]
+	if !ok {
+		t.Fatalf("expected json_schema in response_format, got %v", rf)
+	}
+
+	js, ok := jsRaw.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected json_schema to be an object, got %T: %v", jsRaw, jsRaw)
+	}
+
+	if got := js["name"]; got != "character" {
+		t.Errorf("json_schema.name = %v, want 'character'", got)
+	}
+	if got := js["description"]; got != "A game character" {
+		t.Errorf("json_schema.description = %v, want 'A game character'", got)
+	}
+	if got := js["strict"]; got != true {
+		t.Errorf("json_schema.strict = %v, want true", got)
+	}
+	if js["schema"] == nil {
+		t.Errorf("json_schema.schema is nil")
+	}
+}
+
+func TestResponseFormatOmittedWhenNoSchema(t *testing.T) {
+	var gotBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"hello\"},\"finish_reason\":\"stop\"}]}\n\n")
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+	}))
+	defer server.Close()
+
+	provider := NewHTTPProvider("mock-openai", server.URL, "gpt-4o", "")
+	req := harness.GenerateRequest{Prompt: "hello"}
+
+	out := make(chan harness.StreamChunk, 10)
+	go func() {
+		_ = provider.Stream(context.Background(), req, out)
+	}()
+	for range out {
+	}
+
+	if _, ok := gotBody["response_format"]; ok {
+		t.Errorf("response_format should be omitted when ResponseSchema is nil, got %v", gotBody["response_format"])
+	}
+}

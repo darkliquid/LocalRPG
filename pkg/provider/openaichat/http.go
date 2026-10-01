@@ -78,16 +78,33 @@ func (h *HTTPProvider) ID() string {
 // offered a surface it would ignore or reject.
 func (h *HTTPProvider) ToolCallerCapable() bool { return true }
 
+// StructuredOutputCapable marks a provider that supports native structured outputs
+// (e.g. JSON schema response formats).
+func (h *HTTPProvider) StructuredOutputCapable() bool { return true }
+
 type openAIChatRequest struct {
-	Model         string                   `json:"model"`
-	Messages      []openAIMessage          `json:"messages"`
-	Stream        bool                     `json:"stream"`
-	Temperature   float64                  `json:"temperature,omitempty"`
-	MaxTokens     int                      `json:"max_tokens,omitempty"`
-	Stop          []string                 `json:"stop,omitempty"`
-	Tools         []openAIToolSpec         `json:"tools,omitempty"`
-	ToolChoice    string                   `json:"tool_choice,omitempty"`
-	StreamOptions *openAIChatStreamOptions `json:"stream_options,omitempty"`
+	Model          string                   `json:"model"`
+	Messages       []openAIMessage          `json:"messages"`
+	Stream         bool                     `json:"stream"`
+	Temperature    float64                  `json:"temperature,omitempty"`
+	MaxTokens      int                      `json:"max_tokens,omitempty"`
+	Stop           []string                 `json:"stop,omitempty"`
+	Tools          []openAIToolSpec         `json:"tools,omitempty"`
+	ToolChoice     string                   `json:"tool_choice,omitempty"`
+	ResponseFormat *openAIResponseFormat    `json:"response_format,omitempty"`
+	StreamOptions  *openAIChatStreamOptions `json:"stream_options,omitempty"`
+}
+
+type openAIResponseFormat struct {
+	Type       string                   `json:"type"` // "json_schema" or "json_object"
+	JSONSchema *openAIJSONSchemaWrapper `json:"json_schema,omitempty"`
+}
+
+type openAIJSONSchemaWrapper struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Schema      map[string]interface{} `json:"schema"`
+	Strict      bool                   `json:"strict,omitempty"`
 }
 
 // openAIChatStreamOptions asks the provider to send a final usage frame.
@@ -234,16 +251,30 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 		maxTokens = h.opts.MaxTokens
 	}
 
+	var responseFormat *openAIResponseFormat
+	if req.ResponseSchema != nil {
+		responseFormat = &openAIResponseFormat{
+			Type: "json_schema",
+			JSONSchema: &openAIJSONSchemaWrapper{
+				Name:        req.ResponseSchema.Name,
+				Description: req.ResponseSchema.Description,
+				Schema:      req.ResponseSchema.Schema,
+				Strict:      req.ResponseSchema.Strict,
+			},
+		}
+	}
+
 	payload := openAIChatRequest{
-		Model:         h.model,
-		Messages:      messages,
-		Stream:        true,
-		Temperature:   temperature,
-		MaxTokens:     maxTokens,
-		Stop:          h.opts.Stop,
-		Tools:         tools,
-		ToolChoice:    req.ToolChoice,
-		StreamOptions: &openAIChatStreamOptions{IncludeUsage: true},
+		Model:          h.model,
+		Messages:       messages,
+		Stream:         true,
+		Temperature:    temperature,
+		MaxTokens:      maxTokens,
+		Stop:           h.opts.Stop,
+		Tools:          tools,
+		ToolChoice:     req.ToolChoice,
+		ResponseFormat: responseFormat,
+		StreamOptions:  &openAIChatStreamOptions{IncludeUsage: true},
 	}
 
 	data, err := json.Marshal(payload)
