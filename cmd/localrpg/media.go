@@ -35,7 +35,7 @@ func handleTTSCommand(args []string) {
 		os.Exit(1)
 	}
 
-	client, err := media.NewTTSClient(cfg.Media.TTS)
+	client, err := media.NewTTSClientWithSharedKey(cfg.Media.TTS, cfg.Providers.Gemini.APIKey)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error building TTS client: %v\n", err)
 		os.Exit(1)

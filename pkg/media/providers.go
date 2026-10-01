@@ -21,6 +21,12 @@ func (d *disabledTTSClient) Synthesize(ctx context.Context, text string, voice *
 	return nil, ErrProviderDisabled
 }
 
+// NewCacheOnlyTTSClient is a client that never synthesizes. It lets an export
+// play the clips a campaign already has when no provider can be built (no key, no
+// server), where a cache hit plays and a miss is a silent beat rather than a
+// reason to skip every line.
+func NewCacheOnlyTTSClient() TTSClient { return &disabledTTSClient{} }
+
 type disabledSTTClient struct{}
 
 func (d *disabledSTTClient) Transcribe(ctx context.Context, audioData []byte) (string, error) {

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -30,27 +31,37 @@ func handleExportCommand(args []string) {
 	size := fs.String("size", "1920x1080", "Video size as WxH")
 	quality := fs.Int("quality", 80, "VP8 quality, 0-100")
 
-	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
+	if len(args) == 0 {
 		fs.Usage()
 		os.Exit(0)
 	}
 
-	format := args[0]
+	// Go's flag package stops at the first positional argument, which would read
+	// `export video --dir x <game>` as the game id "--dir". Separate the two so a
+	// flag works wherever it is written.
+	flags, positional := splitExportArgs(fs, args)
+	_ = fs.Parse(flags)
+
+	if len(positional) == 0 {
+		fs.Usage()
+		os.Exit(0)
+	}
+
+	format := positional[0]
 	if format == "inspect" {
-		if len(args) < 2 {
+		if len(positional) < 2 {
 			fmt.Fprintln(os.Stderr, "Error: missing bundle path")
 			os.Exit(1)
 		}
-		handleExportInspect(args[1])
+		handleExportInspect(positional[1])
 		return
 	}
-	if len(args) < 2 {
+	if len(positional) < 2 {
 		fmt.Fprintln(os.Stderr, "Error: missing game ID")
 		fs.Usage()
 		os.Exit(1)
 	}
-	gameID := args[1]
-	fs.Parse(args[2:])
+	gameID := positional[1]
 
 	compiler := export.NewScriptCompiler(*dir)
 	compiler.SetMedia(!*noArt, !*noAudio)
@@ -63,12 +74,19 @@ func handleExportCommand(args []string) {
 	for _, miss := range compiler.SpeechMisses() {
 		fmt.Fprintf(os.Stderr, "No clip for a beat: %s\n", miss)
 	}
+	if len(compiler.SpeechMisses()) > 0 {
+		fmt.Fprintf(os.Stderr, "Looked for clips in %s; pass --dir if the app keeps its campaigns elsewhere.\n", compiler.CacheDir())
+	}
 
 	switch format {
 	case "web":
 		target := *out
 		if target == "" {
-			target = fmt.Sprintf("dist/%s-web.html", gameID)
+			target = gameID + "-web.html"
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Web export failed: %v\n", err)
+			os.Exit(1)
 		}
 		exporter := export.NewWebExporter(*dir)
 		// A bundle is the theatre's own player, so it ships the frontend build and
@@ -88,15 +106,19 @@ func handleExportCommand(args []string) {
 			os.Exit(1)
 		}
 		if info, statErr := os.Stat(path); statErr == nil {
-			fmt.Printf("Exported web replay bundle to %s (%d KB)\n", path, info.Size()/1024)
+			fmt.Printf("Exported web replay bundle to %s (%d KB)\n", absPath(path), info.Size()/1024)
 			break
 		}
-		fmt.Printf("Exported web replay bundle to %s\n", path)
+		fmt.Printf("Exported web replay bundle to %s\n", absPath(path))
 
 	case "video":
 		target := *out
 		if target == "" {
-			target = fmt.Sprintf("dist/%s.webm", gameID)
+			target = gameID + ".webm"
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Video export failed: %v\n", err)
+			os.Exit(1)
 		}
 		pipeline := export.NewVideoPipeline(*dir)
 		pipeline.SetStill(*still)
@@ -134,12 +156,53 @@ func handleExportCommand(args []string) {
 			fmt.Fprintf(os.Stderr, "Video render failed: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Rendered video replay to %s\n", target)
+		fmt.Printf("Rendered video replay to %s\n", absPath(target))
 
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown export format: %s (supported: web, video)\n", format)
 		os.Exit(1)
 	}
+}
+
+// splitExportArgs separates flags from positional arguments, so a flag may be
+// written before or after the format and game id. Go's flag package stops at the
+// first positional argument, which would otherwise read `export video --dir x
+// <game>` as the game id "--dir".
+func splitExportArgs(fs *flag.FlagSet, args []string) (flags, positional []string) {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if !strings.HasPrefix(arg, "-") || arg == "-" {
+			positional = append(positional, arg)
+			continue
+		}
+		flags = append(flags, arg)
+
+		name := strings.TrimLeft(arg, "-")
+		if strings.Contains(name, "=") {
+			continue // the value is attached
+		}
+		f := fs.Lookup(name)
+		if f == nil {
+			continue // let flag.Parse report the unknown flag
+		}
+		if boolFlag, ok := f.Value.(interface{ IsBoolFlag() bool }); ok && boolFlag.IsBoolFlag() {
+			continue // a bool flag takes no value
+		}
+		if i+1 < len(args) {
+			i++
+			flags = append(flags, args[i])
+		}
+	}
+	return flags, positional
+}
+
+// absPath reports where a file landed, so a relative default is not a mystery.
+func absPath(path string) string {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+	return absolute
 }
 
 // parseSize reads a WxH geometry.

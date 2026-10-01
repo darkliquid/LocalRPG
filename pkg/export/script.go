@@ -324,13 +324,22 @@ type ScriptCompiler struct {
 func NewScriptCompiler(rootDir string) *ScriptCompiler {
 	cfg, _ := config.NewConfigManager().Load()
 	projectRoot := ""
-	if rootDir != "" {
+	// "." is the flag's default and means "no project directory", exactly as the
+	// app treats it. Only an explicit directory puts the process in project mode,
+	// where relative paths resolve under it. Without this a plain `export` looks
+	// for campaigns and clips in the working directory instead of the XDG
+	// locations the app actually writes to, and every clip is a miss.
+	if rootDir != "" && rootDir != "." {
 		projectRoot = rootDir
 	}
 	dirs := paths.Resolve(paths.System(), cfg.Paths, projectRoot)
 	return NewScriptCompilerWithResolver(
 		core.NewCustomPathResolver(dirs.Systems, dirs.Worlds, dirs.Games, dirs.Cache), cfg)
 }
+
+// CacheDir is the clip cache an export reads from, so a silent export can say
+// where it looked rather than only that it found nothing.
+func (c *ScriptCompiler) CacheDir() string { return c.resolver.CacheDir() }
 
 // NewScriptCompilerWithResolver builds a compiler against an already-resolved
 // resolver and configuration, so a server exports from the same locations it
@@ -445,14 +454,23 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 
 	if c.speech != nil {
 		compiler.SetSpeechResolver(c.speech)
-	} else if c.audio && c.config.Media.TTS.Type != "" && c.config.Media.TTS.Type != "disabled" {
-		if client, err := media.NewTTSClient(c.config.Media.TTS); err == nil {
-			cache := media.NewContentCache(c.resolver.CacheDir())
-			pipeline := media.NewTTSPipeline(client, cache)
-			pipeline.SetTextPolicy(media.TextPolicyFromConfig(c.config.Media.TTS))
-			pipeline.SetOpusBitrate(c.config.OpusBitrate())
-			compiler.SetSpeechResolver(NewSpeechResolver(pipeline, store, narrator))
+	} else if c.audio {
+		// Cached clips are the campaign's own audio and are worth playing even when
+		// no provider can synthesize: without this an export run where the API key
+		// lives in another environment skips every line instead of using the clips
+		// it already has.
+		// The shared provider key is what the app synthesizes with; without it a
+		// CLI run cannot build the client and every miss would be silent even
+		// though the app can speak.
+		client, err := media.NewTTSClientWithSharedKey(c.config.Media.TTS, c.config.Providers.Gemini.APIKey)
+		if err != nil {
+			client = media.NewCacheOnlyTTSClient()
 		}
+		cache := media.NewContentCache(c.resolver.CacheDir())
+		pipeline := media.NewTTSPipeline(client, cache)
+		pipeline.SetTextPolicy(media.TextPolicyFromConfig(c.config.Media.TTS))
+		pipeline.SetOpusBitrate(c.config.OpusBitrate())
+		compiler.SetSpeechResolver(NewSpeechResolver(pipeline, store, narrator))
 	}
 
 	// Portraits are always worth resolving: they are what makes an exported bundle

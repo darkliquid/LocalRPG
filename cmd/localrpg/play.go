@@ -147,7 +147,7 @@ func handlePlayCommand(args []string) {
 	orchestrator.SetActionEcho(cfg.ActionEcho())
 	orchestrator.LoadPrompts(resolver, manifest.SystemID, manifest.WorldID)
 
-	if ttsCli, err := media.NewTTSClient(cfg.Media.TTS); err == nil {
+	if ttsCli, err := media.NewTTSClientWithSharedKey(cfg.Media.TTS, cfg.Providers.Gemini.APIKey); err == nil {
 		cueCaps := media.ResolveSpeechCueCapabilities(cfg.Media.TTS, ttsCli)
 		orchestrator.SetSpeechCues(harness.SpeechCueContext{
 			AudioTags:        cueCaps.AudioTags,
