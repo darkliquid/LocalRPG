@@ -1,0 +1,8 @@
+id: emberwatch
+name: Emberwatch
+system: narrative_2d6
+world: the_ashen_reach
+player: The Lantern-Bearer
+player_name: Wren
+settings:
+  start_location: the_ashen_bastion

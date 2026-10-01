@@ -1,0 +1,218 @@
+{{define "content"}}
+<section class="hero">
+  <div class="hero__copy">
+    <p class="eyebrow">{{ icon "sparkles" }} Local-first · zero-TCP · schema-agnostic</p>
+    <h1 class="hero__title"><span class="wordmark">LocalRPG</span></h1>
+    <p class="hero__lede">
+      A turn-based tabletop RPG client that runs entirely on your machine. Bring a local
+      model, a CLI agent, or nothing at all &mdash; the built-in narrative oracle needs no
+      server and no GPU. The desktop launcher, terminal client and story theatre all read
+      and write the same campaign.
+    </p>
+    <div class="hero__actions">
+      <a class="button button--primary" href="{{ .RepoURL }}/releases" target="_blank" rel="noopener">
+        {{ icon "download" }} Download
+      </a>
+      <a class="button" href="{{ .Root }}docs/index.html">{{ icon "book" }} Read the docs</a>
+      <a class="button button--ghost" href="{{ .RepoURL }}" target="_blank" rel="noopener">
+        {{ icon "github" }} Source
+      </a>
+    </div>
+    <ul class="hero__facts">
+      <li><strong>0</strong> TCP ports by default</li>
+      <li><strong>1</strong> binary for GUI, TUI and API</li>
+      <li><strong>3</strong> tiers of on-disk memory</li>
+    </ul>
+  </div>
+
+  <div class="hero__stage" aria-hidden="true">
+    <div class="stage glass">
+      <div class="stage__rail">
+        <span class="stage__dot"></span>
+        <span class="stage__dot"></span>
+        <span class="stage__dot"></span>
+        <span class="stage__title">Launcher Hub</span>
+      </div>
+      <div class="stage__body">
+        <div class="stage__dock">
+          <span class="stage__chip is-active">LR</span>
+          <span class="stage__chip"></span>
+          <span class="stage__chip"></span>
+          <span class="stage__chip"></span>
+        </div>
+        <div class="stage__main">
+          <div class="stage__banner">
+            <span class="stage__banner-title">The Ashen Reach</span>
+            <span class="stage__banner-sub">Narrative 2d6 · Turn 14</span>
+          </div>
+          <div class="stage__cards">
+            <div class="stage__card">
+              <span class="stage__card-name">Emberwatch</span>
+              <span class="stage__card-meta">Last played today</span>
+            </div>
+            <div class="stage__card">
+              <span class="stage__card-name">Wild Stars</span>
+              <span class="stage__card-meta">Turn 3</span>
+            </div>
+          </div>
+          <div class="stage__panel">
+            <span class="stage__line"></span>
+            <span class="stage__line stage__line--short"></span>
+            <span class="stage__line"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="section">
+  <header class="section__head">
+    <p class="eyebrow">{{ icon "grid" }} Capabilities</p>
+    <h2>Everything a campaign needs, none of it hardcoded</h2>
+    <p class="section__lede">
+      The engine stores no notion of hit points, mana or classes. Rules live in prompts and
+      sandboxed scripts, so the same binary plays a gritty gothic crawl or a light 2d6
+      narrative game.
+    </p>
+  </header>
+
+  <div class="cards">
+    <article class="card glass">
+      <span class="card__icon">{{ icon "shield" }}</span>
+      <h3>Zero-TCP by default</h3>
+      <p>The desktop app opens a native Wails v3 window and serves its own assets and API in-process. No port is bound unless you ask for one.</p>
+    </article>
+    <article class="card glass">
+      <span class="card__icon">{{ icon "cpu" }}</span>
+      <h3>Local-first model routing</h3>
+      <p>Route the GM, narrator and extractor roles across Ollama, LM Studio, vLLM, a CLI agent, or the deterministic built-in oracle. Per-role fallbacks included.</p>
+    </article>
+    <article class="card glass">
+      <span class="card__icon">{{ icon "layers" }}</span>
+      <h3>Canonical timeline</h3>
+      <p>Every turn records the prompt, the rewrite, the entities involved and who spoke which line, so history is queried, not re-inferred from prose.</p>
+    </article>
+    <article class="card glass">
+      <span class="card__icon">{{ icon "book" }}</span>
+      <h3>Markdown is truth</h3>
+      <p>Entities are Markdown notes with YAML frontmatter; wikilinks become graph edges. The SQLite index is disposable and rebuilt from the notes at any time.</p>
+    </article>
+    <article class="card glass">
+      <span class="card__icon">{{ icon "sparkles" }}</span>
+      <h3>Story theatre &amp; export</h3>
+      <p>Replay a campaign as a visual novel, then export a self-contained web bundle or a video composited and encoded entirely in Go. No ffmpeg required.</p>
+    </article>
+    <article class="card glass">
+      <span class="card__icon">{{ icon "terminal" }}</span>
+      <h3>Terminal and headless</h3>
+      <p>A Bubbletea TUI for the terminal, plus a Unix-socket daemon mode with <code>0600</code> permissions when there is no display to draw on.</p>
+    </article>
+  </div>
+</section>
+
+<section id="screenshots" class="section">
+  <header class="section__head">
+    <p class="eyebrow">{{ icon "image" }} The look</p>
+    <h2>Glassmorphic panels, translucent and quiet</h2>
+    <p class="section__lede">
+      {{ if .ShotCount }}A tour of the studios, the theatre and the codex.{{ else }}Screenshots are captured from a running build; run <code>mise run site:screenshots</code> to fill this gallery in.{{ end }}
+    </p>
+  </header>
+
+  <div class="gallery">
+    {{ range .Shots }}
+    <figure class="shot{{ if not .Present }} is-pending{{ end }}">
+      <div class="shot__frame">
+        {{ if .Present }}
+          <img src="{{ $.Root }}screenshots/{{ .File }}" alt="{{ .Title }}" loading="lazy" decoding="async" />
+        {{ else }}
+          <div class="shot__placeholder">
+            {{ icon "image" }}
+            <span>{{ .Title }}</span>
+            <small>awaiting capture</small>
+          </div>
+        {{ end }}
+      </div>
+      <figcaption>
+        <h3>{{ .Title }}</h3>
+        <p>{{ .Caption }}</p>
+      </figcaption>
+    </figure>
+    {{ end }}
+  </div>
+</section>
+
+<section id="quickstart" class="section">
+  <header class="section__head">
+    <p class="eyebrow">{{ icon "terminal" }} Get started</p>
+    <h2>From a clone to a campaign</h2>
+  </header>
+
+  <div class="split">
+    <div class="split__col">
+      <h3>Run the desktop client</h3>
+      <pre class="code" data-copy><code># Fetch the pinned toolchain and dependencies
+mise run setup
+
+# Build the frontend bundle and the localrpg binary
+mise run build
+
+# Launch the glassmorphic launcher
+bin/localrpg gui</code></pre>
+      <p class="muted">
+        With no display, or with <code>--headless</code>, the same binary serves the identical
+        app over a <code>0600</code> Unix socket. Pass <code>--port 8080</code> to opt into a
+        browser.
+      </p>
+    </div>
+    <div class="split__col">
+      <h3>Play in the terminal</h3>
+      <pre class="code" data-copy><code># Create a world and a system in the studios,
+# then start a campaign from the shell
+bin/localrpg play my-campaign
+
+# Roll dice without a campaign
+bin/localrpg roll 4d6kh3</code></pre>
+      <p class="muted">
+        Linux builds need the GTK4 and WebKitGTK 6.0 development headers:
+        <code>libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev</code>.
+        Release archives are self-contained.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="docs" class="section">
+  <header class="section__head">
+    <p class="eyebrow">{{ icon "book" }} Documentation</p>
+    <h2>The same guide the app ships</h2>
+    <p class="section__lede">
+      These articles are read straight out of the repository and embedded into the binary,
+      so what you read here is what the Help panel shows in-game.
+    </p>
+  </header>
+
+  <div class="doc-groups">
+    {{ range .Groups }}
+    <section class="doc-group glass">
+      <h3 class="doc-group__title">{{ .Category }}</h3>
+      <ul class="doc-group__list">
+        {{ range .Docs }}
+        <li>
+          <a href="{{ $.Root }}{{ .URL }}">
+            <span class="doc-group__name">{{ .Title }}</span>
+            {{ if .Description }}<small>{{ .Description }}</small>{{ end }}
+          </a>
+        </li>
+        {{ end }}
+      </ul>
+    </section>
+    {{ end }}
+  </div>
+
+  <p class="section__foot">
+    <a class="button" href="{{ .Root }}docs/index.html">{{ icon "book" }} Browse all documentation</a>
+  </p>
+</section>
+{{end}}

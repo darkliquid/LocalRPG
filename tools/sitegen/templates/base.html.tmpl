@@ -1,0 +1,65 @@
+{{define "base"}}<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>{{ if .IsHome }}{{ .Title }} · Local-first tabletop RPG client{{ else }}{{ .Title }} · LocalRPG{{ end }}</title>
+    <meta name="description" content="{{ .Description }}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="{{ .Title }}" />
+    <meta property="og:description" content="{{ .Description }}" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230c0a09'/%3E%3Cpath d='M16 5.5l7.5 10.5L16 26.5 8.5 16z' fill='%23a855f7'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ .Root }}assets/style.css" />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true"></div>
+
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <aside class="dock" aria-label="Primary">
+      <a class="dock__mark" href="{{ .Root }}index.html" aria-label="LocalRPG home">LR</a>
+      <span class="dock__rule" aria-hidden="true"></span>
+
+      {{ range .Nav }}
+        <a
+          class="dock__item{{ if eq .Key $.Active }} is-active{{ end }}"
+          href="{{ .Href }}"
+          title="{{ .Label }}"
+          aria-label="{{ .Label }}"
+          {{ if .External }}target="_blank" rel="noopener"{{ end }}
+        >{{ icon .Icon }}<span class="dock__tip">{{ .Label }}</span></a>
+      {{ end }}
+
+      <span class="dock__spacer" aria-hidden="true"></span>
+      {{ if .Version }}<span class="dock__version">v{{ .Version }}</span>{{ end }}
+    </aside>
+
+    <main id="main" class="shell">
+      {{ template "content" . }}
+
+      <footer class="footer">
+        <div class="footer__brand">
+          <span class="wordmark wordmark--sm">LocalRPG</span>
+          <p>A local-first, turn-based tabletop RPG client for the terminal and the desktop.</p>
+        </div>
+        <nav class="footer__links" aria-label="Footer">
+          <a href="{{ .Root }}docs/index.html">Documentation</a>
+          <a href="{{ .Root }}index.html#features">Features</a>
+          <a href="{{ .Root }}index.html#screenshots">Screenshots</a>
+          <a href="{{ .RepoURL }}/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="{{ .RepoURL }}" target="_blank" rel="noopener">Source</a>
+        </nav>
+        <p class="footer__note">
+          {{ if .Version }}v{{ .Version }} · {{ end }}Built with Go, Wails v3 and React 19. © {{ .Year }}.
+        </p>
+      </footer>
+    </main>
+
+    <script src="{{ .Root }}assets/app.js" defer></script>
+  </body>
+</html>
+{{end}}

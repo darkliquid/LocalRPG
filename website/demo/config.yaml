@@ -1,0 +1,22 @@
+# Configuration for the screenshot fixture.
+#
+# Relative paths are resolved against this directory (project mode), so the
+# demo is self-contained: copying it anywhere gives a working launcher with one
+# campaign in it. website/capture-screenshots.sh copies it to a temporary
+# directory first, so the caches the app writes never land in the repository.
+paths:
+  systems: systems
+  worlds: worlds
+  games: games
+  cache: cache
+
+# The built-in oracle needs no server and no GPU, so the fixture is playable
+# offline and deterministic.
+agents:
+  roles:
+    gm:
+      type: builtin
+      builtin_name: narrative-oracle
+    narrator:
+      type: builtin
+      builtin_name: narrative-oracle

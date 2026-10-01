@@ -1,0 +1,49 @@
+{{define "content"}}
+<div class="docs">
+  <aside class="docs__nav glass" aria-label="Documentation">
+    <p class="docs__nav-title">Documentation</p>
+    {{ range .Groups }}
+      <div class="docs__nav-group">
+        <p class="docs__nav-category">{{ .Category }}</p>
+        <ul>
+          {{ range .Docs }}
+          <li>
+            <a href="{{ $.Root }}{{ .URL }}"{{ if and $.Doc (eq $.Doc.ID .ID) }} class="is-active" aria-current="page"{{ end }}>{{ .Title }}</a>
+          </li>
+          {{ end }}
+        </ul>
+      </div>
+    {{ end }}
+  </aside>
+
+  <div class="docs__body">
+    <header class="docs__head">
+      <p class="eyebrow">{{ icon "book" }} Documentation</p>
+      <h1>Guides &amp; reference</h1>
+      <p class="section__lede">
+        The embedded help articles, rendered from the same Markdown the application ships.
+        Start with the core concepts, then follow the studio guides to author your own
+        worlds and systems.
+      </p>
+    </header>
+
+    <div class="doc-groups">
+      {{ range .Groups }}
+      <section class="doc-group glass">
+        <h2 class="doc-group__title">{{ .Category }}</h2>
+        <ul class="doc-group__list">
+          {{ range .Docs }}
+          <li>
+            <a href="{{ $.Root }}{{ .URL }}">
+              <span class="doc-group__name">{{ .Title }}</span>
+              {{ if .Description }}<small>{{ .Description }}</small>{{ end }}
+            </a>
+          </li>
+          {{ end }}
+        </ul>
+      </section>
+      {{ end }}
+    </div>
+  </div>
+</div>
+{{end}}

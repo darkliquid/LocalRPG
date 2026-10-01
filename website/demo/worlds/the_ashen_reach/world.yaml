@@ -1,0 +1,11 @@
+id: the_ashen_reach
+name: The Ashen Reach
+description: A mist-veiled frontier of shattered cathedral keeps, lingering ember magic, and peat bogs.
+genre: Dark Fantasy / Gothic Exploration
+default_system: narrative_2d6
+art_style: Oil on textured canvas, chiaroscuro lighting, deep umber and lantern gold, atmospheric fog, classical dark fantasy illustration
+tags:
+  - gothic
+  - dark_fantasy
+  - mystery
+  - ruins

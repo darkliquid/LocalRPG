@@ -1,0 +1,55 @@
+name: "Showcase Screenshots"
+description: "Captures the launcher and its studios for the documentation site."
+steps:
+  # Each capture starts from a fresh load, so a studio or modal left open by the
+  # previous shot cannot bleed into the next one. The size matches the desktop
+  # window the app opens by default.
+  - action: "navigate"
+    url: "/"
+  - action: "wait_visible"
+    selector: "body"
+  - action: "sleep"
+    timeout_ms: 2000
+  - action: "screenshot"
+    path: "website/screenshots/01-launcher.jpg"
+    width: 1280
+    height: 800
+
+  - action: "click"
+    selector: "[aria-label='Worlds Studio']"
+  - action: "sleep"
+    timeout_ms: 1500
+  - action: "screenshot"
+    path: "website/screenshots/02-worlds-studio.jpg"
+    width: 1280
+    height: 800
+
+  - action: "navigate"
+    url: "/"
+  - action: "wait_visible"
+    selector: "body"
+  - action: "sleep"
+    timeout_ms: 1500
+  - action: "click"
+    selector: "[aria-label='Systems Studio']"
+  - action: "sleep"
+    timeout_ms: 1500
+  - action: "screenshot"
+    path: "website/screenshots/03-systems-studio.jpg"
+    width: 1280
+    height: 800
+
+  - action: "navigate"
+    url: "/"
+  - action: "wait_visible"
+    selector: "body"
+  - action: "sleep"
+    timeout_ms: 1500
+  - action: "click"
+    selector: "[aria-label='Settings']"
+  - action: "sleep"
+    timeout_ms: 2000
+  - action: "screenshot"
+    path: "website/screenshots/04-settings.jpg"
+    width: 1280
+    height: 800

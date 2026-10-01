@@ -1,0 +1,4 @@
+id: narrative_2d6
+name: Narrative 2d6 Engine
+version: 1.0.0
+description: Versatile 2d6 resolution with partial success, dynamic stress, and event hooks.

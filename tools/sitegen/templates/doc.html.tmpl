@@ -1,0 +1,42 @@
+{{define "content"}}
+<div class="docs">
+  <aside class="docs__nav glass" aria-label="Documentation">
+    <p class="docs__nav-title"><a href="{{ .Root }}docs/index.html">Documentation</a></p>
+    {{ range .Groups }}
+      <div class="docs__nav-group">
+        <p class="docs__nav-category">{{ .Category }}</p>
+        <ul>
+          {{ range .Docs }}
+          <li>
+            <a href="{{ $.Root }}{{ .URL }}"{{ if and $.Doc (eq $.Doc.ID .ID) }} class="is-active" aria-current="page"{{ end }}>{{ .Title }}</a>
+          </li>
+          {{ end }}
+        </ul>
+      </div>
+    {{ end }}
+  </aside>
+
+  <article class="docs__body">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href="{{ .Root }}index.html">Home</a>
+      <span aria-hidden="true">/</span>
+      <a href="{{ .Root }}docs/index.html">Documentation</a>
+      <span aria-hidden="true">/</span>
+      <span>{{ .Doc.Category }}</span>
+    </nav>
+
+    <header class="docs__head">
+      <h1>{{ .Doc.Title }}</h1>
+      {{ if .Doc.Description }}<p class="section__lede">{{ .Doc.Description }}</p>{{ end }}
+    </header>
+
+    <div class="prose glass">{{ .Content }}</div>
+
+    <p class="docs__source">
+      <a href="{{ .RepoURL }}/blob/main/{{ .Doc.Source }}" target="_blank" rel="noopener">
+        Edit this page on GitHub
+      </a>
+    </p>
+  </article>
+</div>
+{{end}}
