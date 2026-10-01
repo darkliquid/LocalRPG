@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/pion/opus/pkg/oggreader"
 )
@@ -97,5 +98,19 @@ func TestMuxerWritesAParseableOggStream(t *testing.T) {
 func TestEncodeRejectsEmptyAudio(t *testing.T) {
 	if _, err := Encode(nil, 24000, 1, DefaultBitrate); err == nil {
 		t.Fatal("expected an error for empty audio")
+	}
+}
+
+func TestDurationReadsTheGranulePosition(t *testing.T) {
+	data, err := Encode(tone(SampleRate, 1.5), SampleRate, 1, DefaultBitrate)
+	if err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	got, err := Duration(data)
+	if err != nil {
+		t.Fatalf("Duration: %v", err)
+	}
+	if got < 1400*time.Millisecond || got > 1600*time.Millisecond {
+		t.Errorf("Duration = %v, want about 1.5s", got)
 	}
 }

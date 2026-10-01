@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/gopxl/beep"
 	pionopus "github.com/pion/opus"
@@ -215,3 +216,35 @@ func (s *sliceStreamer) Stream(samples [][2]float64) (int, bool) {
 }
 
 func (s *sliceStreamer) Err() error { return nil }
+
+// Duration reads a clip's length from the final Ogg page's granule position. It
+// replaces probing the file with ffprobe, which the export no longer needs: every
+// clip is an Ogg/Opus stream this package wrote, so the granule is authoritative.
+func Duration(data []byte) (time.Duration, error) {
+	reader, head, err := oggreader.NewWith(bytes.NewReader(data))
+	if err != nil {
+		return 0, fmt.Errorf("opus: read headers: %w", err)
+	}
+
+	var lastGranule uint64
+	for {
+		_, page, err := reader.ParseNextPacket()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return 0, fmt.Errorf("opus: read packet: %w", err)
+		}
+		lastGranule = page.GranulePosition
+	}
+	if lastGranule == 0 {
+		return 0, errors.New("opus: no audio packets")
+	}
+
+	skip := uint64(head.PreSkip)
+	if lastGranule <= skip {
+		return 0, nil
+	}
+	samples := lastGranule - skip
+	return time.Duration(float64(samples) / float64(SampleRate) * float64(time.Second)), nil
+}

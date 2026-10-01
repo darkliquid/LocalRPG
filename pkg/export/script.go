@@ -17,6 +17,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/media/opus"
 	"github.com/darkliquid/localrpg/pkg/paths"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -130,11 +131,15 @@ func (r *speechResolver) SegmentAudio(ctx context.Context, segment entity.TurnSe
 	}
 	clips = checked
 
-	// A clip whose length cannot be probed contributes nothing rather than
-	// throwing the beat's pacing away; the beat falls back to the reading estimate.
+	// A clip whose length cannot be read contributes nothing rather than throwing
+	// the beat's pacing away; the beat falls back to the reading estimate.
 	var total time.Duration
 	for _, clip := range clips {
-		duration, err := media.ProbeAudioDuration(ctx, clip)
+		data, err := os.ReadFile(clip)
+		if err != nil {
+			continue
+		}
+		duration, err := opus.Duration(data)
 		if err != nil {
 			continue
 		}
