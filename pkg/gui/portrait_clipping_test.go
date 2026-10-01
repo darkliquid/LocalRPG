@@ -23,10 +23,7 @@ import (
 // paints and stays inside its rounded border. The image carries the rounding itself,
 // because a transformed child escapes a parent's rounded clip in some engines.
 func TestMirroredPortraitRendersInsideItsRoundedBox(t *testing.T) {
-	browser := chromePath()
-	if browser == "" {
-		t.Skip("no chrome")
-	}
+	browser := requireBrowser(t)
 	assets, err := AssetFS()
 	if err != nil {
 		t.Skipf("no player build: %v", err)
@@ -68,7 +65,8 @@ func TestMirroredPortraitRendersInsideItsRoundedBox(t *testing.T) {
 
 	allocOptions := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.ExecPath(browser), chromedp.Flag("headless", true),
-		chromedp.Flag("no-sandbox", true), chromedp.Flag("disable-gpu", true))
+		chromedp.Flag("no-sandbox", true), chromedp.Flag("disable-gpu", true),
+		chromedp.WSURLReadTimeout(45*time.Second))
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), allocOptions...)
 	defer cancelAlloc()
 	taskCtx, cancelTask := chromedp.NewContext(allocCtx)

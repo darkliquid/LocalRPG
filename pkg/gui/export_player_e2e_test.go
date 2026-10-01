@@ -121,10 +121,7 @@ func exportedBundleFixture(t *testing.T) (string, []string) {
 // asserts the theatre's own stage, portraits, dialogue panel, and transport render,
 // and that the story advances.
 func TestExportedBundlePlaysTheTheatre(t *testing.T) {
-	browser := chromePath()
-	if browser == "" {
-		t.Skip("no chrome/chromium available; skipping the bundle browser loop")
-	}
+	browser := requireBrowser(t)
 	if _, err := AssetFS(); err != nil {
 		t.Skipf("the player has not been built: %v", err)
 	}
@@ -149,6 +146,7 @@ func TestExportedBundlePlaysTheTheatre(t *testing.T) {
 		chromedp.Flag("headless", true),
 		chromedp.Flag("no-sandbox", true),
 		chromedp.Flag("disable-gpu", true),
+		chromedp.WSURLReadTimeout(45*time.Second),
 	)
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), allocOptions...)
 	defer cancelAlloc()

@@ -8,6 +8,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -39,6 +40,19 @@ func New(cfg Config) *Driver {
 // StepCallback is notified after each action step completes.
 type StepCallback func(rec debugger.ActionRecord)
 
+// ChromePath finds a browser for the chromedp loop, or "" when none is available.
+func ChromePath() string {
+	if configured := os.Getenv("CHROME_EXEC"); configured != "" {
+		return configured
+	}
+	for _, candidate := range []string{"google-chrome", "chromium", "chromium-browser", "/opt/google/chrome/chrome"} {
+		if path, err := exec.LookPath(candidate); err == nil {
+			return path
+		}
+	}
+	return ""
+}
+
 // allocatorOptions is the browser launch configuration. Run and Available share
 // it so a capability check cannot disagree with an actual run.
 func allocatorOptions(cfg Config) []chromedp.ExecAllocatorOption {
@@ -46,15 +60,18 @@ func allocatorOptions(cfg Config) []chromedp.ExecAllocatorOption {
 		chromedp.Flag("headless", cfg.Headless),
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("no-sandbox", true),
+		chromedp.WSURLReadTimeout(45*time.Second),
 	)
-	// Chrome is not always on PATH (a distribution package installs to
-	// /opt/google/chrome/chrome), so let the caller point at it, the same way
-	// the browser tests do.
-	if browser := os.Getenv("CHROME_EXEC"); browser != "" {
+	if browser := ChromePath(); browser != "" {
 		opts = append(opts, chromedp.ExecPath(browser))
 	}
 	return opts
 }
+
+var (
+	availableOnce sync.Once
+	availableErr  error
+)
 
 // Available reports whether a browser can actually be launched here. Finding
 // the binary is not enough: a sandboxed or headless host can have Chrome
@@ -62,16 +79,22 @@ func allocatorOptions(cfg Config) []chromedp.ExecAllocatorOption {
 // rather than about the driver. Callers that need a browser can ask first and
 // skip instead of failing.
 func Available(ctx context.Context) error {
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, allocatorOptions(Config{Headless: true})...)
-	defer cancelAlloc()
+	availableOnce.Do(func() {
+		if ChromePath() == "" {
+			availableErr = fmt.Errorf("no chrome/chromium executable found")
+			return
+		}
+		allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, allocatorOptions(Config{Headless: true})...)
+		defer cancelAlloc()
 
-	taskCtx, cancelTask := chromedp.NewContext(allocCtx)
-	defer cancelTask()
+		taskCtx, cancelTask := chromedp.NewContext(allocCtx)
+		defer cancelTask()
 
-	if err := chromedp.Run(taskCtx); err != nil {
-		return fmt.Errorf("start browser: %w", err)
-	}
-	return nil
+		if err := chromedp.Run(taskCtx); err != nil {
+			availableErr = fmt.Errorf("start browser: %w", err)
+		}
+	})
+	return availableErr
 }
 
 // Run executes all scenario steps sequentially, recording actions and telemetry tags.

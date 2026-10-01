@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,21 +13,24 @@ import (
 
 	"github.com/chromedp/chromedp"
 
+	"github.com/darkliquid/localrpg/pkg/driver"
 	"github.com/darkliquid/localrpg/pkg/engine"
 )
 
-// chromePath finds a browser for the chromedp loop, or "" when none is available
-// so the test can skip instead of failing the suite.
-func chromePath() string {
-	if configured := os.Getenv("CHROME_EXEC"); configured != "" {
-		return configured
+// requireBrowser returns the path to a working browser, or skips the test if
+// no browser is installed or can be started in this environment.
+func requireBrowser(t *testing.T) string {
+	t.Helper()
+	browser := driver.ChromePath()
+	if browser == "" {
+		t.Skip("no chrome/chromium available; skipping browser test")
 	}
-	for _, candidate := range []string{"google-chrome", "chromium", "chromium-browser", "/opt/google/chrome/chrome"} {
-		if path, err := exec.LookPath(candidate); err == nil {
-			return path
-		}
+	probeCtx, cancelProbe := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancelProbe()
+	if err := driver.Available(probeCtx); err != nil {
+		t.Skipf("no usable browser in this environment; skipping browser test: %v", err)
 	}
-	return ""
+	return browser
 }
 
 // launcherFixture builds a playable campaign with three turns in a temp root.
@@ -83,10 +85,7 @@ func launcherFixture(t *testing.T) *Service {
 // should reset". It drives the real SPA in a headless browser, deletes the only
 // campaign, and asserts the stats badge is gone.
 func TestDeletingTheLastCampaignResetsLauncherStats(t *testing.T) {
-	browser := chromePath()
-	if browser == "" {
-		t.Skip("no chrome/chromium available; skipping the launcher browser loop")
-	}
+	browser := requireBrowser(t)
 
 	svc := launcherFixture(t)
 	server := httptest.NewServer(NewServer(svc, AssetHandler()))
@@ -97,6 +96,7 @@ func TestDeletingTheLastCampaignResetsLauncherStats(t *testing.T) {
 		chromedp.Flag("headless", true),
 		chromedp.Flag("no-sandbox", true),
 		chromedp.Flag("disable-gpu", true),
+		chromedp.WSURLReadTimeout(45*time.Second),
 	)
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), allocOptions...)
 	defer cancelAlloc()
