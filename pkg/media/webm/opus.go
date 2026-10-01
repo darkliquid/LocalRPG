@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/pion/opus/pkg/oggreader"
+
+	"github.com/darkliquid/localrpg/pkg/media/opus"
 )
 
 // silenceMono is the canonical 20 ms mono Opus silence packet (RFC 6716): a
@@ -33,9 +35,16 @@ type OpusTrack struct {
 	position time.Duration
 }
 
-// NewOpusTrack starts an empty track for a channel count.
+// NewOpusTrack starts an empty track for a channel count. Its OpusHead is set
+// immediately so a story with no clips at all still yields a decodable track.
 func NewOpusTrack(channels uint64) *OpusTrack {
-	return &OpusTrack{Channels: channels}
+	if channels == 0 {
+		channels = 1
+	}
+	return &OpusTrack{
+		Channels: channels,
+		Head:     defaultOpusHead(byte(channels)),
+	}
 }
 
 // AppendClip demuxes one Ogg/Opus clip and appends its packets to the timeline.
@@ -48,9 +57,6 @@ func (t *OpusTrack) AppendClip(ogg []byte) error {
 	}
 	if uint64(head.Channels) != t.Channels {
 		return fmt.Errorf("webm: clip has %d channels, track has %d", head.Channels, t.Channels)
-	}
-	if t.Head == nil {
-		t.Head = opusHead(head, t.Channels)
 	}
 
 	for {
@@ -75,13 +81,13 @@ func (t *OpusTrack) AppendClip(ogg []byte) error {
 }
 
 // AppendSilence advances the timeline by d. A short gap is left to the
-// container's timecodes; a longer one is padded with silence packets so a player
-// never starves its decoder across a clip-less beat.
+// container's timecodes, but a track with no packets yet is always padded, so a
+// player never meets a track it cannot decode.
 func (t *OpusTrack) AppendSilence(d time.Duration) error {
 	if d <= 0 {
 		return nil
 	}
-	if d < 2*time.Second {
+	if d < 2*time.Second && len(t.Packets) > 0 {
 		t.position += d
 		return nil
 	}
@@ -104,19 +110,15 @@ func (t *OpusTrack) AppendSilence(d time.Duration) error {
 // Duration is the length of the timeline so far.
 func (t *OpusTrack) Duration() time.Duration { return t.position }
 
-// opusHead builds the RFC 7845 identification header, which is the WebM track's
-// CodecPrivate.
-func opusHead(head *oggreader.OggHeader, channels uint64) []byte {
-	ch := byte(channels)
-	if ch == 0 {
-		ch = head.Channels
-	}
+// defaultOpusHead builds the RFC 7845 identification header for a channel count,
+// which is the WebM track's CodecPrivate.
+func defaultOpusHead(channels byte) []byte {
 	buf := &bytes.Buffer{}
 	buf.WriteString("OpusHead")
 	buf.WriteByte(1)
-	buf.WriteByte(ch)
-	_ = binary.Write(buf, binary.LittleEndian, head.PreSkip)
-	_ = binary.Write(buf, binary.LittleEndian, uint32(head.SampleRate))
+	buf.WriteByte(channels)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(opus.PreSkip))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(opus.SampleRate))
 	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // output gain
 	buf.WriteByte(0)                                      // channel mapping family
 	return buf.Bytes()

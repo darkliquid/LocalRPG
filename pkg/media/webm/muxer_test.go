@@ -85,7 +85,7 @@ func TestMuxerRequiresAudio(t *testing.T) {
 	}
 	defer file.Close()
 
-	if _, err := NewMuxer(file, 64, 48, NewOpusTrack(1)); err == nil {
-		t.Fatal("expected an error for a track with no audio")
+	if _, err := NewMuxer(file, 64, 48, nil); err == nil {
+		t.Fatal("expected an error for a missing audio track")
 	}
 }

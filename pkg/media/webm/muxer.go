@@ -37,8 +37,8 @@ type Muxer struct {
 // NewMuxer builds the two tracks. Audio packets are written as the video catches
 // up with them, so the caller only feeds video.
 func NewMuxer(w io.WriteSeeker, width, height int, track *OpusTrack) (*Muxer, error) {
-	if track == nil || len(track.Packets) == 0 {
-		return nil, fmt.Errorf("webm: no audio to mux")
+	if track == nil || len(track.Head) == 0 {
+		return nil, fmt.Errorf("webm: no audio track to mux")
 	}
 	closer, ok := w.(io.WriteCloser)
 	if !ok {
