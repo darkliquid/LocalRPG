@@ -248,7 +248,14 @@ func (g *GeminiProvider) callInteractions(ctx context.Context, prevInteractionID
 	return parsed.ID, text, parsed.Usage.TotalCachedTokens, nil
 }
 
+var _ harness.StructuredOutputProvider = (*GeminiProvider)(nil)
+
 func (g *GeminiProvider) ToolCallerCapable() bool {
+	return true
+}
+
+// StructuredOutputCapable reports that this provider supports native structured outputs.
+func (g *GeminiProvider) StructuredOutputCapable() bool {
 	return true
 }
 
@@ -273,6 +280,12 @@ func (g *GeminiProvider) buildGenerateConfig(req harness.GenerateRequest) *genai
 		cfg.SystemInstruction = &genai.Content{
 			Parts: []*genai.Part{{Text: sys}},
 		}
+	}
+
+	// Structured output schema
+	if req.ResponseSchema != nil {
+		cfg.ResponseMIMEType = "application/json"
+		cfg.ResponseJsonSchema = req.ResponseSchema.Schema
 	}
 
 	// Temperature
@@ -621,4 +634,8 @@ func mapGeminiError(err error) error {
 
 func MapGeminiErrorForTest(err error) error {
 	return mapGeminiError(err)
+}
+
+func (g *GeminiProvider) BuildGenerateConfigForTest(req harness.GenerateRequest) *genai.GenerateContentConfig {
+	return g.buildGenerateConfig(req)
 }

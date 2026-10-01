@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -704,4 +705,138 @@ func TestGeminiProviderInteractionsStepsSchema(t *testing.T) {
 		t.Errorf("ContinueSession text = %q, want %q", contResp.Text, "The corridor ahead is shrouded in impenetrable mist.")
 	}
 }
+
+func TestGeminiProviderStructuredOutputCapable(t *testing.T) {
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
+		APIKey: "test-key",
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiProvider: %v", err)
+	}
+
+	if !provider.StructuredOutputCapable() {
+		t.Errorf("StructuredOutputCapable() = false, want true")
+	}
+
+	var _ harness.StructuredOutputProvider = provider
+}
+
+func TestGeminiProviderBuildGenerateConfigResponseSchema(t *testing.T) {
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
+		APIKey: "test-key",
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiProvider: %v", err)
+	}
+
+	// 1. Without ResponseSchema
+	reqWithout := harness.GenerateRequest{
+		Prompt: "Tell a story",
+	}
+	cfgWithout := provider.BuildGenerateConfigForTest(reqWithout)
+	if cfgWithout.ResponseMIMEType != "" {
+		t.Errorf("expected empty ResponseMIMEType, got %q", cfgWithout.ResponseMIMEType)
+	}
+	if cfgWithout.ResponseJsonSchema != nil {
+		t.Errorf("expected nil ResponseJsonSchema, got %v", cfgWithout.ResponseJsonSchema)
+	}
+
+	// 2. With ResponseSchema
+	schema := map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"action": map[string]interface{}{"type": "string"},
+			"rating": map[string]interface{}{"type": "number"},
+		},
+		"required": []interface{}{"action"},
+	}
+
+	reqWith := harness.GenerateRequest{
+		Prompt: "Evaluate action",
+		ResponseSchema: &harness.ResponseSchemaSpec{
+			Name:   "action_eval",
+			Schema: schema,
+		},
+	}
+	cfgWith := provider.BuildGenerateConfigForTest(reqWith)
+	if cfgWith.ResponseMIMEType != "application/json" {
+		t.Errorf("expected ResponseMIMEType 'application/json', got %q", cfgWith.ResponseMIMEType)
+	}
+	if !reflect.DeepEqual(cfgWith.ResponseJsonSchema, schema) {
+		t.Errorf("expected ResponseJsonSchema %+v, got %+v", schema, cfgWith.ResponseJsonSchema)
+	}
+}
+
+func TestGeminiProviderGenerateSendsResponseSchema(t *testing.T) {
+	var gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"candidates": [
+				{
+					"content": {
+						"parts": [{"text": "{\"action\":\"attack\",\"rating\":5}"}],
+						"role": "model"
+					},
+					"finishReason": "STOP"
+				}
+			]
+		}`)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:     "test-key",
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: server.Client(),
+		HTTPOptions: genai.HTTPOptions{
+			BaseURL: server.URL,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
+		Model:  "gemini-2.5-flash",
+		APIKey: "test-key",
+		Client: client,
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiProvider: %v", err)
+	}
+
+	schema := map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"action": map[string]interface{}{"type": "string"},
+		},
+	}
+
+	resp, err := provider.Generate(ctx, harness.GenerateRequest{
+		Prompt: "Evaluate action",
+		ResponseSchema: &harness.ResponseSchemaSpec{
+			Name:   "eval",
+			Schema: schema,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+
+	if resp.Text != `{"action":"attack","rating":5}` {
+		t.Errorf("unexpected response text: %q", resp.Text)
+	}
+
+	if !strings.Contains(gotBody, `"responseMimeType":"application/json"`) {
+		t.Errorf("expected request body to contain responseMimeType: application/json, got: %s", gotBody)
+	}
+	if !strings.Contains(gotBody, `"responseJsonSchema"`) {
+		t.Errorf("expected request body to contain responseJsonSchema, got: %s", gotBody)
+	}
+}
+
 
