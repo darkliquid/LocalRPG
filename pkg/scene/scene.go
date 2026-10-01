@@ -97,3 +97,16 @@ func SceneCard(s Scene) Beat {
 	beat.Duration = BeatDuration(beat)
 	return beat
 }
+
+// DisplayMode is how the prose grammar treats a performance direction such as
+// "[whispering]": the theatre's setting, mirrored from the campaign's speech cues.
+type DisplayMode string
+
+const (
+	// DisplayStageDirections shows a direction as a styled pill.
+	DisplayStageDirections DisplayMode = "stage_directions"
+	// DisplayHidden strips a direction from the prose.
+	DisplayHidden DisplayMode = "hidden"
+	// DisplayRaw shows a direction verbatim.
+	DisplayRaw DisplayMode = "raw"
+)
