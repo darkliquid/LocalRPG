@@ -1425,9 +1425,6 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 
 	caps := harness.Describe(provider)
 	supportsStructured := caps.StructuredOutput
-	if structured, ok := provider.(harness.StructuredOutputProvider); ok && structured.StructuredOutputCapable() {
-		supportsStructured = true
-	}
 	modelName := provider.ID()
 	if m, ok := provider.(interface{ Model() string }); ok && m.Model() != "" {
 		modelName = m.Model()
@@ -1505,7 +1502,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					Model:       modelName,
 					PrefixHash:  assembly.Context.PrefixHash,
 				}
-				return o.parsePureTextSubmission(streamResult{Text: resp.Text}, checks, proposed, engagement, provenance), nil
+				return o.parsePureTextSubmission(streamResult{Text: resp.Text}, checks, proposed, engagement, provenance, supportsStructured), nil
 			}
 			// Session continuation failed: fallback to full_prompt
 			o.logger.Event("context.session_fallback", map[string]interface{}{
@@ -1563,7 +1560,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					PrefixHash:  assembly.Context.PrefixHash,
 				}
 				if text != "" {
-					return o.parsePureTextSubmission(streamResult{Text: text}, checks, proposed, engagement, provenance), nil
+					return o.parsePureTextSubmission(streamResult{Text: text}, checks, proposed, engagement, provenance, supportsStructured), nil
 				}
 			}
 		}
@@ -1692,10 +1689,10 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		if len(result.ToolCalls) > 0 && !offerTools && !hasSubmitTurn {
 			o.logger.Event("tool.stray", map[string]interface{}{"round": round, "calls": len(result.ToolCalls)})
 			result.ToolCalls = nil
-			return o.parsePureTextSubmission(result, checks, proposed, engagement, provenance), nil
+			return o.parsePureTextSubmission(result, checks, proposed, engagement, provenance, supportsStructured), nil
 		}
 		if len(result.ToolCalls) == 0 {
-			return o.parsePureTextSubmission(result, checks, proposed, engagement, provenance), nil
+			return o.parsePureTextSubmission(result, checks, proposed, engagement, provenance, supportsStructured), nil
 		}
 
 		// Prose in a tool round is the model thinking out loud, and its order
@@ -1840,8 +1837,9 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 	return streamResult{}, fmt.Errorf("tool loop ended without an answer")
 }
 
-func (o *TurnOrchestrator) parsePureTextSubmission(result streamResult, checks []harness.CheckResult, proposed *harness.ProposedCheck, engagement string, provenance []ToolCallRecord) streamResult {
+func (o *TurnOrchestrator) parsePureTextSubmission(result streamResult, checks []harness.CheckResult, proposed *harness.ProposedCheck, engagement string, provenance []ToolCallRecord, supportsStructured bool) streamResult {
 	result.Provenance = provenance
+	result.Checks = checks
 	subText := result.Text
 	sub, parseErr := harness.ParseSubmission(subText)
 	if parseErr != nil {
@@ -1853,7 +1851,6 @@ func (o *TurnOrchestrator) parsePureTextSubmission(result streamResult, checks [
 		vErr := validateSubmission(sub, checks, o.declaredStats, proposed, engagement)
 		if vErr == nil {
 			result.Submission = sub
-			result.Checks = checks
 			return result
 		}
 		o.logger.Event("turn.structured_parse_failed", map[string]interface{}{
@@ -1862,9 +1859,12 @@ func (o *TurnOrchestrator) parsePureTextSubmission(result streamResult, checks [
 		})
 		return result
 	}
-	o.logger.Event("turn.structured_parse_failed", map[string]interface{}{
-		"error": parseErr.Error(),
-	})
+	trimmed := strings.TrimSpace(subText)
+	if supportsStructured || strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "```") {
+		o.logger.Event("turn.structured_parse_failed", map[string]interface{}{
+			"error": parseErr.Error(),
+		})
+	}
 	return result
 }
 

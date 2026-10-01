@@ -321,3 +321,81 @@ func TestMalformedSubmissionFallsBackToRawTextAndCallsExtractor(t *testing.T) {
 		t.Error("turn.structured_generation should not be logged on fallback")
 	}
 }
+
+func TestMarkdownFencedJSONParsedIntoStructuredTurn(t *testing.T) {
+	fencedJSON := "```json\n" + `{
+		"action_verdict": {
+			"feasibility": "automatic",
+			"reason": "Clear path."
+		},
+		"segments": [
+			{"kind": "narration", "text": "You walk along the quiet canal."}
+		]
+	}` + "\n```"
+
+	gm := &mockStructuredGM{
+		capable:  true,
+		response: fencedJSON,
+	}
+
+	router := harness.NewRouter()
+	router.RegisterProvider(gm)
+	router.AssignRole("gm", "mock-gm")
+
+	tempDir := t.TempDir()
+	store := newTestStore(t)
+	timeline := NewTimeline(core.NewPathResolver(tempDir), store, NewHistoryLogger(filepath.Join(tempDir, "history.jsonl")), "campaign-test")
+
+	entitiesDir := timeline.EntitiesDir()
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{ID: "tavern", Name: "Alden Tavern", Type: "location", Body: "Cozy."})
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{ID: "player", Name: "Sean", Type: "character", Body: "A traveller."})
+	if _, err := storage.NewSyncer(store).Sync(entitiesDir); err != nil {
+		t.Fatal(err)
+	}
+
+	orchestrator := NewTurnOrchestrator(store, timeline, nil, router, "tavern", "player")
+	extractorModel := &countingExtractorModel{}
+	orchestrator.SetExtractor(harness.NewExtractor(extractorModel))
+
+	turn, err := orchestrator.ProcessAction(context.Background(), "Do", "I walk by the canal")
+	if err != nil {
+		t.Fatalf("ProcessAction failed: %v", err)
+	}
+
+	if turn.Verdict == nil {
+		t.Fatal("expected turn.Verdict to be populated from code-fenced JSON")
+	}
+	if turn.Verdict.Feasibility != harness.FeasibilityAutomatic {
+		t.Errorf("expected feasibility %q, got %q", harness.FeasibilityAutomatic, turn.Verdict.Feasibility)
+	}
+	if !strings.Contains(turn.Narration, "You walk along the quiet canal.") {
+		t.Errorf("expected narration from segments, got %q", turn.Narration)
+	}
+	if extractorModel.calls != 0 {
+		t.Errorf("expected extractor to be skipped (0 calls), got %d calls", extractorModel.calls)
+	}
+}
+
+func TestCheckPreservedOnParseFallback(t *testing.T) {
+	provider := &toolScriptProvider{replies: []toolReply{
+		{tools: []harness.ToolCall{{ID: "c1", Name: "request_check", Arguments: `{"actor":"player","check_kind":"skill","stakes":"jump","outcomes":{"pass":"clear","fail":"fall"}}`}}},
+		{text: "not valid json but ordinary narration describing the jump"},
+	}}
+	orchestrator, _ := toolLoopOrchestrator(t, provider)
+	orchestrator.SetTools(&fakeExecutor{}, "yes")
+	orchestrator.SetCheckResolver(defaultCheckResolver{})
+
+	result, err := runLoopForTest(orchestrator)
+	if err != nil {
+		t.Fatalf("loop: %v", err)
+	}
+	if result.Submission != nil {
+		t.Fatal("expected nil submission on parse failure")
+	}
+	if len(result.Checks) != 1 {
+		t.Fatalf("expected 1 check to be preserved on fallback, got %d", len(result.Checks))
+	}
+	if result.Checks[0].CheckID != "c1" {
+		t.Errorf("expected check ID 'c1', got %q", result.Checks[0].CheckID)
+	}
+}
