@@ -162,6 +162,20 @@ type FrameStep struct {
 // without drawing frames nobody can tell apart.
 const holdFPS = 2
 
+// revealMargin is how long before the end of a beat's clip its text finishes
+// typing.
+//
+// The reveal has to complete with time to spare. The closing characters arrive on
+// the last few frames, so a reveal that ends exactly on the clip's final sample
+// leaves the last word unfinished for any player whose clock follows the audio and
+// stops when the clip does. A fixed margin rather than a share, so a long clip is
+// not left sitting complete for seconds on end.
+const revealMargin = 500 * time.Millisecond
+
+// minRevealShare is the least of a clip a reveal will cover, so a short clip is
+// not swallowed by the margin.
+const minRevealShare = 0.8
+
 // BeatFramePlan is the frames a beat occupies: one when animation is off, and a
 // fast reveal followed by a slow heartbeat when it is on. The spans sum to the
 // beat's duration, so picture and sound stay in step. Every heartbeat frame
@@ -176,10 +190,15 @@ func BeatFramePlan(beat Beat, fps int, animate bool) []FrameStep {
 
 	// When a beat has a clip, that clip is the narration of this very text, so the
 	// reveal runs with it rather than finishing two fifths of the way in and
-	// leaving the words sitting there while the voice catches up.
+	// leaving the words sitting there while the voice catches up. It finishes a
+	// little before the clip does, so the closing word is on screen while it is
+	// still being spoken.
 	revealSpan := time.Duration(float64(beat.Duration) * TypewriterFraction)
 	if beat.AudioDuration > 0 && beat.AudioDuration < beat.Duration {
-		revealSpan = beat.AudioDuration
+		revealSpan = beat.AudioDuration - revealMargin
+		if floor := time.Duration(float64(beat.AudioDuration) * minRevealShare); revealSpan < floor {
+			revealSpan = floor
+		}
 	}
 	holdSpan := beat.Duration - revealSpan
 

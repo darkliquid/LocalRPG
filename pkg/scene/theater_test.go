@@ -179,8 +179,14 @@ func TestBeatFramePlanRevealsWithTheAudio(t *testing.T) {
 			revealSpan += step.Span
 		}
 	}
-	if revealSpan < 3900*time.Millisecond {
-		t.Errorf("reveal spans %v, want about the clip's 4s", revealSpan)
+	// The reveal runs with the clip but finishes before it, so the closing word is
+	// on screen while it is still being spoken rather than arriving on the last
+	// frame the audio reaches.
+	if revealSpan >= beat.AudioDuration {
+		t.Errorf("reveal spans %v, want it to finish before the clip's %v", revealSpan, beat.AudioDuration)
+	}
+	if revealSpan < beat.AudioDuration*3/4 {
+		t.Errorf("reveal spans %v, want most of the clip's %v", revealSpan, beat.AudioDuration)
 	}
 }
 
