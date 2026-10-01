@@ -820,3 +820,42 @@ func TestActionEchoSection(t *testing.T) {
 		t.Fatal("echo instruction must be absent when disabled")
 	}
 }
+
+func TestTurnProtocolInstruction(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+
+	result, err := assembler.Assemble(ContextRequest{
+		Action: "I examine the locked chest.",
+	})
+	if err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+
+	expectedSnippets := []string{
+		"## TURN RESOLUTION PROTOCOL",
+		"For any action with uncertain consequences, resolve it by calling `request_check` before narrating the outcome. Never invent dice roll outcomes.",
+		"End your turn by providing the structured turn output (action verdict, ordered segments, introduced personae, memories, state changes).",
+		"Every speech segment must name its speaker. If introducing a new character, declare them under personae.",
+	}
+
+	for _, snippet := range expectedSnippets {
+		if !strings.Contains(result.Prompt, snippet) {
+			t.Errorf("expected prompt to contain %q, but got:\n%s", snippet, result.Prompt)
+		}
+	}
+
+	foundProtocol := false
+	for _, sec := range result.Sections {
+		if sec.Name == "protocol" {
+			foundProtocol = true
+			if !sec.Included {
+				t.Errorf("expected protocol section to be included")
+			}
+			break
+		}
+	}
+	if !foundProtocol {
+		t.Errorf("expected protocol section in result.Sections")
+	}
+}
+

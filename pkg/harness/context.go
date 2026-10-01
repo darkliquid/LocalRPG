@@ -200,6 +200,14 @@ func (c *ContextAssembler) Assemble(req ContextRequest) (AssembleResult, error) 
 	return result, nil
 }
 
+// turnProtocolInstruction informs the model of the structured turn loop and
+// check resolution requirements.
+const turnProtocolInstruction = `## TURN RESOLUTION PROTOCOL
+1. For any action with uncertain consequences, resolve it by calling ` + "`request_check`" + ` before narrating the outcome. Never invent dice roll outcomes.
+2. End your turn by providing the structured turn output (action verdict, ordered segments, introduced personae, memories, state changes).
+3. Every speech segment must name its speaker. If introducing a new character, declare them under personae.
+`
+
 // actionEchoInstruction tells the narrator to re-anchor the scene on the player's
 // action before resolving it.
 const actionEchoInstruction = `## PLAYER ACTION ECHO
@@ -261,6 +269,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 	actionText += req.Action + "\n"
 
 	return []section{
+		{name: "protocol", source: "turn_protocol", text: turnProtocolInstruction + "\n"},
 		{name: "rules", source: "rules_prompt", text: rulesSection(req.RulesPrompt)},
 		{name: "mechanics", source: "mechanics_prompt", text: mechanicsSection(req.MechanicsPrompt)},
 		{name: "lore", source: "lore_prompt", text: loreSection(req.LorePrompt)},
