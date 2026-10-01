@@ -1,52 +1,36 @@
 # LocalRPG
 
-A local-first, turn-based tabletop RPG client orchestrated by local and cloud AI models, built in Go, Wails v3, and React 19.
+<p align="center">
+  <img src="assets/logo.svg" alt="LocalRPG Logo" width="128" height="128" />
+</p>
+
+A local-first tabletop RPG client for crafting original worlds, designing custom mechanics, and playing immersive AI-orchestrated solo campaigns.
 
 ---
 
 ## Features
 
-- **Core Engine & Manifests:** Schema-agnostic YAML campaign manifests, path resolver, Markdown entity notes, and one canonical SQLite index per campaign.
-- **Rule Extensibility:** Deterministic dice roller (`github.com/darkliquid/roll`) and sandboxed JavaScript rules and state hooks via Goja.
-- **LLM Harness Router:** Multi-engine role router (Ollama, LM Studio, vLLM, OpenAI-compatible HTTP endpoints, in-process procedural engines, plus experimental CLI subprocess support), 4-layer context assembler, and background entity extraction.
-- **Campaign Timeline:** Every turn is recorded with the player's prompt, the narrator's rewrite, the entities involved, and who spoke which line — so a campaign's history is queryable rather than re-inferred from prose.
-- **Headless Terminal TUI:** Interactive Bubbletea client with Glamour Markdown rendering, dice rolling, and `/gm` steering.
-- **Multimodal Pipelines:** State-aware audio and art caching, per-character voice playback from recorded dialogue, ComfyUI image generator, and Whisper STT.
-- **Wails v3 Desktop GUI:** Twintail Launcher inspired glassmorphic aesthetic in React 19 + TypeScript + Tailwind CSS.
-- **Story Theater & Exporter:** In-game Visual Novel replay player, and two exports built from one scene script — an animated web bundle that plays through the theatre's own player, and a video rendered frame by frame in Go.
+- **First-Class Local AI:** Route GM, narrator, and evaluator roles across local models (Ollama, LM Studio, vLLM, LocalAI) or cloud APIs, with per-role fallbacks and zero-GPU built-ins.
+- **Dynamic Generated Imagery:** Generate atmospheric scene backgrounds and character portraits on the fly using ComfyUI, Automatic1111, or procedural vector art.
+- **TTS Narration & Character Voices:** Listen to your stories narrated aloud with Piper, Kokoro, or OS synthesizers, featuring distinct voice profiles for each NPC.
+- **Custom System Mechanics:** Design custom dice expressions, attribute checks, and mechanics in the Systems Studio—adaptable to any tabletop genre without hardcoded stats.
+- **Living Worlds & Campaign Lore:** Craft factions, locations, and starter lore in the Worlds Studio, with automated Codex tracking as new entities and relationships emerge.
+- **Story Theatre & Campaign Exports:** Step through interactive visual novel replays in Theatre Mode, and export campaigns as self-contained web bundles or rendered video.
 
 ---
 
-## Zero-TCP GUI Execution
+## Creating Worlds & Playing Campaigns
 
-LocalRPG runs **zero-TCP by default**:
+LocalRPG is built around the tabletop creative cycle:
 
-### 1. Native Desktop Window (Default)
-```bash
-localrpg gui
-```
-- **0 TCP Ports:** Opens a native Wails v3 desktop window with translucent glassmorphic acrylic panels.
-- Assets and REST API routes (`/api/game/...`) are served in-process directly to the WebKit webview via native OS scheme handlers.
-
-### 2. Headless Unix Domain Socket Daemon
-```bash
-localrpg gui --headless
-# Or specify a custom socket path:
-localrpg gui --socket /path/to/localrpg.sock
-```
-- **0 TCP Ports:** Listens exclusively on a local Unix domain socket with `0600` permissions (readable/writable only by your user).
-- Default path: `$XDG_RUNTIME_DIR/localrpg.sock` (or `~/.local/state/localrpg/gui.sock`).
-- Automatically unlinks on clean shutdown and cleans up stale sockets.
-
-### 3. Opt-in Web Browser Mode (TCP)
-```bash
-localrpg gui --port 8080
-```
-- Explicitly binds an HTTP listener on `127.0.0.1:8080` for standard external browser access.
+1. **Craft a World in Worlds Studio:** Author lore, tone, factions, and key locations. Your world's art style guide shapes how scene imagery is generated.
+2. **Define Rules in Systems Studio:** Create custom resolution systems, dice rules, and action checks. Whether it's a gritty d20 dungeon crawl or a rules-light 2d6 narrative game, nothing is locked to preset stats.
+3. **Embark on a Campaign:** Take actions, roll checks, and shape the story. The AI Game Master adjudicates rules while the Narrator paints vivid scenes with voice and art.
+4. **Relive & Export in Story Theatre:** Review past sessions in visual novel Theatre Mode, then export them as standalone, interactive web bundles or rendered video files.
 
 ---
 
-## Build & Toolchain (`mise`)
+## Quickstart (`mise`)
 
 The project uses [mise](https://mise.jdx.dev/) for pinned toolchain versioning (Go 1.27.1, Node 26.9.0) and task automation:
 
@@ -66,29 +50,25 @@ bin/localrpg gui
 
 ---
 
-## Campaign Timeline & Entity Memory
+## Living Campaigns & The Story Codex
 
-A campaign lives in `games/<id>/` and answers "what happened, and who was involved" without re-reading prose:
+Every campaign keeps track of what happened, who was involved, and how the world responded:
 
-- **One database:** `cache/index.db` is the single canonical index, opened through one code path by both the CLI and the GUI. A pre-existing `game.db` is retired automatically on first open.
-- **Markdown is truth:** entity notes carry state, voice, and the turn numbers that touched them (`history: [3, 7]`); the index is derived and rebuilt from the notes plus `history.jsonl` whenever the two disagree.
-- **Every turn is extracted:** entities are matched against existing notes (by ID, name, then location/role), merged when they already exist and created when they do not, then written to disk and synced.
-- **Every turn is linked:** each `history.jsonl` record holds the player's raw prompt, the narrator's rewrite, and the entities involved, tagged by how (`player`, `location`, `wikilink`, `extracted`, `speech`).
-- **Dialogue carries its speaker:** turns store ordered narration and speech segments with speakers resolved to entities, so playback uses each character's own voice instead of guessing from prose.
-- **Undo is coherent:** `/undo` rewinds the log, the index, and entity turn links together. Entity prose is deliberately kept as the world's memory of what happened.
+- **Automatic Entity Extraction:** As you explore and converse, newly met characters, places, and faction relationships are identified and cataloged into your campaign's Codex.
+- **Dialogue with Speaker Identity:** Turns preserve narrative prose and spoken character dialogue separately, so voice playback uses each character's assigned voice profile.
+- **Visual Codex Drawer:** Inspect character relationships, read discovered lore notes, and customize NPC voice profiles without leaving your game.
+- **Coherent Story Rewind:** Use `/undo` anytime to step back campaign turns while keeping your world's authored history intact.
 
 ---
 
-## Configuration & Global Settings
+## Configuration & Provider Setup
 
-LocalRPG features a unified global settings system that manages app-wide behavior regardless of active campaign, world, or rule system:
+LocalRPG features a unified settings system to connect your AI models and media engines:
 
-- **Hierarchical Loading:** Settings are loaded from `~/.config/localrpg/config.yaml` (global user configuration) and can be overridden per workspace via `./localrpg.yaml`.
-- **Custom Storage Paths:** Configure directories for Rule Systems, Worlds, Campaigns, and Media Caches.
-- **AI Agent Role Routing:** Route `gm`, `narrator`, and `evaluator` roles across `http` (Ollama, LM Studio, vLLM, OpenAI-compatible APIs), `builtin` in-process engines, experimental `cli` subprocesses, or `disabled`.
-- **Multimodal Engines:** Configure TTS (Piper, Kokoro, AllTalk, native-os), STT (Whisper), and Image Generation (ComfyUI, Automatic1111, procedural-art) with master volume, auto-play, and auto-generate art toggles.
+- **AI Agent Role Routing:** Route `gm`, `narrator`, and `evaluator` roles across local inference (Ollama, LM Studio, vLLM, LocalAI), cloud APIs, or built-in procedural engines.
+- **Multimodal Engines:** Configure TTS (Piper, Kokoro, AllTalk, native-os), STT (Whisper), and Image Generation (ComfyUI, Automatic1111, procedural-art) with volume, auto-play, and auto-generate art toggles.
 - **Live Provider Diagnostics:** Test model and media engine connections directly from the UI with latency and preview feedback.
-- **Dual-Access UI:** Access settings anytime from the **Settings** studio tab in Launcher Hub, or via the in-game header gear icon without leaving an active session.
+- **Dual-Access UI:** Access settings anytime from the **Settings** tab in Launcher Hub, or via the in-game header gear icon without leaving an active session.
 
 ---
 

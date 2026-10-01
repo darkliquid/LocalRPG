@@ -194,16 +194,24 @@ img {
   width: 46px;
   height: 46px;
   border-radius: 15px;
-  background: linear-gradient(150deg, var(--ember), var(--ember-deep));
-  color: #fff;
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: 1.05rem;
-  box-shadow: 0 10px 26px -12px rgba(168, 85, 247, 0.9);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-line);
+  box-shadow: 0 8px 24px -10px rgba(168, 85, 247, 0.5);
+  transition: transform 160ms var(--ease), box-shadow 160ms var(--ease), border-color 160ms var(--ease), background 160ms var(--ease);
 }
 
 .dock__mark:hover {
+  transform: translateY(-1px) scale(1.04);
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.45);
+  box-shadow: 0 12px 28px -8px rgba(168, 85, 247, 0.85);
   text-decoration: none;
+}
+
+.dock__mark img {
+  width: 36px;
+  height: 36px;
+  display: block;
 }
 
 .dock__rule {

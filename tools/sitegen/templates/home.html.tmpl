@@ -1,13 +1,13 @@
 {{define "content"}}
 <section class="hero">
   <div class="hero__copy">
-    <p class="eyebrow">{{ icon "sparkles" }} Local-first · zero-TCP · schema-agnostic</p>
+    <p class="eyebrow">{{ icon "sparkles" }} Local-First · AI-Powered · Custom Worlds &amp; Rules</p>
     <h1 class="hero__title"><span class="wordmark">LocalRPG</span></h1>
     <p class="hero__lede">
-      A turn-based tabletop RPG client that runs entirely on your machine. Bring a local
-      model, a CLI agent, or nothing at all &mdash; the built-in narrative oracle needs no
-      server and no GPU. The desktop launcher, terminal client and story theatre all read
-      and write the same campaign.
+      Craft original worlds, build custom tabletop rules, and embark on AI-narrated solo
+      campaigns. LocalRPG brings your adventures to life with rich voice narration, character
+      speech, dynamically generated scene art, and exportable visual novel replays&mdash;all
+      with local AI as a first-class citizen.
     </p>
     <div class="hero__actions">
       <a class="button button--primary" href="{{ .RepoURL }}/releases" target="_blank" rel="noopener">
@@ -19,9 +19,9 @@
       </a>
     </div>
     <ul class="hero__facts">
-      <li><strong>0</strong> TCP ports by default</li>
-      <li><strong>1</strong> binary for GUI, TUI and API</li>
-      <li><strong>3</strong> tiers of on-disk memory</li>
+      <li><strong>Local AI</strong> First-class local &amp; cloud</li>
+      <li><strong>Voices</strong> Narration &amp; NPC speech</li>
+      <li><strong>Theatre</strong> Replay &amp; export web/video</li>
     </ul>
   </div>
 
@@ -35,7 +35,7 @@
       </div>
       <div class="stage__body">
         <div class="stage__dock">
-          <span class="stage__chip is-active">LR</span>
+          <span class="stage__chip is-active"><img src="{{ .Root }}assets/logo.svg" alt="" width="26" height="26" /></span>
           <span class="stage__chip"></span>
           <span class="stage__chip"></span>
           <span class="stage__chip"></span>
@@ -69,44 +69,44 @@
 <section id="features" class="section">
   <header class="section__head">
     <p class="eyebrow">{{ icon "grid" }} Capabilities</p>
-    <h2>Everything a campaign needs, none of it hardcoded</h2>
+    <h2>Everything your campaign needs to come alive</h2>
     <p class="section__lede">
-      The engine stores no notion of hit points, mana or classes. Rules live in prompts and
-      sandboxed scripts, so the same binary plays a gritty gothic crawl or a light 2d6
-      narrative game.
+      From custom mechanics to living lore, LocalRPG gives you complete creative freedom.
+      Bring your own local AI models, immerse yourself in spoken dialogue and generated imagery,
+      and capture your story forever.
     </p>
   </header>
 
   <div class="cards">
     <article class="card glass">
-      <span class="card__icon">{{ icon "shield" }}</span>
-      <h3>Zero-TCP by default</h3>
-      <p>The desktop app opens a native Wails v3 window and serves its own assets and API in-process. No port is bound unless you ask for one.</p>
-    </article>
-    <article class="card glass">
       <span class="card__icon">{{ icon "cpu" }}</span>
-      <h3>Local-first model routing</h3>
-      <p>Route the GM, narrator and extractor roles across Ollama, LM Studio, vLLM, a CLI agent, or the deterministic built-in oracle. Per-role fallbacks included.</p>
-    </article>
-    <article class="card glass">
-      <span class="card__icon">{{ icon "layers" }}</span>
-      <h3>Canonical timeline</h3>
-      <p>Every turn records the prompt, the rewrite, the entities involved and who spoke which line, so history is queried, not re-inferred from prose.</p>
-    </article>
-    <article class="card glass">
-      <span class="card__icon">{{ icon "book" }}</span>
-      <h3>Markdown is truth</h3>
-      <p>Entities are Markdown notes with YAML frontmatter; wikilinks become graph edges. The SQLite index is disposable and rebuilt from the notes at any time.</p>
+      <h3>First-Class Local AI</h3>
+      <p>Connect your local LLMs, TTS engines, and image generators—like Ollama, LM Studio, vLLM, Piper, or ComfyUI—or play instantly with zero-GPU built-ins that require no setup.</p>
     </article>
     <article class="card glass">
       <span class="card__icon">{{ icon "sparkles" }}</span>
-      <h3>Story theatre &amp; export</h3>
-      <p>Replay a campaign as a visual novel, then export a self-contained web bundle or a video composited and encoded entirely in Go. No ffmpeg required.</p>
+      <h3>TTS Narration &amp; NPC Speech</h3>
+      <p>Hear your adventure unfold. Story prose is narrated aloud while every character and NPC speaks with their own distinct voice profile, pitch, and cadence.</p>
     </article>
     <article class="card glass">
-      <span class="card__icon">{{ icon "terminal" }}</span>
-      <h3>Terminal and headless</h3>
-      <p>A Bubbletea TUI for the terminal, plus a Unix-socket daemon mode with <code>0600</code> permissions when there is no display to draw on.</p>
+      <span class="card__icon">{{ icon "image" }}</span>
+      <h3>Generated Scene Imagery</h3>
+      <p>Bring locations and faces into focus. Scene art and character portraits are generated dynamically to match your world's artistic direction as you explore.</p>
+    </article>
+    <article class="card glass">
+      <span class="card__icon">{{ icon "shield" }}</span>
+      <h3>Custom System Mechanics</h3>
+      <p>Play any tabletop style you imagine. Build custom dice rules, stat checks, and mechanics in the Systems Studio—no character classes or stats are hardcoded.</p>
+    </article>
+    <article class="card glass">
+      <span class="card__icon">{{ icon "book" }}</span>
+      <h3>Living Worlds &amp; Campaigns</h3>
+      <p>Author factions, locations, and starter lore in the Worlds Studio. As you play, newly met characters, places, and relationship shifts are tracked in your campaign's Codex.</p>
+    </article>
+    <article class="card glass">
+      <span class="card__icon">{{ icon "layers" }}</span>
+      <h3>Story Theatre &amp; Export</h3>
+      <p>Relive your favorite adventures in visual novel Theatre Mode, then export complete campaigns as standalone web bundles or rendered video to share.</p>
     </article>
   </div>
 </section>
@@ -151,33 +151,26 @@
 
   <div class="split">
     <div class="split__col">
-      <h3>Run the desktop client</h3>
-      <pre class="code" data-copy><code># Fetch the pinned toolchain and dependencies
+      <h3>Launch the desktop app</h3>
+      <pre class="code" data-copy><code># Fetch dependencies and build
 mise run setup
-
-# Build the frontend bundle and the localrpg binary
 mise run build
 
-# Launch the glassmorphic launcher
+# Launch the desktop app
 bin/localrpg gui</code></pre>
       <p class="muted">
-        With no display, or with <code>--headless</code>, the same binary serves the identical
-        app over a <code>0600</code> Unix socket. Pass <code>--port 8080</code> to opt into a
-        browser.
+        Configure your preferred local AI models in Settings Studio, or jump straight in with the built-in zero-GPU storytelling engine.
       </p>
     </div>
     <div class="split__col">
-      <h3>Play in the terminal</h3>
-      <pre class="code" data-copy><code># Create a world and a system in the studios,
-# then start a campaign from the shell
-bin/localrpg play my-campaign
+      <h3>Create a world and play</h3>
+      <pre class="code" data-copy><code># Or export an existing campaign as a standalone web bundle
+bin/localrpg export web my-campaign --out dist/
 
-# Roll dice without a campaign
-bin/localrpg roll 4d6kh3</code></pre>
+# Or render your campaign into a shareable video
+bin/localrpg export video my-campaign --out campaign.webm</code></pre>
       <p class="muted">
-        Linux builds need the GTK4 and WebKitGTK 6.0 development headers:
-        <code>libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev</code>.
-        Release archives are self-contained.
+        Design custom worlds and mechanics in the built-in studios, start a new campaign, and export your journey when complete.
       </p>
     </div>
   </div>

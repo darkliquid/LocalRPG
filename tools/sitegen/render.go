@@ -254,7 +254,7 @@ func build(cfg config) error {
 		}
 	}
 
-	home := common("", "LocalRPG", "A local-first, turn-based tabletop RPG client with a glassmorphic desktop launcher, terminal client and story theatre.", "home")
+	home := common("", "LocalRPG", "A local-first tabletop RPG client for crafting worlds, customizing rules, and playing AI campaigns with voice narration, generated art, and story theatre.", "home")
 	home.IsHome = true
 	if err := writePage(r, cfg.out, "index.html", "home.html.tmpl", home); err != nil {
 		return err
@@ -311,6 +311,9 @@ func copyEmbeddedAssets(out string) error {
 	}
 	if err := os.CopyFS(filepath.Join(out, "assets"), assets); err != nil {
 		return fmt.Errorf("write assets: %w", err)
+	}
+	if err := os.CopyFS(filepath.Join(out, "docs", "assets"), assets); err != nil {
+		return fmt.Errorf("write docs assets: %w", err)
 	}
 	return nil
 }
