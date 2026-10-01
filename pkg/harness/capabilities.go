@@ -4,12 +4,13 @@ package harness
 // offers. pkg/provider converts it into a Descriptor, and a drift guard checks
 // the two agree.
 type Capabilities struct {
-	Streaming    bool
-	Tools        bool
-	Thinking     bool
-	Vision       bool
-	Sessions     bool
-	ContextCache bool
+	Streaming        bool
+	Tools            bool
+	Thinking         bool
+	Vision           bool
+	Sessions         bool
+	ContextCache     bool
+	StructuredOutput bool
 }
 
 // Describe derives capabilities from the adapter's real surfaces, so a
@@ -21,6 +22,9 @@ func Describe(p ModelProvider) Capabilities {
 	}
 	if thinker, ok := p.(interface{ SupportsThinking() bool }); ok {
 		caps.Thinking = thinker.SupportsThinking()
+	}
+	if structured, ok := p.(StructuredOutputProvider); ok {
+		caps.StructuredOutput = structured.StructuredOutputCapable()
 	}
 	if _, ok := p.(SessionProvider); ok {
 		caps.Sessions = true

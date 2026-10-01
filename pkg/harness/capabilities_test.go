@@ -27,7 +27,20 @@ func TestDescribeReportsToolsForToolCaller(t *testing.T) {
 	if !caps.Tools || !caps.Streaming {
 		t.Fatalf("unexpected capabilities: %+v", caps)
 	}
-	if caps.Sessions || caps.ContextCache {
-		t.Fatalf("a plain provider must not claim sessions or caching: %+v", caps)
+	if caps.Sessions || caps.ContextCache || caps.StructuredOutput {
+		t.Fatalf("a plain provider must not claim sessions, caching, or structured output: %+v", caps)
+	}
+}
+
+type stubStructuredProvider struct {
+	stubToolProvider
+}
+
+func (s *stubStructuredProvider) StructuredOutputCapable() bool { return true }
+
+func TestDescribeReportsStructuredOutput(t *testing.T) {
+	caps := harness.Describe(&stubStructuredProvider{})
+	if !caps.StructuredOutput {
+		t.Fatalf("expected StructuredOutput to be true, got %+v", caps)
 	}
 }

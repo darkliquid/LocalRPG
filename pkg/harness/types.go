@@ -78,6 +78,14 @@ type GenerationOptions struct {
 	Stop        []string
 }
 
+// ResponseSchemaSpec asks a provider to constrain output to match a schema.
+type ResponseSchemaSpec struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Schema      map[string]interface{} `json:"schema"`
+	Strict      bool                   `json:"strict,omitempty"`
+}
+
 type GenerateRequest struct {
 	Prompt      string                 `json:"prompt"`
 	System      string                 `json:"system,omitempty"`
@@ -92,6 +100,8 @@ type GenerateRequest struct {
 	// least one, "none" forbids them, and "" leaves it to the model. Providers
 	// that cannot force tool use ignore it.
 	ToolChoice string `json:"tool_choice,omitempty"`
+	// ResponseSchema requests structured JSON matching the provided schema.
+	ResponseSchema *ResponseSchemaSpec `json:"response_schema,omitempty"`
 }
 
 // PromptText is the request as a single string: the explicit Prompt when a caller
@@ -121,6 +131,12 @@ type ModelProvider interface {
 // ToolCaller is implemented by providers that can be offered tools.
 type ToolCaller interface {
 	ToolCallerCapable() bool
+}
+
+// StructuredOutputProvider is implemented by providers that support native
+// structured outputs (e.g. JSON schema response formats).
+type StructuredOutputProvider interface {
+	StructuredOutputCapable() bool
 }
 
 type ProviderConfig struct {
