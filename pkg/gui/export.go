@@ -24,8 +24,6 @@ var (
 	ErrExportInFlight = errors.New("an export is already running for this campaign")
 	// ErrExportFormat reports an unsupported export format.
 	ErrExportFormat = errors.New("export format must be web or video")
-	// ErrExportNoFFmpeg reports that video export needs ffmpeg, which is absent.
-	ErrExportNoFFmpeg = errors.New("ffmpeg is required for video export")
 	// ErrExportDirRequired reports that no destination was provided.
 	ErrExportDirRequired = errors.New("an export destination directory is required")
 	// ErrNoNativeDialog reports that no native directory picker is available, so
@@ -67,11 +65,8 @@ type ExportEvent struct {
 	Error      string `json:"error,omitempty"`
 }
 
-// ExportCapabilitiesDTO reports what this machine can export and where the UI
-// should start a destination picker.
+// ExportCapabilitiesDTO reports where the UI should start a destination picker.
 type ExportCapabilitiesDTO struct {
-	FFmpeg       bool   `json:"ffmpeg"`
-	FFmpegPath   string `json:"ffmpeg_path,omitempty"`
 	DefaultDir   string `json:"default_dir,omitempty"`
 	NativeDialog bool   `json:"native_dialog"`
 }
@@ -194,16 +189,13 @@ func (s *Service) ChooseExportDirectory(ctx context.Context) (string, error) {
 	return picker(s.defaultExportDir())
 }
 
-// ExportCapabilities reports ffmpeg availability, the default destination, and
-// whether a native picker exists.
+// ExportCapabilities reports the default destination and whether a native picker
+// exists.
 func (s *Service) ExportCapabilities() ExportCapabilitiesDTO {
-	path, ok := export.FFmpegAvailable()
 	s.mu.RLock()
 	native := s.directoryPicker != nil
 	s.mu.RUnlock()
 	return ExportCapabilitiesDTO{
-		FFmpeg:       ok,
-		FFmpegPath:   path,
 		DefaultDir:   s.defaultExportDir(),
 		NativeDialog: native,
 	}
@@ -237,11 +229,6 @@ func (s *Service) StartExport(ctx context.Context, req ExportRequestDTO) (*Expor
 	if err != nil {
 		return nil, fmt.Errorf("export: resolve destination: %w", err)
 	}
-	if format == "video" {
-		if _, ok := export.FFmpegAvailable(); !ok {
-			return nil, ErrExportNoFFmpeg
-		}
-	}
 
 	jobCtx, err := s.exports.begin(req.GameID, format)
 	if err != nil {
@@ -273,12 +260,12 @@ func humanBytes(size int64) string {
 }
 
 // exportArtifactPath names the artifact inside a chosen directory: one
-// self-contained page for the web player, a video file otherwise.
+// self-contained page for the web player, a WebM video otherwise.
 func exportArtifactPath(outDir, gameID, format string) string {
 	if format == "web" {
 		return filepath.Join(outDir, gameID+"-web.html")
 	}
-	return filepath.Join(outDir, gameID+".mp4")
+	return filepath.Join(outDir, gameID+".webm")
 }
 
 // uniquePath appends a timestamp when a destination already exists, so an export

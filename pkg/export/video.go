@@ -1,33 +1,43 @@
 package export
 
 import (
-	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"image"
-	"image/png"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
+	"time"
 
+	"github.com/darkliquid/localrpg/pkg/media/webm"
 	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
-// VideoPipeline renders a script to a video file.
+// defaultQuality is the VP8 quality used when a caller asks for none.
+const defaultQuality = 80
+
+// VideoPipeline renders a script to a WebM file, entirely in Go.
 type VideoPipeline struct {
-	rootDir  string
-	width    int
-	height   int
-	fps      int
-	still    bool
-	progress scene.ProgressFunc
+	rootDir     string
+	width       int
+	height      int
+	fps         int
+	quality     int
+	still       bool
+	displayMode scene.DisplayMode
+	progress    scene.ProgressFunc
 }
 
 // NewVideoPipeline builds a renderer rooted at a campaign directory.
 func NewVideoPipeline(rootDir string) *VideoPipeline {
-	return &VideoPipeline{rootDir: rootDir, width: 1920, height: 1080, fps: scene.DefaultFPS}
+	return &VideoPipeline{
+		rootDir:     rootDir,
+		width:       1920,
+		height:      1080,
+		fps:         scene.DefaultFPS,
+		quality:     defaultQuality,
+		displayMode: scene.DisplayStageDirections,
+	}
 }
 
 // SetSize changes the output resolution.
@@ -44,166 +54,31 @@ func (v *VideoPipeline) SetFPS(fps int) {
 	}
 }
 
-// SetStill renders one frame per beat instead of an animated sequence, for a fast
-// export on a weak machine.
+// SetQuality changes the VP8 quality, 0-100.
+func (v *VideoPipeline) SetQuality(quality int) {
+	if quality > 0 && quality <= 100 {
+		v.quality = quality
+	}
+}
+
+// SetStill disables animation: one fully revealed frame per beat.
 func (v *VideoPipeline) SetStill(still bool) { v.still = still }
 
-// SetProgress routes structured frame and encode progress to fn. When set, the
-// pipeline stops writing human-readable progress to stderr.
+// SetDisplayMode chooses how performance tags render.
+func (v *VideoPipeline) SetDisplayMode(mode scene.DisplayMode) {
+	if mode != "" {
+		v.displayMode = mode
+	}
+}
+
+// SetProgress routes structured progress to fn.
 func (v *VideoPipeline) SetProgress(fn scene.ProgressFunc) { v.progress = fn }
 
-// FFmpegAvailable reports the ffmpeg binary path, or ok=false when it is absent.
-func FFmpegAvailable() (string, bool) {
-	path, err := exec.LookPath("ffmpeg")
-	if err != nil {
-		return "", false
-	}
-	return path, true
-}
-
-// frameWriter renders a script's frames into a directory as PNGs.
-type frameWriter struct {
-	renderer *scene.Renderer
-	dir      string
-	fps      int
-	still    bool
-	progress scene.ProgressFunc
-}
-
-// write renders every beat's frames in order, numbering them so FFmpeg can read
-// the directory as a sequence.
-func (w *frameWriter) write(script *scene.Script) (int, error) {
-	number := 0
-	previousArt := ""
-
-	for i := range script.Scenes {
-		sc := script.Scenes[i]
-
-		for _, beat := range sc.Beats {
-			frames := scene.FramesFor(beat.Duration, w.fps)
-			if w.still {
-				frames = 1
-			}
-
-			for f := 0; f < frames; f++ {
-				progress := 1.0
-				if frames > 1 {
-					progress = float64(f) / float64(frames-1)
-				}
-
-				img := w.renderer.Frame(scene.FrameRequest{
-					Scene:       sc,
-					Beat:        beat,
-					Progress:    progress,
-					PreviousArt: previousArt,
-				})
-
-				path := filepath.Join(w.dir, fmt.Sprintf("frame-%06d.png", number))
-				if err := writePNG(path, img); err != nil {
-					return 0, err
-				}
-				number++
-			}
-		}
-
-		previousArt = sc.ArtPath
-		if w.progress != nil {
-			w.progress(scene.Progress{Phase: "frames", Done: i + 1, Total: len(script.Scenes)})
-		}
-	}
-
-	return number, nil
-}
-
-// writePNG encodes one frame. BestSpeed matters here: a 1080p frame is slow to
-// compress, and the file size is irrelevant beside x264's encoding time.
-func writePNG(path string, img image.Image) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("create frame %q: %w", path, err)
-	}
-	defer file.Close()
-
-	encoder := png.Encoder{CompressionLevel: png.BestSpeed}
-	if err := encoder.Encode(file, img); err != nil {
-		return fmt.Errorf("encode frame %q: %w", path, err)
-	}
-	return nil
-}
-
-// BuildCommand assembles the FFmpeg invocation for a rendered frame sequence.
-// Inputs follow beat order so the concat filter's stream indices line up, and a
-// silent beat gets an anullsrc input whose length is that beat's own duration.
-func (v *VideoPipeline) BuildCommand(ctx context.Context, script *scene.Script, framesDir, outputFile string) (*exec.Cmd, error) {
-	if len(script.Scenes) == 0 {
-		return nil, fmt.Errorf("build command: script has no scenes")
-	}
-
-	args := []string{
-		"-y",
-		"-framerate", strconv.Itoa(v.fps),
-		"-i", filepath.Join(framesDir, "frame-%06d.png"),
-	}
-
-	streams := make([]string, 0, len(script.Beats()))
-	index := 1
-
-	for _, beat := range script.Beats() {
-		// One input per unit: a multi-clip beat gets finer pacing than the beat's
-		// own reading estimate, and a clip-less beat still gets its silence.
-		if len(beat.AudioPaths) == 0 {
-			silence := beat.Duration.Seconds()
-			if silence <= 0 {
-				silence = scene.MinimumBeatDuration.Seconds()
-			}
-			args = append(args,
-				"-f", "lavfi",
-				"-t", strconv.FormatFloat(silence, 'f', 3, 64),
-				"-i", "anullsrc=r=44100:cl=stereo",
-			)
-			streams = append(streams, fmt.Sprintf("[%d:a]", index))
-			index++
-			continue
-		}
-
-		for _, clip := range beat.AudioPaths {
-			args = append(args, "-i", clip)
-			streams = append(streams, fmt.Sprintf("[%d:a]", index))
-			index++
-		}
-	}
-
-	if len(streams) > 0 {
-		args = append(args,
-			"-filter_complex", fmt.Sprintf("%sconcat=n=%d:v=0:a=1[a]", strings.Join(streams, ""), len(streams)),
-			"-map", "0:v",
-			"-map", "[a]",
-		)
-	}
-
-	args = append(args,
-		"-c:v", "libx264",
-		"-tune", "stillimage",
-		"-pix_fmt", "yuv420p",
-		"-c:a", "aac",
-		"-b:a", "192k",
-		"-shortest",
-		outputFile,
-	)
-
-	return exec.CommandContext(ctx, "ffmpeg", args...), nil
-}
-
-// RenderVideo draws every frame, muxes them against the campaign's audio, and
-// renames the result into place, so a failed render never leaves a file that
-// looks playable.
+// RenderVideo draws every frame, muxes the campaign's audio, and renames the
+// result into place, so a failed or cancelled render leaves no file behind.
 func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, outputFile string) error {
 	if script == nil || len(script.Scenes) == 0 {
 		return fmt.Errorf("render video: script has no scenes")
-	}
-
-	if _, err := exec.LookPath("ffmpeg"); err != nil {
-		return fmt.Errorf("ffmpeg is required for video export: %w", err)
 	}
 
 	renderer, err := scene.NewRenderer(v.width, v.height)
@@ -211,51 +86,23 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 		return fmt.Errorf("build renderer: %w", err)
 	}
 
-	framesDir, err := os.MkdirTemp("", "localrpg-frames-")
-	if err != nil {
-		return fmt.Errorf("create frames dir: %w", err)
-	}
-	defer os.RemoveAll(framesDir)
-
-	writerProgress := v.progress
-	if writerProgress == nil {
-		writerProgress = func(p scene.Progress) {
-			fmt.Fprintf(os.Stderr, "export: %s %d/%d\n", p.Phase, p.Done, p.Total)
-		}
-	}
-	writer := &frameWriter{
-		renderer: renderer,
-		dir:      framesDir,
-		fps:      v.fps,
-		still:    v.still,
-		progress: writerProgress,
-	}
-
-	count, err := writer.write(script)
+	track, err := v.opusTrack(script)
 	if err != nil {
 		return err
-	}
-	if count == 0 {
-		return fmt.Errorf("render video: no frames were rendered")
-	}
-
-	if v.progress != nil {
-		v.progress(scene.Progress{Phase: "encode"})
 	}
 
 	part := stagingPath(outputFile)
-	cmd, err := v.BuildCommand(ctx, script, framesDir, part)
+	file, err := os.Create(part)
 	if err != nil {
+		return fmt.Errorf("create video: %w", err)
+	}
+
+	if err := v.writeFrames(ctx, renderer, script, file, track); err != nil {
+		closeQuietly(file)
+		os.Remove(part)
 		return err
 	}
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		os.Remove(part)
-		return fmt.Errorf("ffmpeg failed: %w: %s", err, lastLines(stderr.String(), 5))
-	}
-
+	// The muxer owns the writer and has already closed it.
 	if err := os.Rename(part, outputFile); err != nil {
 		os.Remove(part)
 		return fmt.Errorf("publish video: %w", err)
@@ -266,9 +113,90 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 	return nil
 }
 
-// stagingPath names the file FFmpeg writes before it is published. It keeps the
-// output's extension, because that is how FFmpeg picks a container: a plain
-// ".part" suffix leaves it unable to choose a muxer at all.
+// opusTrack lays every beat's clips on one continuous timeline, padding the gaps
+// left by a beat with no clip.
+func (v *VideoPipeline) opusTrack(script *scene.Script) (*webm.OpusTrack, error) {
+	track := webm.NewOpusTrack(1)
+	for _, beat := range script.Beats() {
+		if len(beat.AudioPaths) == 0 {
+			if err := track.AppendSilence(beat.Duration); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		for _, path := range beat.AudioPaths {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil, fmt.Errorf("read clip %q: %w", path, err)
+			}
+			if err := track.AppendClip(data); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return track, nil
+}
+
+// writeFrames walks the beats, renders and encodes each frame, and feeds the
+// muxer, which interleaves the audio it was given up front.
+func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Renderer, script *scene.Script, file *os.File, track *webm.OpusTrack) error {
+	muxer, err := webm.NewMuxer(file, v.width, v.height, track)
+	if err != nil {
+		return err
+	}
+	encoder := webm.NewEncoder(v.width, v.height, v.quality)
+
+	animate := !v.still
+	elapsed := time.Duration(0)
+	previousArt := ""
+	first := true
+
+	for index := range script.Scenes {
+		sc := script.Scenes[index]
+		for _, beat := range sc.Beats {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			frames := scene.FramesForBeat(beat, v.fps, animate)
+			for f := 0; f < frames; f++ {
+				progress := 1.0
+				if frames > 1 {
+					progress = float64(f) / float64(frames-1)
+				}
+				img := renderer.Frame(scene.FrameRequest{
+					Script:      script,
+					SceneIndex:  index,
+					Scene:       sc,
+					Beat:        beat,
+					Progress:    progress,
+					PreviousArt: previousArt,
+					Animate:     animate,
+					DisplayMode: v.displayMode,
+				})
+				data, err := encoder.Encode(img, first)
+				if err != nil {
+					return err
+				}
+				if err := muxer.WriteVideo(data, first, elapsed); err != nil {
+					return err
+				}
+				first = false
+				elapsed += beat.Duration / time.Duration(frames)
+			}
+		}
+		previousArt = sc.ArtPath
+		if v.progress != nil {
+			v.progress(scene.Progress{Phase: "frames", Done: index + 1, Total: len(script.Scenes)})
+		}
+	}
+
+	if v.progress != nil {
+		v.progress(scene.Progress{Phase: "encode"})
+	}
+	return muxer.Close()
+}
+
+// stagingPath names the file written before it is published.
 func stagingPath(outputFile string) string {
 	ext := filepath.Ext(outputFile)
 	if ext == "" {
@@ -277,11 +205,11 @@ func stagingPath(outputFile string) string {
 	return strings.TrimSuffix(outputFile, ext) + ".part" + ext
 }
 
-// lastLines trims FFmpeg's output to the part worth showing a person.
-func lastLines(output string, count int) string {
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	if len(lines) > count {
-		lines = lines[len(lines)-count:]
+// closeQuietly closes a file that is being discarded, tolerating a file the muxer
+// already closed.
+func closeQuietly(file *os.File) {
+	if err := file.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+		// The file is being thrown away; there is nothing useful to report.
+		return
 	}
-	return strings.Join(lines, "\n")
 }

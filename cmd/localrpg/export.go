@@ -28,6 +28,7 @@ func handleExportCommand(args []string) {
 	still := fs.Bool("still", false, "Render one frame per beat instead of animating")
 	fps := fs.Int("fps", scene.DefaultFPS, "Video frame rate")
 	size := fs.String("size", "1920x1080", "Video size as WxH")
+	quality := fs.Int("quality", 80, "VP8 quality, 0-100")
 
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
 		fs.Usage()
@@ -95,11 +96,15 @@ func handleExportCommand(args []string) {
 	case "video":
 		target := *out
 		if target == "" {
-			target = fmt.Sprintf("dist/%s.mp4", gameID)
+			target = fmt.Sprintf("dist/%s.webm", gameID)
 		}
 		pipeline := export.NewVideoPipeline(*dir)
 		pipeline.SetStill(*still)
 		pipeline.SetFPS(*fps)
+		pipeline.SetQuality(*quality)
+		if cfg, cfgErr := config.NewConfigManager().Load(); cfgErr == nil && cfg != nil {
+			pipeline.SetDisplayMode(scene.DisplayMode(cfg.Media.TTS.SpeechCues.DisplayMode))
+		}
 		if width, height, err := parseSize(*size); err == nil {
 			pipeline.SetSize(width, height)
 		} else {

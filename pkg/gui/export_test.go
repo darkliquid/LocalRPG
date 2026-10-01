@@ -64,12 +64,10 @@ func TestStartExportRequiresDestination(t *testing.T) {
 	}
 }
 
-func TestStartExportVideoRequiresFFmpeg(t *testing.T) {
-	t.Setenv("PATH", "")
-	svc := NewService(t.TempDir())
-
-	if _, err := svc.StartExport(context.Background(), ExportRequestDTO{GameID: "g", Format: "video", OutDir: t.TempDir()}); !errors.Is(err, ErrExportNoFFmpeg) {
-		t.Fatalf("StartExport = %v, want ErrExportNoFFmpeg", err)
+func TestExportArtifactPathNamesAWebM(t *testing.T) {
+	got := exportArtifactPath("/tmp/out", "campaign-01", "video")
+	if !strings.HasSuffix(got, "campaign-01.webm") {
+		t.Fatalf("video artefact = %q, want a .webm", got)
 	}
 }
 

@@ -1363,7 +1363,7 @@ func (s *Server) handleExportRoutes(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrExportInFlight):
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
-		case errors.Is(err, ErrExportFormat), errors.Is(err, ErrExportNoFFmpeg), errors.Is(err, ErrExportDirRequired):
+		case errors.Is(err, ErrExportFormat), errors.Is(err, ErrExportDirRequired):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		case err != nil:
