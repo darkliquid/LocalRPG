@@ -1,0 +1,23 @@
+# Secret scanning for LocalRPG.
+#
+# Run it with `mise run secrets:scan` (staged changes plus the whole history) or
+# let .github/workflows/secrets.yml do it on every push and pull request.
+#
+# The default ruleset is *extended*, never replaced: gitleaks ships detection
+# for hundreds of provider token formats, and a config that omits `useDefault`
+# silently turns every one of them off.
+
+[extend]
+useDefault = true
+
+# The trace package tests that registered secrets are stripped from telemetry,
+# so those tests have to hold a string that looks like a real key. The two
+# values below are fixtures; the plan documents that describe the tests quote
+# them verbatim. Allowlisting the exact strings keeps the rules armed for
+# everything else.
+[[allowlists]]
+description = "Fake credentials used by the trace redaction tests and quoted in the plans that describe them."
+regexes = [
+  '''sk-test-abcdef0123456789''',
+  '''sk-live-1234567890''',
+]

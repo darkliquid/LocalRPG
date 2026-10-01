@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # The release workflow calls this so a tag only ships what already passed.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go vet and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+
+      # Wails v3 links GTK4 and WebKitGTK 6.0 by default (the GTK3 path is
+      # behind a build tag), oto links ALSA, and the Wails Linux backend asks
+      # pkg-config for X11. The headers are build-time only, so a headless
+      # runner can compile and test the desktop binary.
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev
+
+      # The GUI embeds the built frontend, and the browser tests skip without
+      # it, so build the bundle before vetting and testing.
+      - name: Build the embedded frontend
+        run: mise run build:frontend
+
+      - name: Vet
+        run: mise exec -- go vet ./...
+
+      - name: Test
+        run: mise run test:backend
+
+  web:
+    name: Frontend type check and docs lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+
+      - name: Type check
+        run: mise run test:frontend
+
+      - name: Lint embedded documentation
+        run: mise run lint:docs
+
+  packaging:
+    name: Release config and site build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+
+      - name: Validate the GoReleaser configuration
+        run: mise run lint:goreleaser
+
+      - name: Build the showcase site
+        run: mise run site:build
+
+      - name: Upload the site preview
+        uses: actions/upload-artifact@v7
+        with:
+          name: site-preview
+          path: website/dist
+          retention-days: 7

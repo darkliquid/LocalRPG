@@ -9,7 +9,10 @@ import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/all"
 )
 
-const Version = "0.1.0"
+// Version is stamped at release time with
+// -ldflags "-X main.Version=...", so it stays a variable rather than a
+// constant. The literal is what a plain `go build` reports.
+var Version = "0.1.0"
 
 func main() {
 	if err := provider.Validate(); err != nil {

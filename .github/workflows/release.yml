@@ -1,0 +1,132 @@
+name: Release
+
+# Tag a commit that already passed CI, e.g. `git tag v0.2.0 && git push origin v0.2.0`.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # A tag is a promise that the commit is good, so re-run the checks here rather
+  # than trusting that whoever tagged it waited for CI.
+  verify:
+    name: Verify
+    uses: ./.github/workflows/ci.yml
+
+  frontend:
+    name: Build embedded frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+
+      # The GUI embeds pkg/gui/dist, so the bundle has to exist in the tree
+      # goreleaser compiles. It is platform independent, so build it once and
+      # hand it to every packaging runner.
+      - name: Build the frontend bundle
+        run: mise run build:frontend
+
+      - name: Upload the frontend bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: gui-dist
+          path: pkg/gui/dist
+          retention-days: 1
+
+  package:
+    name: Package ${{ matrix.target }}
+    needs: [verify, frontend]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # One native runner per target. Linux arm64 gets its own arm64 runner
+        # because a CGO build for arm64 cannot be produced from an amd64 host;
+        # the Apple Silicon runner cross-compiles the Intel slice, which clang
+        # and the universal macOS SDK handle natively.
+        include:
+          - runner: ubuntu-latest
+            target: linux/amd64
+          - runner: ubuntu-24.04-arm
+            target: linux/arm64
+          - runner: macos-latest
+            target: darwin/arm64
+          - runner: macos-latest
+            target: darwin/amd64
+          - runner: windows-latest
+            target: windows/amd64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # GoReleaser needs the tag and the commits it points at.
+          fetch-depth: 0
+
+      - uses: jdx/mise-action@v5
+
+      - name: Install native build dependencies
+        if: startsWith(matrix.target, 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev
+
+      - name: Restore the embedded frontend
+        uses: actions/download-artifact@v8
+        with:
+          name: gui-dist
+          path: pkg/gui/dist
+
+      # RELEASE_TARGET selects the one build in .goreleaser.yaml this runner
+      # can link; every other build skips itself. Publishing is deferred to the
+      # `publish` job because GoReleaser's split/merge is a Pro feature.
+      - name: Build and package
+        shell: bash
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mise run release:package
+
+      - name: Upload archives
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ replace(matrix.target, '/', '-') }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish the release
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect archives
+        uses: actions/download-artifact@v8
+        with:
+          pattern: dist-*
+          path: release
+          merge-multiple: true
+
+      # Each runner wrote checksums for its own archives only, so replace them
+      # with one file covering the whole release.
+      - name: Write the checksums
+        working-directory: release
+        run: sha256sum * > checksums.txt
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          args=(--title "LocalRPG ${GITHUB_REF_NAME}" --generate-notes)
+          case "$GITHUB_REF_NAME" in
+            *-*) args+=(--prerelease) ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" release/* "${args[@]}"

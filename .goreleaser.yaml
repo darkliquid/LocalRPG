@@ -1,0 +1,81 @@
+# Release packaging for LocalRPG.
+#
+# Every supported platform needs CGO: Wails v3 links GTK/WebKit on Linux,
+# sherpa-onnx ships per-architecture shared libraries, and oto talks to ALSA.
+# That rules out cross-compilation, so each build below names exactly one
+# operating system and architecture and skips itself unless RELEASE_TARGET
+# selects it.
+#
+# .github/workflows/release.yml runs one native runner per target: Linux amd64
+# and arm64 on their own runners (a CGO build for arm64 cannot be produced from
+# an amd64 host), both macOS architectures on an Apple Silicon runner, and
+# Windows amd64. The workflow then collects the archives from every runner,
+# combines the checksums and publishes them together.
+#
+# Publishing uses the GitHub CLI rather than goreleaser because the merge step
+# of a split build is a GoReleaser Pro feature.
+version: 2
+
+project_name: localrpg
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  # The first build carries the shared settings as a YAML anchor; the rest
+  # merge it and override only their target.
+  - &build
+    id: linux-amd64
+    main: ./cmd/localrpg
+    binary: localrpg
+    env: [CGO_ENABLED=1]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.Version={{ .Version }}
+    goos: [linux]
+    goarch: [amd64]
+    skip: '{{ ne (or .Env.RELEASE_TARGET "none") "linux/amd64" }}'
+
+  - <<: *build
+    id: linux-arm64
+    goos: [linux]
+    goarch: [arm64]
+    skip: '{{ ne (or .Env.RELEASE_TARGET "none") "linux/arm64" }}'
+
+  - <<: *build
+    id: darwin-arm64
+    goos: [darwin]
+    goarch: [arm64]
+    skip: '{{ ne (or .Env.RELEASE_TARGET "none") "darwin/arm64" }}'
+
+  - <<: *build
+    id: darwin-amd64
+    goos: [darwin]
+    goarch: [amd64]
+    skip: '{{ ne (or .Env.RELEASE_TARGET "none") "darwin/amd64" }}'
+
+  - <<: *build
+    id: windows-amd64
+    goos: [windows]
+    goarch: [amd64]
+    skip: '{{ ne (or .Env.RELEASE_TARGET "none") "windows/amd64" }}'
+
+archives:
+  - id: localrpg
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
