@@ -74,6 +74,7 @@ Settled by review:
 | Container | WebM (`V_VP8` + `A_OPUS`). Playable in VLC; the acceptance bar |
 | Audio | The campaign's existing Ogg/Opus clips, laid onto one 48 kHz timeline; no re-encode of speech |
 | Fonts | Bundle the OFL fonts the theatre uses; `go:generate` fetches them once, they are committed and embedded |
+| SVG art | Rasterized with `srwiley/oksvg` over `srwiley/rasterx`; raster art still decoded with `x/image` |
 | ffmpeg | Removed from the export path entirely, including the `ffprobe` duration probe |
 
 ## 3. Architecture
@@ -193,6 +194,30 @@ to `scene.DefaultFPS` and is settable. During the static tail of an animated bea
 the reveal completes) the compositor emits a cheap inter-frame heartbeat at about 1 fps,
 which costs almost nothing once inter-frame prediction is in play and keeps players from
 holding a single frame for many seconds.
+
+### 4.5 Art loading
+
+Every image the stage draws (scene art, portraits, banner) resolves to a file path from
+the compiler. The compositor loads each path once per export and caches the decoded
+image:
+
+- Raster files (PNG, JPEG, WebP) decode with `image.Decode`, as today.
+- SVG files rasterize with `srwiley/oksvg` over `srwiley/rasterx`. This is the default
+  case, not an edge one: the built-in image provider emits SVG (`pkg/media/procedural_art.go`),
+  and a character with no portrait always gets the procedural bust SVG
+  (`pkg/media/procedural_bust.go`). oksvg handles the linear and radial gradients, paths,
+  ellipses, circles, and rounded rects those generators use.
+- The rasterized image is drawn with the same geometry the stage uses: cover-fit for
+  scene art and the banner, and the square portrait box (`object-cover object-top`) for
+  portraits.
+- A file that is missing or will not parse degrades rather than failing the export:
+  scene art falls back to the native radial gradient, and a missing portrait simply
+  leaves its box empty, which is the state the stage already handles.
+
+This replaces the current renderer's silent substitution of a Go gradient for any SVG
+(`pkg/scene/render.go:136`), which is why a campaign on the default image provider
+currently looks different in the video than in the web export, and why its portraits do
+not appear at all.
 
 ## 5. The WebM Muxer (`pkg/media/webm`)
 
@@ -366,6 +391,9 @@ All tests are pure Go; none may invoke ffmpeg or ffprobe.
   speaker's border colour appears in the portrait band, and that the inline grammar
   renders a `[[wikilink]]`, a `[direction]` under each `display_mode`, code, and
   emphasis.
+- `pkg/scene`: the art loader rasterizes the procedural bust and procedural location SVGs
+  and asserts the result is the right size and non-empty, and falls back to the gradient
+  when a path is missing or unparseable.
 - `pkg/export`: `RenderVideo` on a small script writes a file that reads back as a valid
   WebM, and a cancelled context leaves no output file.
 - `pkg/media/opus`: `Duration` matches the granule position for a generated clip.
@@ -376,6 +404,7 @@ All tests are pure Go; none may invoke ffmpeg or ffprobe.
 | --- | --- |
 | `gen2brain/vpx` is young (single maintainer, low adoption) | It is a libwebp port with conformance tests against libvpx; pin a version and keep it behind the `pkg/media/webm` interface so it can be swapped |
 | The inter-frame encoder is the least-proven path (libwebp has no inter-frame encoder; this is gen2brain's own, validated by libvpx decoding) | Pin the version, verify our own output by decoding it back with the same library, and keep the intra-only WebP-keyframe path (lossy WebP stripped to a VP8 keyframe) as the documented fallback if it proves faulty |
+| `oksvg` implements only part of SVG | The procedural generators use a small subset (gradients, paths, ellipses, circles, rounded rects); test those specifically, and keep the native gradient fallback for anything that will not parse |
 | 1080p encode time and memory | `--size`, `--fps`, `--still`, `--quality`, and `Method`/`Threads`; `--still` is the fast path |
 | Safari's WebM support is partial | The acceptance bar is VLC; Chromium and Firefox play it. Noted, not blocking |
 | VP8 4:2:0 BT.601 differs slightly from the browser's sRGB rendering | Expected; the goal is "very close", not pixel-exact |
