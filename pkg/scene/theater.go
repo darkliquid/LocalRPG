@@ -1,6 +1,7 @@
 package scene
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -114,7 +115,43 @@ func lerpColour(a, b color.RGBA, t float64) color.RGBA {
 // upper is the theatre's label case: uppercase, trimmed.
 func upper(text string) string { return strings.ToUpper(strings.TrimSpace(text)) }
 
-func (r *Renderer) drawHeader(img *image.RGBA, req FrameRequest) {}
+// drawHeader is the theatre's top band: the campaign's name, the location pill,
+// and the scene counter.
+func (r *Renderer) drawHeader(img *image.RGBA, req FrameRequest) {
+	if req.Script == nil {
+		return
+	}
+	face := r.face("sans", max(14, r.height/40))
+	if face == nil {
+		return
+	}
+	top := int(float64(r.height) * 0.03)
+	r.drawText(img, face, upper(req.Script.GameName), int(float64(r.width)*0.03), top+face.Metrics().Ascent.Ceil(), headerPurple, true)
+
+	x := int(float64(r.width) * 0.03)
+	y := top + face.Metrics().Height.Ceil() + r.height/60
+	if req.Scene.LocationName != "" {
+		x = r.drawPill(img, face, req.Scene.LocationName, x, y, chipBackground, stoneText) + r.height/80
+	}
+	if len(req.Script.Scenes) > 0 {
+		counter := fmt.Sprintf("Scene %d of %d", req.SceneIndex+1, len(req.Script.Scenes))
+		r.drawPill(img, r.face("mono", max(12, r.height/56)), counter, x, y, chipBackground, stoneText)
+	}
+}
+
+// drawPill draws a rounded chip and returns the x it ended at.
+func (r *Renderer) drawPill(img *image.RGBA, face font.Face, label string, x, top int, fill, text color.RGBA) int {
+	if face == nil {
+		return x
+	}
+	padding := r.height / 60
+	textWidth := font.MeasureString(face, label).Ceil()
+	height := face.Metrics().Height.Ceil() + padding
+	rect := image.Rect(x, top, x+textWidth+2*padding, top+height)
+	fillRoundRect(img, rect, height/3, fill)
+	r.drawText(img, face, label, rect.Min.X+padding, rect.Min.Y+face.Metrics().Ascent.Ceil()+padding/2, text, false)
+	return rect.Max.X
+}
 
 // drawPortraits paints the theatre's two square character boxes: the protagonist
 // on the left for the whole story, and the current speaker on the right. The
@@ -173,7 +210,231 @@ func (r *Renderer) drawPortraitBox(img *image.RGBA, path string, x, y, size int,
 	}
 }
 
-func (r *Renderer) drawDialogue(img *image.RGBA, req FrameRequest) {}
+// drawDialogue draws the bottom panel: a scene card is a centred amber title,
+// anything else is the name plate, the prose, and the advance caret.
+func (r *Renderer) drawDialogue(img *image.RGBA, req FrameRequest) {
+	panel := r.dialogueRect()
+	if req.Beat.Kind == BeatSceneCard {
+		r.drawSceneCard(img, panel, req)
+		return
+	}
+
+	shown := req.Beat.Text
+	if req.Animate {
+		shown = revealText(shown, req.Progress)
+	}
+
+	isPlayer := req.Beat.Kind == BeatSpeech && req.Beat.Player
+	isSpeech := req.Beat.Kind == BeatSpeech
+	edge := panelBorder
+	name := "Narrator"
+	nameFill := stoneNameFill
+	switch {
+	case isPlayer:
+		edge, nameFill = skyAccent, skyNameFill
+	case isSpeech:
+		edge, nameFill = purpleAccent, purpleNameFill
+	}
+	if isSpeech {
+		if strings.TrimSpace(req.Beat.Speaker) != "" {
+			name = req.Beat.Speaker
+		} else {
+			name = "Unknown"
+		}
+	}
+
+	radius := panel.Dy() / 10
+	fillRoundRect(img, panel, radius, panelFill)
+	strokeRoundRect(img, panel, radius, 2, edge)
+	r.drawNamePlate(img, panel, name, nameFill)
+	r.drawProse(img, panel, shown, isSpeech, req.DisplayMode)
+
+	if !req.Animate || req.Progress >= 1 {
+		caretX := panel.Max.X - panel.Dy()/8
+		caretY := panel.Max.Y - panel.Dy()/10
+		drawDiamond(img, caretX, caretY, 5, color.RGBA{216, 180, 254, 200})
+	}
+}
+
+// dialogueRect is the theatre's panel: max-w-4xl, centred, min-h 20vh, above the
+// bottom edge.
+func (r *Renderer) dialogueRect() image.Rectangle {
+	width := int(math.Min(float64(r.width)*0.72, float64(r.height)*1.15))
+	height := int(math.Max(float64(r.height)*0.20, float64(r.height)*0.22))
+	left := (r.width - width) / 2
+	bottom := int(float64(r.height) * 0.94)
+	return image.Rect(left, bottom-height, left+width, bottom)
+}
+
+// drawNamePlate draws the panel's name chip, straddling the top edge.
+func (r *Renderer) drawNamePlate(img *image.RGBA, panel image.Rectangle, name string, fill color.RGBA) {
+	face := r.face("sans", max(13, r.height/44))
+	if face == nil {
+		return
+	}
+	padding := r.height / 90
+	textWidth := font.MeasureString(face, name).Ceil()
+	height := face.Metrics().Height.Ceil() + padding
+	rect := image.Rect(panel.Min.X+panel.Dy()/12, panel.Min.Y-height/2, panel.Min.X+panel.Dy()/12+textWidth+2*padding, panel.Min.Y+height/2)
+	fillRoundRect(img, rect, height/4, fill)
+	r.drawText(img, face, name, rect.Min.X+padding, rect.Min.Y+face.Metrics().Ascent.Ceil()+padding/2, color.RGBA{255, 255, 255, 255}, true)
+}
+
+// drawProse lays out the beat's prose inside the panel, applying the inline
+// grammar the exported page applies.
+func (r *Renderer) drawProse(img *image.RGBA, panel image.Rectangle, text string, speech bool, mode DisplayMode) {
+	body := text
+	if speech {
+		body = "\u201c" + text + "\u201d"
+	}
+	blocks := ParseProse(body, mode)
+	if len(blocks) == 0 {
+		return
+	}
+
+	size := max(16, r.height/26)
+	base := r.face("serif", size)
+	italic := r.face("serif-italic", size)
+	if speech {
+		base = italic
+	}
+	mono := r.face("mono", max(14, r.height/30))
+	sans := r.face("sans", max(13, r.height/34))
+	if base == nil {
+		return
+	}
+
+	padding := panel.Dy() / 8
+	left := panel.Min.X + padding
+	width := panel.Dx() - 2*padding
+	lineHeight := base.Metrics().Height.Ceil() + r.height/120
+	y := panel.Min.Y + padding + base.Metrics().Ascent.Ceil()
+
+	for _, block := range blocks {
+		if block.Kind == BlockRule {
+			draw.Draw(img, image.Rect(left, y, left+width, y+1), image.NewUniform(inactiveEdge), image.Point{}, draw.Over)
+			y += lineHeight
+			continue
+		}
+		for _, line := range wrapRuns(block.Runs, base, width) {
+			x := left
+			for _, run := range line {
+				face := r.runFace(run.Style, base, italic, mono, sans)
+				col := runColour(run.Style, stoneText)
+				if speech && run.Style == StyleRegular {
+					col = stoneBright
+				}
+				r.drawText(img, face, run.Text, x, y, col, run.Style == StyleBold)
+				x += font.MeasureString(face, run.Text).Ceil()
+			}
+			y += lineHeight
+			if y > panel.Max.Y-padding {
+				return
+			}
+		}
+	}
+}
+
+// runFace picks the face a run draws with.
+func (r *Renderer) runFace(style RunStyle, base, italic, mono, sans font.Face) font.Face {
+	switch style {
+	case StyleCode:
+		return mono
+	case StyleDirection:
+		return sans
+	case StyleItalic:
+		return italic
+	default:
+		return base
+	}
+}
+
+func runColour(style RunStyle, body color.RGBA) color.RGBA {
+	switch style {
+	case StyleLink:
+		return purpleAccent
+	case StyleDirection:
+		return color.RGBA{192, 132, 252, 230}
+	case StyleCode:
+		return stoneText
+	case StyleBold:
+		return stoneBright
+	default:
+		return body
+	}
+}
+
+// drawSceneCard centres the location name in amber, the theatre's title beat.
+func (r *Renderer) drawSceneCard(img *image.RGBA, panel image.Rectangle, req FrameRequest) {
+	face := r.face("serif", max(22, r.height/16))
+	if face == nil {
+		return
+	}
+	shown := upper(req.Beat.Text)
+	if req.Animate {
+		shown = upper(revealText(req.Beat.Text, req.Progress))
+	}
+	textWidth := font.MeasureString(face, shown).Ceil()
+	x := (r.width - textWidth) / 2
+	baseline := panel.Min.Y + panel.Dy()/2 + face.Metrics().Ascent.Ceil()/2
+	r.drawText(img, face, shown, x, baseline, amberLabel, true)
+}
+
+// drawDiamond draws the small advance caret as a rotated square.
+func drawDiamond(img *image.RGBA, cx, cy, radius int, fill color.RGBA) {
+	for dy := -radius; dy <= radius; dy++ {
+		span := radius - abs(dy)
+		for dx := -span; dx <= span; dx++ {
+			x, y := cx+dx, cy+dy
+			if image.Pt(x, y).In(img.Bounds()) {
+				img.SetRGBA(x, y, blendOver(img.RGBAAt(x, y), fill))
+			}
+		}
+	}
+}
+
+func abs(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+// wrapRuns breaks a block's runs into lines that fit width, preserving styles.
+func wrapRuns(runs []Run, face font.Face, width int) [][]Run {
+	var lines [][]Run
+	current := []Run{}
+	currentWidth := 0
+
+	flush := func() {
+		if len(current) > 0 {
+			lines = append(lines, current)
+			current = []Run{}
+			currentWidth = 0
+		}
+	}
+
+	for _, run := range runs {
+		words := strings.SplitAfter(run.Text, " ")
+		for _, word := range words {
+			if word == "" {
+				continue
+			}
+			wordWidth := font.MeasureString(face, word).Ceil()
+			if currentWidth > 0 && currentWidth+wordWidth > width {
+				flush()
+			}
+			if len(current) > 0 && current[len(current)-1].Style == run.Style {
+				current[len(current)-1].Text += word
+			} else {
+				current = append(current, Run{Text: word, Style: run.Style})
+			}
+			currentWidth += wordWidth
+		}
+	}
+	flush()
+	return lines
+}
 
 // drawText draws a line, synthesising bold by drawing it twice a pixel apart
 // because the embedded families are variable fonts x/image cannot instance.

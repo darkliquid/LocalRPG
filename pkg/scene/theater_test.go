@@ -81,3 +81,27 @@ func absDiff(a, b uint8) int {
 	}
 	return int(b) - int(a)
 }
+
+func TestFrameDrawsTheSpeakerNamePlate(t *testing.T) {
+	renderer, _ := NewRenderer(640, 360)
+	script := stageScript()
+	beat := Beat{Kind: BeatSpeech, Speaker: "Evelyn", Text: "Well met.", Duration: 2000 * time.Millisecond}
+
+	frame := renderer.Frame(FrameRequest{Script: script, Scene: script.Scenes[0], Beat: beat, Progress: 1})
+
+	if !hasColourNear(frame, purpleAccent, 40) {
+		t.Fatal("expected the speech panel's purple accent")
+	}
+}
+
+func TestFrameDrawsTheSceneCardInAmber(t *testing.T) {
+	renderer, _ := NewRenderer(640, 360)
+	script := stageScript()
+	beat := SceneCard(script.Scenes[0])
+
+	frame := renderer.Frame(FrameRequest{Script: script, Scene: script.Scenes[0], Beat: beat, Progress: 1})
+
+	if !hasColourNear(frame, amberLabel, 30) {
+		t.Fatal("expected the scene card's amber title")
+	}
+}
