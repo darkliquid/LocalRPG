@@ -24,10 +24,39 @@ import (
 type artCache struct {
 	mu     sync.Mutex
 	images map[string]image.Image
+	covers map[string]*image.RGBA
 }
 
 func newArtCache() *artCache {
-	return &artCache{images: map[string]image.Image{}}
+	return &artCache{images: map[string]image.Image{}, covers: map[string]*image.RGBA{}}
+}
+
+// cover returns art cover-fit to width×height, cached by path and size. A scene's
+// art and a character's portrait are the same for every frame of a beat, so
+// scaling once is both faster and steadier than resampling them each frame.
+func (c *artCache) cover(path string, width, height int) *image.RGBA {
+	if strings.TrimSpace(path) == "" || width < 1 || height < 1 {
+		return nil
+	}
+	key := fmt.Sprintf("%s|%dx%d", path, width, height)
+
+	c.mu.Lock()
+	if covered, ok := c.covers[key]; ok {
+		c.mu.Unlock()
+		return covered
+	}
+	c.mu.Unlock()
+
+	art, err := c.load(path)
+	if err != nil {
+		return nil
+	}
+	covered := scaleToCover(art, width, height)
+
+	c.mu.Lock()
+	c.covers[key] = covered
+	c.mu.Unlock()
+	return covered
 }
 
 // load decodes a raster image or rasterizes an SVG. SVG is the default case, not

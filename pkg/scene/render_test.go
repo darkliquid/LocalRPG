@@ -33,15 +33,17 @@ func TestBaseColourMatchesTheApp(t *testing.T) {
 	}
 }
 
-func TestDrawCoverHandlesTinyArt(t *testing.T) {
-	dst := image.NewRGBA(image.Rect(0, 0, 32, 18))
+func TestScaleToCoverHandlesTinyArt(t *testing.T) {
 	src := image.NewRGBA(image.Rect(0, 0, 1, 1))
 	src.SetRGBA(0, 0, color.RGBA{200, 100, 50, 255})
 
-	drawCover(dst, src, 1.0)
+	covered := scaleToCover(src, 32, 18)
 
-	if dst.RGBAAt(16, 9).A != 255 {
-		t.Errorf("a one-pixel source must still cover the frame")
+	if covered.Bounds().Dx() != 32 || covered.Bounds().Dy() != 18 {
+		t.Fatalf("bounds = %v, want 32x18", covered.Bounds())
+	}
+	if covered.RGBAAt(16, 9).A != 255 {
+		t.Error("a one-pixel source must still cover the frame")
 	}
 }
 

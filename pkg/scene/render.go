@@ -8,7 +8,6 @@ import (
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
-	xdraw "golang.org/x/image/draw"
 
 	"github.com/darkliquid/localrpg/pkg/scene/fonts"
 )
@@ -16,9 +15,6 @@ import (
 const (
 	// crossfadeShare is the share of a scene's first beat spent blending in.
 	crossfadeShare = 0.12
-	// driftStart and driftEnd are the background scale at a beat's ends.
-	driftStart = 1.02
-	driftEnd   = 1.06
 )
 
 // baseColour matches the app and the player's background.
@@ -78,7 +74,6 @@ func (r *Renderer) Frame(req FrameRequest) *image.RGBA {
 
 	r.drawBackground(img, req)
 	r.drawScrim(img)
-	r.drawHeader(img, req)
 	r.drawPortraits(img, req)
 	r.drawDialogue(img, req)
 	return img
@@ -163,67 +158,4 @@ func revealText(text string, progress float64) string {
 		count = len(runes)
 	}
 	return string(runes[:count])
-}
-
-// drawCover scales src to cover dst, centred, so art of any aspect ratio fills the
-// frame without distortion.
-func drawCover(dst *image.RGBA, src image.Image, scale float64) {
-	bounds := dst.Bounds()
-	targetW := int(float64(bounds.Dx()) * scale)
-	targetH := int(float64(bounds.Dy()) * scale)
-	if targetW < 1 || targetH < 1 || src.Bounds().Dx() < 1 || src.Bounds().Dy() < 1 {
-		return
-	}
-
-	scaled := scaleImage(src, targetW, targetH)
-	offset := image.Pt((bounds.Dx()-targetW)/2, (bounds.Dy()-targetH)/2)
-	draw.Draw(dst, image.Rect(offset.X, offset.Y, offset.X+targetW, offset.Y+targetH), scaled, image.Point{}, draw.Over)
-}
-
-// scaleImage resamples src to the given size. Nearest-neighbour keeps a drifting
-// background cheap; the art sits behind text and a scrim, so a finer filter would
-// cost more than it shows.
-func scaleImage(src image.Image, width, height int) *image.RGBA {
-	dst := image.NewRGBA(image.Rect(0, 0, width, height))
-	xdraw.NearestNeighbor.Scale(dst, dst.Bounds(), src, src.Bounds(), xdraw.Src, nil)
-	return dst
-}
-
-// drawCoverAlpha scales src to cover dst, centred, blended at alpha over whatever
-// is already there.
-func drawCoverAlpha(dst *image.RGBA, src image.Image, scale, alpha float64) {
-	if alpha <= 0 {
-		return
-	}
-	if alpha >= 1 {
-		drawCover(dst, src, scale)
-		return
-	}
-
-	bounds := dst.Bounds()
-	targetW := int(float64(bounds.Dx()) * scale)
-	targetH := int(float64(bounds.Dy()) * scale)
-	if targetW < 1 || targetH < 1 || src.Bounds().Dx() < 1 || src.Bounds().Dy() < 1 {
-		return
-	}
-
-	scaled := scaleImage(src, targetW, targetH)
-	offset := image.Pt((bounds.Dx()-targetW)/2, (bounds.Dy()-targetH)/2)
-	for y := 0; y < targetH; y++ {
-		for x := 0; x < targetW; x++ {
-			dstX, dstY := offset.X+x, offset.Y+y
-			if !image.Pt(dstX, dstY).In(bounds) {
-				continue
-			}
-
-			r16, g16, b16, _ := scaled.At(x, y).RGBA()
-			existing := dst.RGBAAt(dstX, dstY)
-			dst.SetRGBA(dstX, dstY, color.RGBA{
-				R: uint8(float64(existing.R)*(1-alpha) + float64(r16>>8)*alpha),
-				G: uint8(float64(existing.G)*(1-alpha) + float64(g16>>8)*alpha),
-				B: uint8(float64(existing.B)*(1-alpha) + float64(b16>>8)*alpha),
-				A: 255,
-			})
-		}
-	}
 }

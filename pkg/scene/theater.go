@@ -1,7 +1,6 @@
 package scene
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -11,11 +10,11 @@ import (
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
+	xdraw "golang.org/x/image/draw"
 )
 
 // Colours are the theatre's, copied from the Tailwind classes the components use.
 var (
-	headerPurple   = color.RGBA{216, 180, 254, 255} // purple-300
 	stoneText      = color.RGBA{231, 229, 228, 255} // stone-200
 	stoneBright    = color.RGBA{250, 250, 249, 255} // stone-50
 	panelFill      = color.RGBA{12, 10, 9, 230}     // stone-950/90
@@ -31,42 +30,64 @@ var (
 )
 
 // drawBackground paints the scene's imagery: the beat's art, the scene's art, or
-// the campaign banner, cover-fit. A scene change blends in over the opening share
-// of a beat, and the drift scale keeps a held beat alive. With no art at all the
-// stage shows the theatre's own radial gradient.
+// the campaign banner, cover-fit and scaled once. A scene change blends in over
+// the opening share of a beat. With no art at all the stage shows the theatre's
+// own radial gradient.
+//
+// The background does not move. A drifting, re-scaled background shimmers as
+// whole source pixels jump, and that high-frequency noise is exactly what an
+// inter frame predicts badly, so the picture crawls and smears over a beat.
 func (r *Renderer) drawBackground(img *image.RGBA, req FrameRequest) {
-	scale := driftStart + (driftEnd-driftStart)*clamp01(req.Progress)
-
-	art := r.backgroundArt(req)
-	if art == nil {
+	current := r.backgroundArt(req)
+	if current == nil {
 		draw.Draw(img, img.Bounds(), r.gradientImage(), image.Point{}, draw.Src)
 		return
 	}
 
 	if blend := crossfadeAlpha(req.Progress); blend < 1 && req.PreviousArt != "" {
-		if previous, err := r.art.load(req.PreviousArt); err == nil {
-			drawCover(img, previous, scale)
-			drawCoverAlpha(img, art, scale, blend)
+		if previous := r.art.cover(req.PreviousArt, r.width, r.height); previous != nil {
+			draw.Draw(img, img.Bounds(), previous, image.Point{}, draw.Src)
+			blendImage(img, current, blend)
 			return
 		}
 	}
-	drawCover(img, art, scale)
+	draw.Draw(img, img.Bounds(), current, image.Point{}, draw.Src)
 }
 
-// backgroundArt is the first art the theatre would show: the beat's own, then the
-// scene's, then the campaign's banner.
-func (r *Renderer) backgroundArt(req FrameRequest) image.Image {
+// backgroundArt is the first art the theatre would show, cover-fit: the beat's
+// own, then the scene's, then the campaign's banner.
+func (r *Renderer) backgroundArt(req FrameRequest) *image.RGBA {
 	for _, path := range []string{req.Beat.ArtPath, req.Scene.ArtPath} {
-		if img, err := r.art.load(path); err == nil {
-			return img
+		if covered := r.art.cover(path, r.width, r.height); covered != nil {
+			return covered
 		}
 	}
-	if req.Script != nil && req.Script.Banner != "" {
-		if img, err := r.art.load(req.Script.Banner); err == nil {
-			return img
+	if req.Script != nil {
+		if covered := r.art.cover(req.Script.Banner, r.width, r.height); covered != nil {
+			return covered
 		}
 	}
 	return nil
+}
+
+// blendImage composites src over dst at the given alpha. Both are the same size,
+// which is what the cached backgrounds are.
+func blendImage(dst, src *image.RGBA, alpha float64) {
+	a := clamp01(alpha)
+	if a <= 0 {
+		return
+	}
+	for y := 0; y < dst.Rect.Dy(); y++ {
+		dstRow := dst.Pix[y*dst.Stride : y*dst.Stride+dst.Rect.Dx()*4]
+		srcRow := src.Pix[y*src.Stride : y*src.Stride+src.Rect.Dx()*4]
+		for x := 0; x < dst.Rect.Dx(); x++ {
+			i := x * 4
+			dstRow[i] = uint8(float64(dstRow[i])*(1-a) + float64(srcRow[i])*a)
+			dstRow[i+1] = uint8(float64(dstRow[i+1])*(1-a) + float64(srcRow[i+1])*a)
+			dstRow[i+2] = uint8(float64(dstRow[i+2])*(1-a) + float64(srcRow[i+2])*a)
+			dstRow[i+3] = 255
+		}
+	}
 }
 
 // drawScrim is the theatre's bottom-heavy black gradient: black/90 at the base,
@@ -219,44 +240,6 @@ func PlanFrames(script *Script, fps int, animate bool) FramePlan {
 	return plan
 }
 
-// drawHeader is the theatre's top band: the campaign's name, the location pill,
-// and the scene counter.
-func (r *Renderer) drawHeader(img *image.RGBA, req FrameRequest) {
-	if req.Script == nil {
-		return
-	}
-	face := r.face("sans", max(14, r.height/40))
-	if face == nil {
-		return
-	}
-	top := int(float64(r.height) * 0.03)
-	r.drawText(img, face, upper(req.Script.GameName), int(float64(r.width)*0.03), top+face.Metrics().Ascent.Ceil(), headerPurple, true)
-
-	x := int(float64(r.width) * 0.03)
-	y := top + face.Metrics().Height.Ceil() + r.height/60
-	if req.Scene.LocationName != "" {
-		x = r.drawPill(img, face, req.Scene.LocationName, x, y, chipBackground, stoneText) + r.height/80
-	}
-	if len(req.Script.Scenes) > 0 {
-		counter := fmt.Sprintf("Scene %d of %d", req.SceneIndex+1, len(req.Script.Scenes))
-		r.drawPill(img, r.face("mono", max(12, r.height/56)), counter, x, y, chipBackground, stoneText)
-	}
-}
-
-// drawPill draws a rounded chip and returns the x it ended at.
-func (r *Renderer) drawPill(img *image.RGBA, face font.Face, label string, x, top int, fill, text color.RGBA) int {
-	if face == nil {
-		return x
-	}
-	padding := r.height / 60
-	textWidth := font.MeasureString(face, label).Ceil()
-	height := face.Metrics().Height.Ceil() + padding
-	rect := image.Rect(x, top, x+textWidth+2*padding, top+height)
-	fillRoundRect(img, rect, height/3, fill)
-	r.drawText(img, face, label, rect.Min.X+padding, rect.Min.Y+face.Metrics().Ascent.Ceil()+padding/2, text, false)
-	return rect.Max.X
-}
-
 // drawPortraits paints the theatre's two square character boxes: the protagonist
 // on the left for the whole story, and the current speaker on the right. The
 // active speaker gets a coloured border and glow; a portrait is never dimmed.
@@ -275,7 +258,9 @@ func (r *Renderer) drawPortraits(img *image.RGBA, req FrameRequest) {
 	box := int(math.Min(float64(r.width)*0.24, float64(r.height)*0.34))
 	box = max(box, 48)
 	margin := int(float64(r.width) * 0.04)
-	bandBottom := int(float64(r.height) * 0.70)
+	// The band ends well above the dialogue panel, which the theatre anchors near
+	// the bottom: a portrait that reaches into it would sit under the narration.
+	bandBottom := int(float64(r.height) * 0.58)
 	top := bandBottom - box
 
 	if playerPortrait != "" {
@@ -304,8 +289,8 @@ func (r *Renderer) drawPortraitBox(img *image.RGBA, path string, x, y, size int,
 		glowRoundRect(img, rect, radius, accent)
 	}
 	fillRoundRect(img, rect, radius, color.RGBA{28, 25, 23, 255})
-	if art, err := r.art.load(path); err == nil {
-		drawCoverRect(img, art, rect, mirror)
+	if covered := r.art.cover(path, size, size); covered != nil {
+		drawCoverRect(img, covered, rect, mirror)
 	}
 	strokeRoundRect(img, rect, radius, 2, edge)
 
@@ -665,9 +650,9 @@ func blendOver(dst, src color.RGBA) color.RGBA {
 	}
 }
 
-// drawCoverRect cover-fits art into a rectangle, optionally mirrored.
-func drawCoverRect(img *image.RGBA, art image.Image, rect image.Rectangle, mirror bool) {
-	scaled := scaleToCover(art, rect.Dx(), rect.Dy())
+// drawCoverRect copies already-cover-fit art into a rectangle, optionally
+// mirrored. The art is scaled once by the cache, so this is a copy.
+func drawCoverRect(img *image.RGBA, art *image.RGBA, rect image.Rectangle, mirror bool) {
 	for y := 0; y < rect.Dy(); y++ {
 		for x := 0; x < rect.Dx(); x++ {
 			sx := x
@@ -677,31 +662,36 @@ func drawCoverRect(img *image.RGBA, art image.Image, rect image.Rectangle, mirro
 			if !image.Pt(rect.Min.X+x, rect.Min.Y+y).In(img.Bounds()) {
 				continue
 			}
-			img.Set(rect.Min.X+x, rect.Min.Y+y, scaled.At(sx, y))
+			img.Set(rect.Min.X+x, rect.Min.Y+y, art.At(sx, y))
 		}
 	}
 }
 
-// scaleToCover resamples src to fill width×height, cropping the overflow.
+// scaleToCover resamples src to fill width×height, cropping the overflow. It runs
+// once per image rather than per frame, so it uses the smooth scaler: nearest
+// neighbour makes a scaled portrait fringe with colour.
 func scaleToCover(src image.Image, width, height int) *image.RGBA {
 	bounds := src.Bounds()
 	srcW, srcH := bounds.Dx(), bounds.Dy()
-	if srcW < 1 || srcH < 1 {
-		return image.NewRGBA(image.Rect(0, 0, width, height))
+	if srcW < 1 || srcH < 1 || width < 1 || height < 1 {
+		return image.NewRGBA(image.Rect(0, 0, max(1, width), max(1, height)))
 	}
 
 	scale := math.Max(float64(width)/float64(srcW), float64(height)/float64(srcH))
-	targetW := int(float64(srcW) * scale)
-	targetH := int(float64(srcH) * scale)
-	resized := scaleImage(src, max(1, targetW), max(1, targetH))
+	targetW := max(1, int(float64(srcW)*scale))
+	targetH := max(1, int(float64(srcH)*scale))
+
+	resized := image.NewRGBA(image.Rect(0, 0, targetW, targetH))
+	xdraw.ApproxBiLinear.Scale(resized, resized.Bounds(), src, bounds, xdraw.Src, nil)
 
 	out := image.NewRGBA(image.Rect(0, 0, width, height))
-	offX := (resized.Bounds().Dx() - width) / 2
-	offY := (resized.Bounds().Dy() - height) / 2
+	offX := (targetW - width) / 2
+	offY := (targetH - height) / 2
 	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			out.Set(x, y, resized.At(x+offX, y+offY))
-		}
+		copy(
+			out.Pix[y*out.Stride:y*out.Stride+width*4],
+			resized.Pix[(y+offY)*resized.Stride+offX*4:(y+offY)*resized.Stride+(offX+width)*4],
+		)
 	}
 	return out
 }

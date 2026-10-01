@@ -17,6 +17,12 @@ import (
 // defaultQuality is the VP8 quality used when a caller asks for none.
 const defaultQuality = 80
 
+// keyframeEvery is how often a keyframe is forced inside a beat. Inter frames
+// predict from the one before, so error accumulates across a run of them; a
+// keyframe resets it, keeps a seek close to where it was asked for, and is what
+// stops a long beat's text slowly smearing.
+const keyframeEvery = 2 * time.Second
+
 // VideoPipeline renders a script to a WebM file, entirely in Go.
 type VideoPipeline struct {
 	rootDir     string
@@ -167,7 +173,8 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 	started := time.Now()
 	elapsed := time.Duration(0)
 	previousArt := ""
-	first := true
+	// The first frame is always a keyframe, so the last one starts out "overdue".
+	lastKeyframe := -keyframeEvery
 
 	totals := renderTotals{plan: plan}
 	var lastImage *image.RGBA
@@ -207,6 +214,9 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 			if err := ctx.Err(); err != nil {
 				return totals, err
 			}
+			// A beat opens on new content, so it opens on a keyframe: prediction
+			// error from the beat before would otherwise smear the new text.
+			beatStart := true
 			for _, step := range scene.BeatFramePlan(beat, v.fps, animate) {
 				// A repeat frame is the frame before it, so it is re-encoded rather
 				// than drawn again: the heartbeat costs an inter frame, not a render.
@@ -229,14 +239,21 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 					totals.imageFrames++
 				}
 
-				data, err := encoder.Encode(img, first)
+				// The muxer is told exactly what the encoder produced. Marking an
+				// inter frame as a keyframe starts a cluster a decoder cannot
+				// reconstruct, which corrupts the picture until the next keyframe.
+				keyframe := beatStart || elapsed-lastKeyframe >= keyframeEvery
+				data, err := encoder.Encode(img, keyframe)
 				if err != nil {
 					return totals, err
 				}
-				if err := muxer.WriteVideo(data, first, elapsed); err != nil {
+				if err := muxer.WriteVideo(data, keyframe, elapsed); err != nil {
 					return totals, err
 				}
-				first = false
+				if keyframe {
+					lastKeyframe = elapsed
+				}
+				beatStart = false
 				totals.frames++
 				elapsed += step.Span
 				report(false)

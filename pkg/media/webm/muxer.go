@@ -9,10 +9,6 @@ import (
 	ebmlwebm "github.com/at-wat/ebml-go/webm"
 )
 
-// keyframeInterval is how often a video keyframe is forced, so a seek always
-// lands on one and every cluster can begin with one.
-const keyframeInterval = 5 * time.Second
-
 // opusCodecDelay is the encoder lookahead declared for the Opus track, in
 // nanoseconds: the 312-sample pre-skip at 48 kHz.
 const opusCodecDelay = 6500000
@@ -33,8 +29,6 @@ type Muxer struct {
 
 	audioWritten int
 	audioBytes   int64
-
-	lastKeyframe time.Duration
 }
 
 // NewMuxer builds the two tracks. Audio packets are written as the video catches
@@ -71,7 +65,7 @@ func NewMuxer(w io.WriteSeeker, width, height int, track *OpusTrack) (*Muxer, er
 	writers, err := ebmlwebm.NewSimpleBlockWriter(closer, tracks,
 		mkvcore.WithSeekHead(true),
 		mkvcore.WithCues(8192),
-		mkvcore.WithMaxKeyframeInterval(1, int64(keyframeInterval/time.Millisecond)),
+		mkvcore.WithMaxKeyframeInterval(1, maxClusterKeyframeGap),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("webm: open block writer: %w", err)
@@ -80,22 +74,25 @@ func NewMuxer(w io.WriteSeeker, width, height int, track *OpusTrack) (*Muxer, er
 	return &Muxer{video: writers[0], audio: writers[1], track: track}, nil
 }
 
-// WriteVideo adds one encoded frame. The first frame is always a keyframe, and a
-// keyframe is forced every keyframeInterval so seeking stays cheap. Audio that
-// belongs before this frame is written first.
+// maxClusterKeyframeGap is the longest a cluster may run without a keyframe. It
+// is a hint to the muxer's cluster rotation, not a policy: the caller decides
+// where keyframes go and must say so.
+const maxClusterKeyframeGap = 2000
+
+// WriteVideo adds one encoded frame. The caller owns the keyframe policy and must
+// pass the same flag it gave the encoder: marking an inter frame as a keyframe
+// starts a cluster on a frame a decoder cannot reconstruct, which corrupts the
+// picture until the next real keyframe.
 func (m *Muxer) WriteVideo(data []byte, keyframe bool, t time.Duration) error {
 	if err := m.flushAudio(t); err != nil {
 		return err
 	}
 
 	if !m.started {
-		keyframe = true
+		if !keyframe {
+			return fmt.Errorf("webm: the first frame must be a keyframe")
+		}
 		m.started = true
-	} else if t-m.lastKeyframe >= keyframeInterval {
-		keyframe = true
-	}
-	if keyframe {
-		m.lastKeyframe = t
 	}
 
 	if _, err := m.video.Write(keyframe, t.Milliseconds(), data); err != nil {
