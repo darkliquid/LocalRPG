@@ -954,6 +954,17 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	structured := result.Submission != nil
+	if structured {
+		turnSpan.SetAttributes(attribute.Bool("turn.structured", true))
+		o.logger.Event("turn.structured_generation", map[string]interface{}{
+			"turn":        turnNum,
+			"feasibility": string(result.Submission.Verdict.Feasibility),
+			"segments":    len(result.Submission.Segments),
+			"personae":    len(result.Submission.Personae),
+			"memories":    len(result.Submission.Memories),
+			"checks":      len(result.Checks),
+		})
+	}
 	extraction := harness.Extraction{}
 	var extractionErr error
 	extractionDone := make(chan struct{})
@@ -1413,6 +1424,10 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 	}
 
 	caps := harness.Describe(provider)
+	supportsStructured := caps.StructuredOutput
+	if structured, ok := provider.(harness.StructuredOutputProvider); ok && structured.StructuredOutputCapable() {
+		supportsStructured = true
+	}
 	modelName := provider.ID()
 	if m, ok := provider.(interface{ Model() string }); ok && m.Model() != "" {
 		modelName = m.Model()
@@ -1427,6 +1442,12 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				storedSession = prevCtx.Session
 			}
 		}
+	}
+
+	var provenance []ToolCallRecord
+	var checks []harness.CheckResult
+	if resolvedPending != nil {
+		checks = append(checks, *resolvedPending)
 	}
 
 	isCaller := false
@@ -1456,6 +1477,13 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				Prompt: deltaPrompt,
 				System: o.rulesPrompt,
 			}
+			if supportsStructured {
+				deltaReq.ResponseSchema = &harness.ResponseSchemaSpec{
+					Name:   "turn_submission",
+					Schema: harness.TurnSubmissionSchema(),
+					Strict: true,
+				}
+			}
 			handle := &harness.SessionHandle{
 				ID:          storedSession.ID,
 				ThroughTurn: storedSession.ThroughTurn,
@@ -1477,7 +1505,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					Model:       modelName,
 					PrefixHash:  assembly.Context.PrefixHash,
 				}
-				return streamResult{Text: resp.Text}, nil
+				return o.parsePureTextSubmission(streamResult{Text: resp.Text}, checks, proposed, engagement, provenance), nil
 			}
 			// Session continuation failed: fallback to full_prompt
 			o.logger.Event("context.session_fallback", map[string]interface{}{
@@ -1510,6 +1538,13 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				Prompt: contextPrompt,
 				System: o.rulesPrompt,
 			}
+			if supportsStructured {
+				fullReq.ResponseSchema = &harness.ResponseSchemaSpec{
+					Name:   "turn_submission",
+					Schema: harness.TurnSubmissionSchema(),
+					Strict: true,
+				}
+			}
 			handle, err := sessProvider.StartSession(ctx, fullReq)
 			if err == nil && handle != nil {
 				text := ""
@@ -1528,7 +1563,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					PrefixHash:  assembly.Context.PrefixHash,
 				}
 				if text != "" {
-					return streamResult{Text: text}, nil
+					return o.parsePureTextSubmission(streamResult{Text: text}, checks, proposed, engagement, provenance), nil
 				}
 			}
 		}
@@ -1538,11 +1573,6 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 	// the single-prompt path for a provider that ignores messages.
 	messages := []harness.Message{{Role: "user", Content: contextPrompt}}
 
-	var provenance []ToolCallRecord
-	var checks []harness.CheckResult
-	if resolvedPending != nil {
-		checks = append(checks, *resolvedPending)
-	}
 	submitAttempts := 0
 	withdrawn := false
 
@@ -1574,6 +1604,16 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				}
 			}
 		}
+		terminalRequest := !offerTools || withdrawn || !canCallTools || len(checks) > 0
+		if supportsStructured && terminalRequest {
+			request.ResponseSchema = &harness.ResponseSchemaSpec{
+				Name:   "turn_submission",
+				Schema: harness.TurnSubmissionSchema(),
+				Strict: true,
+			}
+			request.Tools = nil
+		}
+
 		o.logger.Event("tool.round", map[string]interface{}{
 			"round":               round,
 			"offered":             offerTools,
@@ -1652,12 +1692,10 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		if len(result.ToolCalls) > 0 && !offerTools && !hasSubmitTurn {
 			o.logger.Event("tool.stray", map[string]interface{}{"round": round, "calls": len(result.ToolCalls)})
 			result.ToolCalls = nil
-			result.Provenance = provenance
-			return result, nil
+			return o.parsePureTextSubmission(result, checks, proposed, engagement, provenance), nil
 		}
 		if len(result.ToolCalls) == 0 {
-			result.Provenance = provenance
-			return result, nil
+			return o.parsePureTextSubmission(result, checks, proposed, engagement, provenance), nil
 		}
 
 		// Prose in a tool round is the model thinking out loud, and its order
@@ -1800,6 +1838,51 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 	}
 
 	return streamResult{}, fmt.Errorf("tool loop ended without an answer")
+}
+
+func (o *TurnOrchestrator) parsePureTextSubmission(result streamResult, checks []harness.CheckResult, proposed *harness.ProposedCheck, engagement string, provenance []ToolCallRecord) streamResult {
+	result.Provenance = provenance
+	subText := result.Text
+	sub, parseErr := harness.ParseSubmission(subText)
+	if parseErr != nil {
+		if cleaned := cleanJSON(subText); cleaned != subText {
+			sub, parseErr = harness.ParseSubmission(cleaned)
+		}
+	}
+	if parseErr == nil {
+		vErr := validateSubmission(sub, checks, o.declaredStats, proposed, engagement)
+		if vErr == nil {
+			result.Submission = sub
+			result.Checks = checks
+			return result
+		}
+		o.logger.Event("turn.structured_parse_failed", map[string]interface{}{
+			"reason": vErr.Error(),
+			"error":  vErr.Error(),
+		})
+		return result
+	}
+	o.logger.Event("turn.structured_parse_failed", map[string]interface{}{
+		"error": parseErr.Error(),
+	})
+	return result
+}
+
+func cleanJSON(s string) string {
+	trimmed := strings.TrimSpace(s)
+	if strings.HasPrefix(trimmed, "```") {
+		idx := strings.Index(trimmed, "\n")
+		if idx != -1 {
+			trimmed = trimmed[idx+1:]
+		} else {
+			trimmed = strings.TrimPrefix(trimmed, "```")
+		}
+		if lastIdx := strings.LastIndex(trimmed, "```"); lastIdx != -1 {
+			trimmed = trimmed[:lastIdx]
+		}
+		trimmed = strings.TrimSpace(trimmed)
+	}
+	return trimmed
 }
 
 // notifyTool reports activity if a client asked to see it.
