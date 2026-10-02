@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestTTSBatchJobsEmptyForFreshCampaign(t *testing.T) {
@@ -73,5 +74,40 @@ func TestListAllTTSBatchJobsRouteIsEmpty(t *testing.T) {
 	}
 	if body := strings.TrimSpace(rec.Body.String()); body != "[]" {
 		t.Errorf("body = %q, want an empty list", body)
+	}
+}
+
+func TestResumePendingBatchesWithoutBatchProviderIsNoop(t *testing.T) {
+	_, svc := setupTestGame(t)
+	svc.ResumePendingBatches(context.Background())
+}
+
+// A batch poll can wait hours; closing the app must cancel it rather than block
+// shutdown, because the job is resumable next launch.
+func TestCloseCancelsBackgroundWork(t *testing.T) {
+	_, svc := setupTestGame(t)
+
+	observed := make(chan struct{})
+	svc.goBackground(func() {
+		<-svc.bgCtx.Done()
+		close(observed)
+	})
+
+	closed := make(chan struct{})
+	go func() {
+		svc.Close()
+		close(closed)
+	}()
+
+	select {
+	case <-closed:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Close did not cancel background work")
+	}
+
+	select {
+	case <-observed:
+	case <-time.After(time.Second):
+		t.Errorf("expected the background work to have observed cancellation")
 	}
 }

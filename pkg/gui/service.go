@@ -71,6 +71,11 @@ type Service struct {
 	bgMu   sync.Mutex
 	bg     sync.WaitGroup
 	closed bool
+	// bgCtx is cancelled by Close, so long-lived background work (a batch poll
+	// that can wait hours) stops instead of holding shutdown open. A batch job is
+	// resumable, so cancelling it loses nothing.
+	bgCtx    context.Context
+	bgCancel context.CancelFunc
 	// The turn runtime is the config-derived wiring that does not change from
 	// turn to turn. It is rebuilt only when the config revision or a source
 	// file's mtime changes, so a hand edit still takes effect next turn.
@@ -129,6 +134,7 @@ func NewService(rootDir string) *Service {
 	}
 	dirs := paths.Resolve(paths.System(), cfg.Paths, projectRoot)
 
+	bgCtx, bgCancel := context.WithCancel(context.Background())
 	svc := &Service{
 		rootDir:        rootDir,
 		resolver:       core.NewCustomPathResolver(dirs.Systems, dirs.Worlds, dirs.Games, dirs.Cache),
@@ -140,6 +146,8 @@ func NewService(rootDir string) *Service {
 		summaryPending: make(map[string]bool),
 		limits:         harness.NewLimitRegistry(),
 		exports:        newExportManager(),
+		bgCtx:          bgCtx,
+		bgCancel:       bgCancel,
 	}
 	if !projectMode {
 		if warning := paths.LegacyWarning(paths.System(), cfg.Paths); warning != "" {
@@ -175,6 +183,11 @@ func (s *Service) Close() {
 	s.bgMu.Lock()
 	s.closed = true
 	s.bgMu.Unlock()
+	// Cancel long-lived background work before waiting, so a batch poll stops
+	// promptly rather than holding shutdown open for its next interval.
+	if s.bgCancel != nil {
+		s.bgCancel()
+	}
 	s.bg.Wait()
 
 	s.mu.Lock()
@@ -2357,9 +2370,11 @@ func (s *Service) StartTTSBatch(ctx context.Context, gameID string) (*TTSBatchJo
 	}
 
 	// A batch job can take hours, so it finishes in the background and the panel
-	// watches the job row rather than holding a request open.
+	// watches the job row rather than holding a request open. It runs on the
+	// service's background context, so closing the app cancels the poll instead of
+	// waiting it out; the job stays resumable and is picked up next launch.
 	s.goBackground(func() {
-		if _, err := batchEngine.Resume(context.Background(), opts, job.ID); err != nil {
+		if _, err := batchEngine.Resume(s.bgCtx, opts, job.ID); err != nil {
 			trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
 				"game":     gameID,
 				"job":      job.ID,
@@ -2374,6 +2389,72 @@ func (s *Service) StartTTSBatch(ctx context.Context, gameID string) (*TTSBatchJo
 
 	dto := ttsBatchJobDTO(*job)
 	return &dto, nil
+}
+
+// ResumePendingBatches finishes every unfinished batch job in the background, so
+// a job started in an earlier session is collected on the next launch without
+// the user waiting. It is safe to call once at startup; a provider with no batch
+// API makes it a no-op.
+func (s *Service) ResumePendingBatches(ctx context.Context) {
+	cfg := s.configMgr.Get()
+	client, err := s.ttsClientFor(cfg.Media.TTS)
+	if err != nil {
+		return
+	}
+	batchClient, ok := client.(media.BatchTTSClient)
+	if !ok {
+		return
+	}
+
+	games, err := s.ListGames(ctx)
+	if err != nil {
+		return
+	}
+	for _, game := range games {
+		store, err := s.store(game.ID)
+		if err != nil {
+			continue
+		}
+		jobs, err := store.ListTTSJobs(game.ID)
+		if err != nil {
+			continue
+		}
+		for _, job := range jobs {
+			if !batchJobActive(job.Status) {
+				continue
+			}
+			opts := ttsbatch.Options{GameID: game.ID, Provider: job.Provider, Model: job.Model}
+			engine := ttsbatch.New(batchClient, media.NewContentCache(s.resolver.CacheDir()), store)
+			engine.SetOpusBitrate(cfg.OpusBitrate())
+			trace.OrNil(s.logger).Event("media.tts.batch_resumed", map[string]interface{}{
+				"game": game.ID,
+				"job":  job.ID,
+			})
+			s.goBackground(func() {
+				if _, err := engine.Resume(s.bgCtx, opts, job.ID); err != nil {
+					trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+						"game":  game.ID,
+						"job":   job.ID,
+						"error": err.Error(),
+					})
+					s.noteFailure("tts", err)
+					return
+				}
+				s.noteSuccess("tts")
+			})
+		}
+	}
+}
+
+// batchJobActive reports whether a job is still in flight, so a launch knows to
+// resume it.
+func batchJobActive(status string) bool {
+	switch status {
+	case "submitted", "pending", "running":
+		return true
+	default:
+		return false
+	}
 }
 
 // ttsBatchJobDTO maps a job row to the wire shape.

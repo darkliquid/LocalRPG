@@ -71,7 +71,7 @@ func TestEngineRunStoresResultsAndRecordsFailures(t *testing.T) {
 	jobs := &memJobs{}
 	cache := media.NewContentCache(t.TempDir())
 	engine := New(client, cache, jobs)
-	engine.sleep = func(time.Duration) {}
+	engine.sleep = func(context.Context, time.Duration) error { return nil }
 
 	groups := []media.ClipGroup{{Key: "k1"}, {Key: "k2"}, {Key: "cached", Cached: true}}
 	job, err := engine.Run(context.Background(), Options{GameID: "game", Provider: "tts:gemini"}, groups)
@@ -106,7 +106,7 @@ func TestEngineRunSkipsWhenEverythingIsCached(t *testing.T) {
 func TestEngineRunRespectsMaxPerJob(t *testing.T) {
 	client := &fakeBatch{states: []string{"succeeded"}}
 	engine := New(client, media.NewContentCache(t.TempDir()), &memJobs{})
-	engine.sleep = func(time.Duration) {}
+	engine.sleep = func(context.Context, time.Duration) error { return nil }
 
 	groups := []media.ClipGroup{{Key: "a"}, {Key: "b"}, {Key: "c"}}
 	job, err := engine.Run(context.Background(), Options{MaxPerJob: 2}, groups)
@@ -115,5 +115,27 @@ func TestEngineRunRespectsMaxPerJob(t *testing.T) {
 	}
 	if job.RequestCount != 2 {
 		t.Errorf("expected 2 requests under MaxPerJob, got %d", job.RequestCount)
+	}
+}
+
+// A cancelled context must end a poll at once, so shutdown does not wait out the
+// interval (which can be hours for a batch).
+func TestEnginePollStopsOnCancellation(t *testing.T) {
+	client := &fakeBatch{states: []string{"running", "running", "running"}}
+	engine := New(client, media.NewContentCache(t.TempDir()), &memJobs{})
+	// Never returns on its own, so only cancellation can end the wait.
+	engine.sleep = func(ctx context.Context, _ time.Duration) error {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+	}()
+
+	if _, err := engine.Run(ctx, Options{}, []media.ClipGroup{{Key: "k"}}); err == nil {
+		t.Fatalf("expected a cancelled run to stop with an error")
 	}
 }

@@ -58,6 +58,17 @@ export const TTSBatchPanel: React.FC = () => {
     void refresh();
   }, [refresh]);
 
+  // Poll while any job is in flight, so a completion (including one resumed at
+  // launch) shows without a manual refresh.
+  const hasActive = useMemo(() => jobs.some((job) => ACTIVE_STATUSES.has(job.status)), [jobs]);
+  useEffect(() => {
+    if (!hasActive) return;
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [hasActive, refresh]);
+
   const visible = useMemo(
     () => (filter ? jobs.filter((job) => job.game_id === filter) : jobs),
     [jobs, filter]

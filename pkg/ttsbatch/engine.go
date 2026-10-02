@@ -65,9 +65,11 @@ type Engine struct {
 	jobs        JobStore
 	opusBitrate int
 	logger      trace.Logger
-	// now and sleep are injectable so a test does not wait on a real clock.
+	// now and sleep are injectable so a test does not wait on a real clock. sleep
+	// is context-aware so a cancelled run stops at once instead of at the end of
+	// its interval.
 	now   func() time.Time
-	sleep func(time.Duration)
+	sleep func(context.Context, time.Duration) error
 }
 
 // New builds an engine over a batch client, the shared clip cache, and a job
@@ -79,7 +81,19 @@ func New(client media.BatchTTSClient, cache *media.ContentCache, jobs JobStore) 
 		jobs:        jobs,
 		opusBitrate: opus.DefaultBitrate,
 		now:         time.Now,
-		sleep:       time.Sleep,
+		sleep:       sleepCtx,
+	}
+}
+
+// sleepCtx waits for a duration or until the context is cancelled.
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }
 
@@ -159,7 +173,11 @@ func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) 
 	handle := media.BatchJobHandle{ID: job.ID, Model: job.Model}
 	status, err := e.poll(ctx, handle, opts)
 	if err != nil {
-		_ = e.jobs.UpdateTTSJobStatus(job.ID, status.State, status.Completed, nil)
+		// Keep the last known state so a cancelled poll leaves the job resumable
+		// rather than blanking it.
+		if status.State != "" {
+			_ = e.jobs.UpdateTTSJobStatus(job.ID, status.State, status.Completed, nil)
+		}
 		return job, err
 	}
 
@@ -215,7 +233,9 @@ func (e *Engine) poll(ctx context.Context, handle media.BatchJobHandle, opts Opt
 		if !e.now().Before(deadline) {
 			return status, fmt.Errorf("tts batch job %s timed out after %s", handle.ID, opts.maxWait())
 		}
-		e.sleep(opts.pollInterval())
+		if err := e.sleep(ctx, opts.pollInterval()); err != nil {
+			return status, fmt.Errorf("tts batch job %s interrupted: %w", handle.ID, err)
+		}
 	}
 }
 
