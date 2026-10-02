@@ -109,6 +109,11 @@ func ResolveGroupCaps(cfg config.TTSConfig, client TTSClient) TTSCapabilities {
 			caps.MaxTokensPerRequest = cfg.Limits.MaxTokens
 		}
 	}
+	// multi_speaker: off forces one speaker per request even where the provider
+	// could render two.
+	if strings.EqualFold(strings.TrimSpace(cfg.MultiSpeaker), "off") {
+		caps.MaxSpeakers = 1
+	}
 	return normalizeCaps(caps)
 }
 
@@ -264,13 +269,44 @@ func planGroups(segments []entity.TurnSegment, caps TTSCapabilities, resolve fun
 // canJoinGroup reports whether a line may extend a group without exceeding the
 // speaker budget or the provider's request limit.
 func canJoinGroup(group ClipGroup, line SpeakerLine, caps TTSCapabilities) bool {
-	if !groupHasSpeaker(group, line) && distinctSpeakers(group.Lines) >= caps.MaxSpeakers {
-		return false
+	if !groupHasSpeaker(group, line) {
+		if distinctSpeakers(group.Lines) >= caps.MaxSpeakers {
+			return false
+		}
+		// Two speakers sharing one voice cannot be told apart, so a multi-speaker
+		// provider would read both in the same voice; keep them in separate groups.
+		if sharesVoice(group.Lines, line) {
+			return false
+		}
 	}
 	candidate := make([]SpeakerLine, len(group.Lines), len(group.Lines)+1)
 	copy(candidate, group.Lines)
 	candidate = append(candidate, line)
 	return linesFit(candidate, caps)
+}
+
+// sharesVoice reports whether a line's speaker voice is already used by a
+// different speaker in the group.
+func sharesVoice(lines []SpeakerLine, line SpeakerLine) bool {
+	identity := voiceIdentity(line.Voice)
+	for _, existing := range lines {
+		if sameSpeaker(existing, line) {
+			continue
+		}
+		if voiceIdentity(existing.Voice) == identity {
+			return true
+		}
+	}
+	return false
+}
+
+// voiceIdentity names a voice for the same-voice check: provider and voice ID, so
+// two speakers configured with the same voice are recognised.
+func voiceIdentity(voice *entity.VoiceConfig) string {
+	if voice == nil {
+		return ""
+	}
+	return voice.Provider + "\x00" + voice.VoiceID
 }
 
 // groupHasSpeaker reports whether a line's speaker is already in a group.

@@ -187,7 +187,14 @@ func TestPlanGroupsStartsANewGroupPerSpeakerWhenSingleVoice(t *testing.T) {
 
 func TestPlanGroupsPairsTwoSpeakers(t *testing.T) {
 	segments := []entity.TurnSegment{narration("The door opens."), speech("Garrick", "Keep walking."), speech("Mira", "Wait.")}
-	groups := planGroups(segments, TTSCapabilities{MaxSpeakers: 2}, simpleResolver)
+	resolver := func(segment entity.TurnSegment) (SpeakerLine, bool) {
+		line, ok := simpleResolver(segment)
+		if ok {
+			line.Voice = &entity.VoiceConfig{VoiceID: line.SpeakerID}
+		}
+		return line, ok
+	}
+	groups := planGroups(segments, TTSCapabilities{MaxSpeakers: 2}, resolver)
 
 	if len(groups) != 2 {
 		t.Fatalf("expected 2 groups, got %d: %#v", len(groups), groups)
@@ -230,5 +237,31 @@ func TestPlanGroupsSkipsEmptySegmentsWithoutBreakingAdjacency(t *testing.T) {
 	}
 	if len(groups[0].SegmentIndexes) != 2 || groups[0].SegmentIndexes[0] != 0 || groups[0].SegmentIndexes[1] != 2 {
 		t.Errorf("expected segments 0 and 2, got %v", groups[0].SegmentIndexes)
+	}
+}
+
+func TestPlanGroupsSeparatesSpeakersSharingAVoice(t *testing.T) {
+	shared := &entity.VoiceConfig{VoiceID: "Aoede"}
+	segments := []entity.TurnSegment{narration("The door opens."), speech("Garrick", "Keep walking.")}
+	resolver := func(segment entity.TurnSegment) (SpeakerLine, bool) {
+		line, ok := simpleResolver(segment)
+		line.Voice = shared
+		return line, ok
+	}
+	groups := planGroups(segments, TTSCapabilities{MaxSpeakers: 2}, resolver)
+
+	if len(groups) != 2 {
+		t.Fatalf("expected two speakers sharing a voice to render separately, got %d groups", len(groups))
+	}
+}
+
+func TestResolveGroupCapsHonoursMultiSpeakerOff(t *testing.T) {
+	client := &capGroupClient{caps: TTSCapabilities{MaxSpeakers: 2, SupportsGrouping: true}}
+
+	if caps := ResolveGroupCaps(config.TTSConfig{MultiSpeaker: "off"}, client); caps.MaxSpeakers != 1 {
+		t.Errorf("MaxSpeakers = %d, want 1 when multi_speaker is off", caps.MaxSpeakers)
+	}
+	if caps := ResolveGroupCaps(config.TTSConfig{MultiSpeaker: "auto"}, client); caps.MaxSpeakers != 2 {
+		t.Errorf("MaxSpeakers = %d, want 2 when multi_speaker is auto", caps.MaxSpeakers)
 	}
 }

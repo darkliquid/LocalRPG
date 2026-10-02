@@ -95,7 +95,14 @@ func TestSynthesizeTurnUsesGroupClientForTwoSpeakers(t *testing.T) {
 		{Kind: entity.SegmentNarration, Text: "The door opens."},
 		{Kind: entity.SegmentSpeech, Speaker: "Garrick", SpeakerID: "garrick", Text: "Keep walking."},
 	}
-	groups, err := pipeline.SynthesizeTurn(context.Background(), segments, nil, nil)
+	// Two speakers must sound different to share a multi-speaker request.
+	voiceFor := func(speakerID string) *entity.VoiceConfig {
+		if speakerID == "garrick" {
+			return &entity.VoiceConfig{VoiceID: "Kore"}
+		}
+		return nil
+	}
+	groups, err := pipeline.SynthesizeTurn(context.Background(), segments, &entity.VoiceConfig{VoiceID: "Aoede"}, voiceFor)
 	if err != nil {
 		t.Fatalf("SynthesizeTurn: %v", err)
 	}
