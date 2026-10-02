@@ -59,6 +59,13 @@ type SpeechResolver interface {
 	SegmentAudio(ctx context.Context, segment entity.TurnSegment) ([]string, time.Duration, error)
 }
 
+// GroupSpeechResolver is implemented by a speech resolver that renders a whole
+// turn's groups, so beats that share a clip are synthesized once and the export
+// resolves the same keys the app does.
+type GroupSpeechResolver interface {
+	TurnAudio(ctx context.Context, segments []entity.TurnSegment) ([]ClipGroup, error)
+}
+
 // PortraitResolver returns a character's portrait file, or ErrAudioUnavailable
 // when the character has none. A missing portrait is a normal state: the theatre
 // and the exported player both fall back to a procedural bust.
@@ -87,6 +94,72 @@ func (c *Compiler) SetSpeechResolver(speech SpeechResolver) { c.speech = speech 
 
 // SetPortraitResolver enables per-beat portraits. Without one, beats carry none.
 func (c *Compiler) SetPortraitResolver(portraits PortraitResolver) { c.portraits = portraits }
+
+// turnGroups plans a turn's audio groups and resolves them, returning the group
+// covering each segment index and which segments a preceding beat's clip already
+// covers. It returns nil maps when the resolver does not group, so the compiler
+// falls back to per-beat resolution.
+func (c *Compiler) turnGroups(ctx context.Context, segments []entity.TurnSegment, opts Options) (map[int]ClipGroup, map[int]bool) {
+	if !opts.Audio || c.speech == nil {
+		return nil, nil
+	}
+	grouped, ok := c.speech.(GroupSpeechResolver)
+	if !ok {
+		return nil, nil
+	}
+	groups, err := grouped.TurnAudio(ctx, segments)
+	if err != nil || len(groups) == 0 {
+		return nil, nil
+	}
+	bySegment := make(map[int]ClipGroup, len(segments))
+	covered := make(map[int]bool, len(segments))
+	for _, group := range groups {
+		for i, index := range group.SegmentIndexes {
+			bySegment[index] = group
+			if i > 0 {
+				covered[index] = true
+			}
+		}
+	}
+	return bySegment, covered
+}
+
+// groupBeatShares splits each group's audio duration across its beats in
+// proportion to their reading time, so the beats advance as the one clip plays
+// rather than all holding for the whole clip and then repeating it.
+func groupBeatShares(segments []entity.TurnSegment, groups map[int]ClipGroup) map[int]time.Duration {
+	if len(groups) == 0 {
+		return nil
+	}
+	members := map[string][]int{}
+	for index, group := range groups {
+		members[group.Key] = append(members[group.Key], index)
+	}
+	shares := make(map[int]time.Duration, len(groups))
+	for _, indexes := range members {
+		total := groups[indexes[0]].Duration
+		if total <= 0 {
+			continue
+		}
+		reads := make([]float64, len(indexes))
+		var sum float64
+		for i, index := range indexes {
+			reads[i] = float64(ReadingDuration(segments[index].Text))
+			sum += reads[i]
+		}
+		if sum <= 0 {
+			share := total / time.Duration(len(indexes))
+			for _, index := range indexes {
+				shares[index] = share
+			}
+			continue
+		}
+		for i, index := range indexes {
+			shares[index] = time.Duration(float64(total) * reads[i] / sum)
+		}
+	}
+	return shares
+}
 
 // Compile walks the campaign's turns, grouping them into scenes by location and
 // flattening each turn's segments into beats.
@@ -130,7 +203,14 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 		}
 		current := &script.Scenes[len(script.Scenes)-1]
 
-		for _, segment := range turn.Segments {
+		// A turn's audio is planned as groups first, so a run of beats that shares
+		// one clip is synthesized once and the clip plays across the run: its first
+		// beat carries the clip, and every beat in the run takes a share of its
+		// duration so the run advances under the audio.
+		groupClips, covered := c.turnGroups(ctx, turn.Segments, opts)
+		shares := groupBeatShares(turn.Segments, groupClips)
+
+		for segmentIndex, segment := range turn.Segments {
 			beat := Beat{
 				Kind:       beatKind(segment.Kind),
 				TurnNumber: turn.Number,
@@ -143,12 +223,27 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 
 			if opts.Audio {
 				outcome := outcomeUnspoken
-				if c.speech == nil {
+				switch {
+				case c.speech == nil:
 					// Audio was asked for and no provider can give it: the most common
 					// silent bundle, and the one most worth explaining.
 					silent.note(errNoSpeechProvider)
 					outcome = outcomeSilent
-				} else {
+				case groupClips != nil:
+					if group, ok := groupClips[segmentIndex]; ok {
+						if !covered[segmentIndex] {
+							beat.AudioPaths = group.AudioPaths
+							beat.AudioDuration = group.Duration
+						}
+						if len(group.AudioPaths) > 0 {
+							outcome = outcomeClips
+						} else {
+							outcome = outcomeSilent
+						}
+					} else {
+						outcome = c.resolveAudio(ctx, &beat, segment, &silent)
+					}
+				default:
 					outcome = c.resolveAudio(ctx, &beat, segment, &silent)
 				}
 
@@ -169,6 +264,9 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 			c.resolvePortrait(ctx, &beat, segment)
 
 			beat.Duration = BeatDuration(beat)
+			if share, ok := shares[segmentIndex]; ok && share > 0 {
+				beat.Duration = share
+			}
 			current.Beats = append(current.Beats, beat)
 			current.Duration += beat.Duration
 		}

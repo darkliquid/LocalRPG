@@ -366,6 +366,15 @@ func (p *TTSPipeline) CountUncached(segments []entity.TurnSegment, narratorVoice
 	return cached, uncached
 }
 
+// ClipPath names the file a clip key is stored under, so a caller that holds a
+// group key can find its audio.
+func (p *TTSPipeline) ClipPath(key string) string {
+	if key == "" {
+		return ""
+	}
+	return filepath.Join(p.cache.Subdir("audio"), key+".opus")
+}
+
 // CountUncachedGroups reports how many groups already have their clip and how
 // many would need synthesis, the grouped counterpart of CountUncached.
 func (p *TTSPipeline) CountUncachedGroups(groups []ClipGroup) (cached, uncached int) {
