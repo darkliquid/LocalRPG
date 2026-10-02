@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
 
@@ -90,6 +91,25 @@ func normalizeCaps(caps TTSCapabilities) TTSCapabilities {
 		caps.MaxTokensPerRequest = 0
 	}
 	return caps
+}
+
+// ResolveGroupCaps overlays the operator's configured limits on a client's
+// declared capabilities, so a proxied or self-hosted endpoint whose limits
+// cannot be queried can still be grouped safely.
+func ResolveGroupCaps(cfg config.TTSConfig, client TTSClient) TTSCapabilities {
+	caps := ClientCapabilities(client)
+	if cfg.Limits != nil {
+		if cfg.Limits.MaxSpeakers > 0 {
+			caps.MaxSpeakers = cfg.Limits.MaxSpeakers
+		}
+		if cfg.Limits.MaxChars > 0 {
+			caps.MaxCharsPerRequest = cfg.Limits.MaxChars
+		}
+		if cfg.Limits.MaxTokens > 0 {
+			caps.MaxTokensPerRequest = cfg.Limits.MaxTokens
+		}
+	}
+	return normalizeCaps(caps)
 }
 
 // groupKeyLine is the per-line payload a group key hashes. Every field that

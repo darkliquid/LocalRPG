@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
 
@@ -55,6 +56,22 @@ func TestClientCapabilitiesClampsSpeakersAndLimits(t *testing.T) {
 	caps := ClientCapabilities(client)
 	if caps.MaxSpeakers != 1 || caps.MaxCharsPerRequest != 0 || caps.MaxTokensPerRequest != 0 {
 		t.Errorf("unexpected capabilities %#v", caps)
+	}
+}
+
+func TestResolveGroupCapsOverlaysConfiguredLimits(t *testing.T) {
+	client := &capGroupClient{caps: TTSCapabilities{MaxSpeakers: 2, MaxCharsPerRequest: 4000, SupportsGrouping: true}}
+	cfg := config.TTSConfig{Limits: &config.TTSLimits{MaxChars: 1000, MaxSpeakers: 1}}
+	caps := ResolveGroupCaps(cfg, client)
+
+	if caps.MaxCharsPerRequest != 1000 {
+		t.Errorf("MaxCharsPerRequest = %d, want 1000", caps.MaxCharsPerRequest)
+	}
+	if caps.MaxSpeakers != 1 {
+		t.Errorf("MaxSpeakers = %d, want 1", caps.MaxSpeakers)
+	}
+	if !caps.SupportsGrouping {
+		t.Errorf("expected the provider's grouping capability to survive the overlay")
 	}
 }
 
