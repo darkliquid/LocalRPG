@@ -17,7 +17,7 @@
 - Modify: `pkg/media/exports.go:21-43`
 - Test: `pkg/media/key_test.go:10-55`
 
-- [ ] **Step 1: Write the failing test for KeyTTSFishAudio resolution**
+- [x] **Step 1: Write the failing test for KeyTTSFishAudio resolution**
 
 Add test cases in `pkg/media/key_test.go`:
 
@@ -57,12 +57,12 @@ func TestTTSKeyForFishAudio(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestTTSKeyForFishAudio ./pkg/media/...`
 Expected: FAIL with compilation error: undefined `provider.KeyTTSFishAudio`.
 
-- [ ] **Step 3: Define KeyTTSFishAudio in pkg/provider/keys.go**
+- [x] **Step 3: Define KeyTTSFishAudio in pkg/provider/keys.go**
 
 In `pkg/provider/keys.go`:
 1. Add `KeyTTSFishAudio Key = "tts:fish-audio"` to the `const` block.
@@ -81,7 +81,7 @@ const (
 )
 ```
 
-- [ ] **Step 4: Update TTSKeyFor in pkg/media/exports.go**
+- [x] **Step 4: Update TTSKeyFor in pkg/media/exports.go**
 
 In `pkg/media/exports.go`, update `TTSKeyFor`:
 
@@ -117,12 +117,12 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -v -run TestTTSKeyFor ./pkg/media/...`
 Expected: PASS for all `TestTTSKeyFor*`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/provider/keys.go pkg/media/exports.go pkg/media/key_test.go
@@ -137,7 +137,7 @@ git commit -m "feat(provider): add KeyTTSFishAudio and key resolution"
 - Create: `pkg/provider/ttsfishaudio/client.go`
 - Create: `pkg/provider/ttsfishaudio/client_test.go`
 
-- [ ] **Step 1: Write unit tests in pkg/provider/ttsfishaudio/client_test.go**
+- [x] **Step 1: Write unit tests in pkg/provider/ttsfishaudio/client_test.go**
 
 Create `pkg/provider/ttsfishaudio/client_test.go`:
 
@@ -311,12 +311,12 @@ func TestFishAudioVoiceCatalogFallback(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/provider/ttsfishaudio/...`
 Expected: FAIL with compilation error: package does not exist or types missing.
 
-- [ ] **Step 3: Implement pkg/provider/ttsfishaudio/client.go**
+- [x] **Step 3: Implement pkg/provider/ttsfishaudio/client.go**
 
 Create `pkg/provider/ttsfishaudio/client.go`:
 
@@ -562,12 +562,12 @@ var _ media.VoiceOptions = (*FishAudioTTSClient)(nil)
 var _ media.SpeechCueAdvertiser = (*FishAudioTTSClient)(nil)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/provider/ttsfishaudio/...`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/provider/ttsfishaudio/
@@ -584,7 +584,7 @@ git commit -m "feat(ttsfishaudio): implement FishAudioTTSClient and tests"
 - Test: `pkg/provider/all/all_test.go`
 - Test: `pkg/provider/all/preset_parity_test.go`
 
-- [ ] **Step 1: Write pkg/provider/ttsfishaudio/ttsfishaudio.go**
+- [x] **Step 1: Write pkg/provider/ttsfishaudio/ttsfishaudio.go**
 
 Create `pkg/provider/ttsfishaudio/ttsfishaudio.go`:
 
@@ -645,16 +645,16 @@ func init() {
 }
 ```
 
-- [ ] **Step 2: Blank-import in pkg/provider/all/all.go**
+- [x] **Step 2: Blank-import in pkg/provider/all/all.go**
 
 Add `_ "github.com/darkliquid/localrpg/pkg/provider/ttsfishaudio"` to `pkg/provider/all/all.go`.
 
-- [ ] **Step 3: Run all provider tests to verify descriptor and preset parity**
+- [x] **Step 3: Run all provider tests to verify descriptor and preset parity**
 
 Run: `go test -v ./pkg/provider/all/...`
 Expected: PASS (`TestTTSDescriptorsBuildAndFeaturesAreBacked`, `TestPresetsBuildMatchingClients`, `TestPresetParity`).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/provider/ttsfishaudio/ttsfishaudio.go pkg/provider/all/all.go
@@ -668,7 +668,7 @@ git commit -m "feat(provider): register tts:fish-audio and preset"
 **Files:**
 - Modify: `frontend/src/components/SettingsStudio.tsx:1570-1700`
 
-- [ ] **Step 1: Add Fish Audio S2 to the TTS Engine dropdown in SettingsStudio.tsx**
+- [x] **Step 1: Add Fish Audio S2 to the TTS Engine dropdown in SettingsStudio.tsx**
 
 In `frontend/src/components/SettingsStudio.tsx`:
 1. In the TTS Engine `<select>` value calculation, add support for detecting `fish-audio`:
@@ -705,12 +705,12 @@ config.media.tts.type === 'fish-audio' ||
 }
 ```
 
-- [ ] **Step 2: Verify frontend type check and bundle build**
+- [x] **Step 2: Verify frontend type check and bundle build**
 
 Run: `npm --prefix frontend run build`
 Expected: PASS with no TypeScript or Vite bundle errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/SettingsStudio.tsx
@@ -726,19 +726,19 @@ git commit -m "feat(frontend): add Fish Audio S2 engine selection in SettingsStu
 - Run: `go test ./pkg/gui -update-docs`
 - Verify: `pkg/gui/docs/12-provider-catalogue.md`
 
-- [ ] **Step 1: Document Fish Audio S2 in pkg/gui/docs/05-providers.md**
+- [x] **Step 1: Document Fish Audio S2 in pkg/gui/docs/05-providers.md**
 
 Add a dedicated section for Fish Audio S2 Pro under Voice Synthesis in `pkg/gui/docs/05-providers.md`:
 - Model description: 4B Dual-AR, 44.1 kHz, emotional cues (`[whisper]`, `[excited]`, etc.).
 - vLLM-Omni setup command and Docker run command.
 - Zero-shot voice cloning parameters (`ref_audio`, `ref_text`).
 
-- [ ] **Step 2: Regenerate embedded catalogue documentation**
+- [x] **Step 2: Regenerate embedded catalogue documentation**
 
 Run: `go test ./pkg/gui -update-docs`
 Expected: PASS, updates `pkg/gui/docs/12-provider-catalogue.md` to reflect `tts:fish-audio` and its preset.
 
-- [ ] **Step 3: Run full backend and frontend test suites**
+- [x] **Step 3: Run full backend and frontend test suites**
 
 Run:
 ```bash
@@ -747,7 +747,7 @@ npm --prefix frontend run build
 ```
 Expected: All tests PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/gui/docs/
