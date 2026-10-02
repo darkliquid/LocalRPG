@@ -151,6 +151,17 @@ var TTSPresets = map[string]TTSConfig{
 		MasterVolume: 1.0,
 	},
 
+	"fish-audio-s2-vllm": {
+		Type:         "http",
+		Endpoint:     "http://localhost:8091",
+		Model:        "fishaudio/s2-pro",
+		DefaultVoice: "default",
+		Pitch:        1.0,
+		SpeechRate:   1.0,
+		AutoPlay:     true,
+		MasterVolume: 1.0,
+	},
+
 	"elevenlabs": {
 		Type:         "builtin",
 		BuiltinName:  "elevenlabs",

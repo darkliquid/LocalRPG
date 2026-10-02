@@ -17,6 +17,7 @@ import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/sttwhispercli"
 	_ "github.com/darkliquid/localrpg/pkg/provider/sttwhisperhttp"
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttselevenlabs"
+	_ "github.com/darkliquid/localrpg/pkg/provider/ttsfishaudio"
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttsgemini"
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttshttp"
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttsnativeos"
