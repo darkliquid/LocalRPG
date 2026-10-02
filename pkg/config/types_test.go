@@ -529,3 +529,18 @@ func TestPriceConfigRoundTrips(t *testing.T) {
 		t.Fatalf("round trip lost prices: %+v", back.Providers)
 	}
 }
+
+func TestConfigParsesInworldProvider(t *testing.T) {
+	yamlStr := `
+providers:
+  inworld:
+    api_key: "test-inworld-key-123"
+`
+	var cfg Config
+	if err := yaml.Unmarshal([]byte(yamlStr), &cfg); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if got := cfg.Providers.Inworld.APIKey; got != "test-inworld-key-123" {
+		t.Errorf("cfg.Providers.Inworld.APIKey = %q, want test-inworld-key-123", got)
+	}
+}
