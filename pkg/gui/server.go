@@ -53,6 +53,7 @@ func routePattern(path string) string {
 		path == "/api/settings" || path == "/api/settings/test-provider" ||
 		path == "/api/providers" || path == "/api/providers/models" ||
 		path == "/api/tts/inspect" || path == "/api/tts/voices/search" ||
+		path == "/api/tts/batch" ||
 		path == "/api/stt" || path == "/api/trace" || path == "/api/character/generate" ||
 		path == "/api/generate-text" || path == "/api/generate-asset-preview" ||
 		path == "/api/usage" || path == "/api/limits":
@@ -64,6 +65,8 @@ func routePattern(path string) string {
 		return path
 	case strings.HasPrefix(path, "/api/export/"):
 		return "/api/export/{gameID}"
+	case strings.HasPrefix(path, "/api/tts/batch/"):
+		return "/api/tts/batch"
 	case strings.HasPrefix(path, "/api/game/"):
 		rest := strings.TrimPrefix(path, "/api/game/")
 		if _, suffix, ok := strings.Cut(rest, "/"); ok {
@@ -151,6 +154,68 @@ func (s *Server) handleLimitsRoute(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, LimitsDTO{Blocks: s.service.Limits()})
 }
 
+// handleTTSBatchRoute serves the global batch job manager: GET /api/tts/batch
+// lists every campaign's jobs, and POST /api/tts/batch/cancel cancels one.
+func (s *Server) handleTTSBatchRoute(w http.ResponseWriter, r *http.Request) {
+	switch {
+	case r.Method == http.MethodGet && (r.URL.Path == "/api/tts/batch" || r.URL.Path == "/api/tts/batch/"):
+		jobs, err := s.service.AllTTSBatchJobs(r.Context())
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, jobs)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/tts/batch/cancel":
+		var req TTSBatchCancelRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if err := s.service.CancelTTSBatch(r.Context(), req.GameID, req.JobID); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/tts/batch/delete":
+		var req TTSBatchCancelRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if err := s.service.DeleteTTSBatch(r.Context(), req.GameID, req.JobID); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/tts/batch/clear":
+		var req TTSBatchClearRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		removed, err := s.service.ClearTTSBatch(r.Context(), req.GameID)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, map[string]int{"removed": removed})
+	case r.Method == http.MethodPost && r.URL.Path == "/api/tts/batch/resume":
+		var req TTSBatchCancelRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		job, err := s.service.ResumeTTSBatch(r.Context(), req.GameID, req.JobID)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, job)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
 func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/game/")
 	parts := strings.Split(path, "/")
@@ -231,16 +296,45 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case "tts":
-		if len(parts) < 3 || parts[2] != "uncached" || r.Method != http.MethodGet {
+		if len(parts) < 3 {
 			http.NotFound(w, r)
 			return
 		}
-		cached, uncached, err := s.service.CountUncachedBeats(gameID)
-		if err != nil {
-			writeGameError(w, err)
-			return
+		switch parts[2] {
+		case "uncached":
+			if r.Method != http.MethodGet {
+				http.NotFound(w, r)
+				return
+			}
+			cached, uncached, err := s.service.CountUncachedBeats(gameID)
+			if err != nil {
+				writeGameError(w, err)
+				return
+			}
+			writeJSON(w, map[string]int{"cached": cached, "uncached": uncached})
+		case "batch":
+			switch r.Method {
+			case http.MethodGet:
+				jobs, err := s.service.TTSBatchJobs(gameID)
+				if err != nil {
+					writeGameError(w, err)
+					return
+				}
+				writeJSON(w, jobs)
+			case http.MethodPost:
+				force := r.URL.Query().Get("force") == "1" || r.URL.Query().Get("force") == "true"
+				job, err := s.service.StartTTSBatch(r.Context(), gameID, force)
+				if err != nil {
+					writeGameError(w, err)
+					return
+				}
+				writeJSON(w, job)
+			default:
+				http.NotFound(w, r)
+			}
+		default:
+			http.NotFound(w, r)
 		}
-		writeJSON(w, map[string]int{"cached": cached, "uncached": uncached})
 
 	case "restart":
 		if r.Method != http.MethodPost {

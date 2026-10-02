@@ -3,7 +3,8 @@ package harness
 import "sync"
 
 // Usage is one provider call's consumption. Estimated marks a value derived from
-// request shape rather than reported by the provider.
+// request shape rather than reported by the provider. Batch marks a call made
+// through a provider's batch API, which is priced at a discount.
 type Usage struct {
 	Provider     string `json:"provider,omitempty"`
 	Model        string `json:"model,omitempty"`
@@ -12,6 +13,7 @@ type Usage struct {
 	Characters   int    `json:"characters,omitempty"`
 	Requests     int    `json:"requests,omitempty"`
 	Estimated    bool   `json:"estimated,omitempty"`
+	Batch        bool   `json:"batch,omitempty"`
 }
 
 // UsageRecorder is the sink a Router or Extractor reports to. It knows the role

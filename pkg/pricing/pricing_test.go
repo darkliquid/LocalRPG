@@ -75,6 +75,19 @@ func TestResolvePrefersInstanceModelOverAdapterWide(t *testing.T) {
 	}
 }
 
+func TestCostMicrosAppliesBatchDiscount(t *testing.T) {
+	price := Price{PerCharacter: 100}
+	interactive := CostMicros(harness.Usage{Characters: 1000}, price)
+	batch := CostMicros(harness.Usage{Characters: 1000, Batch: true}, price)
+
+	if interactive != 100_000 {
+		t.Fatalf("interactive cost = %d, want 100000", interactive)
+	}
+	if batch != interactive/2 {
+		t.Errorf("batch cost = %d, want half of %d", batch, interactive)
+	}
+}
+
 func TestResolveIgnoresAKeyThatIsNotCanonical(t *testing.T) {
 	cfg := &config.Config{Providers: config.ProvidersConfig{Prices: []config.PriceConfig{
 		{Provider: "openaichat", PerMillionInput: 1},

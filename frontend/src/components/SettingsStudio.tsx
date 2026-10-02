@@ -22,6 +22,7 @@ import {
   Bug,
   Cloud,
   Coins,
+  Layers,
 } from 'lucide-react';
 import {
   DEFAULT_VOICE_PROFILES,
@@ -33,6 +34,7 @@ import { useTTSInspect } from '../hooks/useTTSInspect';
 import { VoiceCombobox } from './VoiceCombobox';
 import { VoiceCatalogModal } from './VoiceCatalogModal';
 import { UsagePanel } from './UsagePanel';
+import { TTSBatchPanel } from './TTSBatchPanel';
 import { hasWebSpeechSupport } from '../lib/webSpeech';
 
 interface SettingsStudioProps {
@@ -113,7 +115,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const webSpeechAvailable = hasWebSpeechSupport();
   const [activeFilePath, setActiveFilePath] = useState<string>('');
   const [isOverride, setIsOverride] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'paths' | 'providers' | 'agents' | 'media' | 'preferences' | 'usage' | 'debug'>('paths');
+  const [activeSubTab, setActiveSubTab] = useState<'paths' | 'providers' | 'agents' | 'media' | 'batch' | 'preferences' | 'usage' | 'debug'>('paths');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -394,6 +396,15 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           >
             <Volume2 className="w-3.5 h-3.5" />
             <span>Media Engines</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('batch')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
+              activeSubTab === 'batch' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Batch Jobs</span>
           </button>
           <button
             onClick={() => setActiveSubTab('preferences')}
@@ -2852,6 +2863,13 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Tab: Batch Speech Backfill */}
+      {activeSubTab === 'batch' && (
+        <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          <TTSBatchPanel />
         </div>
       )}
 

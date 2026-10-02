@@ -47,6 +47,16 @@ type Scene struct {
 	Duration     time.Duration
 }
 
+// ClipGroup is one clip a run of adjacent same-speaker beats shares, so the
+// exporter resolves and plays it once rather than once per covered beat. The
+// group's clip is carried by the first of its beats.
+type ClipGroup struct {
+	Key            string
+	AudioPaths     []string
+	Duration       time.Duration
+	SegmentIndexes []int
+}
+
 // Script is the whole export.
 type Script struct {
 	GameID   string

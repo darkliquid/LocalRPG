@@ -125,13 +125,51 @@ type SegmentDTO struct {
 	Speaker   string `json:"speaker,omitempty"`
 	SpeakerID string `json:"speaker_id,omitempty"`
 	Text      string `json:"text"`
-	// AudioURLs is the segment's clips in play order, one per sentence of reduced
-	// text. Each URL is content-addressed, so the key in it names the audio.
+	// AudioURLs is the segment's clips in play order. With grouping, a run of
+	// adjacent same-speaker segments shares one clip, so this is usually one URL;
+	// ClipGroup names that shared clip so the client renders one control for the
+	// whole group.
 	AudioURLs   []string `json:"audio_urls,omitempty"`
+	ClipGroup   string   `json:"clip_group,omitempty"`
 	PortraitURL string   `json:"portrait_url,omitempty"`
 	CheckRef    string   `json:"check_ref,omitempty"`
 	Player      bool     `json:"player,omitempty"`
 	Duration    float64  `json:"duration"`
+}
+
+// ClipGroupDTO is one clip that a run of segments shares, so a client renders a
+// single play/stop/regenerate control for the group rather than one per segment.
+type ClipGroupDTO struct {
+	Key            string   `json:"key"`
+	AudioURLs      []string `json:"audio_urls"`
+	SegmentIndexes []int    `json:"segment_indexes"`
+}
+
+// TTSBatchJobDTO is one offline batch synthesis job, for the global manager.
+type TTSBatchJobDTO struct {
+	ID           string   `json:"id"`
+	GameID       string   `json:"game_id"`
+	GameName     string   `json:"game_name,omitempty"`
+	Provider     string   `json:"provider"`
+	Model        string   `json:"model,omitempty"`
+	Status       string   `json:"status"`
+	RequestCount int      `json:"request_count"`
+	Completed    int      `json:"completed"`
+	FailedKeys   []string `json:"failed_keys,omitempty"`
+	// LastError is why the job last failed to progress, empty when it is fine.
+	LastError string `json:"last_error,omitempty"`
+}
+
+// TTSBatchCancelRequest names the job a cancel or delete applies to.
+type TTSBatchCancelRequest struct {
+	GameID string `json:"game_id"`
+	JobID  string `json:"job_id"`
+}
+
+// TTSBatchClearRequest scopes a clear to one campaign, or to all of them when
+// GameID is empty.
+type TTSBatchClearRequest struct {
+	GameID string `json:"game_id,omitempty"`
 }
 
 type TurnDTO struct {
@@ -144,6 +182,9 @@ type TurnDTO struct {
 	ImageURL        string        `json:"image_url,omitempty"`
 	EntitiesHit     []string      `json:"entities_hit,omitempty"`
 	Segments        []SegmentDTO  `json:"segments,omitempty"`
+	// ClipGroups lists the shared clips a run of segments plays, so the client
+	// renders one control per group.
+	ClipGroups      []ClipGroupDTO `json:"clip_groups,omitempty"`
 	Outcome         string        `json:"outcome,omitempty"`
 	Truncated       bool          `json:"truncated,omitempty"`
 	Recovery        string        `json:"recovery,omitempty"`

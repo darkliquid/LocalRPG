@@ -1,7 +1,7 @@
 import React from 'react';
 import { TurnSegment, TurnCheck } from '../types';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
-import { anySegmentHasAudio } from '../lib/audio';
+import { anySegmentHasAudio, segmentIsGroupLeader } from '../lib/audio';
 import { MarkdownProse } from './MarkdownProse';
 import { ImageLightbox } from './ImageLightbox';
 import { useLightbox } from '../hooks/useLightbox';
@@ -86,11 +86,15 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
 
   const segmentControls = (index: number) => {
     if (!ordered[index]?.audio_urls?.length) return null;
+    // A group's control renders once, on its first segment: the hover belongs to
+    // the whole clip, not to each segment it covers.
+    if (!segmentIsGroupLeader(ordered, index)) return null;
     const status = segmentState(index);
     return (
       <SegmentAudioControls
         state={status.state}
         message={status.message}
+        grouped={!!ordered[index]?.clip_group}
         onPlay={() => (serverPlayback ? startServerPlayback(index) : playFrom(index))}
         onStop={() => (serverPlayback ? stopServerPlayback() : stop())}
         onRegenerate={() => (serverPlayback ? startServerPlayback(index, true) : regenerateFrom(index))}
