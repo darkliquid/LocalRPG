@@ -6,6 +6,11 @@ import type { GameSummary, TTSBatchJob } from '../types';
 // A job that is still running can be cancelled.
 const ACTIVE_STATUSES = new Set(['submitted', 'pending', 'running']);
 
+// messageOf turns a thrown value into the reason the server gave, trimmed, so a
+// provider error or a network fault is shown rather than a bare status.
+const messageOf = (err: unknown): string =>
+  (err instanceof Error ? err.message : String(err)).trim() || 'the request failed with no detail';
+
 // statusColor maps a job status to a text colour.
 const statusColor = (status: string): string => {
   switch (status) {
@@ -43,7 +48,7 @@ export const TTSBatchPanel: React.FC = () => {
       setJobs(nextJobs);
       setGames(nextGames);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(messageOf(err));
     } finally {
       setLoading(false);
     }
@@ -68,7 +73,7 @@ export const TTSBatchPanel: React.FC = () => {
       }
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(messageOf(err));
     }
   };
 
@@ -78,7 +83,7 @@ export const TTSBatchPanel: React.FC = () => {
       await APIClient.cancelTTSBatchJob(job.game_id, job.id);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(messageOf(err));
     }
   };
 
@@ -139,7 +144,11 @@ export const TTSBatchPanel: React.FC = () => {
         without spending interactive rate-limit quota.
       </p>
 
-      {error && <div className="text-xs text-rose-300">{error}</div>}
+      {error && (
+        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200 whitespace-pre-wrap break-words">
+          {error}
+        </div>
+      )}
 
       {visible.length === 0 ? (
         <div className="text-xs text-stone-500">No batch jobs.</div>

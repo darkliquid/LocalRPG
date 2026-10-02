@@ -71,7 +71,7 @@ func (c *GeminiTTSClient) SubmitBatch(ctx context.Context, reqs []media.BatchReq
 		DisplayName: "localrpg-tts-batch",
 	})
 	if err != nil {
-		return media.BatchJobHandle{}, fmt.Errorf("gemini tts: upload batch input: %w", err)
+		return media.BatchJobHandle{}, fmt.Errorf("gemini tts: upload batch input: %w", mapGeminiTTSError(err, c.model))
 	}
 
 	job, err := c.client.Batches.Create(ctx, c.model, &genai.BatchJobSource{
@@ -79,7 +79,7 @@ func (c *GeminiTTSClient) SubmitBatch(ctx context.Context, reqs []media.BatchReq
 		FileName: file.Name,
 	}, nil)
 	if err != nil {
-		return media.BatchJobHandle{}, fmt.Errorf("gemini tts: create batch job: %w", err)
+		return media.BatchJobHandle{}, fmt.Errorf("gemini tts: create batch job: %w", mapGeminiTTSError(err, c.model))
 	}
 	return media.BatchJobHandle{ID: job.Name, Model: c.model}, nil
 }

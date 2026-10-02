@@ -2345,6 +2345,11 @@ func (s *Service) StartTTSBatch(ctx context.Context, gameID string) (*TTSBatchJo
 
 	job, err := batchEngine.Submit(ctx, opts, groups)
 	if err != nil {
+		trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+			"game":     gameID,
+			"provider": providerKey,
+			"error":    err.Error(),
+		})
 		return nil, err
 	}
 	if job == nil {
@@ -2355,6 +2360,12 @@ func (s *Service) StartTTSBatch(ctx context.Context, gameID string) (*TTSBatchJo
 	// watches the job row rather than holding a request open.
 	s.goBackground(func() {
 		if _, err := batchEngine.Resume(context.Background(), opts, job.ID); err != nil {
+			trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+				"game":     gameID,
+				"job":      job.ID,
+				"provider": providerKey,
+				"error":    err.Error(),
+			})
 			s.noteFailure("tts", err)
 			return
 		}

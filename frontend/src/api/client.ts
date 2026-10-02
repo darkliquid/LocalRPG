@@ -532,22 +532,23 @@ export class APIClient {
 
   static async uncachedBeats(gameID: string): Promise<{ cached: number; uncached: number }> {
     const res = await fetch(`/api/game/${gameID}/tts/uncached`);
-    if (!res.ok) throw new Error(`uncachedBeats: ${res.statusText}`);
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
   }
 
   // listTTSBatchJobs returns a campaign's offline batch synthesis jobs.
   static async listTTSBatchJobs(gameID: string): Promise<TTSBatchJob[]> {
     const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/tts/batch`);
-    if (!res.ok) throw new Error(`listTTSBatchJobs: ${res.statusText}`);
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
   }
 
   // startTTSBatch submits an offline backfill, or returns null when every clip
-  // is already cached.
+  // is already cached. A failure carries the server's reason (a provider error,
+  // a missing key, a network fault) rather than a bare status.
   static async startTTSBatch(gameID: string): Promise<TTSBatchJob | null> {
     const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/tts/batch`, { method: 'POST' });
-    if (!res.ok) throw new Error(`startTTSBatch: ${res.statusText}`);
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
   }
 
@@ -555,7 +556,7 @@ export class APIClient {
   // global manager.
   static async listAllTTSBatchJobs(): Promise<TTSBatchJob[]> {
     const res = await fetch('/api/tts/batch');
-    if (!res.ok) throw new Error(`listAllTTSBatchJobs: ${res.statusText}`);
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
   }
 
@@ -566,7 +567,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ game_id: gameID, job_id: jobID }),
     });
-    if (!res.ok) throw new Error(`cancelTTSBatchJob: ${res.statusText}`);
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
   }
 
   static async transcribeAudio(audioBlob: Blob): Promise<{ text: string }> {
