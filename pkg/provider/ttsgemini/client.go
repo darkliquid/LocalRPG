@@ -212,10 +212,7 @@ func (c *GeminiTTSClient) Synthesize(ctx context.Context, text string, voice *en
 		return nil, errors.New("gemini tts: client not initialized")
 	}
 
-	voiceName := c.defaultVoice
-	if voice != nil && strings.TrimSpace(voice.VoiceID) != "" {
-		voiceName = strings.TrimSpace(voice.VoiceID)
-	}
+	voiceName := c.voiceNameFor(voice)
 
 	// Gemini TTS has no style field; delivery is steered by director's notes
 	// prepended to the transcript. Sanitise against the declared schema so a
@@ -243,7 +240,13 @@ func (c *GeminiTTSClient) Synthesize(ctx context.Context, text string, voice *en
 	if err != nil {
 		return nil, mapGeminiTTSError(err, c.model)
 	}
+	return c.audioFromResponse(resp)
+}
 
+// audioFromResponse pulls the audio out of a TTS response and wraps headerless
+// PCM so a decoder or browser can play it. An already-containerised clip (some
+// models return WAV) is passed through unchanged.
+func (c *GeminiTTSClient) audioFromResponse(resp *genai.GenerateContentResponse) ([]byte, error) {
 	if resp == nil || len(resp.Candidates) == 0 {
 		return nil, errors.New("gemini tts: no candidates returned from model")
 	}
@@ -257,9 +260,6 @@ func (c *GeminiTTSClient) Synthesize(ctx context.Context, text string, voice *en
 	for _, part := range cand.Content.Parts {
 		if part.InlineData != nil && len(part.InlineData.Data) > 0 {
 			data := part.InlineData.Data
-			// Gemini TTS returns headerless PCM ("audio/L16;..."). Wrap it so a
-			// decoder or browser can play it; an already-containerised clip (some
-			// models return WAV) is passed through unchanged.
 			if media.IsPCMAudio(part.InlineData.MIMEType) {
 				return media.WrapPCMAsWAV(data, media.PCMSampleRate(part.InlineData.MIMEType)), nil
 			}
@@ -268,6 +268,81 @@ func (c *GeminiTTSClient) Synthesize(ctx context.Context, text string, voice *en
 	}
 
 	return nil, errors.New("gemini tts: no audio data found in response")
+}
+
+// TTSCapabilities declares what one Gemini request can render: two speakers, the
+// documented 8192-token input cap (approximated in characters for grouping), and
+// batch and streaming support.
+func (c *GeminiTTSClient) TTSCapabilities() media.TTSCapabilities {
+	return media.TTSCapabilities{
+		MaxSpeakers:         2,
+		MaxCharsPerRequest:  8192,
+		MaxTokensPerRequest: 8192,
+		SupportsGrouping:    true,
+		SupportsBatch:       true,
+		SupportsStreaming:   true,
+	}
+}
+
+// SynthesizeGroup renders a two-speaker scene in one request. Gemini addresses
+// speakers by a label that must match the transcript, so each line's label is
+// used both in the speaker configuration and in the text.
+func (c *GeminiTTSClient) SynthesizeGroup(ctx context.Context, lines []media.SpeakerLine) ([]byte, error) {
+	if len(lines) == 0 {
+		return nil, errors.New("gemini tts: a group needs at least one line")
+	}
+
+	speakerConfigs := make([]*genai.SpeakerVoiceConfig, 0, len(lines))
+	seen := map[string]bool{}
+	var transcript strings.Builder
+	for _, line := range lines {
+		label := strings.TrimSpace(line.Label)
+		if label == "" {
+			label = strings.TrimSpace(line.SpeakerID)
+		}
+		if label == "" {
+			return nil, errors.New("gemini tts: every speaker needs a label")
+		}
+		if !seen[label] {
+			seen[label] = true
+			speakerConfigs = append(speakerConfigs, &genai.SpeakerVoiceConfig{
+				Speaker:     label,
+				VoiceConfig: &genai.VoiceConfig{PrebuiltVoiceConfig: &genai.PrebuiltVoiceConfig{VoiceName: c.voiceNameFor(line.Voice)}},
+			})
+		}
+		transcript.WriteString(label)
+		transcript.WriteString(": ")
+		transcript.WriteString(strings.TrimSpace(line.Text))
+		transcript.WriteByte('\n')
+	}
+
+	if len(speakerConfigs) != 2 {
+		return nil, fmt.Errorf("gemini tts: exactly two speakers are required, got %d", len(speakerConfigs))
+	}
+	if c.client == nil {
+		return nil, errors.New("gemini tts: client not initialized")
+	}
+
+	reqConfig := &genai.GenerateContentConfig{
+		ResponseModalities: []string{"AUDIO"},
+		SpeechConfig: &genai.SpeechConfig{
+			MultiSpeakerVoiceConfig: &genai.MultiSpeakerVoiceConfig{SpeakerVoiceConfigs: speakerConfigs},
+		},
+	}
+
+	resp, err := c.client.Models.GenerateContent(ctx, c.model, genai.Text(transcript.String()), reqConfig)
+	if err != nil {
+		return nil, mapGeminiTTSError(err, c.model)
+	}
+	return c.audioFromResponse(resp)
+}
+
+// voiceNameFor resolves a line's voice, falling back to the client's default.
+func (c *GeminiTTSClient) voiceNameFor(voice *entity.VoiceConfig) string {
+	if voice != nil && strings.TrimSpace(voice.VoiceID) != "" {
+		return strings.TrimSpace(voice.VoiceID)
+	}
+	return c.defaultVoice
 }
 
 func mapGeminiTTSError(err error, model string) error {
