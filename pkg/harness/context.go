@@ -204,8 +204,8 @@ func (c *ContextAssembler) Assemble(req ContextRequest) (AssembleResult, error) 
 // check resolution requirements.
 const turnProtocolInstruction = `## TURN RESOLUTION PROTOCOL
 1. For any action with uncertain consequences, resolve it by calling ` + "`request_check`" + ` before narrating the outcome. Never invent dice roll outcomes.
-2. End your turn by providing the structured turn output (action verdict, ordered segments, introduced personae, memories, state changes).
-3. Every speech segment must name its speaker. If introducing a new character, declare them under personae.
+2. Do not write the turn as prose first. Finish by submitting the structured turn payload exactly once: the action verdict, ordered narration and speech segments, introduced personae, memories, and state changes. Use the ` + "`submit_turn`" + ` tool when it is offered, or a JSON object with the same fields when it is not.
+3. Every speech segment must name its speaker in ` + "`speaker`" + `. If the speaker is a new character, declare them under ` + "`personae`" + `.
 `
 
 // actionEchoInstruction tells the narrator to re-anchor the scene on the player's

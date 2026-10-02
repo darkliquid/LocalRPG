@@ -16,7 +16,10 @@ func buildSegments(sub *harness.TurnSubmission, resolve func(string) (string, bo
 	segments := make([]entity.TurnSegment, 0, len(sub.Segments))
 	for _, spec := range sub.Segments {
 		if spec.Kind == "speech" {
-			id, ok := resolve(spec.Speaker)
+			// The GM often names a speaker the way the narration links them, so
+			// the wikilink is unwrapped before it is resolved and displayed.
+			speaker := entity.WikilinkTarget(spec.Speaker)
+			id, ok := resolve(speaker)
 			if !ok {
 				appendNarration(&narration, spec.Text)
 				segments = append(segments, entity.TurnSegment{Kind: entity.SegmentNarration, Text: spec.Text, CheckRef: spec.CheckRef})
@@ -24,7 +27,7 @@ func buildSegments(sub *harness.TurnSubmission, resolve func(string) (string, bo
 			}
 			segments = append(segments, entity.TurnSegment{
 				Kind:      entity.SegmentSpeech,
-				Speaker:   spec.Speaker,
+				Speaker:   speaker,
 				SpeakerID: id,
 				Text:      spec.Text,
 				CheckRef:  spec.CheckRef,

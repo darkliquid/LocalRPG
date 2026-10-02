@@ -301,3 +301,20 @@ second failure logs `turn.protocol_error` and falls back (§6).
   turn, or should the UI replace in place? (Current proposal: replace on submit.)
 - Does `submit_turn` need an explicit `narration` convenience field, or is joining
   segments enough? (Current proposal: derive only.)
+
+## 11. Addendum (2026-10-02): the provisional stream is not narrated
+
+Replacing the raw stream in place proved harmful once `submit_turn` was the
+primary path. A model that wrote the turn as prose and then submitted it as a
+tool call had its draft shown as narration, then replaced by the same content as
+segments; the sentence streamer also synthesized the draft in the narrator's
+voice, so a `Name: "words"` line had the speaker's name read aloud. A schema
+response was worse still, because the streamed JSON was rendered and spoken
+verbatim.
+
+The provisional stream is therefore only forwarded when it is a prose answer: a
+round that cannot call a tool and is not asked for a schema response. Every other
+round is buffered by the provider stream and never reaches the listener, so the
+chronicle shows the turn once, and the audio comes from the authored segments in
+their own voices. The turn's time to first token is still measured, so a round
+that is not narrated reports its latency like any other.

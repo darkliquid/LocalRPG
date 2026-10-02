@@ -121,6 +121,10 @@ type TurnOrchestrator struct {
 	toolObserver     func(ToolActivity)
 	speechCues       harness.SpeechCueContext
 	usageCtx         *harness.UsageContext
+	// ttftStart and ttftReported measure a turn's time to first token, which is
+	// reported once even when the token is never narrated to the client.
+	ttftStart    time.Time
+	ttftReported bool
 }
 
 // SetSpeechCues sets the vocal steering hints passed to the GM prompt.
@@ -811,20 +815,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		o.pendingCheckRef = ""
 	}
 
-	if onChunk != nil {
-		started := time.Now()
-		first := true
-		inner := onChunk
-		onChunk = func(text string) error {
-			if first {
-				first = false
-				elapsed := time.Since(started).Milliseconds()
-				engineMetrics().turnTTFT.Record(ctx, float64(elapsed))
-				o.logger.Event("turn.ttft", map[string]interface{}{"ms": elapsed})
-			}
-			return inner(text)
-		}
-	}
+	// The turn's first token is reported once, wherever it lands. A round that is
+	// not narrated still measures latency, so a structured turn that never streams
+	// prose to the client reports its time to first token like any other.
+	o.ttftStart = time.Now()
+	o.ttftReported = false
 
 	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, proposedCheck, resolvedPending, validationEngagement, onChunk)
 	if err != nil {
@@ -1327,6 +1322,10 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 			if chunk.Text != "" || len(chunk.ToolCalls) > 0 {
 				chunkCount++
 			}
+			// The turn's first token is reported here, where it actually arrives,
+			// so a round that is never narrated to the client still measures its
+			// latency.
+			o.reportFirstToken(ctx)
 
 			if chunk.Text == "" {
 				continue
@@ -1487,9 +1486,6 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 			}
 			resp, err := sessProvider.ContinueSession(ctx, handle, deltaReq)
 			if err == nil {
-				if onChunk != nil && resp.Text != "" {
-					_ = onChunk(resp.Text)
-				}
 				assembly.Context.CachedTokens = resp.CachedTokens
 				newID := resp.SessionID
 				if newID == "" {
@@ -1502,7 +1498,11 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					Model:       modelName,
 					PrefixHash:  assembly.Context.PrefixHash,
 				}
-				return o.parsePureTextSubmission(streamResult{Text: resp.Text}, checks, proposed, engagement, provenance, supportsStructured), nil
+				result := o.parsePureTextSubmission(streamResult{Text: resp.Text}, checks, proposed, engagement, provenance, supportsStructured)
+				if err := o.streamProse(ctx, result, resp.Text, onChunk); err != nil {
+					return result, err
+				}
+				return result, nil
 			}
 			// Session continuation failed: fallback to full_prompt
 			o.logger.Event("context.session_fallback", map[string]interface{}{
@@ -1547,9 +1547,6 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				text := ""
 				if handle.Response != nil {
 					text = handle.Response.Text
-					if onChunk != nil && text != "" {
-						_ = onChunk(text)
-					}
 				}
 				assembly.Context.CachedTokens = handle.CachedTokens
 				assembly.Context.Session = &harness.ProviderSession{
@@ -1560,7 +1557,11 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					PrefixHash:  assembly.Context.PrefixHash,
 				}
 				if text != "" {
-					return o.parsePureTextSubmission(streamResult{Text: text}, checks, proposed, engagement, provenance, supportsStructured), nil
+					result := o.parsePureTextSubmission(streamResult{Text: text}, checks, proposed, engagement, provenance, supportsStructured)
+					if err := o.streamProse(ctx, result, text, onChunk); err != nil {
+						return result, err
+					}
+					return result, nil
 				}
 			}
 		}
@@ -1611,9 +1612,23 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 			request.Tools = nil
 		}
 
+		// Only a round that cannot call a tool and expects prose narrates as it
+		// arrives. A round that can still call a tool may end in a discarded
+		// draft, and a schema round answers in JSON, so neither is forwarded: the
+		// raw stream would otherwise show the turn twice and have the narrator
+		// read a speaker's name or a JSON field aloud.
+		narrate := !offerTools && request.ResponseSchema == nil
+		roundChunk := func(text string) error {
+			if !narrate || onChunk == nil {
+				return nil
+			}
+			return onChunk(text)
+		}
+
 		o.logger.Event("tool.round", map[string]interface{}{
 			"round":               round,
 			"offered":             offerTools,
+			"narrated":            narrate,
 			"conversation_tokens": conversationTokens(messages),
 			"budget":              o.contextBudget(),
 		})
@@ -1628,7 +1643,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 			),
 		)
 		roundStarted := time.Now()
-		result, err := o.generateRequest(roundCtx, request, onChunk)
+		result, err := o.generateRequest(roundCtx, request, roundChunk)
 		roundDuration := float64(time.Since(roundStarted).Milliseconds())
 		roundAttributes := otelmetric.WithAttributes(
 			attribute.String("localrpg.role", "gm"),
@@ -1866,6 +1881,34 @@ func (o *TurnOrchestrator) parsePureTextSubmission(result streamResult, checks [
 		})
 	}
 	return result
+}
+
+// reportFirstToken records the turn's time to first token once. It is called
+// whether or not the token is narrated, so a structured turn that never streams
+// prose to the client still reports its latency.
+func (o *TurnOrchestrator) reportFirstToken(ctx context.Context) {
+	if o.ttftReported || o.ttftStart.IsZero() {
+		return
+	}
+	o.ttftReported = true
+	elapsed := time.Since(o.ttftStart).Milliseconds()
+	engineMetrics().turnTTFT.Record(ctx, float64(elapsed))
+	o.logger.Event("turn.ttft", map[string]interface{}{"ms": elapsed})
+}
+
+// streamProse forwards a complete reply to the listener, but only when it is a
+// prose answer. A reply that parsed as a structured submission is a JSON payload,
+// not narration, so sending it would show the payload in the chronicle and have
+// the narrator read its fields aloud.
+func (o *TurnOrchestrator) streamProse(ctx context.Context, result streamResult, text string, onChunk func(string) error) error {
+	o.reportFirstToken(ctx)
+	if onChunk == nil || text == "" || result.Submission != nil {
+		return nil
+	}
+	if err := onChunk(text); err != nil {
+		return fmt.Errorf("%w: %w", errStreamListener, err)
+	}
+	return nil
 }
 
 func cleanJSON(s string) string {
