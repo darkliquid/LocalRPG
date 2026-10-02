@@ -561,7 +561,7 @@ export interface TTSInspectResponse {
 }
 
 export interface TTSConfig {
-  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'gemini';
+  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'gemini' | 'fish-audio';
   builtin_name?: string;
   model_path?: string;
   command?: string;
