@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/provider"
@@ -20,6 +21,8 @@ type TTSBuildPayload struct {
 // configuration has no registered adapter.
 func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 	switch cfg.Type {
+	case "fish-audio":
+		return provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.HostDiscriminator(cfg.Endpoint)), true
 	case "gemini":
 		return provider.KeyTTSGemini, true
 	case "builtin":
@@ -37,6 +40,10 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 	case "cli":
 		return provider.InstanceOrSelf(provider.KeyTTSPiper, provider.CommandDiscriminator(cfg.Command)), true
 	case "http":
+		lowerModel := strings.ToLower(cfg.Model)
+		if strings.Contains(lowerModel, "fishaudio") || strings.Contains(lowerModel, "s2-pro") {
+			return provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.HostDiscriminator(cfg.Endpoint)), true
+		}
 		return provider.InstanceOrSelf(provider.KeyTTSHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
 	}
 	return "", false
