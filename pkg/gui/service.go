@@ -2572,7 +2572,7 @@ func (s *Service) ResumePendingBatches(ctx context.Context) {
 // not duplicated and a launch knows to resume it.
 func batchJobActive(job storage.TTSJob) bool {
 	switch job.Status {
-	case "queued", "processing", "downloading", "storing", "submitted", "pending", "running":
+	case "queued", "processing", "processed", "downloading", "storing", "submitted", "pending", "running":
 		return true
 	case "completed", "succeeded":
 		// A job recorded as finished but short of its request count never stored

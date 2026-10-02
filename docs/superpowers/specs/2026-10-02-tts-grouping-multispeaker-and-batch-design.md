@@ -237,16 +237,16 @@ The **cache is the source of truth for completion**: a group whose clip exists i
 
 The job row's `status` is a lifecycle phase, so a manager can say what stage a job is at rather than only that the provider accepted it:
 
-`queued` → `processing` → `downloading` → `storing` → `completed` (or `failed`/`cancelled`/`expired`). A job the provider finished but whose clips are not yet cached is `downloading`/`storing`, never `completed`, so "0 of 8 stored" is never mistaken for "done".
+`queued` → `processing` → `processed` → `downloading` → `storing` → `completed` (or `failed`/`cancelled`/`expired`). **`completed` means the clips are downloaded *and* stored in the local cache**; a job whose provider has finished but whose output is not yet fetched is `processed`. The download and store therefore start automatically on the `processed` transition, and the store reports progress as each clip lands, so "0 of 8" is never mistaken for "done".
 
 1. `GroupPlan` the campaign's turns; keep groups whose key is not cached, unless `Force` is set, in which case every group is submitted and its clip overwrites the cached one.
 2. Write a JSONL file (bounded by the provider's request cap and a configurable max requests per job) and upload it through the File API.
 3. `SubmitBatch`; persist the job row as `queued`.
-4. Poll, updating the phase as the provider's state changes; a cancelled poll leaves the job resumable.
-5. On success, `FetchBatch` (`downloading`), normalise each result to Opus and write it to the content-addressed cache (`storing`), then mark `completed` with the stored and failed counts.
+4. Poll, updating the phase as the provider's state changes (`processing`, then `processed`); a cancelled poll leaves the job resumable.
+5. On `processed`, fetch the output (`downloading`), normalise each result to Opus and write it to the content-addressed cache (`storing`, reporting progress per clip), then mark `completed` with the stored and failed counts.
 6. On partial failure, persist the failed keys and retry them in a later job.
 
-A job is resumable while its phase is in flight, or while it is a legacy `succeeded` row whose stored count is below its request count. `ResumePendingBatches` runs at launch and finishes such jobs in the background, skipping any whose recorded provider differs from the configured one (a different provider's client cannot poll it). Starting a backfill while one is already in flight returns the existing job rather than queueing a second, so the action is idempotent.
+A job is resumable while its phase is in flight (`queued`/`processing`/`processed`/`downloading`/`storing`), or while it is a finished row whose stored plus failed count is below its request count. `ResumePendingBatches` runs at launch and finishes such jobs in the background, skipping any whose recorded provider differs from the configured one (a different provider's client cannot poll it). Starting a backfill while one is already in flight returns the existing job rather than queueing a second, so the action is idempotent.
 
 ### 8.3 Triggering
 

@@ -187,7 +187,7 @@ func TestEngineRecordsLifecyclePhases(t *testing.T) {
 	for _, phase := range jobs.phases {
 		seen[phase] = true
 	}
-	for _, want := range []string{"queued", "processing", "downloading", "storing", "completed"} {
+	for _, want := range []string{"queued", "processing", "processed", "downloading", "storing", "completed"} {
 		if !seen[want] {
 			t.Errorf("expected phase %q, got %#v", want, jobs.phases)
 		}

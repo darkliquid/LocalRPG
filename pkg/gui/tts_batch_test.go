@@ -55,6 +55,7 @@ func TestBatchJobActiveCoversPhasesAndLegacySucceeded(t *testing.T) {
 	}{
 		{name: "queued", job: storage.TTSJob{Status: "queued"}, want: true},
 		{name: "processing", job: storage.TTSJob{Status: "processing"}, want: true},
+		{name: "processed", job: storage.TTSJob{Status: "processed"}, want: true},
 		{name: "downloading", job: storage.TTSJob{Status: "downloading"}, want: true},
 		{name: "storing", job: storage.TTSJob{Status: "storing"}, want: true},
 		{name: "legacy submitted", job: storage.TTSJob{Status: "submitted"}, want: true},

@@ -11,23 +11,26 @@ const ACTIVE_STATUSES = new Set([
   'pending',
   'processing',
   'running',
+  'processed',
   'downloading',
   'storing',
   'succeeded',
 ]);
 
-// PHASE_LABELS turns a job's stored status into what it actually means: a job the
-// provider finished is still downloading, not done, until its clips are cached.
+// PHASE_LABELS turns a job's stored status into what it actually means. The
+// provider finishing is "processed", not "completed": the clips still have to be
+// downloaded and stored in the local cache.
 const PHASE_LABELS: Record<string, string> = {
   queued: 'Queued',
   submitted: 'Queued',
   pending: 'Queued',
   processing: 'Processing',
   running: 'Processing',
+  processed: 'Processed, awaiting download',
   downloading: 'Downloading',
-  storing: 'Saving to cache',
+  storing: 'Storing in cache',
   completed: 'Completed',
-  succeeded: 'Awaiting download',
+  succeeded: 'Processed, awaiting download',
   failed: 'Failed',
   cancelled: 'Cancelled',
   expired: 'Expired',
@@ -44,6 +47,9 @@ const statusColor = (status: string): string => {
     case 'cancelled':
     case 'expired':
       return 'text-stone-500';
+    case 'processed':
+    case 'succeeded':
+      return 'text-amber-300';
     case 'downloading':
     case 'storing':
       return 'text-sky-400';
@@ -51,6 +57,9 @@ const statusColor = (status: string): string => {
       return 'text-purple-400';
   }
 };
+
+// phases that mean the app is actively fetching or writing clips right now.
+const WORKING_STATUSES = new Set(['downloading', 'storing']);
 
 // messageOf turns a thrown value into the reason the server gave, trimmed, so a
 // provider error or a network fault is shown rather than a bare status.
@@ -67,9 +76,13 @@ const jobIncomplete = (job: TTSBatchJob): boolean =>
   job.status !== 'expired';
 
 // canResume reports whether a job is worth finishing by hand: it is incomplete and
-// the provider is not already working on it.
+// nothing is already working on it.
 const canResume = (job: TTSBatchJob): boolean =>
-  jobIncomplete(job) && job.status !== 'processing' && job.status !== 'running';
+  jobIncomplete(job) &&
+  job.status !== 'processing' &&
+  job.status !== 'running' &&
+  job.status !== 'downloading' &&
+  job.status !== 'storing';
 
 // TTSBatchPanel is the global manager for offline batch speech jobs. It lists
 // every campaign's jobs, filters them by campaign, starts a backfill, cancels a
@@ -297,6 +310,9 @@ export const TTSBatchPanel: React.FC = () => {
                     </span>
                   </button>
                   <div className="flex shrink-0 items-center gap-3">
+                    {WORKING_STATUSES.has(job.status) && (
+                      <Loader2 className="w-3 h-3 animate-spin text-sky-400" aria-hidden="true" />
+                    )}
                     <span className={`font-bold uppercase tracking-wide ${statusColor(job.status)}`}>
                       {phaseLabel(job.status)}
                     </span>
@@ -342,6 +358,22 @@ export const TTSBatchPanel: React.FC = () => {
                     )}
                   </div>
                 </div>
+
+                {job.request_count > 0 && (
+                  <div className="px-3 pb-2">
+                    <div
+                      className="h-1 w-full overflow-hidden rounded-full bg-stone-800"
+                      title={`${job.completed} of ${job.request_count} clips stored`}
+                    >
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          job.status === 'completed' ? 'bg-emerald-500' : 'bg-purple-500'
+                        }`}
+                        style={{ width: `${Math.min(100, (job.completed / job.request_count) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {isOpen && (
                   <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 border-t border-stone-800 px-3 py-2 text-stone-400">

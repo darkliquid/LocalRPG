@@ -183,13 +183,22 @@ func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) 
 		_ = e.jobs.UpdateTTSJobStatus(job.ID, phase, job.Completed, job.FailedKeys)
 	})
 	if err != nil {
-		// Keep the last known state so a cancelled poll leaves the job resumable
+		// Keep the last known phase so a cancelled poll leaves the job resumable
 		// rather than blanking it.
 		if status.State != "" {
-			_ = e.jobs.UpdateTTSJobStatus(job.ID, status.State, status.Completed, nil)
+			_ = e.jobs.UpdateTTSJobStatus(job.ID, providerPhase(status.State), job.Completed, job.FailedKeys)
 		}
 		return job, err
 	}
+
+	// The provider is done: the results exist but are not in our cache yet. This
+	// is "processed", not "completed" — the download and store still have to run,
+	// and they start now rather than waiting for a restart.
+	_ = e.jobs.UpdateTTSJobStatus(job.ID, "processed", job.Completed, job.FailedKeys)
+	trace.OrNil(e.logger).Event("media.tts.batch_processed", map[string]interface{}{
+		"job":      job.ID,
+		"requests": job.RequestCount,
+	})
 
 	_ = e.jobs.UpdateTTSJobStatus(job.ID, "downloading", job.Completed, job.FailedKeys)
 	results, err := e.fetchWithRetry(ctx, handle, opts)
@@ -203,13 +212,18 @@ func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) 
 	for _, result := range results {
 		if result.Err != nil {
 			failed = append(failed, result.Key)
+			_ = e.jobs.UpdateTTSJobStatus(job.ID, "storing", completed, failed)
 			continue
 		}
 		if err := e.storeResult(result); err != nil {
 			failed = append(failed, result.Key)
+			_ = e.jobs.UpdateTTSJobStatus(job.ID, "storing", completed, failed)
 			continue
 		}
 		completed++
+		// Report progress as clips land, so the manager shows the store moving
+		// rather than a single jump at the end.
+		_ = e.jobs.UpdateTTSJobStatus(job.ID, "storing", completed, failed)
 	}
 
 	job.Status = "completed"
@@ -285,12 +299,18 @@ func (e *Engine) fetchWithRetry(ctx context.Context, handle media.BatchJobHandle
 }
 
 // providerPhase maps a provider batch state to the job phase we record while a
-// job is in flight: a job the provider has not started is queued, and one it is
-// working on is processing. The download and store phases are ours to write.
+// job is in flight: a job the provider has not started is queued, one it is
+// working on is processing, and one it has finished is processed — its output is
+// ready but not yet downloaded. The download, store, and completed phases are
+// ours to write.
 func providerPhase(state string) string {
 	switch state {
 	case "running":
 		return "processing"
+	case "succeeded":
+		return "processed"
+	case "failed", "cancelled", "expired":
+		return state
 	default:
 		return "queued"
 	}
