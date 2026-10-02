@@ -84,6 +84,8 @@ export interface ClipGroupDTO {
 // TTSBatchJob is one offline batch synthesis job for a campaign.
 export interface TTSBatchJob {
   id: string;
+  game_id: string;
+  game_name?: string;
   provider: string;
   model?: string;
   status: string;

@@ -2239,9 +2239,63 @@ func (s *Service) TTSBatchJobs(gameID string) ([]TTSBatchJobDTO, error) {
 	}
 	out := make([]TTSBatchJobDTO, 0, len(jobs))
 	for _, job := range jobs {
-		out = append(out, ttsBatchJobDTO(job))
+		dto := ttsBatchJobDTO(job)
+		dto.GameID = gameID
+		out = append(out, dto)
 	}
 	return out, nil
+}
+
+// AllTTSBatchJobs lists every campaign's batch jobs, so the global manager can
+// show and filter them by campaign.
+func (s *Service) AllTTSBatchJobs(ctx context.Context) ([]TTSBatchJobDTO, error) {
+	games, err := s.ListGames(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TTSBatchJobDTO, 0)
+	for _, game := range games {
+		store, err := s.store(game.ID)
+		if err != nil {
+			continue
+		}
+		jobs, err := store.ListTTSJobs(game.ID)
+		if err != nil {
+			continue
+		}
+		for _, job := range jobs {
+			dto := ttsBatchJobDTO(job)
+			dto.GameID = game.ID
+			dto.GameName = game.Name
+			out = append(out, dto)
+		}
+	}
+	return out, nil
+}
+
+// CancelTTSBatch cancels a submitted batch job and records it as cancelled,
+// preserving the progress it had reached.
+func (s *Service) CancelTTSBatch(ctx context.Context, gameID, jobID string) error {
+	cfg := s.configMgr.Get()
+	client, err := s.ttsClientFor(cfg.Media.TTS)
+	if err != nil {
+		return err
+	}
+	batchClient, ok := client.(media.BatchTTSClient)
+	if !ok {
+		return fmt.Errorf("the configured TTS provider has no batch API")
+	}
+	if err := batchClient.CancelBatch(ctx, media.BatchJobHandle{ID: jobID}); err != nil {
+		return err
+	}
+	store, err := s.store(gameID)
+	if err != nil {
+		return err
+	}
+	if job, err := store.GetTTSJob(jobID); err == nil && job != nil {
+		return store.UpdateTTSJobStatus(jobID, "cancelled", job.Completed, job.FailedKeys)
+	}
+	return store.UpdateTTSJobStatus(jobID, "cancelled", 0, nil)
 }
 
 // StartTTSBatch submits an offline batch backfill for a campaign and finishes it

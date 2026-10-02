@@ -33,6 +33,7 @@ import { useTTSInspect } from '../hooks/useTTSInspect';
 import { VoiceCombobox } from './VoiceCombobox';
 import { VoiceCatalogModal } from './VoiceCatalogModal';
 import { UsagePanel } from './UsagePanel';
+import { TTSBatchPanel } from './TTSBatchPanel';
 import { hasWebSpeechSupport } from '../lib/webSpeech';
 
 interface SettingsStudioProps {
@@ -2423,6 +2424,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             </div>
           </div>
+
+          {/* Batch Speech Backfill */}
+          <TTSBatchPanel />
 
           {/* Speech-to-Text (STT) Section */}
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">

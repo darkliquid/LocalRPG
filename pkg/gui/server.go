@@ -53,6 +53,7 @@ func routePattern(path string) string {
 		path == "/api/settings" || path == "/api/settings/test-provider" ||
 		path == "/api/providers" || path == "/api/providers/models" ||
 		path == "/api/tts/inspect" || path == "/api/tts/voices/search" ||
+		path == "/api/tts/batch" ||
 		path == "/api/stt" || path == "/api/trace" || path == "/api/character/generate" ||
 		path == "/api/generate-text" || path == "/api/generate-asset-preview" ||
 		path == "/api/usage" || path == "/api/limits":
@@ -64,6 +65,8 @@ func routePattern(path string) string {
 		return path
 	case strings.HasPrefix(path, "/api/export/"):
 		return "/api/export/{gameID}"
+	case strings.HasPrefix(path, "/api/tts/batch/"):
+		return "/api/tts/batch"
 	case strings.HasPrefix(path, "/api/game/"):
 		rest := strings.TrimPrefix(path, "/api/game/")
 		if _, suffix, ok := strings.Cut(rest, "/"); ok {
@@ -149,6 +152,33 @@ func (s *Server) handleLimitsRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, LimitsDTO{Blocks: s.service.Limits()})
+}
+
+// handleTTSBatchRoute serves the global batch job manager: GET /api/tts/batch
+// lists every campaign's jobs, and POST /api/tts/batch/cancel cancels one.
+func (s *Server) handleTTSBatchRoute(w http.ResponseWriter, r *http.Request) {
+	switch {
+	case r.Method == http.MethodGet && (r.URL.Path == "/api/tts/batch" || r.URL.Path == "/api/tts/batch/"):
+		jobs, err := s.service.AllTTSBatchJobs(r.Context())
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, jobs)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/tts/batch/cancel":
+		var req TTSBatchCancelRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if err := s.service.CancelTTSBatch(r.Context(), req.GameID, req.JobID); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {

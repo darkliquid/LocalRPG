@@ -145,15 +145,23 @@ type ClipGroupDTO struct {
 	SegmentIndexes []int    `json:"segment_indexes"`
 }
 
-// TTSBatchJobDTO is one offline batch synthesis job, for the settings panel.
+// TTSBatchJobDTO is one offline batch synthesis job, for the global manager.
 type TTSBatchJobDTO struct {
 	ID           string   `json:"id"`
+	GameID       string   `json:"game_id"`
+	GameName     string   `json:"game_name,omitempty"`
 	Provider     string   `json:"provider"`
 	Model        string   `json:"model,omitempty"`
 	Status       string   `json:"status"`
 	RequestCount int      `json:"request_count"`
 	Completed    int      `json:"completed"`
 	FailedKeys   []string `json:"failed_keys,omitempty"`
+}
+
+// TTSBatchCancelRequest names the job a cancel applies to.
+type TTSBatchCancelRequest struct {
+	GameID string `json:"game_id"`
+	JobID  string `json:"job_id"`
 }
 
 type TurnDTO struct {

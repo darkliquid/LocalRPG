@@ -34,6 +34,8 @@ var mounts = []routeMount{
 	{"/api/providers/models", "handleModelCatalogueRoute", (*Server).handleModelCatalogueRoute},
 	{"/api/tts/inspect", "handleTTSInspectRoute", (*Server).handleTTSInspectRoute},
 	{"/api/tts/voices/search", "handleVoiceSearchRoute", (*Server).handleVoiceSearchRoute},
+	{"/api/tts/batch", "handleTTSBatchRoute", (*Server).handleTTSBatchRoute},
+	{"/api/tts/batch/", "handleTTSBatchRoute", (*Server).handleTTSBatchRoute},
 	{"/api/audio/", "handleAudioRoutes", (*Server).handleAudioRoutes},
 	{"/api/stt", "handleSTTRoute", (*Server).handleSTTRoute},
 	{"/api/export", "handleExportRoutes", (*Server).handleExportRoutes},

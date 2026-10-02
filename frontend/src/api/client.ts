@@ -551,6 +551,24 @@ export class APIClient {
     return res.json();
   }
 
+  // listAllTTSBatchJobs returns every campaign's offline batch jobs, for the
+  // global manager.
+  static async listAllTTSBatchJobs(): Promise<TTSBatchJob[]> {
+    const res = await fetch('/api/tts/batch');
+    if (!res.ok) throw new Error(`listAllTTSBatchJobs: ${res.statusText}`);
+    return res.json();
+  }
+
+  // cancelTTSBatchJob cancels a submitted batch job.
+  static async cancelTTSBatchJob(gameID: string, jobID: string): Promise<void> {
+    const res = await fetch('/api/tts/batch/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game_id: gameID, job_id: jobID }),
+    });
+    if (!res.ok) throw new Error(`cancelTTSBatchJob: ${res.statusText}`);
+  }
+
   static async transcribeAudio(audioBlob: Blob): Promise<{ text: string }> {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'speech.webm');

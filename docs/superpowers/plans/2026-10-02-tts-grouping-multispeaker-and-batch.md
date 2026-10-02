@@ -271,7 +271,7 @@
 
 - [x] **Step 14.1**: Add `localrpg tts batch <game-id>` with `--wait`, `--status`, `--cancel` in `cmd/localrpg/tts.go`.
 - [x] **Step 14.2**: Add `Service.StartTTSBatch`, `Service.TTSBatchStatus` in `pkg/gui/service.go` and routes in `pkg/gui/server.go`; update `frontend/src/api/client.ts` and `frontend/src/types.ts` together.
-- [ ] **Step 14.3** (deferred): a batch jobs panel has no home yet — the Settings Studio is global while a batch job is per-campaign, and there is no campaign-level audio panel to mount it in. The API surface ships now (`GET`/`POST /api/game/{id}/tts/batch`, `APIClient.listTTSBatchJobs`/`startTTSBatch`, `TTSBatchJob`); the panel is a follow-up that needs a campaign-level audio UI. The CLI `localrpg tts batch` is the operator path in the meantime.
+- [x] **Step 14.3**: The batch manager is global, not per-campaign: `TTSBatchPanel` (in the Media Engines tab) lists every campaign's jobs via `GET /api/tts/batch`, filters by campaign, starts a backfill with `POST /api/game/{id}/tts/batch`, and cancels one with `POST /api/tts/batch/cancel`.
 - [x] **Step 14.4**: Run `go test ./cmd/... ./pkg/gui/...` and `cd frontend && npx tsc --noEmit`.
 - [x] **Step 14.5**: Commit: `git commit -am "feat(gui): start and monitor tts batch jobs"`
 
