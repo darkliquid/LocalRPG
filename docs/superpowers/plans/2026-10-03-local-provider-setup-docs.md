@@ -27,7 +27,7 @@
 **Files:**
 - Modify: `pkg/gui/docs_test.go:40-75`
 
-- [ ] **Step 1: Update `pkg/gui/docs_test.go` with category and article assertions**
+- [x] **Step 1: Update `pkg/gui/docs_test.go` with category and article assertions**
 
 Edit `pkg/gui/docs_test.go` to add `"Local AI & Self-Hosting"` to `expectedCategories` in `TestDocsService_GetDocsList`, and add test cases in `TestDocsService_GetDocArticle` asserting that articles `14-local-llm-ollama` through `18-local-image-comfyui` are retrievable and non-empty.
 
@@ -71,12 +71,12 @@ And in `TestDocsService_GetDocArticle`:
 	}
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestDocsService_GetDocsList ./pkg/gui/`
 Expected: FAIL with `missing expected category "Local AI & Self-Hosting"`
 
-- [ ] **Step 3: Commit test changes**
+- [x] **Step 3: Commit test changes**
 
 ```bash
 git add pkg/gui/docs_test.go
@@ -90,7 +90,7 @@ git commit -m "test(docs): assert Local AI & Self-Hosting category and local gui
 **Files:**
 - Create: `pkg/gui/docs/14-local-llm-ollama.md`
 
-- [ ] **Step 1: Write `pkg/gui/docs/14-local-llm-ollama.md`**
+- [x] **Step 1: Write `pkg/gui/docs/14-local-llm-ollama.md`**
 
 Create the document with full instructions following the 5-part structure:
 
@@ -240,14 +240,14 @@ LocalRPG's OpenAI HTTP client works seamlessly with any standard OpenAI-compatib
 - **vLLM**: For multi-turn throughput and high-concurrency batching on Linux with NVIDIA GPUs, run `vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8000`. Use endpoint `http://localhost:8000/v1` in LocalRPG.
 ```
 
-- [ ] **Step 2: Run linter and tests**
+- [x] **Step 2: Run linter and tests**
 
 Run: `npm run lint:docs`
 Expected: `0 issues in 14 files`
 
 Run: `go test -v -run "TestDocsService_GetDocArticle" ./pkg/gui/`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pkg/gui/docs/14-local-llm-ollama.md
@@ -261,7 +261,7 @@ git commit -m "docs(providers): add Ollama local LLM setup guide"
 **Files:**
 - Create: `pkg/gui/docs/15-local-tts-kokoro.md`
 
-- [ ] **Step 1: Write `pkg/gui/docs/15-local-tts-kokoro.md`**
+- [x] **Step 1: Write `pkg/gui/docs/15-local-tts-kokoro.md`**
 
 Create the document with full instructions following the 5-part structure:
 
@@ -379,12 +379,12 @@ media:
 Kokoro-FastAPI supports blending multiple voices using a plus sign in the voice identifier, for example `af_bella+af_sarah`. You can author custom voice profiles in LocalRPG's Voice Profiles table using blended voice IDs to create distinctive tones for specific NPC archetypes.
 ```
 
-- [ ] **Step 2: Run linter and tests**
+- [x] **Step 2: Run linter and tests**
 
 Run: `npm run lint:docs`
 Expected: `0 issues in 15 files`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pkg/gui/docs/15-local-tts-kokoro.md
@@ -398,7 +398,7 @@ git commit -m "docs(providers): add Kokoro-FastAPI local TTS setup guide"
 **Files:**
 - Create: `pkg/gui/docs/16-local-tts-fish-audio.md`
 
-- [ ] **Step 1: Write `pkg/gui/docs/16-local-tts-fish-audio.md`**
+- [x] **Step 1: Write `pkg/gui/docs/16-local-tts-fish-audio.md`**
 
 Create the document relocating and refining the Fish Audio S2 vLLM-Omni content:
 
@@ -519,12 +519,12 @@ media:
 ```
 ```
 
-- [ ] **Step 2: Run linter and tests**
+- [x] **Step 2: Run linter and tests**
 
 Run: `npm run lint:docs`
 Expected: `0 issues in 16 files`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pkg/gui/docs/16-local-tts-fish-audio.md
@@ -538,7 +538,7 @@ git commit -m "docs(providers): add Fish Audio S2 vLLM-Omni setup guide"
 **Files:**
 - Create: `pkg/gui/docs/17-local-stt-whisper.md`
 
-- [ ] **Step 1: Write `pkg/gui/docs/17-local-stt-whisper.md`**
+- [x] **Step 1: Write `pkg/gui/docs/17-local-stt-whisper.md`**
 
 Create the document with full instructions following the 5-part structure:
 
@@ -671,12 +671,12 @@ media:
 ```
 ```
 
-- [ ] **Step 2: Run linter and tests**
+- [x] **Step 2: Run linter and tests**
 
 Run: `npm run lint:docs`
 Expected: `0 issues in 17 files`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pkg/gui/docs/17-local-stt-whisper.md
@@ -690,7 +690,7 @@ git commit -m "docs(providers): add Faster-Whisper local STT setup guide"
 **Files:**
 - Create: `pkg/gui/docs/18-local-image-comfyui.md`
 
-- [ ] **Step 1: Write `pkg/gui/docs/18-local-image-comfyui.md`**
+- [x] **Step 1: Write `pkg/gui/docs/18-local-image-comfyui.md`**
 
 Create the document with full instructions following the 5-part structure:
 
@@ -789,12 +789,12 @@ media:
 Select preset **Automatic1111** in Settings Studio to connect.
 ```
 
-- [ ] **Step 2: Run linter and tests**
+- [x] **Step 2: Run linter and tests**
 
 Run: `npm run lint:docs`
 Expected: `0 issues in 18 files`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pkg/gui/docs/18-local-image-comfyui.md
@@ -808,7 +808,7 @@ git commit -m "docs(providers): add ComfyUI local image generation setup guide"
 **Files:**
 - Modify: `pkg/gui/docs/05-providers.md`
 
-- [ ] **Step 1: Edit `pkg/gui/docs/05-providers.md`**
+- [x] **Step 1: Edit `pkg/gui/docs/05-providers.md`**
 
 Replace the 80 lines of inline Fish Audio vLLM guide in `pkg/gui/docs/05-providers.md` with a clean summary and direct markdown cross-references to all five local guides:
 - In `## LLM Providers`: reference `[Setting Up Ollama for Local LLMs](14-local-llm-ollama)`.
@@ -817,7 +817,7 @@ Replace the 80 lines of inline Fish Audio vLLM guide in `pkg/gui/docs/05-provide
 - In `### Image Generation`: reference `[Setting Up ComfyUI](18-local-image-comfyui)`.
 - In footer links: add reference to the new Local AI & Self-Hosting guides.
 
-- [ ] **Step 2: Run linter and internal link resolution test**
+- [x] **Step 2: Run linter and internal link resolution test**
 
 Run: `npm run lint:docs`
 Expected: `0 issues in 18 files`
@@ -825,7 +825,7 @@ Expected: `0 issues in 18 files`
 Run: `go test -v -run "TestDocsService_InternalLinksResolve" ./pkg/gui/`
 Expected: PASS with all internal links verified.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pkg/gui/docs/05-providers.md
@@ -839,17 +839,17 @@ git commit -m "docs(providers): decouple inline Fish Audio guide and link to loc
 **Files:**
 - Verify: Full repo tests and documentation sync
 
-- [ ] **Step 1: Sync provider catalogue and configuration reference**
+- [x] **Step 1: Sync provider catalogue and configuration reference**
 
 Run: `go test ./pkg/gui -update-docs`
 Expected: PASS
 
-- [ ] **Step 2: Run full documentation linter**
+- [x] **Step 2: Run full documentation linter**
 
 Run: `mise run lint:docs`
 Expected: `Summary: 0 issues in 0 files`
 
-- [ ] **Step 3: Run full docs test suite**
+- [x] **Step 3: Run full docs test suite**
 
 Run: `go test -v -count=1 ./pkg/gui/ -run "TestDocsService_.*|TestServer_DocsEndpoints"`
 Expected: All tests pass, including:
@@ -857,12 +857,12 @@ Expected: All tests pass, including:
 - `TestDocsService_GetDocArticle` (articles 14–18 retrieved successfully)
 - `TestDocsService_InternalLinksResolve` (all internal links resolve)
 
-- [ ] **Step 4: Build static website via `tools/sitegen`**
+- [x] **Step 4: Build static website via `tools/sitegen`**
 
 Run: `mise run site:build`
 Expected: Site generated cleanly in `website/dist` including the new `Local AI & Self-Hosting` navigation group and rendered articles.
 
-- [ ] **Step 5: Run git status and commit if catalogue changed**
+- [x] **Step 5: Run git status and commit if catalogue changed**
 
 ```bash
 git status -s
