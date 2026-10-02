@@ -287,7 +287,8 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				}
 				writeJSON(w, jobs)
 			case http.MethodPost:
-				job, err := s.service.StartTTSBatch(r.Context(), gameID)
+				force := r.URL.Query().Get("force") == "1" || r.URL.Query().Get("force") == "true"
+				job, err := s.service.StartTTSBatch(r.Context(), gameID, force)
 				if err != nil {
 					writeGameError(w, err)
 					return

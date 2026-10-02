@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
 func TestTTSBatchJobsEmptyForFreshCampaign(t *testing.T) {
@@ -22,7 +24,7 @@ func TestTTSBatchJobsEmptyForFreshCampaign(t *testing.T) {
 
 func TestStartTTSBatchWithoutBatchProviderFails(t *testing.T) {
 	gameID, svc := setupTestGame(t)
-	if _, err := svc.StartTTSBatch(context.Background(), gameID); err == nil {
+	if _, err := svc.StartTTSBatch(context.Background(), gameID, false); err == nil {
 		t.Errorf("expected an error when the provider has no batch API")
 	}
 }
@@ -42,6 +44,56 @@ func TestCancelTTSBatchWithoutBatchProviderFails(t *testing.T) {
 	gameID, svc := setupTestGame(t)
 	if err := svc.CancelTTSBatch(context.Background(), gameID, "job"); err == nil {
 		t.Errorf("expected an error when the provider has no batch API")
+	}
+}
+
+func TestBatchJobActiveCoversPhasesAndLegacySucceeded(t *testing.T) {
+	cases := []struct {
+		name string
+		job  storage.TTSJob
+		want bool
+	}{
+		{name: "queued", job: storage.TTSJob{Status: "queued"}, want: true},
+		{name: "processing", job: storage.TTSJob{Status: "processing"}, want: true},
+		{name: "downloading", job: storage.TTSJob{Status: "downloading"}, want: true},
+		{name: "storing", job: storage.TTSJob{Status: "storing"}, want: true},
+		{name: "legacy submitted", job: storage.TTSJob{Status: "submitted"}, want: true},
+		{name: "legacy running", job: storage.TTSJob{Status: "running"}, want: true},
+		{name: "completed", job: storage.TTSJob{Status: "completed"}, want: false},
+		{name: "failed", job: storage.TTSJob{Status: "failed"}, want: false},
+		{name: "cancelled", job: storage.TTSJob{Status: "cancelled"}, want: false},
+		// Legacy: the provider finished but the results were never stored.
+		{name: "legacy succeeded unstored", job: storage.TTSJob{Status: "succeeded", RequestCount: 8, Completed: 0}, want: true},
+		{name: "legacy succeeded stored", job: storage.TTSJob{Status: "succeeded", RequestCount: 8, Completed: 8}, want: false},
+	}
+	for _, tc := range cases {
+		if got := batchJobActive(tc.job); got != tc.want {
+			t.Errorf("%s: batchJobActive = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestActiveBatchJobFindsTheInFlightJob(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	store, err := svc.store(gameID)
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	if _, ok := activeBatchJob(store, gameID); ok {
+		t.Errorf("expected no active job for a fresh campaign")
+	}
+	if err := store.UpsertTTSJob(storage.TTSJob{ID: "j1", GameID: gameID, Status: "completed", RequestCount: 1, Completed: 1}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	if _, ok := activeBatchJob(store, gameID); ok {
+		t.Errorf("a completed job must not be treated as active")
+	}
+	if err := store.UpsertTTSJob(storage.TTSJob{ID: "j2", GameID: gameID, Status: "processing", RequestCount: 3}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	job, ok := activeBatchJob(store, gameID)
+	if !ok || job.ID != "j2" {
+		t.Errorf("expected j2 to be active, got %#v / %v", job, ok)
 	}
 }
 

@@ -41,6 +41,7 @@ func (f *fakeBatch) CancelBatch(context.Context, media.BatchJobHandle) error { r
 // memJobs is an in-memory JobStore.
 type memJobs struct {
 	updated map[string]storage.TTSJob
+	phases  []string
 }
 
 func (m *memJobs) UpsertTTSJob(job storage.TTSJob) error {
@@ -48,6 +49,7 @@ func (m *memJobs) UpsertTTSJob(job storage.TTSJob) error {
 		m.updated = map[string]storage.TTSJob{}
 	}
 	m.updated[job.ID] = job
+	m.phases = append(m.phases, job.Status)
 	return nil
 }
 
@@ -57,6 +59,7 @@ func (m *memJobs) UpdateTTSJobStatus(id, status string, completed int, failed []
 	job.Completed = completed
 	job.FailedKeys = failed
 	m.updated[id] = job
+	m.phases = append(m.phases, status)
 	return nil
 }
 
@@ -90,8 +93,8 @@ func TestEngineRunStoresResultsAndRecordsFailures(t *testing.T) {
 	if !cache.Exists("audio", "k1.opus") {
 		t.Errorf("expected k1's clip to be written to the cache")
 	}
-	if jobs.updated["job"].Status != "succeeded" {
-		t.Errorf("expected the job to be recorded as succeeded, got %#v", jobs.updated["job"])
+	if jobs.updated["job"].Status != "completed" {
+		t.Errorf("expected the job to be recorded as completed, got %#v", jobs.updated["job"])
 	}
 }
 
@@ -137,5 +140,51 @@ func TestEnginePollStopsOnCancellation(t *testing.T) {
 
 	if _, err := engine.Run(ctx, Options{}, []media.ClipGroup{{Key: "k"}}); err == nil {
 		t.Fatalf("expected a cancelled run to stop with an error")
+	}
+}
+
+// A forced run resubmits groups whose clips are already cached, so a campaign
+// can be re-rendered in full rather than only backfilled.
+func TestEngineForceResubmitsCachedGroups(t *testing.T) {
+	client := &fakeBatch{states: []string{"succeeded"}}
+	engine := New(client, media.NewContentCache(t.TempDir()), &memJobs{})
+	engine.sleep = func(context.Context, time.Duration) error { return nil }
+
+	groups := []media.ClipGroup{{Key: "a", Cached: true}, {Key: "b", Cached: true}}
+	job, err := engine.Run(context.Background(), Options{Force: true}, groups)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if job == nil || job.RequestCount != 2 {
+		t.Fatalf("expected a forced run to resubmit both groups, got %#v", job)
+	}
+}
+
+// The job walks queued -> processing -> downloading -> storing -> completed, so
+// the manager can say which stage it is at.
+func TestEngineRecordsLifecyclePhases(t *testing.T) {
+	client := &fakeBatch{
+		states:  []string{"running", "succeeded"},
+		results: []media.BatchResult{{Key: "k", Audio: media.GenerateToneWAV(440, 0.02)}},
+	}
+	jobs := &memJobs{}
+	engine := New(client, media.NewContentCache(t.TempDir()), jobs)
+	engine.sleep = func(context.Context, time.Duration) error { return nil }
+
+	if _, err := engine.Run(context.Background(), Options{}, []media.ClipGroup{{Key: "k"}}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	seen := map[string]bool{}
+	for _, phase := range jobs.phases {
+		seen[phase] = true
+	}
+	for _, want := range []string{"queued", "processing", "downloading", "storing", "completed"} {
+		if !seen[want] {
+			t.Errorf("expected phase %q, got %#v", want, jobs.phases)
+		}
+	}
+	if jobs.updated["job"].Completed != 1 {
+		t.Errorf("expected 1 stored clip, got %d", jobs.updated["job"].Completed)
 	}
 }

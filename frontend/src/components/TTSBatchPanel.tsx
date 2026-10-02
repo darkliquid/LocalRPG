@@ -1,39 +1,72 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Layers, Loader2, RefreshCw, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Layers, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import { APIClient } from '../api/client';
 import type { GameSummary, TTSBatchJob } from '../types';
 
-// A job that is still running can be cancelled.
-const ACTIVE_STATUSES = new Set(['submitted', 'pending', 'running']);
+// A job in one of these phases is still in flight (or was left needing a
+// download), so the manager keeps polling and the start button stays disabled.
+const ACTIVE_STATUSES = new Set([
+  'queued',
+  'submitted',
+  'pending',
+  'processing',
+  'running',
+  'downloading',
+  'storing',
+  'succeeded',
+]);
 
-// messageOf turns a thrown value into the reason the server gave, trimmed, so a
-// provider error or a network fault is shown rather than a bare status.
-const messageOf = (err: unknown): string =>
-  (err instanceof Error ? err.message : String(err)).trim() || 'the request failed with no detail';
+// PHASE_LABELS turns a job's stored status into what it actually means: a job the
+// provider finished is still downloading, not done, until its clips are cached.
+const PHASE_LABELS: Record<string, string> = {
+  queued: 'Queued',
+  submitted: 'Queued',
+  pending: 'Queued',
+  processing: 'Processing',
+  running: 'Processing',
+  downloading: 'Downloading',
+  storing: 'Saving to cache',
+  completed: 'Completed',
+  succeeded: 'Awaiting download',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
+};
 
-// statusColor maps a job status to a text colour.
+const phaseLabel = (status: string): string => PHASE_LABELS[status] ?? status;
+
 const statusColor = (status: string): string => {
   switch (status) {
-    case 'succeeded':
+    case 'completed':
       return 'text-emerald-400';
     case 'failed':
       return 'text-rose-400';
     case 'cancelled':
     case 'expired':
       return 'text-stone-500';
+    case 'downloading':
+    case 'storing':
+      return 'text-sky-400';
     default:
       return 'text-purple-400';
   }
 };
 
+// messageOf turns a thrown value into the reason the server gave, trimmed, so a
+// provider error or a network fault is shown rather than a bare status.
+const messageOf = (err: unknown): string =>
+  (err instanceof Error ? err.message : String(err)).trim() || 'the request failed with no detail';
+
 // TTSBatchPanel is the global manager for offline batch speech jobs. It lists
-// every campaign's jobs, filters them by campaign, starts a backfill, and
-// cancels a running one.
+// every campaign's jobs, filters them by campaign, starts a backfill, cancels a
+// running one, and expands a job to inspect it.
 export const TTSBatchPanel: React.FC = () => {
   const [jobs, setJobs] = useState<TTSBatchJob[]>([]);
   const [games, setGames] = useState<GameSummary[]>([]);
   const [filter, setFilter] = useState('');
   const [startGame, setStartGame] = useState('');
+  const [force, setForce] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,11 +107,18 @@ export const TTSBatchPanel: React.FC = () => {
     [jobs, filter]
   );
 
+  // A backfill already in flight for the chosen campaign makes the start button
+  // a no-op, so it is disabled rather than silently returning the same job.
+  const startBlocked = useMemo(
+    () => jobs.some((job) => job.game_id === startGame && ACTIVE_STATUSES.has(job.status)),
+    [jobs, startGame]
+  );
+
   const start = async () => {
     if (!startGame) return;
     setError(null);
     try {
-      const job = await APIClient.startTTSBatch(startGame);
+      const job = await APIClient.startTTSBatch(startGame, force);
       if (!job) {
         setError('Every clip is already cached for that campaign.');
       }
@@ -130,13 +170,25 @@ export const TTSBatchPanel: React.FC = () => {
               </option>
             ))}
           </select>
+          <label
+            className="flex items-center gap-1.5 text-xs text-stone-400 cursor-pointer"
+            title="Re-render every clip, overwriting the cache, instead of only the missing ones"
+          >
+            <input
+              type="checkbox"
+              checked={force}
+              onChange={(e) => setForce(e.target.checked)}
+              className="accent-purple-500 cursor-pointer"
+            />
+            Full regenerate
+          </label>
           <button
             type="button"
             onClick={() => void start()}
-            disabled={!startGame}
+            disabled={!startGame || startBlocked}
             className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
-            Start
+            {startBlocked ? 'Running' : 'Start'}
           </button>
           <button
             type="button"
@@ -152,7 +204,8 @@ export const TTSBatchPanel: React.FC = () => {
 
       <p className="text-xs text-stone-400">
         Offline jobs render a campaign's missing speech through the provider's batch API, at a discount and
-        without spending interactive rate-limit quota.
+        without spending interactive rate-limit quota. A job keeps running while the app is closed and is
+        collected on the next launch.
       </p>
 
       {error && (
@@ -165,41 +218,85 @@ export const TTSBatchPanel: React.FC = () => {
         <div className="text-xs text-stone-500">No batch jobs.</div>
       ) : (
         <div className="space-y-1">
-          {visible.map((job) => (
-            <div
-              key={`${job.game_id}:${job.id}`}
-              className="flex items-center justify-between gap-3 rounded-lg border border-stone-800 bg-stone-950/40 px-3 py-2 text-xs"
-            >
-              <div className="min-w-0">
-                <div className="text-stone-200 truncate">{job.game_name || job.game_id}</div>
-                <div className="text-stone-500 font-mono truncate">
-                  {job.provider} · {job.id}
-                </div>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={`font-bold uppercase tracking-wide ${statusColor(job.status)}`}>{job.status}</span>
-                <span className="text-stone-400">
-                  {job.completed}/{job.request_count}
-                </span>
-                {job.failed_keys && job.failed_keys.length > 0 && (
-                  <span className="text-amber-300" title={job.failed_keys.join(', ')}>
-                    {job.failed_keys.length} failed
-                  </span>
-                )}
-                {ACTIVE_STATUSES.has(job.status) && (
+          {visible.map((job) => {
+            const key = `${job.game_id}:${job.id}`;
+            const isOpen = expanded === key;
+            const done = job.status === 'completed';
+            return (
+              <div key={key} className="rounded-lg border border-stone-800 bg-stone-950/40 text-xs">
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
                   <button
                     type="button"
-                    onClick={() => void cancel(job)}
-                    className="p-1 rounded text-rose-400 hover:bg-rose-500/20 cursor-pointer"
-                    title="Cancel this job"
-                    aria-label="Cancel this job"
+                    onClick={() => setExpanded(isOpen ? null : key)}
+                    className="flex min-w-0 items-center gap-2 text-left cursor-pointer"
+                    aria-expanded={isOpen}
+                    title="Show job details"
                   >
-                    <XCircle className="w-3.5 h-3.5" />
+                    {isOpen ? (
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0 text-stone-500" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 text-stone-500" />
+                    )}
+                    <span className="min-w-0">
+                      <span className="block truncate text-stone-200">{job.game_name || job.game_id}</span>
+                      <span className="block truncate font-mono text-stone-500">{job.provider}</span>
+                    </span>
                   </button>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className={`font-bold uppercase tracking-wide ${statusColor(job.status)}`}>
+                      {phaseLabel(job.status)}
+                    </span>
+                    <span className="text-stone-400" title="clips stored / groups submitted">
+                      {job.completed}/{job.request_count}
+                    </span>
+                    {job.failed_keys && job.failed_keys.length > 0 && (
+                      <span className="text-amber-300" title={job.failed_keys.join(', ')}>
+                        {job.failed_keys.length} failed
+                      </span>
+                    )}
+                    {!done && ACTIVE_STATUSES.has(job.status) && (
+                      <button
+                        type="button"
+                        onClick={() => void cancel(job)}
+                        className="p-1 rounded text-rose-400 hover:bg-rose-500/20 cursor-pointer"
+                        title="Cancel this job"
+                        aria-label="Cancel this job"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {isOpen && (
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 border-t border-stone-800 px-3 py-2 text-stone-400">
+                    <dt>Campaign</dt>
+                    <dd className="text-stone-200">{job.game_name || job.game_id}</dd>
+                    <dt>Provider</dt>
+                    <dd className="font-mono text-stone-200">{job.provider}</dd>
+                    <dt>Model</dt>
+                    <dd className="font-mono text-stone-200">{job.model || 'provider default'}</dd>
+                    <dt>Stage</dt>
+                    <dd className={statusColor(job.status)}>{phaseLabel(job.status)}</dd>
+                    <dt>Groups</dt>
+                    <dd className="text-stone-200">{job.request_count} submitted</dd>
+                    <dt>Stored</dt>
+                    <dd className="text-stone-200">{job.completed} clips cached</dd>
+                    <dt>Failed</dt>
+                    <dd className="text-stone-200">
+                      {job.failed_keys && job.failed_keys.length > 0 ? (
+                        <span className="font-mono break-all text-amber-300">{job.failed_keys.join(', ')}</span>
+                      ) : (
+                        'none'
+                      )}
+                    </dd>
+                    <dt>Job id</dt>
+                    <dd className="font-mono break-all text-stone-200">{job.id}</dd>
+                  </dl>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

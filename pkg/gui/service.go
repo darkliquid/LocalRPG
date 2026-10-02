@@ -76,6 +76,9 @@ type Service struct {
 	// resumable, so cancelling it loses nothing.
 	bgCtx    context.Context
 	bgCancel context.CancelFunc
+	// batchStartMu serialises starting a backfill, so a double-click cannot
+	// submit two jobs for the same work.
+	batchStartMu sync.Mutex
 	// The turn runtime is the config-derived wiring that does not change from
 	// turn to turn. It is rebuilt only when the config revision or a source
 	// file's mtime changes, so a hand edit still takes effect next turn.
@@ -2315,7 +2318,7 @@ func (s *Service) CancelTTSBatch(ctx context.Context, gameID, jobID string) erro
 // in the background, so the request returns at once and the panel watches the
 // job row. It returns the submitted job, or nil when every clip is already
 // cached.
-func (s *Service) StartTTSBatch(ctx context.Context, gameID string) (*TTSBatchJobDTO, error) {
+func (s *Service) StartTTSBatch(ctx context.Context, gameID string, force bool) (*TTSBatchJobDTO, error) {
 	cfg := s.configMgr.Get()
 	client, err := s.ttsClientFor(cfg.Media.TTS)
 	if err != nil {
@@ -2329,6 +2332,17 @@ func (s *Service) StartTTSBatch(ctx context.Context, gameID string) (*TTSBatchJo
 	if err != nil {
 		return nil, err
 	}
+
+	// Starting twice must not queue two jobs for the same work: a backfill already
+	// in flight is returned as-is, so the button is idempotent.
+	s.batchStartMu.Lock()
+	defer s.batchStartMu.Unlock()
+	if existing, ok := activeBatchJob(store, gameID); ok {
+		dto := ttsBatchJobDTO(*existing)
+		dto.GameID = gameID
+		return &dto, nil
+	}
+
 	pipeline, err := s.audioPipeline()
 	if err != nil {
 		return nil, err
@@ -2354,7 +2368,7 @@ func (s *Service) StartTTSBatch(ctx context.Context, gameID string) (*TTSBatchJo
 	}
 	batchEngine := ttsbatch.New(batchClient, media.NewContentCache(s.resolver.CacheDir()), store)
 	batchEngine.SetOpusBitrate(cfg.OpusBitrate())
-	opts := ttsbatch.Options{GameID: gameID, Provider: providerKey, Model: cfg.Media.TTS.Model}
+	opts := ttsbatch.Options{GameID: gameID, Provider: providerKey, Model: cfg.Media.TTS.Model, Force: force}
 
 	job, err := batchEngine.Submit(ctx, opts, groups)
 	if err != nil {
@@ -2406,6 +2420,11 @@ func (s *Service) ResumePendingBatches(ctx context.Context) {
 		return
 	}
 
+	providerKey := ""
+	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
+		providerKey = string(key)
+	}
+
 	games, err := s.ListGames(ctx)
 	if err != nil {
 		return
@@ -2420,7 +2439,13 @@ func (s *Service) ResumePendingBatches(ctx context.Context) {
 			continue
 		}
 		for _, job := range jobs {
-			if !batchJobActive(job.Status) {
+			if !batchJobActive(job) {
+				continue
+			}
+			// A job belongs to the provider that created it, and a different
+			// provider's client cannot poll it; leave it for when that provider is
+			// selected again.
+			if providerKey != "" && job.Provider != "" && job.Provider != providerKey {
 				continue
 			}
 			opts := ttsbatch.Options{GameID: game.ID, Provider: job.Provider, Model: job.Model}
@@ -2446,15 +2471,33 @@ func (s *Service) ResumePendingBatches(ctx context.Context) {
 	}
 }
 
-// batchJobActive reports whether a job is still in flight, so a launch knows to
-// resume it.
-func batchJobActive(status string) bool {
-	switch status {
-	case "submitted", "pending", "running":
+// batchJobActive reports whether a job is still worth working on, so a start is
+// not duplicated and a launch knows to resume it.
+func batchJobActive(job storage.TTSJob) bool {
+	switch job.Status {
+	case "queued", "processing", "downloading", "storing", "submitted", "pending", "running":
 		return true
+	case "succeeded":
+		// A job the provider finished whose results were never stored — a legacy
+		// row, or one interrupted mid-download — is still worth resuming.
+		return job.RequestCount > 0 && job.Completed < job.RequestCount
 	default:
 		return false
 	}
+}
+
+// activeBatchJob returns a campaign's in-flight batch job, if one exists.
+func activeBatchJob(store *storage.Store, gameID string) (*storage.TTSJob, bool) {
+	jobs, err := store.ListTTSJobs(gameID)
+	if err != nil {
+		return nil, false
+	}
+	for i := range jobs {
+		if batchJobActive(jobs[i]) {
+			return &jobs[i], true
+		}
+	}
+	return nil, false
 }
 
 // ttsBatchJobDTO maps a job row to the wire shape.

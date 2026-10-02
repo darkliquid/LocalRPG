@@ -35,6 +35,9 @@ type Options struct {
 	MaxPerJob    int
 	PollInterval time.Duration
 	MaxWait      time.Duration
+	// Force re-renders every group, overwriting the cached clips, rather than
+	// only backfilling what is missing.
+	Force bool
 }
 
 func (o Options) pollInterval() time.Duration {
@@ -127,7 +130,10 @@ func (e *Engine) Run(ctx context.Context, opts Options, groups []media.ClipGroup
 func (e *Engine) Submit(ctx context.Context, opts Options, groups []media.ClipGroup) (*storage.TTSJob, error) {
 	reqs := make([]media.BatchRequest, 0, len(groups))
 	for _, group := range groups {
-		if group.Cached || group.Key == "" {
+		if group.Key == "" {
+			continue
+		}
+		if group.Cached && !opts.Force {
 			continue
 		}
 		reqs = append(reqs, media.BatchRequest{Key: group.Key, Lines: group.Lines})
@@ -149,7 +155,7 @@ func (e *Engine) Submit(ctx context.Context, opts Options, groups []media.ClipGr
 		GameID:       opts.GameID,
 		Provider:     opts.Provider,
 		Model:        opts.Model,
-		Status:       "submitted",
+		Status:       "queued",
 		RequestCount: len(reqs),
 	}
 	if err := e.jobs.UpsertTTSJob(*job); err != nil {
@@ -168,10 +174,13 @@ func (e *Engine) Resume(ctx context.Context, opts Options, jobID string) (*stora
 	return e.finish(ctx, opts, job)
 }
 
-// finish waits for a job and stores its results, updating the job record.
+// finish waits for a job and stores its results, walking the job through the
+// lifecycle phases so the manager can say what stage it is at.
 func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) (*storage.TTSJob, error) {
 	handle := media.BatchJobHandle{ID: job.ID, Model: job.Model}
-	status, err := e.poll(ctx, handle, opts)
+	status, err := e.poll(ctx, handle, opts, func(phase string) {
+		_ = e.jobs.UpdateTTSJobStatus(job.ID, phase, job.Completed, job.FailedKeys)
+	})
 	if err != nil {
 		// Keep the last known state so a cancelled poll leaves the job resumable
 		// rather than blanking it.
@@ -181,11 +190,13 @@ func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) 
 		return job, err
 	}
 
+	_ = e.jobs.UpdateTTSJobStatus(job.ID, "downloading", job.Completed, job.FailedKeys)
 	results, err := e.client.FetchBatch(ctx, handle)
 	if err != nil {
 		return job, fmt.Errorf("fetch tts batch: %w", err)
 	}
 
+	_ = e.jobs.UpdateTTSJobStatus(job.ID, "storing", job.Completed, job.FailedKeys)
 	completed := 0
 	failed := make([]string, 0)
 	for _, result := range results {
@@ -200,10 +211,10 @@ func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) 
 		completed++
 	}
 
-	job.Status = "succeeded"
+	job.Status = "completed"
 	job.Completed = completed
 	job.FailedKeys = failed
-	if err := e.jobs.UpdateTTSJobStatus(job.ID, "succeeded", completed, failed); err != nil {
+	if err := e.jobs.UpdateTTSJobStatus(job.ID, "completed", completed, failed); err != nil {
 		return job, err
 	}
 	trace.OrNil(e.logger).Event("media.tts.batch_result", map[string]interface{}{
@@ -214,16 +225,24 @@ func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) 
 	return job, nil
 }
 
-// poll waits for a job to finish, checking between waits.
-func (e *Engine) poll(ctx context.Context, handle media.BatchJobHandle, opts Options) (media.BatchStatus, error) {
+// poll waits for a job to finish, checking between waits. onState is called with
+// the job's phase whenever the provider's state changes.
+func (e *Engine) poll(ctx context.Context, handle media.BatchJobHandle, opts Options, onState func(string)) (media.BatchStatus, error) {
 	deadline := e.now().Add(opts.maxWait())
 	var status media.BatchStatus
+	lastPhase := ""
 	for {
 		current, err := e.client.PollBatch(ctx, handle)
 		if err != nil {
 			return status, fmt.Errorf("poll tts batch: %w", err)
 		}
 		status = current
+		if onState != nil {
+			if phase := providerPhase(current.State); phase != lastPhase {
+				onState(phase)
+				lastPhase = phase
+			}
+		}
 		switch current.State {
 		case "succeeded":
 			return status, nil
@@ -236,6 +255,18 @@ func (e *Engine) poll(ctx context.Context, handle media.BatchJobHandle, opts Opt
 		if err := e.sleep(ctx, opts.pollInterval()); err != nil {
 			return status, fmt.Errorf("tts batch job %s interrupted: %w", handle.ID, err)
 		}
+	}
+}
+
+// providerPhase maps a provider batch state to the job phase we record while a
+// job is in flight: a job the provider has not started is queued, and one it is
+// working on is processing. The download and store phases are ours to write.
+func providerPhase(state string) string {
+	switch state {
+	case "running":
+		return "processing"
+	default:
+		return "queued"
 	}
 }
 

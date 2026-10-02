@@ -545,9 +545,12 @@ export class APIClient {
 
   // startTTSBatch submits an offline backfill, or returns null when every clip
   // is already cached. A failure carries the server's reason (a provider error,
-  // a missing key, a network fault) rather than a bare status.
-  static async startTTSBatch(gameID: string): Promise<TTSBatchJob | null> {
-    const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/tts/batch`, { method: 'POST' });
+  // a missing key, a network fault) rather than a bare status. When force is set
+  // every clip is re-rendered, overwriting the cache. Starting while a job is
+  // already in flight returns that job rather than queueing a second one.
+  static async startTTSBatch(gameID: string, force = false): Promise<TTSBatchJob | null> {
+    const query = force ? '?force=1' : '';
+    const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/tts/batch${query}`, { method: 'POST' });
     if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
   }

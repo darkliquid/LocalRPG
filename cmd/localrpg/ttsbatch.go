@@ -28,12 +28,13 @@ func handleTTSBatchCommand(args []string) {
 	showStatus := fs.Bool("status", false, "show the campaign's batch jobs")
 	resume := fs.String("resume", "", "finish a submitted job by id")
 	cancel := fs.String("cancel", "", "cancel a job by id")
+	force := fs.Bool("force", false, "re-render every clip, overwriting the cache, instead of only missing ones")
 	if err := fs.Parse(args); err != nil {
 		return
 	}
 	gameID := strings.TrimSpace(strings.Join(fs.Args(), " "))
 	if gameID == "" {
-		fmt.Fprintln(os.Stderr, "Usage: localrpg tts batch [--wait] [--status] [--resume <job-id>] [--cancel <job-id>] <game-id>")
+		fmt.Fprintln(os.Stderr, "Usage: localrpg tts batch [--wait] [--force] [--status] [--resume <job-id>] [--cancel <job-id>] <game-id>")
 		os.Exit(1)
 	}
 
@@ -81,7 +82,7 @@ func handleTTSBatchCommand(args []string) {
 	}
 	batchEngine := ttsbatch.New(batchClient, media.NewContentCache(resolver.CacheDir()), store)
 	batchEngine.SetOpusBitrate(cfg.OpusBitrate())
-	opts := ttsbatch.Options{GameID: gameID, Provider: providerKey, Model: cfg.Media.TTS.Model}
+	opts := ttsbatch.Options{GameID: gameID, Provider: providerKey, Model: cfg.Media.TTS.Model, Force: *force}
 
 	if *cancel != "" {
 		if err := batchClient.CancelBatch(ctx, media.BatchJobHandle{ID: *cancel}); err != nil {
