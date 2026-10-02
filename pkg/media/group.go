@@ -365,3 +365,16 @@ func withText(line SpeakerLine, text string) SpeakerLine {
 	line.Text = text
 	return line
 }
+
+// GroupForSegment returns the group that covers a segment index, so a caller
+// that holds a segment can find the clip it shares with its neighbours.
+func GroupForSegment(groups []ClipGroup, index int) (ClipGroup, bool) {
+	for _, group := range groups {
+		for _, segmentIndex := range group.SegmentIndexes {
+			if segmentIndex == index {
+				return group, true
+			}
+		}
+	}
+	return ClipGroup{}, false
+}

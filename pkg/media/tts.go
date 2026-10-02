@@ -366,10 +366,22 @@ func (p *TTSPipeline) CountUncached(segments []entity.TurnSegment, narratorVoice
 	return cached, uncached
 }
 
+// CountUncachedGroups reports how many groups already have their clip and how
+// many would need synthesis, the grouped counterpart of CountUncached.
+func (p *TTSPipeline) CountUncachedGroups(groups []ClipGroup) (cached, uncached int) {
+	for _, group := range groups {
+		if _, ok := p.cachedClip(group.Key); ok {
+			cached++
+		} else {
+			uncached++
+		}
+	}
+	return cached, uncached
+}
+
 // LastUsage reports what the most recent synthesis consumed. A cache hit or a
 // provider that reports nothing yields the zero value.
-func (p *TTSPipeline) LastUsage() Usage {
-	p.flightMu.Lock()
+func (p *TTSPipeline) LastUsage() Usage {	p.flightMu.Lock()
 	defer p.flightMu.Unlock()
 	return p.lastUsage
 }
@@ -559,10 +571,16 @@ func (p *TTSPipeline) GroupClipKeys(segments []entity.TurnSegment, narratorVoice
 // caller can fall back to per-segment synthesis for just that group. It is the
 // grouped counterpart of SynthesizeSegmentClips.
 func (p *TTSPipeline) SynthesizeGroups(ctx context.Context, groups []ClipGroup) ([]ClipGroup, error) {
+	return p.SynthesizeGroupsForce(ctx, groups, false)
+}
+
+// SynthesizeGroupsForce is SynthesizeGroups with an option to re-render a group
+// even when its clip is cached, which is what a regenerate does.
+func (p *TTSPipeline) SynthesizeGroupsForce(ctx context.Context, groups []ClipGroup, force bool) ([]ClipGroup, error) {
 	rendered := make([]ClipGroup, 0, len(groups))
 	var firstErr error
 	for _, group := range groups {
-		result, err := p.synthesizeGroup(ctx, group)
+		result, err := p.synthesizeGroup(ctx, group, force)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -580,7 +598,7 @@ func (p *TTSPipeline) SynthesizeTurn(ctx context.Context, segments []entity.Turn
 // synthesizeGroup renders one group, reusing a cached clip when present. The
 // per-key single-flight lock means two callers requesting the same group
 // synthesize it once.
-func (p *TTSPipeline) synthesizeGroup(ctx context.Context, group ClipGroup) (ClipGroup, error) {
+func (p *TTSPipeline) synthesizeGroup(ctx context.Context, group ClipGroup, force bool) (ClipGroup, error) {
 	start := time.Now()
 	provider, model := groupKeyProvider(group.Lines)
 	if group.Key == "" {
@@ -602,11 +620,13 @@ func (p *TTSPipeline) synthesizeGroup(ctx context.Context, group ClipGroup) (Cli
 	keyLock.Lock()
 	defer keyLock.Unlock()
 
-	if path, ok := p.cachedClip(group.Key); ok {
-		_ = path
-		group.Cached = true
-		p.setLastUsage(Usage{})
-		return group, nil
+	if !force {
+		if path, ok := p.cachedClip(group.Key); ok {
+			_ = path
+			group.Cached = true
+			p.setLastUsage(Usage{})
+			return group, nil
+		}
 	}
 
 	audio, err := p.renderGroupAudio(ctx, group)

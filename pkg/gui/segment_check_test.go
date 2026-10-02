@@ -11,7 +11,7 @@ func TestSegmentDTOsCarryCheckRef(t *testing.T) {
 		{Kind: "narration", Text: "A roll.", CheckRef: "chk_1"},
 		{Kind: "narration", Text: "No roll."},
 	}
-	dtos := segmentDTOs(segments, "test-game", nil, nil)
+	dtos := segmentDTOs(segments, "test-game", clipPlan{}, nil)
 	if dtos[0].CheckRef != "chk_1" {
 		t.Fatalf("dtos[0].CheckRef = %q, want chk_1", dtos[0].CheckRef)
 	}

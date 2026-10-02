@@ -146,6 +146,11 @@ func (s *Service) sentenceStreamerFor(ctx context.Context, gameID string, cfg *c
 	if !cfg.TTSStreamSentences() {
 		return nil
 	}
+	// Grouping and sentence streaming are alternative strategies: a streamed
+	// sentence is a cache miss for a group, so only one runs for a turn.
+	if cfg.TTSGrouping() == "always" {
+		return nil
+	}
 	if cfg.Media.TTS.Type == "" || cfg.Media.TTS.Type == "disabled" {
 		return nil
 	}

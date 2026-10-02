@@ -368,9 +368,9 @@ func resolveWikilinks(text string, resolve func(string) string) string {
 	})
 }
 
-func segmentDTOs(segments []entity.TurnSegment, gameID string, clipKeys func(entity.TurnSegment) []string, resolve func(string) string) []SegmentDTO {
+func segmentDTOs(segments []entity.TurnSegment, gameID string, plan clipPlan, resolve func(string) string) []SegmentDTO {
 	dtos := make([]SegmentDTO, 0, len(segments))
-	for _, segment := range segments {
+	for index, segment := range segments {
 		text := resolveWikilinks(segment.Text, resolve)
 		dto := SegmentDTO{
 			Kind:      segment.Kind,
@@ -395,35 +395,93 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, clipKeys func(ent
 				dto.PortraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait", gameID, refID)
 			}
 		}
-		if clipKeys != nil {
-			// The keys come from the pipeline, so the URL a client is handed is the
-			// URL of the audio synthesis writes: one sound, one name.
-			dto.AudioURLs = clipURLs(clipKeys(segment))
+		// The keys come from the pipeline, so the URL a client is handed is the
+		// URL of the audio synthesis writes: one sound, one name. A grouped
+		// segment shares its group's key and names the group for the client.
+		if index < len(plan.segmentKeys) {
+			urls := make([]string, 0, len(plan.segmentKeys[index]))
+			for _, key := range plan.segmentKeys[index] {
+				urls = append(urls, clipURL(key))
+			}
+			dto.AudioURLs = urls
+		}
+		if index < len(plan.groupKey) {
+			dto.ClipGroup = plan.groupKey[index]
 		}
 		dtos = append(dtos, dto)
 	}
 	return dtos
 }
 
-// clipKeyResolver names a segment's clips from the shared pipeline, or nil when no
-// TTS provider is configured. Building the pipeline is cheap: a provider loads its
-// model at first synthesis, not at construction.
-func (s *Service) clipKeyResolver(cfg *config.Config, gameID string) func(entity.TurnSegment) []string {
+// clipPlan is a turn's audio plan for the DTO: the clip keys per segment (a
+// shared group key when grouped, the segment's own keys otherwise) and the group
+// list the client renders controls for.
+type clipPlan struct {
+	segmentKeys [][]string
+	groupKey    []string
+	groups      []ClipGroupDTO
+}
+
+// clipPlanFor names a turn's clips from the shared pipeline. It returns an empty
+// plan when no TTS provider is configured. Building the pipeline is cheap: a
+// provider loads its model at first synthesis, not at construction.
+func (s *Service) clipPlanFor(cfg *config.Config, gameID string, segments []entity.TurnSegment) clipPlan {
+	plan := clipPlan{}
 	if cfg.Media.TTS.Type == "" || cfg.Media.TTS.Type == "disabled" {
-		return nil
+		return plan
 	}
 	pipeline, err := s.audioPipeline()
 	if err != nil {
-		return nil
+		return plan
 	}
 	narrator := s.narratorVoiceFor(gameID, cfg)
 	voiceFor := s.voiceFor(gameID)
-	return func(segment entity.TurnSegment) []string {
+	plan.segmentKeys = make([][]string, len(segments))
+	plan.groupKey = make([]string, len(segments))
+
+	if s.groupingEnabled(cfg, pipeline) {
+		groups := pipeline.GroupClipKeys(segments, narrator, voiceFor)
+		plan.groups = make([]ClipGroupDTO, 0, len(groups))
+		for _, group := range groups {
+			plan.groups = append(plan.groups, ClipGroupDTO{
+				Key:            group.Key,
+				AudioURLs:      []string{clipURL(group.Key)},
+				SegmentIndexes: group.SegmentIndexes,
+			})
+			for _, index := range group.SegmentIndexes {
+				if index < 0 || index >= len(segments) {
+					continue
+				}
+				plan.segmentKeys[index] = []string{group.Key}
+				plan.groupKey[index] = group.Key
+			}
+		}
+		return plan
+	}
+
+	for i, segment := range segments {
 		keys, err := pipeline.SegmentClipKeys(segment, narrator, voiceFor)
 		if err != nil {
-			return nil
+			continue
 		}
-		return keys
+		plan.segmentKeys[i] = keys
+	}
+	return plan
+}
+
+// groupingEnabled reports whether a turn's audio is rendered as groups. Grouping
+// and sentence streaming are alternative strategies: a streamed sentence is a
+// cache miss for a group, so only one runs for a turn.
+func (s *Service) groupingEnabled(cfg *config.Config, pipeline *media.TTSPipeline) bool {
+	switch cfg.TTSGrouping() {
+	case "off":
+		return false
+	case "always":
+		return true
+	default:
+		// "auto" groups when sentence streaming will not run for this turn, which
+		// is the metered-provider case and every provider with streaming off.
+		return !cfg.TTSStreamSentences()
 	}
 }
 
@@ -1025,7 +1083,7 @@ func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, e
 // share it so a live turn and a replayed one are the same shape, which is what
 // lets the client render both with one code path.
 func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID string) TurnDTO {
-	clipKeys := s.clipKeyResolver(cfg, gameID)
+	plan := s.clipPlanFor(cfg, gameID, turn.Segments)
 	artAvailable := cfg.Media.Image.BuiltinFallback || cfg.Media.Image.Type != "disabled"
 
 	dto := TurnDTO{
@@ -1046,7 +1104,8 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		PendingCheck:    turn.PendingCheck,
 		HealthEffects:   healthEffectDTOs(turn.HealthEffects),
 		WorldTick:       turn.WorldTick,
-		Segments: segmentDTOs(turn.Segments, gameID, clipKeys, func(name string) string {
+		ClipGroups:      plan.groups,
+		Segments: segmentDTOs(turn.Segments, gameID, plan, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
 		}),
 	}
@@ -1542,15 +1601,9 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 // appending to the plan only what the streamed sentences did not already play, so
 // no line is heard twice and none is missed.
 func (t *TurnSession) finishTurnAudio(ctx context.Context, turn engine.Turn, plan *turnAudioPlan) {
-	for i := range turn.Segments {
-		clips, err := t.service.GetSegmentClips(ctx, t.gameID, turn.Number, i)
-		if err != nil {
-			continue
-		}
-		for _, clip := range clips {
-			plan.enqueueClip(media.ClipKeyForPath(clip), clip)
-		}
-	}
+	t.service.emitTurnClips(ctx, t.gameID, turn, false, func(clip string) {
+		plan.enqueueClip(media.ClipKeyForPath(clip), clip)
+	})
 }
 
 // GetLocationArt returns a location's scene image and its content type, drawing it
@@ -1921,48 +1974,131 @@ func (s *Service) clipPath(key string) string {
 }
 
 // GetSegmentClips synthesizes one segment on demand and returns its ordered clips,
-// reusing every clip the cache already holds.
+// reusing every clip the cache already holds. When grouping is enabled a segment
+// shares its group's clip, so regenerating one segment regenerates the group it
+// belongs to.
 func (s *Service) GetSegmentClips(ctx context.Context, gameID string, turnNumber, segmentIndex int, force ...bool) ([]string, error) {
-	turns, err := s.cachedHistory(gameID)
+	turn, err := s.findTurn(gameID, turnNumber)
 	if err != nil {
-		return nil, fmt.Errorf("load history: %w", err)
-	}
-
-	var turn *engine.Turn
-	for i := range turns {
-		if turns[i].Number == turnNumber {
-			turn = &turns[i]
-			break
-		}
-	}
-	if turn == nil {
-		return nil, fmt.Errorf("turn %d not found", turnNumber)
+		return nil, err
 	}
 	if segmentIndex < 0 || segmentIndex >= len(turn.Segments) {
 		return nil, fmt.Errorf("segment %d out of range for turn %d", segmentIndex, turnNumber)
 	}
+	isForce := len(force) > 0 && force[0]
 
 	cfg := s.configMgr.Get()
-	narratorVoice := s.narratorVoiceFor(gameID, cfg)
-
 	pipeline, err := s.audioPipeline()
 	if err != nil {
 		return nil, err
 	}
-	isForce := len(force) > 0 && force[0]
-	clips, err := pipeline.SynthesizeSegmentClips(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
+	if s.groupingEnabled(cfg, pipeline) {
+		groups := pipeline.GroupClipKeys(turn.Segments, s.narratorVoiceFor(gameID, cfg), s.voiceFor(gameID))
+		if group, ok := media.GroupForSegment(groups, segmentIndex); ok {
+			rendered, err := pipeline.SynthesizeGroupsForce(ctx, []media.ClipGroup{group}, isForce)
+			if err != nil {
+				s.noteFailure("tts", err)
+				return nil, err
+			}
+			s.noteSuccess("tts")
+			s.recordTTSUsage(gameID, turnNumber, cfg, pipeline)
+			if len(rendered) > 0 && rendered[0].Cached {
+				return []string{s.clipPath(rendered[0].Key)}, nil
+			}
+			return nil, nil
+		}
+	}
+	return s.synthesizeSegment(ctx, gameID, *turn, segmentIndex, isForce)
+}
+
+// synthesizeSegment renders one segment through the ungrouped per-segment path,
+// the fallback when grouping is off or a group failed.
+func (s *Service) synthesizeSegment(ctx context.Context, gameID string, turn engine.Turn, segmentIndex int, force bool) ([]string, error) {
+	if segmentIndex < 0 || segmentIndex >= len(turn.Segments) {
+		return nil, fmt.Errorf("segment %d out of range for turn %d", segmentIndex, turn.Number)
+	}
+	cfg := s.configMgr.Get()
+	pipeline, err := s.audioPipeline()
+	if err != nil {
+		return nil, err
+	}
+	clips, err := pipeline.SynthesizeSegmentClips(ctx, turn.Segments[segmentIndex], s.narratorVoiceFor(gameID, cfg), s.voiceFor(gameID), force)
 	if err != nil {
 		s.noteFailure("tts", err)
 		return nil, err
 	}
 	s.noteSuccess("tts")
-	// A cache hit reports nothing, so only a real synthesis is recorded.
-	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
-		if u := pipeline.LastUsage(); u.Characters != 0 || u.InputTokens != 0 || u.OutputTokens != 0 || u.Requests != 0 {
-			s.RecordUsage(gameID, turnNumber, "tts", mediaUsage(u, key, cfg.Media.TTS.Model))
+	s.recordTTSUsage(gameID, turn.Number, cfg, pipeline)
+	return clips, nil
+}
+
+// synthesizeTurnGroups renders a whole turn's groups when grouping is enabled,
+// reporting whether it did. It returns the rendered groups so a caller can fall
+// back to per-segment synthesis for any group that failed.
+func (s *Service) synthesizeTurnGroups(ctx context.Context, gameID string, turn engine.Turn, cfg *config.Config, force bool) ([]media.ClipGroup, bool, error) {
+	pipeline, err := s.audioPipeline()
+	if err != nil {
+		return nil, false, err
+	}
+	if !s.groupingEnabled(cfg, pipeline) {
+		return nil, false, nil
+	}
+	groups := pipeline.GroupClipKeys(turn.Segments, s.narratorVoiceFor(gameID, cfg), s.voiceFor(gameID))
+	rendered, err := pipeline.SynthesizeGroupsForce(ctx, groups, force)
+	if err != nil {
+		s.noteFailure("tts", err)
+	} else {
+		s.noteSuccess("tts")
+	}
+	s.recordTTSUsage(gameID, turn.Number, cfg, pipeline)
+	return rendered, true, err
+}
+
+// emitTurnClips yields a turn's clips in play order, grouped when grouping is
+// enabled and per-segment otherwise, so every consumer agrees on what a turn
+// sounds like. A group that failed falls back to per-segment synthesis so the
+// beat is not silent.
+func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.Turn, force bool, emit func(string)) {
+	cfg := s.configMgr.Get()
+	if groups, grouped, _ := s.synthesizeTurnGroups(ctx, gameID, turn, cfg, force); grouped {
+		for _, group := range groups {
+			if group.Cached {
+				emit(s.clipPath(group.Key))
+				continue
+			}
+			for _, index := range group.SegmentIndexes {
+				clips, err := s.synthesizeSegment(ctx, gameID, turn, index, false)
+				if err != nil {
+					continue
+				}
+				for _, clip := range clips {
+					emit(clip)
+				}
+			}
+		}
+		return
+	}
+	for i := range turn.Segments {
+		clips, err := s.synthesizeSegment(ctx, gameID, turn, i, force)
+		if err != nil {
+			continue
+		}
+		for _, clip := range clips {
+			emit(clip)
 		}
 	}
-	return clips, nil
+}
+
+// recordTTSUsage records what a synthesis consumed. A cache hit reports nothing,
+// so only a real synthesis is recorded.
+func (s *Service) recordTTSUsage(gameID string, turnNumber int, cfg *config.Config, pipeline *media.TTSPipeline) {
+	key, ok := media.TTSKeyFor(cfg.Media.TTS)
+	if !ok {
+		return
+	}
+	if u := pipeline.LastUsage(); u.Characters != 0 || u.InputTokens != 0 || u.OutputTokens != 0 || u.Requests != 0 {
+		s.RecordUsage(gameID, turnNumber, "tts", mediaUsage(u, key, cfg.Media.TTS.Model))
+	}
 }
 
 // audioPipeline returns the shared TTS pipeline, building it when the current
@@ -1987,6 +2123,7 @@ func (s *Service) audioPipeline() (*media.TTSPipeline, error) {
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
+	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
 	s.ttsConfig, s.ttsPipeline = cfg, pipeline
 	return pipeline, nil
 }
@@ -2067,10 +2204,19 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
+	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
 
 	voiceFor := s.voiceFor(gameID)
+	grouped := s.groupingEnabled(cfg, pipeline)
 	for _, turn := range turns {
 		if len(turn.Segments) == 0 {
+			continue
+		}
+		if grouped {
+			groups := pipeline.GroupClipKeys(turn.Segments, narratorVoice, voiceFor)
+			turnCached, turnUncached := pipeline.CountUncachedGroups(groups)
+			cached += turnCached
+			uncached += turnUncached
 			continue
 		}
 		turnCached, turnUncached := pipeline.CountUncached(turn.Segments, narratorVoice, voiceFor)
@@ -2129,15 +2275,9 @@ func (s *Service) turnClipStream(gameID string, turnNumber int, force bool) <-ch
 	go func() {
 		defer close(clips)
 		ctx := context.Background()
-		for i := range turn.Segments {
-			list, err := s.GetSegmentClips(ctx, gameID, turnNumber, i, force)
-			if err != nil {
-				continue
-			}
-			for _, path := range list {
-				clips <- path
-			}
-		}
+		s.emitTurnClips(ctx, gameID, *turn, force, func(path string) {
+			clips <- path
+		})
 	}()
 
 	return clips
