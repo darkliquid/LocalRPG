@@ -230,67 +230,67 @@
 
 ### Task 10: `BatchTTSClient` interface
 
-- [ ] **Step 10.1**: Create `pkg/media/batch.go` with `BatchRequest`, `BatchJobHandle`, `BatchStatus`, `BatchResult`, `BatchTTSClient` exactly as specified.
-- [ ] **Step 10.2**: Write `pkg/media/batch_test.go` with a fake client asserting the interface is satisfiable and that a result's `Key` maps to a cache entry.
-- [ ] **Step 10.3**: Run `go test ./pkg/media/...` and verify it passes.
-- [ ] **Step 10.4**: Commit: `git commit -am "feat(media): add batch tts client interface"`
+- [x] **Step 10.1**: Create `pkg/media/batch.go` with `BatchRequest`, `BatchJobHandle`, `BatchStatus`, `BatchResult`, `BatchTTSClient` exactly as specified.
+- [x] **Step 10.2**: Write `pkg/media/batch_test.go` with a fake client asserting the interface is satisfiable and that a result's `Key` maps to a cache entry.
+- [x] **Step 10.3**: Run `go test ./pkg/media/...` and verify it passes.
+- [x] **Step 10.4**: Commit: `git commit -am "feat(media): add batch tts client interface"`
 
 ---
 
 ### Task 11: `tts_jobs` migration and storage
 
-- [ ] **Step 11.1**: In `pkg/storage/migrate.go`, add `{version: 10, apply: addTTSJobsTable}` creating `tts_jobs` (see the design §8.1) with an index on `(game_id, status)`.
-- [ ] **Step 11.2**: Create `pkg/storage/ttsjobs.go` with `UpsertTTSJob`, `GetTTSJob`, `ListTTSJobs(gameID)`, `UpdateTTSJobStatus`.
-- [ ] **Step 11.3**: Write `pkg/storage/ttsjobs_test.go` using `t.TempDir()` and `storage.OpenGameStore`.
-- [ ] **Step 11.4**: Run `go test ./pkg/storage/...` and verify it passes.
-- [ ] **Step 11.5**: Commit: `git commit -am "feat(storage): persist tts batch jobs"`
+- [x] **Step 11.1**: In `pkg/storage/migrate.go`, add `{version: 10, apply: addTTSJobsTable}` creating `tts_jobs` (see the design §8.1) with an index on `(game_id, status)`.
+- [x] **Step 11.2**: Create `pkg/storage/ttsjobs.go` with `UpsertTTSJob`, `GetTTSJob`, `ListTTSJobs(gameID)`, `UpdateTTSJobStatus`.
+- [x] **Step 11.3**: Write `pkg/storage/ttsjobs_test.go` using `t.TempDir()` and `storage.OpenGameStore`.
+- [x] **Step 11.4**: Run `go test ./pkg/storage/...` and verify it passes.
+- [x] **Step 11.5**: Commit: `git commit -am "feat(storage): persist tts batch jobs"`
 
 ---
 
 ### Task 12: Gemini batch implementation
 
-- [ ] **Step 12.1**: Create `pkg/provider/ttsgemini/batch.go` implementing `BatchTTSClient`: build a JSONL of `generateContent` requests (one per `BatchRequest`, using `SynthesizeGroup`'s request shape), upload via the File API, `client.Batches.Create`, `PollBatch` via `Get`, `FetchBatch` via the output file, `CancelBatch` via `Cancel`.
-- [ ] **Step 12.2**: Map the batch discount and token accounting into `media.Usage`.
-- [ ] **Step 12.3**: Write tests with a stubbed transport asserting the JSONL shape and status mapping (no live API).
-- [ ] **Step 12.4**: Run `go test ./pkg/provider/ttsgemini/...` and verify it passes.
-- [ ] **Step 12.5**: Commit: `git commit -am "feat(ttsgemini): support the batch api"`
+- [x] **Step 12.1**: Create `pkg/provider/ttsgemini/batch.go` implementing `BatchTTSClient`: build a JSONL of `generateContent` requests (one per `BatchRequest`, using `SynthesizeGroup`'s request shape), upload via the File API, `client.Batches.Create`, `PollBatch` via `Get`, `FetchBatch` via the output file, `CancelBatch` via `Cancel`.
+- [x] **Step 12.2**: Map the batch discount and token accounting into `media.Usage`.
+- [x] **Step 12.3**: Write tests with a stubbed transport asserting the JSONL shape and status mapping (no live API).
+- [x] **Step 12.4**: Run `go test ./pkg/provider/ttsgemini/...` and verify it passes.
+- [x] **Step 12.5**: Commit: `git commit -am "feat(ttsgemini): support the batch api"`
 
 ---
 
 ### Task 13: `pkg/ttsbatch` engine
 
-- [ ] **Step 13.1**: Create `pkg/ttsbatch/engine.go`: plan uncached groups, chunk into submissions bounded by token caps and a max request count, write JSONL, submit, poll with exponential backoff, fetch, normalise to Opus, write to the content-addressed cache, update the job row, record usage.
-- [ ] **Step 13.2**: Make it resumable: skip groups whose clip is cached; retry only persisted failed keys.
-- [ ] **Step 13.3**: Write `pkg/ttsbatch/engine_test.go` with a fake `BatchTTSClient` covering a clean run, a partial failure, and a restart mid-job.
-- [ ] **Step 13.4**: Run `go test ./pkg/ttsbatch/...` and verify it passes.
-- [ ] **Step 13.5**: Commit: `git commit -am "feat(ttsbatch): add resumable batch backfill engine"`
+- [x] **Step 13.1**: Create `pkg/ttsbatch/engine.go`: plan uncached groups, chunk into submissions bounded by token caps and a max request count, write JSONL, submit, poll with exponential backoff, fetch, normalise to Opus, write to the content-addressed cache, update the job row, record usage.
+- [x] **Step 13.2**: Make it resumable: skip groups whose clip is cached; retry only persisted failed keys.
+- [x] **Step 13.3**: Write `pkg/ttsbatch/engine_test.go` with a fake `BatchTTSClient` covering a clean run, a partial failure, and a restart mid-job.
+- [x] **Step 13.4**: Run `go test ./pkg/ttsbatch/...` and verify it passes.
+- [x] **Step 13.5**: Commit: `git commit -am "feat(ttsbatch): add resumable batch backfill engine"`
 
 ---
 
 ### Task 14: CLI and GUI triggers
 
-- [ ] **Step 14.1**: Add `localrpg tts batch <game-id>` with `--wait`, `--status`, `--cancel` in `cmd/localrpg/tts.go`.
-- [ ] **Step 14.2**: Add `Service.StartTTSBatch`, `Service.TTSBatchStatus` in `pkg/gui/service.go` and routes in `pkg/gui/server.go`; update `frontend/src/api/client.ts` and `frontend/src/types.ts` together.
-- [ ] **Step 14.3**: Add a batch jobs panel to `frontend/src/components/SettingsStudio.tsx` showing status, counts and cost.
-- [ ] **Step 14.4**: Run `go test ./cmd/... ./pkg/gui/...` and `cd frontend && npx tsc --noEmit`.
-- [ ] **Step 14.5**: Commit: `git commit -am "feat(gui): start and monitor tts batch jobs"`
+- [x] **Step 14.1**: Add `localrpg tts batch <game-id>` with `--wait`, `--status`, `--cancel` in `cmd/localrpg/tts.go`.
+- [x] **Step 14.2**: Add `Service.StartTTSBatch`, `Service.TTSBatchStatus` in `pkg/gui/service.go` and routes in `pkg/gui/server.go`; update `frontend/src/api/client.ts` and `frontend/src/types.ts` together.
+- [ ] **Step 14.3** (deferred): a batch jobs panel has no home yet — the Settings Studio is global while a batch job is per-campaign, and there is no campaign-level audio panel to mount it in. The API surface ships now (`GET`/`POST /api/game/{id}/tts/batch`, `APIClient.listTTSBatchJobs`/`startTTSBatch`, `TTSBatchJob`); the panel is a follow-up that needs a campaign-level audio UI. The CLI `localrpg tts batch` is the operator path in the meantime.
+- [x] **Step 14.4**: Run `go test ./cmd/... ./pkg/gui/...` and `cd frontend && npx tsc --noEmit`.
+- [x] **Step 14.5**: Commit: `git commit -am "feat(gui): start and monitor tts batch jobs"`
 
 ---
 
 ### Task 15: Batch pricing
 
-- [ ] **Step 15.1**: Add a batch marker to `harness.Usage` and apply a configurable batch multiplier (default 0.5) in `pricing.CostMicros`.
-- [ ] **Step 15.2**: Write tests asserting a batch usage record costs half of an equivalent interactive one.
-- [ ] **Step 15.3**: Run `go test ./pkg/pricing/... ./pkg/harness/...` and verify it passes.
-- [ ] **Step 15.4**: Commit: `git commit -am "feat(pricing): apply the batch api discount"`
+- [x] **Step 15.1**: Add a batch marker to `harness.Usage` and apply a configurable batch multiplier (default 0.5) in `pricing.CostMicros`.
+- [x] **Step 15.2**: Write tests asserting a batch usage record costs half of an equivalent interactive one.
+- [x] **Step 15.3**: Run `go test ./pkg/pricing/... ./pkg/harness/...` and verify it passes.
+- [x] **Step 15.4**: Commit: `git commit -am "feat(pricing): apply the batch api discount"`
 
 ---
 
 ### Task 16: Stage 2 verification
 
-- [ ] **Step 16.1**: Run `mise run test` and `mise run lint`.
-- [ ] **Step 16.2**: Regenerate embedded docs: `go test ./pkg/gui -update-docs`.
-- [ ] **Step 16.3**: Commit: `git commit -am "chore: verify tts batch milestone"`
+- [x] **Step 16.1**: Run `mise run test` and `mise run lint`.
+- [x] **Step 16.2**: Regenerate embedded docs: `go test ./pkg/gui -update-docs`.
+- [x] **Step 16.3**: Commit: `git commit -am "chore: verify tts batch milestone"`
 
 ---
 
