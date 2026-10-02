@@ -145,6 +145,17 @@ type ClipGroupDTO struct {
 	SegmentIndexes []int    `json:"segment_indexes"`
 }
 
+// TTSBatchJobDTO is one offline batch synthesis job, for the settings panel.
+type TTSBatchJobDTO struct {
+	ID           string   `json:"id"`
+	Provider     string   `json:"provider"`
+	Model        string   `json:"model,omitempty"`
+	Status       string   `json:"status"`
+	RequestCount int      `json:"request_count"`
+	Completed    int      `json:"completed"`
+	FailedKeys   []string `json:"failed_keys,omitempty"`
+}
+
 type TurnDTO struct {
 	TurnNumber      int           `json:"turn_number"`
 	InputText       string        `json:"input_text"`

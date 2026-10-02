@@ -33,6 +33,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/tools"
 	"github.com/darkliquid/localrpg/pkg/trace"
+	"github.com/darkliquid/localrpg/pkg/ttsbatch"
 	"gopkg.in/yaml.v3"
 )
 
@@ -2224,6 +2225,103 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 		uncached += turnUncached
 	}
 	return cached, uncached, nil
+}
+
+// TTSBatchJobs lists a campaign's offline batch jobs, newest first.
+func (s *Service) TTSBatchJobs(gameID string) ([]TTSBatchJobDTO, error) {
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, err
+	}
+	jobs, err := store.ListTTSJobs(gameID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TTSBatchJobDTO, 0, len(jobs))
+	for _, job := range jobs {
+		out = append(out, ttsBatchJobDTO(job))
+	}
+	return out, nil
+}
+
+// StartTTSBatch submits an offline batch backfill for a campaign and finishes it
+// in the background, so the request returns at once and the panel watches the
+// job row. It returns the submitted job, or nil when every clip is already
+// cached.
+func (s *Service) StartTTSBatch(ctx context.Context, gameID string) (*TTSBatchJobDTO, error) {
+	cfg := s.configMgr.Get()
+	client, err := s.ttsClientFor(cfg.Media.TTS)
+	if err != nil {
+		return nil, err
+	}
+	batchClient, ok := client.(media.BatchTTSClient)
+	if !ok {
+		return nil, fmt.Errorf("the configured TTS provider has no batch API")
+	}
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, err
+	}
+	pipeline, err := s.audioPipeline()
+	if err != nil {
+		return nil, err
+	}
+	turns, err := s.cachedHistory(gameID)
+	if err != nil {
+		return nil, err
+	}
+
+	narrator := s.narratorVoiceFor(gameID, cfg)
+	voiceFor := s.voiceFor(gameID)
+	groups := make([]media.ClipGroup, 0)
+	for _, turn := range turns {
+		if len(turn.Segments) == 0 {
+			continue
+		}
+		groups = append(groups, pipeline.GroupClipKeys(turn.Segments, narrator, voiceFor)...)
+	}
+
+	providerKey := ""
+	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
+		providerKey = string(key)
+	}
+	batchEngine := ttsbatch.New(batchClient, media.NewContentCache(s.resolver.CacheDir()), store)
+	batchEngine.SetOpusBitrate(cfg.OpusBitrate())
+	opts := ttsbatch.Options{GameID: gameID, Provider: providerKey, Model: cfg.Media.TTS.Model}
+
+	job, err := batchEngine.Submit(ctx, opts, groups)
+	if err != nil {
+		return nil, err
+	}
+	if job == nil {
+		return nil, nil
+	}
+
+	// A batch job can take hours, so it finishes in the background and the panel
+	// watches the job row rather than holding a request open.
+	s.goBackground(func() {
+		if _, err := batchEngine.Resume(context.Background(), opts, job.ID); err != nil {
+			s.noteFailure("tts", err)
+			return
+		}
+		s.noteSuccess("tts")
+	})
+
+	dto := ttsBatchJobDTO(*job)
+	return &dto, nil
+}
+
+// ttsBatchJobDTO maps a job row to the wire shape.
+func ttsBatchJobDTO(job storage.TTSJob) TTSBatchJobDTO {
+	return TTSBatchJobDTO{
+		ID:           job.ID,
+		Provider:     job.Provider,
+		Model:        job.Model,
+		Status:       job.Status,
+		RequestCount: job.RequestCount,
+		Completed:    job.Completed,
+		FailedKeys:   job.FailedKeys,
+	}
 }
 
 // findTurn reads one turn from the canonical log.

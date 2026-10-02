@@ -47,6 +47,7 @@ import {
   ExportJob,
   ExportEvent,
   ExportCapabilities,
+  TTSBatchJob,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -532,6 +533,21 @@ export class APIClient {
   static async uncachedBeats(gameID: string): Promise<{ cached: number; uncached: number }> {
     const res = await fetch(`/api/game/${gameID}/tts/uncached`);
     if (!res.ok) throw new Error(`uncachedBeats: ${res.statusText}`);
+    return res.json();
+  }
+
+  // listTTSBatchJobs returns a campaign's offline batch synthesis jobs.
+  static async listTTSBatchJobs(gameID: string): Promise<TTSBatchJob[]> {
+    const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/tts/batch`);
+    if (!res.ok) throw new Error(`listTTSBatchJobs: ${res.statusText}`);
+    return res.json();
+  }
+
+  // startTTSBatch submits an offline backfill, or returns null when every clip
+  // is already cached.
+  static async startTTSBatch(gameID: string): Promise<TTSBatchJob | null> {
+    const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/tts/batch`, { method: 'POST' });
+    if (!res.ok) throw new Error(`startTTSBatch: ${res.statusText}`);
     return res.json();
   }
 

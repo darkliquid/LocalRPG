@@ -231,16 +231,44 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case "tts":
-		if len(parts) < 3 || parts[2] != "uncached" || r.Method != http.MethodGet {
+		if len(parts) < 3 {
 			http.NotFound(w, r)
 			return
 		}
-		cached, uncached, err := s.service.CountUncachedBeats(gameID)
-		if err != nil {
-			writeGameError(w, err)
-			return
+		switch parts[2] {
+		case "uncached":
+			if r.Method != http.MethodGet {
+				http.NotFound(w, r)
+				return
+			}
+			cached, uncached, err := s.service.CountUncachedBeats(gameID)
+			if err != nil {
+				writeGameError(w, err)
+				return
+			}
+			writeJSON(w, map[string]int{"cached": cached, "uncached": uncached})
+		case "batch":
+			switch r.Method {
+			case http.MethodGet:
+				jobs, err := s.service.TTSBatchJobs(gameID)
+				if err != nil {
+					writeGameError(w, err)
+					return
+				}
+				writeJSON(w, jobs)
+			case http.MethodPost:
+				job, err := s.service.StartTTSBatch(r.Context(), gameID)
+				if err != nil {
+					writeGameError(w, err)
+					return
+				}
+				writeJSON(w, job)
+			default:
+				http.NotFound(w, r)
+			}
+		default:
+			http.NotFound(w, r)
 		}
-		writeJSON(w, map[string]int{"cached": cached, "uncached": uncached})
 
 	case "restart":
 		if r.Method != http.MethodPost {

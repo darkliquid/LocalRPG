@@ -100,6 +100,17 @@ func (e *Engine) SetOpusBitrate(bitrate int) {
 // already cached. A run is bounded by MaxPerJob so one submission stays within
 // the provider's limits; call it again to continue.
 func (e *Engine) Run(ctx context.Context, opts Options, groups []media.ClipGroup) (*storage.TTSJob, error) {
+	job, err := e.Submit(ctx, opts, groups)
+	if err != nil || job == nil {
+		return job, err
+	}
+	return e.finish(ctx, opts, job)
+}
+
+// Submit starts a job for the uncached groups and returns its record without
+// waiting. Resume finishes it later, which is what a CLI that does not want to
+// block for hours uses.
+func (e *Engine) Submit(ctx context.Context, opts Options, groups []media.ClipGroup) (*storage.TTSJob, error) {
 	reqs := make([]media.BatchRequest, 0, len(groups))
 	for _, group := range groups {
 		if group.Cached || group.Key == "" {
@@ -134,10 +145,21 @@ func (e *Engine) Run(ctx context.Context, opts Options, groups []media.ClipGroup
 		"job":      handle.ID,
 		"requests": len(reqs),
 	})
+	return job, nil
+}
 
+// Resume waits for a submitted job and writes its results to the cache.
+func (e *Engine) Resume(ctx context.Context, opts Options, jobID string) (*storage.TTSJob, error) {
+	job := &storage.TTSJob{ID: jobID, GameID: opts.GameID, Provider: opts.Provider, Model: opts.Model}
+	return e.finish(ctx, opts, job)
+}
+
+// finish waits for a job and stores its results, updating the job record.
+func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) (*storage.TTSJob, error) {
+	handle := media.BatchJobHandle{ID: job.ID, Model: job.Model}
 	status, err := e.poll(ctx, handle, opts)
 	if err != nil {
-		_ = e.jobs.UpdateTTSJobStatus(handle.ID, status.State, status.Completed, nil)
+		_ = e.jobs.UpdateTTSJobStatus(job.ID, status.State, status.Completed, nil)
 		return job, err
 	}
 
@@ -163,11 +185,11 @@ func (e *Engine) Run(ctx context.Context, opts Options, groups []media.ClipGroup
 	job.Status = "succeeded"
 	job.Completed = completed
 	job.FailedKeys = failed
-	if err := e.jobs.UpdateTTSJobStatus(handle.ID, "succeeded", completed, failed); err != nil {
+	if err := e.jobs.UpdateTTSJobStatus(job.ID, "succeeded", completed, failed); err != nil {
 		return job, err
 	}
 	trace.OrNil(e.logger).Event("media.tts.batch_result", map[string]interface{}{
-		"job":       handle.ID,
+		"job":       job.ID,
 		"completed": completed,
 		"failed":    len(failed),
 	})

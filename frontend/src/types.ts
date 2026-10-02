@@ -81,6 +81,17 @@ export interface ClipGroupDTO {
   segment_indexes: number[];
 }
 
+// TTSBatchJob is one offline batch synthesis job for a campaign.
+export interface TTSBatchJob {
+  id: string;
+  provider: string;
+  model?: string;
+  status: string;
+  request_count: number;
+  completed: number;
+  failed_keys?: string[];
+}
+
 export interface Turn {
   turn_number: number;
   input_text: string;
