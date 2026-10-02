@@ -42,6 +42,7 @@ func TestDocsService_GetDocsList(t *testing.T) {
 		"Configuration & Providers",
 		"Studio Guides",
 		"Codex & Content Reference",
+		"Local AI & Self-Hosting",
 	}
 	for _, cat := range expectedCategories {
 		if !foundCategories[cat] {
@@ -71,6 +72,28 @@ func TestDocsService_GetDocArticle(t *testing.T) {
 	_, err = svc.GetDocArticle(context.Background(), "non-existent-article")
 	if err == nil {
 		t.Errorf("expected error for non-existent article, got nil")
+	}
+
+	// Verify local provider setup guides
+	localDocIDs := []string{
+		"14-local-llm-ollama",
+		"15-local-tts-kokoro",
+		"16-local-tts-fish-audio",
+		"17-local-stt-whisper",
+		"18-local-image-comfyui",
+	}
+	for _, docID := range localDocIDs {
+		art, err := svc.GetDocArticle(context.Background(), docID)
+		if err != nil {
+			t.Errorf("GetDocArticle(%q) failed: %v", docID, err)
+			continue
+		}
+		if art.Category != "Local AI & Self-Hosting" {
+			t.Errorf("article %q expected category 'Local AI & Self-Hosting', got %q", docID, art.Category)
+		}
+		if len(art.Content) == 0 {
+			t.Errorf("article %q has empty content", docID)
+		}
 	}
 }
 
