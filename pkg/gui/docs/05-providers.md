@@ -67,6 +67,7 @@ Zero-setup built-in fallback model that generates narrative choices using proced
 
 - **ElevenLabs**: High-fidelity AI speech (`type: http`, `base_url: https://api.elevenlabs.io`).
 - **Gemini Voice**: Multimodal speech synthesis.
+- **Fish Audio S2 (Local vLLM-Omni)**: 4B Dual-AR multilingual neural voice synthesis at 44.1 kHz with fine-grained emotional tags (e.g. `[whisper]`, `[excited]`, `[angry]`) and zero-shot voice cloning from reference audio.
 - **Native OS (`builtin_name: native-os`)**: Built-in speech using your operating system's native synthesizer (`say` on macOS, `spd-say` on Linux, PowerShell SAPI on Windows).
 - **Sherpa / Piper**: High quality local neural speech synthesis.
 
