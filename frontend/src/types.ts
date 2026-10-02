@@ -57,9 +57,13 @@ export interface TurnSegment {
   text: string;
   // Names the check whose roll this segment narrates, so the dice render inline.
   check_ref?: string;
-  // The segment's clips in play order, one per sentence of reduced text. Each URL
+  // The segment's clips in play order. With grouping, a run of adjacent
+  // same-speaker segments shares one clip, so this is usually one URL; each URL
   // is content-addressed, so the key in it is what identifies the audio.
   audio_urls?: string[];
+  // The shared clip this segment plays, when a run of segments shares one. The
+  // first segment of the group carries the play/stop/regenerate control.
+  clip_group?: string;
   portrait_url?: string;
   // True for the protagonist's own line, which renders as speech but suppresses
   // the duplicate action block for the turn.
@@ -69,12 +73,23 @@ export interface TurnSegment {
   duration?: number;
 }
 
+// ClipGroupDTO is one clip that a run of segments shares, so the client renders
+// a single audio control for the whole group.
+export interface ClipGroupDTO {
+  key: string;
+  audio_urls: string[];
+  segment_indexes: number[];
+}
+
 export interface Turn {
   turn_number: number;
   input_text: string;
   mode: string;
   prose: string;
   segments?: TurnSegment[];
+  // The shared clips a run of segments plays, so the client renders one audio
+  // control per group.
+  clip_groups?: ClipGroupDTO[];
   image_url?: string;
   entities_hit?: string[];
   location_id?: string;
