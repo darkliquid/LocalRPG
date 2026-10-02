@@ -2,6 +2,10 @@ package media
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
@@ -86,4 +90,84 @@ func normalizeCaps(caps TTSCapabilities) TTSCapabilities {
 		caps.MaxTokensPerRequest = 0
 	}
 	return caps
+}
+
+// groupKeyLine is the per-line payload a group key hashes. Every field that
+// changes the provider prompt or the audio belongs here.
+type groupKeyLine struct {
+	Label      string                 `json:"label"`
+	SpeakerID  string                 `json:"speaker_id"`
+	Provider   string                 `json:"provider"`
+	VoiceID    string                 `json:"voice_id"`
+	Pitch      float64                `json:"pitch"`
+	SpeechRate float64                `json:"speech_rate"`
+	Options    map[string]interface{} `json:"options,omitempty"`
+	Text       string                 `json:"text"`
+}
+
+// canonicalGroupLines coalesces consecutive lines of the same speaker into one,
+// joining their text with a space. The provider receives the concatenation
+// either way, so this makes the group key segmentation-stable for the common
+// single-speaker run without reordering a multi-speaker transcript.
+func canonicalGroupLines(lines []SpeakerLine) []SpeakerLine {
+	canonical := make([]SpeakerLine, 0, len(lines))
+	for _, line := range lines {
+		if len(canonical) > 0 {
+			last := &canonical[len(canonical)-1]
+			if sameSpeaker(*last, line) {
+				last.Text = strings.TrimSpace(last.Text + " " + line.Text)
+				continue
+			}
+		}
+		canonical = append(canonical, line)
+	}
+	return canonical
+}
+
+// sameSpeaker reports whether two lines belong to the same speaker. The speaker
+// ID is authoritative when both carry one; otherwise the labels are compared.
+func sameSpeaker(a, b SpeakerLine) bool {
+	if a.SpeakerID != "" && b.SpeakerID != "" {
+		return a.SpeakerID == b.SpeakerID
+	}
+	return a.Label == b.Label && a.Label != ""
+}
+
+// ComputeGroupCacheKey hashes the effective lines of a group. It is
+// segmentation-stable: the same text in the same order under the same voices
+// yields the same key regardless of how the turn was segmented, because
+// consecutive same-speaker lines are coalesced first.
+func ComputeGroupCacheKey(provider, model string, lines []SpeakerLine) string {
+	canonical := canonicalGroupLines(lines)
+	payload := make([]groupKeyLine, 0, len(canonical))
+	for _, line := range canonical {
+		entry := groupKeyLine{Label: line.Label, SpeakerID: line.SpeakerID, Text: line.Text}
+		if line.Voice != nil {
+			entry.Provider = line.Voice.Provider
+			entry.VoiceID = line.Voice.VoiceID
+			entry.Pitch = line.Voice.Pitch
+			entry.SpeechRate = line.Voice.SpeechRate
+			entry.Options = line.Voice.Options
+		}
+		payload = append(payload, entry)
+	}
+
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		// A slice of canonical scalars cannot fail to marshal; degrade rather
+		// than panic so a hand-edited note never loses a turn.
+		var builder strings.Builder
+		for _, entry := range payload {
+			builder.WriteString(entry.SpeakerID)
+			builder.WriteByte('\x1f')
+			builder.WriteString(entry.VoiceID)
+			builder.WriteByte('\x1f')
+			builder.WriteString(entry.Text)
+			builder.WriteByte('\x1e')
+		}
+		encoded = []byte(builder.String())
+	}
+
+	hash := sha256.Sum256([]byte("v4:" + provider + "\x00" + model + "\x00" + string(encoded)))
+	return hex.EncodeToString(hash[:])
 }
