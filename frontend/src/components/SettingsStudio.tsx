@@ -1577,6 +1577,10 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       ? 'gemini'
                       : config.media.tts.type === 'builtin'
                       ? `builtin:${config.media.tts.builtin_name || 'native-os'}`
+                      : config.media.tts.type === 'fish-audio' ||
+                        (config.media.tts.type === 'http' &&
+                          (config.media.tts.model?.includes('fish') || config.media.tts.model?.includes('s2-pro')))
+                      ? 'fish-audio'
                       : config.media.tts.type
                   }
                   onChange={(e) => {
@@ -1643,6 +1647,25 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                           },
                         },
                       });
+                    } else if (val === 'fish-audio') {
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          tts: {
+                            ...config.media.tts,
+                            type: 'http',
+                            builtin_name: undefined,
+                            endpoint:
+                              config.media.tts.endpoint && config.media.tts.endpoint.includes('8091')
+                                ? config.media.tts.endpoint
+                                : 'http://localhost:8091',
+                            model: 'fishaudio/s2-pro',
+                            default_voice: config.media.tts.default_voice || 'default',
+                            options: undefined,
+                          },
+                        },
+                      });
                     } else if (val === 'http') {
                       setConfig({
                         ...config,
@@ -1656,7 +1679,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                             model:
                               config.media.tts.model &&
                               !config.media.tts.model.includes('eleven') &&
-                              !config.media.tts.model.includes('gemini')
+                              !config.media.tts.model.includes('gemini') &&
+                              !config.media.tts.model.includes('fish') &&
+                              !config.media.tts.model.includes('s2-pro')
                                 ? config.media.tts.model
                                 : 'kokoro',
                             default_voice:
@@ -1686,6 +1711,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   <option value="builtin:sherpa-onnx">Built-in: Sherpa-ONNX (Kokoro Neural Voice)</option>
                   <option value="builtin:native-os">Built-in: Native OS Speech (spd-say / SAPI / procedural)</option>
                   <option value="builtin:elevenlabs">Built-in: ElevenLabs (Cloud, metered)</option>
+                  <option value="fish-audio">Fish Audio S2 (Local vLLM-Omni)</option>
                   <option value="http">HTTP Endpoint (Kokoro-FastAPI, AllTalk, OpenAI Speech)</option>
                   <option value="cli">CLI Command (e.g. piper)</option>
                 </select>
