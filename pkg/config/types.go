@@ -237,7 +237,8 @@ type TelemetryConfig struct {
 
 // ProvidersConfig groups shared credentials and defaults for external ecosystem providers.
 type ProvidersConfig struct {
-	Gemini GeminiProviderConfig `yaml:"gemini,omitempty" json:"gemini,omitempty"`
+	Gemini   GeminiProviderConfig   `yaml:"gemini,omitempty" json:"gemini,omitempty"`
+	Cartesia CartesiaProviderConfig `yaml:"cartesia,omitempty" json:"cartesia,omitempty"`
 	// Currency is the display currency for cost figures. Prices are expressed in
 	// this currency; no conversion is performed.
 	Currency string `yaml:"currency,omitempty" json:"currency,omitempty"`
@@ -257,6 +258,10 @@ type PriceConfig struct {
 }
 
 type GeminiProviderConfig struct {
+	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
+}
+
+type CartesiaProviderConfig struct {
 	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 }
 

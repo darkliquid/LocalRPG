@@ -529,3 +529,41 @@ func TestPriceConfigRoundTrips(t *testing.T) {
 		t.Fatalf("round trip lost prices: %+v", back.Providers)
 	}
 }
+
+func TestCartesiaConfigAndPresets(t *testing.T) {
+	ttsPreset, ok := GetTTSPreset("cartesia")
+	if !ok {
+		t.Fatal("expected cartesia TTS preset")
+	}
+	if ttsPreset.Type != "builtin" || ttsPreset.BuiltinName != "cartesia" {
+		t.Errorf("unexpected TTS preset type/name: %+v", ttsPreset)
+	}
+	if ttsPreset.Model != "sonic-3.6" {
+		t.Errorf("unexpected TTS preset model: %s", ttsPreset.Model)
+	}
+
+	sttPreset, ok := GetSTTPreset("cartesia")
+	if !ok {
+		t.Fatal("expected cartesia STT preset")
+	}
+	if sttPreset.Type != "builtin" || sttPreset.BuiltinName != "cartesia" {
+		t.Errorf("unexpected STT preset type/name: %+v", sttPreset)
+	}
+	if sttPreset.Model != "ink-whisper" {
+		t.Errorf("unexpected STT preset model: %s", sttPreset.Model)
+	}
+
+	var root Config
+	root.Providers.Cartesia.APIKey = "sk_car_test"
+	data, err := yaml.Marshal(root)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	var unmarshaled Config
+	if err := yaml.Unmarshal(data, &unmarshaled); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
+	if unmarshaled.Providers.Cartesia.APIKey != "sk_car_test" {
+		t.Errorf("got %q, want sk_car_test", unmarshaled.Providers.Cartesia.APIKey)
+	}
+}

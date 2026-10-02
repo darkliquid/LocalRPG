@@ -161,6 +161,16 @@ var TTSPresets = map[string]TTSConfig{
 		MasterVolume: 1.0,
 	},
 
+	"cartesia": {
+		Type:         "builtin",
+		BuiltinName:  "cartesia",
+		Model:        "sonic-3.6",
+		DefaultVoice: "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4",
+		Pitch:        1.0,
+		SpeechRate:   1.0,
+		MasterVolume: 1.0,
+	},
+
 	"gemini-3.8-flash-tts": {
 		Type:         "gemini",
 		Model:        "gemini-3.8-flash-tts",
@@ -205,6 +215,11 @@ var TTSPresets = map[string]TTSConfig{
 }
 
 var STTPresets = map[string]STTConfig{
+	"cartesia": {
+		Type:        "builtin",
+		BuiltinName: "cartesia",
+		Model:       "ink-whisper",
+	},
 	"web-speech": {
 		Type: "web-speech",
 	},
