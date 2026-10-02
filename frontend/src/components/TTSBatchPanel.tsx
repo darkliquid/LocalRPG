@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Layers, Loader2, RefreshCw, Trash2, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Layers, Loader2, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import { APIClient } from '../api/client';
 import type { GameSummary, TTSBatchJob } from '../types';
 
@@ -56,6 +56,20 @@ const statusColor = (status: string): string => {
 // provider error or a network fault is shown rather than a bare status.
 const messageOf = (err: unknown): string =>
   (err instanceof Error ? err.message : String(err)).trim() || 'the request failed with no detail';
+
+// jobIncomplete reports whether a job is short of its request count, so its
+// clips still need downloading and storing.
+const jobIncomplete = (job: TTSBatchJob): boolean =>
+  job.request_count > 0 &&
+  job.completed + (job.failed_keys?.length ?? 0) < job.request_count &&
+  job.status !== 'failed' &&
+  job.status !== 'cancelled' &&
+  job.status !== 'expired';
+
+// canResume reports whether a job is worth finishing by hand: it is incomplete and
+// the provider is not already working on it.
+const canResume = (job: TTSBatchJob): boolean =>
+  jobIncomplete(job) && job.status !== 'processing' && job.status !== 'running';
 
 // TTSBatchPanel is the global manager for offline batch speech jobs. It lists
 // every campaign's jobs, filters them by campaign, starts a backfill, cancels a
@@ -142,6 +156,16 @@ export const TTSBatchPanel: React.FC = () => {
     setError(null);
     try {
       await APIClient.deleteTTSBatchJob(job.game_id, job.id);
+      await refresh();
+    } catch (err) {
+      setError(messageOf(err));
+    }
+  };
+
+  const resume = async (job: TTSBatchJob) => {
+    setError(null);
+    try {
+      await APIClient.resumeTTSBatchJob(job.game_id, job.id);
       await refresh();
     } catch (err) {
       setError(messageOf(err));
@@ -283,6 +307,17 @@ export const TTSBatchPanel: React.FC = () => {
                       <span className="text-amber-300" title={job.failed_keys.join(', ')}>
                         {job.failed_keys.length} failed
                       </span>
+                    )}
+                    {canResume(job) && (
+                      <button
+                        type="button"
+                        onClick={() => void resume(job)}
+                        className="p-1 rounded text-sky-400 hover:bg-sky-500/20 cursor-pointer"
+                        title="Download and store this job's clips now"
+                        aria-label="Download and store this job's clips now"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
                     )}
                     {ACTIVE_STATUSES.has(job.status) ? (
                       <button

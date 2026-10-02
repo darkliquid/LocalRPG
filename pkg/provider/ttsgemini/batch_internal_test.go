@@ -35,6 +35,18 @@ func TestDecodeBatchOutput(t *testing.T) {
 	}
 }
 
+// An output file that arrived empty or blank is a retryable state, not an empty
+// set of results, so decoding it must fail rather than report success.
+func TestDecodeBatchOutputRejectsEmpty(t *testing.T) {
+	client := &GeminiTTSClient{model: "gemini-3.8-flash-tts", defaultVoice: "Aoede"}
+	if _, err := client.decodeBatchOutput(nil); err == nil {
+		t.Errorf("expected an error for empty output")
+	}
+	if _, err := client.decodeBatchOutput([]byte("\n\n")); err == nil {
+		t.Errorf("expected an error for blank output")
+	}
+}
+
 func TestBatchStateMapping(t *testing.T) {
 	cases := map[genai.JobState]string{
 		genai.JobStateQueued:    "pending",

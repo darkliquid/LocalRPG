@@ -16,6 +16,10 @@ type fakeBatch struct {
 	polls     int
 	submitted []media.BatchRequest
 	results   []media.BatchResult
+	// emptyFetches is how many leading fetches return nothing, modelling the
+	// output file that is not yet committed.
+	emptyFetches int
+	fetchCalls   int
 }
 
 func (f *fakeBatch) SubmitBatch(_ context.Context, reqs []media.BatchRequest) (media.BatchJobHandle, error) {
@@ -33,6 +37,10 @@ func (f *fakeBatch) PollBatch(context.Context, media.BatchJobHandle) (media.Batc
 }
 
 func (f *fakeBatch) FetchBatch(context.Context, media.BatchJobHandle) ([]media.BatchResult, error) {
+	f.fetchCalls++
+	if f.fetchCalls <= f.emptyFetches {
+		return nil, nil
+	}
 	return f.results, nil
 }
 
@@ -107,7 +115,7 @@ func TestEngineRunSkipsWhenEverythingIsCached(t *testing.T) {
 }
 
 func TestEngineRunRespectsMaxPerJob(t *testing.T) {
-	client := &fakeBatch{states: []string{"succeeded"}}
+	client := &fakeBatch{states: []string{"succeeded"}, results: []media.BatchResult{{Key: "a", Audio: media.GenerateToneWAV(440, 0.02)}}}
 	engine := New(client, media.NewContentCache(t.TempDir()), &memJobs{})
 	engine.sleep = func(context.Context, time.Duration) error { return nil }
 
@@ -146,7 +154,7 @@ func TestEnginePollStopsOnCancellation(t *testing.T) {
 // A forced run resubmits groups whose clips are already cached, so a campaign
 // can be re-rendered in full rather than only backfilled.
 func TestEngineForceResubmitsCachedGroups(t *testing.T) {
-	client := &fakeBatch{states: []string{"succeeded"}}
+	client := &fakeBatch{states: []string{"succeeded"}, results: []media.BatchResult{{Key: "a", Audio: media.GenerateToneWAV(440, 0.02)}}}
 	engine := New(client, media.NewContentCache(t.TempDir()), &memJobs{})
 	engine.sleep = func(context.Context, time.Duration) error { return nil }
 
@@ -186,5 +194,48 @@ func TestEngineRecordsLifecyclePhases(t *testing.T) {
 	}
 	if jobs.updated["job"].Completed != 1 {
 		t.Errorf("expected 1 stored clip, got %d", jobs.updated["job"].Completed)
+	}
+}
+
+// The File API can report a job succeeded before its output file is committed,
+// so an empty fetch is retried rather than treated as a finished job.
+func TestEngineRetriesAnEmptyFetch(t *testing.T) {
+	client := &fakeBatch{
+		states:       []string{"succeeded"},
+		emptyFetches: 1,
+		results:      []media.BatchResult{{Key: "k", Audio: media.GenerateToneWAV(440, 0.02)}},
+	}
+	jobs := &memJobs{}
+	engine := New(client, media.NewContentCache(t.TempDir()), jobs)
+	engine.sleep = func(context.Context, time.Duration) error { return nil }
+
+	job, err := engine.Run(context.Background(), Options{}, []media.ClipGroup{{Key: "k"}})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if job.Completed != 1 {
+		t.Errorf("expected 1 stored clip after the retry, got %d", job.Completed)
+	}
+	if client.fetchCalls != 2 {
+		t.Errorf("expected 2 fetch attempts, got %d", client.fetchCalls)
+	}
+}
+
+// An output that never arrives must not be recorded as a completed job.
+func TestEngineEmptyFetchIsNotAFalseSuccess(t *testing.T) {
+	client := &fakeBatch{states: []string{"succeeded"}, emptyFetches: 10}
+	jobs := &memJobs{}
+	engine := New(client, media.NewContentCache(t.TempDir()), jobs)
+	engine.sleep = func(context.Context, time.Duration) error { return nil }
+
+	job, err := engine.Run(context.Background(), Options{}, []media.ClipGroup{{Key: "k"}})
+	if err == nil {
+		t.Fatalf("expected an error when the output never arrives")
+	}
+	if job.Completed != 0 {
+		t.Errorf("expected nothing stored, got %d", job.Completed)
+	}
+	if jobs.updated["job"].Status == "completed" {
+		t.Errorf("an empty fetch must not be recorded as completed, got %q", jobs.updated["job"].Status)
 	}
 }

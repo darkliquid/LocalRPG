@@ -62,6 +62,11 @@ func TestBatchJobActiveCoversPhasesAndLegacySucceeded(t *testing.T) {
 		{name: "completed", job: storage.TTSJob{Status: "completed"}, want: false},
 		{name: "failed", job: storage.TTSJob{Status: "failed"}, want: false},
 		{name: "cancelled", job: storage.TTSJob{Status: "cancelled"}, want: false},
+		// A job recorded as finished but short of its request count never stored
+		// everything, so it is still worth resuming.
+		{name: "completed but nothing stored", job: storage.TTSJob{Status: "completed", RequestCount: 8, Completed: 0}, want: true},
+		{name: "completed and accounted", job: storage.TTSJob{Status: "completed", RequestCount: 8, Completed: 8}, want: false},
+		{name: "completed with a failure accounted", job: storage.TTSJob{Status: "completed", RequestCount: 8, Completed: 7, FailedKeys: []string{"k"}}, want: false},
 		// Legacy: the provider finished but the results were never stored.
 		{name: "legacy succeeded unstored", job: storage.TTSJob{Status: "succeeded", RequestCount: 8, Completed: 0}, want: true},
 		{name: "legacy succeeded stored", job: storage.TTSJob{Status: "succeeded", RequestCount: 8, Completed: 8}, want: false},

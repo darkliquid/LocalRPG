@@ -596,6 +596,19 @@ export class APIClient {
     return body.removed ?? 0;
   }
 
+  // resumeTTSBatchJob polls a job now and, once it is done, downloads and stores
+  // its clips. It is how a job whose output arrived empty is completed without a
+  // restart.
+  static async resumeTTSBatchJob(gameID: string, jobID: string): Promise<TTSBatchJob | null> {
+    const res = await fetch('/api/tts/batch/resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game_id: gameID, job_id: jobID }),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    return res.json();
+  }
+
   static async transcribeAudio(audioBlob: Blob): Promise<{ text: string }> {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'speech.webm');

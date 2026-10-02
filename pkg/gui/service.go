@@ -2364,6 +2364,53 @@ func (s *Service) ClearTTSBatch(ctx context.Context, gameID string) (int, error)
 	return total, nil
 }
 
+// ResumeTTSBatch finishes a job now: it polls the provider and, once the job is
+// done, downloads the output, converts it to Opus, and writes it to the cache.
+// It is how a job that never stored its clips (an output file that arrived
+// empty, an interrupted download) is completed without waiting for a restart.
+func (s *Service) ResumeTTSBatch(ctx context.Context, gameID, jobID string) (*TTSBatchJobDTO, error) {
+	cfg := s.configMgr.Get()
+	client, err := s.ttsClientFor(cfg.Media.TTS)
+	if err != nil {
+		return nil, err
+	}
+	batchClient, ok := client.(media.BatchTTSClient)
+	if !ok {
+		return nil, fmt.Errorf("the configured TTS provider has no batch API")
+	}
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, err
+	}
+	job, err := store.GetTTSJob(jobID)
+	if err != nil {
+		return nil, err
+	}
+	if job == nil {
+		return nil, fmt.Errorf("batch job %s not found", jobID)
+	}
+
+	engine := ttsbatch.New(batchClient, media.NewContentCache(s.resolver.CacheDir()), store)
+	engine.SetOpusBitrate(cfg.OpusBitrate())
+	opts := ttsbatch.Options{GameID: gameID, Provider: job.Provider, Model: job.Model}
+	s.goBackground(func() {
+		if _, err := engine.Resume(s.bgCtx, opts, jobID); err != nil {
+			trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+				"game":  gameID,
+				"job":   jobID,
+				"error": err.Error(),
+			})
+			s.noteFailure("tts", err)
+			return
+		}
+		s.noteSuccess("tts")
+	})
+
+	dto := ttsBatchJobDTO(*job)
+	dto.GameID = gameID
+	return &dto, nil
+}
+
 // StartTTSBatch submits an offline batch backfill for a campaign and finishes it
 // in the background, so the request returns at once and the panel watches the
 // job row. It returns the submitted job, or nil when every clip is already
@@ -2527,10 +2574,11 @@ func batchJobActive(job storage.TTSJob) bool {
 	switch job.Status {
 	case "queued", "processing", "downloading", "storing", "submitted", "pending", "running":
 		return true
-	case "succeeded":
-		// A job the provider finished whose results were never stored — a legacy
-		// row, or one interrupted mid-download — is still worth resuming.
-		return job.RequestCount > 0 && job.Completed < job.RequestCount
+	case "completed", "succeeded":
+		// A job recorded as finished but short of its request count never stored
+		// everything — an output file that arrived empty, or a download that was
+		// interrupted — so it is still worth resuming.
+		return job.RequestCount > 0 && job.Completed+len(job.FailedKeys) < job.RequestCount
 	default:
 		return false
 	}

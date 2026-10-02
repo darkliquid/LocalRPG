@@ -6,6 +6,7 @@ package ttsbatch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -191,9 +192,9 @@ func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) 
 	}
 
 	_ = e.jobs.UpdateTTSJobStatus(job.ID, "downloading", job.Completed, job.FailedKeys)
-	results, err := e.client.FetchBatch(ctx, handle)
+	results, err := e.fetchWithRetry(ctx, handle, opts)
 	if err != nil {
-		return job, fmt.Errorf("fetch tts batch: %w", err)
+		return job, err
 	}
 
 	_ = e.jobs.UpdateTTSJobStatus(job.ID, "storing", job.Completed, job.FailedKeys)
@@ -256,6 +257,31 @@ func (e *Engine) poll(ctx context.Context, handle media.BatchJobHandle, opts Opt
 			return status, fmt.Errorf("tts batch job %s interrupted: %w", handle.ID, err)
 		}
 	}
+}
+
+// fetchWithRetry downloads a finished job's output, retrying while it is empty or
+// unreadable: the File API can report a job succeeded before its output file is
+// committed, so an empty result is a state to wait out rather than a failure.
+func (e *Engine) fetchWithRetry(ctx context.Context, handle media.BatchJobHandle, opts Options) ([]media.BatchResult, error) {
+	const attempts = 4
+	var lastErr error
+	for attempt := 0; attempt < attempts; attempt++ {
+		results, err := e.client.FetchBatch(ctx, handle)
+		if err == nil && len(results) > 0 {
+			return results, nil
+		}
+		if err != nil {
+			lastErr = err
+		} else {
+			lastErr = errors.New("batch output was empty")
+		}
+		if attempt < attempts-1 {
+			if err := e.sleep(ctx, opts.pollInterval()); err != nil {
+				return nil, fmt.Errorf("tts batch job %s interrupted: %w", handle.ID, err)
+			}
+		}
+	}
+	return nil, fmt.Errorf("fetch tts batch: %w", lastErr)
 }
 
 // providerPhase maps a provider batch state to the job phase we record while a

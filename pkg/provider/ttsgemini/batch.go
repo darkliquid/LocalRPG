@@ -132,6 +132,11 @@ func (c *GeminiTTSClient) FetchBatch(ctx context.Context, h media.BatchJobHandle
 	if err != nil {
 		return nil, fmt.Errorf("gemini tts: download batch output: %w", err)
 	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		// The File API can report a job succeeded before its output is committed,
+		// so an empty file is a retryable state rather than an empty result.
+		return nil, errors.New("gemini tts: batch output file is empty")
+	}
 	return c.decodeBatchOutput(data)
 }
 
@@ -176,6 +181,9 @@ func (c *GeminiTTSClient) decodeBatchOutput(data []byte) ([]media.BatchResult, e
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("read batch output: %w", err)
+	}
+	if len(results) == 0 {
+		return nil, errors.New("gemini tts: batch output contained no responses")
 	}
 	return results, nil
 }

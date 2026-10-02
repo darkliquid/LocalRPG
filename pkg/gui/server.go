@@ -199,6 +199,18 @@ func (s *Server) handleTTSBatchRoute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, map[string]int{"removed": removed})
+	case r.Method == http.MethodPost && r.URL.Path == "/api/tts/batch/resume":
+		var req TTSBatchCancelRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		job, err := s.service.ResumeTTSBatch(r.Context(), req.GameID, req.JobID)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, job)
 	default:
 		http.NotFound(w, r)
 	}
