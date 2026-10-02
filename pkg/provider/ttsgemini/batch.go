@@ -48,40 +48,50 @@ func (c *GeminiTTSClient) SubmitBatch(ctx context.Context, reqs []media.BatchReq
 
 	var payload bytes.Buffer
 	for _, req := range reqs {
-		text, config, _, err := c.groupRequest(req.Lines)
+		line, err := c.batchInputLine(req)
 		if err != nil {
-			return media.BatchJobHandle{}, fmt.Errorf("gemini tts: build batch request %q: %w", req.Key, err)
+			return media.BatchJobHandle{}, err
 		}
-		encoded, err := json.Marshal(batchInputLine{
-			Key: req.Key,
-			Request: batchGenerateRequest{
-				Contents:         []*genai.Content{genai.NewContentFromText(text, genai.RoleUser)},
-				GenerationConfig: config,
-			},
-		})
-		if err != nil {
-			return media.BatchJobHandle{}, fmt.Errorf("gemini tts: encode batch request %q: %w", req.Key, err)
-		}
-		payload.Write(encoded)
+		payload.Write(line)
 		payload.WriteByte('\n')
 	}
-
 	file, err := c.client.Files.Upload(ctx, bytes.NewReader(payload.Bytes()), &genai.UploadFileConfig{
-		MIMEType:    "application/jsonl",
+		MIMEType:    "jsonl",
 		DisplayName: "localrpg-tts-batch",
 	})
 	if err != nil {
 		return media.BatchJobHandle{}, fmt.Errorf("gemini tts: upload batch input: %w", mapGeminiTTSError(err, c.model))
 	}
 
+	// The Developer API takes only the uploaded file: "format" is a Vertex-only
+	// field, and sending it is rejected outright.
 	job, err := c.client.Batches.Create(ctx, c.model, &genai.BatchJobSource{
-		Format:   "jsonl",
 		FileName: file.Name,
 	}, nil)
 	if err != nil {
 		return media.BatchJobHandle{}, fmt.Errorf("gemini tts: create batch job: %w", mapGeminiTTSError(err, c.model))
 	}
 	return media.BatchJobHandle{ID: job.Name, Model: c.model}, nil
+}
+
+// batchInputLine encodes one JSONL request: a key naming the group and a
+// GenerateContentRequest, which is the file format the batch API expects.
+func (c *GeminiTTSClient) batchInputLine(req media.BatchRequest) ([]byte, error) {
+	text, config, _, err := c.groupRequest(req.Lines)
+	if err != nil {
+		return nil, fmt.Errorf("gemini tts: build batch request %q: %w", req.Key, err)
+	}
+	encoded, err := json.Marshal(batchInputLine{
+		Key: req.Key,
+		Request: batchGenerateRequest{
+			Contents:         []*genai.Content{genai.NewContentFromText(text, genai.RoleUser)},
+			GenerationConfig: config,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("gemini tts: encode batch request %q: %w", req.Key, err)
+	}
+	return encoded, nil
 }
 
 // PollBatch reports a job's state and progress.
