@@ -176,6 +176,29 @@ func (s *Server) handleTTSBatchRoute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/tts/batch/delete":
+		var req TTSBatchCancelRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if err := s.service.DeleteTTSBatch(r.Context(), req.GameID, req.JobID); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/tts/batch/clear":
+		var req TTSBatchClearRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		removed, err := s.service.ClearTTSBatch(r.Context(), req.GameID)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, map[string]int{"removed": removed})
 	default:
 		http.NotFound(w, r)
 	}

@@ -97,6 +97,46 @@ func TestActiveBatchJobFindsTheInFlightJob(t *testing.T) {
 	}
 }
 
+func TestDeleteAndClearTTSBatch(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	store, err := svc.store(gameID)
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	if err := store.UpsertTTSJob(storage.TTSJob{ID: "done", GameID: gameID, Status: "completed", RequestCount: 1, Completed: 1}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	if err := store.UpsertTTSJob(storage.TTSJob{ID: "running", GameID: gameID, Status: "processing", RequestCount: 1}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	// An in-flight job must be cancelled before it can be removed.
+	if err := svc.DeleteTTSBatch(context.Background(), gameID, "running"); err == nil {
+		t.Errorf("expected deleting an in-flight job to fail")
+	}
+
+	if err := svc.DeleteTTSBatch(context.Background(), gameID, "done"); err != nil {
+		t.Fatalf("DeleteTTSBatch: %v", err)
+	}
+	if gone, _ := store.GetTTSJob("done"); gone != nil {
+		t.Errorf("expected the finished job to be deleted")
+	}
+
+	if err := store.UpsertTTSJob(storage.TTSJob{ID: "failed", GameID: gameID, Status: "failed"}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	removed, err := svc.ClearTTSBatch(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("ClearTTSBatch: %v", err)
+	}
+	if removed != 1 {
+		t.Errorf("removed = %d, want 1", removed)
+	}
+	if live, _ := store.GetTTSJob("running"); live == nil {
+		t.Errorf("expected the in-flight job to survive a clear")
+	}
+}
+
 // A batch failure must say why it failed, so the manager can show the reason
 // rather than a bare status.
 func TestStartTTSBatchRouteSurfacesTheReason(t *testing.T) {

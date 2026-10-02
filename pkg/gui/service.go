@@ -2314,6 +2314,56 @@ func (s *Service) CancelTTSBatch(ctx context.Context, gameID, jobID string) erro
 	return store.UpdateTTSJobStatus(jobID, "cancelled", 0, nil)
 }
 
+// DeleteTTSBatch removes a finished batch job. An in-flight job must be
+// cancelled first, so a delete never hides work that is still running.
+func (s *Service) DeleteTTSBatch(ctx context.Context, gameID, jobID string) error {
+	store, err := s.store(gameID)
+	if err != nil {
+		return err
+	}
+	job, err := store.GetTTSJob(jobID)
+	if err != nil {
+		return err
+	}
+	if job == nil {
+		return nil
+	}
+	if batchJobActive(*job) {
+		return fmt.Errorf("batch job %s is still running; cancel it first", jobID)
+	}
+	return store.DeleteTTSJob(jobID)
+}
+
+// ClearTTSBatch removes every finished batch job, for one campaign or, when
+// gameID is empty, for all of them. It returns how many jobs it removed.
+func (s *Service) ClearTTSBatch(ctx context.Context, gameID string) (int, error) {
+	if gameID != "" {
+		store, err := s.store(gameID)
+		if err != nil {
+			return 0, err
+		}
+		return store.DeleteFinishedTTSJobs(gameID)
+	}
+
+	games, err := s.ListGames(ctx)
+	if err != nil {
+		return 0, err
+	}
+	total := 0
+	for _, game := range games {
+		store, err := s.store(game.ID)
+		if err != nil {
+			continue
+		}
+		removed, err := store.DeleteFinishedTTSJobs(game.ID)
+		if err != nil {
+			continue
+		}
+		total += removed
+	}
+	return total, nil
+}
+
 // StartTTSBatch submits an offline batch backfill for a campaign and finishes it
 // in the background, so the request returns at once and the panel watches the
 // job row. It returns the submitted job, or nil when every clip is already

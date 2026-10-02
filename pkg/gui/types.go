@@ -158,10 +158,16 @@ type TTSBatchJobDTO struct {
 	FailedKeys   []string `json:"failed_keys,omitempty"`
 }
 
-// TTSBatchCancelRequest names the job a cancel applies to.
+// TTSBatchCancelRequest names the job a cancel or delete applies to.
 type TTSBatchCancelRequest struct {
 	GameID string `json:"game_id"`
 	JobID  string `json:"job_id"`
+}
+
+// TTSBatchClearRequest scopes a clear to one campaign, or to all of them when
+// GameID is empty.
+type TTSBatchClearRequest struct {
+	GameID string `json:"game_id,omitempty"`
 }
 
 type TurnDTO struct {

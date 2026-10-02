@@ -93,6 +93,33 @@ func (s *Store) UpdateTTSJobStatus(id, status string, completed int, failedKeys 
 	return nil
 }
 
+// DeleteTTSJob removes one job record.
+func (s *Store) DeleteTTSJob(id string) error {
+	if _, err := s.db.Exec(`DELETE FROM tts_jobs WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("delete tts job %q: %w", id, err)
+	}
+	return nil
+}
+
+// DeleteFinishedTTSJobs removes every terminal job, for one campaign or, when
+// gameID is empty, for all of them. It returns how many rows it removed. A job
+// that is still in flight is left alone.
+func (s *Store) DeleteFinishedTTSJobs(gameID string) (int, error) {
+	const query = `
+	DELETE FROM tts_jobs
+	WHERE (? = '' OR game_id = ?)
+	  AND (
+	    status IN ('completed', 'failed', 'cancelled', 'expired')
+	    OR (status = 'succeeded' AND request_count > 0 AND completed >= request_count)
+	  )`
+	res, err := s.db.Exec(query, gameID, gameID)
+	if err != nil {
+		return 0, fmt.Errorf("delete finished tts jobs: %w", err)
+	}
+	removed, _ := res.RowsAffected()
+	return int(removed), nil
+}
+
 // scanTTSJob reads one job row, returning nil when there is no row.
 func scanTTSJob(scanner rowScanner) (*TTSJob, error) {
 	var job TTSJob

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Layers, Loader2, RefreshCw, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Layers, Loader2, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import { APIClient } from '../api/client';
 import type { GameSummary, TTSBatchJob } from '../types';
 
@@ -138,6 +138,29 @@ export const TTSBatchPanel: React.FC = () => {
     }
   };
 
+  const remove = async (job: TTSBatchJob) => {
+    setError(null);
+    try {
+      await APIClient.deleteTTSBatchJob(job.game_id, job.id);
+      await refresh();
+    } catch (err) {
+      setError(messageOf(err));
+    }
+  };
+
+  const clearFinished = async () => {
+    setError(null);
+    try {
+      const removed = await APIClient.clearTTSBatchJobs(filter || undefined);
+      if (removed === 0) {
+        setError('No finished jobs to clear.');
+      }
+      await refresh();
+    } catch (err) {
+      setError(messageOf(err));
+    }
+  };
+
   return (
     <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -199,6 +222,14 @@ export const TTSBatchPanel: React.FC = () => {
           >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           </button>
+          <button
+            type="button"
+            onClick={() => void clearFinished()}
+            className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-stone-700 text-stone-300 hover:text-rose-300 hover:border-rose-500/40 cursor-pointer"
+            title={filter ? 'Remove finished jobs for the filtered campaign' : 'Remove every finished job'}
+          >
+            Clear finished
+          </button>
         </div>
       </div>
 
@@ -221,7 +252,6 @@ export const TTSBatchPanel: React.FC = () => {
           {visible.map((job) => {
             const key = `${job.game_id}:${job.id}`;
             const isOpen = expanded === key;
-            const done = job.status === 'completed';
             return (
               <div key={key} className="rounded-lg border border-stone-800 bg-stone-950/40 text-xs">
                 <div className="flex items-center justify-between gap-3 px-3 py-2">
@@ -254,7 +284,7 @@ export const TTSBatchPanel: React.FC = () => {
                         {job.failed_keys.length} failed
                       </span>
                     )}
-                    {!done && ACTIVE_STATUSES.has(job.status) && (
+                    {ACTIVE_STATUSES.has(job.status) ? (
                       <button
                         type="button"
                         onClick={() => void cancel(job)}
@@ -263,6 +293,16 @@ export const TTSBatchPanel: React.FC = () => {
                         aria-label="Cancel this job"
                       >
                         <XCircle className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void remove(job)}
+                        className="p-1 rounded text-stone-400 hover:text-rose-300 hover:bg-rose-500/20 cursor-pointer"
+                        title="Remove this finished job"
+                        aria-label="Remove this finished job"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>

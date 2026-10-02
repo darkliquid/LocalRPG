@@ -573,6 +573,29 @@ export class APIClient {
     if (!res.ok) throw new HTTPError(res.status, await res.text());
   }
 
+  // deleteTTSBatchJob removes a finished batch job.
+  static async deleteTTSBatchJob(gameID: string, jobID: string): Promise<void> {
+    const res = await fetch('/api/tts/batch/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game_id: gameID, job_id: jobID }),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+  }
+
+  // clearTTSBatchJobs removes every finished batch job, for one campaign or all,
+  // and returns how many were removed.
+  static async clearTTSBatchJobs(gameID?: string): Promise<number> {
+    const res = await fetch('/api/tts/batch/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game_id: gameID ?? '' }),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    const body = (await res.json()) as { removed?: number };
+    return body.removed ?? 0;
+  }
+
   static async transcribeAudio(audioBlob: Blob): Promise<{ text: string }> {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'speech.webm');
