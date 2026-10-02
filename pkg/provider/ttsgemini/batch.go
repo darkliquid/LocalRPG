@@ -124,10 +124,10 @@ func (c *GeminiTTSClient) FetchBatch(ctx context.Context, h media.BatchJobHandle
 		return nil, errors.New("gemini tts: batch job has no output file")
 	}
 
-	file, err := c.client.Files.Get(ctx, job.Dest.FileName, nil)
-	if err != nil {
-		return nil, fmt.Errorf("gemini tts: get batch output: %w", err)
-	}
+	// Download by resource name: Files.Get populates URI, but Files.Download reads
+	// DownloadURI (only set for generated files), so fetching the File first and
+	// handing it to Download fails with "the resource doesn't support download".
+	file := &genai.File{Name: job.Dest.FileName, DownloadURI: job.Dest.FileName}
 	data, err := c.client.Files.Download(ctx, genai.NewDownloadURIFromFile(file), nil)
 	if err != nil {
 		return nil, fmt.Errorf("gemini tts: download batch output: %w", err)

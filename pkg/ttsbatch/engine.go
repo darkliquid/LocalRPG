@@ -26,6 +26,7 @@ const (
 type JobStore interface {
 	UpsertTTSJob(job storage.TTSJob) error
 	UpdateTTSJobStatus(id, status string, completed int, failedKeys []string) error
+	SetTTSJobError(id, message string) error
 }
 
 // Options configures one backfill run.
@@ -203,8 +204,13 @@ func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) 
 	_ = e.jobs.UpdateTTSJobStatus(job.ID, "downloading", job.Completed, job.FailedKeys)
 	results, err := e.fetchWithRetry(ctx, handle, opts)
 	if err != nil {
+		// The results still exist; leave the job awaiting download rather than
+		// showing a download that is not happening, and record why.
+		_ = e.jobs.UpdateTTSJobStatus(job.ID, "processed", job.Completed, job.FailedKeys)
+		_ = e.jobs.SetTTSJobError(job.ID, err.Error())
 		return job, err
 	}
+	_ = e.jobs.SetTTSJobError(job.ID, "")
 
 	_ = e.jobs.UpdateTTSJobStatus(job.ID, "storing", job.Completed, job.FailedKeys)
 	completed := 0

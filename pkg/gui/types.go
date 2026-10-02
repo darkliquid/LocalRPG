@@ -156,6 +156,8 @@ type TTSBatchJobDTO struct {
 	RequestCount int      `json:"request_count"`
 	Completed    int      `json:"completed"`
 	FailedKeys   []string `json:"failed_keys,omitempty"`
+	// LastError is why the job last failed to progress, empty when it is fine.
+	LastError string `json:"last_error,omitempty"`
 }
 
 // TTSBatchCancelRequest names the job a cancel or delete applies to.

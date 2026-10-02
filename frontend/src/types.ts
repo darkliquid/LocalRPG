@@ -92,6 +92,8 @@ export interface TTSBatchJob {
   request_count: number;
   completed: number;
   failed_keys?: string[];
+  // Why the job last failed to progress, empty when it is fine.
+  last_error?: string;
 }
 
 export interface Turn {

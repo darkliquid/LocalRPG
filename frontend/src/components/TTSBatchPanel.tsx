@@ -359,6 +359,12 @@ export const TTSBatchPanel: React.FC = () => {
                   </div>
                 </div>
 
+                {job.last_error && (
+                  <div className="mx-3 mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-amber-200 whitespace-pre-wrap break-words">
+                    {job.last_error}
+                  </div>
+                )}
+
                 {job.request_count > 0 && (
                   <div className="px-3 pb-2">
                     <div
@@ -397,6 +403,8 @@ export const TTSBatchPanel: React.FC = () => {
                         'none'
                       )}
                     </dd>
+                    <dt>Last error</dt>
+                    <dd className="text-stone-200 whitespace-pre-wrap break-words">{job.last_error || 'none'}</dd>
                     <dt>Job id</dt>
                     <dd className="font-mono break-all text-stone-200">{job.id}</dd>
                   </dl>

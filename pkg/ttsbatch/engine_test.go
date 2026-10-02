@@ -71,6 +71,13 @@ func (m *memJobs) UpdateTTSJobStatus(id, status string, completed int, failed []
 	return nil
 }
 
+func (m *memJobs) SetTTSJobError(id, message string) error {
+	job := m.updated[id]
+	job.LastError = message
+	m.updated[id] = job
+	return nil
+}
+
 func TestEngineRunStoresResultsAndRecordsFailures(t *testing.T) {
 	client := &fakeBatch{
 		states: []string{"running", "succeeded"},
@@ -237,5 +244,24 @@ func TestEngineEmptyFetchIsNotAFalseSuccess(t *testing.T) {
 	}
 	if jobs.updated["job"].Status == "completed" {
 		t.Errorf("an empty fetch must not be recorded as completed, got %q", jobs.updated["job"].Status)
+	}
+}
+
+// A download that keeps failing leaves the job awaiting download (not completed)
+// and records why, so the manager can show the reason.
+func TestEngineRecordsWhyADownloadFailed(t *testing.T) {
+	client := &fakeBatch{states: []string{"succeeded"}, emptyFetches: 10}
+	jobs := &memJobs{}
+	engine := New(client, media.NewContentCache(t.TempDir()), jobs)
+	engine.sleep = func(context.Context, time.Duration) error { return nil }
+
+	if _, err := engine.Run(context.Background(), Options{}, []media.ClipGroup{{Key: "k"}}); err == nil {
+		t.Fatalf("expected an error when the output never arrives")
+	}
+	if jobs.updated["job"].LastError == "" {
+		t.Errorf("expected the failure reason to be recorded")
+	}
+	if got := jobs.updated["job"].Status; got != "processed" {
+		t.Errorf("expected the job to be left awaiting download, got %q", got)
 	}
 }

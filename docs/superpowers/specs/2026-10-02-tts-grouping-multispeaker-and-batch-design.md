@@ -212,7 +212,7 @@ A resumable, idempotent engine over `BatchTTSClient`, for backfilling a campaign
 
 ### 8.1 Job model
 
-One job is one submission: a JSONL file of `BatchRequest`s, one line per uncached group. A `tts_jobs` table (storage migration 10) tracks it:
+One job is one submission: a JSONL file of `BatchRequest`s, one line per uncached group. A `tts_jobs` table (storage migrations 10 and 11) tracks it:
 
 ```
 tts_jobs(
@@ -220,12 +220,13 @@ tts_jobs(
   game_id       TEXT NOT NULL,
   provider      TEXT NOT NULL,
   model         TEXT NOT NULL,
-  status        TEXT NOT NULL,      -- submitted|running|succeeded|failed|cancelled
+  status        TEXT NOT NULL,      -- queued|processing|processed|downloading|storing|completed|failed|cancelled|expired
   input_uri     TEXT,               -- File API URI of the uploaded JSONL
   request_count INTEGER NOT NULL DEFAULT 0,
   completed     INTEGER NOT NULL DEFAULT 0,
   failed_keys   TEXT NOT NULL DEFAULT '',  -- newline-separated group keys
   cost_micros   INTEGER NOT NULL DEFAULT 0,
+  last_error    TEXT NOT NULL DEFAULT '',  -- why the job last failed to progress
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 )

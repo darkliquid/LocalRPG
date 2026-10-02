@@ -2608,6 +2608,7 @@ func ttsBatchJobDTO(job storage.TTSJob) TTSBatchJobDTO {
 		RequestCount: job.RequestCount,
 		Completed:    job.Completed,
 		FailedKeys:   job.FailedKeys,
+		LastError:    job.LastError,
 	}
 }
 

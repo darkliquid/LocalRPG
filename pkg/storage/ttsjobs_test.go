@@ -44,6 +44,17 @@ func TestTTSJobRoundTrip(t *testing.T) {
 		t.Errorf("unexpected updated job %#v", got)
 	}
 
+	if err := store.SetTTSJobError("job-1", "batch output file is empty"); err != nil {
+		t.Fatalf("SetTTSJobError: %v", err)
+	}
+	got, err = store.GetTTSJob("job-1")
+	if err != nil {
+		t.Fatalf("GetTTSJob after error: %v", err)
+	}
+	if got.LastError != "batch output file is empty" {
+		t.Errorf("LastError = %q, want the recorded reason", got.LastError)
+	}
+
 	jobs, err := store.ListTTSJobs("game")
 	if err != nil {
 		t.Fatalf("ListTTSJobs: %v", err)

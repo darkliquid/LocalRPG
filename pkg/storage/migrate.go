@@ -23,6 +23,23 @@ var migrations = []migration{
 	{version: 8, apply: addUsageTable},
 	{version: 9, apply: addUsageScopeColumn},
 	{version: 10, apply: addTTSJobsTable},
+	{version: 11, apply: addTTSJobErrorColumn},
+}
+
+// addTTSJobErrorColumn records why a batch job last failed to progress, so the
+// manager can show the reason rather than only that a job is not moving.
+func addTTSJobErrorColumn(db *sql.DB) error {
+	exists, err := columnExists(db, "tts_jobs", "last_error")
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	if _, err := db.Exec("ALTER TABLE tts_jobs ADD COLUMN last_error TEXT NOT NULL DEFAULT ''"); err != nil {
+		return fmt.Errorf("add tts_jobs.last_error: %w", err)
+	}
+	return nil
 }
 
 // addTTSJobsTable records offline batch synthesis jobs so a backfill can resume
