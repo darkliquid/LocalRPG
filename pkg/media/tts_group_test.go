@@ -115,6 +115,9 @@ func TestSynthesizeTurnUsesGroupClientForTwoSpeakers(t *testing.T) {
 	if len(client.group[0]) != 2 {
 		t.Errorf("expected two speaker lines, got %#v", client.group[0])
 	}
+	if client.synthCalls != 0 {
+		t.Errorf("expected the two-speaker turn to use one multi-speaker request, got %d single-voice calls", client.synthCalls)
+	}
 }
 
 func TestGroupClipKeysMatchSynthesizedKeys(t *testing.T) {

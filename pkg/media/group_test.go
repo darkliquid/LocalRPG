@@ -18,11 +18,13 @@ func (plainGroupClient) Synthesize(ctx context.Context, text string, voice *enti
 
 // capGroupClient declares capabilities and implements GroupTTSClient.
 type capGroupClient struct {
-	caps  TTSCapabilities
-	group [][]SpeakerLine
+	caps       TTSCapabilities
+	group      [][]SpeakerLine
+	synthCalls int
 }
 
 func (c *capGroupClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
+	c.synthCalls++
 	return GenerateToneWAV(440, 0.01), nil
 }
 

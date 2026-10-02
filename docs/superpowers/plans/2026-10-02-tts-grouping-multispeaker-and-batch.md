@@ -298,27 +298,27 @@
 
 ### Task 17: Gemini `SynthesizeGroup`
 
-- [ ] **Step 17.1**: In `pkg/provider/ttsgemini/client.go`, implement `TTSCapabilities()` returning `MaxSpeakers: 2`, `SupportsGrouping: true`, `SupportsBatch: true`, `SupportsStreaming: true`, and the documented `MaxCharsPerRequest`/`MaxTokensPerRequest`.
-- [ ] **Step 17.2**: Implement `SynthesizeGroup(ctx, lines []SpeakerLine)`: build a `SpeechConfig.MultiSpeakerVoiceConfig` with one `SpeakerVoiceConfig` per line (`Speaker` = label, `voiceConfig.prebuiltVoiceConfig.voiceName` = voice ID) and a labelled transcript whose names match; require exactly two speakers and return an error otherwise.
-- [ ] **Step 17.3**: Reuse the existing PCM wrapping and error mapping.
-- [ ] **Step 17.4**: Write tests asserting the request carries two `SpeakerVoiceConfig`s with the expected names and voices, and that one speaker is rejected.
-- [ ] **Step 17.5**: Run `go test ./pkg/provider/ttsgemini/...` and verify it passes.
-- [ ] **Step 17.6**: Commit: `git commit -am "feat(ttsgemini): add multi-speaker synthesis"`
+- [x] **Step 17.1**: In `pkg/provider/ttsgemini/client.go`, implement `TTSCapabilities()` returning `MaxSpeakers: 2`, `SupportsGrouping: true`, `SupportsBatch: true`, `SupportsStreaming: true`, and the documented `MaxCharsPerRequest`/`MaxTokensPerRequest`.
+- [x] **Step 17.2**: Implement `SynthesizeGroup(ctx, lines []SpeakerLine)`: build a `SpeechConfig.MultiSpeakerVoiceConfig` with one `SpeakerVoiceConfig` per line (`Speaker` = label, `voiceConfig.prebuiltVoiceConfig.voiceName` = voice ID) and a labelled transcript whose names match; require exactly two speakers and return an error otherwise.
+- [x] **Step 17.3**: Reuse the existing PCM wrapping and error mapping.
+- [x] **Step 17.4**: Write tests asserting the request carries two `SpeakerVoiceConfig`s with the expected names and voices, and that one speaker is rejected.
+- [x] **Step 17.5**: Run `go test ./pkg/provider/ttsgemini/...` and verify it passes.
+- [x] **Step 17.6**: Commit: `git commit -am "feat(ttsgemini): add multi-speaker synthesis"`
 
 ---
 
 ### Task 18: Multi-speaker partitioning and gating
 
-- [ ] **Step 18.1**: In `pkg/media/group.go`, extend `GroupPlan` to honour `MaxSpeakers > 1` (already modelled in Task 3) and add the same-voice fallback: when two speakers in a candidate run resolve to the same voice ID, close the group so they render separately.
-- [ ] **Step 18.2**: Gate multi-speaker on `media.tts.multi_speaker`: `off` forces `MaxSpeakers = 1`; `auto`/`always` use the provider value.
-- [ ] **Step 18.3**: Add tests for the same-voice fallback and the `off` gate.
-- [ ] **Step 18.4**: Run `go test ./pkg/media/...` and verify it passes.
-- [ ] **Step 18.5**: Commit: `git commit -am "feat(media): partition two-speaker scenes with a same-voice fallback"`
+- [x] **Step 18.1**: In `pkg/media/group.go`, extend `GroupPlan` to honour `MaxSpeakers > 1` (already modelled in Task 3) and add the same-voice fallback: when two speakers in a candidate run resolve to the same voice ID, close the group so they render separately.
+- [x] **Step 18.2**: Gate multi-speaker on `media.tts.multi_speaker`: `off` forces `MaxSpeakers = 1`; `auto`/`always` use the provider value.
+- [x] **Step 18.3**: Add tests for the same-voice fallback and the `off` gate.
+- [x] **Step 18.4**: Run `go test ./pkg/media/...` and verify it passes.
+- [x] **Step 18.5**: Commit: `git commit -am "feat(media): partition two-speaker scenes with a same-voice fallback"`
 
 ---
 
 ### Task 19: Stage 3 verification
 
-- [ ] **Step 19.1**: Run `mise run test` and `mise run lint`.
-- [ ] **Step 19.2**: Add an end-to-end test: a two-speaker turn renders in one Gemini request and its group clip resolves identically in the GUI and export.
-- [ ] **Step 19.3**: Commit: `git commit -am "chore: verify tts multi-speaker milestone"`
+- [x] **Step 19.1**: Run `mise run test` and `mise run lint`.
+- [x] **Step 19.2**: Add an end-to-end test: a two-speaker turn renders in one Gemini request and its group clip resolves identically in the GUI and export.
+- [x] **Step 19.3**: Commit: `git commit -am "chore: verify tts multi-speaker milestone"`
