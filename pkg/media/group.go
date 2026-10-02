@@ -171,3 +171,177 @@ func ComputeGroupCacheKey(provider, model string, lines []SpeakerLine) string {
 	hash := sha256.Sum256([]byte("v4:" + provider + "\x00" + model + "\x00" + string(encoded)))
 	return hex.EncodeToString(hash[:])
 }
+
+// narratorLabel is the speaker label narration is addressed by in a
+// multi-speaker transcript.
+const narratorLabel = "Narrator"
+
+// GroupPlan maps a turn's segments to groups under a provider's capabilities.
+// It synthesizes nothing and is the one definition of which segments share a
+// clip, shared by synthesis, the GUI DTO builder and export.
+func (p *TTSPipeline) GroupPlan(segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig, caps TTSCapabilities) []ClipGroup {
+	return planGroups(segments, caps, func(segment entity.TurnSegment) (SpeakerLine, bool) {
+		speakerID, voice, spoken := p.prepareSegment(segment, narratorVoice, voiceFor)
+		if strings.TrimSpace(spoken) == "" {
+			return SpeakerLine{}, false
+		}
+		label := narratorLabel
+		if segment.Kind == entity.SegmentSpeech {
+			switch {
+			case segment.Speaker != "":
+				label = segment.Speaker
+			case speakerID != "":
+				label = speakerID
+			}
+		}
+		return SpeakerLine{SpeakerID: speakerID, Label: label, Voice: voice, Text: spoken}, true
+	})
+}
+
+// planGroups is the pure grouping algorithm: it walks the segments in order,
+// extending the current group while the speaker budget and the request limit
+// allow, and splits a single oversized segment at sentence boundaries.
+func planGroups(segments []entity.TurnSegment, caps TTSCapabilities, resolve func(entity.TurnSegment) (SpeakerLine, bool)) []ClipGroup {
+	caps = normalizeCaps(caps)
+	groups := make([]ClipGroup, 0, len(segments))
+	var current *ClipGroup
+
+	flush := func() {
+		if current != nil {
+			groups = append(groups, *current)
+			current = nil
+		}
+	}
+
+	for index, segment := range segments {
+		line, ok := resolve(segment)
+		if !ok {
+			continue
+		}
+
+		// A segment too large for one request is split at sentence boundaries.
+		if !linesFit([]SpeakerLine{line}, caps) {
+			flush()
+			for _, part := range splitLineToFit(line, caps) {
+				groups = append(groups, ClipGroup{SegmentIndexes: []int{index}, Lines: []SpeakerLine{part}})
+			}
+			continue
+		}
+
+		if current != nil && !canJoinGroup(*current, line, caps) {
+			flush()
+		}
+		if current == nil {
+			current = &ClipGroup{}
+		}
+		current.SegmentIndexes = append(current.SegmentIndexes, index)
+		current.Lines = append(current.Lines, line)
+	}
+	flush()
+	return groups
+}
+
+// canJoinGroup reports whether a line may extend a group without exceeding the
+// speaker budget or the provider's request limit.
+func canJoinGroup(group ClipGroup, line SpeakerLine, caps TTSCapabilities) bool {
+	if !groupHasSpeaker(group, line) && distinctSpeakers(group.Lines) >= caps.MaxSpeakers {
+		return false
+	}
+	candidate := make([]SpeakerLine, len(group.Lines), len(group.Lines)+1)
+	copy(candidate, group.Lines)
+	candidate = append(candidate, line)
+	return linesFit(candidate, caps)
+}
+
+// groupHasSpeaker reports whether a line's speaker is already in a group.
+func groupHasSpeaker(group ClipGroup, line SpeakerLine) bool {
+	for _, existing := range group.Lines {
+		if sameSpeaker(existing, line) {
+			return true
+		}
+	}
+	return false
+}
+
+// distinctSpeakers counts the distinct speakers among a group's lines.
+func distinctSpeakers(lines []SpeakerLine) int {
+	seen := make(map[string]bool, len(lines))
+	for _, line := range lines {
+		seen[speakerKey(line)] = true
+	}
+	return len(seen)
+}
+
+// speakerKey names a speaker for grouping: the entity ID when present, else the
+// display label.
+func speakerKey(line SpeakerLine) string {
+	if line.SpeakerID != "" {
+		return line.SpeakerID
+	}
+	return line.Label
+}
+
+// linesFit reports whether a run of lines is within the provider's request
+// limits. A zero limit means unbounded.
+func linesFit(lines []SpeakerLine, caps TTSCapabilities) bool {
+	chars := 0
+	tokens := 0
+	for index, line := range lines {
+		if index > 0 {
+			chars++ // the space that joins one line to the next
+		}
+		chars += len([]rune(line.Text))
+		tokens += estimateTokens(line.Text)
+	}
+	if caps.MaxCharsPerRequest > 0 && chars > caps.MaxCharsPerRequest {
+		return false
+	}
+	if caps.MaxTokensPerRequest > 0 && tokens > caps.MaxTokensPerRequest {
+		return false
+	}
+	return true
+}
+
+// estimateTokens approximates a text's token count for grouping only, at the
+// common four-characters-per-token ratio. The provider's exact tokenizer is not
+// available here, so this bounds a request conservatively.
+func estimateTokens(text string) int {
+	return (len([]rune(text)) + 3) / 4
+}
+
+// splitLineToFit divides an oversized line into the fewest sentence-aligned
+// parts that each fit, never splitting mid-sentence. A single sentence larger
+// than the limit is returned alone; the provider rejects it and the bisection
+// failure path takes over.
+func splitLineToFit(line SpeakerLine, caps TTSCapabilities) []SpeakerLine {
+	sentences := SplitSentences(line.Text)
+	if len(sentences) <= 1 {
+		return []SpeakerLine{line}
+	}
+
+	parts := make([]SpeakerLine, 0, len(sentences))
+	current := ""
+	for _, sentence := range sentences {
+		if current == "" {
+			current = sentence
+			continue
+		}
+		candidate := current + " " + sentence
+		if !linesFit([]SpeakerLine{{Text: candidate}}, caps) {
+			parts = append(parts, withText(line, current))
+			current = sentence
+			continue
+		}
+		current = candidate
+	}
+	if current != "" {
+		parts = append(parts, withText(line, current))
+	}
+	return parts
+}
+
+// withText copies a line with replacement text.
+func withText(line SpeakerLine, text string) SpeakerLine {
+	line.Text = text
+	return line
+}
