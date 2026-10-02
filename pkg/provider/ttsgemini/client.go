@@ -243,14 +243,22 @@ func (c *GeminiTTSClient) Synthesize(ctx context.Context, text string, voice *en
 	return c.audioFromResponse(resp)
 }
 
-// audioFromResponse pulls the audio out of a TTS response and wraps headerless
-// PCM so a decoder or browser can play it. An already-containerised clip (some
-// models return WAV) is passed through unchanged.
+// audioFromResponse records usage and pulls the audio out of a TTS response.
 func (c *GeminiTTSClient) audioFromResponse(resp *genai.GenerateContentResponse) ([]byte, error) {
+	if resp != nil {
+		c.setLastUsage(resp.UsageMetadata)
+	}
+	return extractAudio(resp)
+}
+
+// extractAudio pulls the audio out of a TTS response and wraps headerless PCM so
+// a decoder or browser can play it. An already-containerised clip (some models
+// return WAV) is passed through unchanged. It is shared by the interactive and
+// batch paths, which both read the same response shape.
+func extractAudio(resp *genai.GenerateContentResponse) ([]byte, error) {
 	if resp == nil || len(resp.Candidates) == 0 {
 		return nil, errors.New("gemini tts: no candidates returned from model")
 	}
-	c.setLastUsage(resp.UsageMetadata)
 
 	cand := resp.Candidates[0]
 	if cand.Content == nil || len(cand.Content.Parts) == 0 {
@@ -288,20 +296,43 @@ func (c *GeminiTTSClient) TTSCapabilities() media.TTSCapabilities {
 // speakers by a label that must match the transcript, so each line's label is
 // used both in the speaker configuration and in the text.
 func (c *GeminiTTSClient) SynthesizeGroup(ctx context.Context, lines []media.SpeakerLine) ([]byte, error) {
-	if len(lines) == 0 {
-		return nil, errors.New("gemini tts: a group needs at least one line")
+	text, config, speakers, err := c.groupRequest(lines)
+	if err != nil {
+		return nil, err
+	}
+	if speakers != 2 {
+		return nil, fmt.Errorf("gemini tts: exactly two speakers are required, got %d", speakers)
+	}
+	if c.client == nil {
+		return nil, errors.New("gemini tts: client not initialized")
 	}
 
-	speakerConfigs := make([]*genai.SpeakerVoiceConfig, 0, len(lines))
+	resp, err := c.client.Models.GenerateContent(ctx, c.model, genai.Text(text), config)
+	if err != nil {
+		return nil, mapGeminiTTSError(err, c.model)
+	}
+	return c.audioFromResponse(resp)
+}
+
+// groupRequest builds the prompt and generation config for a group: a
+// multi-speaker transcript when it has two speakers, otherwise the concatenated
+// text in the one voice. It reports the distinct speaker count, so the
+// interactive path can require two and the batch path can accept either.
+func (c *GeminiTTSClient) groupRequest(lines []media.SpeakerLine) (string, *genai.GenerateContentConfig, int, error) {
+	if len(lines) == 0 {
+		return "", nil, 0, errors.New("gemini tts: a group needs at least one line")
+	}
+
+	speakerConfigs := make([]*genai.SpeakerVoiceConfig, 0, 2)
 	seen := map[string]bool{}
-	var transcript strings.Builder
+	var transcript, single strings.Builder
 	for _, line := range lines {
 		label := strings.TrimSpace(line.Label)
 		if label == "" {
 			label = strings.TrimSpace(line.SpeakerID)
 		}
 		if label == "" {
-			return nil, errors.New("gemini tts: every speaker needs a label")
+			return "", nil, 0, errors.New("gemini tts: every speaker needs a label")
 		}
 		if !seen[label] {
 			seen[label] = true
@@ -314,27 +345,31 @@ func (c *GeminiTTSClient) SynthesizeGroup(ctx context.Context, lines []media.Spe
 		transcript.WriteString(": ")
 		transcript.WriteString(strings.TrimSpace(line.Text))
 		transcript.WriteByte('\n')
+
+		if single.Len() > 0 {
+			single.WriteByte(' ')
+		}
+		single.WriteString(strings.TrimSpace(line.Text))
 	}
 
-	if len(speakerConfigs) != 2 {
-		return nil, fmt.Errorf("gemini tts: exactly two speakers are required, got %d", len(speakerConfigs))
+	if len(speakerConfigs) <= 1 {
+		return single.String(), &genai.GenerateContentConfig{
+			ResponseModalities: []string{"AUDIO"},
+			SpeechConfig: &genai.SpeechConfig{
+				VoiceConfig: &genai.VoiceConfig{PrebuiltVoiceConfig: &genai.PrebuiltVoiceConfig{VoiceName: c.voiceNameFor(lines[0].Voice)}},
+			},
+		}, len(speakerConfigs), nil
 	}
-	if c.client == nil {
-		return nil, errors.New("gemini tts: client not initialized")
+	if len(speakerConfigs) > 2 {
+		return "", nil, len(speakerConfigs), fmt.Errorf("gemini tts: at most two speakers are supported, got %d", len(speakerConfigs))
 	}
 
-	reqConfig := &genai.GenerateContentConfig{
+	return transcript.String(), &genai.GenerateContentConfig{
 		ResponseModalities: []string{"AUDIO"},
 		SpeechConfig: &genai.SpeechConfig{
 			MultiSpeakerVoiceConfig: &genai.MultiSpeakerVoiceConfig{SpeakerVoiceConfigs: speakerConfigs},
 		},
-	}
-
-	resp, err := c.client.Models.GenerateContent(ctx, c.model, genai.Text(transcript.String()), reqConfig)
-	if err != nil {
-		return nil, mapGeminiTTSError(err, c.model)
-	}
-	return c.audioFromResponse(resp)
+	}, len(speakerConfigs), nil
 }
 
 // voiceNameFor resolves a line's voice, falling back to the client's default.
