@@ -139,6 +139,9 @@ type TTSPipeline struct {
 	logger      trace.Logger
 	policy      TextPolicy
 	opusBitrate int
+	// groupCaps are the capabilities grouping is planned against: the client's
+	// own declaration, overlaid with any configured limits.
+	groupCaps TTSCapabilities
 
 	// flights serialize synthesis per cache key, so concurrent requests for the
 	// same utterance synthesize and encode once instead of racing.
@@ -383,6 +386,7 @@ func NewTTSPipeline(client TTSClient, cache *ContentCache) *TTSPipeline {
 		cache:       cache,
 		opusBitrate: opus.DefaultBitrate,
 		flights:     map[string]*sync.Mutex{},
+		groupCaps:   ClientCapabilities(client),
 	}
 }
 
@@ -521,6 +525,214 @@ func (p *TTSPipeline) usageFor(text string) Usage {
 		}
 	}
 	return Usage{Characters: len([]rune(text)), Requests: 1, Estimated: true}
+}
+
+// SetGroupCaps overrides the provider capabilities the pipeline plans groups
+// with, so a caller can apply configured limits on top of the provider's own
+// declaration.
+func (p *TTSPipeline) SetGroupCaps(caps TTSCapabilities) {
+	p.groupCaps = normalizeCaps(caps)
+}
+
+// GroupCaps reports the capabilities the pipeline plans groups with.
+func (p *TTSPipeline) GroupCaps() TTSCapabilities {
+	return p.groupCaps
+}
+
+// GroupClipKeys reports the clip keys a turn's groups will have, without
+// synthesizing anything, so a caller can name a clip before it exists. It
+// mirrors SegmentClipKeys for the grouped path.
+func (p *TTSPipeline) GroupClipKeys(segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) []ClipGroup {
+	groups := p.GroupPlan(segments, narratorVoice, voiceFor, p.groupCaps)
+	for i := range groups {
+		provider, model := groupKeyProvider(groups[i].Lines)
+		groups[i].Key = ComputeGroupCacheKey(provider, model, groups[i].Lines)
+		if _, ok := p.cachedClip(groups[i].Key); ok {
+			groups[i].Cached = true
+		}
+	}
+	return groups
+}
+
+// SynthesizeGroups renders each uncached group with one provider call, in order.
+// A group that fails is returned uncached rather than aborting the turn, so a
+// caller can fall back to per-segment synthesis for just that group. It is the
+// grouped counterpart of SynthesizeSegmentClips.
+func (p *TTSPipeline) SynthesizeGroups(ctx context.Context, groups []ClipGroup) ([]ClipGroup, error) {
+	rendered := make([]ClipGroup, 0, len(groups))
+	var firstErr error
+	for _, group := range groups {
+		result, err := p.synthesizeGroup(ctx, group)
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
+		rendered = append(rendered, result)
+	}
+	return rendered, firstErr
+}
+
+// SynthesizeTurn plans a turn's groups and renders them, the turn-level entry
+// point for the grouped path.
+func (p *TTSPipeline) SynthesizeTurn(ctx context.Context, segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) ([]ClipGroup, error) {
+	return p.SynthesizeGroups(ctx, p.GroupClipKeys(segments, narratorVoice, voiceFor))
+}
+
+// synthesizeGroup renders one group, reusing a cached clip when present. The
+// per-key single-flight lock means two callers requesting the same group
+// synthesize it once.
+func (p *TTSPipeline) synthesizeGroup(ctx context.Context, group ClipGroup) (ClipGroup, error) {
+	start := time.Now()
+	provider, model := groupKeyProvider(group.Lines)
+	if group.Key == "" {
+		group.Key = ComputeGroupCacheKey(provider, model, group.Lines)
+	}
+
+	logger := trace.OrNil(p.logger)
+	logger.Event("media.tts.group_request", map[string]interface{}{
+		"speaker":   groupSpeakerLabel(group.Lines),
+		"provider":  provider,
+		"model":     model,
+		"speakers":  distinctSpeakers(group.Lines),
+		"segments":  len(group.SegmentIndexes),
+		"chars":     len([]rune(groupText(group.Lines))),
+		"cache_key": group.Key,
+	})
+
+	keyLock := p.keyLock(group.Key)
+	keyLock.Lock()
+	defer keyLock.Unlock()
+
+	if path, ok := p.cachedClip(group.Key); ok {
+		_ = path
+		group.Cached = true
+		p.setLastUsage(Usage{})
+		return group, nil
+	}
+
+	audio, err := p.renderGroupAudio(ctx, group)
+	if err != nil {
+		code := harness.ClassifyProviderError(err)
+		logger.Event("media.tts.group_error", map[string]interface{}{
+			"provider": provider,
+			"code":     string(code),
+			"error":    err.Error(),
+		})
+		mediaMetrics().providerErrors.Add(ctx, 1, otelmetric.WithAttributes(
+			attribute.String("localrpg.role", "tts"),
+			attribute.String("error.kind", string(code)),
+			attribute.String("gen_ai.system", provider),
+		))
+		return group, &harness.GenerationFailure{
+			Code:    code,
+			Message: fmt.Sprintf("synthesize group: %v", err),
+			Cause:   err,
+		}
+	}
+
+	if _, err := p.storeGroupClip(ctx, group.Key, audio, start, provider, groupText(group.Lines)); err != nil {
+		return group, err
+	}
+	group.Cached = true
+	return group, nil
+}
+
+// renderGroupAudio issues the one provider call a group needs: a single speaker
+// is sent through Synthesize as the concatenated text, and a multi-speaker group
+// through SynthesizeGroup when the provider supports it.
+func (p *TTSPipeline) renderGroupAudio(ctx context.Context, group ClipGroup) ([]byte, error) {
+	lines := canonicalGroupLines(group.Lines)
+	if distinctSpeakers(lines) <= 1 {
+		text := groupText(lines)
+		var voice *entity.VoiceConfig
+		if len(lines) > 0 {
+			voice = lines[0].Voice
+		}
+		return p.client.Synthesize(ctx, text, voice)
+	}
+
+	groupClient, ok := p.client.(GroupTTSClient)
+	if !ok {
+		return nil, fmt.Errorf("tts: provider cannot render %d speakers in one request", distinctSpeakers(lines))
+	}
+	return groupClient.SynthesizeGroup(ctx, lines)
+}
+
+// storeGroupClip normalises provider audio to the cache's one format and writes
+// it under a group key, mirroring the per-utterance path.
+func (p *TTSPipeline) storeGroupClip(ctx context.Context, key string, audio []byte, start time.Time, provider, text string) (string, error) {
+	pcm, inRate, inChannels, decodeErr := DecodeProviderAudio(audio, "")
+	if decodeErr != nil {
+		return "", &harness.GenerationFailure{
+			Code:    harness.FailureProviderError,
+			Message: fmt.Sprintf("normalise speech: %v", decodeErr),
+			Cause:   decodeErr,
+		}
+	}
+	encoded, encodeErr := opus.Encode(pcm, inRate, inChannels, p.opusBitrate)
+	if encodeErr != nil {
+		return "", &harness.GenerationFailure{
+			Code:    harness.FailureProviderError,
+			Message: fmt.Sprintf("encode speech: %v", encodeErr),
+			Cause:   encodeErr,
+		}
+	}
+
+	mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "miss")))
+	mediaMetrics().ttsBytes.Record(ctx, int64(len(encoded)), otelmetric.WithAttributes(attribute.String("localrpg.tts.provider", provider)))
+	mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
+		otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", false)))
+
+	trace.OrNil(p.logger).Event("media.tts.result", map[string]interface{}{
+		"cache_hit":    false,
+		"bytes":        len(encoded),
+		"content_type": "audio/ogg",
+		"duration_ms":  time.Since(start).Milliseconds(),
+		"group":        true,
+	})
+
+	p.setLastUsage(p.usageFor(text))
+	return p.cache.Put("audio", key+".opus", encoded)
+}
+
+// groupKeyProvider names the provider and model a group's key is namespaced
+// under, taken from the first line that carries a voice.
+func groupKeyProvider(lines []SpeakerLine) (provider, model string) {
+	for _, line := range lines {
+		if line.Voice == nil {
+			continue
+		}
+		provider = line.Voice.Provider
+		if value, ok := line.Voice.Options["model"].(string); ok {
+			model = value
+		}
+		return provider, model
+	}
+	return "", ""
+}
+
+// groupText is the speakable text a group sends, the canonical lines joined.
+func groupText(lines []SpeakerLine) string {
+	canonical := canonicalGroupLines(lines)
+	parts := make([]string, 0, len(canonical))
+	for _, line := range canonical {
+		parts = append(parts, line.Text)
+	}
+	return strings.Join(parts, " ")
+}
+
+// groupSpeakerLabel names a group's speakers for a trace event.
+func groupSpeakerLabel(lines []SpeakerLine) string {
+	seen := make([]string, 0, len(lines))
+	known := map[string]bool{}
+	for _, line := range lines {
+		key := speakerKey(line)
+		if known[key] {
+			continue
+		}
+		known[key] = true
+		seen = append(seen, key)
+	}
+	return strings.Join(seen, "+")
 }
 
 // cachedClip finds a clip under any known extension, so a cache written under an
