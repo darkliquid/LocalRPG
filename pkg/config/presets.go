@@ -209,6 +209,17 @@ var TTSPresets = map[string]TTSConfig{
 		SpeechRate:   1.0,
 		MasterVolume: 1.0,
 	},
+
+	"inworld-tts": {
+		Type:          "builtin",
+		BuiltinName:   "inworld",
+		Model:         "inworld-tts-2",
+		DefaultVoice:  "Ashley",
+		Pitch:         1.0,
+		SpeechRate:    1.0,
+		AutoPlay:      true,
+		MasterVolume:  1.0,
+	},
 }
 
 var STTPresets = map[string]STTConfig{

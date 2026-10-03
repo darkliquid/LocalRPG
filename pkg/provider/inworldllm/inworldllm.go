@@ -9,15 +9,13 @@ package inworldllm
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"os"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/provider"
+	"github.com/darkliquid/localrpg/pkg/provider/inworldshared"
 	"github.com/darkliquid/localrpg/pkg/provider/openaichat"
-	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
 // DefaultEndpoint is Inworld's OpenAI-compatible chat completions gateway.
@@ -26,29 +24,14 @@ const DefaultEndpoint = "https://api.inworld.ai/v1/chat/completions"
 // DefaultModel routes a prompt across Inworld's frontier models.
 const DefaultModel = "inworld/compare-frontier-models"
 
-// ErrMissingAPIKey is returned when no credential resolves.
-var ErrMissingAPIKey = errors.New("inworld: an API key is required; set providers.inworld.api_key, agents.roles.<role>.api_key, or INWORLD_API_KEY")
-
-// ResolveAPIKey applies the credential precedence: an explicit role key, then
-// the shared providers.inworld.api_key, then INWORLD_API_KEY.
-func ResolveAPIKey(explicit, shared string) (string, error) {
-	for _, candidate := range []string{explicit, shared, os.Getenv("INWORLD_API_KEY")} {
-		if key := strings.TrimSpace(candidate); key != "" {
-			return key, nil
-		}
-	}
-	return "", ErrMissingAPIKey
-}
-
 // NewInworldLLMClient builds the Inworld chat provider. The endpoint defaults to
 // the public gateway and the model to the frontier router, so a role only has to
 // name `type: inworld`.
 func NewInworldLLMClient(cfg config.AgentRoleConfig, sharedKey string) (*openaichat.HTTPProvider, error) {
-	apiKey, err := ResolveAPIKey(cfg.APIKey, sharedKey)
+	apiKey, err := inworldshared.ResolveAPIKey(cfg.APIKey, sharedKey)
 	if err != nil {
 		return nil, err
 	}
-	trace.RegisterSecret(apiKey)
 
 	endpoint := strings.TrimSpace(cfg.Endpoint)
 	if endpoint == "" {

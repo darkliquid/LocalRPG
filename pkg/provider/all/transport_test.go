@@ -25,6 +25,7 @@ var transportByKey = map[provider.Key]string{
 	provider.KeyTTSSherpaONNX: "builtin",
 	provider.KeyTTSPiper:      "cli",
 	provider.KeyTTSHTTP:       "http",
+	provider.KeyTTSInworld:    "http",
 
 	provider.KeySTTWhisperHTTP: "http",
 	provider.KeySTTWhisperCLI:  "cli",

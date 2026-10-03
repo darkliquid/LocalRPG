@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/provider"
@@ -22,10 +23,14 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 	switch cfg.Type {
 	case "gemini":
 		return provider.KeyTTSGemini, true
+	case "inworld":
+		return provider.KeyTTSInworld, true
 	case "builtin":
 		switch cfg.BuiltinName {
 		case "gemini":
 			return provider.KeyTTSGemini, true
+		case "inworld":
+			return provider.KeyTTSInworld, true
 		case "sherpa-onnx", "kokoro":
 			return provider.KeyTTSSherpaONNX, true
 		case "native-os":
@@ -40,6 +45,24 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 		return provider.InstanceOrSelf(provider.KeyTTSHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
 	}
 	return "", false
+}
+
+// SharedProviderKey is the provider-wide credential a media client inherits when
+// its own config carries none: an Inworld adapter uses providers.inworld.api_key,
+// every other adapter keeps the Gemini key it has always used.
+func SharedProviderKey(cfg *config.Config, key provider.Key, ok bool) string {
+	if cfg == nil {
+		return ""
+	}
+	if ok && isInworldKey(key) {
+		return cfg.Providers.Inworld.APIKey
+	}
+	return cfg.Providers.Gemini.APIKey
+}
+
+// isInworldKey reports whether a canonical key names an Inworld adapter.
+func isInworldKey(key provider.Key) bool {
+	return strings.HasSuffix(string(key.Parent()), ":inworld")
 }
 
 // BuildTTS constructs a TTS client from the registry by ID.
