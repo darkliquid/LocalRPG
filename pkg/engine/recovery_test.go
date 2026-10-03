@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -245,5 +246,29 @@ func TestRecoveryOutcomeIsPersisted(t *testing.T) {
 	}
 	if turns[0].Truncated {
 		t.Errorf("a continued reply should not be recorded truncated")
+	}
+}
+
+// TestRecoveredContinuationJoinsTheTurnSegments guards the seam between recovery
+// and the turn's playback script: the continuation streams through onChunk after
+// the generation loop, so its segments must be drained too, or the turn plays only
+// the cut-off first half.
+func TestRecoveredContinuationJoinsTheTurnSegments(t *testing.T) {
+	gm := &scriptedStreamProvider{chunks: []string{"The gate stands open before us all and the hinges groan "}}
+	completion := &replyProvider{id: "completion", replies: []*scriptedStreamProvider{
+		{chunks: []string{"in the rising wind."}},
+	}}
+	orchestrator, _ := recoveryOrchestrator(t, gm, completion, CompletionPolicy{})
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I look", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+	texts := make([]string, 0, len(turn.Segments))
+	for _, segment := range turn.Segments {
+		texts = append(texts, segment.Text)
+	}
+	if !strings.Contains(strings.Join(texts, " "), "rising wind") {
+		t.Fatalf("the continuation's text is missing from the segments: %#v", turn.Segments)
 	}
 }

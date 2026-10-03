@@ -898,6 +898,21 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	var narrationParts []string
 	const maxRollContinuations = 3
 	endedOnRoll := false
+	// collectedCount is how many of the parser's events are already in collected,
+	// so a recovery continuation's events can be appended without duplicating the
+	// ones the loop already took.
+	collectedCount := 0
+	drainEvents := func() {
+		if o.parser == nil {
+			return
+		}
+		o.parser.Flush()
+		events := o.parser.Events()
+		if collectedCount < len(events) {
+			collected = append(collected, events[collectedCount:]...)
+			collectedCount = len(events)
+		}
+	}
 	for attempt := 0; ; attempt++ {
 		result, err = o.runGenerationLoop(ctx, &assembly, gmDirective, proposedCheck, resolvedPending, validationEngagement, onChunk)
 		if err != nil {
@@ -941,10 +956,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		if strings.TrimSpace(result.Text) != "" {
 			narrationParts = append(narrationParts, result.Text)
 		}
-		if o.parser != nil {
-			o.parser.Flush()
-			collected = append(collected, o.parser.Events()...)
-		}
+		drainEvents()
 
 		// A @roll record ends the call. Under the ask policy it becomes a pending
 		// check the player rolls; under auto the engine rolls at once and the model
@@ -979,6 +991,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		resolvedPending = nil
 		if o.parser != nil {
 			o.parser.Reset()
+			collectedCount = 0
 		}
 	}
 	result.Checks = append(result.Checks, rollResults...)
@@ -1016,6 +1029,9 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			cause = o.classifyCut(result)
 		}
 		narration, recovery, stillIncomplete = o.recoverReply(ctx, strings.Join(narrationParts, "\n\n"), cause, onChunk)
+		// The recovery pass streams its continuation through onChunk, so its
+		// segments are in the parser now and must join the turn's script.
+		drainEvents()
 		if strings.TrimSpace(narration) == "" && result.PendingCheck == nil {
 			outcome = "error"
 			failure := &harness.GenerationFailure{
