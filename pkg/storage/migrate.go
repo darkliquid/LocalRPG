@@ -22,6 +22,50 @@ var migrations = []migration{
 	{version: 7, apply: addChecksColumn},
 	{version: 8, apply: addUsageTable},
 	{version: 9, apply: addUsageScopeColumn},
+	{version: 10, apply: addTTSJobsTable},
+	{version: 11, apply: addTTSJobErrorColumn},
+}
+
+// addTTSJobErrorColumn records why a batch job last failed to progress, so the
+// manager can show the reason rather than only that a job is not moving.
+func addTTSJobErrorColumn(db *sql.DB) error {
+	exists, err := columnExists(db, "tts_jobs", "last_error")
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	if _, err := db.Exec("ALTER TABLE tts_jobs ADD COLUMN last_error TEXT NOT NULL DEFAULT ''"); err != nil {
+		return fmt.Errorf("add tts_jobs.last_error: %w", err)
+	}
+	return nil
+}
+
+// addTTSJobsTable records offline batch synthesis jobs so a backfill can resume
+// across restarts. The clip cache is the source of truth for what is done; a job
+// row tracks only what is in flight and what failed.
+func addTTSJobsTable(db *sql.DB) error {
+	const ddl = `
+	CREATE TABLE IF NOT EXISTS tts_jobs (
+		id            TEXT PRIMARY KEY,
+		game_id       TEXT NOT NULL,
+		provider      TEXT NOT NULL,
+		model         TEXT NOT NULL DEFAULT '',
+		status        TEXT NOT NULL,
+		input_uri     TEXT NOT NULL DEFAULT '',
+		request_count INTEGER NOT NULL DEFAULT 0,
+		completed     INTEGER NOT NULL DEFAULT 0,
+		failed_keys   TEXT NOT NULL DEFAULT '',
+		cost_micros   INTEGER NOT NULL DEFAULT 0,
+		created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_tts_jobs_game ON tts_jobs(game_id, status);`
+	if _, err := db.Exec(ddl); err != nil {
+		return fmt.Errorf("create tts_jobs: %w", err)
+	}
+	return nil
 }
 
 // addUsageScopeColumn lets one ledger hold both campaign rows and the shared

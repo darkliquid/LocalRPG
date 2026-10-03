@@ -158,11 +158,32 @@ var TTSPresets = map[string]TTSConfig{
 		MasterVolume: 1.0,
 	},
 
+	"fish-audio-s2-vllm": {
+		Type:         "http",
+		Endpoint:     "http://localhost:8091",
+		Model:        "fishaudio/s2-pro",
+		DefaultVoice: "default",
+		Pitch:        1.0,
+		SpeechRate:   1.0,
+		AutoPlay:     true,
+		MasterVolume: 1.0,
+	},
+
 	"elevenlabs": {
 		Type:         "builtin",
 		BuiltinName:  "elevenlabs",
 		Model:        "eleven_multilingual_v2",
 		DefaultVoice: "EXAVITQu4vr4xnSDxMaL", // "Sarah", a premade stock voice
+		Pitch:        1.0,
+		SpeechRate:   1.0,
+		MasterVolume: 1.0,
+	},
+
+	"cartesia": {
+		Type:         "builtin",
+		BuiltinName:  "cartesia",
+		Model:        "sonic-3.6",
+		DefaultVoice: "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4",
 		Pitch:        1.0,
 		SpeechRate:   1.0,
 		MasterVolume: 1.0,
@@ -223,6 +244,11 @@ var TTSPresets = map[string]TTSConfig{
 }
 
 var STTPresets = map[string]STTConfig{
+	"cartesia": {
+		Type:        "builtin",
+		BuiltinName: "cartesia",
+		Model:       "ink-whisper",
+	},
 	"web-speech": {
 		Type: "web-speech",
 	},

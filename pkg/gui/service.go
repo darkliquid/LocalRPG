@@ -33,6 +33,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/tools"
 	"github.com/darkliquid/localrpg/pkg/trace"
+	"github.com/darkliquid/localrpg/pkg/ttsbatch"
 	"gopkg.in/yaml.v3"
 )
 
@@ -70,6 +71,14 @@ type Service struct {
 	bgMu   sync.Mutex
 	bg     sync.WaitGroup
 	closed bool
+	// bgCtx is cancelled by Close, so long-lived background work (a batch poll
+	// that can wait hours) stops instead of holding shutdown open. A batch job is
+	// resumable, so cancelling it loses nothing.
+	bgCtx    context.Context
+	bgCancel context.CancelFunc
+	// batchStartMu serialises starting a backfill, so a double-click cannot
+	// submit two jobs for the same work.
+	batchStartMu sync.Mutex
 	// The turn runtime is the config-derived wiring that does not change from
 	// turn to turn. It is rebuilt only when the config revision or a source
 	// file's mtime changes, so a hand edit still takes effect next turn.
@@ -128,6 +137,7 @@ func NewService(rootDir string) *Service {
 	}
 	dirs := paths.Resolve(paths.System(), cfg.Paths, projectRoot)
 
+	bgCtx, bgCancel := context.WithCancel(context.Background())
 	svc := &Service{
 		rootDir:        rootDir,
 		resolver:       core.NewCustomPathResolver(dirs.Systems, dirs.Worlds, dirs.Games, dirs.Cache),
@@ -139,6 +149,8 @@ func NewService(rootDir string) *Service {
 		summaryPending: make(map[string]bool),
 		limits:         harness.NewLimitRegistry(),
 		exports:        newExportManager(),
+		bgCtx:          bgCtx,
+		bgCancel:       bgCancel,
 	}
 	if !projectMode {
 		if warning := paths.LegacyWarning(paths.System(), cfg.Paths); warning != "" {
@@ -174,6 +186,11 @@ func (s *Service) Close() {
 	s.bgMu.Lock()
 	s.closed = true
 	s.bgMu.Unlock()
+	// Cancel long-lived background work before waiting, so a batch poll stops
+	// promptly rather than holding shutdown open for its next interval.
+	if s.bgCancel != nil {
+		s.bgCancel()
+	}
 	s.bg.Wait()
 
 	s.mu.Lock()
@@ -368,9 +385,9 @@ func resolveWikilinks(text string, resolve func(string) string) string {
 	})
 }
 
-func segmentDTOs(segments []entity.TurnSegment, gameID string, clipKeys func(entity.TurnSegment) []string, resolve func(string) string) []SegmentDTO {
+func segmentDTOs(segments []entity.TurnSegment, gameID string, plan clipPlan, resolve func(string) string) []SegmentDTO {
 	dtos := make([]SegmentDTO, 0, len(segments))
-	for _, segment := range segments {
+	for index, segment := range segments {
 		text := resolveWikilinks(segment.Text, resolve)
 		dto := SegmentDTO{
 			Kind:      segment.Kind,
@@ -395,35 +412,93 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, clipKeys func(ent
 				dto.PortraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait", gameID, refID)
 			}
 		}
-		if clipKeys != nil {
-			// The keys come from the pipeline, so the URL a client is handed is the
-			// URL of the audio synthesis writes: one sound, one name.
-			dto.AudioURLs = clipURLs(clipKeys(segment))
+		// The keys come from the pipeline, so the URL a client is handed is the
+		// URL of the audio synthesis writes: one sound, one name. A grouped
+		// segment shares its group's key and names the group for the client.
+		if index < len(plan.segmentKeys) {
+			urls := make([]string, 0, len(plan.segmentKeys[index]))
+			for _, key := range plan.segmentKeys[index] {
+				urls = append(urls, clipURL(key))
+			}
+			dto.AudioURLs = urls
+		}
+		if index < len(plan.groupKey) {
+			dto.ClipGroup = plan.groupKey[index]
 		}
 		dtos = append(dtos, dto)
 	}
 	return dtos
 }
 
-// clipKeyResolver names a segment's clips from the shared pipeline, or nil when no
-// TTS provider is configured. Building the pipeline is cheap: a provider loads its
-// model at first synthesis, not at construction.
-func (s *Service) clipKeyResolver(cfg *config.Config, gameID string) func(entity.TurnSegment) []string {
+// clipPlan is a turn's audio plan for the DTO: the clip keys per segment (a
+// shared group key when grouped, the segment's own keys otherwise) and the group
+// list the client renders controls for.
+type clipPlan struct {
+	segmentKeys [][]string
+	groupKey    []string
+	groups      []ClipGroupDTO
+}
+
+// clipPlanFor names a turn's clips from the shared pipeline. It returns an empty
+// plan when no TTS provider is configured. Building the pipeline is cheap: a
+// provider loads its model at first synthesis, not at construction.
+func (s *Service) clipPlanFor(cfg *config.Config, gameID string, segments []entity.TurnSegment) clipPlan {
+	plan := clipPlan{}
 	if cfg.Media.TTS.Type == "" || cfg.Media.TTS.Type == "disabled" {
-		return nil
+		return plan
 	}
 	pipeline, err := s.audioPipeline()
 	if err != nil {
-		return nil
+		return plan
 	}
 	narrator := s.narratorVoiceFor(gameID, cfg)
 	voiceFor := s.voiceFor(gameID)
-	return func(segment entity.TurnSegment) []string {
+	plan.segmentKeys = make([][]string, len(segments))
+	plan.groupKey = make([]string, len(segments))
+
+	if s.groupingEnabled(cfg, pipeline) {
+		groups := pipeline.GroupClipKeys(segments, narrator, voiceFor)
+		plan.groups = make([]ClipGroupDTO, 0, len(groups))
+		for _, group := range groups {
+			plan.groups = append(plan.groups, ClipGroupDTO{
+				Key:            group.Key,
+				AudioURLs:      []string{clipURL(group.Key)},
+				SegmentIndexes: group.SegmentIndexes,
+			})
+			for _, index := range group.SegmentIndexes {
+				if index < 0 || index >= len(segments) {
+					continue
+				}
+				plan.segmentKeys[index] = []string{group.Key}
+				plan.groupKey[index] = group.Key
+			}
+		}
+		return plan
+	}
+
+	for i, segment := range segments {
 		keys, err := pipeline.SegmentClipKeys(segment, narrator, voiceFor)
 		if err != nil {
-			return nil
+			continue
 		}
-		return keys
+		plan.segmentKeys[i] = keys
+	}
+	return plan
+}
+
+// groupingEnabled reports whether a turn's audio is rendered as groups. Grouping
+// and sentence streaming are alternative strategies: a streamed sentence is a
+// cache miss for a group, so only one runs for a turn.
+func (s *Service) groupingEnabled(cfg *config.Config, pipeline *media.TTSPipeline) bool {
+	switch cfg.TTSGrouping() {
+	case "off":
+		return false
+	case "always":
+		return true
+	default:
+		// "auto" groups when sentence streaming will not run for this turn, which
+		// is the metered-provider case and every provider with streaming off.
+		return !cfg.TTSStreamSentences()
 	}
 }
 
@@ -1025,7 +1100,7 @@ func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, e
 // share it so a live turn and a replayed one are the same shape, which is what
 // lets the client render both with one code path.
 func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID string) TurnDTO {
-	clipKeys := s.clipKeyResolver(cfg, gameID)
+	plan := s.clipPlanFor(cfg, gameID, turn.Segments)
 	artAvailable := cfg.Media.Image.BuiltinFallback || cfg.Media.Image.Type != "disabled"
 
 	dto := TurnDTO{
@@ -1046,7 +1121,8 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		PendingCheck:    turn.PendingCheck,
 		HealthEffects:   healthEffectDTOs(turn.HealthEffects),
 		WorldTick:       turn.WorldTick,
-		Segments: segmentDTOs(turn.Segments, gameID, clipKeys, func(name string) string {
+		ClipGroups:      plan.groups,
+		Segments: segmentDTOs(turn.Segments, gameID, plan, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
 		}),
 	}
@@ -1542,15 +1618,9 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 // appending to the plan only what the streamed sentences did not already play, so
 // no line is heard twice and none is missed.
 func (t *TurnSession) finishTurnAudio(ctx context.Context, turn engine.Turn, plan *turnAudioPlan) {
-	for i := range turn.Segments {
-		clips, err := t.service.GetSegmentClips(ctx, t.gameID, turn.Number, i)
-		if err != nil {
-			continue
-		}
-		for _, clip := range clips {
-			plan.enqueueClip(media.ClipKeyForPath(clip), clip)
-		}
-	}
+	t.service.emitTurnClips(ctx, t.gameID, turn, false, func(clip string) {
+		plan.enqueueClip(media.ClipKeyForPath(clip), clip)
+	})
 }
 
 // GetLocationArt returns a location's scene image and its content type, drawing it
@@ -1921,48 +1991,131 @@ func (s *Service) clipPath(key string) string {
 }
 
 // GetSegmentClips synthesizes one segment on demand and returns its ordered clips,
-// reusing every clip the cache already holds.
+// reusing every clip the cache already holds. When grouping is enabled a segment
+// shares its group's clip, so regenerating one segment regenerates the group it
+// belongs to.
 func (s *Service) GetSegmentClips(ctx context.Context, gameID string, turnNumber, segmentIndex int, force ...bool) ([]string, error) {
-	turns, err := s.cachedHistory(gameID)
+	turn, err := s.findTurn(gameID, turnNumber)
 	if err != nil {
-		return nil, fmt.Errorf("load history: %w", err)
-	}
-
-	var turn *engine.Turn
-	for i := range turns {
-		if turns[i].Number == turnNumber {
-			turn = &turns[i]
-			break
-		}
-	}
-	if turn == nil {
-		return nil, fmt.Errorf("turn %d not found", turnNumber)
+		return nil, err
 	}
 	if segmentIndex < 0 || segmentIndex >= len(turn.Segments) {
 		return nil, fmt.Errorf("segment %d out of range for turn %d", segmentIndex, turnNumber)
 	}
+	isForce := len(force) > 0 && force[0]
 
 	cfg := s.configMgr.Get()
-	narratorVoice := s.narratorVoiceFor(gameID, cfg)
-
 	pipeline, err := s.audioPipeline()
 	if err != nil {
 		return nil, err
 	}
-	isForce := len(force) > 0 && force[0]
-	clips, err := pipeline.SynthesizeSegmentClips(ctx, turn.Segments[segmentIndex], narratorVoice, s.voiceFor(gameID), isForce)
+	if s.groupingEnabled(cfg, pipeline) {
+		groups := pipeline.GroupClipKeys(turn.Segments, s.narratorVoiceFor(gameID, cfg), s.voiceFor(gameID))
+		if group, ok := media.GroupForSegment(groups, segmentIndex); ok {
+			rendered, err := pipeline.SynthesizeGroupsForce(ctx, []media.ClipGroup{group}, isForce)
+			if err != nil {
+				s.noteFailure("tts", err)
+				return nil, err
+			}
+			s.noteSuccess("tts")
+			s.recordTTSUsage(gameID, turnNumber, cfg, pipeline)
+			if len(rendered) > 0 && rendered[0].Cached {
+				return []string{s.clipPath(rendered[0].Key)}, nil
+			}
+			return nil, nil
+		}
+	}
+	return s.synthesizeSegment(ctx, gameID, *turn, segmentIndex, isForce)
+}
+
+// synthesizeSegment renders one segment through the ungrouped per-segment path,
+// the fallback when grouping is off or a group failed.
+func (s *Service) synthesizeSegment(ctx context.Context, gameID string, turn engine.Turn, segmentIndex int, force bool) ([]string, error) {
+	if segmentIndex < 0 || segmentIndex >= len(turn.Segments) {
+		return nil, fmt.Errorf("segment %d out of range for turn %d", segmentIndex, turn.Number)
+	}
+	cfg := s.configMgr.Get()
+	pipeline, err := s.audioPipeline()
+	if err != nil {
+		return nil, err
+	}
+	clips, err := pipeline.SynthesizeSegmentClips(ctx, turn.Segments[segmentIndex], s.narratorVoiceFor(gameID, cfg), s.voiceFor(gameID), force)
 	if err != nil {
 		s.noteFailure("tts", err)
 		return nil, err
 	}
 	s.noteSuccess("tts")
-	// A cache hit reports nothing, so only a real synthesis is recorded.
-	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
-		if u := pipeline.LastUsage(); u.Characters != 0 || u.InputTokens != 0 || u.OutputTokens != 0 || u.Requests != 0 {
-			s.RecordUsage(gameID, turnNumber, "tts", mediaUsage(u, key, cfg.Media.TTS.Model))
+	s.recordTTSUsage(gameID, turn.Number, cfg, pipeline)
+	return clips, nil
+}
+
+// synthesizeTurnGroups renders a whole turn's groups when grouping is enabled,
+// reporting whether it did. It returns the rendered groups so a caller can fall
+// back to per-segment synthesis for any group that failed.
+func (s *Service) synthesizeTurnGroups(ctx context.Context, gameID string, turn engine.Turn, cfg *config.Config, force bool) ([]media.ClipGroup, bool, error) {
+	pipeline, err := s.audioPipeline()
+	if err != nil {
+		return nil, false, err
+	}
+	if !s.groupingEnabled(cfg, pipeline) {
+		return nil, false, nil
+	}
+	groups := pipeline.GroupClipKeys(turn.Segments, s.narratorVoiceFor(gameID, cfg), s.voiceFor(gameID))
+	rendered, err := pipeline.SynthesizeGroupsForce(ctx, groups, force)
+	if err != nil {
+		s.noteFailure("tts", err)
+	} else {
+		s.noteSuccess("tts")
+	}
+	s.recordTTSUsage(gameID, turn.Number, cfg, pipeline)
+	return rendered, true, err
+}
+
+// emitTurnClips yields a turn's clips in play order, grouped when grouping is
+// enabled and per-segment otherwise, so every consumer agrees on what a turn
+// sounds like. A group that failed falls back to per-segment synthesis so the
+// beat is not silent.
+func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.Turn, force bool, emit func(string)) {
+	cfg := s.configMgr.Get()
+	if groups, grouped, _ := s.synthesizeTurnGroups(ctx, gameID, turn, cfg, force); grouped {
+		for _, group := range groups {
+			if group.Cached {
+				emit(s.clipPath(group.Key))
+				continue
+			}
+			for _, index := range group.SegmentIndexes {
+				clips, err := s.synthesizeSegment(ctx, gameID, turn, index, false)
+				if err != nil {
+					continue
+				}
+				for _, clip := range clips {
+					emit(clip)
+				}
+			}
+		}
+		return
+	}
+	for i := range turn.Segments {
+		clips, err := s.synthesizeSegment(ctx, gameID, turn, i, force)
+		if err != nil {
+			continue
+		}
+		for _, clip := range clips {
+			emit(clip)
 		}
 	}
-	return clips, nil
+}
+
+// recordTTSUsage records what a synthesis consumed. A cache hit reports nothing,
+// so only a real synthesis is recorded.
+func (s *Service) recordTTSUsage(gameID string, turnNumber int, cfg *config.Config, pipeline *media.TTSPipeline) {
+	key, ok := media.TTSKeyFor(cfg.Media.TTS)
+	if !ok {
+		return
+	}
+	if u := pipeline.LastUsage(); u.Characters != 0 || u.InputTokens != 0 || u.OutputTokens != 0 || u.Requests != 0 {
+		s.RecordUsage(gameID, turnNumber, "tts", mediaUsage(u, key, cfg.Media.TTS.Model))
+	}
 }
 
 // audioPipeline returns the shared TTS pipeline, building it when the current
@@ -1987,6 +2140,7 @@ func (s *Service) audioPipeline() (*media.TTSPipeline, error) {
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
+	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
 	s.ttsConfig, s.ttsPipeline = cfg, pipeline
 	return pipeline, nil
 }
@@ -2067,10 +2221,19 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
+	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
 
 	voiceFor := s.voiceFor(gameID)
+	grouped := s.groupingEnabled(cfg, pipeline)
 	for _, turn := range turns {
 		if len(turn.Segments) == 0 {
+			continue
+		}
+		if grouped {
+			groups := pipeline.GroupClipKeys(turn.Segments, narratorVoice, voiceFor)
+			turnCached, turnUncached := pipeline.CountUncachedGroups(groups)
+			cached += turnCached
+			uncached += turnUncached
 			continue
 		}
 		turnCached, turnUncached := pipeline.CountUncached(turn.Segments, narratorVoice, voiceFor)
@@ -2078,6 +2241,375 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 		uncached += turnUncached
 	}
 	return cached, uncached, nil
+}
+
+// TTSBatchJobs lists a campaign's offline batch jobs, newest first.
+func (s *Service) TTSBatchJobs(gameID string) ([]TTSBatchJobDTO, error) {
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, err
+	}
+	jobs, err := store.ListTTSJobs(gameID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TTSBatchJobDTO, 0, len(jobs))
+	for _, job := range jobs {
+		dto := ttsBatchJobDTO(job)
+		dto.GameID = gameID
+		out = append(out, dto)
+	}
+	return out, nil
+}
+
+// AllTTSBatchJobs lists every campaign's batch jobs, so the global manager can
+// show and filter them by campaign.
+func (s *Service) AllTTSBatchJobs(ctx context.Context) ([]TTSBatchJobDTO, error) {
+	games, err := s.ListGames(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TTSBatchJobDTO, 0)
+	for _, game := range games {
+		store, err := s.store(game.ID)
+		if err != nil {
+			continue
+		}
+		jobs, err := store.ListTTSJobs(game.ID)
+		if err != nil {
+			continue
+		}
+		for _, job := range jobs {
+			dto := ttsBatchJobDTO(job)
+			dto.GameID = game.ID
+			dto.GameName = game.Name
+			out = append(out, dto)
+		}
+	}
+	return out, nil
+}
+
+// CancelTTSBatch cancels a submitted batch job and records it as cancelled,
+// preserving the progress it had reached.
+func (s *Service) CancelTTSBatch(ctx context.Context, gameID, jobID string) error {
+	cfg := s.configMgr.Get()
+	client, err := s.ttsClientFor(cfg.Media.TTS)
+	if err != nil {
+		return err
+	}
+	batchClient, ok := client.(media.BatchTTSClient)
+	if !ok {
+		return fmt.Errorf("the configured TTS provider has no batch API")
+	}
+	if err := batchClient.CancelBatch(ctx, media.BatchJobHandle{ID: jobID}); err != nil {
+		return err
+	}
+	store, err := s.store(gameID)
+	if err != nil {
+		return err
+	}
+	if job, err := store.GetTTSJob(jobID); err == nil && job != nil {
+		return store.UpdateTTSJobStatus(jobID, "cancelled", job.Completed, job.FailedKeys)
+	}
+	return store.UpdateTTSJobStatus(jobID, "cancelled", 0, nil)
+}
+
+// DeleteTTSBatch removes a finished batch job. An in-flight job must be
+// cancelled first, so a delete never hides work that is still running.
+func (s *Service) DeleteTTSBatch(ctx context.Context, gameID, jobID string) error {
+	store, err := s.store(gameID)
+	if err != nil {
+		return err
+	}
+	job, err := store.GetTTSJob(jobID)
+	if err != nil {
+		return err
+	}
+	if job == nil {
+		return nil
+	}
+	if batchJobActive(*job) {
+		return fmt.Errorf("batch job %s is still running; cancel it first", jobID)
+	}
+	return store.DeleteTTSJob(jobID)
+}
+
+// ClearTTSBatch removes every finished batch job, for one campaign or, when
+// gameID is empty, for all of them. It returns how many jobs it removed.
+func (s *Service) ClearTTSBatch(ctx context.Context, gameID string) (int, error) {
+	if gameID != "" {
+		store, err := s.store(gameID)
+		if err != nil {
+			return 0, err
+		}
+		return store.DeleteFinishedTTSJobs(gameID)
+	}
+
+	games, err := s.ListGames(ctx)
+	if err != nil {
+		return 0, err
+	}
+	total := 0
+	for _, game := range games {
+		store, err := s.store(game.ID)
+		if err != nil {
+			continue
+		}
+		removed, err := store.DeleteFinishedTTSJobs(game.ID)
+		if err != nil {
+			continue
+		}
+		total += removed
+	}
+	return total, nil
+}
+
+// ResumeTTSBatch finishes a job now: it polls the provider and, once the job is
+// done, downloads the output, converts it to Opus, and writes it to the cache.
+// It is how a job that never stored its clips (an output file that arrived
+// empty, an interrupted download) is completed without waiting for a restart.
+func (s *Service) ResumeTTSBatch(ctx context.Context, gameID, jobID string) (*TTSBatchJobDTO, error) {
+	cfg := s.configMgr.Get()
+	client, err := s.ttsClientFor(cfg.Media.TTS)
+	if err != nil {
+		return nil, err
+	}
+	batchClient, ok := client.(media.BatchTTSClient)
+	if !ok {
+		return nil, fmt.Errorf("the configured TTS provider has no batch API")
+	}
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, err
+	}
+	job, err := store.GetTTSJob(jobID)
+	if err != nil {
+		return nil, err
+	}
+	if job == nil {
+		return nil, fmt.Errorf("batch job %s not found", jobID)
+	}
+
+	engine := ttsbatch.New(batchClient, media.NewContentCache(s.resolver.CacheDir()), store)
+	engine.SetOpusBitrate(cfg.OpusBitrate())
+	opts := ttsbatch.Options{GameID: gameID, Provider: job.Provider, Model: job.Model}
+	s.goBackground(func() {
+		if _, err := engine.Resume(s.bgCtx, opts, jobID); err != nil {
+			trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+				"game":  gameID,
+				"job":   jobID,
+				"error": err.Error(),
+			})
+			s.noteFailure("tts", err)
+			return
+		}
+		s.noteSuccess("tts")
+	})
+
+	dto := ttsBatchJobDTO(*job)
+	dto.GameID = gameID
+	return &dto, nil
+}
+
+// StartTTSBatch submits an offline batch backfill for a campaign and finishes it
+// in the background, so the request returns at once and the panel watches the
+// job row. It returns the submitted job, or nil when every clip is already
+// cached.
+func (s *Service) StartTTSBatch(ctx context.Context, gameID string, force bool) (*TTSBatchJobDTO, error) {
+	cfg := s.configMgr.Get()
+	client, err := s.ttsClientFor(cfg.Media.TTS)
+	if err != nil {
+		return nil, err
+	}
+	batchClient, ok := client.(media.BatchTTSClient)
+	if !ok {
+		return nil, fmt.Errorf("the configured TTS provider has no batch API")
+	}
+	store, err := s.store(gameID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Starting twice must not queue two jobs for the same work: a backfill already
+	// in flight is returned as-is, so the button is idempotent.
+	s.batchStartMu.Lock()
+	defer s.batchStartMu.Unlock()
+	if existing, ok := activeBatchJob(store, gameID); ok {
+		dto := ttsBatchJobDTO(*existing)
+		dto.GameID = gameID
+		return &dto, nil
+	}
+
+	pipeline, err := s.audioPipeline()
+	if err != nil {
+		return nil, err
+	}
+	turns, err := s.cachedHistory(gameID)
+	if err != nil {
+		return nil, err
+	}
+
+	narrator := s.narratorVoiceFor(gameID, cfg)
+	voiceFor := s.voiceFor(gameID)
+	groups := make([]media.ClipGroup, 0)
+	for _, turn := range turns {
+		if len(turn.Segments) == 0 {
+			continue
+		}
+		groups = append(groups, pipeline.GroupClipKeys(turn.Segments, narrator, voiceFor)...)
+	}
+
+	providerKey := ""
+	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
+		providerKey = string(key)
+	}
+	batchEngine := ttsbatch.New(batchClient, media.NewContentCache(s.resolver.CacheDir()), store)
+	batchEngine.SetOpusBitrate(cfg.OpusBitrate())
+	opts := ttsbatch.Options{GameID: gameID, Provider: providerKey, Model: cfg.Media.TTS.Model, Force: force}
+
+	job, err := batchEngine.Submit(ctx, opts, groups)
+	if err != nil {
+		trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+			"game":     gameID,
+			"provider": providerKey,
+			"error":    err.Error(),
+		})
+		return nil, err
+	}
+	if job == nil {
+		return nil, nil
+	}
+
+	// A batch job can take hours, so it finishes in the background and the panel
+	// watches the job row rather than holding a request open. It runs on the
+	// service's background context, so closing the app cancels the poll instead of
+	// waiting it out; the job stays resumable and is picked up next launch.
+	s.goBackground(func() {
+		if _, err := batchEngine.Resume(s.bgCtx, opts, job.ID); err != nil {
+			trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+				"game":     gameID,
+				"job":      job.ID,
+				"provider": providerKey,
+				"error":    err.Error(),
+			})
+			s.noteFailure("tts", err)
+			return
+		}
+		s.noteSuccess("tts")
+	})
+
+	dto := ttsBatchJobDTO(*job)
+	return &dto, nil
+}
+
+// ResumePendingBatches finishes every unfinished batch job in the background, so
+// a job started in an earlier session is collected on the next launch without
+// the user waiting. It is safe to call once at startup; a provider with no batch
+// API makes it a no-op.
+func (s *Service) ResumePendingBatches(ctx context.Context) {
+	cfg := s.configMgr.Get()
+	client, err := s.ttsClientFor(cfg.Media.TTS)
+	if err != nil {
+		return
+	}
+	batchClient, ok := client.(media.BatchTTSClient)
+	if !ok {
+		return
+	}
+
+	providerKey := ""
+	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
+		providerKey = string(key)
+	}
+
+	games, err := s.ListGames(ctx)
+	if err != nil {
+		return
+	}
+	for _, game := range games {
+		store, err := s.store(game.ID)
+		if err != nil {
+			continue
+		}
+		jobs, err := store.ListTTSJobs(game.ID)
+		if err != nil {
+			continue
+		}
+		for _, job := range jobs {
+			if !batchJobActive(job) {
+				continue
+			}
+			// A job belongs to the provider that created it, and a different
+			// provider's client cannot poll it; leave it for when that provider is
+			// selected again.
+			if providerKey != "" && job.Provider != "" && job.Provider != providerKey {
+				continue
+			}
+			opts := ttsbatch.Options{GameID: game.ID, Provider: job.Provider, Model: job.Model}
+			engine := ttsbatch.New(batchClient, media.NewContentCache(s.resolver.CacheDir()), store)
+			engine.SetOpusBitrate(cfg.OpusBitrate())
+			trace.OrNil(s.logger).Event("media.tts.batch_resumed", map[string]interface{}{
+				"game": game.ID,
+				"job":  job.ID,
+			})
+			s.goBackground(func() {
+				if _, err := engine.Resume(s.bgCtx, opts, job.ID); err != nil {
+					trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+						"game":  game.ID,
+						"job":   job.ID,
+						"error": err.Error(),
+					})
+					s.noteFailure("tts", err)
+					return
+				}
+				s.noteSuccess("tts")
+			})
+		}
+	}
+}
+
+// batchJobActive reports whether a job is still worth working on, so a start is
+// not duplicated and a launch knows to resume it.
+func batchJobActive(job storage.TTSJob) bool {
+	switch job.Status {
+	case "queued", "processing", "processed", "downloading", "storing", "submitted", "pending", "running":
+		return true
+	case "completed", "succeeded":
+		// A job recorded as finished but short of its request count never stored
+		// everything — an output file that arrived empty, or a download that was
+		// interrupted — so it is still worth resuming.
+		return job.RequestCount > 0 && job.Completed+len(job.FailedKeys) < job.RequestCount
+	default:
+		return false
+	}
+}
+
+// activeBatchJob returns a campaign's in-flight batch job, if one exists.
+func activeBatchJob(store *storage.Store, gameID string) (*storage.TTSJob, bool) {
+	jobs, err := store.ListTTSJobs(gameID)
+	if err != nil {
+		return nil, false
+	}
+	for i := range jobs {
+		if batchJobActive(jobs[i]) {
+			return &jobs[i], true
+		}
+	}
+	return nil, false
+}
+
+// ttsBatchJobDTO maps a job row to the wire shape.
+func ttsBatchJobDTO(job storage.TTSJob) TTSBatchJobDTO {
+	return TTSBatchJobDTO{
+		ID:           job.ID,
+		Provider:     job.Provider,
+		Model:        job.Model,
+		Status:       job.Status,
+		RequestCount: job.RequestCount,
+		Completed:    job.Completed,
+		FailedKeys:   job.FailedKeys,
+		LastError:    job.LastError,
+	}
 }
 
 // findTurn reads one turn from the canonical log.
@@ -2129,15 +2661,9 @@ func (s *Service) turnClipStream(gameID string, turnNumber int, force bool) <-ch
 	go func() {
 		defer close(clips)
 		ctx := context.Background()
-		for i := range turn.Segments {
-			list, err := s.GetSegmentClips(ctx, gameID, turnNumber, i, force)
-			if err != nil {
-				continue
-			}
-			for _, path := range list {
-				clips <- path
-			}
-		}
+		s.emitTurnClips(ctx, gameID, *turn, force, func(path string) {
+			clips <- path
+		})
 	}()
 
 	return clips

@@ -47,6 +47,7 @@ import {
   ExportJob,
   ExportEvent,
   ExportCapabilities,
+  TTSBatchJob,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -531,7 +532,80 @@ export class APIClient {
 
   static async uncachedBeats(gameID: string): Promise<{ cached: number; uncached: number }> {
     const res = await fetch(`/api/game/${gameID}/tts/uncached`);
-    if (!res.ok) throw new Error(`uncachedBeats: ${res.statusText}`);
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    return res.json();
+  }
+
+  // listTTSBatchJobs returns a campaign's offline batch synthesis jobs.
+  static async listTTSBatchJobs(gameID: string): Promise<TTSBatchJob[]> {
+    const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/tts/batch`);
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    return res.json();
+  }
+
+  // startTTSBatch submits an offline backfill, or returns null when every clip
+  // is already cached. A failure carries the server's reason (a provider error,
+  // a missing key, a network fault) rather than a bare status. When force is set
+  // every clip is re-rendered, overwriting the cache. Starting while a job is
+  // already in flight returns that job rather than queueing a second one.
+  static async startTTSBatch(gameID: string, force = false): Promise<TTSBatchJob | null> {
+    const query = force ? '?force=1' : '';
+    const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/tts/batch${query}`, { method: 'POST' });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    return res.json();
+  }
+
+  // listAllTTSBatchJobs returns every campaign's offline batch jobs, for the
+  // global manager.
+  static async listAllTTSBatchJobs(): Promise<TTSBatchJob[]> {
+    const res = await fetch('/api/tts/batch');
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    return res.json();
+  }
+
+  // cancelTTSBatchJob cancels a submitted batch job.
+  static async cancelTTSBatchJob(gameID: string, jobID: string): Promise<void> {
+    const res = await fetch('/api/tts/batch/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game_id: gameID, job_id: jobID }),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+  }
+
+  // deleteTTSBatchJob removes a finished batch job.
+  static async deleteTTSBatchJob(gameID: string, jobID: string): Promise<void> {
+    const res = await fetch('/api/tts/batch/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game_id: gameID, job_id: jobID }),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+  }
+
+  // clearTTSBatchJobs removes every finished batch job, for one campaign or all,
+  // and returns how many were removed.
+  static async clearTTSBatchJobs(gameID?: string): Promise<number> {
+    const res = await fetch('/api/tts/batch/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game_id: gameID ?? '' }),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+    const body = (await res.json()) as { removed?: number };
+    return body.removed ?? 0;
+  }
+
+  // resumeTTSBatchJob polls a job now and, once it is done, downloads and stores
+  // its clips. It is how a job whose output arrived empty is completed without a
+  // restart.
+  static async resumeTTSBatchJob(gameID: string, jobID: string): Promise<TTSBatchJob | null> {
+    const res = await fetch('/api/tts/batch/resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game_id: gameID, job_id: jobID }),
+    });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
   }
 

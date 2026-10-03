@@ -264,6 +264,53 @@ func TestVoiceProfileOptionsAndMeteredRoundTrip(t *testing.T) {
 	}
 }
 
+func TestTTSConfigGroupingRoundTripAndDefaults(t *testing.T) {
+	cfg := TTSConfig{
+		Grouping:     "always",
+		MultiSpeaker: "off",
+		Limits:       &TTSLimits{MaxChars: 4000, MaxTokens: 8000, MaxSpeakers: 2},
+	}
+	encoded, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded TTSConfig
+	if err := yaml.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if decoded.Grouping != "always" || decoded.MultiSpeaker != "off" {
+		t.Errorf("grouping did not round-trip: %#v", decoded)
+	}
+	if decoded.Limits == nil || decoded.Limits.MaxChars != 4000 || decoded.Limits.MaxTokens != 8000 || decoded.Limits.MaxSpeakers != 2 {
+		t.Errorf("limits did not round-trip: %#v", decoded.Limits)
+	}
+
+	plain, err := yaml.Marshal(TTSConfig{})
+	if err != nil {
+		t.Fatalf("marshal plain: %v", err)
+	}
+	if strings.Contains(string(plain), "grouping") || strings.Contains(string(plain), "limits") {
+		t.Errorf("unset grouping and limits must be omitted, got %s", plain)
+	}
+
+	// The accessors default an unset value to "auto".
+	var empty Config
+	if empty.TTSGrouping() != "auto" || empty.TTSMultiSpeaker() != "auto" {
+		t.Errorf("expected auto defaults, got %q/%q", empty.TTSGrouping(), empty.TTSMultiSpeaker())
+	}
+	var set Config
+	set.Media.TTS.Grouping = "off"
+	set.Media.TTS.MultiSpeaker = "always"
+	if set.TTSGrouping() != "off" || set.TTSMultiSpeaker() != "always" {
+		t.Errorf("unexpected modes %q/%q", set.TTSGrouping(), set.TTSMultiSpeaker())
+	}
+	var bogus Config
+	bogus.Media.TTS.Grouping = "nonsense"
+	if bogus.TTSGrouping() != "auto" {
+		t.Errorf("expected an unrecognised mode to fall back to auto, got %q", bogus.TTSGrouping())
+	}
+}
+
 func TestTTSConfigOptionsRoundTrip(t *testing.T) {
 	cfg := TTSConfig{Options: map[string]interface{}{"stability": 0.4, "model": "eleven_multilingual_v2"}}
 	encoded, err := yaml.Marshal(cfg)
@@ -542,5 +589,43 @@ providers:
 	}
 	if got := cfg.Providers.Inworld.APIKey; got != "test-inworld-key-123" {
 		t.Errorf("cfg.Providers.Inworld.APIKey = %q, want test-inworld-key-123", got)
+	}
+}
+
+func TestCartesiaConfigAndPresets(t *testing.T) {
+	ttsPreset, ok := GetTTSPreset("cartesia")
+	if !ok {
+		t.Fatal("expected cartesia TTS preset")
+	}
+	if ttsPreset.Type != "builtin" || ttsPreset.BuiltinName != "cartesia" {
+		t.Errorf("unexpected TTS preset type/name: %+v", ttsPreset)
+	}
+	if ttsPreset.Model != "sonic-3.6" {
+		t.Errorf("unexpected TTS preset model: %s", ttsPreset.Model)
+	}
+
+	sttPreset, ok := GetSTTPreset("cartesia")
+	if !ok {
+		t.Fatal("expected cartesia STT preset")
+	}
+	if sttPreset.Type != "builtin" || sttPreset.BuiltinName != "cartesia" {
+		t.Errorf("unexpected STT preset type/name: %+v", sttPreset)
+	}
+	if sttPreset.Model != "ink-whisper" {
+		t.Errorf("unexpected STT preset model: %s", sttPreset.Model)
+	}
+
+	var root Config
+	root.Providers.Cartesia.APIKey = "sk_car_test"
+	data, err := yaml.Marshal(root)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	var unmarshaled Config
+	if err := yaml.Unmarshal(data, &unmarshaled); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
+	if unmarshaled.Providers.Cartesia.APIKey != "sk_car_test" {
+		t.Errorf("got %q, want sk_car_test", unmarshaled.Providers.Cartesia.APIKey)
 	}
 }

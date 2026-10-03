@@ -165,6 +165,23 @@ type TTSConfig struct {
 	// so the first beat is ready sooner. Nil means enabled, except for a provider
 	// the operator has marked metered.
 	StreamSentences *bool `yaml:"stream_sentences,omitempty" json:"stream_sentences,omitempty"`
+	// Grouping selects whether adjacent same-speaker segments are sent in one
+	// request: "auto" (default), "off", or "always".
+	Grouping string `yaml:"grouping,omitempty" json:"grouping,omitempty"`
+	// MultiSpeaker selects whether a run of two speakers is sent as one
+	// multi-speaker request: "auto" (default), "off", or "always".
+	MultiSpeaker string `yaml:"multi_speaker,omitempty" json:"multi_speaker,omitempty"`
+	// Limits overrides the provider's advertised per-request limits, for a
+	// proxied or self-hosted endpoint whose limits cannot be queried.
+	Limits *TTSLimits `yaml:"limits,omitempty" json:"limits,omitempty"`
+}
+
+// TTSLimits overrides a speech provider's per-request limits. A zero field keeps
+// the provider's advertised value.
+type TTSLimits struct {
+	MaxChars    int `yaml:"max_chars,omitempty" json:"max_chars,omitempty"`
+	MaxTokens   int `yaml:"max_tokens,omitempty" json:"max_tokens,omitempty"`
+	MaxSpeakers int `yaml:"max_speakers,omitempty" json:"max_speakers,omitempty"`
 }
 
 // SpeechCuesConfig controls how vocal acting and steering hints are used and rendered.
@@ -237,8 +254,9 @@ type TelemetryConfig struct {
 
 // ProvidersConfig groups shared credentials and defaults for external ecosystem providers.
 type ProvidersConfig struct {
-	Gemini  GeminiProviderConfig  `yaml:"gemini,omitempty" json:"gemini,omitempty"`
-	Inworld InworldProviderConfig `yaml:"inworld,omitempty" json:"inworld,omitempty"`
+	Gemini   GeminiProviderConfig   `yaml:"gemini,omitempty" json:"gemini,omitempty"`
+	Inworld  InworldProviderConfig  `yaml:"inworld,omitempty" json:"inworld,omitempty"`
+	Cartesia CartesiaProviderConfig `yaml:"cartesia,omitempty" json:"cartesia,omitempty"`
 	// Currency is the display currency for cost figures. Prices are expressed in
 	// this currency; no conversion is performed.
 	Currency string `yaml:"currency,omitempty" json:"currency,omitempty"`
@@ -264,6 +282,10 @@ type PriceConfig struct {
 }
 
 type GeminiProviderConfig struct {
+	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
+}
+
+type CartesiaProviderConfig struct {
 	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 }
 
@@ -704,6 +726,31 @@ func (c *Config) TTSStreamSentences() bool {
 		return *c.Media.TTS.StreamSentences
 	}
 	return !(c.Media.TTS.Metered != nil && *c.Media.TTS.Metered)
+}
+
+// TTSGrouping is the grouping policy: "auto", "off", or "always". Unset is
+// "auto", so grouping is used where a provider supports it.
+func (c *Config) TTSGrouping() string {
+	return normalizeTTSMode(c.Media.TTS.Grouping)
+}
+
+// TTSMultiSpeaker is the multi-speaker policy: "auto", "off", or "always".
+// Unset is "auto", so a two-speaker run is grouped where a provider supports it.
+func (c *Config) TTSMultiSpeaker() string {
+	return normalizeTTSMode(c.Media.TTS.MultiSpeaker)
+}
+
+// normalizeTTSMode maps a grouping or multi-speaker value to one of "auto",
+// "off", or "always". An unrecognised value is treated as "auto".
+func normalizeTTSMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "off":
+		return "off"
+	case "always":
+		return "always"
+	default:
+		return "auto"
+	}
 }
 
 // CompletionMode is the recovery policy: "auto", "continue", "trim", or "off".

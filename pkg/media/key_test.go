@@ -55,6 +55,40 @@ func TestTTSKeyForCLIIsAnInstance(t *testing.T) {
 	}
 }
 
+func TestTTSKeyForFishAudio(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  config.TTSConfig
+		want provider.Key
+		ok   bool
+	}{
+		{
+			name: "explicit fish-audio type",
+			cfg:  config.TTSConfig{Type: "fish-audio", Endpoint: "http://localhost:8091"},
+			want: provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.HostDiscriminator("http://localhost:8091")),
+			ok:   true,
+		},
+		{
+			name: "http type with fishaudio model",
+			cfg:  config.TTSConfig{Type: "http", Endpoint: "http://localhost:8091", Model: "fishaudio/s2-pro"},
+			want: provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.HostDiscriminator("http://localhost:8091")),
+			ok:   true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := media.TTSKeyFor(tc.cfg)
+			if ok != tc.ok {
+				t.Fatalf("TTSKeyFor(%+v) ok = %v, want %v", tc.cfg, ok, tc.ok)
+			}
+			if got != tc.want {
+				t.Errorf("TTSKeyFor(%+v) = %q, want %q", tc.cfg, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestSTTKeyForSkipsBrowserOnly(t *testing.T) {
 	if _, ok := media.STTKeyFor(config.STTConfig{Type: "web-speech"}); ok {
 		t.Error("web-speech must have no key")
@@ -96,3 +130,28 @@ func TestImageKeyFor(t *testing.T) {
 		}
 	}
 }
+
+func TestCartesiaKeyFor(t *testing.T) {
+	ttsCases := []config.TTSConfig{
+		{Type: "cartesia"},
+		{Type: "builtin", BuiltinName: "cartesia"},
+	}
+	for _, tc := range ttsCases {
+		got, ok := media.TTSKeyFor(tc)
+		if !ok || got != provider.KeyTTSCartesia {
+			t.Errorf("TTSKeyFor(%+v) = %q, %v; want %q, true", tc, got, ok, provider.KeyTTSCartesia)
+		}
+	}
+
+	sttCases := []config.STTConfig{
+		{Type: "cartesia"},
+		{Type: "builtin", BuiltinName: "cartesia"},
+	}
+	for _, tc := range sttCases {
+		got, ok := media.STTKeyFor(tc)
+		if !ok || got != provider.KeySTTCartesia {
+			t.Errorf("STTKeyFor(%+v) = %q, %v; want %q, true", tc, got, ok, provider.KeySTTCartesia)
+		}
+	}
+}
+

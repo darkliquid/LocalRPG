@@ -21,10 +21,14 @@ type TTSBuildPayload struct {
 // configuration has no registered adapter.
 func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 	switch cfg.Type {
+	case "fish-audio":
+		return provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.HostDiscriminator(cfg.Endpoint)), true
 	case "gemini":
 		return provider.KeyTTSGemini, true
 	case "inworld":
 		return provider.KeyTTSInworld, true
+	case "cartesia":
+		return provider.KeyTTSCartesia, true
 	case "builtin":
 		switch cfg.BuiltinName {
 		case "gemini":
@@ -37,11 +41,17 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 			return provider.KeyTTSNativeOS, true
 		case "elevenlabs":
 			return provider.KeyTTSElevenLabs, true
+		case "cartesia":
+			return provider.KeyTTSCartesia, true
 		}
 		return "", false
 	case "cli":
 		return provider.InstanceOrSelf(provider.KeyTTSPiper, provider.CommandDiscriminator(cfg.Command)), true
 	case "http":
+		lowerModel := strings.ToLower(cfg.Model)
+		if strings.Contains(lowerModel, "fishaudio") || strings.Contains(lowerModel, "s2-pro") {
+			return provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.HostDiscriminator(cfg.Endpoint)), true
+		}
 		return provider.InstanceOrSelf(provider.KeyTTSHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
 	}
 	return "", false
@@ -49,20 +59,21 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 
 // SharedProviderKey is the provider-wide credential a media client inherits when
 // its own config carries none: an Inworld adapter uses providers.inworld.api_key,
-// every other adapter keeps the Gemini key it has always used.
+// a Cartesia adapter uses providers.cartesia.api_key, and every other adapter
+// keeps the Gemini key it has always used.
 func SharedProviderKey(cfg *config.Config, key provider.Key, ok bool) string {
 	if cfg == nil {
 		return ""
 	}
-	if ok && isInworldKey(key) {
-		return cfg.Providers.Inworld.APIKey
+	if ok {
+		switch string(key.Parent()) {
+		case string(provider.KeyTTSInworld), string(provider.KeySTTInworld):
+			return cfg.Providers.Inworld.APIKey
+		case string(provider.KeyTTSCartesia), string(provider.KeySTTCartesia):
+			return cfg.Providers.Cartesia.APIKey
+		}
 	}
 	return cfg.Providers.Gemini.APIKey
-}
-
-// isInworldKey reports whether a canonical key names an Inworld adapter.
-func isInworldKey(key provider.Key) bool {
-	return strings.HasSuffix(string(key.Parent()), ":inworld")
 }
 
 // BuildTTS constructs a TTS client from the registry by ID.
@@ -93,15 +104,28 @@ type STTBuildPayload struct {
 	SharedKey string           `json:"shared_key,omitempty"`
 }
 
+// sttBuildWire carries both the nested payload and the flattened config so an
+// STT adapter can decode whichever shape it expects.
+type sttBuildWire struct {
+	config.STTConfig
+	Config    config.STTConfig `json:"config"`
+	SharedKey string           `json:"shared_key,omitempty"`
+}
+
 // STTKeyFor maps an STT configuration to its canonical key. Browser-only values
 // have no key: they never reach the server-side factory.
 func STTKeyFor(cfg config.STTConfig) (provider.Key, bool) {
 	switch cfg.Type {
 	case "inworld":
 		return provider.KeySTTInworld, true
+	case "cartesia":
+		return provider.KeySTTCartesia, true
 	case "builtin":
 		if cfg.BuiltinName == "inworld" {
 			return provider.KeySTTInworld, true
+		}
+		if cfg.BuiltinName == "cartesia" {
+			return provider.KeySTTCartesia, true
 		}
 		return "", false
 	case "http":
@@ -113,12 +137,16 @@ func STTKeyFor(cfg config.STTConfig) (provider.Key, bool) {
 }
 
 // BuildSTT constructs an STT client from the registry by ID.
-func BuildSTT(id string, cfg config.STTConfig, sharedKey string) (STTClient, error) {
+func BuildSTT(id string, cfg config.STTConfig, sharedKey ...string) (STTClient, error) {
 	reg, ok := provider.Lookup(id)
 	if !ok {
 		return nil, fmt.Errorf("media: no provider registered for %q", id)
 	}
-	raw, err := json.Marshal(STTBuildPayload{Config: cfg, SharedKey: sharedKey})
+	var sk string
+	if len(sharedKey) > 0 {
+		sk = sharedKey[0]
+	}
+	raw, err := json.Marshal(sttBuildWire{STTConfig: cfg, Config: cfg, SharedKey: sk})
 	if err != nil {
 		return nil, fmt.Errorf("media: encode %s config: %w", id, err)
 	}

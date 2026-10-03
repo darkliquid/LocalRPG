@@ -226,3 +226,73 @@ func TestGeminiTTSWrapsPCM(t *testing.T) {
 		t.Fatalf("extension = %q, want .wav", ext)
 	}
 }
+
+func TestGeminiTTSSynthesizeGroupBuildsTwoSpeakerConfig(t *testing.T) {
+	var gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"candidates": [
+				{"content": {"parts": [{"inlineData": {"data": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=", "mimeType": "audio/wav"}}], "role": "model"}}
+			]
+		}`)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	genaiClient, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:     "test-key",
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: server.Client(),
+		HTTPOptions: genai.HTTPOptions{
+			BaseURL: server.URL,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create genai client: %v", err)
+	}
+
+	ttsClient, err := ttsgemini.NewGeminiTTSClientWithClient(genaiClient, config.TTSConfig{
+		Model:        "gemini-3.8-flash-tts",
+		DefaultVoice: "Aoede",
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiTTSClientWithClient: %v", err)
+	}
+
+	_, err = ttsClient.SynthesizeGroup(ctx, []media.SpeakerLine{
+		{SpeakerID: "narrator", Label: "Narrator", Voice: &entity.VoiceConfig{VoiceID: "Aoede"}, Text: "The door opens."},
+		{SpeakerID: "garrick", Label: "Garrick", Voice: &entity.VoiceConfig{VoiceID: "Kore"}, Text: "Keep walking."},
+	})
+	if err != nil {
+		t.Fatalf("SynthesizeGroup failed: %v", err)
+	}
+	for _, want := range []string{"multiSpeakerVoiceConfig", "Narrator", "Garrick", "Aoede", "Kore", "The door opens.", "Keep walking."} {
+		if !strings.Contains(gotBody, want) {
+			t.Errorf("expected the request to contain %q, got: %s", want, gotBody)
+		}
+	}
+}
+
+func TestGeminiTTSSynthesizeGroupRejectsOneSpeaker(t *testing.T) {
+	client := ttsgemini.NewGeminiTTSClientOffline("gemini-3.8-flash-tts", "Aoede")
+	_, err := client.SynthesizeGroup(context.Background(), []media.SpeakerLine{
+		{SpeakerID: "narrator", Label: "Narrator", Text: "Alone."},
+	})
+	if err == nil {
+		t.Fatalf("expected an error for a single-speaker group")
+	}
+}
+
+func TestGeminiTTSCapabilitiesDeclareTwoSpeakers(t *testing.T) {
+	client := ttsgemini.NewGeminiTTSClientOffline("gemini-3.8-flash-tts", "Aoede")
+	caps := client.TTSCapabilities()
+	if caps.MaxSpeakers != 2 {
+		t.Errorf("MaxSpeakers = %d, want 2", caps.MaxSpeakers)
+	}
+	if !caps.SupportsGrouping || !caps.SupportsBatch || !caps.SupportsStreaming {
+		t.Errorf("unexpected capabilities %#v", caps)
+	}
+}

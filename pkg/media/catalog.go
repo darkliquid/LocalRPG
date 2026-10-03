@@ -110,6 +110,9 @@ func KeyPresentWithSharedKey(cfg config.TTSConfig, sharedKey string) bool {
 	if strings.EqualFold(strings.TrimSpace(cfg.Type), "gemini") || strings.EqualFold(strings.TrimSpace(cfg.BuiltinName), "gemini") {
 		return strings.TrimSpace(os.Getenv("GEMINI_API_KEY")) != "" || strings.TrimSpace(os.Getenv("GOOGLE_API_KEY")) != ""
 	}
+	if strings.EqualFold(strings.TrimSpace(cfg.BuiltinName), "cartesia") || strings.EqualFold(strings.TrimSpace(cfg.Type), "cartesia") {
+		return strings.TrimSpace(os.Getenv("CARTESIA_API_KEY")) != ""
+	}
 	return false
 }
 

@@ -255,12 +255,12 @@ func TestSegmentClipURLsChangeWithVoice(t *testing.T) {
 		Kind: entity.SegmentSpeech, Speaker: "Captain Kaelen", SpeakerID: "captain-kaelen", Text: "Halt!",
 	}}
 
-	first := segmentDTOs(segments, "game", clipKeysFromVoice(t, func(string) *entity.VoiceConfig {
+	first := segmentDTOs(segments, "game", clipPlanFromVoice(t, func(string) *entity.VoiceConfig {
 		return &entity.VoiceConfig{VoiceID: "af_bella"}
-	}), func(string) string { return "" })
-	second := segmentDTOs(segments, "game", clipKeysFromVoice(t, func(string) *entity.VoiceConfig {
+	}, segments), func(string) string { return "" })
+	second := segmentDTOs(segments, "game", clipPlanFromVoice(t, func(string) *entity.VoiceConfig {
 		return &entity.VoiceConfig{VoiceID: "am_adam"}
-	}), func(string) string { return "" })
+	}, segments), func(string) string { return "" })
 
 	if len(first[0].AudioURLs) != 1 || len(second[0].AudioURLs) != 1 {
 		t.Fatalf("audio_urls = %#v / %#v, want one clip each", first[0].AudioURLs, second[0].AudioURLs)
@@ -285,6 +285,18 @@ func clipKeysFromVoice(t *testing.T, voiceFor func(string) *entity.VoiceConfig) 
 		}
 		return keys
 	}
+}
+
+// clipPlanFromVoice builds an ungrouped clip plan for a turn, using the same key
+// computation the app uses.
+func clipPlanFromVoice(t *testing.T, voiceFor func(string) *entity.VoiceConfig, segments []entity.TurnSegment) clipPlan {
+	t.Helper()
+	keys := clipKeysFromVoice(t, voiceFor)
+	plan := clipPlan{segmentKeys: make([][]string, len(segments)), groupKey: make([]string, len(segments))}
+	for i, segment := range segments {
+		plan.segmentKeys[i] = keys(segment)
+	}
+	return plan
 }
 
 func TestGetEntityReadsCanonicalDatabase(t *testing.T) {
@@ -1138,10 +1150,10 @@ func TestSegmentClipURLsFollowVoiceOptions(t *testing.T) {
 	}
 
 	segments := []entity.TurnSegment{{Kind: entity.SegmentSpeech, SpeakerID: "aldric", Text: "Hello there."}}
-	before := segmentDTOs(segments, "campaign", clipKeysFromVoice(t, voiceFor), func(name string) string { return name })
+	before := segmentDTOs(segments, "campaign", clipPlanFromVoice(t, voiceFor, segments), func(name string) string { return name })
 
 	stability = 0.8
-	after := segmentDTOs(segments, "campaign", clipKeysFromVoice(t, voiceFor), func(name string) string { return name })
+	after := segmentDTOs(segments, "campaign", clipPlanFromVoice(t, voiceFor, segments), func(name string) string { return name })
 
 	if len(before[0].AudioURLs) != 1 || len(after[0].AudioURLs) != 1 {
 		t.Fatalf("audio_urls = %#v / %#v, want one clip each", before[0].AudioURLs, after[0].AudioURLs)

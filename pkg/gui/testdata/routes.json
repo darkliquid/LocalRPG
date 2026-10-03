@@ -20,6 +20,8 @@
   "/api/system/",
   "/api/systems",
   "/api/trace",
+  "/api/tts/batch",
+  "/api/tts/batch/",
   "/api/tts/inspect",
   "/api/tts/voices/search",
   "/api/usage",

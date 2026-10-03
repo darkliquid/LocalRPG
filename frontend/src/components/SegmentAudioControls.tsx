@@ -5,6 +5,8 @@ import type { TurnAudioState } from './TurnSegments';
 interface SegmentAudioControlsProps {
   state: TurnAudioState;
   message?: string;
+  // grouped marks a control that covers a whole clip group rather than one line.
+  grouped?: boolean;
   onPlay: () => void;
   onStop: () => void;
   onRegenerate: () => void;
@@ -13,12 +15,14 @@ interface SegmentAudioControlsProps {
 export const SegmentAudioControls: React.FC<SegmentAudioControlsProps> = ({
   state,
   message,
+  grouped = false,
   onPlay,
   onStop,
   onRegenerate,
 }) => {
   const generating = state === 'generating';
   const playing = state === 'playing';
+  const what = grouped ? 'this group' : 'this line';
 
   return (
     <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-lg border border-white/10 bg-stone-950/85 backdrop-blur px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
@@ -31,8 +35,8 @@ export const SegmentAudioControls: React.FC<SegmentAudioControlsProps> = ({
             ? 'text-stone-600 cursor-not-allowed'
             : 'text-stone-300 hover:text-purple-300 cursor-pointer'
         }`}
-        title="Play this line"
-        aria-label="Play this line"
+        title={`Play ${what}`}
+        aria-label={`Play ${what}`}
       >
         {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
       </button>
@@ -43,8 +47,8 @@ export const SegmentAudioControls: React.FC<SegmentAudioControlsProps> = ({
         className={`p-1 rounded transition-colors ${
           playing ? 'text-rose-400 hover:bg-rose-500/20 cursor-pointer' : 'text-stone-600 cursor-not-allowed'
         }`}
-        title="Stop this line"
-        aria-label="Stop this line"
+        title={`Stop ${what}`}
+        aria-label={`Stop ${what}`}
       >
         <Square className="w-3 h-3" />
       </button>
@@ -57,8 +61,8 @@ export const SegmentAudioControls: React.FC<SegmentAudioControlsProps> = ({
             ? 'text-stone-600 cursor-not-allowed'
             : 'text-stone-300 hover:text-amber-300 cursor-pointer'
         }`}
-        title="Regenerate this line"
-        aria-label="Regenerate this line"
+        title={`Regenerate ${what}`}
+        aria-label={`Regenerate ${what}`}
       >
         <RotateCw className="w-3 h-3" />
       </button>

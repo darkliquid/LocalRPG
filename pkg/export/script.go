@@ -60,11 +60,17 @@ type speechResolver struct {
 	pipeline *media.TTSPipeline
 	store    *storage.Store
 	narrator *entity.VoiceConfig
+	// grouped renders a turn's audio as groups, matching the app's grouping
+	// policy so the export resolves the same clip keys.
+	grouped bool
 
 	mu      sync.Mutex
 	misses  []string
 	repairs []string
 }
+
+// SetGrouped selects whether a turn's audio is rendered as groups.
+func (r *speechResolver) SetGrouped(grouped bool) { r.grouped = grouped }
 
 // noteRepair records a clip that was not in the cache's format: one that was re-encoded, or
 // one that could not be and was therefore left out.
@@ -107,6 +113,46 @@ func (r *speechResolver) SegmentAudio(ctx context.Context, segment entity.TurnSe
 	// Opus migration, or one written before a stream marked its own end - is decoded and
 	// re-encoded rather than shipped as audio a browser will refuse. The repaired file
 	// replaces the original under its key.
+	clips, total := r.checkClips(clips)
+	return clips, total, nil
+}
+
+// TurnAudio renders a turn's audio as groups, so a run of adjacent same-speaker
+// beats is synthesized once and the export resolves the same keys the app does.
+func (r *speechResolver) TurnAudio(ctx context.Context, segments []entity.TurnSegment) ([]scene.ClipGroup, error) {
+	if !r.grouped {
+		return nil, nil
+	}
+	groups := r.pipeline.GroupClipKeys(segments, r.narrator, r.voiceFor)
+	rendered, err := r.pipeline.SynthesizeGroups(ctx, groups)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]scene.ClipGroup, 0, len(rendered))
+	for _, group := range rendered {
+		if !group.Cached {
+			continue
+		}
+		clips, duration := r.checkClips([]string{r.pipeline.ClipPath(group.Key)})
+		if len(clips) == 0 {
+			continue
+		}
+		out = append(out, scene.ClipGroup{
+			Key:            group.Key,
+			AudioPaths:     clips,
+			Duration:       duration,
+			SegmentIndexes: group.SegmentIndexes,
+		})
+	}
+	return out, nil
+}
+
+// checkClips verifies each clip is the cache's one format, re-encoding a file
+// that is not and dropping one that cannot be repaired, and sums the readable
+// duration. It is shared by the per-beat and grouped paths so the two agree on
+// what a playable clip is.
+func (r *speechResolver) checkClips(clips []string) ([]string, time.Duration) {
 	checked := make([]string, 0, len(clips))
 	for _, clip := range clips {
 		data, err := os.ReadFile(clip)
@@ -129,12 +175,11 @@ func (r *speechResolver) SegmentAudio(ctx context.Context, segment entity.TurnSe
 		r.noteRepair(fmt.Sprintf("%s was re-encoded: %v", filepath.Base(clip), problem))
 		checked = append(checked, fixed)
 	}
-	clips = checked
 
 	// A clip whose length cannot be read contributes nothing rather than throwing
 	// the beat's pacing away; the beat falls back to the reading estimate.
 	var total time.Duration
-	for _, clip := range clips {
+	for _, clip := range checked {
 		data, err := os.ReadFile(clip)
 		if err != nil {
 			continue
@@ -145,7 +190,7 @@ func (r *speechResolver) SegmentAudio(ctx context.Context, segment entity.TurnSe
 		}
 		total += duration
 	}
-	return clips, total, nil
+	return checked, total
 }
 
 func (r *speechResolver) voiceFor(speakerID string) *entity.VoiceConfig {
@@ -471,7 +516,14 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		pipeline := media.NewTTSPipeline(client, cache)
 		pipeline.SetTextPolicy(media.TextPolicyFromConfig(c.config.Media.TTS))
 		pipeline.SetOpusBitrate(c.config.OpusBitrate())
-		compiler.SetSpeechResolver(NewSpeechResolver(pipeline, store, narrator))
+		pipeline.SetGroupCaps(media.ResolveGroupCaps(c.config.Media.TTS, client))
+		resolver := NewSpeechResolver(pipeline, store, narrator)
+		if grouped, ok := resolver.(*speechResolver); ok {
+			// The export has no sentence streaming to conflict with, so "auto"
+			// groups here: fewer requests for the same audio.
+			grouped.SetGrouped(c.config.TTSGrouping() != "off")
+		}
+		compiler.SetSpeechResolver(resolver)
 	}
 
 	// Portraits are always worth resolving: they are what makes an exported bundle

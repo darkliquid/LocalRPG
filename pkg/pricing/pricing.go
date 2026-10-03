@@ -69,13 +69,24 @@ func openAI(kind rune, host string) provider.Key {
 	return provider.InstanceOrSelf(base, host)
 }
 
+// BatchDiscountNumerator and BatchDiscountDenominator express a batch call's
+// price as a fraction of the interactive rate. The Gemini batch API is half
+// price; an operator can change these if a provider's discount differs.
+var (
+	BatchDiscountNumerator   Micros = 1
+	BatchDiscountDenominator Micros = 2
+)
+
 // CostMicros returns the cost of one usage record under a price. A zero price
-// yields zero, never a guess.
+// yields zero, never a guess. A batch record is priced at the batch discount.
 func CostMicros(u harness.Usage, p Price) Micros {
 	cost := Micros(u.InputTokens) * p.PerMillionInput / 1_000_000
 	cost += Micros(u.OutputTokens) * p.PerMillionOutput / 1_000_000
 	cost += Micros(u.Characters) * p.PerCharacter
 	cost += Micros(u.Requests) * p.PerRequest
+	if u.Batch && BatchDiscountDenominator != 0 {
+		cost = cost * BatchDiscountNumerator / BatchDiscountDenominator
+	}
 	return cost
 }
 

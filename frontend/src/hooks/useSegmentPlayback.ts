@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TurnSegment } from '../types';
-import { clipKeyFromURL, segmentClipURLs } from '../lib/audio';
+import { clipKeyFromURL, segmentClipURLs, segmentIsGroupLeader } from '../lib/audio';
 import { APIClient } from '../api/client';
 
 // Clip names one unit of a segment's audio and the segment it belongs to, so
@@ -41,10 +41,12 @@ export const useSegmentPlayback = (
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
 
   // The turn's clips in play order, one entry per unit of every segment, minus
-  // whatever has already been heard.
+  // whatever has already been heard. A group's clip is listed once, under its
+  // first segment, so a shared clip is not played once per segment it covers.
   const clipsFor = useCallback((): Clip[] => {
     const clips: Clip[] = [];
     (segments ?? []).forEach((segment, segmentIndex) => {
+      if (!segmentIsGroupLeader(segments, segmentIndex)) return;
       segmentClipURLs(segment).forEach((url) => {
         if (skipKeys?.has(clipKeyFromURL(url))) return;
         clips.push({ segmentIndex, url });
