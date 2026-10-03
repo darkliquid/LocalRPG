@@ -148,3 +148,36 @@ func TestSentenceStreamerNilIsSafe(t *testing.T) {
 	streamer.StopEmitting()
 	streamer.Close()
 }
+
+func TestStreamerGroupsConsecutiveSameSpeakerSegments(t *testing.T) {
+	client := &fakeSentenceTTSClient{}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, nil)
+	streamer.SetGrouping(true, media.TTSCapabilities{MaxSpeakers: 1})
+
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The hall is quiet."})
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "Cold air rushes in."})
+	streamer.Close()
+
+	if got := client.callCount(); got != 1 {
+		t.Fatalf("calls = %d, want one grouped request", got)
+	}
+}
+
+func TestStreamerGroupsPerSpeakerRun(t *testing.T) {
+	client := &fakeSentenceTTSClient{}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, nil)
+	streamer.SetGrouping(true, media.TTSCapabilities{MaxSpeakers: 1})
+	streamer.SetVoiceResolver(func(string) *entity.VoiceConfig {
+		return &entity.VoiceConfig{VoiceID: "garrick"}
+	})
+
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The hall is quiet."})
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindSpeech, Speaker: "Garrick", SpeakerID: "garrick", Text: "Keep walking."})
+	streamer.Close()
+
+	if got := client.callCount(); got != 2 {
+		t.Fatalf("calls = %d, want one request per speaker run", got)
+	}
+}

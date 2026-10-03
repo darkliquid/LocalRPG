@@ -564,7 +564,14 @@ func (p *TTSPipeline) GroupCaps() TTSCapabilities {
 // synthesizing anything, so a caller can name a clip before it exists. It
 // mirrors SegmentClipKeys for the grouped path.
 func (p *TTSPipeline) GroupClipKeys(segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) []ClipGroup {
-	groups := p.GroupPlan(segments, narratorVoice, voiceFor, p.groupCaps)
+	return p.GroupClipKeysWithCaps(segments, narratorVoice, voiceFor, p.groupCaps)
+}
+
+// GroupClipKeysWithCaps is GroupClipKeys under an explicit capability set, so a
+// caller can name the clips a live, single-speaker fold would write and match the
+// audio the streamer already produced.
+func (p *TTSPipeline) GroupClipKeysWithCaps(segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig, caps TTSCapabilities) []ClipGroup {
+	groups := p.GroupPlan(segments, narratorVoice, voiceFor, caps)
 	for i := range groups {
 		provider, model := groupKeyProvider(groups[i].Lines)
 		groups[i].Key = ComputeGroupCacheKey(provider, model, groups[i].Lines)

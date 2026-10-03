@@ -19,20 +19,17 @@ Done:
 - Stream A, Tasks A1-A2 — the streamer takes parsed segment events and voices
   speech in the speaker's profile; the session drives it from the segment
   observer instead of raw chunks.
-- Stream A, Task A3, primitive only — `media.GroupFolder` folds speaker lines
-  into groups incrementally, matching `planGroups` when no budget bites.
+- Stream A, Task A3 — grouped live audio. `media.GroupFolder` folds speaker
+  lines incrementally and reproduces `planGroups`; the streamer folds
+  consecutive same-speaker segments under the live, single-speaker caps; the
+  turn's clip plan and the synthesis fold under the same caps, so the streamed
+  clips are the clips the turn records. See
+  `2026-10-04-grouped-live-audio-design.md`.
 - Stream B, Tasks B0-B3 — a pending-check turn keeps its prose; a `@roll` under
   auto resolves and the model continues; a resolved roll is recorded once and
   reused on a retry; an ask continuation carries `ContinuationOf`.
 - Stream C — `submit_turn` and the structured submission path are gone.
   `request_check` and `propose_check` remain as the tool-based roll path.
-
-Remaining:
-
-- Stream A, Task A3, wiring — the streamer does not yet fold live audio into
-  groups, because that needs the turn's clip plan to *be* the stream's plan
-  (`clipPlanFor`, `pkg/gui/service.go`). Until then, live audio is per-sentence
-  and matches the finalise plan exactly, so nothing is synthesized twice.
 
 ## Global Constraints
 

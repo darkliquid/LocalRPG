@@ -483,8 +483,14 @@ func (s *Service) clipPlanFor(cfg *config.Config, gameID string, segments []enti
 	plan.segmentKeys = make([][]string, len(segments))
 	plan.groupKey = make([]string, len(segments))
 
-	if s.groupingEnabled(cfg, pipeline) {
-		groups := pipeline.GroupClipKeys(segments, narrator, voiceFor)
+	if s.groupingEnabled(cfg) {
+		// When the streamer ran, it folded under the live, single-speaker caps, so
+		// name the clips it wrote and make the finalise pass a cache hit.
+		caps := pipeline.GroupCaps()
+		if s.liveGrouping(cfg, pipeline) {
+			caps = media.LiveGroupCaps(caps)
+		}
+		groups := pipeline.GroupClipKeysWithCaps(segments, narrator, voiceFor, caps)
 		plan.groups = make([]ClipGroupDTO, 0, len(groups))
 		for _, group := range groups {
 			plan.groups = append(plan.groups, ClipGroupDTO{
@@ -513,20 +519,26 @@ func (s *Service) clipPlanFor(cfg *config.Config, gameID string, segments []enti
 	return plan
 }
 
-// groupingEnabled reports whether a turn's audio is rendered as groups. Grouping
-// and sentence streaming are alternative strategies: a streamed sentence is a
-// cache miss for a group, so only one runs for a turn.
-func (s *Service) groupingEnabled(cfg *config.Config, pipeline *media.TTSPipeline) bool {
-	switch cfg.TTSGrouping() {
-	case "off":
+// groupingEnabled reports whether a turn's audio is rendered as groups. "off"
+// never groups; "auto" and "always" group. The streaming fold reproduces the
+// batch plan, so a streamed turn groups live without paying twice.
+func (s *Service) groupingEnabled(cfg *config.Config) bool {
+	return cfg.TTSGrouping() != "off"
+}
+
+// streamerRuns reports whether the live pre-synthesiser runs for this turn.
+// "always" renders the whole turn in one batch and streams nothing.
+func (s *Service) streamerRuns(cfg *config.Config) bool {
+	if !cfg.TTSStreamSentences() || cfg.TTSGrouping() == "always" {
 		return false
-	case "always":
-		return true
-	default:
-		// "auto" groups when sentence streaming will not run for this turn, which
-		// is the metered-provider case and every provider with streaming off.
-		return !cfg.TTSStreamSentences()
 	}
+	return cfg.Media.TTS.Type != "" && cfg.Media.TTS.Type != "disabled"
+}
+
+// liveGrouping reports whether the streamer folds this turn's audio into groups,
+// so the turn's clip plan must use the same single-speaker fold.
+func (s *Service) liveGrouping(cfg *config.Config, pipeline *media.TTSPipeline) bool {
+	return s.streamerRuns(cfg) && s.groupingEnabled(cfg)
 }
 
 // turnToolCallDTOs renders a turn's provenance for a client.
@@ -2044,7 +2056,7 @@ func (s *Service) GetSegmentClips(ctx context.Context, gameID string, turnNumber
 	if err != nil {
 		return nil, err
 	}
-	if s.groupingEnabled(cfg, pipeline) {
+	if s.groupingEnabled(cfg) {
 		groups := pipeline.GroupClipKeys(turn.Segments, s.narratorVoiceFor(gameID, cfg), s.voiceFor(gameID))
 		if group, ok := media.GroupForSegment(groups, segmentIndex); ok {
 			rendered, err := pipeline.SynthesizeGroupsForce(ctx, []media.ClipGroup{group}, isForce)
@@ -2092,10 +2104,17 @@ func (s *Service) synthesizeTurnGroups(ctx context.Context, gameID string, turn 
 	if err != nil {
 		return nil, false, err
 	}
-	if !s.groupingEnabled(cfg, pipeline) {
+	if !s.groupingEnabled(cfg) {
 		return nil, false, nil
 	}
-	groups := pipeline.GroupClipKeys(turn.Segments, s.narratorVoiceFor(gameID, cfg), s.voiceFor(gameID))
+	// The clip plan and the synthesis must fold under the same capabilities, or
+	// the DTO names clips the finalise pass did not write. When the streamer ran,
+	// both use the live, single-speaker fold.
+	caps := pipeline.GroupCaps()
+	if s.liveGrouping(cfg, pipeline) {
+		caps = media.LiveGroupCaps(caps)
+	}
+	groups := pipeline.GroupClipKeysWithCaps(turn.Segments, s.narratorVoiceFor(gameID, cfg), s.voiceFor(gameID), caps)
 	rendered, err := pipeline.SynthesizeGroupsForce(ctx, groups, force)
 	if err != nil {
 		s.noteFailure("tts", err)
@@ -2259,7 +2278,7 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
 
 	voiceFor := s.voiceFor(gameID)
-	grouped := s.groupingEnabled(cfg, pipeline)
+	grouped := s.groupingEnabled(cfg)
 	for _, turn := range turns {
 		if len(turn.Segments) == 0 {
 			continue
