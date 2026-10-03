@@ -160,6 +160,19 @@ func TestAssembleContextAlwaysAsksForAttributableSpeech(t *testing.T) {
 	}
 }
 
+func TestAssembleTeachesTheTurnFraming(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+	result, err := assembler.Assemble(ContextRequest{Action: "I listen"})
+	if err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+	for _, want := range []string{"## TURN FORMAT", "> Kaelen: You didn't see me here.", "@persona", "@roll"} {
+		if !strings.Contains(result.Prompt, want) {
+			t.Errorf("framing prompt is missing %q", want)
+		}
+	}
+}
+
 func TestRecentTurnsAreRecalledWithinTheWindow(t *testing.T) {
 	assembler := NewContextAssembler(newTestEntityStore(t))
 

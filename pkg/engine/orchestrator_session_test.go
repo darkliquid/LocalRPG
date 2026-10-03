@@ -222,14 +222,7 @@ func (m *mockSessionAndToolModel) Stream(ctx context.Context, req harness.Genera
 		}
 		return nil
 	}
-	out <- harness.StreamChunk{
-		ToolCalls: []harness.ToolCall{{
-			ID:        "call-2",
-			Name:      "submit_turn",
-			Arguments: `{"action_verdict":{"feasibility":"uncertain","reason":"gap"},"segments":[{"kind":"narration","text":"You cleared the gap!"}]}`,
-		}},
-		Done: true,
-	}
+	out <- harness.StreamChunk{Text: "You cleared the gap!", Done: true}
 	return nil
 }
 

@@ -206,22 +206,33 @@ const narratorLabel = "Narrator"
 // clip, shared by synthesis, the GUI DTO builder and export.
 func (p *TTSPipeline) GroupPlan(segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig, caps TTSCapabilities) []ClipGroup {
 	return planGroups(segments, caps, func(segment entity.TurnSegment) (SpeakerLine, bool) {
-		speakerID, voice, spoken := p.prepareSegment(segment, narratorVoice, voiceFor)
-		if strings.TrimSpace(spoken) == "" {
-			return SpeakerLine{}, false
-		}
-		label := narratorLabel
-		if segment.Kind == entity.SegmentSpeech {
-			switch {
-			case segment.Speaker != "":
-				label = segment.Speaker
-			case speakerID != "":
-				label = speakerID
-			}
-		}
-		return SpeakerLine{SpeakerID: speakerID, Label: label, Voice: voice, Text: spoken}, true
+		return p.SegmentLine(segment, narratorVoice, voiceFor)
 	})
 }
+
+// SegmentLine builds the line a segment is grouped and voiced as: its reduced
+// text, its label, and its voice. It is the one definition of a line, so a
+// streamed group and a finalised group share a cache key.
+func (p *TTSPipeline) SegmentLine(segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (SpeakerLine, bool) {
+	speakerID, voice, spoken := p.prepareSegment(segment, narratorVoice, voiceFor)
+	if strings.TrimSpace(spoken) == "" {
+		return SpeakerLine{}, false
+	}
+	label := narratorLabel
+	if segment.Kind == entity.SegmentSpeech {
+		switch {
+		case segment.Speaker != "":
+			label = segment.Speaker
+		case speakerID != "":
+			label = speakerID
+		}
+	}
+	return SpeakerLine{SpeakerID: speakerID, Label: label, Voice: voice, Text: spoken}, true
+}
+
+// GroupText is the text a group of lines is read as, joined with a space. It is
+// what a streamed group reports as its display text.
+func GroupText(lines []SpeakerLine) string { return groupText(lines) }
 
 // planGroups is the pure grouping algorithm: it walks the segments in order,
 // extending the current group while the speaker budget and the request limit

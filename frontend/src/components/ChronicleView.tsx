@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Turn } from '../types';
+import { Turn, TurnSegment } from '../types';
 import { TurnSegments, TurnAudioState } from './TurnSegments';
 import { Sparkles } from 'lucide-react';
 import { useLightbox } from '../hooks/useLightbox';
@@ -23,7 +23,9 @@ interface ChronicleViewProps {
   onAddress?: (turnNumber: number) => void;
   turnInFlight?: boolean;
   pendingAction?: PendingAction | null;
-  streamedProse?: string;
+  // The segments parsed so far, which render in place of the raw stream while a
+  // turn runs: a control record never appears, because it produces no segment.
+  streamedSegments?: TurnSegment[];
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
   turnAudioStatus?: Record<number, { state: TurnAudioState; message?: string }>;
   segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
@@ -43,7 +45,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   onStopAudio,
   turnInFlight,
   pendingAction,
-  streamedProse,
+  streamedSegments,
   displayMode,
   turnAudioStatus = {},
   segmentAudioStatus = {},
@@ -53,12 +55,12 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
 
-  // Auto-scroll when a new turn is added, turn starts, or prose streams in
+  // Auto-scroll when a new turn is added, turn starts, or a segment streams in
   useEffect(() => {
-    if (turnInFlight || streamedProse) {
+    if (turnInFlight || (streamedSegments?.length ?? 0) > 0) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [turnInFlight, streamedProse, turns.length]);
+  }, [turnInFlight, streamedSegments, turns.length]);
 
   // Art is per scene, not per turn: it is shown when the party arrives somewhere
   // new and reused while they stay.
@@ -226,7 +228,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
       {turnInFlight && pendingAction && (
         <div className="space-y-4 pb-6 anim-fade-in">
           {/* Immediate Action Bubble */}
-          {pendingAction.text && (
+          {pendingAction.text && !(streamedSegments ?? []).some((segment) => segment.player) && (
             <div className="flex items-start gap-3 text-stone-300 text-sm font-sans italic bg-black/40 p-3.5 rounded-xl border border-purple-500/20 shadow-inner">
               <span className="text-purple-400 font-semibold uppercase tracking-wider text-xs font-sans">
                 [{pendingAction.mode || 'Action'}]
@@ -235,11 +237,10 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
             </div>
           )}
 
-          {/* Drafting feedback card or streaming prose */}
-          {streamedProse ? (
+          {/* Drafting feedback card, or the parsed segments as they arrive */}
+          {(streamedSegments?.length ?? 0) > 0 ? (
             <TurnSegments
-              segments={[{ kind: 'narration', text: streamedProse }]}
-              fallback={streamedProse}
+              segments={streamedSegments}
               onEntityClick={onWikilinkClick}
               displayMode={displayMode}
             />

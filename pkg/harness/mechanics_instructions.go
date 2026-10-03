@@ -38,7 +38,7 @@ func FormatMechanicsInstructions(spec *core.MechanicsSpec, engagement string, st
 		sb.WriteString("harm, resources, standing, or a lasting change. ")
 		sb.WriteString("State the stakes and the possible outcomes first. Do not roll for safe or trivial actions. ")
 		sb.WriteString("NPCs do not roll; resolve opposition through the protagonist's check. ")
-		sb.WriteString("Call request_check before submit_turn for any uncertain action; never narrate a resolution the engine has not given you. ")
+		sb.WriteString("Call request_check, or emit a @roll record, for any uncertain action; never narrate a resolution the engine has not given you. ")
 		sb.WriteString("Honour the outcome the engine returns.\n")
 	}
 

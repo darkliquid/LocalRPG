@@ -3,13 +3,11 @@ package engine
 import (
 	"context"
 	"testing"
-
-	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
 func TestEnsureTurnMemoriesIsIdempotent(t *testing.T) {
 	provider := &toolScriptProvider{replies: []toolReply{
-		{tools: []harness.ToolCall{{ID: "1", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"automatic","reason":"greeting"},"segments":[{"kind":"narration","text":"Kae waves."}],"personae":[{"name":"Kae","type":"character","new":true}],"memories":[{"kind":"event","entity_refs":["Kae"],"text":"Kae waved.","importance":2}]}`}}},
+		{text: "@persona {\"name\":\"Kae\",\"type\":\"character\",\"new\":true}\nKae waves.\n@memory {\"kind\":\"event\",\"entity_refs\":[\"Kae\"],\"text\":\"Kae waved.\",\"importance\":2}\n"},
 	}}
 	o, timeline := toolLoopOrchestrator(t, provider)
 	o.SetTools(&fakeExecutor{}, "yes")

@@ -22,6 +22,10 @@ type scriptedStreamProvider struct {
 	toolCalls []harness.ToolCall
 	err       error
 	block     bool
+	// chunksPerCall, when set, supplies a different chunk list for each Stream
+	// call, so a continuation can be scripted separately from the first call.
+	chunksPerCall [][]string
+	calls         int
 	// onRequest is called with each request the provider is given, so a test can
 	// assert what it was asked rather than only what it replied.
 	onRequest func(harness.GenerateRequest)
@@ -49,7 +53,16 @@ func (p *scriptedStreamProvider) Stream(ctx context.Context, req harness.Generat
 		return ctx.Err()
 	}
 
-	for _, chunk := range p.chunks {
+	chunks := p.chunks
+	if len(p.chunksPerCall) > 0 {
+		chunks = nil
+		if p.calls < len(p.chunksPerCall) {
+			chunks = p.chunksPerCall[p.calls]
+		}
+		p.calls++
+	}
+
+	for _, chunk := range chunks {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()

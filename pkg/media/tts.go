@@ -139,6 +139,15 @@ type TTSPipeline struct {
 	logger      trace.Logger
 	policy      TextPolicy
 	opusBitrate int
+	// cues are the resolved speech-cue capabilities, so the text policy honours
+	// the operator's audio-tags choice and the provider's supported set. cuesSet
+	// distinguishes "resolved to no tags" from "not resolved yet".
+	cues    SpeechCueCapabilities
+	cuesSet bool
+	// deliverTags enables sending performance tags to the provider. It is off
+	// unless the operator opts in, because a tag the provider does not honour is
+	// read aloud and a lost delivery hint is cheaper than a spoken stage direction.
+	deliverTags bool
 	// groupCaps are the capabilities grouping is planned against: the client's
 	// own declaration, overlaid with any configured limits.
 	groupCaps TTSCapabilities
@@ -194,6 +203,49 @@ func (p *TTSPipeline) SetLogger(logger trace.Logger) {
 // zero value reduces Markdown unless the client is MarkdownAware.
 func (p *TTSPipeline) SetTextPolicy(policy TextPolicy) {
 	p.policy = policy
+}
+
+// SetSpeechCues records the resolved speech-cue capabilities, so the text policy
+// honours the operator's audio-tags choice and the provider's supported set
+// rather than the provider's declaration alone.
+func (p *TTSPipeline) SetSpeechCues(caps SpeechCueCapabilities) {
+	p.cues = caps
+	p.cuesSet = true
+}
+
+// SetAudioTagDelivery enables sending performance tags to the provider. It is off
+// by default: a tag the provider does not honour is read aloud, and a lost
+// delivery hint is cheaper than a spoken stage direction. The prompt may still ask
+// for tags, so they appear in the transcript.
+func (p *TTSPipeline) SetAudioTagDelivery(enabled bool) {
+	p.deliverTags = enabled
+}
+
+// speakable reduces a segment's text for synthesis. It applies the Markdown
+// policy, then handles performance tags: none survive when audio tags are
+// disabled, and only a tag the provider lists survives when they are enabled, so
+// a stage direction is never read aloud.
+func (p *TTSPipeline) speakable(text string) string {
+	processed := reduceText(p.policy, p.client, text)
+	if !p.audioTagsEnabled() {
+		processed = StripAudioTags(processed)
+	} else {
+		processed = stripUnsupportedTags(processed, p.cues.SupportedTags)
+	}
+	return strings.TrimSpace(processed)
+}
+
+// audioTagsEnabled reports whether performance tags reach the provider. Delivery
+// is opt-in: a tag the provider does not honour is read aloud, and a lost delivery
+// hint is cheaper than a spoken stage direction.
+func (p *TTSPipeline) audioTagsEnabled() bool {
+	if !p.deliverTags {
+		return false
+	}
+	if p.cuesSet {
+		return p.cues.AudioTags
+	}
+	return ClientSupportsAudioTags(p.client)
 }
 
 // SynthesizeSegments renders every segment as a list of clips, skipping a segment
@@ -282,7 +334,7 @@ func (p *TTSPipeline) SynthesizeSegmentClips(ctx context.Context, segment entity
 // synthesising. Both synthesis and the uncached count use it, so the two can
 // never disagree about which clip a segment needs.
 func (p *TTSPipeline) prepareSegment(segment entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) (speakerID string, voice *entity.VoiceConfig, spoken string) {
-	spoken = SpeakableTextFor(p.policy, p.client, segment.Text)
+	spoken = p.speakable(segment.Text)
 	voice = narratorVoice
 	speakerID = narratorSpeaker
 
@@ -564,7 +616,14 @@ func (p *TTSPipeline) GroupCaps() TTSCapabilities {
 // synthesizing anything, so a caller can name a clip before it exists. It
 // mirrors SegmentClipKeys for the grouped path.
 func (p *TTSPipeline) GroupClipKeys(segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig) []ClipGroup {
-	groups := p.GroupPlan(segments, narratorVoice, voiceFor, p.groupCaps)
+	return p.GroupClipKeysWithCaps(segments, narratorVoice, voiceFor, p.groupCaps)
+}
+
+// GroupClipKeysWithCaps is GroupClipKeys under an explicit capability set, so a
+// caller can name the clips a live, single-speaker fold would write and match the
+// audio the streamer already produced.
+func (p *TTSPipeline) GroupClipKeysWithCaps(segments []entity.TurnSegment, narratorVoice *entity.VoiceConfig, voiceFor func(speakerID string) *entity.VoiceConfig, caps TTSCapabilities) []ClipGroup {
+	groups := p.GroupPlan(segments, narratorVoice, voiceFor, caps)
 	for i := range groups {
 		provider, model := groupKeyProvider(groups[i].Lines)
 		groups[i].Key = ComputeGroupCacheKey(provider, model, groups[i].Lines)

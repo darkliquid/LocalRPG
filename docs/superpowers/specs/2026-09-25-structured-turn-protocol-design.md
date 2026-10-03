@@ -1,5 +1,8 @@
 # Structured Turn Protocol Design
 
+> **SUPERSEDED (2026-10-03).** Replaced by
+> `2026-10-03-progressive-turn-stream-design.md`. Kept for history only.
+
 **Date:** 2026-09-25
 **Status:** Proposed
 **Scope:** Engine turn generation, GM response format, entity personae declaration, speech/narration segmentation, mechanics check interleaving, mode mapping

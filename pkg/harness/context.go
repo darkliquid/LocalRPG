@@ -222,6 +222,23 @@ func actionEchoSection(enabled bool, action string) string {
 	return actionEchoInstruction + "\n"
 }
 
+// turnFramingInstruction teaches the line framing the engine parses as the reply
+// streams: blockquote speech and @-prefixed control records.
+const turnFramingInstruction = `## TURN FORMAT
+Write the turn as prose. Mark each spoken line as a blockquote whose speaker is
+named before a colon, on its own line:
+
+> Kaelen: You didn't see me here.
+
+Emit a control record on its own line as ` + "`@type {json}`" + ` when the turn needs
+one. Records are not shown to the player:
+- ` + "`@persona {\"name\",\"type\",\"new\",\"gender\",\"pronouns\",\"role_tags\",\"description\",\"voice_hint\"}`" + ` before a new character's first line, so they can be voiced.
+- ` + "`@roll {\"actor\",\"check_kind\",\"stat\",\"stakes\",\"outcomes\"}`" + ` to ask the engine to resolve an uncertain action. It ends your reply; you will be asked to continue with the result. Never invent dice results.
+- ` + "`@state {\"entity\",\"path\",\"op\",\"value\",\"reason\"}`" + ` after a state change.
+- ` + "`@memory {\"kind\",\"entity_refs\",\"text\",\"importance\"}`" + ` to record a memory.
+- ` + "`@move {\"location\"}`" + ` to move the protagonist.
+`
+
 // buildSections composes the prompt in order. Everything a section needs is read
 // here, so trimming never re-reads the store.
 func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) {
@@ -234,7 +251,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 	var catalogueRefs []Ref
 	if len(req.Profiles) > 0 {
 		if req.OmitVoiceCatalog {
-			catalogue = "## NPC VOICES\nNew characters can be voiced dynamically. Use the search_voice_profiles and assign_voice tools to discover and assign voices, or specify voice_hint when introducing personae in submit_turn.\n\n"
+			catalogue = "## NPC VOICES\nNew characters can be voiced dynamically. Use the search_voice_profiles and assign_voice tools to discover and assign voices, or specify voice_hint on a @persona record.\n\n"
 		} else {
 			catalogue = FormatVoiceProfilesCatalog(req.Profiles) + "\n"
 			for _, p := range req.Profiles {
@@ -265,6 +282,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 		{name: "mechanics", source: "mechanics_prompt", text: mechanicsSection(req.MechanicsPrompt)},
 		{name: "lore", source: "lore_prompt", text: loreSection(req.LorePrompt)},
 		{name: "instructions", source: "speech_cues", text: FormatSpeechFormattingInstructions(req.SpeechCues) + "\n\n"},
+		{name: "framing", source: "turn_format", text: turnFramingInstruction + "\n"},
 		{name: "action_echo", source: "action_echo", text: actionEchoSection(req.ActionEcho, req.Action)},
 		{name: "canon", source: "canon", text: canonText, refs: canonRefs},
 		{name: "working_set", source: "working_set", text: workingSetText, refs: workingSetRefs, droppable: true, rank: 5},

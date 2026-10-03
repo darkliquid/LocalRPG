@@ -1,5 +1,12 @@
 # Structured GM Generation & Native Response Schema Design
 
+> **SUPERSEDED (2026-10-03).** Replaced by
+> `2026-10-03-progressive-turn-stream-design.md`. The terminal `submit_turn`
+> payload is a poor fit for data needed mid-stream (personae before speech, state
+> after a roll) and defers all segmentation to the end. The successor uses a
+> line-framed, progressively parsed turn stream instead. This document is kept for
+> history only; do not implement from it.
+
 **Date:** 2026-10-01  
 **Status:** Approved  
 **Scope:** Engine turn generation, native response schema / structured outputs, hybrid state validation, fallback extractor deprecation  

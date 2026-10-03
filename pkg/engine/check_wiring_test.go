@@ -1,13 +1,22 @@
 package engine
 
 import (
+	"context"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/trace"
 )
+
+// runLoopForTest runs one generation loop against a bare assembled context, so a
+// test can assert what the loop resolved without a full turn.
+func runLoopForTest(o *TurnOrchestrator) (streamResult, error) {
+	o.logger = trace.Nop()
+	return o.runGenerationLoop(context.Background(), &harness.AssembleResult{Prompt: "context"}, "", nil, nil, "auto", nil)
+}
 
 // rulesResolverEngine builds a JSEngine whose onCheck resolver hardcodes a
 // critical outcome, so a check resolved through it is distinguishable from the
@@ -28,7 +37,7 @@ func rulesResolverEngine(t *testing.T, store *storage.Store) *rules.JSEngine {
 func TestOrchestratorPrefersRulesResolver(t *testing.T) {
 	provider := &toolScriptProvider{replies: []toolReply{
 		{tools: []harness.ToolCall{{ID: "1", Name: "request_check", Arguments: `{"actor":"player","check_kind":"luck","stakes":"fate","outcomes":{"critical":"great","fail":"bad"}}`}}},
-		{tools: []harness.ToolCall{{ID: "2", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"uncertain","reason":"luck"},"segments":[{"kind":"narration","text":"Luck turns.","check_ref":"1"}]}`}}},
+		{text: "Luck turns."},
 	}}
 	o, _ := toolLoopOrchestrator(t, provider)
 	o.SetTools(&fakeExecutor{}, "yes")

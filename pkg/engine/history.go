@@ -56,7 +56,12 @@ type Turn struct {
 	Checks   []harness.CheckResult  `json:"checks,omitempty"`
 	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
 	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
-	Personae     []string              `json:"personae,omitempty"`
+	// ResolvesCheckRef names the pending check this turn resolved, so a retried
+	// request reuses the recorded roll instead of rolling again. ContinuationOf is
+	// the turn this one continues, so a client can present the halves as one turn.
+	ResolvesCheckRef string   `json:"resolves_check_ref,omitempty"`
+	ContinuationOf   int      `json:"continuation_of,omitempty"`
+	Personae         []string `json:"personae,omitempty"`
 	// Memories are the accepted memory records, so the timeline stays canonical
 	// and the index can be rebuilt from history.jsonl.
 	Memories []entity.Memory `json:"memories,omitempty"`

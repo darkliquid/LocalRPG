@@ -83,6 +83,12 @@ func TestStitchContinuation(t *testing.T) {
 			want:         "The old hinges groan in the wind.",
 		},
 		{
+			name:         "word boundary cut takes a space",
+			existing:     "though the figure does not fully emerge, the",
+			continuation: "whisper of its passage is enough.",
+			want:         "though the figure does not fully emerge, the whisper of its passage is enough.",
+		},
+		{
 			name:         "trailing space is not doubled",
 			existing:     "The gate stands open, and the hinges groan ",
 			continuation: "in the rising wind.",

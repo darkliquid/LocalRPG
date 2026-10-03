@@ -26,7 +26,7 @@ func TestProposeCheckEndsTheTurnPending(t *testing.T) {
 
 func TestRollingAPendingCheckResolvesAndContinues(t *testing.T) {
 	provider := &toolScriptProvider{replies: []toolReply{
-		{tools: []harness.ToolCall{{ID: "s1", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"automatic","reason":"rolled"},"segments":[{"kind":"narration","text":"You cross the bridge."}]}`}}},
+		{text: "You cross the bridge."},
 	}}
 	o, timeline := toolLoopOrchestrator(t, provider)
 	o.SetMechanicsEngagement("ask")
@@ -51,5 +51,45 @@ func TestRollingAPendingCheckResolvesAndContinues(t *testing.T) {
 	}
 	if turn.PendingCheck != nil {
 		t.Fatalf("the continuation must not be pending: %+v", turn.PendingCheck)
+	}
+	if turn.ContinuationOf != 1 {
+		t.Fatalf("ContinuationOf = %d, want the pending turn's number", turn.ContinuationOf)
+	}
+}
+
+func TestARetriedRollReusesTheRecordedResult(t *testing.T) {
+	provider := &toolScriptProvider{replies: []toolReply{
+		{text: "You cross."},
+		{text: "You cross again."},
+	}}
+	o, timeline := toolLoopOrchestrator(t, provider)
+	o.SetMechanicsEngagement("ask")
+	o.SetTools(&fakeExecutor{}, "yes")
+
+	pending := &harness.PendingCheck{
+		Ref:        "p1",
+		ProposedBy: "gm",
+		Request:    harness.CheckRequest{Actor: "player", CheckKind: "skill", Stakes: "the bridge"},
+	}
+	if err := timeline.history.AppendTurn(Turn{Number: 1, Mode: "Do", PendingCheck: pending}); err != nil {
+		t.Fatal(err)
+	}
+
+	o.SetPendingCheckRef("p1")
+	first, err := o.ProcessActionStream(context.Background(), "Roll", "roll", nil)
+	if err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	o.SetPendingCheckRef("p1")
+	second, err := o.ProcessActionStream(context.Background(), "Roll", "roll", nil)
+	if err != nil {
+		t.Fatalf("second: %v", err)
+	}
+
+	if len(first.Checks) != 1 || len(second.Checks) != 1 {
+		t.Fatalf("checks = %v / %v", first.Checks, second.Checks)
+	}
+	if first.Checks[0].CheckID != second.Checks[0].CheckID || first.Checks[0].Outcome != second.Checks[0].Outcome {
+		t.Fatalf("a retry re-rolled: %+v vs %+v", first.Checks[0], second.Checks[0])
 	}
 }

@@ -47,30 +47,31 @@ func TestSegmentDTOsLeaveUngroupedSegmentsUnnamed(t *testing.T) {
 
 func boolPointer(v bool) *bool { return &v }
 
-func TestGroupingEnabledFollowsPolicyAndStreaming(t *testing.T) {
+func TestGroupingAndStreamingPolicy(t *testing.T) {
 	svc := &Service{}
 	cases := []struct {
-		name     string
-		grouping string
-		stream   *bool
-		metered  *bool
-		want     bool
+		name       string
+		grouping   string
+		stream     *bool
+		wantGroup  bool
+		wantStream bool
 	}{
-		{name: "off", grouping: "off", want: false},
-		{name: "always", grouping: "always", stream: boolPointer(true), want: true},
-		{name: "auto with streaming", grouping: "auto", stream: boolPointer(true), want: false},
-		{name: "auto without streaming", grouping: "auto", stream: boolPointer(false), want: true},
-		{name: "auto metered", grouping: "auto", metered: boolPointer(true), want: true},
-		{name: "auto default streams", grouping: "auto", want: false},
+		{name: "off never groups", grouping: "off", stream: boolPointer(true), wantGroup: false, wantStream: true},
+		{name: "always groups without streaming", grouping: "always", stream: boolPointer(true), wantGroup: true, wantStream: false},
+		{name: "auto groups and streams", grouping: "auto", stream: boolPointer(true), wantGroup: true, wantStream: true},
+		{name: "auto without streaming still groups", grouping: "auto", stream: boolPointer(false), wantGroup: true, wantStream: false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := &config.Config{}
 			cfg.Media.TTS.Grouping = tc.grouping
 			cfg.Media.TTS.StreamSentences = tc.stream
-			cfg.Media.TTS.Metered = tc.metered
-			if got := svc.groupingEnabled(cfg, nil); got != tc.want {
-				t.Errorf("groupingEnabled = %v, want %v", got, tc.want)
+			cfg.Media.TTS.Type = "builtin"
+			if got := svc.groupingEnabled(cfg); got != tc.wantGroup {
+				t.Errorf("groupingEnabled = %v, want %v", got, tc.wantGroup)
+			}
+			if got := svc.streamerRuns(cfg); got != tc.wantStream {
+				t.Errorf("streamerRuns = %v, want %v", got, tc.wantStream)
 			}
 		})
 	}
