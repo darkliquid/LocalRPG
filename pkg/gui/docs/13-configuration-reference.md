@@ -38,6 +38,7 @@ choose; the ledger and provider identifiers are listed in the
 | Key | Type |
 | --- | --- |
 | `providers.gemini.api_key` | string |
+| `providers.inworld.api_key` | string |
 | `providers.currency` | string |
 | `providers.prices[].provider` | string |
 | `providers.prices[].model` | string |

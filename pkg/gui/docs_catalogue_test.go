@@ -210,6 +210,9 @@ func sttConfigFromPreset(preset provider.Preset) config.STTConfig {
 	if v, ok := preset.Config["type"].(string); ok {
 		cfg.Type = v
 	}
+	if v, ok := preset.Config["builtin_name"].(string); ok {
+		cfg.BuiltinName = v
+	}
 	if v, ok := preset.Config["command"].(string); ok {
 		cfg.Command = v
 	}

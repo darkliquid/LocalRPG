@@ -38,6 +38,7 @@ that key.
 | --- | --- | --- | --- |
 | `llm:cli` | cli | `llm:cli@llama-cli` | `claude-cli`, `llama-cli` |
 | `llm:gemini` | gemini | `llm:gemini` | `gemini-3.8-flash` |
+| `llm:inworld` | http | `llm:inworld` | `inworld/compare-frontier-models` |
 | `llm:narrative-oracle` | builtin | `llm:narrative-oracle` | `narrative-oracle` |
 | `llm:openaichat` | http | `llm:openaichat@localhost:11434` | `default`, `gpt-4`, `llama3.2` |
 
@@ -48,6 +49,7 @@ that key.
 | `tts:elevenlabs` | http | `tts:elevenlabs` | `eleven_multilingual_v2` |
 | `tts:gemini` | gemini | `tts:gemini` | `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`, `gemini-3.1-flash-tts-preview`, `gemini-3.8-flash-lite-tts`, `gemini-3.8-flash-tts` |
 | `tts:http` | http | `tts:http@localhost:8880` | `alltalk`, `kokoro`, `tts-1` |
+| `tts:inworld` | http | `tts:inworld` | `inworld-tts-2` |
 | `tts:native-os` | builtin | `tts:native-os` | `native-os` |
 | `tts:piper` | cli | `tts:piper@piper` | `piper` |
 | `tts:sherpa-onnx` | builtin | `tts:sherpa-onnx` | `sherpa-onnx` |
@@ -56,6 +58,7 @@ that key.
 
 | Provider ID | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- |
+| `stt:inworld` | http | `stt:inworld` | `inworld/inworld-stt-1` |
 | `stt:web-speech` | builtin | `not reported` | `web-speech` |
 | `stt:whisper-cli` | cli | `stt:whisper-cli@whisper-cli` | `whisper-cli` |
 | `stt:whisper-http` | http | `stt:whisper-http@localhost:8000` | `whisper-1` |
