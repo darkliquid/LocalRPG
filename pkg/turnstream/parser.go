@@ -249,6 +249,12 @@ func (p *Parser) declarePersona(rec Record) {
 	}
 	if id := entity.Slugify(decl.Name); id != "" {
 		p.roster.Declare(strings.TrimSpace(decl.Name), id)
+		if prev := strings.TrimSpace(decl.PreviousIdentity()); prev != "" {
+			p.roster.Declare(prev, id)
+			if prevSlug := entity.Slugify(prev); prevSlug != "" {
+				p.roster.Declare(prevSlug, id)
+			}
+		}
 		if pr, ok := p.roster.(interface {
 			DeclarePersona(id string, decl harness.PersonaDecl)
 		}); ok {

@@ -1,5 +1,7 @@
 package harness
 
+import "strings"
+
 // ActionFeasibility is the GM's verdict on the player's action.
 type ActionFeasibility string
 
@@ -21,12 +23,30 @@ type PersonaDecl struct {
 	Name        string   `json:"name"`
 	Type        string   `json:"type"`
 	New         bool     `json:"new,omitempty"`
+	Reveals     string   `json:"reveals,omitempty"`
+	Replaces    string   `json:"replaces,omitempty"`
+	Identifies  string   `json:"identifies,omitempty"`
 	Gender      string   `json:"gender,omitempty"`
 	Pronouns    string   `json:"pronouns,omitempty"`
 	RoleTags    []string `json:"role_tags,omitempty"`
 	Description string   `json:"description,omitempty"`
 	VoiceHint   string   `json:"voice_hint,omitempty"`
 }
+
+// PreviousIdentity returns the generic or earlier name this persona reveals or replaces, if any.
+func (p PersonaDecl) PreviousIdentity() string {
+	if p.Reveals != "" {
+		return strings.TrimSpace(p.Reveals)
+	}
+	if p.Replaces != "" {
+		return strings.TrimSpace(p.Replaces)
+	}
+	if p.Identifies != "" {
+		return strings.TrimSpace(p.Identifies)
+	}
+	return ""
+}
+
 
 // MemoryDecl is a narrative memory the GM attaches to entities.
 type MemoryDecl struct {

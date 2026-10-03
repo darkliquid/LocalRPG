@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/turnstream"
 )
@@ -181,3 +182,80 @@ func TestRecordLinesAreStrippedFromNarration(t *testing.T) {
 		t.Fatalf("narration = %q", turn.Narration)
 	}
 }
+
+func TestFinaliseAttributesUnseededSpeakerWithBlockquote(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"The docks are quiet.\n\n> Kaelen: You didn't see me here.\n"}}
+	orchestrator, _, _ := streamingOrchestrator(t, provider)
+	// Do NOT seed kaelen in store! Test that dynamic resolution attributes Kaelen.
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I wait.", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+	if len(turn.Segments) != 2 || turn.Segments[1].Kind != entity.SegmentSpeech || turn.Segments[1].SpeakerID != "kaelen" {
+		t.Fatalf("segments = %#v, want unseeded kaelen attributed as speech", turn.Segments)
+	}
+}
+
+func TestFinaliseRescuesTrappedDialogueFromNarration(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"Kaelen pauses. \"We cannot stay here.\" He looks back.\n"}}
+	orchestrator, _, _ := streamingOrchestrator(t, provider)
+
+	extractorModel := &mockTimelineModel{
+		response: `{"entities":[],"dialogue":[{"speaker":"Kaelen","text":"We cannot stay here."}]}`,
+	}
+	orchestrator.SetExtractor(harness.NewExtractor(extractorModel))
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I wait.", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+
+	foundSpeech := false
+	for _, seg := range turn.Segments {
+		if seg.Kind == entity.SegmentSpeech && seg.SpeakerID == "kaelen" && seg.Text == "We cannot stay here." {
+			foundSpeech = true
+			break
+		}
+	}
+	if !foundSpeech {
+		t.Fatalf("expected extracted dialogue to be rescued as speech segment, got segments: %#v", turn.Segments)
+	}
+}
+
+func TestTurnStreamRevealsRemapsEarlierSegments(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{
+		"> Unknown Voice: \"Who goes there?\"\n\n" +
+			"A figure steps from the shadow.\n\n" +
+			"@persona {\"name\":\"Doctor Cain\",\"reveals\":\"Unknown Voice\",\"type\":\"character\"}\n" +
+			"> Doctor Cain: \"I am Cain.\"\n",
+	}}
+	orchestrator, _, store := streamingOrchestrator(t, provider)
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I listen.", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+
+	// Earlier segment should be remapped to doctor-cain
+	if len(turn.Segments) < 3 {
+		t.Fatalf("expected at least 3 segments, got %#v", turn.Segments)
+	}
+	if turn.Segments[0].Kind != entity.SegmentSpeech || turn.Segments[0].SpeakerID != "doctor-cain" {
+		t.Errorf("first speech segment speakerID = %q, want doctor-cain", turn.Segments[0].SpeakerID)
+	}
+	if turn.Segments[2].Kind != entity.SegmentSpeech || turn.Segments[2].SpeakerID != "doctor-cain" {
+		t.Errorf("second speech segment speakerID = %q, want doctor-cain", turn.Segments[2].SpeakerID)
+	}
+
+	// Check store has doctor-cain with Unknown Voice alias
+	ent, err := store.GetEntity("doctor-cain")
+	if err != nil || ent == nil {
+		t.Fatalf("expected doctor-cain in store, err: %v", err)
+	}
+	if len(ent.Aliases) == 0 || ent.Aliases[0] != "Unknown Voice" {
+		t.Errorf("doctor-cain aliases = %v, want Unknown Voice", ent.Aliases)
+	}
+}
+
+

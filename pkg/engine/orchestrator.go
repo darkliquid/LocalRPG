@@ -155,6 +155,15 @@ func (o *TurnOrchestrator) SetSegmentObserver(observer func(turnstream.Event)) {
 	o.segmentObserver = observer
 }
 
+// Voice returns the voice assigned to a speaker entity, checking the live roster
+// before falling back to store notes.
+func (o *TurnOrchestrator) Voice(speakerID string) *entity.VoiceConfig {
+	if o == nil || o.roster == nil {
+		return nil
+	}
+	return o.roster.Voice(speakerID)
+}
+
 // observeSegments forwards parsed events, if a sink is attached.
 func (o *TurnOrchestrator) observeSegments(events []turnstream.Event) {
 	if o.segmentObserver == nil {
@@ -1196,12 +1205,41 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	// The streamed reply was parsed as it arrived, across every continuation; its
 	// events are the turn's playback script. A reply with no framing at all falls
-	// back to the legacy prose parser plus the extractor.
+	// back to the legacy prose parser plus the extractor. Any dialogue that slipped
+	// through stream parsing as narration is rescued using extractor attributions.
 	events := collected
 	if parsed := segmentsFromEvents(events); len(parsed) > 0 {
 		turn.Segments = parsed
+		if len(extraction.Dialogue) > 0 {
+			resolve := func(candidate string) (string, bool) {
+				if o.roster != nil {
+					if id, ok := o.roster.Resolve(candidate); ok {
+						return id, true
+					}
+				}
+				if id := harness.ResolveSpeakerID(o.store, candidate); id != "" {
+					return id, true
+				}
+				return proposedSpeakerID(extraction.Entities, candidate)
+			}
+			turn.Segments = mergeAttributions(turn.Segments, extraction.Dialogue, resolve)
+		}
 	} else {
 		turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
+	}
+
+	// Remap earlier segments if a declared persona revealed an earlier identity.
+	for _, persona := range personae {
+		if id := entity.Slugify(persona.Name); id != "" {
+			if prev := strings.TrimSpace(persona.PreviousIdentity()); prev != "" {
+				prevSlug := entity.Slugify(prev)
+				for i := range turn.Segments {
+					if turn.Segments[i].SpeakerID == prevSlug || turn.Segments[i].Speaker == prev {
+						turn.Segments[i].SpeakerID = id
+					}
+				}
+			}
+		}
 	}
 
 	// A resolved roll's outcome is narrated after the prose that led to it, so the

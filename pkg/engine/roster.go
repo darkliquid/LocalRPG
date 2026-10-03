@@ -18,6 +18,7 @@ type roster struct {
 	byKey    map[string]string
 	personae map[string]harness.PersonaDecl
 	profiles []config.VoiceProfile
+	dynamic  bool
 }
 
 // newRoster seeds the roster from the store, the player, and configured voice profiles.
@@ -27,6 +28,7 @@ func newRoster(store *storage.Store, playerID, playerName string, profiles ...[]
 		store:    store,
 		byKey:    map[string]string{},
 		personae: map[string]harness.PersonaDecl{},
+		dynamic:  true,
 	}
 	if len(profiles) > 0 {
 		r.profiles = profiles[0]
@@ -54,12 +56,29 @@ func (r *roster) Resolve(name string) (string, bool) {
 	if r == nil {
 		return "", false
 	}
-	key := strings.ToLower(strings.TrimSpace(name))
+	clean := strings.TrimSpace(entity.WikilinkTarget(strings.Trim(name, "*_\"'“”‘’")))
+	if clean == "" {
+		return "", false
+	}
+	key := strings.ToLower(clean)
 	if id, ok := r.byKey[key]; ok {
 		return id, true
 	}
-	if slug := entity.Slugify(name); slug != "" {
+	if slug := entity.Slugify(clean); slug != "" {
 		if id, ok := r.byKey[slug]; ok {
+			return id, true
+		}
+	}
+	if r.store != nil {
+		if id := harness.ResolveSpeakerID(r.store, clean); id != "" {
+			r.Declare(clean, id)
+			return id, true
+		}
+	}
+	if r.dynamic && isValidSpeakerName(clean) {
+		id := entity.Slugify(clean)
+		if id != "" {
+			r.Declare(clean, id)
 			return id, true
 		}
 	}
@@ -87,10 +106,17 @@ func (r *roster) DeclarePersona(id string, decl harness.PersonaDecl) {
 		return
 	}
 	r.personae[id] = decl
+	if prev := strings.TrimSpace(decl.PreviousIdentity()); prev != "" {
+		r.Declare(prev, id)
+		if slug := entity.Slugify(prev); slug != "" {
+			r.Declare(slug, id)
+		}
+	}
 }
 
 // Voice returns the voice assigned to an entity, or nil. It reads the entity's
-// own voice from the store, falling back to persona declaration with gender-matched voice.
+// own voice from the store, falling back to persona declaration with gender-matched voice,
+// and finally to deterministic profile assignment.
 func (r *roster) Voice(id string) *entity.VoiceConfig {
 	if r == nil {
 		return nil
@@ -112,5 +138,95 @@ func (r *roster) Voice(id string) *entity.VoiceConfig {
 		harness.AssignVoiceProfile(temp, r.profiles)
 		return temp.Voice
 	}
+	if len(r.profiles) > 0 && id != "" {
+		temp := &entity.Entity{
+			ID:   id,
+			Name: id,
+			Type: "character",
+		}
+		harness.AssignVoiceProfile(temp, r.profiles)
+		return temp.Voice
+	}
 	return nil
 }
+
+// isValidSpeakerName reports whether a string looks like a genuine character or
+// speaker name rather than prose, punctuation, or a system tag.
+func isValidSpeakerName(raw string) bool {
+	name := strings.TrimSpace(raw)
+	name = strings.Trim(name, "*_\"'“”‘’")
+	if len(name) < 2 || len(name) > 40 {
+		return false
+	}
+
+	// Must not contain punctuation that indicates sentence structure or markdown markup.
+	if strings.ContainsAny(name, "!?;\n\t\r{}[]<>|`~@#$%^&*()=+") {
+		return false
+	}
+	if strings.Contains(name, ",") {
+		return false
+	}
+
+	// Handle periods: allow common titles (e.g. Dr., Mr.), but reject sentence-ending periods
+	// or arbitrary abbreviations.
+	if strings.Contains(name, ".") {
+		allowed := false
+		for _, title := range []string{"dr.", "mr.", "mrs.", "ms.", "prof.", "st.", "sgt.", "cpl.", "lt.", "capt.", "gen.", "col."} {
+			if strings.HasPrefix(strings.ToLower(name), title) {
+				rest := strings.TrimSpace(name[len(title):])
+				if !strings.Contains(rest, ".") {
+					allowed = true
+					break
+				}
+			}
+		}
+		if !allowed {
+			return false
+		}
+	}
+
+	lower := strings.ToLower(name)
+
+	// Blocked system / meta keywords and transition words.
+	keywords := []string{
+		"note", "warning", "caution", "tip", "important", "turn", "status", "location",
+		"scene", "gm", "narrator", "directive", "roll", "check", "action", "outcome",
+		"chapter", "act", "part", "summary", "recap", "inventory", "quest", "stats",
+		"suddenly", "meanwhile", "however", "finally", "afterward", "afterwards", "later",
+	}
+	for _, kw := range keywords {
+		if lower == kw || strings.HasPrefix(lower, kw+" ") {
+			return false
+		}
+	}
+
+	// Sentence-starting conjunctions, prepositions, or pronouns that precede a colon in prose.
+	clauseStarters := []string{
+		"as ", "when ", "then ", "if ", "while ", "after ", "before ", "because ", "since ",
+		"although ", "though ", "where ", "why ", "how ", "what ", "who ", "which ", "there ",
+		"here ", "it ", "they ", "he ", "she ", "you ", "we ", "i ", "meanwhile ", "suddenly ",
+		"slowly ", "quietly ", "looking ", "standing ", "turning ", "walking ", "running ",
+		"reaching ", "drawing ", "stepping ",
+	}
+	for _, starter := range clauseStarters {
+		if strings.HasPrefix(lower, starter) {
+			return false
+		}
+	}
+
+	// Dialogue speech verbs.
+	speechVerbs := []string{
+		" said", " says", " asked", " asks", " replied", " replies", " declared", " declares",
+		" shouted", " shouts", " whispered", " whispers", " cried", " cries", " called", " calls",
+		" yelled", " yells", " muttered", " mutters", " barked", " barks", " snapped", " snaps",
+		" hissed", " hisses", " growled", " growls",
+	}
+	for _, verb := range speechVerbs {
+		if strings.Contains(lower, verb) {
+			return false
+		}
+	}
+
+	return true
+}
+

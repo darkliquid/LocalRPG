@@ -1653,6 +1653,18 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		plan.enqueueClip(speech.AudioKey, t.service.clipPath(speech.AudioKey))
 		_ = announce(speechEvent(speech))
 	})
+	if streamer != nil {
+		baseVoiceFor := t.service.voiceFor(t.gameID)
+		streamer.SetVoiceResolver(func(speakerID string) *entity.VoiceConfig {
+			if v := t.orchestrator.Voice(speakerID); v != nil {
+				return v
+			}
+			if baseVoiceFor != nil {
+				return baseVoiceFor(speakerID)
+			}
+			return nil
+		})
+	}
 	streamer.SetTurnNumber(turnNum)
 	streamer.SetProgressObserver(func(progress AudioProgressDTO) {
 		_ = announce(TurnEvent{Type: "audio_progress", AudioProgress: &progress})

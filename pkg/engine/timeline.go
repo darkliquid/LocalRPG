@@ -196,6 +196,74 @@ func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity
 			}
 			ent.Body = persona.Description
 		}
+
+		if prev := strings.TrimSpace(persona.PreviousIdentity()); prev != "" {
+			ent.Aliases = appendUnique(ent.Aliases, prev)
+			prevSlug := entity.Slugify(prev)
+			if prevSlug != "" && prevSlug != id {
+				ent.Aliases = appendUnique(ent.Aliases, prevSlug)
+			}
+			var prevEnt *entity.Entity
+			if prevSlug != "" {
+				if p, ok := pending[prevSlug]; ok {
+					prevEnt = p
+				} else if existing, err := t.store.GetEntity(prevSlug); err == nil && existing != nil {
+					prevEnt = existing
+				}
+			}
+			if prevEnt == nil && t.store != nil {
+				if matchID := harness.ResolveSpeakerID(t.store, prev); matchID != "" {
+					if existing, err := t.store.GetEntity(matchID); err == nil && existing != nil {
+						prevEnt = existing
+					}
+				}
+			}
+
+			if prevEnt != nil && prevEnt.ID != ent.ID {
+				ent.Aliases = appendUnique(ent.Aliases, prevEnt.Name)
+				ent.Aliases = appendUnique(ent.Aliases, prevEnt.Aliases...)
+				ent.Tags = appendUnique(ent.Tags, prevEnt.Tags...)
+				if ent.Voice == nil && prevEnt.Voice != nil {
+					ent.Voice = prevEnt.Voice
+				}
+				if ent.Portrait == "" && prevEnt.Portrait != "" {
+					ent.Portrait = prevEnt.Portrait
+					ent.PortraitVersion = prevEnt.PortraitVersion
+					ent.PortraitHistory = appendUnique(ent.PortraitHistory, prevEnt.PortraitHistory...)
+				}
+				if strings.TrimSpace(ent.Body) == "" {
+					ent.Body = prevEnt.Body
+				}
+				ent.History = appendUniqueInts(ent.History, prevEnt.History...)
+
+				// Remove previous entity from pending so it's not rewritten.
+				delete(pending, prevEnt.ID)
+				if prevSlug != "" {
+					delete(pending, prevSlug)
+				}
+
+				// Clean up previous entity from disk and store.
+				_ = os.Remove(filepath.Join(t.EntitiesDir(), prevEnt.ID+".md"))
+				if t.store != nil {
+					_ = t.store.DeleteEntity(prevEnt.ID)
+				}
+
+				// Remap mentions in turn.Entities from prevEnt.ID to ent.ID.
+				for i := range turn.Entities {
+					if turn.Entities[i].ID == prevEnt.ID || (prevSlug != "" && turn.Entities[i].ID == prevSlug) {
+						turn.Entities[i].ID = ent.ID
+					}
+				}
+
+				// Remap segments in turn.Segments from prevEnt.ID to ent.ID.
+				for i := range turn.Segments {
+					if turn.Segments[i].SpeakerID == prevEnt.ID || (prevSlug != "" && turn.Segments[i].SpeakerID == prevSlug) {
+						turn.Segments[i].SpeakerID = ent.ID
+					}
+				}
+			}
+		}
+
 		if entity.IsCharacterType(ent.Type) {
 			harness.AssignVoiceProfile(ent, t.voiceProfiles)
 		}
@@ -669,3 +737,42 @@ func (t *Timeline) ensureTurnMemories(turn *Turn) error {
 	}
 	return nil
 }
+
+// appendUnique adds strings that are not already present, preserving order.
+func appendUnique(existing []string, values ...string) []string {
+	seen := make(map[string]bool, len(existing)+len(values))
+	out := make([]string, 0, len(existing)+len(values))
+	for _, v := range existing {
+		if strings.TrimSpace(v) != "" && !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" && !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// appendUniqueInts adds ints that are not already present, preserving order.
+func appendUniqueInts(existing []int, values ...int) []int {
+	seen := make(map[int]bool, len(existing)+len(values))
+	out := make([]int, 0, len(existing)+len(values))
+	for _, v := range existing {
+		if !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+	for _, v := range values {
+		if !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+	return out
+}
+

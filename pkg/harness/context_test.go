@@ -304,6 +304,10 @@ func TestAssembleReportsEverySectionAndKeepsTheActionLast(t *testing.T) {
 	if !strings.Contains(result.Prompt, "## PLAYER ACTION") {
 		t.Errorf("expected a player action section")
 	}
+	if !strings.Contains(result.Prompt, "Format reminder: Every spoken line or dialogue beat MUST start with '> Speaker:") {
+		t.Errorf("expected format reminder in player action section")
+	}
+
 
 	names := make([]string, 0, len(result.Sections))
 	for _, section := range result.Sections {
