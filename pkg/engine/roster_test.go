@@ -3,7 +3,9 @@ package engine
 import (
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
 func TestRosterResolvesNamesSlugsAndAliases(t *testing.T) {
@@ -38,4 +40,21 @@ func TestRosterVoiceIsNilWithoutAStore(t *testing.T) {
 		t.Fatalf("nil roster voice = %#v", voice)
 	}
 	_ = entity.VoiceConfig{}
+}
+
+func TestRosterResolvesDeclaredPersonaVoiceWithGender(t *testing.T) {
+	profiles := []config.VoiceProfile{
+		{ID: "af_female", VoiceID: "af_female", Tags: []string{"female"}},
+		{ID: "am_male", VoiceID: "am_male", Tags: []string{"male"}},
+	}
+	r := newRoster(nil, "", "", profiles)
+	r.DeclarePersona("kaelen", harness.PersonaDecl{
+		Name:   "Kaelen",
+		Type:   "character",
+		Gender: "male",
+	})
+	voice := r.Voice("kaelen")
+	if voice == nil || voice.VoiceID != "am_male" {
+		t.Fatalf("expected am_male for declared male persona, got %#v", voice)
+	}
 }

@@ -505,3 +505,52 @@ func TestAssignVoiceProfileCopiesOptions(t *testing.T) {
 		t.Errorf("options = %v, want the profile's", ent.Voice.Options)
 	}
 }
+
+func TestAssignVoiceProfile_StrictGenderGating(t *testing.T) {
+	profiles := []config.VoiceProfile{
+		{ID: "af_female_1", Name: "Female One", VoiceID: "af_female_1", Tags: []string{"american", "female", "young"}},
+		{ID: "am_male_1", Name: "Male One", VoiceID: "am_male_1", Tags: []string{"american", "male", "authoritative"}},
+	}
+
+	maleChar := &entity.Entity{
+		ID:     "sir_garrow",
+		Name:   "Sir Garrow",
+		Type:   "character",
+		Gender: "male",
+		Body:   "A young knight with a stern look.",
+	}
+	AssignVoiceProfile(maleChar, profiles)
+	if maleChar.Voice == nil || maleChar.Voice.VoiceID != "am_male_1" {
+		t.Fatalf("expected male voice am_male_1 for male character, got %#v", maleChar.Voice)
+	}
+
+	femaleChar := &entity.Entity{
+		ID:     "lady_elena",
+		Name:   "Lady Elena",
+		Type:   "character",
+		Gender: "female",
+		Body:   "An authoritative scholar of magic.",
+	}
+	AssignVoiceProfile(femaleChar, profiles)
+	if femaleChar.Voice == nil || femaleChar.Voice.VoiceID != "af_female_1" {
+		t.Fatalf("expected female voice af_female_1 for female character, got %#v", femaleChar.Voice)
+	}
+}
+
+func TestAssignVoiceProfile_InfersGenderFromPronouns(t *testing.T) {
+	profiles := []config.VoiceProfile{
+		{ID: "af_female_1", Name: "Female One", VoiceID: "af_female_1", Tags: []string{"female"}},
+		{ID: "am_male_1", Name: "Male One", VoiceID: "am_male_1", Tags: []string{"male"}},
+	}
+
+	charWithoutExplicitGender := &entity.Entity{
+		ID:   "brother_thomas",
+		Name: "Brother Thomas",
+		Type: "character",
+		Body: "He walks silently through the cloisters, his hood pulled low.",
+	}
+	AssignVoiceProfile(charWithoutExplicitGender, profiles)
+	if charWithoutExplicitGender.Voice == nil || charWithoutExplicitGender.Voice.VoiceID != "am_male_1" {
+		t.Fatalf("expected inferred male voice am_male_1, got %#v", charWithoutExplicitGender.Voice)
+	}
+}

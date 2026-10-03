@@ -866,7 +866,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// attributed while the model is still writing. The roster is seeded from the
 	// store, and a persona record extends it mid-stream. The parser wraps the
 	// TTFT listener, so the client still sees each raw chunk first.
-	o.roster = newRoster(o.store, o.playerID, o.playerDisplayName())
+	o.roster = newRoster(o.store, o.playerID, o.playerDisplayName(), o.timeline.VoiceProfiles())
 	o.parser = turnstream.NewParser(o.roster)
 	if onChunk != nil {
 		inner := onChunk

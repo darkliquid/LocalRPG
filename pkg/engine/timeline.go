@@ -185,6 +185,7 @@ func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity
 				ent.State = state.NewState(nil)
 			}
 			if persona.Gender != "" {
+				ent.Gender = persona.Gender
 				ent.State.Set("gender", persona.Gender)
 			}
 			if persona.Pronouns != "" {

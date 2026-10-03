@@ -3,6 +3,7 @@ package engine
 import (
 	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -13,14 +14,23 @@ import (
 // persona record declares a speaker mid-stream, and the roster is reused when the
 // turn's segments are finalised so a newly declared speaker stays attributable.
 type roster struct {
-	store *storage.Store
-	byKey map[string]string
+	store    *storage.Store
+	byKey    map[string]string
+	personae map[string]harness.PersonaDecl
+	profiles []config.VoiceProfile
 }
 
-// newRoster seeds the roster from the store and the player. A nil store yields a
-// roster that resolves only declared speakers.
-func newRoster(store *storage.Store, playerID, playerName string) *roster {
-	r := &roster{store: store, byKey: map[string]string{}}
+// newRoster seeds the roster from the store, the player, and configured voice profiles.
+// A nil store yields a roster that resolves only declared speakers.
+func newRoster(store *storage.Store, playerID, playerName string, profiles ...[]config.VoiceProfile) *roster {
+	r := &roster{
+		store:    store,
+		byKey:    map[string]string{},
+		personae: map[string]harness.PersonaDecl{},
+	}
+	if len(profiles) > 0 {
+		r.profiles = profiles[0]
+	}
 	if store != nil {
 		if summaries, err := store.ListEntities(); err == nil {
 			for _, summary := range summaries {
@@ -70,11 +80,37 @@ func (r *roster) Declare(name, id string) {
 	}
 }
 
+// DeclarePersona adds a declared persona so their voice profile can be assigned
+// and queried mid-stream before the entity is staged or saved to store.
+func (r *roster) DeclarePersona(id string, decl harness.PersonaDecl) {
+	if r == nil || id == "" {
+		return
+	}
+	r.personae[id] = decl
+}
+
 // Voice returns the voice assigned to an entity, or nil. It reads the entity's
-// own voice, which is where an assigned profile is stored.
+// own voice from the store, falling back to persona declaration with gender-matched voice.
 func (r *roster) Voice(id string) *entity.VoiceConfig {
-	if r == nil || r.store == nil {
+	if r == nil {
 		return nil
 	}
-	return harness.ResolveSpeakerVoice(r.store, id)
+	if r.store != nil {
+		if voice := harness.ResolveSpeakerVoice(r.store, id); voice != nil {
+			return voice
+		}
+	}
+	if decl, ok := r.personae[id]; ok {
+		temp := &entity.Entity{
+			ID:          id,
+			Name:        decl.Name,
+			Type:        "character",
+			Gender:      decl.Gender,
+			Body:        decl.Description,
+			Tags:        decl.RoleTags,
+		}
+		harness.AssignVoiceProfile(temp, r.profiles)
+		return temp.Voice
+	}
+	return nil
 }

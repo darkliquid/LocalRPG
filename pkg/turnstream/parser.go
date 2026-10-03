@@ -10,6 +10,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/dialogue"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
 // Line classes.
@@ -242,14 +243,17 @@ func (p *Parser) record(line string) []Event {
 // declarePersona adds a declared character to the roster so their first line can
 // be attributed even though the persona record precedes it.
 func (p *Parser) declarePersona(rec Record) {
-	var decl struct {
-		Name string `json:"name"`
-	}
-	if err := json.Unmarshal(rec.Payload, &decl); err != nil {
+	decl, err := rec.DecodePersona()
+	if err != nil {
 		return
 	}
 	if id := entity.Slugify(decl.Name); id != "" {
 		p.roster.Declare(strings.TrimSpace(decl.Name), id)
+		if pr, ok := p.roster.(interface {
+			DeclarePersona(id string, decl harness.PersonaDecl)
+		}); ok {
+			pr.DeclarePersona(id, decl)
+		}
 	}
 }
 
