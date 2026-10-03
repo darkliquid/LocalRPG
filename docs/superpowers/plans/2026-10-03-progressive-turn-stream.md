@@ -10,6 +10,32 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-03-progressive-turn-stream-design.md`
 
+## Status (2026-10-03)
+
+Implemented and merged on `feat/progressive-turn-stream`:
+
+- Phase 1 — `pkg/turnstream` parser (Tasks 1-3).
+- Phase 2 — engine roster, parser wiring, segment observation, finalise from
+  events, record stripping (Tasks 4-7).
+- Phase 3 — GUI `segment` event and client rendering (Tasks 8-9).
+- Phase 5 — personae, memories, state, and moves from records (Task 12).
+- Phase 6 (partial) — a `@roll` record resolves under auto and narrates the
+  model's pre-committed outcome text; under ask it becomes a pending check the
+  player rolls (Task 13, single-shot only).
+- Phase 7 (partial) — the TURN FORMAT prompt instruction (Task 14).
+
+Still to do:
+
+- **Phase 4** — grouped streaming TTS (Tasks 10-11). The streamer still voices
+  narration only, one request per sentence.
+- **Phase 6, continuation loop** — chained rolls and a model continuation after a
+  roll (Task 13's loop), and appending an ask continuation into the same stored
+  turn.
+- **Phase 7, removal** — delete `submit_turn` and the turn-tool surface
+  (Task 15). Until then the tool is still offered and the structured path still
+  runs, so both protocols coexist.
+- A GUI session test that a framed reply produces `segment` events end to end.
+
 ## Global Constraints
 
 - Go standard library only for tests (`testing`, `t.TempDir()`); no testify.
