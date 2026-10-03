@@ -88,3 +88,28 @@ func TestImageKeyFor(t *testing.T) {
 		}
 	}
 }
+
+func TestCartesiaKeyFor(t *testing.T) {
+	ttsCases := []config.TTSConfig{
+		{Type: "cartesia"},
+		{Type: "builtin", BuiltinName: "cartesia"},
+	}
+	for _, tc := range ttsCases {
+		got, ok := media.TTSKeyFor(tc)
+		if !ok || got != provider.KeyTTSCartesia {
+			t.Errorf("TTSKeyFor(%+v) = %q, %v; want %q, true", tc, got, ok, provider.KeyTTSCartesia)
+		}
+	}
+
+	sttCases := []config.STTConfig{
+		{Type: "cartesia"},
+		{Type: "builtin", BuiltinName: "cartesia"},
+	}
+	for _, tc := range sttCases {
+		got, ok := media.STTKeyFor(tc)
+		if !ok || got != provider.KeySTTCartesia {
+			t.Errorf("STTKeyFor(%+v) = %q, %v; want %q, true", tc, got, ok, provider.KeySTTCartesia)
+		}
+	}
+}
+

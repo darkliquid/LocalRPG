@@ -89,3 +89,18 @@ func TestGeminiTTSProviderKeyAndKeyPresent(t *testing.T) {
 		t.Errorf("expected true when GOOGLE_API_KEY set for builtin:gemini")
 	}
 }
+
+func TestCartesiaKeyPresentWithSharedKey(t *testing.T) {
+	cfg := config.TTSConfig{Type: "builtin", BuiltinName: "cartesia"}
+	if KeyPresentWithSharedKey(cfg, "") {
+		t.Error("expected false with no key")
+	}
+	if !KeyPresentWithSharedKey(cfg, "sk_car_shared") {
+		t.Error("expected true with sharedKey")
+	}
+	t.Setenv("CARTESIA_API_KEY", "sk_car_env")
+	if !KeyPresentWithSharedKey(cfg, "") {
+		t.Error("expected true with CARTESIA_API_KEY env set")
+	}
+}
+
