@@ -25,6 +25,8 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 		return provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.HostDiscriminator(cfg.Endpoint)), true
 	case "gemini":
 		return provider.KeyTTSGemini, true
+	case "cartesia":
+		return provider.KeyTTSCartesia, true
 	case "builtin":
 		switch cfg.BuiltinName {
 		case "gemini":
@@ -35,6 +37,8 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 			return provider.KeyTTSNativeOS, true
 		case "elevenlabs":
 			return provider.KeyTTSElevenLabs, true
+		case "cartesia":
+			return provider.KeyTTSCartesia, true
 		}
 		return "", false
 	case "cli":
@@ -70,10 +74,29 @@ func BuildTTS(id string, cfg config.TTSConfig, sharedKey string) (TTSClient, err
 	return client, nil
 }
 
+// STTBuildPayload is what BuildSTT hands an STT provider package.
+type STTBuildPayload struct {
+	Config    config.STTConfig `json:"config"`
+	SharedKey string           `json:"shared_key,omitempty"`
+}
+
+type sttBuildWire struct {
+	config.STTConfig
+	Config    config.STTConfig `json:"config"`
+	SharedKey string           `json:"shared_key,omitempty"`
+}
+
 // STTKeyFor maps an STT configuration to its canonical key. Browser-only values
 // have no key: they never reach the server-side factory.
 func STTKeyFor(cfg config.STTConfig) (provider.Key, bool) {
 	switch cfg.Type {
+	case "cartesia":
+		return provider.KeySTTCartesia, true
+	case "builtin":
+		if cfg.BuiltinName == "cartesia" {
+			return provider.KeySTTCartesia, true
+		}
+		return "", false
 	case "http":
 		return provider.InstanceOrSelf(provider.KeySTTWhisperHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
 	case "cli":
@@ -83,12 +106,16 @@ func STTKeyFor(cfg config.STTConfig) (provider.Key, bool) {
 }
 
 // BuildSTT constructs an STT client from the registry by ID.
-func BuildSTT(id string, cfg config.STTConfig) (STTClient, error) {
+func BuildSTT(id string, cfg config.STTConfig, sharedKey ...string) (STTClient, error) {
 	reg, ok := provider.Lookup(id)
 	if !ok {
 		return nil, fmt.Errorf("media: no provider registered for %q", id)
 	}
-	raw, err := json.Marshal(cfg)
+	var sk string
+	if len(sharedKey) > 0 {
+		sk = sharedKey[0]
+	}
+	raw, err := json.Marshal(sttBuildWire{STTConfig: cfg, Config: cfg, SharedKey: sk})
 	if err != nil {
 		return nil, fmt.Errorf("media: encode %s config: %w", id, err)
 	}

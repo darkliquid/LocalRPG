@@ -345,6 +345,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     (config.media.tts.type === 'builtin' && config.media.tts.builtin_name === 'gemini');
   const isElevenLabsTTS =
     config.media.tts.type === 'builtin' && config.media.tts.builtin_name === 'elevenlabs';
+  const isCartesiaTTS =
+    config.media.tts.type === 'cartesia' ||
+    (config.media.tts.type === 'builtin' && config.media.tts.builtin_name === 'cartesia');
 
   const updateRole = (updated: AgentRoleConfig) => {
     setConfig({
@@ -616,6 +619,77 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
                     <Volume2 className="w-3 h-3 text-purple-400" />
                     <span>Voice Synthesis (Gemini 3.1 & 2.5 Flash/Pro TTS)</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Cartesia Provider Card */}
+            <div className="p-4 bg-stone-950/80 border border-stone-800/90 rounded-xl space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800/60 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-400">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-sans font-bold text-stone-200">Cartesia</h4>
+                    <p className="text-xs text-stone-400">Ultra-fast voice intelligence: Sonic TTS speech synthesis and Ink Whisper STT transcription.</p>
+                  </div>
+                </div>
+                <div>
+                  {config.providers?.cartesia?.api_key ? (
+                    <span className="flex items-center gap-1 text-emerald-400 font-mono text-xs bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Configured in Settings</span>
+                    </span>
+                  ) : (
+                    <span className="text-xs font-mono text-stone-500 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded-md">
+                      Using env or unconfigured
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
+                  <span>Shared Cartesia API Key</span>
+                  <span className="text-xs text-stone-500 font-mono">
+                    {config.providers?.cartesia?.api_key ? '✓ Custom Key Saved' : 'Optional if CARTESIA_API_KEY is set'}
+                  </span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="sk_car_... or leave blank for CARTESIA_API_KEY env var"
+                  value={config.providers?.cartesia?.api_key || ''}
+                  onChange={(e) => {
+                    setConfig({
+                      ...config,
+                      providers: {
+                        ...config.providers,
+                        cartesia: {
+                          ...config.providers?.cartesia,
+                          api_key: e.target.value,
+                        },
+                      },
+                    });
+                  }}
+                  className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                />
+                <p className="text-xs text-stone-500">
+                  Shared key automatically inherited by Cartesia Sonic TTS voice synthesis and Cartesia Ink STT transcription.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-stone-800/50">
+                <div className="text-xs font-sans uppercase text-stone-400 font-semibold mb-2">Connected Subsystems</div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
+                    <Volume2 className="w-3 h-3 text-purple-400" />
+                    <span>Voice Synthesis (Cartesia Sonic 3.6)</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
+                    <Mic className="w-3 h-3 text-purple-400" />
+                    <span>Speech-to-Text (Cartesia Ink Whisper)</span>
                   </span>
                 </div>
               </div>
@@ -1586,6 +1660,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     config.media.tts.type === 'gemini' ||
                     (config.media.tts.type === 'builtin' && config.media.tts.builtin_name === 'gemini')
                       ? 'gemini'
+                      : config.media.tts.type === 'cartesia' ||
+                        (config.media.tts.type === 'builtin' && config.media.tts.builtin_name === 'cartesia')
+                      ? 'builtin:cartesia'
                       : config.media.tts.type === 'builtin'
                       ? `builtin:${config.media.tts.builtin_name || 'native-os'}`
                       : config.media.tts.type === 'fish-audio' ||
@@ -1612,6 +1689,15 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                                 config.media.tts.default_voice.startsWith('EXAV')
                                   ? config.media.tts.default_voice
                                   : 'EXAVITQu4vr4xnSDxMaL',
+                            }
+                          : builtinName === 'cartesia'
+                          ? {
+                              model:
+                                config.media.tts.model && config.media.tts.model.includes('sonic')
+                                  ? config.media.tts.model
+                                  : 'sonic-3.6',
+                              default_voice:
+                                config.media.tts.default_voice || 'db6b0ed5-d5d3-463d-ae85-518a07d3c2b4',
                             }
                           : builtinName === 'sherpa-onnx'
                           ? {
@@ -1719,6 +1805,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 >
                   <option value="disabled">Disabled</option>
                   <option value="gemini">Google Gemini TTS (Cloud, metered)</option>
+                  <option value="builtin:cartesia">Built-in: Cartesia Sonic (Cloud, metered)</option>
                   <option value="builtin:sherpa-onnx">Built-in: Sherpa-ONNX (Kokoro Neural Voice)</option>
                   <option value="builtin:native-os">Built-in: Native OS Speech (spd-say / SAPI / procedural)</option>
                   <option value="builtin:elevenlabs">Built-in: ElevenLabs (Cloud, metered)</option>
@@ -1917,6 +2004,48 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             )}
 
+            {isCartesiaTTS && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-sans uppercase text-stone-300">Cartesia TTS Model</label>
+                <input
+                  type="text"
+                  placeholder="e.g. sonic-3.6"
+                  value={config.media.tts.model || 'sonic-3.6'}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      media: { ...config.media, tts: { ...config.media.tts, model: e.target.value } },
+                    })
+                  }
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                />
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[
+                    { id: 'sonic-3.6', label: 'Sonic 3.6 (Latest)' },
+                    { id: 'sonic', label: 'Sonic (Default)' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, tts: { ...config.media.tts, model: m.id } },
+                        })
+                      }
+                      className={`text-xs px-2.5 py-1 rounded-lg border font-mono transition cursor-pointer ${
+                        (config.media.tts.model || 'sonic-3.6') === m.id
+                          ? 'bg-purple-500/20 border-purple-500/60 text-purple-300'
+                          : 'bg-stone-900/60 border-stone-800 text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {inspect?.metered && (
               <div className="flex items-center gap-2 text-xs font-mono text-purple-400/90">
                 <span className="px-1.5 py-0.5 rounded border border-purple-500/40 bg-purple-500/10">METERED</span>
@@ -1928,6 +2057,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               <div className="text-xs font-mono text-stone-400">
                 {isGeminiTTS
                   ? 'No Gemini API key configured. Enter one below, or set GEMINI_API_KEY / GOOGLE_API_KEY in the environment.'
+                  : isCartesiaTTS
+                  ? 'No Cartesia API key configured. Enter one below, configure it in the Providers tab, or set CARTESIA_API_KEY in the environment.'
                   : isElevenLabsTTS
                   ? 'No API key configured. Enter one below, or set ELEVENLABS_API_KEY in the environment.'
                   : 'No API key configured. Enter one below.'}
@@ -1941,12 +2072,17 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   {isGeminiTTS && config.providers?.gemini?.api_key && !config.media.tts.api_key && (
                     <span className="text-xs text-emerald-400 font-mono">Using shared Gemini key</span>
                   )}
+                  {isCartesiaTTS && config.providers?.cartesia?.api_key && !config.media.tts.api_key && (
+                    <span className="text-xs text-emerald-400 font-mono">Using shared Cartesia key</span>
+                  )}
                 </label>
                 <input
                   type="password"
                   placeholder={
                     isGeminiTTS && config.providers?.gemini?.api_key
                       ? 'Using shared key from providers.gemini.api_key'
+                      : isCartesiaTTS && config.providers?.cartesia?.api_key
+                      ? 'Using shared key from providers.cartesia.api_key'
                       : "Leave empty to use the provider's environment variable"
                   }
                   value={config.media.tts.api_key || ''}
@@ -1961,6 +2097,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <p className="text-xs text-stone-500">
                   {isGeminiTTS
                     ? 'Stored in your configuration file. Set GEMINI_API_KEY instead to keep it off disk.'
+                    : isCartesiaTTS
+                    ? 'Stored in your configuration file. Set CARTESIA_API_KEY or configure in Providers tab to share across TTS and STT.'
                     : isElevenLabsTTS
                     ? 'Stored in your configuration file. Set ELEVENLABS_API_KEY instead to keep it off disk.'
                     : 'Stored in your configuration file.'}
@@ -2498,25 +2636,53 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               <div className="space-y-1.5">
                 <label className="text-xs font-sans uppercase text-stone-300">STT Provider Type</label>
                 <select
-                  value={config.media.stt?.type || 'disabled'}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      media: {
-                        ...config.media,
-                        stt: { ...(config.media.stt || { type: 'disabled' }), type: e.target.value as any },
-                      },
-                    })
+                  value={
+                    config.media.stt?.type === 'builtin'
+                      ? `builtin:${config.media.stt.builtin_name || 'cartesia'}`
+                      : config.media.stt?.type || 'disabled'
                   }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.startsWith('builtin:')) {
+                      const builtinName = val.split(':')[1];
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          stt: {
+                            ...(config.media.stt || { type: 'disabled' }),
+                            type: 'builtin',
+                            builtin_name: builtinName,
+                            model:
+                              builtinName === 'cartesia'
+                                ? config.media.stt?.model || 'ink-whisper'
+                                : config.media.stt?.model,
+                          },
+                        },
+                      });
+                    } else {
+                      setConfig({
+                        ...config,
+                        media: {
+                          ...config.media,
+                          stt: {
+                            ...(config.media.stt || { type: 'disabled' }),
+                            type: val as any,
+                            builtin_name: undefined,
+                          },
+                        },
+                      });
+                    }
+                  }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
                 >
                   <option value="disabled">Disabled</option>
+                  <option value="builtin:cartesia">Built-in: Cartesia Ink (Cloud, metered)</option>
                   <option value="web-speech" disabled={!webSpeechAvailable}>
                     Web Speech API (Browser Native){webSpeechAvailable ? '' : ' — unavailable in this window'}
                   </option>
                   <option value="http">HTTP (Faster-Whisper, OpenAI Whisper)</option>
                   <option value="cli">CLI Command (e.g. whisper-cli)</option>
-                  <option value="builtin">Builtin</option>
                 </select>
                 {!webSpeechAvailable && (
                   <p className="text-xs text-amber-300/80">
@@ -2576,6 +2742,51 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
                   />
                 </div>
+              )}
+
+              {(config.media.stt?.type === 'cartesia' ||
+                (config.media.stt?.type === 'builtin' && config.media.stt?.builtin_name === 'cartesia')) && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-sans uppercase text-stone-300">Model Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. ink-whisper"
+                      value={config.media.stt?.model || 'ink-whisper'}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, stt: { ...config.media.stt, model: e.target.value } },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
+                      <span>API Key Override</span>
+                      {config.providers?.cartesia?.api_key && !config.media.stt?.api_key && (
+                        <span className="text-xs text-emerald-400 font-mono">Using shared Cartesia key</span>
+                      )}
+                    </label>
+                    <input
+                      type="password"
+                      placeholder={
+                        config.providers?.cartesia?.api_key
+                          ? 'Using shared key from providers.cartesia.api_key'
+                          : 'Optional override or CARTESIA_API_KEY env'
+                      }
+                      value={config.media.stt?.api_key || ''}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          media: { ...config.media, stt: { ...config.media.stt, api_key: e.target.value } },
+                        })
+                      }
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                    />
+                  </div>
+                </>
               )}
             </div>
 

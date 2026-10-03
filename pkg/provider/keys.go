@@ -16,10 +16,12 @@ const (
 	KeyTTSPiper      Key = "tts:piper"
 	KeyTTSFishAudio  Key = "tts:fish-audio"
 	KeyTTSHTTP       Key = "tts:http"
+	KeyTTSCartesia   Key = "tts:cartesia"
 
 	KeySTTWhisperHTTP Key = "stt:whisper-http"
 	KeySTTWhisperCLI  Key = "stt:whisper-cli"
 	KeySTTWebSpeech   Key = "stt:web-speech"
+	KeySTTCartesia    Key = "stt:cartesia"
 
 	KeyImageGemini        Key = "image:gemini"
 	KeyImageHTTP          Key = "image:http"
@@ -35,8 +37,9 @@ const (
 func AllKeys() []Key {
 	return []Key{
 		KeyLLMOpenAIChat, KeyLLMGemini, KeyLLMCLI, KeyLLMNarrativeOracle,
-		KeyTTSGemini, KeyTTSElevenLabs, KeyTTSNativeOS, KeyTTSSherpaONNX, KeyTTSPiper, KeyTTSFishAudio, KeyTTSHTTP,
-		KeySTTWhisperHTTP, KeySTTWhisperCLI, KeySTTWebSpeech,
+		KeyTTSGemini, KeyTTSElevenLabs, KeyTTSNativeOS, KeyTTSSherpaONNX, KeyTTSPiper,
+		KeyTTSFishAudio, KeyTTSHTTP, KeyTTSCartesia,
+		KeySTTWhisperHTTP, KeySTTWhisperCLI, KeySTTWebSpeech, KeySTTCartesia,
 		KeyImageGemini, KeyImageHTTP, KeyImageCLI, KeyImageProceduralArt,
 		KeyEmbeddingBuiltin, KeyEmbeddingOpenAI, KeyEmbeddingGemini,
 	}
