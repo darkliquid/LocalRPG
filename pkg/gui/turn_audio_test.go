@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/turnstream"
 )
 
 func TestTurnAudioPlanSendsEachClipOnce(t *testing.T) {
@@ -60,6 +61,57 @@ func TestFinishTurnAudioSkipsStreamedClips(t *testing.T) {
 	}
 	if media.ClipKeyForPath(remaining[0]) == media.ClipKeyForPath(played[0]) {
 		t.Errorf("the streamed clip %q was queued a second time", remaining[0])
+	}
+}
+
+func TestFinishTurnAudioSkipsStreamerFedSpeechClip(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+
+	session := &TurnSession{service: svc, gameID: gameID, cfg: svc.configMgr.Get()}
+	turn, err := svc.findTurn(gameID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plan := &turnAudioPlan{queue: make(chan string, 8), played: newClipSet()}
+
+	// The streamer runs and feeds the speech segment (segment 1 of writeSegmentTurn)
+	streamer := svc.sentenceStreamerFor(context.Background(), gameID, svc.configMgr.Get(), func(speech provisionalSpeech) {
+		plan.enqueueClip(speech.AudioKey, svc.clipPath(speech.AudioKey))
+	})
+	if streamer == nil {
+		t.Fatal("expected sentenceStreamerFor to return non-nil")
+	}
+
+	// Feed Captain Kaelen's line (matching segment 1)
+	streamer.FeedSegment(turnstream.Event{
+		Kind:      turnstream.KindSpeech,
+		Speaker:   "Captain Kaelen",
+		SpeakerID: "captain-kaelen",
+		Text:      "Keep walking.",
+	})
+	streamer.Flush()
+	streamer.Close()
+	streamer.Wait()
+
+	// Drain the clip enqueued by the streamer
+	streamedClip := <-plan.queue
+	if streamedClip == "" {
+		t.Fatal("expected streamer to enqueue a clip")
+	}
+
+	// Now finalize turn audio
+	session.finishTurnAudio(context.Background(), *turn, plan)
+	plan.close()
+
+	// Remaining should only be segment 0 (the narration "He does not look up.")
+	remaining := drainClips(plan.queue)
+	if len(remaining) != 1 {
+		t.Fatalf("remaining = %#v, want only segment 0 (unstreamed narration)", remaining)
+	}
+	if media.ClipKeyForPath(remaining[0]) == media.ClipKeyForPath(streamedClip) {
+		t.Errorf("the streamed speech clip %q was queued a second time", remaining[0])
 	}
 }
 

@@ -155,6 +155,9 @@ func TestAssembleContextAlwaysAsksForAttributableSpeech(t *testing.T) {
 	if !strings.Contains(prompt, `Name: "the words spoken"`) {
 		t.Errorf("expected the instruction to show the shape it wants, got %q", prompt)
 	}
+	if !strings.Contains(prompt, `> Name: "the words spoken"`) {
+		t.Errorf("expected the instruction to show the blockquote shape it wants, got %q", prompt)
+	}
 	if !strings.Contains(prompt, "leave the words in the narration") {
 		t.Errorf("expected guidance for the case the model cannot name a speaker, got %q", prompt)
 	}

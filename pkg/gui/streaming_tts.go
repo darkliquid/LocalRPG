@@ -35,6 +35,7 @@ type provisionalSpeech struct {
 // narration unit carries no speaker and is read by the narrator.
 type speechUnit struct {
 	Kind      string
+	Speaker   string
 	SpeakerID string
 	Text      string
 }
@@ -183,9 +184,16 @@ func (s *sentenceStreamer) SetGrouping(enabled bool, caps media.TTSCapabilities)
 // voiceForUnit resolves the voice a unit is read in: the speaker's own for
 // speech, the narrator's otherwise.
 func (s *sentenceStreamer) voiceForUnit(unit speechUnit) *entity.VoiceConfig {
-	if unit.Kind == entity.SegmentSpeech && unit.SpeakerID != "" && s.voiceFor != nil {
-		if voice := s.voiceFor(unit.SpeakerID); voice != nil {
-			return voice
+	if unit.Kind == entity.SegmentSpeech && s.voiceFor != nil {
+		if unit.SpeakerID != "" {
+			if voice := s.voiceFor(unit.SpeakerID); voice != nil {
+				return voice
+			}
+		}
+		if unit.Speaker != "" {
+			if voice := s.voiceFor(unit.Speaker); voice != nil {
+				return voice
+			}
 		}
 	}
 	return s.narrator
@@ -306,7 +314,7 @@ func (s *sentenceStreamer) Feed(text string) {
 	s.mu.Unlock()
 
 	for _, sentence := range complete {
-		s.feed(entity.SegmentNarration, "", sentence)
+		s.feed(entity.SegmentNarration, "", "", sentence)
 	}
 }
 
@@ -328,7 +336,7 @@ func (s *sentenceStreamer) FeedSegment(event turnstream.Event) {
 	// Grouping folds whole segments, because the turn's clip plan folds whole
 	// segments; splitting here would build a different line and a different key.
 	if s.grouping {
-		s.feed(kind, event.SpeakerID, text)
+		s.feed(kind, event.Speaker, event.SpeakerID, text)
 		if event.Player {
 			s.Flush()
 		}
@@ -340,7 +348,7 @@ func (s *sentenceStreamer) FeedSegment(event turnstream.Event) {
 		complete = append(complete, remainder)
 	}
 	for _, sentence := range complete {
-		s.feed(kind, event.SpeakerID, sentence)
+		s.feed(kind, event.Speaker, event.SpeakerID, sentence)
 	}
 }
 
@@ -361,10 +369,11 @@ func (s *sentenceStreamer) Flush() {
 }
 
 // feed routes one piece of text to the folder or the sentence queue.
-func (s *sentenceStreamer) feed(kind, speakerID, text string) {
+func (s *sentenceStreamer) feed(kind, speaker, speakerID, text string) {
 	if s.grouping {
 		line, ok := s.pipeline.SegmentLine(entity.TurnSegment{
 			Kind:      kind,
+			Speaker:   speaker,
 			SpeakerID: speakerID,
 			Text:      text,
 		}, s.narrator, s.voiceFor)
@@ -379,7 +388,7 @@ func (s *sentenceStreamer) feed(kind, speakerID, text string) {
 		}
 		return
 	}
-	s.enqueueUnit(speechUnit{Kind: kind, SpeakerID: speakerID, Text: text})
+	s.enqueueUnit(speechUnit{Kind: kind, Speaker: speaker, SpeakerID: speakerID, Text: text})
 }
 
 // enqueueUnit sends a sentence without blocking, sequencing its ordinal.

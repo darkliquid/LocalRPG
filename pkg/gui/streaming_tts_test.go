@@ -300,3 +300,52 @@ func TestStreamerEmitsAudioProgressWithFailedCount(t *testing.T) {
 	}
 }
 
+func TestStreamerSpeechGroupKeyMatchesPlannedGroupKey(t *testing.T) {
+	client := &fakeSentenceTTSClient{}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+	var emitted provisionalSpeech
+	var mu sync.Mutex
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, func(p provisionalSpeech) {
+		mu.Lock()
+		emitted = p
+		mu.Unlock()
+	})
+	streamer.SetGrouping(true, media.TTSCapabilities{MaxSpeakers: 1})
+	streamer.SetVoiceResolver(func(id string) *entity.VoiceConfig {
+		return &entity.VoiceConfig{VoiceID: "player-voice"}
+	})
+
+	evt := turnstream.Event{
+		Kind:      turnstream.KindSpeech,
+		Speaker:   "Elena Nightshade",
+		SpeakerID: "player-elena",
+		Text:      "Hello there.",
+		Player:    true,
+	}
+	streamer.FeedSegment(evt)
+	streamer.Close()
+	streamer.Wait()
+
+	segment := entity.TurnSegment{
+		Kind:      entity.SegmentSpeech,
+		Speaker:   "Elena Nightshade",
+		SpeakerID: "player-elena",
+		Text:      "Hello there.",
+		Player:    true,
+	}
+	caps := media.TTSCapabilities{MaxSpeakers: 1}
+	planned := pipeline.GroupClipKeysWithCaps([]entity.TurnSegment{segment}, &entity.VoiceConfig{VoiceID: "narrator"}, func(id string) *entity.VoiceConfig {
+		return &entity.VoiceConfig{VoiceID: "player-voice"}
+	}, caps)
+
+	if len(planned) != 1 {
+		t.Fatalf("expected 1 planned group, got %d", len(planned))
+	}
+	mu.Lock()
+	gotKey := emitted.AudioKey
+	mu.Unlock()
+	if gotKey != planned[0].Key {
+		t.Fatalf("streamed audio key = %q, planned = %q", gotKey, planned[0].Key)
+	}
+}
+
