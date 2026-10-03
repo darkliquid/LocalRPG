@@ -1582,7 +1582,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 			// request: the queue is fed while the turn streams and drains after it.
 			// StopAudio ends it early.
 			t.service.goBackground(func() {
-				if err := player.PlayQueue(plan.queue); err != nil && !errors.Is(err, playback.ErrUnavailable) {
+				if err := player.EnqueueQueue(plan.queue); err != nil && !errors.Is(err, playback.ErrUnavailable) {
 					fmt.Fprintf(os.Stderr, "Warning: narration playback stopped: %v\n", err)
 				}
 			})
@@ -1629,6 +1629,11 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	streamer.StopEmitting()
 
 	dto := t.service.turnDTO(*turn, t.store, t.cfg, t.gameID)
+
+	// Release campaign turn lock immediately so the player can submit the next turn
+	// without waiting for remaining background TTS audio to synthesize.
+	t.Close()
+
 	if err := announce(TurnEvent{Type: "turn", Turn: &dto}); err != nil {
 		return err
 	}
@@ -1650,8 +1655,10 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// The rest of the turn's clips are synthesized behind the turn and appended to
 	// the same queue, so playback continues without a second start and a clip that
 	// failed mid-stream is retried here. The played set makes the handover exact.
+	streamer.Close()
 	if audioEnabled {
 		t.service.goBackground(func() {
+			streamer.Wait()
 			t.finishTurnAudio(context.Background(), *turn, plan)
 			plan.close()
 		})

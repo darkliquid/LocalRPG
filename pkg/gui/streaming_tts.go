@@ -347,14 +347,22 @@ func (s *sentenceStreamer) enqueueGroupLocked(group []media.SpeakerLine) {
 	}
 }
 
-// Close flushes the pending group, stops accepting work, and waits for the queue
-// to drain.
+// Close flushes the pending group and closes the work queue.
 func (s *sentenceStreamer) Close() {
 	if s == nil {
 		return
 	}
-	s.Flush()
-	s.closeOne.Do(func() { close(s.queue) })
+	s.closeOne.Do(func() {
+		s.Flush()
+		close(s.queue)
+	})
+}
+
+// Wait blocks until all queued synthesis jobs have finished.
+func (s *sentenceStreamer) Wait() {
+	if s == nil {
+		return
+	}
 	s.wg.Wait()
 }
 

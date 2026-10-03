@@ -49,6 +49,7 @@ func TestSentenceStreamerVoicesSpeechWithItsSpeaker(t *testing.T) {
 
 	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindSpeech, SpeakerID: "kaelen", Text: "Keep walking."})
 	streamer.Close()
+	streamer.Wait()
 
 	client.mu.Lock()
 	defer client.mu.Unlock()
@@ -65,6 +66,7 @@ func TestSentenceStreamerSynthesizesCompleteSentencesOnly(t *testing.T) {
 	streamer.Feed("The hall is quiet. Garrick")
 	streamer.Feed(" steps inside.")
 	streamer.Close()
+	streamer.Wait()
 
 	if got := client.callCount(); got != 2 {
 		t.Fatalf("calls = %d, want 2 complete sentences", got)
@@ -86,6 +88,7 @@ func TestSentenceStreamerEmitsOrderedSentences(t *testing.T) {
 	streamer.Feed("The hall is quiet. Garrick")
 	streamer.Feed(" steps inside.")
 	streamer.Close()
+	streamer.Wait()
 
 	if len(got) != 2 {
 		t.Fatalf("events = %#v, want the two complete sentences", got)
@@ -139,6 +142,7 @@ func TestSentenceStreamerConcurrentWorkersMaintainOrder(t *testing.T) {
 
 	streamer.Feed("The first sentence is slow. The second is fast.")
 	streamer.Close()
+	streamer.Wait()
 
 	if len(got) != 2 {
 		t.Fatalf("events = %#v, want 2", got)
@@ -158,6 +162,7 @@ func TestSentenceStreamerWithoutAConsumerIsSafe(t *testing.T) {
 
 	streamer.Feed("The hall is quiet.")
 	streamer.Close()
+	streamer.Wait()
 
 	if got := client.callCount(); got != 1 {
 		t.Fatalf("calls = %d, want the sentence still synthesized", got)
@@ -179,6 +184,7 @@ func TestSentenceStreamerStopsEmittingOnceTheTurnIsAuthoritative(t *testing.T) {
 	streamer.StopEmitting()
 	streamer.Feed("The hall is quiet.")
 	streamer.Close()
+	streamer.Wait()
 
 	if len(got) != 0 {
 		t.Errorf("events = %#v, want none once the turn is authoritative", got)
@@ -193,6 +199,7 @@ func TestSentenceStreamerNilIsSafe(t *testing.T) {
 	streamer.Feed("text")
 	streamer.StopEmitting()
 	streamer.Close()
+	streamer.Wait()
 }
 
 func TestStreamerGroupsConsecutiveSameSpeakerSegments(t *testing.T) {
@@ -204,6 +211,7 @@ func TestStreamerGroupsConsecutiveSameSpeakerSegments(t *testing.T) {
 	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The hall is quiet."})
 	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "Cold air rushes in."})
 	streamer.Close()
+	streamer.Wait()
 
 	if got := client.callCount(); got != 1 {
 		t.Fatalf("calls = %d, want one grouped request", got)
@@ -222,6 +230,7 @@ func TestStreamerGroupsPerSpeakerRun(t *testing.T) {
 	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The hall is quiet."})
 	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindSpeech, Speaker: "Garrick", SpeakerID: "garrick", Text: "Keep walking."})
 	streamer.Close()
+	streamer.Wait()
 
 	if got := client.callCount(); got != 2 {
 		t.Fatalf("calls = %d, want one request per speaker run", got)

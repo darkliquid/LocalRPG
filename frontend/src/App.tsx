@@ -311,6 +311,11 @@ export const App: React.FC = () => {
                 : `${event.tool_name}: ${event.tool_summary ?? 'done'}`,
             );
           } else if (event.type === 'turn' && event.turn) {
+            // Restore interactivity immediately so the user can submit the next turn
+            // while any remaining audio synthesizes in the background.
+            setTurnInFlight(false);
+            setToolActivity(null);
+
             // Stop streamed speech so it does not overlap with chronicle playback,
             // and remember which keys were heard to completion.
             streamedSpeech.stop();
@@ -362,11 +367,13 @@ export const App: React.FC = () => {
       console.error('turn failed:', err);
       setTurnError(err instanceof Error ? err.message : String(err));
     } finally {
-      abortRef.current = null;
-      setTurnInFlight(false);
-      setPendingAction(null);
-      setToolActivity(null);
-      streamedSpeech.stop();
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setTurnInFlight(false);
+        setPendingAction(null);
+        setToolActivity(null);
+        streamedSpeech.stop();
+      }
     }
   };
 
