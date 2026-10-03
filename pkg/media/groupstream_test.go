@@ -1,6 +1,11 @@
 package media
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/darkliquid/localrpg/pkg/entity"
+)
 
 func TestGroupFolderMatchesPlanGroupsWithoutABudget(t *testing.T) {
 	lines := []SpeakerLine{
@@ -13,12 +18,10 @@ func TestGroupFolderMatchesPlanGroupsWithoutABudget(t *testing.T) {
 	folder := NewGroupFolder(caps, 0)
 	var flushed [][]SpeakerLine
 	for _, line := range lines {
-		if out := folder.Add(line); out != nil {
-			flushed = append(flushed, out)
-		}
+		flushed = append(flushed, folder.Add(line)...)
 	}
-	if out := folder.Flush(); out != nil {
-		flushed = append(flushed, out)
+	if group := folder.Flush(); group != nil {
+		flushed = append(flushed, group)
 	}
 
 	if len(flushed) != 2 {
@@ -31,7 +34,7 @@ func TestGroupFolderMatchesPlanGroupsWithoutABudget(t *testing.T) {
 
 func TestGroupFolderFlushesAtTheBudget(t *testing.T) {
 	folder := NewGroupFolder(TTSCapabilities{MaxSpeakers: 1}, 10)
-	if out := folder.Add(SpeakerLine{SpeakerID: "n", Label: "Narrator", Text: "One two."}); out != nil {
+	if out := folder.Add(SpeakerLine{SpeakerID: "n", Label: "Narrator", Text: "One two."}); len(out) != 0 {
 		t.Fatalf("premature flush: %#v", out)
 	}
 	out := folder.Add(SpeakerLine{SpeakerID: "n", Label: "Narrator", Text: "Three four five."})
@@ -42,14 +45,60 @@ func TestGroupFolderFlushesAtTheBudget(t *testing.T) {
 
 func TestGroupFolderFlushesWhenTheSpeakerChanges(t *testing.T) {
 	folder := NewGroupFolder(TTSCapabilities{MaxSpeakers: 1}, 0)
-	if out := folder.Add(SpeakerLine{SpeakerID: "a", Label: "A", Text: "One."}); out != nil {
+	if out := folder.Add(SpeakerLine{SpeakerID: "a", Label: "A", Text: "One."}); len(out) != 0 {
 		t.Fatalf("premature flush: %#v", out)
 	}
 	out := folder.Add(SpeakerLine{SpeakerID: "b", Label: "B", Text: "Two."})
-	if len(out) != 1 || out[0].SpeakerID != "a" {
+	if len(out) != 1 || len(out[0]) != 1 || out[0][0].SpeakerID != "a" {
 		t.Fatalf("a speaker change must close the previous group, got %#v", out)
 	}
 	if rest := folder.Flush(); len(rest) != 1 || rest[0].SpeakerID != "b" {
 		t.Fatalf("the new speaker's line must remain pending, got %#v", rest)
+	}
+}
+
+// TestGroupFolderMatchesPlanGroups proves the streaming fold and the batch plan
+// agree, so a streamed group and a finalised group share a cache key.
+func TestGroupFolderMatchesPlanGroups(t *testing.T) {
+	segments := []entity.TurnSegment{
+		{Kind: entity.SegmentNarration, Text: "The hall is quiet."},
+		{Kind: entity.SegmentNarration, Text: "Cold air rushes in."},
+		{Kind: entity.SegmentSpeech, Speaker: "Garrick", SpeakerID: "garrick", Text: "Keep walking."},
+		{Kind: entity.SegmentNarration, Text: strings.Repeat("Long. ", 200)},
+	}
+	caps := TTSCapabilities{MaxSpeakers: 1, MaxCharsPerRequest: 40}
+
+	resolve := func(segment entity.TurnSegment) (SpeakerLine, bool) {
+		label := narratorLabel
+		if segment.Kind == entity.SegmentSpeech {
+			label = segment.Speaker
+		}
+		return SpeakerLine{SpeakerID: segment.SpeakerID, Label: label, Text: segment.Text}, true
+	}
+
+	want := planGroups(segments, caps, resolve)
+
+	folder := NewGroupFolder(caps, 0)
+	var got [][]SpeakerLine
+	for _, segment := range segments {
+		line, _ := resolve(segment)
+		got = append(got, folder.Add(line)...)
+	}
+	if group := folder.Flush(); group != nil {
+		got = append(got, group)
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("folded %d groups, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if len(got[i]) != len(want[i].Lines) {
+			t.Fatalf("group %d has %d lines, want %d", i, len(got[i]), len(want[i].Lines))
+		}
+		for j := range want[i].Lines {
+			if got[i][j].Text != want[i].Lines[j].Text || got[i][j].SpeakerID != want[i].Lines[j].SpeakerID {
+				t.Fatalf("group %d line %d = %#v, want %#v", i, j, got[i][j], want[i].Lines[j])
+			}
+		}
 	}
 }
