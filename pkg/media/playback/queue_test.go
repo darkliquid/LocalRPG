@@ -78,3 +78,30 @@ func TestQueueStreamerSkipsUndecodableClips(t *testing.T) {
 		t.Fatalf("streamed %d frames, want the %d from the good clip", total, want)
 	}
 }
+
+func TestQueueStreamerChainsQueues(t *testing.T) {
+	dir := t.TempDir()
+	first := writeToneWAV(t, dir, "first.wav", deviceSampleRate, 40*time.Millisecond)
+	second := writeToneWAV(t, dir, "second.wav", deviceSampleRate, 40*time.Millisecond)
+	want := decodedFrames(t, first) + decodedFrames(t, second)
+
+	turn1Clips := make(chan string, 1)
+	turn1Clips <- first
+	close(turn1Clips)
+
+	turn2Clips := make(chan string, 1)
+	turn2Clips <- second
+	close(turn2Clips)
+
+	q := newQueueStreamer(turn1Clips)
+	defer q.Close()
+
+	if !q.enqueueChannel(turn2Clips) {
+		t.Fatal("expected enqueueChannel to succeed")
+	}
+
+	if total := drainQueue(t, q); total != want {
+		t.Fatalf("streamed %d frames, want %d across chained queues", total, want)
+	}
+}
+

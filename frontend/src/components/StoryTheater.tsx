@@ -234,7 +234,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   return (
     <div
       data-state={state}
-      className={`fixed inset-0 z-50 overflow-hidden select-none bg-stone-950 text-stone-100 ${
+      className={`fixed inset-0 z-50 overflow-hidden bg-stone-950 text-stone-100 ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
       }`}
       style={{ '--anim-dur': '250ms' } as React.CSSProperties}

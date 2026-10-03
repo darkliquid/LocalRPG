@@ -57,6 +57,27 @@ func Parse(text string, resolve func(candidate string) (string, bool)) []Segment
 			}
 		}
 
+		// Also handle unquoted or loosely quoted `Name: text` lines where the candidate
+		// speaker resolves to a known character.
+		if idx := strings.IndexByte(line, ':'); idx > 0 {
+			candidate := cleanSpeaker(line[:idx])
+			if candidate != "" {
+				if id, ok := resolve(candidate); ok {
+					utterance := strings.TrimSpace(line[idx+1:])
+					utterance = strings.Trim(utterance, "\"“”")
+					if utterance != "" {
+						segments = append(segments, Segment{
+							Speaker:   candidate,
+							SpeakerID: id,
+							Text:      utterance,
+							IsSpeech:  true,
+						})
+						continue
+					}
+				}
+			}
+		}
+
 		segments = append(segments, Segment{Text: line})
 	}
 

@@ -128,6 +128,24 @@ type TurnOrchestrator struct {
 	parser          *turnstream.Parser
 	roster          *roster
 	segmentObserver func(turnstream.Event)
+	sceneWorker     *SceneWorker
+	portraitWorker  *PortraitWorker
+	worldArtStyle   string
+}
+
+// SetSceneWorker attaches a scene illustration worker to the orchestrator.
+func (o *TurnOrchestrator) SetSceneWorker(w *SceneWorker) {
+	o.sceneWorker = w
+}
+
+// SetPortraitWorker attaches a portrait generation worker to the orchestrator.
+func (o *TurnOrchestrator) SetPortraitWorker(w *PortraitWorker) {
+	o.portraitWorker = w
+}
+
+// SetWorldArtStyle sets the art style for scene and portrait generation.
+func (o *TurnOrchestrator) SetWorldArtStyle(style string) {
+	o.worldArtStyle = style
 }
 
 // SetSegmentObserver attaches a sink for parsed turn-stream events, so a client
@@ -135,6 +153,15 @@ type TurnOrchestrator struct {
 // observer records nothing.
 func (o *TurnOrchestrator) SetSegmentObserver(observer func(turnstream.Event)) {
 	o.segmentObserver = observer
+}
+
+// Voice returns the voice assigned to a speaker entity, checking the live roster
+// before falling back to store notes.
+func (o *TurnOrchestrator) Voice(speakerID string) *entity.VoiceConfig {
+	if o == nil || o.roster == nil {
+		return nil
+	}
+	return o.roster.Voice(speakerID)
 }
 
 // observeSegments forwards parsed events, if a sink is attached.
@@ -866,7 +893,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// attributed while the model is still writing. The roster is seeded from the
 	// store, and a persona record extends it mid-stream. The parser wraps the
 	// TTFT listener, so the client still sees each raw chunk first.
-	o.roster = newRoster(o.store, o.playerID, o.playerDisplayName())
+	o.roster = newRoster(o.store, o.playerID, o.playerDisplayName(), o.timeline.VoiceProfiles())
 	o.parser = turnstream.NewParser(o.roster)
 	if onChunk != nil {
 		inner := onChunk
@@ -1178,12 +1205,41 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	// The streamed reply was parsed as it arrived, across every continuation; its
 	// events are the turn's playback script. A reply with no framing at all falls
-	// back to the legacy prose parser plus the extractor.
+	// back to the legacy prose parser plus the extractor. Any dialogue that slipped
+	// through stream parsing as narration is rescued using extractor attributions.
 	events := collected
 	if parsed := segmentsFromEvents(events); len(parsed) > 0 {
 		turn.Segments = parsed
+		if len(extraction.Dialogue) > 0 {
+			resolve := func(candidate string) (string, bool) {
+				if o.roster != nil {
+					if id, ok := o.roster.Resolve(candidate); ok {
+						return id, true
+					}
+				}
+				if id := harness.ResolveSpeakerID(o.store, candidate); id != "" {
+					return id, true
+				}
+				return proposedSpeakerID(extraction.Entities, candidate)
+			}
+			turn.Segments = mergeAttributions(turn.Segments, extraction.Dialogue, resolve)
+		}
 	} else {
 		turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
+	}
+
+	// Remap earlier segments if a declared persona revealed an earlier identity.
+	for _, persona := range personae {
+		if id := entity.Slugify(persona.Name); id != "" {
+			if prev := strings.TrimSpace(persona.PreviousIdentity()); prev != "" {
+				prevSlug := entity.Slugify(prev)
+				for i := range turn.Segments {
+					if turn.Segments[i].SpeakerID == prevSlug || turn.Segments[i].Speaker == prev {
+						turn.Segments[i].SpeakerID = id
+					}
+				}
+			}
+		}
 	}
 
 	// A resolved roll's outcome is narrated after the prose that led to it, so the
@@ -1224,6 +1280,40 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	for _, mention := range speechMentions(turn.Segments) {
 		if !containsMention(turn.Entities, mention.ID) {
 			turn.Entities = append(turn.Entities, mention)
+		}
+	}
+
+	// Detect scene breaks via explicit markdown horizontal rules or extractor cues.
+	if hasProseRuleBreak(turn.Narration) || (extraction.SceneBreak != nil && extraction.SceneBreak.Occurred) {
+		turn.SceneBreak = true
+		if extraction.SceneBreak != nil && extraction.SceneBreak.VisualCue != "" {
+			turn.SceneBreakCue = extraction.SceneBreak.VisualCue
+		}
+	}
+
+	// Anchor speaker portraits with the character's active version at turn time.
+	for i := range turn.Segments {
+		if turn.Segments[i].Kind == entity.SegmentSpeech {
+			speakerID := turn.Segments[i].SpeakerID
+			if speakerID == "" && turn.Segments[i].Speaker != "" {
+				speakerID = harness.ResolveSpeakerID(o.store, turn.Segments[i].Speaker)
+			}
+			if speakerID == "" && turn.Segments[i].Speaker != "" {
+				speakerID = entity.Slugify(turn.Segments[i].Speaker)
+			}
+			if speakerID != "" && o.store != nil {
+				if ent, err := o.store.GetEntity(speakerID); err == nil && ent != nil {
+					version := ent.PortraitVersion
+					if version <= 0 && ent.Portrait != "" {
+						version = 1
+					}
+					if version > 0 {
+						turn.Segments[i].SpeakerPortrait = fmt.Sprintf("/api/game/%s/character/%s/portrait?v=%d", o.gameID(), speakerID, version)
+					} else {
+						turn.Segments[i].SpeakerPortrait = fmt.Sprintf("/api/game/%s/character/%s/portrait", o.gameID(), speakerID)
+					}
+				}
+			}
 		}
 	}
 
@@ -1359,6 +1449,30 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		"outcome":         turn.Outcome,
 		"narration_chars": len([]rune(turn.Narration)),
 	})
+
+	if turn.SceneBreak && o.sceneWorker != nil {
+		var locEntity *entity.Entity
+		if turn.Location != "" && o.store != nil {
+			locEntity, _ = o.store.GetEntity(turn.Location)
+		}
+		cue := turn.SceneBreakCue
+		if cue == "" {
+			cue = ExtractSceneCue(turn.Narration)
+		}
+		scenePrompt := BuildScenePrompt(cue, locEntity, o.worldArtStyle)
+		o.sceneWorker.Enqueue(o.gameID(), turn.Number, scenePrompt)
+	}
+
+	if o.portraitWorker != nil {
+		for _, raw := range extraction.Entities {
+			if raw.AppearanceChanged && o.store != nil {
+				matched := harness.MatchExistingEntity(o.store, &raw)
+				if matched != nil && entity.IsCharacterType(matched.Type) {
+					o.portraitWorker.EnqueueVersion(o.gameID(), matched, o.worldArtStyle, true)
+				}
+			}
+		}
+	}
 
 	return &turn, nil
 }
@@ -2048,4 +2162,14 @@ func unresolvedSpeakers(segments []entity.TurnSegment) []string {
 		}
 	}
 	return unresolved
+}
+
+func hasProseRuleBreak(text string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+			return true
+		}
+	}
+	return false
 }

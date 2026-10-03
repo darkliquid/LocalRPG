@@ -160,6 +160,9 @@ func handleGUICommand(args []string) {
 		},
 	})
 
+	menu := application.DefaultApplicationMenu()
+	app.Menu.Set(menu)
+
 	// The desktop window gets a native directory chooser for exports. Browser and
 	// socket modes have no dialog, so the UI falls back to a path field. Wails
 	// dialogs must run on the application's main thread, and this callback is
@@ -184,13 +187,15 @@ func handleGUICommand(args []string) {
 	})
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:          "LocalRPG",
-		Width:          1280,
-		Height:         800,
-		MinWidth:       900,
-		MinHeight:      600,
-		URL:            "/",
-		BackgroundType: application.BackgroundTypeTranslucent,
+		Title:                      "LocalRPG",
+		Width:                      1280,
+		Height:                     800,
+		MinWidth:                   900,
+		MinHeight:                  600,
+		URL:                        "/",
+		BackgroundType:             application.BackgroundTypeTranslucent,
+		UseApplicationMenu:         true,
+		DefaultContextMenuDisabled: false,
 	})
 
 	if err := app.Run(); err != nil {

@@ -84,6 +84,35 @@ func TestBeginTurnSerialisesTurns(t *testing.T) {
 	second.Close()
 }
 
+func TestConsecutiveTurnsDoNotConflictAfterTurnEvent(t *testing.T) {
+	gameID, svc := turnFixture(t)
+
+	session1, err := svc.BeginTurn(gameID)
+	if err != nil {
+		t.Fatalf("first BeginTurn failed: %v", err)
+	}
+
+	turnAnnounced := false
+	err = session1.Run(context.Background(), TurnRequest{Mode: "Do", Input: "I look around"}, func(event TurnEvent) error {
+		if event.Type == "turn" {
+			turnAnnounced = true
+			session2, err := svc.BeginTurn(gameID)
+			if err != nil {
+				t.Fatalf("expected BeginTurn to succeed immediately after turn announcement, got %v", err)
+			}
+			session2.Close()
+		}
+		return nil
+	})
+	session1.Close()
+	if err != nil {
+		t.Fatalf("session1.Run failed: %v", err)
+	}
+	if !turnAnnounced {
+		t.Fatal("expected turn event to be announced")
+	}
+}
+
 func TestBeginTurnRejectsAnUnplayableCampaign(t *testing.T) {
 	root := t.TempDir()
 	svc := NewService(root)

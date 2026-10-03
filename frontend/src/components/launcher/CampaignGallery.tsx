@@ -212,7 +212,7 @@ export const CampaignGallery: React.FC<CampaignGalleryProps> = ({
   return (
     <div
       data-state={state}
-      className={`fixed inset-0 z-50 flex flex-col bg-stone-950/98 backdrop-blur-xl select-none ${
+      className={`fixed inset-0 z-50 flex flex-col bg-stone-950/98 backdrop-blur-xl ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
       }`}
       style={{ '--anim-dur': '200ms' } as React.CSSProperties}

@@ -188,7 +188,7 @@ export const MarkdownDocViewer: React.FC<MarkdownDocViewerProps> = memo(({ conte
   };
 
   return (
-    <div className={`space-y-4 text-stone-300 font-sans leading-relaxed text-sm sm:text-base ${className}`}>
+    <div className={`space-y-4 text-stone-300 font-sans leading-relaxed text-sm sm:text-base select-text ${className}`}>
       <ReactMarkdown remarkPlugins={[remarkGfm, remarkAlert]} components={markdownComponents}>
         {content}
       </ReactMarkdown>

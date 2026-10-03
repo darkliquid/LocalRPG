@@ -35,6 +35,7 @@ type provisionalSpeech struct {
 // narration unit carries no speaker and is read by the narrator.
 type speechUnit struct {
 	Kind      string
+	Speaker   string
 	SpeakerID string
 	Text      string
 }
@@ -82,6 +83,10 @@ type sentenceStreamer struct {
 	nextSeq      uint64
 	announcedSeq uint64
 	results      map[uint64]jobResult
+	turnNumber       int
+	readyCount       int
+	failedCount      int
+	progressObserver func(AudioProgressDTO)
 	// stopped suppresses emission once the turn is authoritative. From then on the
 	// played set is the client's, so a late unit is synthesized and played with the
 	// rest of the turn rather than announced out of order.
@@ -110,6 +115,52 @@ func newSentenceStreamer(ctx context.Context, pipeline *media.TTSPipeline, voice
 	return streamer
 }
 
+// SetTurnNumber informs the streamer which turn it is generating audio for.
+func (s *sentenceStreamer) SetTurnNumber(turnNumber int) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.turnNumber = turnNumber
+}
+
+// SetProgressObserver sets the callback for audio synthesis lifecycle stages.
+func (s *sentenceStreamer) SetProgressObserver(observer func(AudioProgressDTO)) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.progressObserver = observer
+}
+
+func (s *sentenceStreamer) emitProgress(seq uint64, stage, key, url string) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	observer := s.progressObserver
+	readyCount := s.readyCount
+	failedCount := s.failedCount
+	total := int(s.nextSeq)
+	turnNum := s.turnNumber
+	s.mu.Unlock()
+
+	if observer != nil {
+		observer(AudioProgressDTO{
+			TurnNumber:    turnNum,
+			Sequence:      int(seq),
+			TotalSegments: total,
+			Stage:         stage,
+			ReadyCount:    readyCount,
+			FailedCount:   failedCount,
+			AudioKey:      key,
+			AudioURL:      url,
+		})
+	}
+}
+
 // SetVoiceResolver supplies the per-speaker voice lookup speech is read with. A
 // nil resolver leaves every unit in the narrator's voice.
 func (s *sentenceStreamer) SetVoiceResolver(voiceFor func(string) *entity.VoiceConfig) {
@@ -133,9 +184,16 @@ func (s *sentenceStreamer) SetGrouping(enabled bool, caps media.TTSCapabilities)
 // voiceForUnit resolves the voice a unit is read in: the speaker's own for
 // speech, the narrator's otherwise.
 func (s *sentenceStreamer) voiceForUnit(unit speechUnit) *entity.VoiceConfig {
-	if unit.Kind == entity.SegmentSpeech && unit.SpeakerID != "" && s.voiceFor != nil {
-		if voice := s.voiceFor(unit.SpeakerID); voice != nil {
-			return voice
+	if unit.Kind == entity.SegmentSpeech && s.voiceFor != nil {
+		if unit.SpeakerID != "" {
+			if voice := s.voiceFor(unit.SpeakerID); voice != nil {
+				return voice
+			}
+		}
+		if unit.Speaker != "" {
+			if voice := s.voiceFor(unit.Speaker); voice != nil {
+				return voice
+			}
 		}
 	}
 	return s.narrator
@@ -145,6 +203,7 @@ func (s *sentenceStreamer) voiceForUnit(unit speechUnit) *entity.VoiceConfig {
 func (s *sentenceStreamer) worker() {
 	defer s.wg.Done()
 	for job := range s.queue {
+		s.emitProgress(job.seq, "synthesizing", "", "")
 		if job.group != nil {
 			s.synthesizeGroup(job)
 			continue
@@ -166,6 +225,7 @@ func (s *sentenceStreamer) synthesizeUnit(job synthesisJob) {
 	if path != "" {
 		key = media.ClipKeyForPath(path)
 	}
+	s.emitProgress(job.seq, "encoding", key, clipURL(key))
 	s.completeJob(jobResult{seq: job.seq, text: unit.Text, key: key})
 }
 
@@ -180,6 +240,7 @@ func (s *sentenceStreamer) synthesizeGroup(job synthesisJob) {
 		return
 	}
 	group := groups[0]
+	s.emitProgress(job.seq, "encoding", group.Key, clipURL(group.Key))
 	s.completeJob(jobResult{seq: job.seq, text: media.GroupText(lines), key: group.Key})
 }
 
@@ -187,8 +248,18 @@ func (s *sentenceStreamer) synthesizeGroup(job synthesisJob) {
 // to emit, guaranteeing that units are announced in submission order.
 func (s *sentenceStreamer) completeJob(res jobResult) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	if res.err == nil {
+		s.readyCount++
+	} else {
+		s.failedCount++
+	}
 	s.completeJobLocked(res)
+	s.mu.Unlock()
+	if res.err == nil {
+		s.emitProgress(res.seq, "ready", res.key, clipURL(res.key))
+	} else {
+		s.emitProgress(res.seq, "failed", "", "")
+	}
 }
 
 func (s *sentenceStreamer) completeJobLocked(res jobResult) {
@@ -243,7 +314,7 @@ func (s *sentenceStreamer) Feed(text string) {
 	s.mu.Unlock()
 
 	for _, sentence := range complete {
-		s.feed(entity.SegmentNarration, "", sentence)
+		s.feed(entity.SegmentNarration, "", "", sentence)
 	}
 }
 
@@ -265,7 +336,7 @@ func (s *sentenceStreamer) FeedSegment(event turnstream.Event) {
 	// Grouping folds whole segments, because the turn's clip plan folds whole
 	// segments; splitting here would build a different line and a different key.
 	if s.grouping {
-		s.feed(kind, event.SpeakerID, text)
+		s.feed(kind, event.Speaker, event.SpeakerID, text)
 		if event.Player {
 			s.Flush()
 		}
@@ -277,7 +348,7 @@ func (s *sentenceStreamer) FeedSegment(event turnstream.Event) {
 		complete = append(complete, remainder)
 	}
 	for _, sentence := range complete {
-		s.feed(kind, event.SpeakerID, sentence)
+		s.feed(kind, event.Speaker, event.SpeakerID, sentence)
 	}
 }
 
@@ -287,19 +358,22 @@ func (s *sentenceStreamer) Flush() {
 		return
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	var group []media.SpeakerLine
 	if s.grouping && s.folder != nil {
-		if group := s.folder.Flush(); group != nil {
-			s.enqueueGroupLocked(group)
-		}
+		group = s.folder.Flush()
+	}
+	s.mu.Unlock()
+	if group != nil {
+		s.enqueueGroup(group)
 	}
 }
 
 // feed routes one piece of text to the folder or the sentence queue.
-func (s *sentenceStreamer) feed(kind, speakerID, text string) {
+func (s *sentenceStreamer) feed(kind, speaker, speakerID, text string) {
 	if s.grouping {
 		line, ok := s.pipeline.SegmentLine(entity.TurnSegment{
 			Kind:      kind,
+			Speaker:   speaker,
 			SpeakerID: speakerID,
 			Text:      text,
 		}, s.narrator, s.voiceFor)
@@ -308,13 +382,13 @@ func (s *sentenceStreamer) feed(kind, speakerID, text string) {
 		}
 		s.mu.Lock()
 		groups := s.folder.Add(line)
-		for _, group := range groups {
-			s.enqueueGroupLocked(group)
-		}
 		s.mu.Unlock()
+		for _, group := range groups {
+			s.enqueueGroup(group)
+		}
 		return
 	}
-	s.enqueueUnit(speechUnit{Kind: kind, SpeakerID: speakerID, Text: text})
+	s.enqueueUnit(speechUnit{Kind: kind, Speaker: speaker, SpeakerID: speakerID, Text: text})
 }
 
 // enqueueUnit sends a sentence without blocking, sequencing its ordinal.
@@ -322,39 +396,61 @@ func (s *sentenceStreamer) enqueueUnit(unit speechUnit) {
 	s.mu.Lock()
 	seq := s.nextSeq
 	s.nextSeq++
+	dropped := false
 	select {
 	case s.queue <- synthesisJob{seq: seq, unit: unit}:
 	default:
 		s.completeJobLocked(jobResult{seq: seq, err: errQueueDropped})
+		s.failedCount++
+		dropped = true
 	}
 	s.mu.Unlock()
+
+	if dropped {
+		s.emitProgress(seq, "failed", "", "")
+	} else {
+		s.emitProgress(seq, "waiting", "", "")
+	}
 }
 
 // enqueueGroup sends a folded group without blocking, on the same terms.
 func (s *sentenceStreamer) enqueueGroup(group []media.SpeakerLine) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.enqueueGroupLocked(group)
-}
-
-func (s *sentenceStreamer) enqueueGroupLocked(group []media.SpeakerLine) {
 	seq := s.nextSeq
 	s.nextSeq++
+	dropped := false
 	select {
 	case s.queue <- synthesisJob{seq: seq, group: group}:
 	default:
 		s.completeJobLocked(jobResult{seq: seq, err: errQueueDropped})
+		s.failedCount++
+		dropped = true
+	}
+	s.mu.Unlock()
+
+	if dropped {
+		s.emitProgress(seq, "failed", "", "")
+	} else {
+		s.emitProgress(seq, "waiting", "", "")
 	}
 }
 
-// Close flushes the pending group, stops accepting work, and waits for the queue
-// to drain.
+// Close flushes the pending group and closes the work queue.
 func (s *sentenceStreamer) Close() {
 	if s == nil {
 		return
 	}
-	s.Flush()
-	s.closeOne.Do(func() { close(s.queue) })
+	s.closeOne.Do(func() {
+		s.Flush()
+		close(s.queue)
+	})
+}
+
+// Wait blocks until all queued synthesis jobs have finished.
+func (s *sentenceStreamer) Wait() {
+	if s == nil {
+		return
+	}
 	s.wg.Wait()
 }
 

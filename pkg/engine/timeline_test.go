@@ -240,3 +240,77 @@ func TestEnsureIndexedRederivesWorkingSetWhenEmpty(t *testing.T) {
 		t.Fatalf("expected 2 working set entries, got %d", len(ws))
 	}
 }
+
+func TestStageEntitiesMergesPreviousIdentity(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	store := newTestStore(t)
+	history := NewHistoryLogger(filepath.Join(t.TempDir(), "history.jsonl"))
+	timeline := NewTimeline(paths, store, history, "campaign-01")
+
+	// Seed existing generic-scout entity note in store.
+	entitiesDir := timeline.EntitiesDir()
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{
+		ID:      "generic-scout",
+		Name:    "Generic Scout",
+		Type:    "character",
+		Body:    "A cloaked scout watching from the woods.",
+		Tags:    []string{"scout", "ranger"},
+		History: []int{1},
+		Voice:   &entity.VoiceConfig{VoiceID: "am_adam"},
+	})
+	if _, err := storage.NewSyncer(store).Sync(entitiesDir); err != nil {
+		t.Fatal(err)
+	}
+
+	turn := &Turn{
+		Number:    2,
+		Narration: "The scout steps forward and introduces himself as Valen.",
+		Entities:  []entity.Mention{{ID: "generic-scout", Kind: entity.MentionExtracted}},
+		Segments: []entity.TurnSegment{
+			{Kind: entity.SegmentSpeech, Speaker: "Generic Scout", SpeakerID: "generic-scout", Text: "I am Valen."},
+		},
+	}
+
+	personae := []harness.PersonaDecl{
+		{
+			Name:        "Valen",
+			Type:        "character",
+			Reveals:     "Generic Scout",
+			Description: "A veteran scout of the Silver Guard.",
+		},
+	}
+
+	pending, err := timeline.stageEntities(turn, nil, personae)
+	if err != nil {
+		t.Fatalf("stageEntities: %v", err)
+	}
+
+	valen, ok := pending["valen"]
+	if !ok {
+		t.Fatalf("expected valen in pending entities, got %+v", pending)
+	}
+	if valen.Name != "Valen" {
+		t.Errorf("valen name = %q, want Valen", valen.Name)
+	}
+	if len(valen.Aliases) == 0 || valen.Aliases[0] != "Generic Scout" {
+		t.Errorf("expected Generic Scout in aliases, got %v", valen.Aliases)
+	}
+	if valen.Voice == nil || valen.Voice.VoiceID != "am_adam" {
+		t.Errorf("expected inherited voice am_adam, got %+v", valen.Voice)
+	}
+	// generic-scout should no longer be in pending
+	if _, exists := pending["generic-scout"]; exists {
+		t.Errorf("generic-scout should have been merged and removed from pending")
+	}
+	// turn.Entities should point to valen instead of generic-scout
+	for _, m := range turn.Entities {
+		if m.ID == "generic-scout" {
+			t.Errorf("turn.Entities still mentions generic-scout")
+		}
+	}
+	// turn.Segments should have SpeakerID mapped to valen
+	if turn.Segments[0].SpeakerID != "valen" {
+		t.Errorf("segment SpeakerID = %q, want valen", turn.Segments[0].SpeakerID)
+	}
+}
+

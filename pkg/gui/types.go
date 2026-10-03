@@ -129,10 +129,12 @@ type SegmentDTO struct {
 	// adjacent same-speaker segments shares one clip, so this is usually one URL;
 	// ClipGroup names that shared clip so the client renders one control for the
 	// whole group.
-	AudioURLs   []string `json:"audio_urls,omitempty"`
-	ClipGroup   string   `json:"clip_group,omitempty"`
-	PortraitURL string   `json:"portrait_url,omitempty"`
-	CheckRef    string   `json:"check_ref,omitempty"`
+	AudioURLs       []string `json:"audio_urls,omitempty"`
+	ClipGroup       string   `json:"clip_group,omitempty"`
+	PortraitURL     string   `json:"portrait_url,omitempty"`
+	SpeakerPortrait string   `json:"speaker_portrait,omitempty"`
+	HasCustomPortrait bool   `json:"has_custom_portrait,omitempty"`
+	CheckRef        string   `json:"check_ref,omitempty"`
 	Player      bool     `json:"player,omitempty"`
 	Duration    float64  `json:"duration"`
 }
@@ -172,6 +174,18 @@ type TTSBatchClearRequest struct {
 	GameID string `json:"game_id,omitempty"`
 }
 
+// AudioProgressDTO carries progress metrics for synthesis of a turn's audio segments.
+type AudioProgressDTO struct {
+	TurnNumber    int    `json:"turn_number"`
+	Sequence      int    `json:"sequence"`
+	TotalSegments int    `json:"total_segments"`
+	Stage         string `json:"stage"` // "waiting" | "synthesizing" | "encoding" | "ready" | "failed"
+	ReadyCount    int    `json:"ready_count"`
+	FailedCount   int    `json:"failed_count,omitempty"`
+	AudioKey      string `json:"audio_key,omitempty"`
+	AudioURL      string `json:"audio_url,omitempty"`
+}
+
 type TurnDTO struct {
 	TurnNumber      int           `json:"turn_number"`
 	InputText       string        `json:"input_text"`
@@ -194,6 +208,7 @@ type TurnDTO struct {
 	LocationID      string        `json:"location_id,omitempty"`
 	LocationName    string        `json:"location_name,omitempty"`
 	LocationArtURL  string        `json:"location_art_url,omitempty"`
+	SceneBreak      bool          `json:"scene_break,omitempty"`
 	// Structured turn fields: the action verdict, whether it was rejected, and
 	// the checks the GM resolved.
 	Verdict  *harness.ActionVerdict `json:"verdict,omitempty"`
@@ -332,12 +347,14 @@ type PlayerCharacterDTO struct {
 
 // EntitySummaryDTO is one note as the codex browser lists it.
 type EntitySummaryDTO struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Type       string   `json:"type"`
-	Location   string   `json:"location,omitempty"`
-	Tags       []string `json:"tags,omitempty"`
-	ParseError bool     `json:"parse_error,omitempty"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Location    string   `json:"location,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+	HasPortrait bool     `json:"has_portrait,omitempty"`
+	PortraitURL string   `json:"portrait_url,omitempty"`
+	ParseError  bool     `json:"parse_error,omitempty"`
 }
 
 // ThreadDTO is one unresolved arc as the client sees it.
@@ -558,6 +575,16 @@ type TurnEvent struct {
 	Code    string                     `json:"code,omitempty"`
 	Detail  string                     `json:"detail,omitempty"`
 	Failure *harness.GenerationFailure `json:"failure,omitempty"`
+	// AudioProgress is emitted when Type is "audio_progress".
+	AudioProgress *AudioProgressDTO `json:"audio_progress,omitempty"`
+	// Character portrait update, present when Type is "portrait".
+	CharacterID       string `json:"character_id,omitempty"`
+	PortraitURL       string `json:"portrait_url,omitempty"`
+	Version           int    `json:"version,omitempty"`
+	HasCustomPortrait bool   `json:"has_custom_portrait,omitempty"`
+	// Scene image update, present when Type is "scene_image".
+	TurnNumber int    `json:"turn_number,omitempty"`
+	ImageURL   string `json:"image_url,omitempty"`
 	// RetryAfterMS is the provider's advertised backoff, when it gave one.
 	RetryAfterMS int64 `json:"retry_after_ms,omitempty"`
 }

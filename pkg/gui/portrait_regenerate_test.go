@@ -62,7 +62,7 @@ func TestRegenerateCharacterPortraitEndpoint(t *testing.T) {
 	}
 	// Drain background enrichment so its portrait write cannot race this check.
 	svc.Close()
-	if _, err := os.Stat(filepath.Join(svc.GetResolver().GameDir(game.ID), "assets", "portraits", "hero-vance.png")); err != nil {
+	if _, err := os.Stat(filepath.Join(svc.GetResolver().GameDir(game.ID), "assets", "portraits", "hero-vance-v1.png")); err != nil {
 		t.Fatalf("expected the regenerated portrait on disk: %v", err)
 	}
 }
