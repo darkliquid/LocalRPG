@@ -236,3 +236,29 @@ func TestStreamerGroupsPerSpeakerRun(t *testing.T) {
 		t.Fatalf("calls = %d, want one request per speaker run", got)
 	}
 }
+
+func TestStreamerEmitsAudioProgressEvents(t *testing.T) {
+	client := &fakeSentenceTTSClient{}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, nil)
+	var stages []string
+	var mu sync.Mutex
+	streamer.SetTurnNumber(1)
+	streamer.SetProgressObserver(func(progress AudioProgressDTO) {
+		mu.Lock()
+		stages = append(stages, progress.Stage)
+		mu.Unlock()
+	})
+
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The castle gates creak open."})
+	streamer.Flush()
+	streamer.Close()
+	streamer.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(stages) == 0 || stages[len(stages)-1] != "ready" {
+		t.Fatalf("expected progress reaching 'ready', got: %v", stages)
+	}
+}
+

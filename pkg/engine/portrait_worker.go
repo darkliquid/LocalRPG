@@ -49,6 +49,7 @@ type PortraitWorker struct {
 	store     *storage.Store
 	generator PortraitGenerator
 	inFlight  map[string]bool
+	onReady   func(gameID, characterID, relPath string)
 }
 
 // NewPortraitWorker creates a new PortraitWorker.
@@ -59,6 +60,16 @@ func NewPortraitWorker(resolver *core.PathResolver, store *storage.Store, gen Po
 		generator: gen,
 		inFlight:  make(map[string]bool),
 	}
+}
+
+// SetOnReady registers a callback invoked when a portrait has been written and its note updated.
+func (w *PortraitWorker) SetOnReady(fn func(gameID, characterID, relPath string)) {
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.onReady = fn
 }
 
 // Enqueue asynchronously triggers portrait generation for a character if not already in flight or set.
@@ -136,6 +147,12 @@ func (w *PortraitWorker) writePortrait(ctx context.Context, gameID string, ent *
 
 	if err := w.updateNote(gameID, ent, relPath); err != nil {
 		return "", err
+	}
+	w.mu.Lock()
+	cb := w.onReady
+	w.mu.Unlock()
+	if cb != nil {
+		cb(gameID, ent.ID, relPath)
 	}
 	return relPath, nil
 }

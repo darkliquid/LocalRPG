@@ -132,6 +132,7 @@ type SegmentDTO struct {
 	AudioURLs   []string `json:"audio_urls,omitempty"`
 	ClipGroup   string   `json:"clip_group,omitempty"`
 	PortraitURL string   `json:"portrait_url,omitempty"`
+	HasCustomPortrait bool   `json:"has_custom_portrait,omitempty"`
 	CheckRef    string   `json:"check_ref,omitempty"`
 	Player      bool     `json:"player,omitempty"`
 	Duration    float64  `json:"duration"`
@@ -170,6 +171,17 @@ type TTSBatchCancelRequest struct {
 // GameID is empty.
 type TTSBatchClearRequest struct {
 	GameID string `json:"game_id,omitempty"`
+}
+
+// AudioProgressDTO carries progress metrics for synthesis of a turn's audio segments.
+type AudioProgressDTO struct {
+	TurnNumber    int    `json:"turn_number"`
+	Sequence      int    `json:"sequence"`
+	TotalSegments int    `json:"total_segments"`
+	Stage         string `json:"stage"` // "waiting" | "synthesizing" | "encoding" | "ready" | "failed"
+	ReadyCount    int    `json:"ready_count"`
+	AudioKey      string `json:"audio_key,omitempty"`
+	AudioURL      string `json:"audio_url,omitempty"`
 }
 
 type TurnDTO struct {
@@ -558,6 +570,12 @@ type TurnEvent struct {
 	Code    string                     `json:"code,omitempty"`
 	Detail  string                     `json:"detail,omitempty"`
 	Failure *harness.GenerationFailure `json:"failure,omitempty"`
+	// AudioProgress is emitted when Type is "audio_progress".
+	AudioProgress *AudioProgressDTO `json:"audio_progress,omitempty"`
+	// Character portrait update, present when Type is "portrait".
+	CharacterID       string `json:"character_id,omitempty"`
+	PortraitURL       string `json:"portrait_url,omitempty"`
+	HasCustomPortrait bool   `json:"has_custom_portrait,omitempty"`
 	// RetryAfterMS is the provider's advertised backoff, when it gave one.
 	RetryAfterMS int64 `json:"retry_after_ms,omitempty"`
 }

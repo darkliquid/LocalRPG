@@ -65,6 +65,7 @@ export interface TurnSegment {
   // first segment of the group carries the play/stop/regenerate control.
   clip_group?: string;
   portrait_url?: string;
+  has_custom_portrait?: boolean;
   // True for the protagonist's own line, which renders as speech but suppresses
   // the duplicate action block for the turn.
   player?: boolean;
@@ -172,8 +173,18 @@ export interface ToolCall {
   result_chars: number;
 }
 
+export interface AudioProgressEvent {
+  turn_number: number;
+  sequence: number;
+  total_segments: number;
+  stage: 'waiting' | 'synthesizing' | 'encoding' | 'ready' | 'failed';
+  ready_count: number;
+  audio_key?: string;
+  audio_url?: string;
+}
+
 export interface TurnEvent {
-  type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing';
+  type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing' | 'audio_progress' | 'portrait';
   text?: string;
   turn?: Turn;
   // One parsed narration or speech unit, present when type is 'segment': it is
@@ -184,6 +195,10 @@ export interface TurnEvent {
   index?: number;
   audio_key?: string;
   audio_url?: string;
+  audio_progress?: AudioProgressEvent;
+  character_id?: string;
+  portrait_url?: string;
+  has_custom_portrait?: boolean;
   message?: string;
   model_id?: string;
   name?: string;

@@ -131,3 +131,24 @@ func TestSegmentDTO_IncludesPortraitURLForSpeech(t *testing.T) {
 	}
 }
 
+func TestSegmentDTO_HasCustomPortraitFlag(t *testing.T) {
+	seg := entity.TurnSegment{
+		Kind:      "speech",
+		Speaker:   "Kaelen",
+		SpeakerID: "kaelen",
+		Text:      "Hello traveler.",
+	}
+	// When portrait file does not exist, HasCustomPortrait should be false
+	dtos := segmentDTOs([]entity.TurnSegment{seg}, "test-game", clipPlan{}, nil)
+	if len(dtos) == 0 || dtos[0].HasCustomPortrait {
+		t.Fatalf("expected HasCustomPortrait=false for character without custom portrait file, got %v", dtos[0].HasCustomPortrait)
+	}
+
+	// When custom portrait exists
+	dtosWithCustom := segmentDTOs([]entity.TurnSegment{seg}, "test-game", clipPlan{}, nil, func(string) bool { return true })
+	if len(dtosWithCustom) == 0 || !dtosWithCustom[0].HasCustomPortrait {
+		t.Fatalf("expected HasCustomPortrait=true with custom checker, got %v", dtosWithCustom[0].HasCustomPortrait)
+	}
+}
+
+

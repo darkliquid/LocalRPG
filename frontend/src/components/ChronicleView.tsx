@@ -29,6 +29,8 @@ interface ChronicleViewProps {
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
   turnAudioStatus?: Record<number, { state: TurnAudioState; message?: string }>;
   segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
+  characterPortraits?: Record<string, { url: string; hasCustom: boolean }>;
+  segmentProgress?: Record<number, string>;
   // The campaign whose clips the beat controls regenerate.
   gameId?: string;
   // Clips already heard while the turn streamed, which playback must skip.
@@ -49,6 +51,8 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   displayMode,
   turnAudioStatus = {},
   segmentAudioStatus = {},
+  characterPortraits,
+  segmentProgress,
   gameId,
   skipAudioKeys,
 }) => {
@@ -154,6 +158,8 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 turnAudioMessage={audioStatus?.message}
                 turnNumber={turn.turn_number}
                 segmentAudioStatus={segmentAudioStatus}
+                characterPortraits={characterPortraits}
+                segmentProgress={index === beats.length - 1 ? segmentProgress : undefined}
                 checks={turn.checks}
                 gameId={gameId}
                 skipAudioKeys={skipAudioKeys}
@@ -243,6 +249,8 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               segments={streamedSegments}
               onEntityClick={onWikilinkClick}
               displayMode={displayMode}
+              characterPortraits={characterPortraits}
+              segmentProgress={segmentProgress}
             />
           ) : (
             <div className="flex items-center gap-3 p-4 rounded-xl bg-purple-950/20 border border-purple-500/30 text-stone-300 text-sm animate-pulse">

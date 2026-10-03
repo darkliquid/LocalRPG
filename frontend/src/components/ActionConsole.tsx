@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Send, Mic, Dices, MessageSquare, Zap, Compass, Square, Loader2 } from 'lucide-react';
 import { useVoiceInput } from '../hooks/useVoiceInput';
+import { AudioProgressEvent } from '../types';
 
 interface ActionConsoleProps {
   onSubmit: (mode: string, text: string) => void;
@@ -8,6 +9,7 @@ interface ActionConsoleProps {
   streaming?: boolean;
   onStop?: () => void;
   sttType?: string;
+  audioProgress?: AudioProgressEvent | null;
 }
 
 export const ActionConsole: React.FC<ActionConsoleProps> = ({
@@ -16,6 +18,7 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({
   streaming,
   onStop,
   sttType,
+  audioProgress,
 }) => {
   const [text, setText] = useState('');
   const [mode, setMode] = useState<'do' | 'say' | 'story' | 'roll'>('do');
@@ -106,6 +109,12 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({
           <Dices className="w-3 h-3" />
           <span>ROLL</span>
         </button>
+        {audioProgress && audioProgress.ready_count < audioProgress.total_segments && (
+          <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-sans font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20 anim-fade-in">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span>Audio: {audioProgress.ready_count}/{audioProgress.total_segments} ready ({audioProgress.stage})</span>
+          </div>
+        )}
       </div>
 
       {/* Input Bar with STT and Submit */}

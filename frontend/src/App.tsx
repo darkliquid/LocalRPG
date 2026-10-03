@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
 import { APIClient, HTTPError, GenerationError } from './api/client';
-import { GameState, Turn, TurnSegment, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState } from './types';
+import { GameState, Turn, TurnSegment, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState, AudioProgressEvent } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { TurnAudioState, segmentAudioKey } from './components/TurnSegments';
@@ -69,6 +69,9 @@ export const App: React.FC = () => {
     config?.media.tts.master_volume ?? 1
   );
   const [streamedKeys, setStreamedKeys] = useState<ReadonlySet<string>>(new Set());
+  const [audioProgress, setAudioProgress] = useState<AudioProgressEvent | null>(null);
+  const [segmentAudioProgress, setSegmentAudioProgress] = useState<Record<number, string>>({});
+  const [characterPortraits, setCharacterPortraits] = useState<Record<string, { url: string; hasCustom: boolean }>>({});
 
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
@@ -231,6 +234,9 @@ export const App: React.FC = () => {
       setEntities([]);
       setRecap(null);
       setAddressed(new Set());
+      setAudioProgress(null);
+      setSegmentAudioProgress({});
+      setCharacterPortraits({});
       return;
     }
     client.getChronicle().then(setChronicle).catch(console.error);
@@ -239,6 +245,25 @@ export const App: React.FC = () => {
     }).catch(console.error);
     refreshCorpus();
   }, [client, refreshCorpus]);
+
+  useEffect(() => {
+    if (chronicle.length === 0) return;
+    const portraits: Record<string, { url: string; hasCustom: boolean }> = {};
+    for (const turn of chronicle) {
+      for (const seg of turn.segments || []) {
+        const charId = seg.speaker_id || (seg.speaker ? slugify(seg.speaker) : undefined);
+        if (charId && seg.portrait_url) {
+          if (!portraits[charId] || seg.has_custom_portrait) {
+            portraits[charId] = {
+              url: seg.portrait_url,
+              hasCustom: !!seg.has_custom_portrait,
+            };
+          }
+        }
+      }
+    }
+    setCharacterPortraits((prev) => ({ ...portraits, ...prev }));
+  }, [chronicle]);
 
   const handleSelectGame = (gameId: string) => {
     localStorage.setItem('localrpg_last_played_game', gameId);
@@ -282,6 +307,8 @@ export const App: React.FC = () => {
     setStreamedSegments([]);
     setToolActivity(null);
     setTurnError(null);
+    setAudioProgress(null);
+    setSegmentAudioProgress({});
     streamedSpeech.reset();
     setStreamedKeys(new Set());
 
@@ -303,7 +330,23 @@ export const App: React.FC = () => {
           } else if (event.type === 'speech') {
             // A sentence the server synthesized mid-stream, played here while the
             // rest of the prose is still arriving.
-            streamedSpeech.enqueue(event.audio_url ?? '', event.audio_key ?? '');
+            streamedSpeech.enqueue(event.audio_url ?? '', event.audio_key ?? '', event.index);
+          } else if (event.type === 'audio_progress' && event.audio_progress) {
+            setAudioProgress(event.audio_progress);
+            if (event.audio_progress.sequence !== undefined && event.audio_progress.stage) {
+              setSegmentAudioProgress((prev) => ({
+                ...prev,
+                [event.audio_progress!.sequence]: event.audio_progress!.stage,
+              }));
+            }
+          } else if (event.type === 'portrait' && event.character_id) {
+            setCharacterPortraits((prev) => ({
+              ...prev,
+              [event.character_id!]: {
+                url: event.portrait_url || '',
+                hasCustom: !!event.has_custom_portrait,
+              },
+            }));
           } else if (event.type === 'tool') {
             setToolActivity(
               event.tool_status === 'running'
@@ -736,6 +779,8 @@ export const App: React.FC = () => {
                         segments={streamedSegments}
                         onEntityClick={handleOpenWikilink}
                         displayMode={config?.media.tts.speech_cues?.display_mode}
+                        characterPortraits={characterPortraits}
+                        segmentProgress={segmentAudioProgress}
                       />
                     </div>
                   ) : (
@@ -799,6 +844,8 @@ export const App: React.FC = () => {
                     displayMode={config?.media.tts.speech_cues?.display_mode}
                     turnAudioStatus={turnAudioStatus}
                     segmentAudioStatus={segmentAudioStatus}
+                    characterPortraits={characterPortraits}
+                    segmentProgress={segmentAudioProgress}
                     gameId={activeGameID ?? undefined}
                     skipAudioKeys={streamedKeys}
                   />
@@ -862,6 +909,7 @@ export const App: React.FC = () => {
                 streaming={turnInFlight}
                 onStop={handleStopTurn}
                 sttType={config?.media.stt?.type}
+                audioProgress={audioProgress}
               />
             </div>
           </main>

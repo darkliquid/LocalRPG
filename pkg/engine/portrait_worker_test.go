@@ -148,3 +148,54 @@ func TestPortraitWorker_RegenerateOverwritesExisting(t *testing.T) {
 		t.Fatalf("expected the stale .jpg to be removed, stat err = %v", err)
 	}
 }
+
+func TestPortraitWorker_SetOnReady(t *testing.T) {
+	tmpDir := t.TempDir()
+	resolver := core.NewPathResolver(tmpDir)
+	gameID := "ready-game"
+	gameDir := resolver.GameDir(gameID)
+	entitiesDir := filepath.Join(gameDir, "entities")
+	if err := os.MkdirAll(entitiesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	char := &entity.Entity{
+		ID: "garrick", Name: "Garrick", Type: "character",
+		Gender: "male", Age: "35", Appearance: "Scarred warrior",
+	}
+	data, err := char.SerializeMarkdown()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(entitiesDir, "garrick.md"), data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	pngBytes := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00}
+	gen := &mockPortraitGenerator{returnBytes: pngBytes}
+	worker := NewPortraitWorker(resolver, nil, gen)
+
+	readyCalled := false
+	var readyGame, readyChar, readyRel string
+	worker.SetOnReady(func(gID, charID, relPath string) {
+		readyCalled = true
+		readyGame = gID
+		readyChar = charID
+		readyRel = relPath
+	})
+
+	worker.Enqueue(gameID, char, "sketch")
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && !readyCalled {
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if !readyCalled {
+		t.Fatal("expected SetOnReady callback to be called")
+	}
+	if readyGame != gameID || readyChar != "garrick" || readyRel != filepath.Join("assets", "portraits", "garrick.png") {
+		t.Fatalf("unexpected callback args: game=%s, char=%s, rel=%s", readyGame, readyChar, readyRel)
+	}
+}
+
