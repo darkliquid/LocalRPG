@@ -78,6 +78,10 @@ func handleGUICommand(args []string) {
 		_ = telemetryProvider.Shutdown(shutdownCtx)
 	}()
 
+	// A batch speech job is async: if one was left running when the app closed,
+	// collect it now in the background rather than making the user restart it.
+	svc.ResumePendingBatches(context.Background())
+
 	// os.Exit skips defers, so every exit path past this point drains the
 	// service's background work (narration warm-up, enrichment, retro-summary)
 	// before leaving.

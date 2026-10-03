@@ -14,6 +14,11 @@ import (
 )
 
 func handleTTSCommand(args []string) {
+	if len(args) > 0 && args[0] == "batch" {
+		handleTTSBatchCommand(args[1:])
+		return
+	}
+
 	fs := flag.NewFlagSet("tts", flag.ContinueOnError)
 	voice := fs.String("voice", "", "Voice ID override")
 	pitch := fs.Float64("pitch", 0, "Pitch override")

@@ -14,6 +14,7 @@ const (
 	KeyTTSNativeOS   Key = "tts:native-os"
 	KeyTTSSherpaONNX Key = "tts:sherpa-onnx"
 	KeyTTSPiper      Key = "tts:piper"
+	KeyTTSFishAudio  Key = "tts:fish-audio"
 	KeyTTSHTTP       Key = "tts:http"
 	KeyTTSCartesia   Key = "tts:cartesia"
 
@@ -36,8 +37,9 @@ const (
 func AllKeys() []Key {
 	return []Key{
 		KeyLLMOpenAIChat, KeyLLMGemini, KeyLLMCLI, KeyLLMNarrativeOracle,
-		KeyTTSGemini, KeyTTSElevenLabs, KeyTTSNativeOS, KeyTTSSherpaONNX, KeyTTSPiper, KeyTTSHTTP, KeyTTSCartesia,
-		KeySTTWhisperHTTP, KeySTTWhisperCLI, KeySTTWebSpeech, KeySTTCartesia,
+		KeyTTSGemini, KeyTTSElevenLabs, KeyTTSNativeOS, KeyTTSSherpaONNX, KeyTTSPiper,
+    KeyTTSFishAudio, KeyTTSHTTP, KeyTTSCartesia,
+		KeySTTWhisperHTTP, KeySTTWhisperCLI, KeySTTWebSpeech, KeySTTCartesia
 		KeyImageGemini, KeyImageHTTP, KeyImageCLI, KeyImageProceduralArt,
 		KeyEmbeddingBuiltin, KeyEmbeddingOpenAI, KeyEmbeddingGemini,
 	}

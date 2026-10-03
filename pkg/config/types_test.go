@@ -264,6 +264,53 @@ func TestVoiceProfileOptionsAndMeteredRoundTrip(t *testing.T) {
 	}
 }
 
+func TestTTSConfigGroupingRoundTripAndDefaults(t *testing.T) {
+	cfg := TTSConfig{
+		Grouping:     "always",
+		MultiSpeaker: "off",
+		Limits:       &TTSLimits{MaxChars: 4000, MaxTokens: 8000, MaxSpeakers: 2},
+	}
+	encoded, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded TTSConfig
+	if err := yaml.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if decoded.Grouping != "always" || decoded.MultiSpeaker != "off" {
+		t.Errorf("grouping did not round-trip: %#v", decoded)
+	}
+	if decoded.Limits == nil || decoded.Limits.MaxChars != 4000 || decoded.Limits.MaxTokens != 8000 || decoded.Limits.MaxSpeakers != 2 {
+		t.Errorf("limits did not round-trip: %#v", decoded.Limits)
+	}
+
+	plain, err := yaml.Marshal(TTSConfig{})
+	if err != nil {
+		t.Fatalf("marshal plain: %v", err)
+	}
+	if strings.Contains(string(plain), "grouping") || strings.Contains(string(plain), "limits") {
+		t.Errorf("unset grouping and limits must be omitted, got %s", plain)
+	}
+
+	// The accessors default an unset value to "auto".
+	var empty Config
+	if empty.TTSGrouping() != "auto" || empty.TTSMultiSpeaker() != "auto" {
+		t.Errorf("expected auto defaults, got %q/%q", empty.TTSGrouping(), empty.TTSMultiSpeaker())
+	}
+	var set Config
+	set.Media.TTS.Grouping = "off"
+	set.Media.TTS.MultiSpeaker = "always"
+	if set.TTSGrouping() != "off" || set.TTSMultiSpeaker() != "always" {
+		t.Errorf("unexpected modes %q/%q", set.TTSGrouping(), set.TTSMultiSpeaker())
+	}
+	var bogus Config
+	bogus.Media.TTS.Grouping = "nonsense"
+	if bogus.TTSGrouping() != "auto" {
+		t.Errorf("expected an unrecognised mode to fall back to auto, got %q", bogus.TTSGrouping())
+	}
+}
+
 func TestTTSConfigOptionsRoundTrip(t *testing.T) {
 	cfg := TTSConfig{Options: map[string]interface{}{"stability": 0.4, "model": "eleven_multilingual_v2"}}
 	encoded, err := yaml.Marshal(cfg)
