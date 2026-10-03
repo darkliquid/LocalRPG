@@ -50,7 +50,7 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 			return &builtinEchoModelProvider{id: id}, nil
 		}
 		return BuildModelFor(id, cfg)
-	case "cli", "http", "gemini", "":
+	case "cli", "http", "gemini", "inworld", "":
 		return BuildModelFor(id, cfg)
 	default:
 		return nil, fmt.Errorf("unknown model provider type: %s", cfg.Type)
@@ -94,6 +94,16 @@ func BuildModelFor(id string, cfg ProviderConfig) (ModelProvider, error) {
 // BuildModel constructs a model provider from the registry by descriptor ID.
 func BuildModel(descriptorID string, cfg ProviderConfig) (ModelProvider, error) {
 	return BuildModelFor(descriptorID, cfg)
+}
+
+// sharedKeyFor picks the provider-wide credential a role inherits when it has
+// none of its own: an Inworld role gets providers.inworld.api_key, every other
+// role keeps the Gemini key it has always used.
+func sharedKeyFor(cfg *config.Config, key provider.Key, hasKey bool) string {
+	if hasKey && key.Parent() == provider.KeyLLMInworld {
+		return cfg.Providers.Inworld.APIKey
+	}
+	return cfg.Providers.Gemini.APIKey
 }
 
 // NewModelProviderWithLogger is NewModelProvider with a trace sink attached, so a
@@ -150,6 +160,13 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 			gmConfigured = true
 		}
 
+		key, hasKey := KeyFor(ProviderConfig{
+			Type:        roleCfg.Type,
+			BuiltinName: roleCfg.BuiltinName,
+			Command:     roleCfg.Command,
+			Endpoint:    roleCfg.Endpoint,
+		})
+
 		provider, err := NewModelProviderWithLogger(role, ProviderConfig{
 			Type:           roleCfg.Type,
 			BuiltinName:    roleCfg.BuiltinName,
@@ -163,7 +180,7 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 			ThinkingBudget: roleCfg.ThinkingBudget,
 			TopP:           roleCfg.TopP,
 			TopK:           roleCfg.TopK,
-			SharedAPIKey:   cfg.Providers.Gemini.APIKey,
+			SharedAPIKey:   sharedKeyFor(cfg, key, hasKey),
 		}, logger)
 		if err != nil {
 			name := roleCfg.BuiltinName
@@ -179,12 +196,7 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 
 		router.RegisterProvider(provider)
 		router.AssignRole(role, role)
-		if key, ok := KeyFor(ProviderConfig{
-			Type:        roleCfg.Type,
-			BuiltinName: roleCfg.BuiltinName,
-			Command:     roleCfg.Command,
-			Endpoint:    roleCfg.Endpoint,
-		}); ok {
+		if hasKey {
 			router.AssignRoleKey(role, key)
 		}
 	}

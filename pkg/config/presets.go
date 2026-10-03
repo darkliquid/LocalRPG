@@ -15,6 +15,13 @@ var AgentPresets = map[string]AgentRoleConfig{
 		Temperature: 0.7,
 		MaxTokens:   1024,
 	},
+	"inworld-frontier": {
+		Type:        "builtin",
+		BuiltinName: "inworld",
+		Model:       "inworld/compare-frontier-models",
+		Temperature: 0.7,
+		MaxTokens:   2048,
+	},
 	"localai": {
 		Type:        "http",
 		Endpoint:    "http://localhost:8080/v1",

@@ -14,10 +14,14 @@ func KeyFor(cfg ProviderConfig) (provider.Key, bool) {
 		return provider.InstanceOrSelf(provider.KeyLLMCLI, provider.CommandDiscriminator(cfg.Command)), true
 	case "gemini":
 		return provider.KeyLLMGemini, true
+	case "inworld":
+		return provider.KeyLLMInworld, true
 	case "builtin", "":
 		switch cfg.BuiltinName {
 		case "gemini":
 			return provider.KeyLLMGemini, true
+		case "inworld":
+			return provider.KeyLLMInworld, true
 		case "narrative-oracle":
 			return provider.KeyLLMNarrativeOracle, true
 		}

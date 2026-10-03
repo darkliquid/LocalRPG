@@ -17,6 +17,7 @@ var transportByKey = map[provider.Key]string{
 	provider.KeyLLMGemini:          "gemini",
 	provider.KeyLLMCLI:             "cli",
 	provider.KeyLLMNarrativeOracle: "builtin",
+	provider.KeyLLMInworld:         "http",
 
 	provider.KeyTTSGemini:     "gemini",
 	provider.KeyTTSElevenLabs: "http",

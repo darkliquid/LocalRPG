@@ -15,6 +15,8 @@ func TestKeyFor(t *testing.T) {
 	}{
 		{harness.ProviderConfig{Type: "http", Endpoint: "http://localhost:11434/v1"}, "llm:openaichat@localhost:11434", true},
 		{harness.ProviderConfig{Type: "gemini"}, provider.KeyLLMGemini, true},
+		{harness.ProviderConfig{Type: "inworld"}, provider.KeyLLMInworld, true},
+		{harness.ProviderConfig{Type: "builtin", BuiltinName: "inworld"}, provider.KeyLLMInworld, true},
 		{harness.ProviderConfig{Type: "builtin", BuiltinName: "narrative-oracle"}, provider.KeyLLMNarrativeOracle, true},
 		{harness.ProviderConfig{Type: "cli", Command: "claude"}, "llm:cli@claude", true},
 		{harness.ProviderConfig{Type: "disabled"}, "", false},
