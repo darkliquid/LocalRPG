@@ -996,7 +996,10 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		o.logger.Event("turn.protocol_fallback", map[string]interface{}{"reason": result.FallbackReason})
 	}
 
-	if result.Submission == nil && result.PendingCheck == nil {
+	// A pending check is not an empty turn: the prose the model wrote before the
+	// check is the setup the player reads while deciding, so recovery runs for it
+	// too and only a genuinely empty reply is an error.
+	if result.Submission == nil {
 		// The final call may be cut off; earlier continuations ended on a roll and
 		// are complete by construction, so only the last needs classification.
 		if endedOnRoll {
@@ -1005,7 +1008,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			cause = o.classifyCut(result)
 		}
 		narration, recovery, stillIncomplete = o.recoverReply(ctx, strings.Join(narrationParts, "\n\n"), cause, onChunk)
-		if strings.TrimSpace(narration) == "" {
+		if strings.TrimSpace(narration) == "" && result.PendingCheck == nil {
 			outcome = "error"
 			failure := &harness.GenerationFailure{
 				Code:         harness.FailureEmptyResponse,

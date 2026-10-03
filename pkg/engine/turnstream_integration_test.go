@@ -82,7 +82,7 @@ func TestRecordsIntroducePersonaeAndAttributeTheirFirstLine(t *testing.T) {
 	}
 }
 
-func TestRollRecordResolvesAndNarratesTheOutcome(t *testing.T) {
+func TestRollRecordResolvesAndContinuesTheTurn(t *testing.T) {
 	provider := &scriptedStreamProvider{chunksPerCall: [][]string{
 		{"Kaelen steps onto the bridge.\n@roll {\"actor\":\"kaelen\",\"check_kind\":\"skill\",\"stakes\":\"the bridge\",\"outcomes\":{\"pass\":\"He makes it across.\",\"fail\":\"The plank gives way.\"}}\n"},
 		{"Kaelen reaches the far side.\n"},
@@ -117,6 +117,26 @@ func TestRollRecordUnderAskPolicyBecomesAPendingCheck(t *testing.T) {
 	}
 	if turn.PendingCheck == nil {
 		t.Fatalf("expected a pending check, got %+v", turn)
+	}
+}
+
+func TestAPendingCheckTurnKeepsItsProse(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{
+		"Kaelen steps onto the bridge, the planks swaying.\n" +
+			"@roll {\"actor\":\"kaelen\",\"check_kind\":\"skill\",\"stakes\":\"the bridge\"}\n",
+	}}
+	orchestrator, _, _ := streamingOrchestrator(t, provider)
+	orchestrator.SetMechanicsEngagement("ask")
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I follow.", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+	if turn.PendingCheck == nil {
+		t.Fatalf("expected a pending check, got %+v", turn)
+	}
+	if !strings.Contains(turn.Narration, "planks swaying") {
+		t.Fatalf("narration = %q, want the prose before the check", turn.Narration)
 	}
 }
 

@@ -25,10 +25,11 @@ Done:
 
 Remaining:
 
-- Stream A, Task A3 — grouped live audio (needs the shared clip plan).
-- Stream B, Tasks B2-B3 — persist a resolved roll so a retry cannot re-roll, and
-  mark an ask continuation as continuing the same turn.
-- Stream C — retire `submit_turn` and the turn-tool surface.
+- Stream B, Task B0 — a pending-check turn records empty prose; recover it.
+- Stream B, Task B2 — persist a resolved roll so a retry cannot re-roll.
+- Stream B, Task B3 — mark an ask continuation as continuing the same turn.
+- Stream C, Tasks C1-C3 — retire `submit_turn` and the turn-tool surface.
+- Stream A, Task A3 — grouped live audio, sharing the turn's clip plan.
 
 ## Global Constraints
 
@@ -207,19 +208,195 @@ git add pkg/gui/service.go pkg/gui/service_test.go
 git commit -m "feat(gui): drive live audio from parsed segments, not raw chunks"
 ```
 
-### Task A3: Grouped live audio (design note, not yet a task)
+### Task A3: Grouped live audio shares the turn's clip plan
 
-Live audio today is one request per sentence. Grouping consecutive same-speaker
-sentences into one request would match the offline plan but requires the turn's
-clip plan to *be* the stream's plan, not a re-plan over the finished segments
-(`pkg/gui/service.go:472`). The spec's §5.2 is the design; implementing it means
-the streamer records its `[]media.ClipGroup` and `clipPlanFor` consumes them.
-Left out of this plan because it only bites when grouping is on, in which case
-live audio is currently off by design (`groupingEnabled`, `pkg/gui/service.go:519`).
+**Files:**
+- Create: `pkg/media/groupstream.go`
+- Test: `pkg/media/groupstream_test.go`
+- Modify: `pkg/gui/streaming_tts.go`, `pkg/gui/service.go`
+
+**Interfaces:**
+- Consumes: `TTSCapabilities`, `SpeakerLine`, `canJoinGroup`, `ComputeGroupCacheKey`, `SynthesizeGroups`.
+- Produces: `func (s *sentenceStreamer) GroupPlan() []media.ClipGroup`, so `clipPlanFor` reuses the stream's groups instead of re-planning.
+
+- [ ] **Step 1: Write the failing test**
+
+```go
+func TestGroupFolderMatchesPlanGroupsWithoutABudget(t *testing.T) {
+	lines := []SpeakerLine{
+		{SpeakerID: "narrator", Label: "Narrator", Text: "The hall is quiet."},
+		{SpeakerID: "narrator", Label: "Narrator", Text: "Cold air rushes in."},
+		{SpeakerID: "garrick", Label: "Garrick", Text: "Keep walking."},
+	}
+	caps := TTSCapabilities{MaxSpeakers: 1}
+
+	folder := NewGroupFolder(caps, 0)
+	var flushed [][]SpeakerLine
+	for _, line := range lines {
+		if out := folder.Add(line); out != nil {
+			flushed = append(flushed, out)
+		}
+	}
+	if out := folder.Flush(); out != nil {
+		flushed = append(flushed, out)
+	}
+	if len(flushed) != 2 || len(flushed[0]) != 2 || len(flushed[1]) != 1 {
+		t.Fatalf("folded %#v, want 2/1", flushed)
+	}
+}
+```
+
+- [ ] **Step 2: Run it and watch it fail**
+
+Run: `go test -run TestGroupFolder ./pkg/media/`
+Expected: build failure, `NewGroupFolder` undefined.
+
+- [ ] **Step 3: Implement the fold**
+
+```go
+// GroupFolder folds a turn's speaker lines into groups incrementally, applying
+// the same rules as planGroups: a group ends when the speaker changes, when the
+// speaker budget is reached, or when the request limits would be exceeded. A
+// positive budget additionally forces a sentence-aligned flush so live audio is
+// not held until a long block ends.
+type GroupFolder struct {
+	caps    TTSCapabilities
+	budget  int
+	pending []SpeakerLine
+	chars   int
+}
+
+func NewGroupFolder(caps TTSCapabilities, budget int) *GroupFolder {
+	return &GroupFolder{caps: normalizeCaps(caps), budget: budget}
+}
+
+func (f *GroupFolder) Add(line SpeakerLine) []SpeakerLine {
+	if len(f.pending) > 0 && !canJoinGroup(ClipGroup{Lines: f.pending}, line, f.caps) {
+		out := f.Flush()
+		f.append(line)
+		return out
+	}
+	f.append(line)
+	if f.budget > 0 && f.chars >= f.budget {
+		return f.Flush()
+	}
+	return nil
+}
+
+func (f *GroupFolder) Flush() []SpeakerLine {
+	if len(f.pending) == 0 {
+		return nil
+	}
+	out := f.pending
+	f.pending = nil
+	f.chars = 0
+	return out
+}
+
+func (f *GroupFolder) append(line SpeakerLine) {
+	f.pending = append(f.pending, line)
+	f.chars += len([]rune(strings.TrimSpace(line.Text))) + 1
+}
+```
+
+- [ ] **Step 4: Run it and watch it pass**
+
+Run: `go test ./pkg/media/`
+Expected: PASS.
+
+- [ ] **Step 5: Record the stream's plan and reuse it**
+
+Give the streamer a `GroupFolder`, synthesize each flushed group through
+`SynthesizeGroups` so the clip key is the group key, and expose the plan:
+
+```go
+// GroupPlan returns the groups the stream produced, so the turn records the same
+// clips the player already heard rather than re-planning them.
+func (s *sentenceStreamer) GroupPlan() []media.ClipGroup
+```
+
+In `clipPlanFor`, when a plan is supplied for the turn, build `plan.segmentKeys`
+and `plan.groups` from it instead of calling `GroupClipKeys`. `TurnSession.Run`
+passes `streamer.GroupPlan()` to `turnDTO`. Remove the `TTSGrouping() == "always"`
+early return in `sentenceStreamerFor`: grouping and streaming now cooperate.
+
+- [ ] **Step 6: Run the tests and commit**
+
+```bash
+go test ./pkg/media/ ./pkg/gui/
+git add -A && git commit -m "feat(gui): group streamed audio under the turn's own clip plan"
+```
 
 ---
 
 ## Stream B — A roll continues the reply
+
+### Task B0: Recover prose on a pending-check turn
+
+**Files:**
+- Modify: `pkg/engine/orchestrator.go`
+- Test: `pkg/engine/pending_check_test.go`
+
+A turn whose reply ended on a check records empty narration, because the
+recovery step is gated on `result.Submission == nil && result.PendingCheck == nil`.
+The prose the model wrote before the check is the setup the player reads while
+deciding, so it must survive.
+
+- [ ] **Step 1: Write the failing test**
+
+```go
+func TestAPendingCheckTurnKeepsItsProse(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{
+		"Kaelen steps onto the bridge, the planks swaying.\n" +
+			"@roll {\"actor\":\"kaelen\",\"check_kind\":\"skill\",\"stakes\":\"the bridge\"}\n",
+	}}
+	orchestrator, _, _ := streamingOrchestrator(t, provider)
+	orchestrator.SetMechanicsEngagement("ask")
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I follow.", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+	if turn.PendingCheck == nil {
+		t.Fatalf("expected a pending check, got %+v", turn)
+	}
+	if !strings.Contains(turn.Narration, "planks swaying") {
+		t.Fatalf("narration = %q, want the prose before the check", turn.Narration)
+	}
+}
+```
+
+- [ ] **Step 2: Run it and watch it fail**
+
+Run: `go test -run TestAPendingCheckTurnKeepsItsProse ./pkg/engine/`
+Expected: FAIL, narration is empty.
+
+- [ ] **Step 3: Recover whenever there is text**
+
+Change the gate to `if result.Submission == nil {`, and only treat an empty
+narration as a failure when there is no pending check:
+
+```go
+	if result.Submission == nil {
+		if endedOnRoll {
+			cause = cutNone
+		} else {
+			cause = o.classifyCut(result)
+		}
+		narration, recovery, stillIncomplete = o.recoverReply(ctx, strings.Join(narrationParts, "\n\n"), cause, onChunk)
+		if strings.TrimSpace(narration) == "" && result.PendingCheck == nil {
+			// existing empty-narration failure handling
+		}
+	}
+```
+
+- [ ] **Step 4: Run the tests and commit**
+
+```bash
+go test ./pkg/engine/
+git add pkg/engine/
+git commit -m "fix(engine): keep the prose a pending-check turn was written with"
+```
 
 ### Task B1: Wrap generation in a roll loop
 
