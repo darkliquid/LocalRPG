@@ -317,6 +317,9 @@ export const App: React.FC = () => {
             setChronicle((prev) => [...prev, turn]);
             setStreamedProse('');
             setStreamedSegments([]);
+            // The turn now carries the action, so drop the pending block at once;
+            // otherwise the action shows twice until the stream closes.
+            setPendingAction(null);
             setFundsError(null);
             setRateLimitUntil(null);
             fetchLimits();
