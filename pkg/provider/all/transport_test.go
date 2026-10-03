@@ -24,10 +24,12 @@ var transportByKey = map[provider.Key]string{
 	provider.KeyTTSSherpaONNX: "builtin",
 	provider.KeyTTSPiper:      "cli",
 	provider.KeyTTSHTTP:       "http",
+	provider.KeyTTSCartesia:   "http",
 
 	provider.KeySTTWhisperHTTP: "http",
 	provider.KeySTTWhisperCLI:  "cli",
 	provider.KeySTTWebSpeech:   "builtin",
+	provider.KeySTTCartesia:    "http",
 
 	provider.KeyImageGemini:        "gemini",
 	provider.KeyImageHTTP:          "http",
