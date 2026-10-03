@@ -12,6 +12,24 @@
 
 **Depends on:** `feat/progressive-turn-stream` (parser, engine wiring, GUI segments, records, single-shot rolls, framing prompt).
 
+## Status (2026-10-04)
+
+Done:
+
+- Stream A, Tasks A1-A2 — the streamer takes parsed segment events and voices
+  speech in the speaker's profile; the session drives it from the segment
+  observer instead of raw chunks.
+- Stream B, Task B1 — a `@roll` under auto resolves and the model continues,
+  with the continuation's segments and prose appended to the same turn, bounded
+  by `maxRollContinuations`.
+
+Remaining:
+
+- Stream A, Task A3 — grouped live audio (needs the shared clip plan).
+- Stream B, Tasks B2-B3 — persist a resolved roll so a retry cannot re-roll, and
+  mark an ask continuation as continuing the same turn.
+- Stream C — retire `submit_turn` and the turn-tool surface.
+
 ## Global Constraints
 
 - Go standard library only for tests; no testify. `interface{}`, not `any`. `go vet` clean.
