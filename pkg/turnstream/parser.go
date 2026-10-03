@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/dialogue"
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
 
@@ -43,6 +44,7 @@ type Parser struct {
 	buf     string
 	pending []string
 	records []Record
+	events  []Event
 }
 
 // NewParser builds a parser that attributes speech against roster.
@@ -52,7 +54,7 @@ func NewParser(roster Roster) *Parser {
 
 // Feed adds streamed text and returns every event the new text completed.
 func (p *Parser) Feed(text string) []Event {
-	var events []Event
+	var out []Event
 	p.buf += text
 	for {
 		i := strings.IndexByte(p.buf, '\n')
@@ -61,20 +63,40 @@ func (p *Parser) Feed(text string) []Event {
 		}
 		line := p.buf[:i]
 		p.buf = p.buf[i+1:]
-		events = append(events, p.consume(line)...)
+		out = append(out, p.consume(line)...)
 	}
-	return events
+	p.events = append(p.events, out...)
+	return out
 }
 
 // Flush returns the event for any trailing partial line at end of stream.
 func (p *Parser) Flush() []Event {
-	var events []Event
+	var out []Event
 	if p.buf != "" {
-		events = append(events, p.consume(p.buf)...)
+		out = append(out, p.consume(p.buf)...)
 		p.buf = ""
 	}
-	events = append(events, p.flushNarration()...)
-	return events
+	out = append(out, p.flushNarration()...)
+	p.events = append(p.events, out...)
+	return out
+}
+
+// Events returns every event parsed so far, in order. It is how a caller that
+// consumed the stream incrementally recovers the whole turn at finalise.
+func (p *Parser) Events() []Event {
+	out := make([]Event, len(p.events))
+	copy(out, p.events)
+	return out
+}
+
+// Reset discards all buffered text, pending narration, events, and records, so a
+// caller can reuse the parser for a fresh generation round. The roster is
+// untouched, so a persona declared in an earlier round stays resolvable.
+func (p *Parser) Reset() {
+	p.buf = ""
+	p.pending = p.pending[:0]
+	p.records = p.records[:0]
+	p.events = p.events[:0]
 }
 
 // consume classifies one complete line.
@@ -89,9 +111,40 @@ func (p *Parser) consume(line string) []Event {
 	case strings.HasPrefix(trimmed, ">"):
 		return append(p.flushNarration(), p.speech(trimmed)...)
 	default:
+		// Legacy compatibility: a line that is not a blockquote but follows the
+		// quoted `Name: "…"` convention is speech when the speaker resolves, so a
+		// model prompted for the older format still attributes.
+		if events, ok := p.legacySpeech(trimmed); ok {
+			return append(p.flushNarration(), events...)
+		}
 		p.pending = append(p.pending, trimmed)
 		return nil
 	}
+}
+
+// legacySpeech parses a line with the quoted-speech convention, reporting false
+// when the line carries no attributed speech.
+func (p *Parser) legacySpeech(line string) ([]Event, bool) {
+	segments := dialogue.Parse(line, p.roster.Resolve)
+	if len(segments) == 0 || !segments[0].IsSpeech {
+		return nil, false
+	}
+	events := make([]Event, 0, len(segments))
+	for _, segment := range segments {
+		if segment.IsSpeech {
+			events = append(events, Event{
+				Kind:      KindSpeech,
+				Speaker:   segment.Speaker,
+				SpeakerID: segment.SpeakerID,
+				Text:      segment.Text,
+			})
+			continue
+		}
+		if text := strings.TrimSpace(segment.Text); text != "" {
+			events = append(events, Event{Kind: KindNarration, Text: text})
+		}
+	}
+	return events, true
 }
 
 // flushNarration emits the pending narration paragraph, if any. Narration lines

@@ -23,6 +23,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
+	"github.com/darkliquid/localrpg/pkg/turnstream"
 )
 
 // ErrGenerationStalled reports that the gm provider stopped sending deltas for
@@ -121,6 +122,29 @@ type TurnOrchestrator struct {
 	toolObserver     func(ToolActivity)
 	speechCues       harness.SpeechCueContext
 	usageCtx         *harness.UsageContext
+	// parser, roster, and segmentObserver carry the progressive turn stream for
+	// the turn in flight. The orchestrator is built per turn, so they need no
+	// synchronisation.
+	parser          *turnstream.Parser
+	roster          *roster
+	segmentObserver func(turnstream.Event)
+}
+
+// SetSegmentObserver attaches a sink for parsed turn-stream events, so a client
+// can render attributed segments while the model is still writing. A nil
+// observer records nothing.
+func (o *TurnOrchestrator) SetSegmentObserver(observer func(turnstream.Event)) {
+	o.segmentObserver = observer
+}
+
+// observeSegments forwards parsed events, if a sink is attached.
+func (o *TurnOrchestrator) observeSegments(events []turnstream.Event) {
+	if o.segmentObserver == nil {
+		return
+	}
+	for _, event := range events {
+		o.segmentObserver(event)
+	}
 }
 
 // SetSpeechCues sets the vocal steering hints passed to the GM prompt.
@@ -826,6 +850,28 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 
+	// The reply is parsed as it streams, so segments and their speakers are
+	// attributed while the model is still writing. The roster is seeded from the
+	// store, and a persona record extends it mid-stream. The parser wraps the
+	// TTFT listener, so the client still sees each raw chunk first.
+	o.roster = newRoster(o.store, o.playerID, o.playerDisplayName())
+	o.parser = turnstream.NewParser(o.roster)
+	if onChunk != nil {
+		inner := onChunk
+		onChunk = func(text string) error {
+			if err := inner(text); err != nil {
+				return err
+			}
+			o.observeSegments(o.parser.Feed(text))
+			return nil
+		}
+	} else {
+		onChunk = func(text string) error {
+			o.observeSegments(o.parser.Feed(text))
+			return nil
+		}
+	}
+
 	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, proposedCheck, resolvedPending, validationEngagement, onChunk)
 	if err != nil {
 		outcome = "error"
@@ -935,6 +981,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		"truncated":       stillIncomplete,
 	})
 
+	// Control records are protocol, not story: strip them from the prose that is
+	// recorded, extracted, and shown. The parser keeps them for the declarations
+	// applied below.
+	narration = stripRecordLines(narration)
+
 	turn := Turn{
 		Number:       turnNum,
 		Timestamp:    time.Now(),
@@ -1009,7 +1060,19 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 		turn.Segments = segs
 	} else {
-		turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
+		// The streamed reply was parsed as it arrived; its events are the turn's
+		// playback script. A reply with no framing at all falls back to the legacy
+		// prose parser plus the extractor.
+		events := []turnstream.Event(nil)
+		if o.parser != nil {
+			o.parser.Flush()
+			events = o.parser.Events()
+		}
+		if parsed := segmentsFromEvents(events); len(parsed) > 0 {
+			turn.Segments = parsed
+		} else {
+			turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
+		}
 	}
 
 	// The player's own spoken line leads the turn, so it is heard in their voice
@@ -1591,6 +1654,13 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 			),
 		)
 		roundStarted := time.Now()
+		// Each round's prose is provisional until the round is chosen: only the
+		// last round becomes the turn. Resetting the parser discards a round that
+		// narrated before calling a tool, so the finalised segments match the
+		// recorded narration.
+		if o.parser != nil {
+			o.parser.Reset()
+		}
 		result, err := o.generateRequest(roundCtx, request, onChunk)
 		roundDuration := float64(time.Since(roundStarted).Milliseconds())
 		roundAttributes := otelmetric.WithAttributes(

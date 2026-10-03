@@ -77,6 +77,22 @@ func TestQuotedSpeechIsStripped(t *testing.T) {
 	}
 }
 
+func TestLegacyQuotedSpeechIsAttributed(t *testing.T) {
+	p := NewParser(mapRoster{"Kaelen": "kaelen"})
+	events := append(p.Feed(`Kaelen: "Keep walking."`+"\n"), p.Flush()...)
+	if len(events) != 1 || events[0].Kind != KindSpeech || events[0].SpeakerID != "kaelen" {
+		t.Fatalf("events = %#v", events)
+	}
+}
+
+func TestLegacyQuoteForAnUnknownSpeakerStaysNarration(t *testing.T) {
+	p := NewParser(mapRoster{})
+	events := append(p.Feed(`As you declare: "I draw my blade."`+"\n"), p.Flush()...)
+	if len(events) != 1 || events[0].Kind != KindNarration {
+		t.Fatalf("events = %#v", events)
+	}
+}
+
 func TestRecordsAreParsedAndPersonaeDeclared(t *testing.T) {
 	roster := mapRoster{}
 	p := NewParser(roster)
