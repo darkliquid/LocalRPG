@@ -92,10 +92,25 @@ func (o *TurnOrchestrator) pendingRoll() (harness.CheckRequest, bool) {
 	return harness.CheckRequest{}, false
 }
 
-// rollRef names a check resolved from a stream record. It is stable per turn, so
-// a client that continues the turn references the same check.
-func rollRef(turnNumber int) string {
-	return fmt.Sprintf("roll-%d", turnNumber)
+// rollRef names a check resolved from a stream record. It is stable per turn and
+// per continuation, so a client that continues the turn references the same check.
+func rollRef(turnNumber, index int) string {
+	return fmt.Sprintf("roll-%d-%d", turnNumber, index)
+}
+
+// rollContinuationDirective tells the model the outcome of the roll it asked for,
+// so it continues the scene rather than resolving the roll itself.
+func rollContinuationDirective(resolved harness.CheckResult, req harness.CheckRequest) string {
+	directive := "[ROLL RESULT: " + resolved.Outcome
+	if stakes := strings.TrimSpace(req.Stakes); stakes != "" {
+		directive += ", " + stakes
+	}
+	directive += "]"
+	if outcome := strings.TrimSpace(req.Outcomes[resolved.Outcome]); outcome != "" {
+		directive += " " + outcome
+	}
+	directive += "\nContinue the scene from this outcome. Do not re-roll it."
+	return directive
 }
 
 // stripRecordLines removes control-record lines from prose, so the recorded

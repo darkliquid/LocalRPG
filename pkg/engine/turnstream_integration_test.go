@@ -83,9 +83,9 @@ func TestRecordsIntroducePersonaeAndAttributeTheirFirstLine(t *testing.T) {
 }
 
 func TestRollRecordResolvesAndNarratesTheOutcome(t *testing.T) {
-	provider := &scriptedStreamProvider{chunks: []string{
-		"Kaelen steps onto the bridge.\n" +
-			"@roll {\"actor\":\"kaelen\",\"check_kind\":\"skill\",\"stakes\":\"the bridge\",\"outcomes\":{\"pass\":\"He makes it across.\",\"fail\":\"The plank gives way.\"}}\n",
+	provider := &scriptedStreamProvider{chunksPerCall: [][]string{
+		{"Kaelen steps onto the bridge.\n@roll {\"actor\":\"kaelen\",\"check_kind\":\"skill\",\"stakes\":\"the bridge\",\"outcomes\":{\"pass\":\"He makes it across.\",\"fail\":\"The plank gives way.\"}}\n"},
+		{"Kaelen reaches the far side.\n"},
 	}}
 	orchestrator, _, _ := streamingOrchestrator(t, provider)
 
@@ -94,20 +94,29 @@ func TestRollRecordResolvesAndNarratesTheOutcome(t *testing.T) {
 		t.Fatalf("ProcessActionStream: %v", err)
 	}
 	if len(turn.Checks) != 1 {
-		t.Fatalf("checks = %#v", turn.Checks)
+		t.Fatalf("checks = %#v, want one resolved roll", turn.Checks)
 	}
-	want := "The plank gives way."
-	if turn.Checks[0].Outcome == "pass" {
-		want = "He makes it across."
+	if !strings.Contains(turn.Narration, "far side") {
+		t.Fatalf("the continuation must be recorded: %q", turn.Narration)
 	}
-	found := false
-	for _, segment := range turn.Segments {
-		if segment.Kind == entity.SegmentNarration && strings.Contains(segment.Text, want) {
-			found = true
-		}
+	if strings.Contains(turn.Narration, "@roll") {
+		t.Fatalf("the roll record must not survive into the prose: %q", turn.Narration)
 	}
-	if !found {
-		t.Fatalf("outcome segment missing from %#v (want %q)", turn.Segments, want)
+}
+
+func TestRollRecordUnderAskPolicyBecomesAPendingCheck(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{
+		"Kaelen steps onto the bridge.\n@roll {\"actor\":\"kaelen\",\"check_kind\":\"skill\",\"stakes\":\"the bridge\"}\n",
+	}}
+	orchestrator, _, _ := streamingOrchestrator(t, provider)
+	orchestrator.SetMechanicsEngagement("ask")
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I follow.", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+	if turn.PendingCheck == nil {
+		t.Fatalf("expected a pending check, got %+v", turn)
 	}
 }
 

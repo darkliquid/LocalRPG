@@ -104,8 +104,8 @@ type TurnOrchestrator struct {
 	completionPolicy CompletionPolicy
 	toolExecutor     ToolExecutor
 	checkResolver    harness.CheckResolver
-	declaredStats map[string]core.StatSpec
-	mechanics     *core.MechanicsSpec
+	declaredStats    map[string]core.StatSpec
+	mechanics        *core.MechanicsSpec
 	// health is the declared health schema, resolved to an effect when the stat
 	// reaches zero.
 	health *core.HealthSpec
@@ -117,11 +117,11 @@ type TurnOrchestrator struct {
 	// player's current stats, rebuilt each turn rather than cached.
 	rebuildMechanicsPrompt bool
 	allowFreeform          bool
-	toolCapability   string
-	toolRounds       int
-	toolObserver     func(ToolActivity)
-	speechCues       harness.SpeechCueContext
-	usageCtx         *harness.UsageContext
+	toolCapability         string
+	toolRounds             int
+	toolObserver           func(ToolActivity)
+	speechCues             harness.SpeechCueContext
+	usageCtx               *harness.UsageContext
 	// parser, roster, and segmentObserver carry the progressive turn stream for
 	// the turn in flight. The orchestrator is built per turn, so they need no
 	// synchronisation.
@@ -872,44 +872,104 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 
-	result, err := o.runGenerationLoop(ctx, &assembly, gmDirective, proposedCheck, resolvedPending, validationEngagement, onChunk)
-	if err != nil {
-		outcome = "error"
-		turnSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
-		failure, _ := harness.FailureFrom(err)
-		fields := map[string]interface{}{
-			"code":          generationCode(failure),
-			"error":         err.Error(),
-			"role":          "gm",
-			"provider":      result.ProviderID,
-			"prompt_chars":  len([]rune(actionInput)),
-			"context_chars": len([]rune(assembly.Prompt)),
-			"elapsed_ms":    time.Since(turnStarted).Milliseconds(),
-			"chunk_count":   result.ChunkCount,
-			"partial_chars": len([]rune(result.Text)),
+	cause := cutNone
+	var narration string
+	var recovery RecoveryOutcome
+	var stillIncomplete bool
+
+	// A reply may end on a @roll record, in which case the engine resolves it and
+	// asks the model to continue from the outcome. The loop is bounded so a model
+	// that keeps rolling cannot run forever.
+	var result streamResult
+	var collected []turnstream.Event
+	var rollResults []harness.CheckResult
+	var narrationParts []string
+	const maxRollContinuations = 3
+	endedOnRoll := false
+	for attempt := 0; ; attempt++ {
+		result, err = o.runGenerationLoop(ctx, &assembly, gmDirective, proposedCheck, resolvedPending, validationEngagement, onChunk)
+		if err != nil {
+			outcome = "error"
+			turnSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
+			failure, _ := harness.FailureFrom(err)
+			fields := map[string]interface{}{
+				"code":          generationCode(failure),
+				"error":         err.Error(),
+				"role":          "gm",
+				"provider":      result.ProviderID,
+				"prompt_chars":  len([]rune(actionInput)),
+				"context_chars": len([]rune(assembly.Prompt)),
+				"elapsed_ms":    time.Since(turnStarted).Milliseconds(),
+				"chunk_count":   result.ChunkCount,
+				"partial_chars": len([]rune(result.Text)),
+			}
+			if failure != nil {
+				fields["attempts"] = len(failure.Attempts)
+				turnSpan.SetAttributes(
+					attribute.String("turn.failure_code", string(failure.Code)),
+					attribute.String("turn.failure_message", failure.Message),
+					attribute.String("localrpg.generation.failure_code", string(failure.Code)),
+					attribute.Int("localrpg.generation.attempts", len(failure.Attempts)),
+				)
+				turnSpan.RecordError(failure)
+				turnSpan.SetStatus(codes.Error, string(failure.Code))
+			} else {
+				code := string(harness.ClassifyProviderError(err))
+				turnSpan.SetAttributes(attribute.String("turn.failure_code", code))
+				turnSpan.SetStatus(codes.Error, code)
+				turnSpan.RecordError(err)
+			}
+			if result.Failure != nil {
+				fields["finish_reason"] = result.Failure.FinishReason
+			}
+			o.logger.Event("generation.error", fields)
+			return nil, fmt.Errorf("gm generation failed: %w", err)
 		}
-		if failure != nil {
-			fields["attempts"] = len(failure.Attempts)
-			turnSpan.SetAttributes(
-				attribute.String("turn.failure_code", string(failure.Code)),
-				attribute.String("turn.failure_message", failure.Message),
-				attribute.String("localrpg.generation.failure_code", string(failure.Code)),
-				attribute.Int("localrpg.generation.attempts", len(failure.Attempts)),
-			)
-			turnSpan.RecordError(failure)
-			turnSpan.SetStatus(codes.Error, string(failure.Code))
-		} else {
-			code := string(harness.ClassifyProviderError(err))
-			turnSpan.SetAttributes(attribute.String("turn.failure_code", code))
-			turnSpan.SetStatus(codes.Error, code)
-			turnSpan.RecordError(err)
+
+		if strings.TrimSpace(result.Text) != "" {
+			narrationParts = append(narrationParts, result.Text)
 		}
-		if result.Failure != nil {
-			fields["finish_reason"] = result.Failure.FinishReason
+		if o.parser != nil {
+			o.parser.Flush()
+			collected = append(collected, o.parser.Events()...)
 		}
-		o.logger.Event("generation.error", fields)
-		return nil, fmt.Errorf("gm generation failed: %w", err)
+
+		// A @roll record ends the call. Under the ask policy it becomes a pending
+		// check the player rolls; under auto the engine rolls at once and the model
+		// continues from the outcome.
+		req, hasRoll := o.pendingRoll()
+		endedOnRoll = hasRoll && result.Submission == nil && result.PendingCheck == nil
+		if !endedOnRoll || o.mechanicsEngagement == "off" {
+			break
+		}
+		if o.mechanicsEngagement == "ask" {
+			result.PendingCheck = &harness.PendingCheck{Ref: rollRef(turnNum, 0), Request: req, ProposedBy: "gm"}
+			break
+		}
+		if attempt >= maxRollContinuations {
+			o.logger.Event("roll.cap", map[string]interface{}{"continuations": attempt})
+			if resolved, resolveErr := o.resolveCheck(ctx, req, nil); resolveErr == nil {
+				resolved.CheckID = rollRef(turnNum, len(rollResults))
+				rollResults = append(rollResults, *resolved)
+				result.RollOutcome = strings.TrimSpace(req.Outcomes[resolved.Outcome])
+				result.RollCheckRef = resolved.CheckID
+			}
+			break
+		}
+		resolved, resolveErr := o.resolveCheck(ctx, req, nil)
+		if resolveErr != nil {
+			o.logger.Event("roll.resolve_error", map[string]interface{}{"error": resolveErr.Error()})
+			break
+		}
+		resolved.CheckID = rollRef(turnNum, len(rollResults))
+		rollResults = append(rollResults, *resolved)
+		gmDirective = rollContinuationDirective(*resolved, req)
+		resolvedPending = nil
+		if o.parser != nil {
+			o.parser.Reset()
+		}
 	}
+	result.Checks = append(result.Checks, rollResults...)
 
 	_, finaliseSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "turn.finalise")
 	defer finaliseSpan.End()
@@ -936,32 +996,15 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		o.logger.Event("turn.protocol_fallback", map[string]interface{}{"reason": result.FallbackReason})
 	}
 
-	// A @roll record ends the model's reply. Under the ask policy it becomes a
-	// pending check the player rolls; under auto the engine rolls at once and
-	// narrates the outcome the model pre-committed to, so no second call is
-	// needed.
-	if result.Submission == nil && result.PendingCheck == nil && o.parser != nil {
-		if req, ok := o.pendingRoll(); ok && o.mechanicsEngagement != "off" {
-			if o.mechanicsEngagement == "ask" {
-				result.PendingCheck = &harness.PendingCheck{Ref: rollRef(turnNum), Request: req, ProposedBy: "gm"}
-			} else if resolved, resolveErr := o.resolveCheck(ctx, req, nil); resolveErr == nil {
-				resolved.CheckID = rollRef(turnNum)
-				result.Checks = append(result.Checks, *resolved)
-				result.RollOutcome = strings.TrimSpace(req.Outcomes[resolved.Outcome])
-				result.RollCheckRef = resolved.CheckID
-			} else {
-				o.logger.Event("roll.resolve_error", map[string]interface{}{"error": resolveErr.Error()})
-			}
-		}
-	}
-
-	cause := cutNone
-	var narration string
-	var recovery RecoveryOutcome
-	var stillIncomplete bool
 	if result.Submission == nil && result.PendingCheck == nil {
-		cause = o.classifyCut(result)
-		narration, recovery, stillIncomplete = o.recoverReply(ctx, result.Text, cause, onChunk)
+		// The final call may be cut off; earlier continuations ended on a roll and
+		// are complete by construction, so only the last needs classification.
+		if endedOnRoll {
+			cause = cutNone
+		} else {
+			cause = o.classifyCut(result)
+		}
+		narration, recovery, stillIncomplete = o.recoverReply(ctx, strings.Join(narrationParts, "\n\n"), cause, onChunk)
 		if strings.TrimSpace(narration) == "" {
 			outcome = "error"
 			failure := &harness.GenerationFailure{
@@ -1094,14 +1137,10 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 		turn.Segments = segs
 	} else {
-		// The streamed reply was parsed as it arrived; its events are the turn's
-		// playback script. A reply with no framing at all falls back to the legacy
-		// prose parser plus the extractor.
-		events := []turnstream.Event(nil)
-		if o.parser != nil {
-			o.parser.Flush()
-			events = o.parser.Events()
-		}
+		// The streamed reply was parsed as it arrived, across every continuation;
+		// its events are the turn's playback script. A reply with no framing at all
+		// falls back to the legacy prose parser plus the extractor.
+		events := collected
 		if parsed := segmentsFromEvents(events); len(parsed) > 0 {
 			turn.Segments = parsed
 		} else {
