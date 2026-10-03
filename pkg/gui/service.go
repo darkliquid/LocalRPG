@@ -3093,7 +3093,11 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 			}
 		}
 		cfg := s.configMgr.Get()
-		client, err := media.NewTTSClientWithSharedKey(ttsCfg, cfg.Providers.Gemini.APIKey)
+		sharedKey := cfg.Providers.Gemini.APIKey
+		if ttsCfg.Type == "cartesia" || (ttsCfg.Type == "builtin" && ttsCfg.BuiltinName == "cartesia") {
+			sharedKey = cfg.Providers.Cartesia.APIKey
+		}
+		client, err := media.NewTTSClientWithSharedKey(ttsCfg, sharedKey)
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}
@@ -3150,7 +3154,12 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 				Message: "web-speech runs in the browser; choose an HTTP or CLI Whisper provider",
 			}, nil
 		}
-		client, err := media.NewSTTClient(sttCfg)
+		cfg := s.configMgr.Get()
+		sharedKey := ""
+		if sttCfg.Type == "cartesia" || (sttCfg.Type == "builtin" && sttCfg.BuiltinName == "cartesia") {
+			sharedKey = cfg.Providers.Cartesia.APIKey
+		}
+		client, err := media.NewSTTClientWithSharedKey(sttCfg, sharedKey)
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}
@@ -3222,7 +3231,11 @@ func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string
 		}
 	}
 
-	client, err := media.NewSTTClient(cfg.Media.STT)
+	sharedKey := ""
+	if cfg.Media.STT.Type == "cartesia" || (cfg.Media.STT.Type == "builtin" && cfg.Media.STT.BuiltinName == "cartesia") {
+		sharedKey = cfg.Providers.Cartesia.APIKey
+	}
+	client, err := media.NewSTTClientWithSharedKey(cfg.Media.STT, sharedKey)
 	if err != nil {
 		return "", &harness.GenerationFailure{
 			Code:    harness.FailureProviderUnavailable,

@@ -561,7 +561,7 @@ export interface TTSInspectResponse {
 }
 
 export interface TTSConfig {
-  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'gemini';
+  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'gemini' | 'cartesia';
   builtin_name?: string;
   model_path?: string;
   command?: string;
@@ -586,7 +586,7 @@ export interface TTSConfig {
 }
 
 export interface STTConfig {
-  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'web-speech';
+  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'web-speech' | 'cartesia';
   builtin_name?: string;
   command?: string;
   args?: string[];
@@ -633,6 +633,9 @@ export interface TraceEvent {
 
 export interface ProvidersConfig {
   gemini?: {
+    api_key?: string;
+  };
+  cartesia?: {
     api_key?: string;
   };
 }
