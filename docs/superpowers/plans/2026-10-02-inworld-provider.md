@@ -1,6 +1,6 @@
 # Inworld AI Provider Ecosystem Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Integrate Inworld AI into LocalRPG across LLM routing, Text-to-Speech (TTS), and Speech-to-Text (STT) with unified credentials (`providers.inworld.api_key`), dynamic voice catalogs, and full offline test coverage.
 
@@ -59,7 +59,7 @@
 - Modify: `pkg/provider/keys.go:1-43`
 - Test: `pkg/provider/key_test.go`
 
-- [ ] **Step 1: Write failing test for Inworld config parsing**
+- [x] **Step 1: Write failing test for Inworld config parsing**
 
 In `pkg/config/types_test.go`, add:
 ```go
@@ -79,12 +79,12 @@ providers:
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -run TestConfigParsesInworldProvider ./pkg/config/`
 Expected: FAIL with `cfg.Providers.Inworld undefined`
 
-- [ ] **Step 3: Implement InworldProviderConfig in `pkg/config/types.go`**
+- [x] **Step 3: Implement InworldProviderConfig in `pkg/config/types.go`**
 
 In `pkg/config/types.go`, add `Inworld InworldProviderConfig` to `ProvidersConfig` and declare the type:
 ```go
@@ -101,7 +101,7 @@ type InworldProviderConfig struct {
 }
 ```
 
-- [ ] **Step 4: Add Inworld canonical keys to `pkg/provider/keys.go`**
+- [x] **Step 4: Add Inworld canonical keys to `pkg/provider/keys.go`**
 
 In `pkg/provider/keys.go`:
 ```go
@@ -128,12 +128,12 @@ const (
 ```
 And add `KeyLLMInworld`, `KeyTTSInworld`, `KeySTTInworld` to `AllKeys()`.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test -v -run 'TestConfigParsesInworldProvider' ./pkg/config/ && go test -v ./pkg/provider/`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pkg/config/types.go pkg/config/types_test.go pkg/provider/keys.go
@@ -153,7 +153,7 @@ git commit -m "feat(config): add inworld provider config and canonical keys"
 - Modify: `pkg/harness/factory.go:70-80`
 - Modify: `pkg/harness/key_test.go`
 
-- [ ] **Step 1: Write failing tests for Inworld LLM client**
+- [x] **Step 1: Write failing tests for Inworld LLM client**
 
 Create `pkg/provider/inworldllm/client_test.go`:
 ```go
@@ -256,12 +256,12 @@ func TestInworldLLM_MissingKeyError(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/provider/inworldllm/`
 Expected: FAIL with package not found / compilation error
 
-- [ ] **Step 3: Implement `pkg/provider/inworldllm/client.go`**
+- [x] **Step 3: Implement `pkg/provider/inworldllm/client.go`**
 
 Create `pkg/provider/inworldllm/client.go`:
 ```go
@@ -598,7 +598,7 @@ func (c *InworldLLMClient) mapError(status int, body []byte) error {
 }
 ```
 
-- [ ] **Step 4: Implement `pkg/provider/inworldllm/inworldllm.go`**
+- [x] **Step 4: Implement `pkg/provider/inworldllm/inworldllm.go`**
 
 Create `pkg/provider/inworldllm/inworldllm.go`:
 ```go
@@ -656,7 +656,7 @@ func init() {
 }
 ```
 
-- [ ] **Step 5: Wire Inworld into `pkg/provider/all/all.go`, `pkg/harness/exports.go`, and `pkg/harness/factory.go`**
+- [x] **Step 5: Wire Inworld into `pkg/provider/all/all.go`, `pkg/harness/exports.go`, and `pkg/harness/factory.go`**
 
 In `pkg/provider/all/all.go`, add:
 ```go
@@ -688,12 +688,12 @@ In `ModelBuildPayload` construction:
 	}
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/provider/inworldllm/ && go test -v -run TestKeyFor ./pkg/harness/`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/provider/inworldllm/ pkg/provider/all/all.go pkg/harness/exports.go pkg/harness/factory.go pkg/harness/key_test.go
@@ -713,7 +713,7 @@ git commit -m "feat(llm): implement inworld llm router provider"
 - Modify: `pkg/gui/service.go`
 - Modify: `pkg/media/key_test.go`
 
-- [ ] **Step 1: Write failing tests for Inworld TTS client**
+- [x] **Step 1: Write failing tests for Inworld TTS client**
 
 Create `pkg/provider/inworldtts/client_test.go`:
 ```go
@@ -818,12 +818,12 @@ func TestInworldTTS_MissingKey(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/provider/inworldtts/`
 Expected: FAIL with package not found
 
-- [ ] **Step 3: Implement `pkg/provider/inworldtts/client.go`**
+- [x] **Step 3: Implement `pkg/provider/inworldtts/client.go`**
 
 Create `pkg/provider/inworldtts/client.go`:
 ```go
@@ -1054,7 +1054,7 @@ func (c *InworldTTSClient) mapError(status int, body []byte) error {
 }
 ```
 
-- [ ] **Step 4: Implement `pkg/provider/inworldtts/inworldtts.go`**
+- [x] **Step 4: Implement `pkg/provider/inworldtts/inworldtts.go`**
 
 Create `pkg/provider/inworldtts/inworldtts.go`:
 ```go
@@ -1114,7 +1114,7 @@ func init() {
 }
 ```
 
-- [ ] **Step 5: Wire Inworld into `pkg/provider/all/all.go`, `pkg/media/exports.go`, and `pkg/gui/service.go`**
+- [x] **Step 5: Wire Inworld into `pkg/provider/all/all.go`, `pkg/media/exports.go`, and `pkg/gui/service.go`**
 
 In `pkg/provider/all/all.go`, add:
 ```go
@@ -1146,12 +1146,12 @@ In `ttsClientFor` / `TestProvider` for TTS, resolve shared key:
 	return media.NewTTSClientWithSharedKey(cfg.Media.TTS, sharedKey)
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/provider/inworldtts/ && go test -v -run TestTTSKeyFor ./pkg/media/`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/provider/inworldtts/ pkg/provider/all/all.go pkg/media/exports.go pkg/gui/service.go pkg/media/key_test.go
@@ -1172,7 +1172,7 @@ git commit -m "feat(tts): implement inworld tts provider and voice catalog"
 - Modify: `pkg/gui/service.go`
 - Modify: `pkg/media/key_test.go`
 
-- [ ] **Step 1: Write failing tests for Inworld STT client**
+- [x] **Step 1: Write failing tests for Inworld STT client**
 
 Create `pkg/provider/inworldstt/client_test.go`:
 ```go
@@ -1254,12 +1254,12 @@ func TestInworldSTT_MissingKey(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/provider/inworldstt/`
 Expected: FAIL with package not found
 
-- [ ] **Step 3: Update `pkg/media/exports.go` and `pkg/media/providers.go` for shared key parity**
+- [x] **Step 3: Update `pkg/media/exports.go` and `pkg/media/providers.go` for shared key parity**
 
 In `pkg/media/exports.go`:
 Add `STTBuildPayload`:
@@ -1335,7 +1335,7 @@ func NewSTTClientWithSharedKey(cfg config.STTConfig, sharedKey string) (STTClien
 }
 ```
 
-- [ ] **Step 4: Implement `pkg/provider/inworldstt/client.go`**
+- [x] **Step 4: Implement `pkg/provider/inworldstt/client.go`**
 
 Create `pkg/provider/inworldstt/client.go`:
 ```go
@@ -1525,7 +1525,7 @@ func (c *InworldSTTClient) mapError(status int, body []byte) error {
 }
 ```
 
-- [ ] **Step 5: Implement `pkg/provider/inworldstt/inworldstt.go`**
+- [x] **Step 5: Implement `pkg/provider/inworldstt/inworldstt.go`**
 
 Create `pkg/provider/inworldstt/inworldstt.go`:
 ```go
@@ -1586,7 +1586,7 @@ func init() {
 }
 ```
 
-- [ ] **Step 6: Wire Inworld STT into `pkg/provider/all/all.go` and `pkg/gui/service.go`**
+- [x] **Step 6: Wire Inworld STT into `pkg/provider/all/all.go` and `pkg/gui/service.go`**
 
 In `pkg/provider/all/all.go`:
 ```go
@@ -1603,12 +1603,12 @@ In `TranscribeAudio` and `TestProvider` for `"stt"`, pass `cfg.Providers.Inworld
 	client, err := media.NewSTTClientWithSharedKey(sttCfg, sharedKey)
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `go test -v ./pkg/provider/inworldstt/ && go test -v -run TestSTTKeyFor ./pkg/media/`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add pkg/provider/inworldstt/ pkg/provider/all/all.go pkg/media/exports.go pkg/media/providers.go pkg/gui/service.go pkg/media/key_test.go
@@ -1624,22 +1624,22 @@ git commit -m "feat(stt): implement inworld stt provider and shared key support"
 - Test: `pkg/gui/docs_catalogue_test.go`
 - Generated docs: `pkg/gui/docs/`
 
-- [ ] **Step 1: Verify provider registry passes validation**
+- [x] **Step 1: Verify provider registry passes validation**
 
 Run: `go test -v ./pkg/provider/all/ && go test -v ./pkg/provider/`
 Expected: PASS (`provider.Validate()` passes with `llm:inworld`, `tts:inworld`, and `stt:inworld`)
 
-- [ ] **Step 2: Regenerate embedded documentation**
+- [x] **Step 2: Regenerate embedded documentation**
 
 Run: `go test ./pkg/gui -update-docs`
 Expected: Updates `pkg/gui/docs/` articles with Inworld providers and presets
 
-- [ ] **Step 3: Run documentation catalogue test**
+- [x] **Step 3: Run documentation catalogue test**
 
 Run: `go test -v ./pkg/gui/docs_catalogue_test.go`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pkg/gui/docs/
@@ -1654,7 +1654,7 @@ git commit -m "docs: regenerate provider catalogue and config docs with inworld"
 - Modify: `frontend/src/types.ts`
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Update frontend types in `frontend/src/types.ts`**
+- [x] **Step 1: Update frontend types in `frontend/src/types.ts`**
 
 In `frontend/src/types.ts`:
 Add `InworldProviderConfig` and update `ProvidersConfig`:
@@ -1671,7 +1671,7 @@ export interface ProvidersConfig {
 }
 ```
 
-- [ ] **Step 2: Add Inworld AI credential card to Providers Tab in `SettingsStudio.tsx`**
+- [x] **Step 2: Add Inworld AI credential card to Providers Tab in `SettingsStudio.tsx`**
 
 In `frontend/src/components/SettingsStudio.tsx`, in the Providers tab (next to the Google Gemini card):
 Add the Inworld AI credential card:
@@ -1732,7 +1732,7 @@ Add the Inworld AI credential card:
             </div>
 ```
 
-- [ ] **Step 3: Add shared key placeholder hints in LLM, TTS, and STT tabs**
+- [x] **Step 3: Add shared key placeholder hints in LLM, TTS, and STT tabs**
 
 In `SettingsStudio.tsx`:
 - In the LLM tab API key input, when the selected role uses Inworld (`currentRoleConfig.type === 'inworld' || currentRoleConfig.builtin_name === 'inworld'`):
@@ -1741,12 +1741,12 @@ In `SettingsStudio.tsx`:
   Display helper placeholder: `"Using shared key from providers.inworld.api_key"` if `config.providers?.inworld?.api_key` is set.
 - In the STT tab, add API key input field for Inworld with shared key placeholder support.
 
-- [ ] **Step 4: Verify frontend builds cleanly**
+- [x] **Step 4: Verify frontend builds cleanly**
 
 Run: `npx tsc --noEmit` in `frontend/`
 Expected: PASS (no type errors, no unused variables)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/SettingsStudio.tsx
@@ -1760,27 +1760,27 @@ git commit -m "feat(gui): add inworld ai credential management and settings cont
 **Files:**
 - All modified and created files
 
-- [ ] **Step 1: Run full backend test suite**
+- [x] **Step 1: Run full backend test suite**
 
 Run: `go test -v -count=1 ./...`
 Expected: PASS across all packages
 
-- [ ] **Step 2: Run Go vet linting**
+- [x] **Step 2: Run Go vet linting**
 
 Run: `go vet ./...`
 Expected: PASS (clean output)
 
-- [ ] **Step 3: Run frontend build**
+- [x] **Step 3: Run frontend build**
 
 Run: `cd frontend && npm run build`
 Expected: PASS (Vite builds bundle into `pkg/gui/dist`)
 
-- [ ] **Step 4: Scan for secrets**
+- [x] **Step 4: Scan for secrets**
 
 Run: `mise run secrets:scan`
 Expected: PASS (no leaked keys)
 
-- [ ] **Step 5: Final git status check and verification**
+- [x] **Step 5: Final git status check and verification**
 
 Run: `git status`
 Expected: Working tree clean, all commits scoped and structured.
