@@ -84,10 +84,16 @@ func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClien
 }
 
 func NewSTTClient(cfg config.STTConfig) (STTClient, error) {
+	return NewSTTClientWithSharedKey(cfg, "")
+}
+
+// NewSTTClientWithSharedKey builds an STTClient from configuration and an
+// optional shared key, matching the TTS and image factories.
+func NewSTTClientWithSharedKey(cfg config.STTConfig, sharedKey string) (STTClient, error) {
 	// Registry-first when pkg/provider/all was imported; inline otherwise.
 	if key, ok := STTKeyFor(cfg); ok {
 		if _, found := provider.Lookup(string(key.Parent())); found {
-			return BuildSTT(string(key.Parent()), cfg)
+			return BuildSTT(string(key.Parent()), cfg, sharedKey)
 		}
 	}
 	switch cfg.Type {

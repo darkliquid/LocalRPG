@@ -120,7 +120,7 @@ func TestSTTAndImageDescriptorsBuild(t *testing.T) {
 				var raw []byte
 				var err error
 				if family == provider.FamilySTT {
-					raw, err = json.Marshal(config.STTConfig{APIKey: "test-key"})
+					raw, err = json.Marshal(media.STTBuildPayload{Config: config.STTConfig{APIKey: "test-key"}})
 				} else {
 					raw, err = json.Marshal(media.ImageBuildPayload{Config: config.ImageConfig{APIKey: "test-key"}})
 				}

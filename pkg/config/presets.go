@@ -241,6 +241,11 @@ var STTPresets = map[string]STTConfig{
 		Endpoint: "https://api.openai.com/v1/audio/transcriptions",
 		Model:    "whisper-1",
 	},
+	"inworld-stt": {
+		Type:        "builtin",
+		BuiltinName: "inworld",
+		Model:       "inworld/inworld-stt-1",
+	},
 }
 
 var ImagePresets = map[string]ImageConfig{

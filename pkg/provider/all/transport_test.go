@@ -30,6 +30,7 @@ var transportByKey = map[provider.Key]string{
 	provider.KeySTTWhisperHTTP: "http",
 	provider.KeySTTWhisperCLI:  "cli",
 	provider.KeySTTWebSpeech:   "builtin",
+	provider.KeySTTInworld:     "http",
 
 	provider.KeyImageGemini:        "gemini",
 	provider.KeyImageHTTP:          "http",

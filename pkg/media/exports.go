@@ -86,10 +86,24 @@ func BuildTTS(id string, cfg config.TTSConfig, sharedKey string) (TTSClient, err
 	return client, nil
 }
 
+// STTBuildPayload is what BuildSTT hands an STT provider package: the family
+// config plus the shared provider key, which is not part of STTConfig.
+type STTBuildPayload struct {
+	Config    config.STTConfig `json:"config"`
+	SharedKey string           `json:"shared_key,omitempty"`
+}
+
 // STTKeyFor maps an STT configuration to its canonical key. Browser-only values
 // have no key: they never reach the server-side factory.
 func STTKeyFor(cfg config.STTConfig) (provider.Key, bool) {
 	switch cfg.Type {
+	case "inworld":
+		return provider.KeySTTInworld, true
+	case "builtin":
+		if cfg.BuiltinName == "inworld" {
+			return provider.KeySTTInworld, true
+		}
+		return "", false
 	case "http":
 		return provider.InstanceOrSelf(provider.KeySTTWhisperHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
 	case "cli":
@@ -99,12 +113,12 @@ func STTKeyFor(cfg config.STTConfig) (provider.Key, bool) {
 }
 
 // BuildSTT constructs an STT client from the registry by ID.
-func BuildSTT(id string, cfg config.STTConfig) (STTClient, error) {
+func BuildSTT(id string, cfg config.STTConfig, sharedKey string) (STTClient, error) {
 	reg, ok := provider.Lookup(id)
 	if !ok {
 		return nil, fmt.Errorf("media: no provider registered for %q", id)
 	}
-	raw, err := json.Marshal(cfg)
+	raw, err := json.Marshal(STTBuildPayload{Config: cfg, SharedKey: sharedKey})
 	if err != nil {
 		return nil, fmt.Errorf("media: encode %s config: %w", id, err)
 	}

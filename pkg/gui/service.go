@@ -3093,7 +3093,8 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 			}
 		}
 		cfg := s.configMgr.Get()
-		client, err := media.NewTTSClientWithSharedKey(ttsCfg, cfg.Providers.Gemini.APIKey)
+		ttsKey, hasTTSKey := media.TTSKeyFor(ttsCfg)
+		client, err := media.NewTTSClientWithSharedKey(ttsCfg, media.SharedProviderKey(cfg, ttsKey, hasTTSKey))
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}
@@ -3150,7 +3151,8 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 				Message: "web-speech runs in the browser; choose an HTTP or CLI Whisper provider",
 			}, nil
 		}
-		client, err := media.NewSTTClient(sttCfg)
+		key, hasKey := media.STTKeyFor(sttCfg)
+		client, err := media.NewSTTClientWithSharedKey(sttCfg, media.SharedProviderKey(s.configMgr.Get(), key, hasKey))
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}
@@ -3222,7 +3224,8 @@ func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string
 		}
 	}
 
-	client, err := media.NewSTTClient(cfg.Media.STT)
+	sttKey, hasSTTKey := media.STTKeyFor(cfg.Media.STT)
+	client, err := media.NewSTTClientWithSharedKey(cfg.Media.STT, media.SharedProviderKey(cfg, sttKey, hasSTTKey))
 	if err != nil {
 		return "", &harness.GenerationFailure{
 			Code:    harness.FailureProviderUnavailable,

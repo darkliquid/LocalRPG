@@ -62,6 +62,12 @@ func TestSTTKeyForSkipsBrowserOnly(t *testing.T) {
 	if _, ok := media.STTKeyFor(config.STTConfig{Type: "builtin"}); ok {
 		t.Error("the server-side builtin echo STT must have no key")
 	}
+	if got, ok := media.STTKeyFor(config.STTConfig{Type: "inworld"}); !ok || got != provider.KeySTTInworld {
+		t.Errorf("STTKeyFor(inworld) = %q/%v, want %q", got, ok, provider.KeySTTInworld)
+	}
+	if got, ok := media.STTKeyFor(config.STTConfig{Type: "builtin", BuiltinName: "inworld"}); !ok || got != provider.KeySTTInworld {
+		t.Errorf("STTKeyFor(builtin inworld) = %q/%v, want %q", got, ok, provider.KeySTTInworld)
+	}
 	got, ok := media.STTKeyFor(config.STTConfig{Type: "http", Endpoint: "http://localhost:8000"})
 	if !ok || got != "stt:whisper-http@localhost:8000" {
 		t.Errorf("STTKeyFor(http) = %q/%v, want stt:whisper-http@localhost:8000", got, ok)

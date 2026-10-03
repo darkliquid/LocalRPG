@@ -462,7 +462,8 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		// The shared provider key is what the app synthesizes with; without it a
 		// CLI run cannot build the client and every miss would be silent even
 		// though the app can speak.
-		client, err := media.NewTTSClientWithSharedKey(c.config.Media.TTS, c.config.Providers.Gemini.APIKey)
+		ttsKey, hasTTSKey := media.TTSKeyFor(c.config.Media.TTS)
+		client, err := media.NewTTSClientWithSharedKey(c.config.Media.TTS, media.SharedProviderKey(c.config, ttsKey, hasTTSKey))
 		if err != nil {
 			client = media.NewCacheOnlyTTSClient()
 		}

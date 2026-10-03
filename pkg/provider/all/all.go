@@ -11,6 +11,7 @@ import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/imagehttp"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imageprocedural"
 	_ "github.com/darkliquid/localrpg/pkg/provider/inworldllm"
+	_ "github.com/darkliquid/localrpg/pkg/provider/inworldstt"
 	_ "github.com/darkliquid/localrpg/pkg/provider/inworldtts"
 	_ "github.com/darkliquid/localrpg/pkg/provider/openaichat"
 	_ "github.com/darkliquid/localrpg/pkg/provider/openaiembedding"
