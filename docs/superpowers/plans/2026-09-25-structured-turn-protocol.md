@@ -1,5 +1,8 @@
 # Structured Turn Protocol Implementation Plan
 
+> **SUPERSEDED (2026-10-03).** The `submit_turn` approach it delivered is replaced
+> by `2026-10-03-progressive-turn-stream.md`. Kept for history only.
+
 > **Status:** Implemented and verified against the code on 2026-09-27.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

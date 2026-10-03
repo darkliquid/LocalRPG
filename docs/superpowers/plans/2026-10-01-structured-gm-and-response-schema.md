@@ -1,5 +1,9 @@
 # Structured GM Generation & Response Schema Implementation Plan
 
+> **SUPERSEDED (2026-10-03).** Replaced by
+> `2026-10-03-progressive-turn-stream.md` and the spec it implements. Do not
+> execute this plan.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Implement native structured outputs / response schema and required turn submission in the GM generation loop, eliminating secondary extractor calls while preserving fallback support.
