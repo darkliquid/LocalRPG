@@ -63,6 +63,24 @@ func TestFinaliseExtractsLegacyQuotedSpeech(t *testing.T) {
 	}
 }
 
+func TestRecordsIntroducePersonaeAndAttributeTheirFirstLine(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{
+		"@persona {\"name\":\"Kae\",\"type\":\"character\",\"new\":true}\n> Kae: Well met.\n",
+	}}
+	orchestrator, _, _ := streamingOrchestrator(t, provider)
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I arrive.", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+	if len(turn.Personae) != 1 || turn.Personae[0] != "kae" {
+		t.Fatalf("personae = %#v", turn.Personae)
+	}
+	if len(turn.Segments) != 1 || turn.Segments[0].Kind != entity.SegmentSpeech || turn.Segments[0].SpeakerID != "kae" {
+		t.Fatalf("segments = %#v", turn.Segments)
+	}
+}
+
 func TestRecordLinesAreStrippedFromNarration(t *testing.T) {
 	provider := &scriptedStreamProvider{chunks: []string{"@persona {\"name\":\"Kae\",\"type\":\"character\"}\nThe gate stands open.\n"}}
 	orchestrator, _, _ := streamingOrchestrator(t, provider)

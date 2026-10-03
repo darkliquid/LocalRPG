@@ -1034,17 +1034,24 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	var personae []harness.PersonaDecl
 	var memories []harness.MemoryDecl
+	var stateChanges []harness.StateChangeDecl
+	moveRef := ""
 	if structured {
 		extraction = extractionFromSubmission(result.Submission)
 		personae = result.Submission.Personae
 		memories = result.Submission.Memories
+		stateChanges = result.Submission.StateChanges
 		turn.Verdict = &result.Submission.Verdict
 		turn.Rejected = result.Submission.Verdict.Feasibility == harness.FeasibilityImpossible
 		turn.Checks = result.Checks
-		for _, persona := range personae {
-			if id := entity.Slugify(persona.Name); id != "" {
-				turn.Personae = append(turn.Personae, id)
-			}
+	} else if o.parser != nil {
+		// The progressive stream carries its declarations inline: a persona
+		// before the line that speaks, a state change after the roll it follows.
+		personae, memories, stateChanges, moveRef = o.applyRecords()
+	}
+	for _, persona := range personae {
+		if id := entity.Slugify(persona.Name); id != "" {
+			turn.Personae = append(turn.Personae, id)
 		}
 	}
 
@@ -1111,9 +1118,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	// A move proposed by extraction applies only when it resolves to a real
 	// location, and it takes effect from the next turn: this turn happened where it
-	// started, which is what keeps scenes honest.
-	if ref := strings.TrimSpace(extraction.PlayerLocation); ref != "" {
-		if ent := findLocationByRef(o.store, ref); ent != nil && ent.ID != locationID {
+	// started, which is what keeps scenes honest. An explicit move record wins over
+	// an extracted one.
+	move := strings.TrimSpace(moveRef)
+	if move == "" {
+		move = strings.TrimSpace(extraction.PlayerLocation)
+	}
+	if move != "" {
+		if ent := findLocationByRef(o.store, move); ent != nil && ent.ID != locationID {
 			if err := o.timeline.SetPlayerLocation(o.playerID, ent.ID); err != nil {
 				return nil, fmt.Errorf("apply proposed location: %w", err)
 			}
@@ -1150,8 +1162,8 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// RecordTurn creates and voices the entities the turn introduced. Synthesis
 	// must not begin until this returns, or a character invented in this turn
 	// would be read in the narrator's voice.
-	if structured && len(result.Submission.StateChanges) > 0 && o.rulesEngine != nil {
-		notes, err := rules.ApplyStateChanges(o.rulesEngine.HostAPI(), result.Submission.StateChanges, o.declaredStats, o.allowFreeform)
+	if len(stateChanges) > 0 && o.rulesEngine != nil {
+		notes, err := rules.ApplyStateChanges(o.rulesEngine.HostAPI(), stateChanges, o.declaredStats, o.allowFreeform)
 		if err != nil {
 			return nil, fmt.Errorf("apply state changes: %w", err)
 		}

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/turnstream"
 )
 
@@ -30,6 +31,45 @@ func segmentsFromEvents(events []turnstream.Event) []entity.TurnSegment {
 		}
 	}
 	return segments
+}
+
+// applyRecords decodes the stream's control records into the turn's
+// declarations: personae, memories, state changes, and a location move. A record
+// that failed to parse is logged and skipped, so a malformed declaration never
+// costs the turn.
+func (o *TurnOrchestrator) applyRecords() ([]harness.PersonaDecl, []harness.MemoryDecl, []harness.StateChangeDecl, string) {
+	if o.parser == nil {
+		return nil, nil, nil, ""
+	}
+	var personae []harness.PersonaDecl
+	var memories []harness.MemoryDecl
+	var stateChanges []harness.StateChangeDecl
+	moveRef := ""
+	for _, record := range o.parser.Records() {
+		if record.Err != nil {
+			o.logger.Event("turn.record_error", map[string]interface{}{"type": record.Type, "error": record.Err.Error()})
+			continue
+		}
+		switch record.Type {
+		case turnstream.RecordPersona:
+			if decl, err := record.DecodePersona(); err == nil {
+				personae = append(personae, decl)
+			}
+		case turnstream.RecordMemory:
+			if memory, err := record.DecodeMemory(); err == nil {
+				memories = append(memories, memory)
+			}
+		case turnstream.RecordState:
+			if change, err := record.DecodeState(); err == nil {
+				stateChanges = append(stateChanges, change)
+			}
+		case turnstream.RecordMove:
+			if location, err := record.DecodeMove(); err == nil && strings.TrimSpace(location) != "" {
+				moveRef = location
+			}
+		}
+	}
+	return personae, memories, stateChanges, moveRef
 }
 
 // stripRecordLines removes control-record lines from prose, so the recorded
