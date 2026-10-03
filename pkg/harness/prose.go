@@ -324,7 +324,12 @@ func StitchContinuation(existing, continuation string) string {
 	case startsWithPunctuation(cont):
 		return collapseNewlines(strings.TrimRight(existing, " \t\r\n") + cont)
 	case endsAlphanumeric(existing) && startsAlphanumeric(cont):
-		return collapseNewlines(existing + cont)
+		if resumesWord(cont) {
+			return collapseNewlines(existing + cont)
+		}
+		// A word-boundary cut starts a new word, so it needs a space: "the" and
+		// "whisper" must not read as "thewhisper".
+		return collapseNewlines(existing + " " + cont)
 	default:
 		return collapseNewlines(existing + " " + strings.TrimLeft(cont, " \t\r\n"))
 	}
@@ -406,6 +411,23 @@ func startsAlphanumeric(text string) bool {
 	}
 	r := []rune(text)[0]
 	return unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// resumesWord reports whether a continuation opens with the tail of a word the cut
+// split, rather than a new word. A short lowercase run is a suffix ("hinge" +
+// "s"); anything longer starts a new word and needs a space ("the" + "whisper").
+func resumesWord(cont string) bool {
+	run := 0
+	for _, r := range cont {
+		if !unicode.IsLetter(r) {
+			break
+		}
+		run++
+	}
+	if run == 0 || run > 2 {
+		return false
+	}
+	return unicode.IsLower([]rune(cont)[0])
 }
 
 func startsWithPunctuation(text string) bool {
