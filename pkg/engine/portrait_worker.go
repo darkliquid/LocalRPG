@@ -74,10 +74,15 @@ func (w *PortraitWorker) SetOnReady(fn func(gameID, characterID, relPath string)
 
 // Enqueue asynchronously triggers portrait generation for a character if not already in flight or set.
 func (w *PortraitWorker) Enqueue(gameID string, ent *entity.Entity, artStyle string) {
+	w.EnqueueVersion(gameID, ent, artStyle, false)
+}
+
+// EnqueueVersion triggers portrait generation, allowing forceNewVersion when an appearance change occurs.
+func (w *PortraitWorker) EnqueueVersion(gameID string, ent *entity.Entity, artStyle string, forceNewVersion bool) {
 	if w.generator == nil || ent == nil || ent.ID == "" || ent.Type != "character" {
 		return
 	}
-	if ent.Portrait != "" {
+	if !forceNewVersion && ent.Portrait != "" {
 		return
 	}
 
@@ -134,7 +139,15 @@ func (w *PortraitWorker) writePortrait(ctx context.Context, gameID string, ent *
 	if ext == "" {
 		ext = ".png"
 	}
-	relPath := filepath.Join("assets", "portraits", ent.ID+ext)
+
+	version := 1
+	if ent.PortraitVersion > 0 {
+		version = ent.PortraitVersion + 1
+	} else if ent.Portrait != "" {
+		version = 2
+	}
+
+	relPath := filepath.Join("assets", "portraits", fmt.Sprintf("%s-v%d%s", ent.ID, version, ext))
 	fullPath := filepath.Join(w.resolver.GameDir(gameID), relPath)
 
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
@@ -143,9 +156,9 @@ func (w *PortraitWorker) writePortrait(ctx context.Context, gameID string, ent *
 	if err := os.WriteFile(fullPath, imgBytes, 0644); err != nil {
 		return "", fmt.Errorf("write portrait: %w", err)
 	}
-	w.removeStalePortraits(gameID, ent.ID, ext)
+	w.removeStalePortraits(gameID, ent.ID, version, ext)
 
-	if err := w.updateNote(gameID, ent, relPath); err != nil {
+	if err := w.updateNote(gameID, ent, relPath, version); err != nil {
 		return "", err
 	}
 	w.mu.Lock()
@@ -157,23 +170,27 @@ func (w *PortraitWorker) writePortrait(ctx context.Context, gameID string, ent *
 	return relPath, nil
 }
 
-func (w *PortraitWorker) removeStalePortraits(gameID, id, keepExt string) {
+func (w *PortraitWorker) removeStalePortraits(gameID, id string, version int, keepExt string) {
 	dir := filepath.Join(w.resolver.GameDir(gameID), "assets", "portraits")
 	for _, ext := range portraitExtensions {
 		if ext == keepExt {
 			continue
 		}
-		_ = os.Remove(filepath.Join(dir, id+ext))
+		_ = os.Remove(filepath.Join(dir, fmt.Sprintf("%s-v%d%s", id, version, ext)))
 	}
 }
 
 // updateNote writes the portrait path into the entity's note frontmatter,
 // preferring the on-disk note so a hand edit is not clobbered.
-func (w *PortraitWorker) updateNote(gameID string, ent *entity.Entity, relPath string) error {
+func (w *PortraitWorker) updateNote(gameID string, ent *entity.Entity, relPath string, version int) error {
 	notePath := filepath.Join(w.resolver.GameDir(gameID), "entities", ent.ID+".md")
 	if existingData, err := os.ReadFile(notePath); err == nil {
 		if existingEnt, err := entity.ParseMarkdownEntity(existingData); err == nil {
+			if existingEnt.Portrait != "" && existingEnt.Portrait != relPath {
+				existingEnt.PortraitHistory = append(existingEnt.PortraitHistory, existingEnt.Portrait)
+			}
 			existingEnt.Portrait = relPath
+			existingEnt.PortraitVersion = version
 			if data, err := existingEnt.SerializeMarkdown(); err == nil {
 				if err := os.WriteFile(notePath, data, 0644); err != nil {
 					return fmt.Errorf("write note: %w", err)
@@ -187,7 +204,11 @@ func (w *PortraitWorker) updateNote(gameID string, ent *entity.Entity, relPath s
 	}
 
 	updated := *ent
+	if updated.Portrait != "" && updated.Portrait != relPath {
+		updated.PortraitHistory = append(updated.PortraitHistory, updated.Portrait)
+	}
 	updated.Portrait = relPath
+	updated.PortraitVersion = version
 	data, err := updated.SerializeMarkdown()
 	if err != nil {
 		return fmt.Errorf("serialize note: %w", err)
