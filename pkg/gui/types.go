@@ -129,11 +129,12 @@ type SegmentDTO struct {
 	// adjacent same-speaker segments shares one clip, so this is usually one URL;
 	// ClipGroup names that shared clip so the client renders one control for the
 	// whole group.
-	AudioURLs   []string `json:"audio_urls,omitempty"`
-	ClipGroup   string   `json:"clip_group,omitempty"`
-	PortraitURL string   `json:"portrait_url,omitempty"`
+	AudioURLs       []string `json:"audio_urls,omitempty"`
+	ClipGroup       string   `json:"clip_group,omitempty"`
+	PortraitURL     string   `json:"portrait_url,omitempty"`
+	SpeakerPortrait string   `json:"speaker_portrait,omitempty"`
 	HasCustomPortrait bool   `json:"has_custom_portrait,omitempty"`
-	CheckRef    string   `json:"check_ref,omitempty"`
+	CheckRef        string   `json:"check_ref,omitempty"`
 	Player      bool     `json:"player,omitempty"`
 	Duration    float64  `json:"duration"`
 }
@@ -207,6 +208,7 @@ type TurnDTO struct {
 	LocationID      string        `json:"location_id,omitempty"`
 	LocationName    string        `json:"location_name,omitempty"`
 	LocationArtURL  string        `json:"location_art_url,omitempty"`
+	SceneBreak      bool          `json:"scene_break,omitempty"`
 	// Structured turn fields: the action verdict, whether it was rejected, and
 	// the checks the GM resolved.
 	Verdict  *harness.ActionVerdict `json:"verdict,omitempty"`
@@ -578,7 +580,11 @@ type TurnEvent struct {
 	// Character portrait update, present when Type is "portrait".
 	CharacterID       string `json:"character_id,omitempty"`
 	PortraitURL       string `json:"portrait_url,omitempty"`
+	Version           int    `json:"version,omitempty"`
 	HasCustomPortrait bool   `json:"has_custom_portrait,omitempty"`
+	// Scene image update, present when Type is "scene_image".
+	TurnNumber int    `json:"turn_number,omitempty"`
+	ImageURL   string `json:"image_url,omitempty"`
 	// RetryAfterMS is the provider's advertised backoff, when it gave one.
 	RetryAfterMS int64 `json:"retry_after_ms,omitempty"`
 }

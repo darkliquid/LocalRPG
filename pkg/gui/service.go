@@ -1789,7 +1789,38 @@ func (s *Service) addPortraitListener(gameID string, listener func(TurnEvent)) f
 	}
 }
 
-func (s *Service) broadcastPortraitReady(gameID, characterID, relPath string) {
+func (s *Service) broadcastPortraitReady(gameID, characterID, relPath string, version ...int) {
+	s.portraitMu.Lock()
+	var listeners []func(TurnEvent)
+	if m := s.portraitListeners[gameID]; m != nil {
+		for _, fn := range m {
+			listeners = append(listeners, fn)
+		}
+	}
+	s.portraitMu.Unlock()
+
+	ver := 0
+	if len(version) > 0 {
+		ver = version[0]
+	}
+	portraitURL := fmt.Sprintf("/api/game/%s/character/%s/portrait?t=%d", gameID, characterID, time.Now().UnixMilli())
+	if ver > 0 {
+		portraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait?v=%d&t=%d", gameID, characterID, ver, time.Now().UnixMilli())
+	}
+
+	evt := TurnEvent{
+		Type:              "portrait",
+		CharacterID:       characterID,
+		PortraitURL:       portraitURL,
+		Version:           ver,
+		HasCustomPortrait: true,
+	}
+	for _, fn := range listeners {
+		fn(evt)
+	}
+}
+
+func (s *Service) broadcastSceneImageReady(gameID string, turnNumber int, relPath string) {
 	s.portraitMu.Lock()
 	var listeners []func(TurnEvent)
 	if m := s.portraitListeners[gameID]; m != nil {
@@ -1800,10 +1831,9 @@ func (s *Service) broadcastPortraitReady(gameID, characterID, relPath string) {
 	s.portraitMu.Unlock()
 
 	evt := TurnEvent{
-		Type:              "portrait",
-		CharacterID:       characterID,
-		PortraitURL:       fmt.Sprintf("/api/game/%s/character/%s/portrait?t=%d", gameID, characterID, time.Now().UnixMilli()),
-		HasCustomPortrait: true,
+		Type:       "scene_image",
+		TurnNumber: turnNumber,
+		ImageURL:   fmt.Sprintf("/api/game/%s/turn/%d/scene-image", gameID, turnNumber),
 	}
 	for _, fn := range listeners {
 		fn(evt)
@@ -1817,16 +1847,34 @@ func (s *Service) hasCustomPortrait(gameID, characterID string) bool {
 	gameDir := s.resolver.GameDir(gameID)
 	portraitsDir := filepath.Join(gameDir, "assets", "portraits")
 	for _, ext := range []string{".png", ".jpg", ".jpeg", ".webp", ".svg"} {
-		path := filepath.Join(portraitsDir, characterID+ext)
-		if info, err := os.Stat(path); err == nil && !info.IsDir() && info.Size() > 0 {
-			return true
+		// Check both unversioned and versioned files
+		matches, err := filepath.Glob(filepath.Join(portraitsDir, characterID+"*"+ext))
+		if err == nil && len(matches) > 0 {
+			for _, m := range matches {
+				if info, err := os.Stat(m); err == nil && !info.IsDir() && info.Size() > 0 {
+					return true
+				}
+			}
 		}
 	}
 	return false
 }
 
+// GetTurnSceneImage returns the generated scene illustration for a specific turn.
+func (s *Service) GetTurnSceneImage(ctx context.Context, gameID string, turnNumber int) ([]byte, string, error) {
+	scenesDir := filepath.Join(s.resolver.GameDir(gameID), "assets", "scenes")
+	for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+		p := filepath.Join(scenesDir, fmt.Sprintf("turn-%d%s", turnNumber, ext))
+		if data, err := os.ReadFile(p); err == nil && len(data) > 0 {
+			return data, imageContentType(data), nil
+		}
+	}
+	return nil, "", fmt.Errorf("scene image for turn %d not found", turnNumber)
+}
+
 // GetCharacterPortrait returns the portrait image for a character, or a procedural SVG fallback if not found.
-func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID string) ([]byte, string, error) {
+// When an explicit version (> 0) is specified, it serves that exact historical portrait version.
+func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID string, version ...int) ([]byte, string, error) {
 	s.ensureIndexed(gameID)
 	store, err := s.store(gameID)
 	if err != nil {
@@ -1846,10 +1894,57 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 		return nil, "", fmt.Errorf("character %q not found", characterID)
 	}
 
-	if ent.Portrait != "" {
-		portraitPath := filepath.Join(s.resolver.GameDir(gameID), ent.Portrait)
-		if data, err := os.ReadFile(portraitPath); err == nil && len(data) > 0 {
-			return data, imageContentType(data), nil
+	portraitsDir := filepath.Join(s.resolver.GameDir(gameID), "assets", "portraits")
+
+	// If explicit version requested:
+	if len(version) > 0 && version[0] > 0 {
+		targetVer := version[0]
+		// 1. Check direct file assets/portraits/<id>-v<version>.<ext>
+		for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+			vPath := filepath.Join(portraitsDir, fmt.Sprintf("%s-v%d%s", characterID, targetVer, ext))
+			if data, err := os.ReadFile(vPath); err == nil && len(data) > 0 {
+				return data, imageContentType(data), nil
+			}
+		}
+		// 2. Check if current ent.Portrait matches this version
+		if ent.PortraitVersion == targetVer && ent.Portrait != "" {
+			pPath := filepath.Join(s.resolver.GameDir(gameID), ent.Portrait)
+			if data, err := os.ReadFile(pPath); err == nil && len(data) > 0 {
+				return data, imageContentType(data), nil
+			}
+		}
+		// 3. Check portrait history entries
+		for _, histPath := range ent.PortraitHistory {
+			if strings.Contains(histPath, fmt.Sprintf("-v%d.", targetVer)) {
+				pPath := filepath.Join(s.resolver.GameDir(gameID), histPath)
+				if data, err := os.ReadFile(pPath); err == nil && len(data) > 0 {
+					return data, imageContentType(data), nil
+				}
+			}
+		}
+		// 4. If targetVer == 1, check legacy unversioned files
+		if targetVer == 1 {
+			for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+				legacyPath := filepath.Join(portraitsDir, characterID+ext)
+				if data, err := os.ReadFile(legacyPath); err == nil && len(data) > 0 {
+					return data, imageContentType(data), nil
+				}
+			}
+		}
+	} else {
+		// No version requested: serve current active portrait
+		if ent.Portrait != "" {
+			portraitPath := filepath.Join(s.resolver.GameDir(gameID), ent.Portrait)
+			if data, err := os.ReadFile(portraitPath); err == nil && len(data) > 0 {
+				return data, imageContentType(data), nil
+			}
+		}
+		// Check fallback unversioned file on disk
+		for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+			path := filepath.Join(portraitsDir, characterID+ext)
+			if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
+				return data, imageContentType(data), nil
+			}
 		}
 	}
 
