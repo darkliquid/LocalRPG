@@ -11,7 +11,7 @@ import (
 func TestTurnWritesDeclaredAndMechanicalMemories(t *testing.T) {
 	provider := &toolScriptProvider{replies: []toolReply{
 		{tools: []harness.ToolCall{{ID: "1", Name: "request_check", Arguments: `{"actor":"Kae","check_kind":"skill","stakes":"cross the bridge","outcomes":{"pass":"clear","fail":"fall"}}`}}},
-		{tools: []harness.ToolCall{{ID: "2", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"uncertain","reason":"a swaying bridge"},"segments":[{"kind":"narration","text":"Kae crosses.","check_ref":"1"}],"personae":[{"name":"Kae","type":"character","new":true}],"memories":[{"kind":"event","entity_refs":["Kae"],"text":"Kae crossed the rope bridge.","importance":3}]}`}}},
+		{text: "@persona {\"name\":\"Kae\",\"type\":\"character\",\"new\":true}\nKae crosses.\n@memory {\"kind\":\"event\",\"entity_refs\":[\"Kae\"],\"text\":\"Kae crossed the rope bridge.\",\"importance\":3}\n"},
 	}}
 	o, _ := toolLoopOrchestrator(t, provider)
 	o.SetTools(&fakeExecutor{}, "yes")

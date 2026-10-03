@@ -10,12 +10,20 @@ func TestTurnToolSpecs(t *testing.T) {
 			t.Fatalf("tool %q missing description or parameters", spec.Name)
 		}
 	}
-	for _, want := range []string{"submit_turn", "request_check"} {
-		if !names[want] {
-			t.Fatalf("missing turn tool %q", want)
-		}
+	if !names["request_check"] {
+		t.Fatal("the auto policy must offer request_check")
 	}
-	if !IsTurnTool("submit_turn") || IsTurnTool("search_entities") {
+	askNames := map[string]bool{}
+	for _, spec := range TurnToolSpecsFor("ask") {
+		askNames[spec.Name] = true
+	}
+	if !askNames["propose_check"] {
+		t.Fatal("the ask policy must offer propose_check")
+	}
+	if names["submit_turn"] {
+		t.Fatal("submit_turn is retired; the turn stream carries the prose")
+	}
+	if !IsTurnTool("request_check") || IsTurnTool("search_entities") {
 		t.Fatal("IsTurnTool misclassified a tool")
 	}
 }

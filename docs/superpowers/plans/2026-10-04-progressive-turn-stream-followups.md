@@ -544,36 +544,44 @@ git add -A && git commit -m "feat(engine): mark a roll continuation as continuin
 
 ## Stream C — Retire `submit_turn`
 
-### Task C1: Remove the turn-tool surface
+`submit_turn` is the terminal payload the progressive stream replaces. This stream
+retires it and the structured submission path. `request_check` and `propose_check`
+stay: they are the mid-stream roll tools for a tool-capable provider, and `@roll`
+is the framing-based equivalent for one that is not. Retiring them is a separate
+change, because they are entangled with the `/roll` proposal flow.
+
+### Task C1: Remove `submit_turn` from the tool surface
 
 **Files:**
 - Modify: `pkg/harness/turn_tools.go`, `pkg/engine/orchestrator.go`
 
-- [ ] **Step 1: Delete the tools**
+- [ ] **Step 1: Stop offering and dispatching it**
 
-Delete `TurnToolSpecsFor`, `TurnToolSpecs`, `submitTurnSpec`, `requestCheckSpec`,
-`proposeCheckSpec`, `TurnToolNames`, `IsTurnTool`, and `ParseCheckRequest`. Delete
-the turn-tool dispatch block in `runGenerationLoop`
-(`pkg/engine/orchestrator.go:1754-1801`). Rolls and declarations now arrive as
-stream records.
+Delete `submitTurnSpec` and drop it from `TurnToolSpecsFor` and `TurnToolNames`.
+Delete the `case "submit_turn":` arm of the turn-tool dispatch in
+`runGenerationLoop`. A model that calls it anyway gets the existing
+`unsupported turn tool` message.
 
 - [ ] **Step 2: Run the tests**
 
 Run: `go test ./pkg/engine/ ./pkg/harness/`
-Expected: failures only in tests that referenced the deleted symbols.
+Expected: failures only in the submission tests removed in C2.
 
 ### Task C2: Remove the structured submission path
 
 **Files:**
-- Delete: `pkg/harness/turn.go`, `pkg/engine/submission.go`, `pkg/engine/structured_turn_test.go`, `pkg/engine/structured_stream_test.go`, `pkg/engine/submission_segments_test.go`
-- Modify: `pkg/engine/orchestrator.go`
+- Delete: `pkg/engine/submission.go`, `pkg/engine/structured_turn_test.go`, `pkg/engine/structured_stream_test.go`, `pkg/engine/submission_segments_test.go`
+- Modify: `pkg/engine/orchestrator.go`, `pkg/harness/turn.go`
 
 - [ ] **Step 1: Delete the types and the branch**
 
-Delete `TurnSubmission`, `TurnSubmissionSchema`, `ParseSubmission`,
-`SegmentSpec`, `buildSegments`, `validateSubmission`, `speakerResolver`, and the
-`structured` branch in `ProcessActionStream`. The `result.Submission` and
-`FallbackReason` fields on `streamResult` go too.
+Delete `TurnSubmission`, `TurnSubmissionSchema`, `ParseSubmission`, `SegmentSpec`,
+`DismissedCheck`, `buildSegments`, `validateSubmission`, `speakerResolver`, and
+`extractionFromSubmission`. Remove the `structured` branch in
+`ProcessActionStream` and the `Submission` and `FallbackReason` fields on
+`streamResult`. Keep `ActionVerdict` (the DTO reads it) and the record shapes
+(`PersonaDecl`, `MemoryDecl`, `StateChangeDecl`, `CheckRequest`, `CheckResult`,
+`PendingCheck`).
 
 - [ ] **Step 2: Run the tests**
 
@@ -596,3 +604,4 @@ Expected: the provider catalogue and config reference regenerate.
 mise run test && mise run lint
 git add -A && git commit -m "refactor(engine): retire submit_turn for the turn stream"
 ```
+

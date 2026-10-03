@@ -950,7 +950,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		// check the player rolls; under auto the engine rolls at once and the model
 		// continues from the outcome.
 		req, hasRoll := o.pendingRoll()
-		endedOnRoll = hasRoll && result.Submission == nil && result.PendingCheck == nil
+		endedOnRoll = hasRoll && result.PendingCheck == nil
 		if !endedOnRoll || o.mechanicsEngagement == "off" {
 			break
 		}
@@ -1004,14 +1004,10 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
 	}
 
-	if result.FallbackReason != "" {
-		o.logger.Event("turn.protocol_fallback", map[string]interface{}{"reason": result.FallbackReason})
-	}
-
 	// A pending check is not an empty turn: the prose the model wrote before the
 	// check is the setup the player reads while deciding, so recovery runs for it
 	// too and only a genuinely empty reply is an error.
-	if result.Submission == nil {
+	{
 		// The final call may be cut off; earlier continuations ended on a roll and
 		// are complete by construction, so only the last needs classification.
 		if endedOnRoll {
@@ -1091,14 +1087,13 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		ContinuationOf:   continuationOf,
 	}
 
-	structured := result.Submission != nil
 	extraction := harness.Extraction{}
 	var extractionErr error
 	extractionDone := make(chan struct{})
 	// Extraction is a model call, so start it before the local mention and
 	// segment work and await it just before segments are built. A failed
 	// extractor must not lose the turn.
-	if !structured && o.extractor != nil {
+	if o.extractor != nil {
 		go func() {
 			defer close(extractionDone)
 			extractCtx, extractSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "extract.entities")
@@ -1123,14 +1118,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	var memories []harness.MemoryDecl
 	var stateChanges []harness.StateChangeDecl
 	moveRef := ""
-	if structured {
-		extraction = extractionFromSubmission(result.Submission)
-		personae = result.Submission.Personae
-		memories = result.Submission.Memories
-		stateChanges = result.Submission.StateChanges
-		turn.Verdict = &result.Submission.Verdict
-		turn.Rejected = result.Submission.Verdict.Feasibility == harness.FeasibilityImpossible
-	} else if o.parser != nil {
+	if o.parser != nil {
 		// The progressive stream carries its declarations inline: a persona
 		// before the line that speaks, a state change after the roll it follows.
 		personae, memories, stateChanges, moveRef = o.applyRecords()
@@ -1147,22 +1135,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		o.logger.Event("extract.error", map[string]interface{}{"error": extractionErr.Error()})
 	}
 
-	if structured {
-		narrationText, segs := buildSegments(result.Submission, o.speakerResolver(result.Submission))
-		if narrationText != "" {
-			turn.Narration = narrationText
-		}
-		turn.Segments = segs
+	// The streamed reply was parsed as it arrived, across every continuation; its
+	// events are the turn's playback script. A reply with no framing at all falls
+	// back to the legacy prose parser plus the extractor.
+	events := collected
+	if parsed := segmentsFromEvents(events); len(parsed) > 0 {
+		turn.Segments = parsed
 	} else {
-		// The streamed reply was parsed as it arrived, across every continuation;
-		// its events are the turn's playback script. A reply with no framing at all
-		// falls back to the legacy prose parser plus the extractor.
-		events := collected
-		if parsed := segmentsFromEvents(events); len(parsed) > 0 {
-			turn.Segments = parsed
-		} else {
-			turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
-		}
+		turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
 	}
 
 	// A resolved roll's outcome is narrated after the prose that led to it, so the
@@ -1357,12 +1337,8 @@ type streamResult struct {
 	Failure    *harness.GenerationFailure
 	ProviderID string
 	ChunkCount int
-	// Submission is the structured turn when the GM called submit_turn, and
-	// Checks are the checks it resolved with request_check. FallbackReason is set
-	// when a structured turn failed validation twice and prose was used instead.
-	Submission     *harness.TurnSubmission
-	Checks         []harness.CheckResult
-	FallbackReason string
+	// Checks are the checks the turn resolved.
+	Checks []harness.CheckResult
 	// PendingCheck is set when the model proposed a check under the ask policy and
 	// the turn ends awaiting the player's roll.
 	PendingCheck *harness.PendingCheck
@@ -1716,7 +1692,6 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 	if resolvedPending != nil {
 		checks = append(checks, *resolvedPending)
 	}
-	submitAttempts := 0
 	withdrawn := false
 
 	for round := 0; round <= o.toolRoundCap(); round++ {
@@ -1817,26 +1792,18 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		}
 		roundSpan.End()
 
-		hasSubmitTurn := false
-		for _, call := range result.ToolCalls {
-			if call.Name == "submit_turn" {
-				hasSubmitTurn = true
-				break
-			}
-		}
-
 		// A reply carrying calls while tools were not offered is a protocol quirk:
 		// its text is the answer, and the calls are dropped and traced.
-		// However, if the model called submit_turn, that is the terminal submission
-		// of the turn and must be honored rather than discarded.
-		if len(result.ToolCalls) > 0 && !offerTools && !hasSubmitTurn {
+		if len(result.ToolCalls) > 0 && !offerTools {
 			o.logger.Event("tool.stray", map[string]interface{}{"round": round, "calls": len(result.ToolCalls)})
 			result.ToolCalls = nil
 			result.Provenance = provenance
+			result.Checks = checks
 			return result, nil
 		}
 		if len(result.ToolCalls) == 0 {
 			result.Provenance = provenance
+			result.Checks = checks
 			return result, nil
 		}
 
@@ -1887,30 +1854,6 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: string(encoded)})
 					o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "done", Summary: resolved.Outcome})
 					continue
-				case "submit_turn":
-					sub, parseErr := harness.ParseSubmission(call.Arguments)
-					if parseErr != nil {
-						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
-						continue
-					}
-					if vErr := validateSubmission(sub, checks, o.declaredStats, proposed, engagement); vErr != nil {
-						o.logger.Event("turn.protocol_error", map[string]interface{}{"detail": vErr.Error()})
-						submitAttempts++
-						if submitAttempts >= 2 {
-							result.Submission = nil
-							result.FallbackReason = vErr.Error()
-							result.Provenance = provenance
-							result.ToolCalls = nil
-							return result, nil
-						}
-						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "protocol validation failed: " + vErr.Error()})
-						continue
-					}
-					result.Submission = sub
-					result.Checks = checks
-					result.Provenance = provenance
-					result.ToolCalls = nil
-					return result, nil
 				case "propose_check":
 					if o.mechanicsEngagement != "ask" {
 						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: propose_check is only available when mechanics are set to ask"})
@@ -1974,7 +1917,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 			withdrawn = true
 			messages = append(messages, harness.Message{
 				Role:    "tool",
-				Content: "Tools are no longer available for this turn. Complete and submit the turn now (call submit_turn or provide your narration as text).",
+				Content: "Tools are no longer available for this turn. Complete the turn now by providing your narration as text.",
 			})
 		}
 	}

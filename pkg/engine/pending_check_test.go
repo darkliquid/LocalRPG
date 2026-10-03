@@ -26,7 +26,7 @@ func TestProposeCheckEndsTheTurnPending(t *testing.T) {
 
 func TestRollingAPendingCheckResolvesAndContinues(t *testing.T) {
 	provider := &toolScriptProvider{replies: []toolReply{
-		{tools: []harness.ToolCall{{ID: "s1", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"automatic","reason":"rolled"},"segments":[{"kind":"narration","text":"You cross the bridge."}]}`}}},
+		{text: "You cross the bridge."},
 	}}
 	o, timeline := toolLoopOrchestrator(t, provider)
 	o.SetMechanicsEngagement("ask")
@@ -59,8 +59,8 @@ func TestRollingAPendingCheckResolvesAndContinues(t *testing.T) {
 
 func TestARetriedRollReusesTheRecordedResult(t *testing.T) {
 	provider := &toolScriptProvider{replies: []toolReply{
-		{tools: []harness.ToolCall{{ID: "s1", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"automatic","reason":"rolled"},"segments":[{"kind":"narration","text":"You cross."}]}`}}},
-		{tools: []harness.ToolCall{{ID: "s2", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"automatic","reason":"rolled"},"segments":[{"kind":"narration","text":"You cross again."}]}`}}},
+		{text: "You cross."},
+		{text: "You cross again."},
 	}}
 	o, timeline := toolLoopOrchestrator(t, provider)
 	o.SetMechanicsEngagement("ask")

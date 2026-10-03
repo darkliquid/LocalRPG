@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
 )
 
@@ -14,7 +13,9 @@ import (
 // the turn they just played.
 func TestStateChangesResolveNamesWithoutLosingTheTurn(t *testing.T) {
 	provider := &toolScriptProvider{replies: []toolReply{
-		{tools: []harness.ToolCall{{ID: "1", Name: "submit_turn", Arguments: `{"action_verdict":{"feasibility":"automatic","reason":"nothing in the way"},"segments":[{"kind":"narration","text":"You shoulder the door open."}],"state_changes":[{"entity":"Nobody At All","path":"hp","op":"sub","value":1},{"entity":"Alden Tavern","path":"reputation","op":"set","value":3}]}`}}},
+		{text: "You shoulder the door open.\n" +
+			"@state {\"entity\":\"Nobody At All\",\"path\":\"hp\",\"op\":\"sub\",\"value\":1}\n" +
+			"@state {\"entity\":\"Alden Tavern\",\"path\":\"reputation\",\"op\":\"set\",\"value\":3}\n"},
 	}}
 	o, _ := toolLoopOrchestrator(t, provider)
 	o.SetTools(&fakeExecutor{}, "yes")
