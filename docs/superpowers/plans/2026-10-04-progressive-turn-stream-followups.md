@@ -19,17 +19,20 @@ Done:
 - Stream A, Tasks A1-A2 — the streamer takes parsed segment events and voices
   speech in the speaker's profile; the session drives it from the segment
   observer instead of raw chunks.
-- Stream B, Task B1 — a `@roll` under auto resolves and the model continues,
-  with the continuation's segments and prose appended to the same turn, bounded
-  by `maxRollContinuations`.
+- Stream A, Task A3, primitive only — `media.GroupFolder` folds speaker lines
+  into groups incrementally, matching `planGroups` when no budget bites.
+- Stream B, Tasks B0-B3 — a pending-check turn keeps its prose; a `@roll` under
+  auto resolves and the model continues; a resolved roll is recorded once and
+  reused on a retry; an ask continuation carries `ContinuationOf`.
+- Stream C — `submit_turn` and the structured submission path are gone.
+  `request_check` and `propose_check` remain as the tool-based roll path.
 
 Remaining:
 
-- Stream B, Task B0 — a pending-check turn records empty prose; recover it.
-- Stream B, Task B2 — persist a resolved roll so a retry cannot re-roll.
-- Stream B, Task B3 — mark an ask continuation as continuing the same turn.
-- Stream C, Tasks C1-C3 — retire `submit_turn` and the turn-tool surface.
-- Stream A, Task A3 — grouped live audio, sharing the turn's clip plan.
+- Stream A, Task A3, wiring — the streamer does not yet fold live audio into
+  groups, because that needs the turn's clip plan to *be* the stream's plan
+  (`clipPlanFor`, `pkg/gui/service.go`). Until then, live audio is per-sentence
+  and matches the finalise plan exactly, so nothing is synthesized twice.
 
 ## Global Constraints
 
