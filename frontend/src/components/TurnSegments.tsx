@@ -160,11 +160,12 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             <div className="flex items-center gap-3">
               {(() => {
                 const charId = segment.speaker_id || (segment.speaker ? slugify(segment.speaker) : undefined);
-                const portraitState = charId && characterPortraits?.[charId]
-                  ? characterPortraits[charId]
-                  : { url: segment.portrait_url, hasCustom: !!segment.has_custom_portrait };
-                const portraitURL = portraitState.url;
-                const hasCustomPortrait = portraitState.hasCustom;
+                const portraitURL = segment.speaker_portrait || (charId && characterPortraits?.[charId]?.url) || segment.portrait_url;
+                const hasCustomPortrait = segment.speaker_portrait
+                  ? true
+                  : (charId && characterPortraits?.[charId]
+                    ? characterPortraits[charId].hasCustom
+                    : !!segment.has_custom_portrait);
 
                 return portraitURL ? (
                   <div

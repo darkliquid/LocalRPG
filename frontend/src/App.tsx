@@ -423,6 +423,14 @@ export const App: React.FC = () => {
                 hasCustom: !!event.has_custom_portrait,
               },
             }));
+          } else if (event.type === 'scene_image' && event.turn_number && event.image_url) {
+            setChronicle((prev) =>
+              prev.map((turn) =>
+                turn.turn_number === event.turn_number
+                  ? { ...turn, image_url: event.image_url }
+                  : turn
+              )
+            );
           } else if (event.type === 'tool') {
             setToolActivity(
               event.tool_status === 'running'

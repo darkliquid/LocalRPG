@@ -88,6 +88,18 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
           const locationArtURL = turn.location_art_url;
           return (
             <div key={turn.turn_number} className="space-y-4 pb-6 border-b border-white/5 last:border-0">
+              {/* Scene break indicator */}
+              {turn.scene_break && (
+                <div className="relative flex py-4 items-center" role="separator" aria-label="Scene break">
+                  <div className="flex-grow border-t border-purple-500/30"></div>
+                  <span className="flex-shrink mx-4 text-xs font-mono uppercase tracking-widest text-purple-400/80 bg-black/40 px-3 py-1 rounded-full border border-purple-500/20 shadow-sm flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                    Scene Break
+                  </span>
+                  <div className="flex-grow border-t border-purple-500/30"></div>
+                </div>
+              )}
+
               {/* Player Input Block. A spoken line is rendered as speech below, so
                   the input block is skipped for it to avoid printing it twice. */}
               {turn.input_text && !(turn.segments ?? []).some((segment) => segment.player) && (
