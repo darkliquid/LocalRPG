@@ -1146,6 +1146,7 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		Rejected:        turn.Rejected,
 		Checks:          turn.Checks,
 		PendingCheck:    turn.PendingCheck,
+		ContinuationOf:  turn.ContinuationOf,
 		HealthEffects:   healthEffectDTOs(turn.HealthEffects),
 		WorldTick:       turn.WorldTick,
 		ClipGroups:      plan.groups,

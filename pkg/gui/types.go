@@ -201,6 +201,9 @@ type TurnDTO struct {
 	Checks   []harness.CheckResult  `json:"checks,omitempty"`
 	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
 	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
+	// ContinuationOf is the turn this one continues, when the player rolled a
+	// pending check, so a client can present the halves as one turn.
+	ContinuationOf int `json:"continuation_of,omitempty"`
 	// HealthEffects record a declared health stat reaching zero this turn, and
 	// WorldTick the directive an on-world-tick run injected, so the chronicle can
 	// show the mechanical consequence beside the prose.

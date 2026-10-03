@@ -136,6 +136,8 @@ export interface Turn {
     proposed_by?: string;
     request?: { actor?: string; check_kind?: string; stat?: string; stakes?: string; notation?: string };
   };
+  // The turn this one continues, when the player rolled a pending check.
+  continuation_of?: number;
 }
 
 // DieFace is one die as it landed. Symbol is the notation's own way of showing

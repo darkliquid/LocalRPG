@@ -820,16 +820,28 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// model narrates its outcome rather than proposing it again.
 	var resolvedPending *harness.CheckResult
 	validationEngagement := o.mechanicsEngagement
+	resolvedRef := ""
+	continuationOf := 0
 	if o.pendingCheckRef != "" {
+		resolvedRef = o.pendingCheckRef
+		continuationOf = findPendingTurn(pastTurns, o.pendingCheckRef)
 		if pending := findPendingCheck(pastTurns, o.pendingCheckRef); pending != nil {
-			if resolved, resolveErr := o.resolveCheck(ctx, pending.Request, nil); resolveErr == nil {
-				resolved.CheckID = pending.Ref
+			// A roll a previous attempt already resolved is reused, so a retried
+			// request cannot change the outcome the player already saw.
+			resolved := findResolvedCheck(pastTurns, o.pendingCheckRef)
+			if resolved == nil {
+				if fresh, resolveErr := o.resolveCheck(ctx, pending.Request, nil); resolveErr == nil {
+					fresh.CheckID = pending.Ref
+					resolved = fresh
+				} else {
+					o.logger.Event("pending.resolve_error", map[string]interface{}{"error": resolveErr.Error()})
+				}
+			}
+			if resolved != nil {
 				resolvedPending = resolved
 				validationEngagement = "auto"
 				directive := fmt.Sprintf("[PLAYER ROLL: %s — %s]", resolved.Outcome, strings.TrimSpace(pending.Request.Stakes))
 				gmDirective = strings.TrimSpace(directive + "\n" + gmDirective)
-			} else {
-				o.logger.Event("pending.resolve_error", map[string]interface{}{"error": resolveErr.Error()})
 			}
 		}
 		o.pendingCheckRef = ""
@@ -1073,8 +1085,10 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		ContextNotes: assembly.Trimmed,
 		Context:      &assembly.Context,
 		Prompt:       contextPrompt,
-		ToolCalls:    result.Provenance,
-		PendingCheck: result.PendingCheck,
+		ToolCalls:        result.Provenance,
+		PendingCheck:     result.PendingCheck,
+		ResolvesCheckRef: resolvedRef,
+		ContinuationOf:   continuationOf,
 	}
 
 	structured := result.Submission != nil
