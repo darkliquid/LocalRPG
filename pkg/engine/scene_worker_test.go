@@ -73,3 +73,19 @@ func TestSceneWorker_GeneratesTurnSceneIllustration(t *testing.T) {
 		t.Fatal("timeout waiting for scene image generation")
 	}
 }
+
+func TestExtractSceneCue(t *testing.T) {
+	text := "The old castle stands tall.\n\n---\n\nTen years later, the courtyard is quiet and overgrown with weeds.\n\n> Vera: We survived."
+	cue := ExtractSceneCue(text)
+	expected := "Ten years later, the courtyard is quiet and overgrown with weeds."
+	if cue != expected {
+		t.Errorf("ExtractSceneCue = %q, want %q", cue, expected)
+	}
+
+	fallbackText := "Just a single paragraph describing the rainy streets of London."
+	fallbackCue := ExtractSceneCue(fallbackText)
+	if fallbackCue != fallbackText {
+		t.Errorf("fallback cue = %q, want %q", fallbackCue, fallbackText)
+	}
+}
+

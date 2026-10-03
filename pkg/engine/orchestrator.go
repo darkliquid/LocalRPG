@@ -128,6 +128,24 @@ type TurnOrchestrator struct {
 	parser          *turnstream.Parser
 	roster          *roster
 	segmentObserver func(turnstream.Event)
+	sceneWorker     *SceneWorker
+	portraitWorker  *PortraitWorker
+	worldArtStyle   string
+}
+
+// SetSceneWorker attaches a scene illustration worker to the orchestrator.
+func (o *TurnOrchestrator) SetSceneWorker(w *SceneWorker) {
+	o.sceneWorker = w
+}
+
+// SetPortraitWorker attaches a portrait generation worker to the orchestrator.
+func (o *TurnOrchestrator) SetPortraitWorker(w *PortraitWorker) {
+	o.portraitWorker = w
+}
+
+// SetWorldArtStyle sets the art style for scene and portrait generation.
+func (o *TurnOrchestrator) SetWorldArtStyle(style string) {
+	o.worldArtStyle = style
 }
 
 // SetSegmentObserver attaches a sink for parsed turn-stream events, so a client
@@ -1227,6 +1245,40 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 
+	// Detect scene breaks via explicit markdown horizontal rules or extractor cues.
+	if hasProseRuleBreak(turn.Narration) || (extraction.SceneBreak != nil && extraction.SceneBreak.Occurred) {
+		turn.SceneBreak = true
+		if extraction.SceneBreak != nil && extraction.SceneBreak.VisualCue != "" {
+			turn.SceneBreakCue = extraction.SceneBreak.VisualCue
+		}
+	}
+
+	// Anchor speaker portraits with the character's active version at turn time.
+	for i := range turn.Segments {
+		if turn.Segments[i].Kind == entity.SegmentSpeech {
+			speakerID := turn.Segments[i].SpeakerID
+			if speakerID == "" && turn.Segments[i].Speaker != "" {
+				speakerID = harness.ResolveSpeakerID(o.store, turn.Segments[i].Speaker)
+			}
+			if speakerID == "" && turn.Segments[i].Speaker != "" {
+				speakerID = entity.Slugify(turn.Segments[i].Speaker)
+			}
+			if speakerID != "" && o.store != nil {
+				if ent, err := o.store.GetEntity(speakerID); err == nil && ent != nil {
+					version := ent.PortraitVersion
+					if version <= 0 && ent.Portrait != "" {
+						version = 1
+					}
+					if version > 0 {
+						turn.Segments[i].SpeakerPortrait = fmt.Sprintf("/api/game/%s/character/%s/portrait?v=%d", o.gameID(), speakerID, version)
+					} else {
+						turn.Segments[i].SpeakerPortrait = fmt.Sprintf("/api/game/%s/character/%s/portrait", o.gameID(), speakerID)
+					}
+				}
+			}
+		}
+	}
+
 	if o.continuityEnabled() {
 		_, continuitySpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "continuity.check")
 		findings := CheckContinuity(ContinuityInput{
@@ -1359,6 +1411,30 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		"outcome":         turn.Outcome,
 		"narration_chars": len([]rune(turn.Narration)),
 	})
+
+	if turn.SceneBreak && o.sceneWorker != nil {
+		var locEntity *entity.Entity
+		if turn.Location != "" && o.store != nil {
+			locEntity, _ = o.store.GetEntity(turn.Location)
+		}
+		cue := turn.SceneBreakCue
+		if cue == "" {
+			cue = ExtractSceneCue(turn.Narration)
+		}
+		scenePrompt := BuildScenePrompt(cue, locEntity, o.worldArtStyle)
+		o.sceneWorker.Enqueue(o.gameID(), turn.Number, scenePrompt)
+	}
+
+	if o.portraitWorker != nil {
+		for _, raw := range extraction.Entities {
+			if raw.AppearanceChanged && o.store != nil {
+				matched := harness.MatchExistingEntity(o.store, &raw)
+				if matched != nil && entity.IsCharacterType(matched.Type) {
+					o.portraitWorker.EnqueueVersion(o.gameID(), matched, o.worldArtStyle, true)
+				}
+			}
+		}
+	}
 
 	return &turn, nil
 }
@@ -2048,4 +2124,14 @@ func unresolvedSpeakers(segments []entity.TurnSegment) []string {
 		}
 	}
 	return unresolved
+}
+
+func hasProseRuleBreak(text string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+			return true
+		}
+	}
+	return false
 }

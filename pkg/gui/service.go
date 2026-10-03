@@ -454,6 +454,10 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, plan clipPlan, re
 					dto.HasCustomPortrait = customChecker(refID)
 				}
 			}
+			if segment.SpeakerPortrait != "" {
+				dto.SpeakerPortrait = segment.SpeakerPortrait
+				dto.PortraitURL = segment.SpeakerPortrait
+			}
 		}
 		// The keys come from the pipeline, so the URL a client is handed is the
 		// URL of the audio synthesis writes: one sound, one name. A grouped
@@ -1186,11 +1190,21 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		HealthEffects:   healthEffectDTOs(turn.HealthEffects),
 		WorldTick:       turn.WorldTick,
 		ClipGroups:      plan.groups,
+		SceneBreak:      turn.SceneBreak,
 		Segments: segmentDTOs(turn.Segments, gameID, plan, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
 		}, func(charID string) bool {
 			return s.hasCustomPortrait(gameID, charID)
 		}),
+	}
+
+	scenesDir := filepath.Join(s.resolver.GameDir(gameID), "assets", "scenes")
+	for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+		p := filepath.Join(scenesDir, fmt.Sprintf("turn-%d%s", turn.Number, ext))
+		if info, err := os.Stat(p); err == nil && !info.IsDir() && info.Size() > 0 {
+			dto.ImageURL = fmt.Sprintf("/api/game/%s/turn/%d/scene-image", gameID, turn.Number)
+			break
+		}
 	}
 
 	if turn.Location != "" {
@@ -1551,6 +1565,23 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		CustomGuidance:   cueCaps.PromptGuidance,
 	})
 
+	if cfg.Media.Image.Type != "" && cfg.Media.Image.Type != "disabled" {
+		if imgClient, err := imageClientFactory(cfg.Media.Image, cfg.Providers.Gemini.APIKey); err == nil && imgClient != nil {
+			portraitWorker := engine.NewPortraitWorker(s.resolver, store, imgClient)
+			portraitWorker.SetOnReady(func(gID, charID, relPath string) {
+				s.broadcastPortraitReady(gID, charID, relPath)
+			})
+			orchestrator.SetPortraitWorker(portraitWorker)
+
+			sceneWorker := engine.NewSceneWorker(s.resolver, imgClient)
+			sceneWorker.SetOnReady(func(gID string, turnNum int, relPath string) {
+				s.broadcastSceneImageReady(gID, turnNum, relPath)
+			})
+			orchestrator.SetSceneWorker(sceneWorker)
+		}
+	}
+	orchestrator.SetWorldArtStyle(s.worldArtStyle(gameID))
+
 	return &TurnSession{
 		service:      s,
 		gameID:       gameID,
@@ -1803,6 +1834,9 @@ func (s *Service) broadcastPortraitReady(gameID, characterID, relPath string, ve
 	if len(version) > 0 {
 		ver = version[0]
 	}
+	if ver <= 0 {
+		ver = parsePortraitVersionFromPath(relPath)
+	}
 	portraitURL := fmt.Sprintf("/api/game/%s/character/%s/portrait?t=%d", gameID, characterID, time.Now().UnixMilli())
 	if ver > 0 {
 		portraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait?v=%d&t=%d", gameID, characterID, ver, time.Now().UnixMilli())
@@ -1838,6 +1872,24 @@ func (s *Service) broadcastSceneImageReady(gameID string, turnNumber int, relPat
 	for _, fn := range listeners {
 		fn(evt)
 	}
+}
+
+func parsePortraitVersionFromPath(relPath string) int {
+	base := filepath.Base(relPath)
+	idx := strings.LastIndex(base, "-v")
+	if idx == -1 {
+		return 0
+	}
+	dot := strings.LastIndex(base, ".")
+	if dot == -1 || dot <= idx+2 {
+		return 0
+	}
+	vStr := base[idx+2 : dot]
+	v, err := strconv.Atoi(vStr)
+	if err != nil {
+		return 0
+	}
+	return v
 }
 
 func (s *Service) hasCustomPortrait(gameID, characterID string) bool {

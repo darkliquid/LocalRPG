@@ -211,3 +211,46 @@ func TestContinuityChecksCanBeSwitchedOff(t *testing.T) {
 		t.Errorf("expected no notes when the checks are off, got %v", turn.ContinuityNotes)
 	}
 }
+
+func TestOrchestrator_DetectsSceneBreakAndAnchorsSpeakerPortraits(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{
+		"The old world crumbles.\n\n---\n\nTen years later, the ruined walls stand in silence.\n\n> Vera: We survived.",
+	}}
+	orchestrator, _, store := streamingOrchestrator(t, provider)
+
+	// Save Vera with portrait version 2
+	vera := &entity.Entity{
+		ID:              "vera",
+		Name:            "Vera",
+		Type:            "character",
+		Portrait:        "assets/portraits/vera-v2.png",
+		PortraitVersion: 2,
+	}
+	if err := store.SaveEntity(vera); err != nil {
+		t.Fatal(err)
+	}
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I look forward", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream failed: %v", err)
+	}
+
+	if !turn.SceneBreak {
+		t.Errorf("expected SceneBreak = true due to --- divider")
+	}
+
+	// Verify speaker portrait is anchored on the speech segment
+	foundSpeech := false
+	for _, seg := range turn.Segments {
+		if seg.Kind == entity.SegmentSpeech && seg.Speaker == "Vera" {
+			foundSpeech = true
+			expected := "/api/game/campaign-01/character/vera/portrait?v=2"
+			if seg.SpeakerPortrait != expected {
+				t.Errorf("SpeakerPortrait = %q, want %q", seg.SpeakerPortrait, expected)
+			}
+		}
+	}
+	if !foundSpeech {
+		t.Errorf("expected to find speech segment for Vera")
+	}
+}

@@ -34,6 +34,38 @@ func BuildScenePrompt(visualCue string, location *entity.Entity, worldStyle stri
 	return strings.Join(parts, ", ")
 }
 
+// ExtractSceneCue extracts a concise visual cue from narration text following a scene break delimiter.
+func ExtractSceneCue(narration string) string {
+	lines := strings.Split(narration, "\n")
+	foundRule := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !foundRule {
+			if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+				foundRule = true
+			}
+			continue
+		}
+		if trimmed != "" {
+			if len(trimmed) > 200 {
+				return trimmed[:200]
+			}
+			return trimmed
+		}
+	}
+	// Fallback to first non-empty line
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && trimmed != "---" && trimmed != "***" && trimmed != "___" {
+			if len(trimmed) > 200 {
+				return trimmed[:200]
+			}
+			return trimmed
+		}
+	}
+	return ""
+}
+
 // SceneGenerator abstracts image generation for scene illustrations.
 type SceneGenerator interface {
 	GenerateImage(ctx context.Context, prompt string) ([]byte, error)

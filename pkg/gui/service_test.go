@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1265,3 +1266,50 @@ func TestGetCharacterPortraitVersionQuery(t *testing.T) {
 		t.Errorf("expected v2 bytes, got %s", string(data2))
 	}
 }
+
+func TestTurnDTO_SceneBreakAndAnchoredSpeakerPortraits(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	// Create a scene illustration for turn 3 on disk
+	scenesDir := filepath.Join(svc.GetResolver().GameDir(gameID), "assets", "scenes")
+	_ = os.MkdirAll(scenesDir, 0755)
+	_ = os.WriteFile(filepath.Join(scenesDir, "turn-3.png"), []byte("pngdata"), 0644)
+
+	turn := engine.Turn{
+		Number:     3,
+		Input:      "I rest.",
+		Narration:  "Ten years pass.\n\n---\n\nThe world has changed.",
+		SceneBreak: true,
+		Segments: []entity.TurnSegment{
+			{
+				Kind:            "speech",
+				Speaker:         "Vera",
+				SpeakerID:       "vera",
+				Text:            "We survived.",
+				SpeakerPortrait: "/api/game/" + gameID + "/character/vera/portrait?v=2",
+			},
+		},
+	}
+
+	dto := svc.turnDTO(turn, nil, svc.Config(), gameID)
+
+	if !dto.SceneBreak {
+		t.Errorf("expected dto.SceneBreak to be true")
+	}
+	expectedSceneURL := fmt.Sprintf("/api/game/%s/turn/3/scene-image", gameID)
+	if dto.ImageURL != expectedSceneURL {
+		t.Errorf("dto.ImageURL = %q, want %q", dto.ImageURL, expectedSceneURL)
+	}
+
+	if len(dto.Segments) != 1 {
+		t.Fatalf("expected 1 segment, got %d", len(dto.Segments))
+	}
+	expectedPortrait := fmt.Sprintf("/api/game/%s/character/vera/portrait?v=2", gameID)
+	if dto.Segments[0].SpeakerPortrait != expectedPortrait {
+		t.Errorf("dto.Segments[0].SpeakerPortrait = %q, want %q", dto.Segments[0].SpeakerPortrait, expectedPortrait)
+	}
+	if dto.Segments[0].PortraitURL != expectedPortrait {
+		t.Errorf("dto.Segments[0].PortraitURL = %q, want %q", dto.Segments[0].PortraitURL, expectedPortrait)
+	}
+}
+
