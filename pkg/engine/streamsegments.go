@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -70,6 +71,31 @@ func (o *TurnOrchestrator) applyRecords() ([]harness.PersonaDecl, []harness.Memo
 		}
 	}
 	return personae, memories, stateChanges, moveRef
+}
+
+// pendingRoll returns the first @roll record in the current stream, if any. It is
+// the record that ends the model's reply and hands the outcome to the engine.
+func (o *TurnOrchestrator) pendingRoll() (harness.CheckRequest, bool) {
+	if o.parser == nil {
+		return harness.CheckRequest{}, false
+	}
+	for _, record := range o.parser.Records() {
+		if record.Type != turnstream.RecordRoll || record.Err != nil {
+			continue
+		}
+		req, err := record.DecodeRoll()
+		if err != nil {
+			continue
+		}
+		return req, true
+	}
+	return harness.CheckRequest{}, false
+}
+
+// rollRef names a check resolved from a stream record. It is stable per turn, so
+// a client that continues the turn references the same check.
+func rollRef(turnNumber int) string {
+	return fmt.Sprintf("roll-%d", turnNumber)
 }
 
 // stripRecordLines removes control-record lines from prose, so the recorded

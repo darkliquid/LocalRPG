@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -78,6 +79,35 @@ func TestRecordsIntroducePersonaeAndAttributeTheirFirstLine(t *testing.T) {
 	}
 	if len(turn.Segments) != 1 || turn.Segments[0].Kind != entity.SegmentSpeech || turn.Segments[0].SpeakerID != "kae" {
 		t.Fatalf("segments = %#v", turn.Segments)
+	}
+}
+
+func TestRollRecordResolvesAndNarratesTheOutcome(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{
+		"Kaelen steps onto the bridge.\n" +
+			"@roll {\"actor\":\"kaelen\",\"check_kind\":\"skill\",\"stakes\":\"the bridge\",\"outcomes\":{\"pass\":\"He makes it across.\",\"fail\":\"The plank gives way.\"}}\n",
+	}}
+	orchestrator, _, _ := streamingOrchestrator(t, provider)
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I follow.", nil)
+	if err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+	if len(turn.Checks) != 1 {
+		t.Fatalf("checks = %#v", turn.Checks)
+	}
+	want := "The plank gives way."
+	if turn.Checks[0].Outcome == "pass" {
+		want = "He makes it across."
+	}
+	found := false
+	for _, segment := range turn.Segments {
+		if segment.Kind == entity.SegmentNarration && strings.Contains(segment.Text, want) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("outcome segment missing from %#v (want %q)", turn.Segments, want)
 	}
 }
 

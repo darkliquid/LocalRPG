@@ -936,6 +936,25 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		o.logger.Event("turn.protocol_fallback", map[string]interface{}{"reason": result.FallbackReason})
 	}
 
+	// A @roll record ends the model's reply. Under the ask policy it becomes a
+	// pending check the player rolls; under auto the engine rolls at once and
+	// narrates the outcome the model pre-committed to, so no second call is
+	// needed.
+	if result.Submission == nil && result.PendingCheck == nil && o.parser != nil {
+		if req, ok := o.pendingRoll(); ok && o.mechanicsEngagement != "off" {
+			if o.mechanicsEngagement == "ask" {
+				result.PendingCheck = &harness.PendingCheck{Ref: rollRef(turnNum), Request: req, ProposedBy: "gm"}
+			} else if resolved, resolveErr := o.resolveCheck(ctx, req, nil); resolveErr == nil {
+				resolved.CheckID = rollRef(turnNum)
+				result.Checks = append(result.Checks, *resolved)
+				result.RollOutcome = strings.TrimSpace(req.Outcomes[resolved.Outcome])
+				result.RollCheckRef = resolved.CheckID
+			} else {
+				o.logger.Event("roll.resolve_error", map[string]interface{}{"error": resolveErr.Error()})
+			}
+		}
+	}
+
 	cause := cutNone
 	var narration string
 	var recovery RecoveryOutcome
@@ -970,6 +989,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 				"finish_reason": result.FinishReason,
 			})
 			return nil, failure
+		}
+	}
+
+	if outcome := strings.TrimSpace(result.RollOutcome); outcome != "" {
+		if strings.TrimSpace(narration) == "" {
+			narration = outcome
+		} else {
+			narration = strings.TrimSpace(narration) + "\n\n" + outcome
 		}
 	}
 
@@ -1043,7 +1070,6 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		stateChanges = result.Submission.StateChanges
 		turn.Verdict = &result.Submission.Verdict
 		turn.Rejected = result.Submission.Verdict.Feasibility == harness.FeasibilityImpossible
-		turn.Checks = result.Checks
 	} else if o.parser != nil {
 		// The progressive stream carries its declarations inline: a persona
 		// before the line that speaks, a state change after the roll it follows.
@@ -1054,6 +1080,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			turn.Personae = append(turn.Personae, id)
 		}
 	}
+	turn.Checks = result.Checks
 
 	<-extractionDone
 	if extractionErr != nil {
@@ -1080,6 +1107,16 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		} else {
 			turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
 		}
+	}
+
+	// A resolved roll's outcome is narrated after the prose that led to it, so the
+	// chronicle can render the dice inline with the consequence.
+	if outcome := strings.TrimSpace(result.RollOutcome); outcome != "" {
+		turn.Segments = append(turn.Segments, entity.TurnSegment{
+			Kind:     entity.SegmentNarration,
+			Text:     outcome,
+			CheckRef: result.RollCheckRef,
+		})
 	}
 
 	// The player's own spoken line leads the turn, so it is heard in their voice
@@ -1273,6 +1310,11 @@ type streamResult struct {
 	// PendingCheck is set when the model proposed a check under the ask policy and
 	// the turn ends awaiting the player's roll.
 	PendingCheck *harness.PendingCheck
+	// RollOutcome is the narration text a resolved @roll record produced, and
+	// RollCheckRef names the check it belongs to, so the segment can render the
+	// dice inline.
+	RollOutcome  string
+	RollCheckRef string
 }
 
 // generationCode reads a bounded failure code for logging, defaulting to a
