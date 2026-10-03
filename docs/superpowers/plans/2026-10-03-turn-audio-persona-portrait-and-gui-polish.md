@@ -56,7 +56,7 @@
 - Modify: `frontend/src/components/MarkdownProse.tsx:15`
 - Modify: `frontend/src/App.tsx:996`
 
-- [ ] **Step 1: Write a Go test checking Wails GUI window options configuration**
+- [x] **Step 1: Write a Go test checking Wails GUI window options configuration**
 
 Create `cmd/localrpg/gui_menu_test.go`:
 ```go
@@ -76,12 +76,12 @@ func TestDefaultApplicationMenuIsConfigured(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run Go test to verify menu availability**
+- [x] **Step 2: Run Go test to verify menu availability**
 
 Run: `go test -v ./cmd/localrpg/gui_menu_test.go ./cmd/localrpg/gui.go` (or run backend test suite)  
 Expected: PASS
 
-- [ ] **Step 3: Update `cmd/localrpg/gui.go` to set application menu and webview options**
+- [x] **Step 3: Update `cmd/localrpg/gui.go` to set application menu and webview options**
 
 In `cmd/localrpg/gui.go`:
 ```go
@@ -112,7 +112,7 @@ In `cmd/localrpg/gui.go`:
 	})
 ```
 
-- [ ] **Step 4: Remove blanket `select-none` from frontend containers and add `select-text` to prose/docs/errors**
+- [x] **Step 4: Remove blanket `select-none` from frontend containers and add `select-text` to prose/docs/errors**
 
 In `frontend/src/components/LauncherHub.tsx:207`:
 Replace:
@@ -157,12 +157,12 @@ Ensure error banner text includes `select-text`:
 <span className="flex-1 select-text">{turnError}</span>
 ```
 
-- [ ] **Step 5: Run frontend typecheck**
+- [x] **Step 5: Run frontend typecheck**
 
 Run: `mise run test:frontend`  
 Expected: PASS with 0 type errors.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add cmd/localrpg/ frontend/
@@ -182,7 +182,7 @@ git commit -m "fix(gui): enable desktop text selection, context menu and clipboa
 - Test: `pkg/engine/roster_test.go`
 - Test: `pkg/turnstream/parser_test.go`
 
-- [ ] **Step 1: Write failing tests for gender-gated voice profile assignment**
+- [x] **Step 1: Write failing tests for gender-gated voice profile assignment**
 
 In `pkg/harness/extractor_test.go`, add:
 ```go
@@ -236,12 +236,12 @@ func TestAssignVoiceProfile_InfersGenderFromPronouns(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestAssignVoiceProfile_StrictGenderGating ./pkg/harness/`  
 Expected: FAIL (because maleChar matches "young" and picks `af_female_1`).
 
-- [ ] **Step 3: Implement strict gender filtering and pronoun inference in `pkg/harness/extractor.go`**
+- [x] **Step 3: Implement strict gender filtering and pronoun inference in `pkg/harness/extractor.go`**
 
 In `pkg/harness/extractor.go`:
 ```go
@@ -385,7 +385,7 @@ func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 }
 ```
 
-- [ ] **Step 4: Update `pkg/engine/timeline.go` to assign `ent.Gender = persona.Gender`**
+- [x] **Step 4: Update `pkg/engine/timeline.go` to assign `ent.Gender = persona.Gender`**
 
 In `pkg/engine/timeline.go:stageEntities`:
 ```go
@@ -395,7 +395,7 @@ In `pkg/engine/timeline.go:stageEntities`:
 		}
 ```
 
-- [ ] **Step 5: Update `pkg/turnstream/parser.go` to parse full persona declaration**
+- [x] **Step 5: Update `pkg/turnstream/parser.go` to parse full persona declaration**
 
 In `pkg/turnstream/parser.go:declarePersona`:
 ```go
@@ -431,7 +431,7 @@ func (p *Parser) declarePersona(rec Record) {
 }
 ```
 
-- [ ] **Step 6: Update `pkg/engine/roster.go` to store persona and resolve voice matching gender**
+- [x] **Step 6: Update `pkg/engine/roster.go` to store persona and resolve voice matching gender**
 
 In `pkg/engine/roster.go`:
 ```go
@@ -475,12 +475,12 @@ func (r *roster) Voice(id string) *entity.VoiceConfig {
 }
 ```
 
-- [ ] **Step 7: Run backend tests**
+- [x] **Step 7: Run backend tests**
 
 Run: `go test -v ./pkg/harness/... ./pkg/turnstream/... ./pkg/engine/...`  
 Expected: ALL PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add pkg/harness/ pkg/engine/ pkg/turnstream/
@@ -499,7 +499,7 @@ git commit -m "feat(harness): enforce strict gender matching for persona voice p
 - Test: `pkg/gui/turn_test.go`
 - Test: `pkg/media/playback/player_test.go`
 
-- [ ] **Step 1: Write a test verifying concurrent turns do not return 409 after text completion**
+- [x] **Step 1: Write a test verifying concurrent turns do not return 409 after text completion**
 
 In `pkg/gui/turn_test.go`:
 ```go
@@ -524,7 +524,7 @@ func TestConsecutiveTurnsDoNotConflictWhileAudioIsRendering(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Update `TurnSession.Run` in `pkg/gui/service.go` to release campaign lock immediately on `turn` event**
+- [x] **Step 2: Update `TurnSession.Run` in `pkg/gui/service.go` to release campaign lock immediately on `turn` event**
 
 In `pkg/gui/service.go:TurnSession.Run`:
 ```go
@@ -538,7 +538,7 @@ In `pkg/gui/service.go:TurnSession.Run`:
 	t.Close()
 ```
 
-- [ ] **Step 3: Modify `streaming_tts.go` so `Close()` flushes without blocking session return**
+- [x] **Step 3: Modify `streaming_tts.go` so `Close()` flushes without blocking session return**
 
 In `pkg/gui/streaming_tts.go`:
 ```go
@@ -562,7 +562,7 @@ func (s *sentenceStreamer) Wait() {
 In `TurnSession.Run`:
 Launch `streamer.Wait()` in `t.service.goBackground` along with `finishTurnAudio`, rather than in synchronous `defer streamer.Close()`.
 
-- [ ] **Step 4: Update `Player.PlayQueue` in `pkg/media/playback/player.go` to chain multiple queues without cutting off prior audio**
+- [x] **Step 4: Update `Player.PlayQueue` in `pkg/media/playback/player.go` to chain multiple queues without cutting off prior audio**
 
 In `pkg/media/playback/player.go`:
 ```go
@@ -596,7 +596,7 @@ func (p *Player) EnqueueQueue(clips <-chan string) error {
 }
 ```
 
-- [ ] **Step 5: Update `frontend/src/App.tsx` to set `turnInFlight = false` upon receiving `TurnEvent{Type: "turn"}`**
+- [x] **Step 5: Update `frontend/src/App.tsx` to set `turnInFlight = false` upon receiving `TurnEvent{Type: "turn"}`**
 
 In `frontend/src/App.tsx:handleActionSubmit`:
 ```tsx
@@ -625,12 +625,12 @@ In `finally`:
     }
 ```
 
-- [ ] **Step 6: Run tests to verify**
+- [x] **Step 6: Run tests to verify**
 
 Run: `go test -v ./pkg/gui/ -run TestTurnSession`  
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/gui/ pkg/media/playback/ frontend/src/App.tsx
@@ -654,7 +654,7 @@ git commit -m "feat(turn): decouple turn interactivity from background audio ren
 - Test: `pkg/gui/streaming_tts_test.go`
 - Test: `frontend/src/hooks/useSegmentPlayback.test.ts`
 
-- [ ] **Step 1: Define `AudioProgressDTO` in backend and frontend types**
+- [x] **Step 1: Define `AudioProgressDTO` in backend and frontend types**
 
 In `pkg/gui/types.go`:
 ```go
@@ -684,7 +684,7 @@ export interface AudioProgressEvent {
 ```
 Add `audio_progress?: AudioProgressEvent;` to `TurnEvent` in `frontend/src/types.ts`.
 
-- [ ] **Step 2: Write failing test in `pkg/gui/streaming_tts_test.go` for audio progress emission**
+- [x] **Step 2: Write failing test in `pkg/gui/streaming_tts_test.go` for audio progress emission**
 
 ```go
 func TestStreamerEmitsAudioProgressEvents(t *testing.T) {
@@ -704,7 +704,7 @@ func TestStreamerEmitsAudioProgressEvents(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Implement progress tracking in `sentenceStreamer` (`pkg/gui/streaming_tts.go`)**
+- [x] **Step 3: Implement progress tracking in `sentenceStreamer` (`pkg/gui/streaming_tts.go`)**
 
 In `pkg/gui/streaming_tts.go`:
 - Add `progressObserver func(AudioProgressDTO)` to `sentenceStreamer`.
@@ -716,7 +716,7 @@ In `pkg/gui/streaming_tts.go`:
 In `service.go:TurnSession.Run`:
 Wire `streamer.SetProgressObserver` to `announce(TurnEvent{Type: "audio_progress", AudioProgress: &p})`.
 
-- [ ] **Step 4: Update `useStreamedSpeech` and `useSegmentPlayback` for eager sequential playback**
+- [x] **Step 4: Update `useStreamedSpeech` and `useSegmentPlayback` for eager sequential playback**
 
 In `frontend/src/hooks/useStreamedSpeech.ts`:
 - Track items by sequence number.
@@ -728,7 +728,7 @@ In `frontend/src/hooks/useSegmentPlayback.ts`:
 - Expose `segmentProgress: Record<number, string>` (mapping segment index to stage).
 - Play sequence 0 as soon as it has a URL, advancing sequentially.
 
-- [ ] **Step 5: Add audio progress pill in `ActionConsole.tsx` and segment card status in `TurnSegments.tsx`**
+- [x] **Step 5: Add audio progress pill in `ActionConsole.tsx` and segment card status in `TurnSegments.tsx`**
 
 In `frontend/src/components/ActionConsole.tsx`:
 Render a subtle status badge when audio is in flight:
@@ -744,12 +744,12 @@ Render a subtle status badge when audio is in flight:
 In `frontend/src/components/TurnSegments.tsx`:
 Display a status indicator for segments whose audio is currently processing.
 
-- [ ] **Step 6: Run frontend and backend tests**
+- [x] **Step 6: Run frontend and backend tests**
 
 Run: `mise run test`  
 Expected: ALL PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/gui/ frontend/
@@ -770,7 +770,7 @@ git commit -m "feat(audio): add progressive audio status feedback and eager sequ
 - Test: `pkg/gui/character_portrait_test.go`
 - Test: `pkg/engine/portrait_worker_test.go`
 
-- [ ] **Step 1: Write test for `HasCustomPortrait` in `segmentDTOs` and portrait notification hook**
+- [x] **Step 1: Write test for `HasCustomPortrait` in `segmentDTOs` and portrait notification hook**
 
 In `pkg/gui/character_portrait_test.go`:
 ```go
@@ -789,7 +789,7 @@ func TestSegmentDTO_HasCustomPortraitFlag(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Add `HasCustomPortrait` to `SegmentDTO` in `pkg/gui/types.go` and populate in `service.go`**
+- [x] **Step 2: Add `HasCustomPortrait` to `SegmentDTO` in `pkg/gui/types.go` and populate in `service.go`**
 
 In `pkg/gui/types.go`:
 ```go
@@ -811,7 +811,7 @@ type SegmentDTO struct {
 In `pkg/gui/service.go:segmentDTOs`:
 Check if `ent.Portrait != ""` and file exists in game dir. Set `dto.HasCustomPortrait = true` if so, `false` otherwise.
 
-- [ ] **Step 3: Add `OnPortraitReady` callback to `PortraitWorker` and emit `portrait` event from Service**
+- [x] **Step 3: Add `OnPortraitReady` callback to `PortraitWorker` and emit `portrait` event from Service**
 
 In `pkg/engine/portrait_worker.go`:
 Add callback:
@@ -847,7 +847,7 @@ portraitWorker.SetOnReady(func(gameID, characterID, relPath string) {
 ```
 Define `broadcastPortraitReady` to announce `TurnEvent{Type: "portrait", CharacterID: characterID, PortraitURL: fmt.Sprintf("/api/game/%s/character/%s/portrait?t=%d", gameID, characterID, time.Now().UnixMilli()), HasCustomPortrait: true}` to active turn sessions.
 
-- [ ] **Step 4: Update `frontend/src/types.ts` and `frontend/src/App.tsx`**
+- [x] **Step 4: Update `frontend/src/types.ts` and `frontend/src/App.tsx`**
 
 In `frontend/src/types.ts`:
 Add `has_custom_portrait?: boolean;` to `TurnSegment`.
@@ -876,7 +876,7 @@ On `event.type === 'portrait'`:
 ```
 Pass `characterPortraits` to `ChronicleView`.
 
-- [ ] **Step 5: Update `TurnSegments.tsx` to disable lightbox for placeholder portraits and reactively swap images**
+- [x] **Step 5: Update `TurnSegments.tsx` to disable lightbox for placeholder portraits and reactively swap images**
 
 In `frontend/src/components/TurnSegments.tsx`:
 Resolve portrait state:
@@ -912,12 +912,12 @@ In the avatar render:
 )}
 ```
 
-- [ ] **Step 6: Run tests and verify**
+- [x] **Step 6: Run tests and verify**
 
 Run: `mise run test`  
 Expected: ALL PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pkg/gui/ pkg/engine/ frontend/
@@ -931,32 +931,32 @@ git commit -m "feat(portrait): emit background portrait events, swap chronicle a
 **Files:**
 - Verify: Full codebase
 
-- [ ] **Step 1: Run frontend typecheck**
+- [x] **Step 1: Run frontend typecheck**
 
 Run: `mise run test:frontend`  
 Expected: PASS with 0 errors.
 
-- [ ] **Step 2: Run backend tests**
+- [x] **Step 2: Run backend tests**
 
 Run: `mise run test:backend`  
 Expected: ALL PASS with 0 failures.
 
-- [ ] **Step 3: Run full linter suite**
+- [x] **Step 3: Run full linter suite**
 
 Run: `mise run lint`  
 Expected: PASS (markdownlint, goreleaser check, go vet clean).
 
-- [ ] **Step 4: Update embedded docs if config or catalogue changed**
+- [x] **Step 4: Update embedded docs if config or catalogue changed**
 
 Run: `go test ./pkg/gui -update-docs`  
 Expected: PASS (docs in sync).
 
-- [ ] **Step 5: Build binary and verify assets packaging**
+- [x] **Step 5: Build binary and verify assets packaging**
 
 Run: `mise run build`  
 Expected: Successful build of `bin/localrpg` with embedded frontend assets.
 
-- [ ] **Step 6: Final commit**
+- [x] **Step 6: Final commit**
 
 ```bash
 git commit --allow-empty -m "chore: verify full test and build pass for audio, portrait and gui polish"
