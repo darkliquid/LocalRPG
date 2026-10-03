@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -102,6 +103,51 @@ func TestSentenceStreamerEmitsOrderedSentences(t *testing.T) {
 		if speech.AudioURL != "/api/audio/clip/"+speech.AudioKey {
 			t.Errorf("event %d url = %q, want the clip's content-addressed URL", i, speech.AudioURL)
 		}
+	}
+}
+
+type outOfOrderTTSClient struct {
+	firstStarted chan struct{}
+	secondDone   chan struct{}
+}
+
+func (c *outOfOrderTTSClient) Synthesize(_ context.Context, text string, _ *entity.VoiceConfig) ([]byte, error) {
+	if strings.Contains(text, "first") {
+		close(c.firstStarted)
+		<-c.secondDone
+	} else if strings.Contains(text, "second") {
+		<-c.firstStarted
+		defer close(c.secondDone)
+	}
+	return media.GenerateToneWAV(440, 0.01), nil
+}
+
+func TestSentenceStreamerConcurrentWorkersMaintainOrder(t *testing.T) {
+	client := &outOfOrderTTSClient{
+		firstStarted: make(chan struct{}),
+		secondDone:   make(chan struct{}),
+	}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+
+	var mu sync.Mutex
+	var got []provisionalSpeech
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "v1"}, trace.Nop(), 2, func(speech provisionalSpeech) {
+		mu.Lock()
+		got = append(got, speech)
+		mu.Unlock()
+	})
+
+	streamer.Feed("The first sentence is slow. The second is fast.")
+	streamer.Close()
+
+	if len(got) != 2 {
+		t.Fatalf("events = %#v, want 2", got)
+	}
+	if got[0].Text != "The first sentence is slow." || got[1].Text != "The second is fast." {
+		t.Fatalf("out of order: [0]=%q, [1]=%q", got[0].Text, got[1].Text)
+	}
+	if got[0].Index != 0 || got[1].Index != 1 {
+		t.Fatalf("indexes = %d, %d, want 0, 1", got[0].Index, got[1].Index)
 	}
 }
 

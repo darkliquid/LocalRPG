@@ -144,6 +144,10 @@ type TTSPipeline struct {
 	// distinguishes "resolved to no tags" from "not resolved yet".
 	cues    SpeechCueCapabilities
 	cuesSet bool
+	// deliverTags enables sending performance tags to the provider. It is off
+	// unless the operator opts in, because a tag the provider does not honour is
+	// read aloud and a lost delivery hint is cheaper than a spoken stage direction.
+	deliverTags bool
 	// groupCaps are the capabilities grouping is planned against: the client's
 	// own declaration, overlaid with any configured limits.
 	groupCaps TTSCapabilities
@@ -209,6 +213,14 @@ func (p *TTSPipeline) SetSpeechCues(caps SpeechCueCapabilities) {
 	p.cuesSet = true
 }
 
+// SetAudioTagDelivery enables sending performance tags to the provider. It is off
+// by default: a tag the provider does not honour is read aloud, and a lost
+// delivery hint is cheaper than a spoken stage direction. The prompt may still ask
+// for tags, so they appear in the transcript.
+func (p *TTSPipeline) SetAudioTagDelivery(enabled bool) {
+	p.deliverTags = enabled
+}
+
 // speakable reduces a segment's text for synthesis. It applies the Markdown
 // policy, then handles performance tags: none survive when audio tags are
 // disabled, and only a tag the provider lists survives when they are enabled, so
@@ -223,10 +235,13 @@ func (p *TTSPipeline) speakable(text string) string {
 	return strings.TrimSpace(processed)
 }
 
-// audioTagsEnabled reports whether performance tags reach the provider. The
-// resolved cues win when set, so an operator who disabled them is honoured even
-// when the provider declares support.
+// audioTagsEnabled reports whether performance tags reach the provider. Delivery
+// is opt-in: a tag the provider does not honour is read aloud, and a lost delivery
+// hint is cheaper than a spoken stage direction.
 func (p *TTSPipeline) audioTagsEnabled() bool {
+	if !p.deliverTags {
+		return false
+	}
 	if p.cuesSet {
 		return p.cues.AudioTags
 	}

@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -12,6 +13,8 @@ import (
 	"github.com/darkliquid/localrpg/pkg/trace"
 	"github.com/darkliquid/localrpg/pkg/turnstream"
 )
+
+var errQueueDropped = errors.New("queue full")
 
 // sentenceQueueDepth bounds the sentences waiting for a worker. Generation is
 // never blocked: a queue this deep means the provider is far behind, and a
@@ -39,8 +42,17 @@ type speechUnit struct {
 // synthesisJob is one worker request: a single sentence, or a group of lines the
 // streamer folded together so they share one provider call.
 type synthesisJob struct {
+	seq   uint64
 	unit  speechUnit
 	group []media.SpeakerLine
+}
+
+// jobResult is the finished output of one synthesis job, sequenced before emit.
+type jobResult struct {
+	seq  uint64
+	text string
+	key  string
+	err  error
 }
 
 // sentenceStreamer synthesizes a turn's audio as the model streams it, so a
@@ -64,10 +76,12 @@ type sentenceStreamer struct {
 	// grouping and folder fold consecutive same-speaker lines into one request.
 	grouping bool
 	folder   *media.GroupFolder
-	// emit reports a completed unit and next is the monotonic ordinal it carries.
-	// Both are optional: a streamer with no consumer still caches audio.
+	// emit reports a completed unit in submission order.
 	emit func(provisionalSpeech)
-	next uint64
+	// sequencer maintains in-order announcements across concurrent workers.
+	nextSeq      uint64
+	announcedSeq uint64
+	results      map[uint64]jobResult
 	// stopped suppresses emission once the turn is authoritative. From then on the
 	// played set is the client's, so a late unit is synthesized and played with the
 	// rest of the turn rather than announced out of order.
@@ -75,7 +89,7 @@ type sentenceStreamer struct {
 }
 
 // newSentenceStreamer builds a streamer with workers consuming the queue, calling
-// emit once per completed unit. workers below one becomes one; emit may be nil.
+// emit once per completed unit in submission order. workers below one becomes one; emit may be nil.
 func newSentenceStreamer(ctx context.Context, pipeline *media.TTSPipeline, voice *entity.VoiceConfig, logger trace.Logger, workers int, emit func(provisionalSpeech)) *sentenceStreamer {
 	if workers < 1 {
 		workers = 1
@@ -87,6 +101,7 @@ func newSentenceStreamer(ctx context.Context, pipeline *media.TTSPipeline, voice
 		logger:   trace.OrNil(logger),
 		queue:    make(chan synthesisJob, sentenceQueueDepth),
 		emit:     emit,
+		results:  make(map[uint64]jobResult),
 	}
 	for i := 0; i < workers; i++ {
 		streamer.wg.Add(1)
@@ -131,50 +146,70 @@ func (s *sentenceStreamer) worker() {
 	defer s.wg.Done()
 	for job := range s.queue {
 		if job.group != nil {
-			s.synthesizeGroup(job.group)
+			s.synthesizeGroup(job)
 			continue
 		}
-		s.synthesizeUnit(job.unit)
+		s.synthesizeUnit(job)
 	}
 }
 
-// synthesizeUnit renders one sentence and announces its clip.
-func (s *sentenceStreamer) synthesizeUnit(unit speechUnit) {
+// synthesizeUnit renders one sentence and sequences its clip.
+func (s *sentenceStreamer) synthesizeUnit(job synthesisJob) {
+	unit := job.unit
 	path, err := s.pipeline.SynthesizeProvisional(s.ctx, unit.Kind, unit.SpeakerID, unit.Text, s.voiceForUnit(unit))
 	if err != nil {
 		s.logger.Event("media.tts.provisional_error", map[string]interface{}{"error": err.Error()})
+		s.completeJob(jobResult{seq: job.seq, err: err})
 		return
 	}
-	if !s.emitting() || path == "" {
-		return
+	key := ""
+	if path != "" {
+		key = media.ClipKeyForPath(path)
 	}
-	key := media.ClipKeyForPath(path)
-	s.announce(unit.Text, key)
+	s.completeJob(jobResult{seq: job.seq, text: unit.Text, key: key})
 }
 
 // synthesizeGroup renders one folded group with a single provider call, so its
 // clip is keyed by the group and the finalise pass is a cache hit.
-func (s *sentenceStreamer) synthesizeGroup(lines []media.SpeakerLine) {
+func (s *sentenceStreamer) synthesizeGroup(job synthesisJob) {
+	lines := job.group
 	groups, err := s.pipeline.SynthesizeGroups(s.ctx, []media.ClipGroup{{Lines: lines}})
 	if err != nil || len(groups) == 0 {
 		s.logger.Event("media.tts.provisional_error", map[string]interface{}{"error": "synthesize group"})
+		s.completeJob(jobResult{seq: job.seq, err: errors.New("synthesize group failed")})
 		return
 	}
 	group := groups[0]
-	if !s.emitting() || group.Key == "" {
-		return
-	}
-	s.announce(media.GroupText(lines), group.Key)
+	s.completeJob(jobResult{seq: job.seq, text: media.GroupText(lines), key: group.Key})
 }
 
-// announce reports a finished clip, if a consumer is listening.
-func (s *sentenceStreamer) announce(text, key string) {
-	s.emit(provisionalSpeech{
-		Index:    int(atomic.AddUint64(&s.next, 1) - 1),
-		Text:     text,
-		AudioKey: key,
-		AudioURL: clipURL(key),
-	})
+// completeJob records a finished job and drains any in-sequence completed results
+// to emit, guaranteeing that units are announced in submission order.
+func (s *sentenceStreamer) completeJob(res jobResult) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.completeJobLocked(res)
+}
+
+func (s *sentenceStreamer) completeJobLocked(res jobResult) {
+	s.results[res.seq] = res
+	for {
+		item, ok := s.results[s.announcedSeq]
+		if !ok {
+			break
+		}
+		delete(s.results, s.announcedSeq)
+		s.announcedSeq++
+
+		if item.err == nil && item.key != "" && s.emitting() {
+			s.emit(provisionalSpeech{
+				Index:    int(item.seq),
+				Text:     item.text,
+				AudioKey: item.key,
+				AudioURL: clipURL(item.key),
+			})
+		}
+	}
 }
 
 // emitting reports whether a completed unit should be announced.
@@ -231,6 +266,9 @@ func (s *sentenceStreamer) FeedSegment(event turnstream.Event) {
 	// segments; splitting here would build a different line and a different key.
 	if s.grouping {
 		s.feed(kind, event.SpeakerID, text)
+		if event.Player {
+			s.Flush()
+		}
 		return
 	}
 
@@ -240,6 +278,20 @@ func (s *sentenceStreamer) FeedSegment(event turnstream.Event) {
 	}
 	for _, sentence := range complete {
 		s.feed(kind, event.SpeakerID, sentence)
+	}
+}
+
+// Flush flushes any pending folded group into the queue immediately.
+func (s *sentenceStreamer) Flush() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.grouping && s.folder != nil {
+		if group := s.folder.Flush(); group != nil {
+			s.enqueueGroupLocked(group)
+		}
 	}
 }
 
@@ -254,28 +306,44 @@ func (s *sentenceStreamer) feed(kind, speakerID, text string) {
 		if !ok {
 			return
 		}
-		for _, group := range s.folder.Add(line) {
-			s.enqueueGroup(group)
+		s.mu.Lock()
+		groups := s.folder.Add(line)
+		for _, group := range groups {
+			s.enqueueGroupLocked(group)
 		}
+		s.mu.Unlock()
 		return
 	}
 	s.enqueueUnit(speechUnit{Kind: kind, SpeakerID: speakerID, Text: text})
 }
 
-// enqueueUnit sends a sentence without blocking, dropping it when the worker is
-// far behind; the finalise pass synthesizes whatever was dropped.
+// enqueueUnit sends a sentence without blocking, sequencing its ordinal.
 func (s *sentenceStreamer) enqueueUnit(unit speechUnit) {
+	s.mu.Lock()
+	seq := s.nextSeq
+	s.nextSeq++
 	select {
-	case s.queue <- synthesisJob{unit: unit}:
+	case s.queue <- synthesisJob{seq: seq, unit: unit}:
 	default:
+		s.completeJobLocked(jobResult{seq: seq, err: errQueueDropped})
 	}
+	s.mu.Unlock()
 }
 
 // enqueueGroup sends a folded group without blocking, on the same terms.
 func (s *sentenceStreamer) enqueueGroup(group []media.SpeakerLine) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.enqueueGroupLocked(group)
+}
+
+func (s *sentenceStreamer) enqueueGroupLocked(group []media.SpeakerLine) {
+	seq := s.nextSeq
+	s.nextSeq++
 	select {
-	case s.queue <- synthesisJob{group: group}:
+	case s.queue <- synthesisJob{seq: seq, group: group}:
 	default:
+		s.completeJobLocked(jobResult{seq: seq, err: errQueueDropped})
 	}
 }
 
@@ -285,11 +353,7 @@ func (s *sentenceStreamer) Close() {
 	if s == nil {
 		return
 	}
-	if s.grouping && s.folder != nil {
-		if group := s.folder.Flush(); group != nil {
-			s.enqueueGroup(group)
-		}
-	}
+	s.Flush()
 	s.closeOne.Do(func() { close(s.queue) })
 	s.wg.Wait()
 }

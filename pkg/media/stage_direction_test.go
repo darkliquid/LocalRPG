@@ -47,3 +47,22 @@ func TestSpeakableHonoursDisabledAudioTags(t *testing.T) {
 		t.Fatalf("the spoken words were lost: %q", got)
 	}
 }
+
+func TestAudioTagsAreNotDeliveredUnlessOptedIn(t *testing.T) {
+	pipeline := NewTTSPipeline(nil, NewContentCache(t.TempDir()))
+	pipeline.SetSpeechCues(SpeechCueCapabilities{AudioTags: true, SupportedTags: []string{"serious"}})
+
+	// Even a provider that declares support does not receive a tag until the
+	// operator opts in, because a tag it does not honour is read aloud.
+	if got := pipeline.speakable("[serious] Hold the line."); strings.Contains(got, "serious") {
+		t.Fatalf("a tag was delivered by default: %q", got)
+	}
+
+	pipeline.SetAudioTagDelivery(true)
+	if got := pipeline.speakable("[serious] Hold the line."); !strings.Contains(got, "[serious]") {
+		t.Fatalf("a supported tag was stripped after opt-in: %q", got)
+	}
+	if got := pipeline.speakable("[a dry voice from the shaft] Go."); strings.Contains(got, "shaft") {
+		t.Fatalf("an unsupported tag reached the provider after opt-in: %q", got)
+	}
+}

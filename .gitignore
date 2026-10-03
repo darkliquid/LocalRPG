@@ -21,6 +21,7 @@ pkg/gui/dist/*
 # the documented way to point at a key is `api_key: "env:OPENAI_API_KEY"`.
 *.key
 todo.txt
+*-session.txt
 /localrpg.yaml
 /config.yaml
 .env

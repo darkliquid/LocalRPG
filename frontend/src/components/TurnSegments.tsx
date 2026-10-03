@@ -16,7 +16,7 @@ export type TurnAudioState = 'idle' | 'generating' | 'playing' | 'error';
 
 interface TurnSegmentsProps {
   segments?: TurnSegment[];
-  fallback: string;
+  fallback?: string;
   onEntityClick?: (entityId: string) => void;
   autoPlay?: boolean;
   volume?: number;
@@ -40,7 +40,7 @@ interface TurnSegmentsProps {
 
 export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   segments,
-  fallback,
+  fallback = '',
   onEntityClick,
   autoPlay = false,
   volume = 1,

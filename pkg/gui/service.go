@@ -390,18 +390,23 @@ func resolveWikilinks(text string, resolve func(string) string) string {
 // reports false for an event a client should not render: a control record, or an
 // empty narration. It carries no audio, because the clips arrive with the
 // authoritative turn that finalises the stream.
-func liveSegmentDTO(event turnstream.Event) (SegmentDTO, bool) {
+func liveSegmentDTO(event turnstream.Event, gameID ...string) (SegmentDTO, bool) {
 	switch event.Kind {
 	case turnstream.KindSpeech:
 		if strings.TrimSpace(event.Text) == "" {
 			return SegmentDTO{}, false
 		}
-		return SegmentDTO{
+		dto := SegmentDTO{
 			Kind:      "speech",
 			Speaker:   event.Speaker,
 			SpeakerID: event.SpeakerID,
 			Text:      event.Text,
-		}, true
+			Player:    event.Player,
+		}
+		if len(gameID) > 0 && gameID[0] != "" && event.SpeakerID != "" {
+			dto.PortraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait", gameID[0], event.SpeakerID)
+		}
+		return dto, true
 	case turnstream.KindNarration:
 		if strings.TrimSpace(event.Text) == "" {
 			return SegmentDTO{}, false
@@ -1598,7 +1603,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// each one in its speaker's own voice. A failed emit is ignored, exactly as
 	// tool activity is: the turn still records.
 	t.orchestrator.SetSegmentObserver(func(event turnstream.Event) {
-		if segment, ok := liveSegmentDTO(event); ok {
+		if segment, ok := liveSegmentDTO(event, t.gameID); ok {
 			_ = announce(TurnEvent{Type: "segment", Segment: &segment})
 		}
 		streamer.FeedSegment(event)
@@ -2196,6 +2201,7 @@ func (s *Service) audioPipeline() (*media.TTSPipeline, error) {
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
 	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
 	pipeline.SetSpeechCues(media.ResolveSpeechCueCapabilities(cfg.Media.TTS, client))
+	pipeline.SetAudioTagDelivery(cfg.Media.TTS.SpeechCues.AudioTags != nil && *cfg.Media.TTS.SpeechCues.AudioTags)
 	s.ttsConfig, s.ttsPipeline = cfg, pipeline
 	return pipeline, nil
 }
@@ -2278,6 +2284,7 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
 	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
 	pipeline.SetSpeechCues(media.ResolveSpeechCueCapabilities(cfg.Media.TTS, client))
+	pipeline.SetAudioTagDelivery(cfg.Media.TTS.SpeechCues.AudioTags != nil && *cfg.Media.TTS.SpeechCues.AudioTags)
 
 	voiceFor := s.voiceFor(gameID)
 	grouped := s.groupingEnabled(cfg)

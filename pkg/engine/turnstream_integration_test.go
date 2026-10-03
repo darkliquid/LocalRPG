@@ -36,6 +36,32 @@ func TestProcessActionStreamEmitsSegmentsAsTheyArrive(t *testing.T) {
 	}
 }
 
+func TestProcessActionStreamEmitsPlayerSegmentInSayMode(t *testing.T) {
+	provider := &scriptedStreamProvider{chunks: []string{"The docks are quiet.\n\n> Kaelen: You didn't see me here.\n"}}
+	orchestrator, timeline, store := streamingOrchestrator(t, provider)
+	seedStreamEntity(t, timeline, store, "kaelen", "Kaelen", "character")
+
+	var events []turnstream.Event
+	orchestrator.SetSegmentObserver(func(event turnstream.Event) {
+		events = append(events, event)
+	})
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Say", "Hold the line.", func(string) error { return nil }); err != nil {
+		t.Fatalf("ProcessActionStream: %v", err)
+	}
+	if len(events) < 3 {
+		t.Fatalf("expected at least 3 events (player, narration, speech), got %d: %#v", len(events), events)
+	}
+	if !events[0].Player || events[0].Kind != turnstream.KindSpeech || events[0].Text != "Hold the line." {
+		t.Fatalf("first event = %#v, want player speech beat", events[0])
+	}
+	if events[1].Kind != turnstream.KindNarration {
+		t.Fatalf("second event = %#v, want narration", events[1])
+	}
+	if events[2].Kind != turnstream.KindSpeech || events[2].SpeakerID != "kaelen" {
+		t.Fatalf("third event = %#v, want kaelen speech", events[2])
+	}
+}
+
 func TestFinalisePrefersParsedSegments(t *testing.T) {
 	provider := &scriptedStreamProvider{chunks: []string{"The docks are quiet.\n\n> Kaelen: You didn't see me here.\n"}}
 	orchestrator, timeline, store := streamingOrchestrator(t, provider)
@@ -101,6 +127,9 @@ func TestRollRecordResolvesAndContinuesTheTurn(t *testing.T) {
 	}
 	if strings.Contains(turn.Narration, "@roll") {
 		t.Fatalf("the roll record must not survive into the prose: %q", turn.Narration)
+	}
+	if len(turn.Segments) < 2 || turn.Segments[1].CheckRef != turn.Checks[0].CheckID {
+		t.Fatalf("the check must attach to the continuation's segment: segments=%#v", turn.Segments)
 	}
 }
 

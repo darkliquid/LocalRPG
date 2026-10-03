@@ -33,6 +33,7 @@ type Event struct {
 	Speaker   string
 	SpeakerID string
 	Text      string
+	Player    bool
 	Record    *Record
 }
 

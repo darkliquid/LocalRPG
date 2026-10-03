@@ -20,6 +20,7 @@ import { LimitChip } from './components/LimitChip';
 import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, AlertTriangle, HelpCircle, Download } from 'lucide-react';
 import { formatGenerationError } from './lib/generationError';
 import { useStreamedSpeech } from './hooks/useStreamedSpeech';
+import { TurnStreamProcessor } from './lib/turnStreamProcessor';
 import { slugify } from './lib/slug';
 import { CinematicOverlay } from './components/CinematicOverlay';
 
@@ -266,18 +267,18 @@ export const App: React.FC = () => {
 
   const [turnInFlight, setTurnInFlight] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ mode: string; text: string } | null>(null);
-  const [streamedProse, setStreamedProse] = useState('');
   const [streamedSegments, setStreamedSegments] = useState<TurnSegment[]>([]);
   const [toolActivity, setToolActivity] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const streamProcessorRef = useRef<TurnStreamProcessor>(new TurnStreamProcessor());
 
   const handleActionSubmit = async (mode: string, text: string, pendingCheckRef?: string) => {
     if (!client || !activeGameID || turnInFlight) return;
 
     setTurnInFlight(true);
     setPendingAction({ mode, text });
-    setStreamedProse('');
+    streamProcessorRef.current.reset();
     setStreamedSegments([]);
     setToolActivity(null);
     setTurnError(null);
@@ -294,11 +295,11 @@ export const App: React.FC = () => {
         (event) => {
           if (event.type === 'chunk') {
             setToolActivity(null);
-            setStreamedProse((prev) => prev + (event.text ?? ''));
+            if (event.text) {
+              setStreamedSegments(streamProcessorRef.current.feedChunk(event.text));
+            }
           } else if (event.type === 'segment' && event.segment) {
-            // A parsed narration or speech unit, rendered while the rest of the
-            // prose is still arriving.
-            setStreamedSegments((prev) => [...prev, event.segment!]);
+            setStreamedSegments(streamProcessorRef.current.feedSegment(event.segment));
           } else if (event.type === 'speech') {
             // A sentence the server synthesized mid-stream, played here while the
             // rest of the prose is still arriving.
@@ -310,12 +311,13 @@ export const App: React.FC = () => {
                 : `${event.tool_name}: ${event.tool_summary ?? 'done'}`,
             );
           } else if (event.type === 'turn' && event.turn) {
-            // The authoritative turn arrives with the same clips; the ones already
-            // heard are remembered so the chronicle plays only the rest.
+            // Stop streamed speech so it does not overlap with chronicle playback,
+            // and remember which keys were heard to completion.
+            streamedSpeech.stop();
             setStreamedKeys(streamedSpeech.playedKeys());
             const turn = event.turn;
             setChronicle((prev) => [...prev, turn]);
-            setStreamedProse('');
+            streamProcessorRef.current.reset();
             setStreamedSegments([]);
             // The turn now carries the action, so drop the pending block at once;
             // otherwise the action shows twice until the stream closes.
@@ -371,7 +373,8 @@ export const App: React.FC = () => {
   const handleStopTurn = () => {
     abortRef.current?.abort();
     streamedSpeech.stop();
-    setStreamedProse('');
+    streamProcessorRef.current.reset();
+    setStreamedSegments([]);
     setPendingAction(null);
   };
 
@@ -720,15 +723,10 @@ export const App: React.FC = () => {
             <div className="flex-1 bg-glass-card rounded-2xl flex flex-col overflow-hidden shadow-2xl">
               {chronicle.length === 0 ? (
                 gameState ? (
-                  streamedProse || streamedSegments.length > 0 ? (
+                  streamedSegments.length > 0 ? (
                     <div className="flex-1 overflow-y-auto px-8 py-6">
                       <TurnSegments
-                        segments={
-                          streamedSegments.length > 0
-                            ? streamedSegments
-                            : [{ kind: 'narration' as const, text: streamedProse }]
-                        }
-                        fallback={streamedProse}
+                        segments={streamedSegments}
                         onEntityClick={handleOpenWikilink}
                         displayMode={config?.media.tts.speech_cues?.display_mode}
                       />
@@ -790,7 +788,7 @@ export const App: React.FC = () => {
                     onAddress={handleAddress}
                     turnInFlight={turnInFlight}
                     pendingAction={pendingAction}
-                    streamedProse={streamedProse}
+                    streamedSegments={streamedSegments}
                     displayMode={config?.media.tts.speech_cues?.display_mode}
                     turnAudioStatus={turnAudioStatus}
                     segmentAudioStatus={segmentAudioStatus}

@@ -884,6 +884,19 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 
+	// A player's spoken line leads the turn: observe it immediately so the
+	// client receives its segment and the streamer voices it in the player's
+	// voice before the narrator begins.
+	if beat := playerSegment(mode, actionInput, o.playerID, o.playerDisplayName()); beat != nil {
+		o.observeSegments([]turnstream.Event{{
+			Kind:      turnstream.KindSpeech,
+			Speaker:   beat.Speaker,
+			SpeakerID: beat.SpeakerID,
+			Text:      beat.Text,
+			Player:    true,
+		}})
+	}
+
 	cause := cutNone
 	var narration string
 	var recovery RecoveryOutcome
@@ -898,6 +911,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	var narrationParts []string
 	const maxRollContinuations = 3
 	endedOnRoll := false
+	// rollAnchors record where each resolved roll's check belongs in the turn's
+	// script: at the first segment the continuation produced, so the dice render
+	// where the roll happened rather than leading the turn.
+	type rollAnchor struct {
+		segmentIndex int
+		checkID      string
+	}
+	var rollAnchors []rollAnchor
 	// collectedCount is how many of the parser's events are already in collected,
 	// so a recovery continuation's events can be appended without duplicating the
 	// ones the loop already took.
@@ -987,6 +1008,10 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 		resolved.CheckID = rollRef(turnNum, len(rollResults))
 		rollResults = append(rollResults, *resolved)
+		rollAnchors = append(rollAnchors, rollAnchor{
+			segmentIndex: len(segmentsFromEvents(collected)),
+			checkID:      resolved.CheckID,
+		})
 		gmDirective = rollContinuationDirective(*resolved, req)
 		resolvedPending = nil
 		if o.parser != nil {
@@ -1174,7 +1199,21 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// The player's own spoken line leads the turn, so it is heard in their voice
 	// before the narrator answers. If the narrator's generated text already begins
 	// with the player's line, attachPlayerSegment marks it rather than duplicating it.
+	modelSegments := len(turn.Segments)
 	turn.Segments = attachPlayerSegment(turn.Segments, mode, actionInput, o.playerID, o.playerDisplayName())
+	// A player segment is prepended, so every model segment shifts by one. Point
+	// each resolved roll's check at the segment its continuation produced, so the
+	// chronicle renders the dice where the roll happened.
+	shift := len(turn.Segments) - modelSegments
+	for _, anchor := range rollAnchors {
+		index := anchor.segmentIndex + shift
+		if index < 0 || index >= len(turn.Segments) {
+			continue
+		}
+		if turn.Segments[index].CheckRef == "" {
+			turn.Segments[index].CheckRef = anchor.checkID
+		}
+	}
 
 	o.logger.Event("segment.build", map[string]interface{}{
 		"count":      len(turn.Segments),
