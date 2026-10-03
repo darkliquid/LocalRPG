@@ -179,6 +179,7 @@ export interface AudioProgressEvent {
   total_segments: number;
   stage: 'waiting' | 'synthesizing' | 'encoding' | 'ready' | 'failed';
   ready_count: number;
+  failed_count?: number;
   audio_key?: string;
   audio_url?: string;
 }
@@ -245,6 +246,8 @@ export interface EntitySummary {
   location?: string;
   tags?: string[];
   parse_error?: boolean;
+  has_portrait?: boolean;
+  portrait_url?: string;
 }
 
 export interface EntityNote {

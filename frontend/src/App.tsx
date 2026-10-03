@@ -255,15 +255,91 @@ export const App: React.FC = () => {
         if (charId && seg.portrait_url) {
           if (!portraits[charId] || seg.has_custom_portrait) {
             portraits[charId] = {
-              url: seg.portrait_url,
+              url: seg.has_custom_portrait && !seg.portrait_url.includes('?') ? `${seg.portrait_url}?t=${Date.now()}` : seg.portrait_url,
               hasCustom: !!seg.has_custom_portrait,
             };
           }
         }
       }
     }
-    setCharacterPortraits((prev) => ({ ...portraits, ...prev }));
+    setCharacterPortraits((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const [id, p] of Object.entries(portraits)) {
+        if (!next[id] || (!next[id].hasCustom && p.hasCustom)) {
+          next[id] = p;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
   }, [chronicle]);
+
+  useEffect(() => {
+    if (entities.length === 0) return;
+    const portraits: Record<string, { url: string; hasCustom: boolean }> = {};
+    for (const ent of entities) {
+      if (ent.type === 'character' && ent.has_portrait) {
+        portraits[ent.id] = {
+          url: ent.portrait_url ? `${ent.portrait_url}?t=${Date.now()}` : `/api/game/${encodeURIComponent(activeGameID || '')}/character/${encodeURIComponent(ent.id)}/portrait?t=${Date.now()}`,
+          hasCustom: true,
+        };
+      }
+    }
+    if (Object.keys(portraits).length > 0) {
+      setCharacterPortraits((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        for (const [id, p] of Object.entries(portraits)) {
+          if (!next[id] || (!next[id].hasCustom && p.hasCustom)) {
+            next[id] = p;
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+  }, [entities, activeGameID]);
+
+  // Poll for background portrait completion when characters in chronicle lack custom portraits
+  useEffect(() => {
+    if (!client || !activeGameID || chronicle.length === 0) return;
+
+    const hasPendingPortraits = chronicle.some((turn) =>
+      (turn.segments || []).some((seg) => {
+        if (seg.kind !== 'speech') return false;
+        const charId = seg.speaker_id || (seg.speaker ? slugify(seg.speaker) : undefined);
+        return charId && (!characterPortraits[charId] || !characterPortraits[charId].hasCustom);
+      })
+    );
+
+    if (!hasPendingPortraits) return;
+
+    let attempts = 0;
+    const maxAttempts = 10;
+    const interval = setInterval(() => {
+      attempts++;
+      client.listEntities()
+        .then((ents) => {
+          setEntities(ents);
+          const allResolved = chronicle.every((turn) =>
+            (turn.segments || []).every((seg) => {
+              if (seg.kind !== 'speech') return true;
+              const charId = seg.speaker_id || (seg.speaker ? slugify(seg.speaker) : undefined);
+              if (!charId) return true;
+              const matchingEnt = ents.find((e) => e.id === charId);
+              return matchingEnt?.has_portrait;
+            })
+          );
+          if (allResolved || attempts >= maxAttempts) {
+            clearInterval(interval);
+          }
+        })
+        .catch(console.error);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [client, activeGameID, chronicle, characterPortraits]);
 
   const handleSelectGame = (gameId: string) => {
     localStorage.setItem('localrpg_last_played_game', gameId);
@@ -416,6 +492,8 @@ export const App: React.FC = () => {
         setPendingAction(null);
         setToolActivity(null);
         streamedSpeech.stop();
+        setAudioProgress((prev) => (prev && prev.ready_count + (prev.failed_count || 0) < prev.total_segments ? null : prev));
+        setSegmentAudioProgress({});
       }
     }
   };

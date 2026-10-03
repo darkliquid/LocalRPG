@@ -151,4 +151,66 @@ func TestSegmentDTO_HasCustomPortraitFlag(t *testing.T) {
 	}
 }
 
+func TestListEntities_ReturnsHasPortraitAndPortraitURL(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewService(tmpDir)
+	setupFreeformSystem(t, svc)
+
+	game, err := svc.CreateGame(context.Background(), CreateGameRequestDTO{
+		Name:       "Test List Entities Portrait",
+		SystemID:   "freeform",
+		WorldID:    "harbour-realm",
+		PlayerName: "Hero Vance",
+		Player: PlayerCharacterDTO{
+			Appearance: "A tall adventurer.",
+			Age:        "30",
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateGame failed: %v", err)
+	}
+
+	// Write custom portrait for hero-vance
+	gameDir := svc.GetResolver().GameDir(game.ID)
+	portraitsDir := filepath.Join(gameDir, "assets", "portraits")
+	if err := os.MkdirAll(portraitsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	fakePNG := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00}
+	portraitRelPath := filepath.Join("assets", "portraits", "hero-vance.png")
+	if err := os.WriteFile(filepath.Join(gameDir, portraitRelPath), fakePNG, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update entity note on disk
+	entityPath := filepath.Join(gameDir, "entities", "hero-vance.md")
+	noteContent := "---\nid: hero-vance\nname: Hero Vance\ntype: character\nportrait: " + portraitRelPath + "\n---\nA brave hero."
+	if err := os.WriteFile(entityPath, []byte(noteContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	summaries, err := svc.ListEntities(context.Background(), game.ID)
+	if err != nil {
+		t.Fatalf("ListEntities failed: %v", err)
+	}
+
+	var heroSummary *EntitySummaryDTO
+	for i := range summaries {
+		if summaries[i].ID == "hero-vance" {
+			heroSummary = &summaries[i]
+			break
+		}
+	}
+	if heroSummary == nil {
+		t.Fatal("expected hero-vance in summaries")
+	}
+	if !heroSummary.HasPortrait {
+		t.Error("expected HasPortrait to be true for hero-vance")
+	}
+	expectedURL := "/api/game/" + game.ID + "/character/hero-vance/portrait"
+	if heroSummary.PortraitURL != expectedURL {
+		t.Errorf("expected PortraitURL %s, got %s", expectedURL, heroSummary.PortraitURL)
+	}
+}
+
 

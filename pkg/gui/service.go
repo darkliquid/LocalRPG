@@ -855,12 +855,20 @@ func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySumm
 			name = id
 		}
 
+		hasPortrait := parsed.Portrait != "" && s.hasCustomPortrait(gameID, id)
+		portraitURL := ""
+		if parsed.Type == "character" {
+			portraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait", gameID, id)
+		}
+
 		summaries = append(summaries, EntitySummaryDTO{
-			ID:       id,
-			Name:     name,
-			Type:     parsed.Type,
-			Location: parsed.Location,
-			Tags:     parsed.Tags,
+			ID:          id,
+			Name:        name,
+			Type:        parsed.Type,
+			Location:    parsed.Location,
+			Tags:        parsed.Tags,
+			HasPortrait: hasPortrait,
+			PortraitURL: portraitURL,
 		})
 	}
 
@@ -1685,21 +1693,19 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// The rest of the turn's clips are synthesized behind the turn and appended to
 	// the same queue, so playback continues without a second start and a clip that
 	// failed mid-stream is retried here. The played set makes the handover exact.
-	streamer.Close()
-	if audioEnabled {
-		t.service.goBackground(func() {
-			streamer.Wait()
-			t.finishTurnAudio(context.Background(), *turn, plan)
-			plan.close()
-		})
-	} else {
-		plan.close()
-	}
-
-	// Memory is repaired behind the turn, on the same principle as playback: the
-	// reply is already recorded, so nothing about it should wait for a second call.
+	// Start memory summarization and character enrichment / portrait generation
+	// in the background as soon as the turn is recorded.
 	t.service.summariseBehind(t.gameID, t.chronicler)
 	t.service.goBackground(func() { t.service.scanAndEnrichCharacters(t.gameID, t.store) })
+
+	// Flush and wait for remaining in-flight audio synthesis jobs to finish and
+	// emit their progress events to the client before the turn stream closes.
+	streamer.Close()
+	if audioEnabled {
+		streamer.Wait()
+		t.finishTurnAudio(context.Background(), *turn, plan)
+	}
+	plan.close()
 	return nil
 }
 
@@ -2004,7 +2010,7 @@ func (s *Service) scanAndEnrichCharacters(gameID string, store *storage.Store) {
 			}
 		}
 
-		if portraitWorker != nil && ent.Portrait == "" {
+		if portraitWorker != nil && (ent.Portrait == "" || !s.hasCustomPortrait(gameID, ent.ID)) {
 			portraitWorker.Enqueue(gameID, ent, worldStyle)
 		}
 	}

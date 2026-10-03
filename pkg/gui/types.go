@@ -180,6 +180,7 @@ type AudioProgressDTO struct {
 	TotalSegments int    `json:"total_segments"`
 	Stage         string `json:"stage"` // "waiting" | "synthesizing" | "encoding" | "ready" | "failed"
 	ReadyCount    int    `json:"ready_count"`
+	FailedCount   int    `json:"failed_count,omitempty"`
 	AudioKey      string `json:"audio_key,omitempty"`
 	AudioURL      string `json:"audio_url,omitempty"`
 }
@@ -344,12 +345,14 @@ type PlayerCharacterDTO struct {
 
 // EntitySummaryDTO is one note as the codex browser lists it.
 type EntitySummaryDTO struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Type       string   `json:"type"`
-	Location   string   `json:"location,omitempty"`
-	Tags       []string `json:"tags,omitempty"`
-	ParseError bool     `json:"parse_error,omitempty"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Location    string   `json:"location,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+	HasPortrait bool     `json:"has_portrait,omitempty"`
+	PortraitURL string   `json:"portrait_url,omitempty"`
+	ParseError  bool     `json:"parse_error,omitempty"`
 }
 
 // ThreadDTO is one unresolved arc as the client sees it.

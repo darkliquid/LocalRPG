@@ -84,6 +84,7 @@ type sentenceStreamer struct {
 	results      map[uint64]jobResult
 	turnNumber       int
 	readyCount       int
+	failedCount      int
 	progressObserver func(AudioProgressDTO)
 	// stopped suppresses emission once the turn is authoritative. From then on the
 	// played set is the client's, so a late unit is synthesized and played with the
@@ -140,6 +141,7 @@ func (s *sentenceStreamer) emitProgress(seq uint64, stage, key, url string) {
 	s.mu.Lock()
 	observer := s.progressObserver
 	readyCount := s.readyCount
+	failedCount := s.failedCount
 	total := int(s.nextSeq)
 	turnNum := s.turnNumber
 	s.mu.Unlock()
@@ -151,6 +153,7 @@ func (s *sentenceStreamer) emitProgress(seq uint64, stage, key, url string) {
 			TotalSegments: total,
 			Stage:         stage,
 			ReadyCount:    readyCount,
+			FailedCount:   failedCount,
 			AudioKey:      key,
 			AudioURL:      url,
 		})
@@ -208,7 +211,6 @@ func (s *sentenceStreamer) synthesizeUnit(job synthesisJob) {
 	if err != nil {
 		s.logger.Event("media.tts.provisional_error", map[string]interface{}{"error": err.Error()})
 		s.completeJob(jobResult{seq: job.seq, err: err})
-		s.emitProgress(job.seq, "failed", "", "")
 		return
 	}
 	key := ""
@@ -227,7 +229,6 @@ func (s *sentenceStreamer) synthesizeGroup(job synthesisJob) {
 	if err != nil || len(groups) == 0 {
 		s.logger.Event("media.tts.provisional_error", map[string]interface{}{"error": "synthesize group"})
 		s.completeJob(jobResult{seq: job.seq, err: errors.New("synthesize group failed")})
-		s.emitProgress(job.seq, "failed", "", "")
 		return
 	}
 	group := groups[0]
@@ -241,11 +242,15 @@ func (s *sentenceStreamer) completeJob(res jobResult) {
 	s.mu.Lock()
 	if res.err == nil {
 		s.readyCount++
+	} else {
+		s.failedCount++
 	}
 	s.completeJobLocked(res)
 	s.mu.Unlock()
 	if res.err == nil {
 		s.emitProgress(res.seq, "ready", res.key, clipURL(res.key))
+	} else {
+		s.emitProgress(res.seq, "failed", "", "")
 	}
 }
 
@@ -387,6 +392,7 @@ func (s *sentenceStreamer) enqueueUnit(unit speechUnit) {
 	case s.queue <- synthesisJob{seq: seq, unit: unit}:
 	default:
 		s.completeJobLocked(jobResult{seq: seq, err: errQueueDropped})
+		s.failedCount++
 		dropped = true
 	}
 	s.mu.Unlock()
@@ -408,6 +414,7 @@ func (s *sentenceStreamer) enqueueGroup(group []media.SpeakerLine) {
 	case s.queue <- synthesisJob{seq: seq, group: group}:
 	default:
 		s.completeJobLocked(jobResult{seq: seq, err: errQueueDropped})
+		s.failedCount++
 		dropped = true
 	}
 	s.mu.Unlock()

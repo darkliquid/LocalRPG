@@ -262,3 +262,41 @@ func TestStreamerEmitsAudioProgressEvents(t *testing.T) {
 	}
 }
 
+type failingSentenceTTSClient struct{}
+
+func (c *failingSentenceTTSClient) Synthesize(_ context.Context, _ string, _ *entity.VoiceConfig) ([]byte, error) {
+	return nil, context.DeadlineExceeded
+}
+
+func TestStreamerEmitsAudioProgressWithFailedCount(t *testing.T) {
+	client := &failingSentenceTTSClient{}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, nil)
+	var lastProgress AudioProgressDTO
+	var mu sync.Mutex
+	streamer.SetTurnNumber(1)
+	streamer.SetProgressObserver(func(progress AudioProgressDTO) {
+		mu.Lock()
+		lastProgress = progress
+		mu.Unlock()
+	})
+
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "This will fail."})
+	streamer.Flush()
+	streamer.Close()
+	streamer.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if lastProgress.Stage != "failed" {
+		t.Fatalf("expected last stage 'failed', got: %s", lastProgress.Stage)
+	}
+	if lastProgress.FailedCount != 1 {
+		t.Fatalf("expected FailedCount=1, got: %d", lastProgress.FailedCount)
+	}
+	if lastProgress.ReadyCount+lastProgress.FailedCount != lastProgress.TotalSegments {
+		t.Fatalf("expected ReadyCount + FailedCount == TotalSegments, got ready=%d failed=%d total=%d",
+			lastProgress.ReadyCount, lastProgress.FailedCount, lastProgress.TotalSegments)
+	}
+}
+
