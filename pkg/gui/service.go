@@ -3619,11 +3619,8 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 			}
 		}
 		cfg := s.configMgr.Get()
-		sharedKey := cfg.Providers.Gemini.APIKey
-		if ttsCfg.Type == "cartesia" || (ttsCfg.Type == "builtin" && ttsCfg.BuiltinName == "cartesia") {
-			sharedKey = cfg.Providers.Cartesia.APIKey
-		}
-		client, err := media.NewTTSClientWithSharedKey(ttsCfg, sharedKey)
+		ttsKey, hasTTSKey := media.TTSKeyFor(ttsCfg)
+		client, err := media.NewTTSClientWithSharedKey(ttsCfg, media.SharedProviderKey(cfg, ttsKey, hasTTSKey))
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}
@@ -3680,12 +3677,8 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequestDTO) 
 				Message: "web-speech runs in the browser; choose an HTTP or CLI Whisper provider",
 			}, nil
 		}
-		cfg := s.configMgr.Get()
-		sharedKey := ""
-		if sttCfg.Type == "cartesia" || (sttCfg.Type == "builtin" && sttCfg.BuiltinName == "cartesia") {
-			sharedKey = cfg.Providers.Cartesia.APIKey
-		}
-		client, err := media.NewSTTClientWithSharedKey(sttCfg, sharedKey)
+		key, hasKey := media.STTKeyFor(sttCfg)
+		client, err := media.NewSTTClientWithSharedKey(sttCfg, media.SharedProviderKey(s.configMgr.Get(), key, hasKey))
 		if err != nil {
 			return &TestProviderResponseDTO{Success: false, Message: err.Error()}, nil
 		}
@@ -3757,11 +3750,8 @@ func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string
 		}
 	}
 
-	sharedKey := ""
-	if cfg.Media.STT.Type == "cartesia" || (cfg.Media.STT.Type == "builtin" && cfg.Media.STT.BuiltinName == "cartesia") {
-		sharedKey = cfg.Providers.Cartesia.APIKey
-	}
-	client, err := media.NewSTTClientWithSharedKey(cfg.Media.STT, sharedKey)
+	sttKey, hasSTTKey := media.STTKeyFor(cfg.Media.STT)
+	client, err := media.NewSTTClientWithSharedKey(cfg.Media.STT, media.SharedProviderKey(cfg, sttKey, hasSTTKey))
 	if err != nil {
 		return "", &harness.GenerationFailure{
 			Code:    harness.FailureProviderUnavailable,

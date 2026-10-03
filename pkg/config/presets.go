@@ -15,6 +15,13 @@ var AgentPresets = map[string]AgentRoleConfig{
 		Temperature: 0.7,
 		MaxTokens:   1024,
 	},
+	"inworld-frontier": {
+		Type:        "builtin",
+		BuiltinName: "inworld",
+		Model:       "inworld/compare-frontier-models",
+		Temperature: 0.7,
+		MaxTokens:   2048,
+	},
 	"localai": {
 		Type:        "http",
 		Endpoint:    "http://localhost:8080/v1",
@@ -223,6 +230,17 @@ var TTSPresets = map[string]TTSConfig{
 		SpeechRate:   1.0,
 		MasterVolume: 1.0,
 	},
+
+	"inworld-tts": {
+		Type:          "builtin",
+		BuiltinName:   "inworld",
+		Model:         "inworld-tts-2",
+		DefaultVoice:  "Ashley",
+		Pitch:         1.0,
+		SpeechRate:    1.0,
+		AutoPlay:      true,
+		MasterVolume:  1.0,
+	},
 }
 
 var STTPresets = map[string]STTConfig{
@@ -248,6 +266,11 @@ var STTPresets = map[string]STTConfig{
 		Type:     "http",
 		Endpoint: "https://api.openai.com/v1/audio/transcriptions",
 		Model:    "whisper-1",
+	},
+	"inworld-stt": {
+		Type:        "builtin",
+		BuiltinName: "inworld",
+		Model:       "inworld/inworld-stt-1",
 	},
 }
 

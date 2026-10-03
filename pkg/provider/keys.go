@@ -8,6 +8,7 @@ const (
 	KeyLLMGemini          Key = "llm:gemini"
 	KeyLLMCLI             Key = "llm:cli"
 	KeyLLMNarrativeOracle Key = "llm:narrative-oracle"
+	KeyLLMInworld         Key = "llm:inworld"
 
 	KeyTTSGemini     Key = "tts:gemini"
 	KeyTTSElevenLabs Key = "tts:elevenlabs"
@@ -16,11 +17,13 @@ const (
 	KeyTTSPiper      Key = "tts:piper"
 	KeyTTSFishAudio  Key = "tts:fish-audio"
 	KeyTTSHTTP       Key = "tts:http"
+	KeyTTSInworld    Key = "tts:inworld"
 	KeyTTSCartesia   Key = "tts:cartesia"
 
 	KeySTTWhisperHTTP Key = "stt:whisper-http"
 	KeySTTWhisperCLI  Key = "stt:whisper-cli"
 	KeySTTWebSpeech   Key = "stt:web-speech"
+	KeySTTInworld     Key = "stt:inworld"
 	KeySTTCartesia    Key = "stt:cartesia"
 
 	KeyImageGemini        Key = "image:gemini"
@@ -36,10 +39,10 @@ const (
 // AllKeys lists every canonical adapter key, for validation and docs.
 func AllKeys() []Key {
 	return []Key{
-		KeyLLMOpenAIChat, KeyLLMGemini, KeyLLMCLI, KeyLLMNarrativeOracle,
+		KeyLLMOpenAIChat, KeyLLMGemini, KeyLLMCLI, KeyLLMNarrativeOracle, KeyLLMInworld,
 		KeyTTSGemini, KeyTTSElevenLabs, KeyTTSNativeOS, KeyTTSSherpaONNX, KeyTTSPiper,
-		KeyTTSFishAudio, KeyTTSHTTP, KeyTTSCartesia,
-		KeySTTWhisperHTTP, KeySTTWhisperCLI, KeySTTWebSpeech, KeySTTCartesia,
+		KeyTTSFishAudio, KeyTTSHTTP, KeyTTSInworld, KeyTTSCartesia,
+		KeySTTWhisperHTTP, KeySTTWhisperCLI, KeySTTWebSpeech, KeySTTInworld, KeySTTCartesia,
 		KeyImageGemini, KeyImageHTTP, KeyImageCLI, KeyImageProceduralArt,
 		KeyEmbeddingBuiltin, KeyEmbeddingOpenAI, KeyEmbeddingGemini,
 	}

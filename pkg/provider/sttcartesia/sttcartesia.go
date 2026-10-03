@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 
 	"github.com/darkliquid/localrpg/pkg/config"
-	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
@@ -37,18 +36,23 @@ func init() {
 			},
 		},
 		Build: func(_ context.Context, raw []byte) (interface{}, error) {
-			var payload media.STTBuildPayload
-			if len(raw) > 0 {
-				if err := json.Unmarshal(raw, &payload); err == nil && (payload.Config.Type != "" || payload.SharedKey != "") {
-					return NewCartesiaSTTClient(payload.Config, payload.SharedKey)
-				}
-				var cfg config.STTConfig
-				if err := json.Unmarshal(raw, &cfg); err != nil {
-					return nil, err
-				}
-				return NewCartesiaSTTClient(cfg, "")
+			if len(raw) == 0 {
+				return NewCartesiaSTTClient(config.STTConfig{}, "")
 			}
-			return NewCartesiaSTTClient(config.STTConfig{}, "")
+			// BuildSTT hands over a nested payload; a bare config is still accepted
+			// for callers that marshal the family config directly.
+			var envelope struct {
+				Config    *config.STTConfig `json:"config"`
+				SharedKey string            `json:"shared_key,omitempty"`
+			}
+			if err := json.Unmarshal(raw, &envelope); err == nil && envelope.Config != nil {
+				return NewCartesiaSTTClient(*envelope.Config, envelope.SharedKey)
+			}
+			var cfg config.STTConfig
+			if err := json.Unmarshal(raw, &cfg); err != nil {
+				return nil, err
+			}
+			return NewCartesiaSTTClient(cfg, "")
 		},
 	})
 }

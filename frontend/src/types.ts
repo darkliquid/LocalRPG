@@ -661,10 +661,15 @@ export interface TraceEvent {
   fields?: Record<string, unknown>;
 }
 
+export interface InworldProviderConfig {
+  api_key?: string;
+}
+
 export interface ProvidersConfig {
   gemini?: {
     api_key?: string;
   };
+  inworld?: InworldProviderConfig;
   cartesia?: {
     api_key?: string;
   };

@@ -25,12 +25,16 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 		return provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.HostDiscriminator(cfg.Endpoint)), true
 	case "gemini":
 		return provider.KeyTTSGemini, true
+	case "inworld":
+		return provider.KeyTTSInworld, true
 	case "cartesia":
 		return provider.KeyTTSCartesia, true
 	case "builtin":
 		switch cfg.BuiltinName {
 		case "gemini":
 			return provider.KeyTTSGemini, true
+		case "inworld":
+			return provider.KeyTTSInworld, true
 		case "sherpa-onnx", "kokoro":
 			return provider.KeyTTSSherpaONNX, true
 		case "native-os":
@@ -51,6 +55,25 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 		return provider.InstanceOrSelf(provider.KeyTTSHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
 	}
 	return "", false
+}
+
+// SharedProviderKey is the provider-wide credential a media client inherits when
+// its own config carries none: an Inworld adapter uses providers.inworld.api_key,
+// a Cartesia adapter uses providers.cartesia.api_key, and every other adapter
+// keeps the Gemini key it has always used.
+func SharedProviderKey(cfg *config.Config, key provider.Key, ok bool) string {
+	if cfg == nil {
+		return ""
+	}
+	if ok {
+		switch string(key.Parent()) {
+		case string(provider.KeyTTSInworld), string(provider.KeySTTInworld):
+			return cfg.Providers.Inworld.APIKey
+		case string(provider.KeyTTSCartesia), string(provider.KeySTTCartesia):
+			return cfg.Providers.Cartesia.APIKey
+		}
+	}
+	return cfg.Providers.Gemini.APIKey
 }
 
 // BuildTTS constructs a TTS client from the registry by ID.
@@ -74,12 +97,15 @@ func BuildTTS(id string, cfg config.TTSConfig, sharedKey string) (TTSClient, err
 	return client, nil
 }
 
-// STTBuildPayload is what BuildSTT hands an STT provider package.
+// STTBuildPayload is what BuildSTT hands an STT provider package: the family
+// config plus the shared provider key, which is not part of STTConfig.
 type STTBuildPayload struct {
 	Config    config.STTConfig `json:"config"`
 	SharedKey string           `json:"shared_key,omitempty"`
 }
 
+// sttBuildWire carries both the nested payload and the flattened config so an
+// STT adapter can decode whichever shape it expects.
 type sttBuildWire struct {
 	config.STTConfig
 	Config    config.STTConfig `json:"config"`
@@ -90,9 +116,14 @@ type sttBuildWire struct {
 // have no key: they never reach the server-side factory.
 func STTKeyFor(cfg config.STTConfig) (provider.Key, bool) {
 	switch cfg.Type {
+	case "inworld":
+		return provider.KeySTTInworld, true
 	case "cartesia":
 		return provider.KeySTTCartesia, true
 	case "builtin":
+		if cfg.BuiltinName == "inworld" {
+			return provider.KeySTTInworld, true
+		}
 		if cfg.BuiltinName == "cartesia" {
 			return provider.KeySTTCartesia, true
 		}

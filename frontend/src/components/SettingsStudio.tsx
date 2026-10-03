@@ -624,6 +624,91 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             </div>
 
+            {/* Inworld AI Provider Card */}
+            <div className="p-4 bg-stone-950/80 border border-stone-800/90 rounded-xl space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800/60 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                    <Cloud className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-sans font-bold text-stone-200">Inworld AI</h4>
+                    <p className="text-xs text-stone-400">Frontier model routing, cloud speech synthesis, and transcription.</p>
+                  </div>
+                </div>
+                <div>
+                  {config.providers?.inworld?.api_key ? (
+                    <span className="flex items-center gap-1 text-emerald-400 font-mono text-xs bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Configured in Settings</span>
+                    </span>
+                  ) : (
+                    <span className="text-xs font-mono text-stone-500 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded-md">
+                      Optional if INWORLD_API_KEY is set
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
+                  <span>Shared Inworld API Key (Base64)</span>
+                  <span className="text-xs text-stone-500 font-mono">
+                    {config.providers?.inworld?.api_key ? '✓ Custom Key Saved' : 'Optional if INWORLD_API_KEY is set'}
+                  </span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="Paste the Basic (Base64) key, or leave blank for INWORLD_API_KEY"
+                  value={config.providers?.inworld?.api_key || ''}
+                  onChange={(e) => {
+                    setConfig({
+                      ...config,
+                      providers: {
+                        ...config.providers,
+                        inworld: {
+                          ...config.providers?.inworld,
+                          api_key: e.target.value,
+                        },
+                      },
+                    });
+                  }}
+                  className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-indigo-500/60"
+                />
+                <p className="text-xs text-stone-500">
+                  Sent as <code>Authorization: Basic …</code> to the Inworld LLM Router, Inworld TTS (<code>inworld-tts-2</code>), and Inworld STT
+                  (<code>inworld-stt-1</code>). Create a key at{' '}
+                  <a
+                    href="https://platform.inworld.ai/api-keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-amber-400 hover:underline"
+                  >
+                    platform.inworld.ai/api-keys
+                  </a>{' '}
+                  or run <code>inworld auth login</code>. Individual roles and media engines can still provide an override key.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-stone-800/50">
+                <div className="text-xs font-sans uppercase text-stone-400 font-semibold mb-2">Connected Subsystems</div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
+                    <Cpu className="w-3 h-3 text-indigo-400" />
+                    <span>LLM Router (compare-frontier-models)</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
+                    <Volume2 className="w-3 h-3 text-indigo-400" />
+                    <span>Voice Synthesis (inworld-tts-2)</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
+                    <Mic className="w-3 h-3 text-indigo-400" />
+                    <span>Transcription (inworld-stt-1)</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Cartesia Provider Card */}
             <div className="p-4 bg-stone-950/80 border border-stone-800/90 rounded-xl space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800/60 pb-3">

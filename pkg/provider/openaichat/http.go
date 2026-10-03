@@ -24,6 +24,7 @@ type HTTPProvider struct {
 	endpoint           string
 	model              string
 	apiKey             string
+	authScheme         string
 	opts               harness.GenerationOptions
 	client             *http.Client
 	logger             trace.Logger
@@ -60,13 +61,26 @@ func (h *HTTPProvider) chunkLimit() int {
 
 func NewHTTPProviderWithOptions(id, endpoint, model, apiKey string, opts harness.GenerationOptions) *HTTPProvider {
 	return &HTTPProvider{
-		id:       id,
-		endpoint: strings.TrimRight(endpoint, "/"),
-		model:    model,
-		apiKey:   apiKey,
-		opts:     opts,
-		client:   &http.Client{Transport: telemetry.HTTPTransport(nil)},
+		id:         id,
+		endpoint:   strings.TrimRight(endpoint, "/"),
+		model:      model,
+		apiKey:     apiKey,
+		authScheme: "Bearer",
+		opts:       opts,
+		client:     &http.Client{Transport: telemetry.HTTPTransport(nil)},
 	}
+}
+
+// NewHTTPProviderWithAuth is NewHTTPProviderWithOptions with an explicit
+// Authorization scheme, so a compatible gateway that expects a different prefix
+// (Inworld uses Basic) reuses this implementation rather than a copy. An empty
+// scheme keeps Bearer.
+func NewHTTPProviderWithAuth(id, endpoint, model, apiKey, authScheme string, opts harness.GenerationOptions) *HTTPProvider {
+	provider := NewHTTPProviderWithOptions(id, endpoint, model, apiKey, opts)
+	if strings.TrimSpace(authScheme) != "" {
+		provider.authScheme = authScheme
+	}
+	return provider
 }
 
 func (h *HTTPProvider) ID() string {
@@ -287,7 +301,11 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	if h.apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+h.apiKey)
+		scheme := h.authScheme
+		if scheme == "" {
+			scheme = "Bearer"
+		}
+		httpReq.Header.Set("Authorization", scheme+" "+h.apiKey)
 	}
 
 	resp, err := h.client.Do(httpReq)

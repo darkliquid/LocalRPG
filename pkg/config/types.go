@@ -255,12 +255,19 @@ type TelemetryConfig struct {
 // ProvidersConfig groups shared credentials and defaults for external ecosystem providers.
 type ProvidersConfig struct {
 	Gemini   GeminiProviderConfig   `yaml:"gemini,omitempty" json:"gemini,omitempty"`
+	Inworld  InworldProviderConfig  `yaml:"inworld,omitempty" json:"inworld,omitempty"`
 	Cartesia CartesiaProviderConfig `yaml:"cartesia,omitempty" json:"cartesia,omitempty"`
 	// Currency is the display currency for cost figures. Prices are expressed in
 	// this currency; no conversion is performed.
 	Currency string `yaml:"currency,omitempty" json:"currency,omitempty"`
 	// Prices override the built-in price table, matched by provider then model.
 	Prices []PriceConfig `yaml:"prices,omitempty" json:"prices,omitempty"`
+}
+
+// InworldProviderConfig holds the credential shared by every Inworld capability
+// (LLM router, TTS, STT). A per-service api_key overrides it.
+type InworldProviderConfig struct {
+	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 }
 
 // PriceConfig is one provider's price. A zero model matches every model of the

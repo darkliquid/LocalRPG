@@ -87,7 +87,8 @@ func NewSTTClient(cfg config.STTConfig) (STTClient, error) {
 	return NewSTTClientWithSharedKey(cfg, "")
 }
 
-// NewSTTClientWithSharedKey builds an STTClient from configuration and an optional shared key.
+// NewSTTClientWithSharedKey builds an STTClient from configuration and an
+// optional shared key, matching the TTS and image factories.
 func NewSTTClientWithSharedKey(cfg config.STTConfig, sharedKey string) (STTClient, error) {
 	// Registry-first when pkg/provider/all was imported; inline otherwise.
 	if key, ok := STTKeyFor(cfg); ok {

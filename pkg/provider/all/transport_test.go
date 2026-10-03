@@ -17,6 +17,7 @@ var transportByKey = map[provider.Key]string{
 	provider.KeyLLMGemini:          "gemini",
 	provider.KeyLLMCLI:             "cli",
 	provider.KeyLLMNarrativeOracle: "builtin",
+	provider.KeyLLMInworld:         "http",
 
 	provider.KeyTTSGemini:     "gemini",
 	provider.KeyTTSElevenLabs: "http",
@@ -25,11 +26,13 @@ var transportByKey = map[provider.Key]string{
 	provider.KeyTTSPiper:      "cli",
 	provider.KeyTTSFishAudio:  "http",
 	provider.KeyTTSHTTP:       "http",
+	provider.KeyTTSInworld:    "http",
 	provider.KeyTTSCartesia:   "http",
 
 	provider.KeySTTWhisperHTTP: "http",
 	provider.KeySTTWhisperCLI:  "cli",
 	provider.KeySTTWebSpeech:   "builtin",
+	provider.KeySTTInworld:     "http",
 	provider.KeySTTCartesia:    "http",
 
 	provider.KeyImageGemini:        "gemini",

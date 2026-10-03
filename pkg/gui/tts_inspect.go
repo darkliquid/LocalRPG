@@ -78,12 +78,8 @@ func (s *Service) ttsClientFor(cfg config.TTSConfig) (media.TTSClient, error) {
 	}
 	sharedKey := ""
 	if s.configMgr != nil && s.configMgr.Get() != nil {
-		appCfg := s.configMgr.Get()
-		if cfg.Type == "cartesia" || (cfg.Type == "builtin" && cfg.BuiltinName == "cartesia") {
-			sharedKey = appCfg.Providers.Cartesia.APIKey
-		} else {
-			sharedKey = appCfg.Providers.Gemini.APIKey
-		}
+		key, ok := media.TTSKeyFor(cfg)
+		sharedKey = media.SharedProviderKey(s.configMgr.Get(), key, ok)
 	}
 	return media.NewTTSClientWithSharedKey(cfg, sharedKey)
 }
