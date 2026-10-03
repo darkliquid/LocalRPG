@@ -8,16 +8,23 @@ import (
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/trace"
+	"github.com/darkliquid/localrpg/pkg/turnstream"
 )
 
 type fakeSentenceTTSClient struct {
-	mu    sync.Mutex
-	calls int
+	mu     sync.Mutex
+	calls  int
+	voices []string
 }
 
-func (c *fakeSentenceTTSClient) Synthesize(context.Context, string, *entity.VoiceConfig) ([]byte, error) {
+func (c *fakeSentenceTTSClient) Synthesize(_ context.Context, _ string, voice *entity.VoiceConfig) ([]byte, error) {
 	c.mu.Lock()
 	c.calls++
+	if voice != nil {
+		c.voices = append(c.voices, voice.VoiceID)
+	} else {
+		c.voices = append(c.voices, "")
+	}
 	c.mu.Unlock()
 	return media.GenerateToneWAV(440, 0.01), nil
 }
@@ -26,6 +33,27 @@ func (c *fakeSentenceTTSClient) callCount() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.calls
+}
+
+func TestSentenceStreamerVoicesSpeechWithItsSpeaker(t *testing.T) {
+	client := &fakeSentenceTTSClient{}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, nil)
+	streamer.SetVoiceResolver(func(speakerID string) *entity.VoiceConfig {
+		if speakerID == "kaelen" {
+			return &entity.VoiceConfig{VoiceID: "kaelen-voice"}
+		}
+		return nil
+	})
+
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindSpeech, SpeakerID: "kaelen", Text: "Keep walking."})
+	streamer.Close()
+
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	if len(client.voices) != 1 || client.voices[0] != "kaelen-voice" {
+		t.Fatalf("voices = %#v, want the speaker's profile", client.voices)
+	}
 }
 
 func TestSentenceStreamerSynthesizesCompleteSentencesOnly(t *testing.T) {

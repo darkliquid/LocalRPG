@@ -1547,17 +1547,6 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		_ = announce(toolEvent(activity))
 	})
 
-	// Parsed segments are announced as they arrive, so the client renders
-	// attributed speech while the model is still writing. A failed emit is
-	// ignored, exactly as tool activity is: the turn still records.
-	t.orchestrator.SetSegmentObserver(func(event turnstream.Event) {
-		segment, ok := liveSegmentDTO(event)
-		if !ok {
-			return
-		}
-		_ = announce(TurnEvent{Type: "segment", Segment: &segment})
-	})
-
 	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)
 
 	// Application playback runs on one queue opened before generation: a sentence
@@ -1591,12 +1580,19 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	})
 	defer streamer.Close()
 
-	turn, err := t.orchestrator.ProcessActionStream(runCtx, req.Mode, req.Input, func(text string) error {
-		if emitErr := announce(TurnEvent{Type: "chunk", Text: text}); emitErr != nil {
-			return emitErr
+	// Parsed segments are announced as they arrive, so the client renders
+	// attributed speech while the model is still writing, and the streamer voices
+	// each one in its speaker's own voice. A failed emit is ignored, exactly as
+	// tool activity is: the turn still records.
+	t.orchestrator.SetSegmentObserver(func(event turnstream.Event) {
+		if segment, ok := liveSegmentDTO(event); ok {
+			_ = announce(TurnEvent{Type: "segment", Segment: &segment})
 		}
-		streamer.Feed(text)
-		return nil
+		streamer.FeedSegment(event)
+	})
+
+	turn, err := t.orchestrator.ProcessActionStream(runCtx, req.Mode, req.Input, func(text string) error {
+		return announce(TurnEvent{Type: "chunk", Text: text})
 	})
 	if err != nil {
 		t.service.noteFailure("gm", err)
