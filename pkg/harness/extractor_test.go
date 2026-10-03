@@ -2,6 +2,7 @@ package harness
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -349,6 +350,88 @@ func TestMergeOnlyFillsAnEmptyAppearance(t *testing.T) {
 	merged = MergeExtractedEntity(empty, raw)
 	if merged.Appearance != "gutted by fire" {
 		t.Errorf("Appearance = %q, want the extracted value applied to an empty field", merged.Appearance)
+	}
+}
+
+func TestExtractorParsesSceneBreakAndAppearanceChange(t *testing.T) {
+	jsonPayload := `{
+		"entities": [
+			{
+				"id": "vera",
+				"name": "Vera",
+				"type": "character",
+				"appearance": "Grey-streaked hair and a hardened gaze.",
+				"age": "38",
+				"appearance_changed": true,
+				"body": "Ten years of wandering have changed her."
+			}
+		],
+		"scene_break": {
+			"occurred": true,
+			"visual_cue": "Ten years later, the dilapidated courtyard overgrown with ivy under grey skies."
+		}
+	}`
+
+	var extraction Extraction
+	if err := json.Unmarshal([]byte(jsonPayload), &extraction); err != nil {
+		t.Fatalf("unmarshal Extraction failed: %v", err)
+	}
+
+	if extraction.SceneBreak == nil || !extraction.SceneBreak.Occurred {
+		t.Fatalf("expected SceneBreak.Occurred to be true")
+	}
+	if extraction.SceneBreak.VisualCue != "Ten years later, the dilapidated courtyard overgrown with ivy under grey skies." {
+		t.Errorf("unexpected visual cue: %q", extraction.SceneBreak.VisualCue)
+	}
+
+	if len(extraction.Entities) != 1 {
+		t.Fatalf("expected 1 entity, got %d", len(extraction.Entities))
+	}
+	ent := extraction.Entities[0]
+	if !ent.AppearanceChanged {
+		t.Errorf("expected AppearanceChanged to be true")
+	}
+	if ent.Age != "38" {
+		t.Errorf("expected Age 38, got %q", ent.Age)
+	}
+}
+
+func TestMergeExtractedEntityUpdatesAppearanceWhenChanged(t *testing.T) {
+	existing := &entity.Entity{
+		ID:         "vera",
+		Name:       "Vera",
+		Type:       "character",
+		Appearance: "Youthful scout with bright hazel eyes.",
+		Age:        "28",
+	}
+
+	// 1. Regular mention without AppearanceChanged preserves authored appearance
+	regularMention := &ExtractedEntity{
+		ID:         "vera",
+		Name:       "Vera",
+		Type:       "character",
+		Appearance: "Looking weary.",
+	}
+	merged1 := MergeExtractedEntity(existing, regularMention)
+	if merged1.Appearance != "Youthful scout with bright hazel eyes." {
+		t.Errorf("expected authored appearance kept, got %q", merged1.Appearance)
+	}
+
+	// 2. Evolution with AppearanceChanged updates appearance and age
+	evolution := &ExtractedEntity{
+		ID:                "vera",
+		Name:              "Vera",
+		Type:              "character",
+		Appearance:        "Grey-streaked hair and a hardened gaze.",
+		Age:               "38",
+		AppearanceChanged: true,
+	}
+	merged2 := MergeExtractedEntity(existing, evolution)
+	if merged2.Appearance != "Grey-streaked hair and a hardened gaze." {
+		t.Errorf("expected updated appearance, got %q", merged2.Appearance)
+	}
+	if merged2.Age != "38" {
+		t.Errorf("expected updated age, got %q", merged2.Age)
 	}
 }
 
