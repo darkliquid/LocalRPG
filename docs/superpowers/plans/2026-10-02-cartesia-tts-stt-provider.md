@@ -42,7 +42,7 @@
 - Modify: `pkg/config/presets.go:160-230`
 - Test: `pkg/config/types_test.go`
 
-- [ ] **Step 1: Write the failing test for configuration and preset resolution**
+- [x] **Step 1: Write the failing test for configuration and preset resolution**
 
 Add a test in `pkg/config/types_test.go` that verifies `CartesiaProviderConfig` serializes and `GetTTSPreset("cartesia")` and `GetSTTPreset("cartesia")` return valid configurations:
 
@@ -86,12 +86,12 @@ func TestCartesiaConfigAndPresets(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -run TestCartesiaConfigAndPresets ./pkg/config/`  
 Expected: Compilation failure or FAIL (undefined `Cartesia` on `ProvidersConfig`, `cartesia` preset missing).
 
-- [ ] **Step 3: Implement canonical keys and config types**
+- [x] **Step 3: Implement canonical keys and config types**
 
 1. In `pkg/provider/keys.go`, add:
 ```go
@@ -137,12 +137,12 @@ Add `cartesia` to `STTPresets`:
 	},
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -run TestCartesiaConfigAndPresets ./pkg/config/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/provider/keys.go pkg/config/types.go pkg/config/presets.go pkg/config/types_test.go
@@ -159,7 +159,7 @@ git commit -m "feat(config): add Cartesia provider keys, config struct, and pres
 - Test: `pkg/media/key_test.go`
 - Test: `pkg/media/catalog_test.go`
 
-- [ ] **Step 1: Write the failing tests for key mapping and credential detection**
+- [x] **Step 1: Write the failing tests for key mapping and credential detection**
 
 In `pkg/media/key_test.go`, add test cases for `TTSKeyFor` and `STTKeyFor`:
 
@@ -206,12 +206,12 @@ func TestCartesiaKeyPresentWithSharedKey(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test -v -run "TestCartesiaKeyFor|TestCartesiaKeyPresentWithSharedKey" ./pkg/media/`  
 Expected: FAIL (`TTSKeyFor`, `STTKeyFor`, and `KeyPresentWithSharedKey` don't recognize Cartesia yet).
 
-- [ ] **Step 3: Implement key resolution and credential detection**
+- [x] **Step 3: Implement key resolution and credential detection**
 
 1. In `pkg/media/exports.go`:
 In `TTSKeyFor`:
@@ -244,12 +244,12 @@ In `KeyPresentWithSharedKey`:
 	}
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v -run "TestCartesiaKeyFor|TestCartesiaKeyPresentWithSharedKey" ./pkg/media/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/media/exports.go pkg/media/catalog.go pkg/media/key_test.go pkg/media/catalog_test.go
@@ -265,7 +265,7 @@ git commit -m "feat(media): map Cartesia provider keys and check credentials"
 - Create: `pkg/provider/ttscartesia/client.go`
 - Test: `pkg/provider/ttscartesia/client_test.go`
 
-- [ ] **Step 1: Write the failing unit tests for Cartesia TTS**
+- [x] **Step 1: Write the failing unit tests for Cartesia TTS**
 
 Create `pkg/provider/ttscartesia/client_test.go`:
 - Test synthesis sending correct `model_id: "sonic-3.6"`, `output_format` (wav, pcm_s16le, 44100), `generation_config` with clamped speed, `Cartesia-Version: 2026-08-14`, and Bearer auth.
@@ -407,12 +407,12 @@ func TestRateLimitRetry(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/provider/ttscartesia/`  
 Expected: FAIL (package `pkg/provider/ttscartesia` does not exist).
 
-- [ ] **Step 3: Implement `pkg/provider/ttscartesia`**
+- [x] **Step 3: Implement `pkg/provider/ttscartesia`**
 
 Create `pkg/provider/ttscartesia/ttscartesia.go`:
 ```go
@@ -482,12 +482,12 @@ Create `pkg/provider/ttscartesia/client.go`:
 - Implement structured Cartesia error parsing (`error_code`, `title`, `message`).
 - Implement 429 retry honoring `Retry-After`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/provider/ttscartesia/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/provider/ttscartesia/
@@ -503,7 +503,7 @@ git commit -m "feat(provider): implement Cartesia TTS client and descriptor"
 - Create: `pkg/provider/sttcartesia/client.go`
 - Test: `pkg/provider/sttcartesia/client_test.go`
 
-- [ ] **Step 1: Write the failing unit tests for Cartesia STT**
+- [x] **Step 1: Write the failing unit tests for Cartesia STT**
 
 Create `pkg/provider/sttcartesia/client_test.go`:
 - Test `Transcribe`: Mock server on `POST /stt` expecting multipart file upload with `model: ink-whisper`, file part, `Cartesia-Version: 2026-08-14`, and Bearer auth; returns JSON with `{"type":"transcript","text":"Open the door","duration":2.5}`.
@@ -563,12 +563,12 @@ func TestTranscribe(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v ./pkg/provider/sttcartesia/`  
 Expected: FAIL (package does not exist).
 
-- [ ] **Step 3: Implement `pkg/provider/sttcartesia`**
+- [x] **Step 3: Implement `pkg/provider/sttcartesia`**
 
 Create `pkg/provider/sttcartesia/sttcartesia.go`:
 ```go
@@ -630,12 +630,12 @@ Create `pkg/provider/sttcartesia/client.go`:
 - Parse Cartesia structured errors and implement 429 retry on `Retry-After`.
 - Implement `MeteredProvider` (`Metered() bool`, `LastUsage() media.Usage`).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v ./pkg/provider/sttcartesia/`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/provider/sttcartesia/
@@ -651,7 +651,7 @@ git commit -m "feat(provider): implement Cartesia STT client and descriptor"
 - Modify: `pkg/provider/all/all_test.go`
 - Modify: `pkg/gui/docs/` (generated via `-update-docs`)
 
-- [ ] **Step 1: Blank-import Cartesia providers in `pkg/provider/all/all.go`**
+- [x] **Step 1: Blank-import Cartesia providers in `pkg/provider/all/all.go`**
 
 Add blank imports:
 ```go
@@ -659,22 +659,22 @@ Add blank imports:
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttscartesia"
 ```
 
-- [ ] **Step 2: Run drift-guard tests**
+- [x] **Step 2: Run drift-guard tests**
 
 Run: `go test -v -run "TestTTSDescriptorsBuildAndFeaturesAreBacked|TestSTTAndImageDescriptorsBuild" ./pkg/provider/all/`  
 Expected: PASS (verifies all features declared by `tts:cartesia` and `stt:cartesia` are verified and backed).
 
-- [ ] **Step 3: Update documentation catalog**
+- [x] **Step 3: Update documentation catalog**
 
 Run: `go test ./pkg/gui -update-docs`  
 Expected: PASS, regenerates `pkg/gui/docs/providers.md` or catalogue tables with Cartesia included.
 
-- [ ] **Step 4: Verify git status of generated docs**
+- [x] **Step 4: Verify git status of generated docs**
 
 Run: `git status -s pkg/gui/docs/`  
 Expected: Shows modified docs files containing Cartesia.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/provider/all/all.go pkg/provider/all/all_test.go pkg/gui/docs/
@@ -689,7 +689,7 @@ git commit -m "feat(provider): register Cartesia in all and regenerate catalogue
 - Modify: `frontend/src/types.ts:40-60`
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Update frontend type definitions in `frontend/src/types.ts`**
+- [x] **Step 1: Update frontend type definitions in `frontend/src/types.ts`**
 
 In `frontend/src/types.ts`, add `cartesia` to `ProvidersConfig`:
 ```typescript
@@ -700,7 +700,7 @@ export interface ProvidersConfig {
 }
 ```
 
-- [ ] **Step 2: Update `frontend/src/components/SettingsStudio.tsx`**
+- [x] **Step 2: Update `frontend/src/components/SettingsStudio.tsx`**
 
 1. In Provider API Keys section:
 Add Cartesia API Key input:
@@ -754,12 +754,12 @@ When selected, initialize:
 model: 'ink-whisper'
 ```
 
-- [ ] **Step 3: Run frontend typecheck**
+- [x] **Step 3: Run frontend typecheck**
 
 Run: `mise run test:frontend` (or `cd frontend && npx tsc --noEmit`)  
 Expected: PASS with 0 errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/SettingsStudio.tsx
@@ -773,21 +773,21 @@ git commit -m "feat(frontend): add Cartesia provider key and TTS/STT options in 
 **Files:**
 - Entire repository
 
-- [ ] **Step 1: Run complete backend test suite**
+- [x] **Step 1: Run complete backend test suite**
 
 Run: `mise run test:backend` (or `go test -v -count=1 ./...`)  
 Expected: All tests PASS.
 
-- [ ] **Step 2: Run complete frontend verification**
+- [x] **Step 2: Run complete frontend verification**
 
 Run: `mise run test:frontend`  
 Expected: PASS.
 
-- [ ] **Step 3: Run repository linters**
+- [x] **Step 3: Run repository linters**
 
 Run: `mise run lint`  
 Expected: Clean lint run (markdownlint, goreleaser, actionlint, go vet).
 
-- [ ] **Step 4: Final verification commit if needed**
+- [x] **Step 4: Final verification commit if needed**
 
 Ensure all changes are cleanly committed.
