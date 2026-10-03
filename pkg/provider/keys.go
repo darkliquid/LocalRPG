@@ -38,8 +38,8 @@ func AllKeys() []Key {
 	return []Key{
 		KeyLLMOpenAIChat, KeyLLMGemini, KeyLLMCLI, KeyLLMNarrativeOracle,
 		KeyTTSGemini, KeyTTSElevenLabs, KeyTTSNativeOS, KeyTTSSherpaONNX, KeyTTSPiper,
-    KeyTTSFishAudio, KeyTTSHTTP, KeyTTSCartesia,
-		KeySTTWhisperHTTP, KeySTTWhisperCLI, KeySTTWebSpeech, KeySTTCartesia
+		KeyTTSFishAudio, KeyTTSHTTP, KeyTTSCartesia,
+		KeySTTWhisperHTTP, KeySTTWhisperCLI, KeySTTWebSpeech, KeySTTCartesia,
 		KeyImageGemini, KeyImageHTTP, KeyImageCLI, KeyImageProceduralArt,
 		KeyEmbeddingBuiltin, KeyEmbeddingOpenAI, KeyEmbeddingGemini,
 	}
