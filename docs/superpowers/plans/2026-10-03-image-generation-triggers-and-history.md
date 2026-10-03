@@ -47,7 +47,7 @@
 - Test: `pkg/entity/entity_test.go`
 - Test: `pkg/entity/history_test.go`
 
-- [ ] **Step 1: Write failing test for Entity and TurnSegment fields**
+- [x] **Step 1: Write failing test for Entity and TurnSegment fields**
 
 In `pkg/entity/entity_test.go`:
 ```go
@@ -107,12 +107,12 @@ func TestTurnSegmentSpeakerPortraitRoundTrip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -count=1 ./pkg/entity/ -run "TestEntityPortraitVersioningFields|TestTurnSegmentSpeakerPortraitRoundTrip"`
 Expected: FAIL due to unknown fields `PortraitVersion`, `PortraitHistory`, and `SpeakerPortrait`.
 
-- [ ] **Step 3: Implement data model changes**
+- [x] **Step 3: Implement data model changes**
 
 In `pkg/entity/entity.go`:
 Add fields to `Entity` struct:
@@ -148,12 +148,12 @@ type Turn struct {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test -v -count=1 ./pkg/entity/...`
 Expected: PASS
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 
 ```bash
 git add pkg/entity/entity.go pkg/entity/segment.go pkg/engine/history.go pkg/entity/entity_test.go pkg/entity/history_test.go
@@ -168,7 +168,7 @@ git commit -m "feat(entity): add portrait versioning and speaker portrait fields
 - Modify: `pkg/harness/extractor.go`
 - Test: `pkg/harness/extractor_test.go`
 
-- [ ] **Step 1: Write failing tests for scene break and appearance change extraction**
+- [x] **Step 1: Write failing tests for scene break and appearance change extraction**
 
 In `pkg/harness/extractor_test.go`:
 ```go
@@ -255,12 +255,12 @@ func TestMergeExtractedEntityUpdatesAppearanceWhenChanged(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -count=1 ./pkg/harness/ -run "TestExtractorParsesSceneBreakAndAppearanceChange|TestMergeExtractedEntityUpdatesAppearanceWhenChanged"`
 Expected: FAIL due to missing fields and old `MergeExtractedEntity` logic.
 
-- [ ] **Step 3: Implement extractor enhancements**
+- [x] **Step 3: Implement extractor enhancements**
 
 In `pkg/harness/extractor.go`:
 1. Define `ExtractedSceneBreak`:
@@ -313,12 +313,12 @@ func MergeExtractedEntity(existing *entity.Entity, raw *ExtractedEntity) *entity
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v -count=1 ./pkg/harness/...`
 Expected: PASS
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 
 ```bash
 git add pkg/harness/extractor.go pkg/harness/extractor_test.go
@@ -333,7 +333,7 @@ git commit -m "feat(harness): add scene break and character evolution extraction
 - Modify: `pkg/engine/portrait_worker.go`
 - Test: `pkg/engine/portrait_worker_test.go`
 
-- [ ] **Step 1: Write failing tests for versioned portrait generation**
+- [x] **Step 1: Write failing tests for versioned portrait generation**
 
 In `pkg/engine/portrait_worker_test.go`:
 ```go
@@ -408,12 +408,12 @@ func TestPortraitWorker_VersionedPortraitsAndHistoryRetention(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -count=1 ./pkg/engine/ -run "TestPortraitWorker_VersionedPortraitsAndHistoryRetention"`
 Expected: FAIL due to unversioned file naming `<id>.<ext>`.
 
-- [ ] **Step 3: Update `PortraitWorker` to generate versioned portraits**
+- [x] **Step 3: Update `PortraitWorker` to generate versioned portraits**
 
 In `pkg/engine/portrait_worker.go`:
 1. In `writePortrait`:
@@ -432,12 +432,12 @@ In `pkg/engine/portrait_worker.go`:
      - Update `existingEnt.Portrait = relPath` and `existingEnt.PortraitVersion = version`.
 2. Add `EnqueueVersion(gameID string, ent *entity.Entity, artStyle string, forceNewVersion bool)` to allow triggering when `AppearanceChanged` is true.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v -count=1 ./pkg/engine/ -run "TestPortraitWorker.*"`
 Expected: PASS
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 
 ```bash
 git add pkg/engine/portrait_worker.go pkg/engine/portrait_worker_test.go
@@ -452,7 +452,7 @@ git commit -m "feat(engine): add versioned portrait generation and history reten
 - Create: `pkg/engine/scene_worker.go`
 - Create: `pkg/engine/scene_worker_test.go`
 
-- [ ] **Step 1: Write failing test for `SceneWorker`**
+- [x] **Step 1: Write failing test for `SceneWorker`**
 
 In `pkg/engine/scene_worker_test.go`:
 ```go
@@ -532,12 +532,12 @@ func TestSceneWorker_GeneratesTurnSceneIllustration(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -count=1 ./pkg/engine/ -run "TestBuildScenePrompt|TestSceneWorker_GeneratesTurnSceneIllustration"`
 Expected: FAIL due to missing `SceneWorker` and `BuildScenePrompt`.
 
-- [ ] **Step 3: Implement `SceneWorker` and prompt builder**
+- [x] **Step 3: Implement `SceneWorker` and prompt builder**
 
 In `pkg/engine/scene_worker.go`:
 ```go
@@ -666,12 +666,12 @@ func (w *SceneWorker) writeScene(ctx context.Context, gameID string, turnNumber 
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v -count=1 ./pkg/engine/ -run "TestBuildScenePrompt|TestSceneWorker_GeneratesTurnSceneIllustration"`
 Expected: PASS
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 
 ```bash
 git add pkg/engine/scene_worker.go pkg/engine/scene_worker_test.go
@@ -688,7 +688,7 @@ git commit -m "feat(engine): add scene worker for asynchronous turn illustration
 - Modify: `pkg/gui/server.go`
 - Test: `pkg/gui/service_test.go`
 
-- [ ] **Step 1: Write failing tests for scene image endpoint and versioned portrait query**
+- [x] **Step 1: Write failing tests for scene image endpoint and versioned portrait query**
 
 In `pkg/gui/service_test.go`:
 ```go
@@ -760,12 +760,12 @@ func TestGetCharacterPortraitVersionQuery(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -count=1 ./pkg/gui/ -run "TestGetTurnSceneImage|TestGetCharacterPortraitVersionQuery"`
 Expected: FAIL due to missing `GetTurnSceneImage` and unversioned `GetCharacterPortrait`.
 
-- [ ] **Step 3: Implement GUI service endpoints and routes**
+- [x] **Step 3: Implement GUI service endpoints and routes**
 
 1. In `pkg/gui/types.go`:
    - `TurnDTO`: add `SceneBreak bool json:"scene_break,omitempty"`
@@ -782,12 +782,12 @@ Expected: FAIL due to missing `GetTurnSceneImage` and unversioned `GetCharacterP
    - Route `GET /api/game/{gameID}/turn/{turnNumber}/scene-image` -> calls `service.GetTurnSceneImage`.
    - Update `GET /api/game/{gameID}/character/{characterID}/portrait` route to parse query `v`, e.g. `strconv.Atoi(r.URL.Query().Get("v"))`, and pass to `GetCharacterPortrait`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v -count=1 ./pkg/gui/ -run "TestGetTurnSceneImage|TestGetCharacterPortraitVersionQuery"`
 Expected: PASS
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 
 ```bash
 git add pkg/gui/types.go pkg/gui/service.go pkg/gui/server.go pkg/gui/service_test.go
@@ -804,7 +804,7 @@ git commit -m "feat(gui): add scene image and versioned portrait endpoints"
 - Test: `pkg/engine/orchestrator_test.go`
 - Test: `pkg/gui/service_test.go`
 
-- [ ] **Step 1: Write failing test for orchestrator scene break detection and speaker portrait anchoring**
+- [x] **Step 1: Write failing test for orchestrator scene break detection and speaker portrait anchoring**
 
 In `pkg/engine/orchestrator_test.go`:
 ```go
@@ -815,12 +815,12 @@ func TestOrchestrator_DetectsSceneBreakAndAnchorsSpeakerPortraits(t *testing.T) 
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test -v -count=1 ./pkg/engine/ -run "TestOrchestrator_DetectsSceneBreakAndAnchorsSpeakerPortraits"`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement orchestrator and service turn mapping logic**
+- [x] **Step 3: Implement orchestrator and service turn mapping logic**
 
 1. In `pkg/engine/orchestrator.go`:
    - Check if `turn.Narration` contains a standalone `---` rule or if `extraction.SceneBreak != nil && extraction.SceneBreak.Occurred`.
@@ -837,12 +837,12 @@ Expected: FAIL.
    - In `segmentDTOs`:
      - If `segment.SpeakerPortrait != ""`, set `dto.SpeakerPortrait = segment.SpeakerPortrait` and `dto.PortraitURL = segment.SpeakerPortrait`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test -v -count=1 ./pkg/engine/... ./pkg/gui/...`
 Expected: PASS
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 
 ```bash
 git add pkg/engine/orchestrator.go pkg/gui/service.go pkg/engine/orchestrator_test.go pkg/gui/service_test.go
@@ -859,7 +859,7 @@ git commit -m "feat(orchestrator): anchor turn portraits and trigger scene illus
 - Modify: `frontend/src/components/ChronicleView.tsx`
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Update TypeScript types**
+- [x] **Step 1: Update TypeScript types**
 
 In `frontend/src/types.ts`:
 ```ts
@@ -884,7 +884,7 @@ export interface TurnEvent {
 }
 ```
 
-- [ ] **Step 2: Update `TurnSegments.tsx` to preserve historical portraits**
+- [x] **Step 2: Update `TurnSegments.tsx` to preserve historical portraits**
 
 In `frontend/src/components/TurnSegments.tsx`:
 Update portrait URL resolution:
@@ -894,7 +894,7 @@ const portraitURL = segment.speaker_portrait || segment.portrait_url ||
 ```
 Historical speech segments with `speaker_portrait` or versioned `portrait_url` permanently display their era's portrait, avoiding override by current live state.
 
-- [ ] **Step 3: Update `App.tsx` and `ChronicleView.tsx` for real-time scene illustrations**
+- [x] **Step 3: Update `App.tsx` and `ChronicleView.tsx` for real-time scene illustrations**
 
 In `frontend/src/App.tsx`:
 Handle `scene_image` turn events:
@@ -914,12 +914,12 @@ In `frontend/src/components/ChronicleView.tsx`:
 If `turn.scene_break` is true, render a styled horizontal rule / scene transition marker before the turn's prose.
 Ensure `turn.image_url` lightbox card renders whenever present.
 
-- [ ] **Step 4: Run frontend TypeScript checks**
+- [x] **Step 4: Run frontend TypeScript checks**
 
 Run: `mise run test:frontend` (or `cd frontend && npx tsc --noEmit`)
 Expected: PASS with 0 errors.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 
 ```bash
 git add frontend/src/types.ts frontend/src/components/TurnSegments.tsx frontend/src/components/ChronicleView.tsx frontend/src/App.tsx
@@ -933,22 +933,22 @@ git commit -m "feat(frontend): support scene break illustrations and historical 
 **Files:**
 - Test: All unit, e2e, and integration tests across backend and frontend
 
-- [ ] **Step 1: Run full backend test suite**
+- [x] **Step 1: Run full backend test suite**
 
 Run: `mise run test:backend`
 Expected: PASS with all tests passing.
 
-- [ ] **Step 2: Run full frontend test suite**
+- [x] **Step 2: Run full frontend test suite**
 
 Run: `mise run test:frontend`
 Expected: PASS with 0 errors.
 
-- [ ] **Step 3: Run full linter suite**
+- [x] **Step 3: Run full linter suite**
 
 Run: `mise run lint`
 Expected: PASS with clean vet, markdownlint, and actionlint.
 
-- [ ] **Step 4: Commit any final test cleanups or doc updates**
+- [x] **Step 4: Commit any final test cleanups or doc updates**
 
 ```bash
 git commit --allow-empty -m "chore: verify full test suite passes for image triggers and history"
