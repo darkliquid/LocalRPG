@@ -92,3 +92,27 @@ func TestTurnSegmentPlayerRoundTrip(t *testing.T) {
 		t.Fatal("player marker lost in round trip")
 	}
 }
+
+func TestTurnSegmentSpeakerPortraitRoundTrip(t *testing.T) {
+	seg := TurnSegment{
+		Kind:            SegmentSpeech,
+		Speaker:         "Vera",
+		SpeakerID:       "vera",
+		SpeakerPortrait: "/api/game/g1/character/vera/portrait?v=2",
+		Text:            "It has been a decade.",
+	}
+
+	data, err := json.Marshal(seg)
+	if err != nil {
+		t.Fatalf("marshal TurnSegment failed: %v", err)
+	}
+
+	var unmarshaled TurnSegment
+	if err := json.Unmarshal(data, &unmarshaled); err != nil {
+		t.Fatalf("unmarshal TurnSegment failed: %v", err)
+	}
+
+	if unmarshaled.SpeakerPortrait != seg.SpeakerPortrait {
+		t.Errorf("SpeakerPortrait = %q, want %q", unmarshaled.SpeakerPortrait, seg.SpeakerPortrait)
+	}
+}

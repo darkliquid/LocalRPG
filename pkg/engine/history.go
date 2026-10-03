@@ -23,8 +23,9 @@ type Turn struct {
 	Segments  []entity.TurnSegment `json:"segments,omitempty"`
 	Roll      *rules.RollResult    `json:"roll,omitempty"`
 	Entities  []entity.Mention     `json:"entities,omitempty"`
-	Location  string               `json:"location,omitempty"`
-	Outcome   string               `json:"outcome,omitempty"`
+	Location   string               `json:"location,omitempty"`
+	SceneBreak bool                 `json:"scene_break,omitempty"`
+	Outcome    string               `json:"outcome,omitempty"`
 	// Truncated records that the model hit its token limit mid-reply, so the
 	// client can say so instead of presenting a cut-off scene as a complete one.
 	Truncated bool `json:"truncated,omitempty"`
