@@ -114,7 +114,7 @@ export const MarkdownProse: React.FC<MarkdownProseProps> = memo(({ text, onEntit
   const blocks = normalized.split(/\n{2,}/);
 
   return (
-    <div className={className}>
+    <div className={`select-text ${className ?? ''}`}>
       {blocks.map((block, index) => {
         const trimmed = block.trim();
 

@@ -995,7 +995,7 @@ export const App: React.FC = () => {
           {/* Turn Failure Banner */}
           {turnError && (
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-xl px-4 py-3 rounded-xl bg-red-950/90 border border-red-500/40 text-red-100 text-xs font-sans shadow-2xl flex items-center gap-3">
-              <span className="flex-1">{turnError}</span>
+              <span className="flex-1 select-text">{turnError}</span>
               <button
                 onClick={() => setTurnError(null)}
                 className="text-red-300 hover:text-white cursor-pointer"
