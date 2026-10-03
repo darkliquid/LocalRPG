@@ -47,25 +47,26 @@ func TextPolicyFromConfig(cfg config.TTSConfig) TextPolicy {
 // SpeakableTextFor applies a policy to one segment's text, preserving or stripping
 // Markdown and performance audio tags according to client capabilities and policy.
 func SpeakableTextFor(policy TextPolicy, client TTSClient, text string) string {
-	var processed string
-	switch policy {
-	case TextPolicyKeep:
-		processed = text
-	case TextPolicyStrip:
-		processed = SpeakableText(text)
-	default:
-		if aware, ok := client.(MarkdownAware); ok && aware.SupportsMarkdown() {
-			processed = text
-		} else {
-			processed = SpeakableText(text)
-		}
-	}
-
+	processed := reduceText(policy, client, text)
 	if !ClientSupportsAudioTags(client) {
 		processed = StripAudioTags(processed)
 	}
-
 	return strings.TrimSpace(processed)
+}
+
+// reduceText applies the Markdown policy, leaving performance tags for the caller.
+func reduceText(policy TextPolicy, client TTSClient, text string) string {
+	switch policy {
+	case TextPolicyKeep:
+		return text
+	case TextPolicyStrip:
+		return SpeakableText(text)
+	default:
+		if aware, ok := client.(MarkdownAware); ok && aware.SupportsMarkdown() {
+			return text
+		}
+		return SpeakableText(text)
+	}
 }
 
 // ClientSupportsAudioTags reports whether a client declares AudioTags support.
@@ -80,7 +81,12 @@ func ClientSupportsAudioTags(client TTSClient) bool {
 }
 
 var (
-	wikilinkOrAudioTagRe = regexp.MustCompile(`(\[\[[^\]]+\]\])|(\[[a-zA-Z][a-zA-Z\s_-]{1,28}\])`)
+	// A bracketed performance tag or stage direction. The wikilink alternative is
+	// tried first, so [[a note]] is never mistaken for one. The tag alternative
+	// allows the punctuation and length a model actually writes in a stage
+	// direction ("[a dry, resonant voice, echoing from the shaft]"), because a
+	// direction that is not stripped is read aloud.
+	wikilinkOrAudioTagRe = regexp.MustCompile(`(\[\[[^\]]+\]\])|(\[[^\[\]\n]{1,120}\])`)
 )
 
 // StripAudioTags removes bracketed performance tags and normalizes whitespace,
@@ -95,6 +101,35 @@ func StripAudioTags(text string) string {
 		}
 		return " "
 	})
+	return strings.TrimSpace(strings.Join(strings.Fields(replaced), " "))
+}
+
+// stripUnsupportedTags removes bracketed tags the provider does not list, so a
+// hallucinated cue or a stray stage direction is never read aloud. A provider
+// with no list is left alone, because there is nothing to validate against.
+func stripUnsupportedTags(text string, supported []string) string {
+	if len(supported) == 0 || text == "" {
+		return text
+	}
+	allowed := make(map[string]bool, len(supported))
+	for _, tag := range supported {
+		allowed[strings.ToLower(strings.TrimSpace(tag))] = true
+	}
+	removed := false
+	replaced := wikilinkOrAudioTagRe.ReplaceAllStringFunc(text, func(m string) string {
+		if strings.HasPrefix(m, "[[") {
+			return m
+		}
+		inner := strings.ToLower(strings.TrimSpace(m[1 : len(m)-1]))
+		if allowed[inner] {
+			return m
+		}
+		removed = true
+		return " "
+	})
+	if !removed {
+		return text
+	}
 	return strings.TrimSpace(strings.Join(strings.Fields(replaced), " "))
 }
 

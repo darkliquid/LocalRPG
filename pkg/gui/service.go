@@ -2195,6 +2195,7 @@ func (s *Service) audioPipeline() (*media.TTSPipeline, error) {
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
 	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
+	pipeline.SetSpeechCues(media.ResolveSpeechCueCapabilities(cfg.Media.TTS, client))
 	s.ttsConfig, s.ttsPipeline = cfg, pipeline
 	return pipeline, nil
 }
@@ -2276,6 +2277,7 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
 	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
+	pipeline.SetSpeechCues(media.ResolveSpeechCueCapabilities(cfg.Media.TTS, client))
 
 	voiceFor := s.voiceFor(gameID)
 	grouped := s.groupingEnabled(cfg)
