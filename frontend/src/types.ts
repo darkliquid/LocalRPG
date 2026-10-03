@@ -171,9 +171,12 @@ export interface ToolCall {
 }
 
 export interface TurnEvent {
-  type: 'chunk' | 'speech' | 'turn' | 'tool' | 'error' | 'model_missing';
+  type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing';
   text?: string;
   turn?: Turn;
+  // One parsed narration or speech unit, present when type is 'segment': it is
+  // emitted while the model is still writing, before the authoritative turn.
+  segment?: TurnSegment;
   // Streamed narration, present when type is 'speech': the unit's ordinal within
   // the turn, and the clip written for it.
   index?: number;

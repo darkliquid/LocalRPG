@@ -34,6 +34,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/tools"
 	"github.com/darkliquid/localrpg/pkg/trace"
 	"github.com/darkliquid/localrpg/pkg/ttsbatch"
+	"github.com/darkliquid/localrpg/pkg/turnstream"
 	"gopkg.in/yaml.v3"
 )
 
@@ -383,6 +384,32 @@ func resolveWikilinks(text string, resolve func(string) string) string {
 		}
 		return label
 	})
+}
+
+// liveSegmentDTO renders one parsed turn-stream event as a client segment, or
+// reports false for an event a client should not render: a control record, or an
+// empty narration. It carries no audio, because the clips arrive with the
+// authoritative turn that finalises the stream.
+func liveSegmentDTO(event turnstream.Event) (SegmentDTO, bool) {
+	switch event.Kind {
+	case turnstream.KindSpeech:
+		if strings.TrimSpace(event.Text) == "" {
+			return SegmentDTO{}, false
+		}
+		return SegmentDTO{
+			Kind:      "speech",
+			Speaker:   event.Speaker,
+			SpeakerID: event.SpeakerID,
+			Text:      event.Text,
+		}, true
+	case turnstream.KindNarration:
+		if strings.TrimSpace(event.Text) == "" {
+			return SegmentDTO{}, false
+		}
+		return SegmentDTO{Kind: "narration", Text: event.Text}, true
+	default:
+		return SegmentDTO{}, false
+	}
 }
 
 func segmentDTOs(segments []entity.TurnSegment, gameID string, plan clipPlan, resolve func(string) string) []SegmentDTO {
@@ -1518,6 +1545,17 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// and a disconnected client is handled by the chunk listener below.
 	t.orchestrator.SetToolObserver(func(activity engine.ToolActivity) {
 		_ = announce(toolEvent(activity))
+	})
+
+	// Parsed segments are announced as they arrive, so the client renders
+	// attributed speech while the model is still writing. A failed emit is
+	// ignored, exactly as tool activity is: the turn still records.
+	t.orchestrator.SetSegmentObserver(func(event turnstream.Event) {
+		segment, ok := liveSegmentDTO(event)
+		if !ok {
+			return
+		}
+		_ = announce(TurnEvent{Type: "segment", Segment: &segment})
 	})
 
 	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)

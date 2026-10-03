@@ -534,6 +534,10 @@ type TurnEvent struct {
 	Type    string   `json:"type"`                 // "chunk", "speech", "turn", "tool", "error", or "model_missing"
 	Text    string   `json:"text,omitempty"`       // narration delta, or a streamed sentence's text
 	Turn    *TurnDTO `json:"turn,omitempty"`       // the persisted turn
+	// Segment is one parsed narration or speech unit, present when Type is
+	// "segment": it is emitted while the model is still writing, before the
+	// authoritative turn arrives.
+	Segment *SegmentDTO `json:"segment,omitempty"`
 	Message string   `json:"message,omitempty"`    // failure detail
 	ModelID string   `json:"model_id,omitempty"`   // missing model ID
 	Name    string   `json:"name,omitempty"`       // friendly model name

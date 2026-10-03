@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
 import { APIClient, HTTPError, GenerationError } from './api/client';
-import { GameState, Turn, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState } from './types';
+import { GameState, Turn, TurnSegment, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { TurnAudioState, segmentAudioKey } from './components/TurnSegments';
@@ -267,6 +267,7 @@ export const App: React.FC = () => {
   const [turnInFlight, setTurnInFlight] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ mode: string; text: string } | null>(null);
   const [streamedProse, setStreamedProse] = useState('');
+  const [streamedSegments, setStreamedSegments] = useState<TurnSegment[]>([]);
   const [toolActivity, setToolActivity] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -277,6 +278,7 @@ export const App: React.FC = () => {
     setTurnInFlight(true);
     setPendingAction({ mode, text });
     setStreamedProse('');
+    setStreamedSegments([]);
     setToolActivity(null);
     setTurnError(null);
     streamedSpeech.reset();
@@ -293,6 +295,10 @@ export const App: React.FC = () => {
           if (event.type === 'chunk') {
             setToolActivity(null);
             setStreamedProse((prev) => prev + (event.text ?? ''));
+          } else if (event.type === 'segment' && event.segment) {
+            // A parsed narration or speech unit, rendered while the rest of the
+            // prose is still arriving.
+            setStreamedSegments((prev) => [...prev, event.segment!]);
           } else if (event.type === 'speech') {
             // A sentence the server synthesized mid-stream, played here while the
             // rest of the prose is still arriving.
@@ -310,6 +316,7 @@ export const App: React.FC = () => {
             const turn = event.turn;
             setChronicle((prev) => [...prev, turn]);
             setStreamedProse('');
+            setStreamedSegments([]);
             setFundsError(null);
             setRateLimitUntil(null);
             fetchLimits();
@@ -710,10 +717,14 @@ export const App: React.FC = () => {
             <div className="flex-1 bg-glass-card rounded-2xl flex flex-col overflow-hidden shadow-2xl">
               {chronicle.length === 0 ? (
                 gameState ? (
-                  streamedProse ? (
+                  streamedProse || streamedSegments.length > 0 ? (
                     <div className="flex-1 overflow-y-auto px-8 py-6">
                       <TurnSegments
-                        segments={[{ kind: 'narration', text: streamedProse }]}
+                        segments={
+                          streamedSegments.length > 0
+                            ? streamedSegments
+                            : [{ kind: 'narration' as const, text: streamedProse }]
+                        }
                         fallback={streamedProse}
                         onEntityClick={handleOpenWikilink}
                         displayMode={config?.media.tts.speech_cues?.display_mode}
