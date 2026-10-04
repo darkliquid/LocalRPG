@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"time"
 
 	"github.com/gopxl/beep"
@@ -36,6 +37,9 @@ const (
 func Encode(pcm []int16, sampleRate, channels, bitrate int) ([]byte, error) {
 	if len(pcm) == 0 {
 		return nil, errors.New("opus: no audio to encode")
+	}
+	if sampleRate <= 0 || sampleRate > math.MaxInt32 {
+		return nil, fmt.Errorf("opus: invalid sample rate %d", sampleRate)
 	}
 	if bitrate < MinBitrate || bitrate > MaxBitrate {
 		bitrate = DefaultBitrate
