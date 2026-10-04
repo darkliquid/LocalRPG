@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/darkliquid/localrpg/pkg/core"
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 )
 
 // legacyGameDB is the pre-timeline database name. It is retired on first open.
@@ -16,6 +17,9 @@ var gameStores = NewPool()
 // OpenGameStore returns the shared canonical store for a campaign, retiring a
 // legacy game.db first. It is the only way a game database is opened.
 func OpenGameStore(paths *core.PathResolver, gameID string) (*Store, error) {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return nil, fmt.Errorf("open game store: invalid game id %q: %w", gameID, err)
+	}
 	if paths == nil {
 		return nil, fmt.Errorf("open game store %q: missing path resolver", gameID)
 	}
@@ -44,6 +48,9 @@ func CloseGameStores() error {
 // CloseGameStore releases the pooled handle for one campaign so its directory can
 // be removed or rebuilt. Closing it is safe even when it was never opened.
 func CloseGameStore(paths *core.PathResolver, gameID string) error {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return fmt.Errorf("close game store: invalid game id %q: %w", gameID, err)
+	}
 	if paths == nil {
 		return nil
 	}
@@ -54,7 +61,10 @@ func CloseGameStore(paths *core.PathResolver, gameID string) error {
 }
 
 func retireLegacyGameDB(paths *core.PathResolver, gameID string) error {
-	legacy := filepath.Join(paths.GameDir(gameID), legacyGameDB)
+	legacy, err := pathutil.ResolveSafeChild(paths.GameDir(gameID), legacyGameDB)
+	if err != nil {
+		return fmt.Errorf("inspect legacy game database: %w", err)
+	}
 
 	if _, err := os.Stat(legacy); err != nil {
 		if os.IsNotExist(err) {

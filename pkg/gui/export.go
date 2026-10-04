@@ -15,6 +15,7 @@ import (
 	"github.com/adrg/xdg"
 
 	"github.com/darkliquid/localrpg/pkg/export"
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
@@ -230,14 +231,18 @@ func (s *Service) StartExport(ctx context.Context, req ExportRequestDTO) (*Expor
 	if format != "web" && format != "video" {
 		return nil, ErrExportFormat
 	}
-	if strings.TrimSpace(req.GameID) == "" {
-		return nil, fmt.Errorf("export: game id is required")
+	if err := pathutil.ValidateID(req.GameID); err != nil {
+		return nil, fmt.Errorf("export: invalid game id %q: %w", req.GameID, err)
 	}
 	outDir := strings.TrimSpace(req.OutDir)
 	if outDir == "" {
 		return nil, ErrExportDirRequired
 	}
-	absOut, err := filepath.Abs(outDir)
+	cleanOutDir, err := pathutil.ValidateUserPath(outDir)
+	if err != nil {
+		return nil, fmt.Errorf("export: invalid destination %q: %w", outDir, err)
+	}
+	absOut, err := filepath.Abs(cleanOutDir)
 	if err != nil {
 		return nil, fmt.Errorf("export: resolve destination: %w", err)
 	}
@@ -274,10 +279,11 @@ func humanBytes(size int64) string {
 // exportArtifactPath names the artifact inside a chosen directory: one
 // self-contained page for the web player, a WebM video otherwise.
 func exportArtifactPath(outDir, gameID, format string) string {
+	safeGameID := pathutil.SanitizeID(gameID)
 	if format == "web" {
-		return filepath.Join(outDir, gameID+"-web.html")
+		return filepath.Join(outDir, safeGameID+"-web.html")
 	}
-	return filepath.Join(outDir, gameID+".webm")
+	return filepath.Join(outDir, safeGameID+".webm")
 }
 
 // uniquePath appends a timestamp when a destination already exists, so an export

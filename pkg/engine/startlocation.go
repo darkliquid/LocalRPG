@@ -9,6 +9,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
@@ -165,7 +166,8 @@ func createOpeningSceneLocation(paths *core.PathResolver, store *storage.Store, 
 		return loc.ID, nil
 	}
 
-	gameEntitiesDir := filepath.Join(paths.GameDir(manifest.ID), "entities")
+	safeGameID := pathutil.SanitizeID(manifest.ID)
+	gameEntitiesDir := filepath.Join(paths.GameDir(safeGameID), "entities")
 	if err := os.MkdirAll(gameEntitiesDir, 0755); err != nil {
 		return "", fmt.Errorf("create entities dir: %w", err)
 	}
@@ -175,7 +177,10 @@ func createOpeningSceneLocation(paths *core.PathResolver, store *storage.Store, 
 		return "", fmt.Errorf("serialize opening scene location: %w", err)
 	}
 
-	path := filepath.Join(gameEntitiesDir, OpeningSceneEntityID+".md")
+	path, err := pathutil.ResolveSafeChild(gameEntitiesDir, OpeningSceneEntityID+".md")
+	if err != nil {
+		return "", fmt.Errorf("invalid opening scene location path: %w", err)
+	}
 	if err := os.WriteFile(path, markdown, 0644); err != nil {
 		return "", fmt.Errorf("write opening scene location: %w", err)
 	}

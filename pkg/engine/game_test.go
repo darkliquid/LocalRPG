@@ -196,3 +196,37 @@ func TestInitGameLeavesAnAuthoredPlayerNoteAlone(t *testing.T) {
 		t.Errorf("expected the authored note to survive, got %s", data)
 	}
 }
+
+func TestInitGameRejectsInvalidIDs(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	_, err := InitGame(paths, InitOptions{
+		GameID:   "../escaped",
+		SystemID: "sys",
+		WorldID:  "world",
+		Name:     "Test",
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid game id") {
+		t.Errorf("InitGame expected invalid game id error, got %v", err)
+	}
+
+	_, err = InitGame(paths, InitOptions{
+		GameID:   "game",
+		SystemID: "../sys",
+		WorldID:  "world",
+		Name:     "Test",
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid system id") {
+		t.Errorf("InitGame expected invalid system id error, got %v", err)
+	}
+
+	_, err = InitGame(paths, InitOptions{
+		GameID:   "game",
+		SystemID: "sys",
+		WorldID:  "../world",
+		Name:     "Test",
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid world id") {
+		t.Errorf("InitGame expected invalid world id error, got %v", err)
+	}
+}
+
