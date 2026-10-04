@@ -40,6 +40,9 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   onMerge,
 }) => {
   const [markdown, setMarkdown] = useState('');
+  // savedMarkdown is the last document the server accepted, so the unsaved marker
+  // is derived rather than tracked by every mutation.
+  const [savedMarkdown, setSavedMarkdown] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [folders, setFolders] = useState<FolderNode[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!entity);
@@ -81,7 +84,10 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   useEffect(() => {
     if (entity) {
       setMarkdown(entity.markdown);
+      setSavedMarkdown(entity.markdown);
     } else {
+      setMarkdown('');
+      setSavedMarkdown('');
       setIsSidebarOpen(true);
     }
     setPortraitVersion(0);
@@ -161,6 +167,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
     setSaveError('');
     try {
       await onSave(entity.id, markdown);
+      setSavedMarkdown(markdown);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
     }
@@ -385,6 +392,11 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                     <GitMerge className="w-3.5 h-3.5" />
                     <span>Merge note…</span>
                   </button>
+                )}
+                {markdown !== savedMarkdown && (
+                  <span className="text-[10px] font-sans uppercase tracking-wider text-amber-400 self-center">
+                    Unsaved
+                  </span>
                 )}
                 <button
                   onClick={handleSave}
