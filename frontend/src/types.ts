@@ -451,6 +451,7 @@ export interface WorldEntitySummary {
   id: string;
   name: string;
   type: string;
+  folder?: string;
 }
 
 export interface WorldDetail {

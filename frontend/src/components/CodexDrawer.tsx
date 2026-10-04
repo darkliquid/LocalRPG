@@ -1,12 +1,13 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EntityMemory, EntityNote, EntitySummary, TTSConfig, VoiceProfile, GenerationFailure } from '../types';
+import { EntityMemory, EntityNote, EntitySummary, FolderNode, TTSConfig, VoiceProfile, GenerationFailure } from '../types';
 import { APIClient, GenerationError } from '../api/client';
-import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X, Loader2, RotateCw, AlertCircle } from 'lucide-react';
+import { Save, Volume2, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X, Loader2, RotateCw, AlertCircle } from 'lucide-react';
 import { formatGenerationError } from '../lib/generationError';
 import { TurnHistoryList } from './TurnHistoryList';
 import { ImageLightbox } from './ImageLightbox';
 import { useLightbox } from '../hooks/useLightbox';
 import { VoiceProfileSelect } from './VoiceProfileSelect';
+import EntityTree from './EntityTree';
 
 interface CodexDrawerProps {
   gameID?: string;
@@ -38,8 +39,8 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   onMerge,
 }) => {
   const [markdown, setMarkdown] = useState('');
-  const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [folders, setFolders] = useState<FolderNode[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!entity);
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [mergeTarget, setMergeTarget] = useState('');
@@ -53,6 +54,28 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const [portraitError, setPortraitError] = useState<GenerationFailure | null>(null);
 
   const profiles = voiceProfiles ?? [];
+
+  // The folder tree is loaded per campaign and refreshed after any move, because
+  // a folder that is not in the tree cannot be dropped onto.
+  useEffect(() => {
+    if (!gameID) {
+      setFolders([]);
+      return;
+    }
+    let cancelled = false;
+    new APIClient(gameID)
+      .listFolders()
+      .then((tree) => {
+        if (!cancelled) setFolders(tree);
+      })
+      .catch(() => {
+        // A campaign with no folders yet is not an error.
+        if (!cancelled) setFolders([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameID]);
 
   useEffect(() => {
     if (entity) {
@@ -93,19 +116,11 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
     return Array.from(seen.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [entities]);
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return (entities ?? []).filter((candidate) => {
-      const matchesType = typeFilter === 'all' || candidate.type === typeFilter;
-      if (!matchesType) return false;
-      if (!needle) return true;
-      return (
-        candidate.name.toLowerCase().includes(needle) ||
-        candidate.id.toLowerCase().includes(needle) ||
-        (candidate.tags ?? []).some((tag) => tag.toLowerCase().includes(needle))
-      );
-    });
-  }, [entities, query, typeFilter]);
+  // The type chips narrow the tree; the tree's own filter box does the text
+  // search, because it has to search inside folders too.
+  const visibleEntities = useMemo(() => {
+    return (entities ?? []).filter((candidate) => typeFilter === 'all' || candidate.type === typeFilter);
+  }, [entities, typeFilter]);
 
   const applyVoiceArchetype = (profileId: string) => {
     const profile = profiles.find((p) => p.id === profileId);
@@ -221,17 +236,6 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
 
           {sidebarTab === 'notes' && (
             <>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-500" />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search the codex..."
-                  className="w-full bg-black/50 border border-white/10 rounded-lg pl-8 pr-2 py-1.5 text-xs text-stone-200 placeholder-stone-500 focus:outline-none focus:border-purple-500/60"
-                />
-              </div>
-
               <div className="flex flex-wrap gap-1">
                 <button
                   onClick={() => setTypeFilter('all')}
@@ -258,32 +262,38 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                 ))}
               </div>
 
-              <div className="flex-1 min-h-[160px] overflow-y-auto space-y-1 pr-1">
-                {filtered.length === 0 ? (
-                  <p className="text-stone-500 text-xs italic p-2">
-                    {(entities?.length ?? 0) === 0 ? 'No notes yet. Play a turn and the world will grow.' : 'No notes match.'}
-                  </p>
-                ) : (
-                  filtered.map((candidate) => (
-                    <button
-                      key={candidate.id}
-                      onClick={() => {
-                        onSelect(candidate.id);
-                      }}
-                      className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors cursor-pointer ${
-                        entity?.id === candidate.id
-                          ? 'bg-purple-600/20 border-purple-500/40'
-                          : 'bg-black/30 border-white/5 hover:border-purple-500/30'
-                      }`}
-                    >
-                      <div className="text-xs text-stone-200 truncate font-medium">{candidate.name}</div>
-                      <div className="text-xs font-mono text-stone-500 truncate">
-                        {candidate.type || 'note'}
-                        {candidate.location ? ` · ${candidate.location.replace(/\[\[|\]\]/g, '')}` : ''}
-                      </div>
-                    </button>
-                  ))
-                )}
+              <div className="flex-1 min-h-[160px] min-h-0">
+                <EntityTree
+                  folders={folders}
+                  entities={visibleEntities}
+                  selectedId={entity?.id}
+                  onSelect={onSelect}
+                  onMoveEntity={async (id, folder) => {
+                    if (!gameID) return;
+                    const client = new APIClient(gameID);
+                    const note = await client.getEntity(id);
+                    await client.saveEntity(id, note.markdown, folder);
+                    setFolders(await client.listFolders());
+                  }}
+                  onMoveFolder={async (from, to) => {
+                    if (!gameID) return;
+                    const client = new APIClient(gameID);
+                    await client.moveFolder(from, to);
+                    setFolders(await client.listFolders());
+                  }}
+                  onCreateFolder={async (path) => {
+                    if (!gameID) return;
+                    const client = new APIClient(gameID);
+                    await client.createFolder(path);
+                    setFolders(await client.listFolders());
+                  }}
+                  onDeleteFolder={async (path) => {
+                    if (!gameID) return;
+                    const client = new APIClient(gameID);
+                    await client.deleteFolder(path, false);
+                    setFolders(await client.listFolders());
+                  }}
+                />
               </div>
             </>
           )}

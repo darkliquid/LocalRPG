@@ -453,13 +453,13 @@ export class APIClient {
     return res.json();
   }
 
-  static async saveWorldEntity(worldId: string, entityId: string, markdown: string): Promise<void> {
+  static async saveWorldEntity(worldId: string, entityId: string, markdown: string, folder?: string): Promise<void> {
     const res = await fetch(`/api/world/${worldId}/entity/${entityId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'text/plain' },
-      body: markdown,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ markdown, folder: folder ?? '' }),
     });
-    if (!res.ok) throw new Error(`saveWorldEntity: ${res.statusText}`);
+    if (!res.ok) throw new Error((await res.text()).trim() || `saveWorldEntity: ${res.statusText}`);
   }
 
   static async deleteWorldEntity(worldId: string, entityId: string): Promise<void> {
@@ -467,6 +467,38 @@ export class APIClient {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error(`deleteWorldEntity: ${res.statusText}`);
+  }
+
+  static async listWorldFolders(worldId: string): Promise<FolderNode[]> {
+    const res = await fetch(`/api/world/${worldId}/folders`);
+    if (!res.ok) throw new Error(`listWorldFolders: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async createWorldFolder(worldId: string, path: string): Promise<void> {
+    const res = await fetch(`/api/world/${worldId}/folders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+    if (!res.ok) throw new Error((await res.text()).trim() || `createWorldFolder: ${res.statusText}`);
+  }
+
+  static async moveWorldFolder(worldId: string, from: string, to: string): Promise<void> {
+    const res = await fetch(`/api/world/${worldId}/folders`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, path: to }),
+    });
+    if (!res.ok) throw new Error((await res.text()).trim() || `moveWorldFolder: ${res.statusText}`);
+  }
+
+  static async deleteWorldFolder(worldId: string, path: string, recursive = false): Promise<void> {
+    const params = new URLSearchParams({ path, recursive: String(recursive) });
+    const res = await fetch(`/api/world/${worldId}/folders?${params.toString()}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error((await res.text()).trim() || `deleteWorldFolder: ${res.statusText}`);
   }
 
   static async getSettings(): Promise<SettingsResponse> {

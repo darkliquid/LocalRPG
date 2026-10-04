@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient, WorldExistsError } from '../api/client';
-import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail, GenerationFailure } from '../types';
+import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail, GenerationFailure, FolderNode } from '../types';
 import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
@@ -8,6 +8,7 @@ import { useLightbox } from '../hooks/useLightbox';
 import { ImageLightbox } from './ImageLightbox';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
+import EntityTree from './EntityTree';
 
 interface WorldsStudioProps {
   onWorldSaved?: () => void;
@@ -45,6 +46,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
 
   // Entities state
   const [entities, setEntities] = useState<WorldEntitySummary[]>([]);
+  const [worldFolders, setWorldFolders] = useState<FolderNode[]>([]);
   const [selectedEntityID, setSelectedEntityID] = useState<string | null>(null);
   const [entityMarkdown, setEntityMarkdown] = useState('');
   const [entityDrafts, setEntityDrafts] = useState<Record<string, string>>({});
@@ -84,6 +86,31 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   useEffect(() => {
     loadWorldsRef.current?.(undefined, startModeRef.current);
   }, []);
+
+  // A world's template folders are loaded once the world is saved, because a
+  // draft has no directory to hold them yet.
+  useEffect(() => {
+    if (!savedID) {
+      setWorldFolders([]);
+      return;
+    }
+    let cancelled = false;
+    APIClient.listWorldFolders(savedID)
+      .then((tree) => {
+        if (!cancelled) setWorldFolders(tree);
+      })
+      .catch(() => {
+        if (!cancelled) setWorldFolders([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [savedID]);
+
+  const refreshWorldFolders = async () => {
+    if (!savedID) return;
+    setWorldFolders(await APIClient.listWorldFolders(savedID));
+  };
 
   const loadWorlds = async (selectID?: string, mode: 'new' | 'browse' = startMode) => {
     setIsLoading(true);
@@ -1007,39 +1034,46 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto min-h-0 space-y-1.5 pr-1">
+              <div className="flex-1 min-h-0">
                 {entities.length === 0 ? (
                   <div className="text-xs text-stone-500 py-6 text-center">
                     No starter templates. Click + Add to create one!
                   </div>
                 ) : (
-                  entities.map((e) => (
-                    <div
-                      key={e.id}
-                      onClick={() => handleSelectEntity(e.id)}
-                      className={`group p-2 rounded-lg border text-left cursor-pointer flex items-center justify-between transition-all ${
-                        selectedEntityID === e.id
-                          ? 'bg-purple-950/40 border-purple-500/50 text-purple-300'
-                          : 'bg-stone-900/40 border-stone-800/60 text-stone-300 hover:bg-stone-800'
-                      }`}
-                    >
-                      <div className="truncate">
-                        <div className="text-xs font-bold truncate">{e.name || e.id}</div>
-                        <div className="text-xs text-stone-500">{e.type}</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          handleDeleteEntity(e.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-red-400 p-1 transition-opacity"
-                        title="Delete entity template"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))
+                  <EntityTree
+                    folders={worldFolders}
+                    entities={entities}
+                    selectedId={selectedEntityID ?? undefined}
+                    onSelect={(id) => void handleSelectEntity(id)}
+                    onMoveEntity={async (id, folder) => {
+                      if (!savedID) {
+                        setToast({ type: 'error', message: 'Save the world before organising its templates.' });
+                        return;
+                      }
+                      const note = await APIClient.getWorldEntity(savedID, id);
+                      await APIClient.saveWorldEntity(savedID, id, note.markdown, folder);
+                      await loadWorldDetail(savedID);
+                      await refreshWorldFolders();
+                    }}
+                    onMoveFolder={async (from, to) => {
+                      if (!savedID) return;
+                      await APIClient.moveWorldFolder(savedID, from, to);
+                      await refreshWorldFolders();
+                    }}
+                    onCreateFolder={async (path) => {
+                      if (!savedID) {
+                        setToast({ type: 'error', message: 'Save the world before creating folders.' });
+                        return;
+                      }
+                      await APIClient.createWorldFolder(savedID, path);
+                      await refreshWorldFolders();
+                    }}
+                    onDeleteFolder={async (path) => {
+                      if (!savedID) return;
+                      await APIClient.deleteWorldFolder(savedID, path, false);
+                      await refreshWorldFolders();
+                    }}
+                  />
                 )}
               </div>
             </div>
@@ -1050,14 +1084,25 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 <>
                   <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
                     <span>worlds/{savedID || slugID || 'draft'}/entities/{selectedEntityID}.md</span>
-                    <button
-                      type="button"
-                      onClick={handleSaveEntity}
-                      className="flex items-center gap-1 px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs cursor-pointer shadow transition-all"
-                    >
-                      <Save className="w-3 h-3" />
-                      <span>{savedID ? 'Save Entity' : 'Update Draft'}</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteEntity(selectedEntityID)}
+                        title="Delete entity template"
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-950/40 font-bold text-xs cursor-pointer transition-all"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Delete</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveEntity}
+                        className="flex items-center gap-1 px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs cursor-pointer shadow transition-all"
+                      >
+                        <Save className="w-3 h-3" />
+                        <span>{savedID ? 'Save Entity' : 'Update Draft'}</span>
+                      </button>
+                    </div>
                   </div>
                   <textarea
                     value={entityMarkdown}
