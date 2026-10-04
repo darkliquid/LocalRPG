@@ -99,9 +99,22 @@ added, it should start from a clean tree.
 
 ## Prose linting with Vale
 
-Vale checks prose style in Markdown and in Go and TypeScript comments. It is pinned
-in `mise.toml` like every other tool, and `.vale.ini` at the repository root decides
+Vale checks prose style in the user-facing documentation only. It is pinned in
+`mise.toml` like every other tool, and `.vale.ini` at the repository root decides
 the styles.
+
+**Scope is 21 files**, and it is the same set `tools/sitegen/content.go` renders
+into the showcase site:
+
+- `pkg/gui/docs/*.md` - the 19 guide articles the application embeds, and the bulk
+  of the user-facing prose.
+- `README.md` - the project README.
+- `docs/debugging.md` - the debugging guide.
+
+Everything else is internal and is not linted: the design specs and plans under
+`docs/superpowers/`, `docs/proposals/`, `docs/architecture/`, `AGENTS.md`,
+`THIRD_PARTY_NOTICES.md`, the `website/demo/` fixtures, and every Go and TypeScript
+comment. If a page is added to `content.go`, add it to the script's file list too.
 
 ```bash
 mise run install:vale-styles   # vale sync; runs automatically when .vale.ini changes
@@ -113,7 +126,7 @@ STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
 Three things about it are not obvious.
 
 **The task is report-only, and that is deliberate.** The configured styles find
-**68,525 alerts across 717 of 939 files: 6,875 errors, 21,405 warnings and 40,245
+**1,906 alerts across all 21 files: 229 errors, 648 warnings and 1,029
 suggestions**. `STRICT=1` is what turns that into a gate, and it should not be used
 until the numbers are down. CI runs the summary form so the totals are visible in
 the log without a step that fails.
@@ -121,39 +134,43 @@ the log without a step that fails.
 **The file list comes from git, not from Vale.** Vale walks every file its
 configuration has a section for and does **not** read `.gitignore`, so `vale .`
 would descend into `node_modules`, `bin` and the generated site.
-`scripts/lint-prose.sh` asks `git ls-files` instead, which is exactly the tracked
-files and needs no glob list to maintain.
+`scripts/lint-prose.sh` asks `git ls-files` for the three paths above.
 
 **`styles/` is downloaded, not committed.** `vale sync` rebuilds it from the
 `Packages` key, so it is gitignored. Run `mise run install:vale-styles` after
 changing `.vale.ini`.
 
-### Getting the numbers down
+### Getting to a gate
 
-The findings are dominated by a few rules, and most are a style preference rather
-than a mistake. In rough order of size:
+229 errors is a real amount of work but a tractable one, and most of it is not
+prose that needs rewriting:
 
-- `Readability.Polysyllables` (13,330) and `write-good.E-Prime` (8,949, which bans
-  the verb "to be") are the two biggest, and neither is practical for technical
-  prose. Consider turning them off in `.vale.ini`.
-- `Vale.Spelling` (4,059) is **59% of all the errors** and is almost entirely
-  project vocabulary — `localrpg`, `frontmatter`, `wikilink`, `mise` and so on. It
-  is fixed with a vocabulary file under `styles/config/vocabularies/`, not by
-  rewriting prose.
-- `Google.Passive` and `write-good.Passive` (3,501 each) are the same complaint
+- `Vale.Spelling` (188) is **82% of every error** and is almost entirely project
+  vocabulary - `localrpg`, `frontmatter`, `wikilink`, `mise`, `Wails`, `Goja` and
+  so on. It is fixed with a vocabulary file under `styles/config/vocabularies/`,
+  not by editing the docs. That alone would take the error count to about 41.
+- `Readability.Polysyllables` (502) is the single noisiest rule and the least
+  useful: it flags any word of three or more syllables, which in technical prose is
+  most of them. Consider turning it off.
+- `Google.Passive` and `write-good.Passive` (66 each) are the same complaint
   reported twice, so one of them is redundant.
-- The mechanical ones are worth fixing rather than muting: `Google.EmDash` (742),
-  `Google.Quotes` (328), `ai-tells.DoubleHyphen` (185), `Google.Latin` (148).
+- `Google.Parens` (170), `Google.Headings` (144), `Google.Colons` (131) and
+  `Google.Acronyms` (101) are style preferences worth reading before deciding.
 
-The worst files are the large design documents under `docs/superpowers/`, which are
-the longest prose in the repository and simply accumulate findings.
+The worst files are `README.md` (234), `pkg/gui/docs/19-local-stack-docker-compose.md`
+(222) and `pkg/gui/docs/11-usage-and-pricing.md` (145).
 
 **A `.vale.ini` gotcha worth remembering:** a `Packages` entry is a name from the
 Vale library, a URL, a path to a zip, or a path to a directory. There is no
-`Name.URL` form. `neighbor. https://…/ai-tells.zip` reads like one package with a
+`Name.URL` form. `neighbor. https://.../ai-tells.zip` reads like one package with a
 URL, but it is parsed as a single malformed entry, `vale sync` stops with exit 2,
 and nothing after it installs. Separate entries with commas.
 
+**`ai-tells` is currently installed but unused.** It was referenced only by the
+code-comment section, which no longer exists. Pointed at these docs it reports 218
+more findings, 116 of them `ai-tells.ColonUsage`, which is noise for documentation
+that writes `Term: definition` lists throughout. Remove its URL from `Packages` if
+it is not wanted; the style is aimed at marketing prose, not a technical guide.
 
 ## Build gotcha: the frontend is embedded in the Go binary
 

@@ -12,14 +12,17 @@
 #               thousands of alerts and a full report would bury the log.
 set -euo pipefail
 
-# Vale walks every file its configuration has a section for, and it does not read
-# .gitignore. So the file list comes from git, which is exactly the tracked files:
-# node_modules, bin, the generated site and the local campaign content are
-# excluded by construction rather than by a glob list somebody has to maintain.
-mapfile -t files < <(git ls-files -- '*.md' '*.go' '*.ts' '*.tsx' '*.js' '*.jsx')
+# Only the user-facing documentation is linted: the guide the application embeds
+# and the two reference pages the showcase site renders. These are the same three
+# sources tools/sitegen/content.go renders, so if a page is added there it should be
+# added here too.
+#
+# The file list comes from git rather than from Vale, because Vale does not read
+# .gitignore and would otherwise walk node_modules and the build outputs.
+mapfile -t files < <(git ls-files -- 'pkg/gui/docs/*.md' 'README.md' 'docs/debugging.md')
 
 if [ "${#files[@]}" -eq 0 ]; then
-  echo "no tracked markdown or source files to lint"
+  echo "no user-facing documentation found to lint"
   exit 0
 fi
 
