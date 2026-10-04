@@ -112,3 +112,27 @@ func TestParseRejectsImpossibleSpeakers(t *testing.T) {
 		}
 	}
 }
+
+func TestParseAcceptsUnquotedSpeechForResolvedSpeakers(t *testing.T) {
+	resolve := func(candidate string) (string, bool) {
+		if candidate == "Vera" {
+			return "vera", true
+		}
+		return "", false
+	}
+
+	text := "The dust settles.\nVera: We survived.\nUnknown: Not for long.\nNote: check the gate."
+	segments := Parse(text, resolve)
+
+	want := []Segment{
+		{Text: "The dust settles."},
+		{Speaker: "Vera", SpeakerID: "vera", Text: "We survived.", IsSpeech: true},
+		{Text: "Unknown: Not for long."},
+		{Text: "Note: check the gate."},
+	}
+
+	if !reflect.DeepEqual(segments, want) {
+		t.Fatalf("Parse() = %#v, want %#v", segments, want)
+	}
+}
+

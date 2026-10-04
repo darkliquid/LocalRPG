@@ -49,6 +49,7 @@ func TestSentenceStreamerVoicesSpeechWithItsSpeaker(t *testing.T) {
 
 	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindSpeech, SpeakerID: "kaelen", Text: "Keep walking."})
 	streamer.Close()
+	streamer.Wait()
 
 	client.mu.Lock()
 	defer client.mu.Unlock()
@@ -65,6 +66,7 @@ func TestSentenceStreamerSynthesizesCompleteSentencesOnly(t *testing.T) {
 	streamer.Feed("The hall is quiet. Garrick")
 	streamer.Feed(" steps inside.")
 	streamer.Close()
+	streamer.Wait()
 
 	if got := client.callCount(); got != 2 {
 		t.Fatalf("calls = %d, want 2 complete sentences", got)
@@ -86,6 +88,7 @@ func TestSentenceStreamerEmitsOrderedSentences(t *testing.T) {
 	streamer.Feed("The hall is quiet. Garrick")
 	streamer.Feed(" steps inside.")
 	streamer.Close()
+	streamer.Wait()
 
 	if len(got) != 2 {
 		t.Fatalf("events = %#v, want the two complete sentences", got)
@@ -139,6 +142,7 @@ func TestSentenceStreamerConcurrentWorkersMaintainOrder(t *testing.T) {
 
 	streamer.Feed("The first sentence is slow. The second is fast.")
 	streamer.Close()
+	streamer.Wait()
 
 	if len(got) != 2 {
 		t.Fatalf("events = %#v, want 2", got)
@@ -158,6 +162,7 @@ func TestSentenceStreamerWithoutAConsumerIsSafe(t *testing.T) {
 
 	streamer.Feed("The hall is quiet.")
 	streamer.Close()
+	streamer.Wait()
 
 	if got := client.callCount(); got != 1 {
 		t.Fatalf("calls = %d, want the sentence still synthesized", got)
@@ -179,6 +184,7 @@ func TestSentenceStreamerStopsEmittingOnceTheTurnIsAuthoritative(t *testing.T) {
 	streamer.StopEmitting()
 	streamer.Feed("The hall is quiet.")
 	streamer.Close()
+	streamer.Wait()
 
 	if len(got) != 0 {
 		t.Errorf("events = %#v, want none once the turn is authoritative", got)
@@ -193,6 +199,7 @@ func TestSentenceStreamerNilIsSafe(t *testing.T) {
 	streamer.Feed("text")
 	streamer.StopEmitting()
 	streamer.Close()
+	streamer.Wait()
 }
 
 func TestStreamerGroupsConsecutiveSameSpeakerSegments(t *testing.T) {
@@ -204,6 +211,7 @@ func TestStreamerGroupsConsecutiveSameSpeakerSegments(t *testing.T) {
 	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The hall is quiet."})
 	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "Cold air rushes in."})
 	streamer.Close()
+	streamer.Wait()
 
 	if got := client.callCount(); got != 1 {
 		t.Fatalf("calls = %d, want one grouped request", got)
@@ -222,8 +230,122 @@ func TestStreamerGroupsPerSpeakerRun(t *testing.T) {
 	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The hall is quiet."})
 	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindSpeech, Speaker: "Garrick", SpeakerID: "garrick", Text: "Keep walking."})
 	streamer.Close()
+	streamer.Wait()
 
 	if got := client.callCount(); got != 2 {
 		t.Fatalf("calls = %d, want one request per speaker run", got)
 	}
 }
+
+func TestStreamerEmitsAudioProgressEvents(t *testing.T) {
+	client := &fakeSentenceTTSClient{}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, nil)
+	var stages []string
+	var mu sync.Mutex
+	streamer.SetTurnNumber(1)
+	streamer.SetProgressObserver(func(progress AudioProgressDTO) {
+		mu.Lock()
+		stages = append(stages, progress.Stage)
+		mu.Unlock()
+	})
+
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The castle gates creak open."})
+	streamer.Flush()
+	streamer.Close()
+	streamer.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(stages) == 0 || stages[len(stages)-1] != "ready" {
+		t.Fatalf("expected progress reaching 'ready', got: %v", stages)
+	}
+}
+
+type failingSentenceTTSClient struct{}
+
+func (c *failingSentenceTTSClient) Synthesize(_ context.Context, _ string, _ *entity.VoiceConfig) ([]byte, error) {
+	return nil, context.DeadlineExceeded
+}
+
+func TestStreamerEmitsAudioProgressWithFailedCount(t *testing.T) {
+	client := &failingSentenceTTSClient{}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, nil)
+	var lastProgress AudioProgressDTO
+	var mu sync.Mutex
+	streamer.SetTurnNumber(1)
+	streamer.SetProgressObserver(func(progress AudioProgressDTO) {
+		mu.Lock()
+		lastProgress = progress
+		mu.Unlock()
+	})
+
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "This will fail."})
+	streamer.Flush()
+	streamer.Close()
+	streamer.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if lastProgress.Stage != "failed" {
+		t.Fatalf("expected last stage 'failed', got: %s", lastProgress.Stage)
+	}
+	if lastProgress.FailedCount != 1 {
+		t.Fatalf("expected FailedCount=1, got: %d", lastProgress.FailedCount)
+	}
+	if lastProgress.ReadyCount+lastProgress.FailedCount != lastProgress.TotalSegments {
+		t.Fatalf("expected ReadyCount + FailedCount == TotalSegments, got ready=%d failed=%d total=%d",
+			lastProgress.ReadyCount, lastProgress.FailedCount, lastProgress.TotalSegments)
+	}
+}
+
+func TestStreamerSpeechGroupKeyMatchesPlannedGroupKey(t *testing.T) {
+	client := &fakeSentenceTTSClient{}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+	var emitted provisionalSpeech
+	var mu sync.Mutex
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, func(p provisionalSpeech) {
+		mu.Lock()
+		emitted = p
+		mu.Unlock()
+	})
+	streamer.SetGrouping(true, media.TTSCapabilities{MaxSpeakers: 1})
+	streamer.SetVoiceResolver(func(id string) *entity.VoiceConfig {
+		return &entity.VoiceConfig{VoiceID: "player-voice"}
+	})
+
+	evt := turnstream.Event{
+		Kind:      turnstream.KindSpeech,
+		Speaker:   "Elena Nightshade",
+		SpeakerID: "player-elena",
+		Text:      "Hello there.",
+		Player:    true,
+	}
+	streamer.FeedSegment(evt)
+	streamer.Close()
+	streamer.Wait()
+
+	segment := entity.TurnSegment{
+		Kind:      entity.SegmentSpeech,
+		Speaker:   "Elena Nightshade",
+		SpeakerID: "player-elena",
+		Text:      "Hello there.",
+		Player:    true,
+	}
+	caps := media.TTSCapabilities{MaxSpeakers: 1}
+	planned := pipeline.GroupClipKeysWithCaps([]entity.TurnSegment{segment}, &entity.VoiceConfig{VoiceID: "narrator"}, func(id string) *entity.VoiceConfig {
+		return &entity.VoiceConfig{VoiceID: "player-voice"}
+	}, caps)
+
+	if len(planned) != 1 {
+		t.Fatalf("expected 1 planned group, got %d", len(planned))
+	}
+	mu.Lock()
+	gotKey := emitted.AudioKey
+	mu.Unlock()
+	if gotKey != planned[0].Key {
+		t.Fatalf("streamed audio key = %q, planned = %q", gotKey, planned[0].Key)
+	}
+}
+

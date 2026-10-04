@@ -85,6 +85,15 @@ func TestLegacyQuotedSpeechIsAttributed(t *testing.T) {
 	}
 }
 
+func TestLegacyUnquotedSpeechIsAttributed(t *testing.T) {
+	p := NewParser(mapRoster{"Kaelen": "kaelen"})
+	events := append(p.Feed("Kaelen: Keep walking.\n"), p.Flush()...)
+	if len(events) != 1 || events[0].Kind != KindSpeech || events[0].SpeakerID != "kaelen" || events[0].Text != "Keep walking." {
+		t.Fatalf("events = %#v", events)
+	}
+}
+
+
 func TestLegacyQuoteForAnUnknownSpeakerStaysNarration(t *testing.T) {
 	p := NewParser(mapRoster{})
 	events := append(p.Feed(`As you declare: "I draw my blade."`+"\n"), p.Flush()...)
@@ -110,6 +119,24 @@ func TestRecordsAreParsedAndPersonaeDeclared(t *testing.T) {
 		t.Fatalf("records = %#v", records)
 	}
 }
+
+func TestRecordPersonaRevealsMapsPreviousIdentity(t *testing.T) {
+	roster := mapRoster{}
+	p := NewParser(roster)
+	events := p.Feed("@persona {\"name\":\"Doctor Cain\",\"type\":\"character\",\"reveals\":\"Unknown Voice\"}\n> Unknown Voice: I am here.\n")
+	events = append(events, p.Flush()...)
+
+	if len(events) != 2 || events[0].Kind != KindRecord || events[1].Kind != KindSpeech {
+		t.Fatalf("events = %#v", events)
+	}
+	if events[1].SpeakerID != "doctor-cain" {
+		t.Fatalf("revealed persona must map previous identity to doctor-cain, got %#v", events[1])
+	}
+	if id, ok := roster.Resolve("Unknown Voice"); !ok || id != "doctor-cain" {
+		t.Fatalf("roster must resolve previous identity to doctor-cain, got %q, %v", id, ok)
+	}
+}
+
 
 func TestMalformedRecordIsKeptButDoesNotFailTheStream(t *testing.T) {
 	p := NewParser(mapRoster{})

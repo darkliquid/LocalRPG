@@ -506,6 +506,24 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// GET /api/game/{id}/turn/{n}/scene-image
+		if r.Method == http.MethodGet && len(parts) == 4 && parts[3] == "scene-image" {
+			turnNumber, err := strconv.Atoi(parts[2])
+			if err != nil {
+				http.Error(w, "invalid turn number", http.StatusBadRequest)
+				return
+			}
+			data, contentType, err := s.service.GetTurnSceneImage(r.Context(), gameID, turnNumber)
+			if err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.Header().Set("Content-Type", contentType)
+			w.Header().Set("Cache-Control", "no-cache")
+			_, _ = w.Write(data)
+			return
+		}
+
 		// POST /api/game/{id}/turn/{n}/play plays the whole turn through the
 		// POST /api/game/{id}/turn/{n}/play plays the whole turn through the
 		// application's audio device.
@@ -620,7 +638,13 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if r.Method == http.MethodGet {
-				data, contentType, err := s.service.GetCharacterPortrait(r.Context(), gameID, characterID)
+				var version []int
+				if vStr := r.URL.Query().Get("v"); vStr != "" {
+					if v, err := strconv.Atoi(vStr); err == nil && v > 0 {
+						version = append(version, v)
+					}
+				}
+				data, contentType, err := s.service.GetCharacterPortrait(r.Context(), gameID, characterID, version...)
 				if err != nil {
 					writeGameError(w, err)
 					return

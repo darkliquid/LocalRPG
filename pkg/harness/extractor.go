@@ -16,13 +16,15 @@ import (
 )
 
 type ExtractedEntity struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Type       string `json:"type"`
-	Location   string `json:"location,omitempty"`
-	Faction    string `json:"faction,omitempty"`
-	Appearance string `json:"appearance,omitempty"`
-	Body       string `json:"body"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	Type              string `json:"type"`
+	Location          string `json:"location,omitempty"`
+	Faction           string `json:"faction,omitempty"`
+	Appearance        string `json:"appearance,omitempty"`
+	Age               string `json:"age,omitempty"`
+	AppearanceChanged bool   `json:"appearance_changed,omitempty"`
+	Body              string `json:"body"`
 }
 
 // ExtractedDialogue is one utterance the model attributed to a speaker.
@@ -31,11 +33,18 @@ type ExtractedDialogue struct {
 	Text    string `json:"text"`
 }
 
+// ExtractedSceneBreak represents a major temporal leap or scene transition.
+type ExtractedSceneBreak struct {
+	Occurred  bool   `json:"occurred"`
+	VisualCue string `json:"visual_cue,omitempty"`
+}
+
 // Extraction is everything one extraction pass returned for a turn.
 type Extraction struct {
-	Entities       []ExtractedEntity   `json:"entities"`
-	Dialogue       []ExtractedDialogue `json:"dialogue,omitempty"`
-	PlayerLocation string              `json:"player_location,omitempty"`
+	Entities       []ExtractedEntity    `json:"entities"`
+	Dialogue       []ExtractedDialogue  `json:"dialogue,omitempty"`
+	PlayerLocation string               `json:"player_location,omitempty"`
+	SceneBreak     *ExtractedSceneBreak `json:"scene_break,omitempty"`
 }
 
 type Extractor struct {
@@ -67,10 +76,97 @@ func (e *Extractor) SetUsageRecorder(rec UsageRecorder) { e.recorder = rec }
 // it agrees with the role's own spend.
 func (e *Extractor) SetProviderKey(key provider.Key) { e.key = key }
 
+// inferGender attempts to deduce a character's gender from gender fields, state, or prose pronouns.
+func inferGender(ent *entity.Entity) string {
+	if ent == nil {
+		return ""
+	}
+	if g := strings.ToLower(strings.TrimSpace(ent.Gender)); g != "" {
+		return normalizeGender(g)
+	}
+	if ent.State != nil {
+		if raw, ok := ent.State.Get("gender"); ok {
+			if s, ok := raw.(string); ok && strings.TrimSpace(s) != "" {
+				return normalizeGender(strings.ToLower(strings.TrimSpace(s)))
+			}
+		}
+	}
+	// Heuristic pronoun inference
+	text := strings.ToLower(strings.Join([]string{ent.Name, ent.Body, ent.Appearance}, " "))
+	words := strings.FieldsFunc(text, func(r rune) bool {
+		return !('a' <= r && r <= 'z' || 'A' <= r && r <= 'Z')
+	})
+	maleScore, femaleScore := 0, 0
+	for _, w := range words {
+		switch w {
+		case "he", "him", "his", "himself", "man", "boy", "sir", "lord", "brother", "father", "king", "prince":
+			maleScore++
+		case "she", "her", "hers", "herself", "woman", "girl", "lady", "sister", "mother", "queen", "princess":
+			femaleScore++
+		}
+	}
+	if maleScore > femaleScore && maleScore > 0 {
+		return "male"
+	}
+	if femaleScore > maleScore && femaleScore > 0 {
+		return "female"
+	}
+	return ""
+}
+
+func normalizeGender(raw string) string {
+	switch raw {
+	case "m", "male", "masculine", "man":
+		return "male"
+	case "f", "female", "feminine", "woman":
+		return "female"
+	case "neutral", "nonbinary", "non-binary", "agender":
+		return "neutral"
+	default:
+		return raw
+	}
+}
+
+// filterProfilesByGender filters profiles strictly by matching gender tag.
+func filterProfilesByGender(profiles []config.VoiceProfile, gender string) []config.VoiceProfile {
+	if gender == "" {
+		return profiles
+	}
+	var matched []config.VoiceProfile
+	for _, p := range profiles {
+		hasMale, hasFemale, hasNeutral := false, false, false
+		for _, tag := range p.Tags {
+			t := strings.ToLower(tag)
+			if t == "male" {
+				hasMale = true
+			} else if t == "female" {
+				hasFemale = true
+			} else if t == "neutral" || t == "nonbinary" {
+				hasNeutral = true
+			}
+		}
+		if gender == "male" && hasMale && !hasFemale {
+			matched = append(matched, p)
+		} else if gender == "female" && hasFemale && !hasMale {
+			matched = append(matched, p)
+		} else if (gender == "neutral" || gender == "non-binary") && (hasNeutral || (!hasMale && !hasFemale)) {
+			matched = append(matched, p)
+		}
+	}
+	if len(matched) == 0 {
+		// Fallback to full list if no profiles exist for this gender
+		return profiles
+	}
+	return matched
+}
+
 func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 	if len(profiles) == 0 || ent == nil || !entity.IsCharacterType(ent.Type) || ent.Voice != nil {
 		return
 	}
+
+	gender := inferGender(ent)
+	candidateProfiles := filterProfilesByGender(profiles, gender)
 
 	searchContent := strings.ToLower(strings.Join([]string{
 		ent.Name,
@@ -79,27 +175,27 @@ func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 		strings.Join(ent.Aliases, " "),
 	}, " "))
 
-	// 1. Check direct profile ID match
-	for _, p := range profiles {
+	// 1. Check direct profile ID match within candidate set
+	for _, p := range candidateProfiles {
 		if strings.Contains(searchContent, strings.ToLower(p.ID)) {
 			ent.Voice = voiceFromProfile(p)
 			return
 		}
 	}
 
-	// 2. Score by tag matches
+	// 2. Score by tag matches within candidate set
 	bestScore := 0
 	var bestProfile *config.VoiceProfile
-	for i := range profiles {
+	for i := range candidateProfiles {
 		score := 0
-		for _, tag := range profiles[i].Tags {
+		for _, tag := range candidateProfiles[i].Tags {
 			if strings.Contains(searchContent, strings.ToLower(tag)) {
 				score++
 			}
 		}
 		if score > bestScore {
 			bestScore = score
-			bestProfile = &profiles[i]
+			bestProfile = &candidateProfiles[i]
 		}
 	}
 
@@ -108,11 +204,11 @@ func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 		return
 	}
 
-	// 3. Deterministic hash fallback
+	// 3. Deterministic hash fallback within candidate set
 	h := fnv.New32a()
 	h.Write([]byte(ent.ID))
-	idx := int(h.Sum32()) % len(profiles)
-	p := profiles[idx]
+	idx := int(h.Sum32()) % len(candidateProfiles)
+	p := candidateProfiles[idx]
 	ent.Voice = voiceFromProfile(p)
 }
 
@@ -292,8 +388,13 @@ func MergeExtractedEntity(existing *entity.Entity, raw *ExtractedEntity) *entity
 	if merged.Faction == "" {
 		merged.Faction = raw.Faction
 	}
-	if merged.Appearance == "" {
-		merged.Appearance = raw.Appearance
+	if raw.AppearanceChanged || merged.Appearance == "" {
+		if strings.TrimSpace(raw.Appearance) != "" {
+			merged.Appearance = raw.Appearance
+		}
+	}
+	if strings.TrimSpace(raw.Age) != "" {
+		merged.Age = raw.Age
 	}
 
 	body := strings.TrimSpace(raw.Body)
@@ -316,14 +417,22 @@ const extractorSystemPrompt = `You are a world-state extractor. Read the narrati
       "name": "Full Name",
       "type": "character|location|item|faction|arc",
       "location": "[[Optional-Location]]",
-      "appearance": "How this place looks right now, when it has visibly changed.",
+      "appearance": "Visual physical traits or how this place looks right now.",
+      "age": "Apparent or stated age if character.",
+      "appearance_changed": true,
       "body": "Description and known facts."
     }
   ],
   "dialogue": [
     { "speaker": "Full Name", "text": "Exactly what they said." }
-  ]
+  ],
+  "scene_break": {
+    "occurred": true,
+    "visual_cue": "Concise visual description of the new scene moment after a temporal jump or dramatic change of setting."
+  }
 }
+Set "appearance_changed": true ONLY when an existing character or location has noticeably altered in appearance or age (e.g. time skip, aging, scars, transformation, haircuts).
+If the turn includes a significant temporal leap (such as '10 years later'), scene break, or dramatic change of setting, populate "scene_break"; otherwise omit it.
 List every line of direct speech in "dialogue", attributed to the speaker, using the same names as the entity list. Return empty arrays when nothing new is discovered.
 
 If the narration moves the player to a different place, set "player_location" to a [[wikilink]] of that location; otherwise omit it.`

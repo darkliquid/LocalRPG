@@ -8,6 +8,7 @@ import { useLightbox } from '../hooks/useLightbox';
 import { DiceCheckCard } from './DiceCheckCard';
 import { Play, Square, RotateCw, Loader2 } from 'lucide-react';
 import { SegmentAudioControls } from './SegmentAudioControls';
+import { slugify } from '../lib/slug';
 
 export const segmentAudioKey = (turnNumber: number, segmentIndex: number): string =>
   `${turnNumber}:${segmentIndex}`;
@@ -31,6 +32,8 @@ interface TurnSegmentsProps {
   turnNumber?: number;
   gameId?: string;
   segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
+  characterPortraits?: Record<string, { url: string; hasCustom: boolean }>;
+  segmentProgress?: Record<number, string>;
   // Checks resolved this turn, rendered inline at the segment that narrates them.
   checks?: TurnCheck[];
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
@@ -52,6 +55,8 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   turnNumber,
   gameId,
   segmentAudioStatus,
+  characterPortraits,
+  segmentProgress,
   checks,
   displayMode = 'stage_directions',
   skipAudioKeys,
@@ -85,7 +90,18 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   };
 
   const segmentControls = (index: number) => {
-    if (!ordered[index]?.audio_urls?.length) return null;
+    if (!ordered[index]?.audio_urls?.length) {
+      const stage = segmentProgress?.[index];
+      if (stage && stage !== 'ready' && stage !== 'failed') {
+        return (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono text-amber-300 bg-amber-500/10 border border-amber-500/20 anim-fade-in">
+            <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
+            <span className="capitalize">{stage}...</span>
+          </div>
+        );
+      }
+      return null;
+    }
     // A group's control renders once, on its first segment: the hover belongs to
     // the whole clip, not to each segment it covers.
     if (!segmentIsGroupLeader(ordered, index)) return null;
@@ -142,22 +158,38 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
           >
             {segmentControls(i)}
             <div className="flex items-center gap-3">
-              {segment.portrait_url && (
-                <div
-                  onClick={() => openLightbox(segment.portrait_url!, segment.speaker || 'Portrait')}
-                  className={`w-9 h-9 rounded-full overflow-hidden shrink-0 border-2 shadow-md cursor-zoom-in transition-transform hover:scale-105 ${
-                    segment.player ? 'border-sky-400/80' : 'border-purple-400/80'
-                  }`}
-                  title={`View portrait of ${segment.speaker || 'character'}`}
-                >
-                  <img
-                    src={segment.portrait_url}
-                    alt={segment.speaker || 'Speaker portrait'}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-              )}
+              {(() => {
+                const charId = segment.speaker_id || (segment.speaker ? slugify(segment.speaker) : undefined);
+                const portraitURL = segment.speaker_portrait || (charId && characterPortraits?.[charId]?.url) || segment.portrait_url;
+                const hasCustomPortrait = segment.speaker_portrait
+                  ? true
+                  : (charId && characterPortraits?.[charId]
+                    ? characterPortraits[charId].hasCustom
+                    : !!segment.has_custom_portrait);
+
+                return portraitURL ? (
+                  <div
+                    onClick={() => {
+                      if (hasCustomPortrait) {
+                        openLightbox(portraitURL, segment.speaker || 'Portrait');
+                      }
+                    }}
+                    className={`w-9 h-9 rounded-full overflow-hidden shrink-0 border-2 shadow-md transition-transform ${
+                      hasCustomPortrait ? 'cursor-zoom-in hover:scale-105' : 'cursor-default'
+                    } ${
+                      segment.player ? 'border-sky-400/80' : 'border-purple-400/80'
+                    }`}
+                    title={hasCustomPortrait ? `View portrait of ${segment.speaker || 'character'}` : (segment.speaker || 'character')}
+                  >
+                    <img
+                      src={portraitURL}
+                      alt={segment.speaker || 'Speaker portrait'}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : null;
+              })()}
               {hasAudio ? (
                 <button
                   onClick={() => (serverPlayback ? startServerPlayback(i) : playFrom(i))}

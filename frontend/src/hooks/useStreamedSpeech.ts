@@ -1,20 +1,31 @@
 import { useCallback, useRef } from 'react';
 
-// useStreamedSpeech plays narration clips as the turn streams, in arrival order,
+interface QueuedItem {
+  sequence: number;
+  url: string;
+  key: string;
+}
+
+// useStreamedSpeech plays narration clips as the turn streams, in strict sequence order,
 // and remembers which keys were played. The chronicle then skips exactly those
 // keys when the authoritative turn arrives, so no line is heard twice. It stays
 // idle when application playback is running: one device must own the sound.
 export const useStreamedSpeech = (enabled: boolean, volume: number) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const queueRef = useRef<Array<{ url: string; key: string }>>([]);
+  const pendingRef = useRef<Map<number, QueuedItem>>(new Map());
+  const nextExpectedSeqRef = useRef(0);
+  const fallbackSeqRef = useRef(0);
   const playedRef = useRef<Set<string>>(new Set());
   const drainingRef = useRef(false);
 
   const drain = useCallback(() => {
     if (drainingRef.current) return;
-    const next = queueRef.current.shift();
+
+    const expectedSeq = nextExpectedSeqRef.current;
+    const next = pendingRef.current.get(expectedSeq);
     if (!next) return;
 
+    pendingRef.current.delete(expectedSeq);
     drainingRef.current = true;
     const audio = new Audio(next.url);
     audio.volume = volume;
@@ -25,6 +36,7 @@ export const useStreamedSpeech = (enabled: boolean, volume: number) => {
     // and a clip that fails to start stays available to retry.
     const advance = (heard: boolean) => {
       if (heard) playedRef.current.add(next.key);
+      nextExpectedSeqRef.current++;
       drainingRef.current = false;
       drain();
     };
@@ -34,9 +46,10 @@ export const useStreamedSpeech = (enabled: boolean, volume: number) => {
   }, [volume]);
 
   const enqueue = useCallback(
-    (url: string, key: string) => {
+    (url: string, key: string, sequence?: number) => {
       if (!enabled || !url || !key) return;
-      queueRef.current.push({ url, key });
+      const seq = sequence !== undefined ? sequence : fallbackSeqRef.current++;
+      pendingRef.current.set(seq, { sequence: seq, url, key });
       drain();
     },
     [enabled, drain]
@@ -49,7 +62,9 @@ export const useStreamedSpeech = (enabled: boolean, volume: number) => {
   const reset = useCallback(() => {
     audioRef.current?.pause();
     audioRef.current = null;
-    queueRef.current = [];
+    pendingRef.current.clear();
+    nextExpectedSeqRef.current = 0;
+    fallbackSeqRef.current = 0;
     playedRef.current = new Set();
     drainingRef.current = false;
   }, []);
@@ -57,7 +72,9 @@ export const useStreamedSpeech = (enabled: boolean, volume: number) => {
   const stop = useCallback(() => {
     audioRef.current?.pause();
     audioRef.current = null;
-    queueRef.current = [];
+    pendingRef.current.clear();
+    nextExpectedSeqRef.current = 0;
+    fallbackSeqRef.current = 0;
     drainingRef.current = false;
   }, []);
 

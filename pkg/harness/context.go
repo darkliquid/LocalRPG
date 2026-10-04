@@ -230,9 +230,12 @@ named before a colon, on its own line:
 
 > Kaelen: You didn't see me here.
 
+Every spoken line or dialogue beat MUST start with '> '. Even disembodied or unknown
+speakers must use this format (e.g. '> Unknown Voice: "Who is there?"').
+
 Emit a control record on its own line as ` + "`@type {json}`" + ` when the turn needs
 one. Records are not shown to the player:
-- ` + "`@persona {\"name\",\"type\",\"new\",\"gender\",\"pronouns\",\"role_tags\",\"description\",\"voice_hint\"}`" + ` before a new character's first line, so they can be voiced.
+- ` + "`@persona {\"name\",\"type\",\"new\",\"gender\",\"pronouns\",\"role_tags\",\"description\",\"voice_hint\",\"reveals\"}`" + ` before a new character's first line, so they can be voiced. When an unknown or generic identity is revealed (e.g. "Unknown Voice" or "Generic Scout" turns out to be "Doctor Cain"), set ` + "`\"reveals\":\"Unknown Voice\"`" + ` so their previous identity maps to their true name and their history and voice are linked.
 - ` + "`@roll {\"actor\",\"check_kind\",\"stat\",\"stakes\",\"outcomes\"}`" + ` to ask the engine to resolve an uncertain action. It ends your reply; you will be asked to continue with the result. Never invent dice results.
 - ` + "`@state {\"entity\",\"path\",\"op\",\"value\",\"reason\"}`" + ` after a state change.
 - ` + "`@memory {\"kind\",\"entity_refs\",\"text\",\"importance\"}`" + ` to record a memory.
@@ -272,6 +275,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 	}
 
 	actionText := "\n## PLAYER ACTION\n"
+	actionText += "> Format reminder: Every spoken line or dialogue beat MUST start with '> Speaker: \"utterance\"'. Plain prose without '>' is for narration only. Use '@persona {\"name\":\"...\", \"reveals\":\"Old Name\"}' when an unknown identity is revealed.\n\n"
 	if name := strings.TrimSpace(req.PlayerName); name != "" {
 		actionText += name + ": "
 	}
@@ -936,10 +940,13 @@ func FormatVoiceProfilesCatalog(profiles []config.VoiceProfile) string {
 
 // speechFormattingInstruction is the default instructions block kept for backwards compatibility.
 const speechFormattingInstruction = `## SPEECH FORMATTING
-Write each spoken line on its own line, formatted as  Name: "the words spoken"
+Write each spoken line on its own line as a blockquote, formatted as:
+> Name: "the words spoken"
+Every spoken line, dialogue beat, disembodied voice, or unknown speaker MUST start with '> '.
 Use a character's established name, or [[their note name]] to link them.
-Keep narration on its own lines with no leading name. If you cannot name the
-speaker, leave the words in the narration instead of inventing a name.
+Keep narration on its own lines with no leading '> ' or name. If a speaker is unknown
+or cannot be named, format with a blockquote (e.g. '> Unknown Voice: "Who is there?"')
+or leave the words in the narration instead of inventing a character.
 
 ## PROSE FORMATTING
 Separate narration beats with blank lines, one beat per paragraph.
@@ -957,10 +964,13 @@ Do not write voice IDs, voice tags, or profile names into the narration.`
 func FormatSpeechFormattingInstructions(cues SpeechCueContext) string {
 	var sb strings.Builder
 	sb.WriteString("## SPEECH FORMATTING\n")
-	sb.WriteString("Write each spoken line on its own line, formatted as  Name: \"the words spoken\"\n")
+	sb.WriteString("Write each spoken line on its own line as a blockquote, formatted as:\n")
+	sb.WriteString("> Name: \"the words spoken\"\n")
+	sb.WriteString("Every spoken line, dialogue beat, disembodied voice, or unknown speaker MUST start with '> '.\n")
 	sb.WriteString("Use a character's established name, or [[their note name]] to link them.\n")
-	sb.WriteString("Keep narration on its own lines with no leading name. If you cannot name the\n")
-	sb.WriteString("speaker, leave the words in the narration instead of inventing a name.\n\n")
+	sb.WriteString("Keep narration on its own lines with no leading '> ' or name. If a speaker is unknown\n")
+	sb.WriteString("or cannot be named, format with a blockquote (e.g. '> Unknown Voice: \"Who goes there?\"')\n")
+	sb.WriteString("or leave the words in the narration instead of inventing a character.\n\n")
 
 	sb.WriteString("## PROSE FORMATTING\n")
 	sb.WriteString("Separate narration beats with blank lines, one beat per paragraph.\n")
@@ -982,7 +992,7 @@ func FormatSpeechFormattingInstructions(cues SpeechCueContext) string {
 			sb.WriteString("- Reactions: `[sighs]`, `[laughs]`, `[chuckles]`, `[gasp]`, `[clears throat]`\n")
 			sb.WriteString("- Moods: `[excited]`, `[angry]`, `[sad]`, `[nervous]`, `[playful]`, `[tired]`\n")
 		}
-		sb.WriteString("Example: Garrick: \"[whispers] Keep your head down.\"\n")
+		sb.WriteString("Example: > Garrick: \"[whispers] Keep your head down.\"\n")
 		sb.WriteString("Example: [sighs] It has been a long winter in the northern reaches.\n")
 		sb.WriteString("Use cues purposefully to enhance drama; do not clutter every sentence.\n\n")
 	}

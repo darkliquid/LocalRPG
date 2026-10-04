@@ -2,6 +2,7 @@ package harness
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -352,6 +353,88 @@ func TestMergeOnlyFillsAnEmptyAppearance(t *testing.T) {
 	}
 }
 
+func TestExtractorParsesSceneBreakAndAppearanceChange(t *testing.T) {
+	jsonPayload := `{
+		"entities": [
+			{
+				"id": "vera",
+				"name": "Vera",
+				"type": "character",
+				"appearance": "Grey-streaked hair and a hardened gaze.",
+				"age": "38",
+				"appearance_changed": true,
+				"body": "Ten years of wandering have changed her."
+			}
+		],
+		"scene_break": {
+			"occurred": true,
+			"visual_cue": "Ten years later, the dilapidated courtyard overgrown with ivy under grey skies."
+		}
+	}`
+
+	var extraction Extraction
+	if err := json.Unmarshal([]byte(jsonPayload), &extraction); err != nil {
+		t.Fatalf("unmarshal Extraction failed: %v", err)
+	}
+
+	if extraction.SceneBreak == nil || !extraction.SceneBreak.Occurred {
+		t.Fatalf("expected SceneBreak.Occurred to be true")
+	}
+	if extraction.SceneBreak.VisualCue != "Ten years later, the dilapidated courtyard overgrown with ivy under grey skies." {
+		t.Errorf("unexpected visual cue: %q", extraction.SceneBreak.VisualCue)
+	}
+
+	if len(extraction.Entities) != 1 {
+		t.Fatalf("expected 1 entity, got %d", len(extraction.Entities))
+	}
+	ent := extraction.Entities[0]
+	if !ent.AppearanceChanged {
+		t.Errorf("expected AppearanceChanged to be true")
+	}
+	if ent.Age != "38" {
+		t.Errorf("expected Age 38, got %q", ent.Age)
+	}
+}
+
+func TestMergeExtractedEntityUpdatesAppearanceWhenChanged(t *testing.T) {
+	existing := &entity.Entity{
+		ID:         "vera",
+		Name:       "Vera",
+		Type:       "character",
+		Appearance: "Youthful scout with bright hazel eyes.",
+		Age:        "28",
+	}
+
+	// 1. Regular mention without AppearanceChanged preserves authored appearance
+	regularMention := &ExtractedEntity{
+		ID:         "vera",
+		Name:       "Vera",
+		Type:       "character",
+		Appearance: "Looking weary.",
+	}
+	merged1 := MergeExtractedEntity(existing, regularMention)
+	if merged1.Appearance != "Youthful scout with bright hazel eyes." {
+		t.Errorf("expected authored appearance kept, got %q", merged1.Appearance)
+	}
+
+	// 2. Evolution with AppearanceChanged updates appearance and age
+	evolution := &ExtractedEntity{
+		ID:                "vera",
+		Name:              "Vera",
+		Type:              "character",
+		Appearance:        "Grey-streaked hair and a hardened gaze.",
+		Age:               "38",
+		AppearanceChanged: true,
+	}
+	merged2 := MergeExtractedEntity(existing, evolution)
+	if merged2.Appearance != "Grey-streaked hair and a hardened gaze." {
+		t.Errorf("expected updated appearance, got %q", merged2.Appearance)
+	}
+	if merged2.Age != "38" {
+		t.Errorf("expected updated age, got %q", merged2.Age)
+	}
+}
+
 func TestExtractorReadsAnEntityAppearance(t *testing.T) {
 	model := &mockProvider{
 		id:     "extractor-model",
@@ -503,5 +586,54 @@ func TestAssignVoiceProfileCopiesOptions(t *testing.T) {
 	}
 	if ent.Voice.Options["stability"] != 0.2 {
 		t.Errorf("options = %v, want the profile's", ent.Voice.Options)
+	}
+}
+
+func TestAssignVoiceProfile_StrictGenderGating(t *testing.T) {
+	profiles := []config.VoiceProfile{
+		{ID: "af_female_1", Name: "Female One", VoiceID: "af_female_1", Tags: []string{"american", "female", "young"}},
+		{ID: "am_male_1", Name: "Male One", VoiceID: "am_male_1", Tags: []string{"american", "male", "authoritative"}},
+	}
+
+	maleChar := &entity.Entity{
+		ID:     "sir_garrow",
+		Name:   "Sir Garrow",
+		Type:   "character",
+		Gender: "male",
+		Body:   "A young knight with a stern look.",
+	}
+	AssignVoiceProfile(maleChar, profiles)
+	if maleChar.Voice == nil || maleChar.Voice.VoiceID != "am_male_1" {
+		t.Fatalf("expected male voice am_male_1 for male character, got %#v", maleChar.Voice)
+	}
+
+	femaleChar := &entity.Entity{
+		ID:     "lady_elena",
+		Name:   "Lady Elena",
+		Type:   "character",
+		Gender: "female",
+		Body:   "An authoritative scholar of magic.",
+	}
+	AssignVoiceProfile(femaleChar, profiles)
+	if femaleChar.Voice == nil || femaleChar.Voice.VoiceID != "af_female_1" {
+		t.Fatalf("expected female voice af_female_1 for female character, got %#v", femaleChar.Voice)
+	}
+}
+
+func TestAssignVoiceProfile_InfersGenderFromPronouns(t *testing.T) {
+	profiles := []config.VoiceProfile{
+		{ID: "af_female_1", Name: "Female One", VoiceID: "af_female_1", Tags: []string{"female"}},
+		{ID: "am_male_1", Name: "Male One", VoiceID: "am_male_1", Tags: []string{"male"}},
+	}
+
+	charWithoutExplicitGender := &entity.Entity{
+		ID:   "brother_thomas",
+		Name: "Brother Thomas",
+		Type: "character",
+		Body: "He walks silently through the cloisters, his hood pulled low.",
+	}
+	AssignVoiceProfile(charWithoutExplicitGender, profiles)
+	if charWithoutExplicitGender.Voice == nil || charWithoutExplicitGender.Voice.VoiceID != "am_male_1" {
+		t.Fatalf("expected inferred male voice am_male_1, got %#v", charWithoutExplicitGender.Voice)
 	}
 }

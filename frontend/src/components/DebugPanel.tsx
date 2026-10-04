@@ -72,7 +72,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
   const wireLines = useMemo(() => ordered.filter((event) => event.event === 'provider.wire').slice(0, 50), [ordered]);
 
   return (
-    <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+    <div className="space-y-4 flex-1 overflow-y-auto pr-1 select-text">
       <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">

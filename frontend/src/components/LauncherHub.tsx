@@ -204,7 +204,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   }
 
   return (
-    <div className="relative w-full h-full flex overflow-hidden bg-stone-950 text-stone-200 font-sans select-none anim-fade-in">
+    <div className="relative w-full h-full flex overflow-hidden bg-stone-950 text-stone-200 font-sans anim-fade-in">
       {/* Left Navigation Dock */}
       <LauncherDock
         games={games}

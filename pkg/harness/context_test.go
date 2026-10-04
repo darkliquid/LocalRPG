@@ -155,6 +155,9 @@ func TestAssembleContextAlwaysAsksForAttributableSpeech(t *testing.T) {
 	if !strings.Contains(prompt, `Name: "the words spoken"`) {
 		t.Errorf("expected the instruction to show the shape it wants, got %q", prompt)
 	}
+	if !strings.Contains(prompt, `> Name: "the words spoken"`) {
+		t.Errorf("expected the instruction to show the blockquote shape it wants, got %q", prompt)
+	}
 	if !strings.Contains(prompt, "leave the words in the narration") {
 		t.Errorf("expected guidance for the case the model cannot name a speaker, got %q", prompt)
 	}
@@ -301,6 +304,10 @@ func TestAssembleReportsEverySectionAndKeepsTheActionLast(t *testing.T) {
 	if !strings.Contains(result.Prompt, "## PLAYER ACTION") {
 		t.Errorf("expected a player action section")
 	}
+	if !strings.Contains(result.Prompt, "Format reminder: Every spoken line or dialogue beat MUST start with '> Speaker:") {
+		t.Errorf("expected format reminder in player action section")
+	}
+
 
 	names := make([]string, 0, len(result.Sections))
 	for _, section := range result.Sections {

@@ -233,3 +233,31 @@ Experienced navigator of the Maw.`
 		t.Errorf("Roundtrip mismatch: %+v", reparsed)
 	}
 }
+
+func TestEntityPortraitVersioningFields(t *testing.T) {
+	ent := &Entity{
+		ID:              "vera",
+		Name:            "Vera",
+		Type:            "character",
+		Portrait:        "assets/portraits/vera-v2.png",
+		PortraitVersion: 2,
+		PortraitHistory: []string{"assets/portraits/vera-v1.png"},
+	}
+
+	data, err := ent.SerializeMarkdown()
+	if err != nil {
+		t.Fatalf("SerializeMarkdown failed: %v", err)
+	}
+
+	reparsed, err := ParseMarkdownEntity(data)
+	if err != nil {
+		t.Fatalf("ParseMarkdownEntity failed: %v", err)
+	}
+
+	if reparsed.PortraitVersion != 2 {
+		t.Errorf("PortraitVersion = %d, want 2", reparsed.PortraitVersion)
+	}
+	if len(reparsed.PortraitHistory) != 1 || reparsed.PortraitHistory[0] != "assets/portraits/vera-v1.png" {
+		t.Errorf("PortraitHistory = %v, want [assets/portraits/vera-v1.png]", reparsed.PortraitHistory)
+	}
+}

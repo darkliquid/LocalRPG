@@ -485,7 +485,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   };
 
   return (
-    <div className="w-full h-full flex flex-col md:flex-row overflow-hidden select-none">
+    <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
       {/* Left Master Column: Worlds List */}
       <aside className="w-full md:w-80 h-full bg-stone-950/70 border-r border-white/10 p-4 flex flex-col gap-4 shrink-0 overflow-hidden">
         <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">

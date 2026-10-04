@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
 import { APIClient, HTTPError, GenerationError } from './api/client';
-import { GameState, Turn, TurnSegment, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState } from './types';
+import { GameState, Turn, TurnSegment, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState, AudioProgressEvent } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { TurnAudioState, segmentAudioKey } from './components/TurnSegments';
@@ -69,6 +69,9 @@ export const App: React.FC = () => {
     config?.media.tts.master_volume ?? 1
   );
   const [streamedKeys, setStreamedKeys] = useState<ReadonlySet<string>>(new Set());
+  const [audioProgress, setAudioProgress] = useState<AudioProgressEvent | null>(null);
+  const [segmentAudioProgress, setSegmentAudioProgress] = useState<Record<number, string>>({});
+  const [characterPortraits, setCharacterPortraits] = useState<Record<string, { url: string; hasCustom: boolean }>>({});
 
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
@@ -231,6 +234,9 @@ export const App: React.FC = () => {
       setEntities([]);
       setRecap(null);
       setAddressed(new Set());
+      setAudioProgress(null);
+      setSegmentAudioProgress({});
+      setCharacterPortraits({});
       return;
     }
     client.getChronicle().then(setChronicle).catch(console.error);
@@ -239,6 +245,101 @@ export const App: React.FC = () => {
     }).catch(console.error);
     refreshCorpus();
   }, [client, refreshCorpus]);
+
+  useEffect(() => {
+    if (chronicle.length === 0) return;
+    const portraits: Record<string, { url: string; hasCustom: boolean }> = {};
+    for (const turn of chronicle) {
+      for (const seg of turn.segments || []) {
+        const charId = seg.speaker_id || (seg.speaker ? slugify(seg.speaker) : undefined);
+        if (charId && seg.portrait_url) {
+          if (!portraits[charId] || seg.has_custom_portrait) {
+            portraits[charId] = {
+              url: seg.has_custom_portrait && !seg.portrait_url.includes('?') ? `${seg.portrait_url}?t=${Date.now()}` : seg.portrait_url,
+              hasCustom: !!seg.has_custom_portrait,
+            };
+          }
+        }
+      }
+    }
+    setCharacterPortraits((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const [id, p] of Object.entries(portraits)) {
+        if (!next[id] || (!next[id].hasCustom && p.hasCustom)) {
+          next[id] = p;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [chronicle]);
+
+  useEffect(() => {
+    if (entities.length === 0) return;
+    const portraits: Record<string, { url: string; hasCustom: boolean }> = {};
+    for (const ent of entities) {
+      if (ent.type === 'character' && ent.has_portrait) {
+        portraits[ent.id] = {
+          url: ent.portrait_url ? `${ent.portrait_url}?t=${Date.now()}` : `/api/game/${encodeURIComponent(activeGameID || '')}/character/${encodeURIComponent(ent.id)}/portrait?t=${Date.now()}`,
+          hasCustom: true,
+        };
+      }
+    }
+    if (Object.keys(portraits).length > 0) {
+      setCharacterPortraits((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        for (const [id, p] of Object.entries(portraits)) {
+          if (!next[id] || (!next[id].hasCustom && p.hasCustom)) {
+            next[id] = p;
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+  }, [entities, activeGameID]);
+
+  // Poll for background portrait completion when characters in chronicle lack custom portraits
+  useEffect(() => {
+    if (!client || !activeGameID || chronicle.length === 0) return;
+
+    const hasPendingPortraits = chronicle.some((turn) =>
+      (turn.segments || []).some((seg) => {
+        if (seg.kind !== 'speech') return false;
+        const charId = seg.speaker_id || (seg.speaker ? slugify(seg.speaker) : undefined);
+        return charId && (!characterPortraits[charId] || !characterPortraits[charId].hasCustom);
+      })
+    );
+
+    if (!hasPendingPortraits) return;
+
+    let attempts = 0;
+    const maxAttempts = 10;
+    const interval = setInterval(() => {
+      attempts++;
+      client.listEntities()
+        .then((ents) => {
+          setEntities(ents);
+          const allResolved = chronicle.every((turn) =>
+            (turn.segments || []).every((seg) => {
+              if (seg.kind !== 'speech') return true;
+              const charId = seg.speaker_id || (seg.speaker ? slugify(seg.speaker) : undefined);
+              if (!charId) return true;
+              const matchingEnt = ents.find((e) => e.id === charId);
+              return matchingEnt?.has_portrait;
+            })
+          );
+          if (allResolved || attempts >= maxAttempts) {
+            clearInterval(interval);
+          }
+        })
+        .catch(console.error);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [client, activeGameID, chronicle, characterPortraits]);
 
   const handleSelectGame = (gameId: string) => {
     localStorage.setItem('localrpg_last_played_game', gameId);
@@ -282,6 +383,8 @@ export const App: React.FC = () => {
     setStreamedSegments([]);
     setToolActivity(null);
     setTurnError(null);
+    setAudioProgress(null);
+    setSegmentAudioProgress({});
     streamedSpeech.reset();
     setStreamedKeys(new Set());
 
@@ -303,7 +406,31 @@ export const App: React.FC = () => {
           } else if (event.type === 'speech') {
             // A sentence the server synthesized mid-stream, played here while the
             // rest of the prose is still arriving.
-            streamedSpeech.enqueue(event.audio_url ?? '', event.audio_key ?? '');
+            streamedSpeech.enqueue(event.audio_url ?? '', event.audio_key ?? '', event.index);
+          } else if (event.type === 'audio_progress' && event.audio_progress) {
+            setAudioProgress(event.audio_progress);
+            if (event.audio_progress.sequence !== undefined && event.audio_progress.stage) {
+              setSegmentAudioProgress((prev) => ({
+                ...prev,
+                [event.audio_progress!.sequence]: event.audio_progress!.stage,
+              }));
+            }
+          } else if (event.type === 'portrait' && event.character_id) {
+            setCharacterPortraits((prev) => ({
+              ...prev,
+              [event.character_id!]: {
+                url: event.portrait_url || '',
+                hasCustom: !!event.has_custom_portrait,
+              },
+            }));
+          } else if (event.type === 'scene_image' && event.turn_number && event.image_url) {
+            setChronicle((prev) =>
+              prev.map((turn) =>
+                turn.turn_number === event.turn_number
+                  ? { ...turn, image_url: event.image_url }
+                  : turn
+              )
+            );
           } else if (event.type === 'tool') {
             setToolActivity(
               event.tool_status === 'running'
@@ -311,6 +438,11 @@ export const App: React.FC = () => {
                 : `${event.tool_name}: ${event.tool_summary ?? 'done'}`,
             );
           } else if (event.type === 'turn' && event.turn) {
+            // Restore interactivity immediately so the user can submit the next turn
+            // while any remaining audio synthesizes in the background.
+            setTurnInFlight(false);
+            setToolActivity(null);
+
             // Stop streamed speech so it does not overlap with chronicle playback,
             // and remember which keys were heard to completion.
             streamedSpeech.stop();
@@ -362,11 +494,15 @@ export const App: React.FC = () => {
       console.error('turn failed:', err);
       setTurnError(err instanceof Error ? err.message : String(err));
     } finally {
-      abortRef.current = null;
-      setTurnInFlight(false);
-      setPendingAction(null);
-      setToolActivity(null);
-      streamedSpeech.stop();
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setTurnInFlight(false);
+        setPendingAction(null);
+        setToolActivity(null);
+        streamedSpeech.stop();
+        setAudioProgress((prev) => (prev && prev.ready_count + (prev.failed_count || 0) < prev.total_segments ? null : prev));
+        setSegmentAudioProgress({});
+      }
     }
   };
 
@@ -729,6 +865,8 @@ export const App: React.FC = () => {
                         segments={streamedSegments}
                         onEntityClick={handleOpenWikilink}
                         displayMode={config?.media.tts.speech_cues?.display_mode}
+                        characterPortraits={characterPortraits}
+                        segmentProgress={segmentAudioProgress}
                       />
                     </div>
                   ) : (
@@ -792,6 +930,8 @@ export const App: React.FC = () => {
                     displayMode={config?.media.tts.speech_cues?.display_mode}
                     turnAudioStatus={turnAudioStatus}
                     segmentAudioStatus={segmentAudioStatus}
+                    characterPortraits={characterPortraits}
+                    segmentProgress={segmentAudioProgress}
                     gameId={activeGameID ?? undefined}
                     skipAudioKeys={streamedKeys}
                   />
@@ -855,6 +995,7 @@ export const App: React.FC = () => {
                 streaming={turnInFlight}
                 onStop={handleStopTurn}
                 sttType={config?.media.stt?.type}
+                audioProgress={audioProgress}
               />
             </div>
           </main>
@@ -995,7 +1136,7 @@ export const App: React.FC = () => {
           {/* Turn Failure Banner */}
           {turnError && (
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-xl px-4 py-3 rounded-xl bg-red-950/90 border border-red-500/40 text-red-100 text-xs font-sans shadow-2xl flex items-center gap-3">
-              <span className="flex-1">{turnError}</span>
+              <span className="flex-1 select-text">{turnError}</span>
               <button
                 onClick={() => setTurnError(null)}
                 className="text-red-300 hover:text-white cursor-pointer"

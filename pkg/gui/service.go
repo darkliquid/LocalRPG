@@ -109,6 +109,10 @@ type Service struct {
 	// exportAssets supplies the built player a web export ships. It is a field so a
 	// test can describe a build without one being present on the machine.
 	exportAssets func() (fs.FS, error)
+	// portraitListeners fan out background portrait generation events to active turn streams.
+	portraitMu        sync.Mutex
+	portraitSeq       uint64
+	portraitListeners map[string]map[uint64]func(TurnEvent)
 }
 
 // Config returns the configuration the service is running with, so a command can
@@ -417,7 +421,11 @@ func liveSegmentDTO(event turnstream.Event, gameID ...string) (SegmentDTO, bool)
 	}
 }
 
-func segmentDTOs(segments []entity.TurnSegment, gameID string, plan clipPlan, resolve func(string) string) []SegmentDTO {
+func segmentDTOs(segments []entity.TurnSegment, gameID string, plan clipPlan, resolve func(string) string, hasCustom ...func(string) bool) []SegmentDTO {
+	var customChecker func(string) bool
+	if len(hasCustom) > 0 {
+		customChecker = hasCustom[0]
+	}
 	dtos := make([]SegmentDTO, 0, len(segments))
 	for index, segment := range segments {
 		text := resolveWikilinks(segment.Text, resolve)
@@ -442,6 +450,13 @@ func segmentDTOs(segments []entity.TurnSegment, gameID string, plan clipPlan, re
 			}
 			if refID != "" {
 				dto.PortraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait", gameID, refID)
+				if customChecker != nil {
+					dto.HasCustomPortrait = customChecker(refID)
+				}
+			}
+			if segment.SpeakerPortrait != "" {
+				dto.SpeakerPortrait = segment.SpeakerPortrait
+				dto.PortraitURL = segment.SpeakerPortrait
 			}
 		}
 		// The keys come from the pipeline, so the URL a client is handed is the
@@ -844,12 +859,20 @@ func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySumm
 			name = id
 		}
 
+		hasPortrait := parsed.Portrait != "" && s.hasCustomPortrait(gameID, id)
+		portraitURL := ""
+		if parsed.Type == "character" {
+			portraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait", gameID, id)
+		}
+
 		summaries = append(summaries, EntitySummaryDTO{
-			ID:       id,
-			Name:     name,
-			Type:     parsed.Type,
-			Location: parsed.Location,
-			Tags:     parsed.Tags,
+			ID:          id,
+			Name:        name,
+			Type:        parsed.Type,
+			Location:    parsed.Location,
+			Tags:        parsed.Tags,
+			HasPortrait: hasPortrait,
+			PortraitURL: portraitURL,
 		})
 	}
 
@@ -1167,9 +1190,21 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		HealthEffects:   healthEffectDTOs(turn.HealthEffects),
 		WorldTick:       turn.WorldTick,
 		ClipGroups:      plan.groups,
+		SceneBreak:      turn.SceneBreak,
 		Segments: segmentDTOs(turn.Segments, gameID, plan, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
+		}, func(charID string) bool {
+			return s.hasCustomPortrait(gameID, charID)
 		}),
+	}
+
+	scenesDir := filepath.Join(s.resolver.GameDir(gameID), "assets", "scenes")
+	for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+		p := filepath.Join(scenesDir, fmt.Sprintf("turn-%d%s", turn.Number, ext))
+		if info, err := os.Stat(p); err == nil && !info.IsDir() && info.Size() > 0 {
+			dto.ImageURL = fmt.Sprintf("/api/game/%s/turn/%d/scene-image", gameID, turn.Number)
+			break
+		}
 	}
 
 	if turn.Location != "" {
@@ -1530,6 +1565,23 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		CustomGuidance:   cueCaps.PromptGuidance,
 	})
 
+	if cfg.Media.Image.Type != "" && cfg.Media.Image.Type != "disabled" {
+		if imgClient, err := imageClientFactory(cfg.Media.Image, cfg.Providers.Gemini.APIKey); err == nil && imgClient != nil {
+			portraitWorker := engine.NewPortraitWorker(s.resolver, store, imgClient)
+			portraitWorker.SetOnReady(func(gID, charID, relPath string) {
+				s.broadcastPortraitReady(gID, charID, relPath)
+			})
+			orchestrator.SetPortraitWorker(portraitWorker)
+
+			sceneWorker := engine.NewSceneWorker(s.resolver, imgClient)
+			sceneWorker.SetOnReady(func(gID string, turnNum int, relPath string) {
+				s.broadcastSceneImageReady(gID, turnNum, relPath)
+			})
+			orchestrator.SetSceneWorker(sceneWorker)
+		}
+	}
+	orchestrator.SetWorldArtStyle(s.worldArtStyle(gameID))
+
 	return &TurnSession{
 		service:      s,
 		gameID:       gameID,
@@ -1582,7 +1634,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 			// request: the queue is fed while the turn streams and drains after it.
 			// StopAudio ends it early.
 			t.service.goBackground(func() {
-				if err := player.PlayQueue(plan.queue); err != nil && !errors.Is(err, playback.ErrUnavailable) {
+				if err := player.EnqueueQueue(plan.queue); err != nil && !errors.Is(err, playback.ErrUnavailable) {
 					fmt.Fprintf(os.Stderr, "Warning: narration playback stopped: %v\n", err)
 				}
 			})
@@ -1592,11 +1644,37 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// Sentences are synthesized while the model is still writing, so a finished
 	// segment whose text is one of them is a cache hit at finalise rather than a
 	// second provider call. Nil when disabled or no provider is configured.
+	turnNum := 1
+	if max, err := t.store.MaxTurnNumber(); err == nil && max >= 0 {
+		turnNum = max + 1
+	}
+
 	streamer := t.service.sentenceStreamerFor(runCtx, t.gameID, t.cfg, func(speech provisionalSpeech) {
 		plan.enqueueClip(speech.AudioKey, t.service.clipPath(speech.AudioKey))
 		_ = announce(speechEvent(speech))
 	})
+	if streamer != nil {
+		baseVoiceFor := t.service.voiceFor(t.gameID)
+		streamer.SetVoiceResolver(func(speakerID string) *entity.VoiceConfig {
+			if v := t.orchestrator.Voice(speakerID); v != nil {
+				return v
+			}
+			if baseVoiceFor != nil {
+				return baseVoiceFor(speakerID)
+			}
+			return nil
+		})
+	}
+	streamer.SetTurnNumber(turnNum)
+	streamer.SetProgressObserver(func(progress AudioProgressDTO) {
+		_ = announce(TurnEvent{Type: "audio_progress", AudioProgress: &progress})
+	})
 	defer streamer.Close()
+
+	removePortrait := t.service.addPortraitListener(t.gameID, func(evt TurnEvent) {
+		_ = announce(evt)
+	})
+	defer removePortrait()
 
 	// Parsed segments are announced as they arrive, so the client renders
 	// attributed speech while the model is still writing, and the streamer voices
@@ -1604,6 +1682,9 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// tool activity is: the turn still records.
 	t.orchestrator.SetSegmentObserver(func(event turnstream.Event) {
 		if segment, ok := liveSegmentDTO(event, t.gameID); ok {
+			if segment.SpeakerID != "" && t.service.hasCustomPortrait(t.gameID, segment.SpeakerID) {
+				segment.HasCustomPortrait = true
+			}
 			_ = announce(TurnEvent{Type: "segment", Segment: &segment})
 		}
 		streamer.FeedSegment(event)
@@ -1629,6 +1710,11 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	streamer.StopEmitting()
 
 	dto := t.service.turnDTO(*turn, t.store, t.cfg, t.gameID)
+
+	// Release campaign turn lock immediately so the player can submit the next turn
+	// without waiting for remaining background TTS audio to synthesize.
+	t.Close()
+
 	if err := announce(TurnEvent{Type: "turn", Turn: &dto}); err != nil {
 		return err
 	}
@@ -1650,19 +1736,19 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// The rest of the turn's clips are synthesized behind the turn and appended to
 	// the same queue, so playback continues without a second start and a clip that
 	// failed mid-stream is retried here. The played set makes the handover exact.
-	if audioEnabled {
-		t.service.goBackground(func() {
-			t.finishTurnAudio(context.Background(), *turn, plan)
-			plan.close()
-		})
-	} else {
-		plan.close()
-	}
-
-	// Memory is repaired behind the turn, on the same principle as playback: the
-	// reply is already recorded, so nothing about it should wait for a second call.
+	// Start memory summarization and character enrichment / portrait generation
+	// in the background as soon as the turn is recorded.
 	t.service.summariseBehind(t.gameID, t.chronicler)
 	t.service.goBackground(func() { t.service.scanAndEnrichCharacters(t.gameID, t.store) })
+
+	// Flush and wait for remaining in-flight audio synthesis jobs to finish and
+	// emit their progress events to the client before the turn stream closes.
+	streamer.Close()
+	if audioEnabled {
+		streamer.Wait()
+		t.finishTurnAudio(context.Background(), *turn, plan)
+	}
+	plan.close()
 	return nil
 }
 
@@ -1721,20 +1807,160 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 	return path, contentTypeForArt(path), nil
 }
 
+func (s *Service) addPortraitListener(gameID string, listener func(TurnEvent)) func() {
+	s.portraitMu.Lock()
+	defer s.portraitMu.Unlock()
+	if s.portraitListeners == nil {
+		s.portraitListeners = make(map[string]map[uint64]func(TurnEvent))
+	}
+	if s.portraitListeners[gameID] == nil {
+		s.portraitListeners[gameID] = make(map[uint64]func(TurnEvent))
+	}
+	s.portraitSeq++
+	id := s.portraitSeq
+	s.portraitListeners[gameID][id] = listener
+
+	return func() {
+		s.portraitMu.Lock()
+		defer s.portraitMu.Unlock()
+		if m := s.portraitListeners[gameID]; m != nil {
+			delete(m, id)
+			if len(m) == 0 {
+				delete(s.portraitListeners, gameID)
+			}
+		}
+	}
+}
+
+func (s *Service) broadcastPortraitReady(gameID, characterID, relPath string, version ...int) {
+	s.portraitMu.Lock()
+	var listeners []func(TurnEvent)
+	if m := s.portraitListeners[gameID]; m != nil {
+		for _, fn := range m {
+			listeners = append(listeners, fn)
+		}
+	}
+	s.portraitMu.Unlock()
+
+	ver := 0
+	if len(version) > 0 {
+		ver = version[0]
+	}
+	if ver <= 0 {
+		ver = parsePortraitVersionFromPath(relPath)
+	}
+	portraitURL := fmt.Sprintf("/api/game/%s/character/%s/portrait?t=%d", gameID, characterID, time.Now().UnixMilli())
+	if ver > 0 {
+		portraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait?v=%d&t=%d", gameID, characterID, ver, time.Now().UnixMilli())
+	}
+
+	evt := TurnEvent{
+		Type:              "portrait",
+		CharacterID:       characterID,
+		PortraitURL:       portraitURL,
+		Version:           ver,
+		HasCustomPortrait: true,
+	}
+	for _, fn := range listeners {
+		fn(evt)
+	}
+}
+
+func (s *Service) broadcastSceneImageReady(gameID string, turnNumber int, relPath string) {
+	s.portraitMu.Lock()
+	var listeners []func(TurnEvent)
+	if m := s.portraitListeners[gameID]; m != nil {
+		for _, fn := range m {
+			listeners = append(listeners, fn)
+		}
+	}
+	s.portraitMu.Unlock()
+
+	evt := TurnEvent{
+		Type:       "scene_image",
+		TurnNumber: turnNumber,
+		ImageURL:   fmt.Sprintf("/api/game/%s/turn/%d/scene-image", gameID, turnNumber),
+	}
+	for _, fn := range listeners {
+		fn(evt)
+	}
+}
+
+func parsePortraitVersionFromPath(relPath string) int {
+	base := filepath.Base(relPath)
+	idx := strings.LastIndex(base, "-v")
+	if idx == -1 {
+		return 0
+	}
+	dot := strings.LastIndex(base, ".")
+	if dot == -1 || dot <= idx+2 {
+		return 0
+	}
+	vStr := base[idx+2 : dot]
+	v, err := strconv.Atoi(vStr)
+	if err != nil {
+		return 0
+	}
+	return v
+}
+
+func (s *Service) hasCustomPortrait(gameID, characterID string) bool {
+	if s == nil || s.resolver == nil || gameID == "" || characterID == "" {
+		return false
+	}
+	gameDir := s.resolver.GameDir(gameID)
+	portraitsDir := filepath.Join(gameDir, "assets", "portraits")
+	for _, ext := range []string{".png", ".jpg", ".jpeg", ".webp", ".svg"} {
+		// Check both unversioned and versioned files
+		matches, err := filepath.Glob(filepath.Join(portraitsDir, characterID+"*"+ext))
+		if err == nil && len(matches) > 0 {
+			for _, m := range matches {
+				if info, err := os.Stat(m); err == nil && !info.IsDir() && info.Size() > 0 {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// GetTurnSceneImage returns the generated scene illustration for a specific turn.
+func (s *Service) GetTurnSceneImage(ctx context.Context, gameID string, turnNumber int) ([]byte, string, error) {
+	scenesDir := filepath.Join(s.resolver.GameDir(gameID), "assets", "scenes")
+	for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+		p := filepath.Join(scenesDir, fmt.Sprintf("turn-%d%s", turnNumber, ext))
+		if data, err := os.ReadFile(p); err == nil && len(data) > 0 {
+			return data, imageContentType(data), nil
+		}
+	}
+	return nil, "", fmt.Errorf("scene image for turn %d not found", turnNumber)
+}
+
 // GetCharacterPortrait returns the portrait image for a character, or a procedural SVG fallback if not found.
-func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID string) ([]byte, string, error) {
+// When an explicit version (> 0) is specified, it serves that exact historical portrait version.
+func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID string, version ...int) ([]byte, string, error) {
 	s.ensureIndexed(gameID)
+	cleanID := entity.Slugify(characterID)
+	if cleanID == "" {
+		return nil, "", fmt.Errorf("invalid character id %q", characterID)
+	}
+
+	gameDir := filepath.Clean(s.resolver.GameDir(gameID))
+	portraitsDir := filepath.Clean(filepath.Join(gameDir, "assets", "portraits"))
+
 	store, err := s.store(gameID)
 	if err != nil {
 		return nil, "", err
 	}
-	ent, err := store.GetEntity(characterID)
+	ent, err := store.GetEntity(cleanID)
 	if err != nil || ent == nil {
 		// Fallback: check entity markdown file on disk directly
-		notePath := filepath.Join(s.resolver.GameDir(gameID), "entities", characterID+".md")
-		if data, readErr := os.ReadFile(notePath); readErr == nil {
-			if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
-				ent = parsed
+		notePath := filepath.Clean(filepath.Join(gameDir, "entities", cleanID+".md"))
+		if strings.HasPrefix(notePath, gameDir+string(filepath.Separator)) {
+			if data, readErr := os.ReadFile(notePath); readErr == nil {
+				if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
+					ent = parsed
+				}
 			}
 		}
 	}
@@ -1742,10 +1968,80 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 		return nil, "", fmt.Errorf("character %q not found", characterID)
 	}
 
-	if ent.Portrait != "" {
-		portraitPath := filepath.Join(s.resolver.GameDir(gameID), ent.Portrait)
-		if data, err := os.ReadFile(portraitPath); err == nil && len(data) > 0 {
-			return data, imageContentType(data), nil
+	safeID := ent.ID
+
+	readFileInGameDir := func(relPath string) ([]byte, bool) {
+		relPath = strings.TrimSpace(relPath)
+		if relPath == "" {
+			return nil, false
+		}
+		p := filepath.Clean(filepath.Join(gameDir, relPath))
+		if !strings.HasPrefix(p, gameDir+string(filepath.Separator)) {
+			return nil, false
+		}
+		data, readErr := os.ReadFile(p)
+		if readErr != nil || len(data) == 0 {
+			return nil, false
+		}
+		return data, true
+	}
+
+	readPortraitFile := func(filename string) ([]byte, bool) {
+		filename = filepath.Base(filename)
+		p := filepath.Clean(filepath.Join(portraitsDir, filename))
+		if !strings.HasPrefix(p, portraitsDir+string(filepath.Separator)) {
+			return nil, false
+		}
+		data, readErr := os.ReadFile(p)
+		if readErr != nil || len(data) == 0 {
+			return nil, false
+		}
+		return data, true
+	}
+
+	// If explicit version requested:
+	if len(version) > 0 && version[0] > 0 {
+		targetVer := version[0]
+		// 1. Check direct file assets/portraits/<id>-v<version>.<ext>
+		for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+			if data, ok := readPortraitFile(fmt.Sprintf("%s-v%d%s", safeID, targetVer, ext)); ok {
+				return data, imageContentType(data), nil
+			}
+		}
+		// 2. Check if current ent.Portrait matches this version
+		if ent.PortraitVersion == targetVer && ent.Portrait != "" {
+			if data, ok := readFileInGameDir(ent.Portrait); ok {
+				return data, imageContentType(data), nil
+			}
+		}
+		// 3. Check portrait history entries
+		for _, histPath := range ent.PortraitHistory {
+			if strings.Contains(histPath, fmt.Sprintf("-v%d.", targetVer)) {
+				if data, ok := readFileInGameDir(histPath); ok {
+					return data, imageContentType(data), nil
+				}
+			}
+		}
+		// 4. If targetVer == 1, check legacy unversioned files
+		if targetVer == 1 {
+			for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+				if data, ok := readPortraitFile(safeID + ext); ok {
+					return data, imageContentType(data), nil
+				}
+			}
+		}
+	} else {
+		// No version requested: serve current active portrait
+		if ent.Portrait != "" {
+			if data, ok := readFileInGameDir(ent.Portrait); ok {
+				return data, imageContentType(data), nil
+			}
+		}
+		// Check fallback unversioned file on disk
+		for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+			if data, ok := readPortraitFile(safeID + ext); ok {
+				return data, imageContentType(data), nil
+			}
 		}
 	}
 
@@ -1758,17 +2054,24 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 // overwrites any existing one, returning a cache-busted URL.
 func (s *Service) RegenerateCharacterPortrait(ctx context.Context, gameID, characterID string) (CharacterPortraitDTO, error) {
 	s.ensureIndexed(gameID)
+	cleanID := entity.Slugify(characterID)
+	if cleanID == "" {
+		return CharacterPortraitDTO{}, fmt.Errorf("invalid character id %q", characterID)
+	}
+
+	gameDir := filepath.Clean(s.resolver.GameDir(gameID))
 	store, err := s.store(gameID)
 	if err != nil {
 		return CharacterPortraitDTO{}, err
 	}
-
-	ent, err := store.GetEntity(characterID)
+	ent, err := store.GetEntity(cleanID)
 	if err != nil || ent == nil {
-		notePath := filepath.Join(s.resolver.GameDir(gameID), "entities", characterID+".md")
-		if data, readErr := os.ReadFile(notePath); readErr == nil {
-			if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
-				ent = parsed
+		notePath := filepath.Clean(filepath.Join(gameDir, "entities", cleanID+".md"))
+		if strings.HasPrefix(notePath, gameDir+string(filepath.Separator)) {
+			if data, readErr := os.ReadFile(notePath); readErr == nil {
+				if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
+					ent = parsed
+				}
 			}
 		}
 	}
@@ -1807,6 +2110,9 @@ func (s *Service) RegenerateCharacterPortrait(ctx context.Context, gameID, chara
 	defer span.End()
 
 	worker := engine.NewPortraitWorker(s.resolver, store, client)
+	worker.SetOnReady(func(gID, charID, relPath string) {
+		s.broadcastPortraitReady(gID, charID, relPath)
+	})
 	if _, err := worker.Regenerate(ctx, gameID, ent, s.worldArtStyle(gameID)); err != nil {
 		failure := &harness.GenerationFailure{
 			Code:    harness.ClassifyProviderError(err),
@@ -1877,6 +2183,9 @@ func (s *Service) scanAndEnrichCharacters(gameID string, store *storage.Store) {
 	if cfg != nil && cfg.Media.Image.Type != "" && cfg.Media.Image.Type != "disabled" {
 		if imgClient, err := imageClientFactory(cfg.Media.Image, cfg.Providers.Gemini.APIKey); err == nil && imgClient != nil {
 			portraitWorker = engine.NewPortraitWorker(s.resolver, store, imgClient)
+			portraitWorker.SetOnReady(func(gID, charID, relPath string) {
+				s.broadcastPortraitReady(gID, charID, relPath)
+			})
 		}
 	}
 
@@ -1900,7 +2209,7 @@ func (s *Service) scanAndEnrichCharacters(gameID string, store *storage.Store) {
 			}
 		}
 
-		if portraitWorker != nil && ent.Portrait == "" {
+		if portraitWorker != nil && (ent.Portrait == "" || !s.hasCustomPortrait(gameID, ent.ID)) {
 			portraitWorker.Enqueue(gameID, ent, worldStyle)
 		}
 	}

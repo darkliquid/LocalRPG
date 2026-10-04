@@ -2,8 +2,10 @@
 package gui
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1197,3 +1199,117 @@ func TestTurnDTOOffersOrderedClipURLs(t *testing.T) {
 		t.Errorf("url key %q is not a clip name", key)
 	}
 }
+
+func TestGetTurnSceneImage(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	scenesDir := filepath.Join(svc.GetResolver().GameDir(gameID), "assets", "scenes")
+	_ = os.MkdirAll(scenesDir, 0755)
+	sceneFile := filepath.Join(scenesDir, "turn-5.png")
+	pngBytes := []byte("\x89PNG\r\n\x1a\nfake png data")
+	_ = os.WriteFile(sceneFile, pngBytes, 0644)
+
+	data, contentType, err := svc.GetTurnSceneImage(context.Background(), gameID, 5)
+	if err != nil {
+		t.Fatalf("GetTurnSceneImage failed: %v", err)
+	}
+	if contentType != "image/png" {
+		t.Errorf("expected contentType image/png, got %s", contentType)
+	}
+	if !bytes.Equal(data, pngBytes) {
+		t.Errorf("data mismatch")
+	}
+
+	// Turn 99 (does not exist) returns error
+	_, _, err = svc.GetTurnSceneImage(context.Background(), gameID, 99)
+	if err == nil {
+		t.Errorf("expected error for non-existent scene image, got nil")
+	}
+}
+
+func TestGetCharacterPortraitVersionQuery(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	portraitsDir := filepath.Join(svc.GetResolver().GameDir(gameID), "assets", "portraits")
+	_ = os.MkdirAll(portraitsDir, 0755)
+
+	v1Bytes := []byte("\x89PNG\r\n\x1a\nportrait v1")
+	v2Bytes := []byte("\x89PNG\r\n\x1a\nportrait v2")
+	_ = os.WriteFile(filepath.Join(portraitsDir, "elena-v1.png"), v1Bytes, 0644)
+	_ = os.WriteFile(filepath.Join(portraitsDir, "elena-v2.png"), v2Bytes, 0644)
+
+	// Save entity note with v2 active
+	ent := &entity.Entity{
+		ID:              "elena",
+		Name:            "Elena",
+		Type:            "character",
+		Portrait:        "assets/portraits/elena-v2.png",
+		PortraitVersion: 2,
+		PortraitHistory: []string{"assets/portraits/elena-v1.png"},
+	}
+	noteBytes, _ := ent.SerializeMarkdown()
+	_ = os.WriteFile(filepath.Join(svc.GetResolver().GameDir(gameID), "entities", "elena.md"), noteBytes, 0644)
+
+	// Requesting v=1 returns v1 bytes
+	data1, _, err := svc.GetCharacterPortrait(context.Background(), gameID, "elena", 1)
+	if err != nil {
+		t.Fatalf("GetCharacterPortrait v=1 failed: %v", err)
+	}
+	if !bytes.Equal(data1, v1Bytes) {
+		t.Errorf("expected v1 bytes, got %s", string(data1))
+	}
+
+	// Requesting without version returns active v2 bytes
+	data2, _, err := svc.GetCharacterPortrait(context.Background(), gameID, "elena")
+	if err != nil {
+		t.Fatalf("GetCharacterPortrait default failed: %v", err)
+	}
+	if !bytes.Equal(data2, v2Bytes) {
+		t.Errorf("expected v2 bytes, got %s", string(data2))
+	}
+}
+
+func TestTurnDTO_SceneBreakAndAnchoredSpeakerPortraits(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	// Create a scene illustration for turn 3 on disk
+	scenesDir := filepath.Join(svc.GetResolver().GameDir(gameID), "assets", "scenes")
+	_ = os.MkdirAll(scenesDir, 0755)
+	_ = os.WriteFile(filepath.Join(scenesDir, "turn-3.png"), []byte("pngdata"), 0644)
+
+	turn := engine.Turn{
+		Number:     3,
+		Input:      "I rest.",
+		Narration:  "Ten years pass.\n\n---\n\nThe world has changed.",
+		SceneBreak: true,
+		Segments: []entity.TurnSegment{
+			{
+				Kind:            "speech",
+				Speaker:         "Vera",
+				SpeakerID:       "vera",
+				Text:            "We survived.",
+				SpeakerPortrait: "/api/game/" + gameID + "/character/vera/portrait?v=2",
+			},
+		},
+	}
+
+	dto := svc.turnDTO(turn, nil, svc.Config(), gameID)
+
+	if !dto.SceneBreak {
+		t.Errorf("expected dto.SceneBreak to be true")
+	}
+	expectedSceneURL := fmt.Sprintf("/api/game/%s/turn/3/scene-image", gameID)
+	if dto.ImageURL != expectedSceneURL {
+		t.Errorf("dto.ImageURL = %q, want %q", dto.ImageURL, expectedSceneURL)
+	}
+
+	if len(dto.Segments) != 1 {
+		t.Fatalf("expected 1 segment, got %d", len(dto.Segments))
+	}
+	expectedPortrait := fmt.Sprintf("/api/game/%s/character/vera/portrait?v=2", gameID)
+	if dto.Segments[0].SpeakerPortrait != expectedPortrait {
+		t.Errorf("dto.Segments[0].SpeakerPortrait = %q, want %q", dto.Segments[0].SpeakerPortrait, expectedPortrait)
+	}
+	if dto.Segments[0].PortraitURL != expectedPortrait {
+		t.Errorf("dto.Segments[0].PortraitURL = %q, want %q", dto.Segments[0].PortraitURL, expectedPortrait)
+	}
+}
+

@@ -174,17 +174,34 @@ func (p *Player) PlayFiles(paths []string) error {
 	return p.playStreamer(queue, closers, len(streamers))
 }
 
+// EnqueueQueue appends a clip stream to the playback pipeline. If audio is already
+// playing, the new clips will play immediately after the active queue drains.
+func (p *Player) EnqueueQueue(clips <-chan string) error {
+	if !p.Available() {
+		return ErrUnavailable
+	}
+	p.mu.Lock()
+
+	if p.playing && p.otoPlayer != nil {
+		if qs, ok := p.streamer.(*queueStreamer); ok && !qs.isDone() {
+			if qs.enqueueChannel(clips) {
+				p.mu.Unlock()
+				return nil
+			}
+		}
+	}
+
+	queue := newQueueStreamer(clips)
+	return p.playStreamerLocked(queue, []io.Closer{queue}, 0)
+}
+
 // PlayQueue starts playback and pulls clip paths from clips as each previous
 // clip drains, so the first completed clip is heard while the rest are still
 // synthesized. It returns once playback has started; closing the channel ends
 // the queue, and Stop ends it early. Playback is never tied to a caller's
 // context, so a request that triggered narration finishing does not silence it.
 func (p *Player) PlayQueue(clips <-chan string) error {
-	if !p.Available() {
-		return ErrUnavailable
-	}
-	queue := newQueueStreamer(clips)
-	return p.playStreamer(queue, []io.Closer{queue}, 0)
+	return p.EnqueueQueue(clips)
 }
 
 // playStreamer installs a streamer as the current queue. It returns once
@@ -192,6 +209,10 @@ func (p *Player) PlayQueue(clips <-chan string) error {
 // replaced.
 func (p *Player) playStreamer(queue beep.Streamer, closers []io.Closer, clipCount int) error {
 	p.mu.Lock()
+	return p.playStreamerLocked(queue, closers, clipCount)
+}
+
+func (p *Player) playStreamerLocked(queue beep.Streamer, closers []io.Closer, clipCount int) error {
 	previousClosers := p.closers
 	if p.otoPlayer != nil {
 		_ = p.otoPlayer.Close()

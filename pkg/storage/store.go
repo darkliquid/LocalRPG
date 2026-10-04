@@ -44,11 +44,13 @@ func (s *Store) SaveEntity(e *entity.Entity) error {
 	defer tx.Rollback()
 
 	fmMeta := map[string]interface{}{
-		"tags":       e.Tags,
-		"voice":      e.Voice,
-		"portrait":   e.Portrait,
-		"location":   e.Location,
-		"faction":    e.Faction,
+		"tags":             e.Tags,
+		"voice":            e.Voice,
+		"portrait":         e.Portrait,
+		"portrait_version": e.PortraitVersion,
+		"portrait_history": e.PortraitHistory,
+		"location":         e.Location,
+		"faction":          e.Faction,
 		"appearance": e.Appearance,
 		"age":        e.Age,
 		"gender":     e.Gender,
@@ -137,6 +139,16 @@ func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 		}
 		if port, ok := meta["portrait"].(string); ok {
 			ent.Portrait = port
+		}
+		if pv, ok := meta["portrait_version"].(float64); ok {
+			ent.PortraitVersion = int(pv)
+		}
+		if ph, ok := meta["portrait_history"].([]interface{}); ok {
+			for _, item := range ph {
+				if path, ok := item.(string); ok {
+					ent.PortraitHistory = append(ent.PortraitHistory, path)
+				}
+			}
 		}
 		if aliases, ok := meta["aliases"].([]interface{}); ok {
 			for _, value := range aliases {
