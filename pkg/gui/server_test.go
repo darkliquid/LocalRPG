@@ -871,6 +871,74 @@ func TestListEntitiesRouteReturnsTheCorpus(t *testing.T) {
 		t.Errorf("aldon-harbour type = %q, want location", byID["aldon-harbour"].Type)
 	}
 }
+
+func TestFolderRoutesRoundTrip(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	body := strings.NewReader(`{"path":"factions/orders"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/game/"+gameID+"/folders", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/game/"+gameID+"/folders", nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var tree []FolderDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &tree); err != nil {
+		t.Fatalf("decode tree: %v", err)
+	}
+	if len(tree) != 1 || tree[0].Path != "factions" {
+		t.Fatalf("tree = %+v, want one factions root", tree)
+	}
+	if len(tree[0].Children) != 1 || tree[0].Children[0].Path != "factions/orders" {
+		t.Fatalf("children = %+v, want factions/orders", tree[0].Children)
+	}
+}
+
+func TestFolderRouteRejectsTraversal(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	body := strings.NewReader(`{"path":"../escape"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/game/"+gameID+"/folders", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for a traversing path, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestFolderRouteRefusesANonRecursiveDelete(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+
+	writeNestedNote(t, filepath.Join(entitiesDir, "factions", "note.md"), "note", "Note")
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/game/"+gameID+"/folders?path=factions", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code == http.StatusNoContent {
+		t.Fatalf("a non-empty folder must not be deleted without recursive=true: %s", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/api/game/"+gameID+"/folders?path=factions&recursive=true", nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("recursive delete: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestTraceRouteReturnsTheMostRecentEvents(t *testing.T) {
 	_, svc := turnFixture(t)
 	server := NewServer(svc, http.NotFoundHandler())

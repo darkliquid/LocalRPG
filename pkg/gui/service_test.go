@@ -1425,3 +1425,84 @@ func TestGetGraphResolvesAPathQualifiedLink(t *testing.T) {
 	t.Fatal("the linker's outgoing link is missing from the graph")
 }
 
+func TestFolderCRUD(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+
+	if err := svc.CreateFolder(entitiesDir, "factions/orders"); err != nil {
+		t.Fatalf("CreateFolder: %v", err)
+	}
+
+	tree, err := svc.ListFolders(entitiesDir)
+	if err != nil {
+		t.Fatalf("ListFolders: %v", err)
+	}
+	if len(tree) != 1 || tree[0].Path != "factions" {
+		t.Fatalf("tree = %+v, want one factions root", tree)
+	}
+	if len(tree[0].Children) != 1 || tree[0].Children[0].Path != "factions/orders" {
+		t.Fatalf("children = %+v, want factions/orders", tree[0].Children)
+	}
+
+	if err := svc.MoveFolder(entitiesDir, "factions/orders", "factions/ashen-order"); err != nil {
+		t.Fatalf("MoveFolder: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(entitiesDir, "factions", "ashen-order")); err != nil {
+		t.Fatalf("the moved folder is missing: %v", err)
+	}
+
+	if err := svc.DeleteFolder(entitiesDir, "factions", false); err == nil {
+		t.Fatal("deleting a non-empty folder must be refused without recursive")
+	}
+	if err := svc.DeleteFolder(entitiesDir, "factions", true); err != nil {
+		t.Fatalf("DeleteFolder recursive: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(entitiesDir, "factions")); !os.IsNotExist(err) {
+		t.Fatalf("factions is still on disk: %v", err)
+	}
+}
+
+func TestListFoldersShowsEmptyFolders(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+
+	if err := svc.CreateFolder(entitiesDir, "empty"); err != nil {
+		t.Fatalf("CreateFolder: %v", err)
+	}
+
+	tree, err := svc.ListFolders(entitiesDir)
+	if err != nil {
+		t.Fatalf("ListFolders: %v", err)
+	}
+	if len(tree) != 1 || tree[0].Path != "empty" {
+		t.Fatalf("tree = %+v, want the empty folder to be visible", tree)
+	}
+}
+
+func TestFolderOperationsRejectTraversal(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+
+	if err := svc.CreateFolder(entitiesDir, "../escape"); !errors.Is(err, ErrInvalidFolderPath) {
+		t.Errorf("CreateFolder error = %v, want ErrInvalidFolderPath", err)
+	}
+	if err := svc.MoveFolder(entitiesDir, "..", "escape"); !errors.Is(err, ErrInvalidFolderPath) {
+		t.Errorf("MoveFolder error = %v, want ErrInvalidFolderPath", err)
+	}
+	if err := svc.DeleteFolder(entitiesDir, "..", true); !errors.Is(err, ErrInvalidFolderPath) {
+		t.Errorf("DeleteFolder error = %v, want ErrInvalidFolderPath", err)
+	}
+}
+
+func TestFolderOperationsRefuseTheRoot(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+
+	if err := svc.DeleteFolder(entitiesDir, "", true); err == nil {
+		t.Error("deleting the entities root must be refused")
+	}
+	if err := svc.MoveFolder(entitiesDir, "", "elsewhere"); err == nil {
+		t.Error("moving the entities root must be refused")
+	}
+}
+

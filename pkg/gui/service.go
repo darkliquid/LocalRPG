@@ -1158,6 +1158,120 @@ func (s *Service) rewriteInboundLinks(gameDir, sourceID, targetID string) error 
 	})
 }
 
+// ListFolders returns the folder tree under an entities directory. Folders are
+// read from disk rather than from the index, so a folder with no notes in it is
+// still visible and can be dragged into.
+func (s *Service) ListFolders(entitiesDir string) ([]FolderDTO, error) {
+	paths := make([]string, 0)
+
+	err := filepath.WalkDir(entitiesDir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if os.IsNotExist(walkErr) {
+				return nil
+			}
+			return fmt.Errorf("walk %q: %w", path, walkErr)
+		}
+		if !entry.IsDir() || path == entitiesDir {
+			return nil
+		}
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") || name == "assets" {
+			return fs.SkipDir
+		}
+		rel, err := filepath.Rel(entitiesDir, path)
+		if err != nil {
+			return fmt.Errorf("relative path for %q: %w", path, err)
+		}
+		paths = append(paths, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return BuildFolderTree(paths), nil
+}
+
+// CreateFolder creates a folder and any missing parents.
+func (s *Service) CreateFolder(entitiesDir, path string) error {
+	clean, err := ValidateFolderPath(path)
+	if err != nil {
+		return err
+	}
+	if clean == "" {
+		return fmt.Errorf("%w: a folder needs a name", ErrInvalidFolderPath)
+	}
+	return os.MkdirAll(filepath.Join(entitiesDir, filepath.FromSlash(clean)), 0o755)
+}
+
+// MoveFolder renames a folder, taking its notes with it. No link is rewritten,
+// because a note is linked by id and not by the path it happens to sit at.
+func (s *Service) MoveFolder(entitiesDir, from, to string) error {
+	cleanFrom, err := ValidateFolderPath(from)
+	if err != nil {
+		return err
+	}
+	cleanTo, err := ValidateFolderPath(to)
+	if err != nil {
+		return err
+	}
+	if cleanFrom == "" || cleanTo == "" {
+		return fmt.Errorf("%w: cannot move the entities root", ErrInvalidFolderPath)
+	}
+
+	source := filepath.Join(entitiesDir, filepath.FromSlash(cleanFrom))
+	if _, err := os.Stat(source); err != nil {
+		return fmt.Errorf("move folder %q: %w", cleanFrom, err)
+	}
+
+	target := filepath.Join(entitiesDir, filepath.FromSlash(cleanTo))
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return fmt.Errorf("create parent of %q: %w", cleanTo, err)
+	}
+	return os.Rename(source, target)
+}
+
+// DeleteFolder removes a folder. A folder holding notes is refused unless
+// recursive is set, so a stray click cannot delete a campaign's lore.
+func (s *Service) DeleteFolder(entitiesDir, path string, recursive bool) error {
+	clean, err := ValidateFolderPath(path)
+	if err != nil {
+		return err
+	}
+	if clean == "" {
+		return fmt.Errorf("%w: cannot delete the entities root", ErrInvalidFolderPath)
+	}
+
+	target := filepath.Join(entitiesDir, filepath.FromSlash(clean))
+	empty, err := folderIsEmpty(target)
+	if err != nil {
+		return err
+	}
+	if !empty && !recursive {
+		return fmt.Errorf("folder %q is not empty; pass recursive=true to delete its notes", clean)
+	}
+	return os.RemoveAll(target)
+}
+
+// folderIsEmpty reports whether a directory holds anything, so a non-recursive
+// delete can refuse instead of destroying notes.
+func folderIsEmpty(dir string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, fmt.Errorf("read folder %q: %w", dir, err)
+	}
+	return len(entries) == 0, nil
+}
+
+// GameFolders lists a campaign's folder tree.
+func (s *Service) GameFolders(gameID string) ([]FolderDTO, error) {
+	return s.ListFolders(filepath.Join(s.resolver.GameDir(gameID), "entities"))
+}
+
+// WorldFolders lists a world's folder tree.
+func (s *Service) WorldFolders(worldID string) ([]FolderDTO, error) {
+	return s.ListFolders(filepath.Join(s.resolver.WorldDir(worldID), "entities"))
+}
+
 // appendUnique adds values that are not already present, preserving order.
 func appendUnique(existing []string, values ...string) []string {
 	for _, value := range values {

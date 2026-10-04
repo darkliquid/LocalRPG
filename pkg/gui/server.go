@@ -117,6 +117,8 @@ func writeGameError(w http.ResponseWriter, err error) {
 		http.Error(w, err.Error(), http.StatusConflict)
 	case errors.Is(err, ErrAdvancementRefused):
 		http.Error(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, ErrInvalidFolderPath):
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, fs.ErrNotExist), errors.Is(err, os.ErrNotExist):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	default:
@@ -128,6 +130,56 @@ func writeGameError(w http.ResponseWriter, err error) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// handleFolderRoutes serves the folder CRUD a tree UI needs. It takes the
+// entities directory rather than a collection id, because the game and world
+// trees are the same shape.
+func (s *Server) handleFolderRoutes(w http.ResponseWriter, r *http.Request, entitiesDir string) {
+	switch r.Method {
+	case http.MethodGet:
+		tree, err := s.service.ListFolders(entitiesDir)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, tree)
+
+	case http.MethodPost:
+		var body FolderRequestDTO
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&body); err != nil {
+			http.Error(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		if err := s.service.CreateFolder(entitiesDir, body.Path); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, map[string]string{"path": strings.TrimSpace(body.Path)})
+
+	case http.MethodPut:
+		var body FolderRequestDTO
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&body); err != nil {
+			http.Error(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		if err := s.service.MoveFolder(entitiesDir, body.From, body.Path); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, map[string]string{"path": strings.TrimSpace(body.Path)})
+
+	case http.MethodDelete:
+		recursive := r.URL.Query().Get("recursive") == "true"
+		if err := s.service.DeleteFolder(entitiesDir, r.URL.Query().Get("path"), recursive); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -265,6 +317,10 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	action := parts[1]
 
 	switch action {
+	case "folders":
+		s.handleFolderRoutes(w, r, filepath.Join(s.service.resolver.GameDir(gameID), "entities"))
+		return
+
 	case "banner", "icon":
 		if r.Method == http.MethodGet {
 			filePath, contentType, err := s.service.GetGameAsset(gameID, action)
@@ -960,6 +1016,11 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
+		return
+	}
+
+	if len(parts) >= 2 && parts[1] == "folders" {
+		s.handleFolderRoutes(w, r, filepath.Join(s.service.resolver.WorldDir(worldID), "entities"))
 		return
 	}
 
