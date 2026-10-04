@@ -163,7 +163,7 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
               setFolders(await client.listFolders());
             }}
             onDeleteFolder={async (path) => {
-              await client.deleteFolder(path, false);
+              await client.deleteFolder(path, true);
               setFolders(await client.listFolders());
             }}
           />

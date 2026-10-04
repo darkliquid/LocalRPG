@@ -1073,7 +1073,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                     }}
                     onDeleteFolder={async (path) => {
                       if (!savedID) return;
-                      await APIClient.deleteWorldFolder(savedID, path, false);
+                      await APIClient.deleteWorldFolder(savedID, path, true);
                       await refreshWorldFolders();
                     }}
                   />

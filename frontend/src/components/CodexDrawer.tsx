@@ -333,7 +333,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                   onDeleteFolder={async (path) => {
                     if (!gameID) return;
                     const client = new APIClient(gameID);
-                    await client.deleteFolder(path, false);
+                    await client.deleteFolder(path, true);
                     setFolders(await client.listFolders());
                   }}
                 />
