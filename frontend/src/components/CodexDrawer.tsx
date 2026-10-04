@@ -1,12 +1,15 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EntityMemory, EntityNote, EntitySummary, TTSConfig, VoiceProfile, GenerationFailure } from '../types';
+import { EntityMemory, EntityNote, EntitySummary, FolderNode, TTSConfig, VoiceProfile, GenerationFailure } from '../types';
 import { APIClient, GenerationError } from '../api/client';
-import { Save, Volume2, Search, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X, Loader2, RotateCw, AlertCircle } from 'lucide-react';
+import { Save, Volume2, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X, Loader2, RotateCw, AlertCircle } from 'lucide-react';
 import { formatGenerationError } from '../lib/generationError';
 import { TurnHistoryList } from './TurnHistoryList';
 import { ImageLightbox } from './ImageLightbox';
 import { useLightbox } from '../hooks/useLightbox';
 import { VoiceProfileSelect } from './VoiceProfileSelect';
+import EntityTree from './EntityTree';
+import MarkdownEditor from './editor/MarkdownEditor';
+import { loadEntityIndex, invalidateEntityIndex } from './editor/entityIndex';
 
 interface CodexDrawerProps {
   gameID?: string;
@@ -38,8 +41,13 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   onMerge,
 }) => {
   const [markdown, setMarkdown] = useState('');
-  const [query, setQuery] = useState('');
+  // savedMarkdown is the last document the server accepted, so the unsaved marker
+  // is derived rather than tracked by every mutation.
+  const [savedMarkdown, setSavedMarkdown] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [folders, setFolders] = useState<FolderNode[]>([]);
+  const [linkTargets, setLinkTargets] = useState<EntitySummary[]>([]);
+  const [saveFailure, setSaveFailure] = useState<{ line: number; message: string } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!entity);
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [mergeTarget, setMergeTarget] = useState('');
@@ -54,10 +62,57 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
 
   const profiles = voiceProfiles ?? [];
 
+  // The note list is what wikilink completion offers, so it is loaded per campaign
+  // and refreshed after a save. The frontmatter schema is not passed in: the
+  // editor loads it for itself, so no editor can lose its completion by a caller
+  // forgetting a prop.
+  useEffect(() => {
+    if (!gameID) {
+      setLinkTargets([]);
+      return;
+    }
+    let cancelled = false;
+    loadEntityIndex(new APIClient(gameID), gameID)
+      .then((list) => {
+        if (!cancelled) setLinkTargets(list);
+      })
+      .catch(() => {
+        if (!cancelled) setLinkTargets([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameID]);
+
+  // The folder tree is loaded per campaign and refreshed after any move, because
+  // a folder that is not in the tree cannot be dropped onto.
+  useEffect(() => {
+    if (!gameID) {
+      setFolders([]);
+      return;
+    }
+    let cancelled = false;
+    new APIClient(gameID)
+      .listFolders()
+      .then((tree) => {
+        if (!cancelled) setFolders(tree);
+      })
+      .catch(() => {
+        // A campaign with no folders yet is not an error.
+        if (!cancelled) setFolders([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameID]);
+
   useEffect(() => {
     if (entity) {
       setMarkdown(entity.markdown);
+      setSavedMarkdown(entity.markdown);
     } else {
+      setMarkdown('');
+      setSavedMarkdown('');
       setIsSidebarOpen(true);
     }
     setPortraitVersion(0);
@@ -93,19 +148,11 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
     return Array.from(seen.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [entities]);
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return (entities ?? []).filter((candidate) => {
-      const matchesType = typeFilter === 'all' || candidate.type === typeFilter;
-      if (!matchesType) return false;
-      if (!needle) return true;
-      return (
-        candidate.name.toLowerCase().includes(needle) ||
-        candidate.id.toLowerCase().includes(needle) ||
-        (candidate.tags ?? []).some((tag) => tag.toLowerCase().includes(needle))
-      );
-    });
-  }, [entities, query, typeFilter]);
+  // The type chips narrow the tree; the tree's own filter box does the text
+  // search, because it has to search inside folders too.
+  const visibleEntities = useMemo(() => {
+    return (entities ?? []).filter((candidate) => typeFilter === 'all' || candidate.type === typeFilter);
+  }, [entities, typeFilter]);
 
   const applyVoiceArchetype = (profileId: string) => {
     const profile = profiles.find((p) => p.id === profileId);
@@ -143,10 +190,21 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const handleSave = async () => {
     if (!entity) return;
     setSaveError('');
+    setSaveFailure(null);
     try {
       await onSave(entity.id, markdown);
+      setSavedMarkdown(markdown);
+      // A note written here must be linkable straight away.
+      invalidateEntityIndex();
+      if (gameID) {
+        setLinkTargets(await loadEntityIndex(new APIClient(gameID), gameID, true));
+      }
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : String(err));
+      const withLine = err as Error & { line?: number };
+      if (withLine.line) {
+        setSaveFailure({ line: withLine.line, message: withLine.message });
+      }
+      setSaveError(withLine.message);
     }
   };
 
@@ -221,17 +279,6 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
 
           {sidebarTab === 'notes' && (
             <>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-500" />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search the codex..."
-                  className="w-full bg-black/50 border border-white/10 rounded-lg pl-8 pr-2 py-1.5 text-xs text-stone-200 placeholder-stone-500 focus:outline-none focus:border-purple-500/60"
-                />
-              </div>
-
               <div className="flex flex-wrap gap-1">
                 <button
                   onClick={() => setTypeFilter('all')}
@@ -258,32 +305,38 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                 ))}
               </div>
 
-              <div className="flex-1 min-h-[160px] overflow-y-auto space-y-1 pr-1">
-                {filtered.length === 0 ? (
-                  <p className="text-stone-500 text-xs italic p-2">
-                    {(entities?.length ?? 0) === 0 ? 'No notes yet. Play a turn and the world will grow.' : 'No notes match.'}
-                  </p>
-                ) : (
-                  filtered.map((candidate) => (
-                    <button
-                      key={candidate.id}
-                      onClick={() => {
-                        onSelect(candidate.id);
-                      }}
-                      className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors cursor-pointer ${
-                        entity?.id === candidate.id
-                          ? 'bg-purple-600/20 border-purple-500/40'
-                          : 'bg-black/30 border-white/5 hover:border-purple-500/30'
-                      }`}
-                    >
-                      <div className="text-xs text-stone-200 truncate font-medium">{candidate.name}</div>
-                      <div className="text-xs font-mono text-stone-500 truncate">
-                        {candidate.type || 'note'}
-                        {candidate.location ? ` · ${candidate.location.replace(/\[\[|\]\]/g, '')}` : ''}
-                      </div>
-                    </button>
-                  ))
-                )}
+              <div className="flex-1 min-h-[160px] min-h-0">
+                <EntityTree
+                  folders={folders}
+                  entities={visibleEntities}
+                  selectedId={entity?.id}
+                  onSelect={onSelect}
+                  onMoveEntity={async (id, folder) => {
+                    if (!gameID) return;
+                    const client = new APIClient(gameID);
+                    const note = await client.getEntity(id);
+                    await client.saveEntity(id, note.markdown, folder);
+                    setFolders(await client.listFolders());
+                  }}
+                  onMoveFolder={async (from, to) => {
+                    if (!gameID) return;
+                    const client = new APIClient(gameID);
+                    await client.moveFolder(from, to);
+                    setFolders(await client.listFolders());
+                  }}
+                  onCreateFolder={async (path) => {
+                    if (!gameID) return;
+                    const client = new APIClient(gameID);
+                    await client.createFolder(path);
+                    setFolders(await client.listFolders());
+                  }}
+                  onDeleteFolder={async (path) => {
+                    if (!gameID) return;
+                    const client = new APIClient(gameID);
+                    await client.deleteFolder(path, true);
+                    setFolders(await client.listFolders());
+                  }}
+                />
               </div>
             </>
           )}
@@ -375,6 +428,11 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                     <span>Merge note…</span>
                   </button>
                 )}
+                {markdown !== savedMarkdown && (
+                  <span className="text-[10px] font-sans uppercase tracking-wider text-amber-400 self-center">
+                    Unsaved
+                  </span>
+                )}
                 <button
                   onClick={handleSave}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-sans font-bold text-xs shadow-md transition-all cursor-pointer"
@@ -421,10 +479,16 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               />
             </div>
 
-            <textarea
+            <MarkdownEditor
+              key={entity.id}
               value={markdown}
-              onChange={(e) => setMarkdown(e.target.value)}
-              className="w-full flex-1 min-h-[360px] bg-black/50 border border-white/10 rounded-xl p-3.5 font-mono text-xs text-stone-200 focus:outline-none focus:border-purple-500/80 shadow-inner resize-none leading-relaxed"
+              onChange={setMarkdown}
+              language="markdown-frontmatter"
+              onSave={() => void handleSave()}
+              linkTargets={linkTargets}
+              serverError={saveFailure}
+              ariaLabel="Entity note markdown"
+              minHeight="360px"
             />
 
             <TurnHistoryList turns={entity.history} />

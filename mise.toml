@@ -4,6 +4,7 @@ node = "26.9.0"
 goreleaser = "2.18.2"
 gitleaks = "8.30.1"
 actionlint = "1.7.12"
+vale = "3.24.0"
 
 [tasks."install:frontend"]
 description = "Install frontend dependencies when package manifests change"
@@ -11,6 +12,14 @@ dir = "frontend"
 run = "npm install"
 sources = ["package.json", "package-lock.json"]
 outputs = ["node_modules/.package-lock.json"]
+
+[tasks."install:vale-styles"]
+description = "Download the Vale style packages when .vale.ini changes"
+run = "vale sync"
+sources = [".vale.ini"]
+# Not "styles": the committed vocabulary lives under styles/config, so styles/
+# exists in a fresh clone and mise would treat the download as already done.
+outputs = ["styles/Google"]
 
 [tasks.setup]
 description = "Install dependencies for Go backend and frontend"
@@ -22,8 +31,8 @@ description = "Build the React 19 frontend bundle into pkg/gui/dist"
 dir = "frontend"
 depends = ["install:frontend"]
 run = "npm run build && touch ../pkg/gui/dist/.gitkeep && (cp -r ../pkg/gui/dist ./dist 2>/dev/null || true)"
-sources = ["src/**/*", "index.html", "package.json"]
-outputs = ["../pkg/gui/dist/index.html"]
+sources = ["src/**/*", "index.html", "player.html", "vite.player.config.ts", "package.json"]
+outputs = ["../pkg/gui/dist/index.html", "../pkg/gui/dist/player/player.html"]
 
 [tasks."build:backend"]
 description = "Build the localrpg CLI binary"
@@ -41,10 +50,14 @@ description = "Run all Go unit and integration tests"
 run = "go test -v -count=1 ./..."
 
 [tasks."test:frontend"]
-description = "Run TypeScript type checks on frontend"
+description = "Run TypeScript type checks and the frontend model checks"
 dir = "frontend"
-depends = ["install:frontend"]
-run = "npx tsc --noEmit"
+depends = ["build:frontend"]
+run = """
+npx tsc --noEmit
+npm run check:tree-model
+npm run check:player-bundle
+"""
 
 [tasks.test]
 description = "Run all tests across the project"
@@ -55,6 +68,11 @@ description = "Lint the embedded documentation Markdown"
 dir = "frontend"
 depends = ["install:frontend"]
 run = "npm run lint:docs"
+
+[tasks."lint:prose"]
+description = "Run Vale over tracked prose and source comments (report only; STRICT=1 to gate)"
+depends = ["install:vale-styles"]
+run = "bash scripts/lint-prose.sh"
 
 [tasks.lint]
 description = "Run code analysis and linting"

@@ -8,7 +8,7 @@ description: GPU requirements, Docker/vLLM-Omni container setup, voice cloning, 
 
 # Setting Up Fish Audio S2 with vLLM-Omni
 
-Fish Audio S2 Pro is an expressive, multilingual 4B Dual-AR neural voice model that runs entirely offline. When paired with **vLLM-Omni**, it exposes an OpenAI-compatible speech endpoint on port `8091` with Triton decode acceleration, sub-second latency, and support for expressive emotion tags and zero-shot voice cloning.
+Fish Audio S2 Pro is an expressive, multilingual 4-billion-parameter Dual-AR neural voice model that runs entirely offline. When paired with **vLLM-Omni**, it exposes an OpenAI-compatible speech endpoint on port `8091` with Triton decode acceleration, sub-second latency, and support for expressive emotion tags and zero-shot voice cloning.
 
 ## 1. Hardware Requirements
 
@@ -86,7 +86,7 @@ Play `test.wav` to confirm voice generation and emotional delivery.
 ### Via Settings Studio (GUI)
 
 1. Open **Settings Studio** -> **Media** -> **TTS**.
-2. Click **Load TTS Preset...** and choose **Fish Audio S2 Pro (Local vLLM-Omni)** (or select **Fish Audio S2 (Local vLLM-Omni)** in the **TTS Engine** dropdown).
+2. Click **Load TTS Preset…** and choose **Fish Audio S2 Pro (Local vLLM-Omni)** (or select **Fish Audio S2 (Local vLLM-Omni)** in the **TTS Engine** dropdown).
 3. The endpoint defaults to `http://localhost:8091` and model to `fishaudio/s2-pro`.
 4. Click **Save Settings**.
 
@@ -96,7 +96,7 @@ Bracketed delivery tags (`[whisper]`, `[excited]`, `[angry]`, `[sad]`, `[laugh]`
 
 ### Zero-Shot Voice Cloning
 
-Under **Voice Profiles**, configure `ref_audio` (e.g. `assets/voices/guard.wav` or a file path) and `ref_text` (transcript of the clip). LocalRPG automatically reads and converts the clip to a data URI for the server.
+Under **Voice Profiles**, configure `ref_audio` (such as `assets/voices/guard.wav` or a path) and `ref_text` (transcript of the clip). LocalRPG automatically reads and converts the clip to a data URI for the server.
 
 ### Via Configuration File (`config.yaml` or `localrpg.yaml`)
 

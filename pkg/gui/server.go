@@ -18,6 +18,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/engine"
+	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/models"
@@ -60,6 +61,8 @@ func routePattern(path string) string {
 		path == "/api/generate-text" || path == "/api/generate-asset-preview" ||
 		path == "/api/usage" || path == "/api/limits":
 		return path
+	case strings.HasPrefix(path, "/api/schema/"):
+		return "/api/schema/{name}"
 	case path == "/api/models" || strings.HasPrefix(path, "/api/models/"):
 		return "/api/models"
 	case path == "/api/export" || path == "/api/export/capabilities" || path == "/api/export/events" ||
@@ -118,6 +121,10 @@ func writeGameError(w http.ResponseWriter, err error) {
 		http.Error(w, err.Error(), http.StatusConflict)
 	case errors.Is(err, ErrAdvancementRefused):
 		http.Error(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, ErrInvalidFolderPath):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, ErrDuplicateEntityID):
+		http.Error(w, err.Error(), http.StatusConflict)
 	case errors.Is(err, fs.ErrNotExist), errors.Is(err, os.ErrNotExist):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	default:
@@ -129,6 +136,92 @@ func writeGameError(w http.ResponseWriter, err error) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// writeSaveError answers a failed save. A frontmatter failure carries the line and
+// column it happened on, so the editor can highlight it rather than showing a bare
+// status; anything else falls back to the shared error mapping.
+func writeSaveError(w http.ResponseWriter, err error, document string) {
+	var fe *entity.FrontmatterError
+	if !errors.As(err, &fe) {
+		writeGameError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnprocessableEntity)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"error":  fe.Msg,
+		"line":   fe.Line(document),
+		"column": fe.Column(document),
+	})
+}
+
+// handleSchemaRoutes serves the generated schemas the editor consumes.
+func (s *Server) handleSchemaRoutes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if r.URL.Path != "/api/schema/entity-frontmatter" {
+		http.NotFound(w, r)
+		return
+	}
+	schema, err := s.service.GetEntityFrontmatterSchema(r.Context())
+	if err != nil {
+		writeGameError(w, err)
+		return
+	}
+	writeJSON(w, schema)
+}
+
+// handleFolderRoutes serves the folder CRUD a tree UI needs. It takes the
+// entities directory rather than a collection id, because the game and world
+// trees are the same shape.
+func (s *Server) handleFolderRoutes(w http.ResponseWriter, r *http.Request, entitiesDir string) {
+	switch r.Method {
+	case http.MethodGet:
+		tree, err := s.service.ListFolders(entitiesDir)
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, tree)
+
+	case http.MethodPost:
+		var body FolderRequestDTO
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&body); err != nil {
+			http.Error(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		if err := s.service.CreateFolder(entitiesDir, body.Path); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, map[string]string{"path": strings.TrimSpace(body.Path)})
+
+	case http.MethodPut:
+		var body FolderRequestDTO
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&body); err != nil {
+			http.Error(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		if err := s.service.MoveFolder(entitiesDir, body.From, body.Path); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, map[string]string{"path": strings.TrimSpace(body.Path)})
+
+	case http.MethodDelete:
+		recursive := r.URL.Query().Get("recursive") == "true"
+		if err := s.service.DeleteFolder(entitiesDir, r.URL.Query().Get("path"), recursive); err != nil {
+			writeGameError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -275,6 +368,10 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	action := parts[1]
 
 	switch action {
+	case "folders":
+		s.handleFolderRoutes(w, r, filepath.Join(s.service.resolver.GameDir(gameID), "entities"))
+		return
+
 	case "banner", "icon":
 		if r.Method == http.MethodGet {
 			filePath, contentType, err := s.service.GetGameAsset(gameID, action)
@@ -734,13 +831,14 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPut {
 			var body struct {
 				Markdown string `json:"markdown"`
+				Folder   string `json:"folder"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&body); err != nil {
 				http.Error(w, "invalid body", http.StatusBadRequest)
 				return
 			}
-			if err := s.service.SaveEntity(r.Context(), gameID, entityID, body.Markdown); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+			if err := s.service.SaveEntityInFolder(r.Context(), gameID, entityID, body.Folder, body.Markdown); err != nil {
+				writeSaveError(w, err, body.Markdown)
 				return
 			}
 			w.WriteHeader(http.StatusOK)
@@ -976,12 +1074,13 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 			content := string(data)
 			var obj struct {
 				Markdown string `json:"markdown"`
+				Folder   string `json:"folder"`
 			}
 			if err := json.Unmarshal(data, &obj); err == nil && obj.Markdown != "" {
 				content = obj.Markdown
 			}
-			if err := s.service.SaveWorldEntity(r.Context(), worldID, entityID, content); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+			if err := s.service.SaveWorldEntity(r.Context(), worldID, entityID, obj.Folder, content); err != nil {
+				writeGameError(w, err)
 				return
 			}
 			w.WriteHeader(http.StatusOK)
@@ -994,6 +1093,11 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
+		return
+	}
+
+	if len(parts) >= 2 && parts[1] == "folders" {
+		s.handleFolderRoutes(w, r, filepath.Join(s.service.resolver.WorldDir(worldID), "entities"))
 		return
 	}
 

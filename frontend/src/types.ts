@@ -250,6 +250,9 @@ export interface EntitySummary {
   type: string;
   location?: string;
   tags?: string[];
+  aliases?: string[];
+  folder?: string;
+  filename_mismatch?: boolean;
   parse_error?: boolean;
   has_portrait?: boolean;
   portrait_url?: string;
@@ -263,7 +266,14 @@ export interface EntityNote {
   state: Record<string, any>;
   backlinks: string[];
   history?: number[];
+  folder?: string;
   parse_error?: boolean;
+}
+
+export interface FolderNode {
+  path: string;
+  name: string;
+  children?: FolderNode[];
 }
 
 export interface GraphNode {
@@ -441,6 +451,7 @@ export interface WorldEntitySummary {
   id: string;
   name: string;
   type: string;
+  folder?: string;
 }
 
 export interface WorldDetail {
@@ -974,3 +985,26 @@ export interface DocArticle extends DocArticleSummary {
 
 
 
+
+// FrontmatterKeySchema is one accepted frontmatter key, as the server generates
+// it from the Go struct. Values are suggestions, not a closed set.
+export interface FrontmatterKeySchema {
+  name: string;
+  type: string;
+  required: boolean;
+  values?: string[];
+  description: string;
+}
+
+export interface FrontmatterSchema {
+  allowUnknown: boolean;
+  keys: FrontmatterKeySchema[];
+}
+
+// SaveErrorBody is what the entity save route returns when the frontmatter will
+// not parse, so the editor can point at the offending line.
+export interface SaveErrorBody {
+  error: string;
+  line?: number;
+  column?: number;
+}

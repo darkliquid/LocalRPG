@@ -26,7 +26,7 @@ LocalRPG supports four fundamental action modes configured in `system.yaml`:
 
 - **`do`**: Physical or active interventions ("I leap across the chasm").
 - **`say`**: Direct dialogue or social interactions ("I ask the merchant about the lost amulet").
-- **`story`**: Narrative establishment or background declarations ("Ten years ago, my guild swore an oath...").
+- **`story`**: Narrative establishment or background declarations ("Ten years ago, my guild swore an oath…").
 - **`roll`**: Explicit rules checks evaluated against the mechanics engine ("Roll Athletics DC 15").
 
 ## Dice Expressions

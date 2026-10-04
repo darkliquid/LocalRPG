@@ -1,0 +1,110 @@
+{
+  "allowUnknown": true,
+  "keys": [
+    {
+      "name": "age",
+      "type": "string",
+      "required": false,
+      "description": "The note's age, as free text, because a campaign may count in years, seasons or reigns."
+    },
+    {
+      "name": "aliases",
+      "type": "[]string",
+      "required": false,
+      "description": "Other names the same thing is known by. They are matched when resolving mentions and when completing wikilinks."
+    },
+    {
+      "name": "appearance",
+      "type": "string",
+      "required": false,
+      "description": "A physical description used when generating art or describing the note."
+    },
+    {
+      "name": "faction",
+      "type": "string",
+      "required": false,
+      "description": "The group the note belongs to. May contain a [[wikilink]] to a faction note."
+    },
+    {
+      "name": "gender",
+      "type": "string",
+      "required": false,
+      "description": "The note's gender, as free text."
+    },
+    {
+      "name": "history",
+      "type": "[]int",
+      "required": false,
+      "description": "The turn numbers this note took part in. Written by the engine, not by hand."
+    },
+    {
+      "name": "id",
+      "type": "string",
+      "required": true,
+      "description": "The note's stable identity. It is unique per collection and does not change when the note moves between folders."
+    },
+    {
+      "name": "location",
+      "type": "string",
+      "required": false,
+      "description": "Where the note is. May contain a [[wikilink]] to a location note."
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "required": true,
+      "description": "The display name shown in the codex and used when the engine matches a mention."
+    },
+    {
+      "name": "portrait",
+      "type": "string",
+      "required": false,
+      "description": "The path of the note's portrait image, when it has one."
+    },
+    {
+      "name": "portrait_history",
+      "type": "[]string",
+      "required": false,
+      "description": "Previous portrait paths, kept so an earlier portrait can be restored."
+    },
+    {
+      "name": "portrait_version",
+      "type": "int",
+      "required": false,
+      "description": "A counter bumped each time the portrait is regenerated, so the client can bust its image cache."
+    },
+    {
+      "name": "state",
+      "type": "map\u003cstring, any\u003e",
+      "required": false,
+      "description": "Arbitrary per-note state the mechanics hooks read and write. The engine does not interpret the keys."
+    },
+    {
+      "name": "tags",
+      "type": "[]string",
+      "required": false,
+      "description": "Free-form labels for grouping and search."
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "required": true,
+      "values": [
+        "character",
+        "location",
+        "faction",
+        "item",
+        "event",
+        "quest",
+        "lore"
+      ],
+      "description": "What kind of thing the note is. Types that read as a being (character, npc, person, creature) are the only ones the engine treats specially."
+    },
+    {
+      "name": "voice",
+      "type": "VoiceConfig",
+      "required": false,
+      "description": "The text-to-speech voice this note speaks with, including pitch and speech rate."
+    }
+  ]
+}

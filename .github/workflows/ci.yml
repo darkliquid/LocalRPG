@@ -53,11 +53,20 @@ jobs:
 
       - uses: jdx/mise-action@v5
 
+      - name: Build the embedded frontend
+        run: mise run build:frontend
+
       - name: Type check
         run: mise run test:frontend
 
       - name: Lint embedded documentation
         run: mise run lint:docs
+
+      # Gates on error-level alerts only. Warnings and suggestions are reported in
+      # the summary but do not fail the build, because they are style preferences
+      # rather than mistakes.
+      - name: Lint prose and code comments
+        run: STRICT=1 SUMMARY=1 mise run lint:prose
 
   packaging:
     name: Release config and site build

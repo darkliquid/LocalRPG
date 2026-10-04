@@ -8,14 +8,16 @@ Toolchain is pinned by `mise.toml` (Go 1.27.1, Node 26.9.0, GoReleaser 2.18.2). 
 
 ```bash
 mise run setup          # go mod download + cd frontend && npm install
+mise run install:vale-styles # vale sync: download the style packages when .vale.ini changes
 mise run build          # frontend bundle -> pkg/gui/dist, then bin/localrpg
 mise run build:frontend # npm run build in frontend/ (tsc + vite)
 mise run build:backend  # depends on build:frontend
-mise run test           # go test -v -count=1 ./...  AND  npx tsc --noEmit
+mise run test           # go test -v -count=1 ./...  AND  mise run test:frontend
 mise run test:backend   # go test -v -count=1 ./...
-mise run test:frontend  # npx tsc --noEmit (in frontend/)
+mise run test:frontend  # npx tsc --noEmit, the tree model check and the player bundle check (in frontend/)
 mise run lint           # markdownlint, goreleaser check, actionlint, go vet ./...
-mise run lint:docs      # markdownlint-cli2 on the embedded help articles
+mise run lint:docs      # markdownlint engine on the embedded help articles (frontend/scripts/lintDocs.mjs)
+mise run lint:prose     # Vale over tracked prose and source comments (report only; STRICT=1 to gate)
 mise run lint:goreleaser # goreleaser check
 mise run lint:actions   # actionlint over .github/workflows
 mise run secrets:scan   # gitleaks over the full git history and staged changes
@@ -60,6 +62,178 @@ Anything that reaches a commit is public the moment it is pushed, so scanning is
 
 If a key does reach a commit, rotate it first: rewriting history does not un-publish it.
 
+
+## Known advisories
+
+`npm audit` in `frontend/` reports **nothing**. That is deliberate, and the way it
+was reached is worth knowing before anyone adds a linter CLI back.
+
+The docs lint once used `markdownlint-cli2`, which reported five high-severity
+findings. They were one advisory reflected five times: `braces` stack-exhaustion
+denial of service through deeply nested patterns (GHSA-vfj7-8cjw-p6xm,
+CVE-2026-93687), reached via `globby` → `micromatch` → `braces`. `micromatch`,
+`fast-glob`, `globby` and `markdownlint-cli2` were flagged only for sitting above
+it. There was no fix: `braces` 3.0.3 was the newest release and the advisory listed
+no patched version, and `npm audit`'s suggested remedy was to downgrade
+`markdownlint-cli2` twenty-three minor versions.
+
+The lesson is that the linter was never the problem. `markdownlint`, the engine
+whose rules actually decide pass or fail, depends only on `micromark` and
+`string-width` and has **no advisories at all**. The advisory arrived with the CLI
+wrapper, which exists to glob file arguments. Both wrappers have this shape:
+`markdownlint-cli2` brings `braces`, and `markdownlint-cli` avoids it but pins
+`js-yaml ~5.2.1`, which is inside a different advisory's range.
+
+So `mise run lint:docs` runs `frontend/scripts/lintDocs.mjs`, which enumerates the
+files itself and calls the engine directly. Same engine, same rules, byte-identical
+output, and nothing vulnerable in the tree.
+
+**Do not replace it with a markdownlint CLI.** If the docs ever need a rule the
+script cannot express, add it to the `config` object in that script, which is where
+the three deviations from the default ruleset live with their explanations. The
+`.markdownlint-cli2.jsonc` those came from is gone.
+
+No CI job runs `npm audit`, so a new advisory would not gate a build. If one is
+added, it should start from a clean tree.
+
+
+## Prose linting with Vale
+
+Vale checks prose style in the user-facing documentation only. It is pinned in
+`mise.toml` like every other tool, and `.vale.ini` at the repository root decides
+the styles.
+
+**Scope is 21 files**, and it is the same set `tools/sitegen/content.go` renders
+into the showcase site:
+
+- `pkg/gui/docs/*.md` - the 19 guide articles the application embeds, and the bulk
+  of the user-facing prose.
+- `README.md` - the project README.
+- `docs/debugging.md` - the debugging guide.
+
+Everything else is internal and is not linted: the design specs and plans under
+`docs/superpowers/`, `docs/proposals/`, `docs/architecture/`, `AGENTS.md`,
+`THIRD_PARTY_NOTICES.md`, the `website/demo/` fixtures, and every Go and TypeScript
+comment. If a page is added to `content.go`, add it to the script's file list too.
+
+```bash
+mise run install:vale-styles   # vale sync; runs automatically when .vale.ini changes
+mise run lint:prose            # full report, every finding
+SUMMARY=1 mise run lint:prose  # counts, noisiest rules, worst files
+STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
+```
+
+### What it reports today
+
+**149 alerts across all 21 files: 0 errors, 72 warnings and 77 suggestions.**
+For scale, pointing the same styles at every tracked file reported 68,525 alerts
+and 6,875 errors, which is why the scope is the documentation rather than the
+repository.
+
+**CI gates on the error level.** `STRICT=1` makes the task exit non-zero when an
+error is reported, and the workflow runs it that way. Warnings and suggestions are
+printed but never fail a build, because they are style preferences rather than
+mistakes. Run `mise run lint:prose` for the full report, or `SUMMARY=1` for the
+counts and the noisiest rules.
+
+Reaching zero took three passes: narrowing the scope to the documentation, adding
+the vocabulary, and then rewriting the prose the remaining rules objected to. A
+fourth pass then worked down the warnings and suggestions, which took the report
+from 293 alerts to 149.
+
+Everything left is deliberate. `neighbor.AmpersandInProse` (62) fires on `&` in
+headings and bolded feature labels, which is a design convention rather than prose.
+`Google.Passive` (61) and `Google.Semicolons` (16) are style preferences, and
+passive voice and semicolons are both correct in technical writing.
+`neighbor.DeviceSpecificAction` (6) objects to "click", which is the real action in
+a desktop app. `neighbor.DirectionalLanguage` (3) flags "progress bar" and "prompt
+bar", which are widget names rather than layout instructions, and `Google.FirstPerson`
+(1) fires on "my guild swore an oath", which is a quoted player utterance.
+
+### The vocabulary
+
+`styles/config/vocabularies/LocalRPG/accept.txt` lists the words Vale's dictionary
+does not know: product names, the acronyms this project writes in prose, and domain
+vocabulary. It is **committed**, and `.gitignore` carries a ladder that ignores the
+downloaded styles while keeping this file.
+
+Adding a word here is always better than rewording a correct sentence. This one file
+removed 188 errors, which was 82% of them.
+
+The vocabulary also produces a `Vale.LocalRPG.Terms` rule demanding one
+capitalisation per word, and that rule is **switched off**: it fired on the provider
+catalogue's `http` and `cli` table values, on `Frontmatter` in a YAML `title:` and
+an H1, and on a bolded `**Config (...)**` label. All correct as written. Both cases
+of a word are listed in the vocabulary wherever the documentation uses both.
+
+### Rules switched off, and why
+
+Twenty-one rules are off in `.vale.ini`, grouped by reason. Each one fires on correct,
+deliberate writing rather than on a mistake:
+
+- **Readability grade scores** (`Polysyllables`, `FleschReadingEase`, `FleschKincaid`,
+  `ColemanLiau`, `SMOG`, `LIX`, `GunningFog`, `AutomatedReadability`). They measure
+  word and sentence complexity, which a guide about local language models and audio
+  pipelines has by nature. Satisfying them means writing around the vocabulary the
+  reader came to learn.
+- **Colon usage** (`Google.Colons`, `ai-tells.ColonUsage`). This documentation is
+  built on definition lists and labelled steps, so the rule objects to the format.
+- **`Google.Acronyms`.** Spelling out TTS, STT, LLM, MCP and CLI at every first use
+  is what the vocabulary file exists to avoid.
+- **`Google.Parens`.** Parentheticals carry asides and unit conversions here.
+- **`write-good.E-Prime`.** Bans the verb "to be" outright, which is impossible in
+  technical English.
+- **`neighbor.AllCapsProse`.** The acronyms are correct; renaming them would break
+  every cross-reference.
+- **`Google.Headings`.** The documentation uses Title Case throughout and the
+  showcase site's design is built on it. This is the one suppression that is a house
+  style rather than a property of technical writing, so revisit it if the headings
+  are ever re-cased.
+
+Four `ai-tells` rules are off as well, and the rest of that style is on and clean:
+
+- **`ai-tells.VerbTricolon`.** It looks for a rhetorical tricolon but matches any
+  list of three, which is ordinary English and everywhere in a guide. It fired on
+  "system identity, action modes, and metadata" and on "ComfyUI, Automatic1111,
+  LocalAI" - three servers, not a figure of speech.
+- **`ai-tells.SemicolonUsage`.** Semicolons joining related clauses are correct, and
+  this repository's own convention prefers them to em dashes.
+- **`ai-tells.EmDashUsage`.** It reports "em-dash detected" for U+2013, and 15 of its
+  16 findings were en dashes in ranges such as `4-6 GB` and `16-24 GB`, where an en
+  dash is the right character.
+- **`proselint.Annotations`.** It sees `[!NOTE]` and reports a note left in the text,
+  but that is live syntax: remark-github-blockquote-alert renders it as a callout in
+  the app and on the site.
+
+Two more report something that is not a fault:
+
+- **`write-good.Passive`.** It and `Google.Passive` check for the same thing and
+  agree on every instance, so the same 66 findings were reported twice. Google's
+  wording is the more specific, so write-good's copy is the one switched off.
+- **`neighbor.ExclusiveLanguage`.** It flags "Master" as non-inclusive, but every
+  instance is "Game Master" - the standard tabletop term for the role, and the name
+  of a role in this engine's own configuration. Renaming it would break the domain
+  vocabulary, the documentation and the config keys together.
+
+One contradiction is worth knowing about: **`Google.Latin` demands "for example" in
+place of "e.g.", and `ai-tells.FormalTransitions` objects to "for example".** Both
+are satisfied by writing "such as", which is what the documentation now does.
+
+### Two things that will bite
+
+**Vale does not read `.gitignore`.** It walks every file its configuration has a
+section for, so `vale .` would descend into `node_modules`, `bin` and the generated
+site. `scripts/lint-prose.sh` asks `git ls-files` for the three paths instead.
+
+**A `.vale.ini` `Packages` entry is a name, a URL, a zip path, or a directory path.
+There is no `Name.URL` form.** `neighbor. https://.../ai-tells.zip` reads like one
+package with a URL, but it parses as a single malformed entry, `vale sync` stops with
+exit 2, and nothing after it installs. Separate entries with commas.
+
+**The `install:vale-styles` task writes `outputs = ["styles/Google"]`, not
+`["styles"]`.** The committed vocabulary means `styles/` exists in a fresh clone, so
+keying the task on that directory would make mise treat the download as already done
+and Vale would run with no styles at all.
 
 ## Build gotcha: the frontend is embedded in the Go binary
 

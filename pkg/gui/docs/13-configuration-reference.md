@@ -207,7 +207,7 @@ choose; the ledger and provider identifiers are listed in the
 
 ## Value sets
 
-Keys typed `string` above accept the following values where noted. An
+Keys typed `string` here accept the following values where noted. An
 unlisted value is either rejected or falls back to the documented default.
 
 | Key | Accepted values |

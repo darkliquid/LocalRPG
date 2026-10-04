@@ -1688,7 +1688,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
                   defaultValue=""
                 >
-                  <option value="" disabled>⚡ Load TTS Preset...</option>
+                  <option value="" disabled>⚡ Load TTS Preset…</option>
                   {Object.entries(ttsPresets).map(([id, p]) => (
                     <option key={id} value={id}>
                       {p.label}
@@ -2707,7 +2707,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
                   defaultValue=""
                 >
-                  <option value="" disabled>⚡ Load STT Preset...</option>
+                  <option value="" disabled>⚡ Load STT Preset…</option>
                   {Object.entries(sttPresets).map(([id, p]) => (
                     <option key={id} value={id}>
                       {p.label}
@@ -2926,7 +2926,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                   className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
                   defaultValue=""
                 >
-                  <option value="" disabled>⚡ Load Image Preset...</option>
+                  <option value="" disabled>⚡ Load Image Preset…</option>
                   {Object.entries(imagePresets).map(([id, p]) => (
                     <option key={id} value={id}>
                       {p.label}

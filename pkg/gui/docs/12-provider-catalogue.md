@@ -9,11 +9,11 @@ description: Every registered provider ID, its presets and models, and the ledge
 # Provider & Model Catalogue
 
 This page is generated from the provider registry, so it always lists the IDs
-LocalRPG actually ships. Use it when writing a `providers.<id>` block, assigning
+LocalRPG actually provides. Use it when writing a `providers.<id>` block, assigning
 an agent role, or adding a `providers.prices` entry.
 
 The **Ledger key** column is the exact `provider` value a metered call records
-and therefore the value a price must use. It is also the value shown in the
+and so the value a price must use. It's also the value shown in the
 Provider column of the Usage tab. A price with no `model` matches every model of
 that key.
 
@@ -87,7 +87,7 @@ that key.
 These rates apply when no `providers.prices` entry matches, and only when the
 ledger key matches exactly. A row with no model applies to every model of that
 key. Add a config entry to override or extend them. Local and built-in adapters
-are absent on purpose: they are not metered.
+are absent on purpose: they aren't metered.
 
 | Ledger key | Model | Input (per 1M) | Output (per 1M) | Per character | Per request |
 | --- | --- | --- | --- | --- | --- |

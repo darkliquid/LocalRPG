@@ -1,7 +1,9 @@
 package entity
 
 import (
+	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -259,5 +261,118 @@ func TestEntityPortraitVersioningFields(t *testing.T) {
 	}
 	if len(reparsed.PortraitHistory) != 1 || reparsed.PortraitHistory[0] != "assets/portraits/vera-v1.png" {
 		t.Errorf("PortraitHistory = %v, want [assets/portraits/vera-v1.png]", reparsed.PortraitHistory)
+	}
+}
+
+func TestSerializeMarkdownOmitsFolder(t *testing.T) {
+	ent := &Entity{
+		ID:      "silver-hand",
+		Name:    "Silver Hand",
+		Type:    "faction",
+		Folder:  "factions/orders",
+		Body:    "A guild of smiths.\n",
+		Aliases: []string{"The Hand"},
+	}
+
+	data, err := ent.SerializeMarkdown()
+	if err != nil {
+		t.Fatalf("SerializeMarkdown: %v", err)
+	}
+	if strings.Contains(string(data), "folder") {
+		t.Fatalf("folder is a location, not frontmatter; got:\n%s", data)
+	}
+	if !strings.Contains(string(data), "id: silver-hand") {
+		t.Fatalf("frontmatter lost the id:\n%s", data)
+	}
+}
+
+func TestWikilinkBasename(t *testing.T) {
+	cases := map[string]string{
+		"silver-hand":            "silver-hand",
+		"guilds/silver-hand":     "silver-hand",
+		"guilds/orders/the-hand": "the-hand",
+		"  guilds/silver-hand  ": "silver-hand",
+		"":                       "",
+	}
+	for input, want := range cases {
+		if got := WikilinkBasename(input); got != want {
+			t.Errorf("WikilinkBasename(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestDeclaredID(t *testing.T) {
+	cases := map[string]string{
+		"---\nid: silver-hand\nname: X\n---\n\nbody\n": "silver-hand",
+		"---\nname: X\n---\n\nbody\n":                 "",
+		"no frontmatter at all":                       "",
+		"---\nid: broken\n":                           "",
+	}
+	for input, want := range cases {
+		if got := DeclaredID([]byte(input)); got != want {
+			t.Errorf("DeclaredID(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestFrontmatterErrorNamesItsLine(t *testing.T) {
+	// The third document line is invalid: a value with an unclosed quote.
+	doc := "---\nid: silver-hand\nname: \"unclosed\ntype: faction\n---\n\nBody.\n"
+
+	_, err := ParseMarkdownEntity([]byte(doc))
+	if err == nil {
+		t.Fatal("expected a parse failure")
+	}
+
+	var fe *FrontmatterError
+	if !errors.As(err, &fe) {
+		t.Fatalf("error is %T, want *FrontmatterError", err)
+	}
+	if fe.Offset <= 0 {
+		t.Fatalf("Offset = %d, want a positive offset into the document", fe.Offset)
+	}
+	if line := fe.Line(doc); line < 3 || line > 4 {
+		t.Errorf("Line = %d, want the broken line (3 or 4)", line)
+	}
+	if column := fe.Column(doc); column < 1 {
+		t.Errorf("Column = %d, want a 1-based column", column)
+	}
+}
+
+func TestFrontmatterErrorOffsetPointsIntoTheDocument(t *testing.T) {
+	doc := "---\nid: silver-hand\nname: X\n\tbad: [unclosed\n---\n\nBody.\n"
+
+	_, err := ParseMarkdownEntity([]byte(doc))
+	if err == nil {
+		t.Fatal("expected a parse failure")
+	}
+
+	var fe *FrontmatterError
+	if !errors.As(err, &fe) {
+		t.Fatalf("error is %T, want *FrontmatterError", err)
+	}
+	if fe.Offset >= len(doc) {
+		t.Fatalf("Offset = %d, want it inside the %d-byte document", fe.Offset, len(doc))
+	}
+	// The offset must land inside the frontmatter block, never on the header.
+	if fe.Offset < len("---\n") {
+		t.Fatalf("Offset = %d, want it past the frontmatter header", fe.Offset)
+	}
+}
+
+func TestFrontmatterErrorLineAndColumnAreOneBased(t *testing.T) {
+	doc := "---\nid: x\n---\n\nBody.\n"
+
+	fe := &FrontmatterError{Offset: len("---\n"), Msg: "at the start of the frontmatter"}
+	if line := fe.Line(doc); line != 2 {
+		t.Errorf("Line = %d, want 2 (the line after the header)", line)
+	}
+	if column := fe.Column(doc); column != 1 {
+		t.Errorf("Column = %d, want 1", column)
+	}
+
+	atStart := &FrontmatterError{Offset: 0, Msg: "at the very start"}
+	if line := atStart.Line(doc); line != 1 {
+		t.Errorf("Line = %d, want 1", line)
 	}
 }

@@ -24,6 +24,24 @@ var migrations = []migration{
 	{version: 9, apply: addUsageScopeColumn},
 	{version: 10, apply: addTTSJobsTable},
 	{version: 11, apply: addTTSJobErrorColumn},
+	{version: 12, apply: addEntityFolderColumn},
+}
+
+// addEntityFolderColumn records where a note sits under entities/, so the codex
+// can render a tree from the index instead of walking the filesystem on every
+// list. The folder is a location: the note's id is still its identity.
+func addEntityFolderColumn(db *sql.DB) error {
+	exists, err := columnExists(db, "entities", "folder")
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	if _, err := db.Exec("ALTER TABLE entities ADD COLUMN folder TEXT NOT NULL DEFAULT ''"); err != nil {
+		return fmt.Errorf("add entities.folder: %w", err)
+	}
+	return nil
 }
 
 // addTTSJobErrorColumn records why a batch job last failed to progress, so the

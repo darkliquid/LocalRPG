@@ -8,7 +8,7 @@ description: Running Kokoro-FastAPI via Docker (CPU/GPU), voice profile selectio
 
 # Setting Up Kokoro-FastAPI for Neural TTS
 
-Kokoro is an 82-million parameter neural text-to-speech model that delivers remarkable voice quality, natural cadence, and accurate pronunciation while remaining lightweight enough to run in real time on modern CPUs.
+Kokoro is an 82-million parameter neural text-to-speech model that delivers clear voice quality, natural cadence, and accurate pronunciation while remaining lightweight enough to run in real time on modern CPUs.
 
 When run via the community **Kokoro-FastAPI** container, it exposes an OpenAI-compatible speech endpoint on port `8880` (`/v1/audio/speech`), allowing LocalRPG to stream dialogue and narration audio with near-zero latency.
 
@@ -68,7 +68,7 @@ curl -X POST http://localhost:8880/v1/audio/speech \
   }' --output test.wav
 ```
 
-Play `test.wav` with your system audio player (e.g. `aplay test.wav`, `afplay test.wav`, or `mpv test.wav`) to confirm clean speech output.
+Play `test.wav` with your system audio player (such as `aplay test.wav`, `afplay test.wav`, or `mpv test.wav`) to confirm clean speech output.
 
 ## 4. Connecting in LocalRPG
 
@@ -76,7 +76,7 @@ Play `test.wav` with your system audio player (e.g. `aplay test.wav`, `afplay te
 
 1. Open **Settings Studio** -> **Media** -> **TTS**.
 2. In the **TTS Engine** dropdown, choose **HTTP Endpoint (Kokoro-FastAPI, AllTalk, OpenAI Speech)**.
-3. Or click **Load TTS Preset...** and select **Kokoro-FastAPI**.
+3. Or click **Load TTS Preset…** and select **Kokoro-FastAPI**.
 4. Set the **Endpoint** to `http://localhost:8880` and **Model** to `kokoro`.
 5. Under **Voice Profiles**, click the **Load Kokoro Voices (11 Profiles)** button. This immediately installs the full catalog of archetyped voices with appropriate gender, region, and personality tags:
    - `af_bella` (Warm, approachable American female)
@@ -108,4 +108,4 @@ media:
 
 ## 5. Voice Blending & Customization
 
-Kokoro-FastAPI supports blending multiple voices using a plus sign in the voice identifier, for example `af_bella+af_sarah`. You can author custom voice profiles in LocalRPG's Voice Profiles table using blended voice IDs to create distinctive tones for specific NPC archetypes.
+Kokoro-FastAPI supports blending two or more voices using a plus sign in the voice identifier, such as `af_bella+af_sarah`. You can author custom voice profiles in LocalRPG's Voice Profiles table using blended voice IDs to create distinctive tones for specific NPC archetypes.

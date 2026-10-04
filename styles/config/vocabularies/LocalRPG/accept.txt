@@ -1,0 +1,88 @@
+# Words Vale's dictionary does not know. Each one is a product name, an acronym
+# this project uses in prose, or domain vocabulary from the RPG engine. Adding a
+# word here is always preferable to rewording a correct sentence.
+#
+# Vale loads every vocabulary under StylesPath/config/vocabularies; `.vale.ini`
+# names it with `Vocab = LocalRPG`. `vale sync` merges the downloaded packages
+# into this directory and leaves what is already here alone.
+#
+# The vocabulary also produces a Terms rule, which is switched off in `.vale.ini`
+# because it demanded one capitalisation per word and fired on table data, YAML
+# frontmatter values and titles. Both cases of a word are listed below wherever
+# the documentation legitimately uses both.
+
+# Product and project names.
+LocalRPG
+Ollama
+ollama
+Kokoro
+kokoro
+Imagen
+Civitai
+Goja
+Vite
+ROCm
+Gemini
+gemini
+Correlator
+Multimodal
+
+# Acronyms and initialisms. Google.Acronyms is switched off in `.vale.ini` because
+# a technical guide is built on these, but the spell checker still has to accept
+# them. Lowercase forms are listed where they appear as data, such as the provider
+# catalogue's `http` and `cli` source types.
+API
+APIs
+CPU
+CPUs
+GPU
+GPUs
+LLM
+LLMs
+llm
+NPC
+NPCs
+RPG
+RPGs
+CLI
+cli
+HTTP
+http
+MCP
+
+# Domain vocabulary: the engine's own terms.
+frontmatter
+Frontmatter
+wikilink
+Wikilink
+wikilinks
+ruleset
+toolchain
+roleplay
+roleplaying
+archetyped
+sandboxed
+Sandboxed
+rebuildable
+hardcode
+hardcoded
+headlessly
+unmetered
+prefill
+muxed
+codec
+backoff
+healthcheck
+walkthrough
+Walkthrough
+walkthroughs
+
+# Ordinary English that the bundled dictionary is missing.
+bool
+config
+Config
+dev
+Lovecraftian
+ridgelines
+spellbooks
+starships

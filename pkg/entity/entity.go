@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/state"
@@ -68,6 +69,10 @@ type Entity struct {
 	Body      string
 	Wikilinks []string
 	Hash      string
+	// Folder is where the note sits under entities/, relative and slash-separated,
+	// with "" for the root. It is a location, not frontmatter: the same note in two
+	// folders is the same note, so SerializeMarkdown must never emit it.
+	Folder string
 }
 
 func (e *Entity) InitState(data map[string]interface{}) {
@@ -93,7 +98,7 @@ func ParseMarkdownEntity(data []byte) (*Entity, error) {
 
 	var fm EntityFrontmatter
 	if err := yaml.Unmarshal([]byte(frontmatterRaw), &fm); err != nil {
-		return nil, fmt.Errorf("parse frontmatter: %w", err)
+		return nil, frontmatterError(frontmatterRaw, err)
 	}
 
 	linksSet := make(map[string]struct{})
@@ -166,6 +171,120 @@ func WikilinkTarget(ref string) string {
 		cleaned = cleaned[:idx]
 	}
 	return strings.TrimSpace(cleaned)
+}
+
+// WikilinkBasename returns the final path segment of a link target, so a
+// hand-written [[guilds/silver-hand]] can still resolve to the note whose id is
+// silver-hand. The app never generates the path-qualified form.
+func WikilinkBasename(target string) string {
+	cleaned := strings.TrimSpace(target)
+	if idx := strings.LastIndex(cleaned, "/"); idx >= 0 {
+		cleaned = cleaned[idx+1:]
+	}
+	return strings.TrimSpace(cleaned)
+}
+
+// DeclaredID returns the id a document's frontmatter declares, or "" when it has
+// none. It exists so a writer can detect a collision without parsing the whole
+// note and without paying for the body.
+func DeclaredID(data []byte) string {
+	content := string(data)
+	if !strings.HasPrefix(content, "---\n") {
+		return ""
+	}
+	endIdx := strings.Index(content[4:], "\n---\n")
+	if endIdx == -1 {
+		return ""
+	}
+
+	var fm struct {
+		ID string `yaml:"id"`
+	}
+	if err := yaml.Unmarshal([]byte(content[4:4+endIdx]), &fm); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(fm.ID)
+}
+
+// FrontmatterError is a frontmatter parse failure carrying the byte offset of the
+// offending position, so a caller can point at the line instead of quoting a yaml
+// error at the author.
+type FrontmatterError struct {
+	Offset int
+	Msg    string
+}
+
+func (e *FrontmatterError) Error() string {
+	return "parse frontmatter: " + e.Msg
+}
+
+// Line reports the 1-based line of the failure within a document, so a caller can
+// place a diagnostic without knowing how the frontmatter is delimited.
+func (e *FrontmatterError) Line(document string) int {
+	if e.Offset <= 0 {
+		return 1
+	}
+	if e.Offset > len(document) {
+		return strings.Count(document, "\n") + 1
+	}
+	return strings.Count(document[:e.Offset], "\n") + 1
+}
+
+// Column reports the 1-based column of the failure within its line.
+func (e *FrontmatterError) Column(document string) int {
+	if e.Offset <= 0 || e.Offset > len(document) {
+		return 1
+	}
+	lastNewline := strings.LastIndexByte(document[:e.Offset], '\n')
+	return e.Offset - lastNewline
+}
+
+// frontmatterError converts a yaml failure into one carrying a byte offset in the
+// document. gopkg.in/yaml.v3 reports a line number but not a position, so the line
+// is located inside the raw block and the block's own header offset is added.
+func frontmatterError(frontmatterRaw string, err error) *FrontmatterError {
+	line := yamlErrorLine(err.Error())
+	offset := len("---\n") + lineOffset(frontmatterRaw, line)
+	return &FrontmatterError{Offset: offset, Msg: err.Error()}
+}
+
+// lineOffset returns the byte offset of a 1-based line within text.
+func lineOffset(text string, line int) int {
+	if line <= 1 {
+		return 0
+	}
+	offset := 0
+	for i := 1; i < line; i++ {
+		next := strings.IndexByte(text[offset:], '\n')
+		if next < 0 {
+			return len(text)
+		}
+		offset += next + 1
+	}
+	return offset
+}
+
+// yamlErrorLine extracts the 1-based line from a gopkg.in/yaml.v3 error, which
+// reads "yaml: line 3: ...".
+func yamlErrorLine(message string) int {
+	const marker = "line "
+	idx := strings.Index(message, marker)
+	if idx < 0 {
+		return 1
+	}
+	rest := message[idx+len(marker):]
+	end := 0
+	for end < len(rest) && rest[end] >= '0' && rest[end] <= '9' {
+		end++
+	}
+	if end == 0 {
+		return 1
+	}
+	line, err := strconv.Atoi(rest[:end])
+	if err != nil || line < 1 {
+		return 1
+	}
+	return line
 }
 
 // WikilinkTargets returns every link target found in text.

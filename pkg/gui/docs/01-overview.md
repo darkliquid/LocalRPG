@@ -47,7 +47,7 @@ LocalRPG cleanly separates mechanics, setting, and play sessions across three di
 
 ## The Agent Triad
 
-Three specialized AI agent roles collaborate to create each turn:
+The Game Master, Narrator, and Extractor agents collaborate to create each turn:
 
 - **Game Master (`gm`)**: Evaluates player choices against system rules, decides difficulty, determines whether checks are required, and issues directives.
 - **Narrator (`narrator`)**: Converts GM decisions and player actions into atmospheric prose, dialogue, and stage directions.

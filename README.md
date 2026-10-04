@@ -26,7 +26,7 @@ LocalRPG is built around the tabletop creative cycle:
 1. **Craft a World in Worlds Studio:** Author lore, tone, factions, and key locations. Your world's art style guide shapes how scene imagery is generated.
 2. **Define Rules in Systems Studio:** Create custom resolution systems, dice rules, and action checks. Whether it's a gritty d20 dungeon crawl or a rules-light 2d6 narrative game, nothing is locked to preset stats.
 3. **Embark on a Campaign:** Take actions, roll checks, and shape the story. The AI Game Master adjudicates rules while the Narrator paints vivid scenes with voice and art.
-4. **Relive & Export in Story Theatre:** Review past sessions in visual novel Theatre Mode, then export them as standalone, interactive web bundles or rendered video files.
+4. **Relive & Export in Story Theatre:** Review past sessions in visual novel Theatre Mode, then export them as standalone, interactive web bundles, or rendered video files.
 
 ---
 
@@ -74,12 +74,12 @@ LocalRPG features a unified settings system to connect your AI models and media 
 
 ## Built-in Engines & Local Provider Presets
 
-LocalRPG works completely out of the box with zero external dependencies, servers, or GPU requirements, while also supporting 1-click presets for popular local inference tools:
+LocalRPG works out of the box and doesn't need external dependencies, servers, or a GPU, while also supporting 1-click presets for popular local inference tools:
 
 ### Zero-GPU Built-in Engines
-- **`narrative-oracle` Agent:** Pure-Go deterministic procedural storyteller that evaluates player action modes and dice roll outcome tiers, generating responsive narrative prose woven with entity wikilinks.
+- **`narrative-oracle` Agent:** Pure-Go deterministic procedural storyteller that evaluates player action modes and the outcome tiers a dice roll produces, generating responsive narrative prose woven with entity wikilinks.
 - **`native-os` TTS Client:** Dispatches narration to operating system speech synthesizers (`spd-say` on Linux, `/usr/bin/say` on macOS, PowerShell on Windows) with procedural audio waveform fallback.
-- **`procedural-art` Image Generator:** Pure-Go vector dark fantasy SVG generator producing multi-layered atmospheric citadels, moonlit ridgelines, and misty swamp ruins customized by scene keywords.
+- **`procedural-art` Image Generator:** Pure-Go vector dark fantasy SVG generator producing multi-layered atmospheric citadels, moonlit ridgelines, and misty marsh ruins customized by scene keywords.
 
 ### 1-Click Quick Presets
 Settings Studio includes 1-click loaders that instantly prefill endpoint, model, and parameter defaults:
@@ -89,10 +89,10 @@ Settings Studio includes 1-click loaders that instantly prefill endpoint, model,
 - **Image Generation:** ComfyUI (`127.0.0.1:8188`), Automatic1111 (`127.0.0.1:7860`), LocalAI (`localhost:8080`), `sd-cli`, `procedural-art`, DALL-E 3.
 
 ### NPC Voice Profiles Library
-- **Archetype Catalog:** Ships with default fantasy archetypes (`elder_sage`, `young_scout`, `gruff_blacksmith`, `sinister_cultist`) configuring `voice_id`, `pitch`, and `speech_rate`.
+- **Archetype Catalog:** Includes default fantasy archetypes (`elder_sage`, `young_scout`, `gruff_blacksmith`, `sinister_cultist`) configuring `voice_id`, `pitch`, and `speech_rate`.
 - **Automatic GM Voice Assignment:** The GM prompt is automatically injected with the active voice profile catalog. When new NPCs are introduced, the world extractor auto-assigns matching voice profiles based on tags or deterministic hash.
 - **Per-Character Codex Overrides:** Select and inject voice profile frontmatter directly from the Codex Drawer note editor with one click.
-- **Audio Cache Separation:** Speech cache keys uniquely isolate combinations of speaker, voice ID, pitch, speech rate, and text to eliminate audio cache collisions.
+- **Audio Cache Separation:** Speech cache keys uniquely isolate combinations of speaker, voice ID, pitch, speech rate, and text to remove audio cache collisions.
 
 ---
 
@@ -105,9 +105,9 @@ localrpg export web <game-id> [--out DIR] [--no-art] [--no-audio]
 localrpg export video <game-id> [--out FILE|DIR] [--still] [--fps N] [--size WxH] [--quality N] [--effort N] [--intro D] [--outro D] [--gap D] [--progress] [--no-art] [--no-audio]
 ```
 
-**Web bundle.** Writes a self-contained visual-novel player to `dist/<game-id>-web`, rendered by the same player the app's theatre uses: the stage and its scrim, the protagonist and the speaker on either side with the active one lit, the dialogue panel with its name plate, and markdown prose. It runs itself, blending between locations, revealing each beat's text as it is read, and ducking into a click-to-play state when the browser refuses to start audio without a gesture. Art, portraits, and audio are copied beside the page as sidecar assets and referenced by relative path, so the bundle works from a file:// URL with no server and no network access.
+**Web bundle.** Writes a self-contained visual-novel player to `dist/<game-id>-web`, rendered by the same player the app's theatre uses: the stage and its scrim, the protagonist and the speaker on either side with the active one lit, the dialogue panel with its name plate, and markdown prose. It runs itself, blending between locations, revealing each beat's text as it's read, and ducking into a click-to-play state when the browser refuses to start audio without a gesture. Art, portraits, and audio are copied beside the page as sidecar assets and referenced by relative path. The bundle works from a file:// URL without a server or network access.
 
-**Video.** Draws every frame in Go with the theatre's own stage, portraits, and dialogue panel, then encodes VP8 video and the campaign's Opus clips into one `.webm` with a seek index. No browser, no external binary, and no `ffmpeg` is required. `--still` renders one fully revealed frame per beat instead of animating, which is the fast path on a weak machine. `--quality` sets the VP8 quality (0-100) and `--effort` the encoder's effort (0-6, higher is slower and cleaner on coloured text and fine art). `--intro` and `--outro` hold the opening and closing picture before and after the story, and `--gap` holds every segment a little longer than the script paces it. `--out` takes a file or an existing directory, in which case the file is named after the game. `--progress` draws a live bar of frames drawn, frames repeated, and audio muxed against totals worked out before the render starts; without it an export stays quiet until it finishes.
+**Video.** Draws every frame in Go with the theatre's own stage, portraits, and dialogue panel, then encodes VP8 video and the campaign's Opus clips into one `.webm` with a seek index. Rendering and encoding happen inside the Go binary itself. `--still` renders one fully revealed frame per beat instead of animating, which is the fast path on a weak machine. `--quality` sets the VP8 quality (0-100) and `--effort` the encoder's effort (0-6, higher is slower and cleaner on coloured text and fine art). `--intro` and `--outro` hold the opening and closing picture before and after the story, and `--gap` lengthens every segment slightly beyond the script's pacing. `--out` takes a file or an existing directory, in which case the file is named after the game. `--progress` draws a live bar of frames drawn, frames repeated, and audio muxed against totals worked out before the render starts. Without it, an export prints only a final summary.
 
 **Requirements.** Video export has no external requirements: the frames are composited, encoded, and muxed entirely in Go, and clip lengths are read from the Opus stream itself.
 
@@ -126,6 +126,6 @@ See [docs/debugging.md](docs/debugging.md) for full instructions and scenario sy
 
 ## License
 
-LocalRPG is released under the [MIT License](LICENSE). It is built from
-open-source libraries and uses fonts and icons that carry their own terms;
+LocalRPG is released under the [MIT License](LICENSE). It's built from
+open source libraries and uses fonts and icons with their own terms;
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists them.

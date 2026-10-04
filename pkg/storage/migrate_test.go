@@ -161,3 +161,30 @@ func TestMigrationRetiresTheVestigialAudioColumn(t *testing.T) {
 		t.Fatalf("SaveTurn after the migration failed: %v", err)
 	}
 }
+
+func TestAddEntityFolderColumnIsIdempotent(t *testing.T) {
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "index.db")+"?"+pragmas)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	if _, err := db.Exec(`CREATE TABLE entities (id TEXT PRIMARY KEY)`); err != nil {
+		t.Fatalf("create entities: %v", err)
+	}
+
+	if err := addEntityFolderColumn(db); err != nil {
+		t.Fatalf("first apply: %v", err)
+	}
+	if err := addEntityFolderColumn(db); err != nil {
+		t.Fatalf("second apply must be a no-op, got: %v", err)
+	}
+
+	exists, err := columnExists(db, "entities", "folder")
+	if err != nil {
+		t.Fatalf("columnExists: %v", err)
+	}
+	if !exists {
+		t.Fatal("entities.folder missing after the migration")
+	}
+}

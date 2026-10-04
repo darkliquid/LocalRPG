@@ -36,10 +36,10 @@ func renderProviderCatalogue() string {
 
 	b.WriteString("# Provider & Model Catalogue\n\n")
 	b.WriteString("This page is generated from the provider registry, so it always lists the IDs\n")
-	b.WriteString("LocalRPG actually ships. Use it when writing a `providers.<id>` block, assigning\n")
+	b.WriteString("LocalRPG actually provides. Use it when writing a `providers.<id>` block, assigning\n")
 	b.WriteString("an agent role, or adding a `providers.prices` entry.\n\n")
 	b.WriteString("The **Ledger key** column is the exact `provider` value a metered call records\n")
-	b.WriteString("and therefore the value a price must use. It is also the value shown in the\n")
+	b.WriteString("and so the value a price must use. It's also the value shown in the\n")
 	b.WriteString("Provider column of the Usage tab. A price with no `model` matches every model of\n")
 	b.WriteString("that key.\n\n")
 
@@ -88,7 +88,7 @@ func renderProviderCatalogue() string {
 	b.WriteString("These rates apply when no `providers.prices` entry matches, and only when the\n")
 	b.WriteString("ledger key matches exactly. A row with no model applies to every model of that\n")
 	b.WriteString("key. Add a config entry to override or extend them. Local and built-in adapters\n")
-	b.WriteString("are absent on purpose: they are not metered.\n\n")
+	b.WriteString("are absent on purpose: they aren't metered.\n\n")
 	b.WriteString("| Ledger key | Model | Input (per 1M) | Output (per 1M) | Per character | Per request |\n")
 	b.WriteString("| --- | --- | --- | --- | --- | --- |\n")
 	for _, price := range pricingBuiltinPrices() {

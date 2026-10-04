@@ -28,7 +28,7 @@ providers:
 
 - **`builtin`**: Runs directly in the LocalRPG process without external dependencies or GPU requirements.
 - **`http`**: Connects via HTTP/REST to local daemons (Ollama, LM Studio, Sherpa, ComfyUI) or cloud APIs (OpenAI, Gemini, Anthropic, ElevenLabs).
-- **`cli`**: Spawns command-line binaries (e.g. `whisper.cpp`, `spd-say`, custom scripts).
+- **`cli`**: Spawns command-line binaries (such as `whisper.cpp`, `spd-say`, custom scripts).
 - **`mock`**: Returns deterministic placeholder responses for offline testing and development.
 - **`disabled`**: Explicitly disables the capability.
 
@@ -48,7 +48,7 @@ providers:
 
 For hardware requirements, container deployment, and configuration walkthroughs, see [Setting Up Ollama for Local LLMs](14-local-llm-ollama).
 
-### Gemini API (Cloud)
+### Gemini API (GCP)
 
 ```yaml
 providers:
@@ -69,7 +69,7 @@ Zero-setup built-in fallback model that generates narrative choices using proced
 
 - **ElevenLabs**: High-fidelity AI speech (`type: http`, `base_url: https://api.elevenlabs.io`).
 - **Gemini Voice**: Multimodal speech synthesis.
-- **Fish Audio S2 (Local vLLM-Omni)**: 4B Dual-AR multilingual neural voice synthesis at 44.1 kHz with fine-grained emotional tags and zero-shot voice cloning. See [Setting Up Fish Audio S2](16-local-tts-fish-audio).
+- **Fish Audio S2 (Local vLLM-Omni)**: 4-billion-parameter Dual-AR multilingual voice synthesis at 44.1 kHz with fine-grained emotional tags and zero-shot voice cloning. See [Setting Up Fish Audio S2](16-local-tts-fish-audio).
 - **Kokoro-FastAPI**: High-speed local neural voice synthesis on CPU/GPU. See [Setting Up Kokoro-FastAPI](15-local-tts-kokoro).
 - **Native OS (`builtin_name: native-os`)**: Built-in speech using your operating system's native synthesizer (`say` on macOS, `spd-say` on Linux, PowerShell SAPI on Windows).
 - **Sherpa / Piper**: High quality local neural speech synthesis.
@@ -84,7 +84,7 @@ Zero-setup built-in fallback model that generates narrative choices using proced
 
 - **Procedural Art (`builtin_name: procedural-art`)**: Pure-Go SVG generator creating heraldic banners, landscape silhouettes, and item icons without a GPU.
 - **ComfyUI / Automatic1111**: Local Stable Diffusion web APIs. See [Setting Up ComfyUI](18-local-image-comfyui).
-- **Google Imagen**: Cloud image synthesis.
+- **Google Imagen**: GCP image synthesis.
 
 ## Spend Ledger & Rate Limit Handling
 

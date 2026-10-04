@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -871,6 +872,187 @@ func TestListEntitiesRouteReturnsTheCorpus(t *testing.T) {
 		t.Errorf("aldon-harbour type = %q, want location", byID["aldon-harbour"].Type)
 	}
 }
+
+func TestFolderRoutesRoundTrip(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	body := strings.NewReader(`{"path":"factions/orders"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/game/"+gameID+"/folders", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/game/"+gameID+"/folders", nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var tree []FolderDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &tree); err != nil {
+		t.Fatalf("decode tree: %v", err)
+	}
+	if len(tree) != 1 || tree[0].Path != "factions" {
+		t.Fatalf("tree = %+v, want one factions root", tree)
+	}
+	if len(tree[0].Children) != 1 || tree[0].Children[0].Path != "factions/orders" {
+		t.Fatalf("children = %+v, want factions/orders", tree[0].Children)
+	}
+}
+
+func TestFolderRouteRejectsTraversal(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	body := strings.NewReader(`{"path":"../escape"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/game/"+gameID+"/folders", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for a traversing path, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestFolderRouteRefusesANonRecursiveDelete(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+
+	writeNestedNote(t, filepath.Join(entitiesDir, "factions", "note.md"), "note", "Note")
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/game/"+gameID+"/folders?path=factions", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code == http.StatusNoContent {
+		t.Fatalf("a non-empty folder must not be deleted without recursive=true: %s", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/api/game/"+gameID+"/folders?path=factions&recursive=true", nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("recursive delete: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestEntitySaveRouteReportsADuplicateID(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	first := "---\nid: silver-hand\nname: Silver Hand\ntype: faction\n---\n\nFirst.\n"
+	put := func(id, note string) *httptest.ResponseRecorder {
+		body := `{"markdown":` + strconv.Quote(note) + `}`
+		req := httptest.NewRequest(http.MethodPut, "/api/game/"+gameID+"/entity/"+id, strings.NewReader(body))
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+		return rec
+	}
+
+	if rec := put("silver-hand", first); rec.Code != http.StatusOK {
+		t.Fatalf("first save: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	second := "---\nid: silver-hand\nname: Impostor\ntype: faction\n---\n\nSecond.\n"
+	if rec := put("impostor", second); rec.Code != http.StatusConflict {
+		t.Fatalf("duplicate id: expected 409, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestEntitySaveRouteMovesTheNoteIntoAFolder(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	note := "---\nid: silver-hand\nname: Silver Hand\ntype: faction\n---\n\nA guild.\n"
+	body := `{"markdown":` + strconv.Quote(note) + `,"folder":"factions/orders"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/game/"+gameID+"/entity/silver-hand", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("save: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	moved := filepath.Join(svc.resolver.GameDir(gameID), "entities", "factions", "orders", "silver-hand.md")
+	if _, err := os.Stat(moved); err != nil {
+		t.Fatalf("the note was not written into the folder: %v", err)
+	}
+}
+
+func TestSchemaRouteServesTheFrontmatterSchema(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	_ = gameID
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/schema/entity-frontmatter", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("schema: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var schema FrontmatterSchema
+	if err := json.Unmarshal(rec.Body.Bytes(), &schema); err != nil {
+		t.Fatalf("decode schema: %v", err)
+	}
+	if len(schema.Keys) == 0 {
+		t.Fatal("the served schema lists no keys")
+	}
+	if !schema.AllowUnknown {
+		t.Error("the served schema must allow unknown keys")
+	}
+}
+
+func TestSchemaRouteRejectsAPost(t *testing.T) {
+	_, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/schema/entity-frontmatter", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rec.Code)
+	}
+}
+
+func TestEntitySaveRouteReportsABrokenFrontmatterLine(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	// The third document line has an unclosed quote, so the frontmatter will not
+	// parse and the route must name where.
+	note := "---\nid: silver-hand\nname: \"unclosed\ntype: faction\n---\n\nA guild.\n"
+	body := `{"markdown":` + strconv.Quote(note) + `}`
+	req := httptest.NewRequest(http.MethodPut, "/api/game/"+gameID+"/entity/silver-hand", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for broken frontmatter, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var payload struct {
+		Error  string `json:"error"`
+		Line   int    `json:"line"`
+		Column int    `json:"column"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode error body: %v", err)
+	}
+	if payload.Error == "" {
+		t.Error("the error body must carry a message")
+	}
+	if payload.Line < 3 || payload.Line > 4 {
+		t.Errorf("Line = %d, want the broken line (3 or 4)", payload.Line)
+	}
+	if payload.Column < 1 {
+		t.Errorf("Column = %d, want a 1-based column", payload.Column)
+	}
+}
+
 func TestTraceRouteReturnsTheMostRecentEvents(t *testing.T) {
 	_, svc := turnFixture(t)
 	server := NewServer(svc, http.NotFoundHandler())

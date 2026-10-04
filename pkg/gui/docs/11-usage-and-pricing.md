@@ -9,7 +9,7 @@ description: Reading the spend ledger and setting the provider prices that turn 
 # Usage, Cost & Pricing
 
 LocalRPG records every metered provider call in a **spend ledger** and, when a
-price is known, converts that usage into a cost. The ledger lives in the Usage
+price is known, converts that usage into a cost. The ledger is shown in the Usage
 tab of Global Settings and is stored per campaign, so a turn's spend is never
 lost when a price changes later.
 
@@ -17,19 +17,19 @@ lost when a price changes later.
 
 Open **Global Settings** and select the **Usage** tab. You can switch between
 the active campaign and a global view, and filter by provider or role. Each row
-shows the turn, the role it was attributed to, the provider and model, what was
+shows the turn, the role attributed to it, the provider and model, what was
 consumed (tokens, characters, or requests), and the cost.
 
 Rows that consumed something a provider bills for, but for which LocalRPG has no
-price, show a **no price configured** badge instead of a figure. That is not an
+price, show a **no price configured** badge instead of a figure. That isn't an
 error: LocalRPG never guesses a rate. It means the usage was recorded and you
 can turn it into a cost at any time by adding a price below.
 
 ## Which provider key?
 
-The `provider` field is not the name you gave the block under `providers:`. It is
+The `provider` field isn't the name you gave the block under `providers:`. It's
 the **canonical key** the adapter records usage under, which is fixed by
-LocalRPG. A key is `<family>:<adapter>`, and an adapter that names an endpoint or
+LocalRPG. A key is `<family>:<adapter>`, and an adapter that identifies an endpoint or
 command also has an instance form:
 
 - adapter: `llm:openaichat`, `tts:http`, `image:gemini`, `embedding:gemini`
@@ -50,14 +50,14 @@ An unpriced row in the Usage tab shows exactly the key to use, and the
 
 A recorded key is matched most specific first, stopping at the first match:
 
-1. the instance key and model, e.g. `tts:http@localhost:8880` + `kokoro`
-2. the instance key, e.g. `tts:http@localhost:8880`
-3. the adapter key and model, e.g. `tts:http` + `kokoro`
-4. the adapter key, e.g. `tts:http`
+1. the instance key and model, such as `tts:http@localhost:8880` + `kokoro`
+2. the instance key, such as `tts:http@localhost:8880`
+3. the adapter key and model, such as `tts:http` + `kokoro`
+4. the adapter key, such as `tts:http`
 
-So a price on `tts:http` covers every HTTP speech endpoint, and a price on
+A price on `tts:http` covers every HTTP speech endpoint, and a price on
 `tts:http@hostA` overrides it for that endpoint only. The same ladder decides
-which rate-limit block applies: a block on one endpoint does not stop another,
+which rate-limit block applies: a block on one endpoint doesn't stop another,
 while a block on the adapter stops them all.
 
 The field names below are also listed, with every other config key, in the
@@ -107,7 +107,7 @@ providers:
 | `per_request` | image / request-billed | charge per call |
 
 All values are in **micros**: one millionth of a currency unit. To express a
-price of `2.50`, write `2500000` (2.50 x 1,000,000). The display currency is
+price of `2.50`, write `2500000` (2.50 × 1,000,000). The display currency is
 `providers.currency` (default `USD`); no exchange-rate conversion is performed.
 
 ### Resolution order
@@ -119,29 +119,29 @@ first match:
 2. A config entry with the same instance key and no model.
 3. A config entry with the same **adapter key** and model.
 4. A config entry with the same adapter key and no model.
-5. A built-in default shipped in `pkg/pricing`, matched the same way.
+5. A built-in default in `pkg/pricing`, matched the same way.
 6. Nothing, which yields a zero cost and the **no price configured** badge.
 
-A `providers.prices` entry whose `provider` is not a canonical key is reported as
-a configuration problem on load and matches nothing.
+A `providers.prices` entry whose `provider` isn't a canonical key is reported as
+a configuration problem on load and doesn't match anything.
 
-Costs are computed and stored at write time. Editing a price therefore changes
+Costs are computed and stored at write time. Editing a price changes
 future turns only; existing rows keep the figure they were recorded with, so
-historical totals do not drift.
+historical totals don't drift.
 
 ## Notes
 
 - A missing or zero price yields a zero cost. LocalRPG never fabricates a rate.
-- Providers that report no usage metadata still get an **estimated** row where a
-  count can be derived (for example characters spoken), so spend is at least
+- Providers that don't report usage metadata still get an **estimated** row where a
+  count can be derived (such as characters spoken), so spend is at least
   visible.
 - Local, unmetered providers (procedural art, native OS speech, a local model
   server) have no price and need none. Built-in rates are keyed to the vendor
   endpoint for exactly this reason: `tts:http@api.openai.com` is priced, while
-  `tts:http@localhost:8880` is not.
-- Some metered services ship no built-in rate because none is published, or none
+  `tts:http@localhost:8880` isn't.
+- Some metered services don't have a built-in rate because none is published, or none
   the ledger can express. Gemini speech has no published character rate, and
   transcription is billed per minute while the ledger records requests. Add a
   `providers.prices` entry if you know your own rate.
 - The [Provider & Model Catalogue](12-provider-catalogue) lists the built-in
-  rates with their models, so you can see what is priced before adding anything.
+  rates with their models, so you can see what's priced before adding anything.

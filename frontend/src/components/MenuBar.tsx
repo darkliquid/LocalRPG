@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
   Bug,
+  FolderTree,
   Github,
   Info,
   Maximize,
@@ -17,6 +18,7 @@ import { PROJECT_ISSUES_URL, PROJECT_REPO_URL, openExternal } from '../lib/proje
 interface MenuBarProps {
   onOpenDocs: () => void;
   onOpenAbout: () => void;
+  onOpenContentStudio: () => void;
 }
 
 interface MenuAction {
@@ -46,7 +48,7 @@ function applyZoom(level: number) {
 // MenuBar is the application menu. Wails v3 cannot hide a native menu bar on
 // Linux, so the app draws its own and keeps it out of the way until the player
 // taps Alt, the same gesture a native Windows menu bar answers to.
-export const MenuBar: React.FC<MenuBarProps> = ({ onOpenDocs, onOpenAbout }) => {
+export const MenuBar: React.FC<MenuBarProps> = ({ onOpenDocs, onOpenAbout, onOpenContentStudio }) => {
   const [revealed, setRevealed] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -172,6 +174,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onOpenDocs, onOpenAbout }) => 
     {
       label: 'Help',
       actions: [
+        { label: 'Content Studio', icon: FolderTree, action: onOpenContentStudio },
         { label: 'Documentation', icon: BookOpen, action: onOpenDocs },
         { label: 'Report an Issue', icon: Bug, action: () => openExternal(PROJECT_ISSUES_URL) },
         { label: 'Project Repository', icon: Github, action: () => openExternal(PROJECT_REPO_URL) },

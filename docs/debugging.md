@@ -4,7 +4,7 @@ LocalRPG includes an embedded debugging suite designed to diagnose why turns fai
 
 The suite combines:
 1. **Interactive Dual-Server Mode (`localrpg debug server`)**: Runs the LocalRPG web GUI side-by-side with an embedded OpenTelemetry debugging dashboard.
-2. **Automated Application Driver (`localrpg debug test-run`)**: Drives the UI headlessly using the Chrome DevTools Protocol (CDP via `chromedp`) to run declarative YAML test scenarios.
+2. **Automated App Driver (`localrpg debug test-run`)**: Drives the UI headlessly using the Chrome DevTools Protocol (CDP via `chromedp`) to run declarative YAML test scenarios.
 3. **In-Process OpenTelemetry Collector**: Bounded in-memory ring buffers that buffer spans, traces, and structured logs without requiring external Docker services or Jaeger collectors.
 4. **Action-Telemetry Correlator**: Marries user clicks and turn submissions to their exact backend spans, assembled prompt layers, raw model completions, and failure codes.
 5. **Standalone HTML Reports**: Self-contained report artifacts with trace waterfalls, token counts, and failure screenshots.
@@ -16,7 +16,7 @@ The suite combines:
 When you take an action in LocalRPG and the GM returns no narration, it typically means one of three things:
 - The model returned an empty string or only whitespaces (`empty_response`).
 - The model produced tool calls or internal thoughts without finalizing prose narration.
-- A provider error, timeout, or context prompt overflow caused the generation to abort.
+- A provider error, timeout, or context prompt overflow caused the generation to stop.
 
 ### Step 1: Start the Debug Server
 
@@ -26,7 +26,7 @@ Run:
 ```
 
 This launches:
-- **LocalRPG Application**: `http://localhost:8080` (or `http://localhost:3000` when running the Vite frontend dev server).
+- **LocalRPG app**: `http://localhost:8080` (or `http://localhost:3000` when running the Vite frontend dev server).
 - **Debugger Dashboard**: `http://localhost:8089`.
 
 ### Step 2: Open Both Interfaces
@@ -36,16 +36,16 @@ This launches:
 
 ### Step 3: Trigger the Problematic Turn
 
-In the LocalRPG app, play the campaign turn that is failing or producing blank narration.
+In the LocalRPG app, play the campaign turn that's failing or producing blank narration.
 
 ### Step 4: Inspect in the Debugger Dashboard
 
-In `http://localhost:8089`, the turn automatically appears in the left sidebar (e.g. `[OK] turn #1 (1240ms)` or `[FAIL] turn #1 (850ms)`).
+In `http://localhost:8089`, the turn automatically appears in the left sidebar (such as `[OK] turn #1 (1240ms)` or `[FAIL] turn #1 (850ms)`).
 
-Click on the turn to view:
+Click the turn to view:
 - **Prompt & LLM Tab**:
   - **Assembled Prompt**: The exact layered prompt (system rules, world lore, entity wikilinks, active scene scope, conversation memory) sent to the LLM.
-  - **Raw Completion**: Exactly what the model returned. If it is empty, you will immediately see `""`. If the model returned thoughts, unexpected JSON, or partial text, you can inspect it verbatim.
+  - **Raw Completion**: Exactly what the model returned. If it's empty, you immediately see `""`. If the model returned thoughts, unexpected JSON, or partial text, you can inspect it verbatim.
   - **Failure Code**: Shows classified error codes like `empty_response`, `provider_timeout`, `rate_limit`, or `auth_failure`.
 - **Spans Waterfall Tab**:
   - Shows the complete span tree: `turn` &rarr; `context.assemble` &rarr; `provider.generate` &rarr; `tool.call` &rarr; `timeline.record_turn`.
@@ -80,7 +80,7 @@ You can run automated browser test scenarios to reproduce bugs or verify UI work
 |---|---|---|
 | `--scenario` | *(required)* | Path to the declarative YAML scenario file. |
 | `--headless` | `true` | When `true`, runs Chrome without a visible window. Set to `false` to watch browser actions live. |
-| `--port` | `8080` | LocalRPG application port. |
+| `--port` | `8080` | LocalRPG app port. |
 | `--debugger-port` | `8089` | Port for the live debugger web dashboard. |
 | `--report-dir` | `test-results` | Output directory where `report-<timestamp>.html` is saved upon completion. |
 
@@ -134,8 +134,8 @@ steps:
 | `wait_visible` | `selector` | `timeout_ms` | Waits until element matching CSS selector appears in the DOM. |
 | `assert_visible`| `selector` | `text_contains`, `timeout_ms` | Asserts element is visible and optionally checks text content. |
 | `assert_turn_outcome` | `expected` | - | Asserts that turn resulted in `success`, `error`, or `roll`. |
-| `sleep` | - | `timeout_ms` | Pauses scenario execution for the given duration. |
-| `fault_injection` | `fault` | - | Triggers mock provider behavior (e.g. `empty_response_once`). |
+| `sleep` | - | `timeout_ms` | Pauses scenario execution for `timeout_ms` milliseconds. |
+| `fault_injection` | `fault` | - | Triggers mock provider behavior (such as `empty_response_once`). |
 
 ---
 
@@ -193,7 +193,7 @@ The dashboard on `http://localhost:8089` exposes:
 - Displays error status and failure code if generation failed.
 
 ### 4. Raw JSON (Right Pane - Tab 3)
-- Complete structured diagnostic payload, including provider attempts and token metrics.
+- Complete structured diagnostic payload: provider attempts and token metrics.
 
 ---
 

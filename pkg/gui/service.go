@@ -866,33 +866,28 @@ func maxInt(value, floor int) int {
 // disagree with the graph about what exists.
 func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySummaryDTO, error) {
 	entitiesDir := filepath.Join(s.resolver.GameDir(gameID), "entities")
-	entries, err := os.ReadDir(entitiesDir)
-	if err != nil {
-		return nil, fmt.Errorf("read entities dir: %w", err)
-	}
 
-	summaries := make([]EntitySummaryDTO, 0, len(entries))
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".md") {
-			continue
-		}
-		id := strings.TrimSuffix(entry.Name(), ".md")
-		data, err := os.ReadFile(filepath.Join(entitiesDir, entry.Name()))
-		if err != nil {
-			continue
-		}
+	summaries := make([]EntitySummaryDTO, 0)
+	err := eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
+		filenameID := strings.TrimSuffix(filepath.Base(path), ".md")
 		parsed, err := entity.ParseMarkdownEntity(data)
 		if err != nil {
 			// A note that fails to parse is still a note the player wrote. Show
 			// it so it can be repaired instead of silently vanishing.
 			summaries = append(summaries, EntitySummaryDTO{
-				ID:         id,
-				Name:       id,
+				ID:         filenameID,
+				Name:       filenameID,
+				Folder:     folder,
 				ParseError: true,
 			})
-			continue
+			return nil
 		}
 
+		// The declared id is the identity; the file name is only a convention.
+		id := parsed.ID
+		if id == "" {
+			id = filenameID
+		}
 		name := parsed.Name
 		if name == "" {
 			name = id
@@ -905,20 +900,84 @@ func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySumm
 		}
 
 		summaries = append(summaries, EntitySummaryDTO{
-			ID:          id,
-			Name:        name,
-			Type:        parsed.Type,
-			Location:    parsed.Location,
-			Tags:        parsed.Tags,
-			HasPortrait: hasPortrait,
-			PortraitURL: portraitURL,
+			ID:               id,
+			Name:             name,
+			Type:             parsed.Type,
+			Location:         parsed.Location,
+			Tags:             parsed.Tags,
+			Aliases:          parsed.Aliases,
+			Folder:           folder,
+			FilenameMismatch: id != filenameID,
+			HasPortrait:      hasPortrait,
+			PortraitURL:      portraitURL,
 		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	sort.SliceStable(summaries, func(i, j int) bool {
 		return strings.ToLower(summaries[i].Name) < strings.ToLower(summaries[j].Name)
 	})
 	return summaries, nil
+}
+
+// eachEntityNote walks a collection's entities/ tree in path order, calling fn
+// with each note's path, its folder relative to the root, and its bytes. Every
+// reader of the tree goes through this, so "what counts as a note" is decided
+// once: markdown files, not hidden, not under assets/.
+func eachEntityNote(entitiesDir string, fn func(path, folder string, data []byte) error) error {
+	err := filepath.WalkDir(entitiesDir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if os.IsNotExist(walkErr) {
+				return nil
+			}
+			return fmt.Errorf("walk %q: %w", path, walkErr)
+		}
+		if entry.IsDir() {
+			if path == entitiesDir {
+				return nil
+			}
+			name := entry.Name()
+			if strings.HasPrefix(name, ".") || name == "assets" {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(entry.Name()), ".md") {
+			return nil
+		}
+
+		rel, err := filepath.Rel(entitiesDir, filepath.Dir(path))
+		if err != nil {
+			return fmt.Errorf("relative path for %q: %w", path, err)
+		}
+		folder := ""
+		if rel != "." && rel != "" {
+			folder = filepath.ToSlash(rel)
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil // a note that vanished mid-walk is not an error
+		}
+		return fn(path, folder, data)
+	})
+	if err != nil {
+		return fmt.Errorf("walk entities dir: %w", err)
+	}
+	return nil
+}
+
+// folderForNotePath is the stored folder form for a note path: the directory
+// relative to the entities root, slash-separated, with "" for the root.
+func folderForNotePath(entitiesDir, path string) string {
+	rel, err := filepath.Rel(entitiesDir, filepath.Dir(path))
+	if err != nil || rel == "." || rel == "" {
+		return ""
+	}
+	return filepath.ToSlash(rel)
 }
 
 func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*EntityDTO, error) {
@@ -929,12 +988,20 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 		return nil, fmt.Errorf("invalid entity id: %w", err)
 	}
 
-	gameDir := s.resolver.GameDir(gameID)
-	path := filepath.Join(gameDir, "entities", entityID+".md")
+	entitiesDir := filepath.Join(s.resolver.GameDir(gameID), "entities")
+
+	path, err := s.findEntityNote(entitiesDir, entityID)
+	if err != nil {
+		return nil, err
+	}
+	if path == "" {
+		return nil, fmt.Errorf("read entity file: %w", fs.ErrNotExist)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read entity file: %w", err)
 	}
+	folder := folderForNotePath(entitiesDir, path)
 
 	ent, err := entity.ParseMarkdownEntity(data)
 	if err != nil {
@@ -944,6 +1011,7 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 			ID:         entityID,
 			Name:       entityID,
 			Markdown:   string(data),
+			Folder:     folder,
 			ParseError: true,
 		}, nil
 	}
@@ -968,41 +1036,85 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 		Markdown:  string(data),
 		State:     stateMap,
 		Backlinks: backlinks,
+		Folder:    folder,
 		History:   ent.History,
 	}, nil
 }
 
+// ErrDuplicateEntityID reports a save whose frontmatter id already belongs to a
+// different note. The id is the identity, so a second claim is refused rather
+// than silently overwriting a note in another folder.
+var ErrDuplicateEntityID = errors.New("entity id already in use")
+
+// SaveEntity writes a note at the collection root.
 func (s *Service) SaveEntity(ctx context.Context, gameID, entityID, rawMarkdown string) error {
+	return s.SaveEntityInFolder(ctx, gameID, entityID, "", rawMarkdown)
+}
+
+// SaveEntityInFolder writes a note at folder, moving it when it already lives
+// somewhere else. The file name stays the id, because the id is the identity and
+// the folder is only location: no inbound link is rewritten, which is the whole
+// point of decoupling the two.
+func (s *Service) SaveEntityInFolder(ctx context.Context, gameID, entityID, folder, rawMarkdown string) error {
 	if err := pathutil.ValidateID(gameID); err != nil {
 		return fmt.Errorf("invalid game id: %w", err)
 	}
 	if err := pathutil.ValidateID(entityID); err != nil {
 		return fmt.Errorf("invalid entity id: %w", err)
 	}
+	cleanFolder, err := ValidateFolderPath(folder)
+	if err != nil {
+		return err
+	}
 
 	ent, err := entity.ParseMarkdownEntity([]byte(rawMarkdown))
 	if err != nil {
 		return fmt.Errorf("save entity %q: %w", entityID, err)
 	}
-	// The file name is the note's identity. Normalise the frontmatter id so a
-	// hand-edited or copied id can never index a note under another note's key.
+	// The file name is the note's identity, so a hand-edited or copied id can
+	// never index a note under another note's key.
 	ent.ID = entityID
+	ent.Folder = cleanFolder
+
+	gameDir := s.resolver.GameDir(gameID)
+	entitiesDir := filepath.Join(gameDir, "entities")
+
+	if err := s.assertIDIsFree(entitiesDir, entityID, rawMarkdown); err != nil {
+		return err
+	}
+
+	existingPath, err := s.findEntityNote(entitiesDir, entityID)
+	if err != nil {
+		return err
+	}
+
+	targetDir := entitiesDir
+	if cleanFolder != "" {
+		targetDir = filepath.Join(entitiesDir, filepath.FromSlash(cleanFolder))
+	}
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return fmt.Errorf("create folder %q: %w", cleanFolder, err)
+	}
+
 	normalised, err := ent.SerializeMarkdown()
 	if err != nil {
 		return fmt.Errorf("normalise entity %q: %w", entityID, err)
 	}
 
-	gameDir := s.resolver.GameDir(gameID)
-	entitiesDir := filepath.Join(gameDir, "entities")
-	path, err := pathutil.ResolveSafeChild(entitiesDir, entityID+".md")
+	targetPath, err := pathutil.ResolveSafeChild(targetDir, entityID+".md")
 	if err != nil {
 		return fmt.Errorf("resolve entity path: %w", err)
 	}
-	if strings.Contains(path, "..") {
+	if strings.Contains(targetPath, "..") {
 		return fmt.Errorf("invalid entity path: contains traversal")
 	}
-	if err := os.WriteFile(path, normalised, 0644); err != nil {
+	if err := os.WriteFile(targetPath, normalised, 0o644); err != nil {
 		return fmt.Errorf("write entity file: %w", err)
+	}
+	if existingPath != "" && existingPath != targetPath {
+		if err := os.Remove(existingPath); err != nil {
+			return fmt.Errorf("remove old note %q: %w", existingPath, err)
+		}
 	}
 
 	store, err := s.store(gameID)
@@ -1011,7 +1123,50 @@ func (s *Service) SaveEntity(ctx context.Context, gameID, entityID, rawMarkdown 
 	}
 
 	syncer := storage.NewSyncer(store)
-	return syncer.SyncFile(path)
+	return syncer.SyncFile(targetPath)
+}
+
+// findEntityNote returns the path a note currently occupies, or "" when it is
+// new. A note is found by the id it declares or by its file name, so a note that
+// an author renamed by hand is still reachable.
+func (s *Service) findEntityNote(entitiesDir, entityID string) (string, error) {
+	found := ""
+	err := eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
+		filenameID := strings.TrimSuffix(filepath.Base(path), ".md")
+		if filenameID == entityID {
+			found = path
+			return nil
+		}
+		if entity.DeclaredID(data) == entityID {
+			found = path
+		}
+		return nil
+	})
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return found, nil
+}
+
+// assertIDIsFree refuses a save whose frontmatter id already names another note.
+// The requested file name is the id, so a body declaring a different id is a
+// collision with that other note rather than a rename.
+func (s *Service) assertIDIsFree(entitiesDir, entityID, rawMarkdown string) error {
+	declared := entity.DeclaredID([]byte(rawMarkdown))
+	if declared == "" || declared == entityID {
+		return nil
+	}
+	if _, err := os.Stat(filepath.Join(entitiesDir, declared+".md")); err == nil {
+		return fmt.Errorf("%w: %q; use a different id", ErrDuplicateEntityID, declared)
+	}
+	existing, err := s.findEntityNote(entitiesDir, declared)
+	if err == nil && existing != "" {
+		return fmt.Errorf("%w: %q; use a different id", ErrDuplicateEntityID, declared)
+	}
+	return nil
 }
 
 // MergeEntities folds one note into another: the survivor keeps its identity and
@@ -1127,34 +1282,138 @@ func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID 
 // so no note is left pointing at an entity that no longer exists.
 func (s *Service) rewriteInboundLinks(gameDir, sourceID, targetID string) error {
 	entitiesDir := filepath.Join(gameDir, "entities")
-	entries, err := os.ReadDir(entitiesDir)
-	if err != nil {
-		return fmt.Errorf("read entities dir: %w", err)
-	}
 
 	pattern := regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(sourceID) + `(\s*\|[^\]]*)?\]\]`)
 	replacement := "[[" + targetID + "$1]]"
 
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".md") || strings.TrimSuffix(entry.Name(), ".md") == sourceID {
-			continue
-		}
-
-		path := filepath.Join(entitiesDir, entry.Name())
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
+	return eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
+		if strings.TrimSuffix(filepath.Base(path), ".md") == sourceID {
+			return nil
 		}
 		if !pattern.Match(data) {
-			continue
+			return nil
 		}
 
 		updated := pattern.ReplaceAll(data, []byte(replacement))
 		if err := os.WriteFile(path, updated, 0644); err != nil {
-			return fmt.Errorf("rewrite links in %s: %w", entry.Name(), err)
+			return fmt.Errorf("rewrite links in %s: %w", filepath.Base(path), err)
 		}
+		return nil
+	})
+}
+
+// ListFolders returns the folder tree under an entities directory. Folders are
+// read from disk rather than from the index, so a folder with no notes in it is
+// still visible and can be dragged into.
+func (s *Service) ListFolders(entitiesDir string) ([]FolderDTO, error) {
+	paths := make([]string, 0)
+
+	err := filepath.WalkDir(entitiesDir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if os.IsNotExist(walkErr) {
+				return nil
+			}
+			return fmt.Errorf("walk %q: %w", path, walkErr)
+		}
+		if !entry.IsDir() || path == entitiesDir {
+			return nil
+		}
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") || name == "assets" {
+			return fs.SkipDir
+		}
+		rel, err := filepath.Rel(entitiesDir, path)
+		if err != nil {
+			return fmt.Errorf("relative path for %q: %w", path, err)
+		}
+		paths = append(paths, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	return BuildFolderTree(paths), nil
+}
+
+// CreateFolder creates a folder and any missing parents.
+func (s *Service) CreateFolder(entitiesDir, path string) error {
+	clean, err := ValidateFolderPath(path)
+	if err != nil {
+		return err
+	}
+	if clean == "" {
+		return fmt.Errorf("%w: a folder needs a name", ErrInvalidFolderPath)
+	}
+	return os.MkdirAll(filepath.Join(entitiesDir, filepath.FromSlash(clean)), 0o755)
+}
+
+// MoveFolder renames a folder, taking its notes with it. No link is rewritten,
+// because a note is linked by id and not by the path it happens to sit at.
+func (s *Service) MoveFolder(entitiesDir, from, to string) error {
+	cleanFrom, err := ValidateFolderPath(from)
+	if err != nil {
+		return err
+	}
+	cleanTo, err := ValidateFolderPath(to)
+	if err != nil {
+		return err
+	}
+	if cleanFrom == "" || cleanTo == "" {
+		return fmt.Errorf("%w: cannot move the entities root", ErrInvalidFolderPath)
+	}
+
+	source := filepath.Join(entitiesDir, filepath.FromSlash(cleanFrom))
+	if _, err := os.Stat(source); err != nil {
+		return fmt.Errorf("move folder %q: %w", cleanFrom, err)
+	}
+
+	target := filepath.Join(entitiesDir, filepath.FromSlash(cleanTo))
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return fmt.Errorf("create parent of %q: %w", cleanTo, err)
+	}
+	return os.Rename(source, target)
+}
+
+// DeleteFolder removes a folder. A folder holding notes is refused unless
+// recursive is set, so a stray click cannot delete a campaign's lore.
+func (s *Service) DeleteFolder(entitiesDir, path string, recursive bool) error {
+	clean, err := ValidateFolderPath(path)
+	if err != nil {
+		return err
+	}
+	if clean == "" {
+		return fmt.Errorf("%w: cannot delete the entities root", ErrInvalidFolderPath)
+	}
+
+	target := filepath.Join(entitiesDir, filepath.FromSlash(clean))
+	empty, err := folderIsEmpty(target)
+	if err != nil {
+		return err
+	}
+	if !empty && !recursive {
+		return fmt.Errorf("folder %q is not empty; pass recursive=true to delete its notes", clean)
+	}
+	return os.RemoveAll(target)
+}
+
+// folderIsEmpty reports whether a directory holds anything, so a non-recursive
+// delete can refuse instead of destroying notes.
+func folderIsEmpty(dir string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, fmt.Errorf("read folder %q: %w", dir, err)
+	}
+	return len(entries) == 0, nil
+}
+
+// GameFolders lists a campaign's folder tree.
+func (s *Service) GameFolders(gameID string) ([]FolderDTO, error) {
+	return s.ListFolders(filepath.Join(s.resolver.GameDir(gameID), "entities"))
+}
+
+// WorldFolders lists a world's folder tree.
+func (s *Service) WorldFolders(worldID string) ([]FolderDTO, error) {
+	return s.ListFolders(filepath.Join(s.resolver.WorldDir(worldID), "entities"))
 }
 
 // appendUnique adds values that are not already present, preserving order.
@@ -1182,39 +1441,43 @@ func appendUnique(existing []string, values ...string) []string {
 func (s *Service) GetGraph(ctx context.Context, gameID string) (*GraphDTO, error) {
 	gameDir := s.resolver.GameDir(gameID)
 	entitiesDir := filepath.Join(gameDir, "entities")
-	entries, err := os.ReadDir(entitiesDir)
-	if err != nil {
-		return nil, fmt.Errorf("read entities dir: %w", err)
-	}
-
-	nodes := make([]GraphNodeDTO, 0, len(entries))
+	nodes := make([]GraphNodeDTO, 0)
 	links := make([]GraphLinkDTO, 0)
+	known := make(map[string]struct{})
 
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".md") {
-			continue
-		}
-		id := strings.TrimSuffix(entry.Name(), ".md")
-		data, err := os.ReadFile(filepath.Join(entitiesDir, entry.Name()))
-		if err != nil {
-			continue
-		}
+	err := eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
 		ent, err := entity.ParseMarkdownEntity(data)
 		if err != nil {
-			continue
+			return nil
 		}
-
-		nodes = append(nodes, GraphNodeDTO{
-			ID:    id,
-			Label: ent.Name,
-			Type:  ent.Type,
-		})
+		// The declared id is the node's identity, so a nested note is a
+		// first-class node rather than a file name that happens to be unique.
+		id := ent.ID
+		if id == "" {
+			id = strings.TrimSuffix(filepath.Base(path), ".md")
+		}
+		known[id] = struct{}{}
+		nodes = append(nodes, GraphNodeDTO{ID: id, Label: ent.Name, Type: ent.Type})
 
 		for _, target := range ent.Wikilinks {
-			links = append(links, GraphLinkDTO{
-				Source: id,
-				Target: target,
-			})
+			links = append(links, GraphLinkDTO{Source: id, Target: target})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// A hand-written path-qualified link lands on the note whose id is its final
+	// segment, so the graph and the mention resolver agree.
+	for i := range links {
+		if _, ok := known[links[i].Target]; ok {
+			continue
+		}
+		if base := entity.WikilinkBasename(links[i].Target); base != links[i].Target {
+			if _, ok := known[base]; ok {
+				links[i].Target = base
+			}
 		}
 	}
 
@@ -3817,34 +4080,30 @@ func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, err
 
 	entitiesDir := filepath.Join(worldDir, "entities")
 	var entities []WorldEntitySummaryDTO
-	if entries, err := os.ReadDir(entitiesDir); err == nil {
-		for _, e := range entries {
-			if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
-				continue
+	_ = eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
+		// A world template is identified by its file name, unlike a campaign note:
+		// templates are not indexed and are not linked by id, so taking the id from
+		// the frontmatter here would rename every existing template the first time
+		// it was saved.
+		entID := strings.TrimSuffix(filepath.Base(path), ".md")
+		name := entID
+		entType := "concept"
+		if ent, err := entity.ParseMarkdownEntity(data); err == nil {
+			if ent.Name != "" {
+				name = ent.Name
 			}
-			entID := strings.TrimSuffix(e.Name(), ".md")
-			data, err := os.ReadFile(filepath.Join(entitiesDir, e.Name()))
-			if err != nil {
-				continue
+			if ent.Type != "" {
+				entType = ent.Type
 			}
-			ent, err := entity.ParseMarkdownEntity(data)
-			name := entID
-			entType := "concept"
-			if err == nil {
-				if ent.Name != "" {
-					name = ent.Name
-				}
-				if ent.Type != "" {
-					entType = ent.Type
-				}
-			}
-			entities = append(entities, WorldEntitySummaryDTO{
-				ID:   entID,
-				Name: name,
-				Type: entType,
-			})
 		}
-	}
+		entities = append(entities, WorldEntitySummaryDTO{
+			ID:     entID,
+			Name:   name,
+			Type:   entType,
+			Folder: folder,
+		})
+		return nil
+	})
 
 	lorePrompt := ""
 	if data, err := os.ReadFile(filepath.Join(worldDir, "prompts", "lore.md")); err == nil {
@@ -3955,7 +4214,14 @@ func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) 
 		return nil, fmt.Errorf("invalid entity id: %w", err)
 	}
 
-	path := filepath.Join(s.resolver.WorldDir(worldID), "entities", entityID+".md")
+	worldDir := s.resolver.WorldDir(worldID)
+	path, err := findWorldEntityNote(worldDir, entityID)
+	if err != nil {
+		return nil, err
+	}
+	if path == "" {
+		return nil, fmt.Errorf("read world entity %s: %w", entityID, fs.ErrNotExist)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read world entity %s: %w", entityID, err)
@@ -3966,20 +4232,53 @@ func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) 
 	}, nil
 }
 
-func (s *Service) SaveWorldEntity(ctx context.Context, worldID, entityID, markdown string) error {
+// SaveWorldEntity writes a template into folder, moving it when it already lives
+// somewhere else. World templates are not indexed, so there is no store to keep
+// in step; the file is the record.
+func (s *Service) SaveWorldEntity(ctx context.Context, worldID, entityID, folder, markdown string) error {
 	if err := pathutil.ValidateID(worldID); err != nil {
 		return fmt.Errorf("invalid world id: %w", err)
 	}
 	if err := pathutil.ValidateID(entityID); err != nil {
 		return fmt.Errorf("invalid entity id: %w", err)
 	}
+	cleanFolder, err := ValidateFolderPath(folder)
+	if err != nil {
+		return err
+	}
 
-	dir := filepath.Join(s.resolver.WorldDir(worldID), "entities")
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	worldDir := s.resolver.WorldDir(worldID)
+	entitiesDir := filepath.Join(worldDir, "entities")
+
+	existingPath, err := findWorldEntityNote(worldDir, entityID)
+	if err != nil {
+		return err
+	}
+
+	targetDir := entitiesDir
+	if cleanFolder != "" {
+		targetDir = filepath.Join(entitiesDir, filepath.FromSlash(cleanFolder))
+	}
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return fmt.Errorf("create world entities dir: %w", err)
 	}
-	path := filepath.Join(dir, entityID+".md")
-	return os.WriteFile(path, []byte(markdown), 0644)
+
+	targetPath, err := pathutil.ResolveSafeChild(targetDir, entityID+".md")
+	if err != nil {
+		return fmt.Errorf("resolve world entity path: %w", err)
+	}
+	if strings.Contains(targetPath, "..") {
+		return fmt.Errorf("invalid world entity path: contains traversal")
+	}
+	if err := os.WriteFile(targetPath, []byte(markdown), 0o644); err != nil {
+		return err
+	}
+	if existingPath != "" && existingPath != targetPath {
+		if err := os.Remove(existingPath); err != nil {
+			return fmt.Errorf("remove old template %q: %w", existingPath, err)
+		}
+	}
+	return nil
 }
 
 func (s *Service) DeleteWorldEntity(ctx context.Context, worldID, entityID string) error {
@@ -3990,8 +4289,37 @@ func (s *Service) DeleteWorldEntity(ctx context.Context, worldID, entityID strin
 		return fmt.Errorf("invalid entity id: %w", err)
 	}
 
-	path := filepath.Join(s.resolver.WorldDir(worldID), "entities", entityID+".md")
+	path, err := findWorldEntityNote(s.resolver.WorldDir(worldID), entityID)
+	if err != nil {
+		return err
+	}
+	if path == "" {
+		return fmt.Errorf("delete world entity %s: %w", entityID, fs.ErrNotExist)
+	}
 	return os.Remove(path)
+}
+
+// findWorldEntityNote returns the path a world template occupies, or "" when it
+// does not exist. A template is found by the id it declares or by its file name,
+// so a hand-edited template that disagrees with itself is still reachable.
+func findWorldEntityNote(worldDir, entityID string) (string, error) {
+	entitiesDir := filepath.Join(worldDir, "entities")
+	found := ""
+	err := eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
+		filenameID := strings.TrimSuffix(filepath.Base(path), ".md")
+		declared := entity.DeclaredID(data)
+		if filenameID == entityID || declared == entityID {
+			found = path
+		}
+		return nil
+	})
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return found, nil
 }
 
 // applyResolvedPaths fills a config's path fields with the absolute directories

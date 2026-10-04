@@ -114,3 +114,78 @@ func TestListEntitiesCarriesAliases(t *testing.T) {
 		t.Errorf("Aliases = %v, want the note's alias", summaries[0].Aliases)
 	}
 }
+
+func TestSaveEntityRecordsFolder(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer store.Close()
+
+	ent := &entity.Entity{
+		ID:     "silver-hand",
+		Name:   "Silver Hand",
+		Type:   "faction",
+		Folder: "factions/orders",
+		Body:   "A guild of smiths.\n",
+	}
+	if err := store.SaveEntity(ent); err != nil {
+		t.Fatalf("SaveEntity: %v", err)
+	}
+
+	got, err := store.GetEntity("silver-hand")
+	if err != nil {
+		t.Fatalf("GetEntity: %v", err)
+	}
+	if got.Folder != "factions/orders" {
+		t.Errorf("Folder = %q, want %q", got.Folder, "factions/orders")
+	}
+}
+
+func TestSaveEntityRootFolderIsEmpty(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.SaveEntity(&entity.Entity{
+		ID: "loose-note", Name: "Loose Note", Type: "item", Body: "x\n",
+	}); err != nil {
+		t.Fatalf("SaveEntity: %v", err)
+	}
+
+	got, err := store.GetEntity("loose-note")
+	if err != nil {
+		t.Fatalf("GetEntity: %v", err)
+	}
+	if got.Folder != "" {
+		t.Errorf("Folder = %q, want the empty root folder", got.Folder)
+	}
+}
+
+func TestListEntitiesCarriesFolder(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.SaveEntity(&entity.Entity{
+		ID: "ashen-order", Name: "Ashen Order", Type: "faction",
+		Folder: "factions/orders", Body: "Sworn to the flame.\n",
+	}); err != nil {
+		t.Fatalf("SaveEntity: %v", err)
+	}
+
+	summaries, err := store.ListEntities()
+	if err != nil {
+		t.Fatalf("ListEntities: %v", err)
+	}
+	if len(summaries) != 1 {
+		t.Fatalf("expected one summary, got %d", len(summaries))
+	}
+	if summaries[0].Folder != "factions/orders" {
+		t.Errorf("Folder = %q, want %q", summaries[0].Folder, "factions/orders")
+	}
+}

@@ -30,6 +30,7 @@ import { AboutModal } from './components/AboutModal';
 // opened, so it loads on demand instead of in the first bundle. The chronicle,
 // its drawers, and the launcher stay eager because they are the first paint.
 const DocsModal = lazy(() => import('./components/DocsModal').then((m) => ({ default: m.DocsModal })));
+const ContentStudio = lazy(() => import('./components/ContentStudio'));
 const SettingsStudio = lazy(() => import('./components/SettingsStudio').then((m) => ({ default: m.SettingsStudio })));
 const StoryTheater = lazy(() => import('./components/StoryTheater').then((m) => ({ default: m.StoryTheater })));
 const ExportModal = lazy(() => import('./components/ExportModal').then((m) => ({ default: m.ExportModal })));
@@ -80,6 +81,7 @@ export const App: React.FC = () => {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
+  const [isContentStudioOpen, setIsContentStudioOpen] = useState(false);
   const [docsArticleID, setDocsArticleID] = useState<string | undefined>(undefined);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   // The build version the About dialog reports, read from the settings endpoint.
@@ -1185,7 +1187,19 @@ export const App: React.FC = () => {
       {/* The application menu stays out of the way until Alt reveals it, and the
           About dialog describes the app rather than the framework it is built
           on. Both sit above the launcher and a campaign alike. */}
-      <MenuBar onOpenDocs={() => openDocs()} onOpenAbout={() => setIsAboutOpen(true)} />
+      <MenuBar
+        onOpenDocs={() => openDocs()}
+        onOpenAbout={() => setIsAboutOpen(true)}
+        onOpenContentStudio={() => setIsContentStudioOpen(true)}
+      />
+
+      <Suspense fallback={null}>
+        <ContentStudio
+          isOpen={isContentStudioOpen}
+          onClose={() => setIsContentStudioOpen(false)}
+          gameID={activeGameID ?? ''}
+        />
+      </Suspense>
 
       <Suspense fallback={null}>
         <DocsModal
