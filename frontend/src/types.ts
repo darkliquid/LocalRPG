@@ -250,6 +250,9 @@ export interface EntitySummary {
   type: string;
   location?: string;
   tags?: string[];
+  aliases?: string[];
+  folder?: string;
+  filename_mismatch?: boolean;
   parse_error?: boolean;
   has_portrait?: boolean;
   portrait_url?: string;
@@ -263,7 +266,14 @@ export interface EntityNote {
   state: Record<string, any>;
   backlinks: string[];
   history?: number[];
+  folder?: string;
   parse_error?: boolean;
+}
+
+export interface FolderNode {
+  path: string;
+  name: string;
+  children?: FolderNode[];
 }
 
 export interface GraphNode {

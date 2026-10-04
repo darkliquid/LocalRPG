@@ -7,6 +7,7 @@ import {
   GraphData,
   GameSummary,
   EntitySummary,
+  FolderNode,
   Recap,
   SystemInfo,
   WorldInfo,
@@ -740,13 +741,45 @@ export class APIClient {
     return res.json();
   }
 
-  async saveEntity(entityID: string, markdown: string): Promise<void> {
+  async saveEntity(entityID: string, markdown: string, folder?: string): Promise<void> {
     const res = await fetch(`/api/game/${this.gameID}/entity/${entityID}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ markdown })
+      body: JSON.stringify({ markdown, folder: folder ?? '' })
     });
     if (!res.ok) throw new Error(`saveEntity: ${res.statusText}`);
+  }
+
+  async listFolders(): Promise<FolderNode[]> {
+    const res = await fetch(`/api/game/${this.gameID}/folders`);
+    if (!res.ok) throw new Error(`listFolders: ${res.statusText}`);
+    return res.json();
+  }
+
+  async createFolder(path: string): Promise<void> {
+    const res = await fetch(`/api/game/${this.gameID}/folders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+    if (!res.ok) throw new Error((await res.text()).trim() || `createFolder: ${res.statusText}`);
+  }
+
+  async moveFolder(from: string, to: string): Promise<void> {
+    const res = await fetch(`/api/game/${this.gameID}/folders`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, path: to }),
+    });
+    if (!res.ok) throw new Error((await res.text()).trim() || `moveFolder: ${res.statusText}`);
+  }
+
+  async deleteFolder(path: string, recursive = false): Promise<void> {
+    const params = new URLSearchParams({ path, recursive: String(recursive) });
+    const res = await fetch(`/api/game/${this.gameID}/folders?${params.toString()}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error((await res.text()).trim() || `deleteFolder: ${res.statusText}`);
   }
 
   async mergeEntity(sourceID: string, intoID: string): Promise<EntityNote> {
