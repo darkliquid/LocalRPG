@@ -1423,6 +1423,25 @@ git commit -m "feat(frontend): complete and lint frontmatter and wikilinks in th
 
 ---
 
+## Execution Notes
+
+Recorded after the plan was executed, so the plan matches what shipped.
+
+- **Task 5** dropped the hand-written duplicate-key scan. The `yaml` parser
+  reports a repeated key as an error of its own, so the scan was a second
+  implementation of a rule the parser already enforces; the plan's own step said to
+  delete it if it ended up unused, and it did.
+- **Task 8** attaches the intelligence through a CodeMirror `Compartment` rather
+  than adding the extensions when the editor is created. The schema and the note
+  list are both fetched after the first render, and the editor is deliberately
+  created once, so a compartment is what lets late-arriving intelligence reach an
+  editor that already exists.
+- **Task 1** created `pkg/gui/schema/entity-frontmatter.json` as a committed
+  artifact written by `go test ./pkg/gui -update-docs`, matching how the
+  configuration reference and provider catalogue already work. The reflection
+  helpers moved out of `docs_schema_test.go` into `pkg/gui/schema.go` so the
+  production generator and the documentation generator share one walker.
+
 ## Self-Review
 
 **Spec coverage.** §2.1 generated schema → Task 1, served in Task 2. §2.2 frontmatter intelligence → Tasks 4 (keys) and 5 (values, hover, lint). §2.3 legible save errors → Task 3 (Go) and Task 8 (client and editor). §2.4 wikilink intelligence → Task 6 (completion and the smart form) and Task 7 (the cached list with aliases). §5 testing → Task 1 (staleness, descriptions, required keys), Task 3 (offset and line mapping), Task 2 (route manifest), and `tsc --noEmit` in Tasks 4-8.
