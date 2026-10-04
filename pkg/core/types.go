@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"gopkg.in/yaml.v3"
 )
 
@@ -115,7 +116,7 @@ func (p *PathResolver) SystemsDir() string {
 }
 
 func (p *PathResolver) SystemDir(id string) string {
-	return filepath.Join(p.SystemsDir(), id)
+	return filepath.Join(p.SystemsDir(), pathutil.SanitizeID(id))
 }
 
 func (p *PathResolver) WorldsDir() string {
@@ -126,7 +127,7 @@ func (p *PathResolver) WorldsDir() string {
 }
 
 func (p *PathResolver) WorldDir(id string) string {
-	return filepath.Join(p.WorldsDir(), id)
+	return filepath.Join(p.WorldsDir(), pathutil.SanitizeID(id))
 }
 
 func (p *PathResolver) GamesDir() string {
@@ -137,7 +138,7 @@ func (p *PathResolver) GamesDir() string {
 }
 
 func (p *PathResolver) GameDir(id string) string {
-	return filepath.Join(p.GamesDir(), id)
+	return filepath.Join(p.GamesDir(), pathutil.SanitizeID(id))
 }
 
 // GameDBPath returns the canonical SQLite index for a campaign.
