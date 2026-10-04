@@ -255,7 +255,17 @@ type EntityDTO struct {	ID         string                 `json:"id"`
 	State      map[string]interface{} `json:"state"`
 	Backlinks  []string               `json:"backlinks"`
 	History    []int                  `json:"history,omitempty"`
-	ParseError bool                   `json:"parse_error,omitempty"`
+	// Folder is the note's directory under entities/, slash-separated, with "" for
+	// the root.
+	Folder     string `json:"folder,omitempty"`
+	ParseError bool   `json:"parse_error,omitempty"`
+}
+
+// FolderRequestDTO creates or moves a folder. Path is the target; From is only
+// set when moving.
+type FolderRequestDTO struct {
+	Path string `json:"path"`
+	From string `json:"from,omitempty"`
 }
 
 // CharacterPortraitDTO reports a freshly written portrait so the Codex can bust
