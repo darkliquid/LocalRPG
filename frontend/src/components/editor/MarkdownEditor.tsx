@@ -233,7 +233,10 @@ export default function MarkdownEditor({
   return (
     <div
       ref={hostRef}
-      className="w-full min-h-0 overflow-hidden rounded-xl border border-stone-800 bg-stone-950 transition-colors focus-within:border-purple-500/50"
+      // No overflow clipping here: CodeMirror positions its completion popup
+      // absolutely inside the editor, so overflow-hidden would cut the popup off
+      // at the editor's own edge.
+      className="w-full min-h-0 rounded-xl border border-stone-800 bg-stone-950 transition-colors focus-within:border-purple-500/50"
       style={{ minHeight, height: '100%' }}
     />
   );
