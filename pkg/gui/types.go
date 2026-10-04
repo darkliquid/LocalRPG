@@ -352,9 +352,16 @@ type EntitySummaryDTO struct {
 	Type        string   `json:"type"`
 	Location    string   `json:"location,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
-	HasPortrait bool     `json:"has_portrait,omitempty"`
-	PortraitURL string   `json:"portrait_url,omitempty"`
-	ParseError  bool     `json:"parse_error,omitempty"`
+	Aliases     []string `json:"aliases,omitempty"`
+	// Folder is the note's directory under entities/, slash-separated, with "" for
+	// the root. The client builds the tree from it.
+	Folder string `json:"folder,omitempty"`
+	// FilenameMismatch is set when the note's file name disagrees with the id its
+	// frontmatter declares, so the client can offer to rename the file.
+	FilenameMismatch bool   `json:"filename_mismatch,omitempty"`
+	HasPortrait      bool   `json:"has_portrait,omitempty"`
+	PortraitURL      string `json:"portrait_url,omitempty"`
+	ParseError       bool   `json:"parse_error,omitempty"`
 }
 
 // ThreadDTO is one unresolved arc as the client sees it.

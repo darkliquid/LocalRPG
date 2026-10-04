@@ -872,33 +872,28 @@ func maxInt(value, floor int) int {
 // disagree with the graph about what exists.
 func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySummaryDTO, error) {
 	entitiesDir := filepath.Join(s.resolver.GameDir(gameID), "entities")
-	entries, err := os.ReadDir(entitiesDir)
-	if err != nil {
-		return nil, fmt.Errorf("read entities dir: %w", err)
-	}
 
-	summaries := make([]EntitySummaryDTO, 0, len(entries))
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".md") {
-			continue
-		}
-		id := strings.TrimSuffix(entry.Name(), ".md")
-		data, err := os.ReadFile(filepath.Join(entitiesDir, entry.Name()))
-		if err != nil {
-			continue
-		}
+	summaries := make([]EntitySummaryDTO, 0)
+	err := eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
+		filenameID := strings.TrimSuffix(filepath.Base(path), ".md")
 		parsed, err := entity.ParseMarkdownEntity(data)
 		if err != nil {
 			// A note that fails to parse is still a note the player wrote. Show
 			// it so it can be repaired instead of silently vanishing.
 			summaries = append(summaries, EntitySummaryDTO{
-				ID:         id,
-				Name:       id,
+				ID:         filenameID,
+				Name:       filenameID,
+				Folder:     folder,
 				ParseError: true,
 			})
-			continue
+			return nil
 		}
 
+		// The declared id is the identity; the file name is only a convention.
+		id := parsed.ID
+		if id == "" {
+			id = filenameID
+		}
 		name := parsed.Name
 		if name == "" {
 			name = id
@@ -911,20 +906,74 @@ func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySumm
 		}
 
 		summaries = append(summaries, EntitySummaryDTO{
-			ID:          id,
-			Name:        name,
-			Type:        parsed.Type,
-			Location:    parsed.Location,
-			Tags:        parsed.Tags,
-			HasPortrait: hasPortrait,
-			PortraitURL: portraitURL,
+			ID:               id,
+			Name:             name,
+			Type:             parsed.Type,
+			Location:         parsed.Location,
+			Tags:             parsed.Tags,
+			Aliases:          parsed.Aliases,
+			Folder:           folder,
+			FilenameMismatch: id != filenameID,
+			HasPortrait:      hasPortrait,
+			PortraitURL:      portraitURL,
 		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	sort.SliceStable(summaries, func(i, j int) bool {
 		return strings.ToLower(summaries[i].Name) < strings.ToLower(summaries[j].Name)
 	})
 	return summaries, nil
+}
+
+// eachEntityNote walks a collection's entities/ tree in path order, calling fn
+// with each note's path, its folder relative to the root, and its bytes. Every
+// reader of the tree goes through this, so "what counts as a note" is decided
+// once: markdown files, not hidden, not under assets/.
+func eachEntityNote(entitiesDir string, fn func(path, folder string, data []byte) error) error {
+	err := filepath.WalkDir(entitiesDir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if os.IsNotExist(walkErr) {
+				return nil
+			}
+			return fmt.Errorf("walk %q: %w", path, walkErr)
+		}
+		if entry.IsDir() {
+			if path == entitiesDir {
+				return nil
+			}
+			name := entry.Name()
+			if strings.HasPrefix(name, ".") || name == "assets" {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(entry.Name()), ".md") {
+			return nil
+		}
+
+		rel, err := filepath.Rel(entitiesDir, filepath.Dir(path))
+		if err != nil {
+			return fmt.Errorf("relative path for %q: %w", path, err)
+		}
+		folder := ""
+		if rel != "." && rel != "" {
+			folder = filepath.ToSlash(rel)
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil // a note that vanished mid-walk is not an error
+		}
+		return fn(path, folder, data)
+	})
+	if err != nil {
+		return fmt.Errorf("walk entities dir: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*EntityDTO, error) {
@@ -1089,34 +1138,24 @@ func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID 
 // so no note is left pointing at an entity that no longer exists.
 func (s *Service) rewriteInboundLinks(gameDir, sourceID, targetID string) error {
 	entitiesDir := filepath.Join(gameDir, "entities")
-	entries, err := os.ReadDir(entitiesDir)
-	if err != nil {
-		return fmt.Errorf("read entities dir: %w", err)
-	}
 
 	pattern := regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(sourceID) + `(\s*\|[^\]]*)?\]\]`)
 	replacement := "[[" + targetID + "$1]]"
 
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".md") || strings.TrimSuffix(entry.Name(), ".md") == sourceID {
-			continue
-		}
-
-		path := filepath.Join(entitiesDir, entry.Name())
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
+	return eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
+		if strings.TrimSuffix(filepath.Base(path), ".md") == sourceID {
+			return nil
 		}
 		if !pattern.Match(data) {
-			continue
+			return nil
 		}
 
 		updated := pattern.ReplaceAll(data, []byte(replacement))
 		if err := os.WriteFile(path, updated, 0644); err != nil {
-			return fmt.Errorf("rewrite links in %s: %w", entry.Name(), err)
+			return fmt.Errorf("rewrite links in %s: %w", filepath.Base(path), err)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // appendUnique adds values that are not already present, preserving order.
@@ -1144,39 +1183,43 @@ func appendUnique(existing []string, values ...string) []string {
 func (s *Service) GetGraph(ctx context.Context, gameID string) (*GraphDTO, error) {
 	gameDir := s.resolver.GameDir(gameID)
 	entitiesDir := filepath.Join(gameDir, "entities")
-	entries, err := os.ReadDir(entitiesDir)
-	if err != nil {
-		return nil, fmt.Errorf("read entities dir: %w", err)
-	}
-
-	nodes := make([]GraphNodeDTO, 0, len(entries))
+	nodes := make([]GraphNodeDTO, 0)
 	links := make([]GraphLinkDTO, 0)
+	known := make(map[string]struct{})
 
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".md") {
-			continue
-		}
-		id := strings.TrimSuffix(entry.Name(), ".md")
-		data, err := os.ReadFile(filepath.Join(entitiesDir, entry.Name()))
-		if err != nil {
-			continue
-		}
+	err := eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
 		ent, err := entity.ParseMarkdownEntity(data)
 		if err != nil {
-			continue
+			return nil
 		}
-
-		nodes = append(nodes, GraphNodeDTO{
-			ID:    id,
-			Label: ent.Name,
-			Type:  ent.Type,
-		})
+		// The declared id is the node's identity, so a nested note is a
+		// first-class node rather than a file name that happens to be unique.
+		id := ent.ID
+		if id == "" {
+			id = strings.TrimSuffix(filepath.Base(path), ".md")
+		}
+		known[id] = struct{}{}
+		nodes = append(nodes, GraphNodeDTO{ID: id, Label: ent.Name, Type: ent.Type})
 
 		for _, target := range ent.Wikilinks {
-			links = append(links, GraphLinkDTO{
-				Source: id,
-				Target: target,
-			})
+			links = append(links, GraphLinkDTO{Source: id, Target: target})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// A hand-written path-qualified link lands on the note whose id is its final
+	// segment, so the graph and the mention resolver agree.
+	for i := range links {
+		if _, ok := known[links[i].Target]; ok {
+			continue
+		}
+		if base := entity.WikilinkBasename(links[i].Target); base != links[i].Target {
+			if _, ok := known[base]; ok {
+				links[i].Target = base
+			}
 		}
 	}
 

@@ -1313,3 +1313,115 @@ func TestTurnDTO_SceneBreakAndAnchoredSpeakerPortraits(t *testing.T) {
 	}
 }
 
+// writeNestedNote writes a note at a path under a game's entities directory.
+func writeNestedNote(t *testing.T, path, id, name string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	note := fmt.Sprintf("---\nid: %s\nname: %s\ntype: character\n---\n\nA note.\n", id, name)
+	if err := os.WriteFile(path, []byte(note), 0o644); err != nil {
+		t.Fatalf("write note: %v", err)
+	}
+}
+
+func TestListEntitiesIncludesNestedNotes(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+
+	writeNestedNote(t, filepath.Join(entitiesDir, "silver-hand.md"), "silver-hand", "Silver Hand")
+	writeNestedNote(t, filepath.Join(entitiesDir, "factions", "ashen-order.md"), "ashen-order", "Ashen Order")
+
+	got, err := svc.ListEntities(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("ListEntities: %v", err)
+	}
+
+	folders := map[string]string{}
+	for _, summary := range got {
+		folders[summary.ID] = summary.Folder
+	}
+	if folder, ok := folders["silver-hand"]; !ok {
+		t.Fatal("the root note is missing from the list")
+	} else if folder != "" {
+		t.Errorf("silver-hand folder = %q, want the root", folder)
+	}
+	if folder, ok := folders["ashen-order"]; !ok {
+		t.Fatal("the nested note is missing from the list")
+	} else if folder != "factions" {
+		t.Errorf("ashen-order folder = %q, want %q", folder, "factions")
+	}
+}
+
+func TestListEntitiesFlagsAFilenameMismatch(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+
+	// The file name and the declared id disagree. The id wins, and the list says so
+	// rather than silently indexing the note under the file name.
+	note := "---\nid: silver-hand\nname: Silver Hand\ntype: faction\n---\n\nA guild.\n"
+	if err := os.WriteFile(filepath.Join(entitiesDir, "the-hand.md"), []byte(note), 0o644); err != nil {
+		t.Fatalf("write note: %v", err)
+	}
+
+	got, err := svc.ListEntities(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("ListEntities: %v", err)
+	}
+
+	for _, summary := range got {
+		if summary.ID != "silver-hand" {
+			continue
+		}
+		if !summary.FilenameMismatch {
+			t.Error("the list must flag a note whose file name differs from its id")
+		}
+		return
+	}
+	t.Fatalf("silver-hand missing from the list: %+v", got)
+}
+
+func TestGetGraphIncludesNestedNotes(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+
+	writeNestedNote(t, filepath.Join(entitiesDir, "places", "port-vel.md"), "port-vel", "Port Vel")
+
+	graph, err := svc.GetGraph(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("GetGraph: %v", err)
+	}
+	for _, node := range graph.Nodes {
+		if node.ID == "port-vel" {
+			return
+		}
+	}
+	t.Fatalf("a nested note is missing from the graph: %+v", graph.Nodes)
+}
+
+func TestGetGraphResolvesAPathQualifiedLink(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+
+	writeNestedNote(t, filepath.Join(entitiesDir, "places", "port-vel.md"), "port-vel", "Port Vel")
+	linker := "---\nid: linker\nname: Linker\ntype: character\n---\n\nSails from [[places/port-vel]].\n"
+	if err := os.WriteFile(filepath.Join(entitiesDir, "linker.md"), []byte(linker), 0o644); err != nil {
+		t.Fatalf("write linker: %v", err)
+	}
+
+	graph, err := svc.GetGraph(context.Background(), gameID)
+	if err != nil {
+		t.Fatalf("GetGraph: %v", err)
+	}
+	for _, link := range graph.Links {
+		if link.Source != "linker" {
+			continue
+		}
+		if link.Target != "port-vel" {
+			t.Errorf("Target = %q, want the basename %q", link.Target, "port-vel")
+		}
+		return
+	}
+	t.Fatal("the linker's outgoing link is missing from the graph")
+}
+
