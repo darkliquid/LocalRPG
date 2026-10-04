@@ -8,6 +8,7 @@ import { ImageLightbox } from './ImageLightbox';
 import { useLightbox } from '../hooks/useLightbox';
 import { VoiceProfileSelect } from './VoiceProfileSelect';
 import EntityTree from './EntityTree';
+import MarkdownEditor from './editor/MarkdownEditor';
 
 interface CodexDrawerProps {
   gameID?: string;
@@ -431,10 +432,14 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               />
             </div>
 
-            <textarea
+            <MarkdownEditor
+              key={entity.id}
               value={markdown}
-              onChange={(e) => setMarkdown(e.target.value)}
-              className="w-full flex-1 min-h-[360px] bg-black/50 border border-white/10 rounded-xl p-3.5 font-mono text-xs text-stone-200 focus:outline-none focus:border-purple-500/80 shadow-inner resize-none leading-relaxed"
+              onChange={setMarkdown}
+              language="markdown-frontmatter"
+              onSave={() => void handleSave()}
+              ariaLabel="Entity note markdown"
+              minHeight="360px"
             />
 
             <TurnHistoryList turns={entity.history} />
