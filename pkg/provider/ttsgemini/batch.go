@@ -77,14 +77,14 @@ func (c *GeminiTTSClient) SubmitBatch(ctx context.Context, reqs []media.BatchReq
 // batchInputLine encodes one JSONL request: a key naming the group and a
 // GenerateContentRequest, which is the file format the batch API expects.
 func (c *GeminiTTSClient) batchInputLine(req media.BatchRequest) ([]byte, error) {
-	text, config, _, err := c.groupRequest(req.Lines)
+	contents, config, _, err := c.groupRequest(req.Lines)
 	if err != nil {
 		return nil, fmt.Errorf("gemini tts: build batch request %q: %w", req.Key, err)
 	}
 	encoded, err := json.Marshal(batchInputLine{
 		Key: req.Key,
 		Request: batchGenerateRequest{
-			Contents:         []*genai.Content{genai.NewContentFromText(text, genai.RoleUser)},
+			Contents:         contents,
 			GenerationConfig: config,
 		},
 	})
