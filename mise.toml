@@ -17,7 +17,9 @@ outputs = ["node_modules/.package-lock.json"]
 description = "Download the Vale style packages when .vale.ini changes"
 run = "vale sync"
 sources = [".vale.ini"]
-outputs = ["styles"]
+# Not "styles": the committed vocabulary lives under styles/config, so styles/
+# exists in a fresh clone and mise would treat the download as already done.
+outputs = ["styles/Google"]
 
 [tasks.setup]
 description = "Install dependencies for Go backend and frontend"

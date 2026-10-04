@@ -123,54 +123,77 @@ SUMMARY=1 mise run lint:prose  # counts, noisiest rules, worst files
 STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
 ```
 
-Three things about it are not obvious.
+### What it reports today
 
-**The task is report-only, and that is deliberate.** The configured styles find
-**1,906 alerts across all 21 files: 229 errors, 648 warnings and 1,029
-suggestions**. `STRICT=1` is what turns that into a gate, and it should not be used
-until the numbers are down. CI runs the summary form so the totals are visible in
-the log without a step that fails.
+**436 alerts across all 21 files: 136 errors, 190 warnings and 110 suggestions.**
+For scale, pointing the same styles at every tracked file reported 68,525 alerts
+and 6,875 errors, which is why the scope is the documentation rather than the
+repository.
 
-**The file list comes from git, not from Vale.** Vale walks every file its
-configuration has a section for and does **not** read `.gitignore`, so `vale .`
-would descend into `node_modules`, `bin` and the generated site.
-`scripts/lint-prose.sh` asks `git ls-files` for the three paths above.
+The task is **report-only**, and CI runs the summary form so the totals appear in
+the log without a step that fails. `STRICT=1` turns it into a gate; 136 errors is
+close enough to a working backlog that it is worth doing, and most of what is left
+is individually fixable rather than systemic.
 
-**`styles/` is downloaded, not committed.** `vale sync` rebuilds it from the
-`Packages` key, so it is gitignored. Run `mise run install:vale-styles` after
-changing `.vale.ini`.
+### The vocabulary
 
-### Getting to a gate
+`styles/config/vocabularies/LocalRPG/accept.txt` lists the words Vale's dictionary
+does not know: product names, the acronyms this project writes in prose, and domain
+vocabulary. It is **committed**, and `.gitignore` carries a ladder that ignores the
+downloaded styles while keeping this file.
 
-229 errors is a real amount of work but a tractable one, and most of it is not
-prose that needs rewriting:
+Adding a word here is always better than rewording a correct sentence. This one file
+removed 188 errors, which was 82% of them.
 
-- `Vale.Spelling` (188) is **82% of every error** and is almost entirely project
-  vocabulary - `localrpg`, `frontmatter`, `wikilink`, `mise`, `Wails`, `Goja` and
-  so on. It is fixed with a vocabulary file under `styles/config/vocabularies/`,
-  not by editing the docs. That alone would take the error count to about 41.
-- `Readability.Polysyllables` (502) is the single noisiest rule and the least
-  useful: it flags any word of three or more syllables, which in technical prose is
-  most of them. Consider turning it off.
-- `Google.Passive` and `write-good.Passive` (66 each) are the same complaint
-  reported twice, so one of them is redundant.
-- `Google.Parens` (170), `Google.Headings` (144), `Google.Colons` (131) and
-  `Google.Acronyms` (101) are style preferences worth reading before deciding.
+The vocabulary also produces a `Vale.LocalRPG.Terms` rule demanding one
+capitalisation per word, and that rule is **switched off**: it fired on the provider
+catalogue's `http` and `cli` table values, on `Frontmatter` in a YAML `title:` and
+an H1, and on a bolded `**Config (...)**` label. All correct as written. Both cases
+of a word are listed in the vocabulary wherever the documentation uses both.
 
-The worst files are `README.md` (234), `pkg/gui/docs/19-local-stack-docker-compose.md`
-(222) and `pkg/gui/docs/11-usage-and-pricing.md` (145).
+### Rules switched off, and why
 
-**A `.vale.ini` gotcha worth remembering:** a `Packages` entry is a name from the
-Vale library, a URL, a path to a zip, or a path to a directory. There is no
-`Name.URL` form. `neighbor. https://.../ai-tells.zip` reads like one package with a
-URL, but it is parsed as a single malformed entry, `vale sync` stops with exit 2,
-and nothing after it installs. Separate entries with commas.
+Fifteen rules are off in `.vale.ini`, grouped by reason. Each one fires on correct,
+deliberate writing rather than on a mistake:
 
-**`ai-tells` is currently installed but unused.** It was referenced only by the
-code-comment section, which no longer exists. Pointed at these docs it reports 218
-more findings, 116 of them `ai-tells.ColonUsage`, which is noise for documentation
-that writes `Term: definition` lists throughout. Remove its URL from `Packages` if
-it is not wanted; the style is aimed at marketing prose, not a technical guide.
+- **Readability grade scores** (`Polysyllables`, `FleschReadingEase`, `FleschKincaid`,
+  `ColemanLiau`, `SMOG`, `LIX`, `GunningFog`, `AutomatedReadability`). They measure
+  word and sentence complexity, which a guide about local language models and audio
+  pipelines has by nature. Satisfying them means writing around the vocabulary the
+  reader came to learn.
+- **Colon usage** (`Google.Colons`, `ai-tells.ColonUsage`). This documentation is
+  built on definition lists and labelled steps, so the rule objects to the format.
+- **`Google.Acronyms`.** Spelling out TTS, STT, LLM, MCP and CLI at every first use
+  is what the vocabulary file exists to avoid.
+- **`Google.Parens`.** Parentheticals carry asides and unit conversions here.
+- **`write-good.E-Prime`.** Bans the verb "to be" outright, which is impossible in
+  technical English.
+- **`neighbor.AllCapsProse`.** The acronyms are correct; renaming them would break
+  every cross-reference.
+- **`Google.Headings`.** The documentation uses Title Case throughout and the
+  showcase site's design is built on it. This is the one suppression that is a house
+  style rather than a property of technical writing, so revisit it if the headings
+  are ever re-cased.
+
+`ai-tells` is included and left mostly intact, because its rules target exactly the
+kind of prose this documentation should avoid. Its findings are now the largest group
+of remaining errors.
+
+### Two things that will bite
+
+**Vale does not read `.gitignore`.** It walks every file its configuration has a
+section for, so `vale .` would descend into `node_modules`, `bin` and the generated
+site. `scripts/lint-prose.sh` asks `git ls-files` for the three paths instead.
+
+**A `.vale.ini` `Packages` entry is a name, a URL, a zip path, or a directory path.
+There is no `Name.URL` form.** `neighbor. https://.../ai-tells.zip` reads like one
+package with a URL, but it parses as a single malformed entry, `vale sync` stops with
+exit 2, and nothing after it installs. Separate entries with commas.
+
+**The `install:vale-styles` task writes `outputs = ["styles/Google"]`, not
+`["styles"]`.** The committed vocabulary means `styles/` exists in a fresh clone, so
+keying the task on that directory would make mise treat the download as already done
+and Vale would run with no styles at all.
 
 ## Build gotcha: the frontend is embedded in the Go binary
 

@@ -29,9 +29,16 @@ todo.txt
 
 .gograph/
 
-# Vale's StylesPath. `vale sync` rebuilds it from the Packages key in .vale.ini, so
-# it is downloaded rather than committed.
-/styles/
+# Vale's StylesPath. `vale sync` rebuilds the downloaded styles from the Packages
+# key in .vale.ini, so those are ignored, but the vocabulary we wrote is committed.
+# The ladder is needed because git cannot re-include a file under an excluded
+# directory, so each level is un-ignored before the next is excluded.
+/styles/*
+!/styles/config/
+/styles/config/*
+!/styles/config/vocabularies/
+/styles/config/vocabularies/*
+!/styles/config/vocabularies/LocalRPG/
 
 # Binaries
 /localrpg
