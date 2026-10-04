@@ -2,6 +2,7 @@ package ttsgemini_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -273,6 +274,88 @@ func TestGeminiTTSSynthesizeGroupBuildsTwoSpeakerConfig(t *testing.T) {
 		if !strings.Contains(gotBody, want) {
 			t.Errorf("expected the request to contain %q, got: %s", want, gotBody)
 		}
+	}
+}
+
+// The 3.8 TTS models read the transcript verbatim, so a speaker cannot be named
+// inside the text: every text part of a multi-speaker request must carry
+// speech_metadata.speaker or the API rejects the call with a 400. This server
+// stands in for that validation so the request shape is checked offline.
+func TestGeminiTTSSynthesizeGroupAnnotatesEachPartWithSpeaker(t *testing.T) {
+	var gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+
+		var req struct {
+			Contents []struct {
+				Parts []struct {
+					Text           string `json:"text"`
+					SpeechMetadata *struct {
+						Speaker string `json:"speaker"`
+					} `json:"speechMetadata"`
+				} `json:"parts"`
+			} `json:"contents"`
+			GenerationConfig struct {
+				SpeechConfig *struct {
+					MultiSpeakerVoiceConfig *struct{} `json:"multiSpeakerVoiceConfig"`
+				} `json:"speechConfig"`
+			} `json:"generationConfig"`
+		}
+		if err := json.Unmarshal(body, &req); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		multi := req.GenerationConfig.SpeechConfig != nil && req.GenerationConfig.SpeechConfig.MultiSpeakerVoiceConfig != nil
+		if multi {
+			for _, content := range req.Contents {
+				for _, part := range content.Parts {
+					if part.SpeechMetadata == nil || part.SpeechMetadata.Speaker == "" {
+						w.WriteHeader(http.StatusBadRequest)
+						fmt.Fprint(w, `{"error":{"code":400,"message":"Multi-speaker generation requests must specify speech_metadata.speaker for each text part in the contents.","status":"INVALID_ARGUMENT"}}`)
+						return
+					}
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"candidates": [
+				{"content": {"parts": [{"inlineData": {"data": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=", "mimeType": "audio/wav"}}], "role": "model"}}
+			]
+		}`)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	genaiClient, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:     "test-key",
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: server.Client(),
+		HTTPOptions: genai.HTTPOptions{
+			BaseURL: server.URL,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create genai client: %v", err)
+	}
+
+	ttsClient, err := ttsgemini.NewGeminiTTSClientWithClient(genaiClient, config.TTSConfig{
+		Model:        "gemini-3.8-flash-tts",
+		DefaultVoice: "Aoede",
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiTTSClientWithClient: %v", err)
+	}
+
+	_, err = ttsClient.SynthesizeGroup(ctx, []media.SpeakerLine{
+		{SpeakerID: "narrator", Label: "Narrator", Voice: &entity.VoiceConfig{VoiceID: "Aoede"}, Text: "The door opens."},
+		{SpeakerID: "garrick", Label: "Garrick", Voice: &entity.VoiceConfig{VoiceID: "Kore"}, Text: "Keep walking."},
+	})
+	if err != nil {
+		t.Fatalf("SynthesizeGroup failed: %v", err)
+	}
+	if strings.Contains(gotBody, "Narrator: ") || strings.Contains(gotBody, "Garrick: ") {
+		t.Errorf("speaker labels must not be embedded in the transcript, got: %s", gotBody)
 	}
 }
 

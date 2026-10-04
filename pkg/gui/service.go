@@ -549,13 +549,10 @@ func (s *Service) clipPlanFor(cfg *config.Config, gameID string, segments []enti
 	plan.groupKey = make([]string, len(segments))
 
 	if s.groupingEnabled(cfg) {
-		// When the streamer ran, it folded under the live, single-speaker caps, so
-		// name the clips it wrote and make the finalise pass a cache hit.
-		caps := pipeline.GroupCaps()
-		if s.liveGrouping(cfg, pipeline) {
-			caps = media.LiveGroupCaps(caps)
-		}
-		groups := pipeline.GroupClipKeysWithCaps(segments, narrator, voiceFor, caps)
+		// The pipeline's group caps already fold under the live, single-speaker
+		// caps when the streamer ran, so this names the clips it wrote and makes
+		// the finalise pass a cache hit.
+		groups := pipeline.GroupClipKeys(segments, narrator, voiceFor)
 		plan.groups = make([]ClipGroupDTO, 0, len(groups))
 		for _, group := range groups {
 			plan.groups = append(plan.groups, ClipGroupDTO{
@@ -592,18 +589,14 @@ func (s *Service) groupingEnabled(cfg *config.Config) bool {
 }
 
 // streamerRuns reports whether the live pre-synthesiser runs for this turn.
-// "always" renders the whole turn in one batch and streams nothing.
 func (s *Service) streamerRuns(cfg *config.Config) bool {
-	if !cfg.TTSStreamSentences() || cfg.TTSGrouping() == "always" {
-		return false
-	}
-	return cfg.Media.TTS.Type != "" && cfg.Media.TTS.Type != "disabled"
+	return media.StreamerRuns(cfg)
 }
 
 // liveGrouping reports whether the streamer folds this turn's audio into groups,
 // so the turn's clip plan must use the same single-speaker fold.
-func (s *Service) liveGrouping(cfg *config.Config, pipeline *media.TTSPipeline) bool {
-	return s.streamerRuns(cfg) && s.groupingEnabled(cfg)
+func (s *Service) liveGrouping(cfg *config.Config) bool {
+	return media.LiveGrouping(cfg)
 }
 
 // turnToolCallDTOs renders a turn's provenance for a client.
@@ -2470,14 +2463,10 @@ func (s *Service) synthesizeTurnGroups(ctx context.Context, gameID string, turn 
 	if !s.groupingEnabled(cfg) {
 		return nil, false, nil
 	}
-	// The clip plan and the synthesis must fold under the same capabilities, or
-	// the DTO names clips the finalise pass did not write. When the streamer ran,
-	// both use the live, single-speaker fold.
-	caps := pipeline.GroupCaps()
-	if s.liveGrouping(cfg, pipeline) {
-		caps = media.LiveGroupCaps(caps)
-	}
-	groups := pipeline.GroupClipKeysWithCaps(turn.Segments, s.narratorVoiceFor(gameID, cfg), s.voiceFor(gameID), caps)
+	// The clip plan and the synthesis fold under the pipeline's group caps, which
+	// are already the live, single-speaker caps when the streamer ran, so the DTO
+	// names the clips the finalise pass wrote.
+	groups := pipeline.GroupClipKeys(turn.Segments, s.narratorVoiceFor(gameID, cfg), s.voiceFor(gameID))
 	rendered, err := pipeline.SynthesizeGroupsForce(ctx, groups, force)
 	if err != nil {
 		s.noteFailure("tts", err)
@@ -2557,7 +2546,7 @@ func (s *Service) audioPipeline() (*media.TTSPipeline, error) {
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
-	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
+	pipeline.SetGroupCaps(media.TurnGroupCaps(cfg, media.ResolveGroupCaps(cfg.Media.TTS, client)))
 	pipeline.SetSpeechCues(media.ResolveSpeechCueCapabilities(cfg.Media.TTS, client))
 	pipeline.SetAudioTagDelivery(cfg.Media.TTS.SpeechCues.AudioTags != nil && *cfg.Media.TTS.SpeechCues.AudioTags)
 	s.ttsConfig, s.ttsPipeline = cfg, pipeline
@@ -2640,7 +2629,7 @@ func (s *Service) CountUncachedBeats(gameID string) (cached, uncached int, err e
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(s.resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
-	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
+	pipeline.SetGroupCaps(media.TurnGroupCaps(cfg, media.ResolveGroupCaps(cfg.Media.TTS, client)))
 	pipeline.SetSpeechCues(media.ResolveSpeechCueCapabilities(cfg.Media.TTS, client))
 	pipeline.SetAudioTagDelivery(cfg.Media.TTS.SpeechCues.AudioTags != nil && *cfg.Media.TTS.SpeechCues.AudioTags)
 

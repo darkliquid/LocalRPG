@@ -47,6 +47,47 @@ func TestSegmentDTOsLeaveUngroupedSegmentsUnnamed(t *testing.T) {
 
 func boolPointer(v bool) *bool { return &v }
 
+// A batch backfill and the interactive path must plan a turn's groups under the
+// same caps, or the batch writes clips the app never looks up. With sentence
+// streaming on the app folds single-speaker, so the pipeline's group caps, which
+// the batch planner uses, must clamp a two-speaker provider to one.
+func TestBatchPlanFoldsUnderTheLiveCaps(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+
+	cfg := svc.configMgr.Get()
+	cfg.Media.TTS.Grouping = "auto"
+	cfg.Media.TTS.StreamSentences = boolPointer(true)
+	cfg.Media.TTS.Limits = &config.TTSLimits{MaxSpeakers: 2}
+
+	pipeline, err := svc.audioPipeline()
+	if err != nil {
+		t.Fatalf("audioPipeline: %v", err)
+	}
+	if got := pipeline.GroupCaps().MaxSpeakers; got != 1 {
+		t.Fatalf("pipeline group caps MaxSpeakers = %d, want 1 so the batch writes the live clips", got)
+	}
+
+	turn, err := svc.findTurn(gameID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	narrator := svc.narratorVoiceFor(gameID, cfg)
+	voiceFor := svc.voiceFor(gameID)
+
+	// The batch planner is pipeline.GroupClipKeys; the turn's clip plan must agree.
+	plan := svc.clipPlanFor(cfg, gameID, turn.Segments)
+	batch := pipeline.GroupClipKeys(turn.Segments, narrator, voiceFor)
+	if len(plan.groups) != len(batch) {
+		t.Fatalf("turn plan has %d groups, the batch planned %d", len(plan.groups), len(batch))
+	}
+	for i := range batch {
+		if plan.groups[i].Key != batch[i].Key {
+			t.Errorf("group %d: turn key %q, batch key %q", i, plan.groups[i].Key, batch[i].Key)
+		}
+	}
+}
+
 func TestGroupingAndStreamingPolicy(t *testing.T) {
 	svc := &Service{}
 	cases := []struct {
