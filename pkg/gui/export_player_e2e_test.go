@@ -291,10 +291,15 @@ func TestExportedBundlePlaysTheTheatre(t *testing.T) {
 	// Every clip the story reached must have played. A character line that the browser
 	// refused shows up here as an error or as a clip that never started, which is the
 	// difference between a bundle missing audio and a player failing to play it.
-	var clips string
-	if err := chromedp.Run(ctx, chromedp.Evaluate(`JSON.stringify(window.__clips || [])`, &clips)); err != nil {
-		t.Fatal(err)
-	}
+	//
+	// The probe records a clip as played only once its Audio.play() promise settles, and
+	// a beat advances the moment its clips end, so the beat that follows a clip can be
+	// on screen before that clip's promise has resolved. Reading the probe once here
+	// therefore raced the player: on a runner with no sound card, where clip start
+	// latency is nondeterministic, the second clip was sometimes still pending and the
+	// test failed on "a clip never started" for a bundle that played both. Wait for the
+	// clips to settle instead of taking a single snapshot.
+	clips := waitForClips(t, ctx)
 	if clips == "[]" {
 		t.Fatalf("the story played no clips at all:\n%s", bundleDom(t, ctx))
 	}
@@ -306,6 +311,28 @@ func TestExportedBundlePlaysTheTheatre(t *testing.T) {
 	}
 	if strings.Contains(bundleDom(t, ctx), "could not play") {
 		t.Errorf("the player reported a line it could not play:\n%s", bundleDom(t, ctx))
+	}
+}
+
+// waitForClips returns the browser's recorded clips once they have settled, or the last
+// snapshot when the deadline passes so the caller can report what was still outstanding.
+// A clip settles when its play promise resolves; one whose load errored is settled too,
+// because the caller reports that as a failure. A clip that never starts and never errors
+// is the case the deadline exists for.
+func waitForClips(t *testing.T, ctx context.Context) string {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		var clips string
+		if err := chromedp.Run(ctx, chromedp.Evaluate(`JSON.stringify(window.__clips || [])`, &clips)); err != nil {
+			t.Fatal(err)
+		}
+		settled := clips != "[]" &&
+			(!strings.Contains(clips, `"played":false`) || strings.Contains(clips, `"error":"`))
+		if settled || time.Now().After(deadline) {
+			return clips
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
