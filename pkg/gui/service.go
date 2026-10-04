@@ -1000,7 +1000,14 @@ func (s *Service) SaveEntity(ctx context.Context, gameID, entityID, rawMarkdown 
 	}
 
 	gameDir := s.resolver.GameDir(gameID)
-	path := filepath.Join(gameDir, "entities", entityID+".md")
+	entitiesDir := filepath.Join(gameDir, "entities")
+	path, err := pathutil.ResolveSafeChild(entitiesDir, entityID+".md")
+	if err != nil {
+		return fmt.Errorf("resolve entity path: %w", err)
+	}
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("invalid entity path: contains traversal")
+	}
 	if err := os.WriteFile(path, normalised, 0644); err != nil {
 		return fmt.Errorf("write entity file: %w", err)
 	}
@@ -1035,11 +1042,25 @@ func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID 
 	}
 
 	gameDir := s.resolver.GameDir(gameID)
-	sourceData, err := os.ReadFile(filepath.Join(gameDir, "entities", sourceID+".md"))
+	entitiesDir := filepath.Join(gameDir, "entities")
+	sourcePath, err := pathutil.ResolveSafeChild(entitiesDir, sourceID+".md")
+	if err != nil {
+		return nil, fmt.Errorf("resolve source path: %w", err)
+	}
+	if strings.Contains(sourcePath, "..") {
+		return nil, fmt.Errorf("invalid source path: contains traversal")
+	}
+	sourceData, err := os.ReadFile(sourcePath)
 	if err != nil {
 		return nil, fmt.Errorf("read source %q: %w", sourceID, err)
 	}
-	targetPath := filepath.Join(gameDir, "entities", targetID+".md")
+	targetPath, err := pathutil.ResolveSafeChild(entitiesDir, targetID+".md")
+	if err != nil {
+		return nil, fmt.Errorf("resolve target path: %w", err)
+	}
+	if strings.Contains(targetPath, "..") {
+		return nil, fmt.Errorf("invalid target path: contains traversal")
+	}
 	targetData, err := os.ReadFile(targetPath)
 	if err != nil {
 		return nil, fmt.Errorf("read target %q: %w", targetID, err)
@@ -1089,7 +1110,7 @@ func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID 
 		return nil, err
 	}
 
-	if err := os.Remove(filepath.Join(gameDir, "entities", sourceID+".md")); err != nil {
+	if err := os.Remove(sourcePath); err != nil {
 		return nil, fmt.Errorf("remove source note: %w", err)
 	}
 
@@ -1102,8 +1123,8 @@ func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID 
 	}
 
 	syncer := storage.NewSyncer(store)
-	for _, id := range []string{targetID, sourceID} {
-		_ = syncer.SyncFile(filepath.Join(gameDir, "entities", id+".md"))
+	for _, p := range []string{targetPath, sourcePath} {
+		_ = syncer.SyncFile(p)
 	}
 
 	return s.GetEntity(ctx, gameID, targetID)

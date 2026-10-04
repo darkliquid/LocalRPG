@@ -27,8 +27,8 @@ func PCMSampleRate(mimeType string) int {
 		if !strings.HasPrefix(part, "rate=") {
 			continue
 		}
-		if rate, err := strconv.ParseUint(strings.TrimPrefix(part, "rate="), 10, 32); err == nil && rate > 0 {
-			return int(rate)
+		if rate, err := strconv.Atoi(strings.TrimPrefix(part, "rate=")); err == nil && rate > 0 && rate <= 192000 {
+			return rate
 		}
 	}
 	return DefaultPCMRate

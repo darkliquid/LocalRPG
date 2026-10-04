@@ -5,11 +5,7 @@
 export function safeImagePreview(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
   const trimmed = url.trim();
-  if (
-    trimmed.startsWith('blob:') ||
-    trimmed.startsWith('/api/') ||
-    trimmed.startsWith('data:image/')
-  ) {
+  if (/^(?:blob:|\/api\/|data:image\/(?:png|jpeg|webp|gif|svg\+xml);base64,)/i.test(trimmed)) {
     return trimmed;
   }
   return undefined;

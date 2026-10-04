@@ -83,7 +83,13 @@ func (s *Syncer) Sync(dir string) (*SyncResult, error) {
 }
 
 func (s *Syncer) SyncFile(path string) error {
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("sync file: invalid path %q: contains traversal", path)
+	}
 	cleanPath := filepath.Clean(path)
+	if strings.Contains(cleanPath, "..") {
+		return fmt.Errorf("sync file: invalid path %q: contains traversal", cleanPath)
+	}
 	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return fmt.Errorf("read %q: %w", cleanPath, err)

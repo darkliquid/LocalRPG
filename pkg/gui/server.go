@@ -769,6 +769,10 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "a merge needs a note to merge into", http.StatusBadRequest)
 				return
 			}
+			if err := pathutil.ValidateID(req.Into); err != nil {
+				http.Error(w, "invalid target id", http.StatusBadRequest)
+				return
+			}
 			if !req.Confirm {
 				http.Error(w, "a merge must be explicitly confirmed", http.StatusBadRequest)
 				return

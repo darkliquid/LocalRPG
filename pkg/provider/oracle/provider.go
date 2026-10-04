@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -126,6 +127,6 @@ func (n *narrativeOracleProvider) craftProse(prompt string) string {
 		entityWitness = fmt.Sprintf(" Nearby, [[%s]] watches the outcome with bated breath.", chosenEntity)
 	}
 
-	cleanAction := strings.ReplaceAll(playerAction, "\"", "'")
-	return fmt.Sprintf("%s\n\nAs you declare: '%s', the stones echo your effort.%s What do you do next?", chosenOpener, cleanAction, entityWitness)
+	quotedAction := strconv.Quote(playerAction)
+	return fmt.Sprintf("%s\n\nAs you declare: %s, the stones echo your effort.%s What do you do next?", chosenOpener, quotedAction, entityWitness)
 }

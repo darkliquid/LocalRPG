@@ -2,6 +2,7 @@ package oracle
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -10,18 +11,17 @@ import (
 
 func TestOracleQuoting(t *testing.T) {
 	p := NewNarrativeOracleProvider("test-oracle")
+	rawAction := `I say "hello"`
 	resp, err := p.Generate(context.Background(), harness.GenerateRequest{
 		Messages: []harness.Message{
-			{Role: "user", Content: "Player Action: I say \"hello\""},
+			{Role: "user", Content: "Player Action: " + rawAction},
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(resp.Text, `""hello""`) || strings.Contains(resp.Text, `"hello"`) {
-		t.Errorf("unexpected double quotes in output: %s", resp.Text)
-	}
-	if !strings.Contains(resp.Text, `'hello'`) {
-		t.Errorf("expected single quotes in output: %s", resp.Text)
+	expected := strconv.Quote(rawAction)
+	if !strings.Contains(resp.Text, expected) {
+		t.Errorf("expected quoted string %s in output: %s", expected, resp.Text)
 	}
 }
