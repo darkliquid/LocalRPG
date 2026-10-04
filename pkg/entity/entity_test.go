@@ -2,6 +2,7 @@ package entity
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -259,5 +260,42 @@ func TestEntityPortraitVersioningFields(t *testing.T) {
 	}
 	if len(reparsed.PortraitHistory) != 1 || reparsed.PortraitHistory[0] != "assets/portraits/vera-v1.png" {
 		t.Errorf("PortraitHistory = %v, want [assets/portraits/vera-v1.png]", reparsed.PortraitHistory)
+	}
+}
+
+func TestSerializeMarkdownOmitsFolder(t *testing.T) {
+	ent := &Entity{
+		ID:      "silver-hand",
+		Name:    "Silver Hand",
+		Type:    "faction",
+		Folder:  "factions/orders",
+		Body:    "A guild of smiths.\n",
+		Aliases: []string{"The Hand"},
+	}
+
+	data, err := ent.SerializeMarkdown()
+	if err != nil {
+		t.Fatalf("SerializeMarkdown: %v", err)
+	}
+	if strings.Contains(string(data), "folder") {
+		t.Fatalf("folder is a location, not frontmatter; got:\n%s", data)
+	}
+	if !strings.Contains(string(data), "id: silver-hand") {
+		t.Fatalf("frontmatter lost the id:\n%s", data)
+	}
+}
+
+func TestWikilinkBasename(t *testing.T) {
+	cases := map[string]string{
+		"silver-hand":            "silver-hand",
+		"guilds/silver-hand":     "silver-hand",
+		"guilds/orders/the-hand": "the-hand",
+		"  guilds/silver-hand  ": "silver-hand",
+		"":                       "",
+	}
+	for input, want := range cases {
+		if got := WikilinkBasename(input); got != want {
+			t.Errorf("WikilinkBasename(%q) = %q, want %q", input, got, want)
+		}
 	}
 }

@@ -68,6 +68,10 @@ type Entity struct {
 	Body      string
 	Wikilinks []string
 	Hash      string
+	// Folder is where the note sits under entities/, relative and slash-separated,
+	// with "" for the root. It is a location, not frontmatter: the same note in two
+	// folders is the same note, so SerializeMarkdown must never emit it.
+	Folder string
 }
 
 func (e *Entity) InitState(data map[string]interface{}) {
@@ -164,6 +168,17 @@ func WikilinkTarget(ref string) string {
 	cleaned = strings.TrimSuffix(cleaned, "]]")
 	if idx := strings.Index(cleaned, "|"); idx >= 0 {
 		cleaned = cleaned[:idx]
+	}
+	return strings.TrimSpace(cleaned)
+}
+
+// WikilinkBasename returns the final path segment of a link target, so a
+// hand-written [[guilds/silver-hand]] can still resolve to the note whose id is
+// silver-hand. The app never generates the path-qualified form.
+func WikilinkBasename(target string) string {
+	cleaned := strings.TrimSpace(target)
+	if idx := strings.LastIndex(cleaned, "/"); idx >= 0 {
+		cleaned = cleaned[idx+1:]
 	}
 	return strings.TrimSpace(cleaned)
 }
