@@ -18,6 +18,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/engine"
+	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/models"
@@ -135,6 +136,24 @@ func writeGameError(w http.ResponseWriter, err error) {
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// writeSaveError answers a failed save. A frontmatter failure carries the line and
+// column it happened on, so the editor can highlight it rather than showing a bare
+// status; anything else falls back to the shared error mapping.
+func writeSaveError(w http.ResponseWriter, err error, document string) {
+	var fe *entity.FrontmatterError
+	if !errors.As(err, &fe) {
+		writeGameError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnprocessableEntity)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"error":  fe.Msg,
+		"line":   fe.Line(document),
+		"column": fe.Column(document),
+	})
 }
 
 // handleSchemaRoutes serves the generated schemas the editor consumes.
@@ -801,7 +820,7 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if err := s.service.SaveEntityInFolder(r.Context(), gameID, entityID, body.Folder, body.Markdown); err != nil {
-				writeGameError(w, err)
+				writeSaveError(w, err, body.Markdown)
 				return
 			}
 			w.WriteHeader(http.StatusOK)

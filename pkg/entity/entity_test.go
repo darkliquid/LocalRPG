@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -311,5 +312,67 @@ func TestDeclaredID(t *testing.T) {
 		if got := DeclaredID([]byte(input)); got != want {
 			t.Errorf("DeclaredID(%q) = %q, want %q", input, got, want)
 		}
+	}
+}
+
+func TestFrontmatterErrorNamesItsLine(t *testing.T) {
+	// The third document line is invalid: a value with an unclosed quote.
+	doc := "---\nid: silver-hand\nname: \"unclosed\ntype: faction\n---\n\nBody.\n"
+
+	_, err := ParseMarkdownEntity([]byte(doc))
+	if err == nil {
+		t.Fatal("expected a parse failure")
+	}
+
+	var fe *FrontmatterError
+	if !errors.As(err, &fe) {
+		t.Fatalf("error is %T, want *FrontmatterError", err)
+	}
+	if fe.Offset <= 0 {
+		t.Fatalf("Offset = %d, want a positive offset into the document", fe.Offset)
+	}
+	if line := fe.Line(doc); line < 3 || line > 4 {
+		t.Errorf("Line = %d, want the broken line (3 or 4)", line)
+	}
+	if column := fe.Column(doc); column < 1 {
+		t.Errorf("Column = %d, want a 1-based column", column)
+	}
+}
+
+func TestFrontmatterErrorOffsetPointsIntoTheDocument(t *testing.T) {
+	doc := "---\nid: silver-hand\nname: X\n\tbad: [unclosed\n---\n\nBody.\n"
+
+	_, err := ParseMarkdownEntity([]byte(doc))
+	if err == nil {
+		t.Fatal("expected a parse failure")
+	}
+
+	var fe *FrontmatterError
+	if !errors.As(err, &fe) {
+		t.Fatalf("error is %T, want *FrontmatterError", err)
+	}
+	if fe.Offset >= len(doc) {
+		t.Fatalf("Offset = %d, want it inside the %d-byte document", fe.Offset, len(doc))
+	}
+	// The offset must land inside the frontmatter block, never on the header.
+	if fe.Offset < len("---\n") {
+		t.Fatalf("Offset = %d, want it past the frontmatter header", fe.Offset)
+	}
+}
+
+func TestFrontmatterErrorLineAndColumnAreOneBased(t *testing.T) {
+	doc := "---\nid: x\n---\n\nBody.\n"
+
+	fe := &FrontmatterError{Offset: len("---\n"), Msg: "at the start of the frontmatter"}
+	if line := fe.Line(doc); line != 2 {
+		t.Errorf("Line = %d, want 2 (the line after the header)", line)
+	}
+	if column := fe.Column(doc); column != 1 {
+		t.Errorf("Column = %d, want 1", column)
+	}
+
+	atStart := &FrontmatterError{Offset: 0, Msg: "at the very start"}
+	if line := atStart.Line(doc); line != 1 {
+		t.Errorf("Line = %d, want 1", line)
 	}
 }

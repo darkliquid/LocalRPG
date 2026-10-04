@@ -1018,6 +1018,41 @@ func TestSchemaRouteRejectsAPost(t *testing.T) {
 	}
 }
 
+func TestEntitySaveRouteReportsABrokenFrontmatterLine(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	// The third document line has an unclosed quote, so the frontmatter will not
+	// parse and the route must name where.
+	note := "---\nid: silver-hand\nname: \"unclosed\ntype: faction\n---\n\nA guild.\n"
+	body := `{"markdown":` + strconv.Quote(note) + `}`
+	req := httptest.NewRequest(http.MethodPut, "/api/game/"+gameID+"/entity/silver-hand", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for broken frontmatter, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var payload struct {
+		Error  string `json:"error"`
+		Line   int    `json:"line"`
+		Column int    `json:"column"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode error body: %v", err)
+	}
+	if payload.Error == "" {
+		t.Error("the error body must carry a message")
+	}
+	if payload.Line < 3 || payload.Line > 4 {
+		t.Errorf("Line = %d, want the broken line (3 or 4)", payload.Line)
+	}
+	if payload.Column < 1 {
+		t.Errorf("Column = %d, want a 1-based column", payload.Column)
+	}
+}
+
 func TestTraceRouteReturnsTheMostRecentEvents(t *testing.T) {
 	_, svc := turnFixture(t)
 	server := NewServer(svc, http.NotFoundHandler())
