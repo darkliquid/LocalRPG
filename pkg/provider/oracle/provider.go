@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -74,6 +75,9 @@ func (n *narrativeOracleProvider) craftProse(prompt string) string {
 		if strings.HasPrefix(l, "Player Action:") {
 			playerAction = strings.TrimPrefix(l, "Player Action:")
 			playerAction = strings.TrimSpace(playerAction)
+		} else if strings.HasPrefix(l, "Player: Player Action:") {
+			playerAction = strings.TrimPrefix(l, "Player: Player Action:")
+			playerAction = strings.TrimSpace(playerAction)
 		}
 	}
 
@@ -123,5 +127,6 @@ func (n *narrativeOracleProvider) craftProse(prompt string) string {
 		entityWitness = fmt.Sprintf(" Nearby, [[%s]] watches the outcome with bated breath.", chosenEntity)
 	}
 
-	return fmt.Sprintf("%s\n\nAs you declare: \"%s\", the stones echo your effort.%s What do you do next?", chosenOpener, playerAction, entityWitness)
+	quotedAction := strconv.Quote(playerAction)
+	return fmt.Sprintf("%s\n\nAs you declare: %s, the stones echo your effort.%s What do you do next?", chosenOpener, quotedAction, entityWitness)
 }

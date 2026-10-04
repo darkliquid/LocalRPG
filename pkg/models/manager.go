@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -442,12 +443,12 @@ func (m *Manager) extractArchive(archivePath, archiveType, destDir string) error
 			return err
 		}
 
-		cleanPath := filepath.Clean(header.Name)
-		if filepath.IsAbs(cleanPath) || cleanPath == ".." || len(cleanPath) > 2 && cleanPath[:3] == "../" {
-			continue // Zip Slip prevention
+		cleanName := filepath.Clean(header.Name)
+		target := filepath.Join(destDir, cleanName)
+		rel, relErr := filepath.Rel(destDir, target)
+		if relErr != nil || strings.HasPrefix(rel, "..") || rel == ".." || filepath.IsAbs(cleanName) {
+			return fmt.Errorf("archive entry %q escapes destination directory", header.Name)
 		}
-
-		target := filepath.Join(destDir, cleanPath)
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, 0755); err != nil {

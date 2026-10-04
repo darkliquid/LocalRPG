@@ -49,7 +49,7 @@ func (l *StderrLogger) Event(name string, fields map[string]interface{}) {
 
 	stamped := fields
 	if l.game != "" {
-		stamped = make(map[string]interface{}, len(fields)+1)
+		stamped = make(map[string]interface{})
 		for key, value := range fields {
 			stamped[key] = value
 		}

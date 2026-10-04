@@ -150,3 +150,43 @@ func TestManagerChecksumMismatchRejectsDownload(t *testing.T) {
 		t.Errorf("expected destDir to not exist, err: %v", err)
 	}
 }
+
+func TestExtractArchiveRejectsZipSlip(t *testing.T) {
+	destDir := t.TempDir()
+
+	// Create a tar archive with a malicious traversal entry
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	hdr := &tar.Header{
+		Name: "../evil.txt",
+		Mode: 0600,
+		Size: int64(len("malicious")),
+	}
+	if err := tw.WriteHeader(hdr); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write([]byte("malicious")); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	tarPath := filepath.Join(destDir, "test.tar")
+	if err := os.WriteFile(tarPath, buf.Bytes(), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	mgr := NewManager(t.TempDir())
+	outDir := filepath.Join(destDir, "out")
+	err := mgr.extractArchive(tarPath, "tar", outDir)
+	if err == nil {
+		t.Error("extractArchive expected error for Zip Slip traversal entry, got nil")
+	}
+
+	// Verify evil.txt was NOT written outside destDir/out
+	if _, err := os.Stat(filepath.Join(destDir, "evil.txt")); err == nil {
+		t.Error("evil.txt was written outside target directory!")
+	}
+}
+

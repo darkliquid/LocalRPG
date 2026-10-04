@@ -8,6 +8,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"gopkg.in/yaml.v3"
 )
@@ -42,6 +43,16 @@ type InitOptions struct {
 }
 
 func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
+	if err := pathutil.ValidateID(opts.GameID); err != nil {
+		return nil, fmt.Errorf("invalid game id %q: %w", opts.GameID, err)
+	}
+	if err := pathutil.ValidateID(opts.SystemID); err != nil {
+		return nil, fmt.Errorf("invalid system id %q: %w", opts.SystemID, err)
+	}
+	if err := pathutil.ValidateID(opts.WorldID); err != nil {
+		return nil, fmt.Errorf("invalid world id %q: %w", opts.WorldID, err)
+	}
+
 	gameID := opts.GameID
 	systemID := opts.SystemID
 	worldID := opts.WorldID
@@ -118,7 +129,12 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 			if templateID == "" {
 				templateID = strings.TrimSuffix(e.Name(), ".md")
 			}
-			if err := os.WriteFile(filepath.Join(gameEntitiesDir, templateID+".md"), data, 0644); err != nil {
+			templateID = pathutil.SanitizeID(templateID)
+			safePath, err := pathutil.ResolveSafeChild(gameEntitiesDir, templateID+".md")
+			if err != nil {
+				return nil, fmt.Errorf("invalid entity template id %q: %w", templateID, err)
+			}
+			if err := os.WriteFile(safePath, data, 0644); err != nil {
 				return nil, fmt.Errorf("write entity template %q: %w", e.Name(), err)
 			}
 		}
@@ -177,12 +193,15 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 // this, a campaign created through the GUI cannot serve its own game state, and the
 // player is silently missing from every turn's involvement list.
 func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, playerName, details string, pc PlayerCharacter, locationID string) error {
-	id := entity.Slugify(playerName)
+	id := pathutil.SanitizeID(entity.Slugify(playerName))
 	if id == "" {
 		id = "player"
 	}
 
-	path := filepath.Join(paths.GameDir(gameID), "entities", id+".md")
+	path, err := pathutil.ResolveSafeChild(filepath.Join(paths.GameDir(gameID), "entities"), id+".md")
+	if err != nil {
+		return fmt.Errorf("invalid player note path: %w", err)
+	}
 	if _, err := os.Stat(path); err == nil {
 		return nil
 	}

@@ -8,6 +8,7 @@ import { useLightbox } from '../hooks/useLightbox';
 import { ImageLightbox } from './ImageLightbox';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
+import { safeImagePreview } from '../utils/security';
 
 interface WorldsStudioProps {
   onWorldSaved?: () => void;
@@ -850,11 +851,17 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   <input
                     type="file"
                     ref={bannerInputRef}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
+                    onChange={() => {
+                      const file = bannerInputRef.current?.files?.[0];
                       if (file) {
                         setBannerFile(file);
-                        setBannerPreview(URL.createObjectURL(file));
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          if (typeof reader.result === 'string') {
+                            setBannerPreview(reader.result);
+                          }
+                        };
+                        reader.readAsDataURL(file);
                       }
                     }}
                     accept="image/png,image/jpeg,image/webp,image/svg+xml"
@@ -868,9 +875,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                       bannerPreview ? 'cursor-zoom-in' : 'cursor-pointer'
                     }`}
                   >
-                    {bannerPreview ? (
+                    {safeImagePreview(bannerPreview) ? (
                       <img
-                        src={bannerPreview}
+                        src={safeImagePreview(bannerPreview)}
                         alt="Banner Preview"
                         className="w-full h-full object-cover"
                         onError={() => setBannerPreview(null)}
@@ -907,11 +914,17 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   <input
                     type="file"
                     ref={iconInputRef}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
+                    onChange={() => {
+                      const file = iconInputRef.current?.files?.[0];
                       if (file) {
                         setIconFile(file);
-                        setIconPreview(URL.createObjectURL(file));
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          if (typeof reader.result === 'string') {
+                            setIconPreview(reader.result);
+                          }
+                        };
+                        reader.readAsDataURL(file);
                       }
                     }}
                     accept="image/png,image/jpeg,image/webp,image/svg+xml"
@@ -925,9 +938,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                       iconPreview ? 'cursor-zoom-in' : 'cursor-pointer'
                     }`}
                   >
-                    {iconPreview ? (
+                    {safeImagePreview(iconPreview) ? (
                       <img
-                        src={iconPreview}
+                        src={safeImagePreview(iconPreview)}
                         alt="Icon Preview"
                         className="w-16 h-16 rounded-xl object-cover"
                         onError={() => setIconPreview(null)}

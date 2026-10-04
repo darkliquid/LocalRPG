@@ -132,11 +132,12 @@ func (m *Memory) Event(name string, fields map[string]interface{}) {
 
 	stamped := Sanitize(fields, m.level, defaultPayloadChars)
 	if m.game != "" {
-		stamped = make(map[string]interface{}, len(fields)+1)
-		for key, value := range fields {
-			stamped[key] = value
+		out := make(map[string]interface{})
+		for key, value := range stamped {
+			out[key] = value
 		}
-		stamped["game"] = m.game
+		out["game"] = m.game
+		stamped = out
 	}
 	m.events = append(m.events, Event{Name: name, Fields: stamped})
 }

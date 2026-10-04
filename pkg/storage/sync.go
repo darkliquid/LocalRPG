@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 )
 
 type SyncResult struct {
@@ -38,7 +39,10 @@ func (s *Syncer) Sync(dir string) (*SyncResult, error) {
 			continue
 		}
 
-		fullPath := filepath.Join(dir, entry.Name())
+		fullPath, err := pathutil.ResolveSafeChild(dir, entry.Name())
+		if err != nil {
+			continue
+		}
 		data, err := os.ReadFile(fullPath)
 		if err != nil {
 			return nil, fmt.Errorf("read %q: %w", fullPath, err)
@@ -79,14 +83,21 @@ func (s *Syncer) Sync(dir string) (*SyncResult, error) {
 }
 
 func (s *Syncer) SyncFile(path string) error {
-	data, err := os.ReadFile(path)
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("sync file: invalid path %q: contains traversal", path)
+	}
+	cleanPath := filepath.Clean(path)
+	if strings.Contains(cleanPath, "..") {
+		return fmt.Errorf("sync file: invalid path %q: contains traversal", cleanPath)
+	}
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
-		return fmt.Errorf("read %q: %w", path, err)
+		return fmt.Errorf("read %q: %w", cleanPath, err)
 	}
 
 	ent, err := entity.ParseMarkdownEntity(data)
 	if err != nil {
-		return fmt.Errorf("parse %q: %w", path, err)
+		return fmt.Errorf("parse %q: %w", cleanPath, err)
 	}
 
 	return s.store.SaveEntity(ent)

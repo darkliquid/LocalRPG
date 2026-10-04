@@ -16,6 +16,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 )
@@ -121,7 +122,12 @@ func resolveReferenceAudio(ref string) (string, error) {
 		return trimmed, nil
 	}
 
-	data, err := os.ReadFile(trimmed)
+	cleanPath, err := pathutil.ValidateUserPath(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("invalid audio reference path: %w", err)
+	}
+
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return "", err
 	}

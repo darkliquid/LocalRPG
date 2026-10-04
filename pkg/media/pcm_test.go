@@ -94,3 +94,16 @@ func TestClipIsValidRequiresAWholeStream(t *testing.T) {
 		t.Error("only Ogg/Opus is a stored clip format")
 	}
 }
+
+func TestWrapPCMAsWAV_InvalidSampleRate(t *testing.T) {
+	pcm := []byte{1, 2, 3, 4}
+	wrapped := WrapPCMAsWAV(pcm, -1)
+	if !bytes.HasPrefix(wrapped, []byte("RIFF")) {
+		t.Fatal("expected a RIFF header")
+	}
+	wrappedOver := WrapPCMAsWAV(pcm, 9999999)
+	if !bytes.HasPrefix(wrappedOver, []byte("RIFF")) {
+		t.Fatal("expected a RIFF header")
+	}
+}
+

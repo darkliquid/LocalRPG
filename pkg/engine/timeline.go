@@ -17,6 +17,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/state"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
@@ -243,7 +244,10 @@ func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity
 				}
 
 				// Clean up previous entity from disk and store.
-				_ = os.Remove(filepath.Join(t.EntitiesDir(), prevEnt.ID+".md"))
+				prevSafeID := pathutil.SanitizeID(prevEnt.ID)
+				if prevPath, err := pathutil.ResolveSafeChild(t.EntitiesDir(), prevSafeID+".md"); err == nil {
+					_ = os.Remove(prevPath)
+				}
 				if t.store != nil {
 					_ = t.store.DeleteEntity(prevEnt.ID)
 				}
@@ -327,7 +331,11 @@ func (t *Timeline) writeEntities(pending map[string]*entity.Entity) error {
 	sort.Strings(ids)
 
 	for _, id := range ids {
-		path := filepath.Join(dir, id+".md")
+		safeID := pathutil.SanitizeID(id)
+		path, err := pathutil.ResolveSafeChild(dir, safeID+".md")
+		if err != nil {
+			return fmt.Errorf("invalid entity path %q: %w", id, err)
+		}
 		data, err := pending[id].SerializeMarkdown()
 		if err != nil {
 			return fmt.Errorf("serialize entity %q: %w", id, err)
