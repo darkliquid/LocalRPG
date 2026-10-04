@@ -8,6 +8,7 @@ Toolchain is pinned by `mise.toml` (Go 1.27.1, Node 26.9.0, GoReleaser 2.18.2). 
 
 ```bash
 mise run setup          # go mod download + cd frontend && npm install
+mise run install:vale-styles # vale sync: download the style packages when .vale.ini changes
 mise run build          # frontend bundle -> pkg/gui/dist, then bin/localrpg
 mise run build:frontend # npm run build in frontend/ (tsc + vite)
 mise run build:backend  # depends on build:frontend
@@ -16,6 +17,7 @@ mise run test:backend   # go test -v -count=1 ./...
 mise run test:frontend  # npx tsc --noEmit, the tree model check and the player bundle check (in frontend/)
 mise run lint           # markdownlint, goreleaser check, actionlint, go vet ./...
 mise run lint:docs      # markdownlint engine on the embedded help articles (frontend/scripts/lintDocs.mjs)
+mise run lint:prose     # Vale over tracked prose and source comments (report only; STRICT=1 to gate)
 mise run lint:goreleaser # goreleaser check
 mise run lint:actions   # actionlint over .github/workflows
 mise run secrets:scan   # gitleaks over the full git history and staged changes
@@ -93,6 +95,64 @@ the three deviations from the default ruleset live with their explanations. The
 
 No CI job runs `npm audit`, so a new advisory would not gate a build. If one is
 added, it should start from a clean tree.
+
+
+## Prose linting with Vale
+
+Vale checks prose style in Markdown and in Go and TypeScript comments. It is pinned
+in `mise.toml` like every other tool, and `.vale.ini` at the repository root decides
+the styles.
+
+```bash
+mise run install:vale-styles   # vale sync; runs automatically when .vale.ini changes
+mise run lint:prose            # full report, every finding
+SUMMARY=1 mise run lint:prose  # counts, noisiest rules, worst files
+STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
+```
+
+Three things about it are not obvious.
+
+**The task is report-only, and that is deliberate.** The configured styles find
+**68,525 alerts across 717 of 939 files: 6,875 errors, 21,405 warnings and 40,245
+suggestions**. `STRICT=1` is what turns that into a gate, and it should not be used
+until the numbers are down. CI runs the summary form so the totals are visible in
+the log without a step that fails.
+
+**The file list comes from git, not from Vale.** Vale walks every file its
+configuration has a section for and does **not** read `.gitignore`, so `vale .`
+would descend into `node_modules`, `bin` and the generated site.
+`scripts/lint-prose.sh` asks `git ls-files` instead, which is exactly the tracked
+files and needs no glob list to maintain.
+
+**`styles/` is downloaded, not committed.** `vale sync` rebuilds it from the
+`Packages` key, so it is gitignored. Run `mise run install:vale-styles` after
+changing `.vale.ini`.
+
+### Getting the numbers down
+
+The findings are dominated by a few rules, and most are a style preference rather
+than a mistake. In rough order of size:
+
+- `Readability.Polysyllables` (13,330) and `write-good.E-Prime` (8,949, which bans
+  the verb "to be") are the two biggest, and neither is practical for technical
+  prose. Consider turning them off in `.vale.ini`.
+- `Vale.Spelling` (4,059) is **59% of all the errors** and is almost entirely
+  project vocabulary — `localrpg`, `frontmatter`, `wikilink`, `mise` and so on. It
+  is fixed with a vocabulary file under `styles/config/vocabularies/`, not by
+  rewriting prose.
+- `Google.Passive` and `write-good.Passive` (3,501 each) are the same complaint
+  reported twice, so one of them is redundant.
+- The mechanical ones are worth fixing rather than muting: `Google.EmDash` (742),
+  `Google.Quotes` (328), `ai-tells.DoubleHyphen` (185), `Google.Latin` (148).
+
+The worst files are the large design documents under `docs/superpowers/`, which are
+the longest prose in the repository and simply accumulate findings.
+
+**A `.vale.ini` gotcha worth remembering:** a `Packages` entry is a name from the
+Vale library, a URL, a path to a zip, or a path to a directory. There is no
+`Name.URL` form. `neighbor. https://…/ai-tells.zip` reads like one package with a
+URL, but it is parsed as a single malformed entry, `vale sync` stops with exit 2,
+and nothing after it installs. Separate entries with commas.
 
 
 ## Build gotcha: the frontend is embedded in the Go binary

@@ -29,5 +29,9 @@ todo.txt
 
 .gograph/
 
+# Vale's StylesPath. `vale sync` rebuilds it from the Packages key in .vale.ini, so
+# it is downloaded rather than committed.
+/styles/
+
 # Binaries
 /localrpg

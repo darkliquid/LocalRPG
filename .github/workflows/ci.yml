@@ -59,6 +59,13 @@ jobs:
       - name: Lint embedded documentation
         run: mise run lint:docs
 
+      # Report only, so this step always passes. The styles currently find
+      # thousands of error-level alerts, mostly a technical vocabulary Vale has
+      # never seen, so gating on them would block every change. The summary is
+      # here so the numbers are visible and can be watched down.
+      - name: Report prose and code-comment findings
+        run: SUMMARY=1 mise run lint:prose
+
   packaging:
     name: Release config and site build
     runs-on: ubuntu-latest
