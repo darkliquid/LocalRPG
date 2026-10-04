@@ -68,17 +68,18 @@ func (s *Store) SaveEntity(e *entity.Entity) error {
 	}
 
 	query := `
-	INSERT INTO entities (id, name, type, frontmatter_json, body, file_hash, updated_at)
-	VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	INSERT INTO entities (id, name, type, frontmatter_json, body, file_hash, folder, updated_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	ON CONFLICT(id) DO UPDATE SET
 		name = excluded.name,
 		type = excluded.type,
 		frontmatter_json = excluded.frontmatter_json,
 		body = excluded.body,
 		file_hash = excluded.file_hash,
+		folder = excluded.folder,
 		updated_at = CURRENT_TIMESTAMP
 	`
-	if _, err := tx.Exec(query, e.ID, e.Name, e.Type, string(fmJSON), e.Body, e.Hash); err != nil {
+	if _, err := tx.Exec(query, e.ID, e.Name, e.Type, string(fmJSON), e.Body, e.Hash, e.Folder); err != nil {
 		return fmt.Errorf("upsert entity: %w", err)
 	}
 
@@ -98,12 +99,12 @@ func (s *Store) SaveEntity(e *entity.Entity) error {
 }
 
 func (s *Store) GetEntity(id string) (*entity.Entity, error) {
-	query := `SELECT id, name, type, frontmatter_json, body, file_hash FROM entities WHERE id = ?`
+	query := `SELECT id, name, type, frontmatter_json, body, file_hash, folder FROM entities WHERE id = ?`
 	row := s.db.QueryRow(query, id)
 
 	var ent entity.Entity
 	var fmJSON string
-	if err := row.Scan(&ent.ID, &ent.Name, &ent.Type, &fmJSON, &ent.Body, &ent.Hash); err != nil {
+	if err := row.Scan(&ent.ID, &ent.Name, &ent.Type, &fmJSON, &ent.Body, &ent.Hash, &ent.Folder); err != nil {
 		return nil, err
 	}
 
@@ -241,11 +242,14 @@ type EntitySummary struct {
 	Location string
 	Tags     []string
 	Aliases  []string
+	// Folder is the note's directory under entities/, relative and slash-separated,
+	// with "" for the root.
+	Folder string
 }
 
 // ListEntities returns every indexed entity ordered by entity ID.
 func (s *Store) ListEntities() ([]EntitySummary, error) {
-	rows, err := s.db.Query(`SELECT id, name, type, frontmatter_json FROM entities ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, name, type, frontmatter_json, folder FROM entities ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +259,7 @@ func (s *Store) ListEntities() ([]EntitySummary, error) {
 	for rows.Next() {
 		var summary EntitySummary
 		var fmJSON string
-		if err := rows.Scan(&summary.ID, &summary.Name, &summary.Type, &fmJSON); err != nil {
+		if err := rows.Scan(&summary.ID, &summary.Name, &summary.Type, &fmJSON, &summary.Folder); err != nil {
 			return nil, err
 		}
 

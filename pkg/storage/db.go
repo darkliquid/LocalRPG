@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS entities (
     frontmatter_json TEXT NOT NULL,
     body TEXT NOT NULL,
     file_hash TEXT NOT NULL,
+    folder TEXT NOT NULL DEFAULT '',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
