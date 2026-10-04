@@ -516,11 +516,11 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		pipeline := media.NewTTSPipeline(client, cache)
 		pipeline.SetTextPolicy(media.TextPolicyFromConfig(c.config.Media.TTS))
 		pipeline.SetOpusBitrate(c.config.OpusBitrate())
-		pipeline.SetGroupCaps(media.ResolveGroupCaps(c.config.Media.TTS, client))
+		pipeline.SetGroupCaps(media.TurnGroupCaps(c.config, media.ResolveGroupCaps(c.config.Media.TTS, client)))
 		resolver := NewSpeechResolver(pipeline, store, narrator)
 		if grouped, ok := resolver.(*speechResolver); ok {
-			// The export has no sentence streaming to conflict with, so "auto"
-			// groups here: fewer requests for the same audio.
+			// Grouping follows the app's policy, so a turn the app streamed folds
+			// under the same single-speaker caps and the export resolves its clips.
 			grouped.SetGrouped(c.config.TTSGrouping() != "off")
 		}
 		compiler.SetSpeechResolver(resolver)

@@ -147,7 +147,7 @@ func planCampaignGroups(resolver *core.PathResolver, store *storage.Store, cfg *
 	pipeline := media.NewTTSPipeline(client, media.NewContentCache(resolver.CacheDir()))
 	pipeline.SetTextPolicy(media.TextPolicyFromConfig(cfg.Media.TTS))
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
-	pipeline.SetGroupCaps(media.ResolveGroupCaps(cfg.Media.TTS, client))
+	pipeline.SetGroupCaps(media.TurnGroupCaps(cfg, media.ResolveGroupCaps(cfg.Media.TTS, client)))
 
 	narrator := cliNarratorVoice(resolver, cfg, gameID)
 	voiceFor := func(speakerID string) *entity.VoiceConfig {
