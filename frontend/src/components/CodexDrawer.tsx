@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EntityMemory, EntityNote, EntitySummary, FolderNode, TTSConfig, VoiceProfile, GenerationFailure } from '../types';
+import { EntityMemory, EntityNote, EntitySummary, FolderNode, FrontmatterSchema, TTSConfig, VoiceProfile, GenerationFailure } from '../types';
 import { APIClient, GenerationError } from '../api/client';
 import { Save, Volume2, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X, Loader2, RotateCw, AlertCircle } from 'lucide-react';
 import { formatGenerationError } from '../lib/generationError';
@@ -9,6 +9,7 @@ import { useLightbox } from '../hooks/useLightbox';
 import { VoiceProfileSelect } from './VoiceProfileSelect';
 import EntityTree from './EntityTree';
 import MarkdownEditor from './editor/MarkdownEditor';
+import { loadEntityIndex, invalidateEntityIndex } from './editor/entityIndex';
 
 interface CodexDrawerProps {
   gameID?: string;
@@ -45,6 +46,9 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const [savedMarkdown, setSavedMarkdown] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [folders, setFolders] = useState<FolderNode[]>([]);
+  const [frontmatterSchema, setFrontmatterSchema] = useState<FrontmatterSchema | undefined>();
+  const [linkTargets, setLinkTargets] = useState<EntitySummary[]>([]);
+  const [saveFailure, setSaveFailure] = useState<{ line: number; message: string } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!entity);
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [mergeTarget, setMergeTarget] = useState('');
@@ -58,6 +62,36 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const [portraitError, setPortraitError] = useState<GenerationFailure | null>(null);
 
   const profiles = voiceProfiles ?? [];
+
+  // The schema is generated server-side from the Go struct, so it is fetched once
+  // per session and shared by every note.
+  useEffect(() => {
+    const client = new APIClient(gameID ?? '');
+    client
+      .getEntityFrontmatterSchema()
+      .then(setFrontmatterSchema)
+      .catch(() => setFrontmatterSchema(undefined));
+  }, []);
+
+  // The note list is what wikilink completion offers, so it is loaded per campaign
+  // and refreshed after a save.
+  useEffect(() => {
+    if (!gameID) {
+      setLinkTargets([]);
+      return;
+    }
+    let cancelled = false;
+    loadEntityIndex(new APIClient(gameID), gameID)
+      .then((list) => {
+        if (!cancelled) setLinkTargets(list);
+      })
+      .catch(() => {
+        if (!cancelled) setLinkTargets([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameID]);
 
   // The folder tree is loaded per campaign and refreshed after any move, because
   // a folder that is not in the tree cannot be dropped onto.
@@ -165,11 +199,21 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const handleSave = async () => {
     if (!entity) return;
     setSaveError('');
+    setSaveFailure(null);
     try {
       await onSave(entity.id, markdown);
       setSavedMarkdown(markdown);
+      // A note written here must be linkable straight away.
+      invalidateEntityIndex();
+      if (gameID) {
+        setLinkTargets(await loadEntityIndex(new APIClient(gameID), gameID, true));
+      }
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : String(err));
+      const withLine = err as Error & { line?: number };
+      if (withLine.line) {
+        setSaveFailure({ line: withLine.line, message: withLine.message });
+      }
+      setSaveError(withLine.message);
     }
   };
 
@@ -450,6 +494,9 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               onChange={setMarkdown}
               language="markdown-frontmatter"
               onSave={() => void handleSave()}
+              frontmatterSchema={frontmatterSchema}
+              linkTargets={linkTargets}
+              serverError={saveFailure}
               ariaLabel="Entity note markdown"
               minHeight="360px"
             />

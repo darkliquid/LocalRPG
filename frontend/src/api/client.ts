@@ -9,6 +9,7 @@ import {
   EntitySummary,
   FolderNode,
   FrontmatterSchema,
+  SaveErrorBody,
   Recap,
   SystemInfo,
   WorldInfo,
@@ -786,7 +787,20 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ markdown, folder: folder ?? '' })
     });
-    if (!res.ok) throw new Error(`saveEntity: ${res.statusText}`);
+    if (!res.ok) {
+      const body = await res.text();
+      let parsed: SaveErrorBody | null = null;
+      try {
+        parsed = JSON.parse(body) as SaveErrorBody;
+      } catch {
+        parsed = null;
+      }
+      const error = new Error(parsed?.error ?? (body.trim() || `saveEntity: ${res.statusText}`));
+      if (parsed?.line) {
+        (error as Error & { line?: number }).line = parsed.line;
+      }
+      throw error;
+    }
   }
 
   async listFolders(): Promise<FolderNode[]> {

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { APIClient } from '../api/client';
-import type { EntityNote, EntitySummary, FolderNode } from '../types';
+import type { EntityNote, EntitySummary, FolderNode, FrontmatterSchema } from '../types';
 import EntityTree from './EntityTree';
 import MarkdownEditor, { type MarkdownEditorProps } from './editor/MarkdownEditor';
+import { loadEntityIndex, invalidateEntityIndex } from './editor/entityIndex';
 
 type DocKind = 'entities' | 'prompts' | 'manifests';
 
@@ -24,6 +25,9 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
   const [draft, setDraft] = useState('');
   const [saved, setSaved] = useState('');
   const [error, setError] = useState('');
+  const [frontmatterSchema, setFrontmatterSchema] = useState<FrontmatterSchema | undefined>();
+  const [linkTargets, setLinkTargets] = useState<EntitySummary[]>([]);
+  const [saveFailure, setSaveFailure] = useState<{ line: number; message: string } | null>(null);
 
   const client = useMemo(() => new APIClient(gameID), [gameID]);
 
@@ -52,6 +56,29 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
   }, [isOpen, gameID, client]);
 
   useEffect(() => {
+    if (!isOpen || !gameID) return;
+    let cancelled = false;
+    client
+      .getEntityFrontmatterSchema()
+      .then((schema) => {
+        if (!cancelled) setFrontmatterSchema(schema);
+      })
+      .catch(() => {
+        if (!cancelled) setFrontmatterSchema(undefined);
+      });
+    loadEntityIndex(client, gameID)
+      .then((list) => {
+        if (!cancelled) setLinkTargets(list);
+      })
+      .catch(() => {
+        if (!cancelled) setLinkTargets([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, gameID, client]);
+
+  useEffect(() => {
     if (!note) return;
     setDraft(note.markdown);
     setSaved(note.markdown);
@@ -68,10 +95,17 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
     if (!note) return;
     try {
       setError('');
+      setSaveFailure(null);
       await client.saveEntity(note.id, draft, note.folder);
       setSaved(draft);
+      invalidateEntityIndex();
+      setLinkTargets(await loadEntityIndex(client, gameID, true));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const withLine = err as Error & { line?: number };
+      if (withLine.line) {
+        setSaveFailure({ line: withLine.line, message: withLine.message });
+      }
+      setError(withLine.message);
     }
   };
 
@@ -154,6 +188,9 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
               ariaLabel={`${kind} document`}
               minHeight="100%"
               onSave={() => void save()}
+              frontmatterSchema={frontmatterSchema}
+              linkTargets={linkTargets}
+              serverError={saveFailure}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-xs font-mono text-stone-500">
