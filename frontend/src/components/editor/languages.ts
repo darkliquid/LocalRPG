@@ -1,8 +1,9 @@
 import type { Extension } from '@codemirror/state';
+import { javascript } from '@codemirror/lang-javascript';
 import { markdown } from '@codemirror/lang-markdown';
 import { yaml, yamlFrontmatter } from '@codemirror/lang-yaml';
 
-export type EditorLanguage = 'markdown' | 'markdown-frontmatter' | 'yaml';
+export type EditorLanguage = 'markdown' | 'markdown-frontmatter' | 'yaml' | 'javascript';
 
 // languageExtensions maps a document kind to its parser. It is a plain function
 // with no editor instance, so the mapping is reviewable on its own.
@@ -14,6 +15,8 @@ export function languageExtensions(language: EditorLanguage): Extension[] {
       return [yamlFrontmatter({ content: markdown() })];
     case 'yaml':
       return [yaml()];
+    case 'javascript':
+      return [javascript()];
     case 'markdown':
     default:
       return [markdown()];

@@ -674,11 +674,13 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               <span>JavaScript Runtime (Goja Sandbox)</span>
               <span>Exports: evaluateRoll(stats, diceExpr)</span>
             </div>
-            <textarea
+            <MarkdownEditor
+              key={`${savedID || slugID || 'draft'}-script`}
               value={script}
-              onChange={(e) => { setScript(e.target.value); markDirty(); }}
-              spellCheck={false}
-              className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-purple-200/90 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
+              onChange={(next) => { setScript(next); markDirty(); }}
+              language="javascript"
+              ariaLabel="System mechanics script"
+              placeholder="export function evaluateRoll(stats, diceExpr) { ... }"
             />
           </div>
         )}
