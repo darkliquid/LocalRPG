@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { APIClient } from '../api/client';
-import type { EntityNote, EntitySummary, FolderNode, FrontmatterSchema } from '../types';
+import type { EntityNote, EntitySummary, FolderNode } from '../types';
 import EntityTree from './EntityTree';
 import MarkdownEditor, { type MarkdownEditorProps } from './editor/MarkdownEditor';
 import { loadEntityIndex, invalidateEntityIndex } from './editor/entityIndex';
@@ -25,7 +25,6 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
   const [draft, setDraft] = useState('');
   const [saved, setSaved] = useState('');
   const [error, setError] = useState('');
-  const [frontmatterSchema, setFrontmatterSchema] = useState<FrontmatterSchema | undefined>();
   const [linkTargets, setLinkTargets] = useState<EntitySummary[]>([]);
   const [saveFailure, setSaveFailure] = useState<{ line: number; message: string } | null>(null);
 
@@ -58,14 +57,6 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
   useEffect(() => {
     if (!isOpen || !gameID) return;
     let cancelled = false;
-    client
-      .getEntityFrontmatterSchema()
-      .then((schema) => {
-        if (!cancelled) setFrontmatterSchema(schema);
-      })
-      .catch(() => {
-        if (!cancelled) setFrontmatterSchema(undefined);
-      });
     loadEntityIndex(client, gameID)
       .then((list) => {
         if (!cancelled) setLinkTargets(list);
@@ -188,7 +179,6 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
               ariaLabel={`${kind} document`}
               minHeight="100%"
               onSave={() => void save()}
-              frontmatterSchema={frontmatterSchema}
               linkTargets={linkTargets}
               serverError={saveFailure}
             />

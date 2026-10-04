@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EntityMemory, EntityNote, EntitySummary, FolderNode, FrontmatterSchema, TTSConfig, VoiceProfile, GenerationFailure } from '../types';
+import { EntityMemory, EntityNote, EntitySummary, FolderNode, TTSConfig, VoiceProfile, GenerationFailure } from '../types';
 import { APIClient, GenerationError } from '../api/client';
 import { Save, Volume2, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X, Loader2, RotateCw, AlertCircle } from 'lucide-react';
 import { formatGenerationError } from '../lib/generationError';
@@ -46,7 +46,6 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const [savedMarkdown, setSavedMarkdown] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [folders, setFolders] = useState<FolderNode[]>([]);
-  const [frontmatterSchema, setFrontmatterSchema] = useState<FrontmatterSchema | undefined>();
   const [linkTargets, setLinkTargets] = useState<EntitySummary[]>([]);
   const [saveFailure, setSaveFailure] = useState<{ line: number; message: string } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!entity);
@@ -63,18 +62,10 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
 
   const profiles = voiceProfiles ?? [];
 
-  // The schema is generated server-side from the Go struct, so it is fetched once
-  // per session and shared by every note.
-  useEffect(() => {
-    const client = new APIClient(gameID ?? '');
-    client
-      .getEntityFrontmatterSchema()
-      .then(setFrontmatterSchema)
-      .catch(() => setFrontmatterSchema(undefined));
-  }, []);
-
   // The note list is what wikilink completion offers, so it is loaded per campaign
-  // and refreshed after a save.
+  // and refreshed after a save. The frontmatter schema is not passed in: the
+  // editor loads it for itself, so no editor can lose its completion by a caller
+  // forgetting a prop.
   useEffect(() => {
     if (!gameID) {
       setLinkTargets([]);
@@ -494,7 +485,6 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               onChange={setMarkdown}
               language="markdown-frontmatter"
               onSave={() => void handleSave()}
-              frontmatterSchema={frontmatterSchema}
               linkTargets={linkTargets}
               serverError={saveFailure}
               ariaLabel="Entity note markdown"

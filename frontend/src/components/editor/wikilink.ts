@@ -31,6 +31,12 @@ export function wikilinkCompletion(entities: EntitySummary[]): CompletionSource 
     const match = context.matchBefore(/\[\[[^[\]]*$/);
     if (!match) return null;
 
+    // closeBrackets inserts the closing ]] as soon as [[ is typed, so the
+    // completion has to consume it or the insertion doubles it.
+    const doc = context.state.doc.toString();
+    let to = context.pos;
+    while (doc[to] === ']' && to - context.pos < 2) to++;
+
     const query = match.text.slice(2).trim().toLowerCase();
     const options = entities
       .map((entity) => ({ entity, score: scoreEntity(entity, query) }))
@@ -45,6 +51,6 @@ export function wikilinkCompletion(entities: EntitySummary[]): CompletionSource 
       }));
 
     if (options.length === 0) return null;
-    return { from: match.from, options, validFor: /^\[\[[^[\]]*$/ };
+    return { from: match.from, to, options, validFor: /^\[\[[^[\]]*\]?\]?$/ };
   };
 }

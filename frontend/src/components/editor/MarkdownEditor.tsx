@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Compartment, EditorState, StateEffect, StateField, type Extension } from '@codemirror/state';
 import { EditorView, keymap, placeholder as placeholderExt } from '@codemirror/view';
 import { autocompletion, type CompletionSource } from '@codemirror/autocomplete';
@@ -8,6 +8,7 @@ import { indentWithTab } from '@codemirror/commands';
 import type { EntitySummary, FrontmatterSchema } from '../../types';
 import { languageExtensions, type EditorLanguage } from './languages';
 import { editorTheme } from './theme';
+import { loadFrontmatterSchema } from './frontmatterSchema';
 import {
   frontmatterHover,
   frontmatterKeyCompletion,
@@ -25,6 +26,8 @@ export interface MarkdownEditorProps {
   placeholder?: string;
   minHeight?: string;
   ariaLabel: string;
+  // frontmatterSchema overrides the schema the editor loads for itself. Leave it
+  // unset and a frontmatter document still completes.
   frontmatterSchema?: FrontmatterSchema;
   linkTargets?: EntitySummary[];
   serverError?: { line: number; message: string } | null;
@@ -72,14 +75,39 @@ export default function MarkdownEditor({
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
 
+  // lastEmitted is the document text this editor last reported upwards. It is what
+  // distinguishes a change that came from the user (ignore, the editor already has
+  // it) from one that came from outside (replace, or the editor would keep showing
+  // the previous document). Without it an uncontrolled editor silently ignores a
+  // new value prop, which is how clicking a note opened the previous note.
+  const lastEmittedRef = useRef(value);
+
   // Intelligence arrives after the first render (the schema and the note list are
   // fetched), so it lives in a compartment that can be reconfigured rather than
   // being fixed at creation.
   const intelligenceCompartment = useRef(new Compartment());
-  const schemaRef = useRef(frontmatterSchema);
+  const [loadedSchema, setLoadedSchema] = useState<FrontmatterSchema | undefined>(frontmatterSchema);
+  const schemaRef = useRef(loadedSchema);
   const linksRef = useRef(linkTargets);
-  schemaRef.current = frontmatterSchema;
+  schemaRef.current = loadedSchema;
   linksRef.current = linkTargets;
+
+  // A frontmatter document always gets its schema, so no caller can ship an editor
+  // with completion missing by forgetting a prop.
+  useEffect(() => {
+    if (frontmatterSchema || language !== 'markdown-frontmatter') return;
+    let cancelled = false;
+    void loadFrontmatterSchema().then((schema) => {
+      if (!cancelled && schema) setLoadedSchema(schema);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [frontmatterSchema, language]);
+
+  useEffect(() => {
+    if (frontmatterSchema) setLoadedSchema(frontmatterSchema);
+  }, [frontmatterSchema]);
 
   const buildIntelligence = (): Extension[] => {
     const schema = schemaRef.current;
@@ -115,7 +143,11 @@ export default function MarkdownEditor({
       EditorState.readOnly.of(!!readOnly),
       EditorView.contentAttributes.of({ 'aria-label': ariaLabel }),
       EditorView.updateListener.of((update) => {
-        if (update.docChanged) onChangeRef.current(update.state.doc.toString());
+        if (update.docChanged) {
+          const next = update.state.doc.toString();
+          lastEmittedRef.current = next;
+          onChangeRef.current(next);
+        }
       }),
       keymap.of([
         {
@@ -137,6 +169,7 @@ export default function MarkdownEditor({
       state: EditorState.create({ doc: value, extensions }),
     });
     viewRef.current = view;
+    lastEmittedRef.current = value;
 
     return () => {
       view.destroy();
@@ -147,6 +180,28 @@ export default function MarkdownEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // An incoming value the editor did not produce is an external change: a
+  // different document, or an edit applied above the editor such as inserting a
+  // voice archetype. The document is replaced wholesale, because the two texts
+  // have nothing in common to diff.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+
+    const current = view.state.doc.toString();
+    if (value === current) {
+      lastEmittedRef.current = value;
+      return;
+    }
+    if (value === lastEmittedRef.current) return;
+
+    lastEmittedRef.current = value;
+    view.dispatch({
+      changes: { from: 0, to: current.length, insert: value },
+      selection: { anchor: 0 },
+    });
+  }, [value]);
+
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -154,7 +209,7 @@ export default function MarkdownEditor({
       effects: intelligenceCompartment.current.reconfigure(buildIntelligence()),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frontmatterSchema, linkTargets]);
+  }, [loadedSchema, linkTargets]);
 
   useEffect(() => {
     const view = viewRef.current;
