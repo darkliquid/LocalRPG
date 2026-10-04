@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -61,6 +62,7 @@ func handleGUICommand(args []string) {
 	}
 
 	svc := gui.NewService(cfg.Dir)
+	svc.SetVersion(Version)
 	defer svc.Close()
 	defer func() { _ = storage.CloseGameStores() }()
 
@@ -160,8 +162,20 @@ func handleGUICommand(args []string) {
 		},
 	})
 
-	menu := application.DefaultApplicationMenu()
-	app.Menu.Set(menu)
+	// macOS always shows a global menu bar, so it keeps a native menu (without
+	// Wails' own Help > Learn More entry, which opens wails.io). On every other
+	// platform the menu is drawn by the frontend and stays hidden until Alt
+	// reveals it, so no native menu bar is attached: Wails v3 can only hide one
+	// on Windows, and attaching it would leave it permanently visible on Linux.
+	if runtime.GOOS == "darwin" {
+		app.Menu.Set(localRPGApplicationMenu())
+	}
+
+	// A link in the app (the Help menu, the About dialog) cannot be opened by
+	// the webview itself: Wails v3 installs no handler for a new window, so an
+	// anchor click is a silent no-op on Linux. Routing it through the app's
+	// Browser manager is what reaches the system browser.
+	svc.SetURLOpener(app.Browser.OpenURL)
 
 	// The desktop window gets a native directory chooser for exports. Browser and
 	// socket modes have no dialog, so the UI falls back to a path field. Wails
@@ -186,7 +200,7 @@ func handleGUICommand(args []string) {
 		})
 	})
 
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:                      "LocalRPG",
 		Width:                      1280,
 		Height:                     800,
@@ -194,12 +208,32 @@ func handleGUICommand(args []string) {
 		MinHeight:                  600,
 		URL:                        "/",
 		BackgroundType:             application.BackgroundTypeTranslucent,
-		UseApplicationMenu:         true,
 		DefaultContextMenuDisabled: false,
+	})
+
+	// With no native View menu, Developer Tools keeps its conventional
+	// accelerator as a direct window binding so debugging stays reachable.
+	window.RegisterKeyBinding("F12", func(application.Window) {
+		window.OpenDevTools()
 	})
 
 	if err := app.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Wails application failed: %v\n", err)
 		shutdown(1)
 	}
+}
+
+// localRPGApplicationMenu is the native menu macOS shows in the global menu bar.
+// It is the platform default minus the Help menu, whose only entry ("Learn More")
+// opens wails.io rather than anything about LocalRPG; the application's own Help
+// and About live in the frontend menu. The About item the AppMenu role adds
+// reports the application name and description, so it already describes LocalRPG.
+func localRPGApplicationMenu() *application.Menu {
+	menu := application.NewMenu()
+	menu.AddRole(application.AppMenu)
+	menu.AddRole(application.FileMenu)
+	menu.AddRole(application.EditMenu)
+	menu.AddRole(application.ViewMenu)
+	menu.AddRole(application.WindowMenu)
+	return menu
 }

@@ -51,6 +51,7 @@ func routePattern(path string) string {
 	switch {
 	case path == "/api/games" || path == "/api/systems" || path == "/api/worlds" ||
 		path == "/api/settings" || path == "/api/settings/test-provider" ||
+		path == "/api/open-url" ||
 		path == "/api/providers" || path == "/api/providers/models" ||
 		path == "/api/tts/inspect" || path == "/api/tts/voices/search" ||
 		path == "/api/tts/batch" ||
@@ -152,6 +153,30 @@ func (s *Server) handleLimitsRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, LimitsDTO{Blocks: s.service.Limits()})
+}
+
+// handleOpenURLRoute hands a link to the desktop window, which opens it in the
+// system browser. Browser and socket mode have no window to ask, so they answer
+// 501 and the frontend opens a tab itself.
+func (s *Server) handleOpenURLRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req OpenURLRequestDTO
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxOpenURLBody)).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if err := s.service.OpenURL(req.URL); err != nil {
+		if errors.Is(err, errNoURLOpener) {
+			http.Error(w, err.Error(), http.StatusNotImplemented)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleTTSBatchRoute serves the global batch job manager: GET /api/tts/batch
@@ -1290,6 +1315,10 @@ func (s *Server) handleTraceRoute(w http.ResponseWriter, r *http.Request) {
 // maxTurnBody bounds a player action so a runaway paste cannot allocate without
 // limit. It is far above any plausible action.
 const maxTurnBody = 64 << 10
+
+// maxOpenURLBody bounds a link request. A URL that does not fit in a few
+// kilobytes is not one the app would ever open.
+const maxOpenURLBody = 4 << 10
 
 // handleTurnSubmit streams a turn as newline-delimited JSON. Status codes can only
 // be chosen before the first byte, so the campaign is prepared first: 409 for a

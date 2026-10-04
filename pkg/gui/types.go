@@ -443,6 +443,15 @@ type SettingsResponseDTO struct {
 	ConfigFilePath  string        `json:"config_file_path"`
 	IsLocalOverride bool          `json:"is_local_override"`
 	Warnings        []string      `json:"warnings,omitempty"`
+	// AppVersion is the application's build version, so the About dialog can
+	// report the running release rather than the config schema version.
+	AppVersion string `json:"app_version,omitempty"`
+}
+
+// OpenURLRequestDTO asks the desktop window to open a link in the system
+// browser. Browser and socket mode have no window, so they reject it.
+type OpenURLRequestDTO struct {
+	URL string `json:"url"`
 }
 
 type TestProviderRequestDTO struct {

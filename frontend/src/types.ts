@@ -717,6 +717,7 @@ export interface SettingsResponse {
   config_file_path: string;
   is_local_override: boolean;
   warnings?: string[];
+  app_version?: string;
 }
 
 export interface ExportRequest {

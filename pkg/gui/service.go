@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -106,6 +107,10 @@ type Service struct {
 	// directoryPicker is the desktop window's native directory chooser. It is
 	// nil in browser/socket mode, where the UI falls back to a path field.
 	directoryPicker func(defaultDir string) (string, error)
+	// urlOpener hands a link to the desktop window, which forwards it to the
+	// system browser. It is nil in browser/socket mode, where the frontend opens
+	// a tab itself.
+	urlOpener func(url string) error
 	// exportAssets supplies the built player a web export ships. It is a field so a
 	// test can describe a build without one being present on the machine.
 	exportAssets func() (fs.FS, error)
@@ -113,12 +118,52 @@ type Service struct {
 	portraitMu        sync.Mutex
 	portraitSeq       uint64
 	portraitListeners map[string]map[uint64]func(TurnEvent)
+	// version is the application's build version, surfaced to the About dialog.
+	// It is empty for callers (tests, the terminal client) that never set one.
+	version string
 }
 
 // Config returns the configuration the service is running with, so a command can
 // build shared infrastructure, such as a trace sink, from the same values.
 func (s *Service) Config() *config.Config {
 	return s.configMgr.Get()
+}
+
+// SetVersion records the application's build version so it can be reported to
+// the UI. It is set once at startup, before any request is served.
+func (s *Service) SetVersion(version string) {
+	s.mu.Lock()
+	s.version = version
+	s.mu.Unlock()
+}
+
+// SetURLOpener installs the desktop window's link handler, which hands a URL to
+// the system browser. Without one, OpenURL reports that no opener is available
+// and the frontend opens a tab itself.
+func (s *Service) SetURLOpener(opener func(url string) error) {
+	s.mu.Lock()
+	s.urlOpener = opener
+	s.mu.Unlock()
+}
+
+// OpenURL asks the desktop window to open a link in the system browser. Only
+// http and https are accepted: the handler is reachable from the app's own UI,
+// so it must not become a way to launch arbitrary schemes.
+func (s *Service) OpenURL(rawURL string) error {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("parse url: %w", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("unsupported url scheme %q", parsed.Scheme)
+	}
+	s.mu.RLock()
+	opener := s.urlOpener
+	s.mu.RUnlock()
+	if opener == nil {
+		return errNoURLOpener
+	}
+	return opener(parsed.String())
 }
 
 // SetLogger attaches a trace sink to the service and to every turn it prepares.
@@ -1236,6 +1281,10 @@ func healthEffectDTOs(effects []engine.HealthEffect) []HealthEffectDTO {
 
 // ErrTurnInFlight means another turn is already running for this campaign.
 var ErrTurnInFlight = errors.New("a turn is already in flight")
+
+// errNoURLOpener means the service is running without a desktop window, so it
+// cannot hand a link to the system browser. The frontend opens a tab instead.
+var errNoURLOpener = errors.New("no url opener available")
 
 // ErrCampaignNotPlayable means the campaign's files are not ready for a turn, so
 // the caller can answer before any bytes are sent.
@@ -3884,7 +3933,15 @@ func (s *Service) GetSettings(ctx context.Context) (*SettingsResponseDTO, error)
 		ConfigFilePath:  s.configMgr.ActiveFilePath(),
 		IsLocalOverride: s.configMgr.IsLocalOverride(),
 		Warnings:        s.configMgr.Warnings(),
+		AppVersion:      s.appVersion(),
 	}, nil
+}
+
+// appVersion reports the build version recorded by SetVersion.
+func (s *Service) appVersion() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.version
 }
 
 func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*SettingsResponseDTO, error) {

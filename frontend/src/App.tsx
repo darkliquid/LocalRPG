@@ -23,6 +23,8 @@ import { useStreamedSpeech } from './hooks/useStreamedSpeech';
 import { TurnStreamProcessor } from './lib/turnStreamProcessor';
 import { slugify } from './lib/slug';
 import { CinematicOverlay } from './components/CinematicOverlay';
+import { MenuBar } from './components/MenuBar';
+import { AboutModal } from './components/AboutModal';
 
 // Everything below the campaign shell is only needed once its overlay is
 // opened, so it loads on demand instead of in the first bundle. The chronicle,
@@ -79,6 +81,9 @@ export const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [docsArticleID, setDocsArticleID] = useState<string | undefined>(undefined);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  // The build version the About dialog reports, read from the settings endpoint.
+  const [appVersion, setAppVersion] = useState<string | undefined>(undefined);
   const [addressed, setAddressed] = useState<Set<number>>(new Set());
   const [modalEntity, setModalEntity] = useState<{ name: string; turnNumber: number } | null>(null);
   const [missingModel, setMissingModel] = useState<{ id: string; name: string; sizeBytes: number } | null>(null);
@@ -141,7 +146,10 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     APIClient.getSettings()
-      .then((res) => setConfig(res.config))
+      .then((res) => {
+        setConfig(res.config);
+        setAppVersion(res.app_version);
+      })
       .catch(console.error);
     APIClient.audioStatus()
       .then((status) => setServerAudio(status.available))
@@ -1158,18 +1166,6 @@ export const App: React.FC = () => {
             }}
           />
 
-          {/* Built-in Help and Documentation Modal */}
-          <Suspense fallback={null}>
-            <DocsModal
-              isOpen={isDocsOpen}
-              initialArticleID={docsArticleID}
-              onClose={() => {
-                setIsDocsOpen(false);
-                setDocsArticleID(undefined);
-              }}
-            />
-          </Suspense>
-
           {/* Story Export Modal */}
           <Suspense fallback={null}>
             <ExportModal
@@ -1185,6 +1181,29 @@ export const App: React.FC = () => {
         </>
       )}
       </div>
+
+      {/* The application menu stays out of the way until Alt reveals it, and the
+          About dialog describes the app rather than the framework it is built
+          on. Both sit above the launcher and a campaign alike. */}
+      <MenuBar onOpenDocs={() => openDocs()} onOpenAbout={() => setIsAboutOpen(true)} />
+
+      <Suspense fallback={null}>
+        <DocsModal
+          isOpen={isDocsOpen}
+          initialArticleID={docsArticleID}
+          onClose={() => {
+            setIsDocsOpen(false);
+            setDocsArticleID(undefined);
+          }}
+        />
+      </Suspense>
+
+      <AboutModal
+        isOpen={isAboutOpen}
+        onClose={() => setIsAboutOpen(false)}
+        onOpenDocs={() => openDocs()}
+        version={appVersion}
+      />
     </div>
   );
 };

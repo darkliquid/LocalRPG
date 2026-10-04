@@ -484,6 +484,18 @@ export class APIClient {
     return res.json();
   }
 
+  // openURL asks the desktop window to open a link in the system browser. It
+  // rejects in browser and socket mode, where there is no window to ask and the
+  // caller should open a tab itself.
+  static async openURL(url: string): Promise<void> {
+    const res = await fetch('/api/open-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) throw new Error(`openURL: ${res.statusText}`);
+  }
+
   static async testProvider(req: TestProviderRequest): Promise<TestProviderResponse> {
     const res = await fetch('/api/settings/test-provider', {
       method: 'POST',

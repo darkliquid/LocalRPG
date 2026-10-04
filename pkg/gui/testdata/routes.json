@@ -12,6 +12,7 @@
   "/api/limits",
   "/api/models",
   "/api/models/",
+  "/api/open-url",
   "/api/providers",
   "/api/providers/models",
   "/api/settings",
