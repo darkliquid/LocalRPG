@@ -299,3 +299,17 @@ func TestWikilinkBasename(t *testing.T) {
 		}
 	}
 }
+
+func TestDeclaredID(t *testing.T) {
+	cases := map[string]string{
+		"---\nid: silver-hand\nname: X\n---\n\nbody\n": "silver-hand",
+		"---\nname: X\n---\n\nbody\n":                 "",
+		"no frontmatter at all":                       "",
+		"---\nid: broken\n":                           "",
+	}
+	for input, want := range cases {
+		if got := DeclaredID([]byte(input)); got != want {
+			t.Errorf("DeclaredID(%q) = %q, want %q", input, got, want)
+		}
+	}
+}

@@ -1506,3 +1506,101 @@ func TestFolderOperationsRefuseTheRoot(t *testing.T) {
 	}
 }
 
+func TestSaveEntityMovesBetweenFolders(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	ctx := context.Background()
+
+	note := "---\nid: silver-hand\nname: Silver Hand\ntype: faction\n---\n\nSee [[port-vel]].\n"
+	if err := svc.SaveEntityInFolder(ctx, gameID, "silver-hand", "", note); err != nil {
+		t.Fatalf("initial save: %v", err)
+	}
+
+	// A second note links to the first, and the move must not touch it.
+	linker := "---\nid: port-vel\nname: Port Vel\ntype: location\n---\n\nHome of the [[silver-hand]].\n"
+	if err := svc.SaveEntityInFolder(ctx, gameID, "port-vel", "", linker); err != nil {
+		t.Fatalf("save linker: %v", err)
+	}
+
+	if err := svc.SaveEntityInFolder(ctx, gameID, "silver-hand", "factions/orders", note); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+	if _, err := os.Stat(filepath.Join(entitiesDir, "silver-hand.md")); !os.IsNotExist(err) {
+		t.Fatalf("the old file is still there: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(entitiesDir, "factions", "orders", "silver-hand.md")); err != nil {
+		t.Fatalf("the moved file is missing: %v", err)
+	}
+
+	linkerBytes, err := os.ReadFile(filepath.Join(entitiesDir, "port-vel.md"))
+	if err != nil {
+		t.Fatalf("read linker: %v", err)
+	}
+	if !strings.Contains(string(linkerBytes), "[[silver-hand]]") {
+		t.Fatalf("the move rewrote an inbound link, which it must not do:\n%s", linkerBytes)
+	}
+
+	got, err := svc.GetEntity(ctx, gameID, "silver-hand")
+	if err != nil {
+		t.Fatalf("GetEntity: %v", err)
+	}
+	if got.Folder != "factions/orders" {
+		t.Errorf("Folder = %q, want %q", got.Folder, "factions/orders")
+	}
+}
+
+func TestSaveEntityRejectsDuplicateID(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	ctx := context.Background()
+
+	first := "---\nid: silver-hand\nname: Silver Hand\ntype: faction\n---\n\nFirst.\n"
+	if err := svc.SaveEntityInFolder(ctx, gameID, "silver-hand", "", first); err != nil {
+		t.Fatalf("first save: %v", err)
+	}
+
+	// A different file claims an id that is already taken.
+	second := "---\nid: silver-hand\nname: Impostor\ntype: faction\n---\n\nSecond.\n"
+	err := svc.SaveEntityInFolder(ctx, gameID, "impostor", "", second)
+	if !errors.Is(err, ErrDuplicateEntityID) {
+		t.Fatalf("error = %v, want ErrDuplicateEntityID", err)
+	}
+	if !strings.Contains(err.Error(), "silver-hand") {
+		t.Errorf("the error should name the id it collided with, got: %v", err)
+	}
+
+	got, err := svc.GetEntity(ctx, gameID, "silver-hand")
+	if err != nil {
+		t.Fatalf("GetEntity: %v", err)
+	}
+	if !strings.Contains(got.Markdown, "First.") {
+		t.Errorf("the duplicate overwrote the original:\n%s", got.Markdown)
+	}
+}
+
+func TestSaveEntityRejectsAnInvalidFolder(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	note := "---\nid: silver-hand\nname: Silver Hand\ntype: faction\n---\n\nA guild.\n"
+
+	err := svc.SaveEntityInFolder(context.Background(), gameID, "silver-hand", "../escape", note)
+	if !errors.Is(err, ErrInvalidFolderPath) {
+		t.Fatalf("error = %v, want ErrInvalidFolderPath", err)
+	}
+}
+
+func TestGetEntityReportsItsFolder(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	ctx := context.Background()
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
+
+	writeNestedNote(t, filepath.Join(entitiesDir, "places", "port-vel.md"), "port-vel", "Port Vel")
+
+	got, err := svc.GetEntity(ctx, gameID, "port-vel")
+	if err != nil {
+		t.Fatalf("GetEntity: %v", err)
+	}
+	if got.Folder != "places" {
+		t.Errorf("Folder = %q, want %q", got.Folder, "places")
+	}
+}
+

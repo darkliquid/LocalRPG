@@ -119,6 +119,8 @@ func writeGameError(w http.ResponseWriter, err error) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, ErrInvalidFolderPath):
 		http.Error(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, ErrDuplicateEntityID):
+		http.Error(w, err.Error(), http.StatusConflict)
 	case errors.Is(err, fs.ErrNotExist), errors.Is(err, os.ErrNotExist):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	default:
@@ -772,13 +774,14 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPut {
 			var body struct {
 				Markdown string `json:"markdown"`
+				Folder   string `json:"folder"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&body); err != nil {
 				http.Error(w, "invalid body", http.StatusBadRequest)
 				return
 			}
-			if err := s.service.SaveEntity(r.Context(), gameID, entityID, body.Markdown); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+			if err := s.service.SaveEntityInFolder(r.Context(), gameID, entityID, body.Folder, body.Markdown); err != nil {
+				writeGameError(w, err)
 				return
 			}
 			w.WriteHeader(http.StatusOK)

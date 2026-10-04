@@ -976,13 +976,31 @@ func eachEntityNote(entitiesDir string, fn func(path, folder string, data []byte
 	return nil
 }
 
+// folderForNotePath is the stored folder form for a note path: the directory
+// relative to the entities root, slash-separated, with "" for the root.
+func folderForNotePath(entitiesDir, path string) string {
+	rel, err := filepath.Rel(entitiesDir, filepath.Dir(path))
+	if err != nil || rel == "." || rel == "" {
+		return ""
+	}
+	return filepath.ToSlash(rel)
+}
+
 func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*EntityDTO, error) {
-	gameDir := s.resolver.GameDir(gameID)
-	path := filepath.Join(gameDir, "entities", entityID+".md")
+	entitiesDir := filepath.Join(s.resolver.GameDir(gameID), "entities")
+
+	path, err := s.findEntityNote(entitiesDir, entityID)
+	if err != nil {
+		return nil, err
+	}
+	if path == "" {
+		return nil, fmt.Errorf("read entity file: %w", fs.ErrNotExist)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read entity file: %w", err)
 	}
+	folder := folderForNotePath(entitiesDir, path)
 
 	ent, err := entity.ParseMarkdownEntity(data)
 	if err != nil {
@@ -992,6 +1010,7 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 			ID:         entityID,
 			Name:       entityID,
 			Markdown:   string(data),
+			Folder:     folder,
 			ParseError: true,
 		}, nil
 	}
@@ -1016,27 +1035,73 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 		Markdown:  string(data),
 		State:     stateMap,
 		Backlinks: backlinks,
+		Folder:    folder,
 		History:   ent.History,
 	}, nil
 }
 
+// ErrDuplicateEntityID reports a save whose frontmatter id already belongs to a
+// different note. The id is the identity, so a second claim is refused rather
+// than silently overwriting a note in another folder.
+var ErrDuplicateEntityID = errors.New("entity id already in use")
+
+// SaveEntity writes a note at the collection root.
 func (s *Service) SaveEntity(ctx context.Context, gameID, entityID, rawMarkdown string) error {
+	return s.SaveEntityInFolder(ctx, gameID, entityID, "", rawMarkdown)
+}
+
+// SaveEntityInFolder writes a note at folder, moving it when it already lives
+// somewhere else. The file name stays the id, because the id is the identity and
+// the folder is only location: no inbound link is rewritten, which is the whole
+// point of decoupling the two.
+func (s *Service) SaveEntityInFolder(ctx context.Context, gameID, entityID, folder, rawMarkdown string) error {
+	cleanFolder, err := ValidateFolderPath(folder)
+	if err != nil {
+		return err
+	}
+
 	ent, err := entity.ParseMarkdownEntity([]byte(rawMarkdown))
 	if err != nil {
 		return fmt.Errorf("save entity %q: %w", entityID, err)
 	}
-	// The file name is the note's identity. Normalise the frontmatter id so a
-	// hand-edited or copied id can never index a note under another note's key.
+	// The file name is the note's identity, so a hand-edited or copied id can
+	// never index a note under another note's key.
 	ent.ID = entityID
+	ent.Folder = cleanFolder
+
+	gameDir := s.resolver.GameDir(gameID)
+	entitiesDir := filepath.Join(gameDir, "entities")
+
+	if err := s.assertIDIsFree(entitiesDir, entityID, rawMarkdown); err != nil {
+		return err
+	}
+
+	existingPath, err := s.findEntityNote(entitiesDir, entityID)
+	if err != nil {
+		return err
+	}
+
+	targetDir := entitiesDir
+	if cleanFolder != "" {
+		targetDir = filepath.Join(entitiesDir, filepath.FromSlash(cleanFolder))
+	}
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return fmt.Errorf("create folder %q: %w", cleanFolder, err)
+	}
+
 	normalised, err := ent.SerializeMarkdown()
 	if err != nil {
 		return fmt.Errorf("normalise entity %q: %w", entityID, err)
 	}
 
-	gameDir := s.resolver.GameDir(gameID)
-	path := filepath.Join(gameDir, "entities", entityID+".md")
-	if err := os.WriteFile(path, normalised, 0644); err != nil {
+	targetPath := filepath.Join(targetDir, entityID+".md")
+	if err := os.WriteFile(targetPath, normalised, 0o644); err != nil {
 		return fmt.Errorf("write entity file: %w", err)
+	}
+	if existingPath != "" && existingPath != targetPath {
+		if err := os.Remove(existingPath); err != nil {
+			return fmt.Errorf("remove old note %q: %w", existingPath, err)
+		}
 	}
 
 	store, err := s.store(gameID)
@@ -1045,7 +1110,56 @@ func (s *Service) SaveEntity(ctx context.Context, gameID, entityID, rawMarkdown 
 	}
 
 	syncer := storage.NewSyncer(store)
-	return syncer.SyncFile(path)
+	return syncer.SyncFile(targetPath)
+}
+
+// findEntityNote returns the path a note currently occupies, or "" when it is
+// new. A note is identified by the id it declares, so a move is found wherever
+// the author left it.
+func (s *Service) findEntityNote(entitiesDir, entityID string) (string, error) {
+	found := ""
+	err := eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
+		parsed, err := entity.ParseMarkdownEntity(data)
+		if err != nil {
+			if strings.TrimSuffix(filepath.Base(path), ".md") == entityID {
+				found = path
+			}
+			return nil
+		}
+		id := parsed.ID
+		if id == "" {
+			id = strings.TrimSuffix(filepath.Base(path), ".md")
+		}
+		if id == entityID {
+			found = path
+		}
+		return nil
+	})
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return found, nil
+}
+
+// assertIDIsFree refuses a save whose frontmatter id already names another note.
+// The requested file name is the id, so a body declaring a different id is a
+// collision with that other note rather than a rename.
+func (s *Service) assertIDIsFree(entitiesDir, entityID, rawMarkdown string) error {
+	declared := entity.DeclaredID([]byte(rawMarkdown))
+	if declared == "" || declared == entityID {
+		return nil
+	}
+	if _, err := os.Stat(filepath.Join(entitiesDir, declared+".md")); err == nil {
+		return fmt.Errorf("%w: %q; use a different id", ErrDuplicateEntityID, declared)
+	}
+	existing, err := s.findEntityNote(entitiesDir, declared)
+	if err == nil && existing != "" {
+		return fmt.Errorf("%w: %q; use a different id", ErrDuplicateEntityID, declared)
+	}
+	return nil
 }
 
 // MergeEntities folds one note into another: the survivor keeps its identity and

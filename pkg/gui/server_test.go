@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -936,6 +937,48 @@ func TestFolderRouteRefusesANonRecursiveDelete(t *testing.T) {
 	server.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("recursive delete: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestEntitySaveRouteReportsADuplicateID(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	first := "---\nid: silver-hand\nname: Silver Hand\ntype: faction\n---\n\nFirst.\n"
+	put := func(id, note string) *httptest.ResponseRecorder {
+		body := `{"markdown":` + strconv.Quote(note) + `}`
+		req := httptest.NewRequest(http.MethodPut, "/api/game/"+gameID+"/entity/"+id, strings.NewReader(body))
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+		return rec
+	}
+
+	if rec := put("silver-hand", first); rec.Code != http.StatusOK {
+		t.Fatalf("first save: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	second := "---\nid: silver-hand\nname: Impostor\ntype: faction\n---\n\nSecond.\n"
+	if rec := put("impostor", second); rec.Code != http.StatusConflict {
+		t.Fatalf("duplicate id: expected 409, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestEntitySaveRouteMovesTheNoteIntoAFolder(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	note := "---\nid: silver-hand\nname: Silver Hand\ntype: faction\n---\n\nA guild.\n"
+	body := `{"markdown":` + strconv.Quote(note) + `,"folder":"factions/orders"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/game/"+gameID+"/entity/silver-hand", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("save: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	moved := filepath.Join(svc.resolver.GameDir(gameID), "entities", "factions", "orders", "silver-hand.md")
+	if _, err := os.Stat(moved); err != nil {
+		t.Fatalf("the note was not written into the folder: %v", err)
 	}
 }
 

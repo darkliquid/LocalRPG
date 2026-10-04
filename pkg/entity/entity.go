@@ -183,6 +183,28 @@ func WikilinkBasename(target string) string {
 	return strings.TrimSpace(cleaned)
 }
 
+// DeclaredID returns the id a document's frontmatter declares, or "" when it has
+// none. It exists so a writer can detect a collision without parsing the whole
+// note and without paying for the body.
+func DeclaredID(data []byte) string {
+	content := string(data)
+	if !strings.HasPrefix(content, "---\n") {
+		return ""
+	}
+	endIdx := strings.Index(content[4:], "\n---\n")
+	if endIdx == -1 {
+		return ""
+	}
+
+	var fm struct {
+		ID string `yaml:"id"`
+	}
+	if err := yaml.Unmarshal([]byte(content[4:4+endIdx]), &fm); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(fm.ID)
+}
+
 // WikilinkTargets returns every link target found in text.
 func WikilinkTargets(text string) []string {
 	matches := wikilinkRegex.FindAllStringSubmatch(text, -1)
