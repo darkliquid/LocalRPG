@@ -11,9 +11,9 @@ mise run setup          # go mod download + cd frontend && npm install
 mise run build          # frontend bundle -> pkg/gui/dist, then bin/localrpg
 mise run build:frontend # npm run build in frontend/ (tsc + vite)
 mise run build:backend  # depends on build:frontend
-mise run test           # go test -v -count=1 ./...  AND  npx tsc --noEmit
+mise run test           # go test -v -count=1 ./...  AND  mise run test:frontend
 mise run test:backend   # go test -v -count=1 ./...
-mise run test:frontend  # npx tsc --noEmit (in frontend/)
+mise run test:frontend  # npx tsc --noEmit, the tree model check and the player bundle check (in frontend/)
 mise run lint           # markdownlint, goreleaser check, actionlint, go vet ./...
 mise run lint:docs      # markdownlint-cli2 on the embedded help articles
 mise run lint:goreleaser # goreleaser check

@@ -85,12 +85,19 @@ export function buildIndex(folders: FolderNode[], entities: EntitySummary[]): Ma
   return index;
 }
 
+// childFoldersOf returns the folders directly inside a path. The top level is the
+// array itself rather than a node, because the server sends a list of top-level
+// folders and only nests below that, so there is no node whose path is "".
+export function childFoldersOf(folders: FolderNode[], path: string): FolderNode[] {
+  if (path === '') return folders;
+  return findFolder(folders, path)?.children ?? [];
+}
+
 // childrenOf lists a folder's child folders and notes in the order the tree shows
 // them.
 export function childrenOf(folders: FolderNode[], entities: EntitySummary[], path: string): string[] {
   const ids: string[] = [];
-  const node = findFolder(folders, path);
-  for (const child of node?.children ?? []) ids.push(folderItemId(child.path));
+  for (const child of childFoldersOf(folders, path)) ids.push(folderItemId(child.path));
   for (const entity of entities) {
     if ((entity.folder ?? '') === path) ids.push(noteItemId(entity.id));
   }
@@ -103,14 +110,13 @@ export function countNotesUnder(folders: FolderNode[], entities: EntitySummary[]
   const inFolder = (folder: string) => entities.filter((entity) => (entity.folder ?? '') === folder).length;
 
   let total = inFolder(path);
-  const node = findFolder(folders, path);
   const walk = (nodes: FolderNode[]) => {
     for (const child of nodes) {
       total += inFolder(child.path);
       if (child.children) walk(child.children);
     }
   };
-  if (node?.children) walk(node.children);
+  walk(childFoldersOf(folders, path));
   return total;
 }
 

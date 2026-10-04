@@ -5,7 +5,6 @@ import {
   FileText,
   Folder,
   FolderPlus,
-  MoreVertical,
   MoveRight,
   Pencil,
   Trash2,
@@ -24,6 +23,7 @@ import {
 import { useTree } from '@headless-tree/react';
 import type { EntitySummary, FolderNode } from '../types';
 import { DeleteFolderDialog, FolderNameDialog, MoveNoteDialog } from './TreeDialogs';
+import RowMenu from './RowMenu';
 import {
   ROOT_LABEL,
   buildIndex,
@@ -70,7 +70,6 @@ export default function EntityTree({
   onDeleteFolder,
 }: EntityTreeProps) {
   const [filter, setFilter] = useState('');
-  const [menuFor, setMenuFor] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState>({ kind: 'none' });
 
   const needle = filter.trim().toLowerCase();
@@ -147,14 +146,6 @@ export default function EntityTree({
   }, [selectedId]);
 
   // A menu closes on any click elsewhere, including one on another row.
-  useEffect(() => {
-    if (!menuFor) return;
-    const close = () => setMenuFor(null);
-    window.addEventListener('click', close);
-    return () => window.removeEventListener('click', close);
-  }, [menuFor]);
-
-  const closeMenu = () => setMenuFor(null);
 
   const renderRow = (item: ItemInstance<TreeItem>) => {
     const data = item.getItemData();
@@ -209,80 +200,44 @@ export default function EntityTree({
         </span>
 
         <span className="relative shrink-0">
-          <button
-            type="button"
-            onClick={(ev) => {
-              ev.stopPropagation();
-              setMenuFor((current) => (current === key ? null : key));
-            }}
-            title="More actions"
-            className="cursor-pointer rounded p-0.5 text-stone-500 hover:text-stone-200"
-          >
-            <MoreVertical className="w-3 h-3" />
-          </button>
-          {menuFor === key && (
-            <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-white/10 bg-stone-900 p-1 shadow-2xl">
-              {isFolder ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      closeMenu();
-                      setDialog({ kind: 'create', parent: data.folderPath });
-                    }}
-                    className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-stone-200 hover:bg-white/10"
-                  >
-                    <FolderPlus className="w-3 h-3" />
-                    <span>New subfolder</span>
-                  </button>
-                  {data.folderPath !== '' && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          closeMenu();
-                          setDialog({ kind: 'rename', path: data.folderPath });
-                        }}
-                        className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-stone-200 hover:bg-white/10"
-                      >
-                        <Pencil className="w-3 h-3" />
-                        <span>Rename folder</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          closeMenu();
-                          setDialog({ kind: 'delete', path: data.folderPath });
-                        }}
-                        className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-red-300 hover:bg-red-950/40"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>Delete folder</span>
-                      </button>
-                    </>
-                  )}
-                </>
-              ) : (
-                data.entity && (
-                  <button
-                    type="button"
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      closeMenu();
-                      setDialog({ kind: 'move-note', entity: data.entity as EntitySummary });
-                    }}
-                    className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-stone-200 hover:bg-white/10"
-                  >
-                    <MoveRight className="w-3 h-3" />
-                    <span>Move to folder...</span>
-                  </button>
-                )
-              )}
-            </div>
-          )}
+          <RowMenu
+            label={isFolder ? 'Folder actions' : 'Note actions'}
+            items={
+              isFolder
+                ? [
+                    {
+                      label: 'New subfolder',
+                      icon: <FolderPlus className="w-3 h-3" />,
+                      onSelect: () => setDialog({ kind: 'create', parent: data.folderPath }),
+                    },
+                    ...(data.folderPath === ''
+                      ? []
+                      : [
+                          {
+                            label: 'Rename folder',
+                            icon: <Pencil className="w-3 h-3" />,
+                            onSelect: () => setDialog({ kind: 'rename', path: data.folderPath }),
+                          },
+                          {
+                            label: 'Delete folder',
+                            icon: <Trash2 className="w-3 h-3" />,
+                            destructive: true,
+                            onSelect: () => setDialog({ kind: 'delete', path: data.folderPath }),
+                          },
+                        ]),
+                  ]
+                : data.entity
+                  ? [
+                      {
+                        label: 'Move to folder...',
+                        icon: <MoveRight className="w-3 h-3" />,
+                        onSelect: () =>
+                          setDialog({ kind: 'move-note', entity: data.entity as EntitySummary }),
+                      },
+                    ]
+                  : []
+            }
+          />
         </span>
       </div>
     );

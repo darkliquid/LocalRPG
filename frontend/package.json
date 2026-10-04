@@ -8,7 +8,8 @@
     "build": "tsc && vite build && vite build --config vite.player.config.ts && touch ../pkg/gui/dist/.gitkeep",
     "preview": "vite preview",
     "lint:docs": "markdownlint-cli2 \"../pkg/gui/docs/*.md\"",
-    "check:player-bundle": "node scripts/checkPlayerBundle.mjs"
+    "check:player-bundle": "node scripts/checkPlayerBundle.mjs",
+    "check:tree-model": "node scripts/checkTreeModel.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -36,6 +37,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "esbuild": "^0.28.2",
     "markdownlint-cli2": "^0.23.3",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
