@@ -107,6 +107,11 @@ run = "RELEASE_TARGET=\"$(go env GOOS)/$(go env GOARCH)\" goreleaser release --s
 description = "Build and package release archives for RELEASE_TARGET (one platform)"
 run = "goreleaser release --clean --skip=publish --skip=validate"
 
+[tasks."release:cut"]
+description = "Cut a release: bump or set the version, commit, tag and push with tags"
+usage = 'arg "<bump>" help="major, minor, patch, or an explicit X.Y.Z version" default="patch"'
+run = "bash scripts/cut-release.sh \"${usage_bump:-patch}\""
+
 [tasks.clean]
 description = "Clean up build outputs"
 run = "rm -rf bin/ dist/ frontend/dist website/dist"

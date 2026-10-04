@@ -13,7 +13,11 @@ func TestCLIVersionAndHelp(t *testing.T) {
 		t.Fatalf("command failed: %v, output: %s", err, string(out))
 	}
 
-	if !strings.Contains(string(out), "LocalRPG v0.1.0") {
-		t.Errorf("expected version output, got: %s", string(out))
+	// Compare against the package variable rather than a literal: the release
+	// task rewrites the version, and a hardcoded expectation would fail the
+	// first build after every release.
+	want := "LocalRPG v" + Version
+	if !strings.Contains(string(out), want) {
+		t.Errorf("expected output to contain %q, got: %s", want, string(out))
 	}
 }

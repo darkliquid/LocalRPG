@@ -24,6 +24,7 @@ mise run site:serve     # build it and preview at http://localhost:4173
 mise run site:screenshots # capture website/screenshots from a running build
 mise run release:snapshot # local snapshot build for the current OS
 mise run release:package # package archives for RELEASE_GOOS (one platform)
+mise run release:cut     # bump (or set) the version, commit, tag and push with tags
 mise run dev:gui        # go run ./cmd/localrpg gui --port 8080
 mise run dev:frontend   # vite dev server on :3000, proxies /api -> localhost:8080
 mise run clean
