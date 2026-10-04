@@ -855,7 +855,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                       const file = bannerInputRef.current?.files?.[0];
                       if (file) {
                         setBannerFile(file);
-                        setBannerPreview(URL.createObjectURL(file));
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          if (typeof reader.result === 'string') {
+                            setBannerPreview(reader.result);
+                          }
+                        };
+                        reader.readAsDataURL(file);
                       }
                     }}
                     accept="image/png,image/jpeg,image/webp,image/svg+xml"
@@ -870,7 +876,6 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                     }`}
                   >
                     {safeImagePreview(bannerPreview) ? (
-                      // codeql[js/xss-through-dom]
                       <img
                         src={safeImagePreview(bannerPreview)}
                         alt="Banner Preview"
@@ -913,7 +918,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                       const file = iconInputRef.current?.files?.[0];
                       if (file) {
                         setIconFile(file);
-                        setIconPreview(URL.createObjectURL(file));
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          if (typeof reader.result === 'string') {
+                            setIconPreview(reader.result);
+                          }
+                        };
+                        reader.readAsDataURL(file);
                       }
                     }}
                     accept="image/png,image/jpeg,image/webp,image/svg+xml"
@@ -928,7 +939,6 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                     }`}
                   >
                     {safeImagePreview(iconPreview) ? (
-                      // codeql[js/xss-through-dom]
                       <img
                         src={safeImagePreview(iconPreview)}
                         alt="Icon Preview"

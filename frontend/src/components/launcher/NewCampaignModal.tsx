@@ -95,7 +95,13 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
     const file = bannerInputRef.current?.files?.[0];
     if (file) {
       setBannerFile(file);
-      setBannerPreview(URL.createObjectURL(file));
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setBannerPreview(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -103,7 +109,13 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
     const file = iconInputRef.current?.files?.[0];
     if (file) {
       setIconFile(file);
-      setIconPreview(URL.createObjectURL(file));
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setIconPreview(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -621,7 +633,6 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   className="w-full h-16 rounded-xl border border-dashed border-white/20 hover:border-purple-400/60 bg-white/[0.02] flex items-center justify-center text-xs font-sans text-stone-300 hover:text-white transition-all cursor-pointer overflow-hidden"
                 >
                   {safeImagePreview(bannerPreview) ? (
-                    // codeql[js/xss-through-dom]
                     <img src={safeImagePreview(bannerPreview)} alt="Banner Preview" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-stone-500 text-xs">No Banner Selected</span>
@@ -663,7 +674,6 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   className="w-full h-16 rounded-xl border border-dashed border-white/20 hover:border-purple-400/60 bg-white/[0.02] flex items-center justify-center text-xs font-sans text-stone-300 hover:text-white transition-all cursor-pointer overflow-hidden"
                 >
                   {safeImagePreview(iconPreview) ? (
-                    // codeql[js/xss-through-dom]
                     <img src={safeImagePreview(iconPreview)} alt="Icon Preview" className="w-12 h-12 rounded-lg object-cover" />
                   ) : (
                     <span className="text-stone-500 text-xs">No Icon Selected</span>
