@@ -15,7 +15,7 @@ mise run test           # go test -v -count=1 ./...  AND  mise run test:frontend
 mise run test:backend   # go test -v -count=1 ./...
 mise run test:frontend  # npx tsc --noEmit, the tree model check and the player bundle check (in frontend/)
 mise run lint           # markdownlint, goreleaser check, actionlint, go vet ./...
-mise run lint:docs      # markdownlint-cli2 on the embedded help articles
+mise run lint:docs      # markdownlint engine on the embedded help articles (frontend/scripts/lintDocs.mjs)
 mise run lint:goreleaser # goreleaser check
 mise run lint:actions   # actionlint over .github/workflows
 mise run secrets:scan   # gitleaks over the full git history and staged changes
@@ -63,35 +63,36 @@ If a key does reach a commit, rotate it first: rewriting history does not un-pub
 
 ## Known advisories
 
-`npm audit` in `frontend/` reports five high-severity findings. They are **one
-advisory reflected five times**, and it is accepted rather than fixed.
+`npm audit` in `frontend/` reports **nothing**. That is deliberate, and the way it
+was reached is worth knowing before anyone adds a linter CLI back.
 
-- **The advisory:** `braces` stack-exhaustion denial of service through deeply
-  nested patterns (GHSA-vfj7-8cjw-p6xm, CVE-2026-93687, CWE-674). `braces` walks
-  its AST recursively with no depth guard, so a pattern nested past roughly 3,500
-  levels overflows the call stack and kills the Node process. It needs **untrusted**
-  pattern input.
-- **Why it is reported five times:** only `braces` has an advisory. `micromatch`,
-  `fast-glob`, `globby` and `markdownlint-cli2` are flagged because they sit above
-  it in the dependency chain, not because they have flaws of their own.
-- **Why it cannot be fixed today:** `braces` 3.0.3 is the newest release and the
-  advisory lists no patched version; the fix PR (`micromatch/braces#72`) is open and
-  unmerged. `micromatch` 4.0.8, `fast-glob` 3.3.3, `globby` 16.2.4 and
-  `markdownlint-cli2` 0.23.3 are all the newest releases too, so there is no upgrade
-  path. `npm audit`'s suggested remedy is to downgrade `markdownlint-cli2` to 0.0.4,
-  which is twenty-three minor versions back to a release predating `micromatch`.
-  Do not take it.
-- **Why it is not reachable:** `braces` is a `devDependency`-only path
-  (`npm ls braces --omit=dev` is empty), so it is in neither the shipped binary nor
-  any bundle. The only pattern this repository ever hands to it is the literal
-  `"../pkg/gui/docs/*.md"` in `mise run lint:docs`, which contains no braces at all.
-  There is no untrusted input anywhere near it.
-- **When to revisit:** when `braces` publishes a release past 3.0.3, or when
-  `markdownlint-cli2` bumps `micromatch`. Re-run `npm audit` then; until one of those
-  happens there is nothing to act on.
+The docs lint once used `markdownlint-cli2`, which reported five high-severity
+findings. They were one advisory reflected five times: `braces` stack-exhaustion
+denial of service through deeply nested patterns (GHSA-vfj7-8cjw-p6xm,
+CVE-2026-93687), reached via `globby` → `micromatch` → `braces`. `micromatch`,
+`fast-glob`, `globby` and `markdownlint-cli2` were flagged only for sitting above
+it. There was no fix: `braces` 3.0.3 was the newest release and the advisory listed
+no patched version, and `npm audit`'s suggested remedy was to downgrade
+`markdownlint-cli2` twenty-three minor versions.
 
-No CI job runs `npm audit`, so this does not gate a build. If one is ever added, it
-needs this exemption written into it, or it will fail on an accepted finding.
+The lesson is that the linter was never the problem. `markdownlint`, the engine
+whose rules actually decide pass or fail, depends only on `micromark` and
+`string-width` and has **no advisories at all**. The advisory arrived with the CLI
+wrapper, which exists to glob file arguments. Both wrappers have this shape:
+`markdownlint-cli2` brings `braces`, and `markdownlint-cli` avoids it but pins
+`js-yaml ~5.2.1`, which is inside a different advisory's range.
+
+So `mise run lint:docs` runs `frontend/scripts/lintDocs.mjs`, which enumerates the
+files itself and calls the engine directly. Same engine, same rules, byte-identical
+output, and nothing vulnerable in the tree.
+
+**Do not replace it with a markdownlint CLI.** If the docs ever need a rule the
+script cannot express, add it to the `config` object in that script, which is where
+the three deviations from the default ruleset live with their explanations. The
+`.markdownlint-cli2.jsonc` those came from is gone.
+
+No CI job runs `npm audit`, so a new advisory would not gate a build. If one is
+added, it should start from a clean tree.
 
 
 ## Build gotcha: the frontend is embedded in the Go binary
