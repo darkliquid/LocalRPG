@@ -8,7 +8,7 @@ description: The turn lifecycle, canonical history log, non-destructive rewindin
 
 # Campaigns & Turns
 
-A **Campaign** is an active instance of a World played under a System. It preserves full continuity through an immutable timeline, dynamic relationship graphs, and evolving character sheets.
+A **Campaign** is an active instance of a World played under a System. It preserves full continuity through an immutable timeline, a relationship graph, and per-entity character sheets.
 
 ## The Turn Lifecycle
 

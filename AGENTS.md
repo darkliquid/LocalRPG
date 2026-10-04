@@ -125,15 +125,21 @@ STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
 
 ### What it reports today
 
-**436 alerts across all 21 files: 136 errors, 190 warnings and 110 suggestions.**
+**293 alerts across all 21 files: 0 errors, 183 warnings and 110 suggestions.**
 For scale, pointing the same styles at every tracked file reported 68,525 alerts
 and 6,875 errors, which is why the scope is the documentation rather than the
 repository.
 
-The task is **report-only**, and CI runs the summary form so the totals appear in
-the log without a step that fails. `STRICT=1` turns it into a gate; 136 errors is
-close enough to a working backlog that it is worth doing, and most of what is left
-is individually fixable rather than systemic.
+**CI gates on the error level.** `STRICT=1` makes the task exit non-zero when an
+error is reported, and the workflow runs it that way. Warnings and suggestions are
+printed but never fail a build, because they are style preferences rather than
+mistakes. Run `mise run lint:prose` for the full report, or `SUMMARY=1` for the
+counts and the noisiest rules.
+
+Reaching zero took three passes: narrowing the scope to the documentation, adding
+the vocabulary, and then rewriting the prose the remaining rules objected to. What
+is left is warnings such as `Google.Passive` and `neighbor.AmpersandInProse`, which
+are worth reading but not worth blocking a change on.
 
 ### The vocabulary
 
@@ -153,7 +159,7 @@ of a word are listed in the vocabulary wherever the documentation uses both.
 
 ### Rules switched off, and why
 
-Fifteen rules are off in `.vale.ini`, grouped by reason. Each one fires on correct,
+Nineteen rules are off in `.vale.ini`, grouped by reason. Each one fires on correct,
 deliberate writing rather than on a mistake:
 
 - **Readability grade scores** (`Polysyllables`, `FleschReadingEase`, `FleschKincaid`,
@@ -175,9 +181,24 @@ deliberate writing rather than on a mistake:
   style rather than a property of technical writing, so revisit it if the headings
   are ever re-cased.
 
-`ai-tells` is included and left mostly intact, because its rules target exactly the
-kind of prose this documentation should avoid. Its findings are now the largest group
-of remaining errors.
+Four `ai-tells` rules are off as well, and the rest of that style is on and clean:
+
+- **`ai-tells.VerbTricolon`.** It looks for a rhetorical tricolon but matches any
+  list of three, which is ordinary English and everywhere in a guide. It fired on
+  "system identity, action modes, and metadata" and on "ComfyUI, Automatic1111,
+  LocalAI" - three servers, not a figure of speech.
+- **`ai-tells.SemicolonUsage`.** Semicolons joining related clauses are correct, and
+  this repository's own convention prefers them to em dashes.
+- **`ai-tells.EmDashUsage`.** It reports "em-dash detected" for U+2013, and 15 of its
+  16 findings were en dashes in ranges such as `4-6 GB` and `16-24 GB`, where an en
+  dash is the right character.
+- **`proselint.Annotations`.** It sees `[!NOTE]` and reports a note left in the text,
+  but that is live syntax: remark-github-blockquote-alert renders it as a callout in
+  the app and on the site.
+
+One contradiction is worth knowing about: **`Google.Latin` demands "for example" in
+place of "e.g.", and `ai-tells.FormalTransitions` objects to "for example".** Both
+are satisfied by writing "such as", which is what the documentation now does.
 
 ### Two things that will bite
 

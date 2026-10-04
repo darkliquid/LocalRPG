@@ -16,9 +16,9 @@ Image synthesis is GPU-intensive and benefits heavily from dedicated VRAM:
 
 | Model Architecture | VRAM | Recommended GPUs |
 | --- | --- | --- |
-| **Stable Diffusion 1.5** | 4–6 GB | NVIDIA GTX 1060, RTX 2060, Apple Silicon (8GB+) |
-| **SDXL (Recommended)** | 8–12 GB | NVIDIA RTX 3060, RTX 4060, Apple Silicon (16GB+) |
-| **Flux.1 / SD3** | 12–24 GB | NVIDIA RTX 3090, RTX 4080/4090, Apple Silicon (32GB+) |
+| **Stable Diffusion 1.5** | 4–6 GB | NVIDIA GTX 1060, RTX 2060, Apple Silicon (8 GB+) |
+| **SDXL (Recommended)** | 8–12 GB | NVIDIA RTX 3060, RTX 4060, Apple Silicon (16 GB+) |
+| **Flux.1 / SD3** | 12–24 GB | NVIDIA RTX 3090, RTX 4080/4090, Apple Silicon (32 GB+) |
 
 ## 2. Running ComfyUI
 
@@ -30,7 +30,7 @@ Clone and install ComfyUI according to the official documentation, then launch i
 python main.py --listen 127.0.0.1 --port 8188
 ```
 
-Ensure your target checkpoint (for example `sd_xl_base_1.0.safetensors` or a fantasy fine-tune) is placed inside `ComfyUI/models/checkpoints/`.
+Ensure your target checkpoint (such as `sd_xl_base_1.0.safetensors` or a fantasy fine-tune) is placed inside `ComfyUI/models/checkpoints/`.
 
 ### Option B: Running via Docker
 
@@ -97,7 +97,7 @@ Verify that the response returns system metadata and GPU devices:
 ### Via Settings Studio (GUI)
 
 1. Open **Settings Studio** -> **Media** -> **Image**.
-2. Click **Load Image Preset...** and select **ComfyUI**.
+2. Click **Load Image Preset…** and select **ComfyUI**.
 3. Confirm the **Endpoint** is set to `http://127.0.0.1:8188`.
 4. Click **Save Settings**.
 5. In your campaign or Codex entity view, click **Generate Image** to request an illustration.
@@ -113,7 +113,7 @@ media:
 
 ## 5. Alternatives: Automatic1111 & Stable Diffusion WebUI
 
-If you use **Automatic1111** or **SD-WebUI-Forge**, launch the web UI with the `--api` argument (e.g. `COMMANDLINE_ARGS="--api"`):
+If you use **Automatic1111** or **SD-WebUI-Forge**, launch the web UI with the `--api` argument (such as `COMMANDLINE_ARGS="--api"`):
 
 ```yaml
 media:

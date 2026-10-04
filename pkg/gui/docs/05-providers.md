@@ -28,7 +28,7 @@ providers:
 
 - **`builtin`**: Runs directly in the LocalRPG process without external dependencies or GPU requirements.
 - **`http`**: Connects via HTTP/REST to local daemons (Ollama, LM Studio, Sherpa, ComfyUI) or cloud APIs (OpenAI, Gemini, Anthropic, ElevenLabs).
-- **`cli`**: Spawns command-line binaries (e.g. `whisper.cpp`, `spd-say`, custom scripts).
+- **`cli`**: Spawns command-line binaries (such as `whisper.cpp`, `spd-say`, custom scripts).
 - **`mock`**: Returns deterministic placeholder responses for offline testing and development.
 - **`disabled`**: Explicitly disables the capability.
 
@@ -69,7 +69,7 @@ Zero-setup built-in fallback model that generates narrative choices using proced
 
 - **ElevenLabs**: High-fidelity AI speech (`type: http`, `base_url: https://api.elevenlabs.io`).
 - **Gemini Voice**: Multimodal speech synthesis.
-- **Fish Audio S2 (Local vLLM-Omni)**: 4B Dual-AR multilingual neural voice synthesis at 44.1 kHz with fine-grained emotional tags and zero-shot voice cloning. See [Setting Up Fish Audio S2](16-local-tts-fish-audio).
+- **Fish Audio S2 (Local vLLM-Omni)**: 4-billion-parameter Dual-AR multilingual voice synthesis at 44.1 kHz with fine-grained emotional tags and zero-shot voice cloning. See [Setting Up Fish Audio S2](16-local-tts-fish-audio).
 - **Kokoro-FastAPI**: High-speed local neural voice synthesis on CPU/GPU. See [Setting Up Kokoro-FastAPI](15-local-tts-kokoro).
 - **Native OS (`builtin_name: native-os`)**: Built-in speech using your operating system's native synthesizer (`say` on macOS, `spd-say` on Linux, PowerShell SAPI on Windows).
 - **Sherpa / Piper**: High quality local neural speech synthesis.

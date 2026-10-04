@@ -8,14 +8,14 @@ description: One Docker Compose project that runs Ollama, Kokoro, Faster-Whisper
 
 # Fully Local AI Stack with Docker Compose
 
-The four guides before this one each stand up a single service. This one wires all
+The earlier guides each start a service. This one wires all
 four into one Compose project, so a machine with no outbound network access can
 still run the Game Master, narrate dialogue, transcribe your voice, and illustrate
 the scene. Every container binds to `127.0.0.1`, which matches LocalRPG's
 local-first design: nothing on the stack is reachable from the local network, and
 no API key is required for any of it.
 
-## 1. What the stack runs
+## 1. Services in the stack
 
 | Service | Image | Host port | LocalRPG role |
 | --- | --- | --- | --- |
@@ -24,7 +24,7 @@ no API key is required for any of it.
 | Faster-Whisper | `fedirz/faster-whisper-server:latest-cpu` | `8000` | Speech-to-text for voice dictation |
 | ComfyUI | `yanwk/comfyui-boot:cpu` | `8188` | Scene, portrait, and item illustration |
 
-Two ready-to-run files live in the repository under `docker/`:
+Ready-to-run files live in the repository under `docker/`:
 
 - `docker/compose.local.yml` runs the CPU baseline above.
 - `docker/compose.gpu.yml` is an override that swaps in the CUDA images and
@@ -32,7 +32,7 @@ Two ready-to-run files live in the repository under `docker/`:
 
 ## 2. Minimum system requirements
 
-There is no single number here, because the four services have very different
+These services have different
 appetites. Ollama scales with the model you pick, ComfyUI wants a GPU, and Kokoro
 and Faster-Whisper are cheap either way. Pick the row that matches the hardware
 you already have.
@@ -44,7 +44,7 @@ you already have.
 | **Comfortable** | 12+ cores | 64 GB | 16–24 GB (RTX 3090, RTX 4090, Apple M-series 32 GB+) | `gemma4:26b` or `gemma4:31b`; Whisper `large-v3`; Flux.1 or SD3.5 checkpoints |
 
 > [!IMPORTANT]
-> A single 12 GB card will happily host Ollama, Kokoro, and Whisper at the same
+> One 12 GB card will happily host Ollama, Kokoro, and Whisper at the same
 > time, but Stable Diffusion XL wants most of that VRAM to itself. If ComfyUI
 > starts returning out-of-memory errors, stop the other containers while you
 > generate art, or move up to a 24 GB card.
@@ -177,7 +177,7 @@ backend):
 docker compose -f docker/compose.local.yml -f docker/compose.gpu.yml up -d
 ```
 
-Check that everything came up, and follow a single service's log while it
+Check that everything came up, and follow one service's log while it
 downloads its weights:
 
 ```bash
@@ -197,7 +197,7 @@ Add `-v` to `down` only when you actually want to re-download every model.
 
 ## 5. Pulling and pinning models
 
-Ollama ships no model inside the image, so pull at least one before you play:
+The image doesn't include an Ollama model, so pull at least one before you play:
 
 ```bash
 docker exec -it localrpg-ollama ollama pull gemma4:12b
@@ -210,7 +210,7 @@ request and caches it in the `whisper-models` volume, so the first dictation is
 slower than the ones that follow. To pre-load it instead, set `PRELOAD_MODELS` in
 the service's `environment` block.
 
-Kokoro needs nothing extra: the container ships the ONNX weights and all eleven
+Kokoro works out of the box: the container includes the ONNX weights and all eleven
 voice embeddings. ComfyUI needs a checkpoint, which you place in the
 `comfyui-models` volume under `checkpoints/`. The simplest way is a bind mount
 instead of a named volume, pointing at a folder you can drop files into:
@@ -228,7 +228,7 @@ restart the container.
 
 ## 6. Recommended models
 
-Model choice is the single biggest lever on turn latency and prose quality. The
+Model choice is the biggest lever on turn latency and prose quality. The
 Extractor runs on every turn and only needs structured output, so give it
 something small and keep the bigger model for the GM and Narrator.
 
@@ -252,7 +252,7 @@ something small and keep the bigger model for the GM and Narrator.
 
 Because every service speaks an OpenAI-compatible dialect on localhost, one
 configuration block covers the whole stack. Put this in `config.yaml` in your
-user config directory, or in `./localrpg.yaml` for a single project:
+user config directory, or in `./localrpg.yaml` for one project:
 
 ```yaml
 agents:
@@ -310,7 +310,7 @@ two.
 
 ## 8. Verifying each service
 
-Each service answers a cheap health request, which is the fastest way to tell a
+Each service responds to a cheap health request, which is the fastest way to tell a
 slow model download from a broken container:
 
 ```bash

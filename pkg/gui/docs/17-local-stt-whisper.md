@@ -21,7 +21,7 @@ Faster-Whisper is optimized for high-speed inference on both CPUs and GPUs:
 | `medium` / `large-v3` | ~3–5 GB | Near-perfect multilingual transcription | ~5x real-time on GPU |
 
 > [!TIP]
-> The `small` or `base.en` models provide instantaneous transcription with virtually zero misheard fantasy terms.
+> The `small` or `base.en` models provide instantaneous transcription and rarely mishear fantasy terms.
 
 ## 2. Running via Docker (Recommended)
 
@@ -93,7 +93,7 @@ Verify that the returned JSON contains the transcription text:
 ### Via Settings Studio (GUI)
 
 1. Open **Settings Studio** -> **Media** -> **STT**.
-2. Click **Load STT Preset...** and select **Faster-Whisper**.
+2. Click **Load STT Preset…** and select **Faster-Whisper**.
 3. Confirm the **Endpoint** is set to `http://localhost:8000/v1/audio/transcriptions` and **Model** to `whisper-1`.
 4. Click **Save Settings**.
 5. When playing a campaign, click the microphone button next to the prompt bar to speak your action.

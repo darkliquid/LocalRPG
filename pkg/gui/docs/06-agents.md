@@ -14,19 +14,19 @@ In LocalRPG, distinct cognitive tasks are assigned to specialized **Agent Roles*
 
 1. **`gm` (Game Master)**
    - Responsible for rules adjudication, difficulty checks, world logic, and pacing.
-   - Best suited for reasoning-heavy models (e.g. `claude-3-5-sonnet`, `gemini-2.0-pro`, `gpt-4o`, `qwen2.5:14b`).
+   - Best suited for reasoning-heavy models (such as `claude-3-5-sonnet`, `gemini-2.0-pro`, `gpt-4o`, `qwen2.5:14b`).
 
 2. **`narrator`**
    - Responsible for literary description, evocative dialogue, sensory immersion, and atmospheric stage directions.
-   - Best suited for creative writing models (e.g. `gemini-2.0-flash`, `mistral-large`, `llama3.1:8b`).
+   - Best suited for creative writing models (such as `gemini-2.0-flash`, `mistral-large`, `llama3.1:8b`).
 
 3. **`extractor`**
    - Runs in the background at turn completion to parse entities, character introductions, inventory changes, and relationship tags into the campaign Codex.
-   - Best suited for fast, structured-output models (e.g. `gemini-2.0-flash-lite`, `gpt-4o-mini`, `llama3.2:3b`).
+   - Best suited for fast, structured-output models (such as `gemini-2.0-flash-lite`, `gpt-4o-mini`, `llama3.2:3b`).
 
 ## Role Mapping in Configuration
 
-Configure agent role assignments under `agents.roles` in your `config.yaml`:
+Assign agent roles under `agents.roles` in your `config.yaml`:
 
 ```yaml
 agents:
@@ -48,7 +48,7 @@ agents:
 
 ## Token Budgets & Context Management
 
-The orchestrator dynamically fits prompt layers into the configured `context_window` limit:
+The orchestrator fits prompt layers into the configured `context_window` limit:
 
 - Priority is given to system rules and character sheet state.
 - Entity memories and living-world notes are prioritized based on proximity in the knowledge graph.

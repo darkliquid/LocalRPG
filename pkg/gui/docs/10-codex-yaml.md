@@ -61,7 +61,7 @@ Evelyn is the second daughter of the Vance merchant dynasty. While outwardly man
 
 ## Graph Modeling with `[[Wikilinks]]`
 
-LocalRPG automatically converts wikilinks into dynamic relationship edges in the campaign knowledge graph:
+LocalRPG automatically converts wikilinks into relationship edges in the campaign knowledge graph:
 
 - **Frontmatter references**:
 

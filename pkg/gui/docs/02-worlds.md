@@ -51,4 +51,4 @@ When a new campaign begins, LocalRPG determines the opening scene using a determ
 
 ## System Overrides
 
-Sometimes a world introduces setting-specific mechanics (e.g. sanity in a Lovecraftian setting or oxygen consumption in hard sci-fi). Worlds can provide custom JavaScript hooks inside `system_overrides/<system-id>/hooks.js`. When a campaign runs with that specific system, these hooks merge with the base system mechanics.
+Sometimes a world introduces setting-specific mechanics (such as sanity in a Lovecraftian setting or oxygen consumption in hard sci-fi). Worlds can provide custom JavaScript hooks inside `system_overrides/<system-id>/hooks.js`. When a campaign runs with that specific system, these hooks merge with the base system mechanics.

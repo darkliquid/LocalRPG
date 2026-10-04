@@ -40,7 +40,7 @@ In the LocalRPG app, play the campaign turn that is failing or producing blank n
 
 ### Step 4: Inspect in the Debugger Dashboard
 
-In `http://localhost:8089`, the turn automatically appears in the left sidebar (e.g. `[OK] turn #1 (1240ms)` or `[FAIL] turn #1 (850ms)`).
+In `http://localhost:8089`, the turn automatically appears in the left sidebar (such as `[OK] turn #1 (1240ms)` or `[FAIL] turn #1 (850ms)`).
 
 Click on the turn to view:
 - **Prompt & LLM Tab**:
@@ -134,8 +134,8 @@ steps:
 | `wait_visible` | `selector` | `timeout_ms` | Waits until element matching CSS selector appears in the DOM. |
 | `assert_visible`| `selector` | `text_contains`, `timeout_ms` | Asserts element is visible and optionally checks text content. |
 | `assert_turn_outcome` | `expected` | - | Asserts that turn resulted in `success`, `error`, or `roll`. |
-| `sleep` | - | `timeout_ms` | Pauses scenario execution for the given duration. |
-| `fault_injection` | `fault` | - | Triggers mock provider behavior (e.g. `empty_response_once`). |
+| `sleep` | - | `timeout_ms` | Pauses scenario execution for `timeout_ms` milliseconds. |
+| `fault_injection` | `fault` | - | Triggers mock provider behavior (such as `empty_response_once`). |
 
 ---
 

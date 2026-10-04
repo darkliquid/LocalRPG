@@ -14,7 +14,9 @@
 # Product and project names.
 LocalRPG
 Ollama
+ollama
 Kokoro
+kokoro
 Imagen
 Civitai
 Goja
@@ -37,6 +39,7 @@ GPU
 GPUs
 LLM
 LLMs
+llm
 NPC
 NPCs
 RPG
