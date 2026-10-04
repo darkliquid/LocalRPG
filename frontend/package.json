@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build && vite build --config vite.player.config.ts && touch ../pkg/gui/dist/.gitkeep",
     "preview": "vite preview",
-    "lint:docs": "markdownlint-cli2 \"../pkg/gui/docs/*.md\""
+    "lint:docs": "markdownlint-cli2 \"../pkg/gui/docs/*.md\"",
+    "check:player-bundle": "node scripts/checkPlayerBundle.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
