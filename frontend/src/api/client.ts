@@ -8,6 +8,7 @@ import {
   GameSummary,
   EntitySummary,
   FolderNode,
+  FrontmatterSchema,
   Recap,
   SystemInfo,
   WorldInfo,
@@ -758,6 +759,12 @@ export class APIClient {
   async listEntities(): Promise<EntitySummary[]> {
     const res = await fetch(`/api/game/${this.gameID}/entities`);
     if (!res.ok) throw new Error(`listEntities: ${res.statusText}`);
+    return res.json();
+  }
+
+  async getEntityFrontmatterSchema(): Promise<FrontmatterSchema> {
+    const res = await fetch('/api/schema/entity-frontmatter');
+    if (!res.ok) throw new Error(`getEntityFrontmatterSchema: ${res.statusText}`);
     return res.json();
   }
 

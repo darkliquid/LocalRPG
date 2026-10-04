@@ -982,6 +982,42 @@ func TestEntitySaveRouteMovesTheNoteIntoAFolder(t *testing.T) {
 	}
 }
 
+func TestSchemaRouteServesTheFrontmatterSchema(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	_ = gameID
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/schema/entity-frontmatter", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("schema: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var schema FrontmatterSchema
+	if err := json.Unmarshal(rec.Body.Bytes(), &schema); err != nil {
+		t.Fatalf("decode schema: %v", err)
+	}
+	if len(schema.Keys) == 0 {
+		t.Fatal("the served schema lists no keys")
+	}
+	if !schema.AllowUnknown {
+		t.Error("the served schema must allow unknown keys")
+	}
+}
+
+func TestSchemaRouteRejectsAPost(t *testing.T) {
+	_, svc := setupTestGame(t)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/schema/entity-frontmatter", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rec.Code)
+	}
+}
+
 func TestTraceRouteReturnsTheMostRecentEvents(t *testing.T) {
 	_, svc := turnFixture(t)
 	server := NewServer(svc, http.NotFoundHandler())

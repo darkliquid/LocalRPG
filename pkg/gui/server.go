@@ -59,6 +59,8 @@ func routePattern(path string) string {
 		path == "/api/generate-text" || path == "/api/generate-asset-preview" ||
 		path == "/api/usage" || path == "/api/limits":
 		return path
+	case strings.HasPrefix(path, "/api/schema/"):
+		return "/api/schema/{name}"
 	case path == "/api/models" || strings.HasPrefix(path, "/api/models/"):
 		return "/api/models"
 	case path == "/api/export" || path == "/api/export/capabilities" || path == "/api/export/events" ||
@@ -133,6 +135,24 @@ func writeGameError(w http.ResponseWriter, err error) {
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// handleSchemaRoutes serves the generated schemas the editor consumes.
+func (s *Server) handleSchemaRoutes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if r.URL.Path != "/api/schema/entity-frontmatter" {
+		http.NotFound(w, r)
+		return
+	}
+	schema, err := s.service.GetEntityFrontmatterSchema(r.Context())
+	if err != nil {
+		writeGameError(w, err)
+		return
+	}
+	writeJSON(w, schema)
 }
 
 // handleFolderRoutes serves the folder CRUD a tree UI needs. It takes the

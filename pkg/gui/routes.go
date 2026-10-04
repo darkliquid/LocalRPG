@@ -46,6 +46,7 @@ var mounts = []routeMount{
 	{"/api/models/", "handleModelsRoutes", (*Server).handleModelsRoutes},
 	{"/api/docs", "handleDocsRoutes", (*Server).handleDocsRoutes},
 	{"/api/docs/", "handleDocsRoutes", (*Server).handleDocsRoutes},
+	{"/api/schema/", "handleSchemaRoutes", (*Server).handleSchemaRoutes},
 }
 
 // Routes returns the mounted API patterns, sorted.

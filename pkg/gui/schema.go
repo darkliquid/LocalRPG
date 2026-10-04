@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -129,6 +130,12 @@ func EntityFrontmatterSchema() FrontmatterSchema {
 		return FrontmatterSchema{AllowUnknown: true}
 	}
 	return schema
+}
+
+// GetEntityFrontmatterSchema serves the generated schema the editor completes
+// frontmatter keys and values from.
+func (s *Service) GetEntityFrontmatterSchema(_ context.Context) (FrontmatterSchema, error) {
+	return EntityFrontmatterSchema(), nil
 }
 
 // frontmatterKeyDescriptions documents each accepted key. A test asserts every
