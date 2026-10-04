@@ -6,6 +6,7 @@ import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_SYSTEM_TEMPLATE } from '../templates/referenceTemplates';
+import MarkdownEditor from './editor/MarkdownEditor';
 
 type SystemSelection = { kind: 'saved'; id: string } | { kind: 'draft' } | null;
 
@@ -655,11 +656,13 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                 />
               </div>
             </div>
-            <textarea
+            <MarkdownEditor
+              key={`${savedID || slugID || 'draft'}-rules`}
               value={rulesPrompt}
-              onChange={(e) => { setRulesPrompt(e.target.value); markDirty(); }}
-              spellCheck={false}
-              className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
+              onChange={(next) => { setRulesPrompt(next); markDirty(); }}
+              language="markdown"
+              ariaLabel="System rules prompt"
+              placeholder="Describe the resolution philosophy, dice mechanics and character stats the engine should follow..."
             />
           </div>
         )}
