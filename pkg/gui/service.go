@@ -1114,23 +1114,17 @@ func (s *Service) SaveEntityInFolder(ctx context.Context, gameID, entityID, fold
 }
 
 // findEntityNote returns the path a note currently occupies, or "" when it is
-// new. A note is identified by the id it declares, so a move is found wherever
-// the author left it.
+// new. A note is found by the id it declares or by its file name, so a note that
+// an author renamed by hand is still reachable.
 func (s *Service) findEntityNote(entitiesDir, entityID string) (string, error) {
 	found := ""
 	err := eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
-		parsed, err := entity.ParseMarkdownEntity(data)
-		if err != nil {
-			if strings.TrimSuffix(filepath.Base(path), ".md") == entityID {
-				found = path
-			}
+		filenameID := strings.TrimSuffix(filepath.Base(path), ".md")
+		if filenameID == entityID {
+			found = path
 			return nil
 		}
-		id := parsed.ID
-		if id == "" {
-			id = strings.TrimSuffix(filepath.Base(path), ".md")
-		}
-		if id == entityID {
+		if entity.DeclaredID(data) == entityID {
 			found = path
 		}
 		return nil
@@ -4029,34 +4023,30 @@ func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, err
 
 	entitiesDir := filepath.Join(worldDir, "entities")
 	var entities []WorldEntitySummaryDTO
-	if entries, err := os.ReadDir(entitiesDir); err == nil {
-		for _, e := range entries {
-			if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
-				continue
+	_ = eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
+		// A world template is identified by its file name, unlike a campaign note:
+		// templates are not indexed and are not linked by id, so taking the id from
+		// the frontmatter here would rename every existing template the first time
+		// it was saved.
+		entID := strings.TrimSuffix(filepath.Base(path), ".md")
+		name := entID
+		entType := "concept"
+		if ent, err := entity.ParseMarkdownEntity(data); err == nil {
+			if ent.Name != "" {
+				name = ent.Name
 			}
-			entID := strings.TrimSuffix(e.Name(), ".md")
-			data, err := os.ReadFile(filepath.Join(entitiesDir, e.Name()))
-			if err != nil {
-				continue
+			if ent.Type != "" {
+				entType = ent.Type
 			}
-			ent, err := entity.ParseMarkdownEntity(data)
-			name := entID
-			entType := "concept"
-			if err == nil {
-				if ent.Name != "" {
-					name = ent.Name
-				}
-				if ent.Type != "" {
-					entType = ent.Type
-				}
-			}
-			entities = append(entities, WorldEntitySummaryDTO{
-				ID:   entID,
-				Name: name,
-				Type: entType,
-			})
 		}
-	}
+		entities = append(entities, WorldEntitySummaryDTO{
+			ID:     entID,
+			Name:   name,
+			Type:   entType,
+			Folder: folder,
+		})
+		return nil
+	})
 
 	lorePrompt := ""
 	if data, err := os.ReadFile(filepath.Join(worldDir, "prompts", "lore.md")); err == nil {
@@ -4157,7 +4147,14 @@ func (s *Service) UpdateWorld(ctx context.Context, req CreateWorldRequestDTO) (*
 }
 
 func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) (*WorldEntityDetailDTO, error) {
-	path := filepath.Join(s.resolver.WorldDir(worldID), "entities", entityID+".md")
+	worldDir := s.resolver.WorldDir(worldID)
+	path, err := findWorldEntityNote(worldDir, entityID)
+	if err != nil {
+		return nil, err
+	}
+	if path == "" {
+		return nil, fmt.Errorf("read world entity %s: %w", entityID, fs.ErrNotExist)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read world entity %s: %w", entityID, err)
@@ -4168,18 +4165,75 @@ func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) 
 	}, nil
 }
 
-func (s *Service) SaveWorldEntity(ctx context.Context, worldID, entityID, markdown string) error {
-	dir := filepath.Join(s.resolver.WorldDir(worldID), "entities")
-	if err := os.MkdirAll(dir, 0755); err != nil {
+// SaveWorldEntity writes a template into folder, moving it when it already lives
+// somewhere else. World templates are not indexed, so there is no store to keep
+// in step; the file is the record.
+func (s *Service) SaveWorldEntity(ctx context.Context, worldID, entityID, folder, markdown string) error {
+	cleanFolder, err := ValidateFolderPath(folder)
+	if err != nil {
+		return err
+	}
+
+	worldDir := s.resolver.WorldDir(worldID)
+	entitiesDir := filepath.Join(worldDir, "entities")
+
+	existingPath, err := findWorldEntityNote(worldDir, entityID)
+	if err != nil {
+		return err
+	}
+
+	targetDir := entitiesDir
+	if cleanFolder != "" {
+		targetDir = filepath.Join(entitiesDir, filepath.FromSlash(cleanFolder))
+	}
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return fmt.Errorf("create world entities dir: %w", err)
 	}
-	path := filepath.Join(dir, entityID+".md")
-	return os.WriteFile(path, []byte(markdown), 0644)
+
+	targetPath := filepath.Join(targetDir, entityID+".md")
+	if err := os.WriteFile(targetPath, []byte(markdown), 0o644); err != nil {
+		return err
+	}
+	if existingPath != "" && existingPath != targetPath {
+		if err := os.Remove(existingPath); err != nil {
+			return fmt.Errorf("remove old template %q: %w", existingPath, err)
+		}
+	}
+	return nil
 }
 
 func (s *Service) DeleteWorldEntity(ctx context.Context, worldID, entityID string) error {
-	path := filepath.Join(s.resolver.WorldDir(worldID), "entities", entityID+".md")
+	path, err := findWorldEntityNote(s.resolver.WorldDir(worldID), entityID)
+	if err != nil {
+		return err
+	}
+	if path == "" {
+		return fmt.Errorf("delete world entity %s: %w", entityID, fs.ErrNotExist)
+	}
 	return os.Remove(path)
+}
+
+// findWorldEntityNote returns the path a world template occupies, or "" when it
+// does not exist. A template is found by the id it declares or by its file name,
+// so a hand-edited template that disagrees with itself is still reachable.
+func findWorldEntityNote(worldDir, entityID string) (string, error) {
+	entitiesDir := filepath.Join(worldDir, "entities")
+	found := ""
+	err := eachEntityNote(entitiesDir, func(path, folder string, data []byte) error {
+		filenameID := strings.TrimSuffix(filepath.Base(path), ".md")
+		declared := entity.DeclaredID(data)
+		if filenameID == entityID || declared == entityID {
+			found = path
+		}
+		return nil
+	})
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return found, nil
 }
 
 // applyResolvedPaths fills a config's path fields with the absolute directories

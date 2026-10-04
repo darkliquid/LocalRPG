@@ -1001,12 +1001,13 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 			content := string(data)
 			var obj struct {
 				Markdown string `json:"markdown"`
+				Folder   string `json:"folder"`
 			}
 			if err := json.Unmarshal(data, &obj); err == nil && obj.Markdown != "" {
 				content = obj.Markdown
 			}
-			if err := s.service.SaveWorldEntity(r.Context(), worldID, entityID, content); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+			if err := s.service.SaveWorldEntity(r.Context(), worldID, entityID, obj.Folder, content); err != nil {
+				writeGameError(w, err)
 				return
 			}
 			w.WriteHeader(http.StatusOK)

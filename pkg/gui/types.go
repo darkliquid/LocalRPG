@@ -425,6 +425,9 @@ type WorldEntitySummaryDTO struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Type string `json:"type"`
+	// Folder is the template's directory under entities/, slash-separated, with ""
+	// for the root.
+	Folder string `json:"folder,omitempty"`
 }
 
 type WorldDetailDTO struct {
