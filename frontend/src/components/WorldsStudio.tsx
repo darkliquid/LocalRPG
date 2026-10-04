@@ -9,6 +9,7 @@ import { ImageLightbox } from './ImageLightbox';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
 import EntityTree from './EntityTree';
+import MarkdownEditor from './editor/MarkdownEditor';
 
 interface WorldsStudioProps {
   onWorldSaved?: () => void;
@@ -1007,11 +1008,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 />
               </div>
             </div>
-            <textarea
+            <MarkdownEditor
+              key={`${savedID || slugID || 'draft'}-lore`}
               value={lorePrompt}
-              onChange={(e) => { setLorePrompt(e.target.value); markDirty(); }}
-              spellCheck={false}
-              className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
+              onChange={(next) => { setLorePrompt(next); markDirty(); }}
+              language="markdown"
+              ariaLabel="World lore prompt"
+              placeholder="Describe the sensory tone, factions and conflicts the storyteller should hold in mind..."
             />
           </div>
         )}
@@ -1104,11 +1107,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                       </button>
                     </div>
                   </div>
-                  <textarea
+                  <MarkdownEditor
+                    key={`${savedID || slugID || 'draft'}-${selectedEntityID}`}
                     value={entityMarkdown}
-                    onChange={(e) => { setEntityMarkdown(e.target.value); markDirty(); }}
-                    spellCheck={false}
-                    className="flex-1 w-full min-h-0 h-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-xs font-mono text-stone-200 leading-relaxed focus:outline-none focus:border-purple-500/50 transition-colors resize-none selection:bg-purple-900/60"
+                    onChange={(next) => { setEntityMarkdown(next); markDirty(); }}
+                    language="markdown-frontmatter"
+                    ariaLabel="World entity template markdown"
                   />
                 </>
               ) : (
