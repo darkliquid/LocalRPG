@@ -86,7 +86,7 @@ is bound.
 | `WorldsStudio.tsx:1062` world entity template | `markdown-frontmatter` | replace the textarea |
 | `WorldsStudio.tsx:983` lore prompt | `markdown` | replace the textarea |
 | `SystemsStudio.tsx:674` rules prompt | `markdown` | replace the textarea |
-| `SystemsStudio.tsx:658` `mechanics.js` | — | unchanged; JavaScript is out of scope |
+| `SystemsStudio.tsx:658` `mechanics.js` | `javascript` | replace the textarea |
 | `WorldsStudio.tsx:832`, `SystemsStudio.tsx:489` description fields | — | unchanged; these are short `*.yaml` scalars edited as form fields |
 
 ### 2.4 Content Studio
@@ -129,8 +129,8 @@ all**.
 - Spellcheck. The native path is broken on a CM6 editing host in Chromium — the
   `spellcheck` attribute silently does nothing — so a bundled dictionary
   extension is the only real option and it is deferred.
-- JavaScript editing for `mechanics.js` and world hooks. It is one more
-  `@codemirror/lang-*` import and a trivial follow-on, not part of this spec.
+- JavaScript editing for world hooks. `mechanics.js` is covered; a world hook
+  file has no editor surface in the app yet, so there is nothing to swap.
 - Structured frontmatter forms, frontmatter key completion, and wikilink
   completion. All three are the intelligence spec.
 - Autosave, vim keymaps, and collaborative editing.

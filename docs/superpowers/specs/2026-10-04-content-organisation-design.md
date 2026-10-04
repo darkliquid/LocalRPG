@@ -133,11 +133,21 @@ id, rather than silently overwriting a note in another folder.
 
 One shared `EntityTree` component, used by both studios:
 
-- recursive folders with expand and collapse, a filter box, and drag-and-drop to
-  move a note or a whole folder;
-- new-folder, rename, delete, and "new note here" actions;
-- a note whose id disagrees with its filename shows the repair affordance from
-  §2.1.
+- recursive folders with expand and collapse, and a filter box that searches
+  names, ids and aliases inside every folder;
+- drag-and-drop in both directions: a note onto a folder to file it, and onto the
+  empty space below the tree to take it back out. A folder can be dragged into
+  another, and never into itself;
+- per-folder new subfolder, rename and delete; per-note move-to-folder. Rename
+  reuses the move operation, because renaming a folder is a move to a new path in
+  the same parent, so it needs no extra route;
+- a delete confirmation that names the folder and counts the notes inside it,
+  because the deletion is recursive;
+- a note whose id disagrees with its filename is flagged from §2.1.
+
+Every action is reachable without a pointer gesture as well as by dragging, and
+the dialogs match the shape of the app's existing dialogs rather than the
+browser's own prompt box.
 
 Its first consumers are the flat entity list in `CodexDrawer`
 (`frontend/src/components/CodexDrawer.tsx:261`) and the Templates tab in
