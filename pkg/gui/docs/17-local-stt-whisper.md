@@ -17,7 +17,7 @@ Faster-Whisper is optimized for high-speed inference on both CPUs and GPUs:
 | Model | Memory (VRAM / RAM) | Accuracy | Relative Speed |
 | --- | --- | --- | --- |
 | `tiny` / `base` | < 1 GB | Basic commands | ~16x real-time on GPU, ~3x on CPU |
-| `small` (Recommended) | ~1.5 GB | Excellent for RPG prose & character dialogue | ~10x real-time on GPU, ~1.5x on CPU |
+| `small` (Recommended) | ~1.5 GB | Good for RPG prose & character dialogue | ~10x real-time on GPU, ~1.5x on CPU |
 | `medium` / `large-v3` | ~3–5 GB | Near-perfect multilingual transcription | ~5x real-time on GPU |
 
 > [!TIP]

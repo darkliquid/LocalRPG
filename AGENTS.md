@@ -125,7 +125,7 @@ STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
 
 ### What it reports today
 
-**293 alerts across all 21 files: 0 errors, 183 warnings and 110 suggestions.**
+**149 alerts across all 21 files: 0 errors, 72 warnings and 77 suggestions.**
 For scale, pointing the same styles at every tracked file reported 68,525 alerts
 and 6,875 errors, which is why the scope is the documentation rather than the
 repository.
@@ -137,9 +137,18 @@ mistakes. Run `mise run lint:prose` for the full report, or `SUMMARY=1` for the
 counts and the noisiest rules.
 
 Reaching zero took three passes: narrowing the scope to the documentation, adding
-the vocabulary, and then rewriting the prose the remaining rules objected to. What
-is left is warnings such as `Google.Passive` and `neighbor.AmpersandInProse`, which
-are worth reading but not worth blocking a change on.
+the vocabulary, and then rewriting the prose the remaining rules objected to. A
+fourth pass then worked down the warnings and suggestions, which took the report
+from 293 alerts to 149.
+
+Everything left is deliberate. `neighbor.AmpersandInProse` (62) fires on `&` in
+headings and bolded feature labels, which is a design convention rather than prose.
+`Google.Passive` (61) and `Google.Semicolons` (16) are style preferences, and
+passive voice and semicolons are both correct in technical writing.
+`neighbor.DeviceSpecificAction` (6) objects to "click", which is the real action in
+a desktop app. `neighbor.DirectionalLanguage` (3) flags "progress bar" and "prompt
+bar", which are widget names rather than layout instructions, and `Google.FirstPerson`
+(1) fires on "my guild swore an oath", which is a quoted player utterance.
 
 ### The vocabulary
 
@@ -159,7 +168,7 @@ of a word are listed in the vocabulary wherever the documentation uses both.
 
 ### Rules switched off, and why
 
-Nineteen rules are off in `.vale.ini`, grouped by reason. Each one fires on correct,
+Twenty-one rules are off in `.vale.ini`, grouped by reason. Each one fires on correct,
 deliberate writing rather than on a mistake:
 
 - **Readability grade scores** (`Polysyllables`, `FleschReadingEase`, `FleschKincaid`,
@@ -195,6 +204,16 @@ Four `ai-tells` rules are off as well, and the rest of that style is on and clea
 - **`proselint.Annotations`.** It sees `[!NOTE]` and reports a note left in the text,
   but that is live syntax: remark-github-blockquote-alert renders it as a callout in
   the app and on the site.
+
+Two more report something that is not a fault:
+
+- **`write-good.Passive`.** It and `Google.Passive` check for the same thing and
+  agree on every instance, so the same 66 findings were reported twice. Google's
+  wording is the more specific, so write-good's copy is the one switched off.
+- **`neighbor.ExclusiveLanguage`.** It flags "Master" as non-inclusive, but every
+  instance is "Game Master" - the standard tabletop term for the role, and the name
+  of a role in this engine's own configuration. Renaming it would break the domain
+  vocabulary, the documentation and the config keys together.
 
 One contradiction is worth knowing about: **`Google.Latin` demands "for example" in
 place of "e.g.", and `ai-tells.FormalTransitions` objects to "for example".** Both

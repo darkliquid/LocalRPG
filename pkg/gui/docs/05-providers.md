@@ -48,7 +48,7 @@ providers:
 
 For hardware requirements, container deployment, and configuration walkthroughs, see [Setting Up Ollama for Local LLMs](14-local-llm-ollama).
 
-### Gemini API (Cloud)
+### Gemini API (GCP)
 
 ```yaml
 providers:
@@ -84,7 +84,7 @@ Zero-setup built-in fallback model that generates narrative choices using proced
 
 - **Procedural Art (`builtin_name: procedural-art`)**: Pure-Go SVG generator creating heraldic banners, landscape silhouettes, and item icons without a GPU.
 - **ComfyUI / Automatic1111**: Local Stable Diffusion web APIs. See [Setting Up ComfyUI](18-local-image-comfyui).
-- **Google Imagen**: Cloud image synthesis.
+- **Google Imagen**: GCP image synthesis.
 
 ## Spend Ledger & Rate Limit Handling
 

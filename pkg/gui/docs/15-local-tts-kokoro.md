@@ -108,4 +108,4 @@ media:
 
 ## 5. Voice Blending & Customization
 
-Kokoro-FastAPI supports blending multiple voices using a plus sign in the voice identifier, such as `af_bella+af_sarah`. You can author custom voice profiles in LocalRPG's Voice Profiles table using blended voice IDs to create distinctive tones for specific NPC archetypes.
+Kokoro-FastAPI supports blending two or more voices using a plus sign in the voice identifier, such as `af_bella+af_sarah`. You can author custom voice profiles in LocalRPG's Voice Profiles table using blended voice IDs to create distinctive tones for specific NPC archetypes.

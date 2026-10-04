@@ -8,7 +8,7 @@ description: Anatomy of a world, starting location resolution, and system overri
 
 # Worlds & Lore
 
-A **World** defines the setting, lore, aesthetics, and starting conditions for campaigns. Worlds are completely modular and can be paired with any game system.
+A **World** defines the setting, lore, aesthetics, and starting conditions for campaigns. Worlds are modular and can be paired with any game system.
 
 ## Anatomy of a World
 

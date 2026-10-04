@@ -50,5 +50,5 @@ When you launch LocalRPG inside a repository containing `./localrpg.yaml` or pas
 Each campaign directory contains a SQLite database at `games/<id>/cache/index.db`.
 
 - This database is strictly an index cache for rapid full-text search, graph queries, and turn listing.
-- **It is 100% disposable**: If you delete `cache/index.db`, LocalRPG automatically rebuilds it from the Markdown notes and `history.jsonl` upon next launch.
+- **It's 100% disposable**: If you delete `cache/index.db`, LocalRPG automatically rebuilds it from the Markdown notes and `history.jsonl` upon next launch.
 - Never edit `index.db` directly; always edit the Markdown files in `entities/`.

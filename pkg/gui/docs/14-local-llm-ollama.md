@@ -8,7 +8,7 @@ description: Hardware requirements, native/Docker setup, recommended models for 
 
 # Setting Up Ollama for Local LLMs
 
-Ollama is a lightweight, cross-platform runner for open-weights large language models. It provides out-of-the-box hardware acceleration (CUDA, ROCm, Apple Metal) and exposes an OpenAI-compatible HTTP API on port `11434`. It is the easiest way to power LocalRPG's GM, Narrator, and Extractor agents without sending data to cloud APIs.
+Ollama is a lightweight, cross-platform runner for open-weights large language models. It provides built-in hardware acceleration (CUDA, ROCm, Apple Metal) and exposes an OpenAI-compatible HTTP API on port `11434`. It's the easiest way to power LocalRPG's GM, Narrator, and Extractor agents without sending data to cloud APIs.
 
 ## 1. Hardware Requirements
 
@@ -139,5 +139,5 @@ agents:
 
 LocalRPG's OpenAI HTTP client works with any standard OpenAI-compatible local server:
 
-- **LM Studio**: Run the LM Studio desktop application, load any GGUF model, and click the **Local Server** icon to start serving on `http://localhost:1234/v1`. Select preset `lm-studio` in LocalRPG.
+- **LM Studio**: Run the LM Studio desktop app, load any GGUF model, and click the **Local Server** icon to start serving on `http://localhost:1234/v1`. Select preset `lm-studio` in LocalRPG.
 - **vLLM**: For multi-turn throughput and high-concurrency batching on Linux with NVIDIA GPUs, run `vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8000`. Use endpoint `http://localhost:8000/v1` in LocalRPG.

@@ -3,7 +3,7 @@ id: 19-local-stack-docker-compose
 title: Fully Local AI Stack with Docker Compose
 category: Local AI & Self-Hosting
 order: 19
-description: One Docker Compose project that runs Ollama, Kokoro, Faster-Whisper, and ComfyUI together, with recommended models, minimum system requirements, and the matching LocalRPG configuration.
+description: One Docker Compose project that runs Ollama, Kokoro, Faster-Whisper, and ComfyUI together, with recommended models, system requirements, and the matching LocalRPG configuration.
 ---
 
 # Fully Local AI Stack with Docker Compose
@@ -26,11 +26,11 @@ no API key is required for any of it.
 
 Ready-to-run files live in the repository under `docker/`:
 
-- `docker/compose.local.yml` runs the CPU baseline above.
+- `docker/compose.local.yml` runs the CPU baseline.
 - `docker/compose.gpu.yml` is an override that swaps in the CUDA images and
   reserves the host GPU.
 
-## 2. Minimum system requirements
+## 2. System requirements
 
 These services have different
 appetites. Ollama scales with the model you pick, ComfyUI wants a GPU, and Kokoro
@@ -44,7 +44,7 @@ you already have.
 | **Comfortable** | 12+ cores | 64 GB | 16–24 GB (RTX 3090, RTX 4090, Apple M-series 32 GB+) | `gemma4:26b` or `gemma4:31b`; Whisper `large-v3`; Flux.1 or SD3.5 checkpoints |
 
 > [!IMPORTANT]
-> One 12 GB card will happily host Ollama, Kokoro, and Whisper at the same
+> One 12 GB card can host Ollama, Kokoro, and Whisper at the same
 > time, but Stable Diffusion XL wants most of that VRAM to itself. If ComfyUI
 > starts returning out-of-memory errors, stop the other containers while you
 > generate art, or move up to a 24 GB card.
@@ -54,7 +54,7 @@ actually download:
 
 | Component | Disk footprint |
 | --- | --- |
-| Ollama models | 2–20 GB, depending on size and quantization |
+| Ollama models | 2–20 GB depending on the model and its quantization |
 | Kokoro weights | ~350 MB |
 | Faster-Whisper `small` | ~500 MB |
 | ComfyUI base image plus one SDXL checkpoint | ~2 GB image plus 7 GB checkpoint |
@@ -64,7 +64,7 @@ ComfyUI CUDA image is by far the largest single pull.
 
 ## 3. The Compose project
 
-The base file is the CPU stack. Save it as `docker/compose.local.yml` (it is
+The base file is the CPU stack. Save it as `docker/compose.local.yml` (it's
 already there in a checkout of this repository):
 
 ```yaml
@@ -212,7 +212,7 @@ the service's `environment` block.
 
 Kokoro works out of the box: the container includes the ONNX weights and all eleven
 voice embeddings. ComfyUI needs a checkpoint, which you place in the
-`comfyui-models` volume under `checkpoints/`. The simplest way is a bind mount
+`comfyui-models` volume under `checkpoints/`. One way is a bind mount
 instead of a named volume, pointing at a folder you can drop files into:
 
 ```yaml
@@ -234,12 +234,12 @@ something small and keep the bigger model for the GM and Narrator.
 
 | Role | Model | Disk | Notes |
 | --- | --- | --- | --- |
-| GM and Narrator, baseline | `gemma4:12b` | ~8 GB | Best balance of reasoning, prose, and context length at 12 GB VRAM |
+| GM and Narrator, baseline | `gemma4:12b` | ~8 GB | Good balance of reasoning, prose, and context length at 12 GB VRAM |
 | GM and Narrator, light | `gemma4:latest` | ~7 GB | The edge variant, usable on 8 GB VRAM or CPU-only at 16 GB RAM |
 | GM and Narrator, heavy | `gemma4:26b` | ~17 GB | Mixture-of-experts, fast for its size, wants 24 GB VRAM |
 | GM and Narrator, alternative | `llama3.1:8b` or `qwen2.5:7b` | 5–6 GB | Strong instruction following and reliable Markdown |
-| Extractor | `llama3.2` | ~2 GB | Fast, cheap, good enough for entity and mention extraction |
-| Speech-to-text | `Systran/faster-whisper-small` | ~500 MB | Excellent accuracy on fantasy names at near-real-time speed |
+| Extractor | `llama3.2` | ~2 GB | Fast, cheap, and good enough for entity and mention extraction |
+| Speech-to-text | `Systran/faster-whisper-small` | ~500 MB | Good accuracy on fantasy names at near-real-time speed |
 | Speech-to-text, CPU fallback | `Systran/faster-whisper-base.en` | ~150 MB | Use when `small` is too slow without a GPU |
 | Text-to-speech | Kokoro `af_bella`, `am_adam`, `bm_george` | ~350 MB | Warm, commanding, and distinguished voices respectively |
 
@@ -293,7 +293,7 @@ media:
     auto_generate: false
 ```
 
-The equivalent path through the GUI is **Settings Studio** -> **Agents** for the
+The same path through the GUI is **Settings Studio** -> **Agents** for the
 three roles and **Settings Studio** -> **Media** for the three media services. Each
 panel offers a preset dropdown (**Ollama**, **Kokoro-FastAPI**, **Faster-Whisper**,
 **ComfyUI**) that fills in the endpoint for you.
@@ -310,7 +310,7 @@ two.
 
 ## 8. Verifying each service
 
-Each service responds to a cheap health request, which is the fastest way to tell a
+Each service responds to a cheap health request, which is a quick way to tell a
 slow model download from a broken container:
 
 ```bash
@@ -334,9 +334,9 @@ Kokoro voices, `/health` returns the transcription server's status, and
 - **AMD GPUs** on Linux use the ROCm tags instead of CUDA:
   `ghcr.io/remsky/kokoro-fastapi-rocm` for Kokoro and `yanwk/comfyui-boot:rocm7`
   for ComfyUI. Ollama's ROCm support depends on your card, so check its
-  documentation before assuming it is covered.
-- **Apple Silicon** cannot pass Metal through a container, so no GPU reservation
-  will ever work there. Run Ollama and ComfyUI natively (both use Metal directly
+  documentation before assuming it's covered.
+- **Apple Silicon** can't pass Metal through a container, so no GPU reservation
+  works there. Run Ollama and ComfyUI natively (both use Metal directly
   and are much faster for it) and keep the CPU Kokoro and Whisper containers.
   Point the `endpoint` values at the native servers, which listen on the same
   ports.
@@ -345,7 +345,7 @@ Kokoro voices, `/health` returns the transcription server's status, and
 
 - **A service is unhealthy but the logs look fine.** Give Ollama up to a minute
   on first start; the healthcheck's `start_period` covers it.
-- **Ollama ignores the GPU.** Confirm the container sees the device with
+- **Ollama ignores the GPU.** Confirm the container can access the device with
   `docker exec localrpg-ollama nvidia-smi`. If that fails, the NVIDIA Container
   Toolkit is missing on the host.
 - **Turns are slow.** Move the Extractor to a smaller model, lower
@@ -353,8 +353,8 @@ Kokoro voices, `/health` returns the transcription server's status, and
   entity mentions with no model call at all.
 - **ComfyUI runs out of memory.** Stop Kokoro and Ollama while generating art, or
   switch from SDXL to a Stable Diffusion 1.5 checkpoint.
-- **Disk pressure.** `ollama rm <model>` drops a model you are not using, and the
-  `comfyui-models` volume is usually the next biggest item.
+- **Disk pressure.** `ollama rm <model>` drops a model you aren't using, and the
+  `comfyui-models` volume is the next biggest item.
 
 ## 11. Per-service deep dives
 

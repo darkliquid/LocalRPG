@@ -96,7 +96,7 @@ Bracketed delivery tags (`[whisper]`, `[excited]`, `[angry]`, `[sad]`, `[laugh]`
 
 ### Zero-Shot Voice Cloning
 
-Under **Voice Profiles**, configure `ref_audio` (such as `assets/voices/guard.wav` or a file path) and `ref_text` (transcript of the clip). LocalRPG automatically reads and converts the clip to a data URI for the server.
+Under **Voice Profiles**, configure `ref_audio` (such as `assets/voices/guard.wav` or a path) and `ref_text` (transcript of the clip). LocalRPG automatically reads and converts the clip to a data URI for the server.
 
 ### Via Configuration File (`config.yaml` or `localrpg.yaml`)
 

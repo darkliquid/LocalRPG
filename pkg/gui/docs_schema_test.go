@@ -58,7 +58,7 @@ func renderConfigurationReference() string {
 	}
 
 	b.WriteString("## Value sets\n\n")
-	b.WriteString("Keys typed `string` above accept the following values where noted. An\n")
+	b.WriteString("Keys typed `string` here accept the following values where noted. An\n")
 	b.WriteString("unlisted value is either rejected or falls back to the documented default.\n\n")
 	b.WriteString("| Key | Accepted values |\n")
 	b.WriteString("| --- | --- |\n")
