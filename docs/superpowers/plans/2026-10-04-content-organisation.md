@@ -2135,4 +2135,26 @@ git commit -m "feat(frontend): organise codex and world notes into folders"
 
 **Placeholder scan.** No `TBD`, no "add error handling", no "similar to Task N". Two steps deliberately say "use the existing helper name" where a test helper's name cannot be known without opening the file; each names exactly what to do if the name differs.
 
-**Type consistency.** `Entity.Folder` (Task 1) is the only folder carrier; `folderFromPath` (Task 3) and `eachEntityNote`'s `folder` (Task 4) both produce the same canonical form. `ValidateFolderPath` (Task 5) is the single validator, used by `CreateFolder`, `MoveFolder`, `DeleteFolder` (Task 6) and `SaveEntityInFolder` (Task 7). `Syncer.SyncFile` gains a `root` parameter in Task 3 and its only caller is updated in Task 7. `ErrDuplicateEntityID` is declared in Task 7 and mapped in Task 7's `writeGameError` change. `FolderNode` (Task 8) matches `FolderDTO`'s JSON (`path`, `name`, `children`).
+**Type consistency.** `Entity.Folder` (Task 1) is the only folder carrier; `folderFromPath` (Task 3) and `eachEntityNote`'s `folder` (Task 4) both produce the same canonical form. `ValidateFolderPath` (Task 5) is the single validator, used by `CreateFolder`, `MoveFolder`, `DeleteFolder` (Task 6) and `SaveEntityInFolder` (Task 7). `ErrDuplicateEntityID` is declared in Task 7 and mapped in Task 7's `writeGameError` change. `FolderNode` (Task 8) matches `FolderDTO`'s JSON (`path`, `name`, `children`).
+
+## Execution Notes
+
+Recorded after the plan was executed, so the plan matches what shipped.
+
+- **Task 3** kept `SyncFile(path string)` rather than adding a `root` argument. The
+  plan assumed one caller; there are eight, and every one passes a path under a
+  directory named `entities`, so `entitiesRootFor` derives the root and removes
+  eight chances to pass the wrong one.
+- **Task 4** moved the `EntitySummaryDTO` field additions forward from Task 5, so
+  the task compiles and its test runs on its own.
+- **Task 10** needed backend work the File Map did not list. World templates are a
+  separate store from campaign notes, so nesting them required
+  `WorldEntitySummaryDTO.Folder`, a recursive `GetWorld`, a `folder` parameter on
+  `SaveWorldEntity`, `findWorldEntityNote`, and world folder client methods. It
+  also kept the world studio's per-template delete, which the tree does not offer,
+  by moving it into the editor header.
+- **World template identity stays the file name**, unlike a campaign note. A world
+  template is not indexed and is not linked by id, so taking the id from the
+  frontmatter would rename every existing template the first time it was saved.
+  `findWorldEntityNote` still matches either, so a hand-edited template is
+  reachable.
