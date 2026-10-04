@@ -1940,17 +1940,27 @@ func (s *Service) GetTurnSceneImage(ctx context.Context, gameID string, turnNumb
 // When an explicit version (> 0) is specified, it serves that exact historical portrait version.
 func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID string, version ...int) ([]byte, string, error) {
 	s.ensureIndexed(gameID)
+	cleanID := entity.Slugify(characterID)
+	if cleanID == "" {
+		return nil, "", fmt.Errorf("invalid character id %q", characterID)
+	}
+
+	gameDir := filepath.Clean(s.resolver.GameDir(gameID))
+	portraitsDir := filepath.Clean(filepath.Join(gameDir, "assets", "portraits"))
+
 	store, err := s.store(gameID)
 	if err != nil {
 		return nil, "", err
 	}
-	ent, err := store.GetEntity(characterID)
+	ent, err := store.GetEntity(cleanID)
 	if err != nil || ent == nil {
 		// Fallback: check entity markdown file on disk directly
-		notePath := filepath.Join(s.resolver.GameDir(gameID), "entities", characterID+".md")
-		if data, readErr := os.ReadFile(notePath); readErr == nil {
-			if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
-				ent = parsed
+		notePath := filepath.Clean(filepath.Join(gameDir, "entities", cleanID+".md"))
+		if strings.HasPrefix(notePath, gameDir+string(filepath.Separator)) {
+			if data, readErr := os.ReadFile(notePath); readErr == nil {
+				if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
+					ent = parsed
+				}
 			}
 		}
 	}
@@ -1958,30 +1968,56 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 		return nil, "", fmt.Errorf("character %q not found", characterID)
 	}
 
-	portraitsDir := filepath.Join(s.resolver.GameDir(gameID), "assets", "portraits")
+	safeID := ent.ID
+
+	readFileInGameDir := func(relPath string) ([]byte, bool) {
+		relPath = strings.TrimSpace(relPath)
+		if relPath == "" {
+			return nil, false
+		}
+		p := filepath.Clean(filepath.Join(gameDir, relPath))
+		if !strings.HasPrefix(p, gameDir+string(filepath.Separator)) {
+			return nil, false
+		}
+		data, readErr := os.ReadFile(p)
+		if readErr != nil || len(data) == 0 {
+			return nil, false
+		}
+		return data, true
+	}
+
+	readPortraitFile := func(filename string) ([]byte, bool) {
+		filename = filepath.Base(filename)
+		p := filepath.Clean(filepath.Join(portraitsDir, filename))
+		if !strings.HasPrefix(p, portraitsDir+string(filepath.Separator)) {
+			return nil, false
+		}
+		data, readErr := os.ReadFile(p)
+		if readErr != nil || len(data) == 0 {
+			return nil, false
+		}
+		return data, true
+	}
 
 	// If explicit version requested:
 	if len(version) > 0 && version[0] > 0 {
 		targetVer := version[0]
 		// 1. Check direct file assets/portraits/<id>-v<version>.<ext>
 		for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
-			vPath := filepath.Join(portraitsDir, fmt.Sprintf("%s-v%d%s", characterID, targetVer, ext))
-			if data, err := os.ReadFile(vPath); err == nil && len(data) > 0 {
+			if data, ok := readPortraitFile(fmt.Sprintf("%s-v%d%s", safeID, targetVer, ext)); ok {
 				return data, imageContentType(data), nil
 			}
 		}
 		// 2. Check if current ent.Portrait matches this version
 		if ent.PortraitVersion == targetVer && ent.Portrait != "" {
-			pPath := filepath.Join(s.resolver.GameDir(gameID), ent.Portrait)
-			if data, err := os.ReadFile(pPath); err == nil && len(data) > 0 {
+			if data, ok := readFileInGameDir(ent.Portrait); ok {
 				return data, imageContentType(data), nil
 			}
 		}
 		// 3. Check portrait history entries
 		for _, histPath := range ent.PortraitHistory {
 			if strings.Contains(histPath, fmt.Sprintf("-v%d.", targetVer)) {
-				pPath := filepath.Join(s.resolver.GameDir(gameID), histPath)
-				if data, err := os.ReadFile(pPath); err == nil && len(data) > 0 {
+				if data, ok := readFileInGameDir(histPath); ok {
 					return data, imageContentType(data), nil
 				}
 			}
@@ -1989,8 +2025,7 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 		// 4. If targetVer == 1, check legacy unversioned files
 		if targetVer == 1 {
 			for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
-				legacyPath := filepath.Join(portraitsDir, characterID+ext)
-				if data, err := os.ReadFile(legacyPath); err == nil && len(data) > 0 {
+				if data, ok := readPortraitFile(safeID + ext); ok {
 					return data, imageContentType(data), nil
 				}
 			}
@@ -1998,15 +2033,13 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 	} else {
 		// No version requested: serve current active portrait
 		if ent.Portrait != "" {
-			portraitPath := filepath.Join(s.resolver.GameDir(gameID), ent.Portrait)
-			if data, err := os.ReadFile(portraitPath); err == nil && len(data) > 0 {
+			if data, ok := readFileInGameDir(ent.Portrait); ok {
 				return data, imageContentType(data), nil
 			}
 		}
 		// Check fallback unversioned file on disk
 		for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
-			path := filepath.Join(portraitsDir, characterID+ext)
-			if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
+			if data, ok := readPortraitFile(safeID + ext); ok {
 				return data, imageContentType(data), nil
 			}
 		}
@@ -2021,17 +2054,24 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 // overwrites any existing one, returning a cache-busted URL.
 func (s *Service) RegenerateCharacterPortrait(ctx context.Context, gameID, characterID string) (CharacterPortraitDTO, error) {
 	s.ensureIndexed(gameID)
+	cleanID := entity.Slugify(characterID)
+	if cleanID == "" {
+		return CharacterPortraitDTO{}, fmt.Errorf("invalid character id %q", characterID)
+	}
+
+	gameDir := filepath.Clean(s.resolver.GameDir(gameID))
 	store, err := s.store(gameID)
 	if err != nil {
 		return CharacterPortraitDTO{}, err
 	}
-
-	ent, err := store.GetEntity(characterID)
+	ent, err := store.GetEntity(cleanID)
 	if err != nil || ent == nil {
-		notePath := filepath.Join(s.resolver.GameDir(gameID), "entities", characterID+".md")
-		if data, readErr := os.ReadFile(notePath); readErr == nil {
-			if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
-				ent = parsed
+		notePath := filepath.Clean(filepath.Join(gameDir, "entities", cleanID+".md"))
+		if strings.HasPrefix(notePath, gameDir+string(filepath.Separator)) {
+			if data, readErr := os.ReadFile(notePath); readErr == nil {
+				if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
+					ent = parsed
+				}
 			}
 		}
 	}
