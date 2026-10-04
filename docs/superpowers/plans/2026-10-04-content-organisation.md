@@ -561,41 +561,42 @@ Replace `SyncFile` with:
 
 ```go
 // SyncFile indexes one note, which is what a save uses so the index never waits
-// for a full resync. It derives the folder from the file's own location, because
-// a move is a write to a new path.
+// for a full resync. The collection root is found by walking up to the entities/
+// directory, so no caller can pass the wrong one and the signature stays a single
+// path.
 func (s *Syncer) SyncFile(path string) error {
-	ent, err := entity.ParseMarkdownEntity(mustRead(t, path))
-	if err != nil {
-		return fmt.Errorf("parse %q: %w", path, err)
-	}
-	ent.Folder = folderFromPath(filepath.Join(filepath.Dir(path), ".."), path)
-	if ent.Folder == "" {
-		ent.Folder = folderFromPath(filepath.Dir(path), path)
-	}
-	return s.store.SaveEntity(ent)
-}
-```
-
-The parent-joining above is wrong for a nested note, because `SyncFile` is not told the collection root. Fix it by having callers pass the root, which they always know:
-
-```go
-// SyncFile indexes one note under root, which is what a save uses so the index
-// never waits for a full resync.
-func (s *Syncer) SyncFile(root, path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read %q: %w", path, err)
 	}
+
 	ent, err := entity.ParseMarkdownEntity(data)
 	if err != nil {
 		return fmt.Errorf("parse %q: %w", path, err)
 	}
-	ent.Folder = folderFromPath(root, path)
+
+	ent.Folder = folderFromPath(entitiesRootFor(path), path)
 	return s.store.SaveEntity(ent)
+}
+
+// entitiesRootFor walks up from a note's path to the entities/ directory that
+// contains it. A note always lives under one, so the root needs no argument.
+func entitiesRootFor(path string) string {
+	dir := filepath.Dir(path)
+	for {
+		if filepath.Base(dir) == "entities" {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return filepath.Dir(path)
+		}
+		dir = parent
+	}
 }
 ```
 
-Update the one existing caller in `pkg/gui/service.go` (`SaveEntity`) to pass the entities root; Task 7 covers that call site.
+The signature is deliberately unchanged. `SyncFile` has eight call sites across `pkg/engine` and `pkg/gui`, and every one of them passes a path under a directory named `entities`, so deriving the root removes eight chances to pass the wrong one.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
@@ -805,7 +806,13 @@ func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySumm
 }
 ```
 
-`Aliases` and `FilenameMismatch` are added to `EntitySummaryDTO` in Task 5; add them there before running this test.
+`Aliases`, `Folder` and `FilenameMismatch` do not exist on `EntitySummaryDTO` yet. Add them now, in `pkg/gui/types.go`, so this task compiles and its test can run:
+
+```go
+	Aliases          []string `json:"aliases,omitempty"`
+	Folder           string   `json:"folder,omitempty"`
+	FilenameMismatch bool     `json:"filename_mismatch,omitempty"`
+```
 
 - [ ] **Step 5: Rewrite `GetGraph` on the walker**
 
@@ -1082,15 +1089,7 @@ func BuildFolderTree(paths []string) []FolderDTO {
 
 - [ ] **Step 4: Extend the DTOs**
 
-In `pkg/gui/types.go`, add to `EntitySummaryDTO`:
-
-```go
-	Aliases          []string `json:"aliases,omitempty"`
-	Folder           string   `json:"folder,omitempty"`
-	FilenameMismatch bool     `json:"filename_mismatch,omitempty"`
-```
-
-Add to `EntityDTO`:
+`EntitySummaryDTO` gained `Aliases`, `Folder` and `FilenameMismatch` in Task 4. Add the folder to `EntityDTO` in `pkg/gui/types.go`:
 
 ```go
 	Folder string `json:"folder,omitempty"`
@@ -1564,7 +1563,7 @@ func (s *Service) SaveEntityInFolder(ctx context.Context, gameID, entityID, fold
 	if err != nil {
 		return nil // Non-fatal if db sync fails temporarily
 	}
-	return storage.NewSyncer(store).SyncFile(entitiesDir, targetPath)
+	return storage.NewSyncer(store).SyncFile(targetPath)
 }
 
 // findEntityNote returns the path a note currently occupies, or "" when it is new.
