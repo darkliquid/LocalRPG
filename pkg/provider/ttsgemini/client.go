@@ -292,11 +292,11 @@ func (c *GeminiTTSClient) TTSCapabilities() media.TTSCapabilities {
 	}
 }
 
-// SynthesizeGroup renders a two-speaker scene in one request. Gemini addresses
-// speakers by a label that must match the transcript, so each line's label is
-// used both in the speaker configuration and in the text.
+// SynthesizeGroup renders a two-speaker scene in one request. The model reads
+// each part's text verbatim, so a line's label is carried on the part's
+// speech_metadata.speaker, not written into the text.
 func (c *GeminiTTSClient) SynthesizeGroup(ctx context.Context, lines []media.SpeakerLine) ([]byte, error) {
-	text, config, speakers, err := c.groupRequest(lines)
+	contents, config, speakers, err := c.groupRequest(lines)
 	if err != nil {
 		return nil, err
 	}
@@ -307,32 +307,33 @@ func (c *GeminiTTSClient) SynthesizeGroup(ctx context.Context, lines []media.Spe
 		return nil, errors.New("gemini tts: client not initialized")
 	}
 
-	resp, err := c.client.Models.GenerateContent(ctx, c.model, genai.Text(text), config)
+	resp, err := c.client.Models.GenerateContent(ctx, c.model, contents, config)
 	if err != nil {
 		return nil, mapGeminiTTSError(err, c.model)
 	}
 	return c.audioFromResponse(resp)
 }
 
-// groupRequest builds the prompt and generation config for a group: a
-// multi-speaker transcript when it has two speakers, otherwise the concatenated
-// text in the one voice. It reports the distinct speaker count, so the
-// interactive path can require two and the batch path can accept either.
-func (c *GeminiTTSClient) groupRequest(lines []media.SpeakerLine) (string, *genai.GenerateContentConfig, int, error) {
+// groupRequest builds the contents and generation config for a group: one
+// speech_metadata-annotated part per line when it has two speakers, otherwise
+// the concatenated text in the one voice. It reports the distinct speaker count,
+// so the interactive path can require two and the batch path can accept either.
+func (c *GeminiTTSClient) groupRequest(lines []media.SpeakerLine) ([]*genai.Content, *genai.GenerateContentConfig, int, error) {
 	if len(lines) == 0 {
-		return "", nil, 0, errors.New("gemini tts: a group needs at least one line")
+		return nil, nil, 0, errors.New("gemini tts: a group needs at least one line")
 	}
 
 	speakerConfigs := make([]*genai.SpeakerVoiceConfig, 0, 2)
 	seen := map[string]bool{}
-	var transcript, single strings.Builder
+	parts := make([]*genai.Part, 0, len(lines))
+	var single strings.Builder
 	for _, line := range lines {
 		label := strings.TrimSpace(line.Label)
 		if label == "" {
 			label = strings.TrimSpace(line.SpeakerID)
 		}
 		if label == "" {
-			return "", nil, 0, errors.New("gemini tts: every speaker needs a label")
+			return nil, nil, 0, errors.New("gemini tts: every speaker needs a label")
 		}
 		if !seen[label] {
 			seen[label] = true
@@ -341,19 +342,25 @@ func (c *GeminiTTSClient) groupRequest(lines []media.SpeakerLine) (string, *gena
 				VoiceConfig: &genai.VoiceConfig{PrebuiltVoiceConfig: &genai.PrebuiltVoiceConfig{VoiceName: c.voiceNameFor(line.Voice)}},
 			})
 		}
-		transcript.WriteString(label)
-		transcript.WriteString(": ")
-		transcript.WriteString(strings.TrimSpace(line.Text))
-		transcript.WriteByte('\n')
+
+		// A multi-speaker request addresses its speakers through
+		// speech_metadata.speaker on each part; the 3.8 TTS models read the text
+		// verbatim, so a "Label: text" transcript would be spoken aloud and the
+		// request rejected for missing metadata.
+		text := strings.TrimSpace(line.Text)
+		parts = append(parts, &genai.Part{
+			Text:           text,
+			SpeechMetadata: &genai.SpeechMetadata{Speaker: label},
+		})
 
 		if single.Len() > 0 {
 			single.WriteByte(' ')
 		}
-		single.WriteString(strings.TrimSpace(line.Text))
+		single.WriteString(text)
 	}
 
 	if len(speakerConfigs) <= 1 {
-		return single.String(), &genai.GenerateContentConfig{
+		return []*genai.Content{genai.NewContentFromText(single.String(), genai.RoleUser)}, &genai.GenerateContentConfig{
 			ResponseModalities: []string{"AUDIO"},
 			SpeechConfig: &genai.SpeechConfig{
 				VoiceConfig: &genai.VoiceConfig{PrebuiltVoiceConfig: &genai.PrebuiltVoiceConfig{VoiceName: c.voiceNameFor(lines[0].Voice)}},
@@ -361,10 +368,10 @@ func (c *GeminiTTSClient) groupRequest(lines []media.SpeakerLine) (string, *gena
 		}, len(speakerConfigs), nil
 	}
 	if len(speakerConfigs) > 2 {
-		return "", nil, len(speakerConfigs), fmt.Errorf("gemini tts: at most two speakers are supported, got %d", len(speakerConfigs))
+		return nil, nil, len(speakerConfigs), fmt.Errorf("gemini tts: at most two speakers are supported, got %d", len(speakerConfigs))
 	}
 
-	return transcript.String(), &genai.GenerateContentConfig{
+	return []*genai.Content{genai.NewContentFromParts(parts, genai.RoleUser)}, &genai.GenerateContentConfig{
 		ResponseModalities: []string{"AUDIO"},
 		SpeechConfig: &genai.SpeechConfig{
 			MultiSpeakerVoiceConfig: &genai.MultiSpeakerVoiceConfig{SpeakerVoiceConfigs: speakerConfigs},

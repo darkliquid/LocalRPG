@@ -51,3 +51,16 @@ func TestOpenGameStoreUsesCanonicalPathAndRetiresLegacyDB(t *testing.T) {
 		t.Errorf("expected the shared store for the canonical path")
 	}
 }
+
+func TestOpenGameStoreRejectsInvalidIDs(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	t.Cleanup(func() { _ = CloseGameStores() })
+
+	if _, err := OpenGameStore(paths, "../escaped"); err == nil {
+		t.Error("OpenGameStore expected error for traversal gameID, got nil")
+	}
+	if err := CloseGameStore(paths, "../escaped"); err == nil {
+		t.Error("CloseGameStore expected error for traversal gameID, got nil")
+	}
+}
+

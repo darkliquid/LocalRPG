@@ -69,3 +69,23 @@ func TestPathResolver_CustomPaths(t *testing.T) {
 		t.Errorf("expected /new/cache, got %q", resolver.CacheDir())
 	}
 }
+
+func TestPathResolverSanitizesIDs(t *testing.T) {
+	resolver := NewPathResolver("/app/base")
+
+	malicious := "../../etc/passwd"
+	gameDir := resolver.GameDir(malicious)
+	if filepath.Clean(gameDir) != filepath.Clean("/app/base/games/etc-passwd") {
+		t.Errorf("GameDir(%q) = %q, expected /app/base/games/etc-passwd", malicious, gameDir)
+	}
+
+	worldDir := resolver.WorldDir(malicious)
+	if filepath.Clean(worldDir) != filepath.Clean("/app/base/worlds/etc-passwd") {
+		t.Errorf("WorldDir(%q) = %q, expected /app/base/worlds/etc-passwd", malicious, worldDir)
+	}
+
+	sysDir := resolver.SystemDir(malicious)
+	if filepath.Clean(sysDir) != filepath.Clean("/app/base/systems/etc-passwd") {
+		t.Errorf("SystemDir(%q) = %q, expected /app/base/systems/etc-passwd", malicious, sysDir)
+	}
+}

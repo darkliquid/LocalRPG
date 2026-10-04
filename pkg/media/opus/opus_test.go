@@ -114,3 +114,14 @@ func TestDurationReadsTheGranulePosition(t *testing.T) {
 		t.Errorf("Duration = %v, want about 1.5s", got)
 	}
 }
+
+func TestEncodeRejectsInvalidSampleRate(t *testing.T) {
+	source := tone(SampleRate, 0.1)
+	if _, err := Encode(source, -1, 1, DefaultBitrate); err == nil {
+		t.Fatal("expected an error for negative sample rate")
+	}
+	if _, err := Encode(source, 0, 1, DefaultBitrate); err == nil {
+		t.Fatal("expected an error for zero sample rate")
+	}
+}
+

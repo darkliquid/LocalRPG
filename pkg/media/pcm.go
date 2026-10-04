@@ -27,7 +27,7 @@ func PCMSampleRate(mimeType string) int {
 		if !strings.HasPrefix(part, "rate=") {
 			continue
 		}
-		if rate, err := strconv.Atoi(strings.TrimPrefix(part, "rate=")); err == nil && rate > 0 {
+		if rate, err := strconv.Atoi(strings.TrimPrefix(part, "rate=")); err == nil && rate > 0 && rate <= 192000 {
 			return rate
 		}
 	}
@@ -41,7 +41,7 @@ func WrapPCMAsWAV(pcm []byte, sampleRate int) []byte {
 	if bytes.HasPrefix(pcm, []byte("RIFF")) {
 		return pcm
 	}
-	if sampleRate <= 0 {
+	if sampleRate <= 0 || sampleRate > 192000 {
 		sampleRate = DefaultPCMRate
 	}
 	const channels = 1

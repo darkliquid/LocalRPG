@@ -113,7 +113,7 @@ type GroupTTSClient interface {
 }
 ```
 
-The provider owns prompt construction: for Gemini, a `SpeechConfig.MultiSpeakerVoiceConfig` with one `SpeakerVoiceConfig` per line, and a labelled transcript (`<Label>: <text>`) whose speaker names match `SpeakerVoiceConfig.Speaker`. The pipeline never builds the provider prompt.
+The provider owns prompt construction: for Gemini, a `SpeechConfig.MultiSpeakerVoiceConfig` with one `SpeakerVoiceConfig` per line, and one text part per line carrying `SpeechMetadata.Speaker` set to that line's label. The speaker names must match `SpeakerVoiceConfig.Speaker`. The 3.8 TTS models read each part's text verbatim, so the label cannot be written into the transcript as a `<Label>: <text>` prefix: the API rejects such a request for missing `speech_metadata.speaker`. The pipeline never builds the provider prompt.
 
 `SynthesizeGroup` is used only when a group has more than one distinct speaker. A single-speaker group always goes through `Synthesize`.
 

@@ -130,14 +130,21 @@ func folderFromPath(root, path string) string {
 // directory, so no caller can pass the wrong one and the signature stays a single
 // path.
 func (s *Syncer) SyncFile(path string) error {
-	data, err := os.ReadFile(path)
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("sync file: invalid path %q: contains traversal", path)
+	}
+	cleanPath := filepath.Clean(path)
+	if strings.Contains(cleanPath, "..") {
+		return fmt.Errorf("sync file: invalid path %q: contains traversal", cleanPath)
+	}
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
-		return fmt.Errorf("read %q: %w", path, err)
+		return fmt.Errorf("read %q: %w", cleanPath, err)
 	}
 
 	ent, err := entity.ParseMarkdownEntity(data)
 	if err != nil {
-		return fmt.Errorf("parse %q: %w", path, err)
+		return fmt.Errorf("parse %q: %w", cleanPath, err)
 	}
 
 	ent.Folder = folderFromPath(entitiesRootFor(path), path)

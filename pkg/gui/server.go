@@ -22,6 +22,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/models"
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 )
 
 type Server struct {
@@ -337,11 +338,21 @@ func (s *Server) handleTTSBatchRoute(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/game/")
 	parts := strings.Split(path, "/")
+	if len(parts) == 0 || parts[0] == "" {
+		http.Error(w, "missing game id", http.StatusBadRequest)
+		return
+	}
+
+	gameID := parts[0]
+	if err := pathutil.ValidateID(gameID); err != nil {
+		http.Error(w, "invalid game id", http.StatusBadRequest)
+		return
+	}
 
 	// DELETE /api/game/{id} has no sub-action, so it is matched before the
 	// two-part requirement every other game route satisfies.
 	if len(parts) == 1 && r.Method == http.MethodDelete {
-		if err := s.service.DeleteGame(r.Context(), parts[0]); err != nil {
+		if err := s.service.DeleteGame(r.Context(), gameID); err != nil {
 			writeGameError(w, err)
 			return
 		}
@@ -354,7 +365,6 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gameID := parts[0]
 	action := parts[1]
 
 	switch action {
@@ -746,6 +756,10 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		characterID := parts[2]
+		if err := pathutil.ValidateID(characterID); err != nil {
+			http.Error(w, "invalid character id", http.StatusBadRequest)
+			return
+		}
 		if len(parts) >= 4 && parts[3] == "portrait" {
 			if r.Method == http.MethodPost {
 				dto, err := s.service.RegenerateCharacterPortrait(r.Context(), gameID, characterID)
@@ -786,6 +800,10 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		entityID := parts[2]
+		if err := pathutil.ValidateID(entityID); err != nil {
+			http.Error(w, "invalid entity id", http.StatusBadRequest)
+			return
+		}
 		if len(parts) >= 4 && parts[3] == "turns" && r.Method == http.MethodGet {
 			turns, err := s.service.GetEntityTurns(r.Context(), gameID, entityID)
 			if err != nil {
@@ -847,6 +865,10 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			}
 			if strings.TrimSpace(req.Into) == "" {
 				http.Error(w, "a merge needs a note to merge into", http.StatusBadRequest)
+				return
+			}
+			if err := pathutil.ValidateID(req.Into); err != nil {
+				http.Error(w, "invalid target id", http.StatusBadRequest)
 				return
 			}
 			if !req.Confirm {
@@ -951,6 +973,10 @@ func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing system id", http.StatusBadRequest)
 		return
 	}
+	if err := pathutil.ValidateID(id); err != nil {
+		http.Error(w, "invalid system id", http.StatusBadRequest)
+		return
+	}
 
 	switch r.Method {
 	case http.MethodGet:
@@ -1019,10 +1045,18 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	worldID := parts[0]
+	if err := pathutil.ValidateID(worldID); err != nil {
+		http.Error(w, "invalid world id", http.StatusBadRequest)
+		return
+	}
 
 	// Check if this is an entity route: /api/world/:worldID/entity/:entityID
 	if len(parts) >= 3 && parts[1] == "entity" {
 		entityID := parts[2]
+		if err := pathutil.ValidateID(entityID); err != nil {
+			http.Error(w, "invalid entity id", http.StatusBadRequest)
+			return
+		}
 		switch r.Method {
 		case http.MethodGet:
 			ent, err := s.service.GetWorldEntity(r.Context(), worldID, entityID)

@@ -11,6 +11,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
@@ -147,16 +148,22 @@ func (w *PortraitWorker) writePortrait(ctx context.Context, gameID string, ent *
 		version = 2
 	}
 
-	relPath := filepath.Join("assets", "portraits", fmt.Sprintf("%s-v%d%s", ent.ID, version, ext))
-	fullPath := filepath.Join(w.resolver.GameDir(gameID), relPath)
+	safeID := pathutil.SanitizeID(ent.ID)
+	fileName := fmt.Sprintf("%s-v%d%s", safeID, version, ext)
+	relPath := filepath.Join("assets", "portraits", fileName)
+	portraitsDir := filepath.Join(w.resolver.GameDir(gameID), "assets", "portraits")
+	fullPath, err := pathutil.ResolveSafeChild(portraitsDir, fileName)
+	if err != nil {
+		return "", fmt.Errorf("invalid portrait path: %w", err)
+	}
 
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+	if err := os.MkdirAll(portraitsDir, 0755); err != nil {
 		return "", fmt.Errorf("create portrait dir: %w", err)
 	}
 	if err := os.WriteFile(fullPath, imgBytes, 0644); err != nil {
 		return "", fmt.Errorf("write portrait: %w", err)
 	}
-	w.removeStalePortraits(gameID, ent.ID, version, ext)
+	w.removeStalePortraits(gameID, safeID, version, ext)
 
 	if err := w.updateNote(gameID, ent, relPath, version); err != nil {
 		return "", err
@@ -171,19 +178,27 @@ func (w *PortraitWorker) writePortrait(ctx context.Context, gameID string, ent *
 }
 
 func (w *PortraitWorker) removeStalePortraits(gameID, id string, version int, keepExt string) {
+	safeID := pathutil.SanitizeID(id)
 	dir := filepath.Join(w.resolver.GameDir(gameID), "assets", "portraits")
 	for _, ext := range portraitExtensions {
 		if ext == keepExt {
 			continue
 		}
-		_ = os.Remove(filepath.Join(dir, fmt.Sprintf("%s-v%d%s", id, version, ext)))
+		if p, err := pathutil.ResolveSafeChild(dir, fmt.Sprintf("%s-v%d%s", safeID, version, ext)); err == nil {
+			_ = os.Remove(p)
+		}
 	}
 }
 
 // updateNote writes the portrait path into the entity's note frontmatter,
 // preferring the on-disk note so a hand edit is not clobbered.
 func (w *PortraitWorker) updateNote(gameID string, ent *entity.Entity, relPath string, version int) error {
-	notePath := filepath.Join(w.resolver.GameDir(gameID), "entities", ent.ID+".md")
+	safeID := pathutil.SanitizeID(ent.ID)
+	entitiesDir := filepath.Join(w.resolver.GameDir(gameID), "entities")
+	notePath, err := pathutil.ResolveSafeChild(entitiesDir, safeID+".md")
+	if err != nil {
+		return fmt.Errorf("invalid note path: %w", err)
+	}
 	if existingData, err := os.ReadFile(notePath); err == nil {
 		if existingEnt, err := entity.ParseMarkdownEntity(existingData); err == nil {
 			if existingEnt.Portrait != "" && existingEnt.Portrait != relPath {

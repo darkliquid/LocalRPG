@@ -467,6 +467,6 @@ func (s *Service) sentenceStreamerFor(ctx context.Context, gameID string, cfg *c
 	}
 	streamer := newSentenceStreamer(ctx, pipeline, s.narratorVoiceFor(gameID, cfg), s.logger, 2, emit)
 	streamer.SetVoiceResolver(s.voiceFor(gameID))
-	streamer.SetGrouping(s.liveGrouping(cfg, pipeline), media.LiveGroupCaps(pipeline.GroupCaps()))
+	streamer.SetGrouping(s.liveGrouping(cfg), pipeline.GroupCaps())
 	return streamer
 }

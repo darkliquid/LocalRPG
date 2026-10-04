@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
@@ -87,6 +88,12 @@ type webPayload struct {
 
 // Export writes one self-contained page to outPath and returns it.
 func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath string) (string, error) {
+	cleanOut, err := pathutil.ValidateUserPath(outPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid export output path: %w", err)
+	}
+	outPath = cleanOut
+
 	if script == nil || len(script.Scenes) == 0 {
 		return "", fmt.Errorf("script has no scenes to export")
 	}

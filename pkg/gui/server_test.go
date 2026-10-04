@@ -1320,3 +1320,27 @@ func TestProviderCatalogEndpoint(t *testing.T) {
 		}
 	}
 }
+
+func TestRoutePathTraversalRejection(t *testing.T) {
+	svc := NewService(t.TempDir())
+	server := NewServer(svc, http.NotFoundHandler())
+
+	maliciousPaths := []string{
+		"/api/game/..%2F..%2Fetc/state",
+		"/api/game/test-game/entity/..%2F..%2Fsecret",
+		"/api/game/test-game/character/..%2F..%2Fportrait/portrait",
+		"/api/world/..%2F..%2Fetc",
+		"/api/world/test-world/entity/..%2F..%2Fsecret",
+		"/api/system/..%2F..%2Fetc",
+	}
+
+	for _, path := range maliciousPaths {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("GET %s returned code %d, expected 400 Bad Request", path, rec.Code)
+		}
+	}
+}

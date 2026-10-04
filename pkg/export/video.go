@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/media/webm"
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
@@ -135,6 +136,12 @@ func (v *VideoPipeline) SetProgress(fn scene.ProgressFunc) { v.progress = fn }
 // RenderVideo draws every frame, muxes the campaign's audio, and renames the
 // result into place, so a failed or cancelled render leaves no file behind.
 func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, outputFile string) error {
+	cleanOut, err := pathutil.ValidateUserPath(outputFile)
+	if err != nil {
+		return fmt.Errorf("invalid video output path: %w", err)
+	}
+	outputFile = cleanOut
+
 	if script == nil || len(script.Scenes) == 0 {
 		return fmt.Errorf("render video: script has no scenes")
 	}
