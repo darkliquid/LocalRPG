@@ -7,6 +7,7 @@ import { AIGenerateButton } from '../ui/AIGenerateButton';
 import { VoiceProfileSelect } from '../VoiceProfileSelect';
 import { useMountTransition } from '../../hooks/useMountTransition';
 import { slugify } from '../../lib/slug';
+import { safeImagePreview } from '../../utils/security';
 
 interface NewCampaignModalProps {
   isOpen: boolean;
@@ -619,8 +620,8 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   onClick={() => bannerInputRef.current?.click()}
                   className="w-full h-16 rounded-xl border border-dashed border-white/20 hover:border-purple-400/60 bg-white/[0.02] flex items-center justify-center text-xs font-sans text-stone-300 hover:text-white transition-all cursor-pointer overflow-hidden"
                 >
-                  {bannerPreview ? (
-                    <img src={bannerPreview} alt="Banner Preview" className="w-full h-full object-cover" />
+                  {safeImagePreview(bannerPreview) ? (
+                    <img src={safeImagePreview(bannerPreview)} alt="Banner Preview" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-stone-500 text-xs">No Banner Selected</span>
                   )}
@@ -660,8 +661,8 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   onClick={() => iconInputRef.current?.click()}
                   className="w-full h-16 rounded-xl border border-dashed border-white/20 hover:border-purple-400/60 bg-white/[0.02] flex items-center justify-center text-xs font-sans text-stone-300 hover:text-white transition-all cursor-pointer overflow-hidden"
                 >
-                  {iconPreview ? (
-                    <img src={iconPreview} alt="Icon Preview" className="w-12 h-12 rounded-lg object-cover" />
+                  {safeImagePreview(iconPreview) ? (
+                    <img src={safeImagePreview(iconPreview)} alt="Icon Preview" className="w-12 h-12 rounded-lg object-cover" />
                   ) : (
                     <span className="text-stone-500 text-xs">No Icon Selected</span>
                   )}

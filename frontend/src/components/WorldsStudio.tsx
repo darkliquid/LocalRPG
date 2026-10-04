@@ -8,6 +8,7 @@ import { useLightbox } from '../hooks/useLightbox';
 import { ImageLightbox } from './ImageLightbox';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
+import { safeImagePreview } from '../utils/security';
 
 interface WorldsStudioProps {
   onWorldSaved?: () => void;
@@ -868,9 +869,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                       bannerPreview ? 'cursor-zoom-in' : 'cursor-pointer'
                     }`}
                   >
-                    {bannerPreview ? (
+                    {safeImagePreview(bannerPreview) ? (
                       <img
-                        src={bannerPreview}
+                        src={safeImagePreview(bannerPreview)}
                         alt="Banner Preview"
                         className="w-full h-full object-cover"
                         onError={() => setBannerPreview(null)}
@@ -925,9 +926,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                       iconPreview ? 'cursor-zoom-in' : 'cursor-pointer'
                     }`}
                   >
-                    {iconPreview ? (
+                    {safeImagePreview(iconPreview) ? (
                       <img
-                        src={iconPreview}
+                        src={safeImagePreview(iconPreview)}
                         alt="Icon Preview"
                         className="w-16 h-16 rounded-xl object-cover"
                         onError={() => setIconPreview(null)}
