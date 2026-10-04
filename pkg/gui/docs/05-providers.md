@@ -96,6 +96,7 @@ LocalRPG protects you from runaway API costs and service interruptions:
 
 For step-by-step local service installation guides, see:
 
+- [Fully Local AI Stack with Docker Compose](19-local-stack-docker-compose) (all four services in one Compose project)
 - [Setting Up Ollama for Local LLMs](14-local-llm-ollama)
 - [Setting Up Kokoro-FastAPI for Neural TTS](15-local-tts-kokoro)
 - [Setting Up Fish Audio S2 with vLLM-Omni](16-local-tts-fish-audio)

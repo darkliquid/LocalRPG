@@ -1,0 +1,36 @@
+# NVIDIA GPU override for docker/compose.local.yml.
+#
+#   docker compose -f docker/compose.local.yml -f docker/compose.gpu.yml up -d
+#
+# Requires the NVIDIA Container Toolkit on the host (Linux) or the WSL2 backend
+# with a recent CUDA driver on Windows. Apple Silicon cannot pass Metal through
+# a container, so on a Mac run Ollama and ComfyUI natively and keep only the CPU
+# containers from docker/compose.local.yml.
+
+x-nvidia-gpu: &nvidia-gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  ollama:
+    <<: *nvidia-gpu
+
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
+    <<: *nvidia-gpu
+
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cuda
+    environment:
+      WHISPER_MODEL: Systran/faster-whisper-small
+      WHISPER__COMPUTE_TYPE: float16
+    <<: *nvidia-gpu
+
+  comfyui:
+    image: yanwk/comfyui-boot:cu130-slim-v2
+    <<: *nvidia-gpu

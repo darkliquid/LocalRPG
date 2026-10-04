@@ -1,0 +1,64 @@
+# LocalRPG fully-local AI stack, CPU baseline.
+#
+#   docker compose -f docker/compose.local.yml up -d
+#
+# Every service binds to 127.0.0.1, so nothing on this stack is reachable from
+# the local network. On an NVIDIA host, layer the GPU override on top:
+#
+#   docker compose -f docker/compose.local.yml -f docker/compose.gpu.yml up -d
+#
+# Models, system requirements, and the matching LocalRPG configuration are in
+# pkg/gui/docs/19-local-stack-docker-compose.md.
+
+name: localrpg-local-ai
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: localrpg-ollama
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: localrpg-kokoro
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8880:8880"
+
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cpu
+    container_name: localrpg-whisper
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      WHISPER_MODEL: Systran/faster-whisper-small
+      WHISPER__COMPUTE_TYPE: int8
+    volumes:
+      - whisper-models:/root/.cache/huggingface
+
+  comfyui:
+    image: yanwk/comfyui-boot:cpu
+    container_name: localrpg-comfyui
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8188:8188"
+    volumes:
+      - comfyui-models:/root/ComfyUI/models
+      - comfyui-output:/root/ComfyUI/output
+
+volumes:
+  ollama-models:
+  whisper-models:
+  comfyui-models:
+  comfyui-output:

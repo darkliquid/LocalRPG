@@ -34,16 +34,49 @@ Ensure your target checkpoint (for example `sd_xl_base_1.0.safetensors` or a fan
 
 ### Option B: Running via Docker
 
+The community `yanwk/comfyui-boot` image installs ComfyUI at `/root/ComfyUI`, so
+checkpoints belong in `/root/ComfyUI/models/checkpoints` and generated images land
+in `/root/ComfyUI/output`.
+
 ```bash
 docker run -d \
   --name comfyui \
   --restart always \
   --gpus all \
   -p 8188:8188 \
-  -v ~/comfyui/models:/app/models \
-  -v ~/comfyui/output:/app/output \
-  yanwk/comfyui-boot:latest
+  -v ~/comfyui/models:/root/ComfyUI/models \
+  -v ~/comfyui/output:/root/ComfyUI/output \
+  yanwk/comfyui-boot:cu130-slim-v2
 ```
+
+The image publishes no `latest` tag, so pick the variant that matches your
+hardware: `cu130-slim-v2` for a current NVIDIA driver, `cu126-slim` for an older
+CUDA driver, `rocm7` for AMD on Linux, and `cpu` when there is no GPU. The CUDA
+tags require the NVIDIA Container Toolkit on the host.
+
+### Docker Compose (`docker-compose.yml`)
+
+```yaml
+services:
+  comfyui:
+    image: yanwk/comfyui-boot:cu130-slim-v2 # or cu126-slim, rocm7, cpu
+    container_name: comfyui
+    restart: always
+    ports:
+      - "127.0.0.1:8188:8188"
+    volumes:
+      - ~/comfyui/models:/root/ComfyUI/models
+      - ~/comfyui/output:/root/ComfyUI/output
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+```
+
+Drop the `deploy` block when you use a CPU or ROCm image.
 
 ## 3. Verify Server Health
 

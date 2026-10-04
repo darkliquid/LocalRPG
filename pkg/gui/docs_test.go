@@ -81,6 +81,7 @@ func TestDocsService_GetDocArticle(t *testing.T) {
 		"16-local-tts-fish-audio",
 		"17-local-stt-whisper",
 		"18-local-image-comfyui",
+		"19-local-stack-docker-compose",
 	}
 	for _, docID := range localDocIDs {
 		art, err := svc.GetDocArticle(context.Background(), docID)
