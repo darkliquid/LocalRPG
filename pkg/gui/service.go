@@ -28,6 +28,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/media/playback"
 	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/paths"
+	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -928,6 +929,13 @@ func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySumm
 }
 
 func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*EntityDTO, error) {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return nil, fmt.Errorf("invalid game id: %w", err)
+	}
+	if err := pathutil.ValidateID(entityID); err != nil {
+		return nil, fmt.Errorf("invalid entity id: %w", err)
+	}
+
 	gameDir := s.resolver.GameDir(gameID)
 	path := filepath.Join(gameDir, "entities", entityID+".md")
 	data, err := os.ReadFile(path)
@@ -972,6 +980,13 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 }
 
 func (s *Service) SaveEntity(ctx context.Context, gameID, entityID, rawMarkdown string) error {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return fmt.Errorf("invalid game id: %w", err)
+	}
+	if err := pathutil.ValidateID(entityID); err != nil {
+		return fmt.Errorf("invalid entity id: %w", err)
+	}
+
 	ent, err := entity.ParseMarkdownEntity([]byte(rawMarkdown))
 	if err != nil {
 		return fmt.Errorf("save entity %q: %w", entityID, err)
@@ -1006,6 +1021,15 @@ func (s *Service) SaveEntity(ctx context.Context, gameID, entityID, rawMarkdown 
 // It is deliberately explicit. Deciding that two names are one being is a judgement
 // the engine cannot make, but it can carry the decision out once a player makes it.
 func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID string) (*EntityDTO, error) {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return nil, fmt.Errorf("invalid game id: %w", err)
+	}
+	if err := pathutil.ValidateID(sourceID); err != nil {
+		return nil, fmt.Errorf("invalid source id: %w", err)
+	}
+	if err := pathutil.ValidateID(targetID); err != nil {
+		return nil, fmt.Errorf("invalid target id: %w", err)
+	}
 	if sourceID == targetID {
 		return nil, fmt.Errorf("cannot merge %q into itself", sourceID)
 	}
@@ -3148,10 +3172,16 @@ func contentTypeForArt(path string) string {
 }
 
 func findAssetFile(dir string, name string) (string, string) {
+	if err := pathutil.ValidateID(name); err != nil {
+		return "", ""
+	}
 	assetsDir := filepath.Join(dir, "assets")
 	exts := []string{".png", ".webp", ".jpg", ".jpeg", ".svg"}
 	for _, ext := range exts {
-		path := filepath.Join(assetsDir, name+ext)
+		path, err := pathutil.ResolveSafeChild(assetsDir, name+ext)
+		if err != nil {
+			continue
+		}
 		if fi, err := os.Stat(path); err == nil && !fi.IsDir() {
 			return path, ext
 		}
@@ -3497,6 +3527,10 @@ func (s *Service) UpdateGameSettings(ctx context.Context, gameID string, patch m
 // taken first so a turn in flight finishes or is refused rather than writing into
 // a directory that is being deleted.
 func (s *Service) DeleteGame(ctx context.Context, gameID string) error {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return fmt.Errorf("invalid game id: %w", err)
+	}
+
 	lock := s.gameLock(gameID)
 	if !lock.TryLock() {
 		return ErrTurnInFlight
@@ -3523,6 +3557,10 @@ func (s *Service) DeleteGame(ctx context.Context, gameID string) error {
 // identity, system, world, protagonist, opening prompt, and pinned start location
 // are carried across.
 func (s *Service) RestartGame(ctx context.Context, gameID string) (*GameSummaryDTO, error) {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return nil, fmt.Errorf("invalid game id: %w", err)
+	}
+
 	lock := s.gameLock(gameID)
 	if !lock.TryLock() {
 		return nil, ErrTurnInFlight
@@ -3669,6 +3707,10 @@ function evaluateRoll(stats, diceExpr) {
 `
 
 func (s *Service) GetSystem(ctx context.Context, id string) (*SystemDetailDTO, error) {
+	if err := pathutil.ValidateID(id); err != nil {
+		return nil, fmt.Errorf("invalid system id: %w", err)
+	}
+
 	sysDir := s.resolver.SystemDir(id)
 	m, err := core.LoadSystemManifest(filepath.Join(sysDir, "system.yaml"))
 	if err != nil {
@@ -3703,6 +3745,9 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 	id := req.ID
 	if id == "" {
 		id = slugify(req.Name)
+	}
+	if err := pathutil.ValidateID(id); err != nil {
+		return nil, fmt.Errorf("invalid system id %q: %w", id, err)
 	}
 	if req.Version == "" {
 		req.Version = "1.0.0"
@@ -3750,6 +3795,10 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 }
 
 func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, error) {
+	if err := pathutil.ValidateID(id); err != nil {
+		return nil, fmt.Errorf("invalid world id: %w", err)
+	}
+
 	worldDir := s.resolver.WorldDir(id)
 	m, err := core.LoadWorldManifest(filepath.Join(worldDir, "world.yaml"))
 	if err != nil {
@@ -3822,6 +3871,9 @@ func (s *Service) writeWorld(ctx context.Context, req CreateWorldRequestDTO) (*W
 	if id == "" {
 		id = slugify(req.Name)
 	}
+	if err := pathutil.ValidateID(id); err != nil {
+		return nil, fmt.Errorf("invalid world id %q: %w", id, err)
+	}
 
 	worldDir := s.resolver.WorldDir(id)
 	if err := os.MkdirAll(filepath.Join(worldDir, "entities"), 0755); err != nil {
@@ -3886,6 +3938,13 @@ func (s *Service) UpdateWorld(ctx context.Context, req CreateWorldRequestDTO) (*
 }
 
 func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) (*WorldEntityDetailDTO, error) {
+	if err := pathutil.ValidateID(worldID); err != nil {
+		return nil, fmt.Errorf("invalid world id: %w", err)
+	}
+	if err := pathutil.ValidateID(entityID); err != nil {
+		return nil, fmt.Errorf("invalid entity id: %w", err)
+	}
+
 	path := filepath.Join(s.resolver.WorldDir(worldID), "entities", entityID+".md")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -3898,6 +3957,13 @@ func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) 
 }
 
 func (s *Service) SaveWorldEntity(ctx context.Context, worldID, entityID, markdown string) error {
+	if err := pathutil.ValidateID(worldID); err != nil {
+		return fmt.Errorf("invalid world id: %w", err)
+	}
+	if err := pathutil.ValidateID(entityID); err != nil {
+		return fmt.Errorf("invalid entity id: %w", err)
+	}
+
 	dir := filepath.Join(s.resolver.WorldDir(worldID), "entities")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("create world entities dir: %w", err)
@@ -3907,6 +3973,13 @@ func (s *Service) SaveWorldEntity(ctx context.Context, worldID, entityID, markdo
 }
 
 func (s *Service) DeleteWorldEntity(ctx context.Context, worldID, entityID string) error {
+	if err := pathutil.ValidateID(worldID); err != nil {
+		return fmt.Errorf("invalid world id: %w", err)
+	}
+	if err := pathutil.ValidateID(entityID); err != nil {
+		return fmt.Errorf("invalid entity id: %w", err)
+	}
+
 	path := filepath.Join(s.resolver.WorldDir(worldID), "entities", entityID+".md")
 	return os.Remove(path)
 }
@@ -3945,6 +4018,13 @@ func (s *Service) appVersion() string {
 }
 
 func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*SettingsResponseDTO, error) {
+	for _, p := range []string{cfg.Paths.Systems, cfg.Paths.Worlds, cfg.Paths.Games, cfg.Paths.Cache} {
+		if p != "" {
+			if _, err := pathutil.ValidateUserPath(p); err != nil {
+				return nil, fmt.Errorf("invalid path %q: %w", p, err)
+			}
+		}
+	}
 	if err := s.validateVoiceOptionsInConfig(&cfg); err != nil {
 		return nil, fmt.Errorf("validate tts options: %w", err)
 	}
@@ -4210,6 +4290,12 @@ func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string
 }
 
 func (s *Service) GetGameAsset(gameID, assetKind string) (string, string, error) {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return "", "", fmt.Errorf("invalid game id: %w", err)
+	}
+	if err := pathutil.ValidateID(assetKind); err != nil {
+		return "", "", fmt.Errorf("invalid asset kind: %w", err)
+	}
 	gameDir := s.resolver.GameDir(gameID)
 	if _, err := os.Stat(gameDir); err != nil {
 		return "", "", os.ErrNotExist
@@ -4222,6 +4308,12 @@ func (s *Service) GetGameAsset(gameID, assetKind string) (string, string, error)
 }
 
 func (s *Service) GetWorldAsset(worldID, assetKind string) (string, string, error) {
+	if err := pathutil.ValidateID(worldID); err != nil {
+		return "", "", fmt.Errorf("invalid world id: %w", err)
+	}
+	if err := pathutil.ValidateID(assetKind); err != nil {
+		return "", "", fmt.Errorf("invalid asset kind: %w", err)
+	}
 	worldDir := s.resolver.WorldDir(worldID)
 	if _, err := os.Stat(worldDir); err != nil {
 		return "", "", os.ErrNotExist
@@ -4234,6 +4326,12 @@ func (s *Service) GetWorldAsset(worldID, assetKind string) (string, string, erro
 }
 
 func (s *Service) SaveGameAsset(gameID, assetKind string, data []byte, ext string) (string, error) {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return "", fmt.Errorf("invalid game id: %w", err)
+	}
+	if err := pathutil.ValidateID(assetKind); err != nil {
+		return "", fmt.Errorf("invalid asset kind: %w", err)
+	}
 	gameDir := s.resolver.GameDir(gameID)
 	if _, err := os.Stat(gameDir); err != nil {
 		return "", fmt.Errorf("game not found: %w", err)
@@ -4252,7 +4350,10 @@ func (s *Service) SaveGameAsset(gameID, assetKind string, data []byte, ext strin
 	if !strings.HasPrefix(ext, ".") {
 		ext = "." + ext
 	}
-	targetPath := filepath.Join(assetsDir, assetKind+ext)
+	targetPath, err := pathutil.ResolveSafeChild(assetsDir, assetKind+ext)
+	if err != nil {
+		return "", fmt.Errorf("invalid asset path: %w", err)
+	}
 	if err := os.WriteFile(targetPath, data, 0644); err != nil {
 		return "", fmt.Errorf("write asset: %w", err)
 	}
@@ -4260,6 +4361,12 @@ func (s *Service) SaveGameAsset(gameID, assetKind string, data []byte, ext strin
 }
 
 func (s *Service) SaveWorldAsset(worldID, assetKind string, data []byte, ext string) (string, error) {
+	if err := pathutil.ValidateID(worldID); err != nil {
+		return "", fmt.Errorf("invalid world id: %w", err)
+	}
+	if err := pathutil.ValidateID(assetKind); err != nil {
+		return "", fmt.Errorf("invalid asset kind: %w", err)
+	}
 	worldDir := s.resolver.WorldDir(worldID)
 	if _, err := os.Stat(worldDir); err != nil {
 		return "", fmt.Errorf("world not found: %w", err)
@@ -4278,7 +4385,10 @@ func (s *Service) SaveWorldAsset(worldID, assetKind string, data []byte, ext str
 	if !strings.HasPrefix(ext, ".") {
 		ext = "." + ext
 	}
-	targetPath := filepath.Join(assetsDir, assetKind+ext)
+	targetPath, err := pathutil.ResolveSafeChild(assetsDir, assetKind+ext)
+	if err != nil {
+		return "", fmt.Errorf("invalid asset path: %w", err)
+	}
 	if err := os.WriteFile(targetPath, data, 0644); err != nil {
 		return "", fmt.Errorf("write asset: %w", err)
 	}
@@ -4342,6 +4452,12 @@ func (s *Service) GenerateAssetPreview(ctx context.Context, req GenerateAssetPre
 }
 
 func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req GenerateAssetRequestDTO) (string, error) {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return "", fmt.Errorf("invalid game id: %w", err)
+	}
+	if err := pathutil.ValidateID(req.Kind); err != nil {
+		return "", fmt.Errorf("invalid asset kind: %w", err)
+	}
 	prompt := req.Prompt
 	if prompt == "" {
 		gameDir := s.resolver.GameDir(gameID)
@@ -4369,6 +4485,12 @@ func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req Gene
 }
 
 func (s *Service) GenerateWorldAsset(ctx context.Context, worldID string, req GenerateAssetRequestDTO) (string, error) {
+	if err := pathutil.ValidateID(worldID); err != nil {
+		return "", fmt.Errorf("invalid world id: %w", err)
+	}
+	if err := pathutil.ValidateID(req.Kind); err != nil {
+		return "", fmt.Errorf("invalid asset kind: %w", err)
+	}
 	prompt := req.Prompt
 	if prompt == "" {
 		worldDir := s.resolver.WorldDir(worldID)

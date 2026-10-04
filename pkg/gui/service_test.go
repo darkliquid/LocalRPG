@@ -1313,3 +1313,58 @@ func TestTurnDTO_SceneBreakAndAnchoredSpeakerPortraits(t *testing.T) {
 	}
 }
 
+func TestServiceRejectsInvalidIDs(t *testing.T) {
+	_, svc := setupTestGame(t)
+	ctx := context.Background()
+
+	traversalID := "../escaped"
+
+	if _, err := svc.GetEntity(ctx, "valid-game", traversalID); err == nil {
+		t.Error("GetEntity expected error for traversal entityID, got nil")
+	}
+	if err := svc.SaveEntity(ctx, "valid-game", traversalID, "markdown"); err == nil {
+		t.Error("SaveEntity expected error for traversal entityID, got nil")
+	}
+	if _, err := svc.MergeEntities(ctx, "valid-game", traversalID, "target"); err == nil {
+		t.Error("MergeEntities expected error for traversal sourceID, got nil")
+	}
+	if _, err := svc.MergeEntities(ctx, "valid-game", "source", traversalID); err == nil {
+		t.Error("MergeEntities expected error for traversal targetID, got nil")
+	}
+	if err := svc.DeleteGame(ctx, traversalID); err == nil {
+		t.Error("DeleteGame expected error for traversal gameID, got nil")
+	}
+	if _, err := svc.GetWorldEntity(ctx, "valid-world", traversalID); err == nil {
+		t.Error("GetWorldEntity expected error for traversal entityID, got nil")
+	}
+	if _, _, err := svc.GetGameAsset(traversalID, "banner"); err == nil {
+		t.Error("GetGameAsset expected error for traversal gameID, got nil")
+	}
+	if _, _, err := svc.GetGameAsset("valid-game", traversalID); err == nil {
+		t.Error("GetGameAsset expected error for traversal assetKind, got nil")
+	}
+	if _, err := svc.SaveGameAsset(traversalID, "banner", []byte("data"), ".png"); err == nil {
+		t.Error("SaveGameAsset expected error for traversal gameID, got nil")
+	}
+	if _, err := svc.SaveGameAsset("valid-game", traversalID, []byte("data"), ".png"); err == nil {
+		t.Error("SaveGameAsset expected error for traversal assetKind, got nil")
+	}
+	if _, _, err := svc.GetWorldAsset(traversalID, "banner"); err == nil {
+		t.Error("GetWorldAsset expected error for traversal worldID, got nil")
+	}
+	if _, _, err := svc.GetWorldAsset("valid-world", traversalID); err == nil {
+		t.Error("GetWorldAsset expected error for traversal assetKind, got nil")
+	}
+	if _, err := svc.SaveWorldAsset(traversalID, "banner", []byte("data"), ".png"); err == nil {
+		t.Error("SaveWorldAsset expected error for traversal worldID, got nil")
+	}
+	if _, err := svc.SaveWorldAsset("valid-world", traversalID, []byte("data"), ".png"); err == nil {
+		t.Error("SaveWorldAsset expected error for traversal assetKind, got nil")
+	}
+	if _, err := svc.GetSystem(ctx, traversalID); err == nil {
+		t.Error("GetSystem expected error for traversal id, got nil")
+	}
+	if _, err := svc.GetWorld(ctx, traversalID); err == nil {
+		t.Error("GetWorld expected error for traversal id, got nil")
+	}
+}
