@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -10,12 +10,32 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import type { EntitySummary, FolderNode } from '../types';
 import {
-  DeleteFolderDialog,
-  FolderNameDialog,
-  MoveNoteDialog,
-} from './TreeDialogs';
+  createOnDropHandler,
+  dragAndDropFeature,
+  expandAllFeature,
+  hotkeysCoreFeature,
+  propMemoizationFeature,
+  selectionFeature,
+  syncDataLoaderFeature,
+  type ItemInstance,
+  type TreeConfig,
+} from '@headless-tree/core';
+import { useTree } from '@headless-tree/react';
+import type { EntitySummary, FolderNode } from '../types';
+import { DeleteFolderDialog, FolderNameDialog, MoveNoteDialog } from './TreeDialogs';
+import {
+  ROOT_LABEL,
+  buildIndex,
+  childrenOf,
+  countNotesUnder,
+  folderItemId,
+  leafOf,
+  movesForChildren,
+  noteItemId,
+  parentOf,
+  type TreeItem,
+} from './treeModel';
 
 interface EntityTreeProps {
   folders: FolderNode[];
@@ -28,68 +48,6 @@ interface EntityTreeProps {
   onDeleteFolder: (path: string) => void;
 }
 
-// groupByFolder is pure, so the shape of the tree is reviewable without a browser.
-export function groupByFolder(entities: EntitySummary[]): Map<string, EntitySummary[]> {
-  const byFolder = new Map<string, EntitySummary[]>();
-  for (const entity of entities) {
-    const folder = entity.folder ?? '';
-    const bucket = byFolder.get(folder);
-    if (bucket) {
-      bucket.push(entity);
-    } else {
-      byFolder.set(folder, [entity]);
-    }
-  }
-  for (const bucket of byFolder.values()) {
-    bucket.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-  }
-  return byFolder;
-}
-
-// noteIdFor resolves a link target to a note id, falling back to the final path
-// segment so a hand-written [[guilds/silver-hand]] still lands.
-export function noteIdFor(target: string, known: Set<string>): string | undefined {
-  const trimmed = target.trim();
-  if (known.has(trimmed)) return trimmed;
-  const base = trimmed.slice(trimmed.lastIndexOf('/') + 1).trim();
-  return known.has(base) ? base : undefined;
-}
-
-// parentOf is the folder a path sits inside, which is where a rename has to put it.
-export function parentOf(path: string): string {
-  const idx = path.lastIndexOf('/');
-  return idx === -1 ? '' : path.slice(0, idx);
-}
-
-// leafOf is the folder's own name, the part a rename edits.
-export function leafOf(path: string): string {
-  const idx = path.lastIndexOf('/');
-  return idx === -1 ? path : path.slice(idx + 1);
-}
-
-// moveData is the drag payload. It is written into dataTransfer because a drag
-// with no data never fires a drop in some browsers.
-export const MOVE_MIME = 'application/x-localrpg-move';
-
-export interface MovePayload {
-  kind: 'note' | 'folder';
-  id: string;
-}
-
-export function encodeMove(payload: MovePayload): string {
-  return JSON.stringify(payload);
-}
-
-export function decodeMove(raw: string): MovePayload | null {
-  try {
-    const parsed = JSON.parse(raw) as MovePayload;
-    if (parsed?.kind === 'note' || parsed?.kind === 'folder') return parsed;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 type DialogState =
   | { kind: 'none' }
   | { kind: 'create'; parent: string }
@@ -97,6 +55,10 @@ type DialogState =
   | { kind: 'delete'; path: string }
   | { kind: 'move-note'; entity: EntitySummary };
 
+// EntityTree renders the folder tree. Placement, dragging, keyboard navigation and
+// the drag line come from Headless Tree; what this file owns is the markup, the
+// Tailwind styling and the translation of a drop into the two calls the server
+// understands. The model it reads lives in treeModel.ts.
 export default function EntityTree({
   folders,
   entities,
@@ -107,227 +69,224 @@ export default function EntityTree({
   onCreateFolder,
   onDeleteFolder,
 }: EntityTreeProps) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState>({ kind: 'none' });
-  const [dragging, setDragging] = useState<MovePayload | null>(null);
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
 
-  const byFolder = useMemo(() => groupByFolder(entities), [entities]);
   const needle = filter.trim().toLowerCase();
-  const matches = (entity: EntitySummary) =>
-    needle === '' ||
-    entity.name.toLowerCase().includes(needle) ||
-    entity.id.toLowerCase().includes(needle) ||
-    (entity.aliases ?? []).some((alias) => alias.toLowerCase().includes(needle));
+  // The filter narrows notes only. Folders stay visible, so a match inside a
+  // collapsed folder is still reachable.
+  const visibleEntities = useMemo(
+    () =>
+      needle === ''
+        ? entities
+        : entities.filter(
+            (entity) =>
+              entity.name.toLowerCase().includes(needle) ||
+              entity.id.toLowerCase().includes(needle) ||
+              (entity.aliases ?? []).some((alias) => alias.toLowerCase().includes(needle)),
+          ),
+    [entities, needle],
+  );
 
-  const toggle = (path: string) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
+  const index = useMemo(() => buildIndex(folders, visibleEntities), [folders, visibleEntities]);
+
+  // The drop handler is rebuilt every render so it always closes over the current
+  // index and children. Headless Tree does the placement arithmetic and hands back
+  // the new children of the parent that gained an item; the model turns that
+  // difference into moves.
+  const config: TreeConfig<TreeItem> = {
+    rootItemId: folderItemId(''),
+    indent: 12,
+    getItemName: (item) => item.getItemData().name,
+    isItemFolder: (item) => item.getItemData().kind === 'folder',
+    dataLoader: {
+      getItem: (id) => index.get(id) as TreeItem,
+      getChildren: (id) => childrenOf(folders, visibleEntities, index.get(id)?.folderPath ?? ''),
+    },
+    features: [
+      syncDataLoaderFeature,
+      selectionFeature,
+      hotkeysCoreFeature,
+      dragAndDropFeature,
+      expandAllFeature,
+      propMemoizationFeature,
+    ],
+    initialState: { expandedItems: [folderItemId('')] },
+    onDrop: createOnDropHandler((parent: ItemInstance<TreeItem>, newChildren: string[]) => {
+      const moves = movesForChildren(
+        folders,
+        visibleEntities,
+        index,
+        parent.getItemData().folderPath,
+        newChildren,
+      );
+      for (const move of moves.entities) onMoveEntity(move.id, move.folder);
+      for (const move of moves.folders) onMoveFolder(move.from, move.to);
+    }),
+  };
+
+  const tree = useTree<TreeItem>(config);
+
+  // The tree caches its structure, so a move made through the server has to be
+  // announced or the rows would keep their old parents.
+  const firstRun = useRef(true);
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    tree.rebuildTree();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folders, visibleEntities]);
+
+  // The selection lives in the tree, so the drawer's chosen note is pushed in.
+  useEffect(() => {
+    tree.setSelectedItems(selectedId ? [noteItemId(selectedId)] : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  // A menu closes on any click elsewhere, including one on another row.
+  useEffect(() => {
+    if (!menuFor) return;
+    const close = () => setMenuFor(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [menuFor]);
 
   const closeMenu = () => setMenuFor(null);
 
-  // countNotesUnder counts a folder and everything beneath it, so the delete
-  // dialog can say how much is about to go.
-  const countNotesUnder = (path: string): number => {
-    let total = (byFolder.get(path) ?? []).length;
-    const walk = (nodes: FolderNode[]) => {
-      for (const node of nodes) {
-        total += (byFolder.get(node.path) ?? []).length;
-        if (node.children) walk(node.children);
-      }
-    };
-    const find = (nodes: FolderNode[]): FolderNode | undefined => {
-      for (const node of nodes) {
-        if (node.path === path) return node;
-        const hit = node.children ? find(node.children) : undefined;
-        if (hit) return hit;
-      }
-      return undefined;
-    };
-    const self = find(folders);
-    if (self?.children) walk(self.children);
-    return total;
-  };
+  const renderRow = (item: ItemInstance<TreeItem>) => {
+    const data = item.getItemData();
+    const isFolder = data.kind === 'folder';
+    const isSelected = !isFolder && data.entity?.id === selectedId;
+    const key = item.getId();
 
-  const dropProps = (folder: string) => ({
-    onDragOver: (ev: React.DragEvent) => {
-      if (!dragging) return;
-      ev.preventDefault();
-      ev.dataTransfer.dropEffect = 'move';
-      setDropTarget(folder);
-    },
-    onDragLeave: () => setDropTarget((current) => (current === folder ? null : current)),
-    onDrop: (ev: React.DragEvent) => {
-      ev.preventDefault();
-      const raw = ev.dataTransfer.getData(MOVE_MIME);
-      const payload = decodeMove(raw) ?? dragging;
-      if (!payload) return;
-      if (payload.kind === 'note') {
-        onMoveEntity(payload.id, folder);
-      } else if (folder !== payload.id && !folder.startsWith(`${payload.id}/`)) {
-        onMoveFolder(payload.id, folder === '' ? leafOf(payload.id) : `${folder}/${leafOf(payload.id)}`);
-      }
-      setDragging(null);
-      setDropTarget(null);
-      closeMenu();
-    },
-  });
-
-  const dragProps = (payload: MovePayload) => ({
-    draggable: true,
-    onDragStart: (ev: React.DragEvent) => {
-      ev.dataTransfer.setData(MOVE_MIME, encodeMove(payload));
-      ev.dataTransfer.effectAllowed = 'move';
-      setDragging(payload);
-    },
-    onDragEnd: () => {
-      setDragging(null);
-      setDropTarget(null);
-    },
-  });
-
-  const menuButton = (key: string) => (
-    <button
-      type="button"
-      onClick={(ev) => {
-        ev.stopPropagation();
-        setMenuFor((current) => (current === key ? null : key));
-      }}
-      title="More actions"
-      className="shrink-0 cursor-pointer rounded p-0.5 text-stone-500 hover:text-stone-200"
-    >
-      <MoreVertical className="w-3 h-3" />
-    </button>
-  );
-
-  const renderNotes = (folder: string) =>
-    (byFolder.get(folder) ?? [])
-      .filter(matches)
-      .map((entity) => {
-        const key = `note:${entity.id}`;
-        return (
-          <div
-            key={entity.id}
-            {...dragProps({ kind: 'note', id: entity.id })}
-            onClick={() => onSelect(entity.id)}
-            className={`group flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-xs transition-colors ${
-              selectedId === entity.id
-                ? 'bg-purple-600/20 border border-purple-500/40 text-purple-100'
-                : 'border border-transparent hover:bg-black/30 text-stone-200'
-            }`}
+    return (
+      <div
+        key={key}
+        {...item.getProps()}
+        style={{ paddingLeft: `${item.getItemMeta().level * 12}px` }}
+        onClick={() => {
+          if (!isFolder && data.entity) onSelect(data.entity.id);
+        }}
+        className={`flex cursor-pointer items-center gap-1 rounded-lg border px-1 py-1 text-xs transition-colors ${
+          isSelected
+            ? 'border-purple-500/40 bg-purple-600/20 text-purple-100'
+            : item.isDragTarget()
+              ? 'border-purple-500/50 bg-purple-600/20 text-stone-100'
+              : 'border-transparent text-stone-200 hover:bg-black/30'
+        } ${item.isFocused() ? 'outline outline-1 outline-purple-500/40' : ''}`}
+      >
+        {isFolder ? (
+          <button
+            type="button"
+            onClick={(ev) => {
+              ev.stopPropagation();
+              if (item.isExpanded()) item.collapse();
+              else item.expand();
+            }}
+            className="cursor-pointer text-stone-400"
+            title={item.isExpanded() ? 'Collapse' : 'Expand'}
           >
-            <FileText className="w-3 h-3 shrink-0 text-stone-500" />
-            <span className="flex-1 truncate">
-              {entity.name}
-              {entity.filename_mismatch && <span className="ml-1 text-[10px] text-amber-400">(file name differs)</span>}
-            </span>
-            <span className="relative">
-              {menuButton(key)}
-              {menuFor === key && (
-                <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-white/10 bg-stone-900 p-1 shadow-2xl">
+            {item.isExpanded() ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          </button>
+        ) : (
+          <span className="w-3 shrink-0" />
+        )}
+
+        {isFolder ? (
+          <Folder className="w-3.5 h-3.5 shrink-0 text-purple-400/70" />
+        ) : (
+          <FileText className="w-3 h-3 shrink-0 text-stone-500" />
+        )}
+
+        <span className="flex-1 truncate">
+          {data.name}
+          {!isFolder && data.entity?.filename_mismatch && (
+            <span className="ml-1 text-[10px] text-amber-400">(file name differs)</span>
+          )}
+        </span>
+
+        <span className="relative shrink-0">
+          <button
+            type="button"
+            onClick={(ev) => {
+              ev.stopPropagation();
+              setMenuFor((current) => (current === key ? null : key));
+            }}
+            title="More actions"
+            className="cursor-pointer rounded p-0.5 text-stone-500 hover:text-stone-200"
+          >
+            <MoreVertical className="w-3 h-3" />
+          </button>
+          {menuFor === key && (
+            <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-white/10 bg-stone-900 p-1 shadow-2xl">
+              {isFolder ? (
+                <>
                   <button
                     type="button"
                     onClick={(ev) => {
                       ev.stopPropagation();
                       closeMenu();
-                      setDialog({ kind: 'move-note', entity });
+                      setDialog({ kind: 'create', parent: data.folderPath });
+                    }}
+                    className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-stone-200 hover:bg-white/10"
+                  >
+                    <FolderPlus className="w-3 h-3" />
+                    <span>New subfolder</span>
+                  </button>
+                  {data.folderPath !== '' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          closeMenu();
+                          setDialog({ kind: 'rename', path: data.folderPath });
+                        }}
+                        className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-stone-200 hover:bg-white/10"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        <span>Rename folder</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          closeMenu();
+                          setDialog({ kind: 'delete', path: data.folderPath });
+                        }}
+                        className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-red-300 hover:bg-red-950/40"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Delete folder</span>
+                      </button>
+                    </>
+                  )}
+                </>
+              ) : (
+                data.entity && (
+                  <button
+                    type="button"
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      closeMenu();
+                      setDialog({ kind: 'move-note', entity: data.entity as EntitySummary });
                     }}
                     className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-stone-200 hover:bg-white/10"
                   >
                     <MoveRight className="w-3 h-3" />
                     <span>Move to folder...</span>
                   </button>
-                </div>
+                )
               )}
-            </span>
-          </div>
-        );
-      });
-
-  const renderFolder = (node: FolderNode, depth: number) => {
-    const isCollapsed = collapsed.has(node.path);
-    const key = `folder:${node.path}`;
-    const isDropTarget = dropTarget === node.path;
-    return (
-      <div key={node.path} style={{ paddingLeft: depth * 10 }}>
-        <div
-          {...dropProps(node.path)}
-          {...dragProps({ kind: 'folder', id: node.path })}
-          className={`group flex items-center gap-1 rounded-lg px-1 py-1 ${
-            isDropTarget ? 'bg-purple-600/20 ring-1 ring-purple-500/50' : 'hover:bg-black/30'
-          }`}
-        >
-          <button
-            type="button"
-            onClick={() => toggle(node.path)}
-            className="cursor-pointer text-stone-400"
-            title={isCollapsed ? 'Expand' : 'Collapse'}
-          >
-            {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-          <Folder className="w-3.5 h-3.5 text-purple-400/70" />
-          <span className="flex-1 truncate text-xs text-stone-300">{leafOf(node.path)}</span>
-          <span className="relative">
-            {menuButton(key)}
-            {menuFor === key && (
-              <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-white/10 bg-stone-900 p-1 shadow-2xl">
-                <button
-                  type="button"
-                  onClick={(ev) => {
-                    ev.stopPropagation();
-                    closeMenu();
-                    setDialog({ kind: 'create', parent: node.path });
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-stone-200 hover:bg-white/10"
-                >
-                  <FolderPlus className="w-3 h-3" />
-                  <span>New subfolder</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={(ev) => {
-                    ev.stopPropagation();
-                    closeMenu();
-                    setDialog({ kind: 'rename', path: node.path });
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-stone-200 hover:bg-white/10"
-                >
-                  <Pencil className="w-3 h-3" />
-                  <span>Rename folder</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={(ev) => {
-                    ev.stopPropagation();
-                    closeMenu();
-                    setDialog({ kind: 'delete', path: node.path });
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-red-300 hover:bg-red-950/40"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Delete folder</span>
-                </button>
-              </div>
-            )}
-          </span>
-        </div>
-        {!isCollapsed && (
-          <div>
-            {renderNotes(node.path)}
-            {(node.children ?? []).map((child) => renderFolder(child, depth + 1))}
-          </div>
-        )}
+            </div>
+          )}
+        </span>
       </div>
     );
   };
-
-  const rootNotes = renderNotes('');
 
   return (
     <div className="flex min-h-0 flex-col gap-2">
@@ -348,21 +307,15 @@ export default function EntityTree({
         </button>
       </div>
 
-      <div
-        {...dropProps('')}
-        className={`min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1 rounded-lg ${
-          dropTarget === '' && dragging ? 'bg-purple-600/10 ring-1 ring-purple-500/40' : ''
-        }`}
-      >
-        {rootNotes}
-        {folders.map((node) => renderFolder(node, 0))}
-        {folders.length === 0 && rootNotes.length === 0 && (
-          <p className="p-2 text-xs italic text-stone-500">No notes yet.</p>
-        )}
+      <div className="relative min-h-0 flex-1 overflow-y-auto pr-1">
+        <div {...tree.getContainerProps('Content')} className="space-y-0.5">
+          {tree.getItems().map(renderRow)}
+          <div style={tree.getDragLineStyle()} className="absolute h-0.5 rounded bg-purple-500" />
+        </div>
       </div>
 
       <p className="text-[10px] font-sans text-stone-500">
-        Drag a note onto a folder to file it, or drag it here to take it back out.
+        Drag a note or folder onto another folder to move it, or onto {ROOT_LABEL} to take it back out.
       </p>
 
       <FolderNameDialog
@@ -395,7 +348,7 @@ export default function EntityTree({
       <DeleteFolderDialog
         isOpen={dialog.kind === 'delete'}
         path={dialog.kind === 'delete' ? dialog.path : ''}
-        noteCount={dialog.kind === 'delete' ? countNotesUnder(dialog.path) : 0}
+        noteCount={dialog.kind === 'delete' ? countNotesUnder(folders, entities, dialog.path) : 0}
         onCancel={() => setDialog({ kind: 'none' })}
         onSubmit={() => {
           if (dialog.kind === 'delete') onDeleteFolder(dialog.path);
