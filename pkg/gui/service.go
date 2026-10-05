@@ -2040,6 +2040,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		streamer.FeedSegment(event)
 	})
 
+	t.orchestrator.SetSceneOnly(req.SceneOnly)
 	turn, err := t.orchestrator.ProcessActionStream(runCtx, req.Mode, req.Input, func(text string) error {
 		return announce(TurnEvent{Type: "chunk", Text: text})
 	})

@@ -408,3 +408,62 @@ func TestTurnRequest_NormalizesSlashCommands(t *testing.T) {
 		t.Errorf("req2.Input = %q, want '2d6+1'", req2.Input)
 	}
 }
+
+func TestQuietSceneTurnPrecedesTheFirstAction(t *testing.T) {
+	gameID, svc := turnFixture(t)
+
+	const scene = "Fire rains down as the wreckage of the Dawnbreaker tumbles past the palace window."
+	if err := svc.UpdateGameSettings(context.Background(), gameID, map[string]interface{}{
+		engine.OpeningPromptSetting: scene,
+	}); err != nil {
+		t.Fatalf("UpdateGameSettings failed: %v", err)
+	}
+
+	sceneSession, err := svc.BeginTurn(gameID)
+	if err != nil {
+		t.Fatalf("BeginTurn failed: %v", err)
+	}
+	var sceneTurn *TurnDTO
+	if err := sceneSession.Run(context.Background(), TurnRequest{Mode: "Opening", SceneOnly: true}, func(event TurnEvent) error {
+		if event.Type == "turn" {
+			sceneTurn = event.Turn
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("quiet scene turn failed: %v", err)
+	}
+	sceneSession.Close()
+
+	if sceneTurn == nil {
+		t.Fatal("expected the scene turn to be recorded")
+	}
+	if sceneTurn.TurnNumber != 1 || sceneTurn.Mode != engine.OpeningMode {
+		t.Errorf("scene turn = %d/%q, want 1/%q", sceneTurn.TurnNumber, sceneTurn.Mode, engine.OpeningMode)
+	}
+	// The fixture's gm is the builtin echo provider, so the prompt is in the prose.
+	if !strings.Contains(sceneTurn.Prose, scene) {
+		t.Errorf("expected the scene in the turn prose:\n%s", sceneTurn.Prose)
+	}
+	if strings.Contains(sceneTurn.Prose, "invites the protagonist") {
+		t.Errorf("a quiet scene turn must add no hooks:\n%s", sceneTurn.Prose)
+	}
+
+	actionSession, err := svc.BeginTurn(gameID)
+	if err != nil {
+		t.Fatalf("second BeginTurn failed: %v", err)
+	}
+	defer actionSession.Close()
+
+	var actionTurn *TurnDTO
+	if err := actionSession.Run(context.Background(), TurnRequest{Mode: "Do", Input: "I run for the gate"}, func(event TurnEvent) error {
+		if event.Type == "turn" {
+			actionTurn = event.Turn
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("action turn failed: %v", err)
+	}
+	if actionTurn == nil || actionTurn.TurnNumber != 2 {
+		t.Fatalf("expected the player's action to be turn 2, got %+v", actionTurn)
+	}
+}

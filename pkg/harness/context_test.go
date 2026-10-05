@@ -305,9 +305,8 @@ func TestAssembleReportsEverySectionAndKeepsTheActionLast(t *testing.T) {
 		t.Errorf("expected a player action section")
 	}
 	if !strings.Contains(result.Prompt, "Format reminder: Every spoken line or dialogue beat MUST start with '> Speaker:") {
-		t.Errorf("expected format reminder in player action section")
+		t.Errorf("expected the format reminder in the framing section")
 	}
-
 
 	names := make([]string, 0, len(result.Sections))
 	for _, section := range result.Sections {
@@ -838,5 +837,93 @@ func TestActionEchoSection(t *testing.T) {
 	}
 	if strings.Contains(off.Prompt, "PLAYER ACTION ECHO") {
 		t.Fatal("echo instruction must be absent when disabled")
+	}
+}
+
+func TestOpeningSceneSectionRestatesTheScene(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+
+	const scene = "Fire rains down as the wreckage of the Dawnbreaker tumbles past the palace window."
+
+	result, err := assembler.Assemble(ContextRequest{
+		OpeningScene: scene,
+		OpeningHooks: true,
+		TurnNumber:   1,
+		Mode:         "Opening",
+	})
+	if err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+	if !strings.Contains(result.Prompt, "## OPENING SCENE") {
+		t.Fatalf("expected an opening scene section:\n%s", result.Prompt)
+	}
+	if !strings.Contains(result.Prompt, scene) {
+		t.Fatalf("expected the scene text in the prompt:\n%s", result.Prompt)
+	}
+	if !strings.Contains(result.Prompt, "restating the scene below") {
+		t.Fatalf("expected the restatement instruction:\n%s", result.Prompt)
+	}
+	if !strings.Contains(result.Prompt, "invites the protagonist") {
+		t.Fatalf("expected the hooks instruction:\n%s", result.Prompt)
+	}
+}
+
+func TestOpeningSceneHooksAreOptional(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+
+	const scene = "Fire rains down over the market."
+	quiet, err := assembler.Assemble(ContextRequest{OpeningScene: scene, OpeningHooks: false})
+	if err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+	if !strings.Contains(quiet.Prompt, scene) {
+		t.Fatalf("expected the scene in the quiet turn:\n%s", quiet.Prompt)
+	}
+	if strings.Contains(quiet.Prompt, "invites the protagonist") {
+		t.Fatalf("a quiet scene turn must add no hooks:\n%s", quiet.Prompt)
+	}
+
+	ordinary, err := assembler.Assemble(ContextRequest{Action: "I look around"})
+	if err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+	if strings.Contains(ordinary.Prompt, "## OPENING SCENE") {
+		t.Fatalf("expected no opening scene section for an ordinary turn:\n%s", ordinary.Prompt)
+	}
+}
+
+func TestOpeningSceneSectionIsNotDroppable(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+	assembler.SetLimits(ContextLimits{TokenBudget: 1})
+
+	const scene = "Fire rains down over the market."
+	result, err := assembler.Assemble(ContextRequest{OpeningScene: scene, OpeningHooks: true})
+	if err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+	if !strings.Contains(result.Prompt, scene) {
+		t.Fatalf("the opening scene must survive trimming:\n%s", result.Prompt)
+	}
+}
+
+func TestPromptOmitsThePlayerActionWhenThereIsNone(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+
+	// The protagonist is named, as they are on a real opening turn, but there is no
+	// action: the section must still be absent.
+	result, err := assembler.Assemble(ContextRequest{
+		PlayerID:     "player",
+		PlayerName:   "Sean",
+		OpeningScene: "Fire rains down over the market.",
+		OpeningHooks: true,
+	})
+	if err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+	if strings.Contains(result.Prompt, "## PLAYER ACTION") {
+		t.Fatalf("an opening turn has no action to present:\n%s", result.Prompt)
+	}
+	if !strings.Contains(result.Prompt, "MUST start with '> Speaker:") {
+		t.Fatalf("the reply format must still be taught:\n%s", result.Prompt)
 	}
 }

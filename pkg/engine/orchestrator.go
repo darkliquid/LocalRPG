@@ -57,22 +57,6 @@ func OpeningPrompt(manifest *core.GameManifest) string {
 	return strings.TrimSpace(prompt)
 }
 
-// openingDirective is the instruction the GM receives as the campaign's first
-// turn. It establishes the scene without deciding the protagonist's own actions,
-// which is the one thing a narrator must not take away from a player.
-func openingDirective(prompt string) string {
-	var sb strings.Builder
-	sb.WriteString("[OPENING SCENE]\n")
-	sb.WriteString("Establish the opening of this campaign.\n")
-	sb.WriteString("Describe where the protagonist is, what they can perceive, and one thing that invites action.\n")
-	sb.WriteString("Introduce at most one present character, using their established name.\n")
-	sb.WriteString("Do not decide the protagonist's actions, thoughts, or feelings.\n")
-	if trimmed := strings.TrimSpace(prompt); trimmed != "" {
-		sb.WriteString("\n" + trimmed + "\n")
-	}
-	return sb.String()
-}
-
 type TurnOrchestrator struct {
 	store               *storage.Store
 	timeline            *Timeline
@@ -89,10 +73,13 @@ type TurnOrchestrator struct {
 	// forceToolChoice is set for a turn whose cadence floor requires a check.
 	forceToolChoice bool
 	// pendingCheckRef continues a turn whose GM proposed a check (ask policy).
-	pendingCheckRef  string
-	extractor        *harness.Extractor
-	chunkTimeout     time.Duration
-	openingPrompt    string
+	pendingCheckRef string
+	extractor       *harness.Extractor
+	chunkTimeout    time.Duration
+	openingPrompt   string
+	// sceneOnly marks the next turn as a quiet scene turn: it restates the
+	// campaign's opening scene and adds no hooks. Consumed once per turn.
+	sceneOnly        bool
 	logger           trace.Logger
 	chronicler       *Chronicler
 	threadsMax       int
@@ -415,6 +402,12 @@ func (o *TurnOrchestrator) SetOpeningPrompt(prompt string) {
 	o.openingPrompt = prompt
 }
 
+// SetSceneOnly marks the next turn as a quiet scene turn. It is meaningful only
+// for an Opening turn, and the engine consumes it once.
+func (o *TurnOrchestrator) SetSceneOnly(sceneOnly bool) {
+	o.sceneOnly = sceneOnly
+}
+
 // SetThreadsMax caps how many open threads the prompt carries.
 func (o *TurnOrchestrator) SetThreadsMax(max int) {
 	o.threadsMax = max
@@ -558,6 +551,8 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		return nil, fmt.Errorf("load history: %w", err)
 	}
 	turnNum := len(pastTurns) + 1
+	sceneOnly := o.sceneOnly
+	o.sceneOnly = false
 	if o.usageCtx != nil {
 		o.usageCtx.SetTurn(turnNum)
 	}
@@ -700,7 +695,9 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			return nil, fmt.Errorf("the campaign has already begun")
 		}
 		mode = OpeningMode
-		generationPrompt = openingDirective(o.openingPrompt)
+		// The scene is the turn's frame, not the player's action: handing it over
+		// as the action made the GM respond to it instead of restating it.
+		generationPrompt = ""
 	}
 
 	// Handle /gm director note or mode
@@ -799,11 +796,23 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		!strings.EqualFold(mode, "Say") &&
 		strings.TrimSpace(actionInput) != ""
 
+	// The opening turn restates the campaign's scene. A quiet scene turn suppresses
+	// the hooks only when there is a scene to restate; without one the turn still
+	// establishes a scene from the world.
+	openingScene := ""
+	openingHooks := false
+	if isOpening {
+		openingScene = o.openingPrompt
+		openingHooks = !sceneOnly || strings.TrimSpace(openingScene) == ""
+	}
+
 	assembly, err := o.assembler.Assemble(harness.ContextRequest{
 		Context:          ctx,
 		LocationID:       locationID,
 		PlayerID:         o.playerID,
 		Action:           generationPrompt,
+		OpeningScene:     openingScene,
+		OpeningHooks:     openingHooks,
 		PlayerName:       o.playerDisplayName(),
 		ActionEcho:       echoAction,
 		RulesPrompt:      o.rulesPrompt,
@@ -1136,19 +1145,19 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	narration = stripRecordLines(narration)
 
 	turn := Turn{
-		Number:       turnNum,
-		Timestamp:    time.Now(),
-		Mode:         mode,
-		Input:        actionInput,
-		Roll:         rollRes,
-		Narration:    narration,
-		Location:     locationID,
-		Outcome:      outcome,
-		Truncated:    stillIncomplete,
-		Recovery:     string(recovery),
-		ContextNotes: assembly.Trimmed,
-		Context:      &assembly.Context,
-		Prompt:       contextPrompt,
+		Number:           turnNum,
+		Timestamp:        time.Now(),
+		Mode:             mode,
+		Input:            actionInput,
+		Roll:             rollRes,
+		Narration:        narration,
+		Location:         locationID,
+		Outcome:          outcome,
+		Truncated:        stillIncomplete,
+		Recovery:         string(recovery),
+		ContextNotes:     assembly.Trimmed,
+		Context:          &assembly.Context,
+		Prompt:           contextPrompt,
 		ToolCalls:        result.Provenance,
 		PendingCheck:     result.PendingCheck,
 		ResolvesCheckRef: resolvedRef,

@@ -386,7 +386,7 @@ export const App: React.FC = () => {
   const abortRef = useRef<AbortController | null>(null);
   const streamProcessorRef = useRef<TurnStreamProcessor>(new TurnStreamProcessor());
 
-  const handleActionSubmit = async (mode: string, text: string, pendingCheckRef?: string) => {
+  const handleActionSubmit = async (mode: string, text: string, pendingCheckRef?: string, sceneOnly = false) => {
     if (!client || !activeGameID || turnInFlight) return;
 
     setTurnInFlight(true);
@@ -406,7 +406,7 @@ export const App: React.FC = () => {
     try {
       await APIClient.streamTurn(
         activeGameID,
-        { mode, input: text, pending_check_ref: pendingCheckRef },
+        { mode, input: text, pending_check_ref: pendingCheckRef, scene_only: sceneOnly || undefined },
         (event) => {
           if (event.type === 'chunk') {
             setToolActivity(null);
@@ -540,7 +540,13 @@ export const App: React.FC = () => {
     await handleActionSubmit('Opening', '');
   };
 
-  const handleBeginWithAction = () => {
+  // Taking the first step still establishes the scene first: a quiet scene turn
+  // restates the opening prompt, then the console takes the player's own first
+  // step as turn 2.
+  const handleBeginWithAction = async () => {
+    if (gameState?.opening_prompt && !turnInFlight) {
+      await handleActionSubmit('Opening', '', undefined, true);
+    }
     document.getElementById('action-console-input')?.focus();
   };
 

@@ -48,6 +48,10 @@ func (p *scriptedStreamProvider) Generate(ctx context.Context, req harness.Gener
 func (p *scriptedStreamProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
 	defer close(out)
 
+	if p.onRequest != nil {
+		p.onRequest(req)
+	}
+
 	if p.block {
 		<-ctx.Done()
 		return ctx.Err()
@@ -370,5 +374,93 @@ func TestStreamSurfacesToolCalls(t *testing.T) {
 	}
 	if len(result.ToolCalls) != 1 || result.ToolCalls[0].Name != "search_entities" {
 		t.Errorf("ToolCalls = %+v, want the stream's call", result.ToolCalls)
+	}
+}
+
+func TestOpeningTurnRestatesTheScene(t *testing.T) {
+	const scene = "Fire rains down as the wreckage of the Dawnbreaker tumbles past the palace window."
+
+	var prompt string
+	provider := &scriptedStreamProvider{
+		chunks:    []string{"Smoke blots the dawn."},
+		onRequest: func(req harness.GenerateRequest) { prompt = req.Prompt },
+	}
+	orchestrator, timeline, _ := streamingOrchestrator(t, provider)
+	orchestrator.SetOpeningPrompt(scene)
+
+	turn, err := orchestrator.ProcessActionStream(context.Background(), "Opening", "", nil)
+	if err != nil {
+		t.Fatalf("opening turn failed: %v", err)
+	}
+	if turn.Number != 1 || turn.Mode != OpeningMode {
+		t.Fatalf("Number/Mode = %d/%q, want 1/%q", turn.Number, turn.Mode, OpeningMode)
+	}
+	if !strings.Contains(prompt, "## OPENING SCENE") {
+		t.Errorf("expected an opening scene section:\n%s", prompt)
+	}
+	if !strings.Contains(prompt, scene) {
+		t.Errorf("expected the scene in the prompt:\n%s", prompt)
+	}
+	if strings.Contains(prompt, "## PLAYER ACTION") {
+		t.Errorf("the opening turn must not present the scene as an action:\n%s", prompt)
+	}
+	if !strings.Contains(prompt, "invites the protagonist") {
+		t.Errorf("the opening turn should invite action:\n%s", prompt)
+	}
+
+	turns, err := timeline.history.LoadHistory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 1 {
+		t.Fatalf("expected one recorded turn, got %d", len(turns))
+	}
+}
+
+func TestQuietSceneTurnAddsNoHooks(t *testing.T) {
+	const scene = "Fire rains down over the market."
+
+	var prompt string
+	provider := &scriptedStreamProvider{
+		chunks:    []string{"The market burns."},
+		onRequest: func(req harness.GenerateRequest) { prompt = req.Prompt },
+	}
+	orchestrator, _, _ := streamingOrchestrator(t, provider)
+	orchestrator.SetOpeningPrompt(scene)
+	orchestrator.SetSceneOnly(true)
+
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Opening", "", nil); err != nil {
+		t.Fatalf("quiet scene turn failed: %v", err)
+	}
+	if !strings.Contains(prompt, scene) {
+		t.Errorf("expected the scene restated:\n%s", prompt)
+	}
+	if strings.Contains(prompt, "invites the protagonist") {
+		t.Errorf("a quiet scene turn must add no hooks:\n%s", prompt)
+	}
+}
+
+func TestOpeningSceneIsNotCarriedAfterTurnOne(t *testing.T) {
+	const scene = "Fire rains down over the market."
+
+	var prompts []string
+	provider := &scriptedStreamProvider{
+		chunks:    []string{"The market burns."},
+		onRequest: func(req harness.GenerateRequest) { prompts = append(prompts, req.Prompt) },
+	}
+	orchestrator, _, _ := streamingOrchestrator(t, provider)
+	orchestrator.SetOpeningPrompt(scene)
+
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Opening", "", nil); err != nil {
+		t.Fatalf("opening turn failed: %v", err)
+	}
+	if _, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I run", nil); err != nil {
+		t.Fatalf("second turn failed: %v", err)
+	}
+	if len(prompts) != 2 {
+		t.Fatalf("expected two prompts, got %d", len(prompts))
+	}
+	if strings.Contains(prompts[1], "## OPENING SCENE") {
+		t.Errorf("only the first turn carries the scene:\n%s", prompts[1])
 	}
 }

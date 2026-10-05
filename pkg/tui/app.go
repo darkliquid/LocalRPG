@@ -42,6 +42,12 @@ func NewAppModel(orchestrator *engine.TurnOrchestrator, width, height int) *AppM
 	}
 }
 
+// Seed replaces the model's history, so a campaign that opened with a scene turn
+// shows it before the first input.
+func (m *AppModel) Seed(turns []engine.Turn) {
+	m.history = append(m.history[:0], turns...)
+}
+
 func (m *AppModel) Init() tea.Cmd {
 	return nil
 }

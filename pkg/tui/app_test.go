@@ -80,3 +80,15 @@ func TestTUIViewShowsTheLocation(t *testing.T) {
 		t.Errorf("expected the view to name the current location, got %q", app.View())
 	}
 }
+
+func TestSeedShowsAnEarlierTurn(t *testing.T) {
+	model := NewAppModel(nil, 80, 24)
+	model.Seed([]engine.Turn{{Number: 1, Mode: "Opening", Narration: "The market burns."}})
+
+	if len(model.history) != 1 {
+		t.Fatalf("history = %d turns, want 1", len(model.history))
+	}
+	if model.history[0].Mode != "Opening" {
+		t.Errorf("Mode = %q, want %q", model.history[0].Mode, "Opening")
+	}
+}
