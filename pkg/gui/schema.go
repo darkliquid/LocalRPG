@@ -162,14 +162,16 @@ var frontmatterKeyDescriptions = map[string]string{
 
 // frontmatterKeyValues lists the values worth suggesting for the keys whose
 // domain is small. They are suggestions, not a closed set: only the being-like
-// types change engine behaviour, and any other type string is accepted.
+// types change engine behaviour, and any other type string is accepted. The type
+// list is the entity type catalogue, so the editor and the wizard cannot disagree.
 var frontmatterKeyValues = map[string][]string{
-	"type": {"character", "location", "faction", "item", "event", "quest", "lore"},
+	"type": entityTypeIDs(),
 }
 
-// renderEntityFrontmatterSchema reflects over the entity frontmatter so the keys
-// the editor offers cannot drift from the keys the loader accepts.
-func renderEntityFrontmatterSchema() string {
+// entityFrontmatterKeys reflects over the entity frontmatter so the keys the
+// editor and the wizard offer cannot drift from the keys the loader accepts. The
+// order is the struct's; callers that need a stable order sort it.
+func entityFrontmatterKeys() []FrontmatterKeySchema {
 	t := reflect.TypeOf(entity.EntityFrontmatter{})
 	keys := make([]FrontmatterKeySchema, 0, t.NumField())
 
@@ -190,7 +192,13 @@ func renderEntityFrontmatterSchema() string {
 			Description: frontmatterKeyDescriptions[name],
 		})
 	}
+	return keys
+}
 
+// renderEntityFrontmatterSchema reflects over the entity frontmatter so the keys
+// the editor offers cannot drift from the keys the loader accepts.
+func renderEntityFrontmatterSchema() string {
+	keys := entityFrontmatterKeys()
 	sort.Slice(keys, func(i, j int) bool { return keys[i].Name < keys[j].Name })
 
 	encoded, err := json.MarshalIndent(FrontmatterSchema{AllowUnknown: true, Keys: keys}, "", "  ")

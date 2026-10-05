@@ -94,6 +94,8 @@
         "location",
         "faction",
         "item",
+        "concept",
+        "arc",
         "event",
         "quest",
         "lore"
