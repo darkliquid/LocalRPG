@@ -83,9 +83,16 @@ type ContextRequest struct {
 	// them when restating the action.
 	PlayerName string
 	// ActionEcho asks for a leading third-person restatement of the action.
-	ActionEcho  bool
-	RulesPrompt string
-	LorePrompt  string
+	ActionEcho bool
+	// OpeningScene is the campaign's opening prose, carried on the first turn so
+	// the narrator can restate it before continuing.
+	OpeningScene string
+	// OpeningHooks asks the first turn to extend the scene with events that invite
+	// the protagonist to act. False for the quiet scene turn that precedes the
+	// player's own first action.
+	OpeningHooks bool
+	RulesPrompt  string
+	LorePrompt   string
 	// MechanicsPrompt is the engine's instruction on when to roll, generated
 	// from the loaded system. Empty when the system ships no mechanics.
 	MechanicsPrompt string
@@ -222,6 +229,57 @@ func actionEchoSection(enabled bool, action string) string {
 	return actionEchoInstruction + "\n"
 }
 
+// openingRestateInstruction tells the narrator to restate the campaign's opening
+// scene before continuing, so the first turn never starts mid-consequence.
+const openingRestateInstruction = `## OPENING SCENE
+This is the campaign's first turn. Open the narration by restating the scene below
+in your own words, keeping its facts, imagery, and mood, so the player can tell
+where they are and what is already happening from this turn alone. Do not skip
+straight to the consequences.
+
+Do not decide the protagonist's actions, thoughts, or feelings.
+`
+
+// openingEstablishInstruction is the same framing for a campaign with no opening
+// prompt: the scene comes from the world, the rules, and the lore.
+const openingEstablishInstruction = `## OPENING SCENE
+This is the campaign's first turn. Establish the opening of this campaign: describe
+where the protagonist is and what they can perceive.
+
+Do not decide the protagonist's actions, thoughts, or feelings.
+`
+
+// openingHooksInstruction asks for the developments that draw the player in.
+const openingHooksInstruction = `
+Once the scene is established, continue with one thing that invites the protagonist
+to act, and at most one present character, named as they are already known. Stop
+there; do not resolve the protagonist's response.
+`
+
+// openingSceneSection renders the first turn's scene framing, or nothing when the
+// turn is not an opening one. The scene is restated when the campaign has an
+// opening prompt, and established from the world when it does not.
+func openingSceneSection(scene string, hooks bool) string {
+	trimmed := strings.TrimSpace(scene)
+	if trimmed == "" && !hooks {
+		return ""
+	}
+
+	var sb strings.Builder
+	if trimmed != "" {
+		sb.WriteString(openingRestateInstruction)
+		sb.WriteString("\nOpening scene:\n")
+		sb.WriteString(trimmed)
+		sb.WriteString("\n")
+	} else {
+		sb.WriteString(openingEstablishInstruction)
+	}
+	if hooks {
+		sb.WriteString(openingHooksInstruction)
+	}
+	return sb.String()
+}
+
 // turnFramingInstruction teaches the line framing the engine parses as the reply
 // streams: blockquote speech and @-prefixed control records.
 const turnFramingInstruction = `## TURN FORMAT
@@ -288,6 +346,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 		{name: "instructions", source: "speech_cues", text: FormatSpeechFormattingInstructions(req.SpeechCues) + "\n\n"},
 		{name: "framing", source: "turn_format", text: turnFramingInstruction + "\n"},
 		{name: "action_echo", source: "action_echo", text: actionEchoSection(req.ActionEcho, req.Action)},
+		{name: "opening_scene", source: "opening_scene", text: openingSceneSection(req.OpeningScene, req.OpeningHooks)},
 		{name: "canon", source: "canon", text: canonText, refs: canonRefs},
 		{name: "working_set", source: "working_set", text: workingSetText, refs: workingSetRefs, droppable: true, rank: 5},
 		{name: "summary", source: "summary", text: summaryText, refs: summaryRefs, droppable: true, rank: 6},
