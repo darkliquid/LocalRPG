@@ -65,6 +65,9 @@ The set of things that change is small and explicit:
 4. The protagonist's and the opening scene's runtime fields: `history` and
    `state` are cleared; the authored content (name, appearance, age, gender,
    pronouns, voice, portrait, background, prose, extra frontmatter) is kept.
+5. The campaign's batch synthesis jobs (`tts_jobs`). They exist to speak
+   narration the reset has just discarded, so an in-flight job is cancelled at
+   the provider first, best-effort, and every job row is then removed.
 
 **Kept, untouched:**
 
@@ -72,8 +75,8 @@ The set of things that change is small and explicit:
   `start_location`, `opening_prompt`, mechanics engagement, and anything else.
 - The whole `assets/` directory: banner, icon, NPC portraits, scene images, and
   audio clips.
-- `usage_records` and `tts_jobs`, which are durable records rather than derived
-  state.
+- `usage_records`, the spend ledger, which records what was bought rather than
+  what was said.
 - The protagonist note file itself, apart from the runtime fields above.
 - The opening-scene location note, which is the campaign's pinned start and is
   derived from the world manifest, not from play. It keeps its authored content
@@ -112,9 +115,11 @@ The index is disposable and rebuildable, but it also holds the usage ledger,
 which is not. Deleting `cache/index.db` would lose the ledger, so the reset is
 surgical: a single `Store.ResetDerivedState` clears the timeline, memories, the
 working set, the entity graph and embeddings in one transaction, and leaves
-`usage_records` and `tts_jobs` alone. The caller then re-syncs the notes from
-disk, so entities, edges and embeddings are rebuilt from the Markdown that
-survived.
+`usage_records` alone. The batch job table is cleared separately by
+`Store.DeleteTTSJobs`, because its rows are removed after the provider has been
+asked to cancel them, not as part of the derived-state transaction. The caller
+then re-syncs the notes from disk, so entities, edges and embeddings are rebuilt
+from the Markdown that survived.
 
 ### 2.4 World artwork fallback
 
@@ -141,10 +146,11 @@ still has none to reset.
   `ResetCampaign(paths, store, manifest)`: classify and rewrite notes, clear the
   timeline, re-sync the index. It is engine-level because it is a statement about
   what a campaign is, not about HTTP.
-- `pkg/storage` gains `Store.ResetDerivedState` and `Store.DeleteAllEntities`,
-  the index-level primitives the engine composes.
+- `pkg/storage` gains `Store.ResetDerivedState` and `Store.DeleteTTSJobs`, the
+  index-level primitives the engine composes.
 - `pkg/gui/service.go` keeps `RestartGame` as a thin, lock-holding wrapper that
-  loads the manifest, calls the engine, and returns the summary.
+  loads the manifest, cancels any in-flight batch job, calls the engine, and
+  returns the summary.
 - `pkg/gui` gains a small helper for the world asset fallback so `GetGameAsset`,
   `ListGames` and `GetGameState` agree.
 
@@ -153,12 +159,13 @@ still has none to reset.
 - Engine: a world template modified during play is restored; a play-created
   entity is deleted; the protagonist survives with authored fields intact and
   `history`/`state` cleared; the opening scene survives; the manifest and
-  `assets/` are byte-identical after a reset.
+  `assets/` are byte-identical after a reset; batch jobs are removed.
 - Storage: `ResetDerivedState` empties the timeline and memories but leaves
-  `usage_records` and `tts_jobs` intact.
+  `usage_records` intact; `DeleteTTSJobs` removes one campaign's jobs and no
+  other's.
 - GUI: `RestartGame` preserves the banner, icon, narrator voice and usage ledger,
-  and reports `TurnCount` 0 with an empty chronicle (the existing
-  `TestRestartGameClearsHistoryAndKeepsTheCampaign` and
+  removes the batch jobs, and reports `TurnCount` 0 with an empty chronicle (the
+  existing `TestRestartGameClearsHistoryAndKeepsTheCampaign` and
   `TestRestartGamePreservesPlayerMetadata` must keep passing).
 - GUI: a campaign with no icon of its own reports and serves the world's icon;
   a campaign with its own icon ignores the world's.
@@ -179,5 +186,10 @@ still has none to reset.
 - **Embeddings are rebuilt lazily.** Clearing the entity graph drops entity
   embeddings; the embedding worker regenerates them on demand. This is the
   existing behaviour for any rebuilt index.
+- **Batch cancellation is best-effort.** A job whose provider cannot be reached,
+  or that belongs to a provider no longer selected, is not cancelled remotely;
+  its row is still deleted, so the campaign forgets work for narration it no
+  longer has. A provider that keeps such a job running may still bill for it,
+  which is the one thing a restart cannot prevent.
 - **Not a time machine.** Restart is not `/undo`; it does not preserve any turn.
   It is a full return to turn 0 with the campaign's configuration intact.

@@ -3316,6 +3316,66 @@ func activeBatchJob(store *storage.Store, gameID string) (*storage.TTSJob, bool)
 	return nil, false
 }
 
+// cancelBatchJobs stops a campaign's in-flight batch synthesis, best-effort, so a
+// restart does not leave the provider working on narration that is about to be
+// discarded. A job belongs to the provider that created it, so only jobs matching
+// the selected provider are cancelled; a provider that cannot be reached, or a
+// job from a provider that is no longer selected, is left for the reset to
+// remove.
+func (s *Service) cancelBatchJobs(ctx context.Context, gameID string) {
+	store, err := s.store(gameID)
+	if err != nil {
+		return
+	}
+	jobs, err := store.ListTTSJobs(gameID)
+	if err != nil {
+		return
+	}
+
+	anyActive := false
+	for i := range jobs {
+		if batchJobActive(jobs[i]) {
+			anyActive = true
+			break
+		}
+	}
+	if !anyActive {
+		return
+	}
+
+	cfg := s.configMgr.Get()
+	client, err := s.ttsClientFor(cfg.Media.TTS)
+	if err != nil {
+		return
+	}
+	batchClient, ok := client.(media.BatchTTSClient)
+	if !ok {
+		return
+	}
+
+	providerKey := ""
+	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
+		providerKey = string(key)
+	}
+
+	for i := range jobs {
+		job := jobs[i]
+		if !batchJobActive(job) {
+			continue
+		}
+		if providerKey != "" && job.Provider != "" && job.Provider != providerKey {
+			continue
+		}
+		if err := batchClient.CancelBatch(ctx, media.BatchJobHandle{ID: job.ID}); err != nil {
+			trace.OrNil(s.logger).Event("media.tts.batch_cancel_error", map[string]interface{}{
+				"game":  gameID,
+				"job":   job.ID,
+				"error": err.Error(),
+			})
+		}
+	}
+}
+
 // ttsBatchJobDTO maps a job row to the wire shape.
 func ttsBatchJobDTO(job storage.TTSJob) TTSBatchJobDTO {
 	return TTSBatchJobDTO{
@@ -3867,6 +3927,10 @@ func (s *Service) RestartGame(ctx context.Context, gameID string) (*GameSummaryD
 	if err != nil {
 		return nil, fmt.Errorf("open campaign store: %w", err)
 	}
+
+	// Stop any batch synthesis still speaking narration the reset is about to
+	// discard, so the provider is not left working on it.
+	s.cancelBatchJobs(ctx, gameID)
 
 	if err := engine.ResetCampaign(s.resolver, store, manifest); err != nil {
 		return nil, fmt.Errorf("reset campaign: %w", err)

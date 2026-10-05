@@ -16,9 +16,13 @@ import (
 // ResetCampaign returns a campaign to its opening state without touching its
 // configuration. The world's template cast is restored, notes created during
 // play are removed, the protagonist keeps its authored sheet but loses its
-// runtime state, and the timeline is cleared. The manifest, the assets directory,
-// the usage ledger and the TTS job table are left alone, so a restart costs the
-// player their story and nothing else.
+// runtime state, and the timeline is cleared. The manifest, the assets directory
+// and the usage ledger are left alone, so a restart costs the player their story
+// and nothing else.
+//
+// Batch synthesis jobs are removed too: they exist to speak narration that the
+// reset has just discarded. A caller that can reach the provider should cancel
+// an active job before calling this; the row is deleted either way.
 //
 // The initial set is derived from the world rather than snapshotted at creation,
 // so a world author's correction reaches a restarted campaign.
@@ -46,6 +50,9 @@ func ResetCampaign(paths *core.PathResolver, store *storage.Store, manifest *cor
 
 	if err := store.ResetDerivedState(); err != nil {
 		return fmt.Errorf("reset derived state: %w", err)
+	}
+	if _, err := store.DeleteTTSJobs(manifest.ID); err != nil {
+		return fmt.Errorf("delete batch jobs: %w", err)
 	}
 
 	history := NewHistoryLogger(filepath.Join(gameDir, "history.jsonl"))

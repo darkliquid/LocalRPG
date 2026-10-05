@@ -17,7 +17,7 @@
 - Go standard library only for tests (`testing`, `t.TempDir()`); no testify. Use `interface{}`, not `any`. `go vet ./...` must stay clean.
 - Errors wrapped with `fmt.Errorf("...: %w", err)`. Reuse `entity.Slugify`, `entity.WikilinkTarget`, `pathutil.SanitizeID`, `pathutil.ResolveSafeChild`; do not write local slug or link parsing.
 - Never call `storage.NewStore` for a game; go through `storage.OpenGameStore`.
-- The campaign directory is never deleted by a restart. `assets/`, `game.yaml`, `usage_records` and `tts_jobs` survive a restart untouched.
+- The campaign directory is never deleted by a restart. `assets/`, `game.yaml` and `usage_records` survive a restart untouched. Batch synthesis jobs do not: they speak narration the reset discards, so an in-flight job is cancelled at the provider, best-effort, and every job row is then removed.
 - Frontend: `tsconfig.json` sets `strict`, `noUnusedLocals`, `noUnusedParameters`, so `npm run build` fails on an unused import.
 - Commits are Conventional Commits with a scope; subject under 72 characters.
 
@@ -26,11 +26,12 @@
 ### File Map
 
 - **`pkg/storage/store.go`** — add `ResetDerivedState`.
-- **`pkg/storage/store_test.go`** — reset clears derived tables, keeps durable ones.
-- **`pkg/engine/restart.go`** (new) — `ResetCampaign`, entity classification, protagonist runtime reset.
-- **`pkg/engine/restart_test.go`** (new) — restore, delete, keep, and manifest/asset preservation.
-- **`pkg/gui/service.go`** — rewrite `RestartGame`; add `gameAssetAvailable` helper; world fallback in `GetGameAsset`, `ListGames`, `GetGameState`.
-- **`pkg/gui/restart_player_test.go`** — extend for artwork, narrator voice and usage preservation.
+- **`pkg/storage/store_test.go`** — reset clears derived tables and keeps the ledger; `DeleteTTSJobs` removes one campaign's jobs.
+- **`pkg/storage/ttsjobs.go`** — add `DeleteTTSJobs`.
+- **`pkg/engine/restart.go`** (new) — `ResetCampaign`, entity classification, protagonist runtime reset, batch-job removal.
+- **`pkg/engine/restart_test.go`** (new) — restore, delete, keep, and manifest/asset/ledger preservation.
+- **`pkg/gui/service.go`** — rewrite `RestartGame`; cancel in-flight batch jobs; `gameAssetSource` helper; world fallback in `GetGameAsset` and `ListGames`.
+- **`pkg/gui/restart_player_test.go`** — extend for artwork, narrator voice, usage and batch-job handling.
 - **`pkg/gui/assets_endpoint_test.go`** — world fallback coverage.
 - **`frontend/src/components/launcher/CampaignSettingsModal.tsx`** — restart copy.
 
@@ -165,7 +166,7 @@ git commit -m "feat(storage): reset derived index state while keeping the spend 
 - Test: `pkg/engine/restart_test.go`
 
 **Interfaces:**
-- Consumes: `storage.Store.ResetDerivedState`, `storage.Syncer.Sync`, `HistoryLogger.RewindToTurn`, `ResolvePlayerID`, `OpeningSceneEntityID`.
+- Consumes: `storage.Store.ResetDerivedState`, `storage.Store.DeleteTTSJobs`, `storage.Syncer.Sync`, `HistoryLogger.RewindToTurn`, `ResolvePlayerID`, `OpeningSceneEntityID`.
 - Produces: `func ResetCampaign(paths *core.PathResolver, store *storage.Store, manifest *core.GameManifest) error`
 
 - [ ] **Step 1: Write the failing test**
@@ -222,9 +223,13 @@ import (
 // ResetCampaign returns a campaign to its opening state without touching its
 // configuration. The world's template cast is restored, notes created during
 // play are removed, the protagonist keeps its authored sheet but loses its
-// runtime state, and the timeline is cleared. The manifest, the assets directory,
-// the usage ledger and the TTS job table are left alone, so a restart costs the
-// player their story and nothing else.
+// runtime state, and the timeline is cleared. The manifest, the assets directory
+// and the usage ledger are left alone, so a restart costs the player their story
+// and nothing else.
+//
+// Batch synthesis jobs are removed too: they exist to speak narration the reset
+// has just discarded. A caller that can reach the provider should cancel an
+// active job before calling this; the row is deleted either way.
 func ResetCampaign(paths *core.PathResolver, store *storage.Store, manifest *core.GameManifest) error {
 	if paths == nil || store == nil || manifest == nil {
 		return fmt.Errorf("reset campaign: missing paths, store, or manifest")
@@ -250,6 +255,9 @@ func ResetCampaign(paths *core.PathResolver, store *storage.Store, manifest *cor
 	if err := store.ResetDerivedState(); err != nil {
 		return fmt.Errorf("reset derived state: %w", err)
 	}
+	if _, err := store.DeleteTTSJobs(manifest.ID); err != nil {
+		return fmt.Errorf("delete batch jobs: %w", err)
+	}
 
 	history := NewHistoryLogger(filepath.Join(gameDir, "history.jsonl"))
 	if err := history.RewindToTurn(0); err != nil {
@@ -263,10 +271,9 @@ func ResetCampaign(paths *core.PathResolver, store *storage.Store, manifest *cor
 }
 ```
 
-Then `worldEntityTemplates`, `resetEntityNotes`, `classifyEntityNotes` and `clearPlayerRuntime`. `worldEntityTemplates` mirrors `InitGame`'s import (top-level `worlds/<id>/entities/*.md`, keyed by frontmatter id with filename fallback). `resetEntityNotes` walks `entities/` recursively, classifies by id, and:
+Then `worldEntityTemplates`, `resetEntityNotes`, `noteID`, `restoreTemplate` and `clearRuntimeFields`. `worldEntityTemplates` mirrors `InitGame`'s import (top-level `worlds/<id>/entities/*.md`, keyed by frontmatter id with filename fallback). `resetEntityNotes` walks `entities/` recursively, classifies by id, and:
 
-- protagonist -> parse, clear `History` and `State`, rewrite;
-- opening scene -> leave;
+- protagonist or opening scene -> parse, clear `History` and `State`, rewrite;
 - template -> write template bytes to `entities/<id>.md`, remove any other copy;
 - otherwise -> remove.
 
@@ -296,7 +303,7 @@ git commit -m "feat(engine): reset a campaign to its world cast without losing c
 
 - [ ] **Step 1: Write the failing test**
 
-Extend `TestRestartGamePreservesPlayerMetadata` in `pkg/gui/restart_player_test.go` to write `assets/banner.png`, `assets/icon.png`, a `narrator_voice` setting and one usage row before restarting, and assert all four survive the restart byte-for-byte.
+Extend `TestRestartGamePreservesPlayerMetadata` in `pkg/gui/restart_player_test.go` to write `assets/banner.png`, `assets/icon.png`, a `narrator_voice` setting, one usage row and one in-flight batch job before restarting, and assert the first four survive the restart byte-for-byte while the job row is gone.
 
 - [ ] **Step 2: Run it and watch it fail**
 
@@ -305,7 +312,7 @@ Expected: FAIL, the banner/icon/narrator voice are gone.
 
 - [ ] **Step 3: Implement**
 
-Replace the body of `RestartGame` (`pkg/gui/service.go:3832`) with: validate the id, take the game lock, load the manifest, open the store, call `engine.ResetCampaign`, return the summary with `TurnCount` 0. Remove the delete/recreate, portrait save-and-restore, and settings replay. `s.forgetGame` is no longer needed here, because the index is reset in place.
+Replace the body of `RestartGame` (`pkg/gui/service.go:3832`) with: validate the id, take the game lock, load the manifest, open the store, cancel any in-flight batch job with a new `cancelBatchJobs(ctx, gameID)` helper (best-effort, mirroring `ResumePendingBatches`'s provider guard), call `engine.ResetCampaign`, return the summary with `TurnCount` 0. Remove the delete/recreate, portrait save-and-restore, and settings replay. `s.forgetGame` is no longer needed here, because the index is reset in place.
 
 - [ ] **Step 4: Run it and watch it pass**
 
@@ -328,7 +335,7 @@ git commit -m "fix(gui): restart a campaign in place so its artwork and voice su
 - Test: `pkg/gui/assets_endpoint_test.go`
 
 **Interfaces:**
-- Produces: `func (s *Service) gameAssetAvailable(gameID, worldID, kind string) bool` (unexported) used by `ListGames` and `GetGameState`; `GetGameAsset` falls back to the world.
+- Produces: `func (s *Service) gameAssetSource(gameDir, worldID, assetKind string) (string, string, bool)` (unexported), used by `GetGameAsset`, `ListGames` and `GetGameState`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -341,7 +348,7 @@ Expected: FAIL, `IconURL` is empty and the route 404s.
 
 - [ ] **Step 3: Implement**
 
-In `GetGameAsset`, when `findAssetFile(gameDir, assetKind)` is empty and the manifest's world has the asset, return the world's file and content type. In `ListGames` and `GetGameState`, set `BannerURL`/`IconURL` when either the campaign or the world has the asset, pointing at the campaign route.
+In `GetGameAsset`, when the campaign has no such asset and its world does, return the world's file and content type. In `ListGames`, set `BannerURL`/`IconURL` when either the campaign or the world has the asset, pointing at the campaign route, whose handler now falls back. `GetGameState` already falls back to the world's banner and is left as it is.
 
 - [ ] **Step 4: Run it and watch it pass**
 

@@ -240,3 +240,36 @@ func TestResetDerivedStateClearsTimelineAndKeepsDurableRecords(t *testing.T) {
 		t.Errorf("ListTTSJobs = %d (err %v), want job tracking preserved", len(jobs), err)
 	}
 }
+
+func TestDeleteTTSJobsRemovesEveryJobForOneCampaign(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer store.Close()
+
+	jobs := []TTSJob{
+		{ID: "running", GameID: "campaign-01", Provider: "elevenlabs", Status: "processing"},
+		{ID: "done", GameID: "campaign-01", Provider: "elevenlabs", Status: "completed"},
+		{ID: "other", GameID: "campaign-02", Provider: "elevenlabs", Status: "completed"},
+	}
+	for _, job := range jobs {
+		if err := store.UpsertTTSJob(job); err != nil {
+			t.Fatalf("UpsertTTSJob: %v", err)
+		}
+	}
+
+	removed, err := store.DeleteTTSJobs("campaign-01")
+	if err != nil {
+		t.Fatalf("DeleteTTSJobs: %v", err)
+	}
+	if removed != 2 {
+		t.Errorf("removed = %d, want 2", removed)
+	}
+	if remaining, err := store.ListTTSJobs("campaign-01"); err != nil || len(remaining) != 0 {
+		t.Errorf("campaign-01 jobs = %d (err %v), want 0", len(remaining), err)
+	}
+	if remaining, err := store.ListTTSJobs("campaign-02"); err != nil || len(remaining) != 1 {
+		t.Errorf("campaign-02 jobs = %d (err %v), want the other campaign's job kept", len(remaining), err)
+	}
+}

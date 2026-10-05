@@ -106,6 +106,9 @@ func newResetFixture(t *testing.T) *resetFixture {
 	if err := session.Store.SaveUsage(storage.UsageRecord{GameID: "campaign-01", Role: "gm", Provider: "echo", Requests: 1}); err != nil {
 		t.Fatalf("SaveUsage: %v", err)
 	}
+	if err := session.Store.UpsertTTSJob(storage.TTSJob{ID: "job-1", GameID: "campaign-01", Provider: "echo", Status: "processing"}); err != nil {
+		t.Fatalf("UpsertTTSJob: %v", err)
+	}
 
 	return &resetFixture{
 		paths:    paths,
@@ -223,6 +226,14 @@ func TestResetCampaignRestoresWorldCastAndKeepsConfiguration(t *testing.T) {
 	}
 	if len(usage) != 1 {
 		t.Errorf("usage rows = %d, want the ledger preserved", len(usage))
+	}
+
+	jobs, err := f.store.ListTTSJobs("campaign-01")
+	if err != nil {
+		t.Fatalf("ListTTSJobs: %v", err)
+	}
+	if len(jobs) != 0 {
+		t.Errorf("batch jobs = %d, want them removed with the narration they speak", len(jobs))
 	}
 }
 

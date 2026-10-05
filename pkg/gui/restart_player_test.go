@@ -66,6 +66,9 @@ Sean grew up on the docks and never quite left them.`
 	if err := store.SaveUsage(storage.UsageRecord{GameID: gameID, Role: "gm", Provider: "echo", Requests: 1}); err != nil {
 		t.Fatal(err)
 	}
+	if err := store.UpsertTTSJob(storage.TTSJob{ID: "job-1", GameID: gameID, Provider: "echo", Status: "processing"}); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := svc.RestartGame(context.Background(), gameID); err != nil {
 		t.Fatalf("RestartGame failed: %v", err)
@@ -140,5 +143,13 @@ Sean grew up on the docks and never quite left them.`
 	}
 	if len(usage) != 1 {
 		t.Errorf("usage rows = %d, want the ledger preserved", len(usage))
+	}
+
+	jobs, err := store.ListTTSJobs(gameID)
+	if err != nil {
+		t.Fatalf("ListTTSJobs: %v", err)
+	}
+	if len(jobs) != 0 {
+		t.Errorf("batch jobs = %d, want them removed with the narration they speak", len(jobs))
 	}
 }

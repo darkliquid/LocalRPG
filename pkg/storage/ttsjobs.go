@@ -132,6 +132,19 @@ func (s *Store) DeleteFinishedTTSJobs(gameID string) (int, error) {
 	return int(removed), nil
 }
 
+// DeleteTTSJobs removes every job row for a campaign, in flight or not. A caller
+// that can reach the provider should cancel an active job first; the row is
+// removed either way, because work for narration that no longer exists is
+// pointless whether or not the provider acknowledged the cancellation.
+func (s *Store) DeleteTTSJobs(gameID string) (int, error) {
+	res, err := s.db.Exec(`DELETE FROM tts_jobs WHERE game_id = ?`, gameID)
+	if err != nil {
+		return 0, fmt.Errorf("delete tts jobs: %w", err)
+	}
+	removed, _ := res.RowsAffected()
+	return int(removed), nil
+}
+
 // scanTTSJob reads one job row, returning nil when there is no row.
 func scanTTSJob(scanner rowScanner) (*TTSJob, error) {
 	var job TTSJob
