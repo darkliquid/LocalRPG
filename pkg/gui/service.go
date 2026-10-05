@@ -4745,10 +4745,16 @@ func (s *Service) DeleteGameAsset(gameID, assetKind string) error {
 }
 
 // removeAssetFiles clears every extension an asset kind may have been stored
-// under, so a replacement never leaves a second file behind.
+// under, so a replacement never leaves a second file behind. Each path is
+// resolved through ResolveSafeChild, which is what keeps a crafted asset kind
+// from reaching outside the assets directory.
 func removeAssetFiles(assetsDir, assetKind string) error {
 	for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
-		if err := os.Remove(filepath.Join(assetsDir, assetKind+ext)); err != nil && !os.IsNotExist(err) {
+		path, err := pathutil.ResolveSafeChild(assetsDir, assetKind+ext)
+		if err != nil {
+			return fmt.Errorf("invalid asset path %q: %w", assetKind+ext, err)
+		}
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("remove asset %s: %w", assetKind+ext, err)
 		}
 	}
@@ -4858,9 +4864,8 @@ func (s *Service) SaveWorldAsset(worldID, assetKind string, data []byte, ext str
 	if err := os.MkdirAll(assetsDir, 0755); err != nil {
 		return "", fmt.Errorf("create assets dir: %w", err)
 	}
-	exts := []string{".png", ".webp", ".jpg", ".jpeg", ".svg"}
-	for _, e := range exts {
-		_ = os.Remove(filepath.Join(assetsDir, assetKind+e))
+	if err := removeAssetFiles(assetsDir, assetKind); err != nil {
+		return "", err
 	}
 	if ext == "" {
 		ext = ".png"
