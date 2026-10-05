@@ -104,3 +104,80 @@ func TestAssetEndpointsAndSummary(t *testing.T) {
 		t.Errorf("expected icon.png to exist on disk: %v", err)
 	}
 }
+
+func TestGameAssetFallsBackToTheWorld(t *testing.T) {
+	tempDir := t.TempDir()
+
+	gameDir := filepath.Join(tempDir, "games", "test-game")
+	if err := os.MkdirAll(gameDir, 0755); err != nil {
+		t.Fatalf("mkdir game: %v", err)
+	}
+	worldAssets := filepath.Join(tempDir, "worlds", "test-world", "assets")
+	if err := os.MkdirAll(worldAssets, 0755); err != nil {
+		t.Fatalf("mkdir world assets: %v", err)
+	}
+
+	gameYAML := "id: test-game\nname: Test Game\nsystem: test-sys\nworld: test-world\nplayer: Hero\n"
+	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"), []byte(gameYAML), 0644); err != nil {
+		t.Fatalf("write game.yaml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tempDir, "worlds", "test-world", "world.yaml"), []byte("id: test-world\nname: Test World\n"), 0644); err != nil {
+		t.Fatalf("write world.yaml: %v", err)
+	}
+
+	pngBytes := createTestPNG(t)
+	for _, name := range []string{"banner.png", "icon.png"} {
+		if err := os.WriteFile(filepath.Join(worldAssets, name), pngBytes, 0644); err != nil {
+			t.Fatalf("write world %s: %v", name, err)
+		}
+	}
+
+	svc := NewService(tempDir)
+	srv := NewServer(svc, http.NotFoundHandler())
+
+	games, err := svc.ListGames(context.Background())
+	if err != nil {
+		t.Fatalf("ListGames: %v", err)
+	}
+	if len(games) != 1 {
+		t.Fatalf("expected 1 game, got %d", len(games))
+	}
+	if games[0].BannerURL != "/api/game/test-game/banner" {
+		t.Errorf("BannerURL = %q, want the campaign route", games[0].BannerURL)
+	}
+	if games[0].IconURL != "/api/game/test-game/icon" {
+		t.Errorf("IconURL = %q, want the campaign route", games[0].IconURL)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/game/test-game/icon", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET icon expected 200 from the world fallback, got %d", rr.Code)
+	}
+	if rr.Header().Get("Content-Type") != "image/png" {
+		t.Errorf("Content-Type = %q, want image/png", rr.Header().Get("Content-Type"))
+	}
+	if !bytes.Equal(rr.Body.Bytes(), pngBytes) {
+		t.Errorf("served icon does not match the world's bytes")
+	}
+
+	// A campaign icon of its own wins over the world's.
+	campaignBytes := append([]byte{}, pngBytes...)
+	campaignBytes = append(campaignBytes, []byte("campaign")...)
+	if err := os.MkdirAll(filepath.Join(gameDir, "assets"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "assets", "icon.png"), campaignBytes, 0644); err != nil {
+		t.Fatal(err)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/api/game/test-game/icon", nil)
+	rr = httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET icon expected 200, got %d", rr.Code)
+	}
+	if !bytes.Equal(rr.Body.Bytes(), campaignBytes) {
+		t.Errorf("served icon does not match the campaign's own bytes")
+	}
+}

@@ -3462,6 +3462,23 @@ func findAssetFile(dir string, name string) (string, string) {
 	return "", ""
 }
 
+// gameAssetSource resolves a campaign's banner or icon, preferring the
+// campaign's own copy and falling back to the world's when it has none. The
+// fallback is resolved at read time, so it copies nothing and a campaign that
+// never had its own art still has none.
+func (s *Service) gameAssetSource(gameDir, worldID, assetKind string) (string, string, bool) {
+	if p, ext := findAssetFile(gameDir, assetKind); p != "" {
+		return p, contentTypeForArt(ext), true
+	}
+	if strings.TrimSpace(worldID) == "" {
+		return "", "", false
+	}
+	if p, ext := findAssetFile(s.resolver.WorldDir(worldID), assetKind); p != "" {
+		return p, contentTypeForArt(ext), true
+	}
+	return "", "", false
+}
+
 func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 	gamesDir := s.resolver.GamesDir()
 	entries, err := os.ReadDir(gamesDir)
@@ -3518,10 +3535,10 @@ func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 		}
 
 		var bannerURL, iconURL string
-		if p, _ := findAssetFile(gameDir, "banner"); p != "" {
+		if _, _, ok := s.gameAssetSource(gameDir, m.WorldID, "banner"); ok {
 			bannerURL = fmt.Sprintf("/api/game/%s/banner", gameID)
 		}
-		if p, _ := findAssetFile(gameDir, "icon"); p != "" {
+		if _, _, ok := s.gameAssetSource(gameDir, m.WorldID, "icon"); ok {
 			iconURL = fmt.Sprintf("/api/game/%s/icon", gameID)
 		}
 
@@ -3825,10 +3842,10 @@ func (s *Service) DeleteGame(ctx context.Context, gameID string) error {
 	return nil
 }
 
-// RestartGame returns a campaign to its opening state: history, the derived index,
-// and every entity created during play are discarded, while the campaign's
-// identity, system, world, protagonist, opening prompt, and pinned start location
-// are carried across.
+// RestartGame returns a campaign to its opening state without disturbing its
+// configuration: the timeline and the world's mutable cast are reset in place,
+// while the manifest, the artwork, the narrator voice, the protagonist and the
+// spend ledger are carried across untouched.
 func (s *Service) RestartGame(ctx context.Context, gameID string) (*GameSummaryDTO, error) {
 	if err := pathutil.ValidateID(gameID); err != nil {
 		return nil, fmt.Errorf("invalid game id: %w", err)
@@ -3846,97 +3863,22 @@ func (s *Service) RestartGame(ctx context.Context, gameID string) (*GameSummaryD
 		return nil, fmt.Errorf("load game manifest: %w", err)
 	}
 
-	playerName := manifest.PlayerName
-	details := ""
-	var playerCharacter engine.PlayerCharacter
-	var portraitRel string
-	var portraitBytes []byte
-	if store, err := s.store(gameID); err == nil {
-		if playerID, err := engine.ResolvePlayerID(store, manifest); err == nil && playerID != "" {
-			playerPath := filepath.Join(gameDir, "entities", playerID+".md")
-			if data, err := os.ReadFile(playerPath); err == nil {
-				if ent, err := entity.ParseMarkdownEntity(data); err == nil {
-					if playerName == "" {
-						playerName = ent.Name
-					}
-					details = strings.TrimSpace(ent.Body)
-					playerCharacter = engine.PlayerCharacterFromEntity(ent)
-					if ent.Portrait != "" {
-						if art, err := os.ReadFile(filepath.Join(gameDir, ent.Portrait)); err == nil {
-							portraitRel = ent.Portrait
-							portraitBytes = art
-						}
-					}
-				}
-			}
-		}
-	}
-	// Only carry the portrait reference forward when the file itself survived, so
-	// the recreated note never points at an asset that is no longer on disk.
-	if portraitRel == "" {
-		playerCharacter.Portrait = ""
-	}
-
-	startLocation := ""
-	if pinned, ok := manifest.Settings[engine.StartLocationSetting].(string); ok {
-		startLocation = pinned
-	}
-	openingPrompt := engine.OpeningPrompt(manifest)
-
-	if err := storage.CloseGameStore(s.resolver, gameID); err != nil {
-		return nil, err
-	}
-	if err := os.RemoveAll(gameDir); err != nil {
-		return nil, fmt.Errorf("remove campaign: %w", err)
-	}
-	s.forgetGame(gameID)
-
-	if strings.TrimSpace(playerName) == "" {
-		playerName = "Adventurer"
-	}
-
-	session, err := engine.InitGame(s.resolver, engine.InitOptions{
-		GameID:          gameID,
-		Name:            manifest.Name,
-		SystemID:        manifest.SystemID,
-		WorldID:         manifest.WorldID,
-		PlayerName:      playerName,
-		PlayerDetails:   details,
-		PlayerCharacter: playerCharacter,
-	})
+	store, err := s.store(gameID)
 	if err != nil {
-		return nil, fmt.Errorf("recreate campaign: %w", err)
-	}
-	_ = session.Close()
-
-	// The recreated campaign starts with empty assets, so put the protagonist's
-	// portrait back under the path its note already references.
-	if portraitRel != "" && len(portraitBytes) > 0 {
-		dest := filepath.Join(gameDir, portraitRel)
-		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
-			return nil, fmt.Errorf("restore portrait dir: %w", err)
-		}
-		if err := os.WriteFile(dest, portraitBytes, 0644); err != nil {
-			return nil, fmt.Errorf("restore portrait: %w", err)
-		}
+		return nil, fmt.Errorf("open campaign store: %w", err)
 	}
 
-	settings := map[string]interface{}{}
-	if startLocation != "" {
-		settings[engine.StartLocationSetting] = startLocation
-	}
-	if openingPrompt != "" {
-		settings[engine.OpeningPromptSetting] = openingPrompt
-	}
-	if len(settings) > 0 {
-		if err := s.UpdateGameSettings(ctx, gameID, settings); err != nil {
-			return nil, err
-		}
+	if err := engine.ResetCampaign(s.resolver, store, manifest); err != nil {
+		return nil, fmt.Errorf("reset campaign: %w", err)
 	}
 
 	name := manifest.Name
 	if name == "" {
 		name = gameID
+	}
+	playerName := manifest.PlayerName
+	if playerName == "" {
+		playerName = manifest.Player
 	}
 
 	return &GameSummaryDTO{
@@ -4638,11 +4580,14 @@ func (s *Service) GetGameAsset(gameID, assetKind string) (string, string, error)
 	if _, err := os.Stat(gameDir); err != nil {
 		return "", "", os.ErrNotExist
 	}
-	p, ext := findAssetFile(gameDir, assetKind)
-	if p == "" {
-		return "", "", os.ErrNotExist
+	worldID := ""
+	if manifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml")); err == nil {
+		worldID = manifest.WorldID
 	}
-	return p, contentTypeForArt(ext), nil
+	if p, contentType, ok := s.gameAssetSource(gameDir, worldID, assetKind); ok {
+		return p, contentType, nil
+	}
+	return "", "", os.ErrNotExist
 }
 
 func (s *Service) GetWorldAsset(worldID, assetKind string) (string, string, error) {

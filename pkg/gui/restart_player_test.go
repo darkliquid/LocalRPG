@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
 // TestRestartGamePreservesPlayerMetadata covers the regression where resetting a
@@ -43,6 +45,25 @@ Sean grew up on the docks and never quite left them.`
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(portraitDir, "sean.png"), []byte("portrait-bytes"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Campaign configuration a restart must not disturb: artwork, the narrator
+	// voice, and the spend ledger.
+	assetsDir := filepath.Join(gameDir, "assets")
+	for name, body := range map[string]string{"banner.png": "banner-bytes", "icon.png": "icon-bytes"} {
+		if err := os.WriteFile(filepath.Join(assetsDir, name), []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := svc.UpdateGameSettings(context.Background(), gameID, map[string]interface{}{"narrator_voice": "narrator-01"}); err != nil {
+		t.Fatal(err)
+	}
+	store, err := svc.store(gameID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveUsage(storage.UsageRecord{GameID: gameID, Role: "gm", Provider: "echo", Requests: 1}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -93,5 +114,31 @@ Sean grew up on the docks and never quite left them.`
 	}
 	if string(portrait) != "portrait-bytes" {
 		t.Errorf("portrait asset = %q, want the original bytes", portrait)
+	}
+
+	for name, want := range map[string]string{"banner.png": "banner-bytes", "icon.png": "icon-bytes"} {
+		got, err := os.ReadFile(filepath.Join(assetsDir, name))
+		if err != nil {
+			t.Fatalf("read asset %s after restart: %v", name, err)
+		}
+		if string(got) != want {
+			t.Errorf("asset %s = %q, want %q", name, got, want)
+		}
+	}
+
+	manifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
+	if err != nil {
+		t.Fatalf("reload manifest: %v", err)
+	}
+	if got, _ := manifest.Settings["narrator_voice"].(string); got != "narrator-01" {
+		t.Errorf("narrator_voice = %q, want the setting preserved", got)
+	}
+
+	usage, err := store.UsageByGame(gameID)
+	if err != nil {
+		t.Fatalf("UsageByGame: %v", err)
+	}
+	if len(usage) != 1 {
+		t.Errorf("usage rows = %d, want the ledger preserved", len(usage))
 	}
 }

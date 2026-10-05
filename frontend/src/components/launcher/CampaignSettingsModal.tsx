@@ -420,7 +420,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
             <div className="flex items-center justify-between pt-1">
               <div>
                 <div className="text-xs font-sans font-semibold text-stone-200">Restart Campaign</div>
-                <div className="text-xs font-sans text-stone-400">Resets timeline to Turn 0. Retains character & world.</div>
+                <div className="text-xs font-sans text-stone-400">Resets the story and the world's cast. Keeps artwork, voice, settings and your character.</div>
               </div>
               {confirmAction === 'restart' ? (
                 <div className="flex items-center gap-2">
