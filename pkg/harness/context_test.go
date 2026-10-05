@@ -305,7 +305,7 @@ func TestAssembleReportsEverySectionAndKeepsTheActionLast(t *testing.T) {
 		t.Errorf("expected a player action section")
 	}
 	if !strings.Contains(result.Prompt, "Format reminder: Every spoken line or dialogue beat MUST start with '> Speaker:") {
-		t.Errorf("expected format reminder in player action section")
+		t.Errorf("expected the format reminder in the framing section")
 	}
 
 	names := make([]string, 0, len(result.Sections))
@@ -903,5 +903,23 @@ func TestOpeningSceneSectionIsNotDroppable(t *testing.T) {
 	}
 	if !strings.Contains(result.Prompt, scene) {
 		t.Fatalf("the opening scene must survive trimming:\n%s", result.Prompt)
+	}
+}
+
+func TestPromptOmitsThePlayerActionWhenThereIsNone(t *testing.T) {
+	assembler := NewContextAssembler(newTestEntityStore(t))
+
+	result, err := assembler.Assemble(ContextRequest{
+		OpeningScene: "Fire rains down over the market.",
+		OpeningHooks: true,
+	})
+	if err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+	if strings.Contains(result.Prompt, "## PLAYER ACTION") {
+		t.Fatalf("an opening turn has no action to present:\n%s", result.Prompt)
+	}
+	if !strings.Contains(result.Prompt, "MUST start with '> Speaker:") {
+		t.Fatalf("the reply format must still be taught:\n%s", result.Prompt)
 	}
 }

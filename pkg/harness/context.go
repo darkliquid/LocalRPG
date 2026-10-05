@@ -283,6 +283,8 @@ func openingSceneSection(scene string, hooks bool) string {
 // turnFramingInstruction teaches the line framing the engine parses as the reply
 // streams: blockquote speech and @-prefixed control records.
 const turnFramingInstruction = `## TURN FORMAT
+Format reminder: Every spoken line or dialogue beat MUST start with '> Speaker: "utterance"'. Plain prose without '>' is for narration only. Use '@persona {"name":"...", "reveals":"Old Name"}' when an unknown identity is revealed.
+
 Write the turn as prose. Mark each spoken line as a blockquote whose speaker is
 named before a colon, on its own line:
 
@@ -332,12 +334,16 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 		actionRefs = append(actionRefs, Ref{Kind: RefEntity, ID: req.PlayerID, Relation: "action"})
 	}
 
-	actionText := "\n## PLAYER ACTION\n"
-	actionText += "> Format reminder: Every spoken line or dialogue beat MUST start with '> Speaker: \"utterance\"'. Plain prose without '>' is for narration only. Use '@persona {\"name\":\"...\", \"reveals\":\"Old Name\"}' when an unknown identity is revealed.\n\n"
-	if name := strings.TrimSpace(req.PlayerName); name != "" {
-		actionText += name + ": "
+	// An opening turn has no action to answer, so the section is absent rather than
+	// empty: presenting it made the GM respond to the scene it was given.
+	actionText := ""
+	if strings.TrimSpace(req.Action) != "" || strings.TrimSpace(req.PlayerName) != "" {
+		actionText = "\n## PLAYER ACTION\n"
+		if name := strings.TrimSpace(req.PlayerName); name != "" {
+			actionText += name + ": "
+		}
+		actionText += req.Action + "\n"
 	}
-	actionText += req.Action + "\n"
 
 	return []section{
 		{name: "rules", source: "rules_prompt", text: rulesSection(req.RulesPrompt)},
