@@ -53,11 +53,27 @@ Evelyn is the second daughter of the Vance merchant dynasty. While outwardly man
 
 ## Supported Entity Types
 
-- **`character`**: Player characters, NPCs, companions, and adversaries. Supports `voice`, `appearance`, and `inventory`.
-- **`location`**: Towns, taverns, dungeons, starships, and regions. Can nest inside parent locations via `location: "[[parent-zone]]"`.
-- **`faction`**: Guilds, secret societies, governments, and crews. Can track influence, reputation, and rivalries in `state`.
-- **`item`**: Relics, weapons, spellbooks, and keys. Can be carried in entity `inventory` arrays.
-- **`concept`**: Prophecies, historical events, cultural taboos, and magical phenomena.
+The New Note wizard offers these types. Each one scaffolds the frontmatter keys
+it uses, every key preceded by a line explaining its purpose. The engine
+itself accepts any type string, so a type not listed here still loads.
+
+- **`character`**: Player characters, NPCs, companions, and adversaries. Offers `voice`, `appearance`, `gender`, and `age`.
+- **`location`**: Towns, rooms, regions, and any other place a scene happens in. Offers `appearance`, and nests inside a parent location through `location: "[[parent-zone]]"`.
+- **`faction`**: Guilds, orders, crews, and governments. Offers `appearance`. Influence, reputation, and rivalries live in `state`.
+- **`item`**: Relics, weapons, tools, and keys. Offers `appearance`.
+- **`concept`**: Ideas, customs, deities, and forces that define the world.
+- **`arc`**: A running storyline or threat, tracked as a progress clock in `state`.
+- **`event`**: Something that happened, or something yet to happen.
+- **`quest`**: A goal the player can pursue, with a `state` to track it.
+- **`lore`**: Background history or a piece of world knowledge.
+
+## Creating a Note
+
+The **+ New** button in the codex, the Content Studio, and the Worlds Studio opens
+the same wizard. Give the note a name, pick its type, and answer the options the
+type asks for, such as a voice for a character. The wizard writes the frontmatter
+with every key for that type present and documented, and opens it in the editor,
+where the autosuggester completes keys and known values as you type.
 
 ## Graph Modeling with `[[Wikilinks]]`
 
