@@ -57,6 +57,7 @@ run = """
 npx tsc --noEmit
 npm run check:tree-model
 npm run check:player-bundle
+npm run check:entity-scaffold
 """
 
 [tasks.test]

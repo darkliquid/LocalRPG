@@ -69,6 +69,7 @@ hardcoded
 headlessly
 unmetered
 prefill
+autosuggester
 muxed
 codec
 backoff

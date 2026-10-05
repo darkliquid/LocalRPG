@@ -10,6 +10,7 @@ import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
 import EntityTree from './EntityTree';
 import MarkdownEditor from './editor/MarkdownEditor';
+import { NewEntityWizard } from './NewEntityWizard';
 import { safeImagePreview } from '../utils/security';
 
 interface WorldsStudioProps {
@@ -26,6 +27,13 @@ wikilinks: []
 ---
 An intriguing location waiting to be explored.
 `;
+
+// typeFromMarkdown reads the type the wizard wrote, so the tree summary matches
+// the note without a round trip.
+function typeFromMarkdown(markdown: string): string {
+  const match = markdown.match(/^type:\s*"?([a-z0-9-]+)"?/m);
+  return match ? match[1] : 'concept';
+}
 
 export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startMode = 'browse' }) => {
   const [worlds, setWorlds] = useState<WorldInfo[]>([]);
@@ -53,7 +61,6 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const [entityMarkdown, setEntityMarkdown] = useState('');
   const [entityDrafts, setEntityDrafts] = useState<Record<string, string>>({});
   const [isNewEntityModal, setIsNewEntityModal] = useState(false);
-  const [newEntitySlug, setNewEntitySlug] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -477,35 +484,32 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
     }
   };
 
-  const handleCreateNewEntity = async () => {
-    if (!newEntitySlug.trim()) return;
-    const slug = newEntitySlug.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+  const handleCreateNewEntity = async (input: { id: string; name: string; markdown: string }) => {
+    const { id: slug, markdown } = input;
 
     if (isDraft) {
       if (entities.some((e) => e.id === slug)) {
         setToast({ type: 'error', message: `Entity "${slug}" already exists` });
         return;
       }
-      const newSummary: WorldEntitySummary = { id: slug, name: slug, type: 'concept' };
+      const newSummary: WorldEntitySummary = { id: slug, name: input.name, type: typeFromMarkdown(markdown) };
       setEntities((prev) => [...prev, newSummary]);
       setEntityDrafts((prev) => ({
         ...prev,
         ...(selectedEntityID ? { [selectedEntityID]: entityMarkdown } : {}),
-        [slug]: STARTER_ENTITY_TEMPLATE,
+        [slug]: markdown,
       }));
       setSelectedEntityID(slug);
-      setEntityMarkdown(STARTER_ENTITY_TEMPLATE);
+      setEntityMarkdown(markdown);
       setIsNewEntityModal(false);
-      setNewEntitySlug('');
       markDirty();
       return;
     }
     if (!savedID) return;
 
     try {
-      await APIClient.saveWorldEntity(savedID, slug, STARTER_ENTITY_TEMPLATE);
+      await APIClient.saveWorldEntity(savedID, slug, markdown);
       setIsNewEntityModal(false);
-      setNewEntitySlug('');
       await loadWorldDetail(savedID);
       await handleSelectEntity(slug);
     } catch (err) {
@@ -1145,46 +1149,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       />
 
       {/* New Entity Modal */}
-      {isNewEntityModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm anim-fade-in">
-          <div className="w-full max-w-sm max-h-[85vh] flex flex-col rounded-2xl bg-stone-900 border border-purple-500/30 shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-stone-800 shrink-0">
-              <h3 className="font-sans text-sm font-bold text-purple-400">
-                New Starter Entity Template
-              </h3>
-            </div>
-            <div className="p-6 space-y-4 flex-1 min-h-0 overflow-y-auto">
-              <div className="space-y-1">
-                <label className="text-xs text-stone-300">Entity Slug (filename without .md)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. the_iron_bastion"
-                  value={newEntitySlug}
-                  onChange={(e) => setNewEntitySlug(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:border-purple-500/50"
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-stone-800 shrink-0 bg-stone-900/80">
-              <button
-                type="button"
-                onClick={() => setIsNewEntityModal(false)}
-                className="px-3 py-1.5 text-xs text-stone-400 hover:text-white cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateNewEntity}
-                disabled={!newEntitySlug.trim()}
-                className="px-4 py-1.5 text-xs font-sans font-bold bg-purple-600 text-white rounded-lg disabled:opacity-50 cursor-pointer"
-              >
-                Create
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <NewEntityWizard
+        isOpen={isNewEntityModal}
+        existingIds={entities.map((e) => e.id)}
+        confirmLabel={isDraft ? 'Add template' : 'Create template'}
+        onClose={() => setIsNewEntityModal(false)}
+        onConfirm={handleCreateNewEntity}
+      />
 
       {lightbox && (
         <ImageLightbox isOpen={isLightboxOpen} src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />

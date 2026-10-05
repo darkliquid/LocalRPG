@@ -15,6 +15,7 @@ import { ContextDrawer } from './components/ContextDrawer';
 import { LauncherHub } from './components/LauncherHub';
 import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
+import { NewEntityWizard } from './components/NewEntityWizard';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
 import { LimitChip } from './components/LimitChip';
 import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, AlertTriangle, HelpCircle, Download } from 'lucide-react';
@@ -88,6 +89,7 @@ export const App: React.FC = () => {
   const [appVersion, setAppVersion] = useState<string | undefined>(undefined);
   const [addressed, setAddressed] = useState<Set<number>>(new Set());
   const [modalEntity, setModalEntity] = useState<{ name: string; turnNumber: number } | null>(null);
+  const [wizardEntity, setWizardEntity] = useState<{ name: string; turnNumber: number } | null>(null);
   const [missingModel, setMissingModel] = useState<{ id: string; name: string; sizeBytes: number } | null>(null);
   const [dismissedModelPrompt, setDismissedModelPrompt] = useState(false);
   // The remembered campaign is only a hint until it is verified against the
@@ -678,24 +680,25 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleEditInCodexEntity = async (name: string, type: string) => {
-    if (!client || !modalEntity) return;
-    const slug = slugify(name);
+  const handleEditInCodexEntity = (name: string) => {
+    if (!modalEntity) return;
+    setWizardEntity({ name, turnNumber: modalEntity.turnNumber });
+    setModalEntity(null);
+  };
+
+  const handleWizardCreateEntity = async ({ id, markdown }: { id: string; name: string; markdown: string }) => {
+    if (!client || !wizardEntity) return;
     try {
-      const existing = entities.find((candidate) => candidate.id === slug);
-      if (!existing) {
-        const template = `---\nid: ${slug}\nname: ${name}\ntype: ${type}\n---\n\n`;
-        await client.saveEntity(slug, template);
-      }
-      await client.addressFinding(modalEntity.turnNumber, 'continuity');
-      setAddressed((prev) => new Set(prev).add(modalEntity.turnNumber));
+      await client.saveEntity(id, markdown);
+      await client.addressFinding(wizardEntity.turnNumber, 'continuity');
+      setAddressed((prev) => new Set(prev).add(wizardEntity.turnNumber));
       refreshCorpus();
-      const entity = await client.getEntity(slug);
-      setSelectedEntity(entity);
+      setSelectedEntity(await client.getEntity(id));
       setActiveDrawer('codex');
     } catch (err) {
-      console.error('edit in codex entity failed:', err);
+      console.error('wizard create entity failed:', err);
     } finally {
+      setWizardEntity(null);
       setModalEntity(null);
     }
   };
@@ -1142,6 +1145,23 @@ export const App: React.FC = () => {
             onEditInCodex={handleEditInCodexEntity}
             onClose={() => setModalEntity(null)}
           />
+
+          {wizardEntity && (
+            <NewEntityWizard
+              isOpen={wizardEntity !== null}
+              initialName={wizardEntity.name}
+              existingIds={entities.map((candidate) => candidate.id)}
+              ttsConfig={config?.media.tts}
+              voiceProfiles={config?.media.tts.voice_profiles ?? []}
+              onClose={() => setWizardEntity(null)}
+              onOpenExisting={async (id) => {
+                setWizardEntity(null);
+                if (client) setSelectedEntity(await client.getEntity(id));
+                setActiveDrawer('codex');
+              }}
+              onConfirm={handleWizardCreateEntity}
+            />
+          )}
 
           {/* Turn Failure Banner */}
           {turnError && (

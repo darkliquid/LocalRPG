@@ -1001,6 +1001,23 @@ export interface FrontmatterSchema {
   keys: FrontmatterKeySchema[];
 }
 
+// EntityTypeSpec is one offered entity type, as the server describes it: how the
+// picker labels it and the frontmatter keys a new note of this type is built with.
+export interface EntityTypeSpec {
+  id: string;
+  label: string;
+  description: string;
+  aliases?: string[];
+  keys: FrontmatterKeySchema[];
+}
+
+// EntityTypeCatalog is the served list of offered entity types. base_keys is what
+// an unknown type falls back to.
+export interface EntityTypeCatalog {
+  base_keys: FrontmatterKeySchema[];
+  types: EntityTypeSpec[];
+}
+
 // SaveErrorBody is what the entity save route returns when the frontmatter will
 // not parse, so the editor can point at the offending line.
 export interface SaveErrorBody {

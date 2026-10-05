@@ -9,6 +9,7 @@ import {
   EntitySummary,
   FolderNode,
   FrontmatterSchema,
+  EntityTypeCatalog,
   SaveErrorBody,
   Recap,
   SystemInfo,
@@ -766,6 +767,12 @@ export class APIClient {
   async getEntityFrontmatterSchema(): Promise<FrontmatterSchema> {
     const res = await fetch('/api/schema/entity-frontmatter');
     if (!res.ok) throw new Error(`getEntityFrontmatterSchema: ${res.statusText}`);
+    return res.json();
+  }
+
+  async getEntityTypes(): Promise<EntityTypeCatalog> {
+    const res = await fetch('/api/schema/entity-types');
+    if (!res.ok) throw new Error(`getEntityTypes: ${res.statusText}`);
     return res.json();
   }
 

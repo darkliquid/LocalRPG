@@ -10,6 +10,7 @@ import { VoiceProfileSelect } from './VoiceProfileSelect';
 import EntityTree from './EntityTree';
 import MarkdownEditor from './editor/MarkdownEditor';
 import { loadEntityIndex, invalidateEntityIndex } from './editor/entityIndex';
+import { NewEntityWizard } from './NewEntityWizard';
 
 interface CodexDrawerProps {
   gameID?: string;
@@ -50,6 +51,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   const [saveFailure, setSaveFailure] = useState<{ line: number; message: string } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!entity);
   const [isMergeOpen, setIsMergeOpen] = useState(false);
+  const [isNewNoteOpen, setIsNewNoteOpen] = useState(false);
   const [mergeTarget, setMergeTarget] = useState('');
   const [saveError, setSaveError] = useState('');
   const [memories, setMemories] = useState<EntityMemory[]>([]);
@@ -265,6 +267,13 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               >
                 Memories ({memories.length})
               </button>
+              <button
+                type="button"
+                onClick={() => setIsNewNoteOpen(true)}
+                className="ml-auto rounded-lg border border-purple-500/50 bg-purple-600/20 px-2 py-1 text-xs font-sans font-bold text-purple-200 transition-colors cursor-pointer hover:bg-purple-600/40"
+              >
+                + New
+              </button>
             </div>
             {entity && (
               <button
@@ -366,9 +375,18 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
       {/* Note editor */}
       <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         {!entity ? (
-          <div className="h-full flex flex-col items-center justify-center text-center gap-2 text-stone-500 italic p-6">
+          <div className="h-full flex flex-col items-center justify-center text-center gap-3 text-stone-500 italic p-6">
             <BookOpen className="w-8 h-8 text-purple-500/40" />
             <span className="text-sm">Choose a note from the codex to read or edit it.</span>
+            {gameID && (
+              <button
+                type="button"
+                onClick={() => setIsNewNoteOpen(true)}
+                className="not-italic rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-sans font-bold text-white transition-colors cursor-pointer hover:bg-purple-500"
+              >
+                Create a note
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-4 flex flex-col h-full min-h-0">
@@ -574,6 +592,26 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
             </div>
           </div>
         </div>
+      )}
+      {gameID && (
+        <NewEntityWizard
+          isOpen={isNewNoteOpen}
+          existingIds={(entities ?? []).map((candidate) => candidate.id)}
+          ttsConfig={ttsConfig}
+          voiceProfiles={voiceProfiles}
+          onClose={() => setIsNewNoteOpen(false)}
+          onOpenExisting={(id) => {
+            setIsNewNoteOpen(false);
+            onSelect(id);
+          }}
+          onConfirm={async ({ id, markdown }) => {
+            await new APIClient(gameID).saveEntity(id, markdown);
+            invalidateEntityIndex();
+            setLinkTargets(await loadEntityIndex(new APIClient(gameID), gameID, true));
+            setIsNewNoteOpen(false);
+            onSelect(id);
+          }}
+        />
       )}
       {lightbox && (
         <ImageLightbox isOpen={isLightboxOpen} src={lightbox.src} alt={lightbox.alt} onClose={closeLightbox} />

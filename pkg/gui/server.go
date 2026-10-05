@@ -157,22 +157,31 @@ func writeSaveError(w http.ResponseWriter, err error, document string) {
 	})
 }
 
-// handleSchemaRoutes serves the generated schemas the editor consumes.
+// handleSchemaRoutes serves the generated schemas the editor and the new-entity
+// wizard consume.
 func (s *Server) handleSchemaRoutes(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if r.URL.Path != "/api/schema/entity-frontmatter" {
+	switch r.URL.Path {
+	case "/api/schema/entity-frontmatter":
+		schema, err := s.service.GetEntityFrontmatterSchema(r.Context())
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, schema)
+	case "/api/schema/entity-types":
+		catalog, err := s.service.GetEntityTypeCatalog(r.Context())
+		if err != nil {
+			writeGameError(w, err)
+			return
+		}
+		writeJSON(w, catalog)
+	default:
 		http.NotFound(w, r)
-		return
 	}
-	schema, err := s.service.GetEntityFrontmatterSchema(r.Context())
-	if err != nil {
-		writeGameError(w, err)
-		return
-	}
-	writeJSON(w, schema)
 }
 
 // handleFolderRoutes serves the folder CRUD a tree UI needs. It takes the
