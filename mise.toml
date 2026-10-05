@@ -134,3 +134,104 @@ run = "bash scripts/cut-release.sh \"${usage_bump:-patch}\""
 [tasks.clean]
 description = "Clean up build outputs"
 run = "rm -rf bin/ dist/ frontend/dist website/dist"
+
+# --- project and issue tracking ---------------------------------------------
+# These wrap scripts/project.sh, which owns the GitHub Project field IDs and the
+# status vocabulary, so the tasks stay declarative. They are how a worker finds
+# its next task and records progress. See AGENTS.md, "Working the project".
+
+[tasks."project:list"]
+description = "List project items, optionally filtered"
+usage = '''
+flag "--status <status>" help="proposal, specced, planned, in-progress, testing, or done"
+flag "--wave <wave>" help="1, 2, 3, or 4"
+flag "--area <area>" help="providers, systems, media, ..."
+flag "--kind <kind>" help="epic, feature, enhancement, refactor, chore, test, research, documentation"
+'''
+run = 'bash scripts/project.sh list --status "${usage_status:-}" --wave "${usage_wave:-}" --area "${usage_area:-}" --kind "${usage_kind:-}"'
+
+[tasks."project:show"]
+description = "Show one project item in full: status, fields, spec, plan, and DoD"
+usage = 'arg "<issue>" help="the issue number"'
+run = 'bash scripts/project.sh show "${usage_issue}"'
+
+[tasks."project:next"]
+description = "Print the next ready work item (earliest wave, In Progress first)"
+usage = 'flag "--wave <wave>" help="restrict to a wave (1-4)"'
+run = 'bash scripts/project.sh next "${usage_wave:-}"'
+
+[tasks."project:status"]
+description = "Set a project item's status"
+usage = '''
+arg "<issue>" help="the issue number"
+arg "<status>" help="proposal, specced, planned, in-progress, testing, or done"
+'''
+run = 'bash scripts/project.sh status "${usage_issue}" "${usage_status}"'
+
+[tasks."project:check"]
+description = "Tick a definition-of-done box on an issue"
+usage = '''
+arg "<issue>" help="the issue number"
+arg "<box>" help="spec, plan, implemented, tested, or docs"
+flag "--uncheck" help="clear the box instead"
+'''
+run = 'bash scripts/project.sh check "${usage_issue}" "${usage_box}" ${usage_uncheck:+--uncheck}'
+
+[tasks."project:scaffold"]
+description = "Create the spec and plan skeletons for an issue"
+usage = '''
+arg "<issue>" help="the issue number"
+flag "--slug <slug>" help="override the derived file slug"
+'''
+run = 'bash scripts/project.sh scaffold "${usage_issue}" ${usage_slug:+--slug "$usage_slug"}'
+
+[tasks."project:add-wave"]
+description = "Add a wave: its milestone, project field option, and label"
+usage = '''
+arg "<number>" help="the wave number"
+arg "<title>" help="the wave title"
+'''
+run = 'bash scripts/project.sh add-wave "${usage_number}" "${usage_title}"'
+
+[tasks."project:add-area"]
+description = "Add a theme area: its label and project field option"
+usage = 'arg "<slug>" help="the area slug, e.g. audio"'
+run = 'bash scripts/project.sh add-area "${usage_slug}"'
+
+[tasks."project:new"]
+description = "Create a fresh GitHub Project with the standard fields, and write its ID to project.conf"
+usage = 'flag "--title <title>" help="the project title"'
+run = 'bash scripts/project.sh new --title "$usage_title"'
+
+[tasks."project:add-epic"]
+description = "Create an epic issue, add it to the project, and set its fields"
+usage = '''
+flag "--area <area>" help="the area label suffix"
+flag "--title <title>" help="the epic title"
+flag "--wave <wave>" help="1, 2, 3, or 4"
+flag "--summary <summary>" help="a one-line summary"
+'''
+run = 'bash scripts/project.sh add-epic --area "$usage_area" --title "$usage_title" --wave "$usage_wave" --summary "$usage_summary"'
+
+[tasks."project:add-proposal"]
+description = "Create a proposal issue under an epic and wire it up"
+usage = '''
+flag "--epic <epic>" help="the parent epic issue number"
+flag "--id <id>" help="the proposal id, e.g. RB-7"
+flag "--title <title>" help="the proposal title"
+flag "--area <area>" help="the area label suffix"
+flag "--wave <wave>" help="1, 2, 3, or 4"
+flag "--effort <effort>" help="S, M, or L"
+flag "--kind <kind>" help="feature, enhancement, refactor, chore, test, research, documentation"
+flag "--summary <summary>" help="a one-line summary"
+flag "--deps <deps>" help="comma-separated dependencies"
+'''
+run = 'bash scripts/project.sh add-proposal --epic "$usage_epic" --id "$usage_id" --title "$usage_title" --area "$usage_area" --wave "$usage_wave" --effort "$usage_effort" --kind "$usage_kind" --summary "$usage_summary" --deps "${usage_deps:-none}"'
+
+[tasks."project:link"]
+description = "Attach an existing issue as a sub-issue of an epic"
+usage = '''
+arg "<epic>" help="the parent epic issue number"
+arg "<issue>" help="the child issue number"
+'''
+run = 'bash scripts/project.sh link "${usage_epic}" "${usage_issue}"'
