@@ -145,6 +145,7 @@ func handlePlayCommand(args []string) {
 	orchestrator.SetTools(toolExecutor, cfg.RoleSupportsTools("gm"))
 	orchestrator.SetToolRounds(cfg.ToolRounds())
 	orchestrator.SetActionEcho(cfg.ActionEcho())
+	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
 	orchestrator.LoadPrompts(resolver, manifest.SystemID, manifest.WorldID)
 
 	if ttsCli, err := media.NewTTSClientWithSharedKey(cfg.Media.TTS, cfg.Providers.Gemini.APIKey); err == nil {
@@ -158,6 +159,20 @@ func handlePlayCommand(args []string) {
 	}
 
 	app := tui.NewAppModel(orchestrator, 80, 24)
+
+	// A campaign with an opening prompt and no history opens with the quiet scene
+	// turn, so the TUI restates the scene the GUI shows in its Prologue.
+	if engine.OpeningPrompt(manifest) != "" {
+		if turns, err := history.LoadHistory(); err == nil && len(turns) == 0 {
+			orchestrator.SetSceneOnly(true)
+			if scene, err := orchestrator.ProcessAction(context.Background(), engine.OpeningMode, ""); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: could not establish the opening scene: %v\n", err)
+			} else if scene != nil {
+				app.Seed([]engine.Turn{*scene})
+			}
+		}
+	}
+
 	p := tea.NewProgram(app, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
