@@ -273,8 +273,7 @@ person turn. "Restate" means narrate faithfully, not reproduce.
 | `pkg/gui/types.go` | Add `TurnRequest.SceneOnly` |
 | `pkg/gui/service.go` | Pass `req.SceneOnly` to the orchestrator before the turn |
 | `cmd/localrpg/play.go` | Call `SetOpeningPrompt`; run the quiet scene turn at startup when the campaign is empty |
-| `frontend/src/types.ts` | Add `scene_only?: boolean` to the turn request |
-| `frontend/src/api/client.ts` | Send `scene_only` on the turn body |
+| `frontend/src/api/client.ts` | Send `scene_only` on the turn body (the body type is declared inline here; `types.ts` carries no request type) |
 | `frontend/src/App.tsx` | `handleBeginWithAction` submits the quiet scene turn when a prompt is set |
 | `pkg/engine/orchestrator_stream_test.go` | Update the opening-turn test; add the restatement and hooks tests |
 | `pkg/gui/turn_test.go` | Update the opening-turn session test; add the quiet-scene and action-first cases |
