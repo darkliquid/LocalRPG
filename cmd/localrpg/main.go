@@ -12,7 +12,7 @@ import (
 // Version is stamped at release time with
 // -ldflags "-X main.Version=...", so it stays a variable rather than a
 // constant. The literal is what a plain `go build` reports.
-var Version = "0.4.0"
+var Version = "0.4.1"
 
 func main() {
 	if err := provider.Validate(); err != nil {
