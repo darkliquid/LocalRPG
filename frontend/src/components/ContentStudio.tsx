@@ -5,6 +5,7 @@ import type { EntityNote, EntitySummary, FolderNode } from '../types';
 import EntityTree from './EntityTree';
 import MarkdownEditor, { type MarkdownEditorProps } from './editor/MarkdownEditor';
 import { loadEntityIndex, invalidateEntityIndex } from './editor/entityIndex';
+import { NewEntityWizard } from './NewEntityWizard';
 
 type DocKind = 'entities' | 'prompts' | 'manifests';
 
@@ -27,6 +28,7 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
   const [error, setError] = useState('');
   const [linkTargets, setLinkTargets] = useState<EntitySummary[]>([]);
   const [saveFailure, setSaveFailure] = useState<{ line: number; message: string } | null>(null);
+  const [isNewNoteOpen, setIsNewNoteOpen] = useState(false);
 
   const client = useMemo(() => new APIClient(gameID), [gameID]);
 
@@ -141,6 +143,13 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
 
       <div className="flex min-h-0 flex-1">
         <aside className="w-64 shrink-0 border-r border-white/10 p-3">
+          <button
+            type="button"
+            onClick={() => setIsNewNoteOpen(true)}
+            className="mb-2 w-full rounded-lg border border-purple-500/50 bg-purple-600/20 px-2 py-1 text-xs font-sans font-bold text-purple-200 transition-colors cursor-pointer hover:bg-purple-600/40"
+          >
+            + New
+          </button>
           <EntityTree
             folders={folders}
             entities={entities}
@@ -189,6 +198,24 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
           )}
         </main>
       </div>
+
+      <NewEntityWizard
+        isOpen={isNewNoteOpen}
+        existingIds={entities.map((candidate) => candidate.id)}
+        onClose={() => setIsNewNoteOpen(false)}
+        onOpenExisting={async (id) => {
+          setIsNewNoteOpen(false);
+          setNote(await client.getEntity(id));
+        }}
+        onConfirm={async ({ id, markdown }) => {
+          await client.saveEntity(id, markdown);
+          invalidateEntityIndex();
+          setEntities(await client.listEntities());
+          setLinkTargets(await loadEntityIndex(client, gameID, true));
+          setIsNewNoteOpen(false);
+          setNote(await client.getEntity(id));
+        }}
+      />
     </div>
   );
 }
