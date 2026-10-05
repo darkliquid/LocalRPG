@@ -679,15 +679,9 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		}
 	}
 
-	var bannerURL string
-	if p, _ := findAssetFile(gameDir, "banner"); p != "" {
-		bannerURL = fmt.Sprintf("/api/game/%s/banner", gameID)
-	} else if gameManifest.WorldID != "" {
-		worldDir := s.resolver.WorldDir(gameManifest.WorldID)
-		if p, _ := findAssetFile(worldDir, "banner"); p != "" {
-			bannerURL = fmt.Sprintf("/api/world/%s/banner", gameManifest.WorldID)
-		}
-	}
+	// The campaign route serves the world's banner when the campaign has none of
+	// its own, so one URL covers both and a change to either is a new URL.
+	bannerURL, _ := s.gameAssetURL(gameDir, gameManifest.WorldID, "banner", gameID)
 
 	var systemManifest *core.SystemManifest
 	if sm, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(gameManifest.SystemID), "system.yaml")); err == nil {
@@ -3539,6 +3533,37 @@ func (s *Service) gameAssetSource(gameDir, worldID, assetKind string) (string, s
 	return "", "", false
 }
 
+// gameAssetURL returns the campaign route for a banner or icon, preferring the
+// campaign's own asset and falling back to the world's, and reports which one it
+// is ("campaign", "world", or "" when neither exists).
+//
+// The URL carries a token derived from the file it will serve. Without it the
+// route is identical before and after an asset is generated or cleared, so a
+// browser keeps showing the image it already cached and a new generation looks
+// like it did nothing.
+func (s *Service) gameAssetURL(gameDir, worldID, assetKind, gameID string) (string, string) {
+	base := fmt.Sprintf("/api/game/%s/%s", gameID, assetKind)
+	if p, _ := findAssetFile(gameDir, assetKind); p != "" {
+		return versionedAssetURL(base, p), "campaign"
+	}
+	if strings.TrimSpace(worldID) != "" {
+		if p, _ := findAssetFile(s.resolver.WorldDir(worldID), assetKind); p != "" {
+			return versionedAssetURL(base, p), "world"
+		}
+	}
+	return "", ""
+}
+
+// versionedAssetURL stamps an asset URL with its source file's size and
+// modification time, so a changed file is a new URL.
+func versionedAssetURL(base, path string) string {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return base
+	}
+	return fmt.Sprintf("%s?v=%d-%d", base, fi.ModTime().UnixNano(), fi.Size())
+}
+
 func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 	gamesDir := s.resolver.GamesDir()
 	entries, err := os.ReadDir(gamesDir)
@@ -3594,13 +3619,8 @@ func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 			playerName = m.Player
 		}
 
-		var bannerURL, iconURL string
-		if _, _, ok := s.gameAssetSource(gameDir, m.WorldID, "banner"); ok {
-			bannerURL = fmt.Sprintf("/api/game/%s/banner", gameID)
-		}
-		if _, _, ok := s.gameAssetSource(gameDir, m.WorldID, "icon"); ok {
-			iconURL = fmt.Sprintf("/api/game/%s/icon", gameID)
-		}
+		bannerURL, bannerSource := s.gameAssetURL(gameDir, m.WorldID, "banner", gameID)
+		iconURL, iconSource := s.gameAssetURL(gameDir, m.WorldID, "icon", gameID)
 
 		summaries = append(summaries, GameSummaryDTO{
 			ID:              gameID,
@@ -3612,6 +3632,8 @@ func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 			LastPlayed:      lastPlayed,
 			BannerURL:       bannerURL,
 			IconURL:         iconURL,
+			BannerSource:    bannerSource,
+			IconSource:      iconSource,
 			PlayTimeSeconds: int64(turnCount * 120),
 		})
 	}
@@ -4687,9 +4709,8 @@ func (s *Service) SaveGameAsset(gameID, assetKind string, data []byte, ext strin
 	if err := os.MkdirAll(assetsDir, 0755); err != nil {
 		return "", fmt.Errorf("create assets dir: %w", err)
 	}
-	exts := []string{".png", ".webp", ".jpg", ".jpeg", ".svg"}
-	for _, e := range exts {
-		_ = os.Remove(filepath.Join(assetsDir, assetKind+e))
+	if err := removeAssetFiles(assetsDir, assetKind); err != nil {
+		return "", err
 	}
 	if ext == "" {
 		ext = ".png"
@@ -4705,6 +4726,121 @@ func (s *Service) SaveGameAsset(gameID, assetKind string, data []byte, ext strin
 		return "", fmt.Errorf("write asset: %w", err)
 	}
 	return fmt.Sprintf("/api/game/%s/%s", gameID, assetKind), nil
+}
+
+// DeleteGameAsset removes a campaign's own banner or icon so it falls back to
+// the world's artwork again. It is a no-op when the campaign has none of its own.
+func (s *Service) DeleteGameAsset(gameID, assetKind string) error {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return fmt.Errorf("invalid game id: %w", err)
+	}
+	if err := pathutil.ValidateID(assetKind); err != nil {
+		return fmt.Errorf("invalid asset kind: %w", err)
+	}
+	gameDir := s.resolver.GameDir(gameID)
+	if _, err := os.Stat(gameDir); err != nil {
+		return fmt.Errorf("game not found: %w", err)
+	}
+	return removeAssetFiles(filepath.Join(gameDir, "assets"), assetKind)
+}
+
+// removeAssetFiles clears every extension an asset kind may have been stored
+// under, so a replacement never leaves a second file behind.
+func removeAssetFiles(assetsDir, assetKind string) error {
+	for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+		if err := os.Remove(filepath.Join(assetsDir, assetKind+ext)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove asset %s: %w", assetKind+ext, err)
+		}
+	}
+	return nil
+}
+
+// campaignArtDescriptionLimit caps the campaign-specific description so a long
+// opening directive cannot crowd out the style and composition instructions.
+const campaignArtDescriptionLimit = 400
+
+// campaignArtPrompt describes a campaign for its own banner or icon, so the
+// generated art is about this campaign rather than a copy of its world's. It
+// draws on the campaign's own material -- where it opens, its opening directive,
+// and the protagonist -- while the world still supplies the art style and a
+// grounding name.
+func (s *Service) campaignArtPrompt(gameID, kind string) string {
+	gameDir := s.resolver.GameDir(gameID)
+	manifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
+	if err != nil || manifest == nil {
+		return buildAssetPrompt(kind, gameID, "", "", "")
+	}
+
+	artStyle, worldName := "", ""
+	if wm, err := core.LoadWorldManifest(filepath.Join(s.resolver.WorldDir(manifest.WorldID), "world.yaml")); err == nil && wm != nil {
+		artStyle = wm.ArtStyle
+		worldName = wm.Name
+	}
+
+	parts := make([]string, 0, 4)
+	if location := gameSettingString(manifest, engine.StartLocationSetting); location != "" {
+		parts = append(parts, location)
+	}
+	if opening := engine.OpeningPrompt(manifest); opening != "" {
+		parts = append(parts, opening)
+	}
+	if protagonist := s.protagonistArtSummary(gameDir, manifest); protagonist != "" {
+		parts = append(parts, protagonist)
+	}
+	if worldName != "" {
+		parts = append(parts, "set in "+worldName)
+	}
+
+	name := manifest.Name
+	if name == "" {
+		name = gameID
+	}
+	if len(parts) == 0 {
+		// Nothing campaign-specific to say, so ground the prompt on the campaign
+		// name alone rather than repeating the world.
+		parts = append(parts, name)
+	}
+
+	description := harness.TruncateRunes(strings.Join(parts, ", "), campaignArtDescriptionLimit)
+	return buildAssetPrompt(kind, name, description, artStyle, "")
+}
+
+// protagonistArtSummary names the protagonist and describes how they look, so a
+// campaign's artwork can feature the character the player actually made.
+func (s *Service) protagonistArtSummary(gameDir string, manifest *core.GameManifest) string {
+	store, err := s.store(manifest.ID)
+	if err != nil {
+		return ""
+	}
+	playerID, err := engine.ResolvePlayerID(store, manifest)
+	if err != nil || playerID == "" {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(gameDir, "entities", playerID+".md"))
+	if err != nil {
+		return ""
+	}
+	ent, err := entity.ParseMarkdownEntity(data)
+	if err != nil {
+		return ""
+	}
+	parts := make([]string, 0, 2)
+	if ent.Name != "" {
+		parts = append(parts, ent.Name)
+	}
+	if ent.Appearance != "" {
+		parts = append(parts, ent.Appearance)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// gameSettingString reads a string campaign setting, or "" when it is absent.
+func gameSettingString(manifest *core.GameManifest, key string) string {
+	if manifest == nil || manifest.Settings == nil {
+		return ""
+	}
+	value, _ := manifest.Settings[key].(string)
+	return strings.TrimSpace(value)
 }
 
 func (s *Service) SaveWorldAsset(worldID, assetKind string, data []byte, ext string) (string, error) {
@@ -4807,22 +4943,7 @@ func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req Gene
 	}
 	prompt := req.Prompt
 	if prompt == "" {
-		gameDir := s.resolver.GameDir(gameID)
-		manifest, _ := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
-		gameName := gameID
-		worldName := ""
-		artStyle := ""
-		if manifest != nil {
-			if manifest.Name != "" {
-				gameName = manifest.Name
-			}
-			worldDir := s.resolver.WorldDir(manifest.WorldID)
-			if wm, err := core.LoadWorldManifest(filepath.Join(worldDir, "world.yaml")); err == nil {
-				worldName = wm.Name
-				artStyle = wm.ArtStyle
-			}
-		}
-		prompt = buildAssetPrompt(req.Kind, gameName, worldName, artStyle, "")
+		prompt = s.campaignArtPrompt(gameID, req.Kind)
 	}
 	imgBytes, failure := s.generateImage(ctx, req.Kind, prompt, usageScope{gameID: gameID})
 	if failure != nil {

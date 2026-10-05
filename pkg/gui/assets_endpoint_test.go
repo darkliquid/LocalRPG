@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -61,8 +62,11 @@ func TestAssetEndpointsAndSummary(t *testing.T) {
 	if len(games) != 1 {
 		t.Fatalf("expected 1 game, got %d", len(games))
 	}
-	if games[0].BannerURL != "/api/game/test-game/banner" {
-		t.Errorf("expected BannerURL /api/game/test-game/banner, got %q", games[0].BannerURL)
+	if !strings.HasPrefix(games[0].BannerURL, "/api/game/test-game/banner?v=") {
+		t.Errorf("expected a versioned campaign banner URL, got %q", games[0].BannerURL)
+	}
+	if games[0].BannerSource != "campaign" {
+		t.Errorf("BannerSource = %q, want campaign", games[0].BannerSource)
 	}
 	if games[0].IconURL != "" {
 		t.Errorf("expected empty IconURL, got %q", games[0].IconURL)
@@ -142,12 +146,16 @@ func TestGameAssetFallsBackToTheWorld(t *testing.T) {
 	if len(games) != 1 {
 		t.Fatalf("expected 1 game, got %d", len(games))
 	}
-	if games[0].BannerURL != "/api/game/test-game/banner" {
-		t.Errorf("BannerURL = %q, want the campaign route", games[0].BannerURL)
+	if !strings.HasPrefix(games[0].BannerURL, "/api/game/test-game/banner?v=") {
+		t.Errorf("BannerURL = %q, want a versioned campaign route", games[0].BannerURL)
 	}
-	if games[0].IconURL != "/api/game/test-game/icon" {
-		t.Errorf("IconURL = %q, want the campaign route", games[0].IconURL)
+	if !strings.HasPrefix(games[0].IconURL, "/api/game/test-game/icon?v=") {
+		t.Errorf("IconURL = %q, want a versioned campaign route", games[0].IconURL)
 	}
+	if games[0].BannerSource != "world" || games[0].IconSource != "world" {
+		t.Errorf("sources = %q/%q, want world/world", games[0].BannerSource, games[0].IconSource)
+	}
+	worldIconURL := games[0].IconURL
 
 	req := httptest.NewRequest(http.MethodGet, "/api/game/test-game/icon", nil)
 	rr := httptest.NewRecorder()
@@ -162,7 +170,8 @@ func TestGameAssetFallsBackToTheWorld(t *testing.T) {
 		t.Errorf("served icon does not match the world's bytes")
 	}
 
-	// A campaign icon of its own wins over the world's.
+	// A campaign icon of its own wins over the world's, and the URL changes so a
+	// browser cannot keep showing the image it cached at the old URL.
 	campaignBytes := append([]byte{}, pngBytes...)
 	campaignBytes = append(campaignBytes, []byte("campaign")...)
 	if err := os.MkdirAll(filepath.Join(gameDir, "assets"), 0755); err != nil {
@@ -171,6 +180,17 @@ func TestGameAssetFallsBackToTheWorld(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(gameDir, "assets", "icon.png"), campaignBytes, 0644); err != nil {
 		t.Fatal(err)
 	}
+	games, err = svc.ListGames(context.Background())
+	if err != nil {
+		t.Fatalf("ListGames: %v", err)
+	}
+	if games[0].IconSource != "campaign" {
+		t.Errorf("IconSource = %q, want campaign after its own icon exists", games[0].IconSource)
+	}
+	if games[0].IconURL == worldIconURL {
+		t.Errorf("IconURL = %q, want it to change when the served file changes", games[0].IconURL)
+	}
+
 	req = httptest.NewRequest(http.MethodGet, "/api/game/test-game/icon", nil)
 	rr = httptest.NewRecorder()
 	srv.ServeHTTP(rr, req)
@@ -179,5 +199,33 @@ func TestGameAssetFallsBackToTheWorld(t *testing.T) {
 	}
 	if !bytes.Equal(rr.Body.Bytes(), campaignBytes) {
 		t.Errorf("served icon does not match the campaign's own bytes")
+	}
+
+	// Clearing the campaign's icon restores the world's, at the world's URL.
+	delReq := httptest.NewRequest(http.MethodDelete, "/api/game/test-game/icon", nil)
+	delRR := httptest.NewRecorder()
+	srv.ServeHTTP(delRR, delReq)
+	if delRR.Code != http.StatusNoContent {
+		t.Fatalf("DELETE icon expected 204, got %d: %s", delRR.Code, delRR.Body.String())
+	}
+	games, err = svc.ListGames(context.Background())
+	if err != nil {
+		t.Fatalf("ListGames: %v", err)
+	}
+	if games[0].IconSource != "world" {
+		t.Errorf("IconSource = %q, want world after clearing", games[0].IconSource)
+	}
+	if games[0].IconURL != worldIconURL {
+		t.Errorf("IconURL = %q, want the world's URL restored (%q)", games[0].IconURL, worldIconURL)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/game/test-game/icon", nil)
+	rr = httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET icon expected 200 after clearing, got %d", rr.Code)
+	}
+	if !bytes.Equal(rr.Body.Bytes(), pngBytes) {
+		t.Errorf("served icon does not match the world's bytes after clearing")
 	}
 }

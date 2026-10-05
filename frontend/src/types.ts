@@ -303,6 +303,10 @@ export interface GameSummary {
   thumbnail_url?: string;
   banner_url?: string;
   icon_url?: string;
+  // Where the displayed artwork comes from: 'campaign', 'world', or undefined
+  // when there is none. Used to offer reverting to the world's art.
+  banner_source?: 'campaign' | 'world';
+  icon_source?: 'campaign' | 'world';
   play_time_seconds?: number;
 }
 

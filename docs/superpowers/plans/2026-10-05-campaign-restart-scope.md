@@ -30,10 +30,16 @@
 - **`pkg/storage/ttsjobs.go`** — add `DeleteTTSJobs`.
 - **`pkg/engine/restart.go`** (new) — `ResetCampaign`, entity classification, protagonist runtime reset, batch-job removal.
 - **`pkg/engine/restart_test.go`** (new) — restore, delete, keep, and manifest/asset/ledger preservation.
-- **`pkg/gui/service.go`** — rewrite `RestartGame`; cancel in-flight batch jobs; `gameAssetSource` helper; world fallback in `GetGameAsset` and `ListGames`.
+- **`pkg/gui/service.go`** — rewrite `RestartGame`; cancel in-flight batch jobs; `gameAssetSource`/`gameAssetURL`; `DeleteGameAsset`; `campaignArtPrompt`; world fallback in `GetGameAsset`, `ListGames` and `GetGameState`.
+- **`pkg/gui/types.go`** — `BannerSource`/`IconSource` on the game summary.
+- **`pkg/gui/server.go`** — `DELETE` on the banner/icon route.
 - **`pkg/gui/restart_player_test.go`** — extend for artwork, narrator voice, usage and batch-job handling.
-- **`pkg/gui/assets_endpoint_test.go`** — world fallback coverage.
-- **`frontend/src/components/launcher/CampaignSettingsModal.tsx`** — restart copy.
+- **`pkg/gui/assets_endpoint_test.go`** — world fallback, versioned URLs, and revert coverage.
+- **`pkg/gui/asset_campaign_prompt_test.go`** (new) — campaign-specific prompt coverage.
+- **`frontend/src/types.ts`** — `banner_source`/`icon_source`.
+- **`frontend/src/api/client.ts`** — `deleteGameAsset`.
+- **`frontend/src/components/LauncherHub.tsx`** — `handleUseWorldArtwork`.
+- **`frontend/src/components/launcher/CampaignSettingsModal.tsx`** — restart copy; "Use world artwork" control.
 
 ---
 
@@ -335,11 +341,11 @@ git commit -m "fix(gui): restart a campaign in place so its artwork and voice su
 - Test: `pkg/gui/assets_endpoint_test.go`
 
 **Interfaces:**
-- Produces: `func (s *Service) gameAssetSource(gameDir, worldID, assetKind string) (string, string, bool)` (unexported), used by `GetGameAsset`, `ListGames` and `GetGameState`.
+- Produces: `func (s *Service) gameAssetSource(gameDir, worldID, assetKind string) (string, string, bool)` for `GetGameAsset`; `func (s *Service) gameAssetURL(gameDir, worldID, assetKind, gameID string) (string, string)` for `ListGames` and `GetGameState`.
 
 - [ ] **Step 1: Write the failing test**
 
-Add `TestGameAssetFallsBackToTheWorld` to `pkg/gui/assets_endpoint_test.go`: a world with `assets/icon.png` and `assets/banner.png`, a campaign with neither, assert `ListGames` reports both URLs and `GET /api/game/<id>/icon` serves the world's bytes with `image/png`; then upload a campaign icon and assert the campaign's bytes win.
+Add `TestGameAssetFallsBackToTheWorld` to `pkg/gui/assets_endpoint_test.go`: a world with `assets/icon.png` and `assets/banner.png`, a campaign with neither, assert `ListGames` reports both URLs with source `world` and `GET /api/game/<id>/icon` serves the world's bytes with `image/png`; then give the campaign its own icon and assert the campaign's bytes win at a different URL; then `DELETE` it and assert the world's bytes return at the world's URL.
 
 - [ ] **Step 2: Run it and watch it fail**
 
@@ -348,18 +354,55 @@ Expected: FAIL, `IconURL` is empty and the route 404s.
 
 - [ ] **Step 3: Implement**
 
-In `GetGameAsset`, when the campaign has no such asset and its world does, return the world's file and content type. In `ListGames`, set `BannerURL`/`IconURL` when either the campaign or the world has the asset, pointing at the campaign route, whose handler now falls back. `GetGameState` already falls back to the world's banner and is left as it is.
+In `GetGameAsset`, when the campaign has no such asset and its world does, return the world's file and content type. In `ListGames` and `GetGameState`, resolve `BannerURL`/`IconURL` through `gameAssetURL`, which prefers the campaign's asset, falls back to the world's, and stamps the URL with the served file's size and modification time so a changed asset is a new URL. `ListGames` also reports `BannerSource`/`IconSource`.
 
 - [ ] **Step 4: Run it and watch it pass**
 
 Run: `go test -run 'TestGameAsset|TestAssetEndpoints' ./pkg/gui/`
-Expected: PASS, including the untouched `TestAssetEndpointsAndSummary`.
+Expected: PASS; the exact-match assertions in `TestAssetEndpointsAndSummary` become prefix checks because the URL is now versioned.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add pkg/gui/service.go pkg/gui/assets_endpoint_test.go
+git add pkg/gui/service.go pkg/gui/types.go pkg/gui/assets_endpoint_test.go
 git commit -m "feat(gui): let a campaign borrow its world's banner and icon"
+```
+
+---
+
+### Task 6: Campaign-specific artwork, and reverting to the world's
+
+**Files:**
+- Modify: `pkg/gui/service.go`, `pkg/gui/server.go`
+- Create: `pkg/gui/asset_campaign_prompt_test.go`
+- Modify: `frontend/src/types.ts`, `frontend/src/api/client.ts`, `frontend/src/components/LauncherHub.tsx`, `frontend/src/components/launcher/CampaignSettingsModal.tsx`
+
+**Interfaces:**
+- Produces: `func (s *Service) campaignArtPrompt(gameID, kind string) string`; `func (s *Service) DeleteGameAsset(gameID, assetKind string) error`; `DELETE /api/game/{id}/{banner|icon}`; `APIClient.deleteGameAsset`.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `pkg/gui/asset_campaign_prompt_test.go` asserting `campaignArtPrompt` carries the campaign name, start location, opening directive, protagonist name and appearance, and the world's art style, and that it falls back to the campaign name when nothing campaign-specific exists.
+
+- [ ] **Step 2: Run it and watch it fail**
+
+Run: `go test -run TestCampaignArtPrompt ./pkg/gui/`
+Expected: build failure, `campaignArtPrompt undefined`.
+
+- [ ] **Step 3: Implement**
+
+Replace `GenerateGameAsset`'s world-only prompt with `campaignArtPrompt`, which joins the campaign's start location, opening directive, and protagonist name and appearance, grounded by the world name and rendered in the world's art style. Add `DeleteGameAsset` and a `DELETE` branch on the banner/icon route, and expose `deleteGameAsset` plus a "Use world artwork" control in the campaign settings modal, shown only when `banner_source`/`icon_source` is `campaign`.
+
+- [ ] **Step 4: Run it and watch it pass**
+
+Run: `go test -run TestCampaignArtPrompt ./pkg/gui/ && (cd frontend && npx tsc --noEmit)`
+Expected: PASS and a clean typecheck.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add pkg/gui frontend/src
+git commit -m "fix(gui): generate campaign artwork from the campaign, not its world"
 ```
 
 ---

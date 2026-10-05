@@ -126,19 +126,38 @@ from the Markdown that survived.
 A campaign that has no `assets/banner.*` or `assets/icon.*` of its own borrows
 the world's, for reading only:
 
-- `Service.GetGameAsset` (`pkg/gui/service.go:4630`) falls back to
-  `Service.GetWorldAsset` for the campaign's world when the campaign has no such
-  asset. The route is unchanged, so `/api/game/<id>/icon` transparently serves
-  the world's icon.
+- `Service.GetGameAsset` falls back to the world's file for the campaign's world
+  when the campaign has no such asset. The route is unchanged, so
+  `/api/game/<id>/icon` transparently serves the world's icon.
 - `Service.ListGames` and `Service.GetGameState` set `IconURL` and `BannerURL`
   when **either** the campaign or its world has the asset, so the launcher grid
-  and the campaign modal render the borrowed art.
+  and the campaign modal render the borrowed art. Each URL also reports whether
+  the displayed art is the campaign's own or the world's (`BannerSource`,
+  `IconSource`).
+- `Service.DeleteGameAsset` clears the campaign's own copy, which is how a
+  player reverts to the world's art. The campaign settings modal offers it as
+  "Use world artwork" whenever the campaign has art of its own.
 - Uploading or generating a campaign asset writes into the campaign directory as
   today, so a campaign asset always wins over the borrowed world asset.
 
 The fallback never copies files: it is resolved at read time, so a world asset
 changed later is reflected immediately and a campaign that never had its own art
 still has none to reset.
+
+**Asset URLs carry a version token.** The campaign route is identical before and
+after an asset is generated or cleared, so a browser would keep showing the
+image it had already cached and a new generation would look like it did nothing.
+`gameAssetURL` stamps the URL with the served file's size and modification time,
+so a changed file is a new URL and React re-renders it.
+
+### 2.4.1 Campaign-specific generation
+
+`GenerateGameAsset` used to describe a campaign almost entirely by its world,
+which produced art that looked like the world's own. `campaignArtPrompt` now
+composes the prompt from the campaign's own material: its start location, its
+opening directive, and the protagonist's name and appearance, grounded by the
+world's name and rendered in the world's art style. A campaign with none of that
+falls back to its own name rather than repeating the world.
 
 ### 2.5 Code shape
 
@@ -151,8 +170,9 @@ still has none to reset.
 - `pkg/gui/service.go` keeps `RestartGame` as a thin, lock-holding wrapper that
   loads the manifest, cancels any in-flight batch job, calls the engine, and
   returns the summary.
-- `pkg/gui` gains a small helper for the world asset fallback so `GetGameAsset`,
-  `ListGames` and `GetGameState` agree.
+- `pkg/gui` gains `gameAssetURL` (the versioned fallback resolver),
+  `DeleteGameAsset`, and `campaignArtPrompt`, so `GetGameAsset`, `ListGames`,
+  `GetGameState` and `GenerateGameAsset` agree.
 
 ## 3. Testing
 
@@ -167,8 +187,12 @@ still has none to reset.
   removes the batch jobs, and reports `TurnCount` 0 with an empty chronicle (the
   existing `TestRestartGameClearsHistoryAndKeepsTheCampaign` and
   `TestRestartGamePreservesPlayerMetadata` must keep passing).
-- GUI: a campaign with no icon of its own reports and serves the world's icon;
-  a campaign with its own icon ignores the world's.
+- GUI: a campaign with no icon of its own reports and serves the world's icon and
+  says so; a campaign with its own icon ignores the world's, reports a different
+  versioned URL, and `DELETE` restores the world's at the world's URL.
+- GUI: `campaignArtPrompt` carries the campaign name, start location, opening
+  directive, protagonist name and appearance, and the world's art style; it falls
+  back to the campaign name when nothing campaign-specific exists.
 
 ## 4. Trade-offs and non-goals
 

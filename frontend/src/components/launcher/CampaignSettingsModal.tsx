@@ -15,6 +15,7 @@ interface CampaignSettingsModalProps {
   onClose: () => void;
   onUploadAsset: (gameId: string, kind: 'banner' | 'icon', file: File) => Promise<void>;
   onGenerateAsset: (gameId: string, kind: 'banner' | 'icon') => Promise<void>;
+  onUseWorldArtwork: (gameId: string, kind: 'banner' | 'icon') => Promise<void>;
   onRestartGame: (gameId: string) => Promise<void>;
   onDeleteGame: (gameId: string) => Promise<void>;
 }
@@ -25,6 +26,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   onClose,
   onUploadAsset,
   onGenerateAsset,
+  onUseWorldArtwork,
   onRestartGame,
   onDeleteGame,
 }) => {
@@ -145,6 +147,17 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
       console.error('AI generation failed:', err);
     } finally {
       setGeneratingKind(null);
+    }
+  };
+
+  const handleUseWorldArtwork = async (kind: 'banner' | 'icon') => {
+    setIsBusy(true);
+    try {
+      await onUseWorldArtwork(game.id, kind);
+    } catch (err) {
+      console.error('failed to restore world artwork:', err);
+    } finally {
+      setIsBusy(false);
     }
   };
 
@@ -358,6 +371,18 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
                     <span>{generatingKind === 'banner' ? 'Gen...' : 'AI Gen'}</span>
                   </button>
                 </div>
+                {game.banner_source === 'campaign' ? (
+                  <button
+                    type="button"
+                    onClick={() => handleUseWorldArtwork('banner')}
+                    disabled={isBusy}
+                    className="w-full py-1.5 px-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-xs font-sans text-stone-400 hover:text-stone-200 transition-all cursor-pointer"
+                  >
+                    Use world artwork
+                  </button>
+                ) : game.banner_source === 'world' ? (
+                  <div className="text-center text-xs font-sans text-stone-500">Using world artwork</div>
+                ) : null}
               </div>
 
               {/* Icon Artwork */}
@@ -405,6 +430,18 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
                     <span>{generatingKind === 'icon' ? 'Gen...' : 'AI Gen'}</span>
                   </button>
                 </div>
+                {game.icon_source === 'campaign' ? (
+                  <button
+                    type="button"
+                    onClick={() => handleUseWorldArtwork('icon')}
+                    disabled={isBusy}
+                    className="w-full py-1.5 px-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-xs font-sans text-stone-400 hover:text-stone-200 transition-all cursor-pointer"
+                  >
+                    Use world artwork
+                  </button>
+                ) : game.icon_source === 'world' ? (
+                  <div className="text-center text-xs font-sans text-stone-500">Using world artwork</div>
+                ) : null}
               </div>
             </div>
           </div>
