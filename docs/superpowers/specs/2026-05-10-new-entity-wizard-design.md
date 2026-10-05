@@ -196,12 +196,13 @@ state: {}
 ### 4.2 The voice block
 
 The block is emitted from the catalogue's `voice` key plus a chosen
-`VoiceSelection`. When a voice is chosen, `provider` and `voice_id` carry the
-provider key and voice id from the inspect response, `pitch` and `speech_rate`
-default to `1`, and `options` is emitted only when the provider supplied
-defaults. When no voice is chosen, or no catalog is available, the block is
-emitted with empty `provider` and `voice_id`, `pitch: 1` and `speech_rate: 1`,
-and the same description comment, so the keys are still discoverable.
+`VoiceSelection`, which is built from a configured voice profile: `voice_id` and
+`provider` carry the profile's own values, `pitch` and `speech_rate` carry the
+profile's tuning, and `options` is emitted only when the profile declares any.
+The sub-keys and their order match what the codex writes when a voice archetype
+is applied, so both paths produce the same frontmatter. With no profile chosen
+the block is written with every sub-key empty and the same description comment,
+so the keys are still discoverable.
 
 ### 4.3 The generator
 
@@ -273,20 +274,21 @@ Worlds Studio share one component while writing to three different places.
 2. **Type.** A grid of the catalogue's types, each with its label and one-line
    description.
 3. **Options.** Type-specific inputs. The only one today is a voice picker for
-   `character`: a searchable list driven by the live provider catalog
-   (`useTTSInspect` plus the search and category UI patterns already in
-   `VoiceCatalogPicker.tsx`). Choosing a voice is optional. The step also shows a
+   `character`: the shared `VoiceProfileSelect`, driven by the configured
+   `media.tts.voice_profiles` and offering the same inline preview as the codex
+   and the campaign settings. Choosing a voice is optional. The step also shows a
    live preview of the markdown that confirm will produce.
 4. **Confirm.** Calls `onConfirm` with the id, name and generated markdown.
 
 ### 5.3 TTS configuration
 
-The codex already receives `ttsConfig` from App (`App.tsx:1047`). Content Studio
-and Worlds Studio do not, so the wizard accepts an optional `ttsConfig` and,
-when it is absent, reads `config.media.tts` from `GET /api/settings` once when
-the voice step is first shown. If the provider is disabled, unreachable, or its
-catalog is unavailable, the step shows the provider error inline and the wizard
-proceeds with an empty documented `voice:` block.
+The voice picker needs the same two inputs the codex gives `VoiceProfileSelect`:
+a `TTSConfig` for previews and the configured `VoiceProfile` list. The wizard
+accepts both as optional props; a host that already holds them passes them, and
+one that does not gets them from a single `GET /api/settings` read. A profile
+list that is empty leaves the picker showing its "Configure voices in Settings"
+state, exactly as the codex does, and the wizard still proceeds with an empty
+documented `voice:` block.
 
 ### 5.4 Entry points
 

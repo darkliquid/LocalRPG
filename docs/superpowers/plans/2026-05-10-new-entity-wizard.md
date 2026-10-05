@@ -10,6 +10,13 @@
 
 **Spec:** `docs/superpowers/specs/2026-05-10-new-entity-wizard-design.md`
 
+**Amendment (after Task 4):** The voice step was planned to use the live provider
+catalog through `useTTSInspect`. It was changed to the shared
+`VoiceProfileSelect` over the configured voice profiles, so it behaves exactly
+like the codex and the campaign settings, and the generated `voice:` block now
+mirrors the codex's "Apply Voice Archetype" key order. Task 4's code below shows
+the original plan; the spec is the current design.
+
 ## Global Constraints
 
 - Go tests use `testing` and `t.TempDir()` only. No testify. Use `interface{}`, never `any`. `go vet` must stay clean.
