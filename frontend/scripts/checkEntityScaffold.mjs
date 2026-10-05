@@ -109,7 +109,7 @@ try {
   const emptyVoice = buildEntityMarkdown(catalog, { id: 'a', name: 'A', type: 'character' });
   check(
     'a character without a voice still gets the documented block',
-    frontmatterOf(emptyVoice).includes('voice:\n  provider: ""'),
+    frontmatterOf(emptyVoice).includes('voice:\n  voice_id: ""'),
   );
 
   const voiced = buildEntityMarkdown(catalog, {

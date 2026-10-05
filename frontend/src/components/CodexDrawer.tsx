@@ -598,6 +598,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
           isOpen={isNewNoteOpen}
           existingIds={(entities ?? []).map((candidate) => candidate.id)}
           ttsConfig={ttsConfig}
+          voiceProfiles={voiceProfiles}
           onClose={() => setIsNewNoteOpen(false)}
           onOpenExisting={(id) => {
             setIsNewNoteOpen(false);

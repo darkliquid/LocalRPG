@@ -1,17 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check, Sparkles, X } from 'lucide-react';
-import type { EntityTypeCatalog, TTSConfig } from '../types';
+import type { EntityTypeCatalog, TTSConfig, VoiceProfile } from '../types';
 import { APIClient } from '../api/client';
 import { useMountTransition } from '../hooks/useMountTransition';
-import { useTTSInspect } from '../hooks/useTTSInspect';
 import { buildEntityMarkdown, type VoiceSelection } from '../lib/entityScaffold';
 import { slugify } from '../lib/slug';
+import { VoiceProfileSelect } from './VoiceProfileSelect';
 
 export interface NewEntityWizardProps {
   isOpen: boolean;
   initialName?: string;
   existingIds: string[];
   ttsConfig?: TTSConfig;
+  voiceProfiles?: VoiceProfile[];
   confirmLabel?: string;
   onConfirm: (input: { id: string; name: string; markdown: string }) => void | Promise<void>;
   onOpenExisting?: (id: string) => void;
@@ -26,6 +27,7 @@ export const NewEntityWizard: React.FC<NewEntityWizardProps> = ({
   initialName,
   existingIds,
   ttsConfig,
+  voiceProfiles,
   confirmLabel = 'Create note',
   onConfirm,
   onOpenExisting,
@@ -35,17 +37,18 @@ export const NewEntityWizard: React.FC<NewEntityWizardProps> = ({
   const [catalog, setCatalog] = useState<EntityTypeCatalog | null>(null);
   const [catalogError, setCatalogError] = useState('');
   const [resolvedTTS, setResolvedTTS] = useState<TTSConfig | null>(ttsConfig ?? null);
+  const [resolvedProfiles, setResolvedProfiles] = useState<VoiceProfile[]>(voiceProfiles ?? []);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [name, setName] = useState(initialName ?? '');
   const [id, setId] = useState(initialName ? slugify(initialName) : '');
   const [idTouched, setIdTouched] = useState(false);
   const [type, setType] = useState('');
-  const [voiceId, setVoiceId] = useState('');
-  const [voiceQuery, setVoiceQuery] = useState('');
+  const [voiceProfileId, setVoiceProfileId] = useState('');
   const [saving, setSaving] = useState(false);
 
   const spec = catalog?.types.find((candidate) => candidate.id === type);
   const wantsVoice = spec?.keys.some((key) => key.name === 'voice') ?? false;
-  const { inspect, loading: inspecting } = useTTSInspect(wantsVoice ? resolvedTTS : null, wantsVoice);
+  const profiles = resolvedProfiles;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -53,8 +56,7 @@ export const NewEntityWizard: React.FC<NewEntityWizardProps> = ({
     setId(initialName ? slugify(initialName) : '');
     setIdTouched(false);
     setType('');
-    setVoiceId('');
-    setVoiceQuery('');
+    setVoiceProfileId('');
     setCatalogError('');
     let cancelled = false;
     new APIClient('')
@@ -72,26 +74,44 @@ export const NewEntityWizard: React.FC<NewEntityWizardProps> = ({
     };
   }, [isOpen, initialName]);
 
+  // The voice picker shares VoiceProfileSelect with the codex and the campaign
+  // settings, so it needs the same two inputs. A host that already holds them
+  // passes them; one that does not gets them from one settings read.
   useEffect(() => {
-    if (ttsConfig || resolvedTTS) return;
+    if (ttsConfig && voiceProfiles) {
+      setSettingsLoaded(true);
+      return;
+    }
+    if (settingsLoaded) return;
+    let cancelled = false;
     APIClient.getSettings()
-      .then((settings) => setResolvedTTS(settings.config.media.tts))
-      .catch(() => setResolvedTTS(null));
-  }, [ttsConfig, resolvedTTS]);
-
-  const voices = useMemo(() => {
-    const needle = voiceQuery.trim().toLowerCase();
-    return (inspect?.catalog.voices ?? []).filter(
-      (voice) => !needle || voice.name.toLowerCase().includes(needle) || voice.id.toLowerCase().includes(needle),
-    );
-  }, [inspect, voiceQuery]);
+      .then((settings) => {
+        if (cancelled) return;
+        if (!ttsConfig) setResolvedTTS(settings.config.media.tts);
+        if (!voiceProfiles) setResolvedProfiles(settings.config.media.tts.voice_profiles ?? []);
+        setSettingsLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setSettingsLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ttsConfig, voiceProfiles, settingsLoaded]);
 
   const collision = id !== '' && existingIds.includes(id);
   const idValid = /^[a-z0-9][a-z0-9-]*$/.test(id);
   const canConfirm = !!catalog && !!spec && idValid && !collision && name.trim() !== '' && !saving;
 
-  const selection: VoiceSelection | undefined = voiceId
-    ? { provider: inspect?.provider_key ?? '', voice_id: voiceId }
+  const selectedProfile = profiles.find((profile) => profile.id === voiceProfileId);
+  const selection: VoiceSelection | undefined = selectedProfile
+    ? {
+        provider: selectedProfile.provider ?? '',
+        voice_id: selectedProfile.voice_id,
+        pitch: selectedProfile.pitch,
+        speech_rate: selectedProfile.speech_rate,
+        options: selectedProfile.options,
+      }
     : undefined;
 
   const preview =
@@ -208,50 +228,16 @@ export const NewEntityWizard: React.FC<NewEntityWizardProps> = ({
           {wantsVoice && (
             <div className="space-y-2">
               <label className="block text-xs uppercase tracking-wider text-stone-400">Voice</label>
-              {inspect?.error && <p className="text-xs text-red-300">{inspect.error}</p>}
-              {!inspect?.catalog.available && !inspect?.error && (
-                <p className="text-xs text-stone-500">
-                  {inspecting
-                    ? 'Loading voices...'
-                    : 'No voice catalog is available; the voice block will be left empty.'}
-                </p>
-              )}
-              {inspect?.catalog.available && (
-                <>
-                  <input
-                    type="text"
-                    value={voiceQuery}
-                    onChange={(e) => setVoiceQuery(e.target.value)}
-                    placeholder="Search voices..."
-                    className="w-full rounded border border-stone-800 bg-stone-900 px-2 py-1 text-xs text-stone-200 focus:outline-none"
-                  />
-                  <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
-                    <button
-                      type="button"
-                      onClick={() => setVoiceId('')}
-                      className={`w-full rounded border px-2 py-1 text-left text-xs ${
-                        voiceId === '' ? 'border-purple-500 text-purple-200' : 'border-stone-800 text-stone-400'
-                      }`}
-                    >
-                      None
-                    </button>
-                    {voices.map((voice) => (
-                      <button
-                        key={voice.id}
-                        type="button"
-                        onClick={() => setVoiceId(voice.id)}
-                        className={`w-full rounded border px-2 py-1 text-left text-xs ${
-                          voiceId === voice.id
-                            ? 'border-purple-500 text-purple-200'
-                            : 'border-stone-800 text-stone-300'
-                        }`}
-                      >
-                        {voice.name}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+              <VoiceProfileSelect
+                profiles={profiles}
+                value={voiceProfileId}
+                onChange={(profile) => setVoiceProfileId(profile?.id ?? '')}
+                ttsConfig={resolvedTTS ?? undefined}
+                previewText={`Greetings. I am ${name.trim() || 'ready for the journey'}.`}
+                placeholder={profiles.length === 0 ? 'Configure voices in Settings' : 'Select a voice...'}
+                allowDefault
+                defaultLabel="No voice"
+              />
             </div>
           )}
 

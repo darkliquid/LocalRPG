@@ -1152,6 +1152,7 @@ export const App: React.FC = () => {
               initialName={wizardEntity.name}
               existingIds={entities.map((candidate) => candidate.id)}
               ttsConfig={config?.media.tts}
+              voiceProfiles={config?.media.tts.voice_profiles ?? []}
               onClose={() => setWizardEntity(null)}
               onOpenExisting={async (id) => {
                 setWizardEntity(null);

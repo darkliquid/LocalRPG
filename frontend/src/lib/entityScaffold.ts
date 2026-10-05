@@ -19,13 +19,14 @@ export interface ScaffoldInput {
 // break the block it is written into.
 const yamlScalar = (value: string): string => JSON.stringify(value);
 
-// voiceBlock renders the voice key. With no selection it still writes every
-// sub-key empty, so the shape is discoverable.
+// voiceBlock renders the voice key. The sub-keys and their order match what the
+// codex writes when a voice archetype is applied, so both paths produce the same
+// frontmatter. With no selection every sub-key is still written, empty.
 function voiceBlock(voice?: VoiceSelection): string[] {
   const lines = [
     'voice:',
-    `  provider: ${yamlScalar(voice?.provider ?? '')}`,
     `  voice_id: ${yamlScalar(voice?.voice_id ?? '')}`,
+    `  provider: ${yamlScalar(voice?.provider ?? '')}`,
     `  pitch: ${voice?.pitch ?? 1}`,
     `  speech_rate: ${voice?.speech_rate ?? 1}`,
   ];
