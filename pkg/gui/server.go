@@ -411,6 +411,14 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			}
 			writeJSON(w, map[string]string{"url": url})
 			return
+		} else if r.Method == http.MethodDelete {
+			// Clearing the campaign's own artwork is how the world's is restored.
+			if err := s.service.DeleteGameAsset(gameID, action); err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
 		}
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return

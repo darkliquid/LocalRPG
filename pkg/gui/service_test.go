@@ -1652,6 +1652,12 @@ func TestServiceRejectsInvalidIDs(t *testing.T) {
 	if _, err := svc.SaveWorldAsset("valid-world", traversalID, []byte("data"), ".png"); err == nil {
 		t.Error("SaveWorldAsset expected error for traversal assetKind, got nil")
 	}
+	if err := svc.DeleteGameAsset(traversalID, "banner"); err == nil {
+		t.Error("DeleteGameAsset expected error for traversal gameID, got nil")
+	}
+	if err := svc.DeleteGameAsset("valid-game", traversalID); err == nil {
+		t.Error("DeleteGameAsset expected error for traversal assetKind, got nil")
+	}
 	if _, err := svc.GetSystem(ctx, traversalID); err == nil {
 		t.Error("GetSystem expected error for traversal id, got nil")
 	}

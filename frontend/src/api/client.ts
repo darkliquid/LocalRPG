@@ -275,6 +275,13 @@ export class APIClient {
     return res.json();
   }
 
+  // deleteGameAsset clears a campaign's own banner or icon, so it falls back to
+  // the world's artwork again.
+  static async deleteGameAsset(gameId: string, kind: 'banner' | 'icon'): Promise<void> {
+    const res = await fetch(`/api/game/${encodeURIComponent(gameId)}/${kind}`, { method: 'DELETE' });
+    if (!res.ok) throw new HTTPError(res.status, await res.text());
+  }
+
   static async generateGameAsset(gameId: string, kind: 'banner' | 'icon', prompt?: string): Promise<{ url: string }> {
     const res = await fetch(`/api/game/${encodeURIComponent(gameId)}/generate-asset`, {
       method: 'POST',

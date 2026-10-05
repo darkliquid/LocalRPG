@@ -139,6 +139,11 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
     await loadData();
   };
 
+  const handleUseWorldArtwork = async (gameId: string, kind: 'banner' | 'icon') => {
+    await APIClient.deleteGameAsset(gameId, kind);
+    await loadData();
+  };
+
   const handleRestartGame = async (gameId: string) => {
     await APIClient.restartGame(gameId);
     await loadData();
@@ -305,6 +310,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         onClose={() => setSettingsGameID(null)}
         onUploadAsset={handleUploadAsset}
         onGenerateAsset={handleGenerateAsset}
+        onUseWorldArtwork={handleUseWorldArtwork}
         onRestartGame={handleRestartGame}
         onDeleteGame={handleDeleteGame}
       />

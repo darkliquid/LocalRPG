@@ -234,6 +234,39 @@ func (s *Store) DeleteEntity(id string) error {
 	return tx.Commit()
 }
 
+// ResetDerivedState discards everything the index derives from history.jsonl and
+// the Markdown notes: the timeline, the memory store, the working set, the entity
+// graph and every embedding. Durable records -- the usage ledger and TTS job
+// tracking -- are deliberately left alone, because they are not derivable and a
+// campaign reset must not lose them. The caller re-syncs the notes afterwards.
+func (s *Store) ResetDerivedState() error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	tables := []string{
+		"turn_entities",
+		"turn_contexts",
+		"turns",
+		"memory_entities",
+		"memory_tags",
+		"memories_fts",
+		"memories",
+		"working_set",
+		"embeddings",
+		"edges",
+		"entities",
+	}
+	for _, table := range tables {
+		if _, err := tx.Exec("DELETE FROM " + table); err != nil {
+			return fmt.Errorf("clear %s: %w", table, err)
+		}
+	}
+	return tx.Commit()
+}
+
 // EntitySummary is a lightweight projection of an indexed entity.
 type EntitySummary struct {
 	ID       string

@@ -300,16 +300,22 @@ type GraphDTO struct {
 }
 
 type GameSummaryDTO struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	SystemID        string `json:"system_id"`
-	WorldID         string `json:"world_id"`
-	PlayerName      string `json:"player_name"`
-	TurnCount       int    `json:"turn_count"`
-	LastPlayed      string `json:"last_played"`
-	ThumbnailURL    string `json:"thumbnail_url"`
-	BannerURL       string `json:"banner_url,omitempty"`
-	IconURL         string `json:"icon_url,omitempty"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	SystemID     string `json:"system_id"`
+	WorldID      string `json:"world_id"`
+	PlayerName   string `json:"player_name"`
+	TurnCount    int    `json:"turn_count"`
+	LastPlayed   string `json:"last_played"`
+	ThumbnailURL string `json:"thumbnail_url"`
+	BannerURL    string `json:"banner_url,omitempty"`
+	IconURL      string `json:"icon_url,omitempty"`
+	// BannerSource and IconSource say where the displayed artwork came from:
+	// "campaign" when the campaign has its own, "world" when it borrows its
+	// world's, and "" when there is none. The UI uses them to offer reverting to
+	// the world's art only when there is something of the campaign's to clear.
+	BannerSource    string `json:"banner_source,omitempty"`
+	IconSource      string `json:"icon_source,omitempty"`
 	PlayTimeSeconds int64  `json:"play_time_seconds,omitempty"`
 }
 
