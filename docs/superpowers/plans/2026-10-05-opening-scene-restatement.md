@@ -620,12 +620,12 @@ Expected: FAIL to compile, `TurnRequest` has no field `SceneOnly`.
 
 - [ ] **Step 3: Add the request field**
 
-In `pkg/gui/types.go`, replace `TurnRequest`:
+In `pkg/gui/types.go`, add the field to `TurnRequest` (which already carries `PendingCheckRef`):
 
 ```go
-type TurnRequest struct {
-	Mode  string `json:"mode"`
-	Input string `json:"input"`
+	// PendingCheckRef continues a turn whose GM proposed a check (ask policy):
+	// the engine resolves it and adjudicates the result.
+	PendingCheckRef string `json:"pending_check_ref,omitempty"`
 	// SceneOnly asks an Opening turn to restate the campaign's scene and add no
 	// hooks, so the player's own first action can follow it.
 	SceneOnly bool `json:"scene_only,omitempty"`

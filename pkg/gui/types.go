@@ -576,6 +576,9 @@ type TurnRequest struct {
 	// PendingCheckRef continues a turn whose GM proposed a check (ask policy):
 	// the engine resolves it and adjudicates the result.
 	PendingCheckRef string `json:"pending_check_ref,omitempty"`
+	// SceneOnly asks an Opening turn to restate the campaign's scene and add no
+	// hooks, so the player's own first action can follow it.
+	SceneOnly bool `json:"scene_only,omitempty"`
 }
 
 // TurnEvent is one NDJSON line sent while a turn runs.
