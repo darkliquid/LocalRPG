@@ -909,7 +909,11 @@ func TestOpeningSceneSectionIsNotDroppable(t *testing.T) {
 func TestPromptOmitsThePlayerActionWhenThereIsNone(t *testing.T) {
 	assembler := NewContextAssembler(newTestEntityStore(t))
 
+	// The protagonist is named, as they are on a real opening turn, but there is no
+	// action: the section must still be absent.
 	result, err := assembler.Assemble(ContextRequest{
+		PlayerID:     "player",
+		PlayerName:   "Sean",
 		OpeningScene: "Fire rains down over the market.",
 		OpeningHooks: true,
 	})

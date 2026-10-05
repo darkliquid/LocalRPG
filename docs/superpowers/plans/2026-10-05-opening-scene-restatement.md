@@ -229,6 +229,10 @@ func TestPromptOmitsThePlayerActionWhenThereIsNone(t *testing.T) {
 	assembler := NewContextAssembler(newTestEntityStore(t))
 
 	result, err := assembler.Assemble(ContextRequest{
+		// The protagonist is named, as they are on a real opening turn, but there is
+		// no action: the section must still be absent.
+		PlayerID:     "player",
+		PlayerName:   "Sean",
 		OpeningScene: "Fire rains down over the market.",
 		OpeningHooks: true,
 	})
@@ -274,9 +278,11 @@ In `buildSections`, replace the block that builds `actionText` (currently lines 
 	}
 
 	// An opening turn has no action to answer, so the section is absent rather than
-	// empty: presenting it made the GM respond to the scene it was given.
+	// empty: presenting it made the GM respond to the scene it was given. The gate is
+	// the action alone: an opening turn still carries the protagonist's name, and
+	// gating on that would render "Sean: " against nothing.
 	actionText := ""
-	if strings.TrimSpace(req.Action) != "" || strings.TrimSpace(req.PlayerName) != "" {
+	if strings.TrimSpace(req.Action) != "" {
 		actionText = "\n## PLAYER ACTION\n"
 		if name := strings.TrimSpace(req.PlayerName); name != "" {
 			actionText += name + ": "

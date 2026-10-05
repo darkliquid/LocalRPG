@@ -337,7 +337,7 @@ func (c *ContextAssembler) buildSections(req ContextRequest) ([]section, error) 
 	// An opening turn has no action to answer, so the section is absent rather than
 	// empty: presenting it made the GM respond to the scene it was given.
 	actionText := ""
-	if strings.TrimSpace(req.Action) != "" || strings.TrimSpace(req.PlayerName) != "" {
+	if strings.TrimSpace(req.Action) != "" {
 		actionText = "\n## PLAYER ACTION\n"
 		if name := strings.TrimSpace(req.PlayerName); name != "" {
 			actionText += name + ": "
