@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppConfig, MediaInspectEntry } from '../types';
+import { AgentRoleConfig, AppConfig, MediaInspectEntry } from '../types';
 import { APIClient } from '../api/client';
 import { TierBadge } from './providers/TierBadge';
 import {
@@ -11,6 +11,20 @@ import {
   setMediaEntry,
   uniqueName,
 } from '../lib/mediaProviders';
+
+export type ManagerFamily = ProviderFamily | 'llm';
+
+// RoleListItem describes one LLM role for the manager's list: its display label,
+// the catalogue descriptor of the adapter it resolves to, and its key state.
+export interface RoleListItem {
+  name: string;
+  label: string;
+  providerLabel?: string;
+  tier?: string;
+  caveat?: string;
+  keyRequired?: boolean;
+  keyPresent?: boolean;
+}
 
 // renameInPurposes rewrites every purpose that pointed at oldName.
 export function renameInPurposes(purposes: Record<string, string> | undefined, oldName: string, newName: string): Record<string, string> {
@@ -28,20 +42,36 @@ export function purposeRefs(purposes: Record<string, string> | undefined, name: 
 }
 
 interface ProviderManagerProps {
-  family: ProviderFamily;
+  family: ManagerFamily;
   config: AppConfig;
   onChange: (config: AppConfig) => void;
   selected?: string;
   onSelect?: (name: string) => void;
   renderEditor?: (name: string, value: unknown, onChange: (value: unknown) => void) => React.ReactNode;
+  roles?: RoleListItem[];
+}
+
+interface Row {
+  name: string;
+  label: string;
+  providerLabel?: string;
+  tier?: string;
+  caveat?: string;
+  keyRequired?: boolean;
+  keyPresent?: boolean;
 }
 
 // ProviderManager lists every provider of a family and lets the user add,
-// duplicate, rename, remove, and choose defaults and purposes. It edits a draft
-// config through onChange; it never saves. The selection is controlled when
-// `selected`/`onSelect` are supplied and local otherwise, so the manager stays
-// usable on its own.
-export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config, onChange, selected, onSelect, renderEditor }) => {
+// duplicate, rename, remove, and choose defaults and purposes. In `llm` mode it
+// lists the configured roles instead, with each role's resolved adapter. It
+// edits a draft config through onChange; it never saves. The selection is
+// controlled when `selected`/`onSelect` are supplied and local otherwise, so the
+// manager stays usable on its own.
+export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config, onChange, selected, onSelect, renderEditor, roles }) => {
+  const isLLM = family === 'llm';
+  // The media family the address helpers use; only meaningful when not in llm mode.
+  const mediaFamily = (isLLM ? 'tts' : family) as ProviderFamily;
+
   const [entries, setEntries] = useState<MediaInspectEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [internalSelected, setInternalSelected] = useState<string>('default');
@@ -59,12 +89,13 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
     [onSelect]
   );
 
-  const providers = (config.media[providersKey(family)] ?? {}) as Record<string, unknown>;
+  const providers = (isLLM ? {} : (config.media[providersKey(mediaFamily)] ?? {})) as Record<string, unknown>;
   const purposes = config.media.purposes;
 
   useEffect(() => {
+    if (isLLM) return;
     let active = true;
-    APIClient.inspectMedia(family)
+    APIClient.inspectMedia(mediaFamily)
       .then((res) => {
         if (active) setEntries(res.entries ?? []);
       })
@@ -74,7 +105,7 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
     return () => {
       active = false;
     };
-  }, [family, providers, refreshToken]);
+  }, [mediaFamily, providers, refreshToken, isLLM]);
 
   const byName = useMemo(() => {
     const map: Record<string, MediaInspectEntry> = {};
@@ -82,7 +113,40 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
     return map;
   }, [entries]);
 
-  const names = useMemo(() => entryNames(config, family), [config, family]);
+  const rolesByName = useMemo(() => {
+    const map: Record<string, RoleListItem> = {};
+    for (const item of roles ?? []) map[item.name] = item;
+    return map;
+  }, [roles]);
+
+  const names = useMemo(
+    () => (isLLM ? Object.keys(config.agents.roles) : entryNames(config, mediaFamily)),
+    [isLLM, config, mediaFamily]
+  );
+
+  const rows: Row[] = names.map((name) => {
+    if (isLLM) {
+      const item = rolesByName[name];
+      return {
+        name,
+        label: item?.label ?? name,
+        providerLabel: item?.providerLabel,
+        tier: item?.tier,
+        caveat: item?.caveat,
+        keyRequired: item?.keyRequired,
+        keyPresent: item?.keyPresent,
+      };
+    }
+    const entry = byName[name];
+    return {
+      name,
+      label: name,
+      tier: entry?.tier,
+      caveat: entry?.provider_key,
+      keyRequired: entry?.key_required,
+      keyPresent: entry?.key_present,
+    };
+  });
 
   const emit = useCallback(
     (next: AppConfig) => {
@@ -94,25 +158,25 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
 
   const setProviders = useCallback(
     (next: Record<string, unknown>) => {
-      emit({ ...config, media: { ...config.media, [providersKey(family)]: next } });
+      emit({ ...config, media: { ...config.media, [providersKey(mediaFamily)]: next } });
     },
-    [config, emit, family]
+    [config, emit, mediaFamily]
   );
 
   const addProvider = useCallback(() => {
     const name = uniqueName('new-provider', providers);
-    setProviders({ ...providers, [name]: { ...config.media[family] } });
+    setProviders({ ...providers, [name]: { ...config.media[mediaFamily] } });
     select(name);
-  }, [config.media, family, providers, select, setProviders]);
+  }, [config.media, mediaFamily, providers, select, setProviders]);
 
   const duplicateProvider = useCallback(
     (name: string) => {
-      const source = name === 'default' ? config.media[family] : providers[name];
+      const source = name === 'default' ? config.media[mediaFamily] : providers[name];
       const copyName = uniqueName(`${name}-copy`, providers);
       setProviders({ ...providers, [copyName]: { ...(source as object) } });
       select(copyName);
     },
-    [config.media, family, providers, select, setProviders]
+    [config.media, mediaFamily, providers, select, setProviders]
   );
 
   const renameProvider = useCallback(
@@ -126,12 +190,12 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
         ...config,
         media: {
           ...config.media,
-          [providersKey(family)]: next,
+          [providersKey(mediaFamily)]: next,
           purposes: renameInPurposes(purposes, oldName, trimmed),
         },
       });
     },
-    [config, emit, family, providers, purposes]
+    [config, emit, mediaFamily, providers, purposes]
   );
 
   const removeProvider = useCallback(
@@ -153,12 +217,12 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
     (name: string) => {
       if (name === 'default') return;
       const source = providers[name] as object;
-      emit(setMediaEntry(config, family, 'default', { ...source }));
+      emit(setMediaEntry(config, mediaFamily, 'default', { ...source }));
       setDefaultSource(name);
       setRefreshToken((value) => value + 1);
       setDefaultNotice(`Default is now ${name}.`);
     },
-    [config, emit, family, providers]
+    [config, emit, mediaFamily, providers]
   );
 
   const setPurpose = useCallback(
@@ -174,66 +238,92 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
     [config, emit, purposes]
   );
 
+  const selectedValue = isLLM
+    ? config.agents.roles[activeSelected] ?? {}
+    : mediaEntryValue(config, mediaFamily, activeSelected);
+  const writeSelected = (value: unknown) => {
+    if (isLLM) {
+      emit({ ...config, agents: { ...config.agents, roles: { ...config.agents.roles, [activeSelected]: value as AgentRoleConfig } } });
+    } else {
+      emit(setMediaEntry(config, mediaFamily, activeSelected, value));
+    }
+  };
+
+  const defaultMarker = isLLM ? config.agents.default_role : defaultSource;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="font-sans text-xs uppercase font-bold text-stone-200">{family.toUpperCase()} Providers</h4>
-        <button
-          type="button"
-          onClick={addProvider}
-          className="rounded-lg border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-xs font-medium text-purple-200 hover:bg-purple-500/20"
-        >
-          Add {family.toUpperCase()} Provider
-        </button>
+        <h4 className="font-sans text-xs uppercase font-bold text-stone-200">
+          {isLLM ? 'LLM Roles' : `${family.toUpperCase()} Providers`}
+        </h4>
+        {!isLLM && (
+          <button
+            type="button"
+            onClick={addProvider}
+            className="rounded-lg border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-xs font-medium text-purple-200 hover:bg-purple-500/20"
+          >
+            Add {family.toUpperCase()} Provider
+          </button>
+        )}
       </div>
 
       {error && <p className="text-xs text-amber-300">{error}</p>}
       {defaultNotice && <p className="text-xs text-emerald-300">{defaultNotice}</p>}
 
       <ul className="space-y-1">
-        {names.map((name) => {
-          const entry = byName[name];
-          const isDefault = name === 'default';
-          const isDefaultSource = name === defaultSource;
+        {rows.map((row) => {
+          const isDefault = row.name === 'default';
+          const isDefaultSource = row.name === defaultMarker;
           return (
-            <li key={name} className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-800 bg-stone-950/40 px-3 py-2">
+            <li key={row.name} className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-800 bg-stone-950/40 px-3 py-2">
               <span className={`h-2 w-2 rounded-full ${isDefaultSource ? 'bg-emerald-400' : 'bg-stone-600'}`} title={isDefaultSource ? 'Default' : ''} />
-              <span className="font-mono text-xs text-stone-100">{name}</span>
-              {entry && <TierBadge tier={entry.tier} caveat={entry.provider_key} />}
-              {entry && (
-                <span className={`text-[11px] ${entry.key_required && !entry.key_present ? 'text-amber-300' : 'text-stone-500'}`}>
-                  {entry.key_required ? (entry.key_present ? 'key set' : 'key missing') : 'no key needed'}
+              {isLLM ? (
+                <>
+                  <span className="text-xs text-stone-100">{row.label}</span>
+                  <span className="font-mono text-[11px] text-stone-500">{row.name}</span>
+                  {row.providerLabel && <span className="font-mono text-[11px] text-purple-300/80">{row.providerLabel}</span>}
+                </>
+              ) : (
+                <span className="font-mono text-xs text-stone-100">{row.name}</span>
+              )}
+              <TierBadge tier={row.tier} caveat={row.caveat} />
+              {row.keyRequired !== undefined && (
+                <span className={`text-[11px] ${row.keyRequired && !row.keyPresent ? 'text-amber-300' : 'text-stone-500'}`}>
+                  {row.keyRequired ? (row.keyPresent ? 'key set' : 'key missing') : 'no key needed'}
                 </span>
               )}
               <span className="flex-1" />
               <button
                 type="button"
-                onClick={() => select(name)}
-                className={`text-[11px] ${activeSelected === name ? 'text-purple-300' : 'text-stone-400 hover:text-purple-300'}`}
+                onClick={() => select(row.name)}
+                className={`text-[11px] ${activeSelected === row.name ? 'text-purple-300' : 'text-stone-400 hover:text-purple-300'}`}
               >
                 edit
               </button>
-              {!isDefault && (
-                <button type="button" onClick={() => setDefault(name)} className="text-[11px] text-stone-400 hover:text-emerald-300">
+              {!isLLM && !isDefault && (
+                <button type="button" onClick={() => setDefault(row.name)} className="text-[11px] text-stone-400 hover:text-emerald-300">
                   set default
                 </button>
               )}
-              <button type="button" onClick={() => duplicateProvider(name)} className="text-[11px] text-stone-400 hover:text-purple-300">
-                duplicate
-              </button>
-              {!isDefault && (
+              {!isLLM && (
+                <button type="button" onClick={() => duplicateProvider(row.name)} className="text-[11px] text-stone-400 hover:text-purple-300">
+                  duplicate
+                </button>
+              )}
+              {!isLLM && !isDefault && (
                 <>
                   <button
                     type="button"
                     onClick={() => {
-                      const next = window.prompt('Rename provider', name);
-                      if (next) renameProvider(name, next);
+                      const next = window.prompt('Rename provider', row.name);
+                      if (next) renameProvider(row.name, next);
                     }}
                     className="text-[11px] text-stone-400 hover:text-purple-300"
                   >
                     rename
                   </button>
-                  <button type="button" onClick={() => removeProvider(name)} className="text-[11px] text-stone-400 hover:text-rose-400">
+                  <button type="button" onClick={() => removeProvider(row.name)} className="text-[11px] text-stone-400 hover:text-rose-400">
                     remove
                   </button>
                 </>
@@ -245,17 +335,15 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
 
       {renderEditor && (
         <div className="rounded-lg border border-stone-800 bg-stone-950/40 p-3">
-          {renderEditor(activeSelected, mediaEntryValue(config, family, activeSelected), (value) =>
-            emit(setMediaEntry(config, family, activeSelected, value))
-          )}
+          {renderEditor(activeSelected, selectedValue, writeSelected)}
         </div>
       )}
 
-      {purposesFor(family).length > 0 && (
+      {!isLLM && purposesFor(mediaFamily).length > 0 && (
         <div className="rounded-lg border border-stone-800 bg-stone-950/40 p-3">
           <p className="mb-2 font-sans text-[11px] uppercase text-stone-400">Purposes</p>
           <div className="space-y-1.5">
-            {purposesFor(family).map((use) => (
+            {purposesFor(mediaFamily).map((use) => (
               <label key={use} className="flex items-center gap-2 text-xs text-stone-300">
                 <span className="w-24 font-mono">{use}</span>
                 <select

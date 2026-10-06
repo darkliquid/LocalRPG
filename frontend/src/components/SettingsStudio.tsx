@@ -37,7 +37,7 @@ import { UsagePanel } from './UsagePanel';
 import { TTSBatchPanel } from './TTSBatchPanel';
 import { hasWebSpeechSupport } from '../lib/webSpeech';
 import { TierLegend, tierLabel } from './providers/TierBadge';
-import { ProviderManager } from './ProviderManager';
+import { ProviderManager, RoleListItem } from './ProviderManager';
 import { mediaEntryValue, setMediaEntry } from '../lib/mediaProviders';
 
 interface SettingsStudioProps {
@@ -115,6 +115,26 @@ const presetsToMap = <T,>(
 // makes extraction work out of the box without a second configuration step.
 const defaultRoleConfig = (role: string): AgentRoleConfig =>
   role === 'extractor' ? { type: 'inherit', inherit_from: 'gm' } : { type: 'disabled' };
+
+// descriptorIDForRole maps a role's resolved adapter to its catalogue key, so
+// the LLM role list can reuse the same label and tier vocabulary as the media
+// families.
+const descriptorIDForRole = (role: AgentRoleConfig | undefined): string | undefined => {
+  if (!role) return undefined;
+  if (role.type === 'gemini') return 'llm:gemini';
+  if (role.type === 'http') return 'llm:openaichat';
+  if (role.type === 'cli') return 'llm:cli';
+  if (role.type === 'builtin' && role.builtin_name !== 'echo') return 'llm:narrative-oracle';
+  return undefined;
+};
+
+// roleKeyPresent reports whether a role's adapter has the key it needs, counting
+// the shared provider key as the role's own when it has no override.
+const roleKeyPresent = (role: AgentRoleConfig, providers: AppConfig['providers']): boolean => {
+  if (role.api_key) return true;
+  if (role.type === 'gemini') return Boolean(providers?.gemini?.api_key);
+  return false;
+};
 
 export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSaved, activeGameID, onOpenDocs }) => {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -373,6 +393,34 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const isCartesiaTTS =
     activeTtsConfig?.type === 'cartesia' ||
     (activeTtsConfig?.type === 'builtin' && activeTtsConfig?.builtin_name === 'cartesia');
+
+  // The LLM role list mirrors the media families: one row per role, labelled
+  // with the catalogue descriptor of the adapter it resolves to.
+  const descriptorByID: Record<string, ProviderDescriptor> = {};
+  for (const descriptor of byFamily('llm')) descriptorByID[descriptor.id] = descriptor;
+  const resolveRole = (role: string, seen: Set<string>): AgentRoleConfig | undefined => {
+    const roleConfig = config.agents.roles[role];
+    if (!roleConfig) return undefined;
+    if (roleConfig.type === 'inherit' && roleConfig.inherit_from && !seen.has(roleConfig.inherit_from)) {
+      seen.add(role);
+      return resolveRole(roleConfig.inherit_from, seen) ?? roleConfig;
+    }
+    return roleConfig;
+  };
+  const roleListItems: RoleListItem[] = Object.keys(config.agents.roles).map((role) => {
+    const resolved = resolveRole(role, new Set()) ?? config.agents.roles[role];
+    const descriptor = descriptorByID[descriptorIDForRole(resolved) ?? ''];
+    const keyRequired = Boolean(descriptor?.features.includes('key_required'));
+    return {
+      name: role,
+      label: ROLE_LABELS[role] ?? role,
+      providerLabel: descriptor?.label,
+      tier: descriptor?.tier,
+      caveat: descriptor?.caveat,
+      keyRequired,
+      keyPresent: keyRequired ? roleKeyPresent(resolved, config.providers) : false,
+    };
+  });
 
   const updateRole = (updated: AgentRoleConfig) => {
     setConfig({
@@ -885,6 +933,15 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 <TierLegend caveats={tierCaveats} />
               </div>
             )}
+
+            <ProviderManager
+              family="llm"
+              config={config}
+              onChange={setConfig}
+              selected={selectedRole}
+              onSelect={setSelectedRole}
+              roles={roleListItems}
+            />
 
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
