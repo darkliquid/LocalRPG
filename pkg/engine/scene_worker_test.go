@@ -21,14 +21,14 @@ func (m *mockSceneGen) GenerateImage(ctx context.Context, prompt string) ([]byte
 	return m.data, m.err
 }
 
-func TestBuildScenePrompt(t *testing.T) {
+func TestBuildScenePromptForKeepsTheOldShape(t *testing.T) {
 	loc := &entity.Entity{
 		ID:         "tavern",
 		Name:       "The Rusty Nail",
 		Appearance: "Old wooden beams and a cracked hearth.",
 	}
 	cue := "Ten years later, the courtyard is quiet and mossy."
-	prompt := BuildScenePrompt(cue, loc, "moody oil painting")
+	prompt := BuildScenePromptFor(cue, loc, "moody oil painting")
 
 	if prompt == "" {
 		t.Fatal("expected non-empty prompt")
@@ -38,6 +38,9 @@ func TestBuildScenePrompt(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "The Rusty Nail") {
 		t.Errorf("expected prompt to contain location name, got %q", prompt)
+	}
+	if !strings.Contains(prompt, "Old wooden beams and a cracked hearth.") {
+		t.Errorf("expected prompt to contain appearance, got %q", prompt)
 	}
 }
 

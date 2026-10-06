@@ -1532,7 +1532,22 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		if cue == "" {
 			cue = ExtractSceneCue(turn.Narration)
 		}
-		scenePrompt := BuildScenePrompt(cue, locEntity, o.worldArtStyle)
+		sceneCtx := ScenePromptContext{
+			Cue:       cue,
+			Narration: turn.Narration,
+			Action:    turn.Input,
+			Location:  turn.Location,
+			Style:     o.worldArtStyle,
+			Entities:  o.presentEntityNames(&turn),
+		}
+		if locEntity != nil {
+			sceneCtx.Location = locEntity.Name
+			sceneCtx.Appearance = locEntity.Appearance
+		}
+		if len(turn.Checks) > 0 {
+			sceneCtx.Outcome = turn.Checks[0].Outcome
+		}
+		scenePrompt := BuildScenePrompt(sceneCtx)
 		o.sceneWorker.Enqueue(o.gameID(), turn.Number, scenePrompt)
 	}
 
