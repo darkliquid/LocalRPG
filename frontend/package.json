@@ -12,7 +12,6 @@
     "test:coverage": "vitest run --coverage",
     "lint:docs": "node scripts/lintDocs.mjs",
     "check:player-bundle": "node scripts/checkPlayerBundle.mjs",
-    "check:tree-model": "node scripts/checkTreeModel.mjs",
     "check:entity-scaffold": "node scripts/checkEntityScaffold.mjs"
   },
   "dependencies": {
