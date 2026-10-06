@@ -11,7 +11,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/chromedp/cdproto v0.0.0-20260922220944-a19bff23514f
 	github.com/chromedp/chromedp v0.16.0
-	github.com/darkliquid/roll v0.0.0-20260807212350-599376e6fde8
+	github.com/darkliquid/roll v0.0.0-20261006063131-e515e24fa1af
 	github.com/dop251/goja v0.0.0-20260917113740-793a2a65c13b
 	github.com/ebitengine/oto/v3 v3.1.0
 	github.com/gen2brain/vpx v0.2.1
