@@ -280,6 +280,14 @@ func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRe
 	if resolved.Stakes == "" {
 		resolved.Stakes = req.Stakes
 	}
+	if resolved.OutcomeText == "" {
+		if text, ok := req.Outcomes[resolved.Outcome]; ok {
+			resolved.OutcomeText = text
+		}
+	}
+	if len(resolved.OutcomeVocabulary) == 0 && o.mechanics != nil {
+		resolved.OutcomeVocabulary = o.mechanics.Checks.Outcome
+	}
 	return resolved, nil
 }
 

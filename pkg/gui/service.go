@@ -1558,8 +1558,9 @@ func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, e
 	}
 
 	dtos := make([]TurnDTO, len(turns))
+	engagement := s.engagementFor(gameID)
 	for i, turn := range turns {
-		dtos[i] = s.turnDTO(turn, store, cfg, gameID)
+		dtos[i] = s.turnDTO(turn, store, cfg, gameID, engagement)
 	}
 	return dtos, nil
 }
@@ -1584,7 +1585,7 @@ func recordReportDTO(report *engine.RecordReport) *RecordReportDTO {
 
 // share it so a live turn and a replayed one are the same shape, which is what
 // lets the client render both with one code path.
-func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID string) TurnDTO {
+func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID, engagement string) TurnDTO {
 	plan := s.clipPlanFor(cfg, gameID, turn.Segments)
 	artAvailable := cfg.Media.Image.BuiltinFallback || cfg.Media.Image.Type != "disabled"
 
@@ -1609,6 +1610,7 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		WorldTick:       turn.WorldTick,
 		ClipGroups:      plan.groups,
 		SceneBreak:      turn.SceneBreak,
+		Engagement:      engagement,
 		Segments: segmentDTOs(turn.Segments, gameID, plan, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
 		}, func(charID string) bool {
@@ -1638,6 +1640,17 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 	}
 
 	return dto
+}
+
+// engagementFor resolves the campaign's mechanics policy for the API, so a turn
+// DTO can say why mechanics ran or did not. An unreadable campaign yields "".
+func (s *Service) engagementFor(gameID string) string {
+	manifest, err := core.LoadGameManifest(filepath.Join(s.resolver.GameDir(gameID), "game.yaml"))
+	if err != nil {
+		return ""
+	}
+	systemManifest, _ := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml"))
+	return engine.ResolveEngagement(manifest, systemManifest, s.configMgr.Get())
 }
 
 // healthEffectDTOs maps the engine's resolved health effects to the wire shape.
@@ -2147,7 +2160,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// step with the audio it actually heard.
 	streamer.StopEmitting()
 
-	dto := t.service.turnDTO(*turn, t.store, t.cfg, t.gameID)
+	dto := t.service.turnDTO(*turn, t.store, t.cfg, t.gameID, t.service.engagementFor(t.gameID))
 
 	// Release campaign turn lock immediately so the player can submit the next turn
 	// without waiting for remaining background TTS audio to synthesize.

@@ -172,6 +172,11 @@ export interface TurnCheck {
   check_kind?: string;
   stakes?: string;
   outcome: string;
+  // outcome_text is the system's own description of the outcome, so a label such
+  // as "weak" reads as fiction, and outcome_vocabulary is the declared order the
+  // card uses to tone the result.
+  outcome_text?: string;
+  outcome_vocabulary?: string[];
   // profile names the resolution profile that decided the outcome, when one did,
   // and position/effect are the Blades-style stakes it carries.
   profile?: string;

@@ -960,9 +960,7 @@ export const App: React.FC = () => {
                 <div className="text-xs font-mono text-purple-400/80 px-4 pb-1">{toolActivity}</div>
               )}
               <MechanicsStrip
-                engagement={gameState?.mechanics_engagement}
-                checks={lastTurnChecks.length}
-                outcome={lastTurnChecks[lastTurnChecks.length - 1]?.outcome}
+                turn={{ engagement: gameState?.mechanics_engagement, checks: lastTurnChecks }}
               />
               {pendingCheck && (
                 <div className="mx-4 mb-2 rounded-xl border border-purple-500/40 bg-purple-950/30 px-4 py-3 flex items-center justify-between gap-3">

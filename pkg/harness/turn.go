@@ -111,6 +111,12 @@ type CheckResult struct {
 	Stakes    string       `json:"stakes,omitempty"`
 	Roll      *RollSummary `json:"roll"`
 	Outcome   string       `json:"outcome"`
+	// OutcomeText is the system's own description of the outcome, from the
+	// request's outcomes map, so a label such as "weak" reads as fiction.
+	OutcomeText string `json:"outcome_text,omitempty"`
+	// OutcomeVocabulary is the system's declared outcome order, so a client can
+	// tone a result without hardcoding pass and fail.
+	OutcomeVocabulary []string `json:"outcome_vocabulary,omitempty"`
 	// Applied lists every bonus that contributed, for display.
 	Applied   []AppliedModifier      `json:"applied,omitempty"`
 	Breakdown map[string]interface{} `json:"breakdown,omitempty"`

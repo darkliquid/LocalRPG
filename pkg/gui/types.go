@@ -215,6 +215,9 @@ type TurnDTO struct {
 	Checks   []harness.CheckResult `json:"checks,omitempty"`
 	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
 	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
+	// Engagement is the resolved mechanics policy in force this turn (off, auto,
+	// or ask), so a client can explain why mechanics ran or did not.
+	Engagement string `json:"engagement,omitempty"`
 	// ContinuationOf is the turn this one continues, when the player rolled a
 	// pending check, so a client can present the halves as one turn.
 	ContinuationOf int `json:"continuation_of,omitempty"`

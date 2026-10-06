@@ -1,32 +1,22 @@
 import React from 'react';
 import { TurnCheck } from '../types';
+import { outcomeTone, Tone } from '../lib/checkTone';
 
-export type CheckTone = 'success' | 'partial' | 'failure' | 'neutral';
-
-// classifyCheckOutcome maps a resolver's arbitrary outcome word to a tone. The
-// order matters: a costed success is partial, and a critical failure is a
-// failure before it is anything else.
-export function classifyCheckOutcome(outcome: string): CheckTone {
-  const value = (outcome || '').trim().toLowerCase();
-  if (!value) return 'neutral';
-  if (/(partial|mixed|success_with_cost|complication)/.test(value)) return 'partial';
-  if (/(fail|failure)/.test(value)) return 'failure';
-  if (/(success|pass|critical|succeed)/.test(value)) return 'success';
-  return 'neutral';
-}
-
-const TONE_STYLES: Record<CheckTone, { border: string; chip: string }> = {
-  success: { border: 'border-emerald-500/60', chip: 'text-emerald-300' },
-  partial: { border: 'border-amber-500/60', chip: 'text-amber-300' },
-  failure: { border: 'border-rose-500/60', chip: 'text-rose-400' },
-  neutral: { border: 'border-stone-500/50', chip: 'text-stone-300' },
+const TONE_STYLES: Record<Tone, { border: string; chip: string }> = {
+  best: { border: 'border-emerald-500/60', chip: 'text-emerald-300' },
+  neutral: { border: 'border-amber-500/60', chip: 'text-amber-300' },
+  worst: { border: 'border-rose-500/60', chip: 'text-rose-400' },
 };
 
 // MAX_SHOWN_DICE keeps a large pool readable: the rest is a count.
 const MAX_SHOWN_DICE = 6;
 
+// DiceCheckCard shows the full resolution of a check: the dice, every modifier,
+// the outcome, the stakes, and, where present, the profile, success count,
+// position, and effect. Sections render only when they have content, so a simple
+// roll stays compact. Tone follows the system's own outcome vocabulary.
 export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
-  const tone = classifyCheckOutcome(check.outcome);
+  const tone = outcomeTone(check.outcome, check.outcome_vocabulary ?? []);
   const style = TONE_STYLES[tone];
   const roll = check.roll;
   const notation = roll?.notation ?? 'check';
@@ -39,13 +29,15 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
     (check.stakes ?? '').trim() ||
     [check.actor, check.target].filter(Boolean).join(' vs ') ||
     (check.check_kind ?? '').trim();
+  const outcomeText = (check.outcome_text ?? '').trim();
+  const hasProfileDetail = Boolean(check.profile || check.position || check.effect || (check.successes ?? 0) > 0);
   const label = `${check.actor ? `${check.actor} ` : ''}${notation}${roll ? ` = ${roll.total}` : ''}, ${check.outcome}${
     stakes ? `: ${stakes}` : ''
   }`;
 
   return (
     <div className={`my-3 rounded-xl border-l-4 ${style.border} bg-black/30 px-3 py-2 space-y-1`} aria-label={label}>
-      <div className="flex flex-wrap items-center gap-2">
+      <div data-section="dice" className="flex flex-wrap items-center gap-2">
         {shown > 0 && (
           <span className="flex items-center gap-1" aria-hidden="true">
             {faces.slice(0, shown).map((die, index) => {
@@ -87,7 +79,7 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
         <span className={`text-xs font-sans font-bold uppercase tracking-wider ${style.chip}`}>{check.outcome}</span>
       </div>
       {applied.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1 text-[11px] font-mono text-stone-400">
+        <div data-section="modifiers" className="flex flex-wrap items-center gap-1 text-[11px] font-mono text-stone-400">
           <span className="text-stone-500">{notation}{roll ? ` ${roll.total}` : ''}</span>
           {applied.map((modifier, index) => (
             <span key={index} className="rounded bg-white/5 px-1.5 py-0.5">
@@ -96,8 +88,8 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
           ))}
         </div>
       )}
-      {(check.profile || check.position || check.effect || (check.successes ?? 0) > 0) && (
-        <div className="flex flex-wrap items-center gap-1 text-[11px] font-mono text-stone-400">
+      {hasProfileDetail && (
+        <div data-section="profile" className="flex flex-wrap items-center gap-1 text-[11px] font-mono text-stone-400">
           {check.profile && <span className="rounded bg-white/5 px-1.5 py-0.5">{check.profile}</span>}
           {check.position && <span className="rounded bg-white/5 px-1.5 py-0.5">{check.position}</span>}
           {check.effect && <span className="rounded bg-white/5 px-1.5 py-0.5">{check.effect}</span>}
@@ -106,7 +98,10 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
           )}
         </div>
       )}
-      {stakes && <div className="text-xs font-sans text-stone-400">{stakes}</div>}
+      {outcomeText && (
+        <div data-section="outcome" className="text-xs font-sans text-stone-300">{outcomeText}</div>
+      )}
+      {stakes && <div data-section="stakes" className="text-xs font-sans text-stone-400">{stakes}</div>}
     </div>
   );
 };
