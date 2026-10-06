@@ -661,6 +661,18 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// POST /api/game/{id}/turn/{n}/resolve-check resolves the turn's pending
+		// check without a fresh player action.
+		if r.Method == http.MethodPost && len(parts) == 4 && parts[3] == "resolve-check" {
+			turnNumber, err := strconv.Atoi(parts[2])
+			if err != nil {
+				http.Error(w, "invalid turn number", http.StatusBadRequest)
+				return
+			}
+			s.handleResolveCheck(w, r, gameID, turnNumber)
+			return
+		}
+
 		// GET /api/game/{id}/turn/{n}/scene-image
 		if r.Method == http.MethodGet && len(parts) == 4 && parts[3] == "scene-image" {
 			turnNumber, err := strconv.Atoi(parts[2])
@@ -1607,6 +1619,71 @@ func (s *Server) handleTurnSubmit(w http.ResponseWriter, r *http.Request, gameID
 	}
 
 	if err := session.Run(r.Context(), req, writeEvent); err != nil {
+		event := TurnEvent{Type: "error", Message: err.Error()}
+		if failure, ok := harness.FailureFrom(err); ok {
+			event.Code = string(failure.Code)
+			event.Detail = failure.Message
+			event.Failure = failure
+		}
+		_ = writeEvent(event)
+	}
+}
+
+// handleResolveCheck streams the resolution of a turn's pending check as a
+// continuation turn. Status codes are chosen before the first byte, mirroring
+// handleTurnSubmit: 404 for an unknown turn, 400 for no or mismatched pending
+// check, and 409 for a turn already in flight.
+func (s *Server) handleResolveCheck(w http.ResponseWriter, r *http.Request, gameID string, turnNumber int) {
+	var req ResolveCheckRequestDTO
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+		writeInvalidRequest(w, "invalid request body")
+		return
+	}
+
+	session, pendingRef, err := s.service.BeginResolveCheck(gameID, turnNumber, req)
+	switch {
+	case errors.Is(err, ErrTurnInFlight):
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	case errors.Is(err, fs.ErrNotExist):
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	case errors.Is(err, ErrNoPendingCheck), errors.Is(err, ErrPendingCheckMismatch):
+		writeInvalidRequest(w, err.Error())
+		return
+	case err != nil:
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer session.Close()
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming is not supported by this client", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	encoder := json.NewEncoder(w)
+	writeEvent := func(event TurnEvent) error {
+		if err := encoder.Encode(event); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+
+	err = session.Run(r.Context(), TurnRequest{
+		Mode:            "roll",
+		Input:           req.Note,
+		PendingCheckRef: pendingRef,
+		ForcedTotal:     req.ManualResult,
+	}, writeEvent)
+	if err != nil {
 		event := TurnEvent{Type: "error", Message: err.Error()}
 		if failure, ok := harness.FailureFrom(err); ok {
 			event.Code = string(failure.Code)

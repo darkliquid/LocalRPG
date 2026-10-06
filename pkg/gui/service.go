@@ -1749,6 +1749,61 @@ func (t *TurnSession) Close() {
 	t.release = nil
 }
 
+// ErrNoPendingCheck means the turn carries no pending check to resolve.
+var ErrNoPendingCheck = errors.New("the turn has no pending check")
+
+// ErrPendingCheckMismatch means the pending ref does not match the turn's check.
+var ErrPendingCheckMismatch = errors.New("the pending check ref does not match the turn")
+
+// BeginResolveCheck validates the turn's pending check and acquires the campaign
+// turn lock, so a handler can choose a status code before streaming. It returns
+// the session and the pending ref to resolve.
+func (s *Service) BeginResolveCheck(gameID string, turnNumber int, req ResolveCheckRequestDTO) (*TurnSession, string, error) {
+	turns, err := s.cachedHistory(gameID)
+	if err != nil {
+		return nil, "", err
+	}
+	found := false
+	var pending *harness.PendingCheck
+	for i := range turns {
+		if turns[i].Number == turnNumber {
+			found = true
+			pending = turns[i].PendingCheck
+			break
+		}
+	}
+	if !found {
+		return nil, "", fmt.Errorf("%w: turn %d", fs.ErrNotExist, turnNumber)
+	}
+	if pending == nil {
+		return nil, "", ErrNoPendingCheck
+	}
+	if req.PendingRef != "" && req.PendingRef != pending.Ref {
+		return nil, "", ErrPendingCheckMismatch
+	}
+	session, err := s.BeginTurn(gameID)
+	if err != nil {
+		return nil, "", err
+	}
+	return session, pending.Ref, nil
+}
+
+// ResolveCheck rolls and resolves a pending check, streaming the GM's
+// adjudication as a continuation turn without a fresh player action.
+func (s *Service) ResolveCheck(ctx context.Context, gameID string, turnNumber int, req ResolveCheckRequestDTO, emit func(TurnEvent) error) error {
+	session, ref, err := s.BeginResolveCheck(gameID, turnNumber, req)
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+	return session.Run(ctx, TurnRequest{
+		Mode:            "roll",
+		Input:           req.Note,
+		PendingCheckRef: ref,
+		ForcedTotal:     req.ManualResult,
+	}, emit)
+}
+
 // SummaryPending reports whether a regeneration is in flight for a campaign.
 func (s *Service) SummaryPending(gameID string) bool {
 	s.summaryMu.Lock()
@@ -2055,6 +2110,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	})
 
 	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)
+	t.orchestrator.SetForcedTotal(req.ForcedTotal)
 
 	// Application playback runs on one queue opened before generation: a sentence
 	// the streamer synthesizes is heard as soon as it lands, and the finalise pass

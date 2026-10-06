@@ -679,6 +679,18 @@ type TurnRequest struct {
 	// SceneOnly asks an Opening turn to restate the campaign's scene and add no
 	// hooks, so the player's own first action can follow it.
 	SceneOnly bool `json:"scene_only,omitempty"`
+	// ForcedTotal, when set, makes the turn's check resolve to this total instead
+	// of rolling, so a manually entered die result is honoured.
+	ForcedTotal *int `json:"forced_total,omitempty"`
+}
+
+// ResolveCheckRequestDTO asks the engine to roll and resolve a pending check,
+// producing the GM's adjudication without a fresh player turn.
+type ResolveCheckRequestDTO struct {
+	PendingRef string `json:"pending_check_ref"`
+	// ManualResult, when set, is the total the player entered rather than a roll.
+	ManualResult *int   `json:"manual_result,omitempty"`
+	Note         string `json:"note,omitempty"`
 }
 
 // TurnEvent is one NDJSON line sent while a turn runs.

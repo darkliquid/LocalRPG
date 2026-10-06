@@ -48,6 +48,9 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 		return stateValue(r.bridge, actor, name)
 	}, req)
 	total := roll.Total + bonus
+	if req.ForcedTotal != nil {
+		total = *req.ForcedTotal
+	}
 
 	res := &harness.CheckResult{
 		CheckID: harness.NewCheckID(),
@@ -55,6 +58,9 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 		Target:  req.Target,
 		Roll:    roll.Summary(total),
 		Applied: applied,
+	}
+	if req.ForcedTotal != nil {
+		res.Source = "manual"
 	}
 
 	if hasProfile {

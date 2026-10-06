@@ -47,11 +47,17 @@ func (r defaultCheckResolver) Resolve(_ context.Context, req harness.CheckReques
 		return engineStateValue(actor, name)
 	}, req)
 	total := roll.Total + bonus
+	if req.ForcedTotal != nil {
+		total = *req.ForcedTotal
+	}
 
 	res := &harness.CheckResult{
 		CheckID: harness.NewCheckID(),
 		Roll:    roll.Summary(total),
 		Applied: applied,
+	}
+	if req.ForcedTotal != nil {
+		res.Source = "manual"
 	}
 	if hasProfile {
 		if outcome, decided := rules.ResolveProfile(chosen, total, roll.Successes); decided {

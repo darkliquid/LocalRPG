@@ -74,6 +74,9 @@ type TurnOrchestrator struct {
 	forceToolChoice bool
 	// pendingCheckRef continues a turn whose GM proposed a check (ask policy).
 	pendingCheckRef string
+	// forcedTotal, when set, replaces the next check's rolled total: a manual roll
+	// entry or a resolved pending check. Consumed once per turn.
+	forcedTotal *int
 	extractor       *harness.Extractor
 	chunkTimeout    time.Duration
 	openingPrompt   string
@@ -269,6 +272,12 @@ func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRe
 	resolver := o.checkResolver
 	if resolver == nil {
 		resolver = defaultCheckResolver{mechanics: o.mechanics}
+	}
+	// A forced total applies to the first check of the turn (the pending one),
+	// then is consumed so it cannot colour a later roll.
+	if o.forcedTotal != nil {
+		req.ForcedTotal = o.forcedTotal
+		o.forcedTotal = nil
 	}
 	resolved, err := resolver.Resolve(ctx, req, actor)
 	if err != nil {
@@ -515,6 +524,12 @@ func (o *TurnOrchestrator) SetMechanicsCadence(turns int) {
 // engine resolves it and the GM adjudicates the result.
 func (o *TurnOrchestrator) SetPendingCheckRef(ref string) {
 	o.pendingCheckRef = ref
+}
+
+// SetForcedTotal makes the next check resolve to this total instead of rolling,
+// so a manually entered die result is honoured. It is consumed once per turn.
+func (o *TurnOrchestrator) SetForcedTotal(total *int) {
+	o.forcedTotal = total
 }
 
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {

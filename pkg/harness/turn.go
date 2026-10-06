@@ -82,6 +82,9 @@ type CheckRequest struct {
 	// Position and Effect are the Blades-style stakes a profile may define.
 	Position string `json:"position,omitempty"`
 	Effect   string `json:"effect,omitempty"`
+	// ForcedTotal, when set, replaces the rolled total: a player entering a
+	// physical die result, or a pending check resolved with a manual roll.
+	ForcedTotal *int `json:"-"`
 }
 
 // DieFace is one die as it landed. Symbol is the notation's own way of showing
@@ -128,6 +131,9 @@ type CheckResult struct {
 	// Successes is the count of dice meeting the pool threshold, when the profile
 	// is a success-count pool.
 	Successes int `json:"successes,omitempty"`
+	// Source is "manual" when the total came from a forced entry rather than the
+	// dice, so the chronicle can say so.
+	Source string `json:"source,omitempty"`
 }
 
 // ProposedCheck is a player's explicit request to roll, carried as structured
