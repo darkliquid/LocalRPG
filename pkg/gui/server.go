@@ -691,6 +691,22 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// POST /api/game/{id}/turn/{n}/scene-image generates one on demand,
+		// regardless of the trigger policy.
+		if r.Method == http.MethodPost && len(parts) == 4 && parts[3] == "scene-image" {
+			turnNumber, err := strconv.Atoi(parts[2])
+			if err != nil {
+				http.Error(w, "invalid turn number", http.StatusBadRequest)
+				return
+			}
+			if err := s.service.GenerateTurnSceneImage(r.Context(), gameID, turnNumber); err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+
 		// POST /api/game/{id}/turn/{n}/play plays the whole turn through the
 		// POST /api/game/{id}/turn/{n}/play plays the whole turn through the
 		// application's audio device.

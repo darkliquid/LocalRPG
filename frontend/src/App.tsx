@@ -554,6 +554,15 @@ export const App: React.FC = () => {
     setPendingAction(null);
   };
 
+  const handleGenerateImage = async (turnNumber: number) => {
+    if (!activeGameID) return;
+    try {
+      await APIClient.generateTurnSceneImage(activeGameID, turnNumber);
+    } catch (err) {
+      console.error('generate image:', err);
+    }
+  };
+
   // Beginning the story saves the player's opening prompt and then runs the
   // campaign's first turn in the reserved Opening mode, so the GM establishes
   // the scene before the player is asked for anything.
@@ -982,6 +991,7 @@ export const App: React.FC = () => {
                     segmentProgress={segmentAudioProgress}
                     gameId={activeGameID ?? undefined}
                     skipAudioKeys={streamedKeys}
+                    onGenerateImage={handleGenerateImage}
                   />
                 </>
               )}

@@ -2165,6 +2165,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)
 	t.orchestrator.SetForcedTotal(req.ForcedTotal)
 	t.orchestrator.SetSingleTurnMode(t.cfg.InteractiveRolls() == "single-turn")
+	t.orchestrator.SetImageTrigger(t.cfg.ImageTrigger())
 
 	// Application playback runs on one queue opened before generation: a sentence
 	// the streamer synthesizes is heard as soon as it lands, and the finalise pass
@@ -2516,6 +2517,58 @@ func (s *Service) hasCustomPortrait(gameID, characterID string) bool {
 		}
 	}
 	return false
+}
+
+// GenerateTurnSceneImage enqueues a scene image for a turn on demand, regardless
+// of the trigger policy, so a player can illustrate a beat the policy skipped.
+func (s *Service) GenerateTurnSceneImage(ctx context.Context, gameID string, turnNumber int) error {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return fmt.Errorf("invalid game id: %w", err)
+	}
+	cfg := s.configMgr.Get()
+	if cfg.Media.Image.Type == "" || cfg.Media.Image.Type == "disabled" {
+		return fmt.Errorf("image generation is disabled")
+	}
+	imgClient, err := imageClientFactory(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
+	if err != nil || imgClient == nil {
+		return fmt.Errorf("no image provider is configured")
+	}
+	turn, err := s.findTurn(gameID, turnNumber)
+	if err != nil {
+		return err
+	}
+
+	store := s.storeOrNil(gameID)
+	var locEntity *entity.Entity
+	if turn.Location != "" && store != nil {
+		locEntity, _ = store.GetEntity(turn.Location)
+	}
+	cue := turn.SceneBreakCue
+	if cue == "" {
+		cue = engine.ExtractSceneCue(turn.Narration)
+	}
+	sceneCtx := engine.ScenePromptContext{
+		Cue:       cue,
+		Narration: turn.Narration,
+		Action:    turn.Input,
+		Location:  turn.Location,
+		Style:     s.worldArtStyle(gameID),
+	}
+	if locEntity != nil {
+		sceneCtx.Location = locEntity.Name
+		sceneCtx.Appearance = locEntity.Appearance
+	}
+	if len(turn.Checks) > 0 {
+		sceneCtx.Outcome = turn.Checks[0].Outcome
+	}
+	prompt := engine.BuildScenePrompt(sceneCtx)
+
+	worker := engine.NewSceneWorker(s.resolver, imgClient)
+	worker.SetOnReady(func(gID string, n int, relPath string) {
+		s.broadcastSceneImageReady(gID, n, relPath)
+	})
+	worker.Enqueue(gameID, turnNumber, prompt)
+	return nil
 }
 
 // GetTurnSceneImage returns the generated scene illustration for a specific turn.

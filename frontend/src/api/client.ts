@@ -230,6 +230,16 @@ export class APIClient {
     return res.json();
   }
 
+  // generateTurnSceneImage asks the server to illustrate a turn that has no
+  // image, regardless of the configured trigger policy.
+  static async generateTurnSceneImage(gameID: string, turnNumber: number): Promise<void> {
+    const res = await fetch(`/api/game/${gameID}/turn/${turnNumber}/scene-image`, { method: 'POST' });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`generateTurnSceneImage: ${res.status} ${text}`);
+    }
+  }
+
   static async runSystemTest(req: SystemTestRequest): Promise<SystemTestResponse> {
     const res = await fetch('/api/system/test', {
       method: 'POST',

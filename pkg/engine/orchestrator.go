@@ -80,6 +80,10 @@ type TurnOrchestrator struct {
 	// singleTurn records an interactive roll as one turn: the proposing turn is a
 	// draft, completed in place when the check resolves.
 	singleTurn bool
+	// imageTrigger is the resolved image policy: off, scene_break, significant,
+	// every_turn, or manual. Empty means scene_break (today's behaviour).
+	imageTrigger  string
+	triggerConfig TriggerConfig
 	extractor       *harness.Extractor
 	chunkTimeout    time.Duration
 	openingPrompt   string
@@ -540,6 +544,15 @@ func (o *TurnOrchestrator) SetForcedTotal(total *int) {
 // place rather than appending a continuation turn.
 func (o *TurnOrchestrator) SetSingleTurnMode(single bool) {
 	o.singleTurn = single
+}
+
+// SetImageTrigger sets the policy deciding when a turn image is generated. Empty
+// keeps today's scene-break behaviour.
+func (o *TurnOrchestrator) SetImageTrigger(policy string) {
+	o.imageTrigger = policy
+	if o.triggerConfig.NarrationThreshold == 0 {
+		o.triggerConfig = DefaultTriggerConfig()
+	}
 }
 
 // playerRollRequest builds the check a player-initiated roll asks for, from the
@@ -1523,7 +1536,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		"narration_chars": len([]rune(turn.Narration)),
 	})
 
-	if turn.SceneBreak && o.sceneWorker != nil {
+	if o.sceneWorker != nil && o.shouldIllustrate(turn, pastTurns) {
 		var locEntity *entity.Entity
 		if turn.Location != "" && o.store != nil {
 			locEntity, _ = o.store.GetEntity(turn.Location)

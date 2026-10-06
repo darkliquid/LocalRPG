@@ -156,6 +156,7 @@ choose; the ledger and provider identifiers are listed in the
 | `media.image.api_key` | string |
 | `media.image.auto_generate` | bool |
 | `media.image.builtin_fallback` | bool |
+| `media.image.trigger` | string |
 | `media.image.aspect_ratio` | string |
 | `media.image.person_generation` | string |
 | `media.image.instance` | string |

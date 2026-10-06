@@ -36,6 +36,8 @@ interface ChronicleViewProps {
   gameId?: string;
   // Clips already heard while the turn streamed, which playback must skip.
   skipAudioKeys?: ReadonlySet<string>;
+  // onGenerateImage asks the server to illustrate a turn that has no image.
+  onGenerateImage?: (turnNumber: number) => void;
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
@@ -56,6 +58,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   segmentProgress,
   gameId,
   skipAudioKeys,
+  onGenerateImage,
 }) => {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
@@ -128,6 +131,18 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                     <img src={imageURL} alt="Scene illustration" className="w-full object-cover max-h-96" />
                   </button>
                 </div>
+              )}
+
+              {/* On-demand illustration, when the policy skipped this beat. */}
+              {!imageURL && onGenerateImage && (
+                <button
+                  type="button"
+                  onClick={() => onGenerateImage(turn.turn_number)}
+                  className="my-2 flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-lg border border-stone-700 hover:border-purple-500/50 text-stone-400 hover:text-purple-300 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Generate image</span>
+                </button>
               )}
 
               {/* Scene art, when the party has moved somewhere new */}
