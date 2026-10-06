@@ -32,6 +32,24 @@ providers:
 - **`mock`**: Returns deterministic placeholder responses for offline testing and development.
 - **`disabled`**: Explicitly disables the capability.
 
+### How providers run
+
+LocalRPG labels providers with one of four capability tiers, so an offline
+template is not mistaken for a frontier model. The tier and its caveat appear
+beside each provider in the catalogue and the preset picker.
+
+| Tier | Label | What it means |
+| --- | --- | --- |
+| `offline-basic` | Offline · basic | Deterministic and simple, and it runs entirely on your machine. Its output is more limited and repetitive than a model's. |
+| `offline-neural` | Offline · small model | Runs a small model on your CPU, entirely on your machine. Quality is well below a large local or cloud model. |
+| `local-server` | Local server | Needs a server you run yourself. Local, but only offline while that server is. |
+| `cloud` | Cloud | Sends your text to a remote provider and needs an API key. Metered in most cases. |
+
+The tier describes the architecture. A `cli` provider is `local-server` because
+the binary it runs may reach the network. The
+[Provider & Model Catalogue](12-provider-catalogue) lists the tier of every
+provider.
+
 ## LLM Providers
 
 ### Ollama (Local)

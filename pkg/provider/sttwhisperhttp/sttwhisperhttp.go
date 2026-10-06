@@ -17,6 +17,7 @@ func init() {
 			Label:       "Whisper (HTTP)",
 			Description: "OpenAI-compatible transcription endpoint, local or cloud.",
 			Source:      "http",
+			Tier:        provider.TierLocalServer,
 			Features:    []provider.Feature{provider.FeatureKeyRequired},
 			Presets: []provider.Preset{
 				{ID: "faster-whisper", Order: 2, Label: "Faster-Whisper (Local HTTP)",

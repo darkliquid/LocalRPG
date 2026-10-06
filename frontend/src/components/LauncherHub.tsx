@@ -340,7 +340,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
             </div>
             <div className="flex-1 overflow-y-auto p-6">
               <Suspense fallback={null}>
-                <SettingsStudio onSaved={() => setIsSettingsOpen(false)} isCompact={false} />
+                <SettingsStudio isCompact={false} />
               </Suspense>
             </div>
           </div>

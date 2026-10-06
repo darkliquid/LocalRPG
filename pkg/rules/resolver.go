@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -33,12 +32,10 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 		return nil, fmt.Errorf("resolve check: %w", err)
 	}
 
-	total := roll.Total
-	if req.Stat != "" {
-		if bonus, ok := statValue(r.bridge, actor, req.Stat); ok {
-			total += bonus
-		}
-	}
+	bonus, applied := SumBonuses(func(name string) (int, bool) {
+		return stateValue(r.bridge, actor, name)
+	}, req)
+	total := roll.Total + bonus
 
 	target := 8
 	for _, difficulty := range r.conventions.Difficulty {
@@ -50,16 +47,19 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 
 	outcome := outcomeFor(r.conventions.Outcome, total >= target)
 	return &harness.CheckResult{
-		CheckID: newCheckID(),
+		CheckID: harness.NewCheckID(),
 		Actor:   req.Actor,
 		Target:  req.Target,
 		Roll:    roll.Summary(total),
 		Outcome: outcome,
+		Applied: applied,
 	}, nil
 }
 
-// statValue reads a numeric stat from the actor or, failing that, the bridge.
-func statValue(bridge GameHostAPI, actor *entity.Entity, stat string) (int, bool) {
+// stateValue reads a numeric stat or skill from the actor or, failing that, the
+// bridge. Skills are stored on entity state like stats, so one reader serves
+// both.
+func stateValue(bridge GameHostAPI, actor *entity.Entity, stat string) (int, bool) {
 	if actor != nil && actor.State != nil {
 		if raw, ok := actor.State.Get(stat); ok {
 			if n, ok := toInt(raw); ok {
@@ -117,5 +117,3 @@ func outcomeFor(vocabulary []string, pass bool) string {
 	}
 	return vocabulary[len(vocabulary)-1]
 }
-
-func newCheckID() string { return "chk_" + strconv.FormatInt(time.Now().UnixNano(), 36) }

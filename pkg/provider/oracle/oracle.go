@@ -17,6 +17,7 @@ func init() {
 			Label:       "Narrative Oracle (Built-in)",
 			Description: "Deterministic pure-Go storyteller that needs no model or network.",
 			Source:      "builtin",
+			Tier:        provider.TierOfflineBasic,
 			Features:    []provider.Feature{provider.FeatureStreaming, provider.FeatureOffline},
 			Presets: []provider.Preset{
 				{ID: "narrative-oracle", Order: 7, Label: "Narrative Oracle (Built-in Zero-GPU)",

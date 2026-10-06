@@ -43,6 +43,8 @@ func init() {
 			Label:       "Google Gemini Embeddings",
 			Description: "Vector embeddings via Google GenAI embedding API (text-embedding-004)",
 			Source:      "gemini",
+			Tier:        provider.TierCloud,
+			Features:    []provider.Feature{provider.FeatureKeyRequired},
 		},
 		Build: func(ctx context.Context, raw []byte) (interface{}, error) {
 			var cfg ClientConfig

@@ -17,6 +17,7 @@ func init() {
 			Label:       "Inworld TTS (Cloud, metered)",
 			Description: "Natural-sounding dialogue and narration with inworld-tts-2.",
 			Source:      "http",
+			Tier:        provider.TierCloud,
 			Features: []provider.Feature{
 				provider.FeatureMetered,
 				provider.FeatureKeyRequired,

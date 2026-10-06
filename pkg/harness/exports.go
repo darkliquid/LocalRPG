@@ -9,24 +9,24 @@ import "github.com/darkliquid/localrpg/pkg/provider"
 func KeyFor(cfg ProviderConfig) (provider.Key, bool) {
 	switch cfg.Type {
 	case "http":
-		return provider.InstanceOrSelf(provider.KeyLLMOpenAIChat, provider.HostDiscriminator(cfg.Endpoint)), true
+		return provider.InstanceOrSelf(provider.KeyLLMOpenAIChat, provider.InstanceDiscriminator(cfg.Instance, provider.HostDiscriminator(cfg.Endpoint))), true
 	case "cli":
-		return provider.InstanceOrSelf(provider.KeyLLMCLI, provider.CommandDiscriminator(cfg.Command)), true
+		return provider.InstanceOrSelf(provider.KeyLLMCLI, provider.InstanceDiscriminator(cfg.Instance, provider.CommandDiscriminator(cfg.Command))), true
 	case "gemini":
-		return provider.KeyLLMGemini, true
+		return provider.InstanceOrSelf(provider.KeyLLMGemini, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "inworld":
-		return provider.KeyLLMInworld, true
+		return provider.InstanceOrSelf(provider.KeyLLMInworld, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "builtin", "":
 		switch cfg.BuiltinName {
 		case "gemini":
-			return provider.KeyLLMGemini, true
+			return provider.InstanceOrSelf(provider.KeyLLMGemini, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		case "inworld":
-			return provider.KeyLLMInworld, true
+			return provider.InstanceOrSelf(provider.KeyLLMInworld, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		case "narrative-oracle":
-			return provider.KeyLLMNarrativeOracle, true
+			return provider.InstanceOrSelf(provider.KeyLLMNarrativeOracle, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		}
 		if cfg.Command != "" {
-			return provider.InstanceOrSelf(provider.KeyLLMCLI, provider.CommandDiscriminator(cfg.Command)), true
+			return provider.InstanceOrSelf(provider.KeyLLMCLI, provider.InstanceDiscriminator(cfg.Instance, provider.CommandDiscriminator(cfg.Command))), true
 		}
 		return "", false
 	default:

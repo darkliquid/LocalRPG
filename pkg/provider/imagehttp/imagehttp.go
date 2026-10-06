@@ -17,6 +17,7 @@ func init() {
 			Label:       "Image HTTP Endpoint",
 			Description: "Stable Diffusion WebUI, ComfyUI, or any compatible image endpoint.",
 			Source:      "http",
+			Tier:        provider.TierLocalServer,
 			Features:    []provider.Feature{provider.FeatureAutoGenerate},
 			Presets: []provider.Preset{
 				{ID: "comfyui", Order: 1, Label: "ComfyUI (Local HTTP)",

@@ -67,6 +67,58 @@ func (c *clipSet) take(key string) bool {
 type turnAudioPlan struct {
 	queue  chan string
 	played *clipSet
+	// heard tracks the segment indexes the player has been sent audio for. It is
+	// the authority for the finalise skip: a group whose segments are all heard is
+	// not re-enqueued, whatever its key.
+	heard map[int]bool
+	mu    sync.Mutex
+}
+
+// newTurnAudioPlan builds a plan with an optional playback queue. A nil queue
+// warms clips without playing them here.
+func newTurnAudioPlan(queue chan string) *turnAudioPlan {
+	return &turnAudioPlan{queue: queue, played: newClipSet(), heard: map[int]bool{}}
+}
+
+// markHeard records that the player has been sent audio for each segment index.
+func (a *turnAudioPlan) markHeard(indexes []int) {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.heard == nil {
+		a.heard = map[int]bool{}
+	}
+	for _, index := range indexes {
+		a.heard[index] = true
+	}
+}
+
+// heardAll reports whether every index has been heard. An empty set is trivially
+// heard.
+func (a *turnAudioPlan) heardAll(indexes []int) bool {
+	all, _ := a.heardState(indexes)
+	return all
+}
+
+// heardState reports whether all and whether any of the indexes have been heard.
+// It is the one place the ledger is read, so all and any cannot disagree.
+func (a *turnAudioPlan) heardState(indexes []int) (all, any bool) {
+	if a == nil || len(indexes) == 0 {
+		return true, false
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	all = true
+	for _, index := range indexes {
+		if a.heard[index] {
+			any = true
+			continue
+		}
+		all = false
+	}
+	return all, any
 }
 
 // enqueueClip sends one clip to the player once, reporting whether it was sent.
@@ -74,7 +126,7 @@ func (a *turnAudioPlan) enqueueClip(key, path string) bool {
 	if a == nil || a.queue == nil || path == "" {
 		return false
 	}
-	if !a.played.take(key) {
+	if a.played == nil || !a.played.take(key) {
 		return false
 	}
 	select {

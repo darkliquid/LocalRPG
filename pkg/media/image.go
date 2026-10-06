@@ -45,12 +45,83 @@ func (p *ImagePipeline) GenerateLocationImage(ctx context.Context, location *ent
 	}
 
 	prompt := BuildLocationPrompt(location, worldStyle)
-	imgBytes, err := p.client.GenerateImage(ctx, prompt)
+	imgBytes, err := p.generateScene(ctx, location, worldStyle, prompt, providerParams)
 	if err != nil {
 		return "", fmt.Errorf("generate image for %q: %w", location.ID, err)
 	}
 
 	return p.cache.Put("images", base+artExtension(imgBytes), imgBytes)
+}
+
+// generateScene prefers a provider that understands structured hints, and falls
+// back to the prose prompt for every other provider.
+func (p *ImagePipeline) generateScene(ctx context.Context, location *entity.Entity, worldStyle, prompt, providerParams string) ([]byte, error) {
+	if hp, ok := p.client.(SceneHintProvider); ok {
+		return hp.GenerateScene(ctx, sceneRequest(location, worldStyle, AppearanceHash(location, providerParams)))
+	}
+	return p.client.GenerateImage(ctx, prompt)
+}
+
+// sceneRequest derives structured hints for a location's scene. Every hint is
+// best-effort: an absent one falls back to a deterministic derivation in the
+// generator rather than failing the image.
+func sceneRequest(location *entity.Entity, worldStyle, appearanceHash string) SceneRequest {
+	return SceneRequest{
+		Prompt:    BuildLocationPrompt(location, worldStyle),
+		Genre:     genreFor(location, worldStyle),
+		Mood:      moodFor(location),
+		TimeOfDay: stateString(location, "time_of_day"),
+		Weather:   stateString(location, "weather"),
+		Seed:      location.ID + "|" + appearanceHash,
+	}
+}
+
+// genreFor reads a genre from the world style or the location tags, matching a
+// known palette so an unknown genre falls back to the generator's default.
+func genreFor(location *entity.Entity, worldStyle string) string {
+	text := strings.ToLower(worldStyle)
+	if location != nil {
+		text += " " + strings.ToLower(strings.Join(location.Tags, " "))
+	}
+	for _, genre := range paletteGenres {
+		if strings.Contains(text, genre) {
+			return genre
+		}
+	}
+	return ""
+}
+
+// moodFor reads a mood from the location state, then its tags.
+func moodFor(location *entity.Entity) string {
+	if mood := stateString(location, "mood"); mood != "" {
+		return mood
+	}
+	if location == nil {
+		return ""
+	}
+	text := strings.ToLower(strings.Join(location.Tags, " "))
+	switch {
+	case containsAny(text, "grim", "dark", "ominous", "dread", "dire"):
+		return "grim"
+	case containsAny(text, "serene", "calm", "peaceful", "bright", "warm"):
+		return "serene"
+	}
+	return ""
+}
+
+// stateString reads a string value from an entity's state, or "" when absent.
+func stateString(ent *entity.Entity, key string) string {
+	if ent == nil || ent.State == nil {
+		return ""
+	}
+	raw, ok := ent.State.Get(key)
+	if !ok {
+		return ""
+	}
+	if s, ok := raw.(string); ok {
+		return s
+	}
+	return ""
 }
 
 // AppearanceHash is the variation input for a scene's art: the authored appearance

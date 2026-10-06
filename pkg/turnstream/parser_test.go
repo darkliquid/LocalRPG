@@ -1,6 +1,10 @@
 package turnstream
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/darkliquid/localrpg/pkg/jsonrepair"
+)
 
 // mapRoster is a fixed roster for tests.
 type mapRoster map[string]string
@@ -93,7 +97,6 @@ func TestLegacyUnquotedSpeechIsAttributed(t *testing.T) {
 	}
 }
 
-
 func TestLegacyQuoteForAnUnknownSpeakerStaysNarration(t *testing.T) {
 	p := NewParser(mapRoster{})
 	events := append(p.Feed(`As you declare: "I draw my blade."`+"\n"), p.Flush()...)
@@ -137,7 +140,6 @@ func TestRecordPersonaRevealsMapsPreviousIdentity(t *testing.T) {
 	}
 }
 
-
 func TestMalformedRecordIsKeptButDoesNotFailTheStream(t *testing.T) {
 	p := NewParser(mapRoster{})
 	events := p.Feed("@bogus {not json}\nStill narrated.\n")
@@ -158,5 +160,93 @@ func TestRecordWithoutPayloadIsReported(t *testing.T) {
 	records := p.Records()
 	if len(records) != 1 || records[0].Err == nil {
 		t.Fatalf("records = %#v", records)
+	}
+}
+
+func TestParserRepairsMalformedRecord(t *testing.T) {
+	p := NewParser(mapRoster{})
+	p.Feed("@roll {\"actor\":\"x\",\"check_kind\":\"do\",}\n")
+	recs := p.Records()
+	if len(recs) != 1 {
+		t.Fatalf("got %d records, want 1", len(recs))
+	}
+	if recs[0].Err != nil {
+		t.Fatalf("record errored: %v", recs[0].Err)
+	}
+	if recs[0].Repaired != jsonrepair.KindTrailingComma {
+		t.Fatalf("Repaired = %q, want %q", recs[0].Repaired, jsonrepair.KindTrailingComma)
+	}
+	if req, err := recs[0].DecodeRoll(); err != nil || req.Actor != "x" {
+		t.Fatalf("decode repaired roll: %+v %v", req, err)
+	}
+}
+
+func TestParserKeepsUnrepairableRecord(t *testing.T) {
+	p := NewParser(mapRoster{})
+	p.Feed("@roll not json at all\n")
+	recs := p.Records()
+	if len(recs) != 1 || recs[0].Err == nil {
+		t.Fatalf("expected one errored record, got %+v", recs)
+	}
+	if recs[0].Repaired != jsonrepair.KindNone {
+		t.Fatalf("Repaired = %q, want empty", recs[0].Repaired)
+	}
+}
+
+func TestParserAssemblesMultiLineRecord(t *testing.T) {
+	p := NewParser(mapRoster{})
+	p.Feed("@roll {\n")
+	p.Feed("  \"actor\": \"x\",\n")
+	p.Feed("  \"check_kind\": \"do\"\n")
+	p.Feed("}\n")
+	recs := p.Records()
+	if len(recs) != 1 {
+		t.Fatalf("got %d records, want 1", len(recs))
+	}
+	if recs[0].Err != nil {
+		t.Fatalf("record errored: %v", recs[0].Err)
+	}
+	if recs[0].Repaired != jsonrepair.KindNone {
+		t.Fatalf("Repaired = %q, want empty", recs[0].Repaired)
+	}
+	if req, err := recs[0].DecodeRoll(); err != nil || req.Actor != "x" {
+		t.Fatalf("decode multi-line roll: %+v %v", req, err)
+	}
+}
+
+func TestParserFlushAssemblesUnterminatedRecord(t *testing.T) {
+	p := NewParser(mapRoster{})
+	p.Feed("@roll {\"actor\":\"x\"\n")
+	p.Flush()
+	recs := p.Records()
+	if len(recs) != 1 || recs[0].Err != nil {
+		t.Fatalf("expected one repaired record, got %+v", recs)
+	}
+	if recs[0].Repaired != jsonrepair.KindClose {
+		t.Fatalf("Repaired = %q, want close", recs[0].Repaired)
+	}
+}
+
+func TestParserFlushReportsUnrepairableRecord(t *testing.T) {
+	p := NewParser(mapRoster{})
+	p.Feed("@roll {not json\n")
+	p.Flush()
+	recs := p.Records()
+	if len(recs) != 1 || recs[0].Err == nil {
+		t.Fatalf("expected one errored record, got %+v", recs)
+	}
+}
+
+func TestParserRepairReport(t *testing.T) {
+	p := NewParser(mapRoster{})
+	p.Feed("@roll {\"actor\":\"x\",}\n")
+	p.Feed("@persona {\"name\":\"Vex\"}\n")
+	p.Feed("@roll not json at all\n")
+	r := p.RepairReport()
+	if r.Total != 3 || r.Repaired != 1 || r.Failed != 1 {
+		t.Fatalf("report = %+v, want total 3 repaired 1 failed 1", r)
+	}
+	if r.Kinds[jsonrepair.KindTrailingComma] != 1 {
+		t.Fatalf("kinds = %+v, want one trailing_comma", r.Kinds)
 	}
 }

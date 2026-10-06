@@ -68,6 +68,24 @@ func NewInstanceKey(k Key, discriminator string) (Key, error) {
 	return ParseKey(string(k) + "@" + discriminator)
 }
 
+// InstanceDiscriminator returns the user-chosen instance id when set, else the
+// derived discriminator for the configuration's transport.
+func InstanceDiscriminator(instance, derived string) string {
+	if s := strings.TrimSpace(instance); s != "" {
+		return s
+	}
+	return derived
+}
+
+// ValidateDiscriminator reports whether s matches the key discriminator grammar,
+// so a caller can reject an invalid instance id without building a key.
+func ValidateDiscriminator(s string) error {
+	if !discriminatorPattern.MatchString(s) {
+		return fmt.Errorf("provider: discriminator %q must match %s", s, discriminatorPattern)
+	}
+	return nil
+}
+
 // InstanceOrSelf returns the instance key when a discriminator is present, and
 // the adapter key otherwise, so resolvers need one line per family.
 func InstanceOrSelf(k Key, discriminator string) Key {

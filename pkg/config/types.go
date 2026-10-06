@@ -2,6 +2,9 @@ package config
 
 import (
 	"fmt"
+	"maps"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -41,6 +44,12 @@ type AgentRoleConfig struct {
 	ThinkingBudget *int     `yaml:"thinking_budget,omitempty" json:"thinking_budget,omitempty"`
 	TopP           *float64 `yaml:"top_p,omitempty" json:"top_p,omitempty"`
 	TopK           *int     `yaml:"top_k,omitempty" json:"top_k,omitempty"`
+
+	// Instance is an optional user-chosen discriminator for this provider
+	// configuration. It becomes the key's "@<instance>" segment, so two configs
+	// of one adapter at one endpoint stay distinct. Empty means the discriminator
+	// is derived from the endpoint or command.
+	Instance string `yaml:"instance,omitempty" json:"instance,omitempty"`
 }
 
 type AgentsConfig struct {
@@ -174,6 +183,12 @@ type TTSConfig struct {
 	// Limits overrides the provider's advertised per-request limits, for a
 	// proxied or self-hosted endpoint whose limits cannot be queried.
 	Limits *TTSLimits `yaml:"limits,omitempty" json:"limits,omitempty"`
+
+	// Instance is an optional user-chosen discriminator for this provider
+	// configuration. It becomes the key's "@<instance>" segment, so two configs
+	// of one adapter at one endpoint stay distinct. Empty means the discriminator
+	// is derived from the endpoint or command.
+	Instance string `yaml:"instance,omitempty" json:"instance,omitempty"`
 }
 
 // TTSLimits overrides a speech provider's per-request limits. A zero field keeps
@@ -200,6 +215,12 @@ type STTConfig struct {
 	Endpoint    string   `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
 	Model       string   `yaml:"model,omitempty" json:"model,omitempty"`
 	APIKey      string   `yaml:"api_key,omitempty" json:"api_key,omitempty"`
+
+	// Instance is an optional user-chosen discriminator for this provider
+	// configuration. It becomes the key's "@<instance>" segment, so two configs
+	// of one adapter at one endpoint stay distinct. Empty means the discriminator
+	// is derived from the endpoint or command.
+	Instance string `yaml:"instance,omitempty" json:"instance,omitempty"`
 }
 
 type ImageConfig struct {
@@ -218,13 +239,28 @@ type ImageConfig struct {
 
 	AspectRatio      string `yaml:"aspect_ratio,omitempty" json:"aspect_ratio,omitempty"`
 	PersonGeneration string `yaml:"person_generation,omitempty" json:"person_generation,omitempty"`
-}
 
+	// Instance is an optional user-chosen discriminator for this provider
+	// configuration. It becomes the key's "@<instance>" segment, so two configs
+	// of one adapter at one endpoint stay distinct. Empty means the discriminator
+	// is derived from the endpoint or command.
+	Instance string `yaml:"instance,omitempty" json:"instance,omitempty"`
+}
 
 type MediaConfig struct {
 	TTS   TTSConfig   `yaml:"tts" json:"tts"`
 	STT   STTConfig   `yaml:"stt" json:"stt"`
 	Image ImageConfig `yaml:"image" json:"image"`
+	// TTSProviders, STTProviders, and ImageProviders hold named configurations of
+	// each family. The singleton fields above remain the default entry; a named
+	// entry coexists with it and is selected by name.
+	TTSProviders   map[string]TTSConfig   `yaml:"tts_providers,omitempty" json:"tts_providers,omitempty"`
+	STTProviders   map[string]STTConfig   `yaml:"stt_providers,omitempty" json:"stt_providers,omitempty"`
+	ImageProviders map[string]ImageConfig `yaml:"image_providers,omitempty" json:"image_providers,omitempty"`
+	// Purposes maps a use name (narrator, npc, scene, portrait, placeholder) to a
+	// provider name from the matching family map, or the family default when
+	// unset.
+	Purposes map[string]string `yaml:"purposes,omitempty" json:"purposes,omitempty"`
 }
 
 type PreferencesConfig struct {
@@ -305,6 +341,12 @@ type EmbeddingProviderConfig struct {
 	URL         string `yaml:"url,omitempty" json:"url,omitempty"`
 	APIKey      string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 	Model       string `yaml:"model,omitempty" json:"model,omitempty"`
+
+	// Instance is an optional user-chosen discriminator for this provider
+	// configuration. It becomes the key's "@<instance>" segment, so two configs
+	// of one adapter at one endpoint stay distinct. Empty means the discriminator
+	// is derived from the endpoint or command.
+	Instance string `yaml:"instance,omitempty" json:"instance,omitempty"`
 }
 
 type Config struct {
@@ -351,6 +393,107 @@ func (c *Config) Validate() []string {
 		"media.stt", c.Media.STT.Type, c.Media.STT.BuiltinName, c.Media.STT.Command, c.Media.STT.Endpoint, sttShape)...)
 	problems = append(problems, providerProblems(
 		"media.image", c.Media.Image.Type, c.Media.Image.BuiltinName, c.Media.Image.Command, c.Media.Image.Endpoint, imageShape)...)
+
+	problems = append(problems, c.instanceProblems()...)
+	problems = append(problems, c.mediaProviderProblems()...)
+
+	return problems
+}
+
+// mediaProviderProblems validates the names of the named media provider maps.
+// The reserved default name would shadow the singleton, and a malformed name
+// could not be selected.
+func (c *Config) mediaProviderProblems() []string {
+	var problems []string
+	validateProviderNames("media.tts_providers", mapKeys(c.Media.TTSProviders), &problems)
+	validateProviderNames("media.stt_providers", mapKeys(c.Media.STTProviders), &problems)
+	validateProviderNames("media.image_providers", mapKeys(c.Media.ImageProviders), &problems)
+	problems = append(problems, c.purposeProblems()...)
+	return problems
+}
+
+// purposeProblems validates the media.purposes map: each key must be a known
+// purpose, and each name must exist in the purpose's family.
+func (c *Config) purposeProblems() []string {
+	var problems []string
+	for _, use := range slices.Sorted(maps.Keys(c.Media.Purposes)) {
+		name := c.Media.Purposes[use]
+		family := PurposeFamily(Purpose(use))
+		if family == "" {
+			problems = append(problems, "media.purposes."+use+": unknown purpose")
+			continue
+		}
+		if name == "" || name == ReservedProviderName {
+			continue
+		}
+		switch family {
+		case "tts":
+			if _, ok := c.Media.TTSProviders[name]; !ok {
+				problems = append(problems, "media.purposes."+use+": tts provider "+name+" does not exist")
+			}
+		case "image":
+			if _, ok := c.Media.ImageProviders[name]; !ok {
+				problems = append(problems, "media.purposes."+use+": image provider "+name+" does not exist")
+			}
+		}
+	}
+	return problems
+}
+
+func validateProviderNames(path string, names []string, problems *[]string) {
+	for _, name := range names {
+		switch {
+		case name == ReservedProviderName:
+			*problems = append(*problems, path+": name "+ReservedProviderName+" is reserved")
+		case !providerNamePattern.MatchString(name):
+			*problems = append(*problems, fmt.Sprintf("%s: name %q must match %s", path, name, providerNamePattern))
+		}
+	}
+}
+
+func mapKeys[V interface{}](m map[string]V) []string {
+	out := make([]string, 0, len(m))
+	for name := range m {
+		out = append(out, name)
+	}
+	return out
+}
+
+var providerNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+
+// instanceProblems validates the optional provider instance ids. Each must match
+// the key discriminator grammar, and no two configurations of one family may
+// share one, because they would collapse to the same canonical key and share a
+// usage row, a price, and a cache namespace.
+func (c *Config) instanceProblems() []string {
+	var problems []string
+	check := func(path, instance string, seen map[string]string) {
+		id := strings.TrimSpace(instance)
+		if id == "" {
+			return
+		}
+		if err := provider.ValidateDiscriminator(id); err != nil {
+			problems = append(problems, fmt.Sprintf("%s.instance %q is invalid: %v", path, id, err))
+			return
+		}
+		if prev, ok := seen[id]; ok {
+			problems = append(problems, fmt.Sprintf("%s.instance %q duplicates %s", path, id, prev))
+			return
+		}
+		seen[id] = path
+	}
+
+	llmSeen := map[string]string{}
+	for _, role := range slices.Sorted(maps.Keys(c.Agents.Roles)) {
+		check(fmt.Sprintf("agents.roles[%q]", role), c.Agents.Roles[role].Instance, llmSeen)
+	}
+	embedSeen := map[string]string{}
+	for _, name := range slices.Sorted(maps.Keys(c.Embeddings.Providers)) {
+		check(fmt.Sprintf("embeddings.providers[%q]", name), c.Embeddings.Providers[name].Instance, embedSeen)
+	}
+	check("media.tts", c.Media.TTS.Instance, map[string]string{})
+	check("media.stt", c.Media.STT.Instance, map[string]string{})
+	check("media.image", c.Media.Image.Instance, map[string]string{})
 
 	return problems
 }
@@ -401,7 +544,7 @@ func (c *Config) MechanicsWorldTickTurns() int {
 func DefaultConfig() *Config {
 	return &Config{
 		Version: CurrentVersion,
-		Paths: PathsConfig{},
+		Paths:   PathsConfig{},
 		Agents: AgentsConfig{
 			DefaultRole:         "gm",
 			TurnTimeoutSeconds:  300,

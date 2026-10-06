@@ -2,22 +2,6 @@ package harness
 
 import "strings"
 
-// ActionFeasibility is the GM's verdict on the player's action.
-type ActionFeasibility string
-
-const (
-	FeasibilityAutomatic  ActionFeasibility = "automatic"
-	FeasibilityUncertain  ActionFeasibility = "uncertain"
-	FeasibilityImpossible ActionFeasibility = "impossible"
-)
-
-// ActionVerdict states whether the player's action was automatic, uncertain, or
-// impossible, with a reason.
-type ActionVerdict struct {
-	Feasibility ActionFeasibility `json:"feasibility"`
-	Reason      string            `json:"reason,omitempty"`
-}
-
 // PersonaDecl is a character (or other entity) the GM introduces or references.
 type PersonaDecl struct {
 	Name        string   `json:"name"`
@@ -47,7 +31,6 @@ func (p PersonaDecl) PreviousIdentity() string {
 	return ""
 }
 
-
 // MemoryDecl is a narrative memory the GM attaches to entities.
 type MemoryDecl struct {
 	Kind       string   `json:"kind"` // event|relationship|discovery|dialogue
@@ -66,12 +49,29 @@ type StateChangeDecl struct {
 	Reason string      `json:"reason,omitempty"`
 }
 
+// CheckModifier is one named adjustment to a check's total.
+type CheckModifier struct {
+	Source string `json:"source"`
+	Value  int    `json:"value"`
+	Reason string `json:"reason,omitempty"`
+}
+
+// AppliedModifier is one contribution to a resolved check total.
+type AppliedModifier struct {
+	Source string `json:"source"`
+	Value  int    `json:"value"`
+}
+
 // CheckRequest is a mid-turn request to resolve a check.
 type CheckRequest struct {
-	Actor      string            `json:"actor"`
-	Target     string            `json:"target,omitempty"`
-	CheckKind  string            `json:"check_kind"`
-	Stat       string            `json:"stat,omitempty"`
+	Actor     string `json:"actor"`
+	Target    string `json:"target,omitempty"`
+	CheckKind string `json:"check_kind"`
+	Stat      string `json:"stat,omitempty"`
+	// Skill names a declared skill whose rating is added, alongside Stat.
+	Skill string `json:"skill,omitempty"`
+	// Modifiers are situational adjustments the GM names. Their sum is added.
+	Modifiers  []CheckModifier   `json:"modifiers,omitempty"`
 	Difficulty string            `json:"difficulty,omitempty"`
 	Stakes     string            `json:"stakes"`
 	Outcomes   map[string]string `json:"outcomes"`
@@ -98,19 +98,22 @@ type RollSummary struct {
 
 // CheckResult is the resolved outcome of a CheckRequest.
 type CheckResult struct {
-	CheckID   string                 `json:"check_id"`
-	Actor     string                 `json:"actor,omitempty"`
-	Target    string                 `json:"target,omitempty"`
-	CheckKind string                 `json:"check_kind,omitempty"`
-	Stakes    string                 `json:"stakes,omitempty"`
-	Roll      *RollSummary           `json:"roll"`
-	Outcome   string                 `json:"outcome"`
+	CheckID   string       `json:"check_id"`
+	Actor     string       `json:"actor,omitempty"`
+	Target    string       `json:"target,omitempty"`
+	CheckKind string       `json:"check_kind,omitempty"`
+	Stakes    string       `json:"stakes,omitempty"`
+	Roll      *RollSummary `json:"roll"`
+	Outcome   string       `json:"outcome"`
+	// Applied lists every bonus that contributed, for display.
+	Applied   []AppliedModifier      `json:"applied,omitempty"`
 	Breakdown map[string]interface{} `json:"breakdown,omitempty"`
 }
 
 // ProposedCheck is a player's explicit request to roll, carried as structured
-// data so the engine can require the GM to resolve or dismiss it. Ref is the
-// stable id the GM references in dismissed_checks.
+// data. Roll mode builds one and the orchestrator turns it into an advisory
+// [PROPOSED CHECK] directive for the GM; enforcement is a future concern, so the
+// Ref is an identifier, not a contract the GM must honour.
 type ProposedCheck struct {
 	Ref         string `json:"ref"`
 	Actor       string `json:"actor,omitempty"`

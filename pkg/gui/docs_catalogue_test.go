@@ -74,12 +74,12 @@ func renderProviderCatalogue() string {
 			continue
 		}
 		fmt.Fprintf(&b, "## %s\n\n", entry.title)
-		b.WriteString("| Provider ID | Source | Ledger key | Presets and models |\n")
-		b.WriteString("| --- | --- | --- | --- |\n")
+		b.WriteString("| Provider ID | Tier | Source | Ledger key | Presets and models |\n")
+		b.WriteString("| --- | --- | --- | --- | --- |\n")
 		for _, desc := range descs {
 			presets := presetSummary(desc)
-			fmt.Fprintf(&b, "| `%s` | %s | `%s` | %s |\n",
-				desc.ID, desc.Source, ledgerKey(entry.family, desc), presets)
+			fmt.Fprintf(&b, "| `%s` | %s | %s | `%s` | %s |\n",
+				desc.ID, desc.Tier, desc.Source, ledgerKey(entry.family, desc), presets)
 		}
 		b.WriteString("\n")
 	}

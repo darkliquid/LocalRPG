@@ -27,6 +27,7 @@ func init() {
 			Label:       "Google Gemini / Imagen (Cloud)",
 			Description: "Imagen and native Gemini image models, with shared-key support.",
 			Source:      "gemini",
+			Tier:        provider.TierCloud,
 			Features:    []provider.Feature{provider.FeatureKeyRequired, provider.FeatureAutoGenerate},
 			Presets: []provider.Preset{
 				geminiImagePreset("imagen-3", 7, "Google Imagen 3 (Cloud API)",

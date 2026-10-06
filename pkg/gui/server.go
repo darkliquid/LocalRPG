@@ -56,6 +56,7 @@ func routePattern(path string) string {
 		path == "/api/open-url" ||
 		path == "/api/providers" || path == "/api/providers/models" ||
 		path == "/api/tts/inspect" || path == "/api/tts/voices/search" ||
+		path == "/api/media/inspect" ||
 		path == "/api/tts/batch" ||
 		path == "/api/stt" || path == "/api/trace" || path == "/api/character/generate" ||
 		path == "/api/generate-text" || path == "/api/generate-asset-preview" ||
@@ -1277,6 +1278,26 @@ func (s *Server) handleTTSInspectRoute(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, res)
 }
 
+func (s *Server) handleMediaInspectRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req MediaInspectRequestDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res, err := s.service.InspectMedia(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
 func (s *Server) handleProviderCatalogRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1715,6 +1736,7 @@ func (s *Server) handleGenerateAssetPreview(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", contentType)
 	_, _ = w.Write(data)
 }
+
 // setClipHeaders marks a synthesized clip as cacheable. The clip URL already
 // carries the audio cache key, so a changed voice or text is a new URL; the ETag
 // is derived from the bytes so a regenerated clip on the same URL is not reused.

@@ -155,3 +155,26 @@ func TestCartesiaKeyFor(t *testing.T) {
 	}
 }
 
+func TestTTSKeyForPrefersInstance(t *testing.T) {
+	cfg := config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs", Instance: "narrator"}
+	k, ok := media.TTSKeyFor(cfg)
+	if !ok || k != "tts:elevenlabs@narrator" {
+		t.Fatalf("key = %s ok = %v", k, ok)
+	}
+	plain := config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs"}
+	k2, _ := media.TTSKeyFor(plain)
+	if k2 != "tts:elevenlabs" {
+		t.Fatalf("plain key = %s", k2)
+	}
+}
+
+func TestSTTAndImageKeyForPreferInstance(t *testing.T) {
+	stt, ok := media.STTKeyFor(config.STTConfig{Type: "http", Endpoint: "http://localhost:8000", Instance: "far"})
+	if !ok || stt != "stt:whisper-http@far" {
+		t.Fatalf("stt key = %s ok = %v", stt, ok)
+	}
+	img, ok := media.ImageKeyFor(config.ImageConfig{Type: "comfyui", Endpoint: "http://127.0.0.1:8188", Instance: "studio"})
+	if !ok || img != "image:http@studio" {
+		t.Fatalf("image key = %s ok = %v", img, ok)
+	}
+}

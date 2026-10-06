@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/trace"
 	"github.com/darkliquid/localrpg/pkg/turnstream"
 )
 
@@ -90,7 +91,7 @@ func TestFinishTurnAudioSkipsStreamerFedSpeechClip(t *testing.T) {
 		Speaker:   "Captain Kaelen",
 		SpeakerID: "captain-kaelen",
 		Text:      "Keep walking.",
-	})
+	}, 0)
 	streamer.Flush()
 	streamer.Close()
 	streamer.Wait()
@@ -159,5 +160,116 @@ func TestTurnClipStreamForAnUnknownTurnEndsImmediately(t *testing.T) {
 
 	if clips := drainClips(svc.turnClipStream("test-campaign", 42, false)); len(clips) != 0 {
 		t.Errorf("clips = %#v, want an empty stream", clips)
+	}
+}
+
+func TestHeardAll(t *testing.T) {
+	a := newTurnAudioPlan(nil)
+	a.markHeard([]int{0, 1})
+	if !a.heardAll([]int{0, 1}) {
+		t.Fatal("both indexes were heard")
+	}
+	if a.heardAll([]int{0, 2}) {
+		t.Fatal("index 2 was not heard")
+	}
+	if !a.heardAll(nil) {
+		t.Fatal("an empty set is trivially heard")
+	}
+	all, any := a.heardState([]int{0, 5})
+	if all || !any {
+		t.Fatalf("heardState = %v/%v, want false/true", all, any)
+	}
+}
+
+// captureLogger records trace event names so a test can assert one was emitted.
+type captureLogger struct{ events []string }
+
+func (l *captureLogger) Enabled(trace.Level) bool { return true }
+func (l *captureLogger) Event(name string, _ map[string]interface{}) {
+	l.events = append(l.events, name)
+}
+func (l *captureLogger) SetGame(string) {}
+
+func (l *captureLogger) saw(name string) bool {
+	for _, event := range l.events {
+		if event == name {
+			return true
+		}
+	}
+	return false
+}
+
+func TestFinaliseSkipsHeardSegments(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+
+	turn, err := svc.findTurn(gameID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := newTurnAudioPlan(make(chan string, 8))
+	indexes := make([]int, len(turn.Segments))
+	for i := range turn.Segments {
+		indexes[i] = i
+	}
+	plan.markHeard(indexes)
+
+	session := &TurnSession{service: svc, gameID: gameID, cfg: svc.configMgr.Get()}
+	session.finishTurnAudio(context.Background(), *turn, plan)
+	plan.close()
+
+	if remaining := drainClips(plan.queue); len(remaining) != 0 {
+		t.Fatalf("a fully heard turn enqueued %#v", remaining)
+	}
+}
+
+func TestFinaliseSuppressesAHeardSegment(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+
+	turn, err := svc.findTurn(gameID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := newTurnAudioPlan(make(chan string, 8))
+	plan.markHeard([]int{0})
+
+	session := &TurnSession{service: svc, gameID: gameID, cfg: svc.configMgr.Get()}
+	session.finishTurnAudio(context.Background(), *turn, plan)
+	plan.close()
+
+	heard, err := svc.GetSegmentClips(context.Background(), gameID, 1, 0)
+	if err != nil || len(heard) == 0 {
+		t.Skip("no clip for segment 0")
+	}
+	heardKey := media.ClipKeyForPath(heard[0])
+	for _, clip := range drainClips(plan.queue) {
+		if media.ClipKeyForPath(clip) == heardKey {
+			t.Fatal("a heard segment was replayed")
+		}
+	}
+}
+
+func TestParityMismatchIsTraced(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+
+	turn, err := svc.findTurn(gameID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logger := &captureLogger{}
+	svc.SetLogger(logger)
+
+	svc.logParityMismatch(gameID, turn.Segments, map[string]bool{"not-a-plan-key": true})
+	if !logger.saw("turn.audio_parity_mismatch") {
+		t.Fatal("expected a turn.audio_parity_mismatch trace event")
+	}
+
+	// A streamed key that the plan does contain is not a mismatch.
+	logger.events = nil
+	svc.logParityMismatch(gameID, turn.Segments, map[string]bool{})
+	if logger.saw("turn.audio_parity_mismatch") {
+		t.Fatal("an empty stream must not trace a mismatch")
 	}
 }

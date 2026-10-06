@@ -17,6 +17,7 @@ func init() {
 			Label:       "Google Gemini",
 			Description: "Cloud model with shared-key support and a live model catalogue.",
 			Source:      "gemini",
+			Tier:        provider.TierCloud,
 			Features: []provider.Feature{
 				provider.FeatureStreaming,
 				provider.FeatureTools,

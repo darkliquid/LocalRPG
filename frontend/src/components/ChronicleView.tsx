@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Turn, TurnSegment } from '../types';
 import { TurnSegments, TurnAudioState } from './TurnSegments';
+import { RecordNotice } from './RecordNotice';
 import { Sparkles } from 'lucide-react';
 import { useLightbox } from '../hooks/useLightbox';
 import { ImageLightbox } from './ImageLightbox';
@@ -179,9 +180,11 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
 
               {turn.rejected && (
                 <div className="text-xs font-sans text-amber-300 bg-amber-950/40 border border-amber-500/30 rounded-lg px-3 py-2">
-                  That action was impossible{turn.verdict?.reason ? `: ${turn.verdict.reason}` : '.'}
+                  That action was impossible.
                 </div>
               )}
+
+              <RecordNotice report={turn.record_report} />
 
               {turn.health_effects && turn.health_effects.length > 0 && (
                 <div className="text-xs font-sans text-rose-300 bg-rose-950/40 border border-rose-500/30 rounded-lg px-3 py-2">

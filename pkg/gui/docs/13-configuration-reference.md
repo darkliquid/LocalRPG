@@ -67,6 +67,7 @@ choose; the ledger and provider identifiers are listed in the
 | `agents.roles.<key>.thinking_budget` | int |
 | `agents.roles.<key>.top_p` | float |
 | `agents.roles.<key>.top_k` | int |
+| `agents.roles.<key>.instance` | string |
 | `agents.fallbacks` | map<string, string> |
 | `agents.turn_timeout_seconds` | int |
 | `agents.chunk_timeout_seconds` | int |
@@ -137,6 +138,7 @@ choose; the ledger and provider identifiers are listed in the
 | `media.tts.limits.max_chars` | int |
 | `media.tts.limits.max_tokens` | int |
 | `media.tts.limits.max_speakers` | int |
+| `media.tts.instance` | string |
 | `media.stt.type` | string |
 | `media.stt.builtin_name` | string |
 | `media.stt.command` | string |
@@ -144,6 +146,7 @@ choose; the ledger and provider identifiers are listed in the
 | `media.stt.endpoint` | string |
 | `media.stt.model` | string |
 | `media.stt.api_key` | string |
+| `media.stt.instance` | string |
 | `media.image.type` | string |
 | `media.image.builtin_name` | string |
 | `media.image.command` | string |
@@ -155,6 +158,8 @@ choose; the ledger and provider identifiers are listed in the
 | `media.image.builtin_fallback` | bool |
 | `media.image.aspect_ratio` | string |
 | `media.image.person_generation` | string |
+| `media.image.instance` | string |
+| `media.purposes` | map<string, string> |
 
 ### `embeddings`
 
@@ -171,6 +176,7 @@ choose; the ledger and provider identifiers are listed in the
 | `embeddings.providers.<key>.url` | string |
 | `embeddings.providers.<key>.api_key` | string |
 | `embeddings.providers.<key>.model` | string |
+| `embeddings.providers.<key>.instance` | string |
 
 ### `preferences`
 

@@ -137,6 +137,9 @@ type ProviderConfig struct {
 	TopP           *float64 `yaml:"top_p,omitempty"`
 	TopK           *int     `yaml:"top_k,omitempty"`
 	SharedAPIKey   string   `yaml:"shared_api_key,omitempty"`
+	// Instance is an optional user-chosen discriminator for this provider
+	// configuration. It becomes the key's "@<instance>" segment.
+	Instance string `yaml:"instance,omitempty"`
 }
 
 type RoleRoutingConfig struct {

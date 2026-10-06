@@ -16,6 +16,7 @@ func init() {
 			Label:       "Fish Audio S2 (vLLM-Omni)",
 			Description: "Dual-AR speech synthesis with fine-grained emotional tags and zero-shot voice cloning.",
 			Source:      "http",
+			Tier:        provider.TierLocalServer,
 			Features: []provider.Feature{
 				provider.FeatureVoiceCatalog,
 				provider.FeatureVoiceOptions,

@@ -41,30 +41,23 @@ LocalRPG features a built-in dice evaluation engine supporting standard tabletop
 
 ## Sandboxed JavaScript Mechanics Engine (`mechanics.js`)
 
-Custom systems export JavaScript functions that execute inside an isolated Goja runtime. The engine passes turn state and receives structured mutations:
+Custom systems export JavaScript functions that execute inside an isolated Goja runtime. The engine passes a small context and receives a structured resolution:
 
 ```javascript
 // Example mechanics.js
-function resolveAction(ctx) {
-  // ctx.player contains player character state and frontmatter
-  // ctx.action contains the player's prompt and action mode
-  if (ctx.action.mode === 'roll') {
-    const roll = rollDice('1d20 + ' + (ctx.player.state.athletics || 0));
-    const targetDC = ctx.action.dc || 12;
-    const success = roll.total >= targetDC;
+onAction('roll', function (ctx) {
+  // ctx.player is the player's entity id, and ctx.action is the player's input.
+  const athletics = getStat(ctx.player, 'athletics') || 0;
+  const result = roll('1d20 + ' + athletics);
+  const targetDC = 12;
+  const success = result.total >= targetDC;
 
-    return {
-      success: success,
-      roll: roll,
-      narrative_cue: success ? "Feat succeeded with style." : "Complication arises.",
-      state_patch: {
-        stamina: (ctx.player.state.stamina || 10) - 1
-      }
-    };
-  }
-
-  return { pass_to_gm: true };
-}
+  return {
+    success: success,
+    roll: result,
+    message: success ? 'Feat succeeded with style.' : 'Complication arises.',
+  };
+});
 ```
 
-The mechanics engine exposes hooks including `onTurnStart`, `resolveAction`, and `onTurnEnd`.
+The mechanics engine exposes hooks including `onAction`, `onTurnBegin`, `onTurnEnd`, `onWorldTick`, `onCheck`, and `onHealthZero`, plus helpers such as `roll`, `getStat`, `setStat`, and `injectGMDirection`.

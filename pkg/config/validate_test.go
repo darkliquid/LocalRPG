@@ -62,3 +62,27 @@ func TestValidateDefaultsAreClean(t *testing.T) {
 		t.Errorf("default config should validate cleanly, got: %v", problems)
 	}
 }
+
+func TestValidateRejectsBadInstances(t *testing.T) {
+	bad := config.DefaultConfig()
+	bad.Agents.Roles["gm"] = config.AgentRoleConfig{Type: "http", Endpoint: "http://x", Instance: "Bad Id"}
+	if len(bad.Validate()) == 0 {
+		t.Fatal("a malformed instance should be rejected")
+	}
+
+	dup := config.DefaultConfig()
+	dup.Agents.Roles["gm"] = config.AgentRoleConfig{Type: "http", Endpoint: "http://x", Instance: "same"}
+	dup.Agents.Roles["narrator"] = config.AgentRoleConfig{Type: "http", Endpoint: "http://y", Instance: "same"}
+	if len(dup.Validate()) == 0 {
+		t.Fatal("a duplicate instance should be rejected")
+	}
+}
+
+func TestValidateAcceptsUniqueInstance(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Agents.Roles["gm"] = config.AgentRoleConfig{Type: "http", Endpoint: "http://x", Instance: "good"}
+	cfg.Agents.Roles["narrator"] = config.AgentRoleConfig{Type: "http", Endpoint: "http://y", Instance: "cheap"}
+	if problems := cfg.Validate(); len(problems) != 0 {
+		t.Errorf("unique valid instances should validate cleanly, got: %v", problems)
+	}
+}

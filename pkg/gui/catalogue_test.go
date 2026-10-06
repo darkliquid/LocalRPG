@@ -37,3 +37,23 @@ func TestListModelsWithoutKeyReportsError(t *testing.T) {
 		t.Fatal("expected an error when no Gemini key is available")
 	}
 }
+
+func TestListProvidersCarriesTierAndCaveat(t *testing.T) {
+	svc := NewService(t.TempDir())
+
+	cat, err := svc.ListProviders(context.Background())
+	if err != nil {
+		t.Fatalf("ListProviders: %v", err)
+	}
+	if len(cat.Providers) == 0 {
+		t.Fatal("expected registered providers")
+	}
+	for _, d := range cat.Providers {
+		if !d.Tier.Valid() {
+			t.Errorf("%s has no valid tier", d.ID)
+		}
+		if d.Caveat == "" {
+			t.Errorf("%s has no caveat", d.ID)
+		}
+	}
+}

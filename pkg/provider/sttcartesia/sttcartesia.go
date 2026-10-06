@@ -17,6 +17,7 @@ func init() {
 			Label:       "Cartesia Ink (Cloud, metered)",
 			Description: "Cloud speech transcription via Cartesia Ink Whisper.",
 			Source:      "http",
+			Tier:        provider.TierCloud,
 			Features: []provider.Feature{
 				provider.FeatureMetered,
 				provider.FeatureKeyRequired,

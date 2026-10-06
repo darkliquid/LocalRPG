@@ -28,3 +28,31 @@ func TestKeyFor(t *testing.T) {
 		}
 	}
 }
+
+func TestKeyForPrefersInstance(t *testing.T) {
+	base := harness.ProviderConfig{Type: "http", Endpoint: "https://api.openai.com"}
+	a, _ := harness.KeyFor(base)
+	base.Instance = "good"
+	b, _ := harness.KeyFor(base)
+	if a == b {
+		t.Fatalf("instance did not change the key: %s", a)
+	}
+	if b != "llm:openaichat@good" {
+		t.Fatalf("key = %s", b)
+	}
+
+	builtin := harness.ProviderConfig{Type: "builtin", BuiltinName: "gemini", Instance: "second"}
+	got, _ := harness.KeyFor(builtin)
+	if got != "llm:gemini@second" {
+		t.Fatalf("builtin instance key = %s", got)
+	}
+}
+
+// TestKeyForUnsetInstanceIsUnchanged guards the backward-compatible case: a
+// configuration with no instance produces exactly the key it produced before.
+func TestKeyForUnsetInstanceIsUnchanged(t *testing.T) {
+	got, ok := harness.KeyFor(harness.ProviderConfig{Type: "http", Endpoint: "https://api.openai.com"})
+	if !ok || got != "llm:openaichat@api.openai.com" {
+		t.Fatalf("unset instance key = %q/%v, want llm:openaichat@api.openai.com", got, ok)
+	}
+}

@@ -37,3 +37,26 @@ func TestParseCheckRequest(t *testing.T) {
 		t.Fatalf("req = %+v", req)
 	}
 }
+
+func TestRequestCheckSpecAdvertisesSkillAndModifiers(t *testing.T) {
+	props, ok := requestCheckSpec().Parameters["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatal("request_check has no properties object")
+	}
+	if _, ok := props["skill"]; !ok {
+		t.Fatal("skill parameter missing")
+	}
+	if _, ok := props["modifiers"]; !ok {
+		t.Fatal("modifiers parameter missing")
+	}
+}
+
+func TestParseCheckRequestCarriesSkillAndModifiers(t *testing.T) {
+	req, err := ParseCheckRequest(`{"actor":"x","check_kind":"do","skill":"stealth","modifiers":[{"source":"high ground","value":1}]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.Skill != "stealth" || len(req.Modifiers) != 1 || req.Modifiers[0].Value != 1 {
+		t.Fatalf("decoded %+v", req)
+	}
+}

@@ -52,6 +52,7 @@ import {
   ExportEvent,
   ExportCapabilities,
   TTSBatchJob,
+  MediaInspectResponse,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -556,6 +557,16 @@ export class APIClient {
       body: JSON.stringify(req),
     });
     if (!res.ok) throw new Error(`inspectTTS: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async inspectMedia(family: string): Promise<MediaInspectResponse> {
+    const res = await fetch('/api/media/inspect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ family }),
+    });
+    if (!res.ok) throw new Error(`inspectMedia: ${res.statusText}`);
     return res.json();
   }
 

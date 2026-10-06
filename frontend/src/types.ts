@@ -124,9 +124,7 @@ export interface Turn {
   continuity_notes?: string[];
   // What the turn looked up: the name and result size of each tool call.
   tool_calls?: ToolCall[];
-  // The GM's verdict on the player's action, whether it was rejected as
-  // impossible, and the checks it resolved.
-  verdict?: { feasibility: 'automatic' | 'uncertain' | 'impossible'; reason?: string };
+  // Whether the action was rejected as impossible, and the checks it resolved.
   rejected?: boolean;
   checks?: TurnCheck[];
   // A declared health stat reaching zero this turn, and the directive an
@@ -141,6 +139,23 @@ export interface Turn {
   };
   // The turn this one continues, when the player rolled a pending check.
   continuation_of?: number;
+  // How the turn's control records fared: nil for a clean turn.
+  record_report?: RecordReport;
+}
+
+// RecordIssue is one control record that needed repair or was dropped.
+export interface RecordIssue {
+  type: string;
+  repair?: string;
+  error?: string;
+}
+
+// RecordReport is a turn's control-record health summary.
+export interface RecordReport {
+  total: number;
+  repaired: number;
+  failed: number;
+  issues?: RecordIssue[];
 }
 
 // DieFace is one die as it landed. Symbol is the notation's own way of showing
@@ -160,6 +175,9 @@ export interface TurnCheck {
   // dice are the faces that landed, which is what a die can be drawn from: a
   // total of 4 from 2d6 says nothing about the individual dice.
   roll?: { notation: string; total: number; successes?: number; roll_count?: number; dice?: DieFace[] };
+  // applied is every stat, skill, and modifier that contributed, so a player can
+  // see why a 7 became a 9.
+  applied?: { source: string; value: number }[];
 }
 
 export interface EntityMemory {
@@ -521,6 +539,9 @@ export interface AgentRoleConfig {
   thinking_budget?: number;
   top_p?: number;
   top_k?: number;
+  // An optional user-chosen discriminator that keeps two configs of one adapter
+  // at one endpoint distinct in usage, pricing, and caches.
+  instance?: string;
 }
 
 export interface AgentsConfig {
@@ -633,6 +654,25 @@ export interface TTSInspectResponse {
   speech_cues?: SpeechCueCapabilities;
 }
 
+// MediaInspectRequest names the family to describe: "tts", "stt", or "image".
+export interface MediaInspectRequest {
+  family: string;
+}
+
+// MediaInspectEntry describes one named media configuration.
+export interface MediaInspectEntry {
+  name: string;
+  provider_key: string;
+  key_present: boolean;
+  key_required: boolean;
+  metered: boolean;
+  tier: string;
+}
+
+export interface MediaInspectResponse {
+  entries: MediaInspectEntry[];
+}
+
 export interface TTSConfig {
   type: 'builtin' | 'http' | 'cli' | 'disabled' | 'gemini' | 'fish-audio' | 'cartesia';
   builtin_name?: string;
@@ -656,6 +696,9 @@ export interface TTSConfig {
   metered?: boolean;
   // Vocal performance steering tags and transcript display.
   speech_cues?: SpeechCuesConfig;
+  // An optional user-chosen discriminator that keeps two configs of one adapter
+  // at one endpoint distinct in usage, pricing, and caches.
+  instance?: string;
 }
 
 export interface STTConfig {
@@ -666,6 +709,9 @@ export interface STTConfig {
   endpoint?: string;
   model?: string;
   api_key?: string;
+  // An optional user-chosen discriminator that keeps two configs of one adapter
+  // at one endpoint distinct in usage, pricing, and caches.
+  instance?: string;
 }
 
 export interface ImageConfig {
@@ -680,12 +726,23 @@ export interface ImageConfig {
   builtin_fallback?: boolean;
   aspect_ratio?: string;
   person_generation?: string;
+  // An optional user-chosen discriminator that keeps two configs of one adapter
+  // at one endpoint distinct in usage, pricing, and caches.
+  instance?: string;
 }
 
 export interface MediaConfig {
   tts: TTSConfig;
   stt: STTConfig;
   image: ImageConfig;
+  // Named configurations of each family, which coexist with the singleton
+  // default above and are selected by name.
+  tts_providers?: Record<string, TTSConfig>;
+  stt_providers?: Record<string, STTConfig>;
+  image_providers?: Record<string, ImageConfig>;
+  // Maps a use name (narrator, npc, scene, portrait, placeholder) to a provider
+  // name, or the family default when unset.
+  purposes?: Record<string, string>;
 }
 
 export interface PreferencesConfig {
@@ -871,6 +928,11 @@ export interface ProviderDescriptor {
   label: string;
   description: string;
   source: string;
+  // The honest capability tier: offline-basic, offline-neural, local-server, or
+  // cloud. Caveat is the one-line "what it is not"; the UI falls back to the
+  // tier's default when it is empty.
+  tier?: string;
+  caveat?: string;
   features: ProviderFeature[];
   tunables?: ProviderTunable[];
   presets?: ProviderPreset[];

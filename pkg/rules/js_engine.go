@@ -291,7 +291,7 @@ func (j *JSEngine) Resolve(ctx context.Context, req harness.CheckRequest, actor 
 		if err != nil {
 			return nil, fmt.Errorf("check resolver %q: %w", req.CheckKind, err)
 		}
-		result := &harness.CheckResult{CheckID: newCheckID(), Actor: req.Actor, Target: req.Target, Outcome: "fail"}
+		result := &harness.CheckResult{CheckID: harness.NewCheckID(), Actor: req.Actor, Target: req.Target, Outcome: "fail"}
 		if mapped, ok := value.Export().(map[string]interface{}); ok {
 			if outcome, ok := mapped["outcome"].(string); ok && outcome != "" {
 				result.Outcome = outcome

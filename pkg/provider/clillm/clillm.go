@@ -17,6 +17,7 @@ func init() {
 			Label:       "Command Line (CLI)",
 			Description: "Runs a local binary such as llama-cli or claude and reads its output.",
 			Source:      "cli",
+			Tier:        provider.TierLocalServer,
 			Features:    []provider.Feature{provider.FeatureStreaming},
 			Presets: []provider.Preset{
 				{ID: "llama-cli", Order: 5, Label: "llama-cli (Local Executable)",

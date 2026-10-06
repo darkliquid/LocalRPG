@@ -1665,3 +1665,28 @@ func TestServiceRejectsInvalidIDs(t *testing.T) {
 		t.Error("GetWorld expected error for traversal id, got nil")
 	}
 }
+
+func TestRecordReportDTOMaps(t *testing.T) {
+	rr := &engine.RecordReport{
+		Total:    1,
+		Repaired: 1,
+		Issues:   []engine.RecordIssue{{Type: "roll", Repair: "close"}},
+	}
+	dto := recordReportDTO(rr)
+	if dto == nil || dto.Repaired != 1 || len(dto.Issues) != 1 || dto.Issues[0].Type != "roll" {
+		t.Fatalf("dto = %+v", dto)
+	}
+	if recordReportDTO(nil) != nil {
+		t.Fatal("a nil report must map to nil")
+	}
+}
+
+func TestImageRegistryResolvesTheDefault(t *testing.T) {
+	_, svc := setupTestGame(t)
+	if _, err := svc.imageRegistry().Default(); err != nil {
+		t.Fatalf("image registry default: %v", err)
+	}
+	if _, err := svc.ttsRegistry().Default(); err != nil {
+		t.Fatalf("tts registry default: %v", err)
+	}
+}

@@ -68,6 +68,8 @@ type Descriptor struct {
 	Label       string    `json:"label"`
 	Description string    `json:"description"`
 	Source      string    `json:"source"` // builtin | cli | http | gemini
+	Tier        Tier      `json:"tier"`
+	Caveat      string    `json:"caveat,omitempty"`
 	Features    []Feature `json:"features"`
 	Tunables    []Tunable `json:"tunables,omitempty"`
 	Presets     []Preset  `json:"presets,omitempty"`

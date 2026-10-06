@@ -92,9 +92,9 @@ func KeyFor(cfg config.EmbeddingsConfig) (provider.Key, bool) {
 	}
 	switch pCfg.Type {
 	case "", "builtin":
-		return provider.InstanceOrSelf(provider.KeyEmbeddingBuiltin, "default"), true
+		return provider.InstanceOrSelf(provider.KeyEmbeddingBuiltin, provider.InstanceDiscriminator(pCfg.Instance, "default")), true
 	case "gemini":
-		return provider.InstanceOrSelf(provider.KeyEmbeddingGemini, "default"), true
+		return provider.InstanceOrSelf(provider.KeyEmbeddingGemini, provider.InstanceDiscriminator(pCfg.Instance, "default")), true
 	case "http":
 		endpoint := pCfg.URL
 		if endpoint == "" {
@@ -104,7 +104,7 @@ func KeyFor(cfg config.EmbeddingsConfig) (provider.Key, bool) {
 		if disc == "" {
 			disc = "default"
 		}
-		return provider.InstanceOrSelf(provider.KeyEmbeddingOpenAI, disc), true
+		return provider.InstanceOrSelf(provider.KeyEmbeddingOpenAI, provider.InstanceDiscriminator(pCfg.Instance, disc)), true
 	}
 	return "", false
 }

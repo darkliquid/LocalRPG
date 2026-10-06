@@ -17,6 +17,7 @@ func init() {
 			Label:       "Whisper.cpp (CLI)",
 			Description: "Runs whisper-cli directly with a GGML model.",
 			Source:      "cli",
+			Tier:        provider.TierLocalServer,
 			Features:    []provider.Feature{provider.FeatureOffline},
 			Presets: []provider.Preset{
 				{ID: "whisper-cli", Order: 3, Label: "Whisper.cpp (Local CLI)",

@@ -129,14 +129,14 @@ type SegmentDTO struct {
 	// adjacent same-speaker segments shares one clip, so this is usually one URL;
 	// ClipGroup names that shared clip so the client renders one control for the
 	// whole group.
-	AudioURLs       []string `json:"audio_urls,omitempty"`
-	ClipGroup       string   `json:"clip_group,omitempty"`
-	PortraitURL     string   `json:"portrait_url,omitempty"`
-	SpeakerPortrait string   `json:"speaker_portrait,omitempty"`
-	HasCustomPortrait bool   `json:"has_custom_portrait,omitempty"`
-	CheckRef        string   `json:"check_ref,omitempty"`
-	Player      bool     `json:"player,omitempty"`
-	Duration    float64  `json:"duration"`
+	AudioURLs         []string `json:"audio_urls,omitempty"`
+	ClipGroup         string   `json:"clip_group,omitempty"`
+	PortraitURL       string   `json:"portrait_url,omitempty"`
+	SpeakerPortrait   string   `json:"speaker_portrait,omitempty"`
+	HasCustomPortrait bool     `json:"has_custom_portrait,omitempty"`
+	CheckRef          string   `json:"check_ref,omitempty"`
+	Player            bool     `json:"player,omitempty"`
+	Duration          float64  `json:"duration"`
 }
 
 // ClipGroupDTO is one clip that a run of segments shares, so a client renders a
@@ -187,33 +187,32 @@ type AudioProgressDTO struct {
 }
 
 type TurnDTO struct {
-	TurnNumber      int           `json:"turn_number"`
-	InputText       string        `json:"input_text"`
-	Mode            string        `json:"mode"`
-	Prose           string        `json:"prose"`
-	Speaker         string        `json:"speaker,omitempty"`
-	Dialogue        string        `json:"dialogue,omitempty"`
-	ImageURL        string        `json:"image_url,omitempty"`
-	EntitiesHit     []string      `json:"entities_hit,omitempty"`
-	Segments        []SegmentDTO  `json:"segments,omitempty"`
+	TurnNumber  int          `json:"turn_number"`
+	InputText   string       `json:"input_text"`
+	Mode        string       `json:"mode"`
+	Prose       string       `json:"prose"`
+	Speaker     string       `json:"speaker,omitempty"`
+	Dialogue    string       `json:"dialogue,omitempty"`
+	ImageURL    string       `json:"image_url,omitempty"`
+	EntitiesHit []string     `json:"entities_hit,omitempty"`
+	Segments    []SegmentDTO `json:"segments,omitempty"`
 	// ClipGroups lists the shared clips a run of segments plays, so the client
 	// renders one control per group.
 	ClipGroups      []ClipGroupDTO `json:"clip_groups,omitempty"`
-	Outcome         string        `json:"outcome,omitempty"`
-	Truncated       bool          `json:"truncated,omitempty"`
-	Recovery        string        `json:"recovery,omitempty"`
-	ToolCalls       []ToolCallDTO `json:"tool_calls,omitempty"`
-	ContextNotes    []string      `json:"context_notes,omitempty"`
-	ContinuityNotes []string      `json:"continuity_notes,omitempty"`
-	LocationID      string        `json:"location_id,omitempty"`
-	LocationName    string        `json:"location_name,omitempty"`
-	LocationArtURL  string        `json:"location_art_url,omitempty"`
-	SceneBreak      bool          `json:"scene_break,omitempty"`
-	// Structured turn fields: the action verdict, whether it was rejected, and
-	// the checks the GM resolved.
-	Verdict  *harness.ActionVerdict `json:"verdict,omitempty"`
-	Rejected bool                   `json:"rejected,omitempty"`
-	Checks   []harness.CheckResult  `json:"checks,omitempty"`
+	Outcome         string         `json:"outcome,omitempty"`
+	Truncated       bool           `json:"truncated,omitempty"`
+	Recovery        string         `json:"recovery,omitempty"`
+	ToolCalls       []ToolCallDTO  `json:"tool_calls,omitempty"`
+	ContextNotes    []string       `json:"context_notes,omitempty"`
+	ContinuityNotes []string       `json:"continuity_notes,omitempty"`
+	LocationID      string         `json:"location_id,omitempty"`
+	LocationName    string         `json:"location_name,omitempty"`
+	LocationArtURL  string         `json:"location_art_url,omitempty"`
+	SceneBreak      bool           `json:"scene_break,omitempty"`
+	// Structured turn fields: whether the action was rejected and the checks the
+	// GM resolved.
+	Rejected bool                  `json:"rejected,omitempty"`
+	Checks   []harness.CheckResult `json:"checks,omitempty"`
 	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
 	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
 	// ContinuationOf is the turn this one continues, when the player rolled a
@@ -224,6 +223,44 @@ type TurnDTO struct {
 	// show the mechanical consequence beside the prose.
 	HealthEffects []HealthEffectDTO `json:"health_effects,omitempty"`
 	WorldTick     string            `json:"world_tick,omitempty"`
+	// RecordReport summarises the turn's control-record health. Nil when every
+	// record arrived valid.
+	RecordReport *RecordReportDTO `json:"record_report,omitempty"`
+}
+
+// RecordIssueDTO is one repaired or dropped control record.
+type RecordIssueDTO struct {
+	Type   string `json:"type"`
+	Repair string `json:"repair,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+// RecordReportDTO is a turn's control-record health summary.
+type RecordReportDTO struct {
+	Total    int              `json:"total"`
+	Repaired int              `json:"repaired"`
+	Failed   int              `json:"failed"`
+	Issues   []RecordIssueDTO `json:"issues,omitempty"`
+}
+
+// MediaInspectRequestDTO names the family to describe: "tts", "stt", or "image".
+type MediaInspectRequestDTO struct {
+	Family string `json:"family"`
+}
+
+// MediaInspectEntryDTO describes one named media configuration.
+type MediaInspectEntryDTO struct {
+	Name        string `json:"name"`
+	ProviderKey string `json:"provider_key"`
+	KeyPresent  bool   `json:"key_present"`
+	KeyRequired bool   `json:"key_required"`
+	Metered     bool   `json:"metered"`
+	Tier        string `json:"tier"`
+}
+
+// MediaInspectResponseDTO is every entry of one media family.
+type MediaInspectResponseDTO struct {
+	Entries []MediaInspectEntryDTO `json:"entries"`
 }
 
 // HealthEffectDTO is one resolved health-zero effect on a turn.
@@ -248,13 +285,14 @@ type MemoryDTO struct {
 	Tags       []string `json:"tags,omitempty"`
 }
 
-type EntityDTO struct {	ID         string                 `json:"id"`
-	Name       string                 `json:"name"`
-	Type       string                 `json:"type"`
-	Markdown   string                 `json:"markdown"`
-	State      map[string]interface{} `json:"state"`
-	Backlinks  []string               `json:"backlinks"`
-	History    []int                  `json:"history,omitempty"`
+type EntityDTO struct {
+	ID        string                 `json:"id"`
+	Name      string                 `json:"name"`
+	Type      string                 `json:"type"`
+	Markdown  string                 `json:"markdown"`
+	State     map[string]interface{} `json:"state"`
+	Backlinks []string               `json:"backlinks"`
+	History   []int                  `json:"history,omitempty"`
 	// Folder is the note's directory under entities/, slash-separated, with "" for
 	// the root.
 	Folder     string `json:"folder,omitempty"`
@@ -363,12 +401,12 @@ type PlayerCharacterDTO struct {
 
 // EntitySummaryDTO is one note as the codex browser lists it.
 type EntitySummaryDTO struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Type        string   `json:"type"`
-	Location    string   `json:"location,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
-	Aliases     []string `json:"aliases,omitempty"`
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Type     string   `json:"type"`
+	Location string   `json:"location,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+	Aliases  []string `json:"aliases,omitempty"`
 	// Folder is the note's directory under entities/, slash-separated, with "" for
 	// the root. The client builds the tree from it.
 	Folder string `json:"folder,omitempty"`
@@ -589,17 +627,17 @@ type TurnRequest struct {
 
 // TurnEvent is one NDJSON line sent while a turn runs.
 type TurnEvent struct {
-	Type    string   `json:"type"`                 // "chunk", "speech", "turn", "tool", "error", or "model_missing"
-	Text    string   `json:"text,omitempty"`       // narration delta, or a streamed sentence's text
-	Turn    *TurnDTO `json:"turn,omitempty"`       // the persisted turn
+	Type string   `json:"type"`           // "chunk", "speech", "turn", "tool", "error", or "model_missing"
+	Text string   `json:"text,omitempty"` // narration delta, or a streamed sentence's text
+	Turn *TurnDTO `json:"turn,omitempty"` // the persisted turn
 	// Segment is one parsed narration or speech unit, present when Type is
 	// "segment": it is emitted while the model is still writing, before the
 	// authoritative turn arrives.
 	Segment *SegmentDTO `json:"segment,omitempty"`
-	Message string   `json:"message,omitempty"`    // failure detail
-	ModelID string   `json:"model_id,omitempty"`   // missing model ID
-	Name    string   `json:"name,omitempty"`       // friendly model name
-	Size    int64    `json:"size_bytes,omitempty"` // model size in bytes
+	Message string      `json:"message,omitempty"`    // failure detail
+	ModelID string      `json:"model_id,omitempty"`   // missing model ID
+	Name    string      `json:"name,omitempty"`       // friendly model name
+	Size    int64       `json:"size_bytes,omitempty"` // model size in bytes
 	// Streamed narration, present when Type is "speech": which unit it is, and the
 	// clip that was written for it.
 	Index    int    `json:"index,omitempty"`
@@ -751,4 +789,3 @@ type DocArticleDTO struct {
 	DocArticleSummaryDTO
 	Content string `json:"content"`
 }
-

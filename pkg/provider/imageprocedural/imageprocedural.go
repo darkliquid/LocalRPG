@@ -16,6 +16,7 @@ func init() {
 			Label:       "Procedural Dark Fantasy (Built-in)",
 			Description: "Pure-Go vector landscape generator that needs no model or network.",
 			Source:      "builtin",
+			Tier:        provider.TierOfflineBasic,
 			Features:    []provider.Feature{provider.FeatureOffline},
 			Presets: []provider.Preset{
 				{ID: "procedural-art", Order: 5, Label: "Procedural Dark Fantasy (Built-in Zero-GPU)",

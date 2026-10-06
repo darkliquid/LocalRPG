@@ -16,6 +16,7 @@ func init() {
 			Label:       "Web Speech API (Browser Native)",
 			Description: "Runs in a Chromium browser window and is unavailable in the Wails webview; use an HTTP or CLI Whisper provider there.",
 			Source:      "builtin",
+			Tier:        provider.TierOfflineBasic,
 			Features:    []provider.Feature{provider.FeatureOffline},
 			Presets: []provider.Preset{
 				{ID: "web-speech", Order: 1, Label: "Web Speech API (Browser Native)",

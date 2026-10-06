@@ -68,6 +68,14 @@ type Service struct {
 	ttsMu       sync.Mutex
 	ttsConfig   *config.Config
 	ttsPipeline *media.TTSPipeline
+	// Named media registries are built lazily from the current config and
+	// invalidated when settings change, so a named provider's model loads once.
+	ttsRegMu   sync.Mutex
+	ttsReg     *media.TTSRegistry
+	sttRegMu   sync.Mutex
+	sttReg     *media.STTRegistry
+	imageRegMu sync.Mutex
+	imageReg   *media.ImageRegistry
 	// Background work (entity enrichment, playback warm-up, retro-summary) is
 	// tracked so Close can wait for it. Untracked writers outlived a caller's
 	// view of the service and raced shutdown and test cleanup.
@@ -170,6 +178,59 @@ func (s *Service) OpenURL(rawURL string) error {
 // SetLogger attaches a trace sink to the service and to every turn it prepares.
 func (s *Service) SetLogger(logger trace.Logger) {
 	s.logger = trace.OrNil(logger)
+	// The registries capture the logger when they build a client, so drop them so
+	// a rebuilt client logs to the new sink.
+	s.invalidateRegistries()
+}
+
+// invalidateRegistries drops every cached named media client, so a settings or
+// logger change rebuilds them from the current configuration.
+func (s *Service) invalidateRegistries() {
+	s.ttsRegMu.Lock()
+	if s.ttsReg != nil {
+		s.ttsReg.Invalidate()
+	}
+	s.ttsRegMu.Unlock()
+	s.sttRegMu.Lock()
+	if s.sttReg != nil {
+		s.sttReg.Invalidate()
+	}
+	s.sttRegMu.Unlock()
+	s.imageRegMu.Lock()
+	if s.imageReg != nil {
+		s.imageReg.Invalidate()
+	}
+	s.imageRegMu.Unlock()
+}
+
+// ttsRegistry returns the service's named TTS registry, building it lazily.
+func (s *Service) ttsRegistry() *media.TTSRegistry {
+	s.ttsRegMu.Lock()
+	defer s.ttsRegMu.Unlock()
+	if s.ttsReg == nil {
+		s.ttsReg = media.NewTTSRegistry(s.configMgr.Get(), s.logger)
+	}
+	return s.ttsReg
+}
+
+// sttRegistry returns the service's named STT registry, building it lazily.
+func (s *Service) sttRegistry() *media.STTRegistry {
+	s.sttRegMu.Lock()
+	defer s.sttRegMu.Unlock()
+	if s.sttReg == nil {
+		s.sttReg = media.NewSTTRegistry(s.configMgr.Get())
+	}
+	return s.sttReg
+}
+
+// imageRegistry returns the service's named image registry, building it lazily.
+func (s *Service) imageRegistry() *media.ImageRegistry {
+	s.imageRegMu.Lock()
+	defer s.imageRegMu.Unlock()
+	if s.imageReg == nil {
+		s.imageReg = media.NewImageRegistry(s.configMgr.Get(), s.logger)
+	}
+	return s.imageReg
 }
 
 func NewService(rootDir string) *Service {
@@ -1504,6 +1565,23 @@ func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, e
 }
 
 // turnDTO maps a persisted turn for the API. GetChronicle and the turn endpoint
+// recordReportDTO maps a turn's control-record report for the API, or nil when
+// the turn had none.
+func recordReportDTO(report *engine.RecordReport) *RecordReportDTO {
+	if report == nil {
+		return nil
+	}
+	dto := &RecordReportDTO{
+		Total:    report.Total,
+		Repaired: report.Repaired,
+		Failed:   report.Failed,
+	}
+	for _, issue := range report.Issues {
+		dto.Issues = append(dto.Issues, RecordIssueDTO{Type: issue.Type, Repair: issue.Repair, Error: issue.Error})
+	}
+	return dto
+}
+
 // share it so a live turn and a replayed one are the same shape, which is what
 // lets the client render both with one code path.
 func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID string) TurnDTO {
@@ -1522,9 +1600,9 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		ContextNotes:    turn.ContextNotes,
 		ContinuityNotes: turn.ContinuityNotes,
 		EntitiesHit:     mentionIDs(turn.Entities),
-		Verdict:         turn.Verdict,
 		Rejected:        turn.Rejected,
 		Checks:          turn.Checks,
+		RecordReport:    recordReportDTO(turn.RecordReport),
 		PendingCheck:    turn.PendingCheck,
 		ContinuationOf:  turn.ContinuationOf,
 		HealthEffects:   healthEffectDTOs(turn.HealthEffects),
@@ -1969,7 +2047,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// still warms the clips, because the URLs a client is handed are
 	// content-addressed and cannot synthesize on demand.
 	audioEnabled := t.cfg.Media.TTS.Type != "" && t.cfg.Media.TTS.Type != "disabled"
-	plan := &turnAudioPlan{played: newClipSet()}
+	plan := newTurnAudioPlan(nil)
 	if audioEnabled && t.cfg.Media.TTS.AutoPlay {
 		if player := t.service.audioPlayer(); player != nil && player.Available() {
 			plan.queue = make(chan string, sentenceQueueDepth)
@@ -1993,7 +2071,14 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		turnNum = max + 1
 	}
 
+	// streamedKeys records the clip keys the streamer emitted, so finalise can
+	// assert they are the keys the plan contains.
+	streamedKeys := map[string]bool{}
 	streamer := t.service.sentenceStreamerFor(runCtx, t.gameID, t.cfg, func(speech provisionalSpeech) {
+		if speech.AudioKey != "" {
+			streamedKeys[speech.AudioKey] = true
+		}
+		plan.markHeard(speech.Segments)
 		plan.enqueueClip(speech.AudioKey, t.service.clipPath(speech.AudioKey))
 		_ = announce(speechEvent(speech))
 	})
@@ -2024,14 +2109,22 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// attributed speech while the model is still writing, and the streamer voices
 	// each one in its speaker's own voice. A failed emit is ignored, exactly as
 	// tool activity is: the turn still records.
+	// segmentIndex is the position of the event in the turn's segment order, which
+	// is the same index space the clip plan uses, so the heard ledger and the plan
+	// agree on what a segment is.
+	segmentIndex := 0
 	t.orchestrator.SetSegmentObserver(func(event turnstream.Event) {
-		if segment, ok := liveSegmentDTO(event, t.gameID); ok {
+		segment, isSegment := liveSegmentDTO(event, t.gameID)
+		if isSegment {
 			if segment.SpeakerID != "" && t.service.hasCustomPortrait(t.gameID, segment.SpeakerID) {
 				segment.HasCustomPortrait = true
 			}
 			_ = announce(TurnEvent{Type: "segment", Segment: &segment})
 		}
-		streamer.FeedSegment(event)
+		streamer.FeedSegment(event, segmentIndex)
+		if isSegment {
+			segmentIndex++
+		}
 	})
 
 	t.orchestrator.SetSceneOnly(req.SceneOnly)
@@ -2092,6 +2185,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	if audioEnabled {
 		streamer.Wait()
 		t.finishTurnAudio(context.Background(), *turn, plan)
+		t.service.logParityMismatch(t.gameID, turn.Segments, streamedKeys)
 	}
 	plan.close()
 	return nil
@@ -2103,7 +2197,37 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 func (t *TurnSession) finishTurnAudio(ctx context.Context, turn engine.Turn, plan *turnAudioPlan) {
 	t.service.emitTurnClips(ctx, t.gameID, turn, false, func(clip string) {
 		plan.enqueueClip(media.ClipKeyForPath(clip), clip)
-	})
+	}, plan)
+}
+
+// logParityMismatch traces streamed clip keys that the turn's clip plan does not
+// contain, which means the streamer and the plan folded the same text
+// differently. It is diagnostic only: it never changes what plays.
+func (s *Service) logParityMismatch(gameID string, segments []entity.TurnSegment, streamed map[string]bool) {
+	if len(streamed) == 0 {
+		return
+	}
+	plan := s.clipPlanFor(s.configMgr.Get(), gameID, segments)
+	known := map[string]bool{}
+	for _, keys := range plan.segmentKeys {
+		for _, key := range keys {
+			known[key] = true
+		}
+	}
+	for _, key := range plan.groupKey {
+		if key != "" {
+			known[key] = true
+		}
+	}
+	var missing []string
+	for key := range streamed {
+		if !known[key] {
+			missing = append(missing, key)
+		}
+	}
+	if len(missing) > 0 {
+		trace.OrNil(s.logger).Event("turn.audio_parity_mismatch", map[string]interface{}{"keys": missing})
+	}
 }
 
 // GetLocationArt returns a location's scene image and its content type, drawing it
@@ -2496,11 +2620,12 @@ func (s *Service) worldArtStyle(gameID string) string {
 // images the app already has rather than generating its own.
 func (s *Service) sceneArtResolver(gameID string) *media.ArtStore {
 	cfg := s.configMgr.Get()
-	client, err := media.NewSceneImageClientWithSharedKey(cfg.Media.Image, cfg.Providers.Gemini.APIKey, s.logger)
+	sceneCfg := cfg.Media.ImageForPurpose(config.PurposeScene)
+	client, err := s.imageRegistry().For(cfg.Media.ProviderForPurpose(config.PurposeScene))
 	if err != nil {
 		return nil
 	}
-	params := cfg.Media.Image.Type + ":" + cfg.Media.Image.Model
+	params := sceneCfg.Type + ":" + sceneCfg.Model
 	return media.NewArtStore(client, media.NewContentCache(s.resolver.CacheDir()), s.worldArtStyle(gameID), params)
 }
 
@@ -2783,13 +2908,28 @@ func (s *Service) synthesizeTurnGroups(ctx context.Context, gameID string, turn 
 // emitTurnClips yields a turn's clips in play order, grouped when grouping is
 // enabled and per-segment otherwise, so every consumer agrees on what a turn
 // sounds like. A group that failed falls back to per-segment synthesis so the
-// beat is not silent.
-func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.Turn, force bool, emit func(string)) {
+// beat is not silent. plan, when non-nil, is the heard ledger: a group whose
+// segments are all heard is skipped, and a partially heard group is suppressed
+// and traced, so no clip plays twice.
+func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.Turn, force bool, emit func(string), plan *turnAudioPlan) {
 	cfg := s.configMgr.Get()
 	if groups, grouped, _ := s.synthesizeTurnGroups(ctx, gameID, turn, cfg, force); grouped {
 		for _, group := range groups {
+			if plan != nil {
+				all, any := plan.heardState(group.SegmentIndexes)
+				if all {
+					continue
+				}
+				if any {
+					trace.OrNil(s.logger).Event("turn.audio_partial", map[string]interface{}{
+						"indexes": group.SegmentIndexes,
+					})
+					continue
+				}
+			}
 			if group.Cached {
 				emit(s.clipPath(group.Key))
+				plan.markHeard(group.SegmentIndexes)
 				continue
 			}
 			for _, index := range group.SegmentIndexes {
@@ -2801,10 +2941,14 @@ func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.
 					emit(clip)
 				}
 			}
+			plan.markHeard(group.SegmentIndexes)
 		}
 		return
 	}
 	for i := range turn.Segments {
+		if plan != nil && plan.heardAll([]int{i}) {
+			continue
+		}
 		clips, err := s.synthesizeSegment(ctx, gameID, turn, i, force)
 		if err != nil {
 			continue
@@ -2812,6 +2956,7 @@ func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.
 		for _, clip := range clips {
 			emit(clip)
 		}
+		plan.markHeard([]int{i})
 	}
 }
 
@@ -3436,7 +3581,7 @@ func (s *Service) turnClipStream(gameID string, turnNumber int, force bool) <-ch
 		ctx := context.Background()
 		s.emitTurnClips(ctx, gameID, *turn, force, func(path string) {
 			clips <- path
-		})
+		}, nil)
 	}()
 
 	return clips
@@ -4399,6 +4544,9 @@ func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*Setting
 	if err := s.configMgr.Save(&cfg); err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
 	}
+	// The named media registries cache clients built from the old configuration,
+	// so drop them and let the next use rebuild from the new one.
+	s.invalidateRegistries()
 
 	s.mu.Lock()
 	s.resolver.SetPaths(cfg.Paths.Systems, cfg.Paths.Worlds, cfg.Paths.Games, cfg.Paths.Cache)

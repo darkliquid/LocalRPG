@@ -17,6 +17,7 @@ func init() {
 			Label:       "Image CLI",
 			Description: "Runs an image binary such as stable-diffusion.cpp.",
 			Source:      "cli",
+			Tier:        provider.TierLocalServer,
 			Features:    []provider.Feature{provider.FeatureOffline},
 			Presets: []provider.Preset{
 				{ID: "sd-cli", Order: 4, Label: "stable-diffusion.cpp (Local CLI)",

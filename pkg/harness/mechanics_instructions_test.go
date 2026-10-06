@@ -39,6 +39,14 @@ func TestFormatMechanicsInstructions(t *testing.T) {
 	}
 }
 
+func TestMechanicsInstructionListsSkills(t *testing.T) {
+	spec := &core.MechanicsSpec{Skills: []core.SkillSpec{{ID: "stealth", Label: "Stealth"}}}
+	got := FormatMechanicsInstructions(spec, "auto", nil)
+	if !strings.Contains(got, "Stealth") {
+		t.Fatalf("instruction did not list the skill: %s", got)
+	}
+}
+
 func TestFormatMechanicsInstructionsPerPolicy(t *testing.T) {
 	spec := &core.MechanicsSpec{Checks: core.CheckConventions{Notation: "2d6", Outcome: []string{"strong", "weak", "miss"}}}
 

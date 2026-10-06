@@ -34,53 +34,53 @@ that key.
 
 ## LLM providers
 
-| Provider ID | Source | Ledger key | Presets and models |
-| --- | --- | --- | --- |
-| `llm:cli` | cli | `llm:cli@llama-cli` | `claude-cli`, `llama-cli` |
-| `llm:gemini` | gemini | `llm:gemini` | `gemini-3.8-flash` |
-| `llm:inworld` | http | `llm:inworld` | `inworld/compare-frontier-models` |
-| `llm:narrative-oracle` | builtin | `llm:narrative-oracle` | `narrative-oracle` |
-| `llm:openaichat` | http | `llm:openaichat@localhost:11434` | `default`, `gpt-4`, `llama3.2` |
+| Provider ID | Tier | Source | Ledger key | Presets and models |
+| --- | --- | --- | --- | --- |
+| `llm:cli` | local-server | cli | `llm:cli@llama-cli` | `claude-cli`, `llama-cli` |
+| `llm:gemini` | cloud | gemini | `llm:gemini` | `gemini-3.8-flash` |
+| `llm:inworld` | cloud | http | `llm:inworld` | `inworld/compare-frontier-models` |
+| `llm:narrative-oracle` | offline-basic | builtin | `llm:narrative-oracle` | `narrative-oracle` |
+| `llm:openaichat` | cloud | http | `llm:openaichat@localhost:11434` | `default`, `gpt-4`, `llama3.2` |
 
 ## Speech (TTS) providers
 
-| Provider ID | Source | Ledger key | Presets and models |
-| --- | --- | --- | --- |
-| `tts:cartesia` | http | `tts:cartesia` | `sonic-3.6` |
-| `tts:elevenlabs` | http | `tts:elevenlabs` | `eleven_multilingual_v2` |
-| `tts:fish-audio` | http | `tts:http@localhost:8091` | `fishaudio/s2-pro` |
-| `tts:gemini` | gemini | `tts:gemini` | `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`, `gemini-3.1-flash-tts-preview`, `gemini-3.8-flash-lite-tts`, `gemini-3.8-flash-tts` |
-| `tts:http` | http | `tts:http@localhost:8880` | `alltalk`, `kokoro`, `tts-1` |
-| `tts:inworld` | http | `tts:inworld` | `inworld-tts-2` |
-| `tts:native-os` | builtin | `tts:native-os` | `native-os` |
-| `tts:piper` | cli | `tts:piper@piper` | `piper` |
-| `tts:sherpa-onnx` | builtin | `tts:sherpa-onnx` | `sherpa-onnx` |
+| Provider ID | Tier | Source | Ledger key | Presets and models |
+| --- | --- | --- | --- | --- |
+| `tts:cartesia` | cloud | http | `tts:cartesia` | `sonic-3.6` |
+| `tts:elevenlabs` | cloud | http | `tts:elevenlabs` | `eleven_multilingual_v2` |
+| `tts:fish-audio` | local-server | http | `tts:http@localhost:8091` | `fishaudio/s2-pro` |
+| `tts:gemini` | cloud | gemini | `tts:gemini` | `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`, `gemini-3.1-flash-tts-preview`, `gemini-3.8-flash-lite-tts`, `gemini-3.8-flash-tts` |
+| `tts:http` | local-server | http | `tts:http@localhost:8880` | `alltalk`, `kokoro`, `tts-1` |
+| `tts:inworld` | cloud | http | `tts:inworld` | `inworld-tts-2` |
+| `tts:native-os` | offline-basic | builtin | `tts:native-os` | `native-os` |
+| `tts:piper` | local-server | cli | `tts:piper@piper` | `piper` |
+| `tts:sherpa-onnx` | offline-neural | builtin | `tts:sherpa-onnx` | `sherpa-onnx` |
 
 ## Transcription (STT) providers
 
-| Provider ID | Source | Ledger key | Presets and models |
-| --- | --- | --- | --- |
-| `stt:cartesia` | http | `stt:cartesia` | `ink-whisper` |
-| `stt:inworld` | http | `stt:inworld` | `inworld/inworld-stt-1` |
-| `stt:web-speech` | builtin | `not reported` | `web-speech` |
-| `stt:whisper-cli` | cli | `stt:whisper-cli@whisper-cli` | `whisper-cli` |
-| `stt:whisper-http` | http | `stt:whisper-http@localhost:8000` | `whisper-1` |
+| Provider ID | Tier | Source | Ledger key | Presets and models |
+| --- | --- | --- | --- | --- |
+| `stt:cartesia` | cloud | http | `stt:cartesia` | `ink-whisper` |
+| `stt:inworld` | cloud | http | `stt:inworld` | `inworld/inworld-stt-1` |
+| `stt:web-speech` | offline-basic | builtin | `not reported` | `web-speech` |
+| `stt:whisper-cli` | local-server | cli | `stt:whisper-cli@whisper-cli` | `whisper-cli` |
+| `stt:whisper-http` | local-server | http | `stt:whisper-http@localhost:8000` | `whisper-1` |
 
 ## Image providers
 
-| Provider ID | Source | Ledger key | Presets and models |
-| --- | --- | --- | --- |
-| `image:cli` | cli | `image:cli@sd` | `sd-cli` |
-| `image:gemini` | gemini | `image:gemini` | `gemini-2.5-flash-image`, `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`, `imagen-3.0-fast-generate-001`, `imagen-3.0-generate-002` |
-| `image:http` | http | `image:http@127.0.0.1:8188` | `automatic1111`, `comfyui`, `dall-e-3`, `stablediffusion` |
-| `image:procedural-art` | builtin | `image:procedural-art` | `procedural-art` |
+| Provider ID | Tier | Source | Ledger key | Presets and models |
+| --- | --- | --- | --- | --- |
+| `image:cli` | local-server | cli | `image:cli@sd` | `sd-cli` |
+| `image:gemini` | cloud | gemini | `image:gemini` | `gemini-2.5-flash-image`, `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`, `imagen-3.0-fast-generate-001`, `imagen-3.0-generate-002` |
+| `image:http` | local-server | http | `image:http@127.0.0.1:8188` | `automatic1111`, `comfyui`, `dall-e-3`, `stablediffusion` |
+| `image:procedural-art` | offline-basic | builtin | `image:procedural-art` | `procedural-art` |
 
 ## Embedding providers
 
-| Provider ID | Source | Ledger key | Presets and models |
-| --- | --- | --- | --- |
-| `embedding:gemini` | gemini | `embedding:gemini` | - |
-| `embedding:openai` | http | `embedding:openai` | - |
+| Provider ID | Tier | Source | Ledger key | Presets and models |
+| --- | --- | --- | --- | --- |
+| `embedding:gemini` | cloud | gemini | `embedding:gemini` | - |
+| `embedding:openai` | cloud | http | `embedding:openai` | - |
 
 ## Built-in default prices
 
