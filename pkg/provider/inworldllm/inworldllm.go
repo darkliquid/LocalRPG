@@ -56,6 +56,7 @@ func init() {
 			Label:       "Inworld LLM Router",
 			Description: "Gateway routing prompts across frontier models with automatic fallbacks and tool calling.",
 			Source:      "http",
+			Tier:        provider.TierCloud,
 			Features: []provider.Feature{
 				provider.FeatureStreaming,
 				provider.FeatureTools,

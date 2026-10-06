@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/jsonrepair"
 	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/trace"
@@ -464,18 +466,16 @@ func (e *Extractor) Extract(ctx context.Context, narrativeOutput string) (*Extra
 		e.recorder.RecordUsage("extractor", *res.Usage)
 	}
 
-	cleaned := strings.TrimSpace(res.Text)
-	if idx := strings.IndexAny(cleaned, "[{"); idx != -1 {
-		cleaned = cleaned[idx:]
-	}
-	if idx := strings.LastIndexAny(cleaned, "]}"); idx != -1 {
-		cleaned = cleaned[:idx+1]
+	raw := []byte(strings.TrimSpace(res.Text))
+	shape := jsonrepair.Repair(raw)
+	if !shape.OK {
+		return nil, fmt.Errorf("extractor returned no valid JSON")
 	}
 
-	if strings.HasPrefix(cleaned, "{") {
+	if bytes.HasPrefix(shape.Payload, []byte("{")) {
 		var result Extraction
-		if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
-			return nil, fmt.Errorf("parse extracted json %q: %w", cleaned, err)
+		if err := decodeExtractedJSON(raw, &result); err != nil {
+			return nil, fmt.Errorf("parse extracted json %q: %w", raw, err)
 		}
 		e.logger.Event("extraction.result", map[string]interface{}{
 			"role":            e.id,
@@ -488,10 +488,23 @@ func (e *Extractor) Extract(ctx context.Context, narrativeOutput string) (*Extra
 
 	// Older prompts asked for a bare array of entities.
 	var entities []ExtractedEntity
-	if err := json.Unmarshal([]byte(cleaned), &entities); err != nil {
-		return nil, fmt.Errorf("parse extracted json %q: %w", cleaned, err)
+	if err := decodeExtractedJSON(raw, &entities); err != nil {
+		return nil, fmt.Errorf("parse extracted json %q: %w", raw, err)
 	}
 	return &Extraction{Entities: entities}, nil
+}
+
+// decodeExtractedJSON decodes a JSON value a model returned, repairing fences,
+// surrounding prose, and unclosed structure first.
+func decodeExtractedJSON(payload []byte, v interface{}) error {
+	res := jsonrepair.Repair(payload)
+	if !res.OK {
+		return fmt.Errorf("parse extracted json: not valid JSON")
+	}
+	if err := json.Unmarshal(res.Payload, v); err != nil {
+		return fmt.Errorf("parse extracted json: %w", err)
+	}
+	return nil
 }
 
 // ResolveEntityMentions returns the entities a turn touched, tagged by how. It

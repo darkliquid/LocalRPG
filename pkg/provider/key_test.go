@@ -57,6 +57,18 @@ func TestInstanceOrSelf(t *testing.T) {
 	}
 }
 
+func TestInstanceDiscriminator(t *testing.T) {
+	if got := InstanceDiscriminator("", "localhost:8880"); got != "localhost:8880" {
+		t.Fatalf("derived = %q", got)
+	}
+	if got := InstanceDiscriminator("narrator", "localhost:8880"); got != "narrator" {
+		t.Fatalf("instance = %q", got)
+	}
+	if got := InstanceDiscriminator("  ", "x"); got != "x" {
+		t.Fatalf("blank instance should fall back, got %q", got)
+	}
+}
+
 func TestDiscriminators(t *testing.T) {
 	if got := HostDiscriminator("http://localhost:11434/v1"); got != "localhost:11434" {
 		t.Errorf("HostDiscriminator = %q, want localhost:11434", got)

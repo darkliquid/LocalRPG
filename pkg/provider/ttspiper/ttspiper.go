@@ -17,6 +17,7 @@ func init() {
 			Label:       "Piper TTS (CLI)",
 			Description: "Fast, lightweight neural TTS via the piper binary.",
 			Source:      "cli",
+			Tier:        provider.TierLocalServer,
 			Features:    []provider.Feature{provider.FeatureOffline},
 			Presets: []provider.Preset{
 				{ID: "piper", Order: 4, Label: "Piper TTS (Local CLI)",

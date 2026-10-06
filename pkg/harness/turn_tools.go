@@ -34,16 +34,30 @@ func TurnToolSpecs() []ToolSpec { return TurnToolSpecsFor("auto") }
 func requestCheckSpec() ToolSpec {
 	return ToolSpec{
 		Name:        "request_check",
-		Description: "Resolve a check before continuing: state the stakes and possible outcomes, and the engine rolls and returns one outcome. Call it, then keep narrating.",
+		Description: "Resolve a check before continuing: state the stakes and possible outcomes, and the engine rolls and returns one outcome. Name a skill as well as a stat when the check tests a trained ability, and list situational modifiers. Call it, then keep narrating.",
 		Parameters: objectSchema(map[string]interface{}{
 			"actor":      stringProperty("The entity attempting the action."),
 			"target":     stringProperty("Optional opposing entity."),
 			"check_kind": stringProperty("The kind of check, mapped to a system convention, for example 'skill'."),
-			"stat":       stringProperty("The stat or skill used."),
+			"stat":       stringProperty("The stat used."),
+			"skill":      stringProperty("A declared skill whose rating is added, alongside stat."),
 			"difficulty": stringProperty("Optional difficulty id from the system."),
 			"stakes":     stringProperty("What is at stake if the check fails."),
 			"outcomes":   map[string]interface{}{"type": "object", "description": "Map of outcome key to the result text, for example {'pass': '...', 'fail': '...'}.", "additionalProperties": map[string]interface{}{"type": "string"}},
 			"notation":   stringProperty("Optional dice notation override, for example '2d6'."),
+			"modifiers": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"source": map[string]interface{}{"type": "string"},
+						"value":  map[string]interface{}{"type": "integer"},
+						"reason": map[string]interface{}{"type": "string"},
+					},
+					"required": []string{"source", "value"},
+				},
+				"description": "Situational bonuses and penalties, each named.",
+			},
 		}, "actor", "check_kind", "stakes", "outcomes"),
 	}
 }
@@ -51,16 +65,30 @@ func requestCheckSpec() ToolSpec {
 func proposeCheckSpec() ToolSpec {
 	return ToolSpec{
 		Name:        "propose_check",
-		Description: "Propose a check to the player: state the stakes and the possible outcomes, then stop. The player rolls and you adjudicate the result in the next turn. Do not resolve it yourself.",
+		Description: "Propose a check to the player: state the stakes and the possible outcomes, then stop. Name a skill as well as a stat when the check tests a trained ability, and list situational modifiers. The player rolls and you adjudicate the result in the next turn. Do not resolve it yourself.",
 		Parameters: objectSchema(map[string]interface{}{
 			"actor":      stringProperty("The entity attempting the action."),
 			"target":     stringProperty("Optional opposing entity."),
 			"check_kind": stringProperty("The kind of check, mapped to a system convention, for example 'skill'."),
-			"stat":       stringProperty("The stat or skill used."),
+			"stat":       stringProperty("The stat used."),
+			"skill":      stringProperty("A declared skill whose rating is added, alongside stat."),
 			"difficulty": stringProperty("Optional difficulty id from the system."),
 			"stakes":     stringProperty("What is at stake if the check fails."),
 			"outcomes":   map[string]interface{}{"type": "object", "description": "Map of outcome key to the result text, for example {'pass': '...', 'fail': '...'}.", "additionalProperties": map[string]interface{}{"type": "string"}},
 			"notation":   stringProperty("Optional dice notation override, for example '2d6'."),
+			"modifiers": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"source": map[string]interface{}{"type": "string"},
+						"value":  map[string]interface{}{"type": "integer"},
+						"reason": map[string]interface{}{"type": "string"},
+					},
+					"required": []string{"source", "value"},
+				},
+				"description": "Situational bonuses and penalties, each named.",
+			},
 		}, "actor", "check_kind", "stakes", "outcomes"),
 	}
 }

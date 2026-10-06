@@ -34,6 +34,7 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
   // carried them has a total and no dice, and a guessed face would be a lie.
   const faces = roll?.dice ?? [];
   const shown = Math.min(faces.length, MAX_SHOWN_DICE);
+  const applied = check.applied ?? [];
   const stakes =
     (check.stakes ?? '').trim() ||
     [check.actor, check.target].filter(Boolean).join(' vs ') ||
@@ -85,6 +86,16 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
         )}
         <span className={`text-xs font-sans font-bold uppercase tracking-wider ${style.chip}`}>{check.outcome}</span>
       </div>
+      {applied.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1 text-[11px] font-mono text-stone-400">
+          <span className="text-stone-500">{notation}{roll ? ` ${roll.total}` : ''}</span>
+          {applied.map((modifier, index) => (
+            <span key={index} className="rounded bg-white/5 px-1.5 py-0.5">
+              {modifier.source} {modifier.value >= 0 ? `+${modifier.value}` : modifier.value}
+            </span>
+          ))}
+        </div>
+      )}
       {stakes && <div className="text-xs font-sans text-stone-400">{stakes}</div>}
     </div>
   );

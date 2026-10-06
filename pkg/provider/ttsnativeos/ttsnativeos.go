@@ -15,7 +15,9 @@ func init() {
 			Label:       "Native OS Speech (Built-in)",
 			Description: "Uses spd-say, espeak-ng, say, or PowerShell with a procedural fallback.",
 			Source:      "builtin",
+			Tier:        provider.TierOfflineBasic,
 			Features:    []provider.Feature{provider.FeatureOffline},
+			Caveat:      "Uses an operating-system voice, or a plain tone when none is installed.",
 			Presets: []provider.Preset{
 				{ID: "native-os", Order: 5, Label: "Native OS Speech (Built-in Fallback)",
 					Description: "Uses spd-say (Linux), say (macOS), or PowerShell (Windows) with procedural audio fallback.",

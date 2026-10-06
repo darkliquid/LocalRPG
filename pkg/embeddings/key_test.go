@@ -37,3 +37,17 @@ func TestKeyFor(t *testing.T) {
 		t.Error("disabled embeddings must have no key")
 	}
 }
+
+func TestEmbeddingKeyForPrefersInstance(t *testing.T) {
+	cfg := config.EmbeddingsConfig{
+		Enabled:  true,
+		Provider: "local-a",
+		Providers: map[string]config.EmbeddingProviderConfig{
+			"local-a": {Type: "http", URL: "http://localhost:11434", Instance: "local-a"},
+		},
+	}
+	got, ok := embeddings.KeyFor(cfg)
+	if !ok || got != "embedding:openai@local-a" {
+		t.Fatalf("KeyFor(instance) = %q/%v, want embedding:openai@local-a", got, ok)
+	}
+}

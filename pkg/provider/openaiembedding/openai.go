@@ -42,6 +42,8 @@ func init() {
 			Label:       "OpenAI / Ollama Embedding API",
 			Description: "Vector embeddings via standard OpenAI-compatible /v1/embeddings endpoint",
 			Source:      "http",
+			Tier:        provider.TierCloud,
+			Features:    []provider.Feature{provider.FeatureKeyRequired},
 		},
 		Build: func(ctx context.Context, raw []byte) (interface{}, error) {
 			var cfg ClientConfig

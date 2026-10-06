@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { DebugPanel } from './DebugPanel';
 import { APIClient } from '../api/client';
-import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile, ModelStatus, ProviderVoice, ProviderPreset, TTSConfig, STTConfig, ImageConfig } from '../types';
+import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile, ModelStatus, ProviderVoice, ProviderDescriptor, TTSConfig, STTConfig, ImageConfig } from '../types';
 import { ModelDownloadModal } from './ModelDownloadModal';
 import {
   Folder,
@@ -36,6 +36,8 @@ import { VoiceCatalogModal } from './VoiceCatalogModal';
 import { UsagePanel } from './UsagePanel';
 import { TTSBatchPanel } from './TTSBatchPanel';
 import { hasWebSpeechSupport } from '../lib/webSpeech';
+import { TierLegend, tierLabel } from './providers/TierBadge';
+import { ProviderManager } from './ProviderManager';
 
 interface SettingsStudioProps {
   isCompact?: boolean;
@@ -87,18 +89,23 @@ const narrationModels = (models: { id: string; supported_actions?: string[] }[])
     })
     .map((m) => m.id);
 
-// presetsToMap turns the catalogue's presets for one family into the id-keyed
-// shape the quick-load selects use.
+// presetsToMap turns the catalogue's descriptors for one family into the
+// id-keyed shape the quick-load selects use, carrying each provider's tier and
+// caveat so the picker can label it honestly.
 const presetsToMap = <T,>(
-  catalog: ProviderPreset[]
-): Record<string, { label: string; description: string; config: T }> => {
-  const map: Record<string, { label: string; description: string; config: T }> = {};
-  for (const preset of catalog) {
-    map[preset.id] = {
-      label: preset.label,
-      description: preset.description,
-      config: preset.config as unknown as T,
-    };
+  descriptors: ProviderDescriptor[]
+): Record<string, { label: string; description: string; config: T; tier?: string; caveat?: string }> => {
+  const map: Record<string, { label: string; description: string; config: T; tier?: string; caveat?: string }> = {};
+  for (const descriptor of descriptors) {
+    for (const preset of descriptor.presets ?? []) {
+      map[preset.id] = {
+        label: preset.label,
+        description: preset.description,
+        config: preset.config as unknown as T,
+        tier: descriptor.tier,
+        caveat: descriptor.caveat,
+      };
+    }
   }
   return map;
 };
@@ -134,7 +141,17 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
   // The provider catalogue feeds preset lists so a provider that publishes
   // presets is the source of truth; the built-in fallback covers the rest.
-  const { presets: catalogPresets } = useProviderCatalog(Boolean(config));
+  const { byFamily, providers: catalogProviders } = useProviderCatalog(Boolean(config));
+
+  // The tier vocabulary is data, not a hardcoded legend: collect the caveats the
+  // catalogue actually sends, so the explanation cannot drift from the providers.
+  const tierCaveats = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of catalogProviders) {
+      if (p.tier && !(p.tier in map)) map[p.tier] = p.caveat ?? '';
+    }
+    return map;
+  }, [catalogProviders]);
 
   // Selected agent role for editing
   const [selectedRole, setSelectedRole] = useState<string>('gm');
@@ -334,10 +351,10 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
   const roleNames = Array.from(new Set([...Object.keys(config.agents.roles), 'extractor']));
 
-  const agentPresets = presetsToMap<AgentRoleConfig>(catalogPresets('llm'));
-  const ttsPresets = presetsToMap<TTSConfig>(catalogPresets('tts'));
-  const sttPresets = presetsToMap<STTConfig>(catalogPresets('stt'));
-  const imagePresets = presetsToMap<ImageConfig>(catalogPresets('image'));
+  const agentPresets = presetsToMap<AgentRoleConfig>(byFamily('llm'));
+  const ttsPresets = presetsToMap<TTSConfig>(byFamily('tts'));
+  const sttPresets = presetsToMap<STTConfig>(byFamily('stt'));
+  const imagePresets = presetsToMap<ImageConfig>(byFamily('image'));
 
   const kokoroStatus = models.find((m) => m.id === 'kokoro-tts');
   const isGeminiTTS =
@@ -540,6 +557,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       {/* Tab: Ecosystem Providers */}
       {activeSubTab === 'providers' && (
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-6">
+            <ProviderManager family="tts" config={config} onChange={setConfig} />
+            <ProviderManager family="stt" config={config} onChange={setConfig} />
+            <ProviderManager family="image" config={config} onChange={setConfig} />
+          </div>
+
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
               <Cloud className="w-4 h-4" />
@@ -827,8 +850,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 >
                   <option value="" disabled>⚡ Load Preset...</option>
                   {Object.entries(agentPresets).map(([id, p]) => (
-                    <option key={id} value={id}>
-                      {p.label}
+                    <option key={id} value={id} title={p.caveat}>
+                      {p.label}{p.tier ? ` · ${tierLabel(p.tier)}` : ''}
                     </option>
                   ))}
                 </select>
@@ -847,6 +870,13 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 </select>
               </div>
             </div>
+
+            {Object.keys(tierCaveats).length > 0 && (
+              <div className="rounded-lg border border-stone-800 bg-stone-950/40 p-3">
+                <p className="mb-2 font-sans text-[11px] uppercase text-stone-400">How providers run</p>
+                <TierLegend caveats={tierCaveats} />
+              </div>
+            )}
 
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1690,8 +1720,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 >
                   <option value="" disabled>⚡ Load TTS Preset…</option>
                   {Object.entries(ttsPresets).map(([id, p]) => (
-                    <option key={id} value={id}>
-                      {p.label}
+                    <option key={id} value={id} title={p.caveat}>
+                      {p.label}{p.tier ? ` · ${tierLabel(p.tier)}` : ''}
                     </option>
                   ))}
                 </select>
@@ -2709,8 +2739,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 >
                   <option value="" disabled>⚡ Load STT Preset…</option>
                   {Object.entries(sttPresets).map(([id, p]) => (
-                    <option key={id} value={id}>
-                      {p.label}
+                    <option key={id} value={id} title={p.caveat}>
+                      {p.label}{p.tier ? ` · ${tierLabel(p.tier)}` : ''}
                     </option>
                   ))}
                 </select>
@@ -2928,8 +2958,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 >
                   <option value="" disabled>⚡ Load Image Preset…</option>
                   {Object.entries(imagePresets).map(([id, p]) => (
-                    <option key={id} value={id}>
-                      {p.label}
+                    <option key={id} value={id} title={p.caveat}>
+                      {p.label}{p.tier ? ` · ${tierLabel(p.tier)}` : ''}
                     </option>
                   ))}
                 </select>

@@ -17,6 +17,7 @@ func init() {
 			Label:       "Sherpa-ONNX Kokoro (Built-in)",
 			Description: "High-quality Kokoro TTS in-process, downloading the model on demand.",
 			Source:      "builtin",
+			Tier:        provider.TierOfflineNeural,
 			Features:    []provider.Feature{provider.FeatureOffline, provider.FeatureVoiceCatalog},
 			Presets: []provider.Preset{
 				{ID: "sherpa-onnx", Order: 1, Label: "Sherpa-ONNX Kokoro (Built-in Neural TTS)",

@@ -10,6 +10,7 @@
   "/api/generate-asset-preview",
   "/api/generate-text",
   "/api/limits",
+  "/api/media/inspect",
   "/api/models",
   "/api/models/",
   "/api/open-url",

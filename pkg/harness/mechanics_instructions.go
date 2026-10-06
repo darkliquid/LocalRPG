@@ -37,6 +37,7 @@ func FormatMechanicsInstructions(spec *core.MechanicsSpec, engagement string, st
 		sb.WriteString("Resolve with request_check before narrating whenever an outcome could cost or grant something the player would care about: ")
 		sb.WriteString("harm, resources, standing, or a lasting change. ")
 		sb.WriteString("State the stakes and the possible outcomes first. Do not roll for safe or trivial actions. ")
+		sb.WriteString("Name the skill as well as the stat when a check tests a trained ability, and list situational modifiers. ")
 		sb.WriteString("NPCs do not roll; resolve opposition through the protagonist's check. ")
 		sb.WriteString("Call request_check, or emit a @roll record, for any uncertain action; never narrate a resolution the engine has not given you. ")
 		sb.WriteString("Honour the outcome the engine returns.\n")
@@ -56,6 +57,17 @@ func FormatMechanicsInstructions(spec *core.MechanicsSpec, engagement string, st
 
 	if spec == nil {
 		return sb.String()
+	}
+	if len(spec.Skills) > 0 {
+		parts := make([]string, 0, len(spec.Skills))
+		for _, skill := range spec.Skills {
+			label := skill.Label
+			if label == "" {
+				label = skill.ID
+			}
+			parts = append(parts, label)
+		}
+		sb.WriteString("Skills: " + strings.Join(parts, ", ") + ".\n")
 	}
 	if notation := strings.TrimSpace(spec.Checks.Notation); notation != "" {
 		sb.WriteString("Default notation: " + notation + ".\n")

@@ -27,6 +27,7 @@ func init() {
 			Label:       "Google Gemini TTS (Cloud, metered)",
 			Description: "Expressive cloud synthesis with prebuilt and extended voices.",
 			Source:      "gemini",
+			Tier:        provider.TierCloud,
 			Features: []provider.Feature{
 				provider.FeatureMetered,
 				provider.FeatureKeyRequired,

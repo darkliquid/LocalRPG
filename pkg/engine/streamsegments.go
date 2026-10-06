@@ -92,6 +92,37 @@ func (o *TurnOrchestrator) pendingRoll() (harness.CheckRequest, bool) {
 	return harness.CheckRequest{}, false
 }
 
+// logRepairReport emits a trace event when any control record needed repair, so
+// a degraded turn is visible in the debug trace even before the UI surfaces it.
+func (o *TurnOrchestrator) logRepairReport() {
+	if o.parser == nil || o.logger == nil {
+		return
+	}
+	rep := o.parser.RepairReport()
+	if rep.Repaired == 0 && rep.Failed == 0 {
+		return
+	}
+	fields := map[string]interface{}{
+		"repaired": rep.Repaired,
+		"failed":   rep.Failed,
+		"total":    rep.Total,
+	}
+	// The individual issues ride along, so the debug trace names what was
+	// repaired or dropped rather than only how many.
+	if report := o.recordReport(); report != nil && len(report.Issues) > 0 {
+		issues := make([]map[string]interface{}, 0, len(report.Issues))
+		for _, issue := range report.Issues {
+			issues = append(issues, map[string]interface{}{
+				"type":   issue.Type,
+				"repair": issue.Repair,
+				"error":  issue.Error,
+			})
+		}
+		fields["issues"] = issues
+	}
+	o.logger.Event("turn.records_repaired", fields)
+}
+
 // rollRef names a check resolved from a stream record. It is stable per turn and
 // per continuation, so a client that continues the turn references the same check.
 func rollRef(turnNumber, index int) string {

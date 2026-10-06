@@ -4,13 +4,13 @@
 package turnstream
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/dialogue"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/jsonrepair"
 )
 
 // Line classes.
@@ -47,7 +47,17 @@ type Parser struct {
 	pending []string
 	records []Record
 	events  []Event
+	// openRecord accumulates a record whose JSON spans multiple lines, and
+	// openRecordLn bounds how many lines it may span.
+	openRecord   string
+	openRecordLn int
 }
+
+// record accumulation bounds.
+const (
+	maxRecordLines = 32
+	maxRecordBytes = 64 * 1024
+)
 
 // NewParser builds a parser that attributes speech against roster.
 func NewParser(roster Roster) *Parser {
@@ -78,6 +88,11 @@ func (p *Parser) Flush() []Event {
 		out = append(out, p.consume(p.buf)...)
 		p.buf = ""
 	}
+	if p.openRecord != "" {
+		line := "@" + p.openRecord
+		p.openRecord, p.openRecordLn = "", 0
+		out = append(out, p.record(line)...)
+	}
 	out = append(out, p.flushNarration()...)
 	p.events = append(p.events, out...)
 	return out
@@ -99,6 +114,7 @@ func (p *Parser) Reset() {
 	p.pending = p.pending[:0]
 	p.records = p.records[:0]
 	p.events = p.events[:0]
+	p.openRecord, p.openRecordLn = "", 0
 }
 
 // consume classifies one complete line.
@@ -106,9 +122,25 @@ func (p *Parser) consume(line string) []Event {
 	line = strings.TrimSuffix(line, "\r")
 	trimmed := strings.TrimSpace(line)
 	switch {
+	case p.openRecord != "":
+		p.openRecord += "\n" + trimmed
+		p.openRecordLn++
+		if jsonrepair.BraceDepth([]byte(p.openRecord)) <= 0 ||
+			p.openRecordLn >= maxRecordLines || len(p.openRecord) > maxRecordBytes {
+			line := "@" + p.openRecord
+			p.openRecord, p.openRecordLn = "", 0
+			return append(p.flushNarration(), p.record(line)...)
+		}
+		return nil
 	case trimmed == "":
 		return p.flushNarration()
 	case strings.HasPrefix(trimmed, "@"):
+		body := strings.TrimPrefix(trimmed, "@")
+		if _, payload, _ := strings.Cut(body, " "); jsonrepair.BraceDepth([]byte(payload)) > 0 {
+			p.openRecord = body
+			p.openRecordLn = 1
+			return p.flushNarration()
+		}
 		return append(p.flushNarration(), p.record(trimmed)...)
 	case strings.HasPrefix(trimmed, ">"):
 		return append(p.flushNarration(), p.speech(trimmed)...)
@@ -226,8 +258,15 @@ func (p *Parser) record(line string) []Event {
 		rec.Err = fmt.Errorf("unknown record type %q", rec.Type)
 	case len(rec.Payload) == 0:
 		rec.Err = fmt.Errorf("record %q has no payload", rec.Type)
-	case !json.Valid(rec.Payload):
-		rec.Err = fmt.Errorf("record %q payload is not JSON", rec.Type)
+	default:
+		if res := jsonrepair.Repair(rec.Payload); res.OK {
+			if res.Kind != jsonrepair.KindNone {
+				rec.Repaired = res.Kind
+				rec.Payload = res.Payload
+			}
+		} else {
+			rec.Err = fmt.Errorf("record %q payload is not JSON", rec.Type)
+		}
 	}
 	p.records = append(p.records, rec)
 	if rec.Err != nil {
@@ -268,4 +307,30 @@ func (p *Parser) Records() []Record {
 	out := make([]Record, len(p.records))
 	copy(out, p.records)
 	return out
+}
+
+// RepairReport summarises how records fared: how many were seen, repaired, and
+// unrepairable, and the repair kinds applied. It is the data a diagnostics
+// surface renders; it has no side effects.
+type RepairReport struct {
+	Total    int
+	Repaired int
+	Failed   int
+	Kinds    map[jsonrepair.Kind]int
+}
+
+// RepairReport returns the current record-repair summary.
+func (p *Parser) RepairReport() RepairReport {
+	rep := RepairReport{Total: len(p.records), Kinds: map[jsonrepair.Kind]int{}}
+	for _, rec := range p.records {
+		if rec.Err != nil {
+			rep.Failed++
+			continue
+		}
+		if rec.Repaired != jsonrepair.KindNone {
+			rep.Repaired++
+			rep.Kinds[rec.Repaired]++
+		}
+	}
+	return rep
 }

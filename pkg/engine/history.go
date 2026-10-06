@@ -15,15 +15,15 @@ import (
 )
 
 type Turn struct {
-	Number    int                  `json:"number"`
-	Timestamp time.Time            `json:"timestamp"`
-	Mode      string               `json:"mode"` // "Do", "Say", "Story", "Roll", "GM", "System"
-	Input     string               `json:"input"`
-	Narration string               `json:"narration"`
-	Segments  []entity.TurnSegment `json:"segments,omitempty"`
-	Roll      *rules.RollResult    `json:"roll,omitempty"`
-	Entities  []entity.Mention     `json:"entities,omitempty"`
-	Location   string               `json:"location,omitempty"`
+	Number        int                  `json:"number"`
+	Timestamp     time.Time            `json:"timestamp"`
+	Mode          string               `json:"mode"` // "Do", "Say", "Story", "Roll", "GM", "System"
+	Input         string               `json:"input"`
+	Narration     string               `json:"narration"`
+	Segments      []entity.TurnSegment `json:"segments,omitempty"`
+	Roll          *rules.RollResult    `json:"roll,omitempty"`
+	Entities      []entity.Mention     `json:"entities,omitempty"`
+	Location      string               `json:"location,omitempty"`
 	SceneBreak    bool                 `json:"scene_break,omitempty"`
 	SceneBreakCue string               `json:"scene_break_cue,omitempty"`
 	Outcome       string               `json:"outcome,omitempty"`
@@ -50,12 +50,13 @@ type Turn struct {
 	// Prompt is the exact assembled prompt string for the turn, persisted in SQLite but omitted from history.jsonl.
 	Prompt string `json:"-"`
 
-	// Verdict is the GM's feasibility judgement of the player's action, and
 	// Rejected records an impossible action. Checks are the checks it resolved,
 	// and Personae are the stub entity ids this turn introduced.
-	Verdict  *harness.ActionVerdict `json:"verdict,omitempty"`
-	Rejected bool                   `json:"rejected,omitempty"`
-	Checks   []harness.CheckResult  `json:"checks,omitempty"`
+	Rejected bool                  `json:"rejected,omitempty"`
+	Checks   []harness.CheckResult `json:"checks,omitempty"`
+	// RecordReport summarises how the turn's control records fared. Nil when
+	// every record arrived valid.
+	RecordReport *RecordReport `json:"record_report,omitempty"`
 	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
 	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
 	// ResolvesCheckRef names the pending check this turn resolved, so a retried

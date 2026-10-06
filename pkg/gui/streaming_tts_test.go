@@ -47,7 +47,7 @@ func TestSentenceStreamerVoicesSpeechWithItsSpeaker(t *testing.T) {
 		return nil
 	})
 
-	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindSpeech, SpeakerID: "kaelen", Text: "Keep walking."})
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindSpeech, SpeakerID: "kaelen", Text: "Keep walking."}, 0)
 	streamer.Close()
 	streamer.Wait()
 
@@ -208,8 +208,8 @@ func TestStreamerGroupsConsecutiveSameSpeakerSegments(t *testing.T) {
 	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, nil)
 	streamer.SetGrouping(true, media.TTSCapabilities{MaxSpeakers: 1})
 
-	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The hall is quiet."})
-	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "Cold air rushes in."})
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The hall is quiet."}, 0)
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "Cold air rushes in."}, 0)
 	streamer.Close()
 	streamer.Wait()
 
@@ -227,8 +227,8 @@ func TestStreamerGroupsPerSpeakerRun(t *testing.T) {
 		return &entity.VoiceConfig{VoiceID: "garrick"}
 	})
 
-	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The hall is quiet."})
-	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindSpeech, Speaker: "Garrick", SpeakerID: "garrick", Text: "Keep walking."})
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The hall is quiet."}, 0)
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindSpeech, Speaker: "Garrick", SpeakerID: "garrick", Text: "Keep walking."}, 0)
 	streamer.Close()
 	streamer.Wait()
 
@@ -250,7 +250,7 @@ func TestStreamerEmitsAudioProgressEvents(t *testing.T) {
 		mu.Unlock()
 	})
 
-	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The castle gates creak open."})
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The castle gates creak open."}, 0)
 	streamer.Flush()
 	streamer.Close()
 	streamer.Wait()
@@ -281,7 +281,7 @@ func TestStreamerEmitsAudioProgressWithFailedCount(t *testing.T) {
 		mu.Unlock()
 	})
 
-	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "This will fail."})
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "This will fail."}, 0)
 	streamer.Flush()
 	streamer.Close()
 	streamer.Wait()
@@ -322,7 +322,7 @@ func TestStreamerSpeechGroupKeyMatchesPlannedGroupKey(t *testing.T) {
 		Text:      "Hello there.",
 		Player:    true,
 	}
-	streamer.FeedSegment(evt)
+	streamer.FeedSegment(evt, 0)
 	streamer.Close()
 	streamer.Wait()
 
@@ -349,3 +349,52 @@ func TestStreamerSpeechGroupKeyMatchesPlannedGroupKey(t *testing.T) {
 	}
 }
 
+func TestStreamedGroupReportsSegments(t *testing.T) {
+	client := &fakeSentenceTTSClient{}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+	var mu sync.Mutex
+	var emitted []provisionalSpeech
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, func(speech provisionalSpeech) {
+		mu.Lock()
+		emitted = append(emitted, speech)
+		mu.Unlock()
+	})
+	streamer.SetGrouping(true, media.TTSCapabilities{MaxSpeakers: 1})
+
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "The hall is quiet."}, 0)
+	streamer.FeedSegment(turnstream.Event{Kind: turnstream.KindNarration, Text: "Cold air rushes in."}, 1)
+	streamer.Close()
+	streamer.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(emitted) != 1 {
+		t.Fatalf("emitted %d units, want one folded group", len(emitted))
+	}
+	if len(emitted[0].Segments) != 2 || emitted[0].Segments[0] != 0 || emitted[0].Segments[1] != 1 {
+		t.Fatalf("segments = %#v, want [0 1]", emitted[0].Segments)
+	}
+}
+
+func TestUnframedFeedFoldsParagraphs(t *testing.T) {
+	client := &fakeSentenceTTSClient{}
+	pipeline := media.NewTTSPipeline(client, media.NewContentCache(t.TempDir()))
+	var mu sync.Mutex
+	var emitted []provisionalSpeech
+	streamer := newSentenceStreamer(context.Background(), pipeline, &entity.VoiceConfig{VoiceID: "narrator"}, trace.Nop(), 1, func(speech provisionalSpeech) {
+		mu.Lock()
+		emitted = append(emitted, speech)
+		mu.Unlock()
+	})
+	streamer.SetGrouping(true, media.TTSCapabilities{MaxSpeakers: 1})
+
+	streamer.Feed("The hall is quiet. Cold air rushes in.\n\n")
+	streamer.Close()
+	streamer.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(emitted) != 1 {
+		t.Fatalf("emitted %d units, want one folded paragraph", len(emitted))
+	}
+}

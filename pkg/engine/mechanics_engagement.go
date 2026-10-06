@@ -224,9 +224,6 @@ func (o *TurnOrchestrator) runTurnEndHooks(turnNum int, turn *Turn, pending []He
 		"health_effects": pending,
 		"world_tick":     turn.WorldTick,
 	}
-	if turn.Verdict != nil {
-		hookCtx["verdict"] = string(turn.Verdict.Feasibility)
-	}
 	if err := o.rulesEngine.ExecuteTurnEnd(hookCtx); err != nil {
 		o.logger.Event("turn.end_hook_error", map[string]interface{}{"error": err.Error()})
 	}

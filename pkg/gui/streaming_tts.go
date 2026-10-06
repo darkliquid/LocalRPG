@@ -29,6 +29,9 @@ type provisionalSpeech struct {
 	Text     string
 	AudioKey string
 	AudioURL string
+	// Segments are the turn-segment indexes this unit covers, so the turn plan can
+	// record what the player has heard.
+	Segments []int
 }
 
 // speechUnit is one sentence to speak, with the attribution its voice needs. A
@@ -43,17 +46,19 @@ type speechUnit struct {
 // synthesisJob is one worker request: a single sentence, or a group of lines the
 // streamer folded together so they share one provider call.
 type synthesisJob struct {
-	seq   uint64
-	unit  speechUnit
-	group []media.SpeakerLine
+	seq      uint64
+	unit     speechUnit
+	group    []media.SpeakerLine
+	segments []int
 }
 
 // jobResult is the finished output of one synthesis job, sequenced before emit.
 type jobResult struct {
-	seq  uint64
-	text string
-	key  string
-	err  error
+	seq      uint64
+	text     string
+	key      string
+	segments []int
+	err      error
 }
 
 // sentenceStreamer synthesizes a turn's audio as the model streams it, so a
@@ -77,12 +82,19 @@ type sentenceStreamer struct {
 	// grouping and folder fold consecutive same-speaker lines into one request.
 	grouping bool
 	folder   *media.GroupFolder
+	// segQueue holds the segment indexes of lines fed to the folder, in order, so
+	// an emitted group can be attributed the segments it covers. lastSeg is the
+	// most recently popped index, reused when a split line yields more groups than
+	// indexes. unframedSegment indexes the folded paragraphs of the unframed path.
+	segQueue        []int
+	lastSeg         int
+	unframedSegment int
 	// emit reports a completed unit in submission order.
 	emit func(provisionalSpeech)
 	// sequencer maintains in-order announcements across concurrent workers.
-	nextSeq      uint64
-	announcedSeq uint64
-	results      map[uint64]jobResult
+	nextSeq          uint64
+	announcedSeq     uint64
+	results          map[uint64]jobResult
 	turnNumber       int
 	readyCount       int
 	failedCount      int
@@ -226,7 +238,7 @@ func (s *sentenceStreamer) synthesizeUnit(job synthesisJob) {
 		key = media.ClipKeyForPath(path)
 	}
 	s.emitProgress(job.seq, "encoding", key, clipURL(key))
-	s.completeJob(jobResult{seq: job.seq, text: unit.Text, key: key})
+	s.completeJob(jobResult{seq: job.seq, text: unit.Text, key: key, segments: job.segments})
 }
 
 // synthesizeGroup renders one folded group with a single provider call, so its
@@ -241,7 +253,7 @@ func (s *sentenceStreamer) synthesizeGroup(job synthesisJob) {
 	}
 	group := groups[0]
 	s.emitProgress(job.seq, "encoding", group.Key, clipURL(group.Key))
-	s.completeJob(jobResult{seq: job.seq, text: media.GroupText(lines), key: group.Key})
+	s.completeJob(jobResult{seq: job.seq, text: media.GroupText(lines), key: group.Key, segments: job.segments})
 }
 
 // completeJob records a finished job and drains any in-sequence completed results
@@ -278,6 +290,7 @@ func (s *sentenceStreamer) completeJobLocked(res jobResult) {
 				Text:     item.text,
 				AudioKey: item.key,
 				AudioURL: clipURL(item.key),
+				Segments: item.segments,
 			})
 		}
 	}
@@ -298,9 +311,10 @@ func (s *sentenceStreamer) StopEmitting() {
 	s.stopped.Store(true)
 }
 
-// Feed adds raw narration text and queues every complete sentence, holding a
-// partial sentence until more arrives. It is how a provider that emits no framing
-// still gets live narration audio.
+// Feed adds raw narration text and queues it, holding a partial unit until its
+// boundary arrives. When grouping it folds a whole paragraph into one line, so
+// its keys match the turn's plan; otherwise it splits into sentences. It is how a
+// provider that emits no framing still gets live narration audio.
 func (s *sentenceStreamer) Feed(text string) {
 	if s == nil || s.pipeline == nil {
 		return
@@ -308,19 +322,43 @@ func (s *sentenceStreamer) Feed(text string) {
 
 	s.mu.Lock()
 	s.buf.WriteString(text)
-	complete, remainder := media.SplitCompleteSentences(s.buf.String())
+	buffered := s.buf.String()
+	var units []string
+	if s.grouping {
+		units, buffered = splitCompleteParagraphs(buffered)
+	} else {
+		units, buffered = media.SplitCompleteSentences(buffered)
+	}
 	s.buf.Reset()
-	s.buf.WriteString(remainder)
+	s.buf.WriteString(buffered)
 	s.mu.Unlock()
 
-	for _, sentence := range complete {
-		s.feed(entity.SegmentNarration, "", "", sentence)
+	for _, unit := range units {
+		s.feed(entity.SegmentNarration, "", "", unit, s.nextUnframedIndex())
 	}
 }
 
+// splitCompleteParagraphs returns the paragraphs completed by a blank line and the
+// trailing partial paragraph.
+func splitCompleteParagraphs(text string) ([]string, string) {
+	var out []string
+	for {
+		index := strings.Index(text, "\n\n")
+		if index < 0 {
+			break
+		}
+		if paragraph := strings.TrimSpace(text[:index]); paragraph != "" {
+			out = append(out, paragraph)
+		}
+		text = text[index+2:]
+	}
+	return out, text
+}
+
 // FeedSegment queues one parsed segment: a folded line when grouping, or its
-// sentences otherwise, in the speaker's own voice.
-func (s *sentenceStreamer) FeedSegment(event turnstream.Event) {
+// sentences otherwise, in the speaker's own voice. segmentIndex is the event's
+// position in the turn's segment order, the same index space the clip plan uses.
+func (s *sentenceStreamer) FeedSegment(event turnstream.Event, segmentIndex int) {
 	if s == nil || s.pipeline == nil {
 		return
 	}
@@ -336,7 +374,7 @@ func (s *sentenceStreamer) FeedSegment(event turnstream.Event) {
 	// Grouping folds whole segments, because the turn's clip plan folds whole
 	// segments; splitting here would build a different line and a different key.
 	if s.grouping {
-		s.feed(kind, event.Speaker, event.SpeakerID, text)
+		s.feed(kind, event.Speaker, event.SpeakerID, text, segmentIndex)
 		if event.Player {
 			s.Flush()
 		}
@@ -348,28 +386,65 @@ func (s *sentenceStreamer) FeedSegment(event turnstream.Event) {
 		complete = append(complete, remainder)
 	}
 	for _, sentence := range complete {
-		s.feed(kind, event.Speaker, event.SpeakerID, sentence)
+		s.feed(kind, event.Speaker, event.SpeakerID, sentence, segmentIndex)
 	}
 }
 
-// Flush flushes any pending folded group into the queue immediately.
+// Flush flushes any pending folded group and the unframed paragraph buffer into
+// the queue immediately.
 func (s *sentenceStreamer) Flush() {
 	if s == nil {
 		return
 	}
 	s.mu.Lock()
 	var group []media.SpeakerLine
+	var indexes []int
 	if s.grouping && s.folder != nil {
 		group = s.folder.Flush()
+		if group != nil {
+			indexes = s.takeIndexesLocked(len(group))
+		}
+	}
+	trailing := ""
+	if s.grouping {
+		trailing = strings.TrimSpace(s.buf.String())
+		s.buf.Reset()
 	}
 	s.mu.Unlock()
 	if group != nil {
-		s.enqueueGroup(group)
+		s.enqueueGroup(group, indexes)
+	}
+	if trailing != "" {
+		s.feed(entity.SegmentNarration, "", "", trailing, s.nextUnframedIndex())
 	}
 }
 
+// takeIndexesLocked pops the segment indexes for the next emitted group. The
+// caller holds the mutex. A split line yields more groups than indexes, so the
+// last index is reused; the parity assertion catches any residual mismatch.
+func (s *sentenceStreamer) takeIndexesLocked(n int) []int {
+	out := make([]int, 0, n)
+	for i := 0; i < n; i++ {
+		if len(s.segQueue) > 0 {
+			s.lastSeg = s.segQueue[0]
+			s.segQueue = s.segQueue[1:]
+		}
+		out = append(out, s.lastSeg)
+	}
+	return out
+}
+
+// nextUnframedIndex hands out the segment index for a folded unframed paragraph.
+func (s *sentenceStreamer) nextUnframedIndex() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	index := s.unframedSegment
+	s.unframedSegment++
+	return index
+}
+
 // feed routes one piece of text to the folder or the sentence queue.
-func (s *sentenceStreamer) feed(kind, speaker, speakerID, text string) {
+func (s *sentenceStreamer) feed(kind, speaker, speakerID, text string, segmentIndex int) {
 	if s.grouping {
 		line, ok := s.pipeline.SegmentLine(entity.TurnSegment{
 			Kind:      kind,
@@ -381,24 +456,31 @@ func (s *sentenceStreamer) feed(kind, speaker, speakerID, text string) {
 			return
 		}
 		s.mu.Lock()
+		s.segQueue = append(s.segQueue, segmentIndex)
 		groups := s.folder.Add(line)
+		attributed := make([][]media.SpeakerLine, len(groups))
+		indexes := make([][]int, len(groups))
+		for i, group := range groups {
+			attributed[i] = group
+			indexes[i] = s.takeIndexesLocked(len(group))
+		}
 		s.mu.Unlock()
-		for _, group := range groups {
-			s.enqueueGroup(group)
+		for i := range attributed {
+			s.enqueueGroup(attributed[i], indexes[i])
 		}
 		return
 	}
-	s.enqueueUnit(speechUnit{Kind: kind, Speaker: speaker, SpeakerID: speakerID, Text: text})
+	s.enqueueUnit(speechUnit{Kind: kind, Speaker: speaker, SpeakerID: speakerID, Text: text}, segmentIndex)
 }
 
 // enqueueUnit sends a sentence without blocking, sequencing its ordinal.
-func (s *sentenceStreamer) enqueueUnit(unit speechUnit) {
+func (s *sentenceStreamer) enqueueUnit(unit speechUnit, segmentIndex int) {
 	s.mu.Lock()
 	seq := s.nextSeq
 	s.nextSeq++
 	dropped := false
 	select {
-	case s.queue <- synthesisJob{seq: seq, unit: unit}:
+	case s.queue <- synthesisJob{seq: seq, unit: unit, segments: []int{segmentIndex}}:
 	default:
 		s.completeJobLocked(jobResult{seq: seq, err: errQueueDropped})
 		s.failedCount++
@@ -414,13 +496,13 @@ func (s *sentenceStreamer) enqueueUnit(unit speechUnit) {
 }
 
 // enqueueGroup sends a folded group without blocking, on the same terms.
-func (s *sentenceStreamer) enqueueGroup(group []media.SpeakerLine) {
+func (s *sentenceStreamer) enqueueGroup(group []media.SpeakerLine, indexes []int) {
 	s.mu.Lock()
 	seq := s.nextSeq
 	s.nextSeq++
 	dropped := false
 	select {
-	case s.queue <- synthesisJob{seq: seq, group: group}:
+	case s.queue <- synthesisJob{seq: seq, group: group, segments: indexes}:
 	default:
 		s.completeJobLocked(jobResult{seq: seq, err: errQueueDropped})
 		s.failedCount++

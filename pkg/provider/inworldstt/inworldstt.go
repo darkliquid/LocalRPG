@@ -17,6 +17,7 @@ func init() {
 			Label:       "Inworld STT (Cloud, metered)",
 			Description: "Cloud speech recognition with voice profiling using inworld/inworld-stt-1.",
 			Source:      "http",
+			Tier:        provider.TierCloud,
 			Features: []provider.Feature{
 				provider.FeatureMetered,
 				provider.FeatureKeyRequired,

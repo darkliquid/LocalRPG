@@ -17,13 +17,19 @@ id: grim-survival
 name: Grim Survival d6
 description: A gritty ruleset focusing on stamina depletion, scarcity, and dangerous skill checks.
 version: "1.0.0"
-action_modes:
-  - id: do
-    label: Action
-  - id: say
-    label: Dialogue
-  - id: roll
-    label: Skill Check
+mechanics:
+  stats:
+    - id: stamina
+      label: Stamina
+      type: number
+      default: 10
+    - id: athletics
+      label: Athletics
+      type: number
+      default: 1
+  checks:
+    notation: 1d6
+    outcome: [failure, mixed, success]
 ```
 
 ## Crafting the Rules Prompt (`prompts/rules.md`)
@@ -46,41 +52,22 @@ When the player attempts a risky or uncertain action, call for a d6 check:
 
 ## Writing `mechanics.js` Hooks
 
-Create custom resolution logic in JavaScript. The sandbox includes helper methods like `rollDice(notation)`:
+Create custom resolution logic in JavaScript. The sandbox exposes the helpers `roll`, `getStat`, `setStat`, `getLocation`, `setLocation`, `injectGMDirection`, `log`, and `grantXP`, and you register hooks with `onAction`, `onTurnBegin`, `onTurnEnd`, `onWorldTick`, `onCheck`, and `onHealthZero`. A handler receives the execution context and returns a resolution the engine applies:
 
 ```javascript
-/**
- * resolveAction is invoked whenever a turn requires mechanics evaluation.
- * @param {Object} ctx - The execution context
- * @returns {Object} Resolution outcome and state mutations
- */
-function resolveAction(ctx) {
-  if (ctx.action.mode === 'roll') {
-    const roll = rollDice('1d6');
-    let outcome = 'failure';
-    let cue = 'Things go terribly wrong.';
+// onAction registers a handler for one action mode. The handler returns a
+// resolution: success, an outcome word, the roll, and a message.
+onAction('roll', function (ctx) {
+  const result = roll('1d6');
 
-    if (roll.total >= 5) {
-      outcome = 'success';
-      cue = 'You achieve your goal cleanly.';
-    } else if (roll.total >= 3) {
-      outcome = 'mixed';
-      cue = 'You succeed, but pay a price.';
-    }
-
-    return {
-      success: outcome !== 'failure',
-      outcome: outcome,
-      roll: roll,
-      narrative_cue: cue,
-      state_patch: {
-        last_roll: roll.total
-      }
-    };
+  if (result.total >= 5) {
+    return { success: true, outcome: 'success', roll: result, message: 'You achieve your goal cleanly.' };
   }
-
-  return { pass_to_gm: true };
-}
+  if (result.total >= 3) {
+    return { success: true, outcome: 'mixed', roll: result, message: 'You succeed, but pay a price.' };
+  }
+  return { success: false, outcome: 'failure', roll: result, message: 'Things go terribly wrong.' };
+});
 ```
 
 ## Live Studio Testing

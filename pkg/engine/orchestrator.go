@@ -1199,6 +1199,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		// The progressive stream carries its declarations inline: a persona
 		// before the line that speaks, a state change after the roll it follows.
 		personae, memories, stateChanges, moveRef = o.applyRecords()
+		o.logRepairReport()
 	}
 	for _, persona := range personae {
 		if id := entity.Slugify(persona.Name); id != "" {
@@ -1206,6 +1207,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 	turn.Checks = result.Checks
+	turn.RecordReport = o.recordReport()
 
 	<-extractionDone
 	if extractionErr != nil {

@@ -17,6 +17,7 @@ func init() {
 			Label:       "Cartesia Sonic (Cloud, metered)",
 			Description: "Ultra-fast neural voice synthesis via Cartesia Sonic.",
 			Source:      "http",
+			Tier:        provider.TierCloud,
 			Features: []provider.Feature{
 				provider.FeatureMetered,
 				provider.FeatureKeyRequired,

@@ -11,9 +11,17 @@ import (
 )
 
 // ListProviders returns every registered provider descriptor, so the settings UI
-// can render from capabilities instead of provider names.
+// can render from capabilities instead of provider names. Each descriptor's
+// caveat is filled in with its tier's default when it sets none, so the client
+// never has to know the tier vocabulary.
 func (s *Service) ListProviders(ctx context.Context) (*ProviderCatalogDTO, error) {
-	return &ProviderCatalogDTO{Providers: provider.List()}, nil
+	descs := provider.List()
+	for i := range descs {
+		if descs[i].Caveat == "" {
+			descs[i].Caveat = descs[i].EffectiveCaveat()
+		}
+	}
+	return &ProviderCatalogDTO{Providers: descs}, nil
 }
 
 // ListModels returns the live model catalogue a Gemini key can reach, so the

@@ -17,6 +17,7 @@ func init() {
 			Label:       "OpenAI-Compatible Speech (HTTP)",
 			Description: "Any OpenAI-compatible speech endpoint, local or cloud.",
 			Source:      "http",
+			Tier:        provider.TierLocalServer,
 			Features:    []provider.Feature{provider.FeatureKeyRequired},
 			Presets: []provider.Preset{
 				{ID: "kokoro-fastapi", Order: 2, Label: "Kokoro-FastAPI (Local HTTP)",

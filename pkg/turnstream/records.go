@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/jsonrepair"
 )
 
 // Record types the GM may emit as an "@type {json}" line.
@@ -19,10 +20,11 @@ const (
 // the error that made it unusable, if any. A record with an error is retained so
 // a trace can explain why a declaration was dropped.
 type Record struct {
-	Type    string
-	Payload []byte
-	Line    int
-	Err     error
+	Type     string
+	Payload  []byte
+	Line     int
+	Err      error
+	Repaired jsonrepair.Kind
 }
 
 // validRecordType reports whether a record type is recognised.

@@ -637,3 +637,14 @@ func TestAssignVoiceProfile_InfersGenderFromPronouns(t *testing.T) {
 		t.Fatalf("expected inferred male voice am_male_1, got %#v", charWithoutExplicitGender.Voice)
 	}
 }
+
+func TestDecodeExtractedRepairsFencedJSON(t *testing.T) {
+	var out map[string]string
+	err := decodeExtractedJSON([]byte("```json\n{\"name\":\"Vex\"}\n```"), &out)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out["name"] != "Vex" {
+		t.Fatalf("name = %q, want Vex", out["name"])
+	}
+}

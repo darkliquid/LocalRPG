@@ -17,6 +17,7 @@ func init() {
 			Label:       "ElevenLabs (Cloud, metered)",
 			Description: "Cloud voices fetched from your account; charges per request.",
 			Source:      "http",
+			Tier:        provider.TierCloud,
 			Features: []provider.Feature{
 				provider.FeatureMetered,
 				provider.FeatureKeyRequired,

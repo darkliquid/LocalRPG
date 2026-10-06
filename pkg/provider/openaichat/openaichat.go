@@ -17,7 +17,8 @@ func init() {
 			Label:       "OpenAI-Compatible (HTTP)",
 			Description: "Any OpenAI-compatible chat completions endpoint, local or cloud.",
 			Source:      "http",
-			Features:    []provider.Feature{provider.FeatureStreaming, provider.FeatureTools},
+			Tier:        provider.TierCloud,
+			Features:    []provider.Feature{provider.FeatureStreaming, provider.FeatureTools, provider.FeatureKeyRequired},
 			Presets: []provider.Preset{
 				{ID: "ollama", Order: 1, Label: "Ollama (Local HTTP)",
 					Description: "Connects to local Ollama server running on port 11434 with llama3.2.",

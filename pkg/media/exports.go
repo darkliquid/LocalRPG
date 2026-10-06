@@ -22,37 +22,37 @@ type TTSBuildPayload struct {
 func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 	switch cfg.Type {
 	case "fish-audio":
-		return provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.HostDiscriminator(cfg.Endpoint)), true
+		return provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.InstanceDiscriminator(cfg.Instance, provider.HostDiscriminator(cfg.Endpoint))), true
 	case "gemini":
-		return provider.KeyTTSGemini, true
+		return provider.InstanceOrSelf(provider.KeyTTSGemini, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "inworld":
-		return provider.KeyTTSInworld, true
+		return provider.InstanceOrSelf(provider.KeyTTSInworld, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "cartesia":
-		return provider.KeyTTSCartesia, true
+		return provider.InstanceOrSelf(provider.KeyTTSCartesia, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "builtin":
 		switch cfg.BuiltinName {
 		case "gemini":
-			return provider.KeyTTSGemini, true
+			return provider.InstanceOrSelf(provider.KeyTTSGemini, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		case "inworld":
-			return provider.KeyTTSInworld, true
+			return provider.InstanceOrSelf(provider.KeyTTSInworld, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		case "sherpa-onnx", "kokoro":
-			return provider.KeyTTSSherpaONNX, true
+			return provider.InstanceOrSelf(provider.KeyTTSSherpaONNX, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		case "native-os":
-			return provider.KeyTTSNativeOS, true
+			return provider.InstanceOrSelf(provider.KeyTTSNativeOS, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		case "elevenlabs":
-			return provider.KeyTTSElevenLabs, true
+			return provider.InstanceOrSelf(provider.KeyTTSElevenLabs, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		case "cartesia":
-			return provider.KeyTTSCartesia, true
+			return provider.InstanceOrSelf(provider.KeyTTSCartesia, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		}
 		return "", false
 	case "cli":
-		return provider.InstanceOrSelf(provider.KeyTTSPiper, provider.CommandDiscriminator(cfg.Command)), true
+		return provider.InstanceOrSelf(provider.KeyTTSPiper, provider.InstanceDiscriminator(cfg.Instance, provider.CommandDiscriminator(cfg.Command))), true
 	case "http":
 		lowerModel := strings.ToLower(cfg.Model)
 		if strings.Contains(lowerModel, "fishaudio") || strings.Contains(lowerModel, "s2-pro") {
-			return provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.HostDiscriminator(cfg.Endpoint)), true
+			return provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.InstanceDiscriminator(cfg.Instance, provider.HostDiscriminator(cfg.Endpoint))), true
 		}
-		return provider.InstanceOrSelf(provider.KeyTTSHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
+		return provider.InstanceOrSelf(provider.KeyTTSHTTP, provider.InstanceDiscriminator(cfg.Instance, provider.HostDiscriminator(cfg.Endpoint))), true
 	}
 	return "", false
 }
@@ -117,21 +117,21 @@ type sttBuildWire struct {
 func STTKeyFor(cfg config.STTConfig) (provider.Key, bool) {
 	switch cfg.Type {
 	case "inworld":
-		return provider.KeySTTInworld, true
+		return provider.InstanceOrSelf(provider.KeySTTInworld, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "cartesia":
-		return provider.KeySTTCartesia, true
+		return provider.InstanceOrSelf(provider.KeySTTCartesia, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "builtin":
 		if cfg.BuiltinName == "inworld" {
-			return provider.KeySTTInworld, true
+			return provider.InstanceOrSelf(provider.KeySTTInworld, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		}
 		if cfg.BuiltinName == "cartesia" {
-			return provider.KeySTTCartesia, true
+			return provider.InstanceOrSelf(provider.KeySTTCartesia, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		}
 		return "", false
 	case "http":
-		return provider.InstanceOrSelf(provider.KeySTTWhisperHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
+		return provider.InstanceOrSelf(provider.KeySTTWhisperHTTP, provider.InstanceDiscriminator(cfg.Instance, provider.HostDiscriminator(cfg.Endpoint))), true
 	case "cli":
-		return provider.InstanceOrSelf(provider.KeySTTWhisperCLI, provider.CommandDiscriminator(cfg.Command)), true
+		return provider.InstanceOrSelf(provider.KeySTTWhisperCLI, provider.InstanceDiscriminator(cfg.Instance, provider.CommandDiscriminator(cfg.Command))), true
 	}
 	return "", false
 }
@@ -171,16 +171,16 @@ type ImageBuildPayload struct {
 func ImageKeyFor(cfg config.ImageConfig) (provider.Key, bool) {
 	switch cfg.Type {
 	case "gemini":
-		return provider.KeyImageGemini, true
+		return provider.InstanceOrSelf(provider.KeyImageGemini, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "builtin":
 		if cfg.BuiltinName == "procedural-art" {
-			return provider.KeyImageProceduralArt, true
+			return provider.InstanceOrSelf(provider.KeyImageProceduralArt, provider.InstanceDiscriminator(cfg.Instance, "")), true
 		}
 		return "", false
 	case "cli":
-		return provider.InstanceOrSelf(provider.KeyImageCLI, provider.CommandDiscriminator(cfg.Command)), true
+		return provider.InstanceOrSelf(provider.KeyImageCLI, provider.InstanceDiscriminator(cfg.Instance, provider.CommandDiscriminator(cfg.Command))), true
 	case "comfyui", "http":
-		return provider.InstanceOrSelf(provider.KeyImageHTTP, provider.HostDiscriminator(cfg.Endpoint)), true
+		return provider.InstanceOrSelf(provider.KeyImageHTTP, provider.InstanceDiscriminator(cfg.Instance, provider.HostDiscriminator(cfg.Endpoint))), true
 	}
 	return "", false
 }

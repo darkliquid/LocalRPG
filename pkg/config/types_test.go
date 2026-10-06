@@ -629,3 +629,14 @@ func TestCartesiaConfigAndPresets(t *testing.T) {
 		t.Errorf("got %q, want sk_car_test", unmarshaled.Providers.Cartesia.APIKey)
 	}
 }
+
+func TestInstanceRoundTrips(t *testing.T) {
+	in := []byte("agents:\n  roles:\n    gm:\n      type: http\n      endpoint: http://x\n      instance: good\n")
+	var cfg Config
+	if err := yaml.Unmarshal(in, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Agents.Roles["gm"].Instance != "good" {
+		t.Fatalf("instance = %q", cfg.Agents.Roles["gm"].Instance)
+	}
+}

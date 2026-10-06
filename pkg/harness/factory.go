@@ -165,6 +165,7 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 			BuiltinName: roleCfg.BuiltinName,
 			Command:     roleCfg.Command,
 			Endpoint:    roleCfg.Endpoint,
+			Instance:    roleCfg.Instance,
 		})
 
 		provider, err := NewModelProviderWithLogger(role, ProviderConfig{
@@ -181,6 +182,7 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 			TopP:           roleCfg.TopP,
 			TopK:           roleCfg.TopK,
 			SharedAPIKey:   sharedKeyFor(cfg, key, hasKey),
+			Instance:       roleCfg.Instance,
 		}, logger)
 		if err != nil {
 			name := roleCfg.BuiltinName
@@ -273,6 +275,7 @@ func ExtractorFromConfigWithLogger(cfg *config.Config, router *Router, logger tr
 		TopP:           roleCfg.TopP,
 		TopK:           roleCfg.TopK,
 		SharedAPIKey:   cfg.Providers.Gemini.APIKey,
+		Instance:       roleCfg.Instance,
 	}, logger)
 	if err != nil {
 		return nil
@@ -284,6 +287,7 @@ func ExtractorFromConfigWithLogger(cfg *config.Config, router *Router, logger tr
 		BuiltinName: roleCfg.BuiltinName,
 		Command:     roleCfg.Command,
 		Endpoint:    roleCfg.Endpoint,
+		Instance:    roleCfg.Instance,
 	}); ok {
 		extractor.SetProviderKey(key)
 	}
@@ -332,6 +336,7 @@ func CompletionFromConfig(cfg *config.Config, router *Router, logger trace.Logge
 		TopP:           roleCfg.TopP,
 		TopK:           roleCfg.TopK,
 		SharedAPIKey:   cfg.Providers.Gemini.APIKey,
+		Instance:       roleCfg.Instance,
 	}, logger)
 	if err != nil {
 		return nil

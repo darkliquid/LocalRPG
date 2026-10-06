@@ -92,6 +92,38 @@ func Validate() error {
 			return fmt.Errorf("provider: %q and %q share family/adapter %s", other, id, pair)
 		}
 		pairs[pair] = id
+		if err := validateOne(reg.Descriptor); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateOne checks a descriptor's capability tier against the features it
+// declares, so a descriptor cannot claim to run offline while advertising no
+// offline feature, or call itself cloud without a key. It is the drift guard
+// that keeps the label honest.
+func validateOne(d Descriptor) error {
+	if !d.Tier.Valid() {
+		return fmt.Errorf("provider %q: missing or unknown tier", d.ID)
+	}
+	has := func(f Feature) bool {
+		for _, x := range d.Features {
+			if x == f {
+				return true
+			}
+		}
+		return false
+	}
+	switch d.Tier {
+	case TierCloud:
+		if !has(FeatureKeyRequired) {
+			return fmt.Errorf("provider %q: cloud tier requires key_required", d.ID)
+		}
+	case TierOfflineBasic, TierOfflineNeural:
+		if !has(FeatureOffline) {
+			return fmt.Errorf("provider %q: offline tier requires offline", d.ID)
+		}
 	}
 	return nil
 }
