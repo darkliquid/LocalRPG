@@ -474,6 +474,22 @@ type CreateSystemRequestDTO struct {
 	Mechanics         *core.MechanicsSpec        `json:"mechanics,omitempty"`
 }
 
+// ReferenceSystemDTO is one complete, runnable system shipped as a starting point.
+type ReferenceSystemDTO struct {
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Version     string              `json:"version"`
+	Description string              `json:"description"`
+	RulesPrompt string              `json:"rules_prompt"`
+	Script      string              `json:"script"`
+	Mechanics   *core.MechanicsSpec `json:"mechanics,omitempty"`
+}
+
+// ReferenceSystemsDTO is the list of shipped starting systems.
+type ReferenceSystemsDTO struct {
+	Systems []ReferenceSystemDTO `json:"systems"`
+}
+
 type WorldEntitySummaryDTO struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`

@@ -55,6 +55,7 @@ func routePattern(path string) string {
 		path == "/api/settings" || path == "/api/settings/test-provider" ||
 		path == "/api/open-url" ||
 		path == "/api/providers" || path == "/api/providers/models" ||
+		path == "/api/reference-systems" ||
 		path == "/api/tts/inspect" || path == "/api/tts/voices/search" ||
 		path == "/api/media/inspect" ||
 		path == "/api/tts/batch" ||
@@ -982,6 +983,19 @@ func (s *Server) handleSystemsRoutes(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) handleReferenceSystemsRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	res, err := s.service.ListReferenceSystems(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
 }
 
 func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {

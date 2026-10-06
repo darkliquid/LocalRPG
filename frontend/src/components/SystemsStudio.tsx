@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
-import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec } from '../types';
+import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem } from '../types';
 import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
-import { REFERENCE_SYSTEM_TEMPLATE } from '../templates/referenceTemplates';
 import MarkdownEditor from './editor/MarkdownEditor';
 import { MechanicsEditor } from './MechanicsEditor';
 
@@ -23,6 +22,7 @@ interface SystemsStudioProps {
 
 export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, startMode = 'browse' }) => {
   const [systems, setSystems] = useState<SystemInfo[]>([]);
+  const [referenceSystems, setReferenceSystems] = useState<ReferenceSystem[]>([]);
   const [selection, setSelection] = useState<SystemSelection>(null);
   const [draft, setDraft] = useState<SystemDraft | null>(null);
   const [pendingSelection, setPendingSelection] = useState<SystemSelection>(null);
@@ -58,7 +58,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
   useEffect(() => {
     loadSystems(undefined, startModeRef.current);
+    loadReferenceSystems();
   }, []);
+
+  const loadReferenceSystems = async () => {
+    try {
+      const res = await APIClient.listReferenceSystems();
+      setReferenceSystems(res.systems ?? []);
+    } catch {
+      // A failed fetch shows no starting points rather than a stale constant.
+      setReferenceSystems([]);
+    }
+  };
 
   const loadSystems = async (selectID?: string, mode: 'new' | 'browse' = 'browse') => {
     setIsLoading(true);
@@ -91,8 +102,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       setSlugID(detail.id);
       setVersion(detail.version || '1.0.0');
       setDescription(detail.description || '');
-      setRulesPrompt(detail.rules_prompt || REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
-      setScript(detail.script || REFERENCE_SYSTEM_TEMPLATE.script);
+      setRulesPrompt(detail.rules_prompt || '');
+      setScript(detail.script || '');
       setMechanics(detail.mechanics || {});
       setCreationPreamble(detail.character_creation?.preamble || '');
       setCreationFields(detail.character_creation?.fields || []);
@@ -135,20 +146,30 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setActiveTab('manifest');
   };
 
-  const handleResetToReference = () => {
-    setName(REFERENCE_SYSTEM_TEMPLATE.name);
+  const applyReference = (reference: ReferenceSystem) => {
+    setName(reference.name);
     if (!savedID) {
-      setSlugID(REFERENCE_SYSTEM_TEMPLATE.id);
+      setSlugID(reference.id);
     }
-    setVersion(REFERENCE_SYSTEM_TEMPLATE.version);
-    setDescription(REFERENCE_SYSTEM_TEMPLATE.description);
-    setRulesPrompt(REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
-    setScript(REFERENCE_SYSTEM_TEMPLATE.script);
-    setMechanics({});
+    setVersion(reference.version);
+    setDescription(reference.description);
+    setRulesPrompt(reference.rules_prompt);
+    setScript(reference.script);
+    setMechanics(reference.mechanics ?? {});
     setCreationPreamble('');
     setCreationFields([]);
     markDirty();
-    setToast({ type: 'success', message: 'Reset to Narrative 2d6 Reference Template!' });
+    setToast({ type: 'success', message: `Loaded the ${reference.name} reference.` });
+  };
+
+  const handleResetToReference = () => {
+    const reference =
+      referenceSystems.find((r) => r.id === 'narrative_2d6') ?? referenceSystems[0];
+    if (!reference) {
+      setToast({ type: 'error', message: 'No reference systems are available.' });
+      return;
+    }
+    applyReference(reference);
   };
 
   const getSystemContext = (): Record<string, string> => ({
@@ -248,6 +269,24 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
             <span>New</span>
           </button>
         </div>
+
+        {referenceSystems.length > 0 && (
+          <div className="space-y-1.5 shrink-0">
+            <span className="text-[11px] font-sans uppercase tracking-wider text-stone-500">Starting points</span>
+            <div className="flex flex-wrap gap-1.5">
+              {referenceSystems.map((reference) => (
+                <button
+                  key={reference.id}
+                  type="button"
+                  onClick={() => applyReference(reference)}
+                  className="text-xs font-sans px-2.5 py-1 rounded-lg border border-stone-800 hover:border-purple-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-purple-300 cursor-pointer"
+                >
+                  {reference.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
           {draft && (

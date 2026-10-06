@@ -26,6 +26,7 @@ var mounts = []routeMount{
 	{"/api/generate-asset-preview", "handleGenerateAssetPreview", (*Server).handleGenerateAssetPreview},
 	{"/api/systems", "handleSystemsRoutes", (*Server).handleSystemsRoutes},
 	{"/api/system/", "handleSystemRoutes", (*Server).handleSystemRoutes},
+	{"/api/reference-systems", "handleReferenceSystemsRoute", (*Server).handleReferenceSystemsRoute},
 	{"/api/worlds", "handleWorldsRoutes", (*Server).handleWorldsRoutes},
 	{"/api/world/", "handleWorldRoutes", (*Server).handleWorldRoutes},
 	{"/api/settings", "handleSettingsRoutes", (*Server).handleSettingsRoutes},

@@ -23,6 +23,7 @@ import {
   CharacterPortraitDTO,
   SystemDetail,
   CreateSystemRequest,
+  ReferenceSystemsResponse,
   WorldDetail,
   CreateWorldRequest,
   WorldEntityDetail,
@@ -182,6 +183,12 @@ export class APIClient {
   static async listSystems(): Promise<SystemInfo[]> {
     const res = await fetch('/api/systems');
     if (!res.ok) throw new Error(`listSystems: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async listReferenceSystems(): Promise<ReferenceSystemsResponse> {
+    const res = await fetch('/api/reference-systems');
+    if (!res.ok) throw new Error(`listReferenceSystems: ${res.statusText}`);
     return res.json();
   }
 

@@ -485,6 +485,20 @@ export interface CreateSystemRequest {
   mechanics?: MechanicsSpec;
 }
 
+export interface ReferenceSystem {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  rules_prompt: string;
+  script: string;
+  mechanics?: MechanicsSpec;
+}
+
+export interface ReferenceSystemsResponse {
+  systems: ReferenceSystem[];
+}
+
 export interface StatSpec {
   id: string;
   label?: string;

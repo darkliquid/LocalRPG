@@ -1,0 +1,20 @@
+id: dice_pool
+name: d10 Dice Pool
+version: "1.0"
+description: A d10 success pool where the count of dice meeting the threshold decides the outcome.
+mechanics:
+  stats:
+    - { id: dice, label: Pool Size, type: number, default: 5 }
+    - { id: grit, label: Grit, type: number, default: 2 }
+  checks:
+    notation: 5d10
+    outcome: [strong, weak, miss]
+    profiles:
+      pool:
+        notation: 5d10
+        success_on: ">=8"
+        outcomes:
+          - { min: 3, max: -1, outcome: strong }
+          - { min: 1, max: 2, outcome: weak }
+          - { min: 0, max: 0, outcome: miss }
+  engagement: auto

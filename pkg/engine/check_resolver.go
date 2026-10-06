@@ -36,6 +36,9 @@ func (r defaultCheckResolver) Resolve(_ context.Context, req harness.CheckReques
 	if notation == "" {
 		notation = "2d6"
 	}
+	if hasProfile {
+		notation = rules.ProfileNotation(notation, chosen)
+	}
 	roll, err := rules.EvaluateRoll(notation)
 	if err != nil {
 		return nil, fmt.Errorf("resolve check: %w", err)

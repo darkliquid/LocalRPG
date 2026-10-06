@@ -32,6 +32,10 @@ mechanics:
     outcome: [failure, mixed, success]
 ```
 
+## Reference Systems
+
+The studio offers complete starting systems for a PbtA 2d6 ladder, a d20 difficulty class, and a d10 success pool. They are built into the binary and are the same corpus the engine tests exercise.
+
 ## Editing Mechanics in the Studio
 
 The **Mechanics** tab edits the whole `mechanics` block: stats, skills, health, check conventions (including resolution profiles), advancement, freeform state, and the engagement default. Each list adds and removes its own rows, and the studio warns about an invalid id, a duplicate id, a skill whose stat is undeclared, or a malformed profile before it saves.

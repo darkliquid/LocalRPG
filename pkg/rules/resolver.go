@@ -36,6 +36,9 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 	if notation == "" {
 		notation = "2d6"
 	}
+	if hasProfile {
+		notation = ProfileNotation(notation, p)
+	}
 	roll, err := EvaluateRoll(notation)
 	if err != nil {
 		return nil, fmt.Errorf("resolve check: %w", err)

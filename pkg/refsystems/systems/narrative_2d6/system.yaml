@@ -1,0 +1,21 @@
+id: narrative_2d6
+name: Narrative 2d6
+version: "1.0"
+description: Versatile 2d6 resolution with partial success, dynamic stress, and event hooks.
+mechanics:
+  stats:
+    - { id: might, label: Might, type: number, default: 1 }
+    - { id: edge, label: Edge, type: number, default: 1 }
+    - { id: heart, label: Heart, type: number, default: 1 }
+  skills:
+    - { id: stealth, label: Stealth, stat: edge }
+  checks:
+    notation: 2d6
+    outcome: [strong, weak, miss]
+    profiles:
+      pbta:
+        ladder:
+          - { min: 10, outcome: strong }
+          - { min: 7, outcome: weak }
+          - { min: 0, outcome: miss }
+  engagement: auto

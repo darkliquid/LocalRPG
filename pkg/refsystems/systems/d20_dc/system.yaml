@@ -1,0 +1,18 @@
+id: d20_dc
+name: d20 + DC
+version: "1.0"
+description: Class-and-level flavoured d20 checks against a difficulty class.
+mechanics:
+  stats:
+    - { id: strength, label: Strength, type: number, default: 10 }
+    - { id: dexterity, label: Dexterity, type: number, default: 10 }
+  skills:
+    - { id: athletics, label: Athletics, stat: strength }
+  checks:
+    notation: 1d20
+    outcome: [success, fail]
+    profiles:
+      d20:
+        notation: 1d20
+        dc: 15
+  engagement: auto

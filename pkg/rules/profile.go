@@ -2,6 +2,7 @@ package rules
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 )
@@ -50,4 +51,14 @@ func ClampTo(allowed []string, value string) string {
 		}
 	}
 	return allowed[0]
+}
+
+// ProfileNotation folds a pool profile's success threshold into the dice
+// notation, so the dice library counts the successes the profile's outcomes read.
+// A notation that already carries the threshold is returned unchanged.
+func ProfileNotation(notation string, p core.ResolutionProfile) string {
+	if p.SuccessOn == "" || strings.Contains(notation, p.SuccessOn) {
+		return notation
+	}
+	return notation + p.SuccessOn
 }

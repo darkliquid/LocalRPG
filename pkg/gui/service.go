@@ -29,6 +29,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/paths"
 	"github.com/darkliquid/localrpg/pkg/pathutil"
+	"github.com/darkliquid/localrpg/pkg/refsystems"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -4259,6 +4260,25 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 	}
 	detail.Warnings = validateMechanics(req.Mechanics)
 	return detail, nil
+}
+
+// ListReferenceSystems returns the shipped starting systems, so the studio offers
+// the same corpus the tests exercise.
+func (s *Service) ListReferenceSystems(_ context.Context) (*ReferenceSystemsDTO, error) {
+	systems := refsystems.List()
+	out := &ReferenceSystemsDTO{Systems: make([]ReferenceSystemDTO, 0, len(systems))}
+	for _, sys := range systems {
+		out.Systems = append(out.Systems, ReferenceSystemDTO{
+			ID:          sys.ID,
+			Name:        sys.Name,
+			Version:     sys.Version,
+			Description: sys.Description,
+			RulesPrompt: sys.RulesPrompt,
+			Script:      sys.Script,
+			Mechanics:   sys.Mechanics,
+		})
+	}
+	return out, nil
 }
 
 func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, error) {

@@ -16,6 +16,7 @@
   "/api/open-url",
   "/api/providers",
   "/api/providers/models",
+  "/api/reference-systems",
   "/api/schema/",
   "/api/settings",
   "/api/settings/test-provider",
