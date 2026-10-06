@@ -59,6 +59,9 @@ type Turn struct {
 	RecordReport *RecordReport `json:"record_report,omitempty"`
 	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
 	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
+	// Draft marks a turn written provisionally because it ends on a pending check
+	// in single-turn mode: resolving the check completes it in place.
+	Draft bool `json:"draft,omitempty"`
 	// ResolvesCheckRef names the pending check this turn resolved, so a retried
 	// request reuses the recorded roll instead of rolling again. ContinuationOf is
 	// the turn this one continues, so a client can present the halves as one turn.

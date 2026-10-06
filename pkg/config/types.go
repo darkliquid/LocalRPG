@@ -359,6 +359,23 @@ type Config struct {
 	Preferences PreferencesConfig `yaml:"preferences" json:"preferences"`
 	Telemetry   TelemetryConfig   `yaml:"telemetry,omitempty" json:"telemetry,omitempty"`
 	Mechanics   MechanicsConfig   `yaml:"mechanics,omitempty" json:"mechanics,omitempty"`
+	Interactive InteractiveConfig `yaml:"interactive,omitempty" json:"interactive,omitempty"`
+}
+
+// InteractiveConfig governs how interactive rolls are recorded.
+type InteractiveConfig struct {
+	// Rolls selects "continuation" (a new turn carries the adjudication) or
+	// "single-turn" (the proposing turn is completed in place).
+	Rolls string `yaml:"rolls,omitempty" json:"rolls,omitempty"`
+}
+
+// InteractiveRolls returns the resolved interactive-rolls mode, normalising an
+// empty or unknown value to "continuation".
+func (c *Config) InteractiveRolls() string {
+	if c != nil && c.Interactive.Rolls == "single-turn" {
+		return "single-turn"
+	}
+	return "continuation"
 }
 
 // CurrentVersion is the config schema version.

@@ -74,8 +74,7 @@ func (t *Timeline) RecordTurnContext(ctx context.Context, turn *Turn, extracted 
 // RecordTurnContextStructured is RecordTurnContext with the structured turn's
 // persona declarations and memories, which are staged as entity stubs and memory
 // records (unlike extraction, they carry declared state).
-func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl, memories []harness.MemoryDecl, checks []harness.CheckResult) error {
-	_, span := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "timeline.record_turn",
+func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl, memories []harness.MemoryDecl, checks []harness.CheckResult) error {	_, span := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "timeline.record_turn",
 		oteltrace.WithAttributes(attribute.Int("localrpg.turn.number", turn.Number)),
 	)
 	defer span.End()
@@ -155,6 +154,29 @@ func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, 
 	}
 
 	return nil
+}
+
+// ReplaceTurn completes a draft turn in place: it rewinds the final turn and
+// records the replacement under the same number. Only the final turn may be
+// replaced, so a completed draft cannot rewrite history behind it.
+func (t *Timeline) ReplaceTurn(ctx context.Context, turn *Turn) error {
+	return t.ReplaceTurnContextStructured(ctx, turn, nil, nil, nil, nil)
+}
+
+// ReplaceTurnContextStructured is ReplaceTurn for a structured turn, so a
+// completed draft keeps its personae, memories, and checks.
+func (t *Timeline) ReplaceTurnContextStructured(ctx context.Context, turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl, memories []harness.MemoryDecl, checks []harness.CheckResult) error {
+	turns, err := t.history.LoadHistory()
+	if err != nil {
+		return fmt.Errorf("load history: %w", err)
+	}
+	if len(turns) == 0 || turns[len(turns)-1].Number != turn.Number {
+		return fmt.Errorf("only the final turn may be replaced")
+	}
+	if err := t.RewindToTurn(turn.Number - 1); err != nil {
+		return err
+	}
+	return t.RecordTurnContextStructured(ctx, turn, extracted, personae, memories, checks)
 }
 
 func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl) (map[string]*entity.Entity, error) {

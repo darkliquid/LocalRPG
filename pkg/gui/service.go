@@ -2164,6 +2164,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 
 	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)
 	t.orchestrator.SetForcedTotal(req.ForcedTotal)
+	t.orchestrator.SetSingleTurnMode(t.cfg.InteractiveRolls() == "single-turn")
 
 	// Application playback runs on one queue opened before generation: a sentence
 	// the streamer synthesizes is heard as soon as it lands, and the finalise pass

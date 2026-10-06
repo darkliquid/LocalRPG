@@ -211,6 +211,12 @@ choose; the ledger and provider identifiers are listed in the
 | `mechanics.cadence_turns` | int |
 | `mechanics.world_tick_turns` | int |
 
+### `interactive`
+
+| Key | Type |
+| --- | --- |
+| `interactive.rolls` | string |
+
 ## Value sets
 
 Keys typed `string` here accept the following values where noted. An

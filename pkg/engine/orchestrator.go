@@ -77,6 +77,9 @@ type TurnOrchestrator struct {
 	// forcedTotal, when set, replaces the next check's rolled total: a manual roll
 	// entry or a resolved pending check. Consumed once per turn.
 	forcedTotal *int
+	// singleTurn records an interactive roll as one turn: the proposing turn is a
+	// draft, completed in place when the check resolves.
+	singleTurn bool
 	extractor       *harness.Extractor
 	chunkTimeout    time.Duration
 	openingPrompt   string
@@ -530,6 +533,13 @@ func (o *TurnOrchestrator) SetPendingCheckRef(ref string) {
 // so a manually entered die result is honoured. It is consumed once per turn.
 func (o *TurnOrchestrator) SetForcedTotal(total *int) {
 	o.forcedTotal = total
+}
+
+// SetSingleTurnMode records an interactive roll as one turn: a turn that ends on
+// a pending check is written as a draft, and resolving the check completes it in
+// place rather than appending a continuation turn.
+func (o *TurnOrchestrator) SetSingleTurnMode(single bool) {
+	o.singleTurn = single
 }
 
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
@@ -1183,6 +1193,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Prompt:           contextPrompt,
 		ToolCalls:        result.Provenance,
 		PendingCheck:     result.PendingCheck,
+		Draft:            o.singleTurn && result.PendingCheck != nil,
 		ResolvesCheckRef: resolvedRef,
 		ContinuationOf:   continuationOf,
 	}
@@ -1442,7 +1453,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	finalEffects := o.healthOutcomes(&turn)
 	turn.HealthEffects = append(turn.HealthEffects, mergeHealthEffects(pendingEffects, finalEffects)...)
 
-	if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
+	// In single-turn mode a resolved check completes the draft turn in place
+	// rather than appending a continuation, so the fiction stays one record.
+	if o.singleTurn && continuationOf != 0 {
+		turn.Number = continuationOf
+		if err := o.timeline.ReplaceTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
+			return nil, fmt.Errorf("replace turn: %w", err)
+		}
+	} else if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
 	}
 
