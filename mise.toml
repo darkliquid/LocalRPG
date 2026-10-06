@@ -49,6 +49,10 @@ depends = ["build:backend"]
 description = "Run all Go unit and integration tests"
 run = "go test -v -count=1 ./..."
 
+[tasks."test:e2e"]
+description = "Run the end-to-end browser suite (skips without a browser)"
+run = "go test -v -count=1 -tags e2e ./pkg/e2e/..."
+
 [tasks."test:frontend"]
 description = "Run TypeScript type checks and the frontend test suite"
 dir = "frontend"
