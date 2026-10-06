@@ -12,9 +12,10 @@ mise run install:vale-styles # vale sync: download the style packages when .vale
 mise run build          # frontend bundle -> pkg/gui/dist, then bin/localrpg
 mise run build:frontend # npm run build in frontend/ (tsc + vite)
 mise run build:backend  # depends on build:frontend
-mise run test           # go test -v -count=1 ./...  AND  mise run test:frontend
+mise run test           # go test -v -count=1 ./...  AND  mise run test:frontend  AND  mise run test:e2e
 mise run test:backend   # go test -v -count=1 ./...
-mise run test:frontend  # npx tsc --noEmit, the tree model check and the player bundle check (in frontend/)
+mise run test:frontend  # npx tsc --noEmit and npx vitest run (in frontend/)
+mise run test:e2e       # go test -tags e2e ./pkg/e2e/... (skips without a browser)
 mise run lint           # markdownlint, goreleaser check, actionlint, go vet ./...
 mise run lint:docs      # markdownlint engine on the embedded help articles (frontend/scripts/lintDocs.mjs)
 mise run lint:prose     # Vale over tracked prose and source comments (report only; STRICT=1 to gate)
@@ -357,6 +358,15 @@ Notable built-ins that need no server or GPU: `narrative-oracle` (LLM), `native-
 Resolution order (`pkg/config/manager.go`): `$LOCALRPG_CONFIG_DIR`, else the XDG config search path (`$XDG_CONFIG_HOME` then `$XDG_CONFIG_DIRS`), for `config.yaml`; then an optional `./localrpg.yaml` merged on top, which flips `IsLocalOverride`. `Save` writes to the local override when one exists, otherwise to the user config. `gui.NewService(rootDir)` has its own twist: when `--dir` is set to anything other than `.`, it treats `<rootDir>/config.yaml` as the user config and resolves relative `paths.*` against `rootDir`.
 
 Storage paths are resolved by `pkg/paths.Resolve` from the XDG bases (`github.com/adrg/xdg`), which fall back to native per-OS directories: `systems`/`worlds`/`games` under `DataHome/localrpg`, `cache` under `CacheHome/localrpg`. An empty `paths.*` uses those defaults, an absolute value is used verbatim, and a relative value joins the category base — unless `--dir` or `./localrpg.yaml` puts the process in project mode, where relative values resolve against the project root (the previous behaviour). Nothing is migrated; the GUI logs a `paths.legacy_relative` warning when a legacy working-directory folder exists and the resolved XDG directory is empty.
+
+## Testing
+
+Two suites, one runner each. `mise run test` runs both plus the backend.
+
+- **Frontend unit and component tests: Vitest + React Testing Library + jsdom.** The runner is configured in `frontend/vitest.config.ts` (not the app's `vite.config.ts`, which sets an output directory and loads Tailwind). Tests live beside the code as `*.test.ts`/`*.test.tsx` and import `describe`/`it`/`expect` from `vitest` explicitly; there are no globals. `frontend/src/test/setup.ts` installs the jest-dom matchers, stubs the browser APIs jsdom lacks, and calls RTL's `cleanup`. The old `frontend/scripts/check*.mjs` files are gone — `lintDocs.mjs` remains because it is a linter, not a test.
+- **Browser end-to-end tests: `pkg/e2e`, behind the `e2e` build tag.** The default `go test ./...` never compiles them, so a machine without Chrome stays fast; run them with `mise run test:e2e` (`go test -tags e2e ./pkg/e2e/...`). `harness.go` wraps chromedp (`NewBrowser`, `Click`, `Type`, `WaitFor`, `Poll`, `InstrumentAudio`) and `fixture.go` starts the real `gui.Service` on a temp root behind an `httptest` server (`NewFixture`, `WriteSystem`, `WriteWorld`, `InitGame`, `WriteEntities`, `WriteHistory`). The tests skip, never fail, when `driver.Available` finds no usable browser.
+- **They live in `pkg/e2e`, not `pkg/gui`, because the harness imports `pkg/gui`** (`NewService`, `NewServer`, `AssetHandler`); keeping them in `pkg/gui` would be an import cycle. They use only the exported `pkg/gui` surface.
+- **A failure writes artifacts** to `$E2E_ARTIFACT_DIR/<test name>/` (default `test-results/`): `body.txt`, `dom.json`, and `failure.png`. The CI `e2e` job installs Chrome with `browser-actions/setup-chrome`, runs the suite, and uploads `test-results/` so a red run is debuggable.
 
 ## Conventions
 
