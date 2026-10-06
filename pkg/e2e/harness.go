@@ -7,6 +7,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -147,10 +148,23 @@ func (b *Browser) Type(selector, text string) {
 	b.run(chromedp.WaitVisible(selector, chromedp.BySearch), chromedp.SendKeys(selector, text, chromedp.BySearch))
 }
 
-// Clear empties an input before typing into it.
-func (b *Browser) Clear(selector string) {
+// SetInputValue sets a controlled input's value the way React observes it: it
+// writes through the native value setter and dispatches an input event. Setting
+// the element's value directly is invisible to a controlled component, which
+// restores it on the next render, and so is a keyboard clear.
+func (b *Browser) SetInputValue(selector, value string) {
 	b.t.Helper()
-	b.run(chromedp.WaitVisible(selector, chromedp.BySearch), chromedp.Clear(selector, chromedp.BySearch))
+	script := fmt.Sprintf(`(() => {
+	  const el = document.evaluate(%q, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+	  if (!el) return 'missing';
+	  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+	  Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, %q);
+	  el.dispatchEvent(new Event('input', { bubbles: true }));
+	  return 'ok';
+	})()`, selector, value)
+	if got := b.Eval(script); got != "ok" {
+		b.t.Fatalf("set input %q: %s", selector, got)
+	}
 }
 
 // Text reads a selector's text content.
