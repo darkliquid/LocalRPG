@@ -61,6 +61,8 @@ github.com/coder/websocket v1.8.14/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6p
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/darkliquid/roll v0.0.0-20260807212350-599376e6fde8 h1:2IuDLWdTDrAQM+JeS3lUr7q4vYU27LYIvZgGRMDTnHc=
 github.com/darkliquid/roll v0.0.0-20260807212350-599376e6fde8/go.mod h1:bJnJ8AZK0eS1WHFC54CrwnrwFosbVvSS1plvQ1LRxVo=
+github.com/darkliquid/roll v0.0.0-20261006063131-e515e24fa1af h1:Cjj9+5MGxohh7C0A9P+xhODXEBv8BBobfpNcShT7OMg=
+github.com/darkliquid/roll v0.0.0-20261006063131-e515e24fa1af/go.mod h1:bJnJ8AZK0eS1WHFC54CrwnrwFosbVvSS1plvQ1LRxVo=
 github.com/dlclark/regexp2 v1.11.5 h1:Q/sSnsKerHeCkc/jSTNq1oCm7KiVgUMZRDUoRu0JQZQ=
 github.com/dlclark/regexp2 v1.11.5/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
 github.com/dlclark/regexp2/v2 v2.5.2 h1:HAsucWRhsqcDzl6Ua9aR8JwYOTzrZyPrF0/FNxJVAI0=
