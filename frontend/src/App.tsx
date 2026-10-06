@@ -624,14 +624,25 @@ export const App: React.FC = () => {
         };
         source.onmessage = (evt) => {
           try {
-            const data = JSON.parse(evt.data) as { playing?: boolean };
-            if (data.playing === false) finish();
+            const data = JSON.parse(evt.data) as { playing?: boolean; turn?: number; segment?: number };
+            if (data.playing !== false) return;
+            // Only the beat this subscription started advances, so a stale
+            // completion from a replaced queue cannot skip the current line.
+            if (data.turn !== turnNumber) return;
+            if (segmentIndex !== undefined && data.segment !== segmentIndex) return;
+            finish();
           } catch {
             // A malformed event is ignored; the safety timeout still advances.
           }
         };
         source.onerror = () => finish();
-        audioPollingRef.current[pollKey] = finish;
+        // A completion event that never arrives must not stall the theatre, so a
+        // generous safety timeout ends the beat anyway.
+        const safety = setTimeout(finish, 60_000);
+        audioPollingRef.current[pollKey] = () => {
+          clearTimeout(safety);
+          finish();
+        };
       })
       .catch((err: unknown) => {
         const message =

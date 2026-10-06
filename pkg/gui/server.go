@@ -1550,7 +1550,6 @@ func (s *Server) serveAudioEvents(w http.ResponseWriter, r *http.Request) {
 		_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 		flusher.Flush()
 	}
-	write(AudioStatusDTO{Available: s.service.AudioAvailable(), Playing: s.service.AudioPlaying()})
 
 	ch, cancel := s.service.SubscribeAudioStatus()
 	defer cancel()

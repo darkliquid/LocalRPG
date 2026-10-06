@@ -535,9 +535,6 @@ func TestChronicleTurnsCarryLocationAndPacing(t *testing.T) {
 	if turn.Outcome != "clean_look" {
 		t.Errorf("Outcome = %q", turn.Outcome)
 	}
-	if turn.LocationArtURL == "" {
-		t.Errorf("expected an art URL when the built-in generator is available")
-	}
 	if len(turn.Segments) != 1 || turn.Segments[0].Duration < scene.MinimumBeatDuration.Seconds() {
 		t.Errorf("expected a paced segment, got %+v", turn.Segments)
 	}

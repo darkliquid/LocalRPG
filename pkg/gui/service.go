@@ -61,9 +61,13 @@ type Service struct {
 	player     *playback.Player
 	logger     trace.Logger
 	// audioSubs are the clients watching for a playback completion, so the
-	// theatre advances on a real event rather than a status poll.
-	audioSubMu sync.Mutex
-	audioSubs  map[chan AudioStatusDTO]struct{}
+	// theatre advances on a real event rather than a status poll. audioTurn and
+	// audioSegment name the beat currently playing, so a completion event carries
+	// its identity and a stale event cannot advance the wrong beat.
+	audioSubMu    sync.Mutex
+	audioSubs     map[chan AudioStatusDTO]struct{}
+	audioTurn     int
+	audioSegment  int
 	// A regeneration is detached and coalesced: the flag records that one is in
 	// flight, so a player turning quickly triggers a catch-up run rather than a
 	// queue of overlapping ones.
@@ -956,7 +960,7 @@ func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySumm
 
 		hasPortrait := parsed.Portrait != "" && s.hasCustomPortrait(gameID, id)
 		portraitURL := ""
-		if parsed.Type == "character" {
+		if entity.IsCharacterType(parsed.Type) {
 			portraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait", gameID, id)
 		}
 
@@ -1593,7 +1597,6 @@ func recordReportDTO(report *engine.RecordReport) *RecordReportDTO {
 // lets the client render both with one code path.
 func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID, engagement string) TurnDTO {
 	plan := s.clipPlanFor(cfg, gameID, turn.Segments)
-	artAvailable := cfg.Media.Image.BuiltinFallback || cfg.Media.Image.Type != "disabled"
 
 	dto := TurnDTO{
 		TurnNumber:      turn.Number,
@@ -1639,9 +1642,6 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 			if location, err := store.GetEntity(turn.Location); err == nil && location != nil {
 				dto.LocationName = location.Name
 			}
-		}
-		if artAvailable {
-			dto.LocationArtURL = "/api/game/" + gameID + "/location/" + turn.Location + "/art"
 		}
 	}
 
@@ -3215,7 +3215,10 @@ func (s *Service) audioPlayer() *playback.Player {
 			return
 		}
 		player.SetOnComplete(func() {
-			s.broadcastAudioStatus(AudioStatusDTO{Available: true, Playing: false})
+			s.audioSubMu.Lock()
+			status := AudioStatusDTO{Available: true, Playing: false, Turn: s.audioTurn, Segment: s.audioSegment}
+			s.audioSubMu.Unlock()
+			s.broadcastAudioStatus(status)
 		})
 		s.player = player
 	})
@@ -3248,6 +3251,15 @@ func (s *Service) broadcastAudioStatus(status AudioStatusDTO) {
 		default:
 		}
 	}
+}
+
+// setAudioCurrent records the beat a queue is playing, so its completion event
+// carries the identity a client needs to advance the right beat. Segment is -1
+// for a whole-turn queue.
+func (s *Service) setAudioCurrent(turn, segment int) {
+	s.audioSubMu.Lock()
+	s.audioTurn, s.audioSegment = turn, segment
+	s.audioSubMu.Unlock()
 }
 
 // AudioAvailable reports whether this process can play audio itself, which is
@@ -3772,6 +3784,7 @@ func (s *Service) PlayTurnAudio(gameID string, turnNumber int, force ...bool) er
 	}
 
 	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
+	s.setAudioCurrent(turnNumber, -1)
 	return player.PlayQueue(s.turnClipStream(gameID, turnNumber, len(force) > 0 && force[0]))
 }
 
@@ -3813,6 +3826,7 @@ func (s *Service) PlaySegmentAudio(ctx context.Context, gameID string, turnNumbe
 	}
 
 	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
+	s.setAudioCurrent(turnNumber, segmentIndex)
 	return player.PlayFiles(clips)
 }
 

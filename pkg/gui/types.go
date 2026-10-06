@@ -208,7 +208,6 @@ type TurnDTO struct {
 	ContinuityNotes []string       `json:"continuity_notes,omitempty"`
 	LocationID      string         `json:"location_id,omitempty"`
 	LocationName    string         `json:"location_name,omitempty"`
-	LocationArtURL  string         `json:"location_art_url,omitempty"`
 	SceneBreak      bool           `json:"scene_break,omitempty"`
 	// Structured turn fields: whether the action was rejected and the checks the
 	// GM resolved.
@@ -788,6 +787,11 @@ func (r *TurnRequest) validate() error {
 type AudioStatusDTO struct {
 	Available bool `json:"available"`
 	Playing   bool `json:"playing"`
+	// Turn and Segment name the beat a completion event belongs to, so a client
+	// advances only on the completion of the beat it is playing. Segment is -1 for
+	// a whole-turn queue.
+	Turn    int `json:"turn"`
+	Segment int `json:"segment"`
 }
 
 // TraceEventDTO is one traced event. The event's own fields are nested rather
