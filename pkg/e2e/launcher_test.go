@@ -37,3 +37,21 @@ func TestDeletingTheLastCampaignResetsLauncherStats(t *testing.T) {
 	b.Click(`//button[normalize-space()='Confirm Delete']`)
 	b.WaitForGone("3 turns")
 }
+
+// TestCreatingACampaignFromTheLauncher drives the real creation flow: the dock's
+// New Campaign button opens the world flyout, choosing a world opens the modal,
+// and submitting produces a campaign the hero stage renders.
+func TestCreatingACampaignFromTheLauncher(t *testing.T) {
+	f := NewFixture(t, "agents:\n  roles:\n    gm:\n      type: builtin\n      builtin_name: echo\n")
+	f.WriteSystem(t, "freeform", "Freeform")
+	f.WriteWorld(t, "harbour-realm", "Harbour Realm", []string{"freeform"})
+
+	b := f.Launch(t)
+	b.Navigate("/")
+	b.Click(`//button[@aria-label="New Campaign"]`)
+	b.Click(`//button[@aria-label="Harbour Realm"]`)
+	b.WaitVisible(`//button[normalize-space()='Create Campaign']`)
+	b.Type(`//input[@placeholder='e.g. Valen Duskwarden']`, "Sean")
+	b.Click(`//button[normalize-space()='Create Campaign']`)
+	b.WaitFor("Chronicles of Harbour Realm")
+}
