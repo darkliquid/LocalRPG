@@ -587,7 +587,9 @@ export const App: React.FC = () => {
     document.getElementById('action-console-input')?.focus();
   };
 
-  const audioPollingRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  // audioPollingRef tracks how to end each in-flight playback subscription, so
+  // Stop can close every EventSource.
+  const audioPollingRef = useRef<Record<string, () => void>>({});
 
   const handlePlayTurnAudio = (turnNumber: number, segmentIndex?: number, force = false) => {
     if (!activeGameID) return;
@@ -612,23 +614,24 @@ export const App: React.FC = () => {
     call
       .then(() => {
         setStatus({ state: 'playing' });
-        // Poll until server reports playback finished
-        const intervalId = setInterval(() => {
-          APIClient.audioStatus()
-            .then((status) => {
-              if (!status.playing) {
-                clearInterval(intervalId);
-                delete audioPollingRef.current[pollKey];
-                setStatus({ state: 'idle' });
-              }
-            })
-            .catch(() => {
-              clearInterval(intervalId);
-              delete audioPollingRef.current[pollKey];
-              setStatus({ state: 'idle' });
-            });
-        }, 500);
-        audioPollingRef.current[pollKey] = intervalId;
+        // The server reports the completion over SSE, so the beat advances on a
+        // real event rather than a status poll.
+        const source = new EventSource('/api/audio/events');
+        const finish = () => {
+          source.close();
+          delete audioPollingRef.current[pollKey];
+          setStatus({ state: 'idle' });
+        };
+        source.onmessage = (evt) => {
+          try {
+            const data = JSON.parse(evt.data) as { playing?: boolean };
+            if (data.playing === false) finish();
+          } catch {
+            // A malformed event is ignored; the safety timeout still advances.
+          }
+        };
+        source.onerror = () => finish();
+        audioPollingRef.current[pollKey] = finish;
       })
       .catch((err: unknown) => {
         const message =
@@ -639,9 +642,9 @@ export const App: React.FC = () => {
 
   const handleStopAudio = () => {
     APIClient.stopAudio().catch(console.error);
-    // Clear all polling and reset all turns that are playing
-    for (const [key, intervalId] of Object.entries(audioPollingRef.current)) {
-      clearInterval(intervalId);
+    // Close every in-flight playback subscription and reset what is playing.
+    for (const [key, close] of Object.entries(audioPollingRef.current)) {
+      close();
       delete audioPollingRef.current[key];
     }
     setTurnAudioStatus((prev) => {

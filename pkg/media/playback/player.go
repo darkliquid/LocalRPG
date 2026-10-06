@@ -58,6 +58,9 @@ type Player struct {
 	logger     trace.Logger
 	generation uint64
 	closed     bool
+	// onComplete is called when a queue drains or playback is stopped, so a
+	// caller can advance on a real completion rather than polling.
+	onComplete func()
 }
 
 // Open starts the application's audio device. It returns ErrUnavailable when the
@@ -108,6 +111,17 @@ func (p *Player) SetLogger(logger trace.Logger) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.logger = trace.OrNil(logger)
+}
+
+// SetOnComplete registers a callback invoked when a queue drains or playback is
+// stopped, so a caller can advance on a real completion rather than polling.
+func (p *Player) SetOnComplete(fn func()) {
+	if p == nil {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.onComplete = fn
 }
 
 // Available reports whether a device is open.
@@ -258,9 +272,13 @@ func (p *Player) playStreamerLocked(queue beep.Streamer, closers []io.Closer, cl
 				p.streamer = nil
 				p.closers = nil
 				p.otoPlayer = nil
+				onComplete := p.onComplete
 				p.mu.Unlock()
 				_ = player.Close()
 				closeAll(closers)
+				if onComplete != nil {
+					onComplete()
+				}
 				return
 			}
 			p.mu.Unlock()
@@ -286,9 +304,13 @@ func (p *Player) Stop() {
 		_ = p.otoPlayer.Close()
 		p.otoPlayer = nil
 	}
+	onComplete := p.onComplete
 	p.mu.Unlock()
 
 	go closeAll(closers)
+	if onComplete != nil {
+		onComplete()
+	}
 }
 
 // Close stops playback and releases the device.

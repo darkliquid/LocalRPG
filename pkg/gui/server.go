@@ -1513,12 +1513,54 @@ func (s *Server) handleAudioRoutes(w http.ResponseWriter, r *http.Request) {
 		s.service.StopAudio()
 		w.WriteHeader(http.StatusNoContent)
 
+	case "events":
+		if r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		s.serveAudioEvents(w, r)
+
 	default:
 		if r.Method == http.MethodGet && strings.HasPrefix(action, "clip/") {
 			s.serveClip(w, r, strings.TrimPrefix(action, "clip/"))
 			return
 		}
 		http.NotFound(w, r)
+	}
+}
+
+// serveAudioEvents streams playback status changes as server-sent events, so a
+// client advances on a real completion rather than polling the status endpoint.
+func (s *Server) serveAudioEvents(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming is not supported by this client", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	write := func(status AudioStatusDTO) {
+		data, err := json.Marshal(status)
+		if err != nil {
+			return
+		}
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
+		flusher.Flush()
+	}
+	write(AudioStatusDTO{Available: s.service.AudioAvailable(), Playing: s.service.AudioPlaying()})
+
+	ch, cancel := s.service.SubscribeAudioStatus()
+	defer cancel()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case status := <-ch:
+			write(status)
+		}
 	}
 }
 

@@ -33,7 +33,14 @@ interface StoryTheaterProps {
 
 // BEAT_GAP_MS is the buffer between one voice clip finishing and the next line
 // appearing, so the spoken word always leads the text.
-const BEAT_GAP_MS = 300;
+const BEAT_GAP_MS = 120;
+
+// beatGapMs scales the inter-beat gap by the speed control, so faster playback
+// tightens it and slower playback widens it.
+export function beatGapMs(speed: number): number {
+  const factor = speed > 0 ? speed : 1;
+  return Math.max(40, BEAT_GAP_MS / factor);
+}
 
 export const StoryTheater: React.FC<StoryTheaterProps> = ({
   turns,
@@ -159,13 +166,39 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     onPlayAudio?.(currentTurn.turn_number, activeIndex);
   }, [isOpen, isPlaying, serverPlayback, voiceEnabled, currentTurn, activeIndex, beatKey, onPlayAudio]);
 
+  // Prefetch one beat ahead: warm the browser's cache with the next clip and
+  // preload its image, so the next line does not wait on the network. Bounded to
+  // a single beat.
+  const prefetchedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isOpen || !isPlaying) return;
+    const withinTurn = activeIndex < segments.length - 1;
+    const nextSegment = withinTurn ? segments[activeIndex + 1] : undefined;
+    const nextTurn = withinTurn ? currentTurn : turns[currentIdx + 1];
+    if (!nextTurn) return;
+    const nextIndex = withinTurn ? activeIndex + 1 : 0;
+    const key = `${nextTurn.turn_number}:${nextIndex}`;
+    if (prefetchedRef.current === key) return;
+    prefetchedRef.current = key;
+    for (const url of nextSegment?.audio_urls ?? nextTurn.segments?.[0]?.audio_urls ?? []) {
+      fetch(url).catch(() => {
+        // Prefetch is best effort; playback still works without it.
+      });
+    }
+    const nextImage = nextTurn.image_url;
+    if (nextImage && nextImage !== backgroundURL) {
+      const image = new Image();
+      image.src = nextImage;
+    }
+  }, [isOpen, isPlaying, activeIndex, currentIdx, segments, currentTurn, turns, backgroundURL]);
+
   const previousBeatState = useRef<TurnAudioState>('idle');
   useEffect(() => {
     if (!serverPlayback || !voiceEnabled) return;
     const previous = previousBeatState.current;
     previousBeatState.current = beatState;
     if (previous !== 'playing' || (beatState !== 'idle' && beatState !== 'error') || !isPlaying) return;
-    const timer = setTimeout(advanceBeat, BEAT_GAP_MS);
+    const timer = setTimeout(advanceBeat, beatGapMs(speed));
     return () => clearTimeout(timer);
   }, [beatState, serverPlayback, voiceEnabled, isPlaying, advanceBeat]);
 
@@ -174,7 +207,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   useEffect(() => {
     if (serverPlayback || !voiceEnabled) return;
     if (browser.playingIndex === null) return;
-    const timer = setTimeout(() => setActiveSegment(browser.playingIndex as number), BEAT_GAP_MS);
+    const timer = setTimeout(() => setActiveSegment(browser.playingIndex as number), beatGapMs(speed));
     return () => clearTimeout(timer);
   }, [browser.playingIndex, serverPlayback, voiceEnabled]);
 
@@ -185,7 +218,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     const was = browserWasPlaying.current;
     browserWasPlaying.current = browser.playing;
     if (was && !browser.playing && isPlaying) {
-      const timer = setTimeout(goNext, BEAT_GAP_MS);
+      const timer = setTimeout(goNext, beatGapMs(speed));
       return () => clearTimeout(timer);
     }
   }, [browser.playing, serverPlayback, voiceEnabled, isPlaying, goNext]);

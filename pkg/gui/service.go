@@ -60,6 +60,10 @@ type Service struct {
 	playerOnce sync.Once
 	player     *playback.Player
 	logger     trace.Logger
+	// audioSubs are the clients watching for a playback completion, so the
+	// theatre advances on a real event rather than a status poll.
+	audioSubMu sync.Mutex
+	audioSubs  map[chan AudioStatusDTO]struct{}
 	// A regeneration is detached and coalesced: the flag records that one is in
 	// flight, so a player turning quickly triggers a catch-up run rather than a
 	// queue of overlapping ones.
@@ -3210,9 +3214,40 @@ func (s *Service) audioPlayer() *playback.Player {
 		if err != nil {
 			return
 		}
+		player.SetOnComplete(func() {
+			s.broadcastAudioStatus(AudioStatusDTO{Available: true, Playing: false})
+		})
 		s.player = player
 	})
 	return s.player
+}
+
+// SubscribeAudioStatus registers a channel notified when application playback
+// ends, so a client can advance on a real completion rather than polling.
+func (s *Service) SubscribeAudioStatus() (<-chan AudioStatusDTO, func()) {
+	ch := make(chan AudioStatusDTO, 1)
+	s.audioSubMu.Lock()
+	if s.audioSubs == nil {
+		s.audioSubs = make(map[chan AudioStatusDTO]struct{})
+	}
+	s.audioSubs[ch] = struct{}{}
+	s.audioSubMu.Unlock()
+	return ch, func() {
+		s.audioSubMu.Lock()
+		delete(s.audioSubs, ch)
+		s.audioSubMu.Unlock()
+	}
+}
+
+func (s *Service) broadcastAudioStatus(status AudioStatusDTO) {
+	s.audioSubMu.Lock()
+	defer s.audioSubMu.Unlock()
+	for ch := range s.audioSubs {
+		select {
+		case ch <- status:
+		default:
+		}
+	}
 }
 
 // AudioAvailable reports whether this process can play audio itself, which is
