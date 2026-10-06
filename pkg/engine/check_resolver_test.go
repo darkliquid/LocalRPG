@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/state"
@@ -54,5 +55,30 @@ func TestDefaultResolverAppliesSkillFromState(t *testing.T) {
 	}
 	if res.Roll == nil || res.Roll.Total < 5 {
 		t.Fatalf("total %+v did not include the +3 skill", res.Roll)
+	}
+}
+
+func TestDefaultResolverUsesProfile(t *testing.T) {
+	mechanics := &core.MechanicsSpec{Checks: core.CheckConventions{
+		Profiles: map[string]core.ResolutionProfile{"pbta": {Ladder: []core.LadderStep{{Min: 0, Outcome: "miss"}}}},
+	}}
+	res, err := defaultCheckResolver{mechanics: mechanics}.Resolve(context.Background(),
+		harness.CheckRequest{Notation: "2d6", Profile: "pbta"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Outcome != "miss" || res.Profile != "pbta" {
+		t.Fatalf("res = %+v, want a miss from the pbta profile", res)
+	}
+}
+
+func TestDefaultResolverFallsBackWithoutProfile(t *testing.T) {
+	res, err := defaultCheckResolver{mechanics: &core.MechanicsSpec{}}.Resolve(context.Background(),
+		harness.CheckRequest{Notation: "1d6+10"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Outcome != "pass" || res.Profile != "" {
+		t.Fatalf("res = %+v, want a pass with no profile", res)
 	}
 }

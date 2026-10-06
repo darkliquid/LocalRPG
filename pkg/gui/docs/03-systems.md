@@ -39,6 +39,34 @@ LocalRPG features a built-in dice evaluation engine supporting standard tabletop
 - `1d100` / `d%`: Percentile dice.
 - `3d6kh2`: Keep highest 2 of 3 six-sided dice.
 
+## Resolution Profiles
+
+A system can declare named **resolution profiles** under `mechanics.checks.profiles`, so the GM can name how a check resolves. A profile maps a roll to an outcome. The supported kinds are threshold ladders, difficulty classes, success-count pools, and position/effect pairs.
+
+```yaml
+mechanics:
+  checks:
+    notation: 2d6
+    profiles:
+      pbta:
+        ladder:
+          - { min: 10, outcome: strong }
+          - { min: 7, outcome: weak }
+          - { min: 0, outcome: miss }
+      d20:
+        notation: 1d20
+        dc: 15
+      pool:
+        notation: 5d10
+        success_on: ">=8"
+        outcomes:
+          - { min: 3, max: -1, outcome: strong }
+          - { min: 1, max: 2, outcome: weak }
+          - { min: 0, max: 0, outcome: miss }
+```
+
+Ladders resolve highest-first. Difficulty classes pass when the total meets them. Pools count the dice that meet `success_on`. A check without a profile resolves through the system's default conventions, exactly as before.
+
 ## Sandboxed JavaScript Mechanics Engine (`mechanics.js`)
 
 Custom systems export JavaScript functions that execute inside an isolated Goja runtime. The engine passes a small context and receives a structured resolution:

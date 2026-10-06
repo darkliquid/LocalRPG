@@ -172,6 +172,14 @@ export interface TurnCheck {
   check_kind?: string;
   stakes?: string;
   outcome: string;
+  // profile names the resolution profile that decided the outcome, when one did,
+  // and position/effect are the Blades-style stakes it carries.
+  profile?: string;
+  position?: string;
+  effect?: string;
+  // successes is the count of dice meeting a pool threshold, when the profile is
+  // a success-count pool.
+  successes?: number;
   // dice are the faces that landed, which is what a die can be drawn from: a
   // total of 4 from 2d6 says nothing about the individual dice.
   roll?: { notation: string; total: number; successes?: number; roll_count?: number; dice?: DieFace[] };

@@ -66,6 +66,53 @@ func TestSchemaResolverAppliesSkillAndModifiers(t *testing.T) {
 	}
 }
 
+func TestSchemaResolverUsesProfile(t *testing.T) {
+	conventions := core.CheckConventions{Notation: "2d6", Profiles: map[string]core.ResolutionProfile{
+		"pbta": {Ladder: []core.LadderStep{{Min: 10, Outcome: "strong"}, {Min: 7, Outcome: "weak"}, {Min: 0, Outcome: "miss"}}},
+	}}
+	r := SchemaResolver{conventions: conventions}
+	res, err := r.Resolve(context.Background(), harness.CheckRequest{Profile: "pbta"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Profile != "pbta" || res.Outcome == "" {
+		t.Fatalf("result = %+v", res)
+	}
+}
+
+func TestSchemaResolverClampsStakes(t *testing.T) {
+	conventions := core.CheckConventions{Notation: "2d6", Profiles: map[string]core.ResolutionProfile{
+		"blades": {
+			Ladder:   []core.LadderStep{{Min: 0, Outcome: "weak"}},
+			Position: []string{"controlled", "risky", "desperate"},
+			Effect:   []string{"limited", "standard", "great"},
+		},
+	}}
+	r := SchemaResolver{conventions: conventions}
+	res, err := r.Resolve(context.Background(), harness.CheckRequest{Profile: "blades", Position: "risky", Effect: "bogus"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Position != "risky" || res.Effect != "limited" {
+		t.Fatalf("position/effect = %q/%q, want risky/limited", res.Position, res.Effect)
+	}
+}
+
+func TestSchemaResolverFallsBackWithoutProfile(t *testing.T) {
+	// A request that names no profile resolves exactly as the conventions path did
+	// before profiles existed.
+	conventions := core.CheckConventions{Notation: "1d6", Outcome: []string{"pass", "fail"},
+		Difficulty: []core.DifficultySpec{{ID: "trivial", Target: 1}}}
+	r := SchemaResolver{conventions: conventions}
+	res, err := r.Resolve(context.Background(), harness.CheckRequest{Difficulty: "trivial"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Outcome != "pass" || res.Profile != "" {
+		t.Fatalf("res = %+v, want a pass with no profile", res)
+	}
+}
+
 func TestSchemaResolverStatOnlyIsUnchanged(t *testing.T) {
 	actor := &entity.Entity{ID: "hero", State: state.NewState(map[string]interface{}{"might": 2})}
 	r := SchemaResolver{conventions: core.CheckConventions{Notation: "2d6"}}

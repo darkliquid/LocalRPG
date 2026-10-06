@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -85,6 +86,22 @@ func FormatMechanicsInstructions(spec *core.MechanicsSpec, engagement string, st
 			parts = append(parts, label+" "+strconv.Itoa(d.Target))
 		}
 		sb.WriteString("Difficulties: " + strings.Join(parts, ", ") + ".\n")
+	}
+	if len(spec.Checks.Profiles) > 0 {
+		names := make([]string, 0, len(spec.Checks.Profiles))
+		for name := range spec.Checks.Profiles {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		parts := make([]string, 0, len(names))
+		for _, name := range names {
+			if label := spec.Checks.Profiles[name].Label; label != "" {
+				parts = append(parts, label)
+			} else {
+				parts = append(parts, name)
+			}
+		}
+		sb.WriteString("Resolution profiles: " + strings.Join(parts, ", ") + ".\n")
 	}
 	return sb.String()
 }

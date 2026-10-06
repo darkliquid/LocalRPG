@@ -200,7 +200,7 @@ func (o *TurnOrchestrator) SetToolRounds(rounds int) {
 // the deterministic default.
 func (o *TurnOrchestrator) SetCheckResolver(resolver harness.CheckResolver) {
 	if resolver == nil {
-		o.checkResolver = defaultCheckResolver{}
+		o.checkResolver = nil
 		return
 	}
 	o.checkResolver = resolver
@@ -268,7 +268,7 @@ func (o *TurnOrchestrator) SetUsageContext(ctx *harness.UsageContext) { o.usageC
 func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error) {
 	resolver := o.checkResolver
 	if resolver == nil {
-		resolver = defaultCheckResolver{}
+		resolver = defaultCheckResolver{mechanics: o.mechanics}
 	}
 	resolved, err := resolver.Resolve(ctx, req, actor)
 	if err != nil {

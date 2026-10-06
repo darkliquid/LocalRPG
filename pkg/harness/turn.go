@@ -76,6 +76,12 @@ type CheckRequest struct {
 	Stakes     string            `json:"stakes"`
 	Outcomes   map[string]string `json:"outcomes"`
 	Notation   string            `json:"notation,omitempty"`
+	// Profile names a resolution profile from the system's checks. Empty uses the
+	// system's default conventions.
+	Profile string `json:"profile,omitempty"`
+	// Position and Effect are the Blades-style stakes a profile may define.
+	Position string `json:"position,omitempty"`
+	Effect   string `json:"effect,omitempty"`
 }
 
 // DieFace is one die as it landed. Symbol is the notation's own way of showing
@@ -108,6 +114,14 @@ type CheckResult struct {
 	// Applied lists every bonus that contributed, for display.
 	Applied   []AppliedModifier      `json:"applied,omitempty"`
 	Breakdown map[string]interface{} `json:"breakdown,omitempty"`
+	// Profile names the resolution profile that decided the outcome, when one did.
+	Profile string `json:"profile,omitempty"`
+	// Position and Effect are the Blades-style stakes the profile carries.
+	Position string `json:"position,omitempty"`
+	Effect   string `json:"effect,omitempty"`
+	// Successes is the count of dice meeting the pool threshold, when the profile
+	// is a success-count pool.
+	Successes int `json:"successes,omitempty"`
 }
 
 // ProposedCheck is a player's explicit request to roll, carried as structured

@@ -98,9 +98,10 @@ type HealthSpec struct {
 
 // CheckConventions describe how a check resolves by default.
 type CheckConventions struct {
-	Notation   string           `yaml:"notation,omitempty"`
-	Outcome    []string         `yaml:"outcome,omitempty"`
-	Difficulty []DifficultySpec `yaml:"difficulty,omitempty"`
+	Notation   string                       `yaml:"notation,omitempty"`
+	Outcome    []string                     `yaml:"outcome,omitempty"`
+	Difficulty []DifficultySpec             `yaml:"difficulty,omitempty"`
+	Profiles   map[string]ResolutionProfile `yaml:"profiles,omitempty"`
 }
 
 // DifficultySpec is one named difficulty target.

@@ -96,6 +96,16 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
           ))}
         </div>
       )}
+      {(check.profile || check.position || check.effect || (check.successes ?? 0) > 0) && (
+        <div className="flex flex-wrap items-center gap-1 text-[11px] font-mono text-stone-400">
+          {check.profile && <span className="rounded bg-white/5 px-1.5 py-0.5">{check.profile}</span>}
+          {check.position && <span className="rounded bg-white/5 px-1.5 py-0.5">{check.position}</span>}
+          {check.effect && <span className="rounded bg-white/5 px-1.5 py-0.5">{check.effect}</span>}
+          {(check.successes ?? 0) > 0 && roll?.successes === undefined && (
+            <span>{check.successes} successes</span>
+          )}
+        </div>
+      )}
       {stakes && <div className="text-xs font-sans text-stone-400">{stakes}</div>}
     </div>
   );
