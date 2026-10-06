@@ -102,15 +102,17 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
   const addProvider = useCallback(() => {
     const name = uniqueName('new-provider', providers);
     setProviders({ ...providers, [name]: { ...config.media[family] } });
-  }, [config.media, family, providers, setProviders]);
+    select(name);
+  }, [config.media, family, providers, select, setProviders]);
 
   const duplicateProvider = useCallback(
     (name: string) => {
       const source = name === 'default' ? config.media[family] : providers[name];
       const copyName = uniqueName(`${name}-copy`, providers);
       setProviders({ ...providers, [copyName]: { ...(source as object) } });
+      select(copyName);
     },
-    [config.media, family, providers, setProviders]
+    [config.media, family, providers, select, setProviders]
   );
 
   const renameProvider = useCallback(
