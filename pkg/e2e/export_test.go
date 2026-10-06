@@ -1,12 +1,12 @@
-package gui
+//go:build e2e
+
+package e2e
 
 import (
 	"bytes"
 	"compress/gzip"
 	"context"
-
 	"encoding/base64"
-	"github.com/chromedp/cdproto/page"
 	"io"
 	"net/url"
 	"os"
@@ -15,76 +15,34 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chromedp/cdproto/log"
-	"github.com/chromedp/cdproto/runtime"
-	"github.com/chromedp/chromedp"
-
 	"github.com/darkliquid/localrpg/pkg/engine"
+	"github.com/darkliquid/localrpg/pkg/gui"
 )
 
 // exportedBundleFixture builds a played campaign and exports it as a web bundle,
-// returning the bundle's index.html path. It skips when the player has not been
-// built, because a bundle ships that build.
+// returning the bundle's page path and the export's own messages. It skips when
+// the player has not been built, because a bundle ships that build.
 func exportedBundleFixture(t *testing.T) (string, []string) {
 	t.Helper()
 
-	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "config.yaml"),
-		[]byte("media:\n  tts:\n    type: builtin\n    auto_play: false\n  image:\n    type: disabled\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	svc := NewService(root)
-	t.Cleanup(svc.Close)
-	paths := svc.GetResolver()
-
-	for name, body := range map[string]string{
-		"systems/freeform/system.yaml": "id: freeform\nname: Freeform\nversion: \"1.0\"\n",
-		"worlds/harbour/world.yaml":    "id: harbour\nname: Harbour Realm\n",
-	} {
-		path := filepath.Join(root, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(body), 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	session, err := engine.InitGame(paths, engine.InitOptions{
-		GameID: "campaign-01", SystemID: "freeform", WorldID: "harbour", PlayerName: "Sean",
-	})
-	if err != nil {
-		t.Fatalf("InitGame: %v", err)
-	}
-	_ = session.Close()
-
-	entities := filepath.Join(paths.GameDir("campaign-01"), "entities")
-	if err := os.MkdirAll(entities, 0755); err != nil {
-		t.Fatal(err)
-	}
-	for name, body := range map[string]string{
+	f := NewFixture(t, "media:\n  tts:\n    type: builtin\n    auto_play: false\n  image:\n    type: disabled\n")
+	f.WriteSystem(t, "freeform", "Freeform")
+	f.WriteWorld(t, "harbour", "Harbour Realm", nil)
+	f.InitGame(t, engine.InitOptions{GameID: "campaign-01", SystemID: "freeform", WorldID: "harbour", PlayerName: "Sean"})
+	f.WriteEntities(t, "campaign-01", map[string]string{
 		"garrick.md":  "---\nid: garrick\nname: Garrick\ntype: character\n---\nA grim guard.\n",
 		"the-quay.md": "---\nid: the-quay\nname: The Quay\ntype: location\n---\nSalt air.\n",
 		"sean.md":     "---\nid: sean\nname: Sean O'Malley\ntype: character\n---\nA traveller.\n",
-	} {
-		if err := os.WriteFile(filepath.Join(entities, name), []byte(body), 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	})
+	f.WriteHistory(t, "campaign-01", `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"look","narration":"The quay is quiet.","location":"the-quay","segments":[{"kind":"narration","text":"The quay is quiet by [[the-quay]]."},{"kind":"speech","speaker":"Garrick","speaker_id":"garrick","text":"Keep moving."},{"kind":"speech","speaker":"Sean","speaker_id":"sean","player":true,"text":"I will."}]}`+"\n")
 
-	history := `{"number":1,"timestamp":"2026-09-21T10:00:00Z","mode":"Do","input":"look","narration":"The quay is quiet.","location":"the-quay","segments":[{"kind":"narration","text":"The quay is quiet by [[the-quay]]."},{"kind":"speech","speaker":"Garrick","speaker_id":"garrick","text":"Keep moving."},{"kind":"speech","speaker":"Sean","speaker_id":"sean","player":true,"text":"I will."}]}` + "\n"
-	if err := os.WriteFile(filepath.Join(paths.GameDir("campaign-01"), "history.jsonl"), []byte(history), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	events := svc.SubscribeExportEvents()
-	defer svc.UnsubscribeExportEvents(events)
+	events := f.Service.SubscribeExportEvents()
+	defer f.Service.UnsubscribeExportEvents(events)
 
 	out := t.TempDir()
 	// The app's own export request: art and clips are on by default in the UI, and a
 	// bundle that carries neither is not what the theatre shows.
-	if _, err := svc.StartExport(context.Background(), ExportRequestDTO{
+	if _, err := f.Service.StartExport(context.Background(), gui.ExportRequestDTO{
 		GameID: "campaign-01", Format: "web", OutDir: out, Art: true, Audio: true,
 	}); err != nil {
 		t.Fatalf("StartExport: %v", err)
@@ -121,8 +79,7 @@ func exportedBundleFixture(t *testing.T) (string, []string) {
 // asserts the theatre's own stage, portraits, dialogue panel, and transport render,
 // and that the story advances.
 func TestExportedBundlePlaysTheTheatre(t *testing.T) {
-	browser := requireBrowser(t)
-	if _, err := AssetFS(); err != nil {
+	if _, err := gui.AssetFS(); err != nil {
 		t.Skipf("the player has not been built: %v", err)
 	}
 
@@ -141,70 +98,12 @@ func TestExportedBundlePlaysTheTheatre(t *testing.T) {
 		t.Errorf("coverage = %q, want both speech beats counted", coverage)
 	}
 
-	allocOptions := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.ExecPath(browser),
-		chromedp.Flag("headless", true),
-		chromedp.Flag("no-sandbox", true),
-		chromedp.Flag("disable-gpu", true),
-		chromedp.WSURLReadTimeout(45*time.Second),
-	)
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), allocOptions...)
-	defer cancelAlloc()
-	taskCtx, cancelTask := chromedp.NewContext(allocCtx)
-	defer cancelTask()
-	ctx, cancelTimeout := context.WithTimeout(taskCtx, 45*time.Second)
-	defer cancelTimeout()
-
-	var console []string
-	chromedp.ListenTarget(taskCtx, func(ev interface{}) {
-		switch event := ev.(type) {
-		case *runtime.EventConsoleAPICalled:
-			parts := make([]string, 0, len(event.Args))
-			for _, arg := range event.Args {
-				parts = append(parts, string(arg.Value))
-			}
-			console = append(console, event.Type.String()+": "+strings.Join(parts, " "))
-		case *runtime.EventExceptionThrown:
-			console = append(console, "exception: "+event.ExceptionDetails.Error())
-		case *log.EventEntryAdded:
-			console = append(console, "log: "+event.Entry.Text)
-		}
-	})
-
-	const instrument = `(function () {
-	  window.__clips = [];
-	  var Real = window.Audio;
-	  window.Audio = function (src) {
-	    var audio = new Real(src);
-	    var entry = { src: String(src).slice(0, 22), played: false, error: null };
-	    window.__clips.push(entry);
-	    audio.addEventListener('error', function () { entry.error = 'load'; });
-	    var play = audio.play.bind(audio);
-	    audio.play = function () {
-	      var result = play();
-	      if (result && result.then) {
-	        result.then(function () { entry.played = true; }).catch(function (err) { entry.error = String(err && err.name ? err.name : err); });
-	      }
-	      return result;
-	    };
-	    return audio;
-	  };
-	  window.Audio.prototype = Real.prototype;
-	})();`
-	if err := chromedp.Run(ctx, chromedp.ActionFunc(func(c context.Context) error {
-		_, err := page.AddScriptToEvaluateOnNewDocument(instrument).Do(c)
-		return err
-	})); err != nil {
-		t.Fatalf("instrument the page: %v", err)
-	}
+	b := NewBrowser(t, "")
+	b.InstrumentAudio()
 
 	bundleURL := (&url.URL{Scheme: "file", Path: bundlePath}).String()
-	if err := chromedp.Run(ctx,
-		chromedp.Navigate(bundleURL),
-		chromedp.WaitVisible(`//*[@id="story-player"]//header`, chromedp.BySearch),
-	); err != nil {
-		t.Fatalf("open the bundle: %v\npage console:\n%s", err, strings.Join(console, "\n"))
-	}
+	b.Navigate(bundleURL)
+	b.WaitVisible(`//*[@id="story-player"]//header`)
 
 	// Everything the page needs is inside it: no sidecars, no network, and the clips
 	// and faces the browser renders are carried in the file it already loaded.
@@ -228,27 +127,27 @@ func TestExportedBundlePlaysTheTheatre(t *testing.T) {
 		}
 	}
 
-	if failures := failedRequests(console); len(failures) > 0 {
+	if failures := failedRequests(b.Console()); len(failures) > 0 {
 		t.Fatalf("the bundle's page failed to load:\n%s", strings.Join(failures, "\n"))
 	}
 
 	// A story must not start itself: the beat it opens on is still the beat it is on
 	// two seconds later, and the transport offers to start it. The first beat is waited
 	// for, because the page inflates its bundle before it renders anything.
-	waitFor(t, ctx, "THE QUAY")
-	before := bundleDom(t, ctx)
+	waitForShape(t, b, "THE QUAY")
+	before := bundleDom(t, b)
 	if !strings.Contains(before, "Play") {
 		t.Errorf("expected a play control, got:\n%s", before)
 	}
 	time.Sleep(2 * time.Second)
-	if after := bundleDom(t, ctx); after != before {
+	if after := bundleDom(t, b); after != before {
 		t.Errorf("the story advanced without being started:\nbefore: %s\nafter:  %s", before, after)
 	}
 
 	// The theatre's own furniture, not a lookalike page: the header names the
 	// campaign and the place, the stage keeps the protagonist on it, and the
 	// transport is the theatre's.
-	first := bundleDom(t, ctx)
+	first := bundleDom(t, b)
 	for _, want := range []struct{ label, needle string }{
 		{"the header names the campaign", "CAMPAIGN-01"},
 		{"the header names the scene", "The Quay"},
@@ -264,29 +163,27 @@ func TestExportedBundlePlaysTheTheatre(t *testing.T) {
 	}
 
 	// Play is the gesture the browser needs for audio, and the story then runs itself.
-	if err := chromedp.Run(ctx, chromedp.Click(`button[data-transport="toggle"]`, chromedp.ByQuery)); err != nil {
-		t.Fatalf("start the bundle: %v", err)
-	}
+	b.Click(`button[data-transport="toggle"]`)
 
 	// A beat is never shortened by audio: the card holds for its own pace, so it is
 	// still on screen a second into playback. Before this, a clip the browser refused
 	// to start advanced every beat at once and the story flashed past.
 	time.Sleep(time.Second)
-	if mid := bundleDom(t, ctx); strings.Contains(mid, "NARRATOR") {
+	if mid := bundleDom(t, b); strings.Contains(mid, "NARRATOR") {
 		t.Fatalf("the opening beat was skipped instead of being held:\n%s", mid)
 	}
 
 	// The narration beat renders through the theatre's dialogue panel, and its link reads
 	// as the place's name: a bundle has no codex to open.
-	waitFor(t, ctx, "NARRATOR", "The quay is quiet by The Quay.")
-	if link := bundleDom(t, ctx); strings.Contains(link, "[[") {
+	waitForShape(t, b, "NARRATOR", "The quay is quiet by The Quay.")
+	if link := bundleDom(t, b); strings.Contains(link, "[[") {
 		t.Errorf("the bundle's prose still carries a link:\n%s", link)
 	}
 
 	// The speech beat puts the speaker's face on the stage beside their line, and the
 	// protagonist is labelled under their own.
-	waitFor(t, ctx, "GARRICK", "Keep moving.", "data:image/")
-	waitFor(t, ctx, "Sean O'Malley")
+	waitForShape(t, b, "GARRICK", "Keep moving.", "data:image/")
+	waitForShape(t, b, "Sean O'Malley")
 
 	// Every clip the story reached must have played. A character line that the browser
 	// refused shows up here as an error or as a clip that never started, which is the
@@ -299,9 +196,9 @@ func TestExportedBundlePlaysTheTheatre(t *testing.T) {
 	// latency is nondeterministic, the second clip was sometimes still pending and the
 	// test failed on "a clip never started" for a bundle that played both. Wait for the
 	// clips to settle instead of taking a single snapshot.
-	clips := waitForClips(t, ctx)
+	clips := b.WaitForClips()
 	if clips == "[]" {
-		t.Fatalf("the story played no clips at all:\n%s", bundleDom(t, ctx))
+		t.Fatalf("the story played no clips at all:\n%s", bundleDom(t, b))
 	}
 	if strings.Contains(clips, `"error":"`) {
 		t.Errorf("a clip failed to play: %s", clips)
@@ -309,54 +206,8 @@ func TestExportedBundlePlaysTheTheatre(t *testing.T) {
 	if strings.Contains(clips, `"played":false`) {
 		t.Errorf("a clip never started: %s", clips)
 	}
-	if strings.Contains(bundleDom(t, ctx), "could not play") {
-		t.Errorf("the player reported a line it could not play:\n%s", bundleDom(t, ctx))
-	}
-}
-
-// waitForClips returns the browser's recorded clips once they have settled, or the last
-// snapshot when the deadline passes so the caller can report what was still outstanding.
-// A clip settles when its play promise resolves; one whose load errored is settled too,
-// because the caller reports that as a failure. A clip that never starts and never errors
-// is the case the deadline exists for.
-func waitForClips(t *testing.T, ctx context.Context) string {
-	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		var clips string
-		if err := chromedp.Run(ctx, chromedp.Evaluate(`JSON.stringify(window.__clips || [])`, &clips)); err != nil {
-			t.Fatal(err)
-		}
-		settled := clips != "[]" &&
-			(!strings.Contains(clips, `"played":false`) || strings.Contains(clips, `"error":"`))
-		if settled || time.Now().After(deadline) {
-			return clips
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-}
-
-// waitFor waits for every needle to appear, which the typewriter reveal makes a
-// matter of time rather than of a single frame.
-func waitFor(t *testing.T, ctx context.Context, needles ...string) {
-	t.Helper()
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		shape := bundleDom(t, ctx)
-		missing := ""
-		for _, needle := range needles {
-			if !strings.Contains(strings.ToUpper(shape), strings.ToUpper(needle)) {
-				missing = needle
-				break
-			}
-		}
-		if missing == "" {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("the bundle never showed %q:\n%s", missing, shape)
-		}
-		time.Sleep(200 * time.Millisecond)
+	if strings.Contains(bundleDom(t, b), "could not play") {
+		t.Errorf("the player reported a line it could not play:\n%s", bundleDom(t, b))
 	}
 }
 
@@ -405,21 +256,43 @@ func failedRequests(console []string) []string {
 	return failures
 }
 
+// waitForShape waits for every needle to appear in the rendered bundle's shape
+// (header, portraits, text, transport), which the typewriter reveal makes a
+// matter of time rather than of a single frame. Unlike the harness's text-based
+// WaitFor it can see an inlined portrait, whose src is not part of the page text.
+func waitForShape(t *testing.T, b *Browser, needles ...string) {
+	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		shape := bundleDom(t, b)
+		missing := ""
+		for _, needle := range needles {
+			if !strings.Contains(strings.ToUpper(shape), strings.ToUpper(needle)) {
+				missing = needle
+				break
+			}
+		}
+		if missing == "" {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the bundle never showed %q:\n%s", missing, shape)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 // bundleDom reports what the player actually rendered, so a failure says whether
 // the stage, the portraits, or the dialogue is missing.
-func bundleDom(t *testing.T, ctx context.Context) string {
+func bundleDom(t *testing.T, b *Browser) string {
 	t.Helper()
 	const script = `JSON.stringify({
 	  header: (document.querySelector('header') || {}).innerText || '',
 	  portraits: Array.from(document.querySelectorAll('img')).map(img => (img.getAttribute('src') || '').slice(0, 22)),
 	  namePlate: (document.querySelector('#story-player [class*="absolute -top-3.5"]') || {}).textContent || '',
-	  text: (document.getElementById('story-player') || {}).innerText || '', 
+	  text: (document.getElementById('story-player') || {}).innerText || '',
 	  transport: Array.from(document.querySelectorAll('#story-player button')).map(b => b.getAttribute('title') || b.textContent || '').join('|'),
 	  backgrounds: Array.from(document.querySelectorAll('#story-player [style*="background"]')).length,
 	})`
-	var out string
-	if err := chromedp.Run(ctx, chromedp.Evaluate(script, &out)); err != nil {
-		return "probe failed: " + err.Error()
-	}
-	return out
+	return b.Eval(script)
 }

@@ -12,11 +12,12 @@ mise run install:vale-styles # vale sync: download the style packages when .vale
 mise run build          # frontend bundle -> pkg/gui/dist, then bin/localrpg
 mise run build:frontend # npm run build in frontend/ (tsc + vite)
 mise run build:backend  # depends on build:frontend
-mise run test           # go test -v -count=1 ./...  AND  mise run test:frontend
+mise run test           # go test -v -count=1 ./...  AND  mise run test:frontend  AND  mise run test:e2e
 mise run test:backend   # go test -v -count=1 ./...
-mise run test:frontend  # npx tsc --noEmit, the tree model check and the player bundle check (in frontend/)
-mise run lint           # markdownlint, goreleaser check, actionlint, go vet ./...
-mise run lint:docs      # markdownlint engine on the embedded help articles (frontend/scripts/lintDocs.mjs)
+mise run test:frontend  # npx tsc --noEmit and npx vitest run (in frontend/)
+mise run test:e2e       # go test -tags e2e ./pkg/e2e/... (skips without a browser)
+mise run lint           # rumdl, goreleaser check, actionlint, go vet ./...
+mise run lint:docs      # rumdl over the embedded help articles (pkg/gui/docs, .rumdl.toml)
 mise run lint:prose     # Vale over tracked prose and source comments (report only; STRICT=1 to gate)
 mise run lint:goreleaser # goreleaser check
 mise run lint:actions   # actionlint over .github/workflows
@@ -121,7 +122,7 @@ in the environment (CI, some shells) can lack the `project` scope while the keyr
 
 ## CI, releases and the showcase site
 
-Three workflows live in `.github/workflows/`. `ci.yml` runs on every push to `main` and every pull request: a Go job (native headers, frontend build, `go vet`, `go test`), a web job (`tsc --noEmit`, markdownlint), and a packaging job (`goreleaser check`, `mise run site:build`, plus the built site as an artifact). It also declares `workflow_call`, so `release.yml` reuses it as a `verify` job and a tag can only ship what passed.
+Three workflows live in `.github/workflows/`. `ci.yml` runs on every push to `main` and every pull request: a Go job (native headers, frontend build, `go vet`, `go test`), a web job (`tsc --noEmit`, vitest, rumdl), and a packaging job (`goreleaser check`, `mise run site:build`, plus the built site as an artifact). It also declares `workflow_call`, so `release.yml` reuses it as a `verify` job and a tag can only ship what passed.
 
 `release.yml` runs on `v*` tags and published releases. Every platform needs CGO, so no runner can cross-compile the matrix: `.goreleaser.yaml` defines one build per target (OS plus architecture), each with a `skip` template that disables it unless `RELEASE_TARGET` names its target. The matrix runs one native runner per target — `ubuntu-latest` and `ubuntu-24.04-arm` for the two Linux architectures (a CGO build for arm64 cannot come from an amd64 host), `macos-latest` twice for both macOS slices, and `windows-latest` — uploads archives, and a final job combines the checksums and publishes or enriches the release with `gh`. GoReleaser's own split/merge is a Pro feature, which is why publishing is done with `gh`. The arm64 Linux runner is a hosted runner, free only for public repositories; on a private repo, drop that matrix entry. `Version` in `cmd/localrpg/main.go` is a `var` so `-X main.Version` can stamp the tag.
 
@@ -141,40 +142,42 @@ Anything that reaches a commit is public the moment it is pushed, so scanning is
 
 If a key does reach a commit, rotate it first: rewriting history does not un-publish it.
 
-
 ## Known advisories
 
-`npm audit` in `frontend/` reports **nothing**. That is deliberate, and the way it
-was reached is worth knowing before anyone adds a linter CLI back.
+`npm audit` in `frontend/` reports **nothing**. Two things keep it that way: the
+documentation linter is a Rust binary rather than a Node package, and one
+transitive dependency is pinned by an override.
 
-The docs lint once used `markdownlint-cli2`, which reported five high-severity
-findings. They were one advisory reflected five times: `braces` stack-exhaustion
-denial of service through deeply nested patterns (GHSA-vfj7-8cjw-p6xm,
-CVE-2026-93687), reached via `globby` → `micromatch` → `braces`. `micromatch`,
-`fast-glob`, `globby` and `markdownlint-cli2` were flagged only for sitting above
-it. There was no fix: `braces` 3.0.3 was the newest release and the advisory listed
-no patched version, and `npm audit`'s suggested remedy was to downgrade
-`markdownlint-cli2` twenty-three minor versions.
+**The docs lint is `rumdl`, not a Node linter.** `mise run lint:docs` runs
+`rumdl check pkg/gui/docs`, with rumdl pinned in `mise.toml` like `gitleaks`,
+`actionlint` and `vale`. rumdl is a Rust reimplementation of markdownlint's rules
+that keeps the same numbering, so `.rumdl.toml` reads like the markdownlint config
+it replaced. This is deliberate: every Node-based markdown linter dragged an
+advisory in with it. `markdownlint-cli2` brought `braces` (stack-exhaustion denial
+of service through deeply nested patterns, GHSA-vfj7-8cjw-p6xm, CVE-2026-93687)
+via `globby` → `micromatch` → `braces`, with no patched release and a suggested
+remedy of downgrading twenty-three minor versions; `markdownlint-cli` avoided
+`braces` but pinned `js-yaml ~5.2.1`, inside a different advisory's range. The
+engine itself then turned out to reach a vulnerable `katex` through
+`micromark-extension-math`. A native binary has none of that surface, and
+`rumdl check` reports the same result on the corpus: no issues in 19 files.
 
-The lesson is that the linter was never the problem. `markdownlint`, the engine
-whose rules actually decide pass or fail, depends only on `micromark` and
-`string-width` and has **no advisories at all**. The advisory arrived with the CLI
-wrapper, which exists to glob file arguments. Both wrappers have this shape:
-`markdownlint-cli2` brings `braces`, and `markdownlint-cli` avoids it but pins
-`js-yaml ~5.2.1`, which is inside a different advisory's range.
+**Do not add a Node markdown linter back.** If the docs ever need a rule the config
+cannot express, add it to `.rumdl.toml`, which is where the three deviations from
+the default ruleset live with their explanations. rumdl adds rules of its own
+(MD057, MD061-MD094) and is still 0.x, so re-check the corpus after a version bump.
 
-So `mise run lint:docs` runs `frontend/scripts/lintDocs.mjs`, which enumerates the
-files itself and calls the engine directly. Same engine, same rules, byte-identical
-output, and nothing vulnerable in the tree.
+One advisory does remain in the tree, held down by an `overrides` block in
+`frontend/package.json`:
 
-**Do not replace it with a markdownlint CLI.** If the docs ever need a rule the
-script cannot express, add it to the `config` object in that script, which is where
-the three deviations from the default ruleset live with their explanations. The
-`.markdownlint-cli2.jsonc` those came from is gone.
+- **`source-map-js`** (GHSA-68fv-2mgg-jv7q, event-loop denial of service through
+  indexed source-map section offsets), reached through `postcss`,
+  `@tailwindcss/node`, `css-tree` and `magicast`. The override forces `^1.2.2`, a
+  patch-level fix that is API-compatible with every consumer, so it is a version
+  floor rather than a fork.
 
 No CI job runs `npm audit`, so a new advisory would not gate a build. If one is
 added, it should start from a clean tree.
-
 
 ## Prose linting with Vale
 
@@ -357,6 +360,15 @@ Notable built-ins that need no server or GPU: `narrative-oracle` (LLM), `native-
 Resolution order (`pkg/config/manager.go`): `$LOCALRPG_CONFIG_DIR`, else the XDG config search path (`$XDG_CONFIG_HOME` then `$XDG_CONFIG_DIRS`), for `config.yaml`; then an optional `./localrpg.yaml` merged on top, which flips `IsLocalOverride`. `Save` writes to the local override when one exists, otherwise to the user config. `gui.NewService(rootDir)` has its own twist: when `--dir` is set to anything other than `.`, it treats `<rootDir>/config.yaml` as the user config and resolves relative `paths.*` against `rootDir`.
 
 Storage paths are resolved by `pkg/paths.Resolve` from the XDG bases (`github.com/adrg/xdg`), which fall back to native per-OS directories: `systems`/`worlds`/`games` under `DataHome/localrpg`, `cache` under `CacheHome/localrpg`. An empty `paths.*` uses those defaults, an absolute value is used verbatim, and a relative value joins the category base — unless `--dir` or `./localrpg.yaml` puts the process in project mode, where relative values resolve against the project root (the previous behaviour). Nothing is migrated; the GUI logs a `paths.legacy_relative` warning when a legacy working-directory folder exists and the resolved XDG directory is empty.
+
+## Testing
+
+Two suites, one runner each. `mise run test` runs both plus the backend.
+
+- **Frontend unit and component tests: Vitest + React Testing Library + jsdom.** The runner is configured in `frontend/vitest.config.ts` (not the app's `vite.config.ts`, which sets an output directory and loads Tailwind). Tests live beside the code as `*.test.ts`/`*.test.tsx` and import `describe`/`it`/`expect` from `vitest` explicitly; there are no globals. `frontend/src/test/setup.ts` installs the jest-dom matchers, stubs the browser APIs jsdom lacks, and calls RTL's `cleanup`. The old `frontend/scripts/check*.mjs` files are gone, and the docs lint is no longer a Node script at all: `mise run lint:docs` runs `rumdl` over `pkg/gui/docs`.
+- **Browser end-to-end tests: `pkg/e2e`, behind the `e2e` build tag.** The default `go test ./...` never compiles them, so a machine without Chrome stays fast; run them with `mise run test:e2e` (`go test -tags e2e ./pkg/e2e/...`). `harness.go` wraps chromedp (`NewBrowser`, `Click`, `Type`, `WaitFor`, `Poll`, `InstrumentAudio`) and `fixture.go` starts the real `gui.Service` on a temp root behind an `httptest` server (`NewFixture`, `WriteSystem`, `WriteWorld`, `InitGame`, `WriteEntities`, `WriteHistory`). The tests skip, never fail, when `driver.Available` finds no usable browser.
+- **They live in `pkg/e2e`, not `pkg/gui`, because the harness imports `pkg/gui`** (`NewService`, `NewServer`, `AssetHandler`); keeping them in `pkg/gui` would be an import cycle. They use only the exported `pkg/gui` surface.
+- **A failure writes artifacts** to `$E2E_ARTIFACT_DIR/<test name>/` (default `test-results/`): `body.txt`, `dom.json`, and `failure.png`. The CI `e2e` job installs Chrome with `browser-actions/setup-chrome`, runs the suite, and uploads `test-results/` so a red run is debuggable.
 
 ## Conventions
 

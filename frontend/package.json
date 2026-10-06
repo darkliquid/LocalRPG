@@ -7,10 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build && vite build --config vite.player.config.ts && touch ../pkg/gui/dist/.gitkeep",
     "preview": "vite preview",
-    "lint:docs": "node scripts/lintDocs.mjs",
-    "check:player-bundle": "node scripts/checkPlayerBundle.mjs",
-    "check:tree-model": "node scripts/checkTreeModel.mjs",
-    "check:entity-scaffold": "node scripts/checkEntityScaffold.mjs"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -35,13 +34,23 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^26.6.4",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^5.0.3",
     "esbuild": "^0.28.2",
-    "markdownlint": "^0.41.1",
+    "jsdom": "^30.1.2",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vitest": "^5.0.3"
+  },
+  "overrides": {
+    "source-map-js": "^1.2.2"
   }
 }

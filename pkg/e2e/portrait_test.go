@@ -1,11 +1,13 @@
-package gui
+//go:build e2e
+
+package e2e
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"image"
+	_ "image/jpeg"
 	_ "image/png"
 	"io/fs"
 	"net/url"
@@ -13,9 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/chromedp/chromedp"
+	"github.com/darkliquid/localrpg/pkg/gui"
 )
 
 // TestMirroredPortraitRendersInsideItsRoundedBox renders the theatre's own portrait
@@ -23,8 +24,7 @@ import (
 // paints and stays inside its rounded border. The image carries the rounding itself,
 // because a transformed child escapes a parent's rounded clip in some engines.
 func TestMirroredPortraitRendersInsideItsRoundedBox(t *testing.T) {
-	browser := requireBrowser(t)
-	assets, err := AssetFS()
+	assets, err := gui.AssetFS()
 	if err != nil {
 		t.Skipf("no player build: %v", err)
 	}
@@ -63,38 +63,19 @@ func TestMirroredPortraitRendersInsideItsRoundedBox(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	allocOptions := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.ExecPath(browser), chromedp.Flag("headless", true),
-		chromedp.Flag("no-sandbox", true), chromedp.Flag("disable-gpu", true),
-		chromedp.WSURLReadTimeout(45*time.Second))
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), allocOptions...)
-	defer cancelAlloc()
-	taskCtx, cancelTask := chromedp.NewContext(allocCtx)
-	defer cancelTask()
-	ctx, cancelTimeout := context.WithTimeout(taskCtx, 30*time.Second)
-	defer cancelTimeout()
-
-	if err := chromedp.Run(ctx,
-		chromedp.Navigate((&url.URL{Scheme: "file", Path: file}).String()),
-		chromedp.Poll(`Array.from(document.images).every(i => i.complete && i.naturalWidth > 0)`, nil),
-	); err != nil {
-		t.Fatalf("open the probe page: %v", err)
-	}
+	b := NewBrowser(t, "")
+	b.Navigate((&url.URL{Scheme: "file", Path: file}).String())
+	b.Poll(`Array.from(document.images).every(i => i.complete && i.naturalWidth > 0)`, "the probe images load")
 
 	var raw string
 	const rects = `JSON.stringify(Array.from(document.querySelectorAll('.probe-box')).map(el => { var r = el.getBoundingClientRect(); return {X:r.x,Y:r.y,W:r.width,H:r.height}; }))`
-	if err := chromedp.Run(ctx, chromedp.Evaluate(rects, &raw)); err != nil {
-		t.Fatal(err)
-	}
+	raw = b.Eval(rects)
 	var boxes []struct{ X, Y, W, H float64 }
 	if err := json.Unmarshal([]byte(raw), &boxes); err != nil {
 		t.Fatalf("boxes %q: %v", raw, err)
 	}
 
-	var shot []byte
-	if err := chromedp.Run(ctx, chromedp.FullScreenshot(&shot, 100)); err != nil {
-		t.Fatal(err)
-	}
+	shot := b.FullScreenshot(100)
 	shotPath := filepath.Join(t.TempDir(), "probe.png")
 	if err := os.WriteFile(shotPath, shot, 0644); err != nil {
 		t.Fatal(err)
