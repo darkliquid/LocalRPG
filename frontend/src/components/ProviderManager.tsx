@@ -2,28 +2,12 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppConfig, MediaInspectEntry } from '../types';
 import { APIClient } from '../api/client';
 import { TierBadge } from './providers/TierBadge';
-
-export type ProviderFamily = 'tts' | 'stt' | 'image';
-
-// purposesFor is the family's uses, in display order. STT has none yet.
-export function purposesFor(family: ProviderFamily): string[] {
-  if (family === 'tts') return ['narrator', 'npc'];
-  if (family === 'image') return ['scene', 'portrait', 'placeholder'];
-  return [];
-}
-
-// providersKey is the config field holding a family's named providers.
-export function providersKey(family: ProviderFamily): 'tts_providers' | 'stt_providers' | 'image_providers' {
-  return `${family}_providers` as const;
-}
-
-// uniqueName appends a numeric suffix until the name is free.
-export function uniqueName(base: string, taken: Record<string, unknown>): string {
-  if (!(base in taken)) return base;
-  let n = 2;
-  while (`${base}-${n}` in taken) n++;
-  return `${base}-${n}`;
-}
+import {
+  ProviderFamily,
+  providersKey,
+  purposesFor,
+  uniqueName,
+} from '../lib/mediaProviders';
 
 // renameInPurposes rewrites every purpose that pointed at oldName.
 export function renameInPurposes(purposes: Record<string, string> | undefined, oldName: string, newName: string): Record<string, string> {
