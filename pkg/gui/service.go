@@ -4195,6 +4195,7 @@ func (s *Service) GetSystem(ctx context.Context, id string) (*SystemDetailDTO, e
 		Script:            script,
 		RulesPrompt:       rulesPrompt,
 		CharacterCreation: m.CharacterCreation,
+		Mechanics:         m.Mechanics,
 	}, nil
 }
 
@@ -4228,6 +4229,7 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 		Version:           req.Version,
 		Description:       req.Description,
 		CharacterCreation: req.CharacterCreation,
+		Mechanics:         req.Mechanics,
 	}
 	data, err := yaml.Marshal(manifest)
 	if err != nil {
@@ -4251,7 +4253,12 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 		}
 	}
 
-	return s.GetSystem(ctx, id)
+	detail, err := s.GetSystem(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	detail.Warnings = validateMechanics(req.Mechanics)
+	return detail, nil
 }
 
 func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, error) {

@@ -456,6 +456,11 @@ type SystemDetailDTO struct {
 	Script            string                     `json:"script"`
 	RulesPrompt       string                     `json:"rules_prompt"`
 	CharacterCreation core.CharacterCreationSpec `json:"character_creation"`
+	// Mechanics is the system's declarative mechanics block, when it has one.
+	Mechanics *core.MechanicsSpec `json:"mechanics,omitempty"`
+	// Warnings are non-fatal findings from the last save, so a client can show
+	// them without rejecting the write.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 type CreateSystemRequestDTO struct {
@@ -466,6 +471,7 @@ type CreateSystemRequestDTO struct {
 	Script            string                     `json:"script,omitempty"`
 	RulesPrompt       string                     `json:"rules_prompt,omitempty"`
 	CharacterCreation core.CharacterCreationSpec `json:"character_creation,omitempty"`
+	Mechanics         *core.MechanicsSpec        `json:"mechanics,omitempty"`
 }
 
 type WorldEntitySummaryDTO struct {

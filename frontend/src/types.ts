@@ -470,6 +470,8 @@ export interface SystemDetail {
   script: string;
   rules_prompt?: string;
   character_creation?: CharacterCreationSpec;
+  mechanics?: MechanicsSpec;
+  warnings?: string[];
 }
 
 export interface CreateSystemRequest {
@@ -480,6 +482,119 @@ export interface CreateSystemRequest {
   script?: string;
   rules_prompt?: string;
   character_creation?: CharacterCreationSpec;
+  mechanics?: MechanicsSpec;
+}
+
+export interface StatSpec {
+  id: string;
+  label?: string;
+  type?: string;
+  default?: unknown;
+  min?: number;
+  max?: number;
+}
+
+export interface SkillSpec {
+  id: string;
+  label?: string;
+  stat?: string;
+}
+
+export interface HealthSpec {
+  stat: string;
+  max_stat?: string;
+  zero_effect?: string;
+}
+
+export interface DifficultySpec {
+  id: string;
+  label?: string;
+  target: number;
+}
+
+export interface LadderStep {
+  min: number;
+  outcome: string;
+}
+
+export interface SuccessOutcome {
+  min: number;
+  max: number;
+  outcome: string;
+}
+
+export interface ResolutionProfile {
+  label?: string;
+  notation?: string;
+  dc?: number;
+  ladder?: LadderStep[];
+  success_on?: string;
+  outcomes?: SuccessOutcome[];
+  position?: string[];
+  effect?: string[];
+}
+
+export interface CheckConventions {
+  notation?: string;
+  outcome?: string[];
+  difficulty?: DifficultySpec[];
+  profiles?: Record<string, ResolutionProfile>;
+}
+
+export interface CurrencySpec {
+  stat: string;
+  label?: string;
+}
+
+export interface EarnRule {
+  on: string;
+  outcome?: string;
+  rank?: string;
+  amount: number;
+}
+
+export interface EffectSpec {
+  type: string;
+  stat?: string;
+  amount?: number;
+  max?: number;
+  tag?: string;
+  hook?: string;
+}
+
+export interface UnlockSpec {
+  id: string;
+  label: string;
+  description?: string;
+  cost: number;
+  requires?: string[];
+  effects?: EffectSpec[];
+}
+
+export interface LevelSpec {
+  at: number;
+  label?: string;
+  effects?: EffectSpec[];
+}
+
+export interface AdvancementSpec {
+  currency: CurrencySpec;
+  mode?: string;
+  earn?: EarnRule[];
+  track_size?: number;
+  gate?: string;
+  unlocks?: UnlockSpec[];
+  levels?: LevelSpec[];
+}
+
+export interface MechanicsSpec {
+  stats?: StatSpec[];
+  skills?: SkillSpec[];
+  health?: HealthSpec;
+  checks?: CheckConventions;
+  allow_freeform_state?: boolean;
+  engagement?: string;
+  advancement?: AdvancementSpec;
 }
 
 export interface WorldEntitySummary {

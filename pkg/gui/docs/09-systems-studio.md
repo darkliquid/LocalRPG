@@ -32,6 +32,10 @@ mechanics:
     outcome: [failure, mixed, success]
 ```
 
+## Editing Mechanics in the Studio
+
+The **Mechanics** tab edits the whole `mechanics` block: stats, skills, health, check conventions (including resolution profiles), advancement, freeform state, and the engagement default. Each list adds and removes its own rows, and the studio warns about an invalid id, a duplicate id, a skill whose stat is undeclared, or a malformed profile before it saves.
+
 ## Crafting the Rules Prompt (`prompts/rules.md`)
 
 The rules prompt guides the GM agent when calling for checks:

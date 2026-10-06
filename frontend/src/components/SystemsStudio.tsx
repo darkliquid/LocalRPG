@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
-import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure } from '../types';
-import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2 } from 'lucide-react';
+import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec } from '../types';
+import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_SYSTEM_TEMPLATE } from '../templates/referenceTemplates';
 import MarkdownEditor from './editor/MarkdownEditor';
+import { MechanicsEditor } from './MechanicsEditor';
 
 type SystemSelection = { kind: 'saved'; id: string } | { kind: 'draft' } | null;
 
@@ -25,7 +26,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [selection, setSelection] = useState<SystemSelection>(null);
   const [draft, setDraft] = useState<SystemDraft | null>(null);
   const [pendingSelection, setPendingSelection] = useState<SystemSelection>(null);
-  const [activeTab, setActiveTab] = useState<'manifest' | 'rules' | 'script'>('manifest');
+  const [activeTab, setActiveTab] = useState<'manifest' | 'rules' | 'mechanics' | 'script'>('manifest');
   const startModeRef = React.useRef(startMode);
 
   // Form state
@@ -35,6 +36,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [description, setDescription] = useState('');
   const [rulesPrompt, setRulesPrompt] = useState('');
   const [script, setScript] = useState('');
+  // The system's declarative mechanics block, edited as one object.
+  const [mechanics, setMechanics] = useState<MechanicsSpec>({});
   // Character creation prompts a player answers when starting with this system.
   const [creationPreamble, setCreationPreamble] = useState('');
   const [creationFields, setCreationFields] = useState<CharacterCreationField[]>([]);
@@ -90,6 +93,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       setDescription(detail.description || '');
       setRulesPrompt(detail.rules_prompt || REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
       setScript(detail.script || REFERENCE_SYSTEM_TEMPLATE.script);
+      setMechanics(detail.mechanics || {});
       setCreationPreamble(detail.character_creation?.preamble || '');
       setCreationFields(detail.character_creation?.fields || []);
     } catch (err) {
@@ -125,6 +129,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setDescription('');
     setRulesPrompt('');
     setScript('');
+    setMechanics({});
     setCreationPreamble('');
     setCreationFields([]);
     setActiveTab('manifest');
@@ -139,6 +144,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setDescription(REFERENCE_SYSTEM_TEMPLATE.description);
     setRulesPrompt(REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
     setScript(REFERENCE_SYSTEM_TEMPLATE.script);
+    setMechanics({});
     setCreationPreamble('');
     setCreationFields([]);
     markDirty();
@@ -198,10 +204,15 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
           preamble: creationPreamble.trim() || undefined,
           fields: creationFields,
         },
+        mechanics: Object.keys(mechanics).length > 0 ? mechanics : undefined,
       };
 
       const saved = await APIClient.saveSystem(payload);
-      setToast({ type: 'success', message: `System "${saved.name}" saved successfully!` });
+      if (saved.warnings && saved.warnings.length > 0) {
+        setToast({ type: 'error', message: `Saved with warnings: ${saved.warnings.join('; ')}` });
+      } else {
+        setToast({ type: 'success', message: `System "${saved.name}" saved successfully!` });
+      }
       setDraft(null);
       await loadSystems(saved.id, 'browse');
       if (onSystemSaved) onSystemSaved();
@@ -338,6 +349,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               >
                 <BookOpen className="w-3.5 h-3.5" />
                 <span>rules.md</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('mechanics')}
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  activeTab === 'mechanics'
+                    ? 'bg-purple-600 text-white font-bold shadow'
+                    : 'text-stone-400 hover:text-white'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Mechanics</span>
               </button>
               <button
                 type="button"
@@ -663,6 +686,19 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               language="markdown"
               ariaLabel="System rules prompt"
               placeholder="Describe the resolution philosophy, dice mechanics and character stats the engine should follow..."
+            />
+          </div>
+        )}
+
+        {/* Tab 2b: Mechanics Editor */}
+        {activeTab === 'mechanics' && (
+          <div className="flex-1 overflow-y-auto min-h-0 pr-2">
+            <MechanicsEditor
+              mechanics={mechanics}
+              onChange={(next) => {
+                setMechanics(next);
+                markDirty();
+              }}
             />
           </div>
         )}
