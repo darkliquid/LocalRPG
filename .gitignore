@@ -42,3 +42,7 @@ todo.txt
 
 # Binaries
 /localrpg
+
+# End-to-end failure artifacts
+test-results/
+pkg/e2e/test-results/

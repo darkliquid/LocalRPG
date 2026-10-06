@@ -1,0 +1,17 @@
+# Markdown linting for the embedded help articles (pkg/gui/docs), run by
+# `mise run lint:docs`. rumdl is a Rust reimplementation of markdownlint's rules
+# that shares its rule numbering (MD001-MD056); it is pinned in mise.toml like the
+# other linters. The three settings below are the only deviations from the default
+# set, and they are the same ones the previous lint script configured.
+
+# Documentation is authored as prose that wraps naturally in the viewer, so line
+# length is not enforced.
+#
+# MarkdownDocViewer renders a small, known set of inline HTML, so inline HTML is
+# allowed.
+disable = ["MD013", "MD033"]
+
+# Each article carries its title in frontmatter and repeats it as the H1, so the
+# frontmatter title is not counted as a second top-level heading.
+[MD025]
+front_matter_title = ""
