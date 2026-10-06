@@ -4,8 +4,11 @@ import { APIClient } from '../api/client';
 import { TierBadge } from './providers/TierBadge';
 import {
   ProviderFamily,
+  entryNames,
+  mediaEntryValue,
   providersKey,
   purposesFor,
+  setMediaEntry,
   uniqueName,
 } from '../lib/mediaProviders';
 
@@ -28,14 +31,29 @@ interface ProviderManagerProps {
   family: ProviderFamily;
   config: AppConfig;
   onChange: (config: AppConfig) => void;
+  selected?: string;
+  onSelect?: (name: string) => void;
+  renderEditor?: (name: string, value: unknown, onChange: (value: unknown) => void) => React.ReactNode;
 }
 
 // ProviderManager lists every provider of a family and lets the user add,
 // duplicate, rename, remove, and choose defaults and purposes. It edits a draft
-// config through onChange; it never saves.
-export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config, onChange }) => {
+// config through onChange; it never saves. The selection is controlled when
+// `selected`/`onSelect` are supplied and local otherwise, so the manager stays
+// usable on its own.
+export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config, onChange, selected, onSelect, renderEditor }) => {
   const [entries, setEntries] = useState<MediaInspectEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [internalSelected, setInternalSelected] = useState<string>('default');
+
+  const activeSelected = selected ?? internalSelected;
+  const select = useCallback(
+    (name: string) => {
+      if (onSelect) onSelect(name);
+      else setInternalSelected(name);
+    },
+    [onSelect]
+  );
 
   const providers = (config.media[providersKey(family)] ?? {}) as Record<string, unknown>;
   const purposes = config.media.purposes;
@@ -60,7 +78,7 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
     return map;
   }, [entries]);
 
-  const names = useMemo(() => ['default', ...Object.keys(providers).sort()], [providers]);
+  const names = useMemo(() => entryNames(config, family), [config, family]);
 
   const emit = useCallback(
     (next: AppConfig) => onChange(next),
@@ -174,6 +192,13 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
                 </span>
               )}
               <span className="flex-1" />
+              <button
+                type="button"
+                onClick={() => select(name)}
+                className={`text-[11px] ${activeSelected === name ? 'text-purple-300' : 'text-stone-400 hover:text-purple-300'}`}
+              >
+                edit
+              </button>
               {!isDefault && (
                 <button type="button" onClick={() => setDefault(name)} className="text-[11px] text-stone-400 hover:text-emerald-300">
                   set default
@@ -203,6 +228,14 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
           );
         })}
       </ul>
+
+      {renderEditor && (
+        <div className="rounded-lg border border-stone-800 bg-stone-950/40 p-3">
+          {renderEditor(activeSelected, mediaEntryValue(config, family, activeSelected), (value) =>
+            emit(setMediaEntry(config, family, activeSelected, value))
+          )}
+        </div>
+      )}
 
       {purposesFor(family).length > 0 && (
         <div className="rounded-lg border border-stone-800 bg-stone-950/40 p-3">
