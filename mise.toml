@@ -50,14 +50,12 @@ description = "Run all Go unit and integration tests"
 run = "go test -v -count=1 ./..."
 
 [tasks."test:frontend"]
-description = "Run TypeScript type checks and the frontend model checks"
+description = "Run TypeScript type checks and the frontend test suite"
 dir = "frontend"
 depends = ["build:frontend"]
 run = """
 npx tsc --noEmit
-npm run check:tree-model
-npm run check:player-bundle
-npm run check:entity-scaffold
+npx vitest run
 """
 
 [tasks.test]
