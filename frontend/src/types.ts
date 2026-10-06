@@ -499,6 +499,50 @@ export interface ReferenceSystemsResponse {
   systems: ReferenceSystem[];
 }
 
+export interface ScenarioRange {
+  min: number;
+  max: number;
+}
+
+export interface ScenarioExpectations {
+  outcome?: string;
+  total?: ScenarioRange;
+  state?: Record<string, unknown>;
+  message_contains?: string;
+}
+
+export interface ScenarioStep {
+  action: string;
+  input?: string;
+  expect?: ScenarioExpectations;
+}
+
+export interface Scenario {
+  name: string;
+  seed: number;
+  setup?: { player?: { stats?: Record<string, unknown>; tags?: string[] } };
+  steps: ScenarioStep[];
+}
+
+export interface SystemTestRequest {
+  system: { id: string; script: string; mechanics?: MechanicsSpec };
+  scenarios: Scenario[];
+}
+
+export interface SystemTestFailure {
+  scenario: string;
+  step: number;
+  detail: string;
+}
+
+export interface SystemTestResponse {
+  failures?: SystemTestFailure[];
+}
+
+export interface SystemScenariosResponse {
+  scenarios?: Scenario[];
+}
+
 export interface StatSpec {
   id: string;
   label?: string;

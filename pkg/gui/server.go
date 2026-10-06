@@ -80,6 +80,10 @@ func routePattern(path string) string {
 			return "/api/game/{id}/" + suffix
 		}
 		return "/api/game/{id}"
+	case path == "/api/system/test":
+		return "/api/system/test"
+	case strings.HasPrefix(path, "/api/system/tests/"):
+		return "/api/system/tests/{id}"
 	case strings.HasPrefix(path, "/api/system/"):
 		return "/api/system/{id}"
 	case strings.HasPrefix(path, "/api/world/"):
@@ -996,6 +1000,42 @@ func (s *Server) handleReferenceSystemsRoute(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	writeJSON(w, res)
+}
+
+func (s *Server) handleSystemTestRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req SystemTestRequestDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	resp, err := s.service.TestSystem(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, resp)
+}
+
+func (s *Server) handleSystemTestsRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/system/tests/"), "/")
+	if id == "" {
+		http.Error(w, "missing system id", http.StatusBadRequest)
+		return
+	}
+	resp, err := s.service.SystemScenarios(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	writeJSON(w, resp)
 }
 
 func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {

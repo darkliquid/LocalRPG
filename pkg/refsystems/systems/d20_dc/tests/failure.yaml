@@ -1,0 +1,11 @@
+name: an untrained miss
+seed: 1
+setup:
+  player:
+    stats: { strength: 12 }
+steps:
+  - action: do
+    input: swing the axe
+    expect:
+      outcome: fail
+      message_contains: "misses DC"

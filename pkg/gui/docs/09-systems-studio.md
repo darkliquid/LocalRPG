@@ -78,6 +78,10 @@ onAction('roll', function (ctx) {
 });
 ```
 
+## Testing a System
+
+Deterministic scenarios live under `systems/<id>/tests/*.yaml`. The studio's **Run Tests** action runs them against the saved system and lists any assertion that failed, and `localrpg debug test-system <id>` runs the same scenarios from the command line. Add `--reference` to test a built-in reference system instead of one on disk.
+
 ## Live Studio Testing
 
 Use the built-in **Dice & Rules Tester** at the bottom of the Systems Studio to execute trial actions, verify dice formulas, and inspect returned state patches before deploying your system to a campaign.

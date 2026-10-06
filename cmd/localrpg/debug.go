@@ -26,11 +26,15 @@ type debugConfig struct {
 	Port         int
 	DebuggerPort int
 	ReportDir    string
+	// SystemID is the positional system id for `debug test-system`.
+	SystemID string
+	// Reference selects a shipped reference system rather than one on disk.
+	Reference bool
 }
 
 func parseDebugArgs(args []string) (string, debugConfig, error) {
 	if len(args) == 0 {
-		return "", debugConfig{}, fmt.Errorf("subcommand required: 'test-run' or 'server'")
+		return "", debugConfig{}, fmt.Errorf("subcommand required: 'test-run', 'test-system', or 'server'")
 	}
 
 	subcmd := args[0]
@@ -42,9 +46,14 @@ func parseDebugArgs(args []string) (string, debugConfig, error) {
 	fs.IntVar(&cfg.Port, "port", 8080, "App port")
 	fs.IntVar(&cfg.DebuggerPort, "debugger-port", 8089, "Live debugger port")
 	fs.StringVar(&cfg.ReportDir, "report-dir", "test-results", "Directory for test reports")
+	fs.BoolVar(&cfg.Reference, "reference", false, "Test a shipped reference system")
+	fs.StringVar(&cfg.SystemID, "system", "", "System id to test (positional also accepted)")
 
 	if err := fs.Parse(args[1:]); err != nil {
 		return "", debugConfig{}, err
+	}
+	if cfg.SystemID == "" && fs.NArg() > 0 {
+		cfg.SystemID = fs.Arg(0)
 	}
 
 	return subcmd, cfg, nil
@@ -105,6 +114,9 @@ func handleDebugCommand(args []string) {
 		defer cancel()
 		_ = dbgHttpServer.Shutdown(shutdownCtx)
 		_ = appHttpServer.Shutdown(shutdownCtx)
+
+	case "test-system":
+		os.Exit(runTestSystem(cfg))
 
 	case "test-run":
 		if cfg.Scenario == "" {

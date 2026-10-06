@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
-import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem } from '../types';
-import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal } from 'lucide-react';
+import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure } from '../types';
+import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
@@ -44,6 +44,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testFailures, setTestFailures] = useState<SystemTestFailure[]>([]);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -244,6 +246,33 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     }
   };
 
+  const handleRunTests = async () => {
+    if (!savedID) {
+      setToast({ type: 'error', message: 'Save the system before running its scenarios.' });
+      return;
+    }
+    setIsTesting(true);
+    setTestFailures([]);
+    try {
+      const stored = await APIClient.listSystemScenarios(savedID);
+      const resp = await APIClient.runSystemTest({
+        system: { id: savedID, script, mechanics },
+        scenarios: stored.scenarios ?? [],
+      });
+      const failures = resp.failures ?? [];
+      setTestFailures(failures);
+      if (failures.length === 0) {
+        setToast({ type: 'success', message: `All ${stored.scenarios?.length ?? 0} scenario(s) passed.` });
+      } else {
+        setToast({ type: 'error', message: `${failures.length} scenario assertion(s) failed.` });
+      }
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to run scenarios' });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   return (
     <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
       {/* Left Master Column: Systems List */}
@@ -437,6 +466,17 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
             </button>
 
             <button
+              type="button"
+              onClick={handleRunTests}
+              disabled={isTesting || isSaving}
+              title="Run the system's stored scenarios"
+              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-emerald-500/40 bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isTesting ? 'Testing...' : 'Run Tests'}</span>
+            </button>
+
+            <button
               onClick={handleSave}
               disabled={isSaving}
               className="flex items-center gap-1.5 text-xs font-sans font-bold px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.35)] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
@@ -462,6 +502,16 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               <AlertCircle className="w-4 h-4 text-red-400" />
             )}
             <span>{toast.message}</span>
+          </div>
+        )}
+
+        {testFailures.length > 0 && (
+          <div className="p-3 rounded-xl text-xs bg-red-950/40 border border-red-500/40 text-red-200 space-y-1 shrink-0">
+            {testFailures.map((failure, index) => (
+              <div key={index} className="font-mono">
+                {failure.scenario} step {failure.step}: {failure.detail}
+              </div>
+            ))}
           </div>
         )}
 

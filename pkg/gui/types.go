@@ -11,6 +11,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/provider"
+	"github.com/darkliquid/localrpg/pkg/systemtest"
 )
 
 type PlayerDTO struct {
@@ -488,6 +489,36 @@ type ReferenceSystemDTO struct {
 // ReferenceSystemsDTO is the list of shipped starting systems.
 type ReferenceSystemsDTO struct {
 	Systems []ReferenceSystemDTO `json:"systems"`
+}
+
+// SystemTestSystemDTO is the system a scenario run exercises.
+type SystemTestSystemDTO struct {
+	ID        string              `json:"id"`
+	Script    string              `json:"script"`
+	Mechanics *core.MechanicsSpec `json:"mechanics,omitempty"`
+}
+
+// SystemTestRequestDTO asks the engine to run scenarios against a system.
+type SystemTestRequestDTO struct {
+	System    SystemTestSystemDTO   `json:"system"`
+	Scenarios []systemtest.Scenario `json:"scenarios"`
+}
+
+// SystemTestFailureDTO is one expectation a scenario did not meet.
+type SystemTestFailureDTO struct {
+	Scenario string `json:"scenario"`
+	Step     int    `json:"step"`
+	Detail   string `json:"detail"`
+}
+
+// SystemTestResponseDTO is the result of a scenario run.
+type SystemTestResponseDTO struct {
+	Failures []SystemTestFailureDTO `json:"failures,omitempty"`
+}
+
+// SystemScenariosDTO is a system's stored scenarios.
+type SystemScenariosDTO struct {
+	Scenarios []systemtest.Scenario `json:"scenarios"`
 }
 
 type WorldEntitySummaryDTO struct {

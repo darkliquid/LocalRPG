@@ -24,6 +24,9 @@ import {
   SystemDetail,
   CreateSystemRequest,
   ReferenceSystemsResponse,
+  SystemTestRequest,
+  SystemTestResponse,
+  SystemScenariosResponse,
   WorldDetail,
   CreateWorldRequest,
   WorldEntityDetail,
@@ -189,6 +192,22 @@ export class APIClient {
   static async listReferenceSystems(): Promise<ReferenceSystemsResponse> {
     const res = await fetch('/api/reference-systems');
     if (!res.ok) throw new Error(`listReferenceSystems: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async listSystemScenarios(id: string): Promise<SystemScenariosResponse> {
+    const res = await fetch(`/api/system/tests/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error(`listSystemScenarios: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async runSystemTest(req: SystemTestRequest): Promise<SystemTestResponse> {
+    const res = await fetch('/api/system/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new Error(`runSystemTest: ${res.statusText}`);
     return res.json();
   }
 

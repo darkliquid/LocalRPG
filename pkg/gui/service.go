@@ -33,6 +33,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/systemtest"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/tools"
 	"github.com/darkliquid/localrpg/pkg/trace"
@@ -4277,6 +4278,46 @@ func (s *Service) ListReferenceSystems(_ context.Context) (*ReferenceSystemsDTO,
 			Script:      sys.Script,
 			Mechanics:   sys.Mechanics,
 		})
+	}
+	return out, nil
+}
+
+// TestSystem runs scenarios against a system and returns the expectations that
+// failed, so an authored system can be verified without a store or a provider.
+func (s *Service) TestSystem(_ context.Context, req SystemTestRequestDTO) (*SystemTestResponseDTO, error) {
+	sys := systemtest.System{ID: req.System.ID, Script: req.System.Script, Mechanics: req.System.Mechanics}
+	failures := systemtest.RunAll(sys, req.Scenarios)
+	out := &SystemTestResponseDTO{}
+	for _, f := range failures {
+		out.Failures = append(out.Failures, SystemTestFailureDTO{Scenario: f.Scenario, Step: f.Step, Detail: f.Detail})
+	}
+	return out, nil
+}
+
+// SystemScenarios reads a system's stored scenarios from its tests directory.
+func (s *Service) SystemScenarios(_ context.Context, id string) (*SystemScenariosDTO, error) {
+	if err := pathutil.ValidateID(id); err != nil {
+		return nil, fmt.Errorf("invalid system id: %w", err)
+	}
+	dir := filepath.Join(s.resolver.SystemDir(id), "tests")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return &SystemScenariosDTO{}, nil
+	}
+	out := &SystemScenariosDTO{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		scenario, err := systemtest.LoadScenario(data)
+		if err != nil {
+			return nil, fmt.Errorf("load scenario %q: %w", entry.Name(), err)
+		}
+		out.Scenarios = append(out.Scenarios, scenario)
 	}
 	return out, nil
 }

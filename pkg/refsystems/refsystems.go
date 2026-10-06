@@ -56,6 +56,34 @@ func Get(id string) (ReferenceSystem, bool) {
 	return ReferenceSystem{}, false
 }
 
+// ScenarioFile is one embedded scenario's file name and raw YAML.
+type ScenarioFile struct {
+	Name string
+	Data []byte
+}
+
+// ScenarioFiles returns a system's embedded scenario files, ordered by name.
+func ScenarioFiles(id string) []ScenarioFile {
+	dir := path.Join("systems", id, "tests")
+	entries, err := fs.ReadDir(files, dir)
+	if err != nil {
+		return nil
+	}
+	out := make([]ScenarioFile, 0, len(entries))
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
+			continue
+		}
+		data, err := files.ReadFile(path.Join(dir, e.Name()))
+		if err != nil {
+			continue
+		}
+		out = append(out, ScenarioFile{Name: e.Name(), Data: data})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
 func load(dir string) (ReferenceSystem, bool) {
 	manifest, err := files.ReadFile(path.Join("systems", dir, "system.yaml"))
 	if err != nil {

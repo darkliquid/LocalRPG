@@ -22,6 +22,8 @@
   "/api/settings/test-provider",
   "/api/stt",
   "/api/system/",
+  "/api/system/test",
+  "/api/system/tests/",
   "/api/systems",
   "/api/trace",
   "/api/tts/batch",
