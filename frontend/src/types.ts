@@ -98,6 +98,28 @@ export interface TTSBatchJob {
   last_error?: string;
 }
 
+// PendingCheckRequest is the check a GM proposed, as the player sees it.
+export interface PendingCheckRequest {
+  actor?: string;
+  check_kind?: string;
+  stat?: string;
+  skill?: string;
+  stakes?: string;
+  notation?: string;
+  outcomes?: Record<string, string>;
+}
+
+// PendingCheck is a GM-proposed check awaiting the player's roll, with the
+// arithmetic the roll card shows.
+export interface PendingCheck {
+  ref: string;
+  proposed_by?: string;
+  request?: PendingCheckRequest;
+  notation?: string;
+  bonuses?: { source: string; value: number }[];
+  actor_values?: Record<string, number>;
+}
+
 export interface Turn {
   turn_number: number;
   input_text: string;
@@ -132,11 +154,7 @@ export interface Turn {
   health_effects?: { entity: string; effect: string }[];
   world_tick?: string;
   // A GM-proposed check awaiting the player's roll (ask policy).
-  pending_check?: {
-    ref: string;
-    proposed_by?: string;
-    request?: { actor?: string; check_kind?: string; stat?: string; stakes?: string; notation?: string };
-  };
+  pending_check?: PendingCheck;
   // The turn this one continues, when the player rolled a pending check.
   continuation_of?: number;
   // How the turn's control records fared: nil for a clean turn.

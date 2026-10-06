@@ -215,7 +215,7 @@ type TurnDTO struct {
 	Rejected bool                  `json:"rejected,omitempty"`
 	Checks   []harness.CheckResult `json:"checks,omitempty"`
 	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
-	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
+	PendingCheck *PendingCheckDTO `json:"pending_check,omitempty"`
 	// Engagement is the resolved mechanics policy in force this turn (off, auto,
 	// or ask), so a client can explain why mechanics ran or did not.
 	Engagement string `json:"engagement,omitempty"`
@@ -230,6 +230,18 @@ type TurnDTO struct {
 	// RecordReport summarises the turn's control-record health. Nil when every
 	// record arrived valid.
 	RecordReport *RecordReportDTO `json:"record_report,omitempty"`
+}
+
+// PendingCheckDTO is a GM-proposed check awaiting the player's roll, with the
+// arithmetic the roll card shows: the notation, the bonuses that would apply,
+// and the actor's relevant values.
+type PendingCheckDTO struct {
+	Ref         string                    `json:"ref"`
+	ProposedBy  string                    `json:"proposed_by,omitempty"`
+	Request     harness.CheckRequest      `json:"request"`
+	Notation    string                    `json:"notation,omitempty"`
+	Bonuses     []harness.AppliedModifier `json:"bonuses,omitempty"`
+	ActorValues map[string]int            `json:"actor_values,omitempty"`
 }
 
 // RecordIssueDTO is one repaired or dropped control record.

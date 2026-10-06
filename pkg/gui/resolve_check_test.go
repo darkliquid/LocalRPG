@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/darkliquid/localrpg/pkg/engine"
+	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
 func writePendingTurn(t *testing.T, svc *Service, gameID string) {
@@ -36,5 +39,18 @@ func TestResolveCheckRoutePatternIsNamed(t *testing.T) {
 	got := routePattern("/api/game/campaign-1/turn/3/resolve-check")
 	if got == "http.request" {
 		t.Fatalf("resolve-check falls back to the generic span name: %q", got)
+	}
+}
+
+func TestPendingCheckDTOCarriesArithmetic(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	turn := engine.Turn{Number: 1, PendingCheck: &harness.PendingCheck{Ref: "r",
+		Request: harness.CheckRequest{Actor: "player-elena", Notation: "2d6", Stat: "hp"}}}
+	dto := svc.turnDTO(turn, mustStore(t, svc, gameID), svc.Config(), gameID, "")
+	if dto.PendingCheck == nil || dto.PendingCheck.Notation != "2d6" {
+		t.Fatalf("pending = %+v", dto.PendingCheck)
+	}
+	if dto.PendingCheck.ActorValues["hp"] != 24 {
+		t.Fatalf("actor values = %+v, want hp 24", dto.PendingCheck.ActorValues)
 	}
 }

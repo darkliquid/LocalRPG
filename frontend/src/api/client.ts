@@ -105,6 +105,35 @@ export class WorldExistsError extends HTTPError {
   }
 }
 
+// readNDJSON reports each newline-delimited JSON line of a response as it
+// arrives, so a streaming turn and a streaming check resolution share one reader.
+async function readNDJSON(res: Response, onEvent: (event: TurnEvent) => void): Promise<void> {
+  if (!res.body) {
+    throw new Error('response has no body');
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    let newline = buffer.indexOf('\n');
+    while (newline !== -1) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      if (line) onEvent(JSON.parse(line) as TurnEvent);
+      newline = buffer.indexOf('\n');
+    }
+  }
+
+  const tail = buffer.trim();
+  if (tail) onEvent(JSON.parse(tail) as TurnEvent);
+}
+
 export class APIClient {
   private gameID: string;
 
@@ -757,27 +786,32 @@ export class APIClient {
       throw new Error('streamTurn: response has no body');
     }
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+    await readNDJSON(res, onEvent);
+  }
 
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      let newline = buffer.indexOf('\n');
-      while (newline !== -1) {
-        const line = buffer.slice(0, newline).trim();
-        buffer = buffer.slice(newline + 1);
-        if (line) onEvent(JSON.parse(line) as TurnEvent);
-        newline = buffer.indexOf('\n');
-      }
+  // resolveCheck posts to the pending-check resolution endpoint and reports each
+  // NDJSON line, so a Roll card streams the adjudication without a fresh action.
+  static async resolveCheck(
+    gameID: string,
+    turnNumber: number,
+    body: { pending_check_ref: string; manual_result?: number },
+    onEvent: (event: TurnEvent) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const res = await fetch(`/api/game/${gameID}/turn/${turnNumber}/resolve-check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`resolveCheck: ${res.status} ${text}`);
     }
-
-    const tail = buffer.trim();
-    if (tail) onEvent(JSON.parse(tail) as TurnEvent);
+    if (!res.body) {
+      throw new Error('resolveCheck: response has no body');
+    }
+    await readNDJSON(res, onEvent);
   }
 
   constructor(gameID: string) {

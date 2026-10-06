@@ -1606,7 +1606,7 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		Rejected:        turn.Rejected,
 		Checks:          turn.Checks,
 		RecordReport:    recordReportDTO(turn.RecordReport),
-		PendingCheck:    turn.PendingCheck,
+		PendingCheck:    s.pendingCheckDTO(turn.PendingCheck, store),
 		ContinuationOf:  turn.ContinuationOf,
 		HealthEffects:   healthEffectDTOs(turn.HealthEffects),
 		WorldTick:       turn.WorldTick,
@@ -1641,6 +1641,59 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		}
 	}
 
+	return dto
+}
+
+// pendingCheckDTO maps a GM-proposed check for the roll card, computing the
+// notation and the bonuses that would apply so the player can see the arithmetic
+// before rolling.
+func (s *Service) pendingCheckDTO(p *harness.PendingCheck, store *storage.Store) *PendingCheckDTO {
+	if p == nil {
+		return nil
+	}
+	dto := &PendingCheckDTO{
+		Ref:        p.Ref,
+		ProposedBy: p.ProposedBy,
+		Request:    p.Request,
+		Notation:   p.Request.Notation,
+	}
+	if store == nil || p.Request.Actor == "" {
+		return dto
+	}
+	actor, err := store.GetEntity(p.Request.Actor)
+	if err != nil || actor == nil {
+		return dto
+	}
+	readState := func(name string) (int, bool) {
+		if actor.State == nil || name == "" {
+			return 0, false
+		}
+		raw, ok := actor.State.Get(name)
+		if !ok {
+			return 0, false
+		}
+		switch typed := raw.(type) {
+		case int:
+			return typed, true
+		case int64:
+			return int(typed), true
+		case float64:
+			return int(typed), true
+		}
+		return 0, false
+	}
+	if _, applied := rules.SumBonuses(readState, p.Request); len(applied) > 0 {
+		dto.Bonuses = applied
+	}
+	values := map[string]int{}
+	for _, name := range []string{p.Request.Stat, p.Request.Skill} {
+		if value, ok := readState(name); ok {
+			values[name] = value
+		}
+	}
+	if len(values) > 0 {
+		dto.ActorValues = values
+	}
 	return dto
 }
 

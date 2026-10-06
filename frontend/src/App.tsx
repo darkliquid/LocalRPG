@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
 import { APIClient, HTTPError, GenerationError } from './api/client';
-import { GameState, Turn, TurnSegment, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState, AudioProgressEvent } from './types';
+import { GameState, Turn, TurnSegment, TurnEvent, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState, AudioProgressEvent } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { TurnAudioState, segmentAudioKey } from './components/TurnSegments';
 import { ActionConsole } from './components/ActionConsole';
 import { MechanicsStrip } from './components/MechanicsStrip';
+import { PendingCheckCard } from './components/PendingCheckCard';
 import { Drawers } from './components/Drawers';
 import { CharacterSheetDrawer } from './components/CharacterSheetDrawer';
 import { GraphDrawer } from './components/GraphDrawer';
@@ -386,11 +387,110 @@ export const App: React.FC = () => {
   const abortRef = useRef<AbortController | null>(null);
   const streamProcessorRef = useRef<TurnStreamProcessor>(new TurnStreamProcessor());
 
-  const handleActionSubmit = async (mode: string, text: string, pendingCheckRef?: string, sceneOnly = false) => {
+  const handleTurnEvent = (event: TurnEvent) => {
+    if (event.type === 'chunk') {
+      setToolActivity(null);
+      if (event.text) {
+        setStreamedSegments(streamProcessorRef.current.feedChunk(event.text));
+      }
+    } else if (event.type === 'segment' && event.segment) {
+      setStreamedSegments(streamProcessorRef.current.feedSegment(event.segment));
+    } else if (event.type === 'speech') {
+      // A sentence the server synthesized mid-stream, played here while the
+      // rest of the prose is still arriving.
+      streamedSpeech.enqueue(event.audio_url ?? '', event.audio_key ?? '', event.index);
+    } else if (event.type === 'audio_progress' && event.audio_progress) {
+      setAudioProgress(event.audio_progress);
+      if (event.audio_progress.sequence !== undefined && event.audio_progress.stage) {
+        setSegmentAudioProgress((prev) => ({
+          ...prev,
+          [event.audio_progress!.sequence]: event.audio_progress!.stage,
+        }));
+      }
+    } else if (event.type === 'portrait' && event.character_id) {
+      setCharacterPortraits((prev) => ({
+        ...prev,
+        [event.character_id!]: {
+          url: event.portrait_url || '',
+          hasCustom: !!event.has_custom_portrait,
+        },
+      }));
+    } else if (event.type === 'scene_image' && event.turn_number && event.image_url) {
+      setChronicle((prev) =>
+        prev.map((turn) =>
+          turn.turn_number === event.turn_number
+            ? { ...turn, image_url: event.image_url }
+            : turn
+        )
+      );
+    } else if (event.type === 'tool') {
+      setToolActivity(
+        event.tool_status === 'running'
+          ? `${event.tool_name}...`
+          : `${event.tool_name}: ${event.tool_summary ?? 'done'}`,
+      );
+    } else if (event.type === 'turn' && event.turn) {
+      // Restore interactivity immediately so the user can submit the next turn
+      // while any remaining audio synthesizes in the background.
+      setTurnInFlight(false);
+      setToolActivity(null);
+
+      // Stop streamed speech so it does not overlap with chronicle playback,
+      // and remember which keys were heard to completion.
+      streamedSpeech.stop();
+      setStreamedKeys(streamedSpeech.playedKeys());
+      const turn = event.turn;
+      setChronicle((prev) => [...prev, turn]);
+      streamProcessorRef.current.reset();
+      setStreamedSegments([]);
+      // The turn now carries the action, so drop the pending block at once;
+      // otherwise the action shows twice until the stream closes.
+      setPendingAction(null);
+      setFundsError(null);
+      setRateLimitUntil(null);
+      fetchLimits();
+      // A turn can introduce characters, so the graph and the character
+      // view are refreshed rather than left showing the state before it.
+      refreshCorpus();
+    } else if (event.type === 'model_missing') {
+      if (!dismissedModelPrompt) {
+        setMissingModel({
+          id: event.model_id || 'kokoro-tts',
+          name: event.name || 'Kokoro Voice Pack',
+          sizeBytes: event.size_bytes || 90177536,
+        });
+      }
+    } else if (event.type === 'error') {
+      const reason = event.failure
+        ? formatGenerationError(event.failure)
+        : (event.detail || event.message || 'The turn failed.');
+      setTurnError(reason);
+      if (event.code === 'rate_limited' || event.failure?.code === 'rate_limited') {
+        const retryMs = event.retry_after_ms ?? event.failure?.retry_after_ms ?? 30000;
+        setRateLimitUntil(Date.now() + retryMs);
+        fetchLimits();
+      } else if (event.code === 'insufficient_funds' || event.failure?.code === 'insufficient_funds') {
+        const provider = event.failure?.attempts?.[0]?.provider || 'AI';
+        setFundsError({
+          provider,
+          message: event.failure?.message || event.detail || event.message || 'Insufficient funds/credits',
+        });
+        fetchLimits();
+      }
+      console.error('turn failed:', event.message);
+    }
+  };
+
+  // beginTurnStream shares the setup every streaming turn needs, so a player turn
+  // and a pending-check resolution differ only in the request they post.
+  const beginTurnStream = async (
+    action: { mode: string; text: string },
+    post: (onEvent: (event: TurnEvent) => void, signal: AbortSignal) => Promise<void>,
+  ) => {
     if (!client || !activeGameID || turnInFlight) return;
 
     setTurnInFlight(true);
-    setPendingAction({ mode, text });
+    setPendingAction(action);
     streamProcessorRef.current.reset();
     setStreamedSegments([]);
     setToolActivity(null);
@@ -404,104 +504,7 @@ export const App: React.FC = () => {
     abortRef.current = controller;
 
     try {
-      await APIClient.streamTurn(
-        activeGameID,
-        { mode, input: text, pending_check_ref: pendingCheckRef, scene_only: sceneOnly || undefined },
-        (event) => {
-          if (event.type === 'chunk') {
-            setToolActivity(null);
-            if (event.text) {
-              setStreamedSegments(streamProcessorRef.current.feedChunk(event.text));
-            }
-          } else if (event.type === 'segment' && event.segment) {
-            setStreamedSegments(streamProcessorRef.current.feedSegment(event.segment));
-          } else if (event.type === 'speech') {
-            // A sentence the server synthesized mid-stream, played here while the
-            // rest of the prose is still arriving.
-            streamedSpeech.enqueue(event.audio_url ?? '', event.audio_key ?? '', event.index);
-          } else if (event.type === 'audio_progress' && event.audio_progress) {
-            setAudioProgress(event.audio_progress);
-            if (event.audio_progress.sequence !== undefined && event.audio_progress.stage) {
-              setSegmentAudioProgress((prev) => ({
-                ...prev,
-                [event.audio_progress!.sequence]: event.audio_progress!.stage,
-              }));
-            }
-          } else if (event.type === 'portrait' && event.character_id) {
-            setCharacterPortraits((prev) => ({
-              ...prev,
-              [event.character_id!]: {
-                url: event.portrait_url || '',
-                hasCustom: !!event.has_custom_portrait,
-              },
-            }));
-          } else if (event.type === 'scene_image' && event.turn_number && event.image_url) {
-            setChronicle((prev) =>
-              prev.map((turn) =>
-                turn.turn_number === event.turn_number
-                  ? { ...turn, image_url: event.image_url }
-                  : turn
-              )
-            );
-          } else if (event.type === 'tool') {
-            setToolActivity(
-              event.tool_status === 'running'
-                ? `${event.tool_name}...`
-                : `${event.tool_name}: ${event.tool_summary ?? 'done'}`,
-            );
-          } else if (event.type === 'turn' && event.turn) {
-            // Restore interactivity immediately so the user can submit the next turn
-            // while any remaining audio synthesizes in the background.
-            setTurnInFlight(false);
-            setToolActivity(null);
-
-            // Stop streamed speech so it does not overlap with chronicle playback,
-            // and remember which keys were heard to completion.
-            streamedSpeech.stop();
-            setStreamedKeys(streamedSpeech.playedKeys());
-            const turn = event.turn;
-            setChronicle((prev) => [...prev, turn]);
-            streamProcessorRef.current.reset();
-            setStreamedSegments([]);
-            // The turn now carries the action, so drop the pending block at once;
-            // otherwise the action shows twice until the stream closes.
-            setPendingAction(null);
-            setFundsError(null);
-            setRateLimitUntil(null);
-            fetchLimits();
-            // A turn can introduce characters, so the graph and the character
-            // view are refreshed rather than left showing the state before it.
-            refreshCorpus();
-          } else if (event.type === 'model_missing') {
-            if (!dismissedModelPrompt) {
-              setMissingModel({
-                id: event.model_id || 'kokoro-tts',
-                name: event.name || 'Kokoro Voice Pack',
-                sizeBytes: event.size_bytes || 90177536,
-              });
-            }
-          } else if (event.type === 'error') {
-            const reason = event.failure
-              ? formatGenerationError(event.failure)
-              : (event.detail || event.message || 'The turn failed.');
-            setTurnError(reason);
-            if (event.code === 'rate_limited' || event.failure?.code === 'rate_limited') {
-              const retryMs = event.retry_after_ms ?? event.failure?.retry_after_ms ?? 30000;
-              setRateLimitUntil(Date.now() + retryMs);
-              fetchLimits();
-            } else if (event.code === 'insufficient_funds' || event.failure?.code === 'insufficient_funds') {
-              const provider = event.failure?.attempts?.[0]?.provider || 'AI';
-              setFundsError({
-                provider,
-                message: event.failure?.message || event.detail || event.message || 'Insufficient funds/credits',
-              });
-              fetchLimits();
-            }
-            console.error('turn failed:', event.message);
-          }
-        },
-        controller.signal
-      );
+      await post(handleTurnEvent, controller.signal);
     } catch (err) {
       console.error('turn failed:', err);
       setTurnError(err instanceof Error ? err.message : String(err));
@@ -516,6 +519,31 @@ export const App: React.FC = () => {
         setSegmentAudioProgress({});
       }
     }
+  };
+
+  const handleActionSubmit = async (mode: string, text: string, pendingCheckRef?: string, sceneOnly = false) => {
+    await beginTurnStream({ mode, text }, (onEvent, signal) =>
+      APIClient.streamTurn(
+        activeGameID!,
+        { mode, input: text, pending_check_ref: pendingCheckRef, scene_only: sceneOnly || undefined },
+        onEvent,
+        signal,
+      ),
+    );
+  };
+
+  // handleResolveCheck rolls a pending check through IR-1's endpoint, so the
+  // adjudication streams without a fresh player action.
+  const handleResolveCheck = async (turnNumber: number, pendingCheckRef: string, manualResult?: number) => {
+    await beginTurnStream({ mode: 'Roll', text: '' }, (onEvent, signal) =>
+      APIClient.resolveCheck(
+        activeGameID!,
+        turnNumber,
+        { pending_check_ref: pendingCheckRef, manual_result: manualResult },
+        onEvent,
+        signal,
+      ),
+    );
   };
 
   const handleStopTurn = () => {
@@ -719,6 +747,7 @@ export const App: React.FC = () => {
 
   // A pending check the GM proposed under the ask policy, awaiting the player's roll.
   const pendingCheck = chronicle.length > 0 ? chronicle[chronicle.length - 1].pending_check : undefined;
+  const pendingTurnNumber = chronicle.length > 0 ? chronicle[chronicle.length - 1].turn_number : 0;
   const lastTurnChecks = chronicle.length > 0 ? chronicle[chronicle.length - 1].checks ?? [] : [];
 
   // Open the built-in docs, optionally jumping straight to an article. Callers
@@ -962,23 +991,13 @@ export const App: React.FC = () => {
               <MechanicsStrip
                 turn={{ engagement: gameState?.mechanics_engagement, checks: lastTurnChecks }}
               />
-              {pendingCheck && (
-                <div className="mx-4 mb-2 rounded-xl border border-purple-500/40 bg-purple-950/30 px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-xs font-sans font-bold uppercase tracking-wider text-purple-300">Roll required</div>
-                    <div className="text-xs font-sans text-stone-300 truncate">
-                      {pendingCheck.request?.stakes || pendingCheck.request?.check_kind || 'The GM has called for a check.'}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleActionSubmit('Roll', '', pendingCheck.ref)}
-                    disabled={turnInFlight || isRateLimited}
-                    className="shrink-0 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-sans font-bold cursor-pointer"
-                  >
-                    Roll
-                  </button>
-                </div>
-              )}
+              <PendingCheckCard
+                pending={pendingCheck}
+                busy={turnInFlight || isRateLimited}
+                onRoll={() => handleResolveCheck(pendingTurnNumber, pendingCheck!.ref)}
+                onManual={(total) => handleResolveCheck(pendingTurnNumber, pendingCheck!.ref, total)}
+                onArgue={() => document.getElementById('action-console-input')?.focus()}
+              />
 
               {fundsError && (
                 <div className="mx-4 mb-2 p-3 bg-red-950/80 border border-red-500/50 text-red-200 text-xs rounded-xl flex items-center justify-between shadow-lg">
