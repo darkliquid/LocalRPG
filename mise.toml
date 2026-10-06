@@ -64,7 +64,7 @@ npx vitest run
 
 [tasks.test]
 description = "Run all tests across the project"
-depends = ["test:backend", "test:frontend"]
+depends = ["test:backend", "test:frontend", "test:e2e"]
 
 [tasks."lint:docs"]
 description = "Lint the embedded documentation Markdown"
@@ -80,7 +80,10 @@ run = "bash scripts/lint-prose.sh"
 [tasks.lint]
 description = "Run code analysis and linting"
 depends = ["lint:docs", "lint:goreleaser", "lint:actions"]
-run = "go vet ./..."
+run = """
+go vet ./...
+go vet -tags e2e ./pkg/e2e/...
+"""
 
 [tasks."dev:gui"]
 description = "Launch GUI in development mode"

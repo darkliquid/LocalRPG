@@ -45,6 +45,47 @@ jobs:
       - name: Test
         run: mise run test:backend
 
+  e2e:
+    name: End-to-end browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+
+      # The e2e package does not link GTK or WebKit, but the service it drives
+      # reaches the audio pipeline, so the same headers the go job needs are
+      # installed here to keep the two jobs identical.
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev
+
+      # The SPA and the player bundle are what the browser loads, so build the
+      # embedded frontend before running the suite.
+      - name: Build the embedded frontend
+        run: mise run build:frontend
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v2
+        id: chrome
+
+      - name: Run the browser suite
+        env:
+          CHROME_EXEC: ${{ steps.chrome.outputs.chrome-path }}
+          E2E_ARTIFACT_DIR: ${{ github.workspace }}/test-results
+        run: mise run test:e2e
+
+      - name: Upload failure artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-artifacts
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
   web:
     name: Frontend type check and docs lint
     runs-on: ubuntu-latest
