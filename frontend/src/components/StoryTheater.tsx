@@ -3,6 +3,7 @@ import { Turn, LimitState } from '../types';
 import { TurnAudioState, segmentAudioKey } from './TurnSegments';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { anySegmentHasAudio } from '../lib/audio';
+import { readingDurationMs } from '../lib/pacing';
 import { TheaterStage } from './theater/TheaterStage';
 import { TheaterDialogue } from './theater/TheaterDialogue';
 import { TheaterTransport } from './theater/TheaterTransport';
@@ -134,6 +135,9 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   const beatKey = currentTurn ? segmentAudioKey(currentTurn.turn_number, activeIndex) : '';
   const beatStatus = serverPlayback ? segmentAudioStatus[beatKey] : undefined;
   const beatState: TurnAudioState = beatStatus?.state ?? 'idle';
+  // A beat the policy left without a clip is visibly silent rather than looking
+  // like a stall, unless its clip is still being synthesized.
+  const beatNoAudio = voiceEnabled && (active?.audio_urls?.length ?? 0) === 0 && beatState !== 'generating';
 
   const goNext = useCallback(() => {
     if (currentIdx < turns.length - 1) {
@@ -223,13 +227,14 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     }
   }, [browser.playing, serverPlayback, voiceEnabled, isPlaying, goNext]);
 
-  // Without voice, the text paces itself on the recorded reading time.
+  // Without voice, the text paces itself on the reading estimate, scaled by the
+  // speed control, so a silent beat lingers as long as it takes to read.
   useEffect(() => {
     if (!isOpen || !isPlaying || turns.length === 0 || voiceEnabled) return;
-    const dwell = Math.max(1200, (active?.duration ?? 0) * 1000) / speed;
+    const dwell = readingDurationMs(active?.text ?? '') / (speed > 0 ? speed : 1);
     const timer = setTimeout(advanceBeat, dwell);
     return () => clearTimeout(timer);
-  }, [isOpen, isPlaying, turns.length, voiceEnabled, active?.duration, speed, advanceBeat]);
+  }, [isOpen, isPlaying, turns.length, voiceEnabled, active?.text, speed, advanceBeat]);
 
   const togglePlay = useCallback(() => {
     const next = !isPlaying;
@@ -316,6 +321,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
           isPlayer={playerSpeaking}
           onEntityClick={onEntityClick}
           displayMode={displayMode}
+          noAudio={beatNoAudio}
           onAdvance={advanceDialogue}
         />
         <TheaterTransport

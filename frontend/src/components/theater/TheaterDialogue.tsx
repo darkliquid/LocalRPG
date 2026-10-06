@@ -12,6 +12,9 @@ interface TheaterDialogueProps {
   // reveal is the share of the line to show, so an exported bundle can type it out
   // while the app shows it whole. The advance caret waits until it is complete.
   reveal?: number;
+  // noAudio marks a beat the policy left without a clip, so the silence is
+  // visible rather than looking like a stall.
+  noAudio?: boolean;
   onAdvance: () => void;
 }
 
@@ -25,6 +28,7 @@ export const TheaterDialogue: React.FC<TheaterDialogueProps> = ({
   onEntityClick,
   displayMode,
   reveal = 1,
+  noAudio = false,
   onAdvance,
 }) => {
   const text = segment?.text ?? fallback;
@@ -74,6 +78,11 @@ export const TheaterDialogue: React.FC<TheaterDialogueProps> = ({
           >
             {name}
           </span>
+          {noAudio && (
+            <span className="absolute -top-3.5 right-6 px-2 py-0.5 rounded-md text-[10px] font-sans uppercase tracking-wider bg-stone-800/90 text-stone-400 border border-white/10">
+              no audio
+            </span>
+          )}
           <MarkdownProse
             text={isSpeech ? `\u201c${shown}\u201d` : shown}
             onEntityClick={onEntityClick}
