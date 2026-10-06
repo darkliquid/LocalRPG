@@ -221,19 +221,15 @@ func (b *Browser) waitFor(verb string, ok func(string) bool, what string) {
 	}
 }
 
-// Poll waits for a script to return true, or the deadline passes.
-func (b *Browser) Poll(script, describe string) {
+// Poll waits for an expression to become true, or the deadline passes. The
+// expression is evaluated in the page and must yield a boolean.
+func (b *Browser) Poll(expression, describe string) {
 	b.t.Helper()
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		if b.Eval(script) == "true" {
-			return
-		}
-		if time.Now().After(deadline) {
-			b.dumpArtifacts()
-			b.t.Fatalf("the page never became ready: %s", describe)
-		}
-		time.Sleep(100 * time.Millisecond)
+	pollCtx, cancel := context.WithTimeout(b.ctx, 15*time.Second)
+	defer cancel()
+	if err := chromedp.Run(pollCtx, chromedp.Poll(expression, nil)); err != nil {
+		b.dumpArtifacts()
+		b.t.Fatalf("the page never became ready (%s): %v", describe, err)
 	}
 }
 
@@ -277,6 +273,14 @@ func (b *Browser) Screenshot(path string) {
 	if err := os.WriteFile(path, buf, 0o644); err != nil {
 		b.t.Fatalf("write screenshot: %v", err)
 	}
+}
+
+// FullScreenshot captures the whole page as a JPEG at the given quality.
+func (b *Browser) FullScreenshot(quality int) []byte {
+	b.t.Helper()
+	var buf []byte
+	b.run(chromedp.FullScreenshot(&buf, quality))
+	return buf
 }
 
 const instrumentAudioScript = `(function () {
