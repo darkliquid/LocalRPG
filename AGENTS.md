@@ -158,11 +158,11 @@ no patched version, and `npm audit`'s suggested remedy was to downgrade
 `markdownlint-cli2` twenty-three minor versions.
 
 The lesson is that the linter was never the problem. `markdownlint`, the engine
-whose rules actually decide pass or fail, depends only on `micromark` and
-`string-width` and has **no advisories at all**. The advisory arrived with the CLI
-wrapper, which exists to glob file arguments. Both wrappers have this shape:
-`markdownlint-cli2` brings `braces`, and `markdownlint-cli` avoids it but pins
-`js-yaml ~5.2.1`, which is inside a different advisory's range.
+whose rules actually decide pass or fail, brings only the `micromark` family and
+`string-width`; the `braces` advisory arrived with the CLI wrapper, which exists to
+glob file arguments. Both wrappers have this shape: `markdownlint-cli2` brings
+`braces`, and `markdownlint-cli` avoids it but pins `js-yaml ~5.2.1`, which is
+inside a different advisory's range.
 
 So `mise run lint:docs` runs `frontend/scripts/lintDocs.mjs`, which enumerates the
 files itself and calls the engine directly. Same engine, same rules, byte-identical
@@ -172,6 +172,24 @@ output, and nothing vulnerable in the tree.
 script cannot express, add it to the `config` object in that script, which is where
 the three deviations from the default ruleset live with their explanations. The
 `.markdownlint-cli2.jsonc` those came from is gone.
+
+Two later advisories did reach the tree, and both are pinned down by an `overrides`
+block in `frontend/package.json`:
+
+- **`katex`** (GHSA-238p-pmpm-9mq7, prototype pollution that bypasses the trust
+  restrictions), reached via `markdownlint` → `micromark-extension-math` → `katex`.
+  `micromark-extension-math@3.1.0` pins `katex ^0.16.0`, so the patched 0.19.0 is
+  outside its range and no upstream release widens it. The override forces
+  `katex ^0.19.0`; the only API the extension uses is `katex.renderToString`, which
+  is unchanged, and `mise run lint:docs` proves the module still loads.
+- **`source-map-js`** (GHSA-68fv-2mgg-jv7q, event-loop denial of service through
+  indexed source-map section offsets), reached through `postcss`,
+  `@tailwindcss/node`, `css-tree` and `magicast`. The override forces `^1.2.2`.
+
+Both are patch-level or rendering-only and API-compatible with every consumer, so
+the override is a version floor rather than a fork. Revisit it when
+`micromark-extension-math` widens its `katex` range; at that point the `katex`
+override can be dropped.
 
 No CI job runs `npm audit`, so a new advisory would not gate a build. If one is
 added, it should start from a clean tree.
