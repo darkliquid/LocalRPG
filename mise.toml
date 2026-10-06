@@ -5,6 +5,7 @@ goreleaser = "2.18.2"
 gitleaks = "8.30.1"
 actionlint = "1.7.12"
 vale = "3.24.0"
+rumdl = "0.2.78"
 
 [tasks."install:frontend"]
 description = "Install frontend dependencies when package manifests change"
@@ -67,10 +68,8 @@ description = "Run all tests across the project"
 depends = ["test:backend", "test:frontend", "test:e2e"]
 
 [tasks."lint:docs"]
-description = "Lint the embedded documentation Markdown"
-dir = "frontend"
-depends = ["install:frontend"]
-run = "npm run lint:docs"
+description = "Lint the embedded documentation Markdown with rumdl"
+run = "rumdl check pkg/gui/docs"
 
 [tasks."lint:prose"]
 description = "Run Vale over tracked prose and source comments (report only; STRICT=1 to gate)"
