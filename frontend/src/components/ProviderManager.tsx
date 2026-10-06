@@ -45,10 +45,14 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
   const [entries, setEntries] = useState<MediaInspectEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [internalSelected, setInternalSelected] = useState<string>('default');
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [defaultSource, setDefaultSource] = useState<string>('default');
+  const [defaultNotice, setDefaultNotice] = useState<string | null>(null);
 
   const activeSelected = selected ?? internalSelected;
   const select = useCallback(
     (name: string) => {
+      setDefaultNotice(null);
       if (onSelect) onSelect(name);
       else setInternalSelected(name);
     },
@@ -70,7 +74,7 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
     return () => {
       active = false;
     };
-  }, [family, providers]);
+  }, [family, providers, refreshToken]);
 
   const byName = useMemo(() => {
     const map: Record<string, MediaInspectEntry> = {};
@@ -81,7 +85,10 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
   const names = useMemo(() => entryNames(config, family), [config, family]);
 
   const emit = useCallback(
-    (next: AppConfig) => onChange(next),
+    (next: AppConfig) => {
+      setDefaultNotice(null);
+      onChange(next);
+    },
     [onChange]
   );
 
@@ -144,7 +151,10 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
     (name: string) => {
       if (name === 'default') return;
       const source = providers[name] as object;
-      emit({ ...config, media: { ...config.media, [family]: { ...source } } });
+      emit(setMediaEntry(config, family, 'default', { ...source }));
+      setDefaultSource(name);
+      setRefreshToken((value) => value + 1);
+      setDefaultNotice(`Default is now ${name}.`);
     },
     [config, emit, family, providers]
   );
@@ -176,14 +186,16 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
       </div>
 
       {error && <p className="text-xs text-amber-300">{error}</p>}
+      {defaultNotice && <p className="text-xs text-emerald-300">{defaultNotice}</p>}
 
       <ul className="space-y-1">
         {names.map((name) => {
           const entry = byName[name];
           const isDefault = name === 'default';
+          const isDefaultSource = name === defaultSource;
           return (
             <li key={name} className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-800 bg-stone-950/40 px-3 py-2">
-              <span className={`h-2 w-2 rounded-full ${isDefault ? 'bg-emerald-400' : 'bg-stone-600'}`} title={isDefault ? 'Default' : ''} />
+              <span className={`h-2 w-2 rounded-full ${isDefaultSource ? 'bg-emerald-400' : 'bg-stone-600'}`} title={isDefaultSource ? 'Default' : ''} />
               <span className="font-mono text-xs text-stone-100">{name}</span>
               {entry && <TierBadge tier={entry.tier} caveat={entry.provider_key} />}
               {entry && (
