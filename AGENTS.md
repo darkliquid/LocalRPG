@@ -360,11 +360,11 @@ Storage paths are resolved by `pkg/paths.Resolve` from the XDG bases (`github.co
 
 ## Conventions
 
-- Go: standard library only for tests (`testing`, `t.TempDir()`); no testify. Errors wrapped with `fmt.Errorf("...: %w", err)`. Use `interface{}`, not `any` — the codebase is uniform on this even though gopls suggests otherwise; `go vet` must stay clean.
+- Go: standard library only for tests (`testing`, `t.TempDir()`); no testify. Errors wrapped with `fmt.Errorf("...: %w", err)`. Use modern Go idioms: prefer `any` over `interface{}`, the `slices`/`maps` helpers over hand-rolled loops, `min`/`max` over inline comparisons, and range-over-int; `go vet` must stay clean.
 - Tests that need hardware a CI runner does not have — a browser, a sound card — skip rather than fail, and detect the capability instead of assuming it. `driver.Available` probes for a browser, because having Chrome installed is not the same as being able to start it. The audio device tests play a short clip and watch it finish, because a context opens on a host that cannot play anything and no cheaper signal distinguishes the two.
 - Identifiers: `entity.Slugify` (display name -> kebab-case ID) and `entity.WikilinkTarget` (unwraps `[[target|label]]`) are the shared helpers — reuse them instead of writing local slug/link parsing.
 - TypeScript: React 19 + Tailwind v4 (config lives in CSS via `@import "tailwindcss"` in `frontend/src/index.css`, there is no `tailwind.config.js`). `tsconfig.json` has `strict`, `noUnusedLocals`, `noUnusedParameters`, so `npm run build`/`tsc --noEmit` fails on unused imports — that is the frontend lint gate. Components live in `frontend/src/components/`, icons come from `lucide-react`.
-- Commits: Conventional Commits with a scope, e.g. `feat(harness): …`, `fix(frontend): …`, `docs: …`. Keep the subject under 72 chars.
+- Commits: Conventional Commits with a scope, e.g. `feat(harness): …`, `fix(frontend): …`, `docs: …`. Keep the subject under 72 chars. Commit after every turn of work is preferred, but only on a feature branch: never commit directly on `main` — branch first, then commit there.
 - Design work is spec-first: `docs/superpowers/specs/` holds approved design docs and `docs/superpowers/plans/` holds task-by-task implementation plans with `- [ ]` checkboxes, including a "File Map" listing files to create/modify per feature. Read the relevant spec before changing a subsystem; the plans reference the superpowers skills workflow. Note `.superpowers/` is gitignored while `docs/superpowers/` is tracked.
 
 ## Gotchas
