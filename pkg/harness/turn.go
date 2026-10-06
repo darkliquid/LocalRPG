@@ -136,16 +136,6 @@ type CheckResult struct {
 	Source string `json:"source,omitempty"`
 }
 
-// ProposedCheck is a player's explicit request to roll, carried as structured
-// data. Roll mode builds one and the orchestrator turns it into an advisory
-// [PROPOSED CHECK] directive for the GM; enforcement is a future concern, so the
-// Ref is an identifier, not a contract the GM must honour.
-type ProposedCheck struct {
-	Ref         string `json:"ref"`
-	Actor       string `json:"actor,omitempty"`
-	Description string `json:"description,omitempty"`
-}
-
 // PendingCheck is a check the GM proposed under the ask policy and the player
 // has not yet rolled. It is stored on the turn so a later roll can resolve it.
 type PendingCheck struct {

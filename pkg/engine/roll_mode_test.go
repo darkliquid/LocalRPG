@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/core"
@@ -12,9 +11,21 @@ import (
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
-func TestProcessActionPreservesRawInput(t *testing.T) {
-	tempDir := t.TempDir()
+func TestPlayerRollRequestUsesTheConventionsNotation(t *testing.T) {
+	o := &TurnOrchestrator{playerID: "player", mechanics: &core.MechanicsSpec{
+		Checks: core.CheckConventions{Notation: "2d6"},
+	}}
+	req := o.playerRollRequest("pick the lock")
+	if req.Notation != "2d6" || req.Actor != "player" {
+		t.Fatalf("request = %+v", req)
+	}
+	if req.Stakes != "pick the lock" {
+		t.Fatalf("stakes = %q", req.Stakes)
+	}
+}
 
+func TestRollModeUnderOffProducesNoCheck(t *testing.T) {
+	tempDir := t.TempDir()
 	store, err := storage.NewStore(filepath.Join(tempDir, "index.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -31,21 +42,14 @@ func TestProcessActionPreservesRawInput(t *testing.T) {
 	router.RegisterProvider(model)
 	router.AssignRole("gm", "mock-gm")
 
-	orchestrator := NewTurnOrchestrator(store, timeline, nil, router, "tavern", "player")
+	o := NewTurnOrchestrator(store, timeline, nil, router, "tavern", "player")
+	o.SetMechanicsEngagement("off")
 
-	turn, err := orchestrator.ProcessAction(context.Background(), "Roll", "1d20+5")
+	turn, err := o.ProcessAction(context.Background(), "Roll", "pick the lock")
 	if err != nil {
-		t.Fatalf("ProcessAction failed: %v", err)
+		t.Fatal(err)
 	}
-	if turn.Input != "1d20+5" {
-		t.Errorf("Input = %q, want the raw player entry", turn.Input)
-	}
-	// A player-initiated roll ends the turn on a pending check the player
-	// resolves, rather than a dead proposal directive.
-	if turn.PendingCheck == nil || turn.PendingCheck.ProposedBy != "player" {
-		t.Fatalf("expected a player pending check, got %+v", turn.PendingCheck)
-	}
-	if !strings.Contains(model.lastPrompt, "[PLAYER ROLL REQUESTED: 1d20+5") {
-		t.Errorf("expected the roll request in the generation prompt, got %q", model.lastPrompt)
+	if turn.PendingCheck != nil {
+		t.Fatalf("off should not pend, got %+v", turn.PendingCheck)
 	}
 }

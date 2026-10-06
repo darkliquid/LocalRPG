@@ -1032,6 +1032,7 @@ export const App: React.FC = () => {
                 onStop={handleStopTurn}
                 sttType={config?.media.stt?.type}
                 audioProgress={audioProgress}
+                engagement={gameState?.mechanics_engagement}
               />
             </div>
           </main>

@@ -542,6 +542,24 @@ func (o *TurnOrchestrator) SetSingleTurnMode(single bool) {
 	o.singleTurn = single
 }
 
+// playerRollRequest builds the check a player-initiated roll asks for, from the
+// system's declared conventions: the actor is the player, the notation comes from
+// the conventions, and the stakes are the player's own words.
+func (o *TurnOrchestrator) playerRollRequest(input string) harness.CheckRequest {
+	req := harness.CheckRequest{
+		Actor:     o.playerID,
+		CheckKind: "do",
+		Stakes:    strings.TrimSpace(input),
+	}
+	if o.mechanics != nil {
+		req.Notation = o.mechanics.Checks.Notation
+	}
+	if req.Notation == "" {
+		req.Notation = "2d6"
+	}
+	return req
+}
+
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
 	if paths != nil {
 		if systemID != "" {
@@ -617,7 +635,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	var rollRes *rules.RollResult
 	var outcome string
 	var gmDirective string
-	var proposedCheck *harness.ProposedCheck
+	var pendingCheck *harness.PendingCheck
 	generationPrompt := actionInput
 
 	// The outcome is only known later, so it is attached at return along with
@@ -738,16 +756,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	if isCorrection {
 		directiveText := strings.TrimPrefix(actionInput, "/gm ")
 		gmDirective = fmt.Sprintf("[DIRECTOR CORRECTION DIRECTIVE: %s]", directiveText)
-	} else if !isOpening && strings.EqualFold(mode, "Roll") {
-		// A player-initiated roll is a proposal, not an executed result: the GM
-		// either adopts it with request_check or dismisses it. It is carried as
-		// structured data so the submission can be held to that.
-		proposal := strings.TrimSpace(actionInput)
-		if proposal == "" {
-			proposal = "a check"
-		}
-		proposedCheck = &harness.ProposedCheck{Ref: "player-roll", Actor: o.playerID, Description: proposal}
-		gmDirective = fmt.Sprintf("[PROPOSED CHECK: %s by %s (ref: %s)]", proposal, o.playerID, proposedCheck.Ref)
+	} else if !isOpening && strings.EqualFold(mode, "Roll") && o.mechanicsEngagement != "off" && o.pendingCheckRef == "" {
+		// A player-initiated roll is a check the player resolves: the turn ends on
+		// a pending check, so the roll card can present the stakes. A Roll that
+		// carries a pending ref is resolving an existing check, not asking for a
+		// new one, so it falls through to the resolution path.
+		req := o.playerRollRequest(actionInput)
+		pendingCheck = &harness.PendingCheck{Ref: rollRef(turnNum, 0), Request: req, ProposedBy: "player"}
+		gmDirective = fmt.Sprintf("[PLAYER ROLL REQUESTED: %s]", strings.TrimSpace(actionInput))
 	} else if !isOpening && o.rulesEngine != nil {
 		// Run action through mechanics hook if available
 		res, err := o.rulesEngine.ExecuteAction(strings.ToLower(mode), map[string]interface{}{
@@ -1004,7 +1020,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 	for attempt := 0; ; attempt++ {
-		result, err = o.runGenerationLoop(ctx, &assembly, gmDirective, proposedCheck, resolvedPending, validationEngagement, onChunk)
+		result, err = o.runGenerationLoop(ctx, &assembly, gmDirective, resolvedPending, validationEngagement, onChunk)
 		if err != nil {
 			outcome = "error"
 			turnSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
@@ -1087,6 +1103,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			o.parser.Reset()
 			collectedCount = 0
 		}
+	}
+	// A player-initiated roll ends the turn on the pending check it asked for,
+	// unless the model already proposed one of its own.
+	if pendingCheck != nil && result.PendingCheck == nil {
+		result.PendingCheck = pendingCheck
 	}
 	result.Checks = append(result.Checks, rollResults...)
 
@@ -1771,7 +1792,7 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 // answer. The result is the last reply that carried no tool calls. With no
 // executor attached the loop makes exactly one call, shaped as it was before
 // tools existed, so nothing changes for a provider that cannot call them.
-func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harness.AssembleResult, gmDirective string, proposed *harness.ProposedCheck, resolvedPending *harness.CheckResult, engagement string, onChunk func(string) error) (streamResult, error) {
+func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harness.AssembleResult, gmDirective string, resolvedPending *harness.CheckResult, engagement string, onChunk func(string) error) (streamResult, error) {
 	contextPrompt := assembly.Prompt
 	if gmDirective != "" {
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
