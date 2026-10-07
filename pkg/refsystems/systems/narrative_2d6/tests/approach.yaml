@@ -1,0 +1,12 @@
+name: a strong approach
+seed: 1
+setup:
+  player:
+    stats: { might: 2, edge: 3 }
+steps:
+  - action: do
+    input: slip past the guard
+    expect:
+      outcome: strong
+      total: { min: 10, max: 12 }
+      message_contains: "Strong Hit"

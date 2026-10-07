@@ -1,0 +1,12 @@
+name: a strong pool spends grit
+seed: 1
+setup:
+  player:
+    stats: { dice: 5, grit: 2 }
+steps:
+  - action: do
+    input: push through
+    expect:
+      outcome: strong
+      state: { grit: 1 }
+      message_contains: "strong hit"

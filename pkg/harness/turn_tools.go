@@ -45,6 +45,9 @@ func requestCheckSpec() ToolSpec {
 			"stakes":     stringProperty("What is at stake if the check fails."),
 			"outcomes":   map[string]interface{}{"type": "object", "description": "Map of outcome key to the result text, for example {'pass': '...', 'fail': '...'}.", "additionalProperties": map[string]interface{}{"type": "string"}},
 			"notation":   stringProperty("Optional dice notation override, for example '2d6'."),
+			"profile":    stringProperty("Optional named resolution profile from the system, for example 'pbta' or 'd20'."),
+			"position":   stringProperty("Optional position from a blades-style profile, for example 'risky'."),
+			"effect":     stringProperty("Optional effect from a blades-style profile, for example 'limited'."),
 			"modifiers": map[string]interface{}{
 				"type": "array",
 				"items": map[string]interface{}{
@@ -76,6 +79,9 @@ func proposeCheckSpec() ToolSpec {
 			"stakes":     stringProperty("What is at stake if the check fails."),
 			"outcomes":   map[string]interface{}{"type": "object", "description": "Map of outcome key to the result text, for example {'pass': '...', 'fail': '...'}.", "additionalProperties": map[string]interface{}{"type": "string"}},
 			"notation":   stringProperty("Optional dice notation override, for example '2d6'."),
+			"profile":    stringProperty("Optional named resolution profile from the system, for example 'pbta' or 'd20'."),
+			"position":   stringProperty("Optional position from a blades-style profile, for example 'risky'."),
+			"effect":     stringProperty("Optional effect from a blades-style profile, for example 'limited'."),
 			"modifiers": map[string]interface{}{
 				"type": "array",
 				"items": map[string]interface{}{

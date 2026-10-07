@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Turn, LimitState } from '../types';
+import { Turn, TurnSegment, LimitState } from '../types';
 import { TurnAudioState, segmentAudioKey } from './TurnSegments';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
-import { anySegmentHasAudio } from '../lib/audio';
+import { anySegmentHasAudio, groupLastIndex, groupLeaderIndex } from '../lib/audio';
+import { readingDurationMs } from '../lib/pacing';
 import { TheaterStage } from './theater/TheaterStage';
 import { TheaterDialogue } from './theater/TheaterDialogue';
 import { TheaterTransport } from './theater/TheaterTransport';
@@ -33,7 +34,20 @@ interface StoryTheaterProps {
 
 // BEAT_GAP_MS is the buffer between one voice clip finishing and the next line
 // appearing, so the spoken word always leads the text.
-const BEAT_GAP_MS = 300;
+const BEAT_GAP_MS = 120;
+
+// beatGapMs scales the inter-beat gap by the speed control, so faster playback
+// tightens it and slower playback widens it.
+export function beatGapMs(speed: number): number {
+  const factor = speed > 0 ? speed : 1;
+  return Math.max(40, BEAT_GAP_MS / factor);
+}
+
+// segmentsOf returns a turn's beats, falling back to its prose as one beat.
+function segmentsOf(turn: Turn | undefined): TurnSegment[] {
+  if (turn?.segments && turn.segments.length > 0) return turn.segments;
+  return [{ kind: 'narration', text: turn?.prose ?? '' }];
+}
 
 export const StoryTheater: React.FC<StoryTheaterProps> = ({
   turns,
@@ -60,13 +74,15 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   const [speed, setSpeed] = useState<number>(1);
 
   const currentTurn = turns[currentIdx];
-  const segments = useMemo(() => {
-    if (currentTurn?.segments && currentTurn.segments.length > 0) return currentTurn.segments;
-    return [{ kind: 'narration' as const, text: currentTurn?.prose ?? '' }];
-  }, [currentTurn]);
+  const segments = useMemo(() => segmentsOf(currentTurn), [currentTurn]);
 
   const activeIndex = Math.min(activeSegment, segments.length - 1);
   const active = segments[activeIndex];
+  // A clip group shares one audio clip, so playback is keyed on the group's
+  // leader: stepping within a group keeps the audio playing, and only entering a
+  // new group switches it.
+  const groupLeader = groupLeaderIndex(segments, activeIndex);
+  const groupLast = groupLastIndex(segments, activeIndex);
 
   const playerPortrait = useMemo(() => {
     if (propPlayerPortrait) return propPlayerPortrait;
@@ -124,9 +140,13 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     skipKeys: skipAudioKeys,
   });
 
-  const beatKey = currentTurn ? segmentAudioKey(currentTurn.turn_number, activeIndex) : '';
+  const beatKey = currentTurn ? segmentAudioKey(currentTurn.turn_number, groupLeader) : '';
   const beatStatus = serverPlayback ? segmentAudioStatus[beatKey] : undefined;
   const beatState: TurnAudioState = beatStatus?.state ?? 'idle';
+  // A group the policy left without a clip is visibly silent rather than looking
+  // like a stall, unless its clip is still being synthesized.
+  const beatNoAudio =
+    voiceEnabled && (segments[groupLeader]?.audio_urls?.length ?? 0) === 0 && beatState !== 'generating';
 
   const goNext = useCallback(() => {
     if (currentIdx < turns.length - 1) {
@@ -136,28 +156,76 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     }
   }, [currentIdx, turns.length]);
 
-  const advanceBeat = useCallback(() => {
-    if (activeIndex < segments.length - 1) {
-      setActiveSegment(activeIndex + 1);
+  // stepSegment walks the beats one at a time, crossing a turn boundary at either
+  // end. It is what the transport and the advance caret do, and it never touches
+  // playback: the audio follows the clip group, not the beat.
+  const stepSegment = useCallback(
+    (delta: number) => {
+      const next = activeIndex + delta;
+      if (next >= 0 && next < segments.length) {
+        setActiveSegment(next);
+        return;
+      }
+      const nextTurn = currentIdx + (delta > 0 ? 1 : -1);
+      if (nextTurn < 0 || nextTurn >= turns.length) return;
+      const nextSegments = segmentsOf(turns[nextTurn]);
+      setCurrentIdx(nextTurn);
+      setActiveSegment(delta > 0 ? 0 : nextSegments.length - 1);
+    },
+    [activeIndex, segments.length, currentIdx, turns],
+  );
+
+  // advanceGroup moves to the next clip group once the current one has played, so
+  // a merged run is followed by the next group rather than by a silent beat.
+  const advanceGroup = useCallback(() => {
+    const next = groupLast + 1;
+    if (next < segments.length) {
+      setActiveSegment(next);
     } else {
       goNext();
     }
-  }, [activeIndex, segments.length, goNext]);
+  }, [groupLast, segments.length, goNext]);
 
   // Reset the beat whenever the turn changes.
   useEffect(() => {
     setActiveSegment(0);
   }, [currentIdx]);
 
-  // Native voice: request the current beat's clip once, then wait for the device
-  // to report it finished before the next line appears.
+  // Native voice: request the current group's clip once, then wait for the device
+  // to report it finished before the next group appears. Stepping within the group
+  // leaves the audio untouched.
   const startedBeatRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isOpen || !isPlaying || !serverPlayback || !voiceEnabled || !currentTurn) return;
     if (startedBeatRef.current === beatKey) return;
     startedBeatRef.current = beatKey;
-    onPlayAudio?.(currentTurn.turn_number, activeIndex);
-  }, [isOpen, isPlaying, serverPlayback, voiceEnabled, currentTurn, activeIndex, beatKey, onPlayAudio]);
+    onPlayAudio?.(currentTurn.turn_number, groupLeader);
+  }, [isOpen, isPlaying, serverPlayback, voiceEnabled, currentTurn, groupLeader, beatKey, onPlayAudio]);
+
+  // Prefetch the next clip group's audio and preload its image, so the next
+  // group does not wait on the network. Bounded to a single group.
+  const prefetchedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isOpen || !isPlaying) return;
+    const nextWithinTurn = groupLast + 1 < segments.length;
+    const nextSegment = nextWithinTurn ? segments[groupLast + 1] : undefined;
+    const nextTurn = nextWithinTurn ? currentTurn : turns[currentIdx + 1];
+    if (!nextTurn) return;
+    const nextIndex = nextWithinTurn ? groupLast + 1 : 0;
+    const key = `${nextTurn.turn_number}:${nextIndex}`;
+    if (prefetchedRef.current === key) return;
+    prefetchedRef.current = key;
+    for (const url of nextSegment?.audio_urls ?? nextTurn.segments?.[0]?.audio_urls ?? []) {
+      fetch(url).catch(() => {
+        // Prefetch is best effort; playback still works without it.
+      });
+    }
+    const nextImage = nextTurn.image_url;
+    if (nextImage && nextImage !== backgroundURL) {
+      const image = new Image();
+      image.src = nextImage;
+    }
+  }, [isOpen, isPlaying, groupLast, currentIdx, segments, currentTurn, turns, backgroundURL]);
 
   const previousBeatState = useRef<TurnAudioState>('idle');
   useEffect(() => {
@@ -165,18 +233,34 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     const previous = previousBeatState.current;
     previousBeatState.current = beatState;
     if (previous !== 'playing' || (beatState !== 'idle' && beatState !== 'error') || !isPlaying) return;
-    const timer = setTimeout(advanceBeat, BEAT_GAP_MS);
+    const timer = setTimeout(advanceGroup, beatGapMs(speed));
     return () => clearTimeout(timer);
-  }, [beatState, serverPlayback, voiceEnabled, isPlaying, advanceBeat]);
+  }, [beatState, serverPlayback, voiceEnabled, isPlaying, advanceGroup]);
 
-  // Browser voice: mirror the clip the browser is actually playing, with the
-  // same buffer so the text trails the voice.
+  // While a group's audio plays, walk the text through the group's beats at a
+  // reading pace, so a merged run is read line by line rather than jumped over.
+  // Stepping within a group never re-requests the audio.
+  useEffect(() => {
+    if (!isOpen || !isPlaying || !voiceEnabled) return;
+    const playing = serverPlayback ? beatState === 'playing' : browser.playing;
+    if (!playing || activeIndex >= groupLast) return;
+    const dwell = readingDurationMs(active?.text ?? '') / (speed > 0 ? speed : 1);
+    const timer = setTimeout(() => setActiveSegment(activeIndex + 1), dwell);
+    return () => clearTimeout(timer);
+  }, [isOpen, isPlaying, voiceEnabled, serverPlayback, beatState, browser.playing, activeIndex, groupLast, active?.text, speed]);
+
+  // Browser voice: mirror the clip the browser is actually playing, jumping only
+  // when the group changes so the text does not restart mid-group.
   useEffect(() => {
     if (serverPlayback || !voiceEnabled) return;
     if (browser.playingIndex === null) return;
-    const timer = setTimeout(() => setActiveSegment(browser.playingIndex as number), BEAT_GAP_MS);
+    const timer = setTimeout(() => {
+      setActiveSegment((prev) =>
+        groupLeaderIndex(segments, prev) === browser.playingIndex ? prev : (browser.playingIndex as number),
+      );
+    }, beatGapMs(speed));
     return () => clearTimeout(timer);
-  }, [browser.playingIndex, serverPlayback, voiceEnabled]);
+  }, [browser.playingIndex, serverPlayback, voiceEnabled, segments]);
 
   // Browser voice: the turn is finished once its clips stop playing.
   const browserWasPlaying = useRef(false);
@@ -185,18 +269,19 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     const was = browserWasPlaying.current;
     browserWasPlaying.current = browser.playing;
     if (was && !browser.playing && isPlaying) {
-      const timer = setTimeout(goNext, BEAT_GAP_MS);
+      const timer = setTimeout(advanceGroup, beatGapMs(speed));
       return () => clearTimeout(timer);
     }
-  }, [browser.playing, serverPlayback, voiceEnabled, isPlaying, goNext]);
+  }, [browser.playing, serverPlayback, voiceEnabled, isPlaying, advanceGroup]);
 
-  // Without voice, the text paces itself on the recorded reading time.
+  // Without voice, the text paces itself on the reading estimate, scaled by the
+  // speed control, so a silent beat lingers as long as it takes to read.
   useEffect(() => {
     if (!isOpen || !isPlaying || turns.length === 0 || voiceEnabled) return;
-    const dwell = Math.max(1200, (active?.duration ?? 0) * 1000) / speed;
-    const timer = setTimeout(advanceBeat, dwell);
+    const dwell = readingDurationMs(active?.text ?? '') / (speed > 0 ? speed : 1);
+    const timer = setTimeout(() => stepSegment(1), dwell);
     return () => clearTimeout(timer);
-  }, [isOpen, isPlaying, turns.length, voiceEnabled, active?.duration, speed, advanceBeat]);
+  }, [isOpen, isPlaying, turns.length, voiceEnabled, active?.text, speed, stepSegment]);
 
   const togglePlay = useCallback(() => {
     const next = !isPlaying;
@@ -210,20 +295,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   }, [isPlaying, onStopAudio]);
 
   const advanceDialogue = () => {
-    if (activeIndex < segments.length - 1) {
-      setActiveSegment(activeIndex + 1);
-    } else {
-      goNext();
-    }
-  };
-
-  const changeTurn = (delta: number) => {
-    onStopAudio?.();
-    startedBeatRef.current = null;
-    previousBeatState.current = 'idle';
-    browserWasPlaying.current = false;
-    setActiveSegment(0);
-    setCurrentIdx((prev) => Math.min(Math.max(0, prev + delta), turns.length - 1));
+    stepSegment(1);
   };
 
   const { mounted, state } = useMountTransition(isOpen && turns.length > 0, 250);
@@ -283,18 +355,20 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
           isPlayer={playerSpeaking}
           onEntityClick={onEntityClick}
           displayMode={displayMode}
+          noAudio={beatNoAudio}
           onAdvance={advanceDialogue}
         />
         <TheaterTransport
           progress={progress}
           isPlaying={isPlaying}
           speed={speed}
+          labels={{ prev: 'Previous line', next: 'Next line' }}
           audioState={beatState}
           audioMessage={beatStatus?.message}
           blocked={browser.blocked && !browser.playing}
           onToggle={togglePlay}
-          onPrev={() => changeTurn(-1)}
-          onNext={() => changeTurn(1)}
+          onPrev={() => stepSegment(-1)}
+          onNext={() => stepSegment(1)}
           onCycleSpeed={() => setSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1))}
           onUnblock={browser.play}
         />

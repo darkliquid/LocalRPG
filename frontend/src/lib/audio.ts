@@ -27,3 +27,30 @@ export const segmentIsGroupLeader = (segments: TurnSegment[] | undefined, index:
   }
   return true;
 };
+
+// groupLeaderIndex returns the first segment of the clip group the index belongs
+// to, or the index itself when it is ungrouped. A group shares one clip, so this
+// is the index whose audio a viewer hears while stepping through the group.
+export const groupLeaderIndex = (segments: TurnSegment[] | undefined, index: number): number => {
+  const group = segments?.[index]?.clip_group;
+  if (!group) return index;
+  for (let i = 0; i < index; i += 1) {
+    if (segments?.[i]?.clip_group === group) return i;
+  }
+  return index;
+};
+
+// groupLastIndex returns the last segment of the clip group the index belongs to,
+// or the index itself when it is ungrouped. Groups are contiguous runs, so a
+// forward scan ends at the first segment of a different group.
+export const groupLastIndex = (segments: TurnSegment[] | undefined, index: number): number => {
+  const group = segments?.[index]?.clip_group;
+  if (!group) return index;
+  let last = index;
+  for (let i = index + 1; i < (segments?.length ?? 0); i += 1) {
+    if (segments?.[i]?.clip_group === group) last = i;
+    else if (segments?.[i]?.clip_group) break;
+  }
+  return last;
+};
+

@@ -10,6 +10,9 @@ interface ActionConsoleProps {
   onStop?: () => void;
   sttType?: string;
   audioProgress?: AudioProgressEvent | null;
+  // engagement is the campaign's mechanics policy; Roll is unavailable when it
+  // is "off", because a roll is not a check then.
+  engagement?: string;
 }
 
 export const ActionConsole: React.FC<ActionConsoleProps> = ({
@@ -19,6 +22,7 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({
   onStop,
   sttType,
   audioProgress,
+  engagement,
 }) => {
   const [text, setText] = useState('');
   const [mode, setMode] = useState<'do' | 'say' | 'story' | 'roll'>('do');
@@ -101,7 +105,8 @@ export const ActionConsole: React.FC<ActionConsoleProps> = ({
         <button
           type="button"
           onClick={() => setMode('roll')}
-          disabled={isInputDisabled}
+          disabled={isInputDisabled || engagement === 'off'}
+          title={engagement === 'off' ? 'Mechanics are off for this campaign' : undefined}
           className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-sans tracking-wider transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
             mode === 'roll' ? 'bg-purple-600 text-white font-bold shadow-md' : 'bg-stone-900/60 text-stone-400 hover:bg-stone-800 hover:text-stone-200'
           }`}

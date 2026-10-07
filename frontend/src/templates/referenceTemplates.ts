@@ -5,15 +5,6 @@ export interface ReferenceEntityTemplate {
   markdown: string;
 }
 
-export interface ReferenceSystemTemplate {
-  id: string;
-  name: string;
-  version: string;
-  description: string;
-  rules_prompt: string;
-  script: string;
-}
-
 export interface ReferenceWorldTemplate {
   id: string;
   name: string;
@@ -25,58 +16,6 @@ export interface ReferenceWorldTemplate {
   lore_prompt: string;
   entities: ReferenceEntityTemplate[];
 }
-
-export const REFERENCE_SYSTEM_TEMPLATE: ReferenceSystemTemplate = {
-  id: 'narrative_2d6',
-  name: 'Narrative 2d6 Engine',
-  version: '1.0.0',
-  description: 'Versatile 2d6 resolution with partial success, dynamic stress, and event hooks.',
-  rules_prompt: `You are the Game Master adjudicating a campaign governed by the **Narrative 2d6 Engine**.
-
-### 1. Core Resolution Ladder
-Call \`request_check\` when an action is uncertain and failure would change the story; the engine rolls 2d6 and returns the result. Do not roll for safe or trivial actions.
-- **10+ (Strong Hit / Full Success)**: The protagonist accomplishes their goal cleanly.
-- **7–9 (Weak Hit / Partial Success)**: They succeed at a tangible cost: damage, stress, a complication, a trade-off, or diminished effect.
-- **6- (Miss / Hard Move)**: Escalate the threat, introduce a twist, deplete a resource, or put the protagonist in peril.
-
-### 2. Action Modes
-- \`do\`: general active intent (physical feats, athletics, stealth, lockpicking).
-- \`say\`: social dialogue, persuasion, interrogation, intimidation.
-- \`story\`: narrative or reflective action that still carries risk.
-- \`roll\`: the player's explicit request for a check; resolve it or state why no roll is needed.
-
-NPCs do not roll; resolve opposition through the protagonist's check.
-
-### 3. Handling Mechanics Results
-When the prompt contains a \`[MECHANICS RESULT: ...]\` tag, honour it and weave it into the prose. Never contradict the roll total, damage, or state changes the engine reports.
-`,
-  script: `// ==========================================
-// Narrative 2d6 Engine - Mechanics Script
-// ==========================================
-
-function resolve2d6(ctx) {
-  var r = roll("2d6");
-  var message = "";
-  if (r.total >= 10) {
-    message = "Strong Hit (Total: " + r.total + ") - complete triumph, no complications.";
-  } else if (r.total >= 7) {
-    message = "Weak Hit (Total: " + r.total + ") - success at a cost or complication.";
-  } else {
-    message = "Miss (Total: " + r.total + ") - the attempt falters; danger escalates.";
-    injectGMDirection("The action failed. Introduce an immediate complication or escalate danger.");
-  }
-  return { success: r.total >= 7, message: message, roll: r };
-}
-
-onAction("do", resolve2d6);
-onAction("say", resolve2d6);
-onAction("story", resolve2d6);
-
-onTurnEnd(function(ctx) {
-  log("Turn " + ctx.turn + " completed in Narrative 2d6 Engine.");
-});
-`,
-};
 
 export const REFERENCE_WORLD_TEMPLATE: ReferenceWorldTemplate = {
   id: 'the_ashen_reach',

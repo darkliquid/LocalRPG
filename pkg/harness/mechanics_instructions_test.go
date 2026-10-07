@@ -93,3 +93,12 @@ func TestContextRendersMechanicsPrompt(t *testing.T) {
 		t.Fatalf("mechanics prompt rendered when empty")
 	}
 }
+
+func TestMechanicsInstructionListsProfiles(t *testing.T) {
+	spec := &core.MechanicsSpec{Checks: core.CheckConventions{Profiles: map[string]core.ResolutionProfile{
+		"pbta": {Label: "PbtA ladder"}}}}
+	got := FormatMechanicsInstructions(spec, "auto", nil)
+	if !strings.Contains(got, "PbtA ladder") {
+		t.Fatalf("instruction did not list the profile: %s", got)
+	}
+}

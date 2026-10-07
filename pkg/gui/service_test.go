@@ -16,6 +16,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -533,9 +534,6 @@ func TestChronicleTurnsCarryLocationAndPacing(t *testing.T) {
 	}
 	if turn.Outcome != "clean_look" {
 		t.Errorf("Outcome = %q", turn.Outcome)
-	}
-	if turn.LocationArtURL == "" {
-		t.Errorf("expected an art URL when the built-in generator is available")
 	}
 	if len(turn.Segments) != 1 || turn.Segments[0].Duration < scene.MinimumBeatDuration.Seconds() {
 		t.Errorf("expected a paced segment, got %+v", turn.Segments)
@@ -1184,7 +1182,7 @@ func TestTurnDTOOffersOrderedClipURLs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dto := svc.turnDTO(*turn, mustStore(t, svc, gameID), svc.configMgr.Get(), gameID)
+	dto := svc.turnDTO(*turn, mustStore(t, svc, gameID), svc.configMgr.Get(), gameID, "")
 	if len(dto.Segments) != 2 {
 		t.Fatalf("segments = %d", len(dto.Segments))
 	}
@@ -1291,7 +1289,7 @@ func TestTurnDTO_SceneBreakAndAnchoredSpeakerPortraits(t *testing.T) {
 		},
 	}
 
-	dto := svc.turnDTO(turn, nil, svc.Config(), gameID)
+	dto := svc.turnDTO(turn, nil, svc.Config(), gameID, "")
 
 	if !dto.SceneBreak {
 		t.Errorf("expected dto.SceneBreak to be true")
@@ -1688,5 +1686,17 @@ func TestImageRegistryResolvesTheDefault(t *testing.T) {
 	}
 	if _, err := svc.ttsRegistry().Default(); err != nil {
 		t.Fatalf("tts registry default: %v", err)
+	}
+}
+
+func TestTurnDTOCarriesEngagementAndStakes(t *testing.T) {
+	_, svc := setupTestGame(t)
+	turn := engine.Turn{Number: 1, Checks: []harness.CheckResult{{CheckID: "c1", Stakes: "the bridge holds"}}}
+	dto := svc.turnDTO(turn, nil, svc.Config(), "game", "auto")
+	if dto.Engagement != "auto" {
+		t.Fatalf("engagement = %q, want auto", dto.Engagement)
+	}
+	if len(dto.Checks) != 1 || dto.Checks[0].Stakes != "the bridge holds" {
+		t.Fatalf("checks = %+v", dto.Checks)
 	}
 }

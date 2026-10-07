@@ -40,9 +40,12 @@ func TestProcessActionPreservesRawInput(t *testing.T) {
 	if turn.Input != "1d20+5" {
 		t.Errorf("Input = %q, want the raw player entry", turn.Input)
 	}
-	// A player-initiated roll is a proposed check, not an executed one: the GM
-	// adopts or dismisses it in its submission.
-	if !strings.Contains(model.lastPrompt, "[PROPOSED CHECK: 1d20+5") {
-		t.Errorf("expected the proposed check in the generation prompt, got %q", model.lastPrompt)
+	// A player-initiated roll ends the turn on a pending check the player
+	// resolves, rather than a dead proposal directive.
+	if turn.PendingCheck == nil || turn.PendingCheck.ProposedBy != "player" {
+		t.Fatalf("expected a player pending check, got %+v", turn.PendingCheck)
+	}
+	if !strings.Contains(model.lastPrompt, "[PLAYER ROLL REQUESTED: 1d20+5") {
+		t.Errorf("expected the roll request in the generation prompt, got %q", model.lastPrompt)
 	}
 }

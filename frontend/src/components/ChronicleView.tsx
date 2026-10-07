@@ -36,6 +36,8 @@ interface ChronicleViewProps {
   gameId?: string;
   // Clips already heard while the turn streamed, which playback must skip.
   skipAudioKeys?: ReadonlySet<string>;
+  // onGenerateImage asks the server to illustrate a turn that has no image.
+  onGenerateImage?: (turnNumber: number) => void;
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
@@ -56,6 +58,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   segmentProgress,
   gameId,
   skipAudioKeys,
+  onGenerateImage,
 }) => {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
@@ -67,15 +70,6 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
     }
   }, [turnInFlight, streamedSegments, turns.length]);
 
-  // Art is per scene, not per turn: it is shown when the party arrives somewhere
-  // new and reused while they stay.
-  let previousLocationID: string | undefined;
-  const beats = turns.map((turn) => {
-    const isSceneChange = !!turn.location_id && turn.location_id !== previousLocationID;
-    previousLocationID = turn.location_id ?? previousLocationID;
-    return { turn, isSceneChange };
-  });
-
   return (
     <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
       {turns.length === 0 && !pendingAction ? (
@@ -83,10 +77,9 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
           The chronicle awaits your first action...
         </div>
       ) : (
-        beats.map(({ turn, isSceneChange }, index) => {
+        turns.map((turn, index) => {
           const audioStatus = turnAudioStatus[turn.turn_number];
           const imageURL = turn.image_url;
-          const locationArtURL = turn.location_art_url;
           return (
             <div key={turn.turn_number} className="space-y-4 pb-6 border-b border-white/5 last:border-0">
               {/* Scene break indicator */}
@@ -130,28 +123,16 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 </div>
               )}
 
-              {/* Scene art, when the party has moved somewhere new */}
-              {locationArtURL && isSceneChange && (
-                <div className="my-4 rounded-xl overflow-hidden border border-white/10 shadow-2xl">
-                  <button
-                    type="button"
-                    onClick={() => openLightbox(locationArtURL, turn.location_name || 'Scene')}
-                    className="block w-full cursor-zoom-in"
-                    title="View full size scene art"
-                    aria-label="View full size scene art"
-                  >
-                    <img
-                      src={locationArtURL}
-                      alt={turn.location_name || 'Scene'}
-                      className="w-full object-cover max-h-96"
-                    />
-                  </button>
-                  {turn.location_name && (
-                    <div className="px-3 py-2 text-xs font-sans tracking-widest text-stone-400 uppercase">
-                      {turn.location_name}
-                    </div>
-                  )}
-                </div>
+              {/* On-demand illustration, when the policy skipped this beat. */}
+              {!imageURL && onGenerateImage && (
+                <button
+                  type="button"
+                  onClick={() => onGenerateImage(turn.turn_number)}
+                  className="my-2 flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-lg border border-stone-700 hover:border-purple-500/50 text-stone-400 hover:text-purple-300 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Generate image</span>
+                </button>
               )}
 
               {/* Narrated prose and attributed speech, in playback order */}
@@ -162,7 +143,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 displayMode={displayMode}
                 // Only the newest turn narrates itself: autoplaying every turn would
                 // start them all at once on load.
-                autoPlay={autoPlay && index === beats.length - 1}
+                autoPlay={autoPlay && index === turns.length - 1}
                 volume={volume}
                 serverPlayback={serverPlayback}
                 onPlayTurn={onPlayTurnAudio ? (segmentIndex, force) => onPlayTurnAudio(turn.turn_number, segmentIndex, force) : undefined}
@@ -172,7 +153,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 turnNumber={turn.turn_number}
                 segmentAudioStatus={segmentAudioStatus}
                 characterPortraits={characterPortraits}
-                segmentProgress={index === beats.length - 1 ? segmentProgress : undefined}
+                segmentProgress={index === turns.length - 1 ? segmentProgress : undefined}
                 checks={turn.checks}
                 gameId={gameId}
                 skipAudioKeys={skipAudioKeys}

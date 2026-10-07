@@ -98,6 +98,28 @@ export interface TTSBatchJob {
   last_error?: string;
 }
 
+// PendingCheckRequest is the check a GM proposed, as the player sees it.
+export interface PendingCheckRequest {
+  actor?: string;
+  check_kind?: string;
+  stat?: string;
+  skill?: string;
+  stakes?: string;
+  notation?: string;
+  outcomes?: Record<string, string>;
+}
+
+// PendingCheck is a GM-proposed check awaiting the player's roll, with the
+// arithmetic the roll card shows.
+export interface PendingCheck {
+  ref: string;
+  proposed_by?: string;
+  request?: PendingCheckRequest;
+  notation?: string;
+  bonuses?: { source: string; value: number }[];
+  actor_values?: Record<string, number>;
+}
+
 export interface Turn {
   turn_number: number;
   input_text: string;
@@ -112,7 +134,6 @@ export interface Turn {
   entities_hit?: string[];
   location_id?: string;
   location_name?: string;
-  location_art_url?: string;
   outcome?: string;
   // Set when the model hit its token limit mid-reply.
   truncated?: boolean;
@@ -132,11 +153,7 @@ export interface Turn {
   health_effects?: { entity: string; effect: string }[];
   world_tick?: string;
   // A GM-proposed check awaiting the player's roll (ask policy).
-  pending_check?: {
-    ref: string;
-    proposed_by?: string;
-    request?: { actor?: string; check_kind?: string; stat?: string; stakes?: string; notation?: string };
-  };
+  pending_check?: PendingCheck;
   // The turn this one continues, when the player rolled a pending check.
   continuation_of?: number;
   // How the turn's control records fared: nil for a clean turn.
@@ -172,6 +189,19 @@ export interface TurnCheck {
   check_kind?: string;
   stakes?: string;
   outcome: string;
+  // outcome_text is the system's own description of the outcome, so a label such
+  // as "weak" reads as fiction, and outcome_vocabulary is the declared order the
+  // card uses to tone the result.
+  outcome_text?: string;
+  outcome_vocabulary?: string[];
+  // profile names the resolution profile that decided the outcome, when one did,
+  // and position/effect are the Blades-style stakes it carries.
+  profile?: string;
+  position?: string;
+  effect?: string;
+  // successes is the count of dice meeting a pool threshold, when the profile is
+  // a success-count pool.
+  successes?: number;
   // dice are the faces that landed, which is what a die can be drawn from: a
   // total of 4 from 2d6 says nothing about the individual dice.
   roll?: { notation: string; total: number; successes?: number; roll_count?: number; dice?: DieFace[] };
@@ -457,6 +487,8 @@ export interface SystemDetail {
   script: string;
   rules_prompt?: string;
   character_creation?: CharacterCreationSpec;
+  mechanics?: MechanicsSpec;
+  warnings?: string[];
 }
 
 export interface CreateSystemRequest {
@@ -467,6 +499,177 @@ export interface CreateSystemRequest {
   script?: string;
   rules_prompt?: string;
   character_creation?: CharacterCreationSpec;
+  mechanics?: MechanicsSpec;
+}
+
+export interface ReferenceSystem {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  rules_prompt: string;
+  script: string;
+  mechanics?: MechanicsSpec;
+}
+
+export interface ReferenceSystemsResponse {
+  systems: ReferenceSystem[];
+}
+
+export interface ScenarioRange {
+  min: number;
+  max: number;
+}
+
+export interface ScenarioExpectations {
+  outcome?: string;
+  total?: ScenarioRange;
+  state?: Record<string, unknown>;
+  message_contains?: string;
+}
+
+export interface ScenarioStep {
+  action: string;
+  input?: string;
+  expect?: ScenarioExpectations;
+}
+
+export interface Scenario {
+  name: string;
+  seed: number;
+  setup?: { player?: { stats?: Record<string, unknown>; tags?: string[] } };
+  steps: ScenarioStep[];
+}
+
+export interface SystemTestRequest {
+  system: { id: string; script: string; mechanics?: MechanicsSpec };
+  scenarios: Scenario[];
+}
+
+export interface SystemTestFailure {
+  scenario: string;
+  step: number;
+  detail: string;
+}
+
+export interface SystemTestResponse {
+  failures?: SystemTestFailure[];
+}
+
+export interface SystemScenariosResponse {
+  scenarios?: Scenario[];
+}
+
+export interface StatSpec {
+  id: string;
+  label?: string;
+  type?: string;
+  default?: unknown;
+  min?: number;
+  max?: number;
+}
+
+export interface SkillSpec {
+  id: string;
+  label?: string;
+  stat?: string;
+}
+
+export interface HealthSpec {
+  stat: string;
+  max_stat?: string;
+  zero_effect?: string;
+}
+
+export interface DifficultySpec {
+  id: string;
+  label?: string;
+  target: number;
+}
+
+export interface LadderStep {
+  min: number;
+  outcome: string;
+}
+
+export interface SuccessOutcome {
+  min: number;
+  max: number;
+  outcome: string;
+}
+
+export interface ResolutionProfile {
+  label?: string;
+  notation?: string;
+  dc?: number;
+  ladder?: LadderStep[];
+  success_on?: string;
+  outcomes?: SuccessOutcome[];
+  position?: string[];
+  effect?: string[];
+}
+
+export interface CheckConventions {
+  notation?: string;
+  outcome?: string[];
+  difficulty?: DifficultySpec[];
+  profiles?: Record<string, ResolutionProfile>;
+}
+
+export interface CurrencySpec {
+  stat: string;
+  label?: string;
+}
+
+export interface EarnRule {
+  on: string;
+  outcome?: string;
+  rank?: string;
+  amount: number;
+}
+
+export interface EffectSpec {
+  type: string;
+  stat?: string;
+  amount?: number;
+  max?: number;
+  tag?: string;
+  hook?: string;
+}
+
+export interface UnlockSpec {
+  id: string;
+  label: string;
+  description?: string;
+  cost: number;
+  requires?: string[];
+  effects?: EffectSpec[];
+}
+
+export interface LevelSpec {
+  at: number;
+  label?: string;
+  effects?: EffectSpec[];
+}
+
+export interface AdvancementSpec {
+  currency: CurrencySpec;
+  mode?: string;
+  earn?: EarnRule[];
+  track_size?: number;
+  gate?: string;
+  unlocks?: UnlockSpec[];
+  levels?: LevelSpec[];
+}
+
+export interface MechanicsSpec {
+  stats?: StatSpec[];
+  skills?: SkillSpec[];
+  health?: HealthSpec;
+  checks?: CheckConventions;
+  allow_freeform_state?: boolean;
+  engagement?: string;
+  advancement?: AdvancementSpec;
 }
 
 export interface WorldEntitySummary {

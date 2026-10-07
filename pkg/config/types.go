@@ -236,6 +236,9 @@ type ImageConfig struct {
 	// provider is configured or a provider call fails, so imagery always exists
 	// offline.
 	BuiltinFallback bool `yaml:"builtin_fallback" json:"builtin_fallback"`
+	// Trigger selects when a turn image is generated: off, scene_break,
+	// significant, every_turn, or manual. Empty means significant.
+	Trigger string `yaml:"trigger,omitempty" json:"trigger,omitempty"`
 
 	AspectRatio      string `yaml:"aspect_ratio,omitempty" json:"aspect_ratio,omitempty"`
 	PersonGeneration string `yaml:"person_generation,omitempty" json:"person_generation,omitempty"`
@@ -359,6 +362,36 @@ type Config struct {
 	Preferences PreferencesConfig `yaml:"preferences" json:"preferences"`
 	Telemetry   TelemetryConfig   `yaml:"telemetry,omitempty" json:"telemetry,omitempty"`
 	Mechanics   MechanicsConfig   `yaml:"mechanics,omitempty" json:"mechanics,omitempty"`
+	Interactive InteractiveConfig `yaml:"interactive,omitempty" json:"interactive,omitempty"`
+}
+
+// InteractiveConfig governs how interactive rolls are recorded.
+type InteractiveConfig struct {
+	// Rolls selects "continuation" (a new turn carries the adjudication) or
+	// "single-turn" (the proposing turn is completed in place).
+	Rolls string `yaml:"rolls,omitempty" json:"rolls,omitempty"`
+}
+
+// InteractiveRolls returns the resolved interactive-rolls mode, normalising an
+// empty or unknown value to "continuation".
+func (c *Config) InteractiveRolls() string {
+	if c != nil && c.Interactive.Rolls == "single-turn" {
+		return "single-turn"
+	}
+	return "continuation"
+}
+
+// ImageTrigger returns the resolved image-trigger policy, normalising an empty or
+// unknown value to "significant".
+func (c *Config) ImageTrigger() string {
+	if c == nil {
+		return "significant"
+	}
+	switch c.Media.Image.Trigger {
+	case "off", "scene_break", "significant", "every_turn", "manual":
+		return c.Media.Image.Trigger
+	}
+	return "significant"
 }
 
 // CurrentVersion is the config schema version.

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { APIClient } from '../api/client';
-import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure } from '../types';
-import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2 } from 'lucide-react';
+import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure } from '../types';
+import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
-import { REFERENCE_SYSTEM_TEMPLATE } from '../templates/referenceTemplates';
 import MarkdownEditor from './editor/MarkdownEditor';
+import { MechanicsEditor } from './MechanicsEditor';
 
 type SystemSelection = { kind: 'saved'; id: string } | { kind: 'draft' } | null;
 
@@ -22,10 +22,11 @@ interface SystemsStudioProps {
 
 export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, startMode = 'browse' }) => {
   const [systems, setSystems] = useState<SystemInfo[]>([]);
+  const [referenceSystems, setReferenceSystems] = useState<ReferenceSystem[]>([]);
   const [selection, setSelection] = useState<SystemSelection>(null);
   const [draft, setDraft] = useState<SystemDraft | null>(null);
   const [pendingSelection, setPendingSelection] = useState<SystemSelection>(null);
-  const [activeTab, setActiveTab] = useState<'manifest' | 'rules' | 'script'>('manifest');
+  const [activeTab, setActiveTab] = useState<'manifest' | 'rules' | 'mechanics' | 'script'>('manifest');
   const startModeRef = React.useRef(startMode);
 
   // Form state
@@ -35,12 +36,16 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [description, setDescription] = useState('');
   const [rulesPrompt, setRulesPrompt] = useState('');
   const [script, setScript] = useState('');
+  // The system's declarative mechanics block, edited as one object.
+  const [mechanics, setMechanics] = useState<MechanicsSpec>({});
   // Character creation prompts a player answers when starting with this system.
   const [creationPreamble, setCreationPreamble] = useState('');
   const [creationFields, setCreationFields] = useState<CharacterCreationField[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testFailures, setTestFailures] = useState<SystemTestFailure[]>([]);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -55,7 +60,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
   useEffect(() => {
     loadSystems(undefined, startModeRef.current);
+    loadReferenceSystems();
   }, []);
+
+  const loadReferenceSystems = async () => {
+    try {
+      const res = await APIClient.listReferenceSystems();
+      setReferenceSystems(res.systems ?? []);
+    } catch {
+      // A failed fetch shows no starting points rather than a stale constant.
+      setReferenceSystems([]);
+    }
+  };
 
   const loadSystems = async (selectID?: string, mode: 'new' | 'browse' = 'browse') => {
     setIsLoading(true);
@@ -88,8 +104,9 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       setSlugID(detail.id);
       setVersion(detail.version || '1.0.0');
       setDescription(detail.description || '');
-      setRulesPrompt(detail.rules_prompt || REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
-      setScript(detail.script || REFERENCE_SYSTEM_TEMPLATE.script);
+      setRulesPrompt(detail.rules_prompt || '');
+      setScript(detail.script || '');
+      setMechanics(detail.mechanics || {});
       setCreationPreamble(detail.character_creation?.preamble || '');
       setCreationFields(detail.character_creation?.fields || []);
     } catch (err) {
@@ -125,24 +142,36 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setDescription('');
     setRulesPrompt('');
     setScript('');
+    setMechanics({});
     setCreationPreamble('');
     setCreationFields([]);
     setActiveTab('manifest');
   };
 
-  const handleResetToReference = () => {
-    setName(REFERENCE_SYSTEM_TEMPLATE.name);
+  const applyReference = (reference: ReferenceSystem) => {
+    setName(reference.name);
     if (!savedID) {
-      setSlugID(REFERENCE_SYSTEM_TEMPLATE.id);
+      setSlugID(reference.id);
     }
-    setVersion(REFERENCE_SYSTEM_TEMPLATE.version);
-    setDescription(REFERENCE_SYSTEM_TEMPLATE.description);
-    setRulesPrompt(REFERENCE_SYSTEM_TEMPLATE.rules_prompt);
-    setScript(REFERENCE_SYSTEM_TEMPLATE.script);
+    setVersion(reference.version);
+    setDescription(reference.description);
+    setRulesPrompt(reference.rules_prompt);
+    setScript(reference.script);
+    setMechanics(reference.mechanics ?? {});
     setCreationPreamble('');
     setCreationFields([]);
     markDirty();
-    setToast({ type: 'success', message: 'Reset to Narrative 2d6 Reference Template!' });
+    setToast({ type: 'success', message: `Loaded the ${reference.name} reference.` });
+  };
+
+  const handleResetToReference = () => {
+    const reference =
+      referenceSystems.find((r) => r.id === 'narrative_2d6') ?? referenceSystems[0];
+    if (!reference) {
+      setToast({ type: 'error', message: 'No reference systems are available.' });
+      return;
+    }
+    applyReference(reference);
   };
 
   const getSystemContext = (): Record<string, string> => ({
@@ -198,10 +227,15 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
           preamble: creationPreamble.trim() || undefined,
           fields: creationFields,
         },
+        mechanics: Object.keys(mechanics).length > 0 ? mechanics : undefined,
       };
 
       const saved = await APIClient.saveSystem(payload);
-      setToast({ type: 'success', message: `System "${saved.name}" saved successfully!` });
+      if (saved.warnings && saved.warnings.length > 0) {
+        setToast({ type: 'error', message: `Saved with warnings: ${saved.warnings.join('; ')}` });
+      } else {
+        setToast({ type: 'success', message: `System "${saved.name}" saved successfully!` });
+      }
       setDraft(null);
       await loadSystems(saved.id, 'browse');
       if (onSystemSaved) onSystemSaved();
@@ -209,6 +243,33 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       setToast({ type: 'error', message: errorMessage(err) || 'Failed to save system' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleRunTests = async () => {
+    if (!savedID) {
+      setToast({ type: 'error', message: 'Save the system before running its scenarios.' });
+      return;
+    }
+    setIsTesting(true);
+    setTestFailures([]);
+    try {
+      const stored = await APIClient.listSystemScenarios(savedID);
+      const resp = await APIClient.runSystemTest({
+        system: { id: savedID, script, mechanics },
+        scenarios: stored.scenarios ?? [],
+      });
+      const failures = resp.failures ?? [];
+      setTestFailures(failures);
+      if (failures.length === 0) {
+        setToast({ type: 'success', message: `All ${stored.scenarios?.length ?? 0} scenario(s) passed.` });
+      } else {
+        setToast({ type: 'error', message: `${failures.length} scenario assertion(s) failed.` });
+      }
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to run scenarios' });
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -237,6 +298,24 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
             <span>New</span>
           </button>
         </div>
+
+        {referenceSystems.length > 0 && (
+          <div className="space-y-1.5 shrink-0">
+            <span className="text-[11px] font-sans uppercase tracking-wider text-stone-500">Starting points</span>
+            <div className="flex flex-wrap gap-1.5">
+              {referenceSystems.map((reference) => (
+                <button
+                  key={reference.id}
+                  type="button"
+                  onClick={() => applyReference(reference)}
+                  className="text-xs font-sans px-2.5 py-1 rounded-lg border border-stone-800 hover:border-purple-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-purple-300 cursor-pointer"
+                >
+                  {reference.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
           {draft && (
@@ -341,6 +420,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               </button>
               <button
                 type="button"
+                onClick={() => setActiveTab('mechanics')}
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  activeTab === 'mechanics'
+                    ? 'bg-purple-600 text-white font-bold shadow'
+                    : 'text-stone-400 hover:text-white'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Mechanics</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveTab('script')}
                 className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
                   activeTab === 'script'
@@ -375,6 +466,17 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
             </button>
 
             <button
+              type="button"
+              onClick={handleRunTests}
+              disabled={isTesting || isSaving}
+              title="Run the system's stored scenarios"
+              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-emerald-500/40 bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isTesting ? 'Testing...' : 'Run Tests'}</span>
+            </button>
+
+            <button
               onClick={handleSave}
               disabled={isSaving}
               className="flex items-center gap-1.5 text-xs font-sans font-bold px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.35)] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
@@ -400,6 +502,16 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               <AlertCircle className="w-4 h-4 text-red-400" />
             )}
             <span>{toast.message}</span>
+          </div>
+        )}
+
+        {testFailures.length > 0 && (
+          <div className="p-3 rounded-xl text-xs bg-red-950/40 border border-red-500/40 text-red-200 space-y-1 shrink-0">
+            {testFailures.map((failure, index) => (
+              <div key={index} className="font-mono">
+                {failure.scenario} step {failure.step}: {failure.detail}
+              </div>
+            ))}
           </div>
         )}
 
@@ -663,6 +775,19 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               language="markdown"
               ariaLabel="System rules prompt"
               placeholder="Describe the resolution philosophy, dice mechanics and character stats the engine should follow..."
+            />
+          </div>
+        )}
+
+        {/* Tab 2b: Mechanics Editor */}
+        {activeTab === 'mechanics' && (
+          <div className="flex-1 overflow-y-auto min-h-0 pr-2">
+            <MechanicsEditor
+              mechanics={mechanics}
+              onChange={(next) => {
+                setMechanics(next);
+                markDirty();
+              }}
             />
           </div>
         )}

@@ -20,12 +20,24 @@ type SchemaResolver struct {
 
 // Resolve implements harness.CheckResolver.
 func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error) {
+	profile := req.Profile
+	if profile == "" {
+		profile = "default"
+	}
+	p, hasProfile := r.conventions.Profiles[profile]
+
 	notation := req.Notation
+	if notation == "" && hasProfile {
+		notation = p.Notation
+	}
 	if notation == "" {
 		notation = r.conventions.Notation
 	}
 	if notation == "" {
 		notation = "2d6"
+	}
+	if hasProfile {
+		notation = ProfileNotation(notation, p)
 	}
 	roll, err := EvaluateRoll(notation)
 	if err != nil {
@@ -36,24 +48,42 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 		return stateValue(r.bridge, actor, name)
 	}, req)
 	total := roll.Total + bonus
-
-	target := 8
-	for _, difficulty := range r.conventions.Difficulty {
-		if difficulty.ID == req.Difficulty {
-			target = difficulty.Target
-			break
-		}
+	if req.ForcedTotal != nil {
+		total = *req.ForcedTotal
 	}
 
-	outcome := outcomeFor(r.conventions.Outcome, total >= target)
-	return &harness.CheckResult{
+	res := &harness.CheckResult{
 		CheckID: harness.NewCheckID(),
 		Actor:   req.Actor,
 		Target:  req.Target,
 		Roll:    roll.Summary(total),
-		Outcome: outcome,
 		Applied: applied,
-	}, nil
+	}
+	if req.ForcedTotal != nil {
+		res.Source = "manual"
+	}
+
+	if hasProfile {
+		if outcome, decided := ResolveProfile(p, total, roll.Successes); decided {
+			res.Outcome = outcome
+			res.Profile = profile
+		}
+		res.Position = ClampTo(p.Position, req.Position)
+		res.Effect = ClampTo(p.Effect, req.Effect)
+		res.Successes = roll.Successes
+	}
+
+	if res.Outcome == "" {
+		target := 8
+		for _, difficulty := range r.conventions.Difficulty {
+			if difficulty.ID == req.Difficulty {
+				target = difficulty.Target
+				break
+			}
+		}
+		res.Outcome = outcomeFor(r.conventions.Outcome, total >= target)
+	}
+	return res, nil
 }
 
 // stateValue reads a numeric stat or skill from the actor or, failing that, the

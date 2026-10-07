@@ -156,6 +156,7 @@ choose; the ledger and provider identifiers are listed in the
 | `media.image.api_key` | string |
 | `media.image.auto_generate` | bool |
 | `media.image.builtin_fallback` | bool |
+| `media.image.trigger` | string |
 | `media.image.aspect_ratio` | string |
 | `media.image.person_generation` | string |
 | `media.image.instance` | string |
@@ -210,6 +211,12 @@ choose; the ledger and provider identifiers are listed in the
 | `mechanics.engagement` | string |
 | `mechanics.cadence_turns` | int |
 | `mechanics.world_tick_turns` | int |
+
+### `interactive`
+
+| Key | Type |
+| --- | --- |
+| `interactive.rolls` | string |
 
 ## Value sets
 

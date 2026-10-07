@@ -1,0 +1,11 @@
+name: a trained strike
+seed: 2
+setup:
+  player:
+    stats: { strength: 12 }
+steps:
+  - action: do
+    input: swing the axe
+    expect:
+      outcome: success
+      message_contains: "meets DC"

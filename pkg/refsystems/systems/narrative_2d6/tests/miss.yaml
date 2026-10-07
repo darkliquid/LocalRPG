@@ -1,0 +1,9 @@
+name: a costly miss
+seed: 2
+steps:
+  - action: do
+    input: force the door
+    expect:
+      outcome: miss
+      total: { min: 2, max: 6 }
+      message_contains: "Miss"

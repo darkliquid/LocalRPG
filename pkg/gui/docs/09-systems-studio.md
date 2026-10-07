@@ -32,6 +32,14 @@ mechanics:
     outcome: [failure, mixed, success]
 ```
 
+## Reference Systems
+
+The studio offers complete starting systems for a PbtA 2d6 ladder, a d20 difficulty class, and a d10 success pool. They are built into the binary and are the same corpus the engine tests exercise.
+
+## Editing Mechanics in the Studio
+
+The **Mechanics** tab edits the whole `mechanics` block: stats, skills, health, check conventions (including resolution profiles), advancement, freeform state, and the engagement default. Each list adds and removes its own rows, and the studio warns about an invalid id, a duplicate id, a skill whose stat is undeclared, or a malformed profile before it saves.
+
 ## Crafting the Rules Prompt (`prompts/rules.md`)
 
 The rules prompt guides the GM agent when calling for checks:
@@ -69,6 +77,10 @@ onAction('roll', function (ctx) {
   return { success: false, outcome: 'failure', roll: result, message: 'Things go terribly wrong.' };
 });
 ```
+
+## Testing a System
+
+Deterministic scenarios live under `systems/<id>/tests/*.yaml`. The studio's **Run Tests** action runs them against the saved system and lists any assertion that failed, and `localrpg debug test-system <id>` runs the same scenarios from the command line. Add `--reference` to test a built-in reference system instead of one on disk.
 
 ## Live Studio Testing
 

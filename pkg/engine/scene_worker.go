@@ -13,25 +13,137 @@ import (
 	"github.com/darkliquid/localrpg/pkg/media"
 )
 
-// BuildScenePrompt composes the generation prompt for a turn scene illustration.
-func BuildScenePrompt(visualCue string, location *entity.Entity, worldStyle string) string {
-	parts := make([]string, 0, 4)
-	if cue := strings.TrimSpace(visualCue); cue != "" {
-		parts = append(parts, cue)
+// ScenePromptContext is everything a scene prompt is composed from, so the image
+// reflects what happened rather than only where the player is.
+type ScenePromptContext struct {
+	Cue        string   // the extractor cue or rule-break paragraph, if any
+	Narration  string   // the turn's narration, for an excerpt
+	Action     string   // the player's raw action
+	Entities   []string // present characters, by display name
+	Location   string   // the location's name
+	Appearance string   // the location's authored appearance, if any
+	Style      string   // the world art style
+	Outcome    string   // the resolved check's outcome, if any
+}
+
+const (
+	sceneNarrationCap = 200
+	sceneActionCap    = 160
+	sceneEntityCap    = 4
+	// sceneSuffix is the fixed quality suffix every scene prompt ends with.
+	sceneSuffix = "cinematic scene illustration, high quality, atmospheric lighting, detailed environment, no text, no borders"
+)
+
+// BuildScenePrompt composes the generation prompt for a turn scene illustration
+// from the turn's context, each part bounded so the provider is not asked to
+// reconcile a page of prose.
+func BuildScenePrompt(ctx ScenePromptContext) string {
+	parts := make([]string, 0, 8)
+
+	// Subject: the cue when present, else a short narration excerpt.
+	subject := strings.TrimSpace(ctx.Cue)
+	if subject == "" {
+		subject = sceneExcerpt(ctx.Narration, sceneNarrationCap)
 	}
-	if location != nil {
-		if locName := strings.TrimSpace(location.Name); locName != "" {
-			parts = append(parts, "location: "+locName)
-		}
-		if appearance := strings.TrimSpace(location.Appearance); appearance != "" {
-			parts = append(parts, appearance)
-		}
+	if subject != "" {
+		parts = append(parts, subject)
 	}
-	if style := strings.TrimSpace(worldStyle); style != "" {
+
+	if action := sceneExcerpt(ctx.Action, sceneActionCap); action != "" {
+		parts = append(parts, "action: "+action)
+	}
+
+	if len(ctx.Entities) > 0 {
+		entities := ctx.Entities
+		if len(entities) > sceneEntityCap {
+			entities = entities[:sceneEntityCap]
+		}
+		parts = append(parts, "characters: "+strings.Join(entities, ", "))
+	}
+
+	if location := strings.TrimSpace(ctx.Location); location != "" {
+		parts = append(parts, "location: "+location)
+	}
+	if appearance := strings.TrimSpace(ctx.Appearance); appearance != "" {
+		parts = append(parts, appearance)
+	}
+
+	if style := strings.TrimSpace(ctx.Style); style != "" {
 		parts = append(parts, style)
 	}
-	parts = append(parts, "cinematic scene illustration, high quality, atmospheric lighting, detailed environment, no text, no borders")
+	if tone := outcomeToneWords(ctx.Outcome); tone != "" {
+		parts = append(parts, tone)
+	}
+
+	parts = append(parts, sceneSuffix)
 	return strings.Join(parts, ", ")
+}
+
+// BuildScenePromptFor is the previous three-argument builder, kept for callers
+// that only have a cue, a location, and a style.
+func BuildScenePromptFor(visualCue string, location *entity.Entity, worldStyle string) string {
+	ctx := ScenePromptContext{Cue: visualCue, Style: worldStyle}
+	if location != nil {
+		ctx.Location = location.Name
+		ctx.Appearance = location.Appearance
+	}
+	return BuildScenePrompt(ctx)
+}
+
+// sceneExcerpt returns the first sentence of text, capped at limit characters.
+func sceneExcerpt(text string, limit int) string {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return ""
+	}
+	if idx := strings.IndexAny(trimmed, ".!?"); idx >= 0 && idx < limit {
+		trimmed = trimmed[:idx+1]
+	}
+	if len(trimmed) > limit {
+		trimmed = strings.TrimSpace(trimmed[:limit])
+	}
+	return trimmed
+}
+
+// outcomeToneWords maps the common outcome families to short prompt tone words,
+// and returns "" for anything else so a custom vocabulary adds no wrong mood.
+func outcomeToneWords(outcome string) string {
+	switch strings.ToLower(strings.TrimSpace(outcome)) {
+	case "strong", "success", "pass", "critical", "hit":
+		return "triumphant, bright"
+	case "weak", "partial", "mixed", "success_with_cost":
+		return "tense, uncertain"
+	case "miss", "fail", "failure":
+		return "ominous, shadowed"
+	}
+	return ""
+}
+
+// presentEntityNames resolves the display names of the entities a turn involved,
+// so the scene can show them. It caps the list so the prompt stays short.
+func (o *TurnOrchestrator) presentEntityNames(turn *Turn) []string {
+	seen := make(map[string]bool, len(turn.Entities)+len(turn.Segments))
+	names := make([]string, 0, sceneEntityCap)
+	add := func(id string) {
+		if id == "" || seen[id] || len(names) >= sceneEntityCap {
+			return
+		}
+		seen[id] = true
+		name := id
+		if o.store != nil {
+			if ent, err := o.store.GetEntity(id); err == nil && ent != nil && ent.Name != "" {
+				name = ent.Name
+			}
+		}
+		names = append(names, name)
+	}
+	for _, mention := range turn.Entities {
+		add(mention.ID)
+	}
+	for _, segment := range turn.Segments {
+		add(segment.SpeakerID)
+	}
+	return names
 }
 
 // ExtractSceneCue extracts a concise visual cue from narration text following a scene break delimiter.

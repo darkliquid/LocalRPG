@@ -55,6 +55,7 @@ func routePattern(path string) string {
 		path == "/api/settings" || path == "/api/settings/test-provider" ||
 		path == "/api/open-url" ||
 		path == "/api/providers" || path == "/api/providers/models" ||
+		path == "/api/reference-systems" ||
 		path == "/api/tts/inspect" || path == "/api/tts/voices/search" ||
 		path == "/api/media/inspect" ||
 		path == "/api/tts/batch" ||
@@ -79,6 +80,10 @@ func routePattern(path string) string {
 			return "/api/game/{id}/" + suffix
 		}
 		return "/api/game/{id}"
+	case path == "/api/system/test":
+		return "/api/system/test"
+	case strings.HasPrefix(path, "/api/system/tests/"):
+		return "/api/system/tests/{id}"
 	case strings.HasPrefix(path, "/api/system/"):
 		return "/api/system/{id}"
 	case strings.HasPrefix(path, "/api/world/"):
@@ -656,6 +661,18 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// POST /api/game/{id}/turn/{n}/resolve-check resolves the turn's pending
+		// check without a fresh player action.
+		if r.Method == http.MethodPost && len(parts) == 4 && parts[3] == "resolve-check" {
+			turnNumber, err := strconv.Atoi(parts[2])
+			if err != nil {
+				http.Error(w, "invalid turn number", http.StatusBadRequest)
+				return
+			}
+			s.handleResolveCheck(w, r, gameID, turnNumber)
+			return
+		}
+
 		// GET /api/game/{id}/turn/{n}/scene-image
 		if r.Method == http.MethodGet && len(parts) == 4 && parts[3] == "scene-image" {
 			turnNumber, err := strconv.Atoi(parts[2])
@@ -671,6 +688,22 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", contentType)
 			w.Header().Set("Cache-Control", "no-cache")
 			_, _ = w.Write(data)
+			return
+		}
+
+		// POST /api/game/{id}/turn/{n}/scene-image generates one on demand,
+		// regardless of the trigger policy.
+		if r.Method == http.MethodPost && len(parts) == 4 && parts[3] == "scene-image" {
+			turnNumber, err := strconv.Atoi(parts[2])
+			if err != nil {
+				http.Error(w, "invalid turn number", http.StatusBadRequest)
+				return
+			}
+			if err := s.service.GenerateTurnSceneImage(r.Context(), gameID, turnNumber); err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusAccepted)
 			return
 		}
 
@@ -982,6 +1015,55 @@ func (s *Server) handleSystemsRoutes(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) handleReferenceSystemsRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	res, err := s.service.ListReferenceSystems(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
+func (s *Server) handleSystemTestRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req SystemTestRequestDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	resp, err := s.service.TestSystem(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, resp)
+}
+
+func (s *Server) handleSystemTestsRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/system/tests/"), "/")
+	if id == "" {
+		http.Error(w, "missing system id", http.StatusBadRequest)
+		return
+	}
+	resp, err := s.service.SystemScenarios(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	writeJSON(w, resp)
 }
 
 func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {
@@ -1431,12 +1513,53 @@ func (s *Server) handleAudioRoutes(w http.ResponseWriter, r *http.Request) {
 		s.service.StopAudio()
 		w.WriteHeader(http.StatusNoContent)
 
+	case "events":
+		if r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		s.serveAudioEvents(w, r)
+
 	default:
 		if r.Method == http.MethodGet && strings.HasPrefix(action, "clip/") {
 			s.serveClip(w, r, strings.TrimPrefix(action, "clip/"))
 			return
 		}
 		http.NotFound(w, r)
+	}
+}
+
+// serveAudioEvents streams playback status changes as server-sent events, so a
+// client advances on a real completion rather than polling the status endpoint.
+func (s *Server) serveAudioEvents(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming is not supported by this client", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	write := func(status AudioStatusDTO) {
+		data, err := json.Marshal(status)
+		if err != nil {
+			return
+		}
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
+		flusher.Flush()
+	}
+
+	ch, cancel := s.service.SubscribeAudioStatus()
+	defer cancel()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case status := <-ch:
+			write(status)
+		}
 	}
 }
 
@@ -1553,6 +1676,71 @@ func (s *Server) handleTurnSubmit(w http.ResponseWriter, r *http.Request, gameID
 	}
 
 	if err := session.Run(r.Context(), req, writeEvent); err != nil {
+		event := TurnEvent{Type: "error", Message: err.Error()}
+		if failure, ok := harness.FailureFrom(err); ok {
+			event.Code = string(failure.Code)
+			event.Detail = failure.Message
+			event.Failure = failure
+		}
+		_ = writeEvent(event)
+	}
+}
+
+// handleResolveCheck streams the resolution of a turn's pending check as a
+// continuation turn. Status codes are chosen before the first byte, mirroring
+// handleTurnSubmit: 404 for an unknown turn, 400 for no or mismatched pending
+// check, and 409 for a turn already in flight.
+func (s *Server) handleResolveCheck(w http.ResponseWriter, r *http.Request, gameID string, turnNumber int) {
+	var req ResolveCheckRequestDTO
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+		writeInvalidRequest(w, "invalid request body")
+		return
+	}
+
+	session, pendingRef, err := s.service.BeginResolveCheck(gameID, turnNumber, req)
+	switch {
+	case errors.Is(err, ErrTurnInFlight):
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	case errors.Is(err, fs.ErrNotExist):
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	case errors.Is(err, ErrNoPendingCheck), errors.Is(err, ErrPendingCheckMismatch):
+		writeInvalidRequest(w, err.Error())
+		return
+	case err != nil:
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer session.Close()
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming is not supported by this client", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	encoder := json.NewEncoder(w)
+	writeEvent := func(event TurnEvent) error {
+		if err := encoder.Encode(event); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+
+	err = session.Run(r.Context(), TurnRequest{
+		Mode:            "roll",
+		Input:           req.Note,
+		PendingCheckRef: pendingRef,
+		ForcedTotal:     req.ManualResult,
+	}, writeEvent)
+	if err != nil {
 		event := TurnEvent{Type: "error", Message: err.Error()}
 		if failure, ok := harness.FailureFrom(err); ok {
 			event.Code = string(failure.Code)

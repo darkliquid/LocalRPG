@@ -11,6 +11,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/provider"
+	"github.com/darkliquid/localrpg/pkg/systemtest"
 )
 
 type PlayerDTO struct {
@@ -207,14 +208,16 @@ type TurnDTO struct {
 	ContinuityNotes []string       `json:"continuity_notes,omitempty"`
 	LocationID      string         `json:"location_id,omitempty"`
 	LocationName    string         `json:"location_name,omitempty"`
-	LocationArtURL  string         `json:"location_art_url,omitempty"`
 	SceneBreak      bool           `json:"scene_break,omitempty"`
 	// Structured turn fields: whether the action was rejected and the checks the
 	// GM resolved.
 	Rejected bool                  `json:"rejected,omitempty"`
 	Checks   []harness.CheckResult `json:"checks,omitempty"`
 	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
-	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
+	PendingCheck *PendingCheckDTO `json:"pending_check,omitempty"`
+	// Engagement is the resolved mechanics policy in force this turn (off, auto,
+	// or ask), so a client can explain why mechanics ran or did not.
+	Engagement string `json:"engagement,omitempty"`
 	// ContinuationOf is the turn this one continues, when the player rolled a
 	// pending check, so a client can present the halves as one turn.
 	ContinuationOf int `json:"continuation_of,omitempty"`
@@ -226,6 +229,18 @@ type TurnDTO struct {
 	// RecordReport summarises the turn's control-record health. Nil when every
 	// record arrived valid.
 	RecordReport *RecordReportDTO `json:"record_report,omitempty"`
+}
+
+// PendingCheckDTO is a GM-proposed check awaiting the player's roll, with the
+// arithmetic the roll card shows: the notation, the bonuses that would apply,
+// and the actor's relevant values.
+type PendingCheckDTO struct {
+	Ref         string                    `json:"ref"`
+	ProposedBy  string                    `json:"proposed_by,omitempty"`
+	Request     harness.CheckRequest      `json:"request"`
+	Notation    string                    `json:"notation,omitempty"`
+	Bonuses     []harness.AppliedModifier `json:"bonuses,omitempty"`
+	ActorValues map[string]int            `json:"actor_values,omitempty"`
 }
 
 // RecordIssueDTO is one repaired or dropped control record.
@@ -453,6 +468,11 @@ type SystemDetailDTO struct {
 	Script            string                     `json:"script"`
 	RulesPrompt       string                     `json:"rules_prompt"`
 	CharacterCreation core.CharacterCreationSpec `json:"character_creation"`
+	// Mechanics is the system's declarative mechanics block, when it has one.
+	Mechanics *core.MechanicsSpec `json:"mechanics,omitempty"`
+	// Warnings are non-fatal findings from the last save, so a client can show
+	// them without rejecting the write.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 type CreateSystemRequestDTO struct {
@@ -463,6 +483,53 @@ type CreateSystemRequestDTO struct {
 	Script            string                     `json:"script,omitempty"`
 	RulesPrompt       string                     `json:"rules_prompt,omitempty"`
 	CharacterCreation core.CharacterCreationSpec `json:"character_creation,omitempty"`
+	Mechanics         *core.MechanicsSpec        `json:"mechanics,omitempty"`
+}
+
+// ReferenceSystemDTO is one complete, runnable system shipped as a starting point.
+type ReferenceSystemDTO struct {
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Version     string              `json:"version"`
+	Description string              `json:"description"`
+	RulesPrompt string              `json:"rules_prompt"`
+	Script      string              `json:"script"`
+	Mechanics   *core.MechanicsSpec `json:"mechanics,omitempty"`
+}
+
+// ReferenceSystemsDTO is the list of shipped starting systems.
+type ReferenceSystemsDTO struct {
+	Systems []ReferenceSystemDTO `json:"systems"`
+}
+
+// SystemTestSystemDTO is the system a scenario run exercises.
+type SystemTestSystemDTO struct {
+	ID        string              `json:"id"`
+	Script    string              `json:"script"`
+	Mechanics *core.MechanicsSpec `json:"mechanics,omitempty"`
+}
+
+// SystemTestRequestDTO asks the engine to run scenarios against a system.
+type SystemTestRequestDTO struct {
+	System    SystemTestSystemDTO   `json:"system"`
+	Scenarios []systemtest.Scenario `json:"scenarios"`
+}
+
+// SystemTestFailureDTO is one expectation a scenario did not meet.
+type SystemTestFailureDTO struct {
+	Scenario string `json:"scenario"`
+	Step     int    `json:"step"`
+	Detail   string `json:"detail"`
+}
+
+// SystemTestResponseDTO is the result of a scenario run.
+type SystemTestResponseDTO struct {
+	Failures []SystemTestFailureDTO `json:"failures,omitempty"`
+}
+
+// SystemScenariosDTO is a system's stored scenarios.
+type SystemScenariosDTO struct {
+	Scenarios []systemtest.Scenario `json:"scenarios"`
 }
 
 type WorldEntitySummaryDTO struct {
@@ -623,6 +690,18 @@ type TurnRequest struct {
 	// SceneOnly asks an Opening turn to restate the campaign's scene and add no
 	// hooks, so the player's own first action can follow it.
 	SceneOnly bool `json:"scene_only,omitempty"`
+	// ForcedTotal, when set, makes the turn's check resolve to this total instead
+	// of rolling, so a manually entered die result is honoured.
+	ForcedTotal *int `json:"forced_total,omitempty"`
+}
+
+// ResolveCheckRequestDTO asks the engine to roll and resolve a pending check,
+// producing the GM's adjudication without a fresh player turn.
+type ResolveCheckRequestDTO struct {
+	PendingRef string `json:"pending_check_ref"`
+	// ManualResult, when set, is the total the player entered rather than a roll.
+	ManualResult *int   `json:"manual_result,omitempty"`
+	Note         string `json:"note,omitempty"`
 }
 
 // TurnEvent is one NDJSON line sent while a turn runs.
@@ -708,6 +787,11 @@ func (r *TurnRequest) validate() error {
 type AudioStatusDTO struct {
 	Available bool `json:"available"`
 	Playing   bool `json:"playing"`
+	// Turn and Segment name the beat a completion event belongs to, so a client
+	// advances only on the completion of the beat it is playing. Segment is -1 for
+	// a whole-turn queue.
+	Turn    int `json:"turn"`
+	Segment int `json:"segment"`
 }
 
 // TraceEventDTO is one traced event. The event's own fields are nested rather

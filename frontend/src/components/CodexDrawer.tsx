@@ -10,6 +10,7 @@ import { VoiceProfileSelect } from './VoiceProfileSelect';
 import EntityTree from './EntityTree';
 import MarkdownEditor from './editor/MarkdownEditor';
 import { loadEntityIndex, invalidateEntityIndex } from './editor/entityIndex';
+import { isCharacterType } from '../lib/entityTypes';
 import { NewEntityWizard } from './NewEntityWizard';
 
 interface CodexDrawerProps {
@@ -402,7 +403,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                     <span>Browse Notes</span>
                   </button>
                 )}
-                {entity.type === 'character' && gameID && (
+                {isCharacterType(entity.type) && gameID && (
                   <div className="flex items-center gap-1.5 shrink-0">
                     <div
                       onClick={() => openLightbox(portraitURL, entity.name)}

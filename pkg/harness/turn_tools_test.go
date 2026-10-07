@@ -60,3 +60,21 @@ func TestParseCheckRequestCarriesSkillAndModifiers(t *testing.T) {
 		t.Fatalf("decoded %+v", req)
 	}
 }
+
+func TestRequestCheckSpecAdvertisesProfile(t *testing.T) {
+	props := requestCheckSpec().Parameters["properties"].(map[string]interface{})
+	for _, key := range []string{"profile", "position", "effect"} {
+		if _, ok := props[key]; !ok {
+			t.Fatalf("missing %s parameter", key)
+		}
+	}
+}
+
+func TestProposeCheckSpecAdvertisesProfile(t *testing.T) {
+	props := proposeCheckSpec().Parameters["properties"].(map[string]interface{})
+	for _, key := range []string{"profile", "position", "effect"} {
+		if _, ok := props[key]; !ok {
+			t.Fatalf("missing %s parameter", key)
+		}
+	}
+}

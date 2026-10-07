@@ -76,6 +76,15 @@ type CheckRequest struct {
 	Stakes     string            `json:"stakes"`
 	Outcomes   map[string]string `json:"outcomes"`
 	Notation   string            `json:"notation,omitempty"`
+	// Profile names a resolution profile from the system's checks. Empty uses the
+	// system's default conventions.
+	Profile string `json:"profile,omitempty"`
+	// Position and Effect are the Blades-style stakes a profile may define.
+	Position string `json:"position,omitempty"`
+	Effect   string `json:"effect,omitempty"`
+	// ForcedTotal, when set, replaces the rolled total: a player entering a
+	// physical die result, or a pending check resolved with a manual roll.
+	ForcedTotal *int `json:"-"`
 }
 
 // DieFace is one die as it landed. Symbol is the notation's own way of showing
@@ -105,19 +114,26 @@ type CheckResult struct {
 	Stakes    string       `json:"stakes,omitempty"`
 	Roll      *RollSummary `json:"roll"`
 	Outcome   string       `json:"outcome"`
+	// OutcomeText is the system's own description of the outcome, from the
+	// request's outcomes map, so a label such as "weak" reads as fiction.
+	OutcomeText string `json:"outcome_text,omitempty"`
+	// OutcomeVocabulary is the system's declared outcome order, so a client can
+	// tone a result without hardcoding pass and fail.
+	OutcomeVocabulary []string `json:"outcome_vocabulary,omitempty"`
 	// Applied lists every bonus that contributed, for display.
 	Applied   []AppliedModifier      `json:"applied,omitempty"`
 	Breakdown map[string]interface{} `json:"breakdown,omitempty"`
-}
-
-// ProposedCheck is a player's explicit request to roll, carried as structured
-// data. Roll mode builds one and the orchestrator turns it into an advisory
-// [PROPOSED CHECK] directive for the GM; enforcement is a future concern, so the
-// Ref is an identifier, not a contract the GM must honour.
-type ProposedCheck struct {
-	Ref         string `json:"ref"`
-	Actor       string `json:"actor,omitempty"`
-	Description string `json:"description,omitempty"`
+	// Profile names the resolution profile that decided the outcome, when one did.
+	Profile string `json:"profile,omitempty"`
+	// Position and Effect are the Blades-style stakes the profile carries.
+	Position string `json:"position,omitempty"`
+	Effect   string `json:"effect,omitempty"`
+	// Successes is the count of dice meeting the pool threshold, when the profile
+	// is a success-count pool.
+	Successes int `json:"successes,omitempty"`
+	// Source is "manual" when the total came from a forced entry rather than the
+	// dice, so the chronicle can say so.
+	Source string `json:"source,omitempty"`
 }
 
 // PendingCheck is a check the GM proposed under the ask policy and the player

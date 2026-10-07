@@ -74,6 +74,16 @@ type TurnOrchestrator struct {
 	forceToolChoice bool
 	// pendingCheckRef continues a turn whose GM proposed a check (ask policy).
 	pendingCheckRef string
+	// forcedTotal, when set, replaces the next check's rolled total: a manual roll
+	// entry or a resolved pending check. Consumed once per turn.
+	forcedTotal *int
+	// singleTurn records an interactive roll as one turn: the proposing turn is a
+	// draft, completed in place when the check resolves.
+	singleTurn bool
+	// imageTrigger is the resolved image policy: off, scene_break, significant,
+	// every_turn, or manual. Empty means scene_break (today's behaviour).
+	imageTrigger  string
+	triggerConfig TriggerConfig
 	extractor       *harness.Extractor
 	chunkTimeout    time.Duration
 	openingPrompt   string
@@ -200,7 +210,7 @@ func (o *TurnOrchestrator) SetToolRounds(rounds int) {
 // the deterministic default.
 func (o *TurnOrchestrator) SetCheckResolver(resolver harness.CheckResolver) {
 	if resolver == nil {
-		o.checkResolver = defaultCheckResolver{}
+		o.checkResolver = nil
 		return
 	}
 	o.checkResolver = resolver
@@ -268,7 +278,13 @@ func (o *TurnOrchestrator) SetUsageContext(ctx *harness.UsageContext) { o.usageC
 func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error) {
 	resolver := o.checkResolver
 	if resolver == nil {
-		resolver = defaultCheckResolver{}
+		resolver = defaultCheckResolver{mechanics: o.mechanics}
+	}
+	// A forced total applies to the first check of the turn (the pending one),
+	// then is consumed so it cannot colour a later roll.
+	if o.forcedTotal != nil {
+		req.ForcedTotal = o.forcedTotal
+		o.forcedTotal = nil
 	}
 	resolved, err := resolver.Resolve(ctx, req, actor)
 	if err != nil {
@@ -279,6 +295,14 @@ func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRe
 	}
 	if resolved.Stakes == "" {
 		resolved.Stakes = req.Stakes
+	}
+	if resolved.OutcomeText == "" {
+		if text, ok := req.Outcomes[resolved.Outcome]; ok {
+			resolved.OutcomeText = text
+		}
+	}
+	if len(resolved.OutcomeVocabulary) == 0 && o.mechanics != nil {
+		resolved.OutcomeVocabulary = o.mechanics.Checks.Outcome
 	}
 	return resolved, nil
 }
@@ -509,6 +533,46 @@ func (o *TurnOrchestrator) SetPendingCheckRef(ref string) {
 	o.pendingCheckRef = ref
 }
 
+// SetForcedTotal makes the next check resolve to this total instead of rolling,
+// so a manually entered die result is honoured. It is consumed once per turn.
+func (o *TurnOrchestrator) SetForcedTotal(total *int) {
+	o.forcedTotal = total
+}
+
+// SetSingleTurnMode records an interactive roll as one turn: a turn that ends on
+// a pending check is written as a draft, and resolving the check completes it in
+// place rather than appending a continuation turn.
+func (o *TurnOrchestrator) SetSingleTurnMode(single bool) {
+	o.singleTurn = single
+}
+
+// SetImageTrigger sets the policy deciding when a turn image is generated. Empty
+// keeps today's scene-break behaviour.
+func (o *TurnOrchestrator) SetImageTrigger(policy string) {
+	o.imageTrigger = policy
+	if o.triggerConfig.NarrationThreshold == 0 {
+		o.triggerConfig = DefaultTriggerConfig()
+	}
+}
+
+// playerRollRequest builds the check a player-initiated roll asks for, from the
+// system's declared conventions: the actor is the player, the notation comes from
+// the conventions, and the stakes are the player's own words.
+func (o *TurnOrchestrator) playerRollRequest(input string) harness.CheckRequest {
+	req := harness.CheckRequest{
+		Actor:     o.playerID,
+		CheckKind: "do",
+		Stakes:    strings.TrimSpace(input),
+	}
+	if o.mechanics != nil {
+		req.Notation = o.mechanics.Checks.Notation
+	}
+	if req.Notation == "" {
+		req.Notation = "2d6"
+	}
+	return req
+}
+
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
 	if paths != nil {
 		if systemID != "" {
@@ -584,7 +648,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	var rollRes *rules.RollResult
 	var outcome string
 	var gmDirective string
-	var proposedCheck *harness.ProposedCheck
+	var pendingCheck *harness.PendingCheck
 	generationPrompt := actionInput
 
 	// The outcome is only known later, so it is attached at return along with
@@ -705,16 +769,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	if isCorrection {
 		directiveText := strings.TrimPrefix(actionInput, "/gm ")
 		gmDirective = fmt.Sprintf("[DIRECTOR CORRECTION DIRECTIVE: %s]", directiveText)
-	} else if !isOpening && strings.EqualFold(mode, "Roll") {
-		// A player-initiated roll is a proposal, not an executed result: the GM
-		// either adopts it with request_check or dismisses it. It is carried as
-		// structured data so the submission can be held to that.
-		proposal := strings.TrimSpace(actionInput)
-		if proposal == "" {
-			proposal = "a check"
-		}
-		proposedCheck = &harness.ProposedCheck{Ref: "player-roll", Actor: o.playerID, Description: proposal}
-		gmDirective = fmt.Sprintf("[PROPOSED CHECK: %s by %s (ref: %s)]", proposal, o.playerID, proposedCheck.Ref)
+	} else if !isOpening && strings.EqualFold(mode, "Roll") && o.mechanicsEngagement != "off" && o.pendingCheckRef == "" {
+		// A player-initiated roll is a check the player resolves: the turn ends on
+		// a pending check, so the roll card can present the stakes. A Roll that
+		// carries a pending ref is resolving an existing check, not asking for a
+		// new one, so it falls through to the resolution path.
+		req := o.playerRollRequest(actionInput)
+		pendingCheck = &harness.PendingCheck{Ref: rollRef(turnNum, 0), Request: req, ProposedBy: "player"}
+		gmDirective = fmt.Sprintf("[PLAYER ROLL REQUESTED: %s]", strings.TrimSpace(actionInput))
 	} else if !isOpening && o.rulesEngine != nil {
 		// Run action through mechanics hook if available
 		res, err := o.rulesEngine.ExecuteAction(strings.ToLower(mode), map[string]interface{}{
@@ -971,7 +1033,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 	for attempt := 0; ; attempt++ {
-		result, err = o.runGenerationLoop(ctx, &assembly, gmDirective, proposedCheck, resolvedPending, validationEngagement, onChunk)
+		result, err = o.runGenerationLoop(ctx, &assembly, gmDirective, resolvedPending, validationEngagement, onChunk)
 		if err != nil {
 			outcome = "error"
 			turnSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
@@ -1054,6 +1116,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			o.parser.Reset()
 			collectedCount = 0
 		}
+	}
+	// A player-initiated roll ends the turn on the pending check it asked for,
+	// unless the model already proposed one of its own.
+	if pendingCheck != nil && result.PendingCheck == nil {
+		result.PendingCheck = pendingCheck
 	}
 	result.Checks = append(result.Checks, rollResults...)
 
@@ -1160,6 +1227,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		Prompt:           contextPrompt,
 		ToolCalls:        result.Provenance,
 		PendingCheck:     result.PendingCheck,
+		Draft:            o.singleTurn && result.PendingCheck != nil,
 		ResolvesCheckRef: resolvedRef,
 		ContinuationOf:   continuationOf,
 	}
@@ -1419,7 +1487,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	finalEffects := o.healthOutcomes(&turn)
 	turn.HealthEffects = append(turn.HealthEffects, mergeHealthEffects(pendingEffects, finalEffects)...)
 
-	if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
+	// In single-turn mode a resolved check completes the draft turn in place
+	// rather than appending a continuation, so the fiction stays one record.
+	if o.singleTurn && continuationOf != 0 {
+		turn.Number = continuationOf
+		if err := o.timeline.ReplaceTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
+			return nil, fmt.Errorf("replace turn: %w", err)
+		}
+	} else if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
 		return nil, fmt.Errorf("record turn: %w", err)
 	}
 
@@ -1461,7 +1536,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		"narration_chars": len([]rune(turn.Narration)),
 	})
 
-	if turn.SceneBreak && o.sceneWorker != nil {
+	if o.sceneWorker != nil && o.shouldIllustrate(turn, pastTurns) {
 		var locEntity *entity.Entity
 		if turn.Location != "" && o.store != nil {
 			locEntity, _ = o.store.GetEntity(turn.Location)
@@ -1470,7 +1545,22 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		if cue == "" {
 			cue = ExtractSceneCue(turn.Narration)
 		}
-		scenePrompt := BuildScenePrompt(cue, locEntity, o.worldArtStyle)
+		sceneCtx := ScenePromptContext{
+			Cue:       cue,
+			Narration: turn.Narration,
+			Action:    turn.Input,
+			Location:  turn.Location,
+			Style:     o.worldArtStyle,
+			Entities:  o.presentEntityNames(&turn),
+		}
+		if locEntity != nil {
+			sceneCtx.Location = locEntity.Name
+			sceneCtx.Appearance = locEntity.Appearance
+		}
+		if len(turn.Checks) > 0 {
+			sceneCtx.Outcome = turn.Checks[0].Outcome
+		}
+		scenePrompt := BuildScenePrompt(sceneCtx)
 		o.sceneWorker.Enqueue(o.gameID(), turn.Number, scenePrompt)
 	}
 
@@ -1730,7 +1820,7 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 // answer. The result is the last reply that carried no tool calls. With no
 // executor attached the loop makes exactly one call, shaped as it was before
 // tools existed, so nothing changes for a provider that cannot call them.
-func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harness.AssembleResult, gmDirective string, proposed *harness.ProposedCheck, resolvedPending *harness.CheckResult, engagement string, onChunk func(string) error) (streamResult, error) {
+func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harness.AssembleResult, gmDirective string, resolvedPending *harness.CheckResult, engagement string, onChunk func(string) error) (streamResult, error) {
 	contextPrompt := assembly.Prompt
 	if gmDirective != "" {
 		contextPrompt = gmDirective + "\n\n" + contextPrompt

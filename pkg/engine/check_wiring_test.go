@@ -15,7 +15,7 @@ import (
 // test can assert what the loop resolved without a full turn.
 func runLoopForTest(o *TurnOrchestrator) (streamResult, error) {
 	o.logger = trace.Nop()
-	return o.runGenerationLoop(context.Background(), &harness.AssembleResult{Prompt: "context"}, "", nil, nil, "auto", nil)
+	return o.runGenerationLoop(context.Background(), &harness.AssembleResult{Prompt: "context"}, "", nil, "auto", nil)
 }
 
 // rulesResolverEngine builds a JSEngine whose onCheck resolver hardcodes a

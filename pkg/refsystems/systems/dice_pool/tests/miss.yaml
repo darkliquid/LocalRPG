@@ -1,0 +1,12 @@
+name: a pool miss keeps grit
+seed: 2
+setup:
+  player:
+    stats: { dice: 5, grit: 2 }
+steps:
+  - action: do
+    input: try the lock
+    expect:
+      outcome: miss
+      state: { grit: 2 }
+      message_contains: "misses"

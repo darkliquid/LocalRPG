@@ -29,9 +29,11 @@ import (
 	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/paths"
 	"github.com/darkliquid/localrpg/pkg/pathutil"
+	"github.com/darkliquid/localrpg/pkg/refsystems"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/systemtest"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/tools"
 	"github.com/darkliquid/localrpg/pkg/trace"
@@ -58,6 +60,14 @@ type Service struct {
 	playerOnce sync.Once
 	player     *playback.Player
 	logger     trace.Logger
+	// audioSubs are the clients watching for a playback completion, so the
+	// theatre advances on a real event rather than a status poll. audioTurn and
+	// audioSegment name the beat currently playing, so a completion event carries
+	// its identity and a stale event cannot advance the wrong beat.
+	audioSubMu    sync.Mutex
+	audioSubs     map[chan AudioStatusDTO]struct{}
+	audioTurn     int
+	audioSegment  int
 	// A regeneration is detached and coalesced: the flag records that one is in
 	// flight, so a player turning quickly triggers a catch-up run rather than a
 	// queue of overlapping ones.
@@ -950,7 +960,7 @@ func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySumm
 
 		hasPortrait := parsed.Portrait != "" && s.hasCustomPortrait(gameID, id)
 		portraitURL := ""
-		if parsed.Type == "character" {
+		if entity.IsCharacterType(parsed.Type) {
 			portraitURL = fmt.Sprintf("/api/game/%s/character/%s/portrait", gameID, id)
 		}
 
@@ -1558,8 +1568,9 @@ func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, e
 	}
 
 	dtos := make([]TurnDTO, len(turns))
+	engagement := s.engagementFor(gameID)
 	for i, turn := range turns {
-		dtos[i] = s.turnDTO(turn, store, cfg, gameID)
+		dtos[i] = s.turnDTO(turn, store, cfg, gameID, engagement)
 	}
 	return dtos, nil
 }
@@ -1584,9 +1595,8 @@ func recordReportDTO(report *engine.RecordReport) *RecordReportDTO {
 
 // share it so a live turn and a replayed one are the same shape, which is what
 // lets the client render both with one code path.
-func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID string) TurnDTO {
+func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Config, gameID, engagement string) TurnDTO {
 	plan := s.clipPlanFor(cfg, gameID, turn.Segments)
-	artAvailable := cfg.Media.Image.BuiltinFallback || cfg.Media.Image.Type != "disabled"
 
 	dto := TurnDTO{
 		TurnNumber:      turn.Number,
@@ -1603,12 +1613,13 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 		Rejected:        turn.Rejected,
 		Checks:          turn.Checks,
 		RecordReport:    recordReportDTO(turn.RecordReport),
-		PendingCheck:    turn.PendingCheck,
+		PendingCheck:    s.pendingCheckDTO(turn.PendingCheck, store),
 		ContinuationOf:  turn.ContinuationOf,
 		HealthEffects:   healthEffectDTOs(turn.HealthEffects),
 		WorldTick:       turn.WorldTick,
 		ClipGroups:      plan.groups,
 		SceneBreak:      turn.SceneBreak,
+		Engagement:      engagement,
 		Segments: segmentDTOs(turn.Segments, gameID, plan, func(name string) string {
 			return harness.ResolveSpeakerID(store, name)
 		}, func(charID string) bool {
@@ -1632,12 +1643,73 @@ func (s *Service) turnDTO(turn engine.Turn, store *storage.Store, cfg *config.Co
 				dto.LocationName = location.Name
 			}
 		}
-		if artAvailable {
-			dto.LocationArtURL = "/api/game/" + gameID + "/location/" + turn.Location + "/art"
-		}
 	}
 
 	return dto
+}
+
+// pendingCheckDTO maps a GM-proposed check for the roll card, computing the
+// notation and the bonuses that would apply so the player can see the arithmetic
+// before rolling.
+func (s *Service) pendingCheckDTO(p *harness.PendingCheck, store *storage.Store) *PendingCheckDTO {
+	if p == nil {
+		return nil
+	}
+	dto := &PendingCheckDTO{
+		Ref:        p.Ref,
+		ProposedBy: p.ProposedBy,
+		Request:    p.Request,
+		Notation:   p.Request.Notation,
+	}
+	if store == nil || p.Request.Actor == "" {
+		return dto
+	}
+	actor, err := store.GetEntity(p.Request.Actor)
+	if err != nil || actor == nil {
+		return dto
+	}
+	readState := func(name string) (int, bool) {
+		if actor.State == nil || name == "" {
+			return 0, false
+		}
+		raw, ok := actor.State.Get(name)
+		if !ok {
+			return 0, false
+		}
+		switch typed := raw.(type) {
+		case int:
+			return typed, true
+		case int64:
+			return int(typed), true
+		case float64:
+			return int(typed), true
+		}
+		return 0, false
+	}
+	if _, applied := rules.SumBonuses(readState, p.Request); len(applied) > 0 {
+		dto.Bonuses = applied
+	}
+	values := map[string]int{}
+	for _, name := range []string{p.Request.Stat, p.Request.Skill} {
+		if value, ok := readState(name); ok {
+			values[name] = value
+		}
+	}
+	if len(values) > 0 {
+		dto.ActorValues = values
+	}
+	return dto
+}
+
+// engagementFor resolves the campaign's mechanics policy for the API, so a turn
+// DTO can say why mechanics ran or did not. An unreadable campaign yields "".
+func (s *Service) engagementFor(gameID string) string {
+	manifest, err := core.LoadGameManifest(filepath.Join(s.resolver.GameDir(gameID), "game.yaml"))
+	if err != nil {
+		return ""
+	}
+	systemManifest, _ := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml"))
+	return engine.ResolveEngagement(manifest, systemManifest, s.configMgr.Get())
 }
 
 // healthEffectDTOs maps the engine's resolved health effects to the wire shape.
@@ -1732,6 +1804,61 @@ func (t *TurnSession) Close() {
 	}
 	t.release()
 	t.release = nil
+}
+
+// ErrNoPendingCheck means the turn carries no pending check to resolve.
+var ErrNoPendingCheck = errors.New("the turn has no pending check")
+
+// ErrPendingCheckMismatch means the pending ref does not match the turn's check.
+var ErrPendingCheckMismatch = errors.New("the pending check ref does not match the turn")
+
+// BeginResolveCheck validates the turn's pending check and acquires the campaign
+// turn lock, so a handler can choose a status code before streaming. It returns
+// the session and the pending ref to resolve.
+func (s *Service) BeginResolveCheck(gameID string, turnNumber int, req ResolveCheckRequestDTO) (*TurnSession, string, error) {
+	turns, err := s.cachedHistory(gameID)
+	if err != nil {
+		return nil, "", err
+	}
+	found := false
+	var pending *harness.PendingCheck
+	for i := range turns {
+		if turns[i].Number == turnNumber {
+			found = true
+			pending = turns[i].PendingCheck
+			break
+		}
+	}
+	if !found {
+		return nil, "", fmt.Errorf("%w: turn %d", fs.ErrNotExist, turnNumber)
+	}
+	if pending == nil {
+		return nil, "", ErrNoPendingCheck
+	}
+	if req.PendingRef != "" && req.PendingRef != pending.Ref {
+		return nil, "", ErrPendingCheckMismatch
+	}
+	session, err := s.BeginTurn(gameID)
+	if err != nil {
+		return nil, "", err
+	}
+	return session, pending.Ref, nil
+}
+
+// ResolveCheck rolls and resolves a pending check, streaming the GM's
+// adjudication as a continuation turn without a fresh player action.
+func (s *Service) ResolveCheck(ctx context.Context, gameID string, turnNumber int, req ResolveCheckRequestDTO, emit func(TurnEvent) error) error {
+	session, ref, err := s.BeginResolveCheck(gameID, turnNumber, req)
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+	return session.Run(ctx, TurnRequest{
+		Mode:            "roll",
+		Input:           req.Note,
+		PendingCheckRef: ref,
+		ForcedTotal:     req.ManualResult,
+	}, emit)
 }
 
 // SummaryPending reports whether a regeneration is in flight for a campaign.
@@ -2040,6 +2167,9 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	})
 
 	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)
+	t.orchestrator.SetForcedTotal(req.ForcedTotal)
+	t.orchestrator.SetSingleTurnMode(t.cfg.InteractiveRolls() == "single-turn")
+	t.orchestrator.SetImageTrigger(t.cfg.ImageTrigger())
 
 	// Application playback runs on one queue opened before generation: a sentence
 	// the streamer synthesizes is heard as soon as it lands, and the finalise pass
@@ -2147,7 +2277,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// step with the audio it actually heard.
 	streamer.StopEmitting()
 
-	dto := t.service.turnDTO(*turn, t.store, t.cfg, t.gameID)
+	dto := t.service.turnDTO(*turn, t.store, t.cfg, t.gameID, t.service.engagementFor(t.gameID))
 
 	// Release campaign turn lock immediately so the player can submit the next turn
 	// without waiting for remaining background TTS audio to synthesize.
@@ -2391,6 +2521,58 @@ func (s *Service) hasCustomPortrait(gameID, characterID string) bool {
 		}
 	}
 	return false
+}
+
+// GenerateTurnSceneImage enqueues a scene image for a turn on demand, regardless
+// of the trigger policy, so a player can illustrate a beat the policy skipped.
+func (s *Service) GenerateTurnSceneImage(ctx context.Context, gameID string, turnNumber int) error {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return fmt.Errorf("invalid game id: %w", err)
+	}
+	cfg := s.configMgr.Get()
+	if cfg.Media.Image.Type == "" || cfg.Media.Image.Type == "disabled" {
+		return fmt.Errorf("image generation is disabled")
+	}
+	imgClient, err := imageClientFactory(cfg.Media.Image, cfg.Providers.Gemini.APIKey)
+	if err != nil || imgClient == nil {
+		return fmt.Errorf("no image provider is configured")
+	}
+	turn, err := s.findTurn(gameID, turnNumber)
+	if err != nil {
+		return err
+	}
+
+	store := s.storeOrNil(gameID)
+	var locEntity *entity.Entity
+	if turn.Location != "" && store != nil {
+		locEntity, _ = store.GetEntity(turn.Location)
+	}
+	cue := turn.SceneBreakCue
+	if cue == "" {
+		cue = engine.ExtractSceneCue(turn.Narration)
+	}
+	sceneCtx := engine.ScenePromptContext{
+		Cue:       cue,
+		Narration: turn.Narration,
+		Action:    turn.Input,
+		Location:  turn.Location,
+		Style:     s.worldArtStyle(gameID),
+	}
+	if locEntity != nil {
+		sceneCtx.Location = locEntity.Name
+		sceneCtx.Appearance = locEntity.Appearance
+	}
+	if len(turn.Checks) > 0 {
+		sceneCtx.Outcome = turn.Checks[0].Outcome
+	}
+	prompt := engine.BuildScenePrompt(sceneCtx)
+
+	worker := engine.NewSceneWorker(s.resolver, imgClient)
+	worker.SetOnReady(func(gID string, n int, relPath string) {
+		s.broadcastSceneImageReady(gID, n, relPath)
+	})
+	worker.Enqueue(gameID, turnNumber, prompt)
+	return nil
 }
 
 // GetTurnSceneImage returns the generated scene illustration for a specific turn.
@@ -3032,9 +3214,52 @@ func (s *Service) audioPlayer() *playback.Player {
 		if err != nil {
 			return
 		}
+		player.SetOnComplete(func() {
+			s.audioSubMu.Lock()
+			status := AudioStatusDTO{Available: true, Playing: false, Turn: s.audioTurn, Segment: s.audioSegment}
+			s.audioSubMu.Unlock()
+			s.broadcastAudioStatus(status)
+		})
 		s.player = player
 	})
 	return s.player
+}
+
+// SubscribeAudioStatus registers a channel notified when application playback
+// ends, so a client can advance on a real completion rather than polling.
+func (s *Service) SubscribeAudioStatus() (<-chan AudioStatusDTO, func()) {
+	ch := make(chan AudioStatusDTO, 1)
+	s.audioSubMu.Lock()
+	if s.audioSubs == nil {
+		s.audioSubs = make(map[chan AudioStatusDTO]struct{})
+	}
+	s.audioSubs[ch] = struct{}{}
+	s.audioSubMu.Unlock()
+	return ch, func() {
+		s.audioSubMu.Lock()
+		delete(s.audioSubs, ch)
+		s.audioSubMu.Unlock()
+	}
+}
+
+func (s *Service) broadcastAudioStatus(status AudioStatusDTO) {
+	s.audioSubMu.Lock()
+	defer s.audioSubMu.Unlock()
+	for ch := range s.audioSubs {
+		select {
+		case ch <- status:
+		default:
+		}
+	}
+}
+
+// setAudioCurrent records the beat a queue is playing, so its completion event
+// carries the identity a client needs to advance the right beat. Segment is -1
+// for a whole-turn queue.
+func (s *Service) setAudioCurrent(turn, segment int) {
+	s.audioSubMu.Lock()
+	s.audioTurn, s.audioSegment = turn, segment
+	s.audioSubMu.Unlock()
 }
 
 // AudioAvailable reports whether this process can play audio itself, which is
@@ -3559,6 +3784,7 @@ func (s *Service) PlayTurnAudio(gameID string, turnNumber int, force ...bool) er
 	}
 
 	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
+	s.setAudioCurrent(turnNumber, -1)
 	return player.PlayQueue(s.turnClipStream(gameID, turnNumber, len(force) > 0 && force[0]))
 }
 
@@ -3600,6 +3826,7 @@ func (s *Service) PlaySegmentAudio(ctx context.Context, gameID string, turnNumbe
 	}
 
 	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
+	s.setAudioCurrent(turnNumber, segmentIndex)
 	return player.PlayFiles(clips)
 }
 
@@ -4182,6 +4409,7 @@ func (s *Service) GetSystem(ctx context.Context, id string) (*SystemDetailDTO, e
 		Script:            script,
 		RulesPrompt:       rulesPrompt,
 		CharacterCreation: m.CharacterCreation,
+		Mechanics:         m.Mechanics,
 	}, nil
 }
 
@@ -4215,6 +4443,7 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 		Version:           req.Version,
 		Description:       req.Description,
 		CharacterCreation: req.CharacterCreation,
+		Mechanics:         req.Mechanics,
 	}
 	data, err := yaml.Marshal(manifest)
 	if err != nil {
@@ -4238,7 +4467,71 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 		}
 	}
 
-	return s.GetSystem(ctx, id)
+	detail, err := s.GetSystem(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	detail.Warnings = validateMechanics(req.Mechanics)
+	return detail, nil
+}
+
+// ListReferenceSystems returns the shipped starting systems, so the studio offers
+// the same corpus the tests exercise.
+func (s *Service) ListReferenceSystems(_ context.Context) (*ReferenceSystemsDTO, error) {
+	systems := refsystems.List()
+	out := &ReferenceSystemsDTO{Systems: make([]ReferenceSystemDTO, 0, len(systems))}
+	for _, sys := range systems {
+		out.Systems = append(out.Systems, ReferenceSystemDTO{
+			ID:          sys.ID,
+			Name:        sys.Name,
+			Version:     sys.Version,
+			Description: sys.Description,
+			RulesPrompt: sys.RulesPrompt,
+			Script:      sys.Script,
+			Mechanics:   sys.Mechanics,
+		})
+	}
+	return out, nil
+}
+
+// TestSystem runs scenarios against a system and returns the expectations that
+// failed, so an authored system can be verified without a store or a provider.
+func (s *Service) TestSystem(_ context.Context, req SystemTestRequestDTO) (*SystemTestResponseDTO, error) {
+	sys := systemtest.System{ID: req.System.ID, Script: req.System.Script, Mechanics: req.System.Mechanics}
+	failures := systemtest.RunAll(sys, req.Scenarios)
+	out := &SystemTestResponseDTO{}
+	for _, f := range failures {
+		out.Failures = append(out.Failures, SystemTestFailureDTO{Scenario: f.Scenario, Step: f.Step, Detail: f.Detail})
+	}
+	return out, nil
+}
+
+// SystemScenarios reads a system's stored scenarios from its tests directory.
+func (s *Service) SystemScenarios(_ context.Context, id string) (*SystemScenariosDTO, error) {
+	if err := pathutil.ValidateID(id); err != nil {
+		return nil, fmt.Errorf("invalid system id: %w", err)
+	}
+	dir := filepath.Join(s.resolver.SystemDir(id), "tests")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return &SystemScenariosDTO{}, nil
+	}
+	out := &SystemScenariosDTO{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		scenario, err := systemtest.LoadScenario(data)
+		if err != nil {
+			return nil, fmt.Errorf("load scenario %q: %w", entry.Name(), err)
+		}
+		out.Scenarios = append(out.Scenarios, scenario)
+	}
+	return out, nil
 }
 
 func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, error) {
