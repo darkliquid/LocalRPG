@@ -16,28 +16,84 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  go:
-    name: Go vet and test
+  frontend:
+    name: Build the embedded frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v5
 
+      - name: Cache the npm cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
+      # The GUI embeds pkg/gui/dist, and the SPA the browser tests drive is the
+      # same bundle, so build it once here and hand it to every job that needs
+      # it. It is platform independent, so a single runner is enough.
+      - name: Build the embedded frontend
+        run: mise run build:frontend
+
+      - name: Upload the frontend bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: gui-dist
+          path: pkg/gui/dist
+          retention-days: 1
+
+  go:
+    name: Go vet and test
+    needs: frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+        id: mise
+
       # Wails v3 links GTK4 and WebKitGTK 6.0 by default (the GTK3 path is
       # behind a build tag), oto links ALSA, and the Wails Linux backend asks
       # pkg-config for X11. The headers are build-time only, so a headless
-      # runner can compile and test the desktop binary.
+      # runner can compile and test the desktop binary. The action caches the
+      # downloaded packages, so only a cold cache pays for the fetch.
       - name: Install native build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev
+          version: 1.0
 
-      # The GUI embeds the built frontend, and the browser tests skip without
-      # it, so build the bundle before vetting and testing.
-      - name: Build the embedded frontend
-        run: mise run build:frontend
+      # The module cache holds downloaded modules and only changes when go.sum
+      # does, so it is keyed on the lockfile. The build cache holds compiled
+      # packages and test results and changes with every commit, so its key
+      # carries the SHA: each run saves a fresh cache and restores the newest
+      # matching one, which is what keeps it current instead of frozen.
+      - name: Cache the Go module cache
+        uses: actions/cache@v5
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-mod-${{ runner.os }}-
+
+      - name: Cache the Go build cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
+          restore-keys: |
+            go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-build-${{ runner.os }}-
+
+      - name: Restore the embedded frontend
+        uses: actions/download-artifact@v8
+        with:
+          name: gui-dist
+          path: pkg/gui/dist
 
       - name: Vet
         run: mise exec -- go vet ./...
@@ -47,33 +103,56 @@ jobs:
 
   e2e:
     name: End-to-end browser tests
+    needs: frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v5
+        id: mise
 
       # The e2e package does not link GTK or WebKit, but the service it drives
       # reaches the audio pipeline, so the same headers the go job needs are
-      # installed here to keep the two jobs identical.
+      # installed here, from the same cache, to keep the two jobs identical.
       - name: Install native build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev
+          version: 1.0
 
-      # The SPA and the player bundle are what the browser loads, so build the
-      # embedded frontend before running the suite.
-      - name: Build the embedded frontend
-        run: mise run build:frontend
+      - name: Cache the Go module cache
+        uses: actions/cache@v5
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-mod-${{ runner.os }}-
 
-      - name: Install Chrome
-        uses: browser-actions/setup-chrome@v2
-        id: chrome
+      - name: Cache the Go build cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
+          restore-keys: |
+            go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-build-${{ runner.os }}-
+
+      - name: Restore the embedded frontend
+        uses: actions/download-artifact@v8
+        with:
+          name: gui-dist
+          path: pkg/gui/dist
+
+      # The ubuntu-latest image already ships Google Chrome, so the suite uses
+      # it directly instead of downloading a second copy on every run. The
+      # check fails loudly if it is ever absent, so the suite cannot silently
+      # skip for want of a browser.
+      - name: Check the preinstalled Chrome
+        run: google-chrome --version
 
       - name: Run the browser suite
         env:
-          CHROME_EXEC: ${{ steps.chrome.outputs.chrome-path }}
           E2E_ARTIFACT_DIR: ${{ github.workspace }}/test-results
         run: mise run test:e2e
 
@@ -88,16 +167,34 @@ jobs:
 
   web:
     name: Frontend type check and docs lint
+    needs: frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v5
 
-      - name: Build the embedded frontend
-        run: mise run build:frontend
+      - name: Cache the npm cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
 
-      - name: Type check
+      - name: Restore the embedded frontend
+        uses: actions/download-artifact@v8
+        with:
+          name: gui-dist
+          path: pkg/gui/dist
+
+      # The shared bundle predates this checkout, so mark it current: mise then
+      # treats the build:frontend dependency of test:frontend as up to date and
+      # skips it, leaving only the type check and the unit tests to run here.
+      - name: Mark the shared bundle as current
+        run: find pkg/gui/dist -type f -exec touch {} +
+
+      - name: Type check and unit tests
         run: mise run test:frontend
 
       - name: Lint embedded documentation
@@ -116,6 +213,27 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v5
+        id: mise
+
+      # site:build runs tools/sitegen through `go run`, so the Go caches stop
+      # the generator recompiling from scratch on every run.
+      - name: Cache the Go module cache
+        uses: actions/cache@v5
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-mod-${{ runner.os }}-
+
+      - name: Cache the Go build cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
+          restore-keys: |
+            go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-build-${{ runner.os }}-
 
       - name: Validate the GoReleaser configuration
         run: mise run lint:goreleaser
