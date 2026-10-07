@@ -160,7 +160,7 @@ remedy of downgrading twenty-three minor versions; `markdownlint-cli` avoided
 `braces` but pinned `js-yaml ~5.2.1`, inside a different advisory's range. The
 engine itself then turned out to reach a vulnerable `katex` through
 `micromark-extension-math`. A native binary has none of that surface, and
-`rumdl check` reports the same result on the corpus: no issues in 19 files.
+`rumdl check` reports the same result on the corpus: no issues in 22 files.
 
 **Do not add a Node markdown linter back.** If the docs ever need a rule the config
 cannot express, add it to `.rumdl.toml`, which is where the three deviations from
@@ -185,10 +185,10 @@ Vale checks prose style in the user-facing documentation only. It is pinned in
 `mise.toml` like every other tool, and `.vale.ini` at the repository root decides
 the styles.
 
-**Scope is 21 files**, and it is the same set `tools/sitegen/content.go` renders
+**Scope is 22 files**, and it is the same set `tools/sitegen/content.go` renders
 into the showcase site:
 
-- `pkg/gui/docs/*.md` - the 21 guide articles the application embeds, and the bulk
+- `pkg/gui/docs/*.md` - the 22 guide articles the application embeds, and the bulk
   of the user-facing prose.
 - `README.md` - the project README.
 - `docs/debugging.md` - the debugging guide.
@@ -196,7 +196,9 @@ into the showcase site:
 Everything else is internal and is not linted: the design specs and plans under
 `docs/superpowers/`, `docs/proposals/`, `docs/architecture/`, `AGENTS.md`,
 `THIRD_PARTY_NOTICES.md`, the `website/demo/` fixtures, and every Go and TypeScript
-comment. If a page is added to `content.go`, add it to the script's file list too.
+comment. A page under `pkg/gui/docs/` needs no registration, because both the site
+generator and the lint script read that directory; a page anywhere else must be
+added to `tools/sitegen/content.go` and to the script's file list.
 
 ```bash
 mise run install:vale-styles   # vale sync; runs automatically when .vale.ini changes
@@ -207,7 +209,7 @@ STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
 
 ### What it reports today
 
-**149 alerts across all 21 files: 0 errors, 72 warnings and 77 suggestions.**
+**190 alerts across all 22 files: 0 errors, 89 warnings and 101 suggestions.**
 For scale, pointing the same styles at every tracked file reported 68,525 alerts
 and 6,875 errors, which is why the scope is the documentation rather than the
 repository.
@@ -221,11 +223,12 @@ counts and the noisiest rules.
 Reaching zero took three passes: narrowing the scope to the documentation, adding
 the vocabulary, and then rewriting the prose the remaining rules objected to. A
 fourth pass then worked down the warnings and suggestions, which took the report
-from 293 alerts to 149.
+from 293 alerts to 149. The guide that documents the on-disk and package formats
+added 41 more, so the count stands at 190.
 
-Everything left is deliberate. `neighbor.AmpersandInProse` (62) fires on `&` in
+Everything left is deliberate. `neighbor.AmpersandInProse` (71) fires on `&` in
 headings and bolded feature labels, which is a design convention rather than prose.
-`Google.Passive` (61) and `Google.Semicolons` (16) are style preferences, and
+`Google.Passive` (66) and `Google.Semicolons` (19) are style preferences, and
 passive voice and semicolons are both correct in technical writing.
 `neighbor.DeviceSpecificAction` (6) objects to "click", which is the real action in
 a desktop app. `neighbor.DirectionalLanguage` (3) flags "progress bar" and "prompt
