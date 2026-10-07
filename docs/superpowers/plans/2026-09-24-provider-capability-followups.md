@@ -15,7 +15,7 @@
 - `pkg/provider` imports no internal package; provider packages import `harness`/`media`; `harness`/`media` import `pkg/provider` but never a subpackage.
 - A model provider's `ID()` is the role id it was built for.
 - Move preset data verbatim, preserving ids and `Order`.
-- Use `interface{}`, not `any`; wrap errors with `%w`; stdlib tests only.
+- Use `any`, not `interface{}`; wrap errors with `%w`; stdlib tests only.
 - `go vet ./...`, `go test -count=1 ./...`, and `npx tsc --noEmit` are the gate.
 
 ---

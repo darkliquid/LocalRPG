@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A check with no profile resolves exactly as before.
 - Ladder steps resolve highest-first; ties are impossible after a defensive sort.
 - Conventional Commits, subject under 72 chars.

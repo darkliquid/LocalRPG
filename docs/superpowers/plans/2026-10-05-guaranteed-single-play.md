@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - The framed grouping path must be behaviourally unchanged.
 - A partially heard group is suppressed, not replayed, and traced.
 - Conventional Commits, subject under 72 chars.

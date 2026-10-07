@@ -15,7 +15,7 @@
 ## Global Constraints
 
 - Go 1.27.1. Standard library only for tests (`testing`, `t.TempDir()`); no testify.
-- Use `interface{}`, not `any`; wrap errors with `fmt.Errorf("...: %w", err)`; `go vet ./...` must stay clean.
+- Use `any`, not `interface{}`; wrap errors with `fmt.Errorf("...: %w", err)`; `go vet ./...` must stay clean.
 - TypeScript: `strict`, `noUnusedLocals`, `noUnusedParameters`; `npx tsc --noEmit` is the frontend gate.
 - No on-disk format changes; drafts are in-memory only.
 - `POST /api/worlds` must never overwrite an existing world; `PUT /api/world/:id` must never create one.

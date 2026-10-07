@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - Captions are off by default.
 - Captions and subtitles come from the same segments and timings.
 - Conventional Commits, subject under 72 chars.

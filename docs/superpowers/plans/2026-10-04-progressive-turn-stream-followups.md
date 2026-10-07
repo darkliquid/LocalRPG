@@ -33,7 +33,7 @@ Done:
 
 ## Global Constraints
 
-- Go standard library only for tests; no testify. `interface{}`, not `any`. `go vet` clean.
+- Go standard library only for tests; no testify. `any`, not `interface{}`. `go vet` clean.
 - TypeScript `strict` with `noUnusedLocals`/`noUnusedParameters`; `npx tsc --noEmit` is the frontend gate.
 - Commits are Conventional Commits with a scope, subject under 72 chars.
 - A streamed sentence must key the same clip the finaliser would, or the turn pays twice. `groupingEnabled` (`pkg/gui/service.go:519`) is the invariant that keeps them equal: while sentence streaming runs, grouping is off, so the finalise keys are per-utterance.

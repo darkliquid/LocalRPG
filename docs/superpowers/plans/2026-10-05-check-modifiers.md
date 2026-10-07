@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A request with only `Stat` set must resolve to exactly the pre-change total.
 - A missing stat or skill contributes 0 and is not an error.
 - Conventional Commits, subject under 72 chars.

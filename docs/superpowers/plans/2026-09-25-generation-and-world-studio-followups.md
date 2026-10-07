@@ -15,7 +15,7 @@
 ## Global Constraints
 
 - Go 1.27.1. Standard library only for tests (`testing`, `t.TempDir()`); no testify.
-- Use `interface{}`, not `any`; wrap errors with `fmt.Errorf("...: %w", err)`; `go vet ./...` must stay clean.
+- Use `any`, not `interface{}`; wrap errors with `fmt.Errorf("...: %w", err)`; `go vet ./...` must stay clean.
 - The failure-code enum and the success contract do not change: `provider_unavailable`, `provider_error`, `empty_response`, `parse_error`, `timeout`, `context_too_large`, `invalid_request`.
 - One event family: `generate.request`, `generate.attempt`, `generate.complete`, `generate.error`. Images use `form_type=image`; there is no `image.*` event family.
 - Span name is `generate.image` (no `localrpg.` prefix on span names). Image attributes are `localrpg.image.kind`, `localrpg.image.provider`, `localrpg.image.bytes`.

@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A dry run makes no model call.
 - The cap is per generation and configurable.
 - Conventional Commits, subject under 72 chars.

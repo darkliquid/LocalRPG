@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A manual entry sets the dice; bonuses apply after.
 - A plausible entry is never rejected.
 - Conventional Commits, subject under 72 chars.

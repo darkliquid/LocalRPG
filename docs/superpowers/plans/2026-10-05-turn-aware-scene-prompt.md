@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - Caps: narration excerpt 200 chars, action 160, entities 4.
 - The old three-argument call must produce the previous prompt for the same inputs.
 - Conventional Commits, subject under 72 chars.

@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A system with no mechanics saved unedited must leave `system.yaml` unchanged.
 - `noUnusedLocals`/`noUnusedParameters` are on.
 - Conventional Commits, subject under 72 chars.

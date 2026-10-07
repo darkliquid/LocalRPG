@@ -15,7 +15,7 @@
 - `pkg/provider` imports **no** internal package; it is a leaf.
 - Provider packages import `pkg/provider` and register in `init`; duplicate or empty IDs panic.
 - `harness`/`media` keep their existing interfaces and constructor signatures; migration is per family and the suite stays green.
-- Use `interface{}`, not `any`; wrap errors with `%w`; tests are stdlib-only (`testing`, `t.TempDir()`).
+- Use `any`, not `interface{}`; wrap errors with `%w`; tests are stdlib-only (`testing`, `t.TempDir()`).
 - When adding an endpoint, update `Service`, `server.go`, `frontend/src/types.ts`, and `client.ts` together.
 - `go vet ./...` and `go test -count=1 ./...` plus `npx tsc --noEmit` are the gate.
 

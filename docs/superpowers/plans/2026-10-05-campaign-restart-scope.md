@@ -14,7 +14,7 @@
 
 ## Global Constraints
 
-- Go standard library only for tests (`testing`, `t.TempDir()`); no testify. Use `interface{}`, not `any`. `go vet ./...` must stay clean.
+- Go standard library only for tests (`testing`, `t.TempDir()`); no testify. Use `any`, not `interface{}`. `go vet ./...` must stay clean.
 - Errors wrapped with `fmt.Errorf("...: %w", err)`. Reuse `entity.Slugify`, `entity.WikilinkTarget`, `pathutil.SanitizeID`, `pathutil.ResolveSafeChild`; do not write local slug or link parsing.
 - Never call `storage.NewStore` for a game; go through `storage.OpenGameStore`.
 - The campaign directory is never deleted by a restart. `assets/`, `game.yaml` and `usage_records` survive a restart untouched. Batch synthesis jobs do not: they speak narration the reset discards, so an in-flight job is cancelled at the provider, best-effort, and every job row is then removed.

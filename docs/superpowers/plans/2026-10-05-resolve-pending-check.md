@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - The endpoint must reuse the existing resolution; no second resolver.
 - `POST /turn` with `PendingCheckRef` must behave exactly as before.
 - Conventional Commits, subject under 72 chars.

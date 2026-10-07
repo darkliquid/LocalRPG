@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - No pack yields the built-in output byte-for-byte.
 - An invalid pack is reported and ignored, never fatal.
 - The art cache key includes the pack id.

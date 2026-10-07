@@ -16,7 +16,7 @@
 ## Global Constraints
 
 - Go 1.27.1. Standard library only for tests; no testify.
-- Use `interface{}`, not `any`; `go vet ./...` clean.
+- Use `any`, not `interface{}`; `go vet ./...` clean.
 - The engine stays schema-agnostic; the schema lives in `pkg/core` and is consumed through interfaces.
 - `mechanics` and every sub-field are optional; a nil `Mechanics` preserves today's behaviour exactly.
 - `state.State` remains a free-form dotted-path map; only `mechanics.js` or a declared schema constrain it.

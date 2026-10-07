@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - No chain is exactly today's behaviour.
 - The ordering is a permutation of the chain.
 - An unknown member or rule is a validation error.

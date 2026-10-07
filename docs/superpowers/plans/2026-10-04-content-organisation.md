@@ -14,7 +14,7 @@
 
 ## Global Constraints
 
-- Go standard library only for tests (`testing`, `t.TempDir()`); no testify. Use `interface{}`, not `any`. `go vet ./...` must stay clean.
+- Go standard library only for tests (`testing`, `t.TempDir()`); no testify. Use `any`, not `interface{}`. `go vet ./...` must stay clean.
 - Errors wrapped with `fmt.Errorf("...: %w", err)`. Identifiers go through `entity.Slugify` and `entity.WikilinkTarget`; do not write local slug or link parsing.
 - Migration versions are contiguous and idempotent; the next free version is **12**.
 - `entities.id` stays `TEXT PRIMARY KEY`: the id is globally unique per collection, and a duplicate is a `409`, never an overwrite.

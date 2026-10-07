@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - The default mode must be byte-for-byte the IR-1 behaviour.
 - Only the final turn may be replaced.
 - Conventional Commits, subject under 72 chars.

@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Use `interface{}`, not `any`. Wrap errors with `fmt.Errorf("...: %w", err)`. `go vet` must stay clean.
+- Use `any`, not `interface{}`. Wrap errors with `fmt.Errorf("...: %w", err)`. `go vet` must stay clean.
 - Reuse `harness.GenerationFailure` for provider/config failures so the client sees the structured body (the provider-error-surfacing work landed).
 - Use `engine.BuildPortraitPrompt` and `media.ArtExtension`; do not duplicate them.
 - TypeScript `strict`, `noUnusedLocals`, `noUnusedParameters`.

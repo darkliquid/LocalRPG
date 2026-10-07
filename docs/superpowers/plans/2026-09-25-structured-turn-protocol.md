@@ -18,7 +18,7 @@
 ## Global Constraints
 
 - Go 1.27.1. Standard library only for tests (`testing`, `t.TempDir()`); no testify.
-- Use `interface{}`, not `any`; wrap errors with `fmt.Errorf("...: %w", err)`; `go vet ./...` clean.
+- Use `any`, not `interface{}`; wrap errors with `fmt.Errorf("...: %w", err)`; `go vet ./...` clean.
 - The engine stays schema-agnostic; check resolution and state application are behind interfaces (`CheckResolver`, host API) provided by the mechanics spec.
 - `Turn.Narration` remains populated (derived from narration segments); the change is additive and existing `history.jsonl` keeps working.
 - The extractor is never invoked when a valid `submit_turn` was accepted.

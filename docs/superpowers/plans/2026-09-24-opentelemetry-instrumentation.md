@@ -15,7 +15,7 @@
 - Telemetry is **off by default**; no OTLP connection is attempted unless enabled in config or by environment.
 - Only the OTLP/gRPC exporter is compiled in. Default endpoint `localhost:4317`, `insecure` true for localhost.
 - Tests must **never** require a network or a collector; use in-memory providers only.
-- Module path `github.com/darkliquid/localrpg`. Use `interface{}`, not `any`. Wrap errors with `fmt.Errorf("...: %w", err)`. Tests use only the standard library (`testing`, `t.TempDir()`) plus the OTel in-memory test packages.
+- Module path `github.com/darkliquid/localrpg`. Use `any`, not `interface{}`. Wrap errors with `fmt.Errorf("...: %w", err)`. Tests use only the standard library (`testing`, `t.TempDir()`) plus the OTel in-memory test packages.
 - Keep `pkg/trace` JSONL output and the GUI Debug panel working unchanged.
 - `go vet ./...` must stay clean; `go test -count=1 ./...` is the gate.
 - Package import alias: `pkg/telemetry` imports OTel trace/metric as `oteltrace`/`otelmetric` and `pkg/trace` as `trace`.

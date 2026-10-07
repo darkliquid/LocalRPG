@@ -16,7 +16,7 @@
 ## Global Constraints
 
 - Go 1.27.1. Standard library only for tests; no testify.
-- Use `interface{}`, not `any`; `go vet ./...` clean.
+- Use `any`, not `interface{}`; `go vet ./...` clean.
 - `cache/index.db` stays disposable; a dropped database is repaired from `history.jsonl` by `EnsureIndexed`.
 - Memories never auto-inject into the context prompt; they are tool-reachable only.
 - A memory write failure fails the turn, because the turn and its memories must stay consistent.

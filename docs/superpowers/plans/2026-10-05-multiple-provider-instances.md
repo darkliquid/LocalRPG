@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - The existing `media.tts`/`stt`/`image` fields remain the default entry; a config without the new
   maps must be byte-identical after a save/load.
 - `default` is a reserved provider name.

@@ -14,7 +14,7 @@
 
 ## Global Constraints
 
-- Go standard library only for tests; no testify. `interface{}`, not `any`. `go vet` clean.
+- Go standard library only for tests; no testify. `any`, not `interface{}`. `go vet` clean.
 - A streamed group and a finalised group must share a cache key, or the turn pays twice. `ComputeGroupCacheKey` hashes the `SpeakerLine`s, so both sides must build identical lines.
 - Commits are Conventional Commits with a scope, subject under 72 chars.
 

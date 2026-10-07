@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Use `interface{}`, not `any`. Wrap errors with `fmt.Errorf("...: %w", err)`. `go vet` must stay clean.
+- Use `any`, not `interface{}`. Wrap errors with `fmt.Errorf("...: %w", err)`. `go vet` must stay clean.
 - Tests use only `testing` and `t.TempDir()`; no testify.
 - `pkg/provider` is a leaf package and must stay free of internal imports; the new helper is stdlib-only.
 - `pkg/media` may import `pkg/harness` and `pkg/trace`: `pkg/harness` does not import `pkg/media` or any provider adapter, so there is no cycle.

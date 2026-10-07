@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - Magnitudes are small: scale to ~1.08, translation a few percent.
 - A reduced-motion preference disables the motion.
 - The app's and the export's transforms must agree.

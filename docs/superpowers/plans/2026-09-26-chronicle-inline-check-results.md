@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Use `interface{}`, not `any`. Wrap errors with `fmt.Errorf("...: %w", err)`. `go vet` clean.
+- Use `any`, not `interface{}`. Wrap errors with `fmt.Errorf("...: %w", err)`. `go vet` clean.
 - Do not AI-generate dice art; inline SVG plus numbers only.
 - Migrations are ordered and idempotent; new version is 7.
 - TypeScript `strict`, `noUnusedLocals`, `noUnusedParameters`.

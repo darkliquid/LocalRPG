@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - Folder ingestion performs no network call.
 - URL ingestion respects robots.txt, uses a descriptive user agent, and is bounded.
 - No crawling; only the URLs the user names.

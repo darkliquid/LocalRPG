@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - 384 dimensions, matching the existing schema.
 - The model is downloaded and checksum-verified by `pkg/models`; no network at inference.
 - Tests that need the model skip when it is unavailable.

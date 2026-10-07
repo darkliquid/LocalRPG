@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A one-layer scene at depth 0 is a flat image; the flat path is unchanged.
 - Layers are deterministic; one seeded RNG.
 - Conventional Commits, subject under 72 chars.

@@ -39,7 +39,7 @@ Still to do:
 ## Global Constraints
 
 - Go standard library only for tests (`testing`, `t.TempDir()`); no testify.
-- Use `interface{}`, not `any`; `go vet` must stay clean.
+- Use `any`, not `interface{}`; `go vet` must stay clean.
 - Errors wrapped with `fmt.Errorf("...: %w", err)`.
 - `pkg/turnstream` must not import `pkg/engine` or `pkg/gui`.
 - TypeScript is `strict` with `noUnusedLocals`/`noUnusedParameters`; `npx tsc --noEmit` is the frontend gate.

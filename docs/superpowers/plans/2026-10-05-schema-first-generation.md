@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - `Build` returns an error rather than an invalid spec.
 - JavaScript is generated only for a listed escape hatch.
 - Conventional Commits, subject under 72 chars.

@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Use `interface{}`, not `any`; `go vet` clean; `mise run test:backend`, `mise run lint`, `mise run test:frontend`.
+- Use `any`, not `interface{}`; `go vet` clean; `mise run test:backend`, `mise run lint`, `mise run test:frontend`.
 - Default on for existing configs: a nil pointer means enabled.
 - Do not echo for `Say`, opening, `/gm`, `Roll`, or `System`.
 - Do not commit unless the user asks.

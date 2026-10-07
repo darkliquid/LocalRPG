@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - Deterministic output: sorted members, zero mtimes, zeroed gzip mtime.
 - Unpack rejects `..`, absolute paths, and symlinks, and bounds size and member count.
 - Conventional Commits, subject under 72 chars.

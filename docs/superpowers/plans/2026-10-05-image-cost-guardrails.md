@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - Unlimited by default; an unconfigured campaign is unchanged.
 - The budget check is in one place.
 - Conventional Commits, subject under 72 chars.

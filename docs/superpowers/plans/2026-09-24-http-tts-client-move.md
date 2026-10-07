@@ -15,7 +15,7 @@
 - No behaviour change: move code and qualify identifiers only.
 - `pkg/media` imports `pkg/provider` (leaf), never `ttshttp`.
 - Media internal test files (package `media`) must not import `provider/all`.
-- Use `interface{}`, not `any`; wrap errors with `%w`; stdlib tests only.
+- Use `any`, not `interface{}`; wrap errors with `%w`; stdlib tests only.
 - `go vet ./...` and `go test -count=1 ./...` are the gate.
 
 ---

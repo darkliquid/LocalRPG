@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A scene's first image is unchanged from IMG-1's output.
 - Conditioning is optional; the seed-and-prefix path stands alone.
 - Conventional Commits, subject under 72 chars.

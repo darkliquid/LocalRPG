@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A system with no mechanics passes trivially.
 - The gate makes no model call.
 - Conventional Commits, subject under 72 chars.

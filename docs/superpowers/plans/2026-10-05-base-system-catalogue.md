@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - The catalogue is `refsystems.List()`; no second source.
 - A derive with no instruction errors.
 - Conventional Commits, subject under 72 chars.

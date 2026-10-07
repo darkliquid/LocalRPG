@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A config with no `instance` must produce exactly the key it produced before.
 - The discriminator grammar is `^[a-z0-9.:-]+$` (`pkg/provider/key.go:18`).
 - Conventional Commits, subject under 72 chars.

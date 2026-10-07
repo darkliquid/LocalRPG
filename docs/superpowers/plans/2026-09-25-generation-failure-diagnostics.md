@@ -15,7 +15,7 @@
 ## Global Constraints
 
 - Go 1.27.1. Standard library only for tests (`testing`, `t.TempDir()`); no testify.
-- Use `interface{}`, not `any`; wrap errors with `fmt.Errorf("...: %w", err)`; `go vet ./...` must stay clean.
+- Use `any`, not `interface{}`; wrap errors with `fmt.Errorf("...: %w", err)`; `go vet ./...` must stay clean.
 - Failure codes are the fixed enum `provider_unavailable`, `provider_error`, `empty_response`, `parse_error`, `timeout`, `context_too_large`, `invalid_request`.
 - `empty_response` means `strings.TrimSpace(text) == ""`.
 - Trace is off by default and telemetry is off by default; both must be no-ops when disabled.

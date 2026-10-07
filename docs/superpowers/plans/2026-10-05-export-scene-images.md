@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - An export of a campaign with no illustrations is unchanged.
 - A missing asset is skipped, never a failure.
 - Conventional Commits, subject under 72 chars.

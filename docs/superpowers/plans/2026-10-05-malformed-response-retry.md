@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A valid reply is never retried.
 - A cut reply goes to completion recovery, not the repair.
 - The cap is small and configurable.

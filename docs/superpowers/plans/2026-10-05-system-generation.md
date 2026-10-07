@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A generated system must pass verification before it is offered.
 - JavaScript is generated only for behaviour the schema cannot express.
 - Conventional Commits, subject under 72 chars.

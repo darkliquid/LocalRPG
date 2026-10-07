@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - The content digest definition is a format constant; pin it with a test.
 - An unsigned package installs exactly as before.
 - Conventional Commits, subject under 72 chars.

@@ -15,7 +15,7 @@
 - `history.jsonl` stays canonical and append-only; the compact `context` field carries no prompt text.
 - A provider session is a cache: used only on exact tip, model, and prefix-hash match.
 - Everything degrades to `full_prompt`; no provider is required to support sessions.
-- Use `interface{}`, not `any`; wrap errors with `%w`; stdlib tests only.
+- Use `any`, not `interface{}`; wrap errors with `%w`; stdlib tests only.
 - `Timeline.RecordTurn` remains the single writer; no second write path.
 - `go vet ./...`, `go test -count=1 ./...`, and `npx tsc --noEmit` are the gate.
 

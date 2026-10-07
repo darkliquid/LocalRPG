@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - A draft is never written into `worlds/<id>/`; it lives in `worlds/.drafts/` or memory.
 - Every wikilink in a draft resolves to a draft entity, or is dropped.
 - Conventional Commits, subject under 72 chars.

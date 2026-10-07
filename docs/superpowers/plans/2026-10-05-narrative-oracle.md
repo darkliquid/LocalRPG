@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - Deterministic: the same prompt yields byte-identical prose; no clock, no global RNG.
 - The oracle remains a `ModelProvider`; streaming is unchanged.
 - Conventional Commits, subject under 72 chars.

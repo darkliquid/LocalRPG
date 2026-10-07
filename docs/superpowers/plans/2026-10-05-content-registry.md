@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - Install goes through PKG-2; the registry never writes content directly.
 - The index cache is used when the network is unavailable.
 - Conventional Commits, subject under 72 chars.

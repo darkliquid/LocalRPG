@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Go standard library only for tests; no testify. Errors wrapped with `fmt.Errorf("...: %w", err)`.
-- Use `interface{}`, not `any` (the codebase is uniform on this; `go vet` must stay clean).
+- Use `any`, not `interface{}` (the codebase is uniform on this; `go vet` must stay clean).
 - Commits: Conventional Commits with a scope, subject under 72 chars (for example `fix(turnstream): repair malformed control records`).
 - Repair must never invent content: it may remove, truncate, or close structure, never add a key.
 - A payload that is already valid JSON must be returned byte-identical.

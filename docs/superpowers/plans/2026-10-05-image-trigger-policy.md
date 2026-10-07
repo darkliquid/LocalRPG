@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - With `scene_break`, behaviour must be identical to today.
 - Conventional Commits, subject under 72 chars.
 

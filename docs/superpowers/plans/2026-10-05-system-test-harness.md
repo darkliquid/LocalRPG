@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - The runner must use the same `SchemaResolver` the engine uses; it must not reimplement resolution.
 - The same scenario run twice must produce identical failures.
 - Conventional Commits, subject under 72 chars.

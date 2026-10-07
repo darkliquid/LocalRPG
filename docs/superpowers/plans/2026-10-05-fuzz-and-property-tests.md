@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - Invariants are the real contracts; loosen one only with a reason.
 - A fuzz finding is a bug to fix, with its seed committed.
 - Conventional Commits, subject under 72 chars.

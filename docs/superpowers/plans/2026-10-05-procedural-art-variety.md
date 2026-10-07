@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - No `math/rand` global source and no `time.Now()` in the generator; one seeded RNG per request.
 - The output stays an 800×600 SVG; the art cache key must not change.
 - Conventional Commits, subject under 72 chars.

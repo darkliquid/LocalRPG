@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - The preview writes nothing; only accept writes.
 - `count` is clamped to a cap (10).
 - Conventional Commits, subject under 72 chars.

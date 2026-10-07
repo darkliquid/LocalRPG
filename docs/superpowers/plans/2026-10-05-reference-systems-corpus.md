@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - One source of truth: the studio must not keep a hardcoded system template.
 - Conventional Commits, subject under 72 chars.
 

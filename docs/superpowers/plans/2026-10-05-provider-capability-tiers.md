@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - Every adapter must declare a tier in the same change; the drift guard rejects an empty tier.
 - Conventional Commits, subject under 72 chars.
 

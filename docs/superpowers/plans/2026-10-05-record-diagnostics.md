@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - The report is nil for a clean turn; never emit an empty report.
 - `Issues` is capped at 5; error strings are trimmed to 120 runes.
 - Conventional Commits, subject under 72 chars.

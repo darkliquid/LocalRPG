@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Go tests use the standard library only; no testify.
-- Use `interface{}`, not `any`, in Go.
+- Use `any`, not `interface{}`, in Go.
 - An unset purpose resolves to the family default; an empty purposes map changes nothing.
 - A per-entity `voice.provider` override wins over the NPC purpose.
 - Conventional Commits, subject under 72 chars.

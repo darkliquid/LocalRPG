@@ -18,7 +18,7 @@
 - An unknown frontmatter key is **info**, never an error. `EntityFrontmatter.ExtraMeta` is an inline catch-all and the engine is deliberately schema-agnostic.
 - Save is never disabled by the client linter. The client and `gopkg.in/yaml.v3` will not agree on every edge case, and a false positive must not trap the author.
 - The generated artifact is committed and embedded; regenerate with `go test ./pkg/gui -update-docs`. A new route needs `go test ./pkg/gui -update-routes` too.
-- Go tests use the standard library only; `interface{}`, not `any`; `go vet ./...` clean. Errors wrapped with `fmt.Errorf("...: %w", err)`.
+- Go tests use the standard library only; `any`, not `interface{}`; `go vet ./...` clean. Errors wrapped with `fmt.Errorf("...: %w", err)`.
 - Reuse `entity.Slugify`, `entity.WikilinkTarget` and `frontend/src/lib/slug.ts`; do not write local slug or link parsing.
 - When adding an endpoint, update `Service`, `pkg/gui/server.go`, `pkg/gui/types.go`, `frontend/src/types.ts` and `frontend/src/api/client.ts` together.
 - `tsconfig.json` sets `strict`, `noUnusedLocals`, `noUnusedParameters`.
