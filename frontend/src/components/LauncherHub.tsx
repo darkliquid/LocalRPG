@@ -38,9 +38,10 @@ export function isWorkingGame(
 
 interface LauncherHubProps {
   onSelectGame: (gameId: string) => void;
+  onOpenDocs?: (articleID?: string) => void;
 }
 
-export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
+export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDocs }) => {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [systems, setSystems] = useState<SystemInfo[]>([]);
   const [worlds, setWorlds] = useState<WorldInfo[]>([]);
@@ -60,7 +61,17 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
   >(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
+  const [docsArticleID, setDocsArticleID] = useState<string | undefined>(undefined);
   const { mounted: settingsMounted, state: settingsState } = useMountTransition(isSettingsOpen, 200);
+
+  const handleOpenDocs = (articleID?: string) => {
+    if (onOpenDocs) {
+      onOpenDocs(articleID);
+    } else {
+      setDocsArticleID(articleID);
+      setIsDocsOpen(true);
+    }
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -232,7 +243,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         onOpenWorldsStudio={() => setActiveStudio({ studio: 'worlds', mode: 'browse' })}
         onOpenSystemsStudio={() => setActiveStudio({ studio: 'systems' })}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenDocs={() => setIsDocsOpen(true)}
+        onOpenDocs={() => handleOpenDocs()}
       />
 
       {/* Horizontal World Flyout */}
@@ -291,6 +302,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
         onOpenCampaignSettings={(id) => setSettingsGameID(id)}
         onCreateWorld={() => setActiveStudio({ studio: 'worlds', mode: 'new' })}
         onBrowseSystems={() => setActiveStudio({ studio: 'systems' })}
+        onOpenDocs={handleOpenDocs}
       />
 
       {/* New Campaign Modal */}
@@ -349,7 +361,14 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame }) => {
 
       {/* Built-in Help and Documentation Modal */}
       <Suspense fallback={null}>
-        <DocsModal isOpen={isDocsOpen} onClose={() => setIsDocsOpen(false)} />
+        <DocsModal
+          isOpen={isDocsOpen}
+          initialArticleID={docsArticleID}
+          onClose={() => {
+            setIsDocsOpen(false);
+            setDocsArticleID(undefined);
+          }}
+        />
       </Suspense>
     </div>
   );

@@ -188,7 +188,7 @@ the styles.
 **Scope is 21 files**, and it is the same set `tools/sitegen/content.go` renders
 into the showcase site:
 
-- `pkg/gui/docs/*.md` - the 19 guide articles the application embeds, and the bulk
+- `pkg/gui/docs/*.md` - the 21 guide articles the application embeds, and the bulk
   of the user-facing prose.
 - `README.md` - the project README.
 - `docs/debugging.md` - the debugging guide.

@@ -1,7 +1,7 @@
 import React from 'react';
 import { GameSummary } from '../../types';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
-import { Play, Settings, Compass, Sparkles, Clock, Calendar, Globe, BookOpen } from 'lucide-react';
+import { Play, Settings, Compass, Sparkles, Clock, Calendar, Globe, BookOpen, Cpu } from 'lucide-react';
 import { useLightbox } from '../../hooks/useLightbox';
 import { ImageLightbox } from '../ImageLightbox';
 
@@ -15,6 +15,7 @@ interface CampaignHeroStageProps {
   onOpenCampaignSettings: (gameId: string) => void;
   onCreateWorld: () => void;
   onBrowseSystems: () => void;
+  onOpenDocs?: (articleID?: string) => void;
 }
 
 function formatRelativeTime(dateStr?: string): string {
@@ -49,6 +50,7 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
   onOpenCampaignSettings,
   onCreateWorld,
   onBrowseSystems,
+  onOpenDocs,
 }) => {
   const iconURL = game?.icon_url;
   const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
@@ -148,7 +150,7 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
               <p className="text-sm font-sans text-stone-400 leading-relaxed mb-6">
                 Create your first world or explore available game systems to begin crafting your tabletop campaign.
               </p>
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
                   onClick={onCreateWorld}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-sans font-semibold text-xs transition-all shadow-lg shadow-purple-600/30 cursor-pointer"
@@ -163,6 +165,15 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
                   <BookOpen className="w-4 h-4" />
                   <span>Browse Systems</span>
                 </button>
+                {onOpenDocs && (
+                  <button
+                    onClick={() => onOpenDocs('21-local-first')}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-emerald-400 font-sans font-semibold text-xs border border-emerald-500/30 transition-all cursor-pointer"
+                  >
+                    <Cpu className="w-4 h-4" />
+                    <span>Local-First Guide</span>
+                  </button>
+                )}
               </div>
             </div>
           )}

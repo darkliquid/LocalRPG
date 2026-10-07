@@ -11,6 +11,7 @@ import {
   Sliders,
   Wrench,
   FileCode,
+  Cpu,
 } from 'lucide-react';
 import { APIClient } from '../api/client';
 import { DocArticleSummary, DocArticle } from '../types';
@@ -27,6 +28,7 @@ const CATEGORY_ICONS: Record<string, React.FC<{ className?: string }>> = {
   'Configuration & Providers': Sliders,
   'Studio Guides': Wrench,
   'Codex & Content Reference': FileCode,
+  'Local AI & Self-Hosting': Cpu,
 };
 
 export const DocsModal: React.FC<DocsModalProps> = ({
