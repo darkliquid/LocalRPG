@@ -2037,3 +2037,47 @@ func (s *Server) handleContentExportRoute(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(buf.Bytes())
 }
+
+func (s *Server) handleContentImportRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	onConflict := r.URL.Query().Get("on_conflict")
+
+	r.Body = http.MaxBytesReader(w, r.Body, 510*1024*1024)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		http.Error(w, "failed to parse multipart form: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer func() {
+		if r.MultipartForm != nil {
+			_ = r.MultipartForm.RemoveAll()
+		}
+	}()
+
+	if onConflict == "" {
+		onConflict = r.FormValue("on_conflict")
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "missing 'file' in multipart form", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	res, err := s.service.ImportContent(r.Context(), file, onConflict)
+	if err != nil {
+		if errors.Is(err, ErrContentConflict) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, res)
+}
+

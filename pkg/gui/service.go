@@ -5641,3 +5641,170 @@ func (s *Service) ExportContent(ctx context.Context, typ, id string, w io.Writer
 
 	return content.Pack(dir, typ, content.ManifestMeta{}, w)
 }
+
+// ErrContentConflict reports an attempt to import content that already exists under refuse mode.
+var ErrContentConflict = errors.New("content already exists")
+
+// ImportContent unpacks a .lrpgpack from r into a staging directory, validates its
+// structure, resolves conflicts according to onConflict ("refuse", "rename", "overwrite"),
+// and atomically moves it into the content directory.
+func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict string) (ImportResultDTO, error) {
+	if onConflict == "" {
+		onConflict = "refuse"
+	}
+	if onConflict != "refuse" && onConflict != "rename" && onConflict != "overwrite" {
+		return ImportResultDTO{}, fmt.Errorf("invalid on_conflict mode %q: must be refuse, rename, or overwrite", onConflict)
+	}
+
+	stagingDir, err := os.MkdirTemp("", "lrpg-import-staging-*")
+	if err != nil {
+		return ImportResultDTO{}, fmt.Errorf("create staging directory: %w", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(stagingDir)
+	}()
+
+	m, err := content.Unpack(r, stagingDir)
+	if err != nil {
+		return ImportResultDTO{}, fmt.Errorf("unpack content: %w", err)
+	}
+
+	// Validate staged content structure
+	var wm *core.WorldManifest
+	var sm *core.SystemManifest
+	switch m.Type {
+	case "world":
+		var loadErr error
+		wm, loadErr = core.LoadWorldManifest(filepath.Join(stagingDir, "world.yaml"))
+		if loadErr != nil {
+			return ImportResultDTO{}, fmt.Errorf("invalid world package: missing or invalid world.yaml: %w", loadErr)
+		}
+		if wm.ID != m.ID {
+			return ImportResultDTO{}, fmt.Errorf("world.yaml id %q does not match package id %q", wm.ID, m.ID)
+		}
+	case "system":
+		var loadErr error
+		sm, loadErr = core.LoadSystemManifest(filepath.Join(stagingDir, "system.yaml"))
+		if loadErr != nil {
+			return ImportResultDTO{}, fmt.Errorf("invalid system package: missing or invalid system.yaml: %w", loadErr)
+		}
+		if sm.ID != m.ID {
+			return ImportResultDTO{}, fmt.Errorf("system.yaml id %q does not match package id %q", sm.ID, m.ID)
+		}
+	default:
+		return ImportResultDTO{}, fmt.Errorf("invalid content type %q", m.Type)
+	}
+
+	// Detect whether package contains any executable script
+	hasScript := false
+	_ = filepath.WalkDir(stagingDir, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil || d.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(d.Name(), ".js") {
+			hasScript = true
+			return fs.SkipAll
+		}
+		return nil
+	})
+
+	targetDirFor := func(id string) string {
+		if m.Type == "world" {
+			return s.resolver.WorldDir(id)
+		}
+		return s.resolver.SystemDir(id)
+	}
+
+	targetDir := targetDirFor(m.ID)
+	finalID := m.ID
+	action := "installed"
+
+	if fi, err := os.Stat(targetDir); err == nil && fi.IsDir() {
+		switch onConflict {
+		case "refuse":
+			return ImportResultDTO{}, fmt.Errorf("%w: content %s %q already exists", ErrContentConflict, m.Type, m.ID)
+		case "rename":
+			n := 2
+			for {
+				candidate := fmt.Sprintf("%s-%d", m.ID, n)
+				if _, err := os.Stat(targetDirFor(candidate)); os.IsNotExist(err) {
+					finalID = candidate
+					break
+				}
+				n++
+			}
+			// Rewrite manifest with new ID in staging
+			if m.Type == "world" {
+				wm.ID = finalID
+				data, err := yaml.Marshal(wm)
+				if err != nil {
+					return ImportResultDTO{}, fmt.Errorf("marshal updated world manifest: %w", err)
+				}
+				if err := os.WriteFile(filepath.Join(stagingDir, "world.yaml"), data, 0644); err != nil {
+					return ImportResultDTO{}, fmt.Errorf("write updated world manifest: %w", err)
+				}
+			} else if m.Type == "system" {
+				sm.ID = finalID
+				data, err := yaml.Marshal(sm)
+				if err != nil {
+					return ImportResultDTO{}, fmt.Errorf("marshal updated system manifest: %w", err)
+				}
+				if err := os.WriteFile(filepath.Join(stagingDir, "system.yaml"), data, 0644); err != nil {
+					return ImportResultDTO{}, fmt.Errorf("write updated system manifest: %w", err)
+				}
+			}
+			targetDir = targetDirFor(finalID)
+			action = "renamed"
+		case "overwrite":
+			action = "overwritten"
+		}
+	}
+
+	// Install: ensure parent dir exists
+	parentDir := filepath.Dir(targetDir)
+	if err := os.MkdirAll(parentDir, 0755); err != nil {
+		return ImportResultDTO{}, fmt.Errorf("create content parent directory: %w", err)
+	}
+
+	if action == "overwritten" {
+		backupDir, err := os.MkdirTemp(parentDir, fmt.Sprintf(".backup-%s-*", finalID))
+		if err != nil {
+			return ImportResultDTO{}, fmt.Errorf("create backup directory: %w", err)
+		}
+		_ = os.RemoveAll(backupDir)
+		if err := os.Rename(targetDir, backupDir); err != nil {
+			return ImportResultDTO{}, fmt.Errorf("backup existing content: %w", err)
+		}
+		swapSuccess := false
+		defer func() {
+			if !swapSuccess {
+				_ = os.RemoveAll(targetDir)
+				_ = os.Rename(backupDir, targetDir)
+			} else {
+				_ = os.RemoveAll(backupDir)
+			}
+		}()
+
+		if err := os.Rename(stagingDir, targetDir); err != nil {
+			return ImportResultDTO{}, fmt.Errorf("install content into %q: %w", targetDir, err)
+		}
+		swapSuccess = true
+	} else {
+		if err := os.Rename(stagingDir, targetDir); err != nil {
+			return ImportResultDTO{}, fmt.Errorf("install content into %q: %w", targetDir, err)
+		}
+	}
+
+	return ImportResultDTO{
+		ID:          finalID,
+		Name:        m.Name,
+		Version:     m.Version,
+		Type:        m.Type,
+		Author:      m.Author,
+		License:     m.License,
+		Description: m.Description,
+		FileCount:   len(m.Files),
+		HasScript:   hasScript,
+		Action:      action,
+	}, nil
+}
