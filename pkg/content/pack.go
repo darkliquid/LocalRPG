@@ -104,7 +104,11 @@ func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
 			m.ID = wm.ID
 			m.Name = wm.Name
 			m.Description = wm.Description
-			m.Version = "1.0.0"
+			if wm.Version != "" {
+				m.Version = wm.Version
+			} else {
+				m.Version = "1.0.0"
+			}
 		}
 	} else if typ == "system" {
 		sysPath := filepath.Join(dir, "system.yaml")
@@ -142,6 +146,10 @@ func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
 	}
 	if m.Version == "" {
 		m.Version = "1.0.0"
+	}
+
+	if err := core.ValidateSemver(m.Version); err != nil {
+		return Manifest{}, fmt.Errorf("package version: %w", err)
 	}
 
 	manifestBytes, err := m.Marshal()

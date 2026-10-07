@@ -89,3 +89,28 @@ func TestPathResolverSanitizesIDs(t *testing.T) {
 		t.Errorf("SystemDir(%q) = %q, expected /app/base/systems/etc-passwd", malicious, sysDir)
 	}
 }
+
+func TestManifestVersionMustBeSemver(t *testing.T) {
+	if err := (SystemManifest{ID: "s", Version: "latest"}).Validate(); err == nil {
+		t.Fatal("an invalid system version should be rejected")
+	}
+	if err := (SystemManifest{ID: "s", Version: "1.2.0"}).Validate(); err != nil {
+		t.Fatalf("a valid system version was rejected: %v", err)
+	}
+	if err := (SystemManifest{ID: "s", Version: "v1.2.0"}).Validate(); err != nil {
+		t.Fatalf("a valid system version with v prefix was rejected: %v", err)
+	}
+	if err := (SystemManifest{ID: "s", Version: ""}).Validate(); err != nil {
+		t.Fatalf("an unversioned system manifest should be allowed: %v", err)
+	}
+
+	if err := (WorldManifest{ID: "w", Version: "latest"}).Validate(); err == nil {
+		t.Fatal("an invalid world version should be rejected")
+	}
+	if err := (WorldManifest{ID: "w", Version: "1.2.0"}).Validate(); err != nil {
+		t.Fatalf("a valid world version was rejected: %v", err)
+	}
+	if err := (WorldManifest{ID: "w", Version: ""}).Validate(); err != nil {
+		t.Fatalf("an unversioned world manifest should be allowed: %v", err)
+	}
+}

@@ -76,3 +76,12 @@ func TestPackProducesManifestAndMembers(t *testing.T) {
 		t.Fatalf("parsed manifest ID = %s, want ashen_reach", parsedM.ID)
 	}
 }
+
+func TestPackRejectsInvalidSemver(t *testing.T) {
+	dir := writeFixtureWorld(t)
+	var buf bytes.Buffer
+	_, err := content.Pack(dir, "world", content.ManifestMeta{Version: "not-a-semver"}, &buf)
+	if err == nil {
+		t.Fatal("expected error packing with invalid semver, got nil")
+	}
+}

@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/pathutil"
+	"golang.org/x/mod/semver"
 	"gopkg.in/yaml.v3"
 )
 
@@ -43,6 +45,7 @@ type CharacterCreationSpec struct {
 type WorldManifest struct {
 	ID            string   `yaml:"id"`
 	Name          string   `yaml:"name"`
+	Version       string   `yaml:"version,omitempty"`
 	Description   string   `yaml:"description,omitempty"`
 	Genre         string   `yaml:"genre,omitempty"`
 	DefaultSystem string   `yaml:"default_system,omitempty"`
@@ -153,6 +156,43 @@ func (p *PathResolver) CacheDir() string {
 	return filepath.Join(p.BaseDir, "cache")
 }
 
+// CanonicalSemver prepends 'v' if missing for semver package compatibility.
+func CanonicalSemver(v string) string {
+	if v == "" {
+		return ""
+	}
+	if !strings.HasPrefix(v, "v") {
+		return "v" + v
+	}
+	return v
+}
+
+// ValidateSemver checks if v is valid semantic versioning (accepts with or without leading 'v').
+// An empty string is considered valid (unversioned).
+func ValidateSemver(v string) error {
+	if v == "" {
+		return nil
+	}
+	if !semver.IsValid(CanonicalSemver(v)) {
+		return fmt.Errorf("invalid semver: %q", v)
+	}
+	return nil
+}
+
+func (s SystemManifest) Validate() error {
+	if err := ValidateSemver(s.Version); err != nil {
+		return fmt.Errorf("system %q: %w", s.ID, err)
+	}
+	return nil
+}
+
+func (w WorldManifest) Validate() error {
+	if err := ValidateSemver(w.Version); err != nil {
+		return fmt.Errorf("world %q: %w", w.ID, err)
+	}
+	return nil
+}
+
 func LoadSystemManifest(path string) (*SystemManifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -161,6 +201,9 @@ func LoadSystemManifest(path string) (*SystemManifest, error) {
 	var manifest SystemManifest
 	if err := yaml.Unmarshal(data, &manifest); err != nil {
 		return nil, fmt.Errorf("unmarshal system manifest: %w", err)
+	}
+	if err := manifest.Validate(); err != nil {
+		return nil, err
 	}
 	return &manifest, nil
 }
@@ -173,6 +216,9 @@ func LoadWorldManifest(path string) (*WorldManifest, error) {
 	var manifest WorldManifest
 	if err := yaml.Unmarshal(data, &manifest); err != nil {
 		return nil, fmt.Errorf("unmarshal world manifest: %w", err)
+	}
+	if err := manifest.Validate(); err != nil {
+		return nil, err
 	}
 	return &manifest, nil
 }
