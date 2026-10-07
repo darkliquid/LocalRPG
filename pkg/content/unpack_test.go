@@ -23,7 +23,7 @@ func TestUnpackRoundTrip(t *testing.T) {
 	}
 
 	dest := filepath.Join(t.TempDir(), "unpacked")
-	unpackedManifest, err := content.Unpack(&buf, dest)
+	unpackedManifest, _, err := content.Unpack(&buf, dest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestUnpackRejectsTraversal(t *testing.T) {
 	_ = gzw.Close()
 
 	dest := filepath.Join(t.TempDir(), "dest")
-	if _, err := content.Unpack(&buf, dest); err == nil {
+	if _, _, err := content.Unpack(&buf, dest); err == nil {
 		t.Fatal("expected error unpacking path traversal, got nil")
 	}
 
@@ -131,7 +131,7 @@ func TestUnpackRejectsTamper(t *testing.T) {
 	_ = gzw.Close()
 
 	dest := filepath.Join(t.TempDir(), "dest")
-	if _, err := content.Unpack(&buf, dest); err == nil {
+	if _, _, err := content.Unpack(&buf, dest); err == nil {
 		t.Fatal("expected error unpacking tampered content, got nil")
 	}
 

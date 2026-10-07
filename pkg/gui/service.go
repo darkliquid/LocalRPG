@@ -5670,7 +5670,7 @@ func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict str
 		_ = os.RemoveAll(stagingDir)
 	}()
 
-	m, err := content.Unpack(r, stagingDir)
+	m, _, err := content.Unpack(r, stagingDir)
 	if err != nil {
 		return ImportResultDTO{}, fmt.Errorf("unpack content: %w", err)
 	}

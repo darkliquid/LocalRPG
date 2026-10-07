@@ -85,3 +85,38 @@ func TestPackRejectsInvalidSemver(t *testing.T) {
 		t.Fatal("expected error packing with invalid semver, got nil")
 	}
 }
+
+func TestPackIncludesSignature(t *testing.T) {
+	dir := writeFixtureWorld(t)
+	sigPath := filepath.Join(dir, "package.sig")
+	if err := os.WriteFile(sigPath, []byte("signature: dummy"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	m, err := content.Pack(dir, "world", content.ManifestMeta{}, &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, f := range m.Files {
+		if f.Path == "package.sig" {
+			t.Fatal("package.sig should not be declared in m.Files")
+		}
+	}
+
+	dest := t.TempDir()
+	unpackedM, sigBytes, err := content.Unpack(&buf, dest)
+	if err != nil {
+		t.Fatalf("Unpack: %v", err)
+	}
+	if unpackedM.ID != m.ID {
+		t.Fatalf("unpacked ID = %s, want %s", unpackedM.ID, m.ID)
+	}
+	if string(sigBytes) != "signature: dummy" {
+		t.Fatalf("sigBytes = %q, want 'signature: dummy'", string(sigBytes))
+	}
+	if _, err := os.Stat(filepath.Join(dest, "package.sig")); err != nil {
+		t.Fatalf("expected package.sig to be unpacked into dest: %v", err)
+	}
+}

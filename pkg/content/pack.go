@@ -40,7 +40,7 @@ func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
 		}
 
 		name := entry.Name()
-		if strings.HasPrefix(name, ".") || strings.HasSuffix(name, ".legacy") || name == "package.yaml" {
+		if strings.HasPrefix(name, ".") || strings.HasSuffix(name, ".legacy") || name == "package.yaml" || name == "package.sig" {
 			return nil
 		}
 		if !entry.Type().IsRegular() {
@@ -177,6 +177,25 @@ func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
 	if _, err := tw.Write(manifestBytes); err != nil {
 		_ = gzw.Close()
 		return Manifest{}, fmt.Errorf("write package.yaml content: %w", err)
+	}
+
+	sigPath := filepath.Join(dir, "package.sig")
+	if sigBytes, err := os.ReadFile(sigPath); err == nil && len(sigBytes) > 0 {
+		sigHdr := &tar.Header{
+			Name:     "package.sig",
+			Mode:     0644,
+			Size:     int64(len(sigBytes)),
+			ModTime:  time.Unix(0, 0),
+			Format:   tar.FormatPAX,
+		}
+		if err := tw.WriteHeader(sigHdr); err != nil {
+			_ = gzw.Close()
+			return Manifest{}, fmt.Errorf("write package.sig header: %w", err)
+		}
+		if _, err := tw.Write(sigBytes); err != nil {
+			_ = gzw.Close()
+			return Manifest{}, fmt.Errorf("write package.sig content: %w", err)
+		}
 	}
 
 	for _, f := range files {

@@ -86,7 +86,7 @@ func TestUnpackReproducesTree(t *testing.T) {
 			}
 
 			destDir := filepath.Join(t.TempDir(), "out")
-			unpackedM, err := content.Unpack(&buf, destDir)
+			unpackedM, _, err := content.Unpack(&buf, destDir)
 			if err != nil {
 				t.Fatalf("Unpack failed: %v", err)
 			}
