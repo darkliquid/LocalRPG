@@ -190,3 +190,123 @@ func TestExtractArchiveRejectsZipSlip(t *testing.T) {
 	}
 }
 
+
+func TestEmbeddingModelSpecIsRegistered(t *testing.T) {
+	m := NewManager(t.TempDir())
+	spec, ok := m.specs[EmbeddingEncoderModelID]
+	if !ok {
+		t.Fatal("the embedding model spec is not registered")
+	}
+	if spec.SHA256 == "" || spec.SizeBytes == 0 {
+		t.Fatalf("spec incomplete: %+v", spec)
+	}
+	if len(spec.Files) == 0 {
+		t.Fatal("the embedding spec has no file list")
+	}
+	for _, f := range spec.Files {
+		if f.URL == "" || f.SHA256 == "" || f.SizeBytes == 0 || f.Name == "" {
+			t.Fatalf("file entry incomplete: %+v", f)
+		}
+	}
+	if m.ModelDir(EmbeddingEncoderModelID) == "" {
+		t.Fatal("the embedding spec has no model directory")
+	}
+}
+
+func TestManagerDownloadsLooseFiles(t *testing.T) {
+	cacheDir := t.TempDir()
+
+	files := map[string]string{
+		"model.onnx": "fake encoder weights",
+		"vocab.txt":  "fake vocab",
+	}
+	sums := map[string]string{}
+	for name, content := range files {
+		sum := sha256.Sum256([]byte(content))
+		sums[name] = hex.EncodeToString(sum[:])
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := filepath.Base(r.URL.Path)
+		content, ok := files[name]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(content))
+	}))
+	defer server.Close()
+
+	m := NewManager(cacheDir)
+	m.RegisterSpec(ModelSpec{
+		ID:            "loose-files",
+		Name:          "Loose Files",
+		Subdir:        "loose",
+		RequiredFiles: []string{"model.onnx", "vocab.txt"},
+		Files: []ModelFile{
+			{URL: server.URL + "/model.onnx", SHA256: sums["model.onnx"], SizeBytes: int64(len(files["model.onnx"])), Name: "model.onnx"},
+			{URL: server.URL + "/vocab.txt", SHA256: sums["vocab.txt"], SizeBytes: int64(len(files["vocab.txt"])), Name: "vocab.txt"},
+		},
+	})
+
+	ch, err := m.Download(context.Background(), "loose-files")
+	if err != nil {
+		t.Fatalf("Download: %v", err)
+	}
+	var last ModelStatus
+	for status := range ch {
+		last = status
+	}
+	if last.Error != "" {
+		t.Fatalf("download reported error: %s", last.Error)
+	}
+	if !last.Installed {
+		t.Fatalf("download did not finish installed: %+v", last)
+	}
+	if !m.Status("loose-files").Installed {
+		t.Fatal("status does not report the model installed")
+	}
+	for name, content := range files {
+		got, err := os.ReadFile(filepath.Join(cacheDir, "models", "loose", name))
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		if string(got) != content {
+			t.Fatalf("%s = %q, want %q", name, got, content)
+		}
+	}
+}
+
+func TestManagerRejectsBadFileChecksum(t *testing.T) {
+	cacheDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("tampered"))
+	}))
+	defer server.Close()
+
+	m := NewManager(cacheDir)
+	m.RegisterSpec(ModelSpec{
+		ID:            "bad-checksum",
+		Name:          "Bad Checksum",
+		Subdir:        "bad",
+		RequiredFiles: []string{"model.onnx"},
+		Files: []ModelFile{
+			{URL: server.URL + "/model.onnx", SHA256: "deadbeef", SizeBytes: 8, Name: "model.onnx"},
+		},
+	})
+
+	ch, err := m.Download(context.Background(), "bad-checksum")
+	if err != nil {
+		t.Fatalf("Download: %v", err)
+	}
+	var last ModelStatus
+	for status := range ch {
+		last = status
+	}
+	if last.Error == "" {
+		t.Fatal("expected a checksum error, got none")
+	}
+	if last.Installed {
+		t.Fatal("a model with a bad checksum must not be installed")
+	}
+}

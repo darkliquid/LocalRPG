@@ -32,14 +32,34 @@ type ModelSpec struct {
 	ArchiveType   string   `json:"archive_type"` // "tar", "tar.gz", "tar.bz2"
 	Subdir        string   `json:"subdir"`
 	RequiredFiles []string `json:"required_files"`
+	// Files, when set, downloads each entry directly instead of unpacking a
+	// single archive. It is for models that are published as loose files (a
+	// Hugging Face repository, for example) rather than as one tarball.
+	Files []ModelFile `json:"files,omitempty"`
 	// Variant names the speaker layout a model uses, so a changed model cannot
 	// silently inherit the previous one's voice-to-speaker ids.
 	Variant string `json:"variant,omitempty"`
 }
 
+// ModelFile is one loose artifact of a model that is not distributed as an
+// archive. Name is the destination file name, relative to the spec's Subdir.
+type ModelFile struct {
+	URL       string `json:"url"`
+	SHA256    string `json:"sha256"`
+	SizeBytes int64  `json:"size_bytes"`
+	Name      string `json:"name"`
+}
+
 // KokoroTTSVariant is the speaker layout of the pinned Kokoro model. It must
 // match media.KokoroModelV019.
 const KokoroTTSVariant = "kokoro-en-v0_19"
+
+// EmbeddingEncoderModelID is the model id of the local text embedding encoder.
+const EmbeddingEncoderModelID = "embedding-encoder"
+
+// EmbeddingEncoderVariant names the tokenizer layout of the pinned encoder, so
+// a changed model cannot silently inherit the previous one's token ids.
+const EmbeddingEncoderVariant = "bge-small-en-v1.5-bert-wordpiece"
 
 type ModelStatus struct {
 	ID              string  `json:"id"`
@@ -94,6 +114,34 @@ func (m *Manager) registerDefaultSpecs() {
 			"voices.bin",
 			"tokens.txt",
 			"espeak-ng-data",
+		},
+	}
+
+	m.specs[EmbeddingEncoderModelID] = ModelSpec{
+		ID:          EmbeddingEncoderModelID,
+		Name:        "BGE Small Encoder",
+		URL:         "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/onnx/model_quantized.onnx",
+		SHA256:      "6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4",
+		SizeBytes:   34235934,
+		Subdir:      filepath.Join("embeddings", "bge-small-en-v1.5"),
+		Variant:     EmbeddingEncoderVariant,
+		RequiredFiles: []string{
+			"model.onnx",
+			"vocab.txt",
+		},
+		Files: []ModelFile{
+			{
+				URL:       "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/onnx/model_quantized.onnx",
+				SHA256:    "6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4",
+				SizeBytes: 34014426,
+				Name:      "model.onnx",
+			},
+			{
+				URL:       "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/vocab.txt",
+				SHA256:    "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
+				SizeBytes: 231508,
+				Name:      "vocab.txt",
+			},
 		},
 	}
 }
@@ -286,6 +334,11 @@ func (m *Manager) runDownload(ctx context.Context, spec ModelSpec, session *down
 		return
 	}
 
+	if len(spec.Files) > 0 {
+		m.runFileDownload(ctx, spec, tmpDir, updateStatus, cleanup)
+		return
+	}
+
 	partPath := filepath.Join(tmpDir, spec.ID+".part")
 	defer os.Remove(partPath)
 
@@ -407,6 +460,128 @@ func (m *Manager) runDownload(ctx context.Context, spec ModelSpec, session *down
 	}
 
 	cleanup(nil)
+}
+
+// runFileDownload downloads a spec's loose files into its target directory,
+// verifying each against its pinned checksum. It is the archive-free path for
+// models published as individual files rather than as one tarball.
+func (m *Manager) runFileDownload(ctx context.Context, spec ModelSpec, tmpDir string, updateStatus func(func(*ModelStatus)), cleanup func(error)) {
+	stagingDir := filepath.Join(tmpDir, spec.ID+"_files")
+	_ = os.RemoveAll(stagingDir)
+	if err := os.MkdirAll(stagingDir, 0755); err != nil {
+		cleanup(fmt.Errorf("create staging dir: %w", err))
+		return
+	}
+	defer os.RemoveAll(stagingDir)
+
+	var total int64
+	for _, f := range spec.Files {
+		total += f.SizeBytes
+	}
+	var done int64
+	for _, f := range spec.Files {
+		dest := filepath.Join(stagingDir, filepath.Clean(f.Name))
+		base := done
+		n, err := downloadFile(ctx, f.URL, dest, f.SHA256, func(written int64) {
+			updateStatus(func(s *ModelStatus) {
+				s.BytesDownloaded = base + written
+				s.TotalBytes = total
+				if total > 0 {
+					s.Progress = float64(base+written) / float64(total)
+				}
+			})
+		})
+		if err != nil {
+			cleanup(err)
+			return
+		}
+		done += n
+	}
+
+	targetDir := filepath.Join(m.cacheDir, "models", spec.Subdir)
+	_ = os.RemoveAll(targetDir)
+	if err := os.MkdirAll(filepath.Dir(targetDir), 0755); err != nil {
+		cleanup(fmt.Errorf("create parent dir: %w", err))
+		return
+	}
+	if err := os.Rename(stagingDir, targetDir); err != nil {
+		cleanup(fmt.Errorf("move downloaded files: %w", err))
+		return
+	}
+	cleanup(nil)
+}
+
+// downloadFile fetches url into destPath, verifying wantSHA256 when it is set
+// and reporting bytes as they arrive. It writes to a sibling .part file and
+// renames it into place only after the checksum matches.
+func downloadFile(ctx context.Context, url, destPath, wantSHA256 string, report func(int64)) (int64, error) {
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		return 0, fmt.Errorf("create dir: %w", err)
+	}
+	partPath := destPath + ".part"
+	defer os.Remove(partPath)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("prepare request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("download request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return 0, fmt.Errorf("download HTTP error %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	out, err := os.Create(partPath)
+	if err != nil {
+		return 0, fmt.Errorf("create part file: %w", err)
+	}
+	hasher := sha256.New()
+	writer := io.MultiWriter(out, hasher)
+	buf := make([]byte, 64*1024)
+	var downloaded int64
+	for {
+		select {
+		case <-ctx.Done():
+			_ = out.Close()
+			return downloaded, ctx.Err()
+		default:
+		}
+		n, rerr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, werr := writer.Write(buf[:n]); werr != nil {
+				_ = out.Close()
+				return downloaded, fmt.Errorf("write part file: %w", werr)
+			}
+			downloaded += int64(n)
+			if report != nil {
+				report(downloaded)
+			}
+		}
+		if rerr != nil {
+			if rerr == io.EOF {
+				break
+			}
+			_ = out.Close()
+			return downloaded, fmt.Errorf("download stream read: %w", rerr)
+		}
+	}
+	if err := out.Close(); err != nil {
+		return downloaded, fmt.Errorf("close part file: %w", err)
+	}
+
+	if wantSHA256 != "" {
+		got := hex.EncodeToString(hasher.Sum(nil))
+		if got != wantSHA256 {
+			return downloaded, fmt.Errorf("%w: expected %s, got %s", ErrChecksumMismatch, wantSHA256, got)
+		}
+	}
+	if err := os.Rename(partPath, destPath); err != nil {
+		return downloaded, fmt.Errorf("finalise file: %w", err)
+	}
+	return downloaded, nil
 }
 
 func (m *Manager) extractArchive(archivePath, archiveType, destDir string) error {
