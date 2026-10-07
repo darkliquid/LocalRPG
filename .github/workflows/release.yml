@@ -34,6 +34,14 @@ jobs:
 
       - uses: jdx/mise-action@v5
 
+      - name: Cache the npm cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
       # The GUI embeds pkg/gui/dist, so the bundle has to exist in the tree
       # goreleaser compiles. It is platform independent, so build it once and
       # hand it to every packaging runner.
@@ -51,6 +59,11 @@ jobs:
     name: Package ${{ matrix.target }}
     needs: [verify, frontend]
     runs-on: ${{ matrix.runner }}
+    # Keep the Go caches inside the workspace so one path works on every target;
+    # the default build cache lives in a different directory on each OS.
+    env:
+      GOMODCACHE: ${{ github.workspace }}/.go/mod
+      GOCACHE: ${{ github.workspace }}/.go/build
     strategy:
       fail-fast: false
       matrix:
@@ -82,13 +95,37 @@ jobs:
           fetch-depth: 0
 
       - uses: jdx/mise-action@v5
+        id: mise
 
+      # Linux links GTK/WebKit/ALSA at build time; the action caches the
+      # packages so only a cold cache pays for the fetch. The other targets
+      # need no native headers.
       - name: Install native build dependencies
         if: startsWith(matrix.target, 'linux')
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev
+          version: 1.0
+
+      # The caches are keyed on the lockfile (and, for the build cache, the
+      # commit) so a module change or a new revision restores the right one.
+      - name: Cache the Go module cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ github.workspace }}/.go/mod
+          key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-mod-${{ runner.os }}-
+
+      - name: Cache the Go build cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ github.workspace }}/.go/build
+          key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
+          restore-keys: |
+            go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-build-${{ runner.os }}-
 
       - name: Restore the embedded frontend
         uses: actions/download-artifact@v8
