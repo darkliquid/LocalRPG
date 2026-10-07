@@ -92,6 +92,19 @@ func TestRegistrySearchCLI(t *testing.T) {
 	cfgDir := t.TempDir()
 	t.Setenv("LOCALRPG_CONFIG_DIR", cfgDir)
 
+	// A registry command treats the current directory as the project root, so the
+	// index cache and the content it reads land there. Run from a temp directory
+	// so the test leaves nothing behind in the package directory.
+	workDir := t.TempDir()
+	oldCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(workDir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(oldCwd) }()
+
 	var stdout, stderr bytes.Buffer
 	// Add test registry
 	code := runRegistryCommand([]string{"add", s.URL}, &stdout, &stderr)
