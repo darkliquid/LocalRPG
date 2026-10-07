@@ -154,3 +154,43 @@ func TestOpenRefusesUnsatisfiedRequirement(t *testing.T) {
 		t.Fatalf("unexpected error message: %v", err)
 	}
 }
+
+func TestLegacyCampaignWithoutLockLocksOnOpen(t *testing.T) {
+	paths, sysID, worldID := setupTestEnvironment(t)
+	gameID := "game_legacy_test"
+
+	session, err := engine.InitGame(paths, engine.InitOptions{
+		GameID:     gameID,
+		Name:       "Legacy Test",
+		SystemID:   sysID,
+		WorldID:    worldID,
+		PlayerName: "Hero",
+	})
+	if err != nil {
+		t.Fatalf("InitGame: %v", err)
+	}
+	session.Close()
+
+	// Simulate a pre-lock campaign by deleting content.lock.yaml
+	lockPath := filepath.Join(paths.GameDir(gameID), "content.lock.yaml")
+	if err := os.Remove(lockPath); err != nil {
+		t.Fatalf("remove lock: %v", err)
+	}
+
+	// ResolveContentLock should automatically re-create the lock without warnings
+	lock, warnings, err := engine.ResolveContentLock(paths, gameID)
+	if err != nil {
+		t.Fatalf("ResolveContentLock on unlocked campaign: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected 0 warnings on fresh lock, got: %v", warnings)
+	}
+	if len(lock.Entries) != 2 {
+		t.Fatalf("expected 2 lock entries, got: %d", len(lock.Entries))
+	}
+
+	// Verify file was written to disk
+	if _, err := os.Stat(lockPath); err != nil {
+		t.Fatalf("expected content.lock.yaml to exist on disk: %v", err)
+	}
+}
