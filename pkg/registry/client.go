@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,13 +17,18 @@ import (
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/content"
 )
+
+// ContentInstaller delegates the actual content staging and installation.
+type ContentInstaller func(ctx context.Context, r io.Reader, onConflict string) (content.Manifest, error)
 
 // Client fetches, caches, and queries registry package indexes.
 type Client struct {
 	cfg        config.RegistriesConfig
 	cacheDir   string
 	httpClient *http.Client
+	installer  ContentInstaller
 	mu         sync.RWMutex
 }
 
@@ -201,4 +208,136 @@ func (c *Client) fetchOrCachedIndex(ctx context.Context, rawURL string) (Index, 
 	}
 
 	return Index{}, fmt.Errorf("fetch registry index %q: network failed and no cache available", rawURL)
+}
+
+// SetInstaller configures the installer delegate called by Install.
+func (c *Client) SetInstaller(installer ContentInstaller) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.installer = installer
+}
+
+// Install downloads, verifies, and installs a package from a PackageRef.
+func (c *Client) Install(ctx context.Context, ref PackageRef, onConflict string) (content.Manifest, error) {
+	if ref.Package.Download == "" {
+		return content.Manifest{}, errors.New("package download URL is empty")
+	}
+	if ref.Package.SHA256 == "" {
+		return content.Manifest{}, errors.New("package sha256 checksum is empty")
+	}
+
+	packagesDir := filepath.Join(c.cacheDir, "packages")
+	cachedPkgPath := filepath.Join(packagesDir, strings.ToLower(ref.Package.SHA256)+".lrpgpack")
+
+	var pkgFile *os.File
+
+	if fi, statErr := os.Stat(cachedPkgPath); statErr == nil && fi.Size() > 0 {
+		f, openErr := os.Open(cachedPkgPath)
+		if openErr == nil {
+			h := sha256.New()
+			if _, copyErr := io.Copy(h, f); copyErr == nil {
+				computed := hex.EncodeToString(h.Sum(nil))
+				if strings.EqualFold(computed, ref.Package.SHA256) {
+					_, _ = f.Seek(0, io.SeekStart)
+					pkgFile = f
+				}
+			}
+			if pkgFile == nil {
+				_ = f.Close()
+				_ = os.Remove(cachedPkgPath)
+			}
+		}
+	}
+
+	if pkgFile == nil {
+		downloadURL := ref.Package.Download
+		if ref.RegistryURL != "" {
+			if base, parseErr := url.Parse(ref.RegistryURL); parseErr == nil {
+				if resolved, resolveErr := base.Parse(downloadURL); resolveErr == nil {
+					downloadURL = resolved.String()
+				}
+			}
+		}
+
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+		if reqErr != nil {
+			return content.Manifest{}, fmt.Errorf("create download request: %w", reqErr)
+		}
+
+		client := c.getHTTPClient()
+		resp, doErr := client.Do(req)
+		if doErr != nil {
+			return content.Manifest{}, fmt.Errorf("download package: %w", doErr)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return content.Manifest{}, fmt.Errorf("download package failed with status %d", resp.StatusCode)
+		}
+
+		if err := os.MkdirAll(packagesDir, 0755); err != nil {
+			return content.Manifest{}, fmt.Errorf("create packages cache dir: %w", err)
+		}
+
+		tmpFile, err := os.CreateTemp(packagesDir, ".download-*")
+		if err != nil {
+			return content.Manifest{}, fmt.Errorf("create temp package file: %w", err)
+		}
+		tmpName := tmpFile.Name()
+		defer func() {
+			if tmpFile != nil {
+				_ = tmpFile.Close()
+				_ = os.Remove(tmpName)
+			}
+		}()
+
+		hasher := sha256.New()
+		tee := io.TeeReader(resp.Body, hasher)
+		if _, err := io.Copy(tmpFile, tee); err != nil {
+			return content.Manifest{}, fmt.Errorf("stream download: %w", err)
+		}
+
+		computedSHA := hex.EncodeToString(hasher.Sum(nil))
+		if !strings.EqualFold(computedSHA, ref.Package.SHA256) {
+			return content.Manifest{}, fmt.Errorf("checksum mismatch: got %s, want %s", computedSHA, ref.Package.SHA256)
+		}
+
+		_ = tmpFile.Close()
+		tmpFile = nil
+
+		if err := os.Rename(tmpName, cachedPkgPath); err != nil {
+			return content.Manifest{}, fmt.Errorf("cache package file: %w", err)
+		}
+
+		f, openErr := os.Open(cachedPkgPath)
+		if openErr != nil {
+			return content.Manifest{}, fmt.Errorf("open cached package file: %w", openErr)
+		}
+		pkgFile = f
+	}
+
+	defer pkgFile.Close()
+
+	c.mu.RLock()
+	installer := c.installer
+	c.mu.RUnlock()
+
+	if installer != nil {
+		return installer(ctx, pkgFile, onConflict)
+	}
+
+	stagingDir, err := os.MkdirTemp(c.cacheDir, ".default-install-*")
+	if err != nil {
+		return content.Manifest{}, fmt.Errorf("create staging dir: %w", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(stagingDir)
+	}()
+
+	m, _, err := content.Unpack(pkgFile, stagingDir)
+	if err != nil {
+		return content.Manifest{}, fmt.Errorf("unpack package: %w", err)
+	}
+
+	return m, nil
 }

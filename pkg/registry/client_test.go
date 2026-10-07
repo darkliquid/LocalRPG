@@ -1,13 +1,20 @@
 package registry
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/content"
 )
 
 func TestClientCachesIndexes(t *testing.T) {
@@ -207,5 +214,119 @@ func TestSearchMatchesAcrossIndexes(t *testing.T) {
 	}
 	if len(res) != 0 {
 		t.Fatalf("expected 0 packages, got %d", len(res))
+	}
+}
+
+func TestInstallVerifiesChecksum(t *testing.T) {
+	pkgBytes := []byte("some package payload")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(pkgBytes)
+	}))
+	defer server.Close()
+
+	cacheDir := t.TempDir()
+	client := NewClient(config.RegistriesConfig{}, cacheDir)
+	client.SetHTTPClient(server.Client())
+
+	ref := PackageRef{
+		RegistryName: "TestReg",
+		RegistryURL:  server.URL + "/index.json",
+		Package: Package{
+			Type:     "world",
+			ID:       "corrupt_pkg",
+			Name:     "Corrupt Package",
+			Version:  "1.0.0",
+			Download: server.URL + "/pkg.lrpgpack",
+			SHA256:   "expected_different_sha256",
+		},
+	}
+
+	_, err := client.Install(context.Background(), ref, "refuse")
+	if err == nil {
+		t.Fatal("expected error on checksum mismatch, got nil")
+	}
+}
+
+func TestInstallDelegatesToImport(t *testing.T) {
+	// Create a real package
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "src")
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	worldYAML := "id: my_world\nname: My World\nversion: 1.0.0\n"
+	if err := os.WriteFile(filepath.Join(srcDir, "world.yaml"), []byte(worldYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var packBuf bytes.Buffer
+	m, err := content.Pack(srcDir, "world", content.ManifestMeta{}, &packBuf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packBytes := packBuf.Bytes()
+	h := sha256.Sum256(packBytes)
+	actualSHA256 := hex.EncodeToString(h[:])
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(packBytes)
+	}))
+	defer server.Close()
+
+	cacheDir := t.TempDir()
+	client := NewClient(config.RegistriesConfig{}, cacheDir)
+	client.SetHTTPClient(server.Client())
+
+	var delegateCalled bool
+	var receivedConflict string
+	client.SetInstaller(func(ctx context.Context, r io.Reader, onConflict string) (content.Manifest, error) {
+		delegateCalled = true
+		receivedConflict = onConflict
+		readBytes, err := io.ReadAll(r)
+		if err != nil {
+			return content.Manifest{}, err
+		}
+		if len(readBytes) != len(packBytes) {
+			t.Fatalf("delegate received %d bytes, want %d", len(readBytes), len(packBytes))
+		}
+		return m, nil
+	})
+
+	ref := PackageRef{
+		RegistryName: "TestReg",
+		RegistryURL:  server.URL + "/registry/index.json",
+		Package: Package{
+			Type:     "world",
+			ID:       "my_world",
+			Name:     "My World",
+			Version:  "1.0.0",
+			Download: "my_world.lrpgpack", // relative URL
+			SHA256:   actualSHA256,
+		},
+	}
+
+	installedM, err := client.Install(context.Background(), ref, "rename")
+	if err != nil {
+		t.Fatalf("Install failed: %v", err)
+	}
+	if !delegateCalled {
+		t.Fatal("expected installer delegate to be called")
+	}
+	if receivedConflict != "rename" {
+		t.Fatalf("expected onConflict 'rename', got %q", receivedConflict)
+	}
+	if installedM.ID != "my_world" {
+		t.Fatalf("expected installed ID 'my_world', got %q", installedM.ID)
+	}
+
+	// Now shut down server: second install should work from cache
+	server.Close()
+	delegateCalled = false
+	_, err = client.Install(context.Background(), ref, "overwrite")
+	if err != nil {
+		t.Fatalf("offline Install from package cache failed: %v", err)
+	}
+	if !delegateCalled {
+		t.Fatal("expected installer delegate to be called from cache")
 	}
 }
