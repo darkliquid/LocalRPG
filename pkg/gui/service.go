@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -33,6 +34,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/refsystems"
+	"github.com/darkliquid/localrpg/pkg/registry"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -5827,3 +5829,165 @@ func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict str
 		Trust:       trust,
 	}, nil
 }
+
+func (s *Service) registryClient() *registry.Client {
+	var regCfg config.RegistriesConfig
+	if s.configMgr != nil {
+		if cfg := s.configMgr.Get(); cfg != nil {
+			regCfg = cfg.Registries
+		}
+	}
+	cacheDir := s.resolver.CacheDir()
+	client := registry.NewClient(regCfg, cacheDir)
+
+	client.SetInstaller(func(ctx context.Context, r io.Reader, conflictMode string) (content.Manifest, error) {
+		res, err := s.ImportContent(ctx, r, conflictMode)
+		if err != nil {
+			return content.Manifest{}, err
+		}
+		return content.Manifest{
+			ID:          res.ID,
+			Name:        res.Name,
+			Version:     res.Version,
+			Type:        res.Type,
+			Description: res.Description,
+		}, nil
+	})
+
+	client.SetInstalledLister(func(ctx context.Context) ([]content.Manifest, error) {
+		var manifests []content.Manifest
+
+		// Scan worlds
+		worldsDir := s.resolver.WorldsDir()
+		if entries, err := os.ReadDir(worldsDir); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					worldPath := filepath.Join(s.resolver.WorldDir(entry.Name()), "world.yaml")
+					if wm, err := core.LoadWorldManifest(worldPath); err == nil && wm != nil {
+						manifests = append(manifests, content.Manifest{
+							ID:      wm.ID,
+							Name:    wm.Name,
+							Version: wm.Version,
+							Type:    "world",
+						})
+					}
+				}
+			}
+		}
+
+		// Scan systems
+		systemsDir := s.resolver.SystemsDir()
+		if entries, err := os.ReadDir(systemsDir); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					sysPath := filepath.Join(s.resolver.SystemDir(entry.Name()), "system.yaml")
+					if sm, err := core.LoadSystemManifest(sysPath); err == nil && sm != nil {
+						manifests = append(manifests, content.Manifest{
+							ID:      sm.ID,
+							Name:    sm.Name,
+							Version: sm.Version,
+							Type:    "system",
+						})
+					}
+				}
+			}
+		}
+
+		return manifests, nil
+	})
+
+	return client
+}
+
+// HandleRegistrySearch handles GET /api/registry/search?q=...
+func (s *Service) HandleRegistrySearch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	q := r.URL.Query().Get("q")
+	client := s.registryClient()
+	results, err := client.Search(r.Context(), q)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if results == nil {
+		results = []registry.PackageRef{}
+	}
+	writeJSON(w, results)
+}
+
+// HandleRegistryInstall handles POST /api/registry/install
+func (s *Service) HandleRegistryInstall(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req RegistryInstallRequestDTO
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.OnConflict == "" {
+		req.OnConflict = "refuse"
+	}
+
+	client := s.registryClient()
+	var lastResult ImportResultDTO
+	client.SetInstaller(func(ctx context.Context, r io.Reader, conflictMode string) (content.Manifest, error) {
+		res, err := s.ImportContent(ctx, r, conflictMode)
+		if err != nil {
+			return content.Manifest{}, err
+		}
+		lastResult = res
+		return content.Manifest{
+			ID:          res.ID,
+			Name:        res.Name,
+			Version:     res.Version,
+			Type:        res.Type,
+			Description: res.Description,
+		}, nil
+	})
+
+	m, err := client.Install(r.Context(), req.Ref, req.OnConflict)
+	if err != nil {
+		if errors.Is(err, ErrContentConflict) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if lastResult.ID == "" {
+		lastResult = ImportResultDTO{
+			ID:          m.ID,
+			Name:        m.Name,
+			Version:     m.Version,
+			Type:        m.Type,
+			Description: m.Description,
+			Action:      "installed",
+		}
+	}
+	writeJSON(w, lastResult)
+}
+
+// HandleRegistryUpdates handles GET /api/registry/updates
+func (s *Service) HandleRegistryUpdates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	client := s.registryClient()
+	updates, err := client.Update(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if updates == nil {
+		updates = []registry.PackageRef{}
+	}
+	writeJSON(w, updates)
+}
+

@@ -367,6 +367,12 @@ type Config struct {
 	Mechanics   MechanicsConfig   `yaml:"mechanics,omitempty" json:"mechanics,omitempty"`
 	Interactive InteractiveConfig `yaml:"interactive,omitempty" json:"interactive,omitempty"`
 	Publishers  map[string]string `yaml:"publishers,omitempty" json:"publishers,omitempty"`
+	Registries  RegistriesConfig  `yaml:"registries,omitempty" json:"registries,omitempty"`
+}
+
+// RegistriesConfig lists URLs of static or git package indexes.
+type RegistriesConfig struct {
+	URLs []string `yaml:"urls,omitempty" json:"urls,omitempty"`
 }
 
 // InteractiveConfig governs how interactive rolls are recorded.

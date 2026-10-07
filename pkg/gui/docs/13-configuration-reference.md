@@ -225,6 +225,12 @@ choose; the ledger and provider identifiers are listed in the
 | --- | --- |
 | `publishers` | map<string, string> |
 
+### `registries`
+
+| Key | Type |
+| --- | --- |
+| `registries.urls` | []string |
+
 ## Value sets
 
 Keys typed `string` here accept the following values where noted. An
