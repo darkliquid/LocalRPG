@@ -56,3 +56,20 @@ func TestSettingsRoundTripAPath(t *testing.T) {
 		t.Fatalf("path did not round-trip: got %q", got)
 	}
 }
+
+// TestSettingsEmbeddingsSectionRenders opens the providers tab, asserts the
+// embeddings section is there, and adds an entry, which is what "the family is
+// reachable from the UI" means.
+func TestSettingsEmbeddingsSectionRenders(t *testing.T) {
+	f := NewFixture(t, "agents:\n  roles:\n    gm:\n      type: builtin\n      builtin_name: echo\n")
+
+	b := f.Launch(t)
+	b.Navigate("/")
+	b.Click(`//button[@aria-label="Settings"]`)
+	b.WaitFor("Global Settings")
+	b.Click(`//button[.//span[normalize-space()='Providers']]`)
+
+	b.WaitFor("Embeddings")
+	b.Click(`//button[normalize-space()='Add Embedding Provider']`)
+	b.WaitFor("new-provider")
+}

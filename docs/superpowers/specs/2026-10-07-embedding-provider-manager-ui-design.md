@@ -111,20 +111,22 @@ download button.
 
 ### 4.4 The editor and its presets
 
-The editor is a small form whose fields follow the selected `type`:
+The editor is a small form whose fields follow the selected `type`. Dimensions and
+batch size are family-level, so they sit once at the head of the section rather
+than on each entry:
 
 | Type | Fields |
 | --- | --- |
-| `builtin` | dimensions |
-| `onnx` | dimensions, model path (optional), model download |
-| `http` | endpoint, api key, model, dimensions |
+| `builtin` | none |
+| `onnx` | model path (optional), model download |
+| `http` | endpoint, api key, model |
 | `gemini` | model, api key (falls back to the shared Gemini key) |
 
 To make the add menu useful, register descriptors' presets so the "add" flow
 offers the common entries ready-made. `openaiembedding` and `geminiembedding`
 declare none today; add:
 
-- **Built-in ONNX encoder** — `{type: onnx, dimensions: 384}`.
+- **Built-in ONNX encoder** — `{type: onnx}`.
 - **OpenAI** — `{type: http, endpoint: "https://api.openai.com/v1", model:
   "text-embedding-3-small"}`.
 - **Ollama** — `{type: http, endpoint: "http://localhost:11434/v1", model:

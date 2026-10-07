@@ -1115,7 +1115,7 @@ export interface VoiceSearchResponse {
   error?: string;
 }
 
-export type ProviderFamily = 'llm' | 'tts' | 'stt' | 'image';
+export type ProviderFamily = 'llm' | 'tts' | 'stt' | 'image' | 'embedding';
 
 export type ProviderFeature =
   | 'streaming'
