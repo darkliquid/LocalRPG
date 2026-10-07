@@ -219,6 +219,12 @@ choose; the ledger and provider identifiers are listed in the
 | --- | --- |
 | `interactive.rolls` | string |
 
+### `publishers`
+
+| Key | Type |
+| --- | --- |
+| `publishers` | map<string, string> |
+
 ## Value sets
 
 Keys typed `string` here accept the following values where noted. An

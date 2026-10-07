@@ -5670,9 +5670,21 @@ func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict str
 		_ = os.RemoveAll(stagingDir)
 	}()
 
-	m, _, err := content.Unpack(r, stagingDir)
+	m, sigBytes, err := content.Unpack(r, stagingDir)
 	if err != nil {
 		return ImportResultDTO{}, fmt.Errorf("unpack content: %w", err)
+	}
+
+	var trustedPublishers map[string]string
+	if s.configMgr != nil {
+		if cfg := s.configMgr.Get(); cfg != nil {
+			trustedPublishers = cfg.Publishers
+		}
+	}
+
+	trust, verifyErr := content.Verify(m, sigBytes, trustedPublishers)
+	if verifyErr != nil || trust.State == "invalid" {
+		return ImportResultDTO{Trust: trust}, fmt.Errorf("package signature is invalid: %w", verifyErr)
 	}
 
 	// Validate staged content structure
@@ -5812,5 +5824,6 @@ func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict str
 		FileCount:   len(m.Files),
 		HasScript:   hasScript,
 		Action:      action,
+		Trust:       trust,
 	}, nil
 }

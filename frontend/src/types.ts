@@ -1348,6 +1348,12 @@ export interface SaveErrorBody {
   column?: number;
 }
 
+export interface TrustInfo {
+  state: 'verified' | 'unknown_key' | 'unsigned' | 'invalid';
+  publisher?: string;
+  fingerprint?: string;
+}
+
 export interface ImportResultDTO {
   id: string;
   name: string;
@@ -1359,6 +1365,7 @@ export interface ImportResultDTO {
   file_count: number;
   has_script: boolean;
   action: 'installed' | 'renamed' | 'overwritten';
+  trust?: TrustInfo;
 }
 
 export interface ContentManifestInfo {
@@ -1371,5 +1378,6 @@ export interface ContentManifestInfo {
   description?: string;
   file_count?: number;
   has_script?: boolean;
+  trust?: TrustInfo;
 }
 
