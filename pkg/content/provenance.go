@@ -1,11 +1,19 @@
 package content
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -106,4 +114,291 @@ func Verify(m Manifest, sigBytes []byte, trusted map[string]string) (Trust, erro
 		Publisher:   ps.Publisher,
 		Fingerprint: computedFP,
 	}, nil
+}
+
+// SignDirectory generates a manifest for dir, computes package.sig using key,
+// and writes package.sig into dir.
+func SignDirectory(dir string, key ed25519.PrivateKey, publisher string) error {
+	m, err := BuildManifest(dir, "", ManifestMeta{})
+	if err != nil {
+		return fmt.Errorf("build manifest for %q: %w", dir, err)
+	}
+
+	sigBytes, err := Sign(m, key, publisher)
+	if err != nil {
+		return fmt.Errorf("sign manifest: %w", err)
+	}
+
+	target := filepath.Join(dir, "package.sig")
+	if err := os.WriteFile(target, sigBytes, 0644); err != nil {
+		return fmt.Errorf("write package.sig: %w", err)
+	}
+	return nil
+}
+
+// SignPackageFile signs an existing .lrpgpack archive by parsing its package.yaml,
+// generating package.sig, and rewriting the archive to include package.sig.
+func SignPackageFile(archivePath string, key ed25519.PrivateKey, publisher string) error {
+	f, err := os.Open(archivePath)
+	if err != nil {
+		return fmt.Errorf("open archive: %w", err)
+	}
+	defer f.Close()
+
+	gzr, err := gzip.NewReader(f)
+	if err != nil {
+		return fmt.Errorf("read gzip: %w", err)
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+
+	type member struct {
+		hdr  tar.Header
+		data []byte
+	}
+
+	var manifest *Manifest
+	var manifestData []byte
+	var otherMembers []member
+
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("read tar: %w", err)
+		}
+
+		cleanName := filepath.ToSlash(filepath.Clean(hdr.Name))
+		if cleanName == "package.sig" {
+			// discard previous signature when re-signing
+			continue
+		}
+
+		data, err := io.ReadAll(tr)
+		if err != nil {
+			return fmt.Errorf("read member %q: %w", hdr.Name, err)
+		}
+
+		if cleanName == "package.yaml" {
+			m, err := ParseManifest(data)
+			if err != nil {
+				return fmt.Errorf("parse package.yaml: %w", err)
+			}
+			manifest = &m
+			manifestData = data
+		} else {
+			otherMembers = append(otherMembers, member{
+				hdr:  *hdr,
+				data: data,
+			})
+		}
+	}
+
+	if manifest == nil {
+		return errors.New("archive is missing package.yaml")
+	}
+
+	sigBytes, err := Sign(*manifest, key, publisher)
+	if err != nil {
+		return fmt.Errorf("sign manifest: %w", err)
+	}
+
+	// Write to temporary file in the same directory, then rename
+	dir := filepath.Dir(archivePath)
+	tmpFile, err := os.CreateTemp(dir, ".lrpgpack-sign-*")
+	if err != nil {
+		return fmt.Errorf("create temp archive: %w", err)
+	}
+	tmpName := tmpFile.Name()
+	defer func() {
+		_ = os.Remove(tmpName)
+	}()
+
+	gzw := gzip.NewWriter(tmpFile)
+	gzw.ModTime = time.Unix(0, 0)
+	gzw.OS = 255
+	tw := tar.NewWriter(gzw)
+
+	// 1. package.yaml
+	pkgHdr := &tar.Header{
+		Name:     "package.yaml",
+		Mode:     0644,
+		Size:     int64(len(manifestData)),
+		ModTime:  time.Unix(0, 0),
+		Format:   tar.FormatPAX,
+	}
+	if err := tw.WriteHeader(pkgHdr); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("write package.yaml header: %w", err)
+	}
+	if _, err := tw.Write(manifestData); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("write package.yaml content: %w", err)
+	}
+
+	// 2. package.sig
+	sigHdr := &tar.Header{
+		Name:     "package.sig",
+		Mode:     0644,
+		Size:     int64(len(sigBytes)),
+		ModTime:  time.Unix(0, 0),
+		Format:   tar.FormatPAX,
+	}
+	if err := tw.WriteHeader(sigHdr); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("write package.sig header: %w", err)
+	}
+	if _, err := tw.Write(sigBytes); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("write package.sig content: %w", err)
+	}
+
+	// 3. other files
+	for _, m := range otherMembers {
+		if err := tw.WriteHeader(&m.hdr); err != nil {
+			_ = tmpFile.Close()
+			return fmt.Errorf("write %q header: %w", m.hdr.Name, err)
+		}
+		if _, err := tw.Write(m.data); err != nil {
+			_ = tmpFile.Close()
+			return fmt.Errorf("write %q content: %w", m.hdr.Name, err)
+		}
+	}
+
+	if err := tw.Close(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("close tar: %w", err)
+	}
+	if err := gzw.Close(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("close gzip: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("close temp file: %w", err)
+	}
+
+	_ = f.Close()
+	if err := os.Rename(tmpName, archivePath); err != nil {
+		return fmt.Errorf("replace archive: %w", err)
+	}
+
+	return nil
+}
+
+// ReadPackageManifestAndSig reads the manifest and optional signature bytes from a .lrpgpack file or directory.
+// When reading a .lrpgpack, it also verifies that every archive member matches the manifest's declared size and sha256 checksum.
+func ReadPackageManifestAndSig(targetPath string) (Manifest, []byte, error) {
+	fi, err := os.Stat(targetPath)
+	if err != nil {
+		return Manifest{}, nil, err
+	}
+
+	if fi.IsDir() {
+		m, err := BuildManifest(targetPath, "", ManifestMeta{})
+		if err != nil {
+			return Manifest{}, nil, err
+		}
+		sigBytes, _ := os.ReadFile(filepath.Join(targetPath, "package.sig"))
+		return m, sigBytes, nil
+	}
+
+	f, err := os.Open(targetPath)
+	if err != nil {
+		return Manifest{}, nil, fmt.Errorf("open archive: %w", err)
+	}
+	defer f.Close()
+
+	gzr, err := gzip.NewReader(f)
+	if err != nil {
+		return Manifest{}, nil, fmt.Errorf("read gzip: %w", err)
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+
+	// First pass / header: package.yaml
+	firstHdr, err := tr.Next()
+	if err != nil {
+		return Manifest{}, nil, fmt.Errorf("read first archive member: %w", err)
+	}
+	if filepath.ToSlash(filepath.Clean(firstHdr.Name)) != "package.yaml" {
+		return Manifest{}, nil, fmt.Errorf("first archive member must be package.yaml, got %q", firstHdr.Name)
+	}
+
+	manifestBytes, err := io.ReadAll(tr)
+	if err != nil {
+		return Manifest{}, nil, fmt.Errorf("read package.yaml: %w", err)
+	}
+	m, err := ParseManifest(manifestBytes)
+	if err != nil {
+		return Manifest{}, nil, fmt.Errorf("parse package.yaml: %w", err)
+	}
+
+	declared := make(map[string]FileEntry, len(m.Files))
+	for _, fe := range m.Files {
+		declared[filepath.ToSlash(filepath.Clean(fe.Path))] = fe
+	}
+
+	var sigBytes []byte
+	extracted := make(map[string]bool, len(m.Files))
+
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return Manifest{}, nil, fmt.Errorf("read archive entry: %w", err)
+		}
+
+		cleanRel := filepath.ToSlash(filepath.Clean(hdr.Name))
+		if cleanRel == "package.sig" {
+			sig, err := io.ReadAll(tr)
+			if err != nil {
+				return Manifest{}, nil, fmt.Errorf("read package.sig: %w", err)
+			}
+			sigBytes = sig
+			continue
+		}
+
+		fe, isDeclared := declared[cleanRel]
+		if !isDeclared {
+			return Manifest{}, nil, fmt.Errorf("archive member %q not declared in manifest", cleanRel)
+		}
+		if extracted[cleanRel] {
+			return Manifest{}, nil, fmt.Errorf("duplicate archive member %q", cleanRel)
+		}
+		if hdr.Size != fe.Size {
+			return Manifest{}, nil, fmt.Errorf("archive member %q size %d does not match manifest size %d", cleanRel, hdr.Size, fe.Size)
+		}
+
+		hasher := sha256.New()
+		written, copyErr := io.Copy(hasher, tr)
+		if copyErr != nil {
+			return Manifest{}, nil, fmt.Errorf("read %q: %w", cleanRel, copyErr)
+		}
+		if written != fe.Size {
+			return Manifest{}, nil, fmt.Errorf("read %q: got %d bytes, expected %d", cleanRel, written, fe.Size)
+		}
+
+		computedSum := hex.EncodeToString(hasher.Sum(nil))
+		if !strings.EqualFold(computedSum, fe.SHA256) {
+			return Manifest{}, nil, fmt.Errorf("checksum mismatch for %q: got %s, want %s", cleanRel, computedSum, fe.SHA256)
+		}
+		extracted[cleanRel] = true
+	}
+
+	if len(extracted) != len(declared) {
+		return Manifest{}, nil, errors.New("archive is missing declared files")
+	}
+
+	// Drain any remaining bytes in the gzip stream to verify CRC32
+	if _, err := io.Copy(io.Discard, gzr); err != nil {
+		return Manifest{}, nil, fmt.Errorf("archive stream corrupt: %w", err)
+	}
+
+	return m, sigBytes, nil
 }

@@ -17,9 +17,17 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 )
 
-// Pack writes dir as a .lrpgpack (gzip-compressed tar) to w.
-// typ is "system" or "world".
-func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
+// BuildManifest scans dir and constructs a Manifest from its files and descriptor.
+// If typ is empty, it attempts to detect "world" or "system" based on world.yaml or system.yaml.
+func BuildManifest(dir, typ string, meta ManifestMeta) (Manifest, error) {
+	if typ == "" {
+		if _, err := os.Stat(filepath.Join(dir, "world.yaml")); err == nil {
+			typ = "world"
+		} else if _, err := os.Stat(filepath.Join(dir, "system.yaml")); err == nil {
+			typ = "system"
+		}
+	}
+
 	var relPaths []string
 	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -60,16 +68,7 @@ func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
 
 	sort.Strings(relPaths)
 
-	type fileData struct {
-		path   string
-		bytes  []byte
-		sha256 string
-		size   int64
-	}
-
-	files := make([]fileData, 0, len(relPaths))
 	fileEntries := make([]FileEntry, 0, len(relPaths))
-
 	for _, rel := range relPaths {
 		diskPath := filepath.Join(dir, filepath.FromSlash(rel))
 		b, err := os.ReadFile(diskPath)
@@ -80,12 +79,6 @@ func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
 		hexSum := hex.EncodeToString(h[:])
 		size := int64(len(b))
 
-		files = append(files, fileData{
-			path:   rel,
-			bytes:  b,
-			sha256: hexSum,
-			size:   size,
-		})
 		fileEntries = append(fileEntries, FileEntry{
 			Path:   rel,
 			SHA256: hexSum,
@@ -152,6 +145,17 @@ func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("package version: %w", err)
 	}
 
+	return m, nil
+}
+
+// Pack writes dir as a .lrpgpack (gzip-compressed tar) to w.
+// typ is "system" or "world".
+func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
+	m, err := BuildManifest(dir, typ, meta)
+	if err != nil {
+		return Manifest{}, err
+	}
+
 	manifestBytes, err := m.Marshal()
 	if err != nil {
 		return Manifest{}, fmt.Errorf("marshal package manifest: %w", err)
@@ -198,21 +202,28 @@ func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
 		}
 	}
 
-	for _, f := range files {
+	for _, fe := range m.Files {
+		diskPath := filepath.Join(dir, filepath.FromSlash(fe.Path))
+		b, err := os.ReadFile(diskPath)
+		if err != nil {
+			_ = gzw.Close()
+			return Manifest{}, fmt.Errorf("read file %q: %w", fe.Path, err)
+		}
+
 		hdr := &tar.Header{
-			Name:     f.path,
+			Name:     fe.Path,
 			Mode:     0644,
-			Size:     f.size,
+			Size:     fe.Size,
 			ModTime:  time.Unix(0, 0),
 			Format:   tar.FormatPAX,
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
 			_ = gzw.Close()
-			return Manifest{}, fmt.Errorf("write %q header: %w", f.path, err)
+			return Manifest{}, fmt.Errorf("write %q header: %w", fe.Path, err)
 		}
-		if _, err := tw.Write(f.bytes); err != nil {
+		if _, err := tw.Write(b); err != nil {
 			_ = gzw.Close()
-			return Manifest{}, fmt.Errorf("write %q content: %w", f.path, err)
+			return Manifest{}, fmt.Errorf("write %q content: %w", fe.Path, err)
 		}
 	}
 

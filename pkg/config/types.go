@@ -366,6 +366,7 @@ type Config struct {
 	Telemetry   TelemetryConfig   `yaml:"telemetry,omitempty" json:"telemetry,omitempty"`
 	Mechanics   MechanicsConfig   `yaml:"mechanics,omitempty" json:"mechanics,omitempty"`
 	Interactive InteractiveConfig `yaml:"interactive,omitempty" json:"interactive,omitempty"`
+	Publishers  map[string]string `yaml:"publishers,omitempty" json:"publishers,omitempty"`
 }
 
 // InteractiveConfig governs how interactive rolls are recorded.
@@ -706,6 +707,7 @@ func DefaultConfig() *Config {
 			Logs:        true,
 			ServiceName: "localrpg",
 		},
+		Publishers: make(map[string]string),
 	}
 }
 

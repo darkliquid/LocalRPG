@@ -29,6 +29,10 @@ func runContentCommand(args []string, stdout, stderr io.Writer) int {
 		return runContentExport(args[1:], stdout, stderr)
 	case "import":
 		return runContentImport(args[1:], stdout, stderr)
+	case "sign":
+		return runContentSign(args[1:], stdout, stderr)
+	case "verify":
+		return runContentVerify(args[1:], stdout, stderr)
 	case "help", "-h", "--help":
 		printContentUsage(stdout)
 		return 0
@@ -44,6 +48,8 @@ func printContentUsage(w io.Writer) {
 	fmt.Fprintln(w, "\nSubcommands:")
 	fmt.Fprintln(w, "  export <world|system> <id> [--out <file>]              Export content as a .lrpgpack package")
 	fmt.Fprintln(w, "  import <file> [--on-conflict refuse|rename|overwrite] [--yes] Import content from a .lrpgpack package")
+	fmt.Fprintln(w, "  sign <file|dir> --key <privkey> [--publisher <name>]   Sign a package or content directory")
+	fmt.Fprintln(w, "  verify <file|dir>                                    Verify package signature and integrity")
 }
 
 func runContentExport(args []string, stdout, stderr io.Writer) int {
