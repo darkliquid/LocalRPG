@@ -94,9 +94,6 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({
         author: installingRef.package.author,
         license: installingRef.package.license,
         description: installingRef.package.description,
-        trust: installingRef.package.signature
-          ? { state: 'verified', key_id: installingRef.package.key_id } as any
-          : { state: 'unsigned' },
       }
     : undefined;
 
@@ -219,10 +216,13 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({
                         <div className="flex items-center gap-3 text-[11px] text-stone-400">
                           {pkg.author && <span>By {pkg.author}</span>}
                           {pkg.license && <span>{pkg.license}</span>}
-                          {pkg.signature && (
-                            <span className="flex items-center gap-1 text-emerald-400">
+                          {pkg.publisher && (
+                            <span
+                              className="flex items-center gap-1 text-stone-300"
+                              title={`Publisher key ${pkg.publisher}`}
+                            >
                               <ShieldCheck className="w-3.5 h-3.5" />
-                              Signed
+                              Publisher {pkg.publisher.slice(0, 8)}
                             </span>
                           )}
                         </div>

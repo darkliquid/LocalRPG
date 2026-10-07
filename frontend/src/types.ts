@@ -1391,9 +1391,8 @@ export interface RegistryPackageDTO {
   license?: string;
   download: string;
   sha256: string;
-  signature?: string;
-  key_id?: string;
-  deps?: string[];
+  publisher?: string;
+  requires?: { type: string; id: string; version?: string }[];
 }
 
 export interface PackageRefDTO {
