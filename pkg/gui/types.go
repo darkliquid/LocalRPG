@@ -12,6 +12,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/provider"
+	"github.com/darkliquid/localrpg/pkg/registry"
 	"github.com/darkliquid/localrpg/pkg/systemtest"
 )
 
@@ -596,6 +597,12 @@ type ImportResultDTO struct {
 	HasScript   bool          `json:"has_script"`
 	Action      string        `json:"action"` // "installed", "renamed", "overwritten"
 	Trust       content.Trust `json:"trust"`
+}
+
+// RegistryInstallRequestDTO requests installing a package from a configured registry.
+type RegistryInstallRequestDTO struct {
+	Ref        registry.PackageRef `json:"ref"`
+	OnConflict string              `json:"on_conflict"`
 }
 
 type SettingsResponseDTO struct {

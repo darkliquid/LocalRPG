@@ -9,6 +9,7 @@ import { CampaignHeroStage } from './launcher/CampaignHeroStage';
 import { NewCampaignModal } from './launcher/NewCampaignModal';
 import { CampaignSettingsModal } from './launcher/CampaignSettingsModal';
 import { ContentImportDialog } from './ContentImportDialog';
+import { RegistryModal } from './RegistryModal';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { ArrowLeft, X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
@@ -64,6 +65,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [docsArticleID, setDocsArticleID] = useState<string | undefined>(undefined);
+  const [isRegistryOpen, setIsRegistryOpen] = useState(false);
   const { mounted: settingsMounted, state: settingsState } = useMountTransition(isSettingsOpen, 200);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -296,6 +298,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenDocs={() => handleOpenDocs()}
         onImportPackage={handleTriggerImport}
+        onOpenRegistry={() => setIsRegistryOpen(true)}
       />
 
       {/* Horizontal World Flyout */}
@@ -443,6 +446,13 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
         }}
         loading={isImporting}
         error={importError}
+      />
+
+      {/* Content Package Registry Modal */}
+      <RegistryModal
+        isOpen={isRegistryOpen}
+        onClose={() => setIsRegistryOpen(false)}
+        onInstalled={loadData}
       />
     </div>
   );

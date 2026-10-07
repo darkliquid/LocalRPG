@@ -1381,3 +1381,25 @@ export interface ContentManifestInfo {
   trust?: TrustInfo;
 }
 
+export interface RegistryPackageDTO {
+  type: string;
+  id: string;
+  name: string;
+  version: string;
+  description?: string;
+  author?: string;
+  license?: string;
+  download: string;
+  sha256: string;
+  signature?: string;
+  key_id?: string;
+  deps?: string[];
+}
+
+export interface PackageRefDTO {
+  registry_name: string;
+  registry_url: string;
+  package: RegistryPackageDTO;
+}
+
+

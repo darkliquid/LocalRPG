@@ -60,6 +60,7 @@ import {
   OfflinePresetResponse,
   OfflineReportResponse,
   ImportResultDTO,
+  PackageRefDTO,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -1056,8 +1057,47 @@ export class APIClient {
     }
     return res.json();
   }
+
+  static async searchRegistry(query?: string): Promise<PackageRefDTO[]> {
+    const url = query ? `/api/registry/search?q=${encodeURIComponent(query)}` : '/api/registry/search';
+    const res = await fetch(url);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new HTTPError(res.status, text || `searchRegistry: ${res.statusText}`);
+    }
+    return res.json();
+  }
+
+  static async installRegistryPackage(
+    ref: PackageRefDTO,
+    onConflict: 'refuse' | 'rename' | 'overwrite' = 'refuse'
+  ): Promise<ImportResultDTO> {
+    const res = await fetch('/api/registry/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref, on_conflict: onConflict }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new HTTPError(res.status, text || `installRegistryPackage: ${res.statusText}`);
+    }
+    return res.json();
+  }
+
+  static async checkRegistryUpdates(): Promise<PackageRefDTO[]> {
+    const res = await fetch('/api/registry/updates');
+    if (!res.ok) {
+      const text = await res.text();
+      throw new HTTPError(res.status, text || `checkRegistryUpdates: ${res.statusText}`);
+    }
+    return res.json();
+  }
 }
 
 export const exportContent = APIClient.exportContent;
 export const importContent = APIClient.importContent;
+export const searchRegistry = APIClient.searchRegistry;
+export const installRegistryPackage = APIClient.installRegistryPackage;
+export const checkRegistryUpdates = APIClient.checkRegistryUpdates;
+
 

@@ -54,6 +54,9 @@ var mounts = []routeMount{
 	{"/api/docs/", "handleDocsRoutes", (*Server).handleDocsRoutes},
 	{"/api/content/export", "handleContentExportRoute", (*Server).handleContentExportRoute},
 	{"/api/content/import", "handleContentImportRoute", (*Server).handleContentImportRoute},
+	{"/api/registry/search", "handleRegistrySearchRoute", (*Server).handleRegistrySearchRoute},
+	{"/api/registry/install", "handleRegistryInstallRoute", (*Server).handleRegistryInstallRoute},
+	{"/api/registry/updates", "handleRegistryUpdatesRoute", (*Server).handleRegistryUpdatesRoute},
 	{"/api/schema/", "handleSchemaRoutes", (*Server).handleSchemaRoutes},
 }
 
