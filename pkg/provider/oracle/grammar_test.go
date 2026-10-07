@@ -44,3 +44,23 @@ func TestHighStatSelectsConfidentVariants(t *testing.T) {
 		t.Fatalf("expected different opener variant sets for high stat vs normal/low stat, both got %q", highGot)
 	}
 }
+
+func TestCastLineNamesAnEntity(t *testing.T) {
+	got := castLine(parts{Entities: []string{"Garrick"}}, rand.New(rand.NewSource(1)))
+	if !strings.Contains(got, "Garrick") {
+		t.Fatalf("cast line = %q", got)
+	}
+}
+
+func TestPlaceLineNamesTheLocation(t *testing.T) {
+	got := placeLine(parts{Location: "Saltmarch"}, rand.New(rand.NewSource(1)))
+	if !strings.Contains(got, "Saltmarch") {
+		t.Fatalf("place line = %q", got)
+	}
+}
+
+func TestEmptyPartsProduceNoLines(t *testing.T) {
+	if castLine(parts{}, rand.New(rand.NewSource(1))) != "" || placeLine(parts{}, rand.New(rand.NewSource(1))) != "" {
+		t.Fatal("empty parts should yield no lines")
+	}
+}

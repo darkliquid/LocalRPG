@@ -79,6 +79,20 @@ var (
 		"The surrounding quiet breaks as the scene shifts around your intent.",
 		"Every second counts as new variables enter the fray.",
 	}
+
+	castLineTemplates = []string{
+		"Nearby, [[%s]] watches the outcome with bated breath.",
+		"In the shadows close by, [[%s]] takes note of every motion.",
+		"Across the clearing, [[%s]] reacts to the sudden shift in momentum.",
+		"[[%s]] stands witness, eyes fixed on your next move.",
+	}
+
+	placeLineTemplates = []string{
+		"The surrounding air of %s hangs heavy with the weight of the moment.",
+		"Every stone and timber of %s seems to echo the clash.",
+		"Silence settles briefly across %s as the dust begins to clear.",
+		"The ancient atmosphere of %s braces for whatever follows.",
+	}
 )
 
 func tierCategory(tier string) string {
@@ -178,3 +192,22 @@ func consequence(p parts, rng *rand.Rand) string {
 		return neutralPlainConsequences[rng.Intn(len(neutralPlainConsequences))]
 	}
 }
+
+func castLine(p parts, rng *rand.Rand) string {
+	if len(p.Entities) == 0 {
+		return ""
+	}
+	ent := p.Entities[rng.Intn(len(p.Entities))]
+	tmpl := castLineTemplates[rng.Intn(len(castLineTemplates))]
+	return fmt.Sprintf(tmpl, ent)
+}
+
+func placeLine(p parts, rng *rand.Rand) string {
+	loc := strings.TrimSpace(p.Location)
+	if loc == "" {
+		return ""
+	}
+	tmpl := placeLineTemplates[rng.Intn(len(placeLineTemplates))]
+	return fmt.Sprintf(tmpl, loc)
+}
+
