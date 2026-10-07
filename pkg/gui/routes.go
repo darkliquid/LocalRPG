@@ -52,6 +52,7 @@ var mounts = []routeMount{
 	{"/api/models/", "handleModelsRoutes", (*Server).handleModelsRoutes},
 	{"/api/docs", "handleDocsRoutes", (*Server).handleDocsRoutes},
 	{"/api/docs/", "handleDocsRoutes", (*Server).handleDocsRoutes},
+	{"/api/content/export", "handleContentExportRoute", (*Server).handleContentExportRoute},
 	{"/api/schema/", "handleSchemaRoutes", (*Server).handleSchemaRoutes},
 }
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/url"
 	"os"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/content"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/embeddings"
 	"github.com/darkliquid/localrpg/pkg/engine"
@@ -5616,4 +5618,26 @@ func (s *Service) ListEntityMemories(gameID, entityID string, limit int) ([]Memo
 		})
 	}
 	return out, nil
+}
+
+// ExportContent packs a world or system directory as a .lrpgpack archive and writes it to w.
+func (s *Service) ExportContent(ctx context.Context, typ, id string, w io.Writer) (content.Manifest, error) {
+	if err := pathutil.ValidateID(id); err != nil {
+		return content.Manifest{}, fmt.Errorf("invalid content ID: %w", err)
+	}
+	var dir string
+	switch typ {
+	case "world":
+		dir = s.resolver.WorldDir(id)
+	case "system":
+		dir = s.resolver.SystemDir(id)
+	default:
+		return content.Manifest{}, fmt.Errorf("invalid content type %q: must be 'world' or 'system'", typ)
+	}
+
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return content.Manifest{}, fmt.Errorf("content %s %q not found", typ, id)
+	}
+
+	return content.Pack(dir, typ, content.ManifestMeta{}, w)
 }
