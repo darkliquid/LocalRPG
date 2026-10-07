@@ -1,6 +1,8 @@
 [
   "/api/audio/",
   "/api/character/generate",
+  "/api/config/offline-preset",
+  "/api/config/offline-report",
   "/api/docs",
   "/api/docs/",
   "/api/export",

@@ -39,7 +39,7 @@ Regenerate the generated embedded docs (provider catalogue, config reference)
 after changing a provider, preset, or config struct:
 `go test ./pkg/gui -update-docs`.
 
-CLI surface (`localrpg <cmd>`): `roll <notation>`, `prompt`, `play <game-id>`, `tts`, `image`, `gui`, `export <web|video>`, `debug <test-run|server>`, `version`.
+CLI surface (`localrpg <cmd>`): `roll <notation>`, `prompt`, `play <game-id>`, `tts`, `image`, `gui`, `export <web|video>`, `debug <test-run|server>`, `config <cmd>`, `version`.
 
 ## Working the project
 

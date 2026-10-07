@@ -101,10 +101,10 @@ func ApplyOfflinePreset(cfg *Config, tts string) []string {
 // VerifyOffline inspects each configured role and media provider against the
 // provider registry, reporting any that are not declared offline.
 func VerifyOffline(cfg *Config) provider.OfflineReport {
-	var issues []provider.OfflineIssue
+	issues := make([]provider.OfflineIssue, 0)
 
 	if cfg == nil {
-		return provider.OfflineReport{Offline: true}
+		return provider.OfflineReport{Offline: true, Issues: issues}
 	}
 
 	// 1. Roles

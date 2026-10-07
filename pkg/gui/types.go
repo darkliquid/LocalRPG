@@ -878,3 +878,17 @@ type DocArticleDTO struct {
 	DocArticleSummaryDTO
 	Content string `json:"content"`
 }
+
+// OfflinePresetRequestDTO is the request body for POST /api/config/offline-preset.
+type OfflinePresetRequestDTO struct {
+	TTS string `json:"tts,omitempty"`
+}
+
+// OfflinePresetResponseDTO is the response body for POST /api/config/offline-preset.
+type OfflinePresetResponseDTO struct {
+	Changes []string `json:"changes"`
+}
+
+// OfflineReportResponseDTO is the response body for GET /api/config/offline-report.
+type OfflineReportResponseDTO = provider.OfflineReport
+

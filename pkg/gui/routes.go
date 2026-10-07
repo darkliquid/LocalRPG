@@ -33,6 +33,8 @@ var mounts = []routeMount{
 	{"/api/world/", "handleWorldRoutes", (*Server).handleWorldRoutes},
 	{"/api/settings", "handleSettingsRoutes", (*Server).handleSettingsRoutes},
 	{"/api/settings/test-provider", "handleTestProviderRoute", (*Server).handleTestProviderRoute},
+	{"/api/config/offline-preset", "handleOfflinePresetRoute", (*Server).handleOfflinePresetRoute},
+	{"/api/config/offline-report", "handleOfflineReportRoute", (*Server).handleOfflineReportRoute},
 	{"/api/open-url", "handleOpenURLRoute", (*Server).handleOpenURLRoute},
 	{"/api/providers", "handleProviderCatalogRoute", (*Server).handleProviderCatalogRoute},
 	{"/api/providers/models", "handleModelCatalogueRoute", (*Server).handleModelCatalogueRoute},

@@ -53,6 +53,7 @@ func routePattern(path string) string {
 	switch {
 	case path == "/api/games" || path == "/api/systems" || path == "/api/worlds" ||
 		path == "/api/settings" || path == "/api/settings/test-provider" ||
+		path == "/api/config/offline-preset" || path == "/api/config/offline-report" ||
 		path == "/api/open-url" ||
 		path == "/api/providers" || path == "/api/providers/models" ||
 		path == "/api/reference-systems" ||
@@ -1333,6 +1334,42 @@ func (s *Server) handleTestProviderRoute(w http.ResponseWriter, r *http.Request)
 	}
 
 	res, err := s.service.TestProvider(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
+func (s *Server) handleOfflinePresetRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req OfflinePresetRequestDTO
+	if r.Body != nil && r.ContentLength != 0 {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+			http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	res, err := s.service.ApplyOfflinePreset(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
+func (s *Server) handleOfflineReportRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	res, err := s.service.CheckOffline(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -11,7 +11,7 @@ type OfflineIssue struct {
 // OfflineReport lists configured providers that are not offline.
 type OfflineReport struct {
 	Offline bool           `json:"offline"`
-	Issues  []OfflineIssue `json:"issues,omitempty"`
+	Issues  []OfflineIssue `json:"issues"`
 }
 
 // InspectOffline checks a single provider key against the registry. If the

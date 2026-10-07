@@ -29,6 +29,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/paths"
 	"github.com/darkliquid/localrpg/pkg/pathutil"
+	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/refsystems"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
@@ -4860,6 +4861,35 @@ func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*Setting
 		IsLocalOverride: s.configMgr.IsLocalOverride(),
 		Warnings:        s.configMgr.Warnings(),
 	}, nil
+}
+
+func (s *Service) ApplyOfflinePreset(ctx context.Context, req OfflinePresetRequestDTO) (*OfflinePresetResponseDTO, error) {
+	cfg, err := s.configMgr.Load()
+	if err != nil {
+		return nil, fmt.Errorf("load config: %w", err)
+	}
+	changes := config.ApplyOfflinePreset(cfg, req.TTS)
+	if changes == nil {
+		changes = []string{}
+	}
+	if _, err := s.SaveSettings(ctx, *cfg); err != nil {
+		return nil, fmt.Errorf("save config: %w", err)
+	}
+	return &OfflinePresetResponseDTO{
+		Changes: changes,
+	}, nil
+}
+
+func (s *Service) CheckOffline(ctx context.Context) (provider.OfflineReport, error) {
+	cfg := s.configMgr.Get()
+	if cfg == nil {
+		var err error
+		cfg, err = s.configMgr.Load()
+		if err != nil {
+			return provider.OfflineReport{}, fmt.Errorf("load config: %w", err)
+		}
+	}
+	return config.VerifyOffline(cfg), nil
 }
 
 // defaultTTSPreviewText is long enough to expose cadence, pitch, and pacing
