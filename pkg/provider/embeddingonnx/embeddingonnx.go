@@ -26,6 +26,13 @@ func init() {
 			Source:      "builtin",
 			Tier:        provider.TierOfflineNeural,
 			Features:    []provider.Feature{provider.FeatureOffline},
+			Presets: []provider.Preset{
+				{ID: "onnx", Order: 1, Label: "Built-in BGE Encoder",
+					Description: "Semantic embeddings from a small BGE encoder, run on the CPU with no key and no server (downloads the model on demand).",
+					Config: map[string]interface{}{
+						"type": "onnx",
+					}},
+			},
 		},
 		Build: func(_ context.Context, raw []byte) (interface{}, error) {
 			var payload buildPayload

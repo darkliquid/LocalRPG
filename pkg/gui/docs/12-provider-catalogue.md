@@ -79,9 +79,9 @@ that key.
 
 | Provider ID | Tier | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- | --- |
-| `embedding:gemini` | cloud | gemini | `embedding:gemini` | - |
-| `embedding:onnx` | offline-neural | builtin | `embedding:onnx` | - |
-| `embedding:openai` | cloud | http | `embedding:openai` | - |
+| `embedding:gemini` | cloud | gemini | `embedding:gemini` | `text-embedding-004` |
+| `embedding:onnx` | offline-neural | builtin | `embedding:onnx` | `onnx` |
+| `embedding:openai` | cloud | http | `embedding:openai` | `nomic-embed-text`, `text-embedding-3-small` |
 
 ## Built-in default prices
 

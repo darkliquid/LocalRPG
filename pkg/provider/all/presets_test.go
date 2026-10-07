@@ -13,7 +13,7 @@ import (
 
 func TestEachFamilyHasPresets(t *testing.T) {
 	for _, family := range []provider.Family{
-		provider.FamilyLLM, provider.FamilyTTS, provider.FamilySTT, provider.FamilyImage,
+		provider.FamilyLLM, provider.FamilyTTS, provider.FamilySTT, provider.FamilyImage, provider.FamilyEmbedding,
 	} {
 		count := 0
 		for _, desc := range provider.List(family) {
@@ -42,6 +42,8 @@ func TestEveryPresetConfigUnmarshals(t *testing.T) {
 				target = &config.STTConfig{}
 			case provider.FamilyImage:
 				target = &config.ImageConfig{}
+			case provider.FamilyEmbedding:
+				target = &config.EmbeddingProviderConfig{}
 			default:
 				continue
 			}
