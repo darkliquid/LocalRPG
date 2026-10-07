@@ -179,51 +179,42 @@ func (n *narrativeOracleProvider) Stream(ctx context.Context, req harness.Genera
 }
 
 func (n *narrativeOracleProvider) craftProse(prompt string) string {
+	return craftProse(prompt)
+}
+
+func craftProse(prompt string) string {
 	p := parsePrompt(prompt)
-	tier := p.Tier
-	if tier == "" {
-		tier = "Success"
-	}
-	playerAction := p.Action
-	entities := p.Entities
 
 	seed := int64(len(prompt) * 17)
 	rng := rand.New(rand.NewSource(seed))
 
-	successOpeners := []string{
-		"With practiced grace and sharp focus, your intent takes hold.",
-		"The tides of fate answer your call; shadows part before your advance.",
-		"Your action lands with resounding clarity across the chamber.",
+	op := opener(p, rng)
+	conseq := consequence(p, rng)
+	cast := castLine(p, rng)
+	place := placeLine(p, rng)
+
+	var secondParagraph []string
+	if p.Action != "" && p.Action != "You steel your resolve and take action." {
+		secondParagraph = append(secondParagraph, fmt.Sprintf("As you declare: %s, the consequences take shape.", strconv.Quote(p.Action)))
+	} else {
+		secondParagraph = append(secondParagraph, "As you steel your resolve and take action, the consequences take shape.")
 	}
 
-	mixedOpeners := []string{
-		"You gain ground, though not without feeling the cold sting of consequence.",
-		"The maneuver succeeds, but the environment twists unexpectedly beneath your boots.",
-		"A hard-won advantage, though eyes in the darkness take note of your position.",
+	if conseq != "" {
+		secondParagraph = append(secondParagraph, conseq)
 	}
-
-	failureOpeners := []string{
-		"The darkness lashes out; your footing betrays you at the pivotal instant.",
-		"A sudden jarring blow forces you back as the enemy anticipates your intent.",
-		"The air turns freezing cold as the ancient wards shudder and resist.",
+	if cast != "" {
+		secondParagraph = append(secondParagraph, cast)
 	}
-
-	var chosenOpener string
-	switch strings.ToLower(tier) {
-	case "critical", "success", "full success":
-		chosenOpener = successOpeners[rng.Intn(len(successOpeners))]
-	case "mixed", "partial", "complication":
-		chosenOpener = mixedOpeners[rng.Intn(len(mixedOpeners))]
-	default:
-		chosenOpener = failureOpeners[rng.Intn(len(failureOpeners))]
+	if place != "" {
+		secondParagraph = append(secondParagraph, place)
 	}
+	secondParagraph = append(secondParagraph, "What do you do next?")
 
-	entityWitness := ""
-	if len(entities) > 0 {
-		chosenEntity := entities[rng.Intn(len(entities))]
-		entityWitness = fmt.Sprintf(" Nearby, [[%s]] watches the outcome with bated breath.", chosenEntity)
+	body := strings.Join(secondParagraph, " ")
+	if op == "" {
+		return body
 	}
-
-	quotedAction := strconv.Quote(playerAction)
-	return fmt.Sprintf("%s\n\nAs you declare: %s, the stones echo your effort.%s What do you do next?", chosenOpener, quotedAction, entityWitness)
+	return op + "\n\n" + body
 }
+

@@ -25,3 +25,19 @@ func TestOracleQuoting(t *testing.T) {
 		t.Errorf("expected quoted string %s in output: %s", expected, resp.Text)
 	}
 }
+
+func TestCraftProseComposesParts(t *testing.T) {
+	prompt := "[MECHANICS RESULT: miss]\nPlayer Action: x\nLocation: Saltmarch\nNear [[Garrick]].\n"
+	got := craftProse(prompt)
+	if !strings.Contains(got, "Saltmarch") || !strings.Contains(got, "Garrick") {
+		t.Fatalf("prose = %q", got)
+	}
+}
+
+func TestCraftProseIsDeterministic(t *testing.T) {
+	prompt := "[MECHANICS RESULT: weak]\nPlayer Action: y\n"
+	if craftProse(prompt) != craftProse(prompt) {
+		t.Fatal("the same prompt should yield the same prose")
+	}
+}
+
