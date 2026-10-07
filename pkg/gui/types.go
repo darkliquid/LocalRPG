@@ -574,6 +574,26 @@ type WorldEntityDetailDTO struct {
 	Markdown string `json:"markdown"`
 }
 
+// ExportContentRequestDTO requests exporting a world or system as a .lrpgpack package.
+type ExportContentRequestDTO struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+}
+
+// ImportResultDTO reports the outcome of importing a content package.
+type ImportResultDTO struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Type        string `json:"type"`
+	Author      string `json:"author,omitempty"`
+	License     string `json:"license,omitempty"`
+	Description string `json:"description,omitempty"`
+	FileCount   int    `json:"file_count"`
+	HasScript   bool   `json:"has_script"`
+	Action      string `json:"action"` // "installed", "renamed", "overwritten"
+}
+
 type SettingsResponseDTO struct {
 	Config          config.Config `json:"config"`
 	ConfigFilePath  string        `json:"config_file_path"`

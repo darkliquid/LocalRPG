@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy, useRef } from 'react';
 import { APIClient } from '../api/client';
-import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest } from '../types';
+import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest, ContentManifestInfo } from '../types';
 import { LauncherDock } from './launcher/LauncherDock';
 import { WorldFlyout } from './launcher/WorldFlyout';
 import { WorldGallery } from './launcher/WorldGallery';
@@ -8,6 +8,8 @@ import { CampaignGallery } from './launcher/CampaignGallery';
 import { CampaignHeroStage } from './launcher/CampaignHeroStage';
 import { NewCampaignModal } from './launcher/NewCampaignModal';
 import { CampaignSettingsModal } from './launcher/CampaignSettingsModal';
+import { ContentImportDialog } from './ContentImportDialog';
+import { inspectPackageFile } from '../lib/packageInspect';
 import { ArrowLeft, X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
 
@@ -63,6 +65,55 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [docsArticleID, setDocsArticleID] = useState<string | undefined>(undefined);
   const { mounted: settingsMounted, state: settingsState } = useMountTransition(isSettingsOpen, 200);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importManifest, setImportManifest] = useState<ContentManifestInfo | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const handleTriggerImport = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError(null);
+    try {
+      const manifest = await inspectPackageFile(file);
+      setImportFile(file);
+      setImportManifest(manifest);
+    } catch (err) {
+      console.error('Failed to read package manifest:', err);
+      setImportFile(file);
+      setImportManifest({
+        id: file.name.replace(/\.lrpgpack$/, ''),
+        name: file.name.replace(/\.lrpgpack$/, ''),
+        version: '1.0.0',
+        type: 'world',
+      });
+    }
+  };
+
+  const handleConfirmImport = async (conflictMode: 'refuse' | 'rename' | 'overwrite') => {
+    if (!importFile) return;
+    setIsImporting(true);
+    setImportError(null);
+    try {
+      await APIClient.importContent(importFile, conflictMode);
+      setImportFile(null);
+      setImportManifest(null);
+      await loadData();
+    } catch (err: any) {
+      setImportError(err.message || 'Failed to import package');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const handleOpenDocs = (articleID?: string) => {
     if (onOpenDocs) {
@@ -244,6 +295,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
         onOpenSystemsStudio={() => setActiveStudio({ studio: 'systems' })}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenDocs={() => handleOpenDocs()}
+        onImportPackage={handleTriggerImport}
       />
 
       {/* Horizontal World Flyout */}
@@ -370,6 +422,28 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
           }}
         />
       </Suspense>
+
+      {/* Hidden file input for content import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".lrpgpack"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+
+      {/* Content Import Dialog */}
+      <ContentImportDialog
+        manifest={importManifest || undefined}
+        onConfirm={handleConfirmImport}
+        onCancel={() => {
+          setImportFile(null);
+          setImportManifest(null);
+          setImportError(null);
+        }}
+        loading={isImporting}
+        error={importError}
+      />
     </div>
   );
 };

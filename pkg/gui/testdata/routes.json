@@ -3,6 +3,8 @@
   "/api/character/generate",
   "/api/config/offline-preset",
   "/api/config/offline-report",
+  "/api/content/export",
+  "/api/content/import",
   "/api/docs",
   "/api/docs/",
   "/api/export",
