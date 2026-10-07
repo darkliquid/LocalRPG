@@ -79,7 +79,7 @@ providers:
 
 ### Narrative Oracle (Built-in)
 
-Zero-setup built-in fallback model that generates narrative choices using procedural oracle tables.
+Zero-setup built-in offline storyteller. It reads character stats, outcome tiers, stakes, entities, and location to compose responsive prose deterministically without requiring a model, server, or network connection.
 
 ## Media Providers
 
