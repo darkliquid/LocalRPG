@@ -42,6 +42,7 @@ var transportByKey = map[provider.Key]string{
 
 	provider.KeyEmbeddingGemini: "gemini",
 	provider.KeyEmbeddingOpenAI: "http",
+	provider.KeyEmbeddingONNX:   "builtin",
 }
 
 func TestDescriptorSourcesMatchTransport(t *testing.T) {

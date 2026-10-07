@@ -274,6 +274,10 @@ func NewService(rootDir string) *Service {
 		bgCtx:          bgCtx,
 		bgCancel:       bgCancel,
 	}
+	// Point the embedding factory at the local model cache so the ONNX encoder
+	// resolves, and let it report model events through the service logger.
+	embeddings.SetModelDir(svc.modelsManager.ModelDir(models.EmbeddingEncoderModelID))
+	embeddings.SetLogger(svc.logger)
 	if !projectMode {
 		if warning := paths.LegacyWarning(paths.System(), cfg.Paths); warning != "" {
 			trace.OrNil(svc.logger).Event("paths.legacy_relative", map[string]interface{}{"detail": warning})
