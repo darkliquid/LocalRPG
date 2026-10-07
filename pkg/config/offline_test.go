@@ -44,3 +44,42 @@ func TestApplyOfflinePresetSherpa(t *testing.T) {
 		t.Fatalf("tts = %+v", cfg.Media.TTS)
 	}
 }
+
+func TestApplyOfflinePresetPreservesPathsAndPreferences(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Paths = PathsConfig{
+		Systems: "/custom/systems",
+		Worlds:  "/custom/worlds",
+		Games:   "/custom/games",
+		Cache:   "/custom/cache",
+	}
+	cfg.Preferences = PreferencesConfig{
+		Streaming:        true,
+		TypingSpeedMS:    42,
+		CinematicEffects: true,
+		FontScale:        "large",
+	}
+
+	ApplyOfflinePreset(cfg, "native-os")
+
+	wantPaths := PathsConfig{
+		Systems: "/custom/systems",
+		Worlds:  "/custom/worlds",
+		Games:   "/custom/games",
+		Cache:   "/custom/cache",
+	}
+	wantPrefs := PreferencesConfig{
+		Streaming:        true,
+		TypingSpeedMS:    42,
+		CinematicEffects: true,
+		FontScale:        "large",
+	}
+
+	if !reflect.DeepEqual(cfg.Paths, wantPaths) {
+		t.Fatalf("paths altered: got %+v, want %+v", cfg.Paths, wantPaths)
+	}
+	if !reflect.DeepEqual(cfg.Preferences, wantPrefs) {
+		t.Fatalf("preferences altered: got %+v, want %+v", cfg.Preferences, wantPrefs)
+	}
+}
+
