@@ -36,7 +36,13 @@ opt-in, because it downloads a model the first time you use it.
 
 ## 3. Enabling the encoder
 
-Name the provider in `config.yaml` and set its type to `onnx`:
+Open **Settings → Providers** and find the **Embeddings** section. Switch on
+**Enable semantic search**, add a provider, and load the **Built-in BGE Encoder**
+preset. The entry offers a **Download encoder** button; the model is about 34 MB,
+and LocalRPG verifies it against a pinned checksum before use. Embedding then runs
+entirely on your machine.
+
+The same choices are available in `config.yaml`, if you prefer to edit it:
 
 ```yaml
 embeddings:
@@ -48,10 +54,6 @@ embeddings:
     local:
       type: onnx
 ```
-
-Download the encoder from the model manager, the same way you download the Kokoro
-voice pack. It is about 34 MB, and LocalRPG verifies it against a pinned checksum
-before use. Embedding then runs entirely on your machine.
 
 To use a copy you downloaded elsewhere, point `model_path` at its directory:
 

@@ -45,6 +45,13 @@ func init() {
 			Source:      "gemini",
 			Tier:        provider.TierCloud,
 			Features:    []provider.Feature{provider.FeatureKeyRequired},
+			Presets: []provider.Preset{
+				{ID: "gemini", Order: 1, Label: "Google Gemini",
+					Description: "Gemini embeddings through the Google GenAI API. Uses the shared Gemini key from the Providers tab.",
+					Config: map[string]interface{}{
+						"type": "gemini", "model": "text-embedding-004",
+					}},
+			},
 		},
 		Build: func(ctx context.Context, raw []byte) (interface{}, error) {
 			var cfg ClientConfig

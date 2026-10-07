@@ -870,6 +870,10 @@ export interface MediaInspectEntry {
   key_required: boolean;
   metered: boolean;
   tier: string;
+  // model_id and model_installed describe a local model an entry needs. They are
+  // set for an embedding encoder so the manager can offer a download.
+  model_id?: string;
+  model_installed?: boolean;
 }
 
 export interface MediaInspectResponse {
@@ -948,6 +952,31 @@ export interface MediaConfig {
   purposes?: Record<string, string>;
 }
 
+export type EmbeddingProviderType = 'builtin' | 'onnx' | 'http' | 'gemini' | 'disabled';
+
+// EmbeddingProviderConfig is one named embedding provider. Unlike the media
+// families there is no singleton default: the top-level provider selector names
+// which entry is active.
+export interface EmbeddingProviderConfig {
+  type: EmbeddingProviderType;
+  builtin_name?: string;
+  endpoint?: string;
+  url?: string;
+  api_key?: string;
+  model?: string;
+  model_path?: string;
+  instance?: string;
+}
+
+export interface EmbeddingsConfig {
+  enabled: boolean;
+  provider: string;
+  model?: string;
+  dimensions?: number;
+  batch_size?: number;
+  providers?: Record<string, EmbeddingProviderConfig>;
+}
+
 export interface PreferencesConfig {
   streaming: boolean;
   typing_speed_ms: number;
@@ -984,6 +1013,7 @@ export interface AppConfig {
   providers?: ProvidersConfig;
   agents: AgentsConfig;
   media: MediaConfig;
+  embeddings?: EmbeddingsConfig;
   preferences: PreferencesConfig;
 }
 
@@ -1085,7 +1115,7 @@ export interface VoiceSearchResponse {
   error?: string;
 }
 
-export type ProviderFamily = 'llm' | 'tts' | 'stt' | 'image';
+export type ProviderFamily = 'llm' | 'tts' | 'stt' | 'image' | 'embedding';
 
 export type ProviderFeature =
   | 'streaming'

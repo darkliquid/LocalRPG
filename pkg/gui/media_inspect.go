@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/embeddings"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
@@ -37,8 +39,50 @@ func (s *Service) InspectMedia(ctx context.Context, req MediaInspectRequestDTO) 
 			key, ok := media.ImageKeyFor(entry)
 			resp.Entries = append(resp.Entries, s.mediaInspectEntry(cfg, name, key, ok, entry.APIKey))
 		}
+	case "embedding":
+		for _, name := range cfg.Embeddings.ProviderNames() {
+			entry := cfg.Embeddings.ProviderFor(name)
+			key, ok := embeddings.KeyFor(embeddingsForInspect(cfg.Embeddings, name))
+			resp.Entries = append(resp.Entries, s.embeddingInspectEntry(cfg, name, entry, key, ok))
+		}
 	}
 	return resp, nil
+}
+
+// embeddingsForInspect presents one named embedding entry as the selected one, so
+// KeyFor resolves its canonical key. It forces Enabled so the manager can
+// describe the entries even while embeddings are switched off.
+func embeddingsForInspect(emb config.EmbeddingsConfig, name string) config.EmbeddingsConfig {
+	emb.Enabled = true
+	emb.Provider = name
+	return emb
+}
+
+// embeddingInspectEntry describes one embedding configuration. It shares the
+// Gemini key with the Gemini entry, and reports the encoder's model state so the
+// manager can offer a download.
+func (s *Service) embeddingInspectEntry(cfg *config.Config, name string, entry config.EmbeddingProviderConfig, key provider.Key, ok bool) MediaInspectEntryDTO {
+	dto := MediaInspectEntryDTO{Name: name}
+	if ok {
+		dto.ProviderKey = string(key)
+		if reg, found := provider.Lookup(string(key.Parent())); found {
+			dto.Tier = string(reg.Descriptor.Tier)
+			dto.KeyRequired = hasFeature(reg.Descriptor.Features, provider.FeatureKeyRequired)
+			dto.Metered = hasFeature(reg.Descriptor.Features, provider.FeatureMetered)
+		}
+	}
+	shared := ""
+	if key.Parent() == provider.KeyEmbeddingGemini {
+		shared = cfg.Providers.Gemini.APIKey
+	}
+	dto.KeyPresent = strings.TrimSpace(entry.APIKey) != "" || strings.TrimSpace(shared) != ""
+	if entry.Type == "onnx" {
+		dto.ModelID = models.EmbeddingEncoderModelID
+		if s.modelsManager != nil {
+			dto.ModelInstalled = s.modelsManager.Status(models.EmbeddingEncoderModelID).Installed
+		}
+	}
+	return dto
 }
 
 // mediaInspectEntry describes one configuration from its canonical key and the

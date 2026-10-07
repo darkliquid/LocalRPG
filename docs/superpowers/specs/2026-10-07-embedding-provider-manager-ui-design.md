@@ -68,15 +68,18 @@ precedent, so the UI adapter mirrors the media one without moving the config.
 
 Add to `pkg/config` (a new `embeddings.go`, beside `media.go`):
 
-- `func (c Config) EmbeddingNames() []string` — reserved `default` first, then
-  the named entries sorted, reusing `providerNames`.
-- `func (c Config) EmbeddingFor(name string) EmbeddingProviderConfig` — the
-  named entry, or the default (the singleton synthesised from `Embeddings.Type`
-  and friends) when name is empty, `default`, or unknown.
-- The `default` entry is not stored as a map entry: it is the top-level
-  `Embeddings.Provider`, `Model`, `Dimensions`, `BatchSize`, and a
-  `Embeddings.Providers["default"]`-equivalent. The existing `Embeddings.Providers`
-  map and `Provider` selector already express this; the helper resolves both.
+- `func (e EmbeddingsConfig) ProviderNames() []string` — the named entries,
+  sorted. Unlike the media families there is no reserved `default` row: the
+  top-level selector names the active entry, so the default is not a name.
+- `func (e EmbeddingsConfig) ProviderFor(name string) EmbeddingProviderConfig` —
+  the named entry; an empty name or the reserved `default` resolves to the entry
+  the top-level selector names; an unknown name falls back to the built-in
+  projection, so a caller always gets a usable entry.
+- `func (e EmbeddingsConfig) SelectedProvider() string` — the active entry name,
+  or the reserved `default` when none is chosen.
+
+The manager renders the named entries and marks the selected one, rather than
+copying a named entry into a singleton the way the media families do.
 
 ### 4.2 The frontend family adapter
 
@@ -93,7 +96,7 @@ to a `renderEditor` callback. Embeddings need no purpose map, so the manager's
 
 ### 4.3 Backend inspection
 
-`InspectMedia` gains a `case "embedding"` that walks `EmbeddingNames()`, resolves
+`InspectMedia` gains a `case "embedding"` that walks `ProviderNames()`, resolves
 each with `embeddings.KeyFor` (`pkg/embeddings/factory.go`), and reports the same
 `MediaInspectEntryDTO` fields the other families use (key, tier, key required,
 metered, key present). Add one embeddings-only field to the DTO:
@@ -108,20 +111,22 @@ download button.
 
 ### 4.4 The editor and its presets
 
-The editor is a small form whose fields follow the selected `type`:
+The editor is a small form whose fields follow the selected `type`. Dimensions and
+batch size are family-level, so they sit once at the head of the section rather
+than on each entry:
 
 | Type | Fields |
 | --- | --- |
-| `builtin` | dimensions |
-| `onnx` | dimensions, model path (optional), model download |
-| `http` | endpoint, api key, model, dimensions |
+| `builtin` | none |
+| `onnx` | model path (optional), model download |
+| `http` | endpoint, api key, model |
 | `gemini` | model, api key (falls back to the shared Gemini key) |
 
 To make the add menu useful, register descriptors' presets so the "add" flow
 offers the common entries ready-made. `openaiembedding` and `geminiembedding`
 declare none today; add:
 
-- **Built-in ONNX encoder** — `{type: onnx, dimensions: 384}`.
+- **Built-in ONNX encoder** — `{type: onnx}`.
 - **OpenAI** — `{type: http, endpoint: "https://api.openai.com/v1", model:
   "text-embedding-3-small"}`.
 - **Ollama** — `{type: http, endpoint: "http://localhost:11434/v1", model:
