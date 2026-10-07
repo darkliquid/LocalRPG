@@ -49,6 +49,8 @@ func main() {
 		handleGUICommand(args[1:])
 	case "export":
 		handleExportCommand(args[1:])
+	case "content":
+		handleContentCommand(args[1:])
 	case "debug":
 		handleDebugCommand(args[1:])
 	case "config":
@@ -74,6 +76,7 @@ func printUsage() {
 	fmt.Println("  image <prompt>     Generate scene or character image")
 	fmt.Println("  gui                Launch desktop application (Wails v3)")
 	fmt.Println("  export <format>    Export story replay (web, video)")
+	fmt.Println("  content <cmd>      Export or import content packages (.lrpgpack)")
 	fmt.Println("  debug <cmd>        Run automated scenario tests or debug server")
 	fmt.Println("  config <cmd>       Manage configuration (offline-preset, check-offline)")
 	fmt.Println("  version            Print version information")
