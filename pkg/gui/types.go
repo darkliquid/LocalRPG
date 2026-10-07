@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/config"
+	"github.com/darkliquid/localrpg/pkg/content"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -592,8 +593,9 @@ type ImportResultDTO struct {
 	License     string `json:"license,omitempty"`
 	Description string `json:"description,omitempty"`
 	FileCount   int    `json:"file_count"`
-	HasScript   bool   `json:"has_script"`
-	Action      string `json:"action"` // "installed", "renamed", "overwritten"
+	HasScript   bool          `json:"has_script"`
+	Action      string        `json:"action"` // "installed", "renamed", "overwritten"
+	Trust       content.Trust `json:"trust"`
 }
 
 type SettingsResponseDTO struct {

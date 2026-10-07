@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Package, X } from 'lucide-react';
+import { AlertTriangle, Package, Shield, ShieldAlert, ShieldCheck, X } from 'lucide-react';
 import { ContentManifestInfo } from '../types';
 
 export interface ContentImportDialogProps {
@@ -90,6 +90,36 @@ export const ContentImportDialog: React.FC<ContentImportDialogProps> = ({
               <div className="flex gap-4 pt-1 text-xs text-neutral-400">
                 {manifest.author && <div>Author: <span className="text-neutral-300">{manifest.author}</span></div>}
                 {manifest.license && <div>License: <span className="text-neutral-300">{manifest.license}</span></div>}
+              </div>
+            )}
+
+            {manifest.trust && (
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs">
+                <span className="text-neutral-400">Provenance:</span>
+                {manifest.trust.state === 'verified' && (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Verified by {manifest.trust.publisher || 'trusted publisher'}
+                  </span>
+                )}
+                {manifest.trust.state === 'unknown_key' && (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    Signed by untrusted key{manifest.trust.publisher ? ` (${manifest.trust.publisher})` : ''}
+                  </span>
+                )}
+                {manifest.trust.state === 'unsigned' && (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10 text-neutral-400 font-medium">
+                    <Shield className="w-3.5 h-3.5" />
+                    Unsigned package
+                  </span>
+                )}
+                {manifest.trust.state === 'invalid' && (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Invalid signature
+                  </span>
+                )}
               </div>
             )}
           </div>

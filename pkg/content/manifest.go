@@ -1,7 +1,10 @@
 package content
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"sort"
 
 	"gopkg.in/yaml.v3"
 )
@@ -62,4 +65,27 @@ func (m Manifest) Marshal() ([]byte, error) {
 		return nil, fmt.Errorf("marshal manifest: %w", err)
 	}
 	return data, nil
+}
+
+// ContentDigest returns the stable digest of a manifest's files: the SHA-256 of
+// the sorted "path\x00sha256\x00size\n" lines. It excludes package.sig.
+func (m Manifest) ContentDigest() string {
+	entries := make([]FileEntry, 0, len(m.Files))
+	for _, f := range m.Files {
+		if f.Path == "package.sig" {
+			continue
+		}
+		entries = append(entries, f)
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Path < entries[j].Path
+	})
+
+	h := sha256.New()
+	for _, f := range entries {
+		fmt.Fprintf(h, "%s\x00%s\x00%d\n", f.Path, f.SHA256, f.Size)
+	}
+
+	return hex.EncodeToString(h.Sum(nil))
 }
