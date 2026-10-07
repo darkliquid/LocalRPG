@@ -952,6 +952,31 @@ export interface MediaConfig {
   purposes?: Record<string, string>;
 }
 
+export type EmbeddingProviderType = 'builtin' | 'onnx' | 'http' | 'gemini' | 'disabled';
+
+// EmbeddingProviderConfig is one named embedding provider. Unlike the media
+// families there is no singleton default: the top-level provider selector names
+// which entry is active.
+export interface EmbeddingProviderConfig {
+  type: EmbeddingProviderType;
+  builtin_name?: string;
+  endpoint?: string;
+  url?: string;
+  api_key?: string;
+  model?: string;
+  model_path?: string;
+  instance?: string;
+}
+
+export interface EmbeddingsConfig {
+  enabled: boolean;
+  provider: string;
+  model?: string;
+  dimensions?: number;
+  batch_size?: number;
+  providers?: Record<string, EmbeddingProviderConfig>;
+}
+
 export interface PreferencesConfig {
   streaming: boolean;
   typing_speed_ms: number;
@@ -988,6 +1013,7 @@ export interface AppConfig {
   providers?: ProvidersConfig;
   agents: AgentsConfig;
   media: MediaConfig;
+  embeddings?: EmbeddingsConfig;
   preferences: PreferencesConfig;
 }
 
