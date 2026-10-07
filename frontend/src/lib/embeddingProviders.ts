@@ -47,3 +47,9 @@ export function renameEmbeddingEntry(config: AppConfig, oldName: string, newName
 export function embeddingSelected(config: AppConfig): string {
   return config.embeddings?.provider || 'default';
 }
+
+// setEmbeddingSelected marks one entry as the active provider.
+export function setEmbeddingSelected(config: AppConfig, name: string): AppConfig {
+  const embeddings = config.embeddings ?? { enabled: false, provider: '' };
+  return { ...config, embeddings: { ...embeddings, provider: name } };
+}
