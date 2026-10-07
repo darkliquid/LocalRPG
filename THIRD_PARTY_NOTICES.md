@@ -38,7 +38,7 @@ used only that way, so it is never redistributed.
 LocalRPG links every one of these statically into the binary, so they are
 distributed with it. Each group is the licence that module ships.
 
-### MIT (58)
+### MIT (59)
 
 - `github.com/adrg/xdg`
 - `github.com/alecthomas/assert/v2`
@@ -95,6 +95,7 @@ distributed with it. Each group is the licence that module ships.
 - `github.com/stretchr/testify`
 - `github.com/wailsapp/wails/v3`
 - `github.com/xo/terminfo`
+- `github.com/yalue/onnxruntime_go`
 - `github.com/yuin/goldmark`
 - `github.com/yuin/goldmark-emoji`
 - `go.uber.org/goleak`

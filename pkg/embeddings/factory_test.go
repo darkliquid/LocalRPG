@@ -62,6 +62,20 @@ func TestFactoryUsesConfiguredModelDir(t *testing.T) {
 	}
 }
 
+func TestFallbackStillAnswersASearch(t *testing.T) {
+	p, err := NewProviderFromConfig(onnxConfig(t.TempDir()))
+	if err != nil {
+		t.Fatalf("NewProviderFromConfig: %v", err)
+	}
+	vecs, err := p.Embed(t.Context(), []string{"a sword"})
+	if err != nil {
+		t.Fatalf("Embed: %v", err)
+	}
+	if len(vecs) != 1 || len(vecs[0]) != 384 {
+		t.Fatalf("fallback returned %dx%d, want 1x384", len(vecs), len(vecs[0]))
+	}
+}
+
 func TestKeyForONNX(t *testing.T) {
 	key, ok := KeyFor(onnxConfig("/tmp/model"))
 	if !ok {

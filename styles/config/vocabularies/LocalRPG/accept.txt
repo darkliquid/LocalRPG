@@ -87,3 +87,11 @@ Lovecraftian
 ridgelines
 spellbooks
 starships
+
+# Embedding and local-model vocabulary.
+ONNX
+onnx
+BGE
+WordPiece
+n-gram
+n-grams
