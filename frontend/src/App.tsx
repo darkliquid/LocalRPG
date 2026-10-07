@@ -803,7 +803,7 @@ export const App: React.FC = () => {
         className="relative flex-1 flex flex-col min-h-0 anim-fade-in"
       >
       {!activeGameID ? (
-        <LauncherHub onSelectGame={handleSelectGame} />
+        <LauncherHub onSelectGame={handleSelectGame} onOpenDocs={openDocs} />
       ) : (
         <>
           {/* Floating Translucent Acrylic Header */}
