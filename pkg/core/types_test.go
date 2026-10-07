@@ -89,3 +89,52 @@ func TestPathResolverSanitizesIDs(t *testing.T) {
 		t.Errorf("SystemDir(%q) = %q, expected /app/base/systems/etc-passwd", malicious, sysDir)
 	}
 }
+
+func TestManifestVersionMustBeSemver(t *testing.T) {
+	if err := (SystemManifest{ID: "s", Version: "latest"}).Validate(); err == nil {
+		t.Fatal("an invalid system version should be rejected")
+	}
+	if err := (SystemManifest{ID: "s", Version: "1.2.0"}).Validate(); err != nil {
+		t.Fatalf("a valid system version was rejected: %v", err)
+	}
+	if err := (SystemManifest{ID: "s", Version: "v1.2.0"}).Validate(); err != nil {
+		t.Fatalf("a valid system version with v prefix was rejected: %v", err)
+	}
+	if err := (SystemManifest{ID: "s", Version: ""}).Validate(); err != nil {
+		t.Fatalf("an unversioned system manifest should be allowed: %v", err)
+	}
+
+	if err := (WorldManifest{ID: "w", Version: "latest"}).Validate(); err == nil {
+		t.Fatal("an invalid world version should be rejected")
+	}
+	if err := (WorldManifest{ID: "w", Version: "1.2.0"}).Validate(); err != nil {
+		t.Fatalf("a valid world version was rejected: %v", err)
+	}
+	if err := (WorldManifest{ID: "w", Version: ""}).Validate(); err != nil {
+		t.Fatalf("an unversioned world manifest should be allowed: %v", err)
+	}
+}
+
+func TestRequirementSatisfies(t *testing.T) {
+	r := ContentRequirement{Type: "system", ID: "narrative_2d6", Version: ">=1.0.0 <2.0.0"}
+	if !r.Satisfies("1.4.0") {
+		t.Fatal("1.4.0 should satisfy the range")
+	}
+	if r.Satisfies("2.0.0") {
+		t.Fatal("2.0.0 should not satisfy the range")
+	}
+	if !r.Satisfies("1.0.0") {
+		t.Fatal("1.0.0 should satisfy >=1.0.0")
+	}
+	if r.Satisfies("0.9.0") {
+		t.Fatal("0.9.0 should not satisfy >=1.0.0")
+	}
+
+	any := ContentRequirement{Type: "system", ID: "x"}
+	if !any.Satisfies("0.0.0") {
+		t.Fatal("an empty constraint should accept any version")
+	}
+	if !any.Satisfies("1.2.3") {
+		t.Fatal("an empty constraint should accept any version")
+	}
+}

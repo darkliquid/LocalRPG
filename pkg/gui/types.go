@@ -119,6 +119,8 @@ type GameStateDTO struct {
 	MechanicsEngagement string `json:"mechanics_engagement,omitempty"`
 	// Advancement is the campaign's progression summary, when the system has one.
 	Advancement *AdvancementDTO `json:"advancement,omitempty"`
+	// ContentWarnings carries mismatch or digest drift warnings from the content lock.
+	ContentWarnings []string `json:"content_warnings,omitempty"`
 }
 
 type SegmentDTO struct {

@@ -100,6 +100,7 @@ export const App: React.FC = () => {
   // Advancement spending: the drawer disables its buttons and shows the refusal.
   const [advancementSpending, setAdvancementSpending] = useState(false);
   const [advancementError, setAdvancementError] = useState<string | null>(null);
+  const [dismissedContentWarnings, setDismissedContentWarnings] = useState(false);
 
   // Rate limits & funds failures
   const [limits, setLimits] = useState<LimitState[]>([]);
@@ -250,8 +251,10 @@ export const App: React.FC = () => {
       setAudioProgress(null);
       setSegmentAudioProgress({});
       setCharacterPortraits({});
+      setDismissedContentWarnings(false);
       return;
     }
+    setDismissedContentWarnings(false);
     client.getChronicle().then(setChronicle).catch(console.error);
     client.getFindings().then((res) => {
       setAddressed(new Set(res.addressed.map((a) => a.turn)));
@@ -1033,6 +1036,23 @@ export const App: React.FC = () => {
                   </div>
                   <button
                     onClick={() => setFundsError(null)}
+                    className="text-stone-400 hover:text-white p-1 rounded hover:bg-white/10 ml-2 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {gameState?.content_warnings && gameState.content_warnings.length > 0 && !dismissedContentWarnings && (
+                <div className="mx-4 mb-2 p-3 bg-amber-950/80 border border-amber-500/50 text-amber-200 text-xs rounded-xl flex items-center justify-between shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>
+                      Content warnings: {gameState.content_warnings.join('; ')}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setDismissedContentWarnings(true)}
                     className="text-stone-400 hover:text-white p-1 rounded hover:bg-white/10 ml-2 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />

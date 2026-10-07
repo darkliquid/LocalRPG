@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/pathutil"
+	"golang.org/x/mod/semver"
 	"gopkg.in/yaml.v3"
 )
 
@@ -40,14 +42,94 @@ type CharacterCreationSpec struct {
 	Fields   []CharacterCreationField `yaml:"fields,omitempty" json:"fields,omitempty"`
 }
 
+// ContentRequirement names a content dependency and semver constraint.
+type ContentRequirement struct {
+	Type    string `yaml:"type"`              // e.g. "system"
+	ID      string `yaml:"id"`                // e.g. "narrative_2d6"
+	Version string `yaml:"version,omitempty"` // semver constraint, e.g. ">=1.0.0 <2.0.0"
+}
+
+// Satisfies checks whether targetVersion satisfies the requirement's version constraint.
+// An empty constraint accepts any version.
+func (r ContentRequirement) Satisfies(targetVersion string) bool {
+	constraint := strings.TrimSpace(r.Version)
+	if constraint == "" {
+		return true
+	}
+	targetCanon := CanonicalSemver(strings.TrimSpace(targetVersion))
+	if !semver.IsValid(targetCanon) {
+		return false
+	}
+
+	clauses := strings.Fields(constraint)
+	for _, clause := range clauses {
+		op := "=="
+		vStr := clause
+		if strings.HasPrefix(clause, ">=") {
+			op = ">="
+			vStr = clause[2:]
+		} else if strings.HasPrefix(clause, "<=") {
+			op = "<="
+			vStr = clause[2:]
+		} else if strings.HasPrefix(clause, ">") {
+			op = ">"
+			vStr = clause[1:]
+		} else if strings.HasPrefix(clause, "<") {
+			op = "<"
+			vStr = clause[1:]
+		} else if strings.HasPrefix(clause, "==") {
+			op = "=="
+			vStr = clause[2:]
+		} else if strings.HasPrefix(clause, "=") {
+			op = "=="
+			vStr = clause[1:]
+		}
+
+		clauseCanon := CanonicalSemver(strings.TrimSpace(vStr))
+		if !semver.IsValid(clauseCanon) {
+			return false
+		}
+
+		cmp := semver.Compare(targetCanon, clauseCanon)
+		switch op {
+		case ">=":
+			if cmp < 0 {
+				return false
+			}
+		case "<=":
+			if cmp > 0 {
+				return false
+			}
+		case ">":
+			if cmp <= 0 {
+				return false
+			}
+		case "<":
+			if cmp >= 0 {
+				return false
+			}
+		case "==":
+			if cmp != 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+
+	return true
+}
+
 type WorldManifest struct {
-	ID            string   `yaml:"id"`
-	Name          string   `yaml:"name"`
-	Description   string   `yaml:"description,omitempty"`
-	Genre         string   `yaml:"genre,omitempty"`
-	DefaultSystem string   `yaml:"default_system,omitempty"`
-	ArtStyle      string   `yaml:"art_style,omitempty"`
-	Tags          []string `yaml:"tags,omitempty"`
+	ID            string               `yaml:"id"`
+	Name          string               `yaml:"name"`
+	Version       string               `yaml:"version,omitempty"`
+	Description   string               `yaml:"description,omitempty"`
+	Genre         string               `yaml:"genre,omitempty"`
+	DefaultSystem string               `yaml:"default_system,omitempty"`
+	Requires      []ContentRequirement `yaml:"requires,omitempty"`
+	ArtStyle      string               `yaml:"art_style,omitempty"`
+	Tags          []string             `yaml:"tags,omitempty"`
 }
 
 type GameManifest struct {
@@ -153,6 +235,43 @@ func (p *PathResolver) CacheDir() string {
 	return filepath.Join(p.BaseDir, "cache")
 }
 
+// CanonicalSemver prepends 'v' if missing for semver package compatibility.
+func CanonicalSemver(v string) string {
+	if v == "" {
+		return ""
+	}
+	if !strings.HasPrefix(v, "v") {
+		return "v" + v
+	}
+	return v
+}
+
+// ValidateSemver checks if v is valid semantic versioning (accepts with or without leading 'v').
+// An empty string is considered valid (unversioned).
+func ValidateSemver(v string) error {
+	if v == "" {
+		return nil
+	}
+	if !semver.IsValid(CanonicalSemver(v)) {
+		return fmt.Errorf("invalid semver: %q", v)
+	}
+	return nil
+}
+
+func (s SystemManifest) Validate() error {
+	if err := ValidateSemver(s.Version); err != nil {
+		return fmt.Errorf("system %q: %w", s.ID, err)
+	}
+	return nil
+}
+
+func (w WorldManifest) Validate() error {
+	if err := ValidateSemver(w.Version); err != nil {
+		return fmt.Errorf("world %q: %w", w.ID, err)
+	}
+	return nil
+}
+
 func LoadSystemManifest(path string) (*SystemManifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -161,6 +280,9 @@ func LoadSystemManifest(path string) (*SystemManifest, error) {
 	var manifest SystemManifest
 	if err := yaml.Unmarshal(data, &manifest); err != nil {
 		return nil, fmt.Errorf("unmarshal system manifest: %w", err)
+	}
+	if err := manifest.Validate(); err != nil {
+		return nil, err
 	}
 	return &manifest, nil
 }
@@ -173,6 +295,9 @@ func LoadWorldManifest(path string) (*WorldManifest, error) {
 	var manifest WorldManifest
 	if err := yaml.Unmarshal(data, &manifest); err != nil {
 		return nil, fmt.Errorf("unmarshal world manifest: %w", err)
+	}
+	if err := manifest.Validate(); err != nil {
+		return nil, err
 	}
 	return &manifest, nil
 }

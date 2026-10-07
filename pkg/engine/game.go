@@ -68,6 +68,17 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 		return nil, fmt.Errorf("load world %q: %w", worldID, err)
 	}
 
+	// Verify world requirements
+	for _, req := range worldManifest.Requires {
+		if req.Type == "" || req.Type == "system" {
+			if req.ID == "" || req.ID == systemID {
+				if !req.Satisfies(sysManifest.Version) {
+					return nil, fmt.Errorf("incompatible system %q: world %q requires version constraint %q, but system version is %q", systemID, worldID, req.Version, sysManifest.Version)
+				}
+			}
+		}
+	}
+
 	gameDir := paths.GameDir(gameID)
 	gameEntitiesDir := filepath.Join(gameDir, "entities")
 	gameCacheDir := filepath.Join(gameDir, "cache")
@@ -177,6 +188,11 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 	}
 	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"), manifestBytes, 0644); err != nil {
 		return nil, fmt.Errorf("write game.yaml: %w", err)
+	}
+
+	// Lock the campaign content versions and behavioural digests
+	if _, err := LockContent(paths, gameID); err != nil {
+		return nil, fmt.Errorf("lock content: %w", err)
 	}
 
 	return &Session{
