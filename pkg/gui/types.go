@@ -271,6 +271,11 @@ type MediaInspectEntryDTO struct {
 	KeyRequired bool   `json:"key_required"`
 	Metered     bool   `json:"metered"`
 	Tier        string `json:"tier"`
+	// ModelID and ModelInstalled describe a local model an entry needs. They are
+	// set for an embedding encoder and empty otherwise, so the manager knows
+	// whether to offer a download.
+	ModelID        string `json:"model_id,omitempty"`
+	ModelInstalled bool   `json:"model_installed,omitempty"`
 }
 
 // MediaInspectResponseDTO is every entry of one media family.

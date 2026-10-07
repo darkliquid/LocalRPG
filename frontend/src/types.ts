@@ -870,6 +870,10 @@ export interface MediaInspectEntry {
   key_required: boolean;
   metered: boolean;
   tier: string;
+  // model_id and model_installed describe a local model an entry needs. They are
+  // set for an embedding encoder so the manager can offer a download.
+  model_id?: string;
+  model_installed?: boolean;
 }
 
 export interface MediaInspectResponse {
