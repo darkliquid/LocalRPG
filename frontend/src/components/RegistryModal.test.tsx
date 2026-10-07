@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RegistryModal } from './RegistryModal';
 import { APIClient } from '../api/client';
@@ -49,5 +49,35 @@ describe('RegistryModal', () => {
       />
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('shows the publisher and makes no provenance claim before install', async () => {
+    vi.spyOn(APIClient, 'searchRegistry').mockResolvedValue([
+      {
+        registry_name: 'Community Registry',
+        registry_url: 'https://example.org/index.json',
+        package: {
+          type: 'system',
+          id: 'sys_one',
+          name: 'System One',
+          version: '1.0.0',
+          download: 'https://example.org/one.lrpgpack',
+          sha256: 'abcd1234',
+          publisher: 'deadbeefcafef00d',
+        },
+      },
+    ]);
+    vi.spyOn(APIClient, 'checkRegistryUpdates').mockResolvedValue([]);
+
+    render(<RegistryModal isOpen={true} onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Publisher deadbeef/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Install'));
+
+    expect(screen.getByText('Import Content Package')).toBeInTheDocument();
+    expect(screen.queryByText(/Provenance:/)).not.toBeInTheDocument();
   });
 });
