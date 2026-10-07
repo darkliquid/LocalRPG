@@ -722,6 +722,11 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		return nil, fmt.Errorf("read game manifest: %w", err)
 	}
 
+	_, contentWarnings, err := engine.ResolveContentLock(s.resolver, gameID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve content lock: %w", err)
+	}
+
 	playerID, err := engine.ResolvePlayerID(s.storeOrNil(gameID), gameManifest)
 	if err != nil {
 		return nil, fmt.Errorf("resolve player: %w", err)
@@ -787,6 +792,7 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 
 		MechanicsEngagement: engine.ResolveEngagement(gameManifest, systemManifest, s.configMgr.Get()),
 		Advancement:         s.computeAdvancement(gameID, systemManifest),
+		ContentWarnings:     contentWarnings,
 	}, nil
 }
 

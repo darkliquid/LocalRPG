@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/content"
 	"github.com/darkliquid/localrpg/pkg/core"
@@ -73,24 +74,36 @@ func ResolveContentLock(paths *core.PathResolver, gameID string) (content.Conten
 		return content.ContentLock{}, nil, fmt.Errorf("load game manifest: %w", err)
 	}
 
+	var warnings []string
+
 	sysDir := paths.SystemDir(gameManifest.SystemID)
-	sysManifest, err := core.LoadSystemManifest(filepath.Join(sysDir, "system.yaml"))
-	if err != nil {
-		return content.ContentLock{}, nil, fmt.Errorf("load system %q: %w", gameManifest.SystemID, err)
+	sysManifest, sysErr := core.LoadSystemManifest(filepath.Join(sysDir, "system.yaml"))
+	if sysErr != nil {
+		if os.IsNotExist(sysErr) || strings.Contains(sysErr.Error(), "no such file or directory") {
+			warnings = append(warnings, fmt.Sprintf("system %q is missing on disk", gameManifest.SystemID))
+		} else {
+			return content.ContentLock{}, nil, fmt.Errorf("load system %q: %w", gameManifest.SystemID, sysErr)
+		}
 	}
 
 	worldDir := paths.WorldDir(gameManifest.WorldID)
-	worldManifest, err := core.LoadWorldManifest(filepath.Join(worldDir, "world.yaml"))
-	if err != nil {
-		return content.ContentLock{}, nil, fmt.Errorf("load world %q: %w", gameManifest.WorldID, err)
+	worldManifest, worldErr := core.LoadWorldManifest(filepath.Join(worldDir, "world.yaml"))
+	if worldErr != nil {
+		if os.IsNotExist(worldErr) || strings.Contains(worldErr.Error(), "no such file or directory") {
+			warnings = append(warnings, fmt.Sprintf("world %q is missing on disk", gameManifest.WorldID))
+		} else {
+			return content.ContentLock{}, nil, fmt.Errorf("load world %q: %w", gameManifest.WorldID, worldErr)
+		}
 	}
 
 	// 1. Check requirements
-	for _, req := range worldManifest.Requires {
-		if req.Type == "" || req.Type == "system" {
-			if req.ID == "" || req.ID == gameManifest.SystemID {
-				if !req.Satisfies(sysManifest.Version) {
-					return content.ContentLock{}, nil, fmt.Errorf("incompatible system %q: world %q requires version constraint %q, but system version is %q", gameManifest.SystemID, gameManifest.WorldID, req.Version, sysManifest.Version)
+	if sysManifest != nil && worldManifest != nil {
+		for _, req := range worldManifest.Requires {
+			if req.Type == "" || req.Type == "system" {
+				if req.ID == "" || req.ID == gameManifest.SystemID {
+					if !req.Satisfies(sysManifest.Version) {
+						return content.ContentLock{}, nil, fmt.Errorf("incompatible system %q: world %q requires version constraint %q, but system version is %q", gameManifest.SystemID, gameManifest.WorldID, req.Version, sysManifest.Version)
+					}
 				}
 			}
 		}
@@ -99,20 +112,21 @@ func ResolveContentLock(paths *core.PathResolver, gameID string) (content.Conten
 	// 2. Check lockfile
 	lockPath := filepath.Join(paths.GameDir(gameID), "content.lock.yaml")
 	if _, err := os.Stat(lockPath); os.IsNotExist(err) {
-		// Campaign has no lockfile yet: lock on open
-		lock, err := LockContent(paths, gameID)
-		if err != nil {
-			return content.ContentLock{}, nil, fmt.Errorf("lock content on open: %w", err)
+		// Campaign has no lockfile yet: lock on open if content is available
+		if sysManifest != nil && worldManifest != nil {
+			lock, err := LockContent(paths, gameID)
+			if err != nil {
+				return content.ContentLock{}, nil, fmt.Errorf("lock content on open: %w", err)
+			}
+			return lock, warnings, nil
 		}
-		return lock, nil, nil
+		return content.ContentLock{}, warnings, nil
 	}
 
 	lock, err := content.LoadLock(lockPath)
 	if err != nil {
 		return content.ContentLock{}, nil, fmt.Errorf("load lockfile: %w", err)
 	}
-
-	var warnings []string
 
 	// Current digests
 	currentSysDigest, err := content.BehaviouralDigest(sysDir)

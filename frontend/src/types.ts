@@ -48,6 +48,8 @@ export interface GameState {
   mechanics_engagement?: 'off' | 'auto' | 'ask';
   // The campaign's progression summary, when the system declares advancement.
   advancement?: Advancement;
+  // Content warnings (mismatch or drift detected against content lock)
+  content_warnings?: string[];
 }
 
 export interface TurnSegment {
