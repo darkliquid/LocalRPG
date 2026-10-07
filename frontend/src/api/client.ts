@@ -59,6 +59,7 @@ import {
   MediaInspectResponse,
   OfflinePresetResponse,
   OfflineReportResponse,
+  ImportResultDTO,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -1026,5 +1027,37 @@ export class APIClient {
   async getGameUsage(): Promise<Usage> {
     return APIClient.getGameUsage(this.gameID);
   }
+
+  static async exportContent(type: 'world' | 'system', id: string): Promise<Blob> {
+    const res = await fetch('/api/content/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, id }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new HTTPError(res.status, text || `exportContent: ${res.statusText}`);
+    }
+    return res.blob();
+  }
+
+  static async importContent(file: File, onConflict: 'refuse' | 'rename' | 'overwrite' = 'refuse'): Promise<ImportResultDTO> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('on_conflict', onConflict);
+
+    const res = await fetch('/api/content/import', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new HTTPError(res.status, text || `importContent: ${res.statusText}`);
+    }
+    return res.json();
+  }
 }
+
+export const exportContent = APIClient.exportContent;
+export const importContent = APIClient.importContent;
 

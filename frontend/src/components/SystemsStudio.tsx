@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { APIClient } from '../api/client';
-import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure } from '../types';
-import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play } from 'lucide-react';
+import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure, ContentManifestInfo } from '../types';
+import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play, Download, Upload } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import MarkdownEditor from './editor/MarkdownEditor';
 import { MechanicsEditor } from './MechanicsEditor';
+import { ContentImportDialog } from './ContentImportDialog';
+import { inspectPackageFile } from '../lib/packageInspect';
 
 type SystemSelection = { kind: 'saved'; id: string } | { kind: 'draft' } | null;
 
@@ -48,6 +50,11 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [testFailures, setTestFailures] = useState<SystemTestFailure[]>([]);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importManifest, setImportManifest] = useState<ContentManifestInfo | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const isDraft = selection?.kind === 'draft';
   const savedID = selection?.kind === 'saved' ? selection.id : null;
@@ -273,6 +280,53 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     }
   };
 
+  const handleExport = async () => {
+    if (!savedID) return;
+    try {
+      const blob = await APIClient.exportContent('system', savedID);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${savedID}-${version || '1.0.0'}.lrpgpack`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setToast({ type: 'success', message: `Exported system package: ${savedID}.lrpgpack` });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) });
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const info = await inspectPackageFile(file);
+      setImportFile(file);
+      setImportManifest(info);
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) });
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleConfirmImport = async (conflictMode: 'refuse' | 'rename' | 'overwrite') => {
+    if (!importFile) return;
+    setIsImporting(true);
+    try {
+      const res = await APIClient.importContent(importFile, conflictMode);
+      setToast({ type: 'success', message: `Successfully ${res.action} system ${res.name} (${res.id})` });
+      setImportFile(null);
+      setImportManifest(null);
+      await loadSystems(res.id, 'browse');
+      if (onSystemSaved) onSystemSaved();
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
       {/* Left Master Column: Systems List */}
@@ -284,19 +338,36 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               Rule Systems
             </h3>
           </div>
-          <button
-            onClick={() => {
-              if (isDraft && draft?.dirty) {
-                setPendingSelection({ kind: 'draft' });
-                return;
-              }
-              handleNewSystem();
-            }}
-            className="flex items-center gap-1 text-xs font-sans font-bold px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="file"
+              ref={importInputRef}
+              onChange={handleFileSelect}
+              accept=".lrpgpack,application/gzip,application/x-gzip"
+              className="hidden"
+            />
+            <button
+              onClick={() => importInputRef.current?.click()}
+              title="Import content package (.lrpgpack)"
+              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Import</span>
+            </button>
+            <button
+              onClick={() => {
+                if (isDraft && draft?.dirty) {
+                  setPendingSelection({ kind: 'draft' });
+                  return;
+                }
+                handleNewSystem();
+              }}
+              className="flex items-center gap-1 text-xs font-sans font-bold px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New</span>
+            </button>
+          </div>
         </div>
 
         {referenceSystems.length > 0 && (
@@ -474,6 +545,17 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
             >
               <Play className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{isTesting ? 'Testing...' : 'Run Tests'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={!savedID}
+              title="Export system package (.lrpgpack)"
+              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Export</span>
             </button>
 
             <button
@@ -819,6 +901,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
         onCancel={() => setPendingSelection(null)}
         onDiscard={() => applySelection(pendingSelection)}
       />
+
+      {importManifest && (
+        <ContentImportDialog
+          manifest={importManifest}
+          onConfirm={handleConfirmImport}
+          onCancel={() => {
+            setImportFile(null);
+            setImportManifest(null);
+          }}
+          loading={isImporting}
+        />
+      )}
     </div>
   );
 };

@@ -1345,3 +1345,29 @@ export interface SaveErrorBody {
   line?: number;
   column?: number;
 }
+
+export interface ImportResultDTO {
+  id: string;
+  name: string;
+  version: string;
+  type: string;
+  author?: string;
+  license?: string;
+  description?: string;
+  file_count: number;
+  has_script: boolean;
+  action: 'installed' | 'renamed' | 'overwritten';
+}
+
+export interface ContentManifestInfo {
+  id: string;
+  name: string;
+  version: string;
+  type?: string;
+  author?: string;
+  license?: string;
+  description?: string;
+  file_count?: number;
+  has_script?: boolean;
+}
+
