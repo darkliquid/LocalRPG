@@ -80,6 +80,7 @@ that key.
 | Provider ID | Tier | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- | --- |
 | `embedding:gemini` | cloud | gemini | `embedding:gemini` | - |
+| `embedding:onnx` | offline-neural | builtin | `embedding:onnx` | - |
 | `embedding:openai` | cloud | http | `embedding:openai` | - |
 
 ## Built-in default prices

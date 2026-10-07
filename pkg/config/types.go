@@ -338,12 +338,15 @@ type EmbeddingsConfig struct {
 }
 
 type EmbeddingProviderConfig struct {
-	Type        string `yaml:"type" json:"type"` // "builtin", "http", "gemini", "disabled"
+	Type        string `yaml:"type" json:"type"` // "builtin", "onnx", "http", "gemini", "disabled"
 	BuiltinName string `yaml:"builtin_name,omitempty" json:"builtin_name,omitempty"`
 	Endpoint    string `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
 	URL         string `yaml:"url,omitempty" json:"url,omitempty"`
 	APIKey      string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 	Model       string `yaml:"model,omitempty" json:"model,omitempty"`
+	// ModelPath is the directory holding a local model's files. It is used by
+	// the onnx provider; an empty value falls back to the app's model cache.
+	ModelPath string `yaml:"model_path,omitempty" json:"model_path,omitempty"`
 
 	// Instance is an optional user-chosen discriminator for this provider
 	// configuration. It becomes the key's "@<instance>" segment, so two configs

@@ -119,7 +119,7 @@ func TestBertTokenizerWrapsAndSplits(t *testing.T) {
 
 func TestBertTokenizerTruncates(t *testing.T) {
 	vocab := map[string]int64{"[CLS]": bertTokenCLS, "[SEP]": bertTokenSEP, "[UNK]": bertTokenUNK}
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		vocab[string(rune('a'+i%26))+string(rune('0'+i/26))] = int64(100 + i)
 	}
 	tok := &bertTokenizer{vocab: vocab, maxLen: 10}

@@ -4,6 +4,7 @@ package all
 
 import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/clillm"
+	_ "github.com/darkliquid/localrpg/pkg/provider/embeddingonnx"
 	_ "github.com/darkliquid/localrpg/pkg/provider/geminillm"
 	_ "github.com/darkliquid/localrpg/pkg/provider/geminiembedding"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imagecli"

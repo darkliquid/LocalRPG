@@ -27,7 +27,6 @@ const (
 	onnxEmbedBatchSize = 32
 
 	// The BERT special-token ids of the pinned encoder's vocabulary.
-	bertTokenPAD int64 = 0
 	bertTokenUNK int64 = 100
 	bertTokenCLS int64 = 101
 	bertTokenSEP int64 = 102

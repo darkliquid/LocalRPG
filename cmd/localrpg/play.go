@@ -14,6 +14,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/paths"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -74,6 +75,9 @@ func handlePlayCommand(args []string) {
 	history := engine.NewHistoryLogger(historyPath)
 
 	timeline := engine.NewTimeline(resolver, store, history, gameID)
+	// Point the embedding factory at the local model cache so the ONNX encoder
+	// resolves.
+	embeddings.SetModelDir(models.NewManager(resolver.CacheDir()).ModelDir(models.EmbeddingEncoderModelID))
 	if embProvider, err := embeddings.NewProviderFromConfig(cfg.Embeddings); err == nil && embProvider != nil {
 		worker := storage.NewEmbeddingWorker(store, embProvider, storage.EmbeddingWorkerOptions{
 			BatchSize: cfg.Embeddings.BatchSize,

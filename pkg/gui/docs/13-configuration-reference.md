@@ -177,6 +177,7 @@ choose; the ledger and provider identifiers are listed in the
 | `embeddings.providers.<key>.url` | string |
 | `embeddings.providers.<key>.api_key` | string |
 | `embeddings.providers.<key>.model` | string |
+| `embeddings.providers.<key>.model_path` | string |
 | `embeddings.providers.<key>.instance` | string |
 
 ### `preferences`

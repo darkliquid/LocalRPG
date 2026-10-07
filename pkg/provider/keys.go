@@ -34,6 +34,7 @@ const (
 	KeyEmbeddingBuiltin Key = "embedding:builtin"
 	KeyEmbeddingOpenAI  Key = "embedding:openai"
 	KeyEmbeddingGemini  Key = "embedding:gemini"
+	KeyEmbeddingONNX    Key = "embedding:onnx"
 )
 
 // AllKeys lists every canonical adapter key, for validation and docs.
@@ -44,6 +45,6 @@ func AllKeys() []Key {
 		KeyTTSFishAudio, KeyTTSHTTP, KeyTTSInworld, KeyTTSCartesia,
 		KeySTTWhisperHTTP, KeySTTWhisperCLI, KeySTTWebSpeech, KeySTTInworld, KeySTTCartesia,
 		KeyImageGemini, KeyImageHTTP, KeyImageCLI, KeyImageProceduralArt,
-		KeyEmbeddingBuiltin, KeyEmbeddingOpenAI, KeyEmbeddingGemini,
+		KeyEmbeddingBuiltin, KeyEmbeddingOpenAI, KeyEmbeddingGemini, KeyEmbeddingONNX,
 	}
 }
