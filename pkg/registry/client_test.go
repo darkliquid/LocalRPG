@@ -114,3 +114,98 @@ func TestClientEmptyRegistries(t *testing.T) {
 		t.Fatalf("expected 0 indexes, got %d", len(indexes))
 	}
 }
+
+func TestSearchMatchesAcrossIndexes(t *testing.T) {
+	s1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"name": "Community",
+			"packages": [
+				{
+					"type": "world",
+					"id": "ashen_reach",
+					"name": "Ashen Reach",
+					"version": "1.2.0",
+					"description": "A dying frontier.",
+					"author": "Bob",
+					"download": "https://example.org/ashen.lrpgpack",
+					"sha256": "111111"
+				}
+			]
+		}`))
+	}))
+	defer s1.Close()
+
+	s2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"name": "Official",
+			"packages": [
+				{
+					"type": "system",
+					"id": "dusk_realm",
+					"name": "Dusk Realm",
+					"version": "2.0.0",
+					"description": "A shadowy kingdom.",
+					"author": "Alice",
+					"download": "https://example.org/dusk.lrpgpack",
+					"sha256": "222222"
+				}
+			]
+		}`))
+	}))
+	defer s2.Close()
+
+	cacheDir := t.TempDir()
+	cfg := config.RegistriesConfig{
+		URLs: []string{s1.URL, s2.URL},
+	}
+	client := NewClient(cfg, cacheDir)
+
+	ctx := context.Background()
+
+	// 1. Query "ash" matches ashen_reach
+	res, err := client.Search(ctx, "ash")
+	if err != nil {
+		t.Fatalf("Search('ash') failed: %v", err)
+	}
+	if len(res) != 1 || res[0].Package.ID != "ashen_reach" || res[0].RegistryName != "Community" {
+		t.Fatalf("unexpected Search('ash') result: %+v", res)
+	}
+
+	// 2. Query "shadowy" matches description
+	res, err = client.Search(ctx, "shadowy")
+	if err != nil {
+		t.Fatalf("Search('shadowy') failed: %v", err)
+	}
+	if len(res) != 1 || res[0].Package.ID != "dusk_realm" || res[0].RegistryName != "Official" {
+		t.Fatalf("unexpected Search('shadowy') result: %+v", res)
+	}
+
+	// 3. Query "alice" matches author
+	res, err = client.Search(ctx, "alice")
+	if err != nil {
+		t.Fatalf("Search('alice') failed: %v", err)
+	}
+	if len(res) != 1 || res[0].Package.ID != "dusk_realm" {
+		t.Fatalf("unexpected Search('alice') result: %+v", res)
+	}
+
+	// 4. Empty query returns all packages
+	res, err = client.Search(ctx, "")
+	if err != nil {
+		t.Fatalf("Search('') failed: %v", err)
+	}
+	if len(res) != 2 {
+		t.Fatalf("expected 2 packages for empty query, got %d", len(res))
+	}
+
+	// 5. Query with no match
+	res, err = client.Search(ctx, "nonexistent")
+	if err != nil {
+		t.Fatalf("Search('nonexistent') failed: %v", err)
+	}
+	if len(res) != 0 {
+		t.Fatalf("expected 0 packages, got %d", len(res))
+	}
+}

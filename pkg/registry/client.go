@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -61,14 +62,21 @@ func (c *Client) cacheKey(url string) string {
 	return hex.EncodeToString(h[:])
 }
 
-// Indexes returns the parsed indexes from all configured registries.
-// It caches indexes on disk and falls back to the cache if a registry is unreachable.
-func (c *Client) Indexes(ctx context.Context) ([]Index, error) {
+// Registry pairs a configured registry index with its name, URL, and fetch time.
+type Registry struct {
+	Name    string    `json:"name"`
+	URL     string    `json:"url"`
+	Index   Index     `json:"index"`
+	Fetched time.Time `json:"fetched,omitempty"`
+}
+
+// Registries returns the configured registries with their parsed indexes.
+func (c *Client) Registries(ctx context.Context) ([]Registry, error) {
 	if len(c.cfg.URLs) == 0 {
-		return []Index{}, nil
+		return []Registry{}, nil
 	}
 
-	var results []Index
+	var results []Registry
 	var lastErr error
 
 	for _, rawURL := range c.cfg.URLs {
@@ -77,15 +85,63 @@ func (c *Client) Indexes(ctx context.Context) ([]Index, error) {
 			lastErr = err
 			continue
 		}
-		results = append(results, idx)
+		results = append(results, Registry{
+			Name:    idx.Name,
+			URL:     rawURL,
+			Index:   idx,
+			Fetched: time.Now(),
+		})
 	}
 
-	// If no registries succeeded and we had configured URLs, return lastErr
 	if len(results) == 0 && len(c.cfg.URLs) > 0 {
 		return nil, fmt.Errorf("all registries failed: %w", lastErr)
 	}
 
 	return results, nil
+}
+
+// Indexes returns the parsed indexes from all configured registries.
+// It caches indexes on disk and falls back to the cache if a registry is unreachable.
+func (c *Client) Indexes(ctx context.Context) ([]Index, error) {
+	regs, err := c.Registries(ctx)
+	if err != nil {
+		return nil, err
+	}
+	indexes := make([]Index, len(regs))
+	for i, r := range regs {
+		indexes[i] = r.Index
+	}
+	return indexes, nil
+}
+
+// Search performs a case-insensitive substring match across id, name, description, and author
+// across every configured registry index, returning PackageRef items.
+func (c *Client) Search(ctx context.Context, query string) ([]PackageRef, error) {
+	regs, err := c.Registries(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	q := strings.ToLower(strings.TrimSpace(query))
+	var matches []PackageRef
+
+	for _, reg := range regs {
+		for _, pkg := range reg.Index.Packages {
+			if q == "" ||
+				strings.Contains(strings.ToLower(pkg.ID), q) ||
+				strings.Contains(strings.ToLower(pkg.Name), q) ||
+				strings.Contains(strings.ToLower(pkg.Description), q) ||
+				strings.Contains(strings.ToLower(pkg.Author), q) {
+				matches = append(matches, PackageRef{
+					RegistryName: reg.Name,
+					RegistryURL:  reg.URL,
+					Package:      pkg,
+				})
+			}
+		}
+	}
+
+	return matches, nil
 }
 
 func (c *Client) fetchOrCachedIndex(ctx context.Context, rawURL string) (Index, error) {
