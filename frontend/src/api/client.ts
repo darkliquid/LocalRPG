@@ -57,6 +57,8 @@ import {
   ExportCapabilities,
   TTSBatchJob,
   MediaInspectResponse,
+  OfflinePresetResponse,
+  OfflineReportResponse,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -590,6 +592,22 @@ export class APIClient {
       body: JSON.stringify({ config: cfg }),
     });
     if (!res.ok) throw new Error(`saveSettings: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async applyOfflinePreset(tts?: string): Promise<OfflinePresetResponse> {
+    const res = await fetch('/api/config/offline-preset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tts: tts || 'native-os' }),
+    });
+    if (!res.ok) throw new Error((await res.text()).trim() || `applyOfflinePreset: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async checkOffline(): Promise<OfflineReportResponse> {
+    const res = await fetch('/api/config/offline-report');
+    if (!res.ok) throw new Error(`checkOffline: ${res.statusText}`);
     return res.json();
   }
 

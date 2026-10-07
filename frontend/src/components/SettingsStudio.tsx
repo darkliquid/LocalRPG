@@ -40,6 +40,7 @@ import { TTSBatchPanel } from './TTSBatchPanel';
 import { hasWebSpeechSupport } from '../lib/webSpeech';
 import { TierLegend, tierLabel } from './providers/TierBadge';
 import { ProviderManager, RoleListItem } from './ProviderManager';
+import { OfflinePreset } from './OfflinePreset';
 import { mediaEntryValue, setMediaEntry } from '../lib/mediaProviders';
 
 interface SettingsStudioProps {
@@ -624,6 +625,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       {/* Tab: Ecosystem Providers */}
       {activeSubTab === 'providers' && (
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          <OfflinePreset onChange={setConfig} />
+
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-6">
             <ProviderManager family="tts" config={config} onChange={setConfig} />
             <ProviderManager family="stt" config={config} onChange={setConfig} />

@@ -1025,6 +1025,27 @@ export interface SettingsResponse {
   app_version?: string;
 }
 
+export interface OfflinePresetRequest {
+  tts?: string;
+}
+
+export interface OfflinePresetResponse {
+  changes: string[];
+}
+
+export interface OfflineIssue {
+  role: string;
+  provider_key: string;
+  tier: string;
+  reason: string;
+}
+
+export interface OfflineReportResponse {
+  offline: boolean;
+  issues: OfflineIssue[];
+}
+
+
 export interface ExportRequest {
   game_id: string;
   format: 'web' | 'video';
