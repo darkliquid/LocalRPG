@@ -114,3 +114,27 @@ func TestManifestVersionMustBeSemver(t *testing.T) {
 		t.Fatalf("an unversioned world manifest should be allowed: %v", err)
 	}
 }
+
+func TestRequirementSatisfies(t *testing.T) {
+	r := ContentRequirement{Type: "system", ID: "narrative_2d6", Version: ">=1.0.0 <2.0.0"}
+	if !r.Satisfies("1.4.0") {
+		t.Fatal("1.4.0 should satisfy the range")
+	}
+	if r.Satisfies("2.0.0") {
+		t.Fatal("2.0.0 should not satisfy the range")
+	}
+	if !r.Satisfies("1.0.0") {
+		t.Fatal("1.0.0 should satisfy >=1.0.0")
+	}
+	if r.Satisfies("0.9.0") {
+		t.Fatal("0.9.0 should not satisfy >=1.0.0")
+	}
+
+	any := ContentRequirement{Type: "system", ID: "x"}
+	if !any.Satisfies("0.0.0") {
+		t.Fatal("an empty constraint should accept any version")
+	}
+	if !any.Satisfies("1.2.3") {
+		t.Fatal("an empty constraint should accept any version")
+	}
+}
