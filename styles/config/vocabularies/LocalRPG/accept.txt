@@ -24,6 +24,8 @@ Vite
 ROCm
 Gemini
 gemini
+Cartesia
+Inworld
 Correlator
 Multimodal
 
