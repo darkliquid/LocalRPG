@@ -927,3 +927,51 @@ func TestPromptOmitsThePlayerActionWhenThereIsNone(t *testing.T) {
 		t.Fatalf("the reply format must still be taught:\n%s", result.Prompt)
 	}
 }
+
+func TestContextAssemblerOracleContract(t *testing.T) {
+	tempDir := t.TempDir()
+	store, err := storage.NewStore(filepath.Join(tempDir, "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	store.SaveEntity(&entity.Entity{
+		ID:   "alden-tavern",
+		Name: "Alden Tavern",
+		Type: "location",
+		Body: "A warm tavern.",
+	})
+	store.SaveEntity(&entity.Entity{
+		ID:       "lady-evelyn",
+		Name:     "Lady Evelyn",
+		Type:     "character",
+		Location: "[[alden-tavern]]",
+		Body:     "Guarded former lieutenant. [[lady-evelyn]]",
+	})
+
+	assembler := NewContextAssembler(store)
+	result, err := assembler.Assemble(ContextRequest{
+		LocationID:      "alden-tavern",
+		PlayerName:      "Sean",
+		Action:          "I speak with Evelyn",
+		MechanicsPrompt: "Player stats: Edge 3, Grit 1.",
+	})
+	if err != nil {
+		t.Fatalf("Assemble failed: %v", err)
+	}
+
+	prompt := "[MECHANICS RESULT: Mode=attack Roll=11 Tier=Success]\n\n" + result.Prompt
+
+	// Verify the contract markers the narrative oracle relies upon:
+	if !strings.Contains(prompt, "**Current Location:** Alden Tavern") {
+		t.Fatalf("context prompt must contain location marker for oracle: %s", prompt)
+	}
+	if !strings.Contains(prompt, "## PLAYER ACTION\nSean: I speak with Evelyn") {
+		t.Fatalf("context prompt must contain player action marker for oracle: %s", prompt)
+	}
+	if !strings.Contains(prompt, "Player stats: Edge 3, Grit 1.") {
+		t.Fatalf("context prompt must contain stats marker for oracle: %s", prompt)
+	}
+}
+
