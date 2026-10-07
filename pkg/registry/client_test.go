@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -328,5 +329,107 @@ func TestInstallDelegatesToImport(t *testing.T) {
 	}
 	if !delegateCalled {
 		t.Fatal("expected installer delegate to be called from cache")
+	}
+}
+
+func TestUpdateFindsNewerVersions(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"name": "Updates Registry",
+			"packages": [
+				{
+					"type": "world",
+					"id": "my_world",
+					"name": "My World",
+					"version": "1.5.0",
+					"download": "https://example.org/w15.lrpgpack",
+					"sha256": "123"
+				},
+				{
+					"type": "world",
+					"id": "current_world",
+					"name": "Current World",
+					"version": "1.0.0",
+					"download": "https://example.org/cw.lrpgpack",
+					"sha256": "456"
+				}
+			]
+		}`))
+	}))
+	defer s.Close()
+
+	cacheDir := t.TempDir()
+	client := NewClient(config.RegistriesConfig{URLs: []string{s.URL}}, cacheDir)
+	client.SetHTTPClient(s.Client())
+
+	// Configure installed packages
+	client.SetInstalledLister(func(ctx context.Context) ([]content.Manifest, error) {
+		return []content.Manifest{
+			{ID: "my_world", Type: "world", Version: "1.0.0"},
+			{ID: "current_world", Type: "world", Version: "1.0.0"},
+		}, nil
+	})
+
+	updates, err := client.Update(context.Background())
+	if err != nil {
+		t.Fatalf("Update() failed: %v", err)
+	}
+
+	if len(updates) != 1 {
+		t.Fatalf("expected 1 update, got %d (%+v)", len(updates), updates)
+	}
+	if updates[0].Package.ID != "my_world" || updates[0].Package.Version != "1.5.0" {
+		t.Fatalf("unexpected update: %+v", updates[0])
+	}
+}
+
+func TestGitRegistryScheme(t *testing.T) {
+	// Create a local git repository fixture
+	gitDir := t.TempDir()
+	cmdInit := exec.Command("git", "init", gitDir)
+	if out, err := cmdInit.CombinedOutput(); err != nil {
+		t.Skipf("git init not available: %v (%s)", err, out)
+	}
+
+	// Configure author for commit
+	_ = exec.Command("git", "-C", gitDir, "config", "user.name", "Tester").Run()
+	_ = exec.Command("git", "-C", gitDir, "config", "user.email", "test@test.com").Run()
+
+	indexJSON := `{
+		"name": "Git Registry",
+		"packages": [
+			{
+				"type": "world",
+				"id": "git_world",
+				"name": "Git World",
+				"version": "1.0.0",
+				"download": "https://example.org/git.lrpgpack",
+				"sha256": "999"
+			}
+		]
+	}`
+	if err := os.WriteFile(filepath.Join(gitDir, "index.json"), []byte(indexJSON), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_ = exec.Command("git", "-C", gitDir, "add", "index.json").Run()
+	if out, err := exec.Command("git", "-C", gitDir, "commit", "-m", "init").CombinedOutput(); err != nil {
+		t.Fatalf("git commit failed: %v (%s)", err, out)
+	}
+
+	cacheDir := t.TempDir()
+	gitURL := "git+file://" + gitDir
+	client := NewClient(config.RegistriesConfig{URLs: []string{gitURL}}, cacheDir)
+
+	indexes, err := client.Indexes(context.Background())
+	if err != nil {
+		t.Fatalf("Indexes() with git+ scheme failed: %v", err)
+	}
+	if len(indexes) != 1 || indexes[0].Name != "Git Registry" {
+		t.Fatalf("expected Git Registry index, got: %+v", indexes)
+	}
+	if len(indexes[0].Packages) != 1 || indexes[0].Packages[0].ID != "git_world" {
+		t.Fatalf("expected git_world package, got: %+v", indexes[0].Packages)
 	}
 }

@@ -11,25 +11,33 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"golang.org/x/mod/semver"
+
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/content"
+	"github.com/darkliquid/localrpg/pkg/core"
 )
 
 // ContentInstaller delegates the actual content staging and installation.
 type ContentInstaller func(ctx context.Context, r io.Reader, onConflict string) (content.Manifest, error)
 
+// InstalledLister returns the manifests of installed content packages.
+type InstalledLister func(ctx context.Context) ([]content.Manifest, error)
+
 // Client fetches, caches, and queries registry package indexes.
 type Client struct {
-	cfg        config.RegistriesConfig
-	cacheDir   string
-	httpClient *http.Client
-	installer  ContentInstaller
-	mu         sync.RWMutex
+	cfg             config.RegistriesConfig
+	cacheDir        string
+	httpClient      *http.Client
+	installer       ContentInstaller
+	installedLister InstalledLister
+	mu              sync.RWMutex
 }
 
 // NewClient constructs a Client for the given registries configuration and cache directory.
@@ -152,6 +160,10 @@ func (c *Client) Search(ctx context.Context, query string) ([]PackageRef, error)
 }
 
 func (c *Client) fetchOrCachedIndex(ctx context.Context, rawURL string) (Index, error) {
+	if strings.HasPrefix(rawURL, "git+") {
+		return c.fetchOrCachedGitIndex(ctx, rawURL)
+	}
+
 	key := c.cacheKey(rawURL)
 	cachePath := filepath.Join(c.cacheDir, "registries", key+".json")
 	metaPath := filepath.Join(c.cacheDir, "registries", key+".meta")
@@ -340,4 +352,97 @@ func (c *Client) Install(ctx context.Context, ref PackageRef, onConflict string)
 	}
 
 	return m, nil
+}
+
+func (c *Client) fetchOrCachedGitIndex(ctx context.Context, rawURL string) (Index, error) {
+	gitURL := strings.TrimPrefix(rawURL, "git+")
+	key := c.cacheKey(rawURL)
+	targetDir := filepath.Join(c.cacheDir, "registries", "git-"+key)
+	indexPath := filepath.Join(targetDir, "index.json")
+
+	// Check if already cloned
+	if fi, err := os.Stat(filepath.Join(targetDir, ".git")); err == nil && fi.IsDir() {
+		fetchCmd := exec.CommandContext(ctx, "git", "-C", targetDir, "fetch", "--depth", "1", "origin")
+		_ = fetchCmd.Run()
+		resetCmd := exec.CommandContext(ctx, "git", "-C", targetDir, "reset", "--hard", "FETCH_HEAD")
+		_ = resetCmd.Run()
+	} else {
+		_ = os.MkdirAll(filepath.Dir(targetDir), 0755)
+		_ = os.RemoveAll(targetDir)
+		cloneCmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", gitURL, targetDir)
+		if out, err := cloneCmd.CombinedOutput(); err != nil {
+			if data, readErr := os.ReadFile(indexPath); readErr == nil {
+				return ParseIndex(data)
+			}
+			return Index{}, fmt.Errorf("git clone %s: %w (%s)", gitURL, err, string(out))
+		}
+	}
+
+	data, err := os.ReadFile(indexPath)
+	if err != nil {
+		return Index{}, fmt.Errorf("read index.json in git registry %s: %w", gitURL, err)
+	}
+
+	return ParseIndex(data)
+}
+
+// SetInstalledLister configures the function that enumerates currently installed packages for Update.
+func (c *Client) SetInstalledLister(lister InstalledLister) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.installedLister = lister
+}
+
+// Update checks installed content packages against configured registries
+// and returns PackageRef entries that offer a newer semantic version.
+func (c *Client) Update(ctx context.Context) ([]PackageRef, error) {
+	c.mu.RLock()
+	lister := c.installedLister
+	c.mu.RUnlock()
+
+	var installed []content.Manifest
+	if lister != nil {
+		var err error
+		installed, err = lister(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("list installed content: %w", err)
+		}
+	}
+
+	if len(installed) == 0 {
+		return []PackageRef{}, nil
+	}
+
+	allPackages, err := c.Search(ctx, "")
+	if err != nil {
+		return nil, fmt.Errorf("search registries: %w", err)
+	}
+
+	var updates []PackageRef
+
+	for _, inst := range installed {
+		var bestCandidate *PackageRef
+
+		for i := range allPackages {
+			cand := &allPackages[i]
+			if cand.Package.Type != inst.Type || cand.Package.ID != inst.ID {
+				continue
+			}
+
+			vCand := core.CanonicalSemver(cand.Package.Version)
+			vInst := core.CanonicalSemver(inst.Version)
+
+			if semver.Compare(vCand, vInst) > 0 {
+				if bestCandidate == nil || semver.Compare(vCand, core.CanonicalSemver(bestCandidate.Package.Version)) > 0 {
+					bestCandidate = cand
+				}
+			}
+		}
+
+		if bestCandidate != nil {
+			updates = append(updates, *bestCandidate)
+		}
+	}
+
+	return updates, nil
 }
