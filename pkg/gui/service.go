@@ -4493,6 +4493,55 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 	return detail, nil
 }
 
+// ErrSystemNotFound reports an attempt to operate on a system that does not exist.
+var ErrSystemNotFound = errors.New("system not found")
+
+// ErrSystemInUse reports an attempt to delete a system that is still referenced by a campaign or world.
+var ErrSystemInUse = errors.New("system is in use")
+
+// DeleteSystem removes a system directory.
+// When force is false, it refuses to delete if any campaign or world references this system.
+func (s *Service) DeleteSystem(ctx context.Context, systemID string, force bool) error {
+	if err := pathutil.ValidateID(systemID); err != nil {
+		return fmt.Errorf("invalid system id: %w", err)
+	}
+
+	sysDir := s.resolver.SystemDir(systemID)
+	if _, err := os.Stat(filepath.Join(sysDir, "system.yaml")); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%w: %s", ErrSystemNotFound, systemID)
+		}
+		return fmt.Errorf("system %q: %w", systemID, err)
+	}
+
+	if !force {
+		games, err := s.ListGames(ctx)
+		if err == nil {
+			for _, g := range games {
+				if g.SystemID == systemID {
+					return fmt.Errorf("%w: campaign %q (%s)", ErrSystemInUse, g.Name, g.ID)
+				}
+			}
+		}
+
+		worlds, err := s.ListWorlds(ctx)
+		if err == nil {
+			for _, w := range worlds {
+				for _, comp := range w.CompatibleSystems {
+					if comp == systemID {
+						return fmt.Errorf("%w: world %q (%s)", ErrSystemInUse, w.Name, w.ID)
+					}
+				}
+			}
+		}
+	}
+
+	if err := os.RemoveAll(sysDir); err != nil {
+		return fmt.Errorf("remove system: %w", err)
+	}
+	return nil
+}
+
 // ListReferenceSystems returns the shipped starting systems, so the studio offers
 // the same corpus the tests exercise.
 func (s *Service) ListReferenceSystems(_ context.Context) (*ReferenceSystemsDTO, error) {

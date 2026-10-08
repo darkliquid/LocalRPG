@@ -538,6 +538,12 @@ export class APIClient {
     return res.json();
   }
 
+  static async deleteSystem(id: string, force = false): Promise<void> {
+    const url = force ? `/api/system/${encodeURIComponent(id)}?force=true` : `/api/system/${encodeURIComponent(id)}`;
+    const res = await fetch(url, { method: 'DELETE' });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || `deleteSystem: ${res.statusText}`);
+  }
+
   static async getWorld(id: string): Promise<WorldDetail> {
     const res = await fetch(`/api/world/${id}`);
     if (!res.ok) throw new Error(`getWorld: ${res.statusText}`);

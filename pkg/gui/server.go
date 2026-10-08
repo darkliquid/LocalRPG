@@ -1105,6 +1105,22 @@ func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, sys)
+	case http.MethodDelete:
+		force := r.URL.Query().Get("force") == "true"
+		err := s.service.DeleteSystem(r.Context(), id, force)
+		if errors.Is(err, ErrSystemNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, ErrSystemInUse) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}

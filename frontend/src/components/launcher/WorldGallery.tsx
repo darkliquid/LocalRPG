@@ -1,23 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { WorldInfo } from '../../types';
 import { ProceduralBanner, ProceduralIcon, getGenreIcon } from './ProceduralAsset';
-import { X, Plus, Globe, Maximize2 } from 'lucide-react';
+import { X, Plus, Globe, Maximize2, Trash2, AlertCircle } from 'lucide-react';
 import { useLightbox } from '../../hooks/useLightbox';
 import { useMountTransition } from '../../hooks/useMountTransition';
 import { ImageLightbox } from '../ImageLightbox';
+import { APIClient } from '../../api/client';
 
 interface WorldGalleryProps {
   isOpen: boolean;
   worlds: WorldInfo[];
   onSelectWorld: (worldId: string) => void;
   onCreateWorld: () => void;
+  onDeleteWorld?: (worldId: string, force?: boolean) => Promise<void>;
   onClose: () => void;
 }
 
 const WorldCard: React.FC<{
   world: WorldInfo;
   onSelect: () => void;
-}> = ({ world, onSelect }) => {
+  onDelete?: () => void;
+}> = ({ world, onSelect, onDelete }) => {
   const GenreIcon = getGenreIcon(world.genre) || getGenreIcon(world.name);
   const tags = world.tags ?? [];
   const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
@@ -87,6 +90,21 @@ const WorldCard: React.FC<{
         </div>
       </button>
 
+      {onDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-black/60 hover:bg-red-950/80 hover:text-red-300 border border-white/15 hover:border-red-500/40 flex items-center justify-center text-stone-400 opacity-40 group-hover:opacity-100 hover:!opacity-100 focus:opacity-100 transition-all cursor-pointer"
+          title={`Delete world "${world.name}"`}
+          aria-label={`Delete world "${world.name}"`}
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+
       {artworkURL && (
         <button
           type="button"
@@ -114,9 +132,39 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
   worlds,
   onSelectWorld,
   onCreateWorld,
+  onDeleteWorld,
   onClose,
 }) => {
   const { mounted, state } = useMountTransition(isOpen, 200);
+  const [deleteTarget, setDeleteTarget] = useState<WorldInfo | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [canForce, setCanForce] = useState(false);
+
+  const handleConfirmDelete = async (force = false) => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      if (onDeleteWorld) {
+        await onDeleteWorld(deleteTarget.id, force);
+      } else {
+        await APIClient.deleteWorld(deleteTarget.id, force);
+      }
+      setDeleteTarget(null);
+      setDeleteError(null);
+      setCanForce(false);
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to delete world';
+      setDeleteError(msg);
+      if (msg.includes('in use') || msg.toLowerCase().includes('conflict')) {
+        setCanForce(true);
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (!mounted) return null;
 
   return (
@@ -154,7 +202,16 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
       <div className="flex-1 overflow-y-auto p-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-[1600px] mx-auto content-start">
           {worlds.map((world) => (
-            <WorldCard key={world.id} world={world} onSelect={() => onSelectWorld(world.id)} />
+            <WorldCard
+              key={world.id}
+              world={world}
+              onSelect={() => onSelectWorld(world.id)}
+              onDelete={() => {
+                setDeleteTarget(world);
+                setDeleteError(null);
+                setCanForce(false);
+              }}
+            />
           ))}
 
           {/* Create World Tile */}
@@ -170,6 +227,68 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
           </button>
         </div>
       </div>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none">
+          <div className="w-full max-w-md bg-stone-900 border border-white/15 rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 text-red-400">
+              <Trash2 className="w-5 h-5 shrink-0" />
+              <h3 className="font-sans text-sm font-bold text-white">
+                Delete world &ldquo;{deleteTarget.name}&rdquo;?
+              </h3>
+            </div>
+            <p className="text-xs font-sans text-stone-300">
+              This will permanently delete the world directory and all of its lore and entities. This action cannot be undone.
+            </p>
+            {deleteError && (
+              <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-300 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p>{deleteError}</p>
+                  {canForce && (
+                    <p className="text-stone-400">
+                      You can force deletion to remove the world anyway. Existing campaigns using this world will lose their world files.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteError(null);
+                  setCanForce(false);
+                }}
+                disabled={isDeleting}
+                className="text-xs font-sans px-3 py-1.5 rounded-lg border border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              {canForce ? (
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmDelete(true)}
+                  disabled={isDeleting}
+                  className="text-xs font-sans font-bold px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-600 text-white transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isDeleting ? 'Deleting...' : 'Force Delete'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmDelete(false)}
+                  disabled={isDeleting}
+                  className="text-xs font-sans font-bold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete World'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -744,7 +744,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                       setCanForceDelete(false);
                     }}
                     title={`Delete world "${w.name}"`}
-                    className="p-1 text-stone-500 hover:text-red-400 rounded hover:bg-red-950/40 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                    className="p-1 text-stone-500 hover:text-red-400 rounded hover:bg-red-950/40 transition-colors opacity-40 group-hover:opacity-100 hover:!opacity-100 shrink-0 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -879,7 +879,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-red-500/30 bg-red-950/20 hover:bg-red-950/40 text-red-300 hover:text-red-200 transition-all cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Delete</span>
+                <span className="hidden sm:inline">Delete World</span>
               </button>
             )}
 
@@ -1215,6 +1215,31 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   </div>
                 </div>
               </div>
+
+              {savedID && (
+                <div className="p-4 bg-red-950/20 border border-red-500/30 rounded-2xl flex items-center justify-between mt-4">
+                  <div>
+                    <div className="text-xs font-sans font-bold text-red-400 flex items-center gap-1.5">
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Danger Zone: Delete World</span>
+                    </div>
+                    <p className="text-xs font-sans text-stone-400 mt-1">
+                      Permanently delete this world and all of its lore and entities from disk. This cannot be undone.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteTarget({ id: savedID, name: name || savedID });
+                      setDeleteWorldError(null);
+                      setCanForceDelete(false);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-sans text-xs font-bold transition-all cursor-pointer shadow"
+                  >
+                    Delete World
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
