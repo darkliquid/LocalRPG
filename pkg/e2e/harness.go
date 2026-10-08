@@ -328,8 +328,9 @@ func artifactDir(t *testing.T) string {
 	return filepath.Join(base, strings.NewReplacer("/", "_", " ", "_", "\\", "_").Replace(t.Name()))
 }
 
-// dumpArtifacts writes the page's text, a DOM probe, and a screenshot. It runs
-// while a test is already failing, so every step ignores its own error.
+// dumpArtifacts writes the page's text, a DOM probe, the console, and a
+// screenshot. It runs while a test is already failing, so every step ignores its
+// own error.
 func (b *Browser) dumpArtifacts() {
 	if b.dir == "" {
 		return
@@ -337,6 +338,10 @@ func (b *Browser) dumpArtifacts() {
 	if err := os.MkdirAll(b.dir, 0o755); err != nil {
 		return
 	}
+	// The console is what names an uncaught error, which is often the whole
+	// reason a page went blank.
+	_ = os.WriteFile(filepath.Join(b.dir, "console.txt"),
+		[]byte(strings.Join(b.Console(), "\n")+"\n"), 0o644)
 	var text string
 	if err := chromedp.Run(b.ctx, chromedp.Evaluate(`document.body.innerText`, &text)); err == nil {
 		_ = os.WriteFile(filepath.Join(b.dir, "body.txt"), []byte(text), 0o644)
