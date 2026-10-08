@@ -1,9 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { AlertTriangle, Check, FolderOpen, Globe, PackagePlus, Pencil, RefreshCw, X } from 'lucide-react';
-import { APIClient } from '../api/client';
+import { APIClient, HTTPError } from '../api/client';
 import { useFolderPicker } from '../hooks/useFolderPicker';
-import { generationLimitHint, isGenerationLimit } from '../lib/generationLimit';
+import { limitFieldFor } from '../lib/generationLimit';
+import { GenerationLimitNotice } from './GenerationLimitNotice';
 import {
+  GenerationLimitsOverride,
   WorldApplyResult,
   WorldDraftEntity,
   WorldEntityBatch,
@@ -46,6 +48,10 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState<string[] | null>(null);
+  // A raise the user asked for stays in effect for this dialog, so a retry does
+  // not have to be confirmed twice.
+  const [limits, setLimits] = useState<GenerationLimitsOverride | undefined>(undefined);
+  const [limitCode, setLimitCode] = useState<string | null>(null);
 
   const urlList = useMemo(
     () =>
@@ -75,9 +81,10 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
     if (chosen) setFolderPath(chosen);
   }, [folderPicker]);
 
-  const handleGenerate = async () => {
+  const runExtraction = async (override?: GenerationLimitsOverride) => {
     setLoading(true);
     setError(null);
+    setLimitCode(null);
     setAccepted(null);
     try {
       const req: WorldEntityBatchRequest = {
@@ -86,14 +93,31 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
         kinds: source ? undefined : [kind],
         count: source ? undefined : count,
         focus: focus || undefined,
+        limits: override ?? limits,
       };
       setBatch(await APIClient.previewWorldEntities(worldId, req));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      setError(isGenerationLimit(err) ? `${message} ${generationLimitHint}` : message);
+      setError(message);
+      setLimitCode(err instanceof HTTPError ? (limitFieldFor(err.code) ? (err.code ?? null) : null) : null);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGenerate = () => void runExtraction();
+
+  // Raising a limit and running again is one action, so a retry is a single
+  // click rather than a trip through Settings and back.
+  const handleRaiseAndRun = (raised: GenerationLimitsOverride) => {
+    setLimits(raised);
+    void runExtraction(raised);
+  };
+
+  const handleRaiseAndSave = (raised: GenerationLimitsOverride) => {
+    APIClient.raiseGenerationLimit(raised)
+      .then(() => handleRaiseAndRun(raised))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
   };
 
   const handleAccept = async () => {
@@ -140,10 +164,20 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
         </div>
 
         <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
-          {error && (
-            <p className="p-3 text-sm rounded-xl bg-red-950/40 border border-red-500/30 text-red-300">
-              {error}
-            </p>
+          {limitCode && error ? (
+            <GenerationLimitNotice
+              code={limitCode}
+              message={error}
+              busy={loading}
+              onRetry={handleRaiseAndRun}
+              onSave={handleRaiseAndSave}
+            />
+          ) : (
+            error && (
+              <p className="p-3 text-sm rounded-xl bg-red-950/40 border border-red-500/30 text-red-300">
+                {error}
+              </p>
+            )
           )}
           {accepted && (
             <p className="p-3 text-sm rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300">
@@ -338,7 +372,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
 
         <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10">
           <button
-            onClick={() => void handleGenerate()}
+            onClick={handleGenerate}
             disabled={loading || !sourceReady}
             className="flex items-center gap-2 px-4 py-2 text-sm text-neutral-200 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >

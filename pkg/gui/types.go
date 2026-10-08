@@ -592,16 +592,25 @@ type WorldSourceDTO struct {
 	URLs []string `json:"urls,omitempty"`
 }
 
+// GenerationLimitsDTO raises a generation's limits for one request, so a user who
+// hits a limit can carry on without leaving the flow. A zero field uses the
+// configured default.
+type GenerationLimitsDTO struct {
+	MaxCalls  int `json:"max_calls,omitempty"`
+	MaxChunks int `json:"max_chunks,omitempty"`
+}
+
 // WorldGenerateRequestDTO is a whole-world generation request. DryRun asks only
 // for the estimate, so the cost is visible before the spend.
 type WorldGenerateRequestDTO struct {
-	Premise string          `json:"premise"`
-	Name    string          `json:"name,omitempty"`
-	Genre   string          `json:"genre,omitempty"`
-	Themes  []string        `json:"themes,omitempty"`
-	Counts  CountsDTO       `json:"counts,omitempty"`
-	Source  *WorldSourceDTO `json:"source,omitempty"`
-	DryRun  bool            `json:"dry_run,omitempty"`
+	Premise string              `json:"premise"`
+	Name    string              `json:"name,omitempty"`
+	Genre   string              `json:"genre,omitempty"`
+	Themes  []string            `json:"themes,omitempty"`
+	Counts  CountsDTO           `json:"counts,omitempty"`
+	Source  *WorldSourceDTO     `json:"source,omitempty"`
+	DryRun  bool                `json:"dry_run,omitempty"`
+	Limits  *GenerationLimitsDTO `json:"limits,omitempty"`
 }
 
 // WorldGenStepDTO is one progress report from the generation pipeline.
@@ -659,11 +668,12 @@ type WorldDraftDTO struct {
 // WorldEntityBatchRequestDTO asks for a batch of entities in an existing world,
 // either generated from an instruction or extracted from a source.
 type WorldEntityBatchRequestDTO struct {
-	Instruction string          `json:"instruction"`
-	Kinds       []string        `json:"kinds,omitempty"`
-	Count       int             `json:"count,omitempty"`
-	Focus       string          `json:"focus,omitempty"`
-	Source      *WorldSourceDTO `json:"source,omitempty"`
+	Instruction string               `json:"instruction"`
+	Kinds       []string             `json:"kinds,omitempty"`
+	Count       int                  `json:"count,omitempty"`
+	Focus       string               `json:"focus,omitempty"`
+	Source      *WorldSourceDTO      `json:"source,omitempty"`
+	Limits      *GenerationLimitsDTO `json:"limits,omitempty"`
 }
 
 // WorldEntityBatchDTO is a previewed batch, with any links that were dropped.

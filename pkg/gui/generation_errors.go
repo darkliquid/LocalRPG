@@ -68,12 +68,17 @@ func writeJSONErrorCode(w http.ResponseWriter, status int, code, message string)
 
 // generationLimitCode names the code a caller gets when a generation stopped
 // because it reached a configured limit. An empty code means the failure is not
-// one the user can fix by changing a setting.
+// one the user can fix by changing a limit. The two limits carry different codes
+// so the UI can offer the field that caused it.
 func generationLimitCode(err error) string {
-	if errors.Is(err, worldgen.ErrCallBudgetExceeded) || errors.Is(err, ErrSourceTooLarge) {
-		return ErrorCodeGenerationLimit
+	switch {
+	case errors.Is(err, worldgen.ErrCallBudgetExceeded):
+		return ErrorCodeCallLimit
+	case errors.Is(err, ErrSourceTooLarge):
+		return ErrorCodeSourceLimit
+	default:
+		return ""
 	}
-	return ""
 }
 
 // writeGenerationFailure recognises a generation failure and writes it, so

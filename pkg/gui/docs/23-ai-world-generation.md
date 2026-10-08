@@ -113,7 +113,14 @@ When the estimate reaches 10 calls, **Generate** asks for a second click to conf
 | `generation.max_calls` | A generation from a premise, a batch of entities, or an enhancement. Each is a short pipeline. | 20 calls |
 | `generation.max_chunks` | An import, which reads whatever you point it at. A call reads four chunks, and the calls follow from the source. | 200 chunks |
 
-Set both in **Settings**, on the **AI Agents** tab, under **Generation Limits**. LocalRPG refuses an import over the chunk limit before it makes the first call, so a folder too large to read spends nothing and the message reports how large it is. A generation that hits either limit stops, and the error states the setting to raise.
+Set both in **Settings**, on the **AI Agents** tab, under **Generation Limits**. LocalRPG refuses an import over the chunk limit before it makes the first call, so a folder too large to read spends nothing and the message reports how large it is.
+
+You do not have to leave the flow to change one. When a generation hits a limit, the dialog shows the limit that stopped it, with a field and two choices:
+
+- **Use for this run** raises it for this generation only, and leaves the configured value alone.
+- **Save and use** raises it in the configuration as well, so later runs start from the higher value.
+
+The field is pre-filled with double the current limit, which is the smallest change likely to get the same source past the wall.
 
 After a generation runs, the calls and tokens it used are recorded in the usage ledger under the `generator` role, and the Usage view shows what generation cost.
 

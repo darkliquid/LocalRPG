@@ -312,6 +312,7 @@ export interface WorldGenerateRequest {
   counts?: WorldCounts;
   source?: WorldSource;
   dry_run?: boolean;
+  limits?: GenerationLimitsOverride;
 }
 
 export interface WorldDraftEntity {
@@ -354,6 +355,7 @@ export interface WorldEntityBatchRequest {
   // source extracts the batch from a folder or a set of URLs instead of
   // generating it from the instruction.
   source?: WorldSource;
+  limits?: GenerationLimitsOverride;
 }
 
 export interface WorldEntityBatch {
@@ -1169,6 +1171,13 @@ export interface AppConfig {
 // enhancement generation is bounded by its call count; an ingestion, whose size
 // is the source's, is bounded by how many chunks it will read.
 export interface GenerationConfig {
+  max_calls?: number;
+  max_chunks?: number;
+}
+
+// GenerationLimitsOverride raises a generation's limits for one request, so a
+// user who hits a limit can carry on without leaving the flow.
+export interface GenerationLimitsOverride {
   max_calls?: number;
   max_chunks?: number;
 }

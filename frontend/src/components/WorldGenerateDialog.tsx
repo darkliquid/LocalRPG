@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, FolderOpen, Globe, Sparkles, Wand2, X } from 'lucide-react';
 import { APIClient } from '../api/client';
 import { useFolderPicker } from '../hooks/useFolderPicker';
-import { generationLimitCode, generationLimitHint } from '../lib/generationLimit';
-import { TurnEvent, WorldDraftInfo, WorldEstimate, WorldGenStep } from '../types';
+import { limitFieldFor } from '../lib/generationLimit';
+import { GenerationLimitNotice } from './GenerationLimitNotice';
+import { GenerationLimitsOverride, TurnEvent, WorldDraftInfo, WorldEstimate, WorldGenStep } from '../types';
 
 // LargeEstimateCalls is the call count above which Generate asks for a second
 // confirmation, so a costly generation is a deliberate choice.
@@ -51,6 +52,10 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
   const [steps, setSteps] = useState<WorldGenStep[]>([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A raise the user asked for stays in effect for this dialog, so a retry does
+  // not have to be confirmed twice.
+  const [limits, setLimits] = useState<GenerationLimitsOverride | undefined>(undefined);
+  const [limitCode, setLimitCode] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const urlList = useMemo(
@@ -76,8 +81,9 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
           : sourceMode === 'url'
             ? { kind: 'url' as const, urls: urlList }
             : undefined,
+      limits,
     }),
-    [premise, name, genre, locations, factions, characters, sourceMode, folderPath, urlList]
+    [premise, name, genre, locations, factions, characters, sourceMode, folderPath, urlList, limits]
   );
 
   const sourceReady =
@@ -117,15 +123,13 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
     return () => abortRef.current?.abort();
   }, []);
 
-  const handleGenerate = useCallback(async () => {
-    if (estimate && estimate.calls >= LargeEstimateCalls && !needsConfirm) {
-      setNeedsConfirm(true);
-      return;
-    }
+  const runGeneration = useCallback(async (override?: GenerationLimitsOverride) => {
     setNeedsConfirm(false);
     setError(null);
+    setLimitCode(null);
     setSteps([]);
     setGenerating(true);
+    const body = override ? { ...request, limits: override } : request;
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -138,14 +142,14 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
           onDraft(event.draft);
         }
         if (event.type === 'error') {
-          const message = event.message || event.detail || 'the generation failed';
-          setError(event.code === generationLimitCode ? `${message} ${generationLimitHint}` : message);
+          setError(event.message || event.detail || 'the generation failed');
+          setLimitCode(limitFieldFor(event.code) ? (event.code ?? null) : null);
         }
       };
       if (sourceMode === 'prompt') {
-        await APIClient.generateWorld(request, emit, controller.signal);
+        await APIClient.generateWorld(body, emit, controller.signal);
       } else {
-        await APIClient.ingestWorld(request, emit, controller.signal);
+        await APIClient.ingestWorld(body, emit, controller.signal);
       }
     } catch (err) {
       if (!controller.signal.aborted) {
@@ -155,7 +159,34 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
       setGenerating(false);
       abortRef.current = null;
     }
-  }, [estimate, needsConfirm, onDraft, request, sourceMode]);
+  }, [onDraft, request, sourceMode]);
+
+  const handleGenerate = useCallback(async () => {
+    if (estimate && estimate.calls >= LargeEstimateCalls && !needsConfirm) {
+      setNeedsConfirm(true);
+      return;
+    }
+    await runGeneration();
+  }, [estimate, needsConfirm, runGeneration]);
+
+  // Raising a limit and running again is one action, so a retry is a single
+  // click rather than a trip through Settings and back.
+  const handleRaiseAndRun = useCallback(
+    (raised: GenerationLimitsOverride) => {
+      setLimits(raised);
+      void runGeneration(raised);
+    },
+    [runGeneration]
+  );
+
+  const handleRaiseAndSave = useCallback(
+    (raised: GenerationLimitsOverride) => {
+      APIClient.raiseGenerationLimit(raised)
+        .then(() => handleRaiseAndRun(raised))
+        .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+    },
+    [handleRaiseAndRun]
+  );
 
   const handleCancel = useCallback(() => {
     abortRef.current?.abort();
@@ -206,10 +237,20 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
         </div>
 
         <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
-          {error && (
-            <div className="p-3 text-sm text-red-300 border border-red-500/30 rounded-xl bg-red-950/40">
-              {error}
-            </div>
+          {limitCode && error ? (
+            <GenerationLimitNotice
+              code={limitCode}
+              message={error}
+              busy={generating}
+              onRetry={handleRaiseAndRun}
+              onSave={handleRaiseAndSave}
+            />
+          ) : (
+            error && (
+              <div className="p-3 text-sm text-red-300 border border-red-500/30 rounded-xl bg-red-950/40">
+                {error}
+              </div>
+            )
           )}
 
           <div className="space-y-2">

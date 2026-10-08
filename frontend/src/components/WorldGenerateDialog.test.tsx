@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { WorldGenerateDialog } from './WorldGenerateDialog';
 import { APIClient, HTTPError } from '../api/client';
-import { WorldDraftInfo } from '../types';
+import { SettingsResponse, WorldDraftInfo } from '../types';
 
 const draft: WorldDraftInfo = {
   id: 'ashen-reach',
@@ -93,28 +93,74 @@ describe('WorldGenerateDialog', () => {
     expect(screen.getByText(/this fetches the pages you name/i)).toBeInTheDocument();
   });
 
-  it('points at the setting when a generation hits a limit', async () => {
-    vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (req, onEvent) => {
+  it('offers to raise the limit in place when a generation hits one', async () => {
+    const generate = vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (req, onEvent) => {
       if (req.dry_run) {
         onEvent({ type: 'estimate', estimate: { calls: 4, priced: false } });
         return;
       }
+      // The retry carries the raised limit, so it succeeds.
+      if (req.limits?.max_calls) {
+        onEvent({ type: 'draft', draft });
+        return;
+      }
       onEvent({
         type: 'error',
-        code: 'generation_limit',
-        message: 'generation call budget exceeded: 20 calls (raise generation.max_calls to allow more)',
+        code: 'generation_call_limit',
+        message: 'generation call budget exceeded: 20 calls',
       });
     });
+    vi.spyOn(APIClient, 'getSettings').mockResolvedValue({
+      config: { generation: { max_calls: 20 } },
+    } as unknown as SettingsResponse);
 
-    render(<WorldGenerateDialog onCancel={() => {}} onDraft={() => {}} estimateDelayMs={0} />);
+    const onDraft = vi.fn();
+    render(<WorldGenerateDialog onCancel={() => {}} onDraft={onDraft} estimateDelayMs={0} />);
 
     fireEvent.change(screen.getByLabelText(/premise/i), { target: { value: 'a drowned kingdom' } });
     await waitFor(() => expect(screen.getByTestId('generation-estimate')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
 
-    await waitFor(() =>
-      expect(screen.getByText(/settings .* AI Agents .* Generation Limits/i)).toBeInTheDocument()
-    );
+    // The notice offers the field, with a raised suggestion, and both choices.
+    const field = await screen.findByLabelText(/call limit/i);
+    await waitFor(() => expect(field).toHaveValue(40));
+    expect(screen.getByRole('button', { name: /use for this run/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save and use/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /use for this run/i }));
+
+    await waitFor(() => expect(onDraft).toHaveBeenCalledWith(draft));
+    expect(generate.mock.calls[generate.mock.calls.length - 1][0].limits).toEqual({ max_calls: 40 });
+  });
+
+  it('saves a raised limit when asked to make it stick', async () => {
+    vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (req, onEvent) => {
+      if (req.dry_run) {
+        onEvent({ type: 'estimate', estimate: { calls: 4, priced: false } });
+        return;
+      }
+      if (req.limits?.max_calls) {
+        onEvent({ type: 'draft', draft });
+        return;
+      }
+      onEvent({ type: 'error', code: 'generation_call_limit', message: 'generation call budget exceeded' });
+    });
+    vi.spyOn(APIClient, 'getSettings').mockResolvedValue({
+      config: { generation: { max_calls: 20 } },
+    } as unknown as SettingsResponse);
+    const save = vi.spyOn(APIClient, 'raiseGenerationLimit').mockResolvedValue(undefined);
+
+    const onDraft = vi.fn();
+    render(<WorldGenerateDialog onCancel={() => {}} onDraft={onDraft} estimateDelayMs={0} />);
+    fireEvent.change(screen.getByLabelText(/premise/i), { target: { value: 'a drowned kingdom' } });
+    await waitFor(() => expect(screen.getByTestId('generation-estimate')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
+
+    await screen.findByLabelText(/call limit/i);
+    fireEvent.click(screen.getByRole('button', { name: /save and use/i }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith({ max_calls: 40 }));
+    await waitFor(() => expect(onDraft).toHaveBeenCalledWith(draft));
   });
 
   it('hides the counts once a source decides how many entities exist', async () => {

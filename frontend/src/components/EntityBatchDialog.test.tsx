@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { EntityBatchDialog } from './EntityBatchDialog';
 import { APIClient, HTTPError } from '../api/client';
-import { WorldEntityBatch } from '../types';
+import { SettingsResponse, WorldEntityBatch } from '../types';
 
 const batch: WorldEntityBatch = {
   entities: [
@@ -146,14 +146,18 @@ describe('EntityBatchDialog', () => {
     await waitFor(() => expect(screen.getByLabelText(/folder path/i)).toHaveValue('/home/you/notes'));
   });
 
-  it('points at the setting when the source is over the chunk limit', async () => {
-    vi.spyOn(APIClient, 'previewWorldEntities').mockRejectedValue(
-      new HTTPError(
+  it('offers to raise the source limit in place, then extracts', async () => {
+    const preview = vi.spyOn(APIClient, 'previewWorldEntities').mockImplementation(async (_worldId, req) => {
+      if (req.limits?.max_chunks) return batch;
+      throw new HTTPError(
         400,
-        'the source is larger than the chunk limit: it holds 300 chunks and generation.max_chunks is 200',
-        'generation_limit'
-      )
-    );
+        'the source is larger than the chunk limit: it holds 300 chunks and the limit is 200',
+        'generation_source_limit'
+      );
+    });
+    vi.spyOn(APIClient, 'getSettings').mockResolvedValue({
+      config: { generation: { max_chunks: 200 } },
+    } as unknown as SettingsResponse);
 
     render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
 
@@ -161,11 +165,37 @@ describe('EntityBatchDialog', () => {
     fireEvent.change(screen.getByLabelText(/folder path/i), { target: { value: '/tmp/big' } });
     fireEvent.click(screen.getByRole('button', { name: /^extract$/i }));
 
-    await waitFor(() =>
-      expect(screen.getByText(/settings .* AI Agents .* Generation Limits/i)).toBeInTheDocument()
-    );
+    const field = await screen.findByLabelText(/source chunk limit/i);
+    await waitFor(() => expect(field).toHaveValue(400));
     // The raw envelope is not shown to the user.
     expect(screen.queryByText(/^\{/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /use for this run/i }));
+
+    await waitFor(() => expect(screen.getByText('The Tidewatch')).toBeInTheDocument());
+    expect(preview.mock.calls[preview.mock.calls.length - 1][1].limits).toEqual({ max_chunks: 400 });
+  });
+
+  it('saves a raised source limit when asked to make it stick', async () => {
+    vi.spyOn(APIClient, 'previewWorldEntities').mockImplementation(async (_worldId, req) => {
+      if (req.limits?.max_chunks) return batch;
+      throw new HTTPError(400, 'the source is larger than the chunk limit', 'generation_source_limit');
+    });
+    vi.spyOn(APIClient, 'getSettings').mockResolvedValue({
+      config: { generation: { max_chunks: 200 } },
+    } as unknown as SettingsResponse);
+    const save = vi.spyOn(APIClient, 'raiseGenerationLimit').mockResolvedValue(undefined);
+
+    render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /folder/i }));
+    fireEvent.change(screen.getByLabelText(/folder path/i), { target: { value: '/tmp/big' } });
+    fireEvent.click(screen.getByRole('button', { name: /^extract$/i }));
+
+    await screen.findByLabelText(/source chunk limit/i);
+    fireEvent.click(screen.getByRole('button', { name: /save and use/i }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith({ max_chunks: 400 }));
+    await waitFor(() => expect(screen.getByText('The Tidewatch')).toBeInTheDocument());
   });
 
   it('will not extract without a source', () => {

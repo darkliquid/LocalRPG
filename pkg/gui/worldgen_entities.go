@@ -84,12 +84,12 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 		return nil, err
 	}
 
+	limits := s.limitsFor(req.Limits)
 	gen, _ := s.worldGenerator()
-	budget := &worldgen.BudgetGenerator{Inner: gen, Max: s.configMgr.Get().GenerationMaxCalls()}
 
 	var batch []worldgen.DraftEntity
 	if req.Source != nil {
-		chunks, err := s.extractSource(ctx, *req.Source)
+		chunks, err := s.extractSource(ctx, *req.Source, limits.MaxChunks)
 		if err != nil {
 			return nil, err
 		}
@@ -101,6 +101,7 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 			return nil, err
 		}
 	} else {
+		budget := &worldgen.BudgetGenerator{Inner: gen, Max: limits.MaxCalls}
 		batch, err = worldgen.GenerateEntities(ctx, budget, world, worldgen.EntityRequest{
 			WorldID:     worldID,
 			Instruction: req.Instruction,

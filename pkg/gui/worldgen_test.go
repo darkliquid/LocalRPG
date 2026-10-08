@@ -818,8 +818,8 @@ func TestSourceOverTheChunkLimitIsRefusedBeforeAnyCall(t *testing.T) {
 	if !errors.Is(err, ErrSourceTooLarge) {
 		t.Fatalf("err = %v, want ErrSourceTooLarge", err)
 	}
-	if !containsStrings(err.Error(), "max_chunks", "3 chunks") {
-		t.Fatalf("the refusal should name the setting and the size: %v", err)
+	if !containsStrings(err.Error(), "3 chunks", "the limit is 1") {
+		t.Fatalf("the refusal should report the size and the limit: %v", err)
 	}
 	if provider.count() != 0 {
 		t.Fatalf("a refused source made %d call(s)", provider.count())
@@ -856,11 +856,11 @@ func TestIngestionIsBoundedByChunksNotTheCallCap(t *testing.T) {
 	}
 }
 
-func TestGenerationLimitCodeNamesTheFailingSetting(t *testing.T) {
-	if got := generationLimitCode(worldgen.ErrCallBudgetExceeded); got != ErrorCodeGenerationLimit {
+func TestGenerationLimitCodeNamesTheLimitThatStoppedIt(t *testing.T) {
+	if got := generationLimitCode(worldgen.ErrCallBudgetExceeded); got != ErrorCodeCallLimit {
 		t.Fatalf("call budget code = %q", got)
 	}
-	if got := generationLimitCode(fmt.Errorf("wrapped: %w", ErrSourceTooLarge)); got != ErrorCodeGenerationLimit {
+	if got := generationLimitCode(fmt.Errorf("wrapped: %w", ErrSourceTooLarge)); got != ErrorCodeSourceLimit {
 		t.Fatalf("source size code = %q", got)
 	}
 	if got := generationLimitCode(errors.New("something else")); got != "" {
@@ -905,5 +905,69 @@ func TestCommitDraftFilesEntitiesByFolder(t *testing.T) {
 	}
 	if folders["saltmarch"] != "locations" || folders["maren"] != "characters" {
 		t.Fatalf("folders = %+v", folders)
+	}
+}
+
+func TestARequestCanRaiseTheChunkLimitForItself(t *testing.T) {
+	provider := &sequencedProvider{id: "gen"}
+	svc := worldGenService(t, provider)
+	world := mustCreateWorld(t, svc, "Ember Peak")
+	svc.configMgr.Get().Generation.MaxChunks = 1
+
+	dir := t.TempDir()
+	for i := 0; i < 5; i++ {
+		name := filepath.Join(dir, fmt.Sprintf("note-%d.md", i))
+		if err := os.WriteFile(name, []byte("# Note\n\nSome lore.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	source := &WorldSourceDTO{Kind: "folder", Path: dir}
+
+	// The configured limit refuses it.
+	if _, err := svc.PreviewWorldEntities(context.Background(), world.ID, WorldEntityBatchRequestDTO{
+		Source: source,
+	}); !errors.Is(err, ErrSourceTooLarge) {
+		t.Fatalf("err = %v, want ErrSourceTooLarge", err)
+	}
+
+	// Raising it for this request carries on without touching the config.
+	batch, err := svc.PreviewWorldEntities(context.Background(), world.ID, WorldEntityBatchRequestDTO{
+		Source: source,
+		Limits: &GenerationLimitsDTO{MaxChunks: 100},
+	})
+	if err != nil {
+		t.Fatalf("an override should let the import through: %v", err)
+	}
+	if batch == nil {
+		t.Fatal("expected a batch")
+	}
+	if got := svc.configMgr.Get().GenerationMaxChunks(); got != 1 {
+		t.Fatalf("the override changed the config: max_chunks = %d", got)
+	}
+}
+
+func TestARequestCanRaiseTheCallLimitForItself(t *testing.T) {
+	provider := &sequencedProvider{id: "gen", responses: []string{fullWorldScript}}
+	svc := worldGenService(t, provider)
+	svc.configMgr.Get().Generation.MaxCalls = 2
+
+	noop := func(TurnEvent) error { return nil }
+
+	if _, err := svc.GenerateWorld(context.Background(), WorldGenerateRequestDTO{Premise: "x"}, noop); !errors.Is(err, worldgen.ErrCallBudgetExceeded) {
+		t.Fatalf("err = %v, want ErrCallBudgetExceeded", err)
+	}
+
+	draft, err := svc.GenerateWorld(context.Background(), WorldGenerateRequestDTO{
+		Premise: "x",
+		Limits:  &GenerationLimitsDTO{MaxCalls: 10},
+	}, noop)
+	if err != nil {
+		t.Fatalf("an override should let the generation finish: %v", err)
+	}
+	if draft == nil || draft.Name == "" {
+		t.Fatalf("draft = %+v", draft)
+	}
+	if got := svc.configMgr.Get().GenerationMaxCalls(); got != 2 {
+		t.Fatalf("the override changed the config: max_calls = %d", got)
 	}
 }

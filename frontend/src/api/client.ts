@@ -42,6 +42,7 @@ import {
   DraftCommitRequest,
   DraftDiscardRequest,
   DirectoryChoice,
+  GenerationLimitsOverride,
   AppConfig,
   SettingsResponse,
   TestProviderRequest,
@@ -662,6 +663,18 @@ export class APIClient {
     if (!res.ok) throw await errorFromResponse(res, res.statusText);
     if (!res.body) throw new Error('ingestWorld: response has no body');
     await readNDJSON(res, onEvent);
+  }
+
+  // raiseGenerationLimit persists a higher limit, so the next run does not need
+  // the same override again. It re-reads the config first, because the settings
+  // API replaces the whole document.
+  static async raiseGenerationLimit(patch: GenerationLimitsOverride): Promise<void> {
+    const current = await APIClient.getSettings();
+    const next: AppConfig = {
+      ...current.config,
+      generation: { ...current.config.generation, ...patch },
+    };
+    await APIClient.saveSettings(next);
   }
 
   // getDraft restores a persisted draft, so a reload resumes review.

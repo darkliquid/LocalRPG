@@ -22,14 +22,41 @@ const (
 	WorldEventDraft    = "draft"
 )
 
-// ErrorCodeGenerationLimit marks a failure the user can fix by changing a
-// setting, so the UI can say where rather than only printing the text.
-const ErrorCodeGenerationLimit = "generation_limit"
+// ErrorCodeCallLimit and ErrorCodeSourceLimit mark a failure the user can fix by
+// raising a limit. They are separate so the UI can offer the field that caused it
+// rather than guessing from the message.
+const (
+	ErrorCodeCallLimit   = "generation_call_limit"
+	ErrorCodeSourceLimit = "generation_source_limit"
+)
 
 // ErrSourceTooLarge reports a source that would need more calls than the chunk
 // budget allows. It is refused before the first call, so a large folder costs
 // nothing and the message names the setting that would let it through.
 var ErrSourceTooLarge = errors.New("the source is larger than the chunk limit")
+
+// generationLimits are the limits one generation runs under.
+type generationLimits struct {
+	MaxCalls  int
+	MaxChunks int
+}
+
+// limitsFor resolves the limits a request runs under. A per-request override wins
+// over the configured default, so a user who hits a limit can raise it for the
+// run in front of them without leaving it raised for every later run.
+func (s *Service) limitsFor(override *GenerationLimitsDTO) generationLimits {
+	cfg := s.configMgr.Get()
+	limits := generationLimits{MaxCalls: cfg.GenerationMaxCalls(), MaxChunks: cfg.GenerationMaxChunks()}
+	if override != nil {
+		if override.MaxCalls > 0 {
+			limits.MaxCalls = override.MaxCalls
+		}
+		if override.MaxChunks > 0 {
+			limits.MaxChunks = override.MaxChunks
+		}
+	}
+	return limits
+}
 
 // generatorRole is the role a world generation runs as when one is configured.
 const generatorRole = "generator"
@@ -225,6 +252,7 @@ func (s *Service) worldPriceTable(role string) worldgen.PriceTable {
 // for review.
 func (s *Service) GenerateWorld(ctx context.Context, req WorldGenerateRequestDTO, emit func(TurnEvent) error) (*WorldDraftDTO, error) {
 	brief := req.brief()
+	limits := s.limitsFor(req.Limits)
 	role := resolveGeneratorRole(s.configMgr.Get())
 	chunks := 0
 	if req.Source != nil && strings.EqualFold(req.Source.Kind, "url") {
@@ -262,16 +290,16 @@ func (s *Service) GenerateWorld(ctx context.Context, req WorldGenerateRequestDTO
 	var genErr error
 
 	if req.Source != nil {
-		chunks, err := s.extractSource(ctx, *req.Source)
+		sourceChunks, err := s.extractSource(ctx, *req.Source, limits.MaxChunks)
 		if err != nil {
 			return nil, err
 		}
 		// An ingestion is as big as the source is, so its budget follows the
 		// chunk cap rather than the bounded pipeline's call cap.
-		budget = &worldgen.BudgetGenerator{Inner: gen, Max: worldgen.ChunkCalls(len(chunks))}
-		genErr = s.buildFromChunks(genCtx, budget, brief, chunks, emitEvent, &draft)
+		budget = &worldgen.BudgetGenerator{Inner: gen, Max: worldgen.ChunkCalls(len(sourceChunks))}
+		genErr = s.buildFromChunks(genCtx, budget, brief, sourceChunks, emitEvent, &draft)
 	} else {
-		budget = &worldgen.BudgetGenerator{Inner: gen, Max: s.configMgr.Get().GenerationMaxCalls()}
+		budget = &worldgen.BudgetGenerator{Inner: gen, Max: limits.MaxCalls}
 		draft, genErr = worldgen.Generate(genCtx, budget, brief, func(step worldgen.Step) {
 			emitEvent(TurnEvent{Type: WorldEventStep, Step: stepDTO(step)})
 		})
@@ -328,9 +356,9 @@ func (s *Service) buildFromChunks(ctx context.Context, gen worldgen.Generator, b
 }
 
 // extractSource reads a source and refuses one over the chunk budget. Refusing
-// up front means a folder too large to read costs nothing and names the setting
-// that would let it through, rather than failing partway through the calls.
-func (s *Service) extractSource(ctx context.Context, src WorldSourceDTO) ([]ingest.Chunk, error) {
+// up front means a folder too large to read costs nothing and the message says
+// how much it holds, so the user can raise the limit and carry on.
+func (s *Service) extractSource(ctx context.Context, src WorldSourceDTO, maxChunks int) ([]ingest.Chunk, error) {
 	chunks, err := ingest.Extract(ctx, ingest.Source{
 		Kind: src.Kind,
 		Path: src.Path,
@@ -339,9 +367,9 @@ func (s *Service) extractSource(ctx context.Context, src WorldSourceDTO) ([]inge
 	if err != nil {
 		return nil, err
 	}
-	if max := s.configMgr.Get().GenerationMaxChunks(); len(chunks) > max {
-		return nil, fmt.Errorf("%w: it holds %d chunks and generation.max_chunks is %d",
-			ErrSourceTooLarge, len(chunks), max)
+	if len(chunks) > maxChunks {
+		return nil, fmt.Errorf("%w: it holds %d chunks and the limit is %d",
+			ErrSourceTooLarge, len(chunks), maxChunks)
 	}
 	return chunks, nil
 }
