@@ -697,6 +697,9 @@ type WorldEntityBatchDTO struct {
 	// Oracle marks a batch the deterministic fallback produced, so the review can
 	// say so rather than implying a model wrote it.
 	Oracle bool `json:"oracle,omitempty"`
+	// CutOff counts the batches whose reply ran out of room, so a short import is
+	// not mistaken for a complete one once the progress has gone.
+	CutOff int `json:"cut_off,omitempty"`
 }
 
 // WorldEntityAcceptRequestDTO accepts a previewed batch.

@@ -99,3 +99,28 @@ func TestArrayElementsStopsAtTheEnclosingArray(t *testing.T) {
 		t.Fatalf("elements = %q, want none", got)
 	}
 }
+
+func TestRepairReportsTheFurthestAttemptWhenNothingValidates(t *testing.T) {
+	// A reply that was fenced and then cut off. The fence is gone, so an error
+	// quotes the cut rather than the backticks, and a caller salvaging elements
+	// starts from the JSON instead of from Markdown.
+	// The cut is inside a string, which closing structures cannot repair.
+	in := []byte("```json\n{\"entities\":[{\"name\":\"A\"},{\"name\":\"B")
+	got := Repair(in)
+	if got.OK {
+		t.Fatalf("payload should not validate: %q", got.Payload)
+	}
+	if !bytes.HasPrefix(got.Payload, []byte("{")) {
+		t.Fatalf("the fence should be stripped from the reported payload: %q", got.Payload)
+	}
+	if len(ArrayElements(got.Payload)) != 1 {
+		t.Fatalf("elements = %q, want the one complete element", ArrayElements(got.Payload))
+	}
+}
+
+func TestRepairLeavesAnUnrepairablePayloadAlone(t *testing.T) {
+	in := []byte("no json here at all")
+	if got := Repair(in); got.OK || string(got.Payload) != string(in) {
+		t.Fatalf("payload = %q, want the input unchanged", got.Payload)
+	}
+}

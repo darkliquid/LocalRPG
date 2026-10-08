@@ -2,6 +2,7 @@ package worldgen
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -68,15 +69,14 @@ func GenerateEntities(ctx context.Context, gen Generator, world WorldContext, re
 		return nil, err
 	}
 	var out struct {
-		Entities []struct {
-			Name        string   `json:"name"`
-			Type        string   `json:"type"`
-			Description string   `json:"description"`
-			Tags        []string `json:"tags"`
-		} `json:"entities"`
+		Entities []entitySpec `json:"entities"`
 	}
 	if err := decodeJSON(raw, &out); err != nil {
-		return nil, err
+		// A reply cut off part-way still holds the entities it managed to write.
+		out.Entities = salvageEntitySpecs(raw)
+		if len(out.Entities) == 0 {
+			return nil, err
+		}
 	}
 
 	batch := make([]DraftEntity, 0, len(out.Entities))
@@ -102,6 +102,27 @@ func GenerateEntities(ctx context.Context, gen Generator, world WorldContext, re
 		}
 	}
 	return linkBatch(batch, world.Entities), nil
+}
+
+// entitySpec is one entity as a batch reply returns it.
+type entitySpec struct {
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
+}
+
+// salvageEntitySpecs reads the entity objects out of a reply that did not parse
+// as a whole, so a reply cut off by a token limit still yields what it wrote.
+func salvageEntitySpecs(raw []byte) []entitySpec {
+	var specs []entitySpec
+	for _, element := range SalvageObjects(raw) {
+		var spec entitySpec
+		if err := json.Unmarshal(element, &spec); err == nil && spec.Name != "" {
+			specs = append(specs, spec)
+		}
+	}
+	return specs
 }
 
 // normalizeEntityRequest clamps a request so one call cannot ask for an

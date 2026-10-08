@@ -765,6 +765,16 @@ func truncate(s string, limit int) string {
 	return strings.TrimSpace(string(runes[:limit])) + "..."
 }
 
+// replyTail is the last few bytes of a reply, so a failure report shows whether
+// the model stopped mid-word.
+func replyTail(payload []byte) string {
+	const window = 40
+	if len(payload) <= window {
+		return string(payload)
+	}
+	return "..." + string(payload[len(payload)-window:])
+}
+
 // decodeReply parses one batch's reply, salvaging the entities from a reply that
 // ran out of room. A response cut off mid-entity is not a failed response: the
 // entities before the cut are whole, and a long import cannot afford to lose a
@@ -785,14 +795,17 @@ func decodeReply(raw []byte) (ingestReply, bool, error) {
 	// The reply did not parse as a whole. It may still hold the entities written
 	// before it was cut off, so keep those rather than losing the batch.
 	salvaged := ingestReply{}
-	for _, element := range jsonrepair.ArrayElements(payload) {
+	for _, element := range worldgen.SalvageObjects(payload) {
 		var entity ingestEntity
 		if err := json.Unmarshal(element, &entity); err == nil && entity.Name != "" {
 			salvaged.Entities = append(salvaged.Entities, entity)
 		}
 	}
 	if len(salvaged.Entities) == 0 {
-		return ingestReply{}, false, fmt.Errorf("ingest: parse model reply: %w", parseErr)
+		// The length and the tail tell a cut-off reply from a reply that was never
+		// JSON, which the unmarshal error alone does not.
+		return ingestReply{}, false, fmt.Errorf("ingest: parse model reply (%d bytes, ending %q): %w",
+			len(payload), replyTail(payload), parseErr)
 	}
 	return salvaged, true, nil
 }

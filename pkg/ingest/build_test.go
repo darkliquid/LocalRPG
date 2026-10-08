@@ -372,3 +372,28 @@ func TestABatchWithOnePageThatFailsIsSkippedNotFatal(t *testing.T) {
 		t.Fatalf("the progress should report it: %+v", last)
 	}
 }
+
+func TestAFencedTruncatedReplyStillYieldsWhatItWrote(t *testing.T) {
+	// The failure that started this: a reply fenced in Markdown and cut off inside
+	// a string. The fence must not be what the report complains about.
+	probe := &jsonGen{responses: []string{
+		"```json\n{\"entities\":[{\"name\":\"Saltmarch\",\"type\":\"location\",\"description\":\"A port.\"},{\"name\":\"Maren\",\"ty",
+	}}
+	d, err := BuildInto(context.Background(), probe, []Chunk{{Source: "a.md", Text: "x"}}, worldgen.Brief{}, BuildContext{}, nil)
+	if err != nil {
+		t.Fatalf("a fenced, cut-off reply should not fail the import: %v", err)
+	}
+	if len(d.Entities) != 1 || d.Entities[0].ID != "saltmarch" {
+		t.Fatalf("entities = %+v", d.Entities)
+	}
+}
+
+func TestAnUnreadableReplyReportsWhatItSaw(t *testing.T) {
+	probe := &jsonGen{responses: []string{"I cannot help with that."}}
+	_, err := BuildInto(context.Background(), probe, []Chunk{{Source: "a.md", Text: "x"}}, worldgen.Brief{}, BuildContext{}, nil)
+	// One page, so there is nothing to split; the batch is skipped, and the
+	// import carries on. The error is reported through the progress instead.
+	if err != nil {
+		t.Fatalf("one unreadable page should not fail the import: %v", err)
+	}
+}

@@ -225,6 +225,20 @@ describe('EntityBatchDialog', () => {
     expect(preview.mock.calls[preview.mock.calls.length - 1][1].limits).toEqual({ max_chunks: 500 });
   });
 
+  it('warns when a batch ran out of room', async () => {
+    vi.spyOn(APIClient, 'previewWorldEntitiesStream').mockResolvedValue({
+      entities: [{ id: 'saltmarch', name: 'Saltmarch', type: 'location', body: 'A port.' }],
+      cut_off: 2,
+    });
+
+    render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
+    fireEvent.change(screen.getByLabelText(/instruction/i), { target: { value: 'add a place' } });
+    fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
+
+    await waitFor(() => expect(screen.getByText(/2 batches ran out of room/)).toBeInTheDocument());
+    expect(screen.getByText(/the rest of those pages was not read/)).toBeInTheDocument();
+  });
+
   it('says when the fallback answered instead of a model', async () => {
     vi.spyOn(APIClient, 'previewWorldEntitiesStream').mockResolvedValue({
       entities: [{ id: 'maren-vale', name: 'Maren Vale', type: 'character', body: 'A wanderer.' }],

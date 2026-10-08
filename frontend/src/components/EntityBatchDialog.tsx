@@ -190,6 +190,14 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
 
         <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
           {loading && progress && <ImportProgressPanel progress={progress} />}
+          {!loading && batch?.cut_off ? (
+            <p className="p-3 text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200">
+              {batch.cut_off} {batch.cut_off === 1 ? 'batch' : 'batches'} ran out of room before
+              finishing. What they wrote was kept; the rest of{' '}
+              {batch.cut_off === 1 ? 'that page' : 'those pages'} was not read. A smaller source
+              chunk limit, or a provider with more context, would read it all.
+            </p>
+          ) : null}
           {batch?.oracle && (
             <p className="p-3 text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200">
               No model provider is configured, so these came from the built-in template generator

@@ -86,3 +86,25 @@ func TestGenerateEntitiesWithoutAGeneratorErrors(t *testing.T) {
 		t.Fatal("a nil generator must error")
 	}
 }
+
+func TestGenerateEntitiesKeepsWhatATruncatedReplyWrote(t *testing.T) {
+	// A reply cut off inside a string, which closing structures cannot repair.
+	g := &jsonGen{responses: []string{
+		"```json\n{\"entities\":[{\"name\":\"A\",\"type\":\"faction\",\"description\":\"First.\"},{\"name\":\"B",
+	}}
+	got, err := GenerateEntities(context.Background(), g, WorldContext{ID: "w"}, EntityRequest{Count: 5})
+	if err != nil {
+		t.Fatalf("a cut-off reply should not fail the batch: %v", err)
+	}
+	if len(got) != 1 || got[0].Name != "A" {
+		t.Fatalf("entities = %+v", got)
+	}
+}
+
+func TestSalvageObjectsStripsAFence(t *testing.T) {
+	raw := []byte("```json\n{\"entities\":[{\"name\":\"A\"},{\"name\":\"B")
+	got := SalvageObjects(raw)
+	if len(got) != 1 || string(got[0]) != `{"name":"A"}` {
+		t.Fatalf("objects = %q", got)
+	}
+}

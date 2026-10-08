@@ -20,7 +20,11 @@ const (
 	KindTrailingComma Kind = "trailing_comma"
 )
 
-// Result reports what a repair did. Payload equals the input when OK is false.
+// Result reports what a repair did. When OK is false, Payload holds the furthest
+// repair attempted rather than the input: a caller salvaging what a cut-off reply
+// managed to write needs the fence stripped and the prose trimmed, and an error
+// that quotes the fence points at the wrong problem. Payload is the input only
+// when no repair could be attempted at all.
 type Result struct {
 	Payload []byte
 	Kind    Kind
@@ -62,7 +66,7 @@ func Repair(payload []byte) Result {
 			return Result{Payload: cur, Kind: KindTrailingComma, OK: true}
 		}
 	}
-	return Result{Payload: payload}
+	return Result{Payload: cur}
 }
 
 // stripFence removes one Markdown code fence around the payload.

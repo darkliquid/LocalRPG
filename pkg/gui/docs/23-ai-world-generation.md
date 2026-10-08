@@ -76,7 +76,7 @@ Notes are filed by kind: `entities/locations/`, `entities/characters/`, `entitie
 
 An import is one call per four chunks, so a large folder is a long run of calls. The dialog reports each batch as it finishes: how many batches the source needs, which files that batch read, how many entities the import has found, and how long is left. The estimate comes from the batches already done, so it sharpens as the run goes.
 
-A batch whose reply runs out of room is not a lost batch. LocalRPG keeps the entities the reply wrote before it was cut off, and reports the count in the progress. If a reply cannot be read at all, the batch is halved and read again, down to one page, so one oversized call does not cost a fifty-call import.
+A batch whose reply runs out of room is not a lost batch. LocalRPG keeps the entities the reply wrote before it was cut off, and reports the count in the progress and in the review, so a short import cannot pass for a complete one. If a reply cannot be read at all, the batch is halved and read again, down to one page, so one oversized call does not cost a fifty-call import.
 
 The chunk limit and the estimated call count are under [Cost controls](#cost-controls) below, and the review shows what every call produced. LocalRPG writes nothing until you accept it.
 

@@ -95,6 +95,7 @@ func (s *Service) PreviewWorldEntitiesStream(ctx context.Context, worldID string
 	resolved := s.resolveWorldGenerator()
 
 	var batch []worldgen.DraftEntity
+	var cutOff int
 	if req.Source != nil {
 		// An import reads the user's source, so the template fallback cannot
 		// stand in for a model: it would answer with fixed names and no error.
@@ -109,7 +110,7 @@ func (s *Service) PreviewWorldEntitiesStream(ctx context.Context, worldID string
 		// An extraction is as big as the source is, so its budget follows the
 		// chunk cap rather than the bounded pipeline's call cap.
 		fromSource := &worldgen.BudgetGenerator{Inner: gen, Max: worldgen.ChunkCalls(len(chunks))}
-		batch, err = s.entitiesFromChunks(ctx, fromSource, world, req, chunks, emit)
+		batch, cutOff, err = s.entitiesFromChunks(ctx, fromSource, world, req, chunks, emit)
 		if err != nil {
 			return nil, err
 		}
@@ -133,6 +134,7 @@ func (s *Service) PreviewWorldEntitiesStream(ctx context.Context, worldID string
 	out := &WorldEntityBatchDTO{
 		Entities: make([]WorldDraftEntityDTO, 0, len(batch)),
 		Oracle:   resolved.Oracle,
+		CutOff:   cutOff,
 	}
 	for _, e := range batch {
 		out.Entities = append(out.Entities, draftEntityDTO(e))
@@ -141,8 +143,11 @@ func (s *Service) PreviewWorldEntitiesStream(ctx context.Context, worldID string
 }
 
 // entitiesFromChunks extracts entities from already-read chunks, links them
-// against the world they are being added to, and reports each batch.
-func (s *Service) entitiesFromChunks(ctx context.Context, gen worldgen.Generator, world worldgen.WorldContext, req WorldEntityBatchRequestDTO, chunks []ingest.Chunk, emit func(TurnEvent) error) ([]worldgen.DraftEntity, error) {
+// against the world they are being added to, and reports each batch. It also
+// reports how many batches ran out of room, so a short batch is not mistaken for
+// a complete one after the progress has gone.
+func (s *Service) entitiesFromChunks(ctx context.Context, gen worldgen.Generator, world worldgen.WorldContext, req WorldEntityBatchRequestDTO, chunks []ingest.Chunk, emit func(TurnEvent) error) ([]worldgen.DraftEntity, int, error) {
+	var cutOff int
 	draft, err := ingest.BuildInto(ctx, gen, chunks, worldgen.Brief{Premise: req.Instruction}, ingest.BuildContext{
 		Name:        world.Name,
 		Genre:       world.Genre,
@@ -150,17 +155,18 @@ func (s *Service) entitiesFromChunks(ctx context.Context, gen worldgen.Generator
 		Lore:        world.Lore,
 		Entities:    world.Entities,
 	}, func(p ingest.Progress) {
+		cutOff = p.CutOff
 		if emit != nil {
 			_ = emit(TurnEvent{Type: WorldEventProgress, Progress: importProgressDTO(p)})
 		}
 	})
 	if err != nil {
 		if errors.Is(err, worldgen.ErrCallBudgetExceeded) {
-			return nil, fmt.Errorf("generation stopped: %w", err)
+			return nil, 0, fmt.Errorf("generation stopped: %w", err)
 		}
-		return nil, err
+		return nil, 0, err
 	}
-	return draft.Entities, nil
+	return draft.Entities, cutOff, nil
 }
 
 // AcceptWorldEntities writes a reviewed batch into worlds/<id>/entities/. It

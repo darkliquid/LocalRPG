@@ -380,6 +380,9 @@ export interface WorldEntityBatch {
   // oracle marks a batch the deterministic fallback produced, so the dialog can
   // say so rather than implying a model wrote it.
   oracle?: boolean;
+  // cut_off counts the batches whose reply ran out of room, so a short import is
+  // not mistaken for a complete one.
+  cut_off?: number;
 }
 
 export interface WorldEntityAcceptRequest {

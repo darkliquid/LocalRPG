@@ -203,6 +203,17 @@ func clamp(v, low, high int) int {
 	return v
 }
 
+// SalvageObjects returns the complete objects of a reply that holds an array of
+// them, even when the reply was cut off part-way. A response that ran out of room
+// is not a failed response: the objects written before the cut are whole, and a
+// long generation cannot afford to lose a call, or to fail outright, because one
+// reply was longer than the model had room for.
+func SalvageObjects(raw []byte) [][]byte {
+	// The furthest repair is used whether or not it validated: it has the fence
+	// stripped and the prose trimmed, and the complete objects are still whole.
+	return jsonrepair.ArrayElements(jsonrepair.Repair(raw).Payload)
+}
+
 // decodeJSON repairs a model reply that is fenced, padded with prose, or
 // unterminated, then unmarshals it into v.
 func decodeJSON(raw []byte, v any) error {
@@ -211,9 +222,21 @@ func decodeJSON(raw []byte, v any) error {
 		payload = res.Payload
 	}
 	if err := json.Unmarshal(payload, v); err != nil {
-		return fmt.Errorf("parse model reply: %w", err)
+		// The length and the tail tell a cut-off reply from a reply that was never
+		// JSON, which the unmarshal error alone does not.
+		return fmt.Errorf("parse model reply (%d bytes, ending %q): %w", len(payload), replyTail(payload), err)
 	}
 	return nil
+}
+
+// replyTail is the last few bytes of a reply, so a failure report shows whether
+// the model stopped mid-word.
+func replyTail(payload []byte) string {
+	const window = 40
+	if len(payload) <= window {
+		return string(payload)
+	}
+	return "..." + string(payload[len(payload)-window:])
 }
 
 // linkDraft validates every wikilink in every entity body against the draft's
