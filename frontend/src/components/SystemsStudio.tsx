@@ -343,7 +343,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               type="file"
               ref={importInputRef}
               onChange={handleFileSelect}
-              accept=".lrpgpack,application/gzip,application/x-gzip"
+              accept=".lrpgpack"
               className="hidden"
             />
             <button

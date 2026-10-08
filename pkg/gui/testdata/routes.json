@@ -5,6 +5,7 @@
   "/api/config/offline-report",
   "/api/content/export",
   "/api/content/import",
+  "/api/dialog/",
   "/api/docs",
   "/api/docs/",
   "/api/export",

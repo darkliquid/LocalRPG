@@ -116,7 +116,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
   const handleBrowse = useCallback(async () => {
     setError(null);
     try {
-      const chosen = await APIClient.chooseExportDirectory();
+      const chosen = await APIClient.chooseDirectory('Choose an export destination');
       if (chosen) setOutDir(chosen);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to open the directory dialog');

@@ -613,40 +613,40 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
     <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
       {/* Left Master Column: Worlds List */}
       <aside className="w-full md:w-80 h-full bg-stone-950/70 border-r border-white/10 p-4 flex flex-col gap-4 shrink-0 overflow-hidden">
-        <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
+        <div className="flex flex-col gap-2 pb-2 border-b border-stone-800/60 shrink-0">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-purple-400" />
             <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">
               Worlds Studio
             </h3>
           </div>
+          <input
+            type="file"
+            ref={importInputRef}
+            onChange={handleFileSelect}
+            accept=".lrpgpack"
+            className="hidden"
+          />
           <div className="flex items-center gap-1.5">
-            <input
-              type="file"
-              ref={importInputRef}
-              onChange={handleFileSelect}
-              accept=".lrpgpack,application/gzip,application/x-gzip"
-              className="hidden"
-            />
-            <button
-              onClick={() => importInputRef.current?.click()}
-              title="Import content package (.lrpgpack)"
-              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Import</span>
-            </button>
             <button
               onClick={() => setShowGenerate(true)}
               title="Generate a world with AI"
-              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-purple-500/40 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 transition-all cursor-pointer"
+              className="flex-1 flex items-center justify-center gap-1 text-xs font-sans px-2 py-1.5 rounded-lg border border-purple-500/40 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 transition-all cursor-pointer whitespace-nowrap"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>Generate</span>
             </button>
             <button
+              onClick={() => importInputRef.current?.click()}
+              title="Import content package (.lrpgpack)"
+              className="flex-1 flex items-center justify-center gap-1 text-xs font-sans px-2 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Import</span>
+            </button>
+            <button
               onClick={() => requestSelection({ kind: 'draft' })}
-              className="flex items-center gap-1 text-xs font-sans font-bold px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow"
+              className="flex-1 flex items-center justify-center gap-1 text-xs font-sans font-bold px-2 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow whitespace-nowrap"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New</span>

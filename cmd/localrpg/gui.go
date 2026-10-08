@@ -182,13 +182,16 @@ func handleGUICommand(args []string) {
 	// dialogs must run on the application's main thread, and this callback is
 	// reached from an HTTP handler goroutine, so the dialog is marshalled over.
 	// A dismissed dialog is reported as a cancellation, not a failure.
-	svc.SetDirectoryPicker(func(defaultDir string) (string, error) {
+	svc.SetDirectoryPicker(func(title, defaultDir string) (string, error) {
 		return application.InvokeSyncWithResultAndError(func() (string, error) {
+			if title == "" {
+				title = "Choose a folder"
+			}
 			dialog := app.Dialog.OpenFile().
 				CanChooseDirectories(true).
 				CanChooseFiles(false).
 				CanCreateDirectories(true).
-				SetTitle("Choose an export destination")
+				SetTitle(title)
 			if defaultDir != "" {
 				dialog = dialog.SetDirectory(defaultDir)
 			}

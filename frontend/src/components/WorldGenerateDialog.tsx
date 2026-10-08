@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, FolderOpen, Globe, Sparkles, Wand2, X } from 'lucide-react';
-import { APIClient } from '../api/client';
+import { APIClient, HTTPError } from '../api/client';
 import { TurnEvent, WorldDraftInfo, WorldEstimate, WorldGenStep } from '../types';
 
 // LargeEstimateCalls is the call count above which Generate asks for a second
@@ -43,6 +43,8 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
   const [sourceMode, setSourceMode] = useState<SourceMode>('prompt');
   const [folderPath, setFolderPath] = useState('');
   const [urls, setUrls] = useState('');
+  const [browsing, setBrowsing] = useState(false);
+  const [browseUnavailable, setBrowseUnavailable] = useState(false);
 
   const [estimate, setEstimate] = useState<WorldEstimate | null>(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
@@ -60,12 +62,14 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
     [urls]
   );
 
+  // A source decides how many entities exist, so counts are sent for a premise
+  // generation only.
   const request = useMemo(
     () => ({
       premise,
       name: name || undefined,
       genre: genre || undefined,
-      counts: { locations, factions, characters },
+      counts: sourceMode === 'prompt' ? { locations, factions, characters } : undefined,
       source:
         sourceMode === 'folder'
           ? { kind: 'folder' as const, path: folderPath }
@@ -157,6 +161,25 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
     onCancel();
   }, [onCancel]);
 
+  // browse opens the desktop window's native folder picker. A headless or
+  // browser build has none, so the path field stays usable on its own.
+  const handleBrowse = useCallback(async () => {
+    setBrowsing(true);
+    setError(null);
+    try {
+      const chosen = await APIClient.chooseDirectory('Choose a source folder');
+      if (chosen) setFolderPath(chosen);
+    } catch (err) {
+      if (err instanceof HTTPError && err.status === 501) {
+        setBrowseUnavailable(true);
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      setBrowsing(false);
+    }
+  }, []);
+
   // formatCost renders an estimate's cost, or says plainly that the provider has
   // no published rate rather than implying the generation is free.
   const formatCost = (micros: number) => {
@@ -238,51 +261,63 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <label className="space-y-2 text-xs font-medium text-neutral-300">
-              Locations
-              <input
-                type="number"
-                min={0}
-                max={10}
-                aria-label="Locations"
-                value={locations}
-                onChange={(event) => setLocations(Number(event.target.value))}
-                className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-purple-500/50 focus:outline-none"
-              />
-            </label>
-            <label className="space-y-2 text-xs font-medium text-neutral-300">
-              Factions
-              <input
-                type="number"
-                min={0}
-                max={10}
-                aria-label="Factions"
-                value={factions}
-                onChange={(event) => setFactions(Number(event.target.value))}
-                className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-purple-500/50 focus:outline-none"
-              />
-            </label>
-            <label className="space-y-2 text-xs font-medium text-neutral-300">
-              Characters
-              <input
-                type="number"
-                min={0}
-                max={10}
-                aria-label="Characters"
-                value={characters}
-                onChange={(event) => setCharacters(Number(event.target.value))}
-                className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-purple-500/50 focus:outline-none"
-              />
-            </label>
-          </div>
+          {sourceMode === 'prompt' ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-3">
+                <label className="space-y-2 text-xs font-medium text-neutral-300">
+                  Locations
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    aria-label="Locations"
+                    value={locations}
+                    onChange={(event) => setLocations(Number(event.target.value))}
+                    className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-purple-500/50 focus:outline-none"
+                  />
+                </label>
+                <label className="space-y-2 text-xs font-medium text-neutral-300">
+                  Factions
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    aria-label="Factions"
+                    value={factions}
+                    onChange={(event) => setFactions(Number(event.target.value))}
+                    className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-purple-500/50 focus:outline-none"
+                  />
+                </label>
+                <label className="space-y-2 text-xs font-medium text-neutral-300">
+                  Characters
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    aria-label="Characters"
+                    value={characters}
+                    onChange={(event) => setCharacters(Number(event.target.value))}
+                    className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-purple-500/50 focus:outline-none"
+                  />
+                </label>
+              </div>
+              <p className="text-[11px] text-neutral-500">
+                How many of each the generation asks for, up to 10. These counts apply to the
+                premise only.
+              </p>
+            </div>
+          ) : (
+            <p className="text-[11px] text-neutral-500">
+              The source decides how many entities are extracted, so there are no counts to set.
+            </p>
+          )}
 
           <div className="space-y-2">
             <span className="text-xs font-medium text-neutral-300">Source</span>
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  { id: 'prompt', label: 'Brief', icon: Sparkles },
+                  { id: 'prompt', label: 'Premise', icon: Sparkles },
                   { id: 'folder', label: 'Folder', icon: FolderOpen },
                   { id: 'url', label: 'URLs', icon: Globe },
                 ] as const
@@ -310,14 +345,29 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
               <label htmlFor="world-folder" className="text-xs font-medium text-neutral-300">
                 Folder path
               </label>
-              <input
-                id="world-folder"
-                value={folderPath}
-                onChange={(event) => setFolderPath(event.target.value)}
-                placeholder="/home/you/setting-notes"
-                className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-purple-500/50 focus:outline-none font-mono"
-              />
-              <p className="text-[11px] text-neutral-500">Read locally. Nothing is fetched.</p>
+              <div className="flex items-center gap-2">
+                <input
+                  id="world-folder"
+                  value={folderPath}
+                  onChange={(event) => setFolderPath(event.target.value)}
+                  placeholder="/home/you/setting-notes"
+                  className="flex-1 min-w-0 px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-purple-500/50 focus:outline-none font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleBrowse()}
+                  disabled={browsing}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs text-neutral-200 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-40 transition-colors whitespace-nowrap"
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  Browse
+                </button>
+              </div>
+              <p className="text-[11px] text-neutral-500">
+                {browseUnavailable
+                  ? 'No native folder dialog is available here, so type the path instead.'
+                  : 'Read locally. Nothing is fetched.'}
+              </p>
             </div>
           )}
 

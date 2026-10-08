@@ -71,39 +71,6 @@ func TestExportArtifactPathNamesAWebM(t *testing.T) {
 	}
 }
 
-func TestChooseExportDirectoryWithoutPicker(t *testing.T) {
-	svc := NewService(t.TempDir())
-
-	if _, err := svc.ChooseExportDirectory(context.Background()); !errors.Is(err, ErrNoNativeDialog) {
-		t.Fatalf("ChooseExportDirectory = %v, want ErrNoNativeDialog", err)
-	}
-}
-
-func TestChooseExportDirectoryUsesThePicker(t *testing.T) {
-	svc := NewService(t.TempDir())
-	want := t.TempDir()
-	var seenDefault string
-	svc.SetDirectoryPicker(func(defaultDir string) (string, error) {
-		seenDefault = defaultDir
-		return want, nil
-	})
-
-	got, err := svc.ChooseExportDirectory(context.Background())
-	if err != nil {
-		t.Fatalf("ChooseExportDirectory: %v", err)
-	}
-	if got != want {
-		t.Fatalf("path = %q, want %q", got, want)
-	}
-	if seenDefault == "" {
-		t.Fatalf("expected a default directory to be offered")
-	}
-
-	if !svc.ExportCapabilities().NativeDialog {
-		t.Fatalf("expected capabilities to report a native dialog")
-	}
-}
-
 func TestStartExportWritesIntoTheChosenDirectory(t *testing.T) {
 	svc := NewService(t.TempDir())
 	outDir := t.TempDir()
@@ -158,19 +125,6 @@ func TestExportCapabilitiesRoute(t *testing.T) {
 	}
 	if caps.NativeDialog {
 		t.Errorf("a headless service must not report a native dialog")
-	}
-}
-
-func TestChooseDirectoryRouteWithoutPicker(t *testing.T) {
-	svc := NewService(t.TempDir())
-	server := NewServer(svc, http.NotFoundHandler())
-
-	req := httptest.NewRequest(http.MethodPost, "/api/export/choose-directory", nil)
-	rec := httptest.NewRecorder()
-	server.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotImplemented {
-		t.Fatalf("status = %d, want 501", rec.Code)
 	}
 }
 

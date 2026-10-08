@@ -353,11 +353,15 @@ func chunkSources(batch []Chunk) string {
 	return strings.Join(sources, ", ")
 }
 
-// buildPrompt assembles a bounded extraction prompt for one batch of chunks.
+// buildPrompt assembles a bounded extraction prompt for one batch of chunks. It
+// asks for every entity the source describes rather than a count: an ingestion
+// reports what is in the source, and inventing entities to reach a target is the
+// opposite of what a source is for.
 func buildPrompt(brief worldgen.Brief, batch []Chunk, first bool) string {
 	var b strings.Builder
 	b.WriteString(ingestSystem)
 	b.WriteString("\n\nExtract the world described by the source material below.\n")
+	b.WriteString("\nExtract every distinct entity the source describes, and nothing it does not.\n")
 	if brief.Premise != "" {
 		b.WriteString("\nAdditional instruction: " + truncate(brief.Premise, 500) + "\n")
 	}

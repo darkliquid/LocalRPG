@@ -24,6 +24,10 @@ const worldStepCalls = 4
 
 // EstimatePlan reports the calls a generation of the given kind will make.
 // kind is one of "world", "entities", "enhance", or "ingest".
+//
+// brief.Counts steers a from-scratch world and a batch of entities. An ingestion
+// ignores them: the source decides how many entities exist, so only the chunk
+// count moves its estimate.
 func EstimatePlan(kind string, brief Brief, chunks int, prices PriceTable) Estimate {
 	counts := brief.Counts
 	if counts.Zero() {
@@ -37,7 +41,7 @@ func EstimatePlan(kind string, brief Brief, chunks int, prices PriceTable) Estim
 	case "enhance":
 		e.Calls = 1
 	case "ingest":
-		e.Calls = chunks + worldStepCalls + extraBatches(counts)
+		e.Calls = chunks + worldStepCalls
 	default:
 		e.Calls = worldStepCalls + extraBatches(counts)
 	}

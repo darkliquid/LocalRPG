@@ -86,6 +86,8 @@ func routePattern(path string) string {
 		return "/api/game/{id}"
 	case path == "/api/system/test":
 		return "/api/system/test"
+	case strings.HasPrefix(path, "/api/dialog/"):
+		return "/api/dialog/{action}"
 	case strings.HasPrefix(path, "/api/system/tests/"):
 		return "/api/system/tests/{id}"
 	case strings.HasPrefix(path, "/api/system/"):
@@ -1877,20 +1879,6 @@ func (s *Server) handleExportRoutes(w http.ResponseWriter, r *http.Request) {
 
 	if path == "capabilities" && r.Method == http.MethodGet {
 		writeJSON(w, s.service.ExportCapabilities())
-		return
-	}
-
-	if path == "choose-directory" && r.Method == http.MethodPost {
-		chosen, err := s.service.ChooseExportDirectory(r.Context())
-		switch {
-		case errors.Is(err, ErrNoNativeDialog):
-			http.Error(w, err.Error(), http.StatusNotImplemented)
-			return
-		case err != nil:
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, map[string]interface{}{"path": chosen})
 		return
 	}
 

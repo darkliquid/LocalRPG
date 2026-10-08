@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { WorldGenerateDialog } from './WorldGenerateDialog';
-import { APIClient } from '../api/client';
+import { APIClient, HTTPError } from '../api/client';
 import { WorldDraftInfo } from '../types';
 
 const draft: WorldDraftInfo = {
@@ -91,6 +91,54 @@ describe('WorldGenerateDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /urls/i }));
     expect(screen.getByLabelText(/urls, one per line/i)).toBeInTheDocument();
     expect(screen.getByText(/this fetches the pages you name/i)).toBeInTheDocument();
+  });
+
+  it('hides the counts once a source decides how many entities exist', async () => {
+    vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (_req, onEvent) => {
+      onEvent({ type: 'estimate', estimate: { calls: 1, priced: false } });
+    });
+
+    render(<WorldGenerateDialog onCancel={() => {}} onDraft={() => {}} estimateDelayMs={0} />);
+
+    expect(screen.getByLabelText('Locations')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /folder/i }));
+    expect(screen.queryByLabelText('Locations')).not.toBeInTheDocument();
+    expect(screen.getByText(/the source decides how many entities/i)).toBeInTheDocument();
+  });
+
+  it('fills the folder path from the native picker', async () => {
+    vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (_req, onEvent) => {
+      onEvent({ type: 'estimate', estimate: { calls: 1, priced: false } });
+    });
+    const pick = vi.spyOn(APIClient, 'chooseDirectory').mockResolvedValue('/home/you/notes');
+
+    render(<WorldGenerateDialog onCancel={() => {}} onDraft={() => {}} estimateDelayMs={0} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /folder/i }));
+    fireEvent.click(screen.getByRole('button', { name: /browse/i }));
+
+    await waitFor(() => expect(screen.getByLabelText(/folder path/i)).toHaveValue('/home/you/notes'));
+    expect(pick).toHaveBeenCalledWith('Choose a source folder');
+  });
+
+  it('falls back to a typed path when there is no native dialog', async () => {
+    vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (_req, onEvent) => {
+      onEvent({ type: 'estimate', estimate: { calls: 1, priced: false } });
+    });
+    vi.spyOn(APIClient, 'chooseDirectory').mockRejectedValue(new HTTPError(501, 'no dialog'));
+
+    render(<WorldGenerateDialog onCancel={() => {}} onDraft={() => {}} estimateDelayMs={0} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /folder/i }));
+    fireEvent.click(screen.getByRole('button', { name: /browse/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/no native folder dialog is available/i)).toBeInTheDocument()
+    );
+    // The field is still usable by hand.
+    fireEvent.change(screen.getByLabelText(/folder path/i), { target: { value: '/tmp/notes' } });
+    expect(screen.getByLabelText(/folder path/i)).toHaveValue('/tmp/notes');
   });
 
   it('streams a source ingestion through the ingest endpoint', async () => {

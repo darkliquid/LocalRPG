@@ -24,6 +24,8 @@ Open the Worlds Studio and click **Generate**. The dialog collects:
 - **Name** and **Genre**: optional, and filled in by the model when you leave them empty.
 - **Locations**, **Factions**, and **Characters**: how many of each to produce, up to 10.
 
+The counts steer a premise generation only. Once you pick a source, the dialog hides them, because the number of entities is whatever the source describes.
+
 ## Pipeline steps
 
 A generation runs as four structured model calls, and each one reports progress as it finishes:
@@ -52,9 +54,11 @@ The **Source** row in the dialog has three modes:
 
 | Source | What it does |
 | --- | --- |
-| **Brief** | Generates from the premise alone. |
+| **Premise** | Generates from the premise alone. |
 | **Folder** | Reads `.md`, `.markdown`, and `.txt` files under a directory. Entirely local, with no network call. |
 | **URLs** | Fetches the pages you list, one per line, and reduces each to readable text. |
+
+For a folder, the **Browse** button opens the desktop window's folder picker. A browser or headless build has no native dialog, so type the path into the field instead.
 
 Folder ingestion splits each file into chunks at headings and paragraph boundaries, and skips binary files and dot-directories. An empty folder is an error rather than an empty world.
 

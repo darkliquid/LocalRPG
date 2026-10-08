@@ -199,11 +199,18 @@ export class APIClient {
     if (!res.ok) throw new Error(`cancelExport: ${res.statusText}`);
   }
 
-  static async chooseExportDirectory(): Promise<string> {
-    const res = await fetch('/api/export/choose-directory', { method: 'POST' });
+  // chooseDirectory opens the desktop window's native folder picker. It throws a
+  // 501 HTTPError when there is no native dialog, so the caller falls back to a
+  // path field.
+  static async chooseDirectory(title?: string): Promise<string> {
+    const res = await fetch('/api/dialog/directory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title ?? '' }),
+    });
     if (!res.ok) {
       if (res.status === 501) throw new HTTPError(res.status, 'No native directory dialog is available');
-      throw new HTTPError(res.status, `chooseExportDirectory: ${res.statusText}`);
+      throw new HTTPError(res.status, `chooseDirectory: ${res.statusText}`);
     }
     const data = (await res.json()) as { path?: string };
     return data.path ?? '';

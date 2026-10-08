@@ -63,6 +63,7 @@ var mounts = []routeMount{
 	{"/api/registry/install", "handleRegistryInstallRoute", (*Server).handleRegistryInstallRoute},
 	{"/api/registry/updates", "handleRegistryUpdatesRoute", (*Server).handleRegistryUpdatesRoute},
 	{"/api/schema/", "handleSchemaRoutes", (*Server).handleSchemaRoutes},
+	{"/api/dialog/", "handleDialogRoutes", (*Server).handleDialogRoutes},
 }
 
 // Routes returns the mounted API patterns, sorted.
