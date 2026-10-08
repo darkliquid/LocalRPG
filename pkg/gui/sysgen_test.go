@@ -162,3 +162,40 @@ func TestCommitAndDiscardSystemDraft(t *testing.T) {
 		t.Fatal("draft should be deleted after commit")
 	}
 }
+
+func TestGenerateSystemOracleFallback(t *testing.T) {
+	svc := NewService(t.TempDir())
+
+	var events []TurnEvent
+	draft, err := svc.GenerateSystem(context.Background(), SystemGenerateRequestDTO{
+		Name:        "Oracle Fallback Test",
+		Description: "Testing oracle fallback with default config",
+	}, collectEvents(&events))
+	if err != nil {
+		t.Fatalf("GenerateSystem failed: %v", err)
+	}
+	if draft == nil {
+		t.Fatal("expected draft to be non-nil")
+	}
+	if !draft.Oracle {
+		t.Errorf("expected draft.Oracle to be true, got false")
+	}
+	if draft.Name != "Oracle Fallback Test" {
+		t.Errorf("draft.Name = %q, want %q", draft.Name, "Oracle Fallback Test")
+	}
+	if draft.Mechanics == nil {
+		t.Error("expected draft.Mechanics to be non-nil")
+	}
+	if !draft.Verify.OK {
+		t.Errorf("expected oracle draft verification to pass, got failures: %v", draft.Verify.Failures)
+	}
+
+	// Verify draft was saved in .drafts/
+	loaded, err := svc.GetSystemDraft(context.Background(), draft.ID)
+	if err != nil {
+		t.Fatalf("failed to load saved oracle draft: %v", err)
+	}
+	if loaded.ID != draft.ID {
+		t.Errorf("loaded.ID = %q, want %q", loaded.ID, draft.ID)
+	}
+}

@@ -29,6 +29,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [referenceSystems, setReferenceSystems] = useState<ReferenceSystem[]>([]);
   const [selection, setSelection] = useState<SystemSelection>(null);
   const [draft, setDraft] = useState<SystemDraft | null>(null);
+  const [activeDraftID, setActiveDraftID] = useState<string | null>(null);
   const [pendingSelection, setPendingSelection] = useState<SystemSelection>(null);
   const [activeTab, setActiveTab] = useState<'manifest' | 'rules' | 'mechanics' | 'script'>('manifest');
   const startModeRef = React.useRef(startMode);
@@ -77,6 +78,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
   const handleDraftProduced = (generatedDraft: SystemDraftInfo) => {
     setShowGenerateDialog(false);
+    setActiveDraftID(generatedDraft.id || null);
     setName(generatedDraft.name);
     setSlugID(generatedDraft.id);
     setVersion(generatedDraft.version || '1.0.0');
@@ -295,6 +297,14 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       };
 
       const saved = await APIClient.saveSystem(payload);
+      if (activeDraftID) {
+        try {
+          await APIClient.discardSystemDraft(activeDraftID);
+        } catch {
+          // ignore draft cleanup failure
+        }
+        setActiveDraftID(null);
+      }
       if (saved.warnings && saved.warnings.length > 0) {
         setToast({ type: 'error', message: `Saved with warnings: ${saved.warnings.join('; ')}` });
       } else {
@@ -672,7 +682,12 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
             <button
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || (verificationResult !== null && !verificationResult.ok)}
+              title={
+                verificationResult && !verificationResult.ok
+                  ? 'Cannot save: verification failed. Regenerate or fix errors.'
+                  : undefined
+              }
               className="flex items-center gap-1.5 text-xs font-sans font-bold px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.35)] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
@@ -1078,7 +1093,13 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
         title="Discard unsaved system?"
         description="This system has not been saved. Leaving now discards every field you entered."
         onCancel={() => setPendingSelection(null)}
-        onDiscard={() => applySelection(pendingSelection)}
+        onDiscard={() => {
+          if (activeDraftID) {
+            APIClient.discardSystemDraft(activeDraftID).catch(() => {});
+            setActiveDraftID(null);
+          }
+          applySelection(pendingSelection);
+        }}
       />
 
       {importManifest && (

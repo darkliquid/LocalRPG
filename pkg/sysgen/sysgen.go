@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/core"
@@ -150,13 +151,15 @@ func Generate(ctx context.Context, gen Generator, brief Brief, onStep ...func(St
 	scenario := systemtest.Scenario{Name: "smoke"}
 	if mech != nil {
 		if len(mech.Checks.Profiles) > 0 {
-			for profName := range mech.Checks.Profiles {
-				scenario.Steps = append(scenario.Steps, systemtest.Step{
-					Action: "check",
-					Input:  profName,
-				})
-				break
+			keys := make([]string, 0, len(mech.Checks.Profiles))
+			for k := range mech.Checks.Profiles {
+				keys = append(keys, k)
 			}
+			sort.Strings(keys)
+			scenario.Steps = append(scenario.Steps, systemtest.Step{
+				Action: "check",
+				Input:  keys[0],
+			})
 		}
 		if len(mech.Stats) > 0 {
 			scenario.Steps = append(scenario.Steps, systemtest.Step{
@@ -186,5 +189,3 @@ func Generate(ctx context.Context, gen Generator, brief Brief, onStep ...func(St
 
 	return s, nil
 }
-
-

@@ -4042,13 +4042,9 @@ func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 	return summaries, nil
 }
 
-// systemDraftDir is where system drafts live: a dot-directory under systems/.
-func (s *Service) systemDraftDir() string {
-	return filepath.Join(s.resolver.SystemsDir(), sysgen.DraftsDirName)
-}
-
+// systemDraftsDir is where system drafts live: a dot-directory under systems/.
 func (s *Service) systemDraftsDir() string {
-	return s.systemDraftDir()
+	return filepath.Join(s.resolver.SystemsDir(), sysgen.DraftsDirName)
 }
 
 func (s *Service) ListSystems(ctx context.Context) ([]SystemSummaryDTO, error) {

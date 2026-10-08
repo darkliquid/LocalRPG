@@ -25,7 +25,7 @@ func (s *Service) resolveSystemGenerator() systemGeneratorResolution {
 		return systemGeneratorResolution{
 			Generator: sysgen.NewOracleGenerator(),
 			Oracle:    true,
-			Reason: "no agent role is set up to generate. Assign a model provider to gm or generator in Settings → AI Agents",
+			Reason:    "no agent role is set up to generate. Assign a model provider to gm or generator in Settings → AI Agents",
 		}
 	}
 
