@@ -4,6 +4,7 @@ import { ContentManifestInfo } from '../types';
 
 export interface ContentImportDialogProps {
   manifest?: ContentManifestInfo;
+  expectedType?: 'world' | 'system';
   onConfirm: (conflictMode: 'refuse' | 'rename' | 'overwrite') => void;
   onCancel: () => void;
   loading?: boolean;
@@ -12,6 +13,7 @@ export interface ContentImportDialogProps {
 
 export const ContentImportDialog: React.FC<ContentImportDialogProps> = ({
   manifest,
+  expectedType,
   onConfirm,
   onCancel,
   loading = false,
@@ -22,6 +24,8 @@ export const ContentImportDialog: React.FC<ContentImportDialogProps> = ({
   if (!manifest) {
     return null;
   }
+
+  const isTypeMismatch = Boolean(expectedType && manifest.type && manifest.type !== expectedType);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -51,6 +55,15 @@ export const ContentImportDialog: React.FC<ContentImportDialogProps> = ({
           {error && (
             <div className="p-3 text-sm text-red-300 border border-red-500/30 rounded-xl bg-red-950/40">
               {error}
+            </div>
+          )}
+
+          {isTypeMismatch && (
+            <div className="p-3 text-sm text-amber-200 border border-amber-500/30 rounded-xl bg-amber-950/40 flex items-center gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+              <span>
+                This package contains a <strong className="capitalize text-white">{manifest.type}</strong>, but you are importing into {expectedType}s. It cannot be imported here.
+              </span>
             </div>
           )}
 
@@ -215,8 +228,8 @@ export const ContentImportDialog: React.FC<ContentImportDialogProps> = ({
           <button
             type="button"
             onClick={() => onConfirm(conflictMode)}
-            disabled={loading}
-            className="px-5 py-2 text-xs font-semibold text-white rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-[0.98] transition-all shadow-lg shadow-purple-600/20 disabled:opacity-50"
+            disabled={loading || isTypeMismatch}
+            className="px-5 py-2 text-xs font-semibold text-white rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-[0.98] transition-all shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Importing...' : 'Install Package'}
           </button>

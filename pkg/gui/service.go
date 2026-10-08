@@ -130,7 +130,15 @@ type Service struct {
 	exports *exportManager
 	// directoryPicker is the desktop window's native directory chooser. It is
 	// nil in browser/socket mode, where the UI falls back to a path field.
-	directoryPicker func(defaultDir string) (string, error)
+	directoryPicker func(title, defaultDir string) (string, error)
+	// directoryChoice holds the one native folder dialog that may be open, so a
+	// blocking modal never sits inside a request the webview is waiting on.
+	directoryChoice directoryChoice
+	// saveFilePicker is the desktop window's native save file chooser. It is
+	// nil in browser/socket mode, where the UI falls back to direct browser download.
+	saveFilePicker func(req ChooseSaveFileRequestDTO) (string, error)
+	// saveFileChoice holds the one native save file dialog that may be open.
+	saveFileChoice saveFileChoice
 	// urlOpener hands a link to the desktop window, which forwards it to the
 	// system browser. It is nil in browser/socket mode, where the frontend opens
 	// a tab itself.
@@ -4490,6 +4498,55 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 	return detail, nil
 }
 
+// ErrSystemNotFound reports an attempt to operate on a system that does not exist.
+var ErrSystemNotFound = errors.New("system not found")
+
+// ErrSystemInUse reports an attempt to delete a system that is still referenced by a campaign or world.
+var ErrSystemInUse = errors.New("system is in use")
+
+// DeleteSystem removes a system directory.
+// When force is false, it refuses to delete if any campaign or world references this system.
+func (s *Service) DeleteSystem(ctx context.Context, systemID string, force bool) error {
+	if err := pathutil.ValidateID(systemID); err != nil {
+		return fmt.Errorf("invalid system id: %w", err)
+	}
+
+	sysDir := s.resolver.SystemDir(systemID)
+	if _, err := os.Stat(filepath.Join(sysDir, "system.yaml")); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%w: %s", ErrSystemNotFound, systemID)
+		}
+		return fmt.Errorf("system %q: %w", systemID, err)
+	}
+
+	if !force {
+		games, err := s.ListGames(ctx)
+		if err == nil {
+			for _, g := range games {
+				if g.SystemID == systemID {
+					return fmt.Errorf("%w: campaign %q (%s)", ErrSystemInUse, g.Name, g.ID)
+				}
+			}
+		}
+
+		worlds, err := s.ListWorlds(ctx)
+		if err == nil {
+			for _, w := range worlds {
+				for _, comp := range w.CompatibleSystems {
+					if comp == systemID {
+						return fmt.Errorf("%w: world %q (%s)", ErrSystemInUse, w.Name, w.ID)
+					}
+				}
+			}
+		}
+	}
+
+	if err := os.RemoveAll(sysDir); err != nil {
+		return fmt.Errorf("remove system: %w", err)
+	}
+	return nil
+}
+
 // ListReferenceSystems returns the shipped starting systems, so the studio offers
 // the same corpus the tests exercise.
 func (s *Service) ListReferenceSystems(_ context.Context) (*ReferenceSystemsDTO, error) {
@@ -4611,6 +4668,9 @@ var ErrWorldExists = errors.New("world already exists")
 // ErrWorldNotFound reports an attempt to update a world that does not exist.
 var ErrWorldNotFound = errors.New("world not found")
 
+// ErrWorldInUse reports an attempt to delete a world that is still referenced by one or more campaigns.
+var ErrWorldInUse = errors.New("world is in use by a campaign")
+
 // writeWorld writes a world directory. It never decides create vs update; the
 // caller does, so a create can refuse a duplicate and an update can require a
 // target.
@@ -4688,6 +4748,38 @@ func (s *Service) UpdateWorld(ctx context.Context, req CreateWorldRequestDTO) (*
 	return s.writeWorld(ctx, req)
 }
 
+// DeleteWorld removes a world and all its entity templates, prompts, and assets.
+// When force is false, it refuses to delete if any campaign references this world.
+func (s *Service) DeleteWorld(ctx context.Context, worldID string, force bool) error {
+	if err := pathutil.ValidateID(worldID); err != nil {
+		return fmt.Errorf("invalid world id: %w", err)
+	}
+
+	worldDir := s.resolver.WorldDir(worldID)
+	if _, err := os.Stat(filepath.Join(worldDir, "world.yaml")); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%w: %s", ErrWorldNotFound, worldID)
+		}
+		return fmt.Errorf("world %q: %w", worldID, err)
+	}
+
+	if !force {
+		games, err := s.ListGames(ctx)
+		if err == nil {
+			for _, g := range games {
+				if g.WorldID == worldID {
+					return fmt.Errorf("%w: campaign %q (%s)", ErrWorldInUse, g.Name, g.ID)
+				}
+			}
+		}
+	}
+
+	if err := os.RemoveAll(worldDir); err != nil {
+		return fmt.Errorf("remove world: %w", err)
+	}
+	return nil
+}
+
 func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) (*WorldEntityDetailDTO, error) {
 	if err := pathutil.ValidateID(worldID); err != nil {
 		return nil, fmt.Errorf("invalid world id: %w", err)
@@ -4708,9 +4800,14 @@ func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) 
 	if err != nil {
 		return nil, fmt.Errorf("read world entity %s: %w", entityID, err)
 	}
+	folder := ""
+	if rel, err := filepath.Rel(filepath.Join(worldDir, "entities"), filepath.Dir(path)); err == nil && rel != "." && rel != "" {
+		folder = filepath.ToSlash(rel)
+	}
 	return &WorldEntityDetailDTO{
 		ID:       entityID,
 		Markdown: string(data),
+		Folder:   folder,
 	}, nil
 }
 
@@ -5653,10 +5750,23 @@ func (s *Service) ExportContent(ctx context.Context, typ, id string, w io.Writer
 // ErrContentConflict reports an attempt to import content that already exists under refuse mode.
 var ErrContentConflict = errors.New("content already exists")
 
-// ImportContent unpacks a .lrpgpack from r into a staging directory, validates its
+// ImportContentOptions specifies optional options and validation when importing packages.
+type ImportContentOptions struct {
+	ConflictMode string
+	Filename     string
+	ExpectedType string
+}
+
+// ImportContent unpacks a package archive from r into a staging directory, validates its
 // structure, resolves conflicts according to onConflict ("refuse", "rename", "overwrite"),
 // and atomically moves it into the content directory.
 func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict string) (ImportResultDTO, error) {
+	return s.ImportContentWithOptions(ctx, r, ImportContentOptions{ConflictMode: onConflict})
+}
+
+// ImportContentWithOptions unpacks a package archive from r with type validation and conflict handling.
+func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opts ImportContentOptions) (ImportResultDTO, error) {
+	onConflict := opts.ConflictMode
 	if onConflict == "" {
 		onConflict = "refuse"
 	}
@@ -5675,6 +5785,35 @@ func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict str
 	m, sigBytes, err := content.Unpack(r, stagingDir)
 	if err != nil {
 		return ImportResultDTO{}, fmt.Errorf("unpack content: %w", err)
+	}
+	if err := pathutil.ValidateID(m.ID); err != nil {
+		return ImportResultDTO{}, fmt.Errorf("invalid package content ID %q: %w", m.ID, err)
+	}
+
+	if opts.ExpectedType != "" {
+		expected := strings.ToLower(strings.TrimSpace(opts.ExpectedType))
+		if expected != "world" && expected != "system" {
+			return ImportResultDTO{}, fmt.Errorf("invalid expected content type %q: must be 'world' or 'system'", expected)
+		}
+		if m.Type != expected {
+			return ImportResultDTO{}, fmt.Errorf("package contains %s %q, cannot import as %s", m.Type, m.ID, expected)
+		}
+	}
+
+	if opts.Filename != "" {
+		ext := strings.ToLower(filepath.Ext(opts.Filename))
+		switch ext {
+		case ".lrpgworld":
+			if m.Type != "world" {
+				return ImportResultDTO{}, fmt.Errorf("package filename %q has extension .lrpgworld but package contains %s %q", opts.Filename, m.Type, m.ID)
+			}
+		case ".lrpgsystem":
+			if m.Type != "system" {
+				return ImportResultDTO{}, fmt.Errorf("package filename %q has extension .lrpgsystem but package contains %s %q", opts.Filename, m.Type, m.ID)
+			}
+		case ".lrpgpack":
+			// Universal package format, allowed for both
+		}
 	}
 
 	var trustedPublishers map[string]string
@@ -5729,10 +5868,11 @@ func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict str
 	})
 
 	targetDirFor := func(id string) string {
+		cleanID := filepath.Base(pathutil.SanitizeID(id))
 		if m.Type == "world" {
-			return s.resolver.WorldDir(id)
+			return filepath.Join(s.resolver.WorldsDir(), cleanID)
 		}
-		return s.resolver.SystemDir(id)
+		return filepath.Join(s.resolver.SystemsDir(), cleanID)
 	}
 
 	targetDir := targetDirFor(m.ID)
@@ -5787,7 +5927,9 @@ func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict str
 	}
 
 	if action == "overwritten" {
-		backupDir, err := os.MkdirTemp(parentDir, fmt.Sprintf(".backup-%s-*", finalID))
+		// Temporary backup directory created directly under parentDir for atomic rollback.
+		// lgtm[go/path-injection]
+		backupDir, err := os.MkdirTemp(parentDir, ".backup-*")
 		if err != nil {
 			return ImportResultDTO{}, fmt.Errorf("create backup directory: %w", err)
 		}

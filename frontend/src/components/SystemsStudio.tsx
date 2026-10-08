@@ -9,6 +9,7 @@ import MarkdownEditor from './editor/MarkdownEditor';
 import { MechanicsEditor } from './MechanicsEditor';
 import { ContentImportDialog } from './ContentImportDialog';
 import { inspectPackageFile } from '../lib/packageInspect';
+import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
 
 type SystemSelection = { kind: 'saved'; id: string } | { kind: 'draft' } | null;
 
@@ -55,6 +56,12 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [importManifest, setImportManifest] = useState<ContentManifestInfo | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const savePicker = useSaveFilePicker();
+
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [isDeletingSystem, setIsDeletingSystem] = useState(false);
+  const [deleteSystemError, setDeleteSystemError] = useState<string | null>(null);
+  const [canForceDelete, setCanForceDelete] = useState(false);
 
   const isDraft = selection?.kind === 'draft';
   const savedID = selection?.kind === 'saved' ? selection.id : null;
@@ -64,6 +71,35 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setToast({ type: 'error', message: formatGenerationError(failure) });
   const errorMessage = (err: unknown): string =>
     err instanceof Error ? err.message : 'Unexpected error';
+
+  const handleDeleteSystem = async (force = false) => {
+    if (!deleteTarget) return;
+    setIsDeletingSystem(true);
+    setDeleteSystemError(null);
+    try {
+      await APIClient.deleteSystem(deleteTarget.id, force);
+      const deletedName = deleteTarget.name;
+      const deletedID = deleteTarget.id;
+      setDeleteTarget(null);
+      setDeleteSystemError(null);
+      setCanForceDelete(false);
+      setToast({ type: 'success', message: `System "${deletedName}" deleted.` });
+
+      if (selection?.kind === 'saved' && selection.id === deletedID) {
+        handleNewSystem();
+      }
+      await loadSystems(undefined, 'browse');
+      if (onSystemSaved) onSystemSaved();
+    } catch (err) {
+      const msg = errorMessage(err);
+      setDeleteSystemError(msg);
+      if (msg.includes('in use') || msg.toLowerCase().includes('conflict')) {
+        setCanForceDelete(true);
+      }
+    } finally {
+      setIsDeletingSystem(false);
+    }
+  };
 
   useEffect(() => {
     loadSystems(undefined, startModeRef.current);
@@ -282,15 +318,31 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
   const handleExport = async () => {
     if (!savedID) return;
+    const defaultFilename = `${savedID}-${version || '1.0.0'}.lrpgsystem`;
     try {
-      const blob = await APIClient.exportContent('system', savedID);
+      if (savePicker.nativeDialog) {
+        const path = await savePicker.pick({
+          title: 'Export System Package',
+          default_filename: defaultFilename,
+          filters: [
+            { display_name: 'LocalRPG System (*.lrpgsystem)', pattern: '*.lrpgsystem' },
+            { display_name: 'All Files (*.*)', pattern: '*.*' },
+          ],
+        });
+        if (!path) return;
+        await APIClient.exportContent('system', savedID, path);
+        setToast({ type: 'success', message: `Exported system package: ${path}` });
+        return;
+      }
+
+      const blob = (await APIClient.exportContent('system', savedID)) as Blob;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${savedID}-${version || '1.0.0'}.lrpgpack`;
+      a.download = defaultFilename;
       a.click();
       URL.revokeObjectURL(url);
-      setToast({ type: 'success', message: `Exported system package: ${savedID}.lrpgpack` });
+      setToast({ type: 'success', message: `Exported system package: ${defaultFilename}` });
     } catch (err) {
       setToast({ type: 'error', message: errorMessage(err) });
     }
@@ -314,7 +366,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     if (!importFile) return;
     setIsImporting(true);
     try {
-      const res = await APIClient.importContent(importFile, conflictMode);
+      const res = await APIClient.importContent(importFile, conflictMode, 'system');
       setToast({ type: 'success', message: `Successfully ${res.action} system ${res.name} (${res.id})` });
       setImportFile(null);
       setImportManifest(null);
@@ -343,12 +395,12 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               type="file"
               ref={importInputRef}
               onChange={handleFileSelect}
-              accept=".lrpgpack,application/gzip,application/x-gzip"
+              accept=".lrpgsystem,.lrpgpack"
               className="hidden"
             />
             <button
               onClick={() => importInputRef.current?.click()}
-              title="Import content package (.lrpgpack)"
+              title="Import system package (.lrpgsystem, .lrpgpack)"
               className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5" />
@@ -427,17 +479,32 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               <div
                 key={s.id}
                 onClick={() => requestSelection({ kind: 'saved', id: s.id })}
-                className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${
+                className={`group p-3 rounded-xl border transition-all cursor-pointer text-left ${
                   selection?.kind === 'saved' && selection.id === s.id
                     ? 'bg-purple-950/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
                     : 'bg-stone-900/40 border-stone-800/60 hover:bg-stone-800/40 hover:border-stone-700'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <h4 className="font-sans text-xs font-bold text-stone-200 truncate">{s.name}</h4>
-                  <span className="text-xs font-mono text-stone-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
-                    v{s.version}
-                  </span>
+                <div className="flex items-start justify-between gap-1">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-sans text-xs font-bold text-stone-200 truncate">{s.name}</h4>
+                    <span className="text-xs font-mono text-stone-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800 mt-1 inline-block">
+                      v{s.version}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget({ id: s.id, name: s.name });
+                      setDeleteSystemError(null);
+                      setCanForceDelete(false);
+                    }}
+                    title={`Delete system "${s.name}"`}
+                    className="p-1 text-stone-500 hover:text-red-400 rounded hover:bg-red-950/40 transition-colors opacity-40 group-hover:opacity-100 hover:!opacity-100 shrink-0 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
                 {s.description && (
                   <p className="text-xs text-stone-400 truncate mt-1">{s.description}</p>
@@ -551,12 +618,28 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               type="button"
               onClick={handleExport}
               disabled={!savedID}
-              title="Export system package (.lrpgpack)"
+              title="Export system package (.lrpgsystem)"
               className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Export</span>
             </button>
+
+            {savedID && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTarget({ id: savedID, name: name || savedID });
+                  setDeleteSystemError(null);
+                  setCanForceDelete(false);
+                }}
+                title="Delete this system"
+                className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-red-500/30 bg-red-950/20 hover:bg-red-950/40 text-red-300 hover:text-red-200 transition-all cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Delete System</span>
+              </button>
+            )}
 
             <button
               onClick={handleSave}
@@ -830,6 +913,31 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                 </div>
               )}
             </div>
+
+            {savedID && (
+              <div className="p-4 bg-red-950/20 border border-red-500/30 rounded-2xl flex items-center justify-between mt-4">
+                <div>
+                  <div className="text-xs font-sans font-bold text-red-400 flex items-center gap-1.5">
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Danger Zone: Delete System</span>
+                  </div>
+                  <p className="text-xs font-sans text-stone-400 mt-1">
+                    Permanently delete this ruleset and its scripts from disk. This cannot be undone.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteTarget({ id: savedID, name: name || savedID });
+                    setDeleteSystemError(null);
+                    setCanForceDelete(false);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-sans text-xs font-bold transition-all cursor-pointer shadow"
+                >
+                  Delete System
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -905,6 +1013,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       {importManifest && (
         <ContentImportDialog
           manifest={importManifest}
+          expectedType="system"
           onConfirm={handleConfirmImport}
           onCancel={() => {
             setImportFile(null);
@@ -912,6 +1021,68 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
           }}
           loading={isImporting}
         />
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none">
+          <div className="w-full max-w-md bg-stone-900 border border-white/15 rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 text-red-400">
+              <Trash2 className="w-5 h-5 shrink-0" />
+              <h3 className="font-sans text-sm font-bold text-white">
+                Delete system &ldquo;{deleteTarget.name}&rdquo;?
+              </h3>
+            </div>
+            <p className="text-xs font-sans text-stone-300">
+              This will permanently delete the system directory and all of its mechanics and prompts. This action cannot be undone.
+            </p>
+            {deleteSystemError && (
+              <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-300 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p>{deleteSystemError}</p>
+                  {canForceDelete && (
+                    <p className="text-stone-400">
+                      You can force deletion to remove the system anyway. Existing campaigns or worlds using this system may fail to resolve mechanics.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteSystemError(null);
+                  setCanForceDelete(false);
+                }}
+                disabled={isDeletingSystem}
+                className="text-xs font-sans px-3 py-1.5 rounded-lg border border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              {canForceDelete ? (
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteSystem(true)}
+                  disabled={isDeletingSystem}
+                  className="text-xs font-sans font-bold px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-600 text-white transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isDeletingSystem ? 'Deleting...' : 'Force Delete'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteSystem(false)}
+                  disabled={isDeletingSystem}
+                  className="text-xs font-sans font-bold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isDeletingSystem ? 'Deleting...' : 'Delete System'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

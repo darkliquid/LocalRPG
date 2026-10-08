@@ -366,8 +366,49 @@ type Config struct {
 	Telemetry   TelemetryConfig   `yaml:"telemetry,omitempty" json:"telemetry,omitempty"`
 	Mechanics   MechanicsConfig   `yaml:"mechanics,omitempty" json:"mechanics,omitempty"`
 	Interactive InteractiveConfig `yaml:"interactive,omitempty" json:"interactive,omitempty"`
+	Generation  GenerationConfig  `yaml:"generation,omitempty" json:"generation,omitempty"`
 	Publishers  map[string]string `yaml:"publishers,omitempty" json:"publishers,omitempty"`
 	Registries  RegistriesConfig  `yaml:"registries,omitempty" json:"registries,omitempty"`
+}
+
+// GenerationConfig bounds an AI world generation. It exists so a runaway
+// generation cannot spend without limit, which is a control the usage ledger,
+// recording spend after the fact, cannot provide.
+//
+// There are two budgets because there are two shapes of work. A premise, entity,
+// or enhancement generation is a fixed, small pipeline, so its call count bounds
+// it. An ingestion reads whatever the user pointed it at, so how much source it
+// will read bounds it, and the calls follow from that.
+type GenerationConfig struct {
+	// MaxCalls caps the model calls one bounded generation may make. Zero means
+	// the default of 20, which is generous for a pipeline that makes four.
+	MaxCalls int `yaml:"max_calls,omitempty" json:"max_calls,omitempty"`
+	// MaxChunks caps how much source material one ingestion reads. A source is
+	// split into chunks and each batch of them is one call, so this is the lever
+	// for a large folder or a long list of URLs. Zero means the default of 200.
+	MaxChunks int `yaml:"max_chunks,omitempty" json:"max_chunks,omitempty"`
+}
+
+// The defaults a generation falls back to when the config names neither.
+const (
+	DefaultGenerationMaxCalls  = 20
+	DefaultGenerationMaxChunks = 200
+)
+
+// GenerationMaxCalls returns the resolved call cap for a bounded generation.
+func (c *Config) GenerationMaxCalls() int {
+	if c != nil && c.Generation.MaxCalls > 0 {
+		return c.Generation.MaxCalls
+	}
+	return DefaultGenerationMaxCalls
+}
+
+// GenerationMaxChunks returns the resolved chunk cap for an ingestion.
+func (c *Config) GenerationMaxChunks() int {
+	if c != nil && c.Generation.MaxChunks > 0 {
+		return c.Generation.MaxChunks
+	}
+	return DefaultGenerationMaxChunks
 }
 
 // RegistriesConfig lists URLs of static or git package indexes.

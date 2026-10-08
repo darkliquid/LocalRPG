@@ -45,9 +45,8 @@ func runContentCommand(args []string, stdout, stderr io.Writer) int {
 
 func printContentUsage(w io.Writer) {
 	fmt.Fprintln(w, "Usage: localrpg content <subcommand> [flags]")
-	fmt.Fprintln(w, "\nSubcommands:")
-	fmt.Fprintln(w, "  export <world|system> <id> [--out <file>]              Export content as a .lrpgpack package")
-	fmt.Fprintln(w, "  import <file> [--on-conflict refuse|rename|overwrite] [--yes] Import content from a .lrpgpack package")
+	fmt.Fprintln(w, "  export <world|system> <id> [--out <file>]              Export content as a package (.lrpgworld or .lrpgsystem)")
+	fmt.Fprintln(w, "  import <file> [--on-conflict refuse|rename|overwrite] [--yes] Import content from a package")
 	fmt.Fprintln(w, "  sign <file|dir> --key <privkey> [--publisher <name>]   Sign a package or content directory")
 	fmt.Fprintln(w, "  verify <file|dir>                                    Verify package signature and integrity")
 }
@@ -138,7 +137,10 @@ func runContentImport(args []string, stdout, stderr io.Writer) int {
 
 	cwd, _ := os.Getwd()
 	svc := gui.NewService(cwd)
-	res, err := svc.ImportContent(context.Background(), f, *onConflict)
+	res, err := svc.ImportContentWithOptions(context.Background(), f, gui.ImportContentOptions{
+		ConflictMode: *onConflict,
+		Filename:     filepath.Base(filePath),
+	})
 	if err != nil {
 		fmt.Fprintf(stderr, "Import failed: %v\n", err)
 		return 1

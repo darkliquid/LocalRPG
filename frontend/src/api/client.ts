@@ -30,6 +30,22 @@ import {
   WorldDetail,
   CreateWorldRequest,
   WorldEntityDetail,
+  WorldGenerateRequest,
+  WorldDraftInfo,
+  WorldEntityBatchRequest,
+  WorldEntityBatch,
+  WorldEntityAcceptRequest,
+  WorldEnhanceRequest,
+  WorldEnhanceResponse,
+  WorldEnhanceApplyRequest,
+  WorldApplyResult,
+  DraftCommitRequest,
+  DraftDiscardRequest,
+  DirectoryChoice,
+  ChooseSaveFileRequest,
+  SaveFileChoice,
+  ExportContentResult,
+  GenerationLimitsOverride,
   AppConfig,
   SettingsResponse,
   TestProviderRequest,
@@ -67,11 +83,32 @@ import {
 // campaign apart from a transient failure.
 export class HTTPError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  // code is the machine-readable reason a failure carries, when the endpoint
+  // sends one, so a caller can explain it instead of only printing the text.
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = 'HTTPError';
     this.status = status;
+    this.code = code;
   }
+}
+
+// errorFromResponse builds the most useful error a failed response allows: the
+// message and code from an error envelope when it is one, the raw text
+// otherwise. Without this a caller shows the envelope's JSON to the user.
+async function errorFromResponse(res: Response, fallback: string): Promise<HTTPError> {
+  const text = (await res.text()).trim();
+  let message = text || fallback;
+  let code: string | undefined;
+  try {
+    const body = JSON.parse(text) as { error?: { message?: string; code?: string } };
+    if (body.error?.message) message = body.error.message;
+    code = body.error?.code;
+  } catch {
+    // Keep the raw text when the body is not JSON.
+  }
+  return new HTTPError(res.status, message, code);
 }
 
 // GenerationError carries the structured failure a generation endpoint returns,
@@ -188,14 +225,49 @@ export class APIClient {
     if (!res.ok) throw new Error(`cancelExport: ${res.statusText}`);
   }
 
-  static async chooseExportDirectory(): Promise<string> {
-    const res = await fetch('/api/export/choose-directory', { method: 'POST' });
-    if (!res.ok) {
-      if (res.status === 501) throw new HTTPError(res.status, 'No native directory dialog is available');
-      throw new HTTPError(res.status, `chooseExportDirectory: ${res.statusText}`);
-    }
-    const data = (await res.json()) as { path?: string };
-    return data.path ?? '';
+  // startDirectoryChoice opens the desktop window's native folder picker and
+  // returns at once. The picker is modal, so the result is polled with
+  // directoryChoice rather than awaited on the request: a webview left waiting
+  // on a modal dialog cannot repaint.
+  static async startDirectoryChoice(title?: string): Promise<void> {
+    const res = await fetch('/api/dialog/directory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title ?? '' }),
+    });
+    if (res.ok) return;
+    if (res.status === 501) throw new HTTPError(res.status, 'No native directory dialog is available');
+    if (res.status === 409) throw new HTTPError(res.status, 'A folder dialog is already open');
+    throw new HTTPError(res.status, `startDirectoryChoice: ${res.statusText}`);
+  }
+
+  // directoryChoice reports the pending folder choice. A finished choice is
+  // delivered once, so a poll must act on it.
+  static async directoryChoice(): Promise<DirectoryChoice> {
+    const res = await fetch('/api/dialog/directory');
+    if (!res.ok) throw new HTTPError(res.status, `directoryChoice: ${res.statusText}`);
+    return res.json();
+  }
+
+  // startSaveFileChoice opens the desktop window's native save file picker and
+  // returns at once. The result is polled with saveFileChoice.
+  static async startSaveFileChoice(req: ChooseSaveFileRequest = {}): Promise<void> {
+    const res = await fetch('/api/dialog/save-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (res.ok) return;
+    if (res.status === 501) throw new HTTPError(res.status, 'No native save file dialog is available');
+    if (res.status === 409) throw new HTTPError(res.status, 'A save file dialog is already open');
+    throw new HTTPError(res.status, `startSaveFileChoice: ${res.statusText}`);
+  }
+
+  // saveFileChoice reports the pending save file choice.
+  static async saveFileChoice(): Promise<SaveFileChoice> {
+    const res = await fetch('/api/dialog/save-file');
+    if (!res.ok) throw new HTTPError(res.status, `saveFileChoice: ${res.statusText}`);
+    return res.json();
   }
 
   static subscribeExportEvents(onEvent: (event: ExportEvent) => void): () => void {
@@ -490,6 +562,12 @@ export class APIClient {
     return res.json();
   }
 
+  static async deleteSystem(id: string, force = false): Promise<void> {
+    const url = force ? `/api/system/${encodeURIComponent(id)}?force=true` : `/api/system/${encodeURIComponent(id)}`;
+    const res = await fetch(url, { method: 'DELETE' });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || `deleteSystem: ${res.statusText}`);
+  }
+
   static async getWorld(id: string): Promise<WorldDetail> {
     const res = await fetch(`/api/world/${id}`);
     if (!res.ok) throw new Error(`getWorld: ${res.statusText}`);
@@ -525,6 +603,12 @@ export class APIClient {
     });
     if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
+  }
+
+  static async deleteWorld(id: string, force = false): Promise<void> {
+    const url = force ? `/api/world/${encodeURIComponent(id)}?force=true` : `/api/world/${encodeURIComponent(id)}`;
+    const res = await fetch(url, { method: 'DELETE' });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || `deleteWorld: ${res.statusText}`);
   }
 
   static async getWorldEntity(worldId: string, entityId: string): Promise<WorldEntityDetail> {
@@ -579,6 +663,153 @@ export class APIClient {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error((await res.text()).trim() || `deleteWorldFolder: ${res.statusText}`);
+  }
+
+  // generateWorld streams a world generation: a step event per pipeline stage
+  // and a final draft event. The same call serves a dry run, which reports the
+  // estimate and makes no model call.
+  static async generateWorld(
+    req: WorldGenerateRequest,
+    onEvent: (event: TurnEvent) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const res = await fetch('/api/world/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal,
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    if (!res.body) throw new Error('generateWorld: response has no body');
+    await readNDJSON(res, onEvent);
+  }
+
+  // ingestWorld streams a world generation built from a folder or a set of URLs.
+  static async ingestWorld(
+    req: WorldGenerateRequest,
+    onEvent: (event: TurnEvent) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const res = await fetch('/api/world/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal,
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    if (!res.body) throw new Error('ingestWorld: response has no body');
+    await readNDJSON(res, onEvent);
+  }
+
+  // raiseGenerationLimit persists a higher limit, so the next run does not need
+  // the same override again. It re-reads the config first, because the settings
+  // API replaces the whole document.
+  static async raiseGenerationLimit(patch: GenerationLimitsOverride): Promise<void> {
+    const current = await APIClient.getSettings();
+    const next: AppConfig = {
+      ...current.config,
+      generation: { ...current.config.generation, ...patch },
+    };
+    await APIClient.saveSettings(next);
+  }
+
+  // getDraft restores a persisted draft, so a reload resumes review.
+  static async getDraft(draftId: string): Promise<WorldDraftInfo> {
+    const res = await fetch(`/api/world/draft/${encodeURIComponent(draftId)}`);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  static async listDrafts(): Promise<string[]> {
+    const res = await fetch('/api/world/draft/');
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  static async commitDraft(req: DraftCommitRequest): Promise<WorldInfo> {
+    const res = await fetch('/api/world/draft/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  static async discardDraft(req: DraftDiscardRequest): Promise<void> {
+    const res = await fetch('/api/world/draft/discard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+  }
+
+  // previewWorldEntitiesStream generates or extracts a batch of entities for an
+  // existing world, reporting each batch as it finishes. Reading a large folder
+  // is many model calls, so a caller that shows nothing for it looks hung. It
+  // resolves with the finished batch, or null when the stream reported an error.
+  static async previewWorldEntitiesStream(
+    worldId: string,
+    req: WorldEntityBatchRequest,
+    onEvent: (event: TurnEvent) => void,
+    signal?: AbortSignal
+  ): Promise<WorldEntityBatch | null> {
+    const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/generate-entities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal,
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    if (!res.body) throw new Error('previewWorldEntitiesStream: response has no body');
+
+    let finished: WorldEntityBatch | null = null;
+    await readNDJSON(res, (event) => {
+      if (event.type === 'batch' && event.batch) finished = event.batch;
+      onEvent(event);
+    });
+    return finished;
+  }
+
+  // previewWorldEntities generates a batch without progress reporting, for a
+  // caller that would rather wait than watch.
+  static async previewWorldEntities(worldId: string, req: WorldEntityBatchRequest): Promise<WorldEntityBatch> {
+    const batch = await APIClient.previewWorldEntitiesStream(worldId, req, () => {});
+    if (!batch) throw new Error('previewWorldEntities: the stream produced no batch');
+    return batch;
+  }
+
+  static async acceptWorldEntities(worldId: string, req: WorldEntityAcceptRequest): Promise<WorldApplyResult> {
+    const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/entities/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  // enhanceWorld proposes lore, entity, and hook additions for an existing
+  // world. Nothing is written until the proposals are applied.
+  static async enhanceWorld(worldId: string, req: WorldEnhanceRequest): Promise<WorldEnhanceResponse> {
+    const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/enhance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  static async applyWorldEnhancements(worldId: string, req: WorldEnhanceApplyRequest): Promise<WorldApplyResult> {
+    const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/enhance/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
   }
 
   static async getSettings(): Promise<SettingsResponse> {
@@ -1029,25 +1260,36 @@ export class APIClient {
     return APIClient.getGameUsage(this.gameID);
   }
 
-  static async exportContent(type: 'world' | 'system', id: string): Promise<Blob> {
+  static async exportContent(type: 'world' | 'system', id: string, targetPath?: string): Promise<Blob | ExportContentResult> {
     const res = await fetch('/api/content/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, id }),
+      body: JSON.stringify({ type, id, target_path: targetPath }),
     });
     if (!res.ok) {
       const text = await res.text();
       throw new HTTPError(res.status, text || `exportContent: ${res.statusText}`);
     }
+    if (targetPath) {
+      return res.json();
+    }
     return res.blob();
   }
 
-  static async importContent(file: File, onConflict: 'refuse' | 'rename' | 'overwrite' = 'refuse'): Promise<ImportResultDTO> {
+  static async importContent(
+    file: File,
+    onConflict: 'refuse' | 'rename' | 'overwrite' = 'refuse',
+    expectedType?: 'world' | 'system'
+  ): Promise<ImportResultDTO> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('on_conflict', onConflict);
 
-    const res = await fetch('/api/content/import', {
+    const url = expectedType
+      ? `/api/content/import?expected_type=${encodeURIComponent(expectedType)}`
+      : '/api/content/import';
+
+    const res = await fetch(url, {
       method: 'POST',
       body: formData,
     });

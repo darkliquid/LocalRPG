@@ -20,7 +20,11 @@ const (
 	KindTrailingComma Kind = "trailing_comma"
 )
 
-// Result reports what a repair did. Payload equals the input when OK is false.
+// Result reports what a repair did. When OK is false, Payload holds the furthest
+// repair attempted rather than the input: a caller salvaging what a cut-off reply
+// managed to write needs the fence stripped and the prose trimmed, and an error
+// that quotes the fence points at the wrong problem. Payload is the input only
+// when no repair could be attempted at all.
 type Result struct {
 	Payload []byte
 	Kind    Kind
@@ -62,7 +66,7 @@ func Repair(payload []byte) Result {
 			return Result{Payload: cur, Kind: KindTrailingComma, OK: true}
 		}
 	}
-	return Result{Payload: payload}
+	return Result{Payload: cur}
 }
 
 // stripFence removes one Markdown code fence around the payload.
@@ -219,4 +223,67 @@ func removeTrailingCommas(b []byte) ([]byte, bool) {
 		return b, false
 	}
 	return out, true
+}
+
+// ArrayElements returns the complete elements of the first array in payload, even
+// when the array itself is unterminated. A reply cut off by a token limit is not
+// a failed reply: the elements written before the cut are whole, and keeping them
+// beats discarding a batch, which for a long import means discarding its work.
+//
+// Only objects and arrays are returned; a scalar element is skipped because a
+// truncated number or string cannot be told from a complete one.
+func ArrayElements(payload []byte) [][]byte {
+	if len(payload) > maxPayload {
+		return nil
+	}
+	open := bytes.IndexByte(payload, '[')
+	if open < 0 {
+		return nil
+	}
+
+	var elements [][]byte
+	depth := 0
+	inString := false
+	escaped := false
+	start := -1
+
+	for i := open + 1; i < len(payload); i++ {
+		c := payload[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			switch c {
+			case '\\':
+				escaped = true
+			case '"':
+				inString = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inString = true
+		case '{', '[':
+			if depth == 0 {
+				start = i
+			}
+			depth++
+		case '}', ']':
+			if depth == 0 {
+				// The enclosing array closed without an open element.
+				return elements
+			}
+			depth--
+			if depth == 0 && start >= 0 {
+				element := bytes.TrimSpace(payload[start : i+1])
+				if len(element) > 0 && element[0] == '{' {
+					elements = append(elements, element)
+				}
+				start = -1
+			}
+		}
+	}
+	return elements
 }

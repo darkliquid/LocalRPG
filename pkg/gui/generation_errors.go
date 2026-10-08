@@ -1,10 +1,12 @@
 package gui
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/worldgen"
 )
 
 // generationStatus maps a bounded failure code to the HTTP status that best
@@ -54,6 +56,29 @@ func writeInvalidRequest(w http.ResponseWriter, message string) {
 // non-generation failures such as a world conflict.
 func writeJSONError(w http.ResponseWriter, status int, message string) {
 	writeJSONStatus(w, status, map[string]interface{}{"error": map[string]string{"message": message}})
+}
+
+// writeJSONErrorCode is writeJSONError with a machine-readable reason, so the UI
+// can explain a failure the user can act on rather than only printing the text.
+func writeJSONErrorCode(w http.ResponseWriter, status int, code, message string) {
+	writeJSONStatus(w, status, map[string]interface{}{
+		"error": map[string]string{"code": code, "message": message},
+	})
+}
+
+// generationLimitCode names the code a caller gets when a generation stopped
+// because it reached a configured limit. An empty code means the failure is not
+// one the user can fix by changing a limit. The two limits carry different codes
+// so the UI can offer the field that caused it.
+func generationLimitCode(err error) string {
+	switch {
+	case errors.Is(err, worldgen.ErrCallBudgetExceeded):
+		return ErrorCodeCallLimit
+	case errors.Is(err, ErrSourceTooLarge):
+		return ErrorCodeSourceLimit
+	default:
+		return ""
+	}
 }
 
 // writeGenerationFailure recognises a generation failure and writes it, so

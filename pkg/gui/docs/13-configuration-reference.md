@@ -219,6 +219,13 @@ choose; the ledger and provider identifiers are listed in the
 | --- | --- |
 | `interactive.rolls` | string |
 
+### `generation`
+
+| Key | Type |
+| --- | --- |
+| `generation.max_calls` | int |
+| `generation.max_chunks` | int |
+
 ### `publishers`
 
 | Key | Type |

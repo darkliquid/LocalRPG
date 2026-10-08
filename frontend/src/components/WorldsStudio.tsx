@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient, WorldExistsError } from '../api/client';
-import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail, GenerationFailure, FolderNode, ContentManifestInfo } from '../types';
-import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles, Download } from 'lucide-react';
+import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail, GenerationFailure, FolderNode, ContentManifestInfo, DraftCommitRequest, WorldDraftInfo } from '../types';
+import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles, Download, PackagePlus, Lightbulb } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { useLightbox } from '../hooks/useLightbox';
@@ -14,21 +14,16 @@ import { NewEntityWizard } from './NewEntityWizard';
 import { safeImagePreview } from '../utils/security';
 import { ContentImportDialog } from './ContentImportDialog';
 import { inspectPackageFile } from '../lib/packageInspect';
+import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
+import { WorldGenerateDialog } from './WorldGenerateDialog';
+import { WorldDraftReview } from './WorldDraftReview';
+import { EntityBatchDialog } from './EntityBatchDialog';
+import { WorldEnhanceDialog } from './WorldEnhanceDialog';
 
 interface WorldsStudioProps {
   onWorldSaved?: () => void;
   startMode?: 'new' | 'browse';
 }
-
-const STARTER_ENTITY_TEMPLATE = `---
-name: New Location
-type: location
-state:
-  danger_level: 1
-wikilinks: []
----
-An intriguing location waiting to be explored.
-`;
 
 // typeFromMarkdown reads the type the wizard wrote, so the tree summary matches
 // the note without a round trip.
@@ -84,6 +79,20 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importManifest, setImportManifest] = useState<ContentManifestInfo | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const savePicker = useSaveFilePicker();
+  // AI generation: a whole-world brief, a draft awaiting review, a batch of
+  // entities, and an enhancement diff. Every one of them reviews before it writes.
+  const [showGenerate, setShowGenerate] = useState(false);
+  const [reviewDraft, setReviewDraft] = useState<WorldDraftInfo | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<string | undefined>(undefined);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [batchWorldId, setBatchWorldId] = useState<string | null>(null);
+  const [enhanceWorldId, setEnhanceWorldId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [isDeletingWorld, setIsDeletingWorld] = useState(false);
+  const [deleteWorldError, setDeleteWorldError] = useState<string | null>(null);
+  const [canForceDelete, setCanForceDelete] = useState(false);
   const detailRequest = React.useRef(0);
   const startModeRef = React.useRef(startMode);
 
@@ -95,6 +104,60 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const markDirty = () => setDraft((d) => (d ? { ...d, dirty: true } : d));
   const reportGenerationError = (failure: GenerationFailure) =>
     setToast({ type: 'error', message: formatGenerationError(failure) });
+
+  // commitReviewedDraft writes the accepted set and opens the world it produced.
+  const commitReviewedDraft = async (req: DraftCommitRequest) => {
+    setReviewLoading(true);
+    setReviewError(null);
+    try {
+      const world = await APIClient.commitDraft(req);
+      setReviewDraft(null);
+      setReviewTarget(undefined);
+      await loadWorldsRef.current?.(world.id, 'browse');
+    } catch (err) {
+      setReviewError(errorMessage(err));
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const discardReviewedDraft = async (draftId: string) => {
+    try {
+      await APIClient.discardDraft({ draft_id: draftId });
+    } catch {
+      // A draft that is already gone is not a failure worth reporting.
+    }
+    setReviewDraft(null);
+    setReviewTarget(undefined);
+  };
+
+  const handleDeleteWorld = async (force = false) => {
+    if (!deleteTarget) return;
+    setIsDeletingWorld(true);
+    setDeleteWorldError(null);
+    try {
+      await APIClient.deleteWorld(deleteTarget.id, force);
+      const deletedName = deleteTarget.name;
+      const deletedID = deleteTarget.id;
+      setDeleteTarget(null);
+      setDeleteWorldError(null);
+      setCanForceDelete(false);
+      setToast({ type: 'success', message: `World "${deletedName}" deleted.` });
+
+      if (selection?.kind === 'saved' && selection.id === deletedID) {
+        requestSelection({ kind: 'draft' });
+      }
+      await loadWorldsRef.current?.(undefined, 'browse');
+    } catch (err) {
+      const msg = errorMessage(err);
+      setDeleteWorldError(msg);
+      if (msg.includes('in use by a campaign') || msg.toLowerCase().includes('conflict')) {
+        setCanForceDelete(true);
+      }
+    } finally {
+      setIsDeletingWorld(false);
+    }
+  };
 
   const loadWorldsRef = React.useRef<((selectID?: string, mode?: 'new' | 'browse') => Promise<void>) | null>(null);
 
@@ -408,15 +471,23 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         ? await APIClient.createWorld(payload)
         : await APIClient.updateWorld(savedID as string, payload);
 
-      // Save all entity templates (whether new world or edited world)
-      const allDrafts = { ...entityDrafts };
-      if (selectedEntityID) {
-        allDrafts[selectedEntityID] = entityMarkdown;
-      }
+      // For a newly created draft world, persist the entity templates that were drafted in memory.
+      if (isDraft) {
+        const allDrafts = { ...entityDrafts };
+        if (selectedEntityID) {
+          allDrafts[selectedEntityID] = entityMarkdown;
+        }
 
-      for (const ent of entities) {
-        const md = allDrafts[ent.id] || STARTER_ENTITY_TEMPLATE;
-        await APIClient.saveWorldEntity(saved.id, ent.id, md).catch(() => {});
+        for (const ent of entities) {
+          const md = allDrafts[ent.id];
+          if (md) {
+            await APIClient.saveWorldEntity(saved.id, ent.id, md, ent.folder).catch(() => {});
+          }
+        }
+      } else if (selectedEntityID && entityDrafts[selectedEntityID] !== undefined) {
+        // For an existing world, only save the currently selected entity if it has unpersisted edits.
+        const currentEntity = entities.find((e) => e.id === selectedEntityID);
+        await APIClient.saveWorldEntity(saved.id, selectedEntityID, entityMarkdown, currentEntity?.folder).catch(() => {});
       }
 
       if (bannerFile) {
@@ -454,7 +525,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
     if (!savedID) return;
 
     try {
-      await APIClient.saveWorldEntity(savedID, selectedEntityID, entityMarkdown);
+      const currentEntity = entities.find((e) => e.id === selectedEntityID);
+      await APIClient.saveWorldEntity(savedID, selectedEntityID, entityMarkdown, currentEntity?.folder);
       setToast({ type: 'success', message: `Entity "${selectedEntityID}" saved!` });
       await loadWorldDetail(savedID);
     } catch (err) {
@@ -525,15 +597,31 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
 
   const handleExport = async () => {
     if (!savedID) return;
+    const defaultFilename = `${savedID}-1.0.0.lrpgworld`;
     try {
-      const blob = await APIClient.exportContent('world', savedID);
+      if (savePicker.nativeDialog) {
+        const path = await savePicker.pick({
+          title: 'Export World Package',
+          default_filename: defaultFilename,
+          filters: [
+            { display_name: 'LocalRPG World (*.lrpgworld)', pattern: '*.lrpgworld' },
+            { display_name: 'All Files (*.*)', pattern: '*.*' },
+          ],
+        });
+        if (!path) return;
+        await APIClient.exportContent('world', savedID, path);
+        setToast({ type: 'success', message: `Exported world package: ${path}` });
+        return;
+      }
+
+      const blob = (await APIClient.exportContent('world', savedID)) as Blob;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${savedID}-1.0.0.lrpgpack`;
+      a.download = defaultFilename;
       a.click();
       URL.revokeObjectURL(url);
-      setToast({ type: 'success', message: `Exported world package: ${savedID}.lrpgpack` });
+      setToast({ type: 'success', message: `Exported world package: ${defaultFilename}` });
     } catch (err) {
       setToast({ type: 'error', message: errorMessage(err) });
     }
@@ -557,7 +645,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
     if (!importFile) return;
     setIsImporting(true);
     try {
-      const res = await APIClient.importContent(importFile, conflictMode);
+      const res = await APIClient.importContent(importFile, conflictMode, 'world');
       setToast({ type: 'success', message: `Successfully ${res.action} world ${res.name} (${res.id})` });
       setImportFile(null);
       setImportManifest(null);
@@ -574,32 +662,40 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
     <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
       {/* Left Master Column: Worlds List */}
       <aside className="w-full md:w-80 h-full bg-stone-950/70 border-r border-white/10 p-4 flex flex-col gap-4 shrink-0 overflow-hidden">
-        <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
+        <div className="flex flex-col gap-2 pb-2 border-b border-stone-800/60 shrink-0">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-purple-400" />
             <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">
               Worlds Studio
             </h3>
           </div>
+          <input
+            type="file"
+            ref={importInputRef}
+            onChange={handleFileSelect}
+            accept=".lrpgworld,.lrpgpack"
+            className="hidden"
+          />
           <div className="flex items-center gap-1.5">
-            <input
-              type="file"
-              ref={importInputRef}
-              onChange={handleFileSelect}
-              accept=".lrpgpack,application/gzip,application/x-gzip"
-              className="hidden"
-            />
+            <button
+              onClick={() => setShowGenerate(true)}
+              title="Generate a world with AI"
+              className="flex-1 flex items-center justify-center gap-1 text-xs font-sans px-2 py-1.5 rounded-lg border border-purple-500/40 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Generate</span>
+            </button>
             <button
               onClick={() => importInputRef.current?.click()}
-              title="Import content package (.lrpgpack)"
-              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer"
+              title="Import world package (.lrpgworld, .lrpgpack)"
+              className="flex-1 flex items-center justify-center gap-1 text-xs font-sans px-2 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer whitespace-nowrap"
             >
               <Upload className="w-3.5 h-3.5" />
               <span>Import</span>
             </button>
             <button
               onClick={() => requestSelection({ kind: 'draft' })}
-              className="flex items-center gap-1 text-xs font-sans font-bold px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow"
+              className="flex-1 flex items-center justify-center gap-1 text-xs font-sans font-bold px-2 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow whitespace-nowrap"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New</span>
@@ -640,21 +736,36 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
               <div
                 key={w.id}
                 onClick={() => requestSelection({ kind: 'saved', id: w.id })}
-                className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${
+                className={`group p-3 rounded-xl border transition-all cursor-pointer text-left ${
                   selection?.kind === 'saved' && selection.id === w.id
                     ? 'bg-purple-950/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
                     : 'bg-stone-900/40 border-stone-800/60 hover:bg-stone-800/40 hover:border-stone-700'
                 }`}
               >
-                <div>
-                  <h4 className="font-sans text-xs font-bold text-stone-200 truncate">{w.name}</h4>
-                  {w.genre && (
-                    <div className="mt-1">
-                      <span className="inline-block text-xs font-mono text-purple-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
-                        {w.genre}
-                      </span>
-                    </div>
-                  )}
+                <div className="flex items-start justify-between gap-1">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-sans text-xs font-bold text-stone-200 truncate">{w.name}</h4>
+                    {w.genre && (
+                      <div className="mt-1">
+                        <span className="inline-block text-xs font-mono text-purple-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
+                          {w.genre}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget({ id: w.id, name: w.name });
+                      setDeleteWorldError(null);
+                      setCanForceDelete(false);
+                    }}
+                    title={`Delete world "${w.name}"`}
+                    className="p-1 text-stone-500 hover:text-red-400 rounded hover:bg-red-950/40 transition-colors opacity-40 group-hover:opacity-100 hover:!opacity-100 shrink-0 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
                 {w.description && (
                   <p className="text-xs text-stone-400 truncate mt-1">{w.description}</p>
@@ -681,6 +792,28 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {savedID && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setBatchWorldId(savedID)}
+                  title="Generate a batch of entities for this world"
+                  className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl border border-sky-500/40 bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 transition-all cursor-pointer"
+                >
+                  <PackagePlus className="w-3.5 h-3.5" />
+                  <span>Generate entities</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEnhanceWorldId(savedID)}
+                  title="Propose lore, entities, and hooks for this world"
+                  className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 transition-all cursor-pointer"
+                >
+                  <Lightbulb className="w-3.5 h-3.5" />
+                  <span>Enhance</span>
+                </button>
+              </>
+            )}
             <div className="flex flex-wrap bg-stone-950/80 p-1 rounded-xl border border-stone-800">
               <button
                 type="button"
@@ -745,12 +878,28 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
               type="button"
               onClick={handleExport}
               disabled={!savedID}
-              title="Export world package (.lrpgpack)"
+              title="Export world package (.lrpgworld)"
               className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Export</span>
             </button>
+
+            {savedID && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTarget({ id: savedID, name: name || savedID });
+                  setDeleteWorldError(null);
+                  setCanForceDelete(false);
+                }}
+                title="Delete this world"
+                className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-red-500/30 bg-red-950/20 hover:bg-red-950/40 text-red-300 hover:text-red-200 transition-all cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Delete World</span>
+              </button>
+            )}
 
             <button
               onClick={handleSaveWorld}
@@ -1084,6 +1233,31 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   </div>
                 </div>
               </div>
+
+              {savedID && (
+                <div className="p-4 bg-red-950/20 border border-red-500/30 rounded-2xl flex items-center justify-between mt-4">
+                  <div>
+                    <div className="text-xs font-sans font-bold text-red-400 flex items-center gap-1.5">
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Danger Zone: Delete World</span>
+                    </div>
+                    <p className="text-xs font-sans text-stone-400 mt-1">
+                      Permanently delete this world and all of its lore and entities from disk. This cannot be undone.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteTarget({ id: savedID, name: name || savedID });
+                      setDeleteWorldError(null);
+                      setCanForceDelete(false);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-sans text-xs font-bold transition-all cursor-pointer shadow"
+                  >
+                    Delete World
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1121,7 +1295,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         {activeTab === 'entities' && (
           <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
             {/* Entity List */}
-            <div className="w-56 shrink-0 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2 min-h-0">
+            <div className="w-64 shrink-0 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2 min-h-0 h-full">
               <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
                 <span className="text-xs font-sans uppercase tracking-wider text-stone-400">
                   Templates
@@ -1135,7 +1309,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 </button>
               </div>
 
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 {entities.length === 0 ? (
                   <div className="text-xs text-stone-500 py-6 text-center">
                     No starter templates. Click + Add to create one!
@@ -1184,7 +1358,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
               {selectedEntityID ? (
                 <>
                   <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
-                    <span>worlds/{savedID || slugID || 'draft'}/entities/{selectedEntityID}.md</span>
+                    <span>
+                      worlds/{savedID || slugID || 'draft'}/entities/
+                      {entities.find((e) => e.id === selectedEntityID)?.folder
+                        ? `${entities.find((e) => e.id === selectedEntityID)?.folder}/`
+                        : ''}
+                      {selectedEntityID}.md
+                    </span>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -1245,6 +1425,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       {importManifest && (
         <ContentImportDialog
           manifest={importManifest}
+          expectedType="world"
           onConfirm={handleConfirmImport}
           onCancel={() => {
             setImportFile(null);
@@ -1252,6 +1433,118 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
           }}
           loading={isImporting}
         />
+      )}
+
+      {showGenerate && (
+        <WorldGenerateDialog
+          onCancel={() => setShowGenerate(false)}
+          onDraft={(generated) => {
+            setShowGenerate(false);
+            setReviewTarget(undefined);
+            setReviewError(null);
+            setReviewDraft(generated);
+          }}
+        />
+      )}
+
+      {reviewDraft && (
+        <WorldDraftReview
+          draft={reviewDraft}
+          targetWorldId={reviewTarget}
+          loading={reviewLoading}
+          error={reviewError}
+          onCommit={(req) => void commitReviewedDraft(req)}
+          onDiscard={(draftId) => void discardReviewedDraft(draftId)}
+        />
+      )}
+
+      {batchWorldId && (
+        <EntityBatchDialog
+          worldId={batchWorldId}
+          onClose={() => setBatchWorldId(null)}
+          onAccepted={(result) => {
+            setBatchWorldId(null);
+            setToast({
+              type: 'success',
+              message: `Wrote ${result.written.length} entit${result.written.length === 1 ? 'y' : 'ies'}`,
+            });
+            void loadWorldsRef.current?.(batchWorldId, 'browse');
+          }}
+        />
+      )}
+
+      {enhanceWorldId && (
+        <WorldEnhanceDialog
+          worldId={enhanceWorldId}
+          onClose={() => setEnhanceWorldId(null)}
+          onApplied={(result) => {
+            setEnhanceWorldId(null);
+            setToast({ type: 'success', message: `Applied ${result.written.join(', ')}` });
+            void loadWorldsRef.current?.(enhanceWorldId, 'browse');
+          }}
+        />
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none">
+          <div className="w-full max-w-md bg-stone-900 border border-white/15 rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 text-red-400">
+              <Trash2 className="w-5 h-5 shrink-0" />
+              <h3 className="font-sans text-sm font-bold text-white">
+                Delete world &ldquo;{deleteTarget.name}&rdquo;?
+              </h3>
+            </div>
+            <p className="text-xs font-sans text-stone-300">
+              This will permanently delete the world directory and all of its lore and entities. This action cannot be undone.
+            </p>
+            {deleteWorldError && (
+              <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-300 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p>{deleteWorldError}</p>
+                  {canForceDelete && (
+                    <p className="text-stone-400">
+                      You can force deletion to remove the world anyway. Existing campaigns using this world will lose their world files.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteWorldError(null);
+                  setCanForceDelete(false);
+                }}
+                disabled={isDeletingWorld}
+                className="text-xs font-sans px-3 py-1.5 rounded-lg border border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              {canForceDelete ? (
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteWorld(true)}
+                  disabled={isDeletingWorld}
+                  className="text-xs font-sans font-bold px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-600 text-white transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isDeletingWorld ? 'Deleting...' : 'Force Delete'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteWorld(false)}
+                  disabled={isDeletingWorld}
+                  className="text-xs font-sans font-bold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isDeletingWorld ? 'Deleting...' : 'Delete World'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

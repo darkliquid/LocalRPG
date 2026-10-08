@@ -160,7 +160,7 @@ remedy of downgrading twenty-three minor versions; `markdownlint-cli` avoided
 `braces` but pinned `js-yaml ~5.2.1`, inside a different advisory's range. The
 engine itself then turned out to reach a vulnerable `katex` through
 `micromark-extension-math`. A native binary has none of that surface, and
-`rumdl check` reports the same result on the corpus: no issues in 22 files.
+`rumdl check` reports the same result on the corpus: no issues in 23 files.
 
 **Do not add a Node markdown linter back.** If the docs ever need a rule the config
 cannot express, add it to `.rumdl.toml`, which is where the three deviations from
@@ -185,10 +185,10 @@ Vale checks prose style in the user-facing documentation only. It is pinned in
 `mise.toml` like every other tool, and `.vale.ini` at the repository root decides
 the styles.
 
-**Scope is 22 files**, and it is the same set `tools/sitegen/content.go` renders
+**Scope is 25 files**, and it is the same set `tools/sitegen/content.go` renders
 into the showcase site:
 
-- `pkg/gui/docs/*.md` - the 22 guide articles the application embeds, and the bulk
+- `pkg/gui/docs/*.md` - the 23 guide articles the application embeds, and the bulk
   of the user-facing prose.
 - `README.md` - the project README.
 - `docs/debugging.md` - the debugging guide.
@@ -209,7 +209,7 @@ STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
 
 ### What it reports today
 
-**190 alerts across all 22 files: 0 errors, 89 warnings and 101 suggestions.**
+**234 alerts across all 25 files: 0 errors, 100 warnings and 134 suggestions.**
 For scale, pointing the same styles at every tracked file reported 68,525 alerts
 and 6,875 errors, which is why the scope is the documentation rather than the
 repository.
@@ -224,7 +224,7 @@ Reaching zero took three passes: narrowing the scope to the documentation, addin
 the vocabulary, and then rewriting the prose the remaining rules objected to. A
 fourth pass then worked down the warnings and suggestions, which took the report
 from 293 alerts to 149. The guide that documents the on-disk and package formats
-added 41 more, so the count stands at 190.
+added 41 more, and the AI world generation guide added 44, so the count stands at 234.
 
 Everything left is deliberate. `neighbor.AmpersandInProse` (71) fires on `&` in
 headings and bolded feature labels, which is a design convention rather than prose.
@@ -372,6 +372,7 @@ Two suites, one runner each. `mise run test` runs both plus the backend.
 - **Browser end-to-end tests: `pkg/e2e`, behind the `e2e` build tag.** The default `go test ./...` never compiles them, so a machine without Chrome stays fast; run them with `mise run test:e2e` (`go test -tags e2e ./pkg/e2e/...`). `harness.go` wraps chromedp (`NewBrowser`, `Click`, `Type`, `WaitFor`, `Poll`, `InstrumentAudio`) and `fixture.go` starts the real `gui.Service` on a temp root behind an `httptest` server (`NewFixture`, `WriteSystem`, `WriteWorld`, `InitGame`, `WriteEntities`, `WriteHistory`). The tests skip, never fail, when `driver.Available` finds no usable browser.
 - **They live in `pkg/e2e`, not `pkg/gui`, because the harness imports `pkg/gui`** (`NewService`, `NewServer`, `AssetHandler`); keeping them in `pkg/gui` would be an import cycle. They use only the exported `pkg/gui` surface.
 - **A failure writes artifacts** to `$E2E_ARTIFACT_DIR/<test name>/` (default `test-results/`): `body.txt`, `dom.json`, and `failure.png`. The CI `e2e` job installs Chrome with `browser-actions/setup-chrome`, runs the suite, and uploads `test-results/` so a red run is debuggable.
+- **A test must never resolve the developer's real config.** `config.DetectConfigFile` reads `LOCALRPG_CONFIG_DIR` on every call, then falls back to XDG, and `xdg` caches its directories when the package is first used, so setting `HOME` in a test does not redirect anything: a test that then saves writes `~/.config/localrpg/config.yaml` and destroys the provider setup on the machine running it. `TestOfflineConfigCommands` did exactly that on every `go test ./...`. `cmd/localrpg` now redirects the whole package through `LOCALRPG_CONFIG_DIR` in its `TestMain` and refuses to run if a resolution escapes it; a test that resolves the config itself must do the same and assert the path is inside its own `t.TempDir()`.
 
 ## Conventions
 

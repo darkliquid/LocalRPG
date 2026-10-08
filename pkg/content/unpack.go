@@ -184,11 +184,19 @@ func Unpack(r io.Reader, destDir string) (Manifest, []byte, error) {
 		if err != nil {
 			return Manifest{}, nil, fmt.Errorf("resolve safe path for %q: %w", cleanRel, err)
 		}
+		// CodeQL local containment validation
+		cleanStaging := filepath.Clean(stagingDir)
+		relToStaging, err := filepath.Rel(cleanStaging, targetPath)
+		if err != nil || strings.HasPrefix(relToStaging, "..") || relToStaging == ".." {
+			return Manifest{}, nil, fmt.Errorf("archive member %q escapes staging directory", cleanRel)
+		}
 
+		// lgtm[go/path-injection]
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 			return Manifest{}, nil, fmt.Errorf("create directory for %q: %w", cleanRel, err)
 		}
 
+		// lgtm[go/path-injection]
 		targetFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 		if err != nil {
 			return Manifest{}, nil, fmt.Errorf("create file %q: %w", cleanRel, err)

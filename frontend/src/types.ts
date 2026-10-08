@@ -237,7 +237,7 @@ export interface AudioProgressEvent {
 }
 
 export interface TurnEvent {
-  type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing' | 'audio_progress' | 'portrait' | 'scene_image';
+  type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing' | 'audio_progress' | 'portrait' | 'scene_image' | 'step' | 'estimate' | 'draft' | 'progress' | 'batch';
   text?: string;
   turn?: Turn;
   // One parsed narration or speech unit, present when type is 'segment': it is
@@ -266,6 +266,218 @@ export interface TurnEvent {
   detail?: string;
   failure?: GenerationFailure;
   retry_after_ms?: number;
+  // World generation progress, present when type is 'step'.
+  step?: WorldGenStep;
+  // The dry-run estimate, present when type is 'estimate'.
+  estimate?: WorldEstimate;
+  // The generated draft, present when type is 'draft'.
+  draft?: WorldDraftInfo;
+  // Import progress, present when type is 'progress'.
+  progress?: WorldImportProgress;
+  // The previewed entity batch, present when type is 'batch'.
+  batch?: WorldEntityBatch;
+}
+
+// WorldImportProgress is one batch of a source import: what it read, what it
+// found, and how much of the whole is done.
+export interface WorldImportProgress {
+  batch: number;
+  batches: number;
+  sources?: string[];
+  found: number;
+  total: number;
+  names?: string[];
+  // cut_off counts the batches whose reply ran out before it finished.
+  cut_off?: number;
+}
+
+// WorldGenStep is one progress report from the generation pipeline.
+export interface WorldGenStep {
+  name: string;
+  status: 'done' | 'error';
+  detail?: string;
+}
+
+// WorldEstimate is a planned generation's cost, before it runs. An unpriced
+// provider reports priced: false rather than a cost of zero.
+export interface WorldEstimate {
+  calls: number;
+  chunks?: number;
+  cost_micros?: number;
+  priced: boolean;
+}
+
+// WorldSource names something to ingest: a folder, or a set of URLs.
+export interface WorldSource {
+  kind: 'folder' | 'url';
+  path?: string;
+  urls?: string[];
+}
+
+// WorldCounts is how many of each thing a generation should produce.
+export interface WorldCounts {
+  locations?: number;
+  factions?: number;
+  characters?: number;
+}
+
+export interface WorldGenerateRequest {
+  premise: string;
+  name?: string;
+  genre?: string;
+  themes?: string[];
+  counts?: WorldCounts;
+  source?: WorldSource;
+  dry_run?: boolean;
+  limits?: GenerationLimitsOverride;
+}
+
+export interface WorldDraftEntity {
+  id: string;
+  name: string;
+  type: string;
+  tags?: string[];
+  folder?: string;
+  body: string;
+  source?: string;
+  links?: string[];
+  dropped_links?: string[];
+}
+
+export interface WorldDraftSection {
+  title: string;
+  body: string;
+}
+
+export interface WorldDraftInfo {
+  id: string;
+  name: string;
+  description: string;
+  genre: string;
+  art_style?: string;
+  tags?: string[];
+  lore: string;
+  sections: WorldDraftSection[];
+  entities: WorldDraftEntity[];
+  estimate?: WorldEstimate;
+  calls?: number;
+  oracle?: boolean;
+}
+
+export interface WorldEntityBatchRequest {
+  instruction: string;
+  kinds?: string[];
+  count?: number;
+  focus?: string;
+  // source extracts the batch from a folder or a set of URLs instead of
+  // generating it from the instruction.
+  source?: WorldSource;
+  limits?: GenerationLimitsOverride;
+}
+
+export interface WorldEntityBatch {
+  entities: WorldDraftEntity[];
+  // batch_id names the stored batch. A batch of a few hundred entities is far
+  // more than a request body carries, so accepting it names the batch.
+  batch_id?: string;
+  // oracle marks a batch the deterministic fallback produced, so the dialog can
+  // say so rather than implying a model wrote it.
+  oracle?: boolean;
+  // cut_off counts the batches whose reply ran out of room, so a short import is
+  // not mistaken for a complete one.
+  cut_off?: number;
+}
+
+export interface WorldEntityAcceptRequest {
+  // The batch is named rather than posted, so an accept of hundreds of entities
+  // is a small request. ids narrows it; empty means the whole batch.
+  batch_id?: string;
+  ids?: string[];
+  // entities carries the batch itself, for a caller with no stored one.
+  entities?: WorldDraftEntity[];
+  rename?: boolean;
+}
+
+export interface WorldEnhanceRequest {
+  instruction: string;
+  kinds?: string[];
+}
+
+export interface WorldEnhancement {
+  kind: 'lore' | 'entity' | 'hook';
+  title: string;
+  body: string;
+  entity?: WorldDraftEntity;
+  target?: string;
+  reason?: string;
+}
+
+export interface WorldEnhanceResponse {
+  proposals: WorldEnhancement[];
+  oracle?: boolean;
+}
+
+export interface WorldEnhanceApplyRequest {
+  proposals: WorldEnhancement[];
+  rename?: boolean;
+}
+
+export interface WorldApplyResult {
+  written: string[];
+  renamed?: string[];
+}
+
+export interface DraftCommitRequest {
+  draft_id: string;
+  target_world_id?: string;
+  // accept_all keeps the whole draft. Otherwise section_indexes and entity_ids
+  // name what was kept; the content is read from the stored draft, because a
+  // generated world can hold hundreds of entities.
+  accept_all?: boolean;
+  section_indexes?: number[];
+  entity_ids?: string[];
+  // edits carries the entities the reviewer changed, so an edit is written rather
+  // than the generated text, without posting everything that was accepted.
+  edits?: WorldDraftEntity[];
+  meta?: CreateWorldRequest;
+}
+
+export interface DraftDiscardRequest {
+  draft_id: string;
+}
+
+// DirectoryChoiceStatus is the state of a pending native folder choice.
+export type DirectoryChoiceStatus = 'idle' | 'pending' | 'selected' | 'cancelled';
+
+export interface DirectoryChoice {
+  status: DirectoryChoiceStatus;
+  path?: string;
+}
+
+export type SaveFileChoiceStatus = 'idle' | 'pending' | 'selected' | 'cancelled';
+
+export interface SaveFileFilter {
+  display_name: string;
+  pattern: string;
+}
+
+export interface ChooseSaveFileRequest {
+  title?: string;
+  default_dir?: string;
+  default_filename?: string;
+  filters?: SaveFileFilter[];
+}
+
+export interface SaveFileChoice {
+  status: SaveFileChoiceStatus;
+  path?: string;
+}
+
+export interface ExportContentResult {
+  path: string;
+  id: string;
+  version: string;
+  type: string;
 }
 
 export interface ModelStatus {
@@ -707,6 +919,7 @@ export interface CreateWorldRequest {
 export interface WorldEntityDetail {
   id: string;
   markdown: string;
+  folder?: string;
 }
 
 // WorldSelection models what the Worlds Studio editor is showing: a saved
@@ -1017,6 +1230,22 @@ export interface AppConfig {
   media: MediaConfig;
   embeddings?: EmbeddingsConfig;
   preferences: PreferencesConfig;
+  generation?: GenerationConfig;
+}
+
+// GenerationConfig bounds an AI world generation. A premise, entity, or
+// enhancement generation is bounded by its call count; an ingestion, whose size
+// is the source's, is bounded by how many chunks it will read.
+export interface GenerationConfig {
+  max_calls?: number;
+  max_chunks?: number;
+}
+
+// GenerationLimitsOverride raises a generation's limits for one request, so a
+// user who hits a limit can carry on without leaving the flow.
+export interface GenerationLimitsOverride {
+  max_calls?: number;
+  max_chunks?: number;
 }
 
 export interface SettingsResponse {

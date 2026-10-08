@@ -31,7 +31,7 @@
 - Consumes: `Brief`, `Counts`, the pricing table.
 - Produces: `Estimate`, `func EstimatePlan(kind string, brief Brief, chunks int, prices pricing.Table) Estimate`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestEstimatePlan(t *testing.T) {
@@ -47,22 +47,22 @@ func TestEstimatePlan(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/worldgen/ -run TestEstimatePlan -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Compute the calls per kind (fixed steps plus batches), and fill `CostMicros` from the pricing table
 when the provider is priced.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/worldgen/ -run TestEstimatePlan -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/worldgen/estimate.go pkg/worldgen/estimate_test.go
@@ -82,30 +82,30 @@ git commit -m "feat(worldgen): estimate a generation's cost"
 - Consumes: `EstimatePlan` (Task 1).
 - Produces: `GenerationConfig{MaxCalls int}`, a `dry_run` request flag, and a per-generation budget.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestDryRunMakesNoCall(t *testing.T) { /* the stub generator is never called */ }
 func TestCapAborts(t *testing.T) { /* exceeding MaxCalls errors and discards the draft */ }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./pkg/gui/ -run 'TestDryRun|TestCap' -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add `Generation.MaxCalls` to the config and an accessor. Thread a call counter through
 `worldgen.Generate` that errors past the budget. Handle `dry_run` by returning the estimate before
 any call.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/gui/ -run 'TestDryRun|TestCap' -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/config pkg/worldgen pkg/gui
@@ -124,7 +124,7 @@ git commit -m "feat: dry-run and cap world generation"
 - Consumes: the narrative-oracle provider.
 - Produces: an oracle `Generator` that produces a template world with zero calls.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestOracleGeneratorProducesATemplate(t *testing.T) {
@@ -139,22 +139,22 @@ func TestOracleGeneratorProducesATemplate(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/worldgen/ -run TestOracleGenerator -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Implement a `Generator` backed by the deterministic oracle that fills the same structured shapes from
 templates, and have the GUI select it when no provider is configured.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/worldgen/ -run TestOracleGenerator -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/worldgen pkg/gui
@@ -174,7 +174,7 @@ git commit -m "feat(worldgen): generate offline with the oracle"
 - Consumes: the estimate (Task 1), the ledger.
 - Produces: actual usage recorded under `generator`, and an estimate shown before Generate.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestGenerationRecordsUsage(t *testing.T) { /* the ledger gains a generator entry */ }
@@ -184,22 +184,22 @@ test("shows the estimate before generating", () => { /* the dry run's calls are 
 test("requires confirmation for a large estimate", () => { /* a second click is needed */ });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./pkg/gui/ -run TestGenerationRecordsUsage -v` and `npm run test -- WorldGenerateDialog`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Record the calls and cost in the ledger after generation. In the dialog, dry-run first, show the
 estimate, and gate a large estimate behind a confirmation.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/gui/ -run TestGenerationRecordsUsage -v` and `npm run test -- WorldGenerateDialog`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui frontend/src
@@ -210,23 +210,23 @@ git commit -m "feat: show the generation estimate and record usage"
 
 ### Task 5: Verification
 
-- [ ] **Step 1: Regression guard**
+- [x] **Step 1: Regression guard**
 
 Add a test that a small generation under the cap and threshold behaves as before.
 
-- [ ] **Step 2: Full suite and lint**
+- [x] **Step 2: Full suite and lint**
 
 Run: `mise run test && mise run lint`
 Expected: PASS and clean.
 
-- [ ] **Step 3: Confirm the acceptance criteria**
+- [x] **Step 3: Confirm the acceptance criteria**
 
 - A dry run makes no call and returns an estimate.
 - The cap aborts a runaway.
 - No provider falls back to the oracle.
 - Actual usage is recorded and the estimate is shown first.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A

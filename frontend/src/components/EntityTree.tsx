@@ -90,6 +90,26 @@ export default function EntityTree({
 
   const index = useMemo(() => buildIndex(folders, visibleEntities), [folders, visibleEntities]);
 
+  // Headless Tree renders its cached item list once more before the rebuild
+  // effect below runs, so it can still ask for a note the server has just
+  // removed. A loader that answers undefined throws out of render and unmounts
+  // the app, so an unknown id gets a stable placeholder and renderRow skips it.
+  const placeholders = useRef(new Map<string, TreeItem>());
+  const itemFor = (id: string): TreeItem => {
+    const known = index.get(id);
+    if (known) return known;
+    let placeholder = placeholders.current.get(id);
+    if (!placeholder) {
+      placeholder = { id, kind: 'note', name: '', folderPath: '' };
+      placeholders.current.set(id, placeholder);
+    }
+    return placeholder;
+  };
+
+  useEffect(() => {
+    placeholders.current.clear();
+  }, [index]);
+
   // The drop handler is rebuilt every render so it always closes over the current
   // index and children. Headless Tree does the placement arithmetic and hands back
   // the new children of the parent that gained an item; the model turns that
@@ -100,7 +120,7 @@ export default function EntityTree({
     getItemName: (item) => item.getItemData().name,
     isItemFolder: (item) => item.getItemData().kind === 'folder',
     dataLoader: {
-      getItem: (id) => index.get(id) as TreeItem,
+      getItem: itemFor,
       getChildren: (id) => childrenOf(folders, visibleEntities, index.get(id)?.folderPath ?? ''),
     },
     features: [
@@ -148,6 +168,9 @@ export default function EntityTree({
   // A menu closes on any click elsewhere, including one on another row.
 
   const renderRow = (item: ItemInstance<TreeItem>) => {
+    // A placeholder stands in for an id the tree has not rebuilt past, and it
+    // has no row to draw.
+    if (!index.has(item.getId())) return null;
     const data = item.getItemData();
     const isFolder = data.kind === 'folder';
     const isSelected = !isFolder && data.entity?.id === selectedId;
@@ -244,8 +267,8 @@ export default function EntityTree({
   };
 
   return (
-    <div className="flex min-h-0 flex-col gap-2">
-      <div className="flex items-center gap-1.5">
+    <div className="flex flex-1 min-h-0 h-full flex-col gap-2">
+      <div className="flex items-center gap-1.5 shrink-0">
         <input
           value={filter}
           onChange={(ev) => setFilter(ev.target.value)}
@@ -269,7 +292,7 @@ export default function EntityTree({
         </div>
       </div>
 
-      <p className="text-[10px] font-sans text-stone-500">
+      <p className="text-[10px] font-sans text-stone-500 shrink-0">
         Drag a note or folder onto another folder to move it, or onto {ROOT_LABEL} to take it back out.
       </p>
 

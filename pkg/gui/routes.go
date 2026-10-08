@@ -30,6 +30,11 @@ var mounts = []routeMount{
 	{"/api/system/tests/", "handleSystemTestsRoute", (*Server).handleSystemTestsRoute},
 	{"/api/reference-systems", "handleReferenceSystemsRoute", (*Server).handleReferenceSystemsRoute},
 	{"/api/worlds", "handleWorldsRoutes", (*Server).handleWorldsRoutes},
+	{"/api/world/generate", "handleWorldGenerateRoute", (*Server).handleWorldGenerateRoute},
+	{"/api/world/ingest", "handleWorldIngestRoute", (*Server).handleWorldIngestRoute},
+	{"/api/world/draft/commit", "handleWorldDraftCommitRoute", (*Server).handleWorldDraftCommitRoute},
+	{"/api/world/draft/discard", "handleWorldDraftDiscardRoute", (*Server).handleWorldDraftDiscardRoute},
+	{"/api/world/draft/", "handleWorldDraftRoutes", (*Server).handleWorldDraftRoutes},
 	{"/api/world/", "handleWorldRoutes", (*Server).handleWorldRoutes},
 	{"/api/settings", "handleSettingsRoutes", (*Server).handleSettingsRoutes},
 	{"/api/settings/test-provider", "handleTestProviderRoute", (*Server).handleTestProviderRoute},
@@ -58,6 +63,7 @@ var mounts = []routeMount{
 	{"/api/registry/install", "handleRegistryInstallRoute", (*Server).handleRegistryInstallRoute},
 	{"/api/registry/updates", "handleRegistryUpdatesRoute", (*Server).handleRegistryUpdatesRoute},
 	{"/api/schema/", "handleSchemaRoutes", (*Server).handleSchemaRoutes},
+	{"/api/dialog/", "handleDialogRoutes", (*Server).handleDialogRoutes},
 }
 
 // Routes returns the mounted API patterns, sorted.

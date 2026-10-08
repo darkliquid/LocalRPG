@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adrg/xdg"
-
 	"github.com/darkliquid/localrpg/pkg/export"
 	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/scene"
@@ -27,9 +25,6 @@ var (
 	ErrExportFormat = errors.New("export format must be web or video")
 	// ErrExportDirRequired reports that no destination was provided.
 	ErrExportDirRequired = errors.New("an export destination directory is required")
-	// ErrNoNativeDialog reports that no native directory picker is available, so
-	// the UI must fall back to a path field.
-	ErrNoNativeDialog = errors.New("native directory dialog is not available")
 )
 
 // ExportRequestDTO asks for a story replay to be generated for a campaign. OutDir
@@ -164,53 +159,12 @@ func (m *exportManager) unsubscribe(ch chan ExportEvent) {
 	m.subMu.Unlock()
 }
 
-// SetDirectoryPicker installs a native directory chooser, used only by the Wails
-// desktop window. Without one the UI falls back to a path field.
-func (s *Service) SetDirectoryPicker(picker func(defaultDir string) (string, error)) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.directoryPicker = picker
-}
-
-// defaultExportDir is where a picker should open: the XDG Videos folder, then
-// Documents, then the home directory. Only existing directories are offered.
-func (s *Service) defaultExportDir() string {
-	for _, candidate := range []string{xdg.UserDirs.Videos, xdg.UserDirs.Documents} {
-		if candidate == "" {
-			continue
-		}
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate
-		}
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		return home
-	}
-	return ""
-}
-
-// ChooseExportDirectory opens the native picker, or reports that none is
-// available so the UI can fall back to a text field. An empty path with no error
-// means the user cancelled.
-func (s *Service) ChooseExportDirectory(ctx context.Context) (string, error) {
-	s.mu.RLock()
-	picker := s.directoryPicker
-	s.mu.RUnlock()
-	if picker == nil {
-		return "", ErrNoNativeDialog
-	}
-	return picker(s.defaultExportDir())
-}
-
 // ExportCapabilities reports the default destination and whether a native picker
 // exists.
 func (s *Service) ExportCapabilities() ExportCapabilitiesDTO {
-	s.mu.RLock()
-	native := s.directoryPicker != nil
-	s.mu.RUnlock()
 	return ExportCapabilitiesDTO{
 		DefaultDir:   s.defaultExportDir(),
-		NativeDialog: native,
+		NativeDialog: s.hasDirectoryPicker() || s.hasSaveFilePicker(),
 	}
 }
 

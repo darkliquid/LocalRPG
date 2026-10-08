@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Download, X, AlertCircle, Loader2, Film, Globe, Ban, FolderOpen } from 'lucide-react';
 import { APIClient } from '../api/client';
+import { useFolderPicker } from '../hooks/useFolderPicker';
 import type { ExportCapabilities, ExportEvent, ExportJob } from '../types';
 
 interface ExportModalProps {
@@ -113,15 +114,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
     }
   }, [gameID, format, outDir, art, audio, still, fps, size]);
 
+  // The native picker is a modal dialog, so the server opens it and this hook
+  // polls for the result. A build with no dialog leaves the field usable.
+  const folderPicker = useFolderPicker();
   const handleBrowse = useCallback(async () => {
     setError(null);
-    try {
-      const chosen = await APIClient.chooseExportDirectory();
-      if (chosen) setOutDir(chosen);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to open the directory dialog');
-    }
-  }, []);
+    const chosen = await folderPicker.pick('Choose an export destination');
+    if (chosen) setOutDir(chosen);
+    else if (folderPicker.note) setError(folderPicker.note);
+  }, [folderPicker]);
 
   const handleCancel = useCallback(async () => {
     if (!gameID) return;

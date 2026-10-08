@@ -177,29 +177,6 @@ func handleGUICommand(args []string) {
 	// Browser manager is what reaches the system browser.
 	svc.SetURLOpener(app.Browser.OpenURL)
 
-	// The desktop window gets a native directory chooser for exports. Browser and
-	// socket modes have no dialog, so the UI falls back to a path field. Wails
-	// dialogs must run on the application's main thread, and this callback is
-	// reached from an HTTP handler goroutine, so the dialog is marshalled over.
-	// A dismissed dialog is reported as a cancellation, not a failure.
-	svc.SetDirectoryPicker(func(defaultDir string) (string, error) {
-		return application.InvokeSyncWithResultAndError(func() (string, error) {
-			dialog := app.Dialog.OpenFile().
-				CanChooseDirectories(true).
-				CanChooseFiles(false).
-				CanCreateDirectories(true).
-				SetTitle("Choose an export destination")
-			if defaultDir != "" {
-				dialog = dialog.SetDirectory(defaultDir)
-			}
-			chosen, err := dialog.PromptForSingleSelection()
-			if err != nil {
-				return "", nil
-			}
-			return chosen, nil
-		})
-	})
-
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:                      "LocalRPG",
 		Width:                      1280,
@@ -209,6 +186,57 @@ func handleGUICommand(args []string) {
 		URL:                        "/",
 		BackgroundType:             application.BackgroundTypeTranslucent,
 		DefaultContextMenuDisabled: false,
+	})
+
+	// The desktop window gets a native directory chooser. Browser and socket
+	// modes have no dialog, so the UI falls back to a path field.
+	//
+	// PromptForSingleSelection marshals the dialog onto the application's main
+	// thread itself, so this closure is not wrapped in another InvokeSync: a
+	// second hop would run the inner one from inside a main-thread callback,
+	// where the idle it posts can never be serviced. The dialog is attached to
+	// the window so it is modal to it rather than a free-floating toplevel. A
+	// dismissed dialog is reported as a cancellation, not a failure.
+	svc.SetDirectoryPicker(func(title, defaultDir string) (string, error) {
+		if title == "" {
+			title = "Choose a folder"
+		}
+		dialog := app.Dialog.OpenFile().
+			CanChooseDirectories(true).
+			CanChooseFiles(false).
+			CanCreateDirectories(true).
+			AttachToWindow(window).
+			SetTitle(title)
+		if defaultDir != "" {
+			dialog = dialog.SetDirectory(defaultDir)
+		}
+		chosen, err := dialog.PromptForSingleSelection()
+		if err != nil {
+			return "", nil
+		}
+		return chosen, nil
+	})
+
+	svc.SetSaveFilePicker(func(req gui.ChooseSaveFileRequestDTO) (string, error) {
+		options := &application.SaveFileDialogOptions{
+			Title:                req.Title,
+			Directory:            req.DefaultDir,
+			Filename:             req.DefaultFilename,
+			CanCreateDirectories: true,
+			Window:               window,
+		}
+		for _, f := range req.Filters {
+			options.Filters = append(options.Filters, application.FileFilter{
+				DisplayName: f.DisplayName,
+				Pattern:     f.Pattern,
+			})
+		}
+		dialog := app.Dialog.SaveFileWithOptions(options)
+		chosen, err := dialog.PromptForSingleSelection()
+		if err != nil {
+			return "", nil
+		}
+		return chosen, nil
 	})
 
 	// With no native View menu, Developer Tools keeps its conventional

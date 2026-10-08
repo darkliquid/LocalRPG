@@ -218,6 +218,11 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
     await loadData();
   };
 
+  const handleDeleteWorld = async (worldId: string, force = false) => {
+    await APIClient.deleteWorld(worldId, force);
+    await loadData();
+  };
+
   // Full-Window Overlay: Worlds Studio
   if (activeStudio?.studio === 'worlds') {
     return (
@@ -322,6 +327,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
           setIsGalleryOpen(false);
           setActiveStudio({ studio: 'worlds', mode: 'new' });
         }}
+        onDeleteWorld={handleDeleteWorld}
         onClose={() => setIsGalleryOpen(false)}
       />
 
@@ -430,7 +436,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
       <input
         ref={fileInputRef}
         type="file"
-        accept=".lrpgpack"
+        accept=".lrpgworld,.lrpgsystem,.lrpgpack"
         className="hidden"
         onChange={handleFileSelect}
       />
