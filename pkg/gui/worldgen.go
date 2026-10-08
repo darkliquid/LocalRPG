@@ -20,6 +20,7 @@ const (
 	WorldEventStep     = "step"
 	WorldEventEstimate = "estimate"
 	WorldEventDraft    = "draft"
+	WorldEventProgress = "progress"
 )
 
 // ErrorCodeCallLimit and ErrorCodeSourceLimit mark a failure the user can fix by
@@ -397,14 +398,16 @@ func (s *Service) GenerateWorld(ctx context.Context, req WorldGenerateRequestDTO
 }
 
 // buildFromChunks assembles a draft from already-read chunks, reporting the same
-// step events a from-scratch generation does.
+// step events a from-scratch generation does, and one progress event per batch.
 func (s *Service) buildFromChunks(ctx context.Context, gen worldgen.Generator, brief worldgen.Brief, chunks []ingest.Chunk, emit func(TurnEvent), draft *worldgen.Draft) error {
 	emit(TurnEvent{Type: WorldEventStep, Step: stepDTO(worldgen.Step{
 		Name: "extract", Status: worldgen.StatusDone,
 		Detail: fmt.Sprintf("%d chunk(s)", len(chunks)),
 	})})
 
-	built, err := ingest.Build(ctx, gen, chunks, brief)
+	built, err := ingest.BuildInto(ctx, gen, chunks, brief, ingest.BuildContext{}, func(p ingest.Progress) {
+		emit(TurnEvent{Type: WorldEventProgress, Progress: importProgressDTO(p)})
+	})
 	if err != nil {
 		return err
 	}
@@ -457,6 +460,18 @@ func (r WorldGenerateRequestDTO) brief() worldgen.Brief {
 
 func stepDTO(step worldgen.Step) *WorldGenStepDTO {
 	return &WorldGenStepDTO{Name: step.Name, Status: step.Status, Detail: step.Detail}
+}
+
+// importProgressDTO renders one batch of an import for the client.
+func importProgressDTO(p ingest.Progress) *WorldImportProgressDTO {
+	return &WorldImportProgressDTO{
+		Batch:   p.Batch,
+		Batches: p.Batches,
+		Sources: p.Sources,
+		Found:   p.Found,
+		Total:   p.Total,
+		Names:   p.Names,
+	}
 }
 
 func estimateDTO(e worldgen.Estimate) *WorldEstimateDTO {

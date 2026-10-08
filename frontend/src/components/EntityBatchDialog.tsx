@@ -1,15 +1,18 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, FolderOpen, Globe, PackagePlus, Pencil, RefreshCw, X } from 'lucide-react';
 import { APIClient, HTTPError } from '../api/client';
 import { useFolderPicker } from '../hooks/useFolderPicker';
 import { limitFieldFor } from '../lib/generationLimit';
 import { GenerationLimitNotice } from './GenerationLimitNotice';
+import { ImportProgressPanel } from './ImportProgressPanel';
 import {
   GenerationLimitsOverride,
+  TurnEvent,
   WorldApplyResult,
   WorldDraftEntity,
   WorldEntityBatch,
   WorldEntityBatchRequest,
+  WorldImportProgress,
   WorldSource,
 } from '../types';
 
@@ -52,6 +55,9 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
   // not have to be confirmed twice.
   const [limits, setLimits] = useState<GenerationLimitsOverride | undefined>(undefined);
   const [limitCode, setLimitCode] = useState<string | null>(null);
+  // Progress through a source import, so a long read says what it is doing.
+  const [progress, setProgress] = useState<WorldImportProgress | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const urlList = useMemo(
     () =>
@@ -86,6 +92,10 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
     setError(null);
     setLimitCode(null);
     setAccepted(null);
+    setProgress(null);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const req: WorldEntityBatchRequest = {
         instruction,
@@ -95,13 +105,24 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
         focus: focus || undefined,
         limits: override ?? limits,
       };
-      setBatch(await APIClient.previewWorldEntities(worldId, req));
+      const emit = (event: TurnEvent) => {
+        if (event.type === 'progress' && event.progress) setProgress(event.progress);
+        if (event.type === 'error') {
+          setError(event.message || event.detail || 'the extraction failed');
+          setLimitCode(limitFieldFor(event.code) ? (event.code ?? null) : null);
+        }
+      };
+      const finished = await APIClient.previewWorldEntitiesStream(worldId, req, emit, controller.signal);
+      if (finished) setBatch(finished);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-      setLimitCode(err instanceof HTTPError ? (limitFieldFor(err.code) ? (err.code ?? null) : null) : null);
+      if (!controller.signal.aborted) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+        setLimitCode(err instanceof HTTPError ? (limitFieldFor(err.code) ? (err.code ?? null) : null) : null);
+      }
     } finally {
       setLoading(false);
+      abortRef.current = null;
     }
   };
 
@@ -168,6 +189,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
         </div>
 
         <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+          {loading && progress && <ImportProgressPanel progress={progress} />}
           {batch?.oracle && (
             <p className="p-3 text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200">
               No model provider is configured, so these came from the built-in template generator

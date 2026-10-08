@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -96,7 +97,7 @@ func TestBuildIntoAnExistingWorld(t *testing.T) {
 		Description: "A frontier town.",
 		Lore:        "# Lore\n\nThe frontier.\n",
 		Entities:    []worldgen.EntitySummary{{ID: "the-tidewatch", Name: "The Tidewatch", Type: "faction"}},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,5 +240,68 @@ func TestEntitiesAreFiledByKind(t *testing.T) {
 	}
 	if folders["saltmarch"] != "locations" || folders["maren"] != "characters" || folders["the-tidewatch"] != "factions" {
 		t.Fatalf("folders = %+v", folders)
+	}
+}
+
+func TestProgressReportsEveryBatch(t *testing.T) {
+	probe := &jsonGen{responses: []string{
+		`{"entities":[{"name":"Saltmarch","type":"location","description":"A port."}]}`,
+		`{"entities":[{"name":"Maren","type":"character","description":"A harbormaster."}]}`,
+		`{}`,
+	}}
+	chunks := make([]Chunk, 9)
+	for i := range chunks {
+		chunks[i] = Chunk{Source: fmt.Sprintf("note-%d.md", i), Title: "Note", Text: "Some lore."}
+	}
+
+	var got []Progress
+	if _, err := BuildInto(context.Background(), probe, chunks, worldgen.Brief{}, BuildContext{}, func(p Progress) {
+		got = append(got, p)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// One event up front with the total, then one per batch.
+	if len(got) != 4 {
+		t.Fatalf("events = %d, want 4: %+v", len(got), got)
+	}
+	if got[0].Batch != 0 || got[0].Batches != 3 {
+		t.Fatalf("first event = %+v, want the batch count up front", got[0])
+	}
+	if got[1].Batch != 1 || got[1].Batches != 3 || got[1].Total != 1 || got[1].Found != 1 {
+		t.Fatalf("first batch = %+v", got[1])
+	}
+	if len(got[1].Names) != 1 || got[1].Names[0] != "Saltmarch" {
+		t.Fatalf("names = %+v", got[1].Names)
+	}
+	if len(got[1].Sources) != 4 {
+		t.Fatalf("sources = %+v, want the four files this batch read", got[1].Sources)
+	}
+	if got[3].Total != 2 || got[3].Found != 0 {
+		t.Fatalf("last batch = %+v", got[3])
+	}
+}
+
+func TestProgressReportsAMergedEntity(t *testing.T) {
+	probe := &jsonGen{responses: []string{
+		`{"entities":[{"name":"Quezta","type":"species"}]}`,
+		`{"entities":[{"name":"Quezta","type":"species","description":"Hiveborn soldiers."}]}`,
+	}}
+	chunks := make([]Chunk, 5)
+	for i := range chunks {
+		chunks[i] = Chunk{Source: "a.md", Title: "A", Text: "Some lore."}
+	}
+
+	var last Progress
+	if _, err := BuildInto(context.Background(), probe, chunks, worldgen.Brief{}, BuildContext{}, func(p Progress) {
+		if p.Batch > 0 {
+			last = p
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// A repeated name improves a note, which is work worth reporting.
+	if last.Found != 1 || last.Total != 1 || last.Names[0] != "Quezta" {
+		t.Fatalf("last = %+v", last)
 	}
 }

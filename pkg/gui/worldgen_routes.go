@@ -136,7 +136,9 @@ func (s *Server) handleWorldDraftRoutes(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, draft)
 }
 
-// handleWorldEntitiesPreview previews a batch of generated entities.
+// handleWorldEntitiesPreview previews a batch of generated entities, streaming
+// one progress event per batch and a final batch event. Reading a large folder is
+// many model calls, so a caller that is shown nothing for it looks hung.
 func (s *Server) handleWorldEntitiesPreview(w http.ResponseWriter, r *http.Request, worldID string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -147,16 +149,31 @@ func (s *Server) handleWorldEntitiesPreview(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	batch, err := s.service.PreviewWorldEntities(r.Context(), worldID, req)
-	if err != nil {
-		if code := generationLimitCode(err); code != "" {
-			writeJSONErrorCode(w, http.StatusBadRequest, code, err.Error())
-			return
-		}
-		writeJSONError(w, http.StatusBadRequest, err.Error())
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming is not supported by this client", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, batch)
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	encoder := json.NewEncoder(w)
+	emit := func(event TurnEvent) error {
+		if err := encoder.Encode(event); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+
+	batch, err := s.service.PreviewWorldEntitiesStream(r.Context(), worldID, req, emit)
+	if err != nil {
+		_ = emit(TurnEvent{Type: "error", Message: err.Error(), Code: generationLimitCode(err)})
+		return
+	}
+	_ = emit(TurnEvent{Type: "batch", Batch: batch})
 }
 
 // handleWorldEntitiesAccept writes a reviewed batch.

@@ -237,7 +237,7 @@ export interface AudioProgressEvent {
 }
 
 export interface TurnEvent {
-  type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing' | 'audio_progress' | 'portrait' | 'scene_image' | 'step' | 'estimate' | 'draft';
+  type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing' | 'audio_progress' | 'portrait' | 'scene_image' | 'step' | 'estimate' | 'draft' | 'progress' | 'batch';
   text?: string;
   turn?: Turn;
   // One parsed narration or speech unit, present when type is 'segment': it is
@@ -272,6 +272,21 @@ export interface TurnEvent {
   estimate?: WorldEstimate;
   // The generated draft, present when type is 'draft'.
   draft?: WorldDraftInfo;
+  // Import progress, present when type is 'progress'.
+  progress?: WorldImportProgress;
+  // The previewed entity batch, present when type is 'batch'.
+  batch?: WorldEntityBatch;
+}
+
+// WorldImportProgress is one batch of a source import: what it read, what it
+// found, and how much of the whole is done.
+export interface WorldImportProgress {
+  batch: number;
+  batches: number;
+  sources?: string[];
+  found: number;
+  total: number;
+  names?: string[];
 }
 
 // WorldGenStep is one progress report from the generation pipeline.

@@ -613,6 +613,17 @@ type WorldGenerateRequestDTO struct {
 	Limits  *GenerationLimitsDTO `json:"limits,omitempty"`
 }
 
+// WorldImportProgressDTO is one batch of a source import, so a long read can say
+// what it is reading and how much is left.
+type WorldImportProgressDTO struct {
+	Batch   int      `json:"batch"`
+	Batches int      `json:"batches"`
+	Sources []string `json:"sources,omitempty"`
+	Found   int      `json:"found"`
+	Total   int      `json:"total"`
+	Names   []string `json:"names,omitempty"`
+}
+
 // WorldGenStepDTO is one progress report from the generation pipeline.
 type WorldGenStepDTO struct {
 	Name   string `json:"name"`
@@ -946,10 +957,14 @@ type TurnEvent struct {
 	RetryAfterMS int64 `json:"retry_after_ms,omitempty"`
 	// World generation progress, present when Type is "step".
 	Step *WorldGenStepDTO `json:"step,omitempty"`
+	// Import progress, present when Type is "progress".
+	Progress *WorldImportProgressDTO `json:"progress,omitempty"`
 	// The dry-run estimate, present when Type is "estimate".
 	Estimate *WorldEstimateDTO `json:"estimate,omitempty"`
 	// The generated draft, present when Type is "draft".
 	Draft *WorldDraftDTO `json:"draft,omitempty"`
+	// The previewed entity batch, present when Type is "batch".
+	Batch *WorldEntityBatchDTO `json:"batch,omitempty"`
 }
 
 // turnModes maps the mode names a client may send to the engine's casing.

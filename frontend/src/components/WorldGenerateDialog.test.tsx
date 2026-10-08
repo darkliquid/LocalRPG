@@ -189,7 +189,8 @@ describe('WorldGenerateDialog', () => {
     await waitFor(() => expect(screen.getByTestId('generation-estimate')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
 
-    await screen.findByLabelText(/call limit/i);
+    const field = await screen.findByLabelText(/call limit/i);
+    await waitFor(() => expect(field).toHaveValue(40));
     fireEvent.click(screen.getByRole('button', { name: /save and use/i }));
 
     await waitFor(() => expect(save).toHaveBeenCalledWith({ max_calls: 40 }));

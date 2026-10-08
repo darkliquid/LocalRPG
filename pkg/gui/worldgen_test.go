@@ -1062,3 +1062,76 @@ func TestAMisconfiguredProviderIsNotSilentlyReplaced(t *testing.T) {
 		t.Fatalf("reason = %q, want the build failure named", res.Reason)
 	}
 }
+
+func TestEntityPreviewStreamsProgress(t *testing.T) {
+	provider := &sequencedProvider{id: "gen", responses: []string{
+		`{"entities":[{"name":"Saltmarch","type":"location","description":"A port."}]}`,
+	}}
+	svc := worldGenService(t, provider)
+	world := mustCreateWorld(t, svc, "Ember Peak")
+
+	dir := t.TempDir()
+	for i := 0; i < 5; i++ {
+		name := filepath.Join(dir, fmt.Sprintf("note-%d.md", i))
+		if err := os.WriteFile(name, []byte("# Note\n\nSome lore.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var events []TurnEvent
+	batch, err := svc.PreviewWorldEntitiesStream(context.Background(), world.ID, WorldEntityBatchRequestDTO{
+		Source: &WorldSourceDTO{Kind: "folder", Path: dir},
+	}, func(event TurnEvent) error {
+		events = append(events, event)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if batch == nil || len(batch.Entities) != 1 {
+		t.Fatalf("batch = %+v", batch)
+	}
+
+	var progress []*WorldImportProgressDTO
+	for _, event := range events {
+		if event.Type != WorldEventProgress || event.Progress == nil {
+			t.Fatalf("unexpected event %+v", event)
+		}
+		progress = append(progress, event.Progress)
+	}
+	// Five chunks at four per call is two batches: one event up front naming the
+	// total, then one per batch.
+	if len(progress) != 3 {
+		t.Fatalf("progress events = %d, want 3", len(progress))
+	}
+	if progress[0].Batch != 0 || progress[0].Batches != 2 {
+		t.Fatalf("first = %+v, want the batch count before any call", progress[0])
+	}
+	if progress[1].Batch != 1 || progress[1].Total != 1 {
+		t.Fatalf("second = %+v", progress[1])
+	}
+	if len(progress[1].Sources) != 4 {
+		t.Fatalf("sources = %+v", progress[1].Sources)
+	}
+	if progress[2].Batch != 2 || progress[2].Total != 1 {
+		t.Fatalf("third = %+v", progress[2])
+	}
+}
+
+func TestEntityPreviewStreamIsRefusedWithNoProvider(t *testing.T) {
+	// The refusal must reach a streaming caller as an error, not as an empty
+	// batch: an empty batch reads as "your source had nothing in it".
+	svc := NewService(t.TempDir())
+	world := mustCreateWorld(t, svc, "Ember Peak")
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("# A place\n\nSome lore.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.PreviewWorldEntitiesStream(context.Background(), world.ID, WorldEntityBatchRequestDTO{
+		Source: &WorldSourceDTO{Kind: "folder", Path: dir},
+	}, func(TurnEvent) error { return nil }); !errors.Is(err, ErrNoGeneratorForImport) {
+		t.Fatalf("err = %v, want ErrNoGeneratorForImport", err)
+	}
+}

@@ -709,16 +709,39 @@ export class APIClient {
     if (!res.ok) throw await errorFromResponse(res, res.statusText);
   }
 
-  // previewWorldEntities generates a batch of entities for an existing world.
-  // Nothing is written until the batch is accepted.
-  static async previewWorldEntities(worldId: string, req: WorldEntityBatchRequest): Promise<WorldEntityBatch> {
+  // previewWorldEntitiesStream generates or extracts a batch of entities for an
+  // existing world, reporting each batch as it finishes. Reading a large folder
+  // is many model calls, so a caller that shows nothing for it looks hung. It
+  // resolves with the finished batch, or null when the stream reported an error.
+  static async previewWorldEntitiesStream(
+    worldId: string,
+    req: WorldEntityBatchRequest,
+    onEvent: (event: TurnEvent) => void,
+    signal?: AbortSignal
+  ): Promise<WorldEntityBatch | null> {
     const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/generate-entities`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
+      signal,
     });
     if (!res.ok) throw await errorFromResponse(res, res.statusText);
-    return res.json();
+    if (!res.body) throw new Error('previewWorldEntitiesStream: response has no body');
+
+    let finished: WorldEntityBatch | null = null;
+    await readNDJSON(res, (event) => {
+      if (event.type === 'batch' && event.batch) finished = event.batch;
+      onEvent(event);
+    });
+    return finished;
+  }
+
+  // previewWorldEntities generates a batch without progress reporting, for a
+  // caller that would rather wait than watch.
+  static async previewWorldEntities(worldId: string, req: WorldEntityBatchRequest): Promise<WorldEntityBatch> {
+    const batch = await APIClient.previewWorldEntitiesStream(worldId, req, () => {});
+    if (!batch) throw new Error('previewWorldEntities: the stream produced no batch');
+    return batch;
   }
 
   static async acceptWorldEntities(worldId: string, req: WorldEntityAcceptRequest): Promise<WorldApplyResult> {

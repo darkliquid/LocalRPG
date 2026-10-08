@@ -318,6 +318,22 @@ type ingestReply struct {
 	} `json:"entities"`
 }
 
+// Progress reports one batch of an ingestion, so a long import can say what it
+// is reading and how much is left.
+type Progress struct {
+	// Batch is the one-based index of this batch, and Batches is how many the
+	// whole source needs, so a caller can estimate the time remaining.
+	Batch   int
+	Batches int
+	// Sources names the files or pages this batch read.
+	Sources []string
+	// Found is how many entities this batch added or improved, Total is how many
+	// the import has produced so far, and Names is what this batch touched.
+	Found int
+	Total int
+	Names []string
+}
+
 // BuildContext names the world an ingestion is adding to. An empty context means
 // the chunks describe a world of their own, which is what a whole-world import
 // wants; a filled one steers the extraction to fit a world that already exists.
@@ -332,13 +348,13 @@ type BuildContext struct {
 // Build turns chunks into a draft world, reusing WG-1's generator, and records
 // each entity's source so provenance survives into the review.
 func Build(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brief worldgen.Brief) (worldgen.Draft, error) {
-	return BuildInto(ctx, gen, chunks, brief, BuildContext{})
+	return BuildInto(ctx, gen, chunks, brief, BuildContext{}, nil)
 }
 
 // BuildInto is Build for chunks that extend an existing world: the world's
 // identity, lore, and entities are given to the model so the extracted notes fit
 // it, and every link is validated against that world as well as the new notes.
-func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brief worldgen.Brief, into BuildContext) (worldgen.Draft, error) {
+func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brief worldgen.Brief, into BuildContext, onProgress func(Progress)) (worldgen.Draft, error) {
 	if len(chunks) == 0 {
 		return worldgen.Draft{}, fmt.Errorf("ingest: nothing to build from")
 	}
@@ -352,7 +368,15 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 	for _, e := range into.Entities {
 		seen[e.ID] = struct{}{}
 	}
-	for i, batch := range Batch(chunks, ChunksPerCall) {
+
+	batches := Batch(chunks, ChunksPerCall)
+	// The batch count is known before the first call, so a caller can show how
+	// much work is coming rather than only how much is done.
+	if onProgress != nil {
+		onProgress(Progress{Batch: 0, Batches: len(batches)})
+	}
+
+	for i, batch := range batches {
 		if err := ctx.Err(); err != nil {
 			return draft, err
 		}
@@ -367,7 +391,17 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 		if err := decodeJSON(raw, &reply); err != nil {
 			return draft, err
 		}
-		applyReply(&draft, reply, batch, i == 0, seen, at)
+		touched := applyReply(&draft, reply, batch, i == 0, seen, at)
+		if onProgress != nil {
+			onProgress(Progress{
+				Batch:   i + 1,
+				Batches: len(batches),
+				Sources: chunkSourceList(batch),
+				Found:   len(touched),
+				Total:   len(draft.Entities),
+				Names:   touched,
+			})
+		}
 	}
 
 	if into.Name != "" {
@@ -404,7 +438,8 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 // merged rather than dropped: the later mention often carries the description
 // the first one lacked, and losing it is how an import ends up with names and
 // nothing else.
-func applyReply(draft *worldgen.Draft, reply ingestReply, batch []Chunk, first bool, seen map[string]struct{}, at map[string]int) {
+func applyReply(draft *worldgen.Draft, reply ingestReply, batch []Chunk, first bool, seen map[string]struct{}, at map[string]int) []string {
+	var touched []string
 	if first {
 		draft.World.Name = firstNonEmpty(reply.Name, draft.World.Name)
 		draft.World.Genre = firstNonEmpty(reply.Genre, draft.World.Genre)
@@ -437,6 +472,7 @@ func applyReply(draft *worldgen.Draft, reply ingestReply, batch []Chunk, first b
 		if _, exists := seen[id]; exists {
 			if position, ok := at[id]; ok {
 				mergeEntity(&draft.Entities[position], incoming)
+				touched = append(touched, name)
 				continue
 			}
 			// The world already has this note; adding entities must not touch it.
@@ -449,7 +485,9 @@ func applyReply(draft *worldgen.Draft, reply ingestReply, batch []Chunk, first b
 		seen[id] = struct{}{}
 		at[id] = len(draft.Entities)
 		draft.Entities = append(draft.Entities, incoming)
+		touched = append(touched, name)
 	}
+	return touched
 }
 
 // mergeEntity folds a repeated mention into the entity it repeats, keeping the
@@ -525,6 +563,11 @@ func appendUnique(list []string, value string) []string {
 
 // chunkSources names where a batch's text came from, so an entity can be traced.
 func chunkSources(batch []Chunk) string {
+	return strings.Join(chunkSourceList(batch), ", ")
+}
+
+// chunkSourceList is the distinct sources a batch read, in order.
+func chunkSourceList(batch []Chunk) []string {
 	seen := map[string]struct{}{}
 	var sources []string
 	for _, c := range batch {
@@ -537,7 +580,7 @@ func chunkSources(batch []Chunk) string {
 		seen[c.Source] = struct{}{}
 		sources = append(sources, c.Source)
 	}
-	return strings.Join(sources, ", ")
+	return sources
 }
 
 // buildPrompt assembles a bounded extraction prompt for one batch of chunks. It

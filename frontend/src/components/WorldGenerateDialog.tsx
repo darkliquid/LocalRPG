@@ -4,7 +4,15 @@ import { APIClient } from '../api/client';
 import { useFolderPicker } from '../hooks/useFolderPicker';
 import { limitFieldFor } from '../lib/generationLimit';
 import { GenerationLimitNotice } from './GenerationLimitNotice';
-import { GenerationLimitsOverride, TurnEvent, WorldDraftInfo, WorldEstimate, WorldGenStep } from '../types';
+import { ImportProgressPanel } from './ImportProgressPanel';
+import {
+  GenerationLimitsOverride,
+  TurnEvent,
+  WorldDraftInfo,
+  WorldEstimate,
+  WorldGenStep,
+  WorldImportProgress,
+} from '../types';
 
 // LargeEstimateCalls is the call count above which Generate asks for a second
 // confirmation, so a costly generation is a deliberate choice.
@@ -56,6 +64,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
   // not have to be confirmed twice.
   const [limits, setLimits] = useState<GenerationLimitsOverride | undefined>(undefined);
   const [limitCode, setLimitCode] = useState<string | null>(null);
+  const [progress, setProgress] = useState<WorldImportProgress | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const urlList = useMemo(
@@ -128,6 +137,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
     setError(null);
     setLimitCode(null);
     setSteps([]);
+    setProgress(null);
     setGenerating(true);
     const body = override ? { ...request, limits: override } : request;
 
@@ -138,6 +148,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
         if (event.type === 'step' && event.step) {
           setSteps((prev) => [...prev.filter((s) => s.name !== event.step!.name), event.step!]);
         }
+        if (event.type === 'progress' && event.progress) setProgress(event.progress);
         if (event.type === 'draft' && event.draft) {
           onDraft(event.draft);
         }
@@ -442,6 +453,8 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
               This generation will make {estimate?.calls} calls. Press Generate again to confirm.
             </div>
           )}
+
+          {generating && progress && <ImportProgressPanel progress={progress} />}
 
           {steps.length > 0 && (
             <ul aria-label="Generation progress" className="space-y-1.5">

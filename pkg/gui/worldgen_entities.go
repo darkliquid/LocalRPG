@@ -79,6 +79,13 @@ func summaryLine(body string) string {
 // folder or a set of URLs when the request names a source. The user accepts or
 // discards the preview.
 func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req WorldEntityBatchRequestDTO) (*WorldEntityBatchDTO, error) {
+	return s.PreviewWorldEntitiesStream(ctx, worldID, req, nil)
+}
+
+// PreviewWorldEntitiesStream is PreviewWorldEntities with progress: one event per
+// batch, so a long import can report what it is reading. An extraction of a large
+// folder is many calls, and a caller that shows nothing for it looks hung.
+func (s *Service) PreviewWorldEntitiesStream(ctx context.Context, worldID string, req WorldEntityBatchRequestDTO, emit func(TurnEvent) error) (*WorldEntityBatchDTO, error) {
 	world, err := s.worldContext(worldID)
 	if err != nil {
 		return nil, err
@@ -102,7 +109,7 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 		// An extraction is as big as the source is, so its budget follows the
 		// chunk cap rather than the bounded pipeline's call cap.
 		fromSource := &worldgen.BudgetGenerator{Inner: gen, Max: worldgen.ChunkCalls(len(chunks))}
-		batch, err = s.entitiesFromChunks(ctx, fromSource, world, req, chunks)
+		batch, err = s.entitiesFromChunks(ctx, fromSource, world, req, chunks, emit)
 		if err != nil {
 			return nil, err
 		}
@@ -133,15 +140,19 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 	return out, nil
 }
 
-// entitiesFromChunks extracts entities from already-read chunks and links them
-// against the world they are being added to.
-func (s *Service) entitiesFromChunks(ctx context.Context, gen worldgen.Generator, world worldgen.WorldContext, req WorldEntityBatchRequestDTO, chunks []ingest.Chunk) ([]worldgen.DraftEntity, error) {
+// entitiesFromChunks extracts entities from already-read chunks, links them
+// against the world they are being added to, and reports each batch.
+func (s *Service) entitiesFromChunks(ctx context.Context, gen worldgen.Generator, world worldgen.WorldContext, req WorldEntityBatchRequestDTO, chunks []ingest.Chunk, emit func(TurnEvent) error) ([]worldgen.DraftEntity, error) {
 	draft, err := ingest.BuildInto(ctx, gen, chunks, worldgen.Brief{Premise: req.Instruction}, ingest.BuildContext{
 		Name:        world.Name,
 		Genre:       world.Genre,
 		Description: world.Description,
 		Lore:        world.Lore,
 		Entities:    world.Entities,
+	}, func(p ingest.Progress) {
+		if emit != nil {
+			_ = emit(TurnEvent{Type: WorldEventProgress, Progress: importProgressDTO(p)})
+		}
 	})
 	if err != nil {
 		if errors.Is(err, worldgen.ErrCallBudgetExceeded) {

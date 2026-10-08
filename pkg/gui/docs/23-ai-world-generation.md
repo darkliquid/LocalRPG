@@ -74,7 +74,9 @@ Each call is told what the earlier calls already found. The batches build one in
 
 Notes are filed by kind: `entities/locations/`, `entities/characters/`, `entities/factions/`, and so on. A source that yields sixty entities arrives as several folders rather than one flat list.
 
-An import is one call per four chunks, so a large folder is a long run of calls. The chunk limit and the estimated call count are under [Cost controls](#cost-controls) below, and the review shows what every call produced. LocalRPG writes nothing until you accept it.
+An import is one call per four chunks, so a large folder is a long run of calls. The dialog reports each batch as it finishes: how many batches the source needs, which files that batch read, how many entities the import has found, and how long is left. The estimate comes from the batches already done, so it sharpens as the run goes.
+
+The chunk limit and the estimated call count are under [Cost controls](#cost-controls) below, and the review shows what every call produced. LocalRPG writes nothing until you accept it.
 
 ## Generating entities for an existing world
 

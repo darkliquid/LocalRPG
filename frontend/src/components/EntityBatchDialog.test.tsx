@@ -43,7 +43,7 @@ describe('EntityBatchDialog', () => {
   });
 
   it('generates a preview from an instruction', async () => {
-    const preview = vi.spyOn(APIClient, 'previewWorldEntities').mockResolvedValue(batch);
+    const preview = vi.spyOn(APIClient, 'previewWorldEntitiesStream').mockResolvedValue(batch);
 
     render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
 
@@ -90,7 +90,7 @@ describe('EntityBatchDialog', () => {
   });
 
   it('extracts a batch from a folder instead of an instruction', async () => {
-    const preview = vi.spyOn(APIClient, 'previewWorldEntities').mockResolvedValue(batch);
+    const preview = vi.spyOn(APIClient, 'previewWorldEntitiesStream').mockResolvedValue(batch);
 
     render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
 
@@ -114,7 +114,7 @@ describe('EntityBatchDialog', () => {
   });
 
   it('extracts a batch from URLs', async () => {
-    const preview = vi.spyOn(APIClient, 'previewWorldEntities').mockResolvedValue(batch);
+    const preview = vi.spyOn(APIClient, 'previewWorldEntitiesStream').mockResolvedValue(batch);
 
     render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
 
@@ -147,7 +147,7 @@ describe('EntityBatchDialog', () => {
   });
 
   it('offers to raise the source limit in place, then extracts', async () => {
-    const preview = vi.spyOn(APIClient, 'previewWorldEntities').mockImplementation(async (_worldId, req) => {
+    const preview = vi.spyOn(APIClient, 'previewWorldEntitiesStream').mockImplementation(async (_worldId, req) => {
       if (req.limits?.max_chunks) return batch;
       throw new HTTPError(
         400,
@@ -177,7 +177,7 @@ describe('EntityBatchDialog', () => {
   });
 
   it('saves a raised source limit when asked to make it stick', async () => {
-    vi.spyOn(APIClient, 'previewWorldEntities').mockImplementation(async (_worldId, req) => {
+    vi.spyOn(APIClient, 'previewWorldEntitiesStream').mockImplementation(async (_worldId, req) => {
       if (req.limits?.max_chunks) return batch;
       throw new HTTPError(400, 'the source is larger than the chunk limit', 'generation_source_limit');
     });
@@ -191,7 +191,8 @@ describe('EntityBatchDialog', () => {
     fireEvent.change(screen.getByLabelText(/folder path/i), { target: { value: '/tmp/big' } });
     fireEvent.click(screen.getByRole('button', { name: /^extract$/i }));
 
-    await screen.findByLabelText(/source chunk limit/i);
+    const field = await screen.findByLabelText(/source chunk limit/i);
+    await waitFor(() => expect(field).toHaveValue(400));
     fireEvent.click(screen.getByRole('button', { name: /save and use/i }));
 
     await waitFor(() => expect(save).toHaveBeenCalledWith({ max_chunks: 400 }));
@@ -199,7 +200,7 @@ describe('EntityBatchDialog', () => {
   });
 
   it('uses an edited limit when the main action is pressed again', async () => {
-    const preview = vi.spyOn(APIClient, 'previewWorldEntities').mockImplementation(async (_worldId, req) => {
+    const preview = vi.spyOn(APIClient, 'previewWorldEntitiesStream').mockImplementation(async (_worldId, req) => {
       if (req.limits?.max_chunks === 500) return batch;
       throw new HTTPError(400, 'the source is larger than the chunk limit', 'generation_source_limit');
     });
@@ -225,7 +226,7 @@ describe('EntityBatchDialog', () => {
   });
 
   it('says when the fallback answered instead of a model', async () => {
-    vi.spyOn(APIClient, 'previewWorldEntities').mockResolvedValue({
+    vi.spyOn(APIClient, 'previewWorldEntitiesStream').mockResolvedValue({
       entities: [{ id: 'maren-vale', name: 'Maren Vale', type: 'character', body: 'A wanderer.' }],
       oracle: true,
     });
@@ -241,7 +242,7 @@ describe('EntityBatchDialog', () => {
   });
 
   it('surfaces a refusal to read a source with no provider', async () => {
-    vi.spyOn(APIClient, 'previewWorldEntities').mockRejectedValue(
+    vi.spyOn(APIClient, 'previewWorldEntitiesStream').mockRejectedValue(
       new HTTPError(
         400,
         'reading a source needs a model provider: no agent role is set up to generate. The gm role is the shipped echo command, so assign a model provider to gm, or to a generator role, in Settings → AI Agents'
