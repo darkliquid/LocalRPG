@@ -237,7 +237,7 @@ export interface AudioProgressEvent {
 }
 
 export interface TurnEvent {
-  type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing' | 'audio_progress' | 'portrait' | 'scene_image';
+  type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing' | 'audio_progress' | 'portrait' | 'scene_image' | 'step' | 'estimate' | 'draft';
   text?: string;
   turn?: Turn;
   // One parsed narration or speech unit, present when type is 'segment': it is
@@ -266,6 +266,140 @@ export interface TurnEvent {
   detail?: string;
   failure?: GenerationFailure;
   retry_after_ms?: number;
+  // World generation progress, present when type is 'step'.
+  step?: WorldGenStep;
+  // The dry-run estimate, present when type is 'estimate'.
+  estimate?: WorldEstimate;
+  // The generated draft, present when type is 'draft'.
+  draft?: WorldDraftInfo;
+}
+
+// WorldGenStep is one progress report from the generation pipeline.
+export interface WorldGenStep {
+  name: string;
+  status: 'done' | 'error';
+  detail?: string;
+}
+
+// WorldEstimate is a planned generation's cost, before it runs. An unpriced
+// provider reports priced: false rather than a cost of zero.
+export interface WorldEstimate {
+  calls: number;
+  chunks?: number;
+  cost_micros?: number;
+  priced: boolean;
+}
+
+// WorldSource names something to ingest: a folder, or a set of URLs.
+export interface WorldSource {
+  kind: 'folder' | 'url';
+  path?: string;
+  urls?: string[];
+}
+
+// WorldCounts is how many of each thing a generation should produce.
+export interface WorldCounts {
+  locations?: number;
+  factions?: number;
+  characters?: number;
+}
+
+export interface WorldGenerateRequest {
+  premise: string;
+  name?: string;
+  genre?: string;
+  themes?: string[];
+  counts?: WorldCounts;
+  source?: WorldSource;
+  dry_run?: boolean;
+}
+
+export interface WorldDraftEntity {
+  id: string;
+  name: string;
+  type: string;
+  tags?: string[];
+  folder?: string;
+  body: string;
+  source?: string;
+  links?: string[];
+  dropped_links?: string[];
+}
+
+export interface WorldDraftSection {
+  title: string;
+  body: string;
+}
+
+export interface WorldDraftInfo {
+  id: string;
+  name: string;
+  description: string;
+  genre: string;
+  art_style?: string;
+  tags?: string[];
+  lore: string;
+  sections: WorldDraftSection[];
+  entities: WorldDraftEntity[];
+  estimate?: WorldEstimate;
+  calls?: number;
+  oracle?: boolean;
+}
+
+export interface WorldEntityBatchRequest {
+  instruction: string;
+  kinds?: string[];
+  count?: number;
+  focus?: string;
+}
+
+export interface WorldEntityBatch {
+  entities: WorldDraftEntity[];
+}
+
+export interface WorldEntityAcceptRequest {
+  entities: WorldDraftEntity[];
+  rename?: boolean;
+}
+
+export interface WorldEnhanceRequest {
+  instruction: string;
+  kinds?: string[];
+}
+
+export interface WorldEnhancement {
+  kind: 'lore' | 'entity' | 'hook';
+  title: string;
+  body: string;
+  entity?: WorldDraftEntity;
+  target?: string;
+  reason?: string;
+}
+
+export interface WorldEnhanceResponse {
+  proposals: WorldEnhancement[];
+}
+
+export interface WorldEnhanceApplyRequest {
+  proposals: WorldEnhancement[];
+  rename?: boolean;
+}
+
+export interface WorldApplyResult {
+  written: string[];
+  renamed?: string[];
+}
+
+export interface DraftCommitRequest {
+  draft_id: string;
+  target_world_id?: string;
+  sections?: WorldDraftSection[];
+  entities?: WorldDraftEntity[];
+  meta?: CreateWorldRequest;
+}
+
+export interface DraftDiscardRequest {
+  draft_id: string;
 }
 
 export interface ModelStatus {

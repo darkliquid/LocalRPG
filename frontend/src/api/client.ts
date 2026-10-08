@@ -30,6 +30,17 @@ import {
   WorldDetail,
   CreateWorldRequest,
   WorldEntityDetail,
+  WorldGenerateRequest,
+  WorldDraftInfo,
+  WorldEntityBatchRequest,
+  WorldEntityBatch,
+  WorldEntityAcceptRequest,
+  WorldEnhanceRequest,
+  WorldEnhanceResponse,
+  WorldEnhanceApplyRequest,
+  WorldApplyResult,
+  DraftCommitRequest,
+  DraftDiscardRequest,
   AppConfig,
   SettingsResponse,
   TestProviderRequest,
@@ -579,6 +590,118 @@ export class APIClient {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error((await res.text()).trim() || `deleteWorldFolder: ${res.statusText}`);
+  }
+
+  // generateWorld streams a world generation: a step event per pipeline stage
+  // and a final draft event. The same call serves a dry run, which reports the
+  // estimate and makes no model call.
+  static async generateWorld(
+    req: WorldGenerateRequest,
+    onEvent: (event: TurnEvent) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const res = await fetch('/api/world/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal,
+    });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.body) throw new Error('generateWorld: response has no body');
+    await readNDJSON(res, onEvent);
+  }
+
+  // ingestWorld streams a world generation built from a folder or a set of URLs.
+  static async ingestWorld(
+    req: WorldGenerateRequest,
+    onEvent: (event: TurnEvent) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const res = await fetch('/api/world/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal,
+    });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.body) throw new Error('ingestWorld: response has no body');
+    await readNDJSON(res, onEvent);
+  }
+
+  // getDraft restores a persisted draft, so a reload resumes review.
+  static async getDraft(draftId: string): Promise<WorldDraftInfo> {
+    const res = await fetch(`/api/world/draft/${encodeURIComponent(draftId)}`);
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    return res.json();
+  }
+
+  static async listDrafts(): Promise<string[]> {
+    const res = await fetch('/api/world/draft/');
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    return res.json();
+  }
+
+  static async commitDraft(req: DraftCommitRequest): Promise<WorldInfo> {
+    const res = await fetch('/api/world/draft/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    return res.json();
+  }
+
+  static async discardDraft(req: DraftDiscardRequest): Promise<void> {
+    const res = await fetch('/api/world/draft/discard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+  }
+
+  // previewWorldEntities generates a batch of entities for an existing world.
+  // Nothing is written until the batch is accepted.
+  static async previewWorldEntities(worldId: string, req: WorldEntityBatchRequest): Promise<WorldEntityBatch> {
+    const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/generate-entities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    return res.json();
+  }
+
+  static async acceptWorldEntities(worldId: string, req: WorldEntityAcceptRequest): Promise<WorldApplyResult> {
+    const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/entities/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    return res.json();
+  }
+
+  // enhanceWorld proposes lore, entity, and hook additions for an existing
+  // world. Nothing is written until the proposals are applied.
+  static async enhanceWorld(worldId: string, req: WorldEnhanceRequest): Promise<WorldEnhanceResponse> {
+    const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/enhance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    return res.json();
+  }
+
+  static async applyWorldEnhancements(worldId: string, req: WorldEnhanceApplyRequest): Promise<WorldApplyResult> {
+    const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/enhance/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    return res.json();
   }
 
   static async getSettings(): Promise<SettingsResponse> {

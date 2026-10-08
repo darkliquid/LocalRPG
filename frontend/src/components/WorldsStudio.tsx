@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient, WorldExistsError } from '../api/client';
-import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail, GenerationFailure, FolderNode, ContentManifestInfo } from '../types';
-import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles, Download } from 'lucide-react';
+import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail, GenerationFailure, FolderNode, ContentManifestInfo, DraftCommitRequest, WorldDraftInfo } from '../types';
+import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles, Download, PackagePlus, Lightbulb } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { useLightbox } from '../hooks/useLightbox';
@@ -14,6 +14,10 @@ import { NewEntityWizard } from './NewEntityWizard';
 import { safeImagePreview } from '../utils/security';
 import { ContentImportDialog } from './ContentImportDialog';
 import { inspectPackageFile } from '../lib/packageInspect';
+import { WorldGenerateDialog } from './WorldGenerateDialog';
+import { WorldDraftReview } from './WorldDraftReview';
+import { EntityBatchDialog } from './EntityBatchDialog';
+import { WorldEnhanceDialog } from './WorldEnhanceDialog';
 
 interface WorldsStudioProps {
   onWorldSaved?: () => void;
@@ -84,6 +88,15 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importManifest, setImportManifest] = useState<ContentManifestInfo | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  // AI generation: a whole-world brief, a draft awaiting review, a batch of
+  // entities, and an enhancement diff. Every one of them reviews before it writes.
+  const [showGenerate, setShowGenerate] = useState(false);
+  const [reviewDraft, setReviewDraft] = useState<WorldDraftInfo | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<string | undefined>(undefined);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [batchWorldId, setBatchWorldId] = useState<string | null>(null);
+  const [enhanceWorldId, setEnhanceWorldId] = useState<string | null>(null);
   const detailRequest = React.useRef(0);
   const startModeRef = React.useRef(startMode);
 
@@ -95,6 +108,32 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const markDirty = () => setDraft((d) => (d ? { ...d, dirty: true } : d));
   const reportGenerationError = (failure: GenerationFailure) =>
     setToast({ type: 'error', message: formatGenerationError(failure) });
+
+  // commitReviewedDraft writes the accepted set and opens the world it produced.
+  const commitReviewedDraft = async (req: DraftCommitRequest) => {
+    setReviewLoading(true);
+    setReviewError(null);
+    try {
+      const world = await APIClient.commitDraft(req);
+      setReviewDraft(null);
+      setReviewTarget(undefined);
+      await loadWorldsRef.current?.(world.id, 'browse');
+    } catch (err) {
+      setReviewError(errorMessage(err));
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const discardReviewedDraft = async (draftId: string) => {
+    try {
+      await APIClient.discardDraft({ draft_id: draftId });
+    } catch {
+      // A draft that is already gone is not a failure worth reporting.
+    }
+    setReviewDraft(null);
+    setReviewTarget(undefined);
+  };
 
   const loadWorldsRef = React.useRef<((selectID?: string, mode?: 'new' | 'browse') => Promise<void>) | null>(null);
 
@@ -598,6 +637,14 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
               <span>Import</span>
             </button>
             <button
+              onClick={() => setShowGenerate(true)}
+              title="Generate a world with AI"
+              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-purple-500/40 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 transition-all cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Generate</span>
+            </button>
+            <button
               onClick={() => requestSelection({ kind: 'draft' })}
               className="flex items-center gap-1 text-xs font-sans font-bold px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow"
             >
@@ -681,6 +728,28 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {savedID && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setBatchWorldId(savedID)}
+                  title="Generate a batch of entities for this world"
+                  className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl border border-sky-500/40 bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 transition-all cursor-pointer"
+                >
+                  <PackagePlus className="w-3.5 h-3.5" />
+                  <span>Generate entities</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEnhanceWorldId(savedID)}
+                  title="Propose lore, entities, and hooks for this world"
+                  className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 transition-all cursor-pointer"
+                >
+                  <Lightbulb className="w-3.5 h-3.5" />
+                  <span>Enhance</span>
+                </button>
+              </>
+            )}
             <div className="flex flex-wrap bg-stone-950/80 p-1 rounded-xl border border-stone-800">
               <button
                 type="button"
@@ -1251,6 +1320,56 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
             setImportManifest(null);
           }}
           loading={isImporting}
+        />
+      )}
+
+      {showGenerate && (
+        <WorldGenerateDialog
+          onCancel={() => setShowGenerate(false)}
+          onDraft={(generated) => {
+            setShowGenerate(false);
+            setReviewTarget(undefined);
+            setReviewError(null);
+            setReviewDraft(generated);
+          }}
+        />
+      )}
+
+      {reviewDraft && (
+        <WorldDraftReview
+          draft={reviewDraft}
+          targetWorldId={reviewTarget}
+          loading={reviewLoading}
+          error={reviewError}
+          onCommit={(req) => void commitReviewedDraft(req)}
+          onDiscard={(draftId) => void discardReviewedDraft(draftId)}
+        />
+      )}
+
+      {batchWorldId && (
+        <EntityBatchDialog
+          worldId={batchWorldId}
+          onClose={() => setBatchWorldId(null)}
+          onAccepted={(result) => {
+            setBatchWorldId(null);
+            setToast({
+              type: 'success',
+              message: `Wrote ${result.written.length} entit${result.written.length === 1 ? 'y' : 'ies'}`,
+            });
+            void loadWorldsRef.current?.(batchWorldId, 'browse');
+          }}
+        />
+      )}
+
+      {enhanceWorldId && (
+        <WorldEnhanceDialog
+          worldId={enhanceWorldId}
+          onClose={() => setEnhanceWorldId(null)}
+          onApplied={(result) => {
+            setEnhanceWorldId(null);
+            setToast({ type: 'success', message: `Applied ${result.written.join(', ')}` });
+            void loadWorldsRef.current?.(enhanceWorldId, 'browse');
+          }}
         />
       )}
     </div>
