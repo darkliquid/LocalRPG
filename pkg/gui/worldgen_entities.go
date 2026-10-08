@@ -85,10 +85,16 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 	}
 
 	limits := s.limitsFor(req.Limits)
-	gen, _ := s.worldGenerator()
+	resolved := s.resolveWorldGenerator()
 
 	var batch []worldgen.DraftEntity
 	if req.Source != nil {
+		// An import reads the user's source, so the template fallback cannot
+		// stand in for a model: it would answer with fixed names and no error.
+		gen, err := s.generatorForSource()
+		if err != nil {
+			return nil, err
+		}
 		chunks, err := s.extractSource(ctx, *req.Source, limits.MaxChunks)
 		if err != nil {
 			return nil, err
@@ -101,7 +107,7 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 			return nil, err
 		}
 	} else {
-		budget := &worldgen.BudgetGenerator{Inner: gen, Max: limits.MaxCalls}
+		budget := &worldgen.BudgetGenerator{Inner: resolved.Generator, Max: limits.MaxCalls}
 		batch, err = worldgen.GenerateEntities(ctx, budget, world, worldgen.EntityRequest{
 			WorldID:     worldID,
 			Instruction: req.Instruction,
@@ -117,7 +123,10 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 		}
 	}
 
-	out := &WorldEntityBatchDTO{Entities: make([]WorldDraftEntityDTO, 0, len(batch))}
+	out := &WorldEntityBatchDTO{
+		Entities: make([]WorldDraftEntityDTO, 0, len(batch)),
+		Oracle:   resolved.Oracle,
+	}
 	for _, e := range batch {
 		out.Entities = append(out.Entities, draftEntityDTO(e))
 	}
@@ -212,8 +221,8 @@ func (s *Service) EnhanceWorld(ctx context.Context, worldID string, req WorldEnh
 		return nil, err
 	}
 
-	gen, _ := s.worldGenerator()
-	budget := &worldgen.BudgetGenerator{Inner: gen, Max: s.configMgr.Get().GenerationMaxCalls()}
+	resolved := s.resolveWorldGenerator()
+	budget := &worldgen.BudgetGenerator{Inner: resolved.Generator, Max: s.configMgr.Get().GenerationMaxCalls()}
 
 	proposals, err := worldgen.Enhance(ctx, budget, world, req.Instruction, req.Kinds)
 	if err != nil {
@@ -223,7 +232,10 @@ func (s *Service) EnhanceWorld(ctx context.Context, worldID string, req WorldEnh
 		return nil, err
 	}
 
-	out := &WorldEnhanceResponseDTO{Proposals: make([]WorldEnhancementDTO, 0, len(proposals))}
+	out := &WorldEnhanceResponseDTO{
+		Proposals: make([]WorldEnhancementDTO, 0, len(proposals)),
+		Oracle:    resolved.Oracle,
+	}
 	for _, p := range proposals {
 		out.Proposals = append(out.Proposals, enhancementDTO(p))
 	}

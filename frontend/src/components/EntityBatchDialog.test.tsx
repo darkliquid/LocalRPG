@@ -224,6 +224,41 @@ describe('EntityBatchDialog', () => {
     expect(preview.mock.calls[preview.mock.calls.length - 1][1].limits).toEqual({ max_chunks: 500 });
   });
 
+  it('says when the fallback answered instead of a model', async () => {
+    vi.spyOn(APIClient, 'previewWorldEntities').mockResolvedValue({
+      entities: [{ id: 'maren-vale', name: 'Maren Vale', type: 'character', body: 'A wanderer.' }],
+      oracle: true,
+    });
+
+    render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
+    fireEvent.change(screen.getByLabelText(/instruction/i), { target: { value: 'add a faction' } });
+    fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/built-in template generator/i)).toBeInTheDocument()
+    );
+    expect(screen.getByText(/Settings .* AI Agents/i)).toBeInTheDocument();
+  });
+
+  it('surfaces a refusal to read a source with no provider', async () => {
+    vi.spyOn(APIClient, 'previewWorldEntities').mockRejectedValue(
+      new HTTPError(
+        400,
+        'reading a source needs a model provider: no agent role is set up to generate. The gm role is the shipped echo command, so assign a model provider to gm, or to a generator role, in Settings → AI Agents'
+      )
+    );
+
+    render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /folder/i }));
+    fireEvent.change(screen.getByLabelText(/folder path/i), { target: { value: '/tmp/notes' } });
+    fireEvent.click(screen.getByRole('button', { name: /^extract$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/needs a model provider/i)).toBeInTheDocument()
+    );
+    expect(screen.getByText(/Settings .* AI Agents/i)).toBeInTheDocument();
+  });
+
   it('will not extract without a source', () => {
     render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
 

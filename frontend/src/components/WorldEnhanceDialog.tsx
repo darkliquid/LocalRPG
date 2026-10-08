@@ -33,6 +33,7 @@ export const WorldEnhanceDialog: React.FC<WorldEnhanceDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState<string[] | null>(null);
+  const [oracle, setOracle] = useState(false);
 
   const accepted = proposals.filter((_, index) => !rejected.has(index));
 
@@ -49,9 +50,11 @@ export const WorldEnhanceDialog: React.FC<WorldEnhanceDialogProps> = ({
     setLoading(true);
     setError(null);
     setApplied(null);
+    setOracle(false);
     try {
       const response = await APIClient.enhanceWorld(worldId, { instruction });
       setProposals(response.proposals);
+      setOracle(response.oracle === true);
       setRejected(new Set());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -105,6 +108,12 @@ export const WorldEnhanceDialog: React.FC<WorldEnhanceDialogProps> = ({
           {error && (
             <p className="p-3 text-sm rounded-xl bg-red-950/40 border border-red-500/30 text-red-300">
               {error}
+            </p>
+          )}
+          {oracle && (
+            <p className="p-3 text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200">
+              No model provider is configured, so these came from the built-in template generator.
+              Assign one in Settings → AI Agents for proposals drawn from this world.
             </p>
           )}
           {applied && (

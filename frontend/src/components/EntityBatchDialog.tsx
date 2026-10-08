@@ -168,6 +168,12 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
         </div>
 
         <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+          {batch?.oracle && (
+            <p className="p-3 text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200">
+              No model provider is configured, so these came from the built-in template generator
+              rather than from your source. Assign one in Settings → AI Agents to read a source.
+            </p>
+          )}
           {limitCode && error ? (
             <GenerationLimitNotice
               code={limitCode}

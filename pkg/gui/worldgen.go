@@ -35,6 +35,12 @@ const (
 // nothing and the message names the setting that would let it through.
 var ErrSourceTooLarge = errors.New("the source is larger than the chunk limit")
 
+// ErrNoGeneratorForImport reports an import with no model provider to read the
+// source. An import exists to read what the user pointed at, and the template
+// generator cannot: it returns a fixed handful of names, which looks like a
+// result and is not one.
+var ErrNoGeneratorForImport = errors.New("reading a source needs a model provider")
+
 // generationLimits are the limits one generation runs under.
 type generationLimits struct {
 	MaxCalls  int
@@ -145,22 +151,67 @@ func schemaHint(schema string) string {
 	return "You answer with one JSON object and nothing else, matching this schema exactly: " + schema
 }
 
-// worldGenerator resolves the generator a world generation runs against. It
-// returns the deterministic oracle when no role can generate, so the feature
-// works offline instead of failing.
-func (s *Service) worldGenerator() (worldgen.Generator, bool) {
-	role := resolveGeneratorRole(s.configMgr.Get())
+// generatorResolution is the generator a world generation runs against, and why
+// that one.
+type generatorResolution struct {
+	Generator worldgen.Generator
+	// Oracle reports that no model provider is available, so the deterministic
+	// template generator answers instead.
+	Oracle bool
+	// Reason explains an oracle fallback, so a refusal can say what is missing
+	// rather than only that something is.
+	Reason string
+}
+
+// resolveWorldGenerator chooses the generator a world generation runs against.
+// It never fails: a missing or unusable provider resolves to the template
+// generator, and the caller decides whether that is acceptable for the work in
+// hand. Inventing a world from templates is a legitimate offline answer;
+// pretending to have read the user's source is not.
+func (s *Service) resolveWorldGenerator() generatorResolution {
+	cfg := s.configMgr.Get()
+	role := resolveGeneratorRole(cfg)
 	if role == "" {
-		return worldgen.NewOracleGenerator(), true
+		return generatorResolution{
+			Generator: worldgen.NewOracleGenerator(),
+			Oracle:    true,
+			Reason: "no agent role is set up to generate. The gm role is the shipped echo " +
+				"command, so assign a model provider to gm, or to a generator role, " +
+				"in Settings → AI Agents",
+		}
 	}
-	router, err := textRouterFactory(s.configMgr.Get(), s.logger)
+
+	router, err := textRouterFactory(cfg, s.logger)
 	if err != nil {
-		return worldgen.NewOracleGenerator(), true
+		return generatorResolution{
+			Generator: worldgen.NewOracleGenerator(),
+			Oracle:    true,
+			Reason:    fmt.Sprintf("the provider router could not be built: %v", err),
+		}
 	}
 	if _, err := router.GetProviderForRole(role); err != nil {
-		return worldgen.NewOracleGenerator(), true
+		detail := err.Error()
+		if buildErrs := router.BuildErrors(); len(buildErrs) > 0 {
+			first := buildErrs[0]
+			detail = fmt.Sprintf("the provider for the %q role could not be built: %v", first.Role, first.Err)
+		}
+		return generatorResolution{
+			Generator: worldgen.NewOracleGenerator(),
+			Oracle:    true,
+			Reason:    detail,
+		}
 	}
-	return &routerGenerator{router: router, roles: []string{role}}, false
+	return generatorResolution{Generator: &routerGenerator{router: router, roles: []string{role}}}
+}
+
+// generatorForSource resolves the generator an import runs against, refusing the
+// template fallback: an import that invents three names looks like it worked.
+func (s *Service) generatorForSource() (worldgen.Generator, error) {
+	res := s.resolveWorldGenerator()
+	if res.Oracle {
+		return nil, fmt.Errorf("%w: %s", ErrNoGeneratorForImport, res.Reason)
+	}
+	return res.Generator, nil
 }
 
 // resolveGeneratorRole names the role a world generation runs as: an explicit
@@ -283,13 +334,20 @@ func (s *Service) GenerateWorld(ctx context.Context, req WorldGenerateRequestDTO
 		}
 	}
 
-	gen, oracle := s.worldGenerator()
+	resolved := s.resolveWorldGenerator()
+	oracle := resolved.Oracle
+	gen := resolved.Generator
 
 	var budget *worldgen.BudgetGenerator
 	var draft worldgen.Draft
 	var genErr error
 
 	if req.Source != nil {
+		// An import reads the user's source, so the template fallback cannot
+		// stand in for a model: it would answer with fixed names and no error.
+		if resolved.Oracle {
+			return nil, fmt.Errorf("%w: %s", ErrNoGeneratorForImport, resolved.Reason)
+		}
 		sourceChunks, err := s.extractSource(ctx, *req.Source, limits.MaxChunks)
 		if err != nil {
 			return nil, err

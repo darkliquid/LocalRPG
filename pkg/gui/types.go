@@ -679,6 +679,9 @@ type WorldEntityBatchRequestDTO struct {
 // WorldEntityBatchDTO is a previewed batch, with any links that were dropped.
 type WorldEntityBatchDTO struct {
 	Entities []WorldDraftEntityDTO `json:"entities"`
+	// Oracle marks a batch the deterministic fallback produced, so the review can
+	// say so rather than implying a model wrote it.
+	Oracle bool `json:"oracle,omitempty"`
 }
 
 // WorldEntityAcceptRequestDTO accepts a previewed batch.
@@ -708,6 +711,8 @@ type WorldEnhancementDTO struct {
 // WorldEnhanceResponseDTO is a set of proposals awaiting accept or reject.
 type WorldEnhanceResponseDTO struct {
 	Proposals []WorldEnhancementDTO `json:"proposals"`
+	// Oracle marks proposals the deterministic fallback produced.
+	Oracle bool `json:"oracle,omitempty"`
 }
 
 // WorldEnhanceApplyRequestDTO applies the accepted proposals.

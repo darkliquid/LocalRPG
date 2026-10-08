@@ -360,6 +360,9 @@ export interface WorldEntityBatchRequest {
 
 export interface WorldEntityBatch {
   entities: WorldDraftEntity[];
+  // oracle marks a batch the deterministic fallback produced, so the dialog can
+  // say so rather than implying a model wrote it.
+  oracle?: boolean;
 }
 
 export interface WorldEntityAcceptRequest {
@@ -383,6 +386,7 @@ export interface WorldEnhancement {
 
 export interface WorldEnhanceResponse {
   proposals: WorldEnhancement[];
+  oracle?: boolean;
 }
 
 export interface WorldEnhanceApplyRequest {

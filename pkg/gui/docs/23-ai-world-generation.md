@@ -128,6 +128,8 @@ After a generation runs, the calls and tokens it used are recorded in the usage 
 
 World generation works offline. When no agent role can generate, LocalRPG uses a deterministic template generator that fills the same fields from fixed pools, and the review states that plainly. Treat the result as a fallback that produces something usable without a provider.
 
+Reading a folder or a page does need a model, so LocalRPG refuses an import with no provider and says which role to configure instead of answering with template names. A template cannot read your source, and three fixed names returned without an error is worse than a refusal, because it looks like the import worked.
+
 LocalRPG prefers an explicit `generator` role when you define one, and otherwise the `gm` role. The default configurations (the `echo` command and the built-in narrative oracle) count as unavailable, because neither one can generate.
 
 ```yaml

@@ -971,3 +971,94 @@ func TestARequestCanRaiseTheCallLimitForItself(t *testing.T) {
 		t.Fatalf("the override changed the config: max_calls = %d", got)
 	}
 }
+
+func TestImportWithoutAProviderIsRefused(t *testing.T) {
+	// The shipped default has no model: gm is the echo command. An import that
+	// fell back to the template generator would return three fixed names and no
+	// error, which reads as a successful import of the user's source.
+	svc := NewService(t.TempDir())
+	world := mustCreateWorld(t, svc, "Ember Peak")
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("# A place\n\nSome lore.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := svc.PreviewWorldEntities(context.Background(), world.ID, WorldEntityBatchRequestDTO{
+		Source: &WorldSourceDTO{Kind: "folder", Path: dir},
+	})
+	if !errors.Is(err, ErrNoGeneratorForImport) {
+		t.Fatalf("err = %v, want ErrNoGeneratorForImport", err)
+	}
+	if !containsStrings(err.Error(), "Settings", "echo") {
+		t.Fatalf("the refusal should say what is missing and where to fix it: %v", err)
+	}
+}
+
+func TestWholeWorldImportWithoutAProviderIsRefused(t *testing.T) {
+	svc := NewService(t.TempDir())
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("# A place\n\nSome lore.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := svc.GenerateWorld(context.Background(), WorldGenerateRequestDTO{
+		Source: &WorldSourceDTO{Kind: "folder", Path: dir},
+	}, func(TurnEvent) error { return nil })
+	if !errors.Is(err, ErrNoGeneratorForImport) {
+		t.Fatalf("err = %v, want ErrNoGeneratorForImport", err)
+	}
+}
+
+func TestEntityBatchSaysWhenTheFallbackAnswered(t *testing.T) {
+	// From an instruction the template fallback is a legitimate offline answer,
+	// so it is labelled rather than refused.
+	svc := NewService(t.TempDir())
+	world := mustCreateWorld(t, svc, "Ember Peak")
+
+	batch, err := svc.PreviewWorldEntities(context.Background(), world.ID, WorldEntityBatchRequestDTO{
+		Instruction: "add a faction", Count: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !batch.Oracle {
+		t.Fatal("the batch should say the fallback produced it")
+	}
+	if len(batch.Entities) == 0 {
+		t.Fatal("expected the template fallback to produce something")
+	}
+}
+
+func TestEnhanceSaysWhenTheFallbackAnswered(t *testing.T) {
+	svc := NewService(t.TempDir())
+	world := mustCreateWorld(t, svc, "Ember Peak")
+
+	resp, err := svc.EnhanceWorld(context.Background(), world.ID, WorldEnhanceRequestDTO{Instruction: "deepen it"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resp.Oracle {
+		t.Fatal("the proposals should say the fallback produced them")
+	}
+}
+
+func TestAMisconfiguredProviderIsNotSilentlyReplaced(t *testing.T) {
+	// A role whose provider cannot be built must not read as "no provider": the
+	// reason names the build failure so the user can fix it. This drives the real
+	// router factory, so the build error is the one the app would report.
+	svc := NewService(t.TempDir())
+	svc.configMgr.Get().Agents.Roles[config.RoleGM] = config.AgentRoleConfig{
+		Type:        "builtin",
+		BuiltinName: "does-not-exist",
+	}
+
+	res := svc.resolveWorldGenerator()
+	if !res.Oracle {
+		t.Fatal("a provider that cannot be built should fall back")
+	}
+	if !containsStrings(res.Reason, "could not be built") {
+		t.Fatalf("reason = %q, want the build failure named", res.Reason)
+	}
+}
