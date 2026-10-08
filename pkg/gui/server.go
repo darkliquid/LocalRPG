@@ -1310,6 +1310,22 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, world)
+	case http.MethodDelete:
+		force := r.URL.Query().Get("force") == "true"
+		err := s.service.DeleteWorld(r.Context(), worldID, force)
+		if errors.Is(err, ErrWorldNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, ErrWorldInUse) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}

@@ -575,6 +575,12 @@ export class APIClient {
     return res.json();
   }
 
+  static async deleteWorld(id: string, force = false): Promise<void> {
+    const url = force ? `/api/world/${encodeURIComponent(id)}?force=true` : `/api/world/${encodeURIComponent(id)}`;
+    const res = await fetch(url, { method: 'DELETE' });
+    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || `deleteWorld: ${res.statusText}`);
+  }
+
   static async getWorldEntity(worldId: string, entityId: string): Promise<WorldEntityDetail> {
     const res = await fetch(`/api/world/${worldId}/entity/${entityId}`);
     if (!res.ok) throw new Error(`getWorldEntity: ${res.statusText}`);

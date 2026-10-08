@@ -4614,6 +4614,9 @@ var ErrWorldExists = errors.New("world already exists")
 // ErrWorldNotFound reports an attempt to update a world that does not exist.
 var ErrWorldNotFound = errors.New("world not found")
 
+// ErrWorldInUse reports an attempt to delete a world that is still referenced by one or more campaigns.
+var ErrWorldInUse = errors.New("world is in use by a campaign")
+
 // writeWorld writes a world directory. It never decides create vs update; the
 // caller does, so a create can refuse a duplicate and an update can require a
 // target.
@@ -4689,6 +4692,38 @@ func (s *Service) UpdateWorld(ctx context.Context, req CreateWorldRequestDTO) (*
 		return nil, fmt.Errorf("%w: %s", ErrWorldNotFound, req.ID)
 	}
 	return s.writeWorld(ctx, req)
+}
+
+// DeleteWorld removes a world and all its entity templates, prompts, and assets.
+// When force is false, it refuses to delete if any campaign references this world.
+func (s *Service) DeleteWorld(ctx context.Context, worldID string, force bool) error {
+	if err := pathutil.ValidateID(worldID); err != nil {
+		return fmt.Errorf("invalid world id: %w", err)
+	}
+
+	worldDir := s.resolver.WorldDir(worldID)
+	if _, err := os.Stat(filepath.Join(worldDir, "world.yaml")); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%w: %s", ErrWorldNotFound, worldID)
+		}
+		return fmt.Errorf("world %q: %w", worldID, err)
+	}
+
+	if !force {
+		games, err := s.ListGames(ctx)
+		if err == nil {
+			for _, g := range games {
+				if g.WorldID == worldID {
+					return fmt.Errorf("%w: campaign %q (%s)", ErrWorldInUse, g.Name, g.ID)
+				}
+			}
+		}
+	}
+
+	if err := os.RemoveAll(worldDir); err != nil {
+		return fmt.Errorf("remove world: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) (*WorldEntityDetailDTO, error) {
