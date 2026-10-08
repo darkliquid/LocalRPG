@@ -81,3 +81,33 @@ func TestSchemaStepRejectsInvalidProfiles(t *testing.T) {
 	}
 }
 
+func TestAssembleScript(t *testing.T) {
+	hooks := []hookEntry{
+		{Raw: "// raw js comment"},
+		{Event: "action", Name: "strike", Code: "return { outcome: 'hit' };"},
+		{Event: "turn_begin", Code: "state.buff = false;"},
+		{Event: "turn_end", Code: "state.tick = true;"},
+		{Event: "world_tick", Code: "state.world = true;"},
+		{Event: "check", Name: "custom", Code: "return { outcome: 'pass' };"},
+		{Event: "health_zero", Code: "return 'dead';"},
+		{Event: "unknown", Code: "console.log('fallback');"},
+	}
+	script := assembleScript(hooks)
+	expectedSubstrings := []string{
+		"// raw js comment",
+		`onAction("strike", function(ctx) {`,
+		`onTurnBegin(function(ctx) {`,
+		`onTurnEnd(function(ctx) {`,
+		`onWorldTick(function(ctx) {`,
+		`onCheck("custom", function(req) {`,
+		`onHealthZero(function(effect) {`,
+		`console.log('fallback');`,
+	}
+	for _, substr := range expectedSubstrings {
+		if !strings.Contains(script, substr) {
+			t.Errorf("expected script to contain %q, got:\n%s", substr, script)
+		}
+	}
+}
+
+

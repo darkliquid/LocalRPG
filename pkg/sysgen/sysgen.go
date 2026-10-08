@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/jsonrepair"
+	"github.com/darkliquid/localrpg/pkg/systemtest"
 )
 
 // Brief is the starting description for generating a tabletop RPG system.
@@ -88,7 +90,7 @@ func Generate(ctx context.Context, gen Generator, brief Brief) (System, error) {
 		id = "custom-system"
 	}
 
-	return System{
+	s := System{
 		ID:          id,
 		Name:        name,
 		Version:     "1.0.0",
@@ -96,7 +98,51 @@ func Generate(ctx context.Context, gen Generator, brief Brief) (System, error) {
 		Mechanics:   mech,
 		Script:      script,
 		RulesPrompt: rules,
-		Verify:      VerifyResult{},
-	}, nil
+		Verify:      VerifyResult{Script: strings.TrimSpace(script) != ""},
+	}
+
+	sys := systemtest.System{
+		ID:        s.ID,
+		Script:    s.Script,
+		Mechanics: s.Mechanics,
+	}
+
+	scenario := systemtest.Scenario{Name: "smoke"}
+	if mech != nil {
+		if len(mech.Checks.Profiles) > 0 {
+			for profName := range mech.Checks.Profiles {
+				scenario.Steps = append(scenario.Steps, systemtest.Step{
+					Action: "check",
+					Input:  profName,
+				})
+				break
+			}
+		}
+		if len(mech.Stats) > 0 {
+			scenario.Steps = append(scenario.Steps, systemtest.Step{
+				Action: "do",
+				Input:  mech.Stats[0].ID,
+			})
+		}
+	}
+
+	failures := systemtest.Run(sys, scenario)
+	if len(failures) == 0 {
+		s.Verify.OK = true
+	} else {
+		s.Verify.OK = false
+		for _, f := range failures {
+			detail := f.Detail
+			if f.Scenario != "" && f.Step > 0 {
+				detail = fmt.Sprintf("[%s step %d] %s", f.Scenario, f.Step, f.Detail)
+			} else if f.Scenario != "" {
+				detail = fmt.Sprintf("[%s] %s", f.Scenario, f.Detail)
+			}
+			s.Verify.Failures = append(s.Verify.Failures, detail)
+		}
+	}
+
+	return s, nil
 }
+
 
