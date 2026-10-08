@@ -656,12 +656,14 @@ type WorldDraftDTO struct {
 	Oracle bool `json:"oracle,omitempty"`
 }
 
-// WorldEntityBatchRequestDTO asks for a batch of entities in an existing world.
+// WorldEntityBatchRequestDTO asks for a batch of entities in an existing world,
+// either generated from an instruction or extracted from a source.
 type WorldEntityBatchRequestDTO struct {
-	Instruction string   `json:"instruction"`
-	Kinds       []string `json:"kinds,omitempty"`
-	Count       int      `json:"count,omitempty"`
-	Focus       string   `json:"focus,omitempty"`
+	Instruction string          `json:"instruction"`
+	Kinds       []string        `json:"kinds,omitempty"`
+	Count       int             `json:"count,omitempty"`
+	Focus       string          `json:"focus,omitempty"`
+	Source      *WorldSourceDTO `json:"source,omitempty"`
 }
 
 // WorldEntityBatchDTO is a previewed batch, with any links that were dropped.

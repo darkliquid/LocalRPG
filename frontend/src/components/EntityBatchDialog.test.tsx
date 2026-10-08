@@ -88,4 +88,67 @@ describe('EntityBatchDialog', () => {
       expect(screen.getByText(/world entity already exists/i)).toBeInTheDocument()
     );
   });
+
+  it('extracts a batch from a folder instead of an instruction', async () => {
+    const preview = vi.spyOn(APIClient, 'previewWorldEntities').mockResolvedValue(batch);
+
+    render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /folder/i }));
+    expect(screen.queryByLabelText('Count')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/folder path/i), { target: { value: '/tmp/notes' } });
+    fireEvent.change(screen.getByLabelText(/instruction/i), {
+      target: { value: 'keep the source names' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^extract$/i }));
+
+    await waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
+    expect(preview.mock.calls[0][1]).toEqual({
+      instruction: 'keep the source names',
+      source: { kind: 'folder', path: '/tmp/notes' },
+      kinds: undefined,
+      count: undefined,
+      focus: undefined,
+    });
+  });
+
+  it('extracts a batch from URLs', async () => {
+    const preview = vi.spyOn(APIClient, 'previewWorldEntities').mockResolvedValue(batch);
+
+    render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /urls/i }));
+    fireEvent.change(screen.getByLabelText(/urls, one per line/i), {
+      target: { value: 'https://example.org/a\nhttps://example.org/b\n' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^extract$/i }));
+
+    await waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
+    expect(preview.mock.calls[0][1].source).toEqual({
+      kind: 'url',
+      urls: ['https://example.org/a', 'https://example.org/b'],
+    });
+  });
+
+  it('fills the folder path from the native picker', async () => {
+    vi.spyOn(APIClient, 'chooseDirectory').mockResolvedValue('/home/you/notes');
+
+    render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /folder/i }));
+    fireEvent.click(screen.getByRole('button', { name: /browse/i }));
+
+    await waitFor(() => expect(screen.getByLabelText(/folder path/i)).toHaveValue('/home/you/notes'));
+  });
+
+  it('will not extract without a source', () => {
+    render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /folder/i }));
+    expect(screen.getByRole('button', { name: /^extract$/i })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/folder path/i), { target: { value: '/tmp/notes' } });
+    expect(screen.getByRole('button', { name: /^extract$/i })).toBeEnabled();
+  });
 });

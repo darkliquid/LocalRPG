@@ -24,16 +24,18 @@ type sequencedProvider struct {
 	usage     *harness.Usage
 	responses []string
 
-	mu    sync.Mutex
-	calls int
+	mu         sync.Mutex
+	calls      int
+	lastPrompt string
 }
 
 func (p *sequencedProvider) ID() string { return p.id }
 
-func (p *sequencedProvider) Generate(context.Context, harness.GenerateRequest) (*harness.GenerateResponse, error) {
+func (p *sequencedProvider) Generate(_ context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.calls++
+	p.lastPrompt = req.Prompt
 	text := "{}"
 	if p.calls <= len(p.responses) {
 		text = p.responses[p.calls-1]
@@ -340,6 +342,69 @@ func TestAcceptWorldEntitiesRefusesAnEmptyBatch(t *testing.T) {
 	world := mustCreateWorld(t, svc, "Ember Peak")
 	if _, err := svc.AcceptWorldEntities(context.Background(), world.ID, WorldEntityAcceptRequestDTO{}); err == nil {
 		t.Fatal("an empty batch must be refused")
+	}
+}
+
+func TestPreviewWorldEntitiesFromAFolder(t *testing.T) {
+	provider := &sequencedProvider{id: "gen", responses: []string{
+		`{"entities":[{"name":"Saltmarch","type":"location","description":"A port watched by [[The Tidewatch]]."}]}`,
+	}}
+	svc := worldGenService(t, provider)
+	world := mustCreateWorld(t, svc, "Ember Peak")
+
+	// An existing entity the extraction should link to rather than repeat.
+	if _, err := svc.AcceptWorldEntities(context.Background(), world.ID, WorldEntityAcceptRequestDTO{
+		Entities: []WorldDraftEntityDTO{
+			{ID: "the-tidewatch", Name: "The Tidewatch", Type: "faction", Body: "A crew."},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("# Saltmarch\n\nA port.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	batch, err := svc.PreviewWorldEntities(context.Background(), world.ID, WorldEntityBatchRequestDTO{
+		Source: &WorldSourceDTO{Kind: "folder", Path: dir},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(batch.Entities) != 1 {
+		t.Fatalf("batch = %+v", batch)
+	}
+	if batch.Entities[0].Source != "a.md" {
+		t.Fatalf("source = %q, want a.md", batch.Entities[0].Source)
+	}
+	if !containsStrings(batch.Entities[0].Body, "[[The Tidewatch]]") {
+		t.Fatalf("a link to the world's own entity should survive: %q", batch.Entities[0].Body)
+	}
+
+	// The extraction is told which world it is joining.
+	if !containsStrings(provider.lastPrompt, "Ember Peak", "The Tidewatch", "Saltmarch") {
+		t.Fatalf("prompt = %q", provider.lastPrompt)
+	}
+
+	// The preview writes nothing beyond the entity that was already accepted.
+	detail, err := svc.GetWorld(context.Background(), world.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(detail.Entities) != 1 {
+		t.Fatalf("a preview must write nothing: %+v", detail.Entities)
+	}
+}
+
+func TestPreviewWorldEntitiesFromAFolderNeedsAReadableSource(t *testing.T) {
+	svc := NewService(t.TempDir())
+	world := mustCreateWorld(t, svc, "Ember Peak")
+
+	if _, err := svc.PreviewWorldEntities(context.Background(), world.ID, WorldEntityBatchRequestDTO{
+		Source: &WorldSourceDTO{Kind: "folder", Path: t.TempDir()},
+	}); err == nil {
+		t.Fatal("an empty folder must error")
 	}
 }
 

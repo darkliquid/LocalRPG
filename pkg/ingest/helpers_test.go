@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -31,4 +32,14 @@ type failTransport struct{ t *testing.T }
 func (f failTransport) RoundTrip(*http.Request) (*http.Response, error) {
 	f.t.Fatal("folder ingestion must not make a network call")
 	return nil, errors.New("network call attempted")
+}
+
+// containsAll reports whether every want appears in got.
+func containsAll(got string, want ...string) bool {
+	for _, w := range want {
+		if !strings.Contains(got, w) {
+			return false
+		}
+	}
+	return true
 }

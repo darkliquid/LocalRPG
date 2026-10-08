@@ -10,6 +10,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/ingest"
 	"github.com/darkliquid/localrpg/pkg/pathutil"
 	"github.com/darkliquid/localrpg/pkg/worldgen"
 )
@@ -74,7 +75,9 @@ func summaryLine(body string) string {
 }
 
 // PreviewWorldEntities generates a batch of entities for an existing world
-// without writing anything. The user accepts or discards the preview.
+// without writing anything. The batch comes from an instruction, or from a
+// folder or a set of URLs when the request names a source. The user accepts or
+// discards the preview.
 func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req WorldEntityBatchRequestDTO) (*WorldEntityBatchDTO, error) {
 	world, err := s.worldContext(worldID)
 	if err != nil {
@@ -84,13 +87,18 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 	gen, _ := s.worldGenerator()
 	budget := &worldgen.BudgetGenerator{Inner: gen, Max: s.configMgr.Get().GenerationMaxCalls()}
 
-	batch, err := worldgen.GenerateEntities(ctx, budget, world, worldgen.EntityRequest{
-		WorldID:     worldID,
-		Instruction: req.Instruction,
-		Kinds:       req.Kinds,
-		Count:       req.Count,
-		Focus:       req.Focus,
-	})
+	var batch []worldgen.DraftEntity
+	if req.Source != nil {
+		batch, err = s.entitiesFromSource(ctx, budget, world, req)
+	} else {
+		batch, err = worldgen.GenerateEntities(ctx, budget, world, worldgen.EntityRequest{
+			WorldID:     worldID,
+			Instruction: req.Instruction,
+			Kinds:       req.Kinds,
+			Count:       req.Count,
+			Focus:       req.Focus,
+		})
+	}
 	if err != nil {
 		if errors.Is(err, worldgen.ErrCallBudgetExceeded) {
 			return nil, fmt.Errorf("generation stopped: %w", err)
@@ -103,6 +111,30 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 		out.Entities = append(out.Entities, draftEntityDTO(e))
 	}
 	return out, nil
+}
+
+// entitiesFromSource extracts entities from a folder or a set of URLs and links
+// them against the world they are being added to.
+func (s *Service) entitiesFromSource(ctx context.Context, gen worldgen.Generator, world worldgen.WorldContext, req WorldEntityBatchRequestDTO) ([]worldgen.DraftEntity, error) {
+	chunks, err := ingest.Extract(ctx, ingest.Source{
+		Kind: req.Source.Kind,
+		Path: req.Source.Path,
+		URLs: req.Source.URLs,
+	})
+	if err != nil {
+		return nil, err
+	}
+	draft, err := ingest.BuildInto(ctx, gen, chunks, worldgen.Brief{Premise: req.Instruction}, ingest.BuildContext{
+		Name:        world.Name,
+		Genre:       world.Genre,
+		Description: world.Description,
+		Lore:        world.Lore,
+		Entities:    world.Entities,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return draft.Entities, nil
 }
 
 // AcceptWorldEntities writes a reviewed batch into worlds/<id>/entities/. It

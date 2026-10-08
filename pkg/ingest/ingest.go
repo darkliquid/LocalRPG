@@ -256,9 +256,27 @@ type ingestReply struct {
 	} `json:"entities"`
 }
 
+// BuildContext names the world an ingestion is adding to. An empty context means
+// the chunks describe a world of their own, which is what a whole-world import
+// wants; a filled one steers the extraction to fit a world that already exists.
+type BuildContext struct {
+	Name        string
+	Genre       string
+	Description string
+	Lore        string
+	Entities    []worldgen.EntitySummary
+}
+
 // Build turns chunks into a draft world, reusing WG-1's generator, and records
 // each entity's source so provenance survives into the review.
 func Build(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brief worldgen.Brief) (worldgen.Draft, error) {
+	return BuildInto(ctx, gen, chunks, brief, BuildContext{})
+}
+
+// BuildInto is Build for chunks that extend an existing world: the world's
+// identity, lore, and entities are given to the model so the extracted notes fit
+// it, and every link is validated against that world as well as the new notes.
+func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brief worldgen.Brief, into BuildContext) (worldgen.Draft, error) {
 	if len(chunks) == 0 {
 		return worldgen.Draft{}, fmt.Errorf("ingest: nothing to build from")
 	}
@@ -268,11 +286,14 @@ func Build(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brief wo
 
 	draft := worldgen.Draft{}
 	seen := map[string]struct{}{}
+	for _, e := range into.Entities {
+		seen[e.ID] = struct{}{}
+	}
 	for i, batch := range Batch(chunks, ChunksPerCall) {
 		if err := ctx.Err(); err != nil {
 			return draft, err
 		}
-		raw, err := gen.GenerateJSON(ctx, buildPrompt(brief, batch, i == 0), ingestSchema)
+		raw, err := gen.GenerateJSON(ctx, buildPrompt(brief, batch, i == 0, into), ingestSchema)
 		if err != nil {
 			return draft, fmt.Errorf("ingest: batch %d: %w", i+1, err)
 		}
@@ -283,6 +304,14 @@ func Build(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brief wo
 		applyReply(&draft, reply, batch, i == 0, seen)
 	}
 
+	if into.Name != "" {
+		// Extending a world: the draft borrows its identity, and the caller keeps
+		// only the notes.
+		draft.World.ID = ""
+		draft.World.Name = into.Name
+		draft.World.Genre = firstNonEmpty(draft.World.Genre, into.Genre)
+		draft.World.Description = firstNonEmpty(draft.World.Description, into.Description)
+	}
 	if draft.World.Name == "" {
 		draft.World.Name = firstNonEmpty(brief.Name, "Imported World")
 	}
@@ -291,7 +320,15 @@ func Build(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brief wo
 		draft.World.ID = "imported-world"
 	}
 	draft.ID = draft.World.ID
-	draft = worldgen.LinkDraft(draft)
+	// Links resolve against the notes this batch produced and, when the chunks
+	// extend a world, against that world's own entities too. Linking against the
+	// batch alone first would flatten a link to an existing note before the world
+	// ever saw it.
+	if len(into.Entities) > 0 {
+		draft.Entities = worldgen.LinkBatch(draft.Entities, into.Entities)
+	} else {
+		draft = worldgen.LinkDraft(draft)
+	}
 	draft.Sections = worldgen.SplitLoreSections(draft.Lore)
 	return draft, nil
 }
@@ -357,15 +394,35 @@ func chunkSources(batch []Chunk) string {
 // asks for every entity the source describes rather than a count: an ingestion
 // reports what is in the source, and inventing entities to reach a target is the
 // opposite of what a source is for.
-func buildPrompt(brief worldgen.Brief, batch []Chunk, first bool) string {
+func buildPrompt(brief worldgen.Brief, batch []Chunk, first bool, into BuildContext) string {
 	var b strings.Builder
 	b.WriteString(ingestSystem)
-	b.WriteString("\n\nExtract the world described by the source material below.\n")
+	if into.Name != "" {
+		b.WriteString("\n\nExtract the entities the source material below describes as belonging to the world \"" +
+			into.Name + "\".\n")
+	} else {
+		b.WriteString("\n\nExtract the world described by the source material below.\n")
+	}
 	b.WriteString("\nExtract every distinct entity the source describes, and nothing it does not.\n")
 	if brief.Premise != "" {
 		b.WriteString("\nAdditional instruction: " + truncate(brief.Premise, 500) + "\n")
 	}
-	if first {
+	if into.Name != "" {
+		if into.Genre != "" {
+			b.WriteString("\nThe world's genre is " + into.Genre + ".\n")
+		}
+		if into.Description != "" {
+			b.WriteString("The world's premise: " + truncate(into.Description, 400) + "\n")
+		}
+		if lore := truncate(into.Lore, 1200); lore != "" {
+			b.WriteString("\nExisting lore, for tone and continuity:\n" + lore + "\n")
+		}
+		if existing := summaryList(into.Entities, 60); existing != "" {
+			b.WriteString("\nEntities this world already has. Do not repeat them, and link to them " +
+				"with [[Name]] where the source supports it:\n" + existing)
+		}
+		b.WriteString("\nDo not propose a new world name, genre, or description; the world already exists.\n")
+	} else if first {
 		b.WriteString("\nAlso give the world a name, a genre, a one-line description, and a short lore " +
 			"document assembled from the source.\n")
 	} else {
@@ -377,6 +434,24 @@ func buildPrompt(brief worldgen.Brief, batch []Chunk, first bool) string {
 		b.WriteString(c.Text + "\n")
 	}
 	b.WriteString(`\nReturn {"name":...,"genre":...,"description":...,"lore":...,"entities":[...]}.`)
+	return b.String()
+}
+
+// summaryList renders a bounded list of a world's existing entities, so a
+// model can link to them by name.
+func summaryList(entities []worldgen.EntitySummary, limit int) string {
+	var b strings.Builder
+	count := 0
+	for _, e := range entities {
+		if count >= limit {
+			break
+		}
+		if e.Name == "" {
+			continue
+		}
+		b.WriteString("- " + e.Name + " (" + firstNonEmpty(e.Type, "concept") + ")\n")
+		count++
+	}
 	return b.String()
 }
 

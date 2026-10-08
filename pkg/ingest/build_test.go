@@ -85,6 +85,39 @@ func TestBuildRefusesAnEmptySource(t *testing.T) {
 	}
 }
 
+func TestBuildIntoAnExistingWorld(t *testing.T) {
+	chunks := []Chunk{{Source: "a.md", Title: "Saltmarch", Text: "A port."}}
+	g := &jsonGen{responses: []string{
+		`{"entities":[{"name":"Saltmarch","type":"location","description":"A port watched by [[The Tidewatch]]."}]}`,
+	}}
+	d, err := BuildInto(context.Background(), g, chunks, worldgen.Brief{}, BuildContext{
+		Name:        "Ember Peak",
+		Genre:       "fantasy",
+		Description: "A frontier town.",
+		Lore:        "# Lore\n\nThe frontier.\n",
+		Entities:    []worldgen.EntitySummary{{ID: "the-tidewatch", Name: "The Tidewatch", Type: "faction"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The world's identity is kept, and the link to its own note survives.
+	if d.World.Name != "Ember Peak" || d.World.Genre != "fantasy" {
+		t.Fatalf("world = %+v", d.World)
+	}
+	if len(d.Entities) != 1 || !strings.Contains(d.Entities[0].Body, "[[The Tidewatch]]") {
+		t.Fatalf("entities = %+v", d.Entities)
+	}
+	if len(d.Entities[0].Links) != 1 {
+		t.Fatalf("links = %+v", d.Entities[0].Links)
+	}
+
+	// The prompt tells the model which world it is joining.
+	if !containsAll(g.lastPrompt, "Ember Peak", "fantasy", "The Tidewatch", "already has") {
+		t.Fatalf("prompt = %q", g.lastPrompt)
+	}
+}
+
 func TestBuildPromptCarriesTheChunks(t *testing.T) {
 	g := &jsonGen{responses: []string{`{}`}}
 	chunks := []Chunk{{Source: "a.md", Title: "Saltmarch", Text: "A port with a long history."}}

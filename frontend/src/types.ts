@@ -351,6 +351,9 @@ export interface WorldEntityBatchRequest {
   kinds?: string[];
   count?: number;
   focus?: string;
+  // source extracts the batch from a folder or a set of URLs instead of
+  // generating it from the instruction.
+  source?: WorldSource;
 }
 
 export interface WorldEntityBatch {

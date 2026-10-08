@@ -1,7 +1,13 @@
-import React, { useState } from 'react';
-import { AlertTriangle, Check, PackagePlus, RefreshCw, X } from 'lucide-react';
-import { APIClient } from '../api/client';
-import { WorldApplyResult, WorldDraftEntity, WorldEntityBatch, WorldEntityBatchRequest } from '../types';
+import React, { useCallback, useMemo, useState } from 'react';
+import { AlertTriangle, Check, FolderOpen, Globe, PackagePlus, Pencil, RefreshCw, X } from 'lucide-react';
+import { APIClient, HTTPError } from '../api/client';
+import {
+  WorldApplyResult,
+  WorldDraftEntity,
+  WorldEntityBatch,
+  WorldEntityBatchRequest,
+  WorldSource,
+} from '../types';
 
 export interface EntityBatchDialogProps {
   worldId: string;
@@ -14,23 +20,71 @@ export interface EntityBatchDialogProps {
 
 const KINDS = ['character', 'location', 'faction', 'item', 'concept'];
 
-// EntityBatchDialog generates a batch of entities for an existing world, shows
-// the preview with its resolved links, and writes nothing until Accept.
+type SourceMode = 'instruction' | 'folder' | 'url';
+
+// EntityBatchDialog generates or extracts a batch of entities for an existing
+// world, shows the preview with its resolved links, and writes nothing until
+// Accept.
 export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
   worldId,
   onClose,
   onAccepted,
   batch: seeded = null,
 }) => {
+  const [sourceMode, setSourceMode] = useState<SourceMode>('instruction');
   const [instruction, setInstruction] = useState('');
   const [kind, setKind] = useState('faction');
   const [count, setCount] = useState(3);
   const [focus, setFocus] = useState('');
+  const [folderPath, setFolderPath] = useState('');
+  const [urls, setUrls] = useState('');
+  const [browsing, setBrowsing] = useState(false);
+  const [browseUnavailable, setBrowseUnavailable] = useState(false);
+
   const [batch, setBatch] = useState<WorldEntityBatch | null>(seeded);
   const [rename, setRename] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState<string[] | null>(null);
+
+  const urlList = useMemo(
+    () =>
+      urls
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
+    [urls]
+  );
+
+  const source: WorldSource | undefined =
+    sourceMode === 'folder'
+      ? { kind: 'folder', path: folderPath }
+      : sourceMode === 'url'
+        ? { kind: 'url', urls: urlList }
+        : undefined;
+
+  const sourceReady =
+    sourceMode === 'instruction' ||
+    (sourceMode === 'folder' ? folderPath.trim() !== '' : urlList.length > 0);
+
+  // browse opens the desktop window's native folder picker. A browser or headless
+  // build has none, so the path field stays usable on its own.
+  const handleBrowse = useCallback(async () => {
+    setBrowsing(true);
+    setError(null);
+    try {
+      const chosen = await APIClient.chooseDirectory('Choose a source folder');
+      if (chosen) setFolderPath(chosen);
+    } catch (err) {
+      if (err instanceof HTTPError && err.status === 501) {
+        setBrowseUnavailable(true);
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      setBrowsing(false);
+    }
+  }, []);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -39,8 +93,9 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
     try {
       const req: WorldEntityBatchRequest = {
         instruction,
-        kinds: [kind],
-        count,
+        source,
+        kinds: source ? undefined : [kind],
+        count: source ? undefined : count,
         focus: focus || undefined,
       };
       setBatch(await APIClient.previewWorldEntities(worldId, req));
@@ -68,6 +123,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
   };
 
   const entities: WorldDraftEntity[] = batch?.entities ?? [];
+  const actionLabel = sourceMode === 'instruction' ? 'Generate' : 'Extract';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -78,8 +134,10 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
               <PackagePlus className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">Generate entities</h3>
-              <p className="text-xs text-neutral-400">Preview a batch before it is written</p>
+              <h3 className="text-lg font-semibold text-white">Add entities to this world</h3>
+              <p className="text-xs text-neutral-400">
+                Preview a batch before it is written. Nothing existing is changed.
+              </p>
             </div>
           </div>
           <button
@@ -104,58 +162,148 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
           )}
 
           <div className="space-y-2">
+            <span className="text-xs font-medium text-neutral-300">From</span>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: 'instruction', label: 'Instruction', icon: Pencil },
+                  { id: 'folder', label: 'Folder', icon: FolderOpen },
+                  { id: 'url', label: 'URLs', icon: Globe },
+                ] as const
+              ).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setSourceMode(id)}
+                  aria-pressed={sourceMode === id}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs transition-all ${
+                    sourceMode === id
+                      ? 'border-sky-500/50 bg-sky-500/10 text-white'
+                      : 'border-white/5 bg-white/[0.02] text-neutral-400 hover:border-white/10'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
             <label htmlFor="batch-instruction" className="text-xs font-medium text-neutral-300">
-              Instruction
+              {sourceMode === 'instruction' ? 'Instruction' : 'Instruction (optional)'}
             </label>
             <textarea
               id="batch-instruction"
               value={instruction}
               onChange={(event) => setInstruction(event.target.value)}
               rows={2}
-              placeholder="three rival factions in the south"
+              placeholder={
+                sourceMode === 'instruction'
+                  ? 'three rival factions in the south'
+                  : 'keep the names exactly as the source writes them'
+              }
               className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-sky-500/50 focus:outline-none resize-none"
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <label className="space-y-2 text-xs font-medium text-neutral-300">
-              Kind
-              <select
-                aria-label="Kind"
-                value={kind}
-                onChange={(event) => setKind(event.target.value)}
-                className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-sky-500/50 focus:outline-none"
-              >
-                {KINDS.map((option) => (
-                  <option key={option} value={option} className="bg-neutral-900">
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-2 text-xs font-medium text-neutral-300">
-              Count
-              <input
-                type="number"
-                min={1}
-                max={10}
-                aria-label="Count"
-                value={count}
-                onChange={(event) => setCount(Number(event.target.value))}
-                className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-sky-500/50 focus:outline-none"
+          {sourceMode === 'instruction' ? (
+            <div className="grid grid-cols-3 gap-3">
+              <label className="space-y-2 text-xs font-medium text-neutral-300">
+                Kind
+                <select
+                  aria-label="Kind"
+                  value={kind}
+                  onChange={(event) => setKind(event.target.value)}
+                  className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-sky-500/50 focus:outline-none"
+                >
+                  {KINDS.map((option) => (
+                    <option key={option} value={option} className="bg-neutral-900">
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-2 text-xs font-medium text-neutral-300">
+                Count
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  aria-label="Count"
+                  value={count}
+                  onChange={(event) => setCount(Number(event.target.value))}
+                  className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-sky-500/50 focus:outline-none"
+                />
+              </label>
+              <label className="space-y-2 text-xs font-medium text-neutral-300">
+                Focus (optional)
+                <input
+                  aria-label="Focus"
+                  value={focus}
+                  onChange={(event) => setFocus(event.target.value)}
+                  placeholder="Saltmarch"
+                  className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-sky-500/50 focus:outline-none"
+                />
+              </label>
+            </div>
+          ) : (
+            <p className="text-[11px] text-neutral-500">
+              The source decides how many entities are added and what kind they are.
+            </p>
+          )}
+
+          {sourceMode === 'folder' && (
+            <div className="space-y-2">
+              <label htmlFor="batch-folder" className="text-xs font-medium text-neutral-300">
+                Folder path
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="batch-folder"
+                  value={folderPath}
+                  onChange={(event) => setFolderPath(event.target.value)}
+                  placeholder="/home/you/setting-notes"
+                  className="flex-1 min-w-0 px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-sky-500/50 focus:outline-none font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleBrowse()}
+                  disabled={browsing}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs text-neutral-200 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-40 transition-colors whitespace-nowrap"
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  Browse
+                </button>
+              </div>
+              <p className="text-[11px] text-neutral-500">
+                {browseUnavailable
+                  ? 'No native folder dialog is available here, so type the path instead.'
+                  : 'Read locally. Nothing is fetched.'}
+              </p>
+            </div>
+          )}
+
+          {sourceMode === 'url' && (
+            <div className="space-y-2">
+              <label htmlFor="batch-urls" className="text-xs font-medium text-neutral-300">
+                URLs, one per line
+              </label>
+              <textarea
+                id="batch-urls"
+                value={urls}
+                onChange={(event) => setUrls(event.target.value)}
+                rows={3}
+                placeholder="https://example.org/wiki/saltmarch"
+                className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-sky-500/50 focus:outline-none resize-none font-mono"
               />
-            </label>
-            <label className="space-y-2 text-xs font-medium text-neutral-300">
-              Focus (optional)
-              <input
-                aria-label="Focus"
-                value={focus}
-                onChange={(event) => setFocus(event.target.value)}
-                placeholder="Saltmarch"
-                className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-xl focus:border-sky-500/50 focus:outline-none"
-              />
-            </label>
-          </div>
+              <p className="text-[11px] text-amber-400/80 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                This fetches the pages you name. Only the URLs listed are fetched, and you are
+                responsible for their licensing.
+              </p>
+            </div>
+          )}
 
           {entities.length > 0 && (
             <div className="space-y-2">
@@ -182,6 +330,9 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
                     <span className="ml-auto font-mono text-[11px] text-neutral-500">{entity.id}</span>
                   </div>
                   <p className="mt-1 text-xs text-neutral-300 line-clamp-3">{entity.body}</p>
+                  {entity.source && (
+                    <p className="mt-1 text-[11px] text-neutral-500">From: {entity.source}</p>
+                  )}
                   {entity.links && entity.links.length > 0 && (
                     <p className="mt-1 text-[11px] text-neutral-500">Links: {entity.links.join(', ')}</p>
                   )}
@@ -199,12 +350,12 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
 
         <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10">
           <button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 text-sm text-neutral-200 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-40 transition-colors"
+            onClick={() => void handleGenerate()}
+            disabled={loading || !sourceReady}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-neutral-200 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            {entities.length > 0 ? 'Regenerate' : 'Generate'}
+            {entities.length > 0 ? `${actionLabel} again` : actionLabel}
           </button>
           <button
             onClick={() => void handleAccept()}

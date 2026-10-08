@@ -68,7 +68,15 @@ Each entity built from a source records the chunk it came from in its `source` f
 
 ## Generating entities for an existing world
 
-Select a world and click **Generate entities**. The dialog takes an instruction ("three rival factions in the south"), a kind, a count, and an optional focus that anchors the batch to an existing entity.
+Select a world and click **Generate entities**. The **From** row in the dialog offers three ways to build the batch:
+
+| From | What it does |
+| --- | --- |
+| **Instruction** | Generates from an instruction ("three rival factions in the south"), a kind, a count, and an optional focus that anchors the batch to an existing entity. |
+| **Folder** | Reads `.md`, `.markdown`, and `.txt` files under a directory and adds the entities they describe. Entirely local, with no network call. |
+| **URLs** | Fetches the pages you list, one per line, and adds the entities they describe. |
+
+An extracted batch is told which world it is joining, so it leaves out an entity that world already has and links to one where the source supports it. Adding entities never changes an existing note.
 
 LocalRPG seeds the batch with the world's lore and its existing entities. The new entities fit the established tone. Links resolve against the batch **and** the existing world. An unresolved link is dropped and listed in the preview. The preview is read-only. **Accept** writes each note and renames it to its frontmatter id. When an id is already taken, the accept is refused unless you tick **Rename on an id clash**, which suffixes the new note instead.
 

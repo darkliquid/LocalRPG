@@ -200,3 +200,10 @@ func linkBatch(batch []DraftEntity, existing []EntitySummary) []DraftEntity {
 	linked := linkAgainst(Draft{Entities: batch}, known)
 	return linked.Entities
 }
+
+// LinkBatch is linkBatch for callers outside the package, so a batch another
+// producer built (an ingestion, say) resolves its links against a world the same
+// way a generated batch does.
+func LinkBatch(batch []DraftEntity, existing []EntitySummary) []DraftEntity {
+	return linkBatch(batch, existing)
+}
