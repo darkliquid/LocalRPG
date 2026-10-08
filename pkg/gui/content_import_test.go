@@ -136,3 +136,83 @@ func TestImportContentEndpoint(t *testing.T) {
 		t.Fatalf("body did not contain endpoint_world: %s", rec.Body.String())
 	}
 }
+
+func TestImportContentExtensionValidation(t *testing.T) {
+	svc := NewService(t.TempDir())
+	worldBytes := createWorldPackageBytes(t, "world_ext", "World Ext", false)
+
+	// Valid world extension
+	res, err := svc.ImportContentWithOptions(context.Background(), bytes.NewReader(worldBytes), ImportContentOptions{
+		Filename: "world_ext-1.0.0.lrpgworld",
+	})
+	if err != nil {
+		t.Fatalf("import with .lrpgworld failed: %v", err)
+	}
+	if res.ID != "world_ext" {
+		t.Errorf("res.ID = %q, want world_ext", res.ID)
+	}
+
+	// Mismatched extension (.lrpgsystem for a world package)
+	_, err = svc.ImportContentWithOptions(context.Background(), bytes.NewReader(worldBytes), ImportContentOptions{
+		Filename: "world_ext-1.0.0.lrpgsystem",
+	})
+	if err == nil || !strings.Contains(err.Error(), "extension .lrpgsystem but package contains world") {
+		t.Fatalf("expected extension mismatch error, got: %v", err)
+	}
+}
+
+func TestImportContentExpectedTypeValidation(t *testing.T) {
+	svc := NewService(t.TempDir())
+	worldBytes := createWorldPackageBytes(t, "world_type", "World Type", false)
+
+	// Matching expected type
+	res, err := svc.ImportContentWithOptions(context.Background(), bytes.NewReader(worldBytes), ImportContentOptions{
+		ExpectedType: "world",
+	})
+	if err != nil {
+		t.Fatalf("import with expected_type=world failed: %v", err)
+	}
+	if res.ID != "world_type" {
+		t.Errorf("res.ID = %q, want world_type", res.ID)
+	}
+
+	// Mismatched expected type (expecting system, package is world)
+	_, err = svc.ImportContentWithOptions(context.Background(), bytes.NewReader(worldBytes), ImportContentOptions{
+		ExpectedType: "system",
+	})
+	if err == nil || !strings.Contains(err.Error(), "cannot import as system") {
+		t.Fatalf("expected type mismatch error, got: %v", err)
+	}
+}
+
+func TestImportContentEndpointRejectsMismatchedType(t *testing.T) {
+	svc := NewService(t.TempDir())
+	server := NewServer(svc, http.NotFoundHandler())
+
+	pkgBytes := createWorldPackageBytes(t, "endpoint_world", "Endpoint World", false)
+
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, err := mw.CreateFormFile("file", "endpoint_world-1.0.0.lrpgworld")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fw.Write(pkgBytes); err != nil {
+		t.Fatal(err)
+	}
+	_ = mw.Close()
+
+	// Call endpoint requesting expected_type=system
+	req := httptest.NewRequest("POST", "/api/content/import?expected_type=system", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 Bad Request: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "cannot import as system") {
+		t.Fatalf("unexpected error response: %s", rec.Body.String())
+	}
+}

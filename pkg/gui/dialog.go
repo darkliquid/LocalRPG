@@ -20,6 +20,13 @@ var ErrNoNativeDialog = errors.New("native directory dialog is not available")
 // The native picker is modal, so only one can be pending at a time.
 var ErrDirectoryChoiceInFlight = errors.New("a folder dialog is already open")
 
+// ErrNoNativeSaveFileDialog reports that no native save file picker is available, so the
+// UI must fall back to direct download.
+var ErrNoNativeSaveFileDialog = errors.New("native save file dialog is not available")
+
+// ErrSaveFileChoiceInFlight reports a second save file dialog while one is open.
+var ErrSaveFileChoiceInFlight = errors.New("a save file dialog is already open")
+
 // The states a directory choice moves through. Idle means nothing is pending and
 // nothing has been chosen.
 const (
@@ -27,6 +34,13 @@ const (
 	DirectoryChoicePending   = "pending"
 	DirectoryChoiceSelected  = "selected"
 	DirectoryChoiceCancelled = "cancelled"
+)
+
+const (
+	SaveFileChoiceIdle      = "idle"
+	SaveFileChoicePending   = "pending"
+	SaveFileChoiceSelected  = "selected"
+	SaveFileChoiceCancelled = "cancelled"
 )
 
 // ChooseDirectoryRequestDTO asks the desktop window for a directory. Title is
@@ -41,6 +55,32 @@ type ChooseDirectoryRequestDTO struct {
 type DirectoryChoiceDTO struct {
 	Status string `json:"status"`
 	Path   string `json:"path,omitempty"`
+}
+
+// FileFilterDTO defines an allowed file filter in file pickers.
+type FileFilterDTO struct {
+	DisplayName string `json:"display_name"`
+	Pattern     string `json:"pattern"`
+}
+
+// ChooseSaveFileRequestDTO asks the desktop window for a save file destination.
+type ChooseSaveFileRequestDTO struct {
+	Title           string          `json:"title,omitempty"`
+	DefaultDir      string          `json:"default_dir,omitempty"`
+	DefaultFilename string          `json:"default_filename,omitempty"`
+	Filters         []FileFilterDTO `json:"filters,omitempty"`
+}
+
+// SaveFileChoiceDTO is the state of a pending save file choice.
+type SaveFileChoiceDTO struct {
+	Status string `json:"status"`
+	Path   string `json:"path,omitempty"`
+}
+
+type saveFileChoice struct {
+	mu     sync.Mutex
+	status string
+	path   string
 }
 
 // directoryChoice is the one native folder dialog that may be open. The dialog
@@ -162,18 +202,27 @@ func (s *Service) defaultExportDir() string {
 // handleDialogRoutes serves the native-dialog endpoints.
 func (s *Server) handleDialogRoutes(w http.ResponseWriter, r *http.Request) {
 	action := r.URL.Path[len("/api/dialog/"):]
-	if action != "directory" {
-		http.NotFound(w, r)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodPost:
-		s.handleStartDirectoryChoice(w, r)
-	case http.MethodGet:
-		writeJSON(w, s.service.DirectoryChoice())
+	switch action {
+	case "directory":
+		switch r.Method {
+		case http.MethodPost:
+			s.handleStartDirectoryChoice(w, r)
+		case http.MethodGet:
+			writeJSON(w, s.service.DirectoryChoice())
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	case "save-file":
+		switch r.Method {
+		case http.MethodPost:
+			s.handleStartSaveFileChoice(w, r)
+		case http.MethodGet:
+			writeJSON(w, s.service.SaveFileChoice())
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.NotFound(w, r)
 	}
 }
 
@@ -198,6 +247,25 @@ func (s *Server) handleStartDirectoryChoice(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+// handleStartSaveFileChoice opens the save picker and answers immediately.
+func (s *Server) handleStartSaveFileChoice(w http.ResponseWriter, r *http.Request) {
+	req := ChooseSaveFileRequestDTO{}
+	if r.Body != nil {
+		_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req)
+	}
+
+	switch err := s.service.StartSaveFileChoice(req); {
+	case errors.Is(err, ErrNoNativeSaveFileDialog):
+		http.Error(w, err.Error(), http.StatusNotImplemented)
+	case errors.Is(err, ErrSaveFileChoiceInFlight):
+		http.Error(w, err.Error(), http.StatusConflict)
+	case err != nil:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	default:
+		writeJSONStatus(w, http.StatusAccepted, SaveFileChoiceDTO{Status: SaveFileChoicePending})
+	}
+}
+
 // WaitForDirectoryChoice blocks until the pending choice finishes or the context
 // is done. It exists for tests and for a caller that would rather wait than poll.
 func (s *Service) WaitForDirectoryChoice(ctx context.Context) (DirectoryChoiceDTO, error) {
@@ -208,6 +276,97 @@ func (s *Service) WaitForDirectoryChoice(ctx context.Context) (DirectoryChoiceDT
 		select {
 		case <-ctx.Done():
 			return DirectoryChoiceDTO{Status: DirectoryChoicePending}, ctx.Err()
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+// SetSaveFilePicker installs a native save file chooser, used only by the Wails
+// desktop window. Without one the UI falls back to direct browser download.
+func (s *Service) SetSaveFilePicker(picker func(req ChooseSaveFileRequestDTO) (string, error)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.saveFilePicker = picker
+}
+
+// hasSaveFilePicker reports whether a native save file chooser is installed.
+func (s *Service) hasSaveFilePicker() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.saveFilePicker != nil
+}
+
+// StartSaveFileChoice opens the save picker in the background and returns at once.
+// The caller polls SaveFileChoice for the result.
+func (s *Service) StartSaveFileChoice(req ChooseSaveFileRequestDTO) error {
+	s.mu.RLock()
+	picker := s.saveFilePicker
+	s.mu.RUnlock()
+	if picker == nil {
+		return ErrNoNativeSaveFileDialog
+	}
+
+	s.saveFileChoice.mu.Lock()
+	if s.saveFileChoice.status == SaveFileChoicePending {
+		s.saveFileChoice.mu.Unlock()
+		return ErrSaveFileChoiceInFlight
+	}
+	s.saveFileChoice.status = SaveFileChoicePending
+	s.saveFileChoice.path = ""
+	s.saveFileChoice.mu.Unlock()
+
+	title := req.Title
+	if title == "" {
+		title = "Save file"
+	}
+	start := req.DefaultDir
+	if start == "" {
+		start = s.defaultFolderDir()
+	}
+	req.Title = title
+	req.DefaultDir = start
+
+	go func() {
+		chosen, err := picker(req)
+		status := SaveFileChoiceSelected
+		if err != nil || chosen == "" {
+			status = SaveFileChoiceCancelled
+		}
+		s.saveFileChoice.mu.Lock()
+		defer s.saveFileChoice.mu.Unlock()
+		s.saveFileChoice.status = status
+		s.saveFileChoice.path = chosen
+	}()
+	return nil
+}
+
+// SaveFileChoice reports the current state. A finished state is delivered once
+// and then cleared, so a poll that arrives late does not replay an old choice.
+func (s *Service) SaveFileChoice() SaveFileChoiceDTO {
+	s.saveFileChoice.mu.Lock()
+	defer s.saveFileChoice.mu.Unlock()
+
+	dto := SaveFileChoiceDTO{Status: s.saveFileChoice.status, Path: s.saveFileChoice.path}
+	switch s.saveFileChoice.status {
+	case SaveFileChoiceSelected, SaveFileChoiceCancelled:
+		s.saveFileChoice.status = SaveFileChoiceIdle
+		s.saveFileChoice.path = ""
+	case "":
+		dto.Status = SaveFileChoiceIdle
+	}
+	return dto
+}
+
+// WaitForSaveFileChoice blocks until the pending choice finishes or the context
+// is done. It exists for tests and for a caller that would rather wait than poll.
+func (s *Service) WaitForSaveFileChoice(ctx context.Context) (SaveFileChoiceDTO, error) {
+	for {
+		if choice := s.SaveFileChoice(); choice.Status != SaveFileChoicePending {
+			return choice, nil
+		}
+		select {
+		case <-ctx.Done():
+			return SaveFileChoiceDTO{Status: SaveFileChoicePending}, ctx.Err()
 		case <-time.After(10 * time.Millisecond):
 		}
 	}

@@ -436,7 +436,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
       <input
         ref={fileInputRef}
         type="file"
-        accept=".lrpgpack"
+        accept=".lrpgworld,.lrpgsystem,.lrpgpack"
         className="hidden"
         onChange={handleFileSelect}
       />

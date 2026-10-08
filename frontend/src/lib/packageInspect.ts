@@ -1,6 +1,13 @@
 import { ContentManifestInfo } from '../types';
 
 export async function inspectPackageFile(file: File): Promise<ContentManifestInfo> {
+  const cleanId = file.name.replace(/\.(lrpgpack|lrpgworld|lrpgsystem)$/i, '');
+  const inferredType = file.name.endsWith('.lrpgworld')
+    ? 'world'
+    : file.name.endsWith('.lrpgsystem')
+      ? 'system'
+      : undefined;
+
   try {
     if (typeof DecompressionStream !== 'undefined') {
       const stream = file.stream().pipeThrough(new DecompressionStream('gzip'));
@@ -23,6 +30,7 @@ export async function inspectPackageFile(file: File): Promise<ContentManifestInf
       const text = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
       const idMatch = text.match(/\bid:\s*([^\r\n]+)/);
       const nameMatch = text.match(/\bname:\s*([^\r\n]+)/);
+      const typeMatch = text.match(/\btype:\s*([^\r\n]+)/);
       const versionMatch = text.match(/\bversion:\s*([^\r\n]+)/);
       const authorMatch = text.match(/\bauthor:\s*([^\r\n]+)/);
       const licenseMatch = text.match(/\blicense:\s*([^\r\n]+)/);
@@ -30,8 +38,9 @@ export async function inspectPackageFile(file: File): Promise<ContentManifestInf
       const hasScript = text.includes('.js') || text.includes('mechanics.js');
 
       return {
-        id: idMatch ? idMatch[1].trim() : file.name.replace(/\.lrpgpack$/, ''),
+        id: idMatch ? idMatch[1].trim() : cleanId,
         name: nameMatch ? nameMatch[1].trim() : file.name,
+        type: typeMatch ? typeMatch[1].trim() : inferredType,
         version: versionMatch ? versionMatch[1].trim() : '1.0.0',
         author: authorMatch ? authorMatch[1].trim() : undefined,
         license: licenseMatch ? licenseMatch[1].trim() : undefined,
@@ -44,8 +53,9 @@ export async function inspectPackageFile(file: File): Promise<ContentManifestInf
   }
 
   return {
-    id: file.name.replace(/\.lrpgpack$/, ''),
+    id: cleanId,
     name: file.name,
+    type: inferredType,
     version: '1.0.0',
     has_script: true,
   };

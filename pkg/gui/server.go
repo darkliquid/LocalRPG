@@ -2071,7 +2071,50 @@ func (s *Server) handleContentExportRoute(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	filename := fmt.Sprintf("%s-%s.lrpgpack", m.ID, m.Version)
+	ext := ".lrpgworld"
+	if req.Type == "system" {
+		ext = ".lrpgsystem"
+	}
+
+	if req.TargetPath != "" {
+		cleanTarget, err := pathutil.ValidateUserPath(req.TargetPath)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid target path: %v", err), http.StatusBadRequest)
+			return
+		}
+		absTarget, err := filepath.Abs(cleanTarget)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("resolve target path: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		targetExt := strings.ToLower(filepath.Ext(absTarget))
+		if targetExt == "" {
+			absTarget += ext
+		} else if targetExt != ext && targetExt != ".lrpgpack" {
+			http.Error(w, fmt.Sprintf("target path %q has invalid extension for %s (expected %s or .lrpgpack)", absTarget, req.Type, ext), http.StatusBadRequest)
+			return
+		}
+
+		if err := os.MkdirAll(filepath.Dir(absTarget), 0o755); err != nil {
+			http.Error(w, fmt.Sprintf("create destination directory: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if err := os.WriteFile(absTarget, buf.Bytes(), 0o644); err != nil {
+			http.Error(w, fmt.Sprintf("write package file: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		writeJSON(w, ExportContentResultDTO{
+			Path:    absTarget,
+			ID:      m.ID,
+			Version: m.Version,
+			Type:    req.Type,
+		})
+		return
+	}
+
+	filename := fmt.Sprintf("%s-%s%s", m.ID, m.Version, ext)
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 	w.WriteHeader(http.StatusOK)
@@ -2101,14 +2144,28 @@ func (s *Server) handleContentImportRoute(w http.ResponseWriter, r *http.Request
 		onConflict = r.FormValue("on_conflict")
 	}
 
-	file, _, err := r.FormFile("file")
+	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "missing 'file' in multipart form", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
-	res, err := s.service.ImportContent(r.Context(), file, onConflict)
+	expectedType := r.URL.Query().Get("expected_type")
+	if expectedType == "" {
+		expectedType = r.FormValue("expected_type")
+	}
+
+	var filename string
+	if fileHeader != nil {
+		filename = fileHeader.Filename
+	}
+
+	res, err := s.service.ImportContentWithOptions(r.Context(), file, ImportContentOptions{
+		ConflictMode: onConflict,
+		Filename:     filename,
+		ExpectedType: expectedType,
+	})
 	if err != nil {
 		if errors.Is(err, ErrContentConflict) {
 			http.Error(w, err.Error(), http.StatusConflict)

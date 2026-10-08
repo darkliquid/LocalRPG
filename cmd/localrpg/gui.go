@@ -217,6 +217,28 @@ func handleGUICommand(args []string) {
 		return chosen, nil
 	})
 
+	svc.SetSaveFilePicker(func(req gui.ChooseSaveFileRequestDTO) (string, error) {
+		options := &application.SaveFileDialogOptions{
+			Title:                req.Title,
+			Directory:            req.DefaultDir,
+			Filename:             req.DefaultFilename,
+			CanCreateDirectories: true,
+			Window:               window,
+		}
+		for _, f := range req.Filters {
+			options.Filters = append(options.Filters, application.FileFilter{
+				DisplayName: f.DisplayName,
+				Pattern:     f.Pattern,
+			})
+		}
+		dialog := app.Dialog.SaveFileWithOptions(options)
+		chosen, err := dialog.PromptForSingleSelection()
+		if err != nil {
+			return "", nil
+		}
+		return chosen, nil
+	})
+
 	// With no native View menu, Developer Tools keeps its conventional
 	// accelerator as a direct window binding so debugging stays reachable.
 	window.RegisterKeyBinding("F12", func(application.Window) {

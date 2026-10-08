@@ -9,6 +9,7 @@ import MarkdownEditor from './editor/MarkdownEditor';
 import { MechanicsEditor } from './MechanicsEditor';
 import { ContentImportDialog } from './ContentImportDialog';
 import { inspectPackageFile } from '../lib/packageInspect';
+import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
 
 type SystemSelection = { kind: 'saved'; id: string } | { kind: 'draft' } | null;
 
@@ -55,6 +56,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [importManifest, setImportManifest] = useState<ContentManifestInfo | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const savePicker = useSaveFilePicker();
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [isDeletingSystem, setIsDeletingSystem] = useState(false);
@@ -316,15 +318,31 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
   const handleExport = async () => {
     if (!savedID) return;
+    const defaultFilename = `${savedID}-${version || '1.0.0'}.lrpgsystem`;
     try {
-      const blob = await APIClient.exportContent('system', savedID);
+      if (savePicker.nativeDialog) {
+        const path = await savePicker.pick({
+          title: 'Export System Package',
+          default_filename: defaultFilename,
+          filters: [
+            { display_name: 'LocalRPG System (*.lrpgsystem)', pattern: '*.lrpgsystem' },
+            { display_name: 'All Files (*.*)', pattern: '*.*' },
+          ],
+        });
+        if (!path) return;
+        await APIClient.exportContent('system', savedID, path);
+        setToast({ type: 'success', message: `Exported system package: ${path}` });
+        return;
+      }
+
+      const blob = (await APIClient.exportContent('system', savedID)) as Blob;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${savedID}-${version || '1.0.0'}.lrpgpack`;
+      a.download = defaultFilename;
       a.click();
       URL.revokeObjectURL(url);
-      setToast({ type: 'success', message: `Exported system package: ${savedID}.lrpgpack` });
+      setToast({ type: 'success', message: `Exported system package: ${defaultFilename}` });
     } catch (err) {
       setToast({ type: 'error', message: errorMessage(err) });
     }
@@ -348,7 +366,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     if (!importFile) return;
     setIsImporting(true);
     try {
-      const res = await APIClient.importContent(importFile, conflictMode);
+      const res = await APIClient.importContent(importFile, conflictMode, 'system');
       setToast({ type: 'success', message: `Successfully ${res.action} system ${res.name} (${res.id})` });
       setImportFile(null);
       setImportManifest(null);
@@ -377,12 +395,12 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               type="file"
               ref={importInputRef}
               onChange={handleFileSelect}
-              accept=".lrpgpack"
+              accept=".lrpgsystem,.lrpgpack"
               className="hidden"
             />
             <button
               onClick={() => importInputRef.current?.click()}
-              title="Import content package (.lrpgpack)"
+              title="Import system package (.lrpgsystem, .lrpgpack)"
               className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5" />
@@ -600,7 +618,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               type="button"
               onClick={handleExport}
               disabled={!savedID}
-              title="Export system package (.lrpgpack)"
+              title="Export system package (.lrpgsystem)"
               className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
@@ -995,6 +1013,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       {importManifest && (
         <ContentImportDialog
           manifest={importManifest}
+          expectedType="system"
           onConfirm={handleConfirmImport}
           onCancel={() => {
             setImportFile(null);

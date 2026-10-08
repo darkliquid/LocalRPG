@@ -164,7 +164,7 @@ func (m *exportManager) unsubscribe(ch chan ExportEvent) {
 func (s *Service) ExportCapabilities() ExportCapabilitiesDTO {
 	return ExportCapabilitiesDTO{
 		DefaultDir:   s.defaultExportDir(),
-		NativeDialog: s.hasDirectoryPicker(),
+		NativeDialog: s.hasDirectoryPicker() || s.hasSaveFilePicker(),
 	}
 }
 

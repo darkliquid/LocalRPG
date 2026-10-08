@@ -134,6 +134,11 @@ type Service struct {
 	// directoryChoice holds the one native folder dialog that may be open, so a
 	// blocking modal never sits inside a request the webview is waiting on.
 	directoryChoice directoryChoice
+	// saveFilePicker is the desktop window's native save file chooser. It is
+	// nil in browser/socket mode, where the UI falls back to direct browser download.
+	saveFilePicker func(req ChooseSaveFileRequestDTO) (string, error)
+	// saveFileChoice holds the one native save file dialog that may be open.
+	saveFileChoice saveFileChoice
 	// urlOpener hands a link to the desktop window, which forwards it to the
 	// system browser. It is nil in browser/socket mode, where the frontend opens
 	// a tab itself.
@@ -5745,10 +5750,23 @@ func (s *Service) ExportContent(ctx context.Context, typ, id string, w io.Writer
 // ErrContentConflict reports an attempt to import content that already exists under refuse mode.
 var ErrContentConflict = errors.New("content already exists")
 
-// ImportContent unpacks a .lrpgpack from r into a staging directory, validates its
+// ImportContentOptions specifies optional options and validation when importing packages.
+type ImportContentOptions struct {
+	ConflictMode string
+	Filename     string
+	ExpectedType string
+}
+
+// ImportContent unpacks a package archive from r into a staging directory, validates its
 // structure, resolves conflicts according to onConflict ("refuse", "rename", "overwrite"),
 // and atomically moves it into the content directory.
 func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict string) (ImportResultDTO, error) {
+	return s.ImportContentWithOptions(ctx, r, ImportContentOptions{ConflictMode: onConflict})
+}
+
+// ImportContentWithOptions unpacks a package archive from r with type validation and conflict handling.
+func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opts ImportContentOptions) (ImportResultDTO, error) {
+	onConflict := opts.ConflictMode
 	if onConflict == "" {
 		onConflict = "refuse"
 	}
@@ -5767,6 +5785,32 @@ func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict str
 	m, sigBytes, err := content.Unpack(r, stagingDir)
 	if err != nil {
 		return ImportResultDTO{}, fmt.Errorf("unpack content: %w", err)
+	}
+
+	if opts.ExpectedType != "" {
+		expected := strings.ToLower(strings.TrimSpace(opts.ExpectedType))
+		if expected != "world" && expected != "system" {
+			return ImportResultDTO{}, fmt.Errorf("invalid expected content type %q: must be 'world' or 'system'", expected)
+		}
+		if m.Type != expected {
+			return ImportResultDTO{}, fmt.Errorf("package contains %s %q, cannot import as %s", m.Type, m.ID, expected)
+		}
+	}
+
+	if opts.Filename != "" {
+		ext := strings.ToLower(filepath.Ext(opts.Filename))
+		switch ext {
+		case ".lrpgworld":
+			if m.Type != "world" {
+				return ImportResultDTO{}, fmt.Errorf("package filename %q has extension .lrpgworld but package contains %s %q", opts.Filename, m.Type, m.ID)
+			}
+		case ".lrpgsystem":
+			if m.Type != "system" {
+				return ImportResultDTO{}, fmt.Errorf("package filename %q has extension .lrpgsystem but package contains %s %q", opts.Filename, m.Type, m.ID)
+			}
+		case ".lrpgpack":
+			// Universal package format, allowed for both
+		}
 	}
 
 	var trustedPublishers map[string]string

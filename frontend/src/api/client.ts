@@ -42,6 +42,9 @@ import {
   DraftCommitRequest,
   DraftDiscardRequest,
   DirectoryChoice,
+  ChooseSaveFileRequest,
+  SaveFileChoice,
+  ExportContentResult,
   GenerationLimitsOverride,
   AppConfig,
   SettingsResponse,
@@ -243,6 +246,27 @@ export class APIClient {
   static async directoryChoice(): Promise<DirectoryChoice> {
     const res = await fetch('/api/dialog/directory');
     if (!res.ok) throw new HTTPError(res.status, `directoryChoice: ${res.statusText}`);
+    return res.json();
+  }
+
+  // startSaveFileChoice opens the desktop window's native save file picker and
+  // returns at once. The result is polled with saveFileChoice.
+  static async startSaveFileChoice(req: ChooseSaveFileRequest = {}): Promise<void> {
+    const res = await fetch('/api/dialog/save-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (res.ok) return;
+    if (res.status === 501) throw new HTTPError(res.status, 'No native save file dialog is available');
+    if (res.status === 409) throw new HTTPError(res.status, 'A save file dialog is already open');
+    throw new HTTPError(res.status, `startSaveFileChoice: ${res.statusText}`);
+  }
+
+  // saveFileChoice reports the pending save file choice.
+  static async saveFileChoice(): Promise<SaveFileChoice> {
+    const res = await fetch('/api/dialog/save-file');
+    if (!res.ok) throw new HTTPError(res.status, `saveFileChoice: ${res.statusText}`);
     return res.json();
   }
 
@@ -1236,25 +1260,36 @@ export class APIClient {
     return APIClient.getGameUsage(this.gameID);
   }
 
-  static async exportContent(type: 'world' | 'system', id: string): Promise<Blob> {
+  static async exportContent(type: 'world' | 'system', id: string, targetPath?: string): Promise<Blob | ExportContentResult> {
     const res = await fetch('/api/content/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, id }),
+      body: JSON.stringify({ type, id, target_path: targetPath }),
     });
     if (!res.ok) {
       const text = await res.text();
       throw new HTTPError(res.status, text || `exportContent: ${res.statusText}`);
     }
+    if (targetPath) {
+      return res.json();
+    }
     return res.blob();
   }
 
-  static async importContent(file: File, onConflict: 'refuse' | 'rename' | 'overwrite' = 'refuse'): Promise<ImportResultDTO> {
+  static async importContent(
+    file: File,
+    onConflict: 'refuse' | 'rename' | 'overwrite' = 'refuse',
+    expectedType?: 'world' | 'system'
+  ): Promise<ImportResultDTO> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('on_conflict', onConflict);
 
-    const res = await fetch('/api/content/import', {
+    const url = expectedType
+      ? `/api/content/import?expected_type=${encodeURIComponent(expectedType)}`
+      : '/api/content/import';
+
+    const res = await fetch(url, {
       method: 'POST',
       body: formData,
     });

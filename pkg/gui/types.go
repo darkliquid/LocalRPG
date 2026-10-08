@@ -784,10 +784,19 @@ type DraftDiscardRequestDTO struct {
 	DraftID string `json:"draft_id"`
 }
 
-// ExportContentRequestDTO requests exporting a world or system as a .lrpgpack package.
+// ExportContentRequestDTO requests exporting a world or system as a content package.
 type ExportContentRequestDTO struct {
-	Type string `json:"type"`
-	ID   string `json:"id"`
+	Type       string `json:"type"`
+	ID         string `json:"id"`
+	TargetPath string `json:"target_path,omitempty"`
+}
+
+// ExportContentResultDTO reports the outcome of saving an exported package to disk.
+type ExportContentResultDTO struct {
+	Path    string `json:"path"`
+	ID      string `json:"id"`
+	Version string `json:"version"`
+	Type    string `json:"type"`
 }
 
 // ImportResultDTO reports the outcome of importing a content package.

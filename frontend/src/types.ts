@@ -454,6 +454,32 @@ export interface DirectoryChoice {
   path?: string;
 }
 
+export type SaveFileChoiceStatus = 'idle' | 'pending' | 'selected' | 'cancelled';
+
+export interface SaveFileFilter {
+  display_name: string;
+  pattern: string;
+}
+
+export interface ChooseSaveFileRequest {
+  title?: string;
+  default_dir?: string;
+  default_filename?: string;
+  filters?: SaveFileFilter[];
+}
+
+export interface SaveFileChoice {
+  status: SaveFileChoiceStatus;
+  path?: string;
+}
+
+export interface ExportContentResult {
+  path: string;
+  id: string;
+  version: string;
+  type: string;
+}
+
 export interface ModelStatus {
   id: string;
   name: string;

@@ -14,6 +14,7 @@ import { NewEntityWizard } from './NewEntityWizard';
 import { safeImagePreview } from '../utils/security';
 import { ContentImportDialog } from './ContentImportDialog';
 import { inspectPackageFile } from '../lib/packageInspect';
+import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
 import { WorldGenerateDialog } from './WorldGenerateDialog';
 import { WorldDraftReview } from './WorldDraftReview';
 import { EntityBatchDialog } from './EntityBatchDialog';
@@ -78,6 +79,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importManifest, setImportManifest] = useState<ContentManifestInfo | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const savePicker = useSaveFilePicker();
   // AI generation: a whole-world brief, a draft awaiting review, a batch of
   // entities, and an enhancement diff. Every one of them reviews before it writes.
   const [showGenerate, setShowGenerate] = useState(false);
@@ -595,15 +597,31 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
 
   const handleExport = async () => {
     if (!savedID) return;
+    const defaultFilename = `${savedID}-1.0.0.lrpgworld`;
     try {
-      const blob = await APIClient.exportContent('world', savedID);
+      if (savePicker.nativeDialog) {
+        const path = await savePicker.pick({
+          title: 'Export World Package',
+          default_filename: defaultFilename,
+          filters: [
+            { display_name: 'LocalRPG World (*.lrpgworld)', pattern: '*.lrpgworld' },
+            { display_name: 'All Files (*.*)', pattern: '*.*' },
+          ],
+        });
+        if (!path) return;
+        await APIClient.exportContent('world', savedID, path);
+        setToast({ type: 'success', message: `Exported world package: ${path}` });
+        return;
+      }
+
+      const blob = (await APIClient.exportContent('world', savedID)) as Blob;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${savedID}-1.0.0.lrpgpack`;
+      a.download = defaultFilename;
       a.click();
       URL.revokeObjectURL(url);
-      setToast({ type: 'success', message: `Exported world package: ${savedID}.lrpgpack` });
+      setToast({ type: 'success', message: `Exported world package: ${defaultFilename}` });
     } catch (err) {
       setToast({ type: 'error', message: errorMessage(err) });
     }
@@ -627,7 +645,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
     if (!importFile) return;
     setIsImporting(true);
     try {
-      const res = await APIClient.importContent(importFile, conflictMode);
+      const res = await APIClient.importContent(importFile, conflictMode, 'world');
       setToast({ type: 'success', message: `Successfully ${res.action} world ${res.name} (${res.id})` });
       setImportFile(null);
       setImportManifest(null);
@@ -655,7 +673,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
             type="file"
             ref={importInputRef}
             onChange={handleFileSelect}
-            accept=".lrpgpack"
+            accept=".lrpgworld,.lrpgpack"
             className="hidden"
           />
           <div className="flex items-center gap-1.5">
@@ -669,7 +687,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
             </button>
             <button
               onClick={() => importInputRef.current?.click()}
-              title="Import content package (.lrpgpack)"
+              title="Import world package (.lrpgworld, .lrpgpack)"
               className="flex-1 flex items-center justify-center gap-1 text-xs font-sans px-2 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer whitespace-nowrap"
             >
               <Upload className="w-3.5 h-3.5" />
@@ -860,7 +878,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
               type="button"
               onClick={handleExport}
               disabled={!savedID}
-              title="Export world package (.lrpgpack)"
+              title="Export world package (.lrpgworld)"
               className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
@@ -1407,6 +1425,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       {importManifest && (
         <ContentImportDialog
           manifest={importManifest}
+          expectedType="world"
           onConfirm={handleConfirmImport}
           onCancel={() => {
             setImportFile(null);

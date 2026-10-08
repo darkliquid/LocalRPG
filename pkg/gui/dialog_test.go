@@ -263,3 +263,169 @@ func TestDirectoryChoiceRouteRejectsAnUnknownAction(t *testing.T) {
 		t.Fatalf("status = %d, want 404", rec.Code)
 	}
 }
+
+func TestStartSaveFileChoiceWithoutPicker(t *testing.T) {
+	svc := NewService(t.TempDir())
+
+	if err := svc.StartSaveFileChoice(ChooseSaveFileRequestDTO{}); !errors.Is(err, ErrNoNativeSaveFileDialog) {
+		t.Fatalf("StartSaveFileChoice = %v, want ErrNoNativeSaveFileDialog", err)
+	}
+}
+
+func TestSaveFileChoiceReportsAPick(t *testing.T) {
+	svc := NewService(t.TempDir())
+	want := "/tmp/test-export.lrpgworld"
+	svc.SetSaveFilePicker(func(req ChooseSaveFileRequestDTO) (string, error) {
+		return want, nil
+	})
+
+	if err := svc.StartSaveFileChoice(ChooseSaveFileRequestDTO{Title: "Save World"}); err != nil {
+		t.Fatal(err)
+	}
+
+	choice, err := svc.WaitForSaveFileChoice(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if choice.Status != SaveFileChoiceSelected || choice.Path != want {
+		t.Fatalf("choice = %+v, want selected with %s", choice, want)
+	}
+
+	if again := svc.SaveFileChoice(); again.Status != SaveFileChoiceIdle {
+		t.Fatalf("second read = %+v, want idle", again)
+	}
+}
+
+func TestSaveFileChoiceReportsACancel(t *testing.T) {
+	svc := NewService(t.TempDir())
+	svc.SetSaveFilePicker(func(req ChooseSaveFileRequestDTO) (string, error) {
+		return "", nil
+	})
+
+	if err := svc.StartSaveFileChoice(ChooseSaveFileRequestDTO{}); err != nil {
+		t.Fatal(err)
+	}
+
+	choice, err := svc.WaitForSaveFileChoice(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if choice.Status != SaveFileChoiceCancelled {
+		t.Fatalf("choice = %+v, want cancelled", choice)
+	}
+}
+
+func TestSaveFileChoiceReportsAPickerErrorAsACancel(t *testing.T) {
+	svc := NewService(t.TempDir())
+	svc.SetSaveFilePicker(func(req ChooseSaveFileRequestDTO) (string, error) {
+		return "", errors.New("dismissed")
+	})
+
+	if err := svc.StartSaveFileChoice(ChooseSaveFileRequestDTO{}); err != nil {
+		t.Fatal(err)
+	}
+
+	choice, err := svc.WaitForSaveFileChoice(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if choice.Status != SaveFileChoiceCancelled {
+		t.Fatalf("choice = %+v, want cancelled", choice)
+	}
+}
+
+func TestStartSaveFileChoiceRefusesASecondDialog(t *testing.T) {
+	svc := NewService(t.TempDir())
+	release := make(chan struct{})
+	svc.SetSaveFilePicker(func(req ChooseSaveFileRequestDTO) (string, error) {
+		<-release
+		return "/tmp/saved", nil
+	})
+
+	if err := svc.StartSaveFileChoice(ChooseSaveFileRequestDTO{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.StartSaveFileChoice(ChooseSaveFileRequestDTO{}); !errors.Is(err, ErrSaveFileChoiceInFlight) {
+		t.Fatalf("second start = %v, want ErrSaveFileChoiceInFlight", err)
+	}
+	close(release)
+}
+
+func TestSaveFileChoiceRouteWithoutPicker(t *testing.T) {
+	svc := NewService(t.TempDir())
+	server := NewServer(svc, http.NotFoundHandler())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/dialog/save-file", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotImplemented {
+		t.Fatalf("status = %d, want 501", rec.Code)
+	}
+}
+
+func TestSaveFileChoiceRouteStartsAndPolls(t *testing.T) {
+	svc := NewService(t.TempDir())
+	want := "/tmp/output.lrpgsystem"
+	svc.SetSaveFilePicker(func(req ChooseSaveFileRequestDTO) (string, error) {
+		return want, nil
+	})
+	server := NewServer(svc, http.NotFoundHandler())
+
+	startReq := httptest.NewRequest(http.MethodPost, "/api/dialog/save-file", strings.NewReader(`{"title":"Export System"}`))
+	startRec := httptest.NewRecorder()
+	server.ServeHTTP(startRec, startReq)
+
+	if startRec.Code != http.StatusAccepted {
+		t.Fatalf("start status = %d, want 202", startRec.Code)
+	}
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		pollReq := httptest.NewRequest(http.MethodGet, "/api/dialog/save-file", nil)
+		pollRec := httptest.NewRecorder()
+		server.ServeHTTP(pollRec, pollReq)
+		if pollRec.Code != http.StatusOK {
+			t.Fatalf("poll status = %d", pollRec.Code)
+		}
+		var choice SaveFileChoiceDTO
+		if err := json.NewDecoder(pollRec.Body).Decode(&choice); err != nil {
+			t.Fatal(err)
+		}
+		if choice.Status == SaveFileChoiceSelected {
+			if choice.Path != want {
+				t.Fatalf("path = %q, want %q", choice.Path, want)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the choice never completed: %+v", choice)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestSaveFileChoiceRouteRejectsASecondDialog(t *testing.T) {
+	svc := NewService(t.TempDir())
+	release := make(chan struct{})
+	svc.SetSaveFilePicker(func(req ChooseSaveFileRequestDTO) (string, error) {
+		<-release
+		return "/tmp/saved", nil
+	})
+	defer close(release)
+	server := NewServer(svc, http.NotFoundHandler())
+
+	first := httptest.NewRequest(http.MethodPost, "/api/dialog/save-file", nil)
+	firstRec := httptest.NewRecorder()
+	server.ServeHTTP(firstRec, first)
+	if firstRec.Code != http.StatusAccepted {
+		t.Fatalf("first status = %d", firstRec.Code)
+	}
+
+	second := httptest.NewRequest(http.MethodPost, "/api/dialog/save-file", nil)
+	secondRec := httptest.NewRecorder()
+	server.ServeHTTP(secondRec, second)
+	if secondRec.Code != http.StatusConflict {
+		t.Fatalf("second status = %d, want 409", secondRec.Code)
+	}
+}
