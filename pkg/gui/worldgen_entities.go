@@ -139,7 +139,53 @@ func (s *Service) PreviewWorldEntitiesStream(ctx context.Context, worldID string
 	for _, e := range batch {
 		out.Entities = append(out.Entities, draftEntityDTO(e))
 	}
+	// The batch is stored, not just returned: an extraction of a few hundred
+	// entities is far more than a request body can carry back, so accepting it
+	// names the batch and the entities are read from here.
+	if err := worldgen.SaveDraft(s.batchStoreDir(), worldgen.Draft{ID: batchIDFor(worldID), Entities: batch}); err != nil {
+		return nil, err
+	}
+	out.BatchID = batchIDFor(worldID)
 	return out, nil
+}
+
+// batchStoreDir is where previewed batches live: beside the drafts, in the same
+// dot-directory the syncer skips.
+func (s *Service) batchStoreDir() string {
+	return filepath.Join(s.worldDraftsDir(), worldgen.BatchesDirName)
+}
+
+// batchIDFor is the stored batch of the world's most recent extraction. One
+// batch per world is enough, and a re-run replaces it.
+func batchIDFor(worldID string) string {
+	return worldID + "-entities"
+}
+
+// batchEntities reads the stored batch, narrowed to the named ids. An empty ids
+// list means the whole batch.
+func (s *Service) batchEntities(batchID string, ids []string) ([]worldgen.DraftEntity, error) {
+	draft, err := worldgen.LoadDraft(s.batchStoreDir(), batchID)
+	if err != nil {
+		return nil, fmt.Errorf("read the extracted batch: %w", err)
+	}
+	if len(ids) == 0 {
+		return draft.Entities, nil
+	}
+
+	wanted := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		wanted[id] = struct{}{}
+	}
+	accepted := make([]worldgen.DraftEntity, 0, len(ids))
+	for _, e := range draft.Entities {
+		if _, ok := wanted[e.ID]; ok {
+			accepted = append(accepted, e)
+		}
+	}
+	if len(accepted) == 0 {
+		return nil, fmt.Errorf("none of the %d named entities are in the batch", len(ids))
+	}
+	return accepted, nil
 }
 
 // entitiesFromChunks extracts entities from already-read chunks, links them
@@ -172,7 +218,18 @@ func (s *Service) entitiesFromChunks(ctx context.Context, gen worldgen.Generator
 // AcceptWorldEntities writes a reviewed batch into worlds/<id>/entities/. It
 // refuses an id clash unless the caller asked for a rename.
 func (s *Service) AcceptWorldEntities(ctx context.Context, worldID string, req WorldEntityAcceptRequestDTO) (*WorldEnhanceApplyResultDTO, error) {
-	if len(req.Entities) == 0 {
+	incoming := req.Entities
+	if req.BatchID != "" {
+		stored, err := s.batchEntities(req.BatchID, req.IDs)
+		if err != nil {
+			return nil, err
+		}
+		incoming = make([]WorldDraftEntityDTO, 0, len(stored))
+		for _, e := range stored {
+			incoming = append(incoming, draftEntityDTO(e))
+		}
+	}
+	if len(incoming) == 0 {
 		return nil, fmt.Errorf("no entities to accept")
 	}
 	worldDir := s.resolver.WorldDir(worldID)
@@ -182,7 +239,7 @@ func (s *Service) AcceptWorldEntities(ctx context.Context, worldID string, req W
 
 	result := &WorldEnhanceApplyResultDTO{}
 	seen := map[string]struct{}{}
-	for _, incoming := range req.Entities {
+	for _, incoming := range incoming {
 		e := draftEntity(incoming)
 		if e.ID == "" {
 			e.ID = entity.Slugify(e.Name)
@@ -210,6 +267,11 @@ func (s *Service) AcceptWorldEntities(ctx context.Context, worldID string, req W
 			return nil, err
 		}
 		result.Written = append(result.Written, e.ID)
+	}
+	// The batch has been written, so the stored copy is spent. A partial failure
+	// above leaves it in place, so a retry still has the entities.
+	if req.BatchID != "" {
+		_ = worldgen.DeleteDraft(s.batchStoreDir(), req.BatchID)
 	}
 	return result, nil
 }

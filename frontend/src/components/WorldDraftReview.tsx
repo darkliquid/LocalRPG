@@ -73,11 +73,23 @@ export const WorldDraftReview: React.FC<WorldDraftReviewProps> = ({
 
   const handleCommit = () => {
     if (acceptedCount === 0) return;
+    const acceptAll = rejectedSections.size === 0 && rejectedEntities.size === 0;
+    const editedList = Object.values(edits).filter((e) => !rejectedEntities.has(e.id));
     onCommit({
       draft_id: draft.id,
       target_world_id: targetWorldId,
-      sections: acceptedSections,
-      entities: acceptedEntities,
+      accept_all: acceptAll,
+      section_indexes: acceptAll
+        ? undefined
+        : sections
+            .map((_, index) => index)
+            .filter((index) => !rejectedSections.has(index)),
+      entity_ids: acceptAll
+        ? undefined
+        : (draft.entities ?? [])
+            .map((e) => e.id)
+            .filter((id) => !rejectedEntities.has(id)),
+      edits: editedList.length > 0 ? editedList : undefined,
     });
   };
 

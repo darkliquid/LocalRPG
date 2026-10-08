@@ -14,6 +14,11 @@ import (
 // syncer skips a dot-directory, so a draft is never mistaken for a world.
 const DraftsDirName = ".drafts"
 
+// BatchesDirName is the drafts sub-directory that holds previewed entity
+// batches. A batch is a draft in every way that matters, so it uses the same
+// store rather than a second one.
+const BatchesDirName = "batches"
+
 // DraftPath is where a draft with id lives inside a drafts directory. The id is a
 // base name rather than a path, so a draft can never be written or read outside
 // the directory it belongs to.

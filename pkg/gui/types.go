@@ -694,6 +694,10 @@ type WorldEntityBatchRequestDTO struct {
 // WorldEntityBatchDTO is a previewed batch, with any links that were dropped.
 type WorldEntityBatchDTO struct {
 	Entities []WorldDraftEntityDTO `json:"entities"`
+	// BatchID names the stored batch. A batch of a few hundred entities is far
+	// more than a request body can carry, so accepting it names the batch and the
+	// server reads the entities from disk.
+	BatchID string `json:"batch_id,omitempty"`
 	// Oracle marks a batch the deterministic fallback produced, so the review can
 	// say so rather than implying a model wrote it.
 	Oracle bool `json:"oracle,omitempty"`
@@ -702,9 +706,14 @@ type WorldEntityBatchDTO struct {
 	CutOff int `json:"cut_off,omitempty"`
 }
 
-// WorldEntityAcceptRequestDTO accepts a previewed batch.
+// WorldEntityAcceptRequestDTO accepts a previewed batch. A stored batch is named
+// by BatchID and narrowed by IDs; Entities carries the batch itself for a caller
+// that has no stored one, such as a small direct call.
 type WorldEntityAcceptRequestDTO struct {
-	Entities []WorldDraftEntityDTO `json:"entities"`
+	BatchID string `json:"batch_id,omitempty"`
+	// IDs names the accepted entities. Empty means the whole batch.
+	IDs      []string               `json:"ids,omitempty"`
+	Entities []WorldDraftEntityDTO  `json:"entities,omitempty"`
 	// Rename resolves an id clash by suffixing the new entity instead of
 	// refusing it.
 	Rename bool `json:"rename,omitempty"`
@@ -745,14 +754,26 @@ type WorldEnhanceApplyResultDTO struct {
 	Renamed []string `json:"renamed,omitempty"`
 }
 
-// DraftCommitRequestDTO commits an accepted set from a draft.
+// DraftCommitRequestDTO commits an accepted set from a draft. The accepted set is
+// named rather than posted: a generated world can hold hundreds of entities, far
+// more than a request body carries, so the content is read from the stored draft
+// and only the reviewer's edits travel with the request.
 type DraftCommitRequestDTO struct {
 	DraftID string `json:"draft_id"`
 	// TargetWorldID names an existing world to merge into. Empty creates a new
 	// world from the draft.
-	TargetWorldID string                  `json:"target_world_id,omitempty"`
-	Sections      []WorldDraftSectionDTO  `json:"sections,omitempty"`
-	Entities      []WorldDraftEntityDTO   `json:"entities,omitempty"`
+	TargetWorldID string `json:"target_world_id,omitempty"`
+	// AcceptAll keeps the whole draft, which is the common case and needs no
+	// lists at all.
+	AcceptAll bool `json:"accept_all,omitempty"`
+	// SectionIndexes and EntityIDs name the accepted subset when AcceptAll is
+	// false. Naming nothing then means the reviewer rejected everything, which is
+	// refused rather than guessed at.
+	SectionIndexes []int    `json:"section_indexes,omitempty"`
+	EntityIDs      []string `json:"entity_ids,omitempty"`
+	// Edits carries the entities the reviewer changed, so an edit is written
+	// rather than the generated text.
+	Edits []WorldDraftEntityDTO `json:"edits,omitempty"`
 	// Meta overrides the draft's identity when it is committed as a new world.
 	Meta *CreateWorldRequestDTO `json:"meta,omitempty"`
 }

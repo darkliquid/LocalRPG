@@ -146,7 +146,13 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const result = await APIClient.acceptWorldEntities(worldId, { entities: batch.entities, rename });
+      // The batch is named, not posted: it may hold hundreds of entities, which
+      // is far more than a request body carries.
+      const result = await APIClient.acceptWorldEntities(worldId, {
+        batch_id: batch.batch_id,
+        entities: batch.batch_id ? undefined : batch.entities,
+        rename,
+      });
       setAccepted(result.written);
       setBatch(null);
       onAccepted?.(result);

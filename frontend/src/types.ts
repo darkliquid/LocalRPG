@@ -377,6 +377,9 @@ export interface WorldEntityBatchRequest {
 
 export interface WorldEntityBatch {
   entities: WorldDraftEntity[];
+  // batch_id names the stored batch. A batch of a few hundred entities is far
+  // more than a request body carries, so accepting it names the batch.
+  batch_id?: string;
   // oracle marks a batch the deterministic fallback produced, so the dialog can
   // say so rather than implying a model wrote it.
   oracle?: boolean;
@@ -386,7 +389,12 @@ export interface WorldEntityBatch {
 }
 
 export interface WorldEntityAcceptRequest {
-  entities: WorldDraftEntity[];
+  // The batch is named rather than posted, so an accept of hundreds of entities
+  // is a small request. ids narrows it; empty means the whole batch.
+  batch_id?: string;
+  ids?: string[];
+  // entities carries the batch itself, for a caller with no stored one.
+  entities?: WorldDraftEntity[];
   rename?: boolean;
 }
 
@@ -422,8 +430,15 @@ export interface WorldApplyResult {
 export interface DraftCommitRequest {
   draft_id: string;
   target_world_id?: string;
-  sections?: WorldDraftSection[];
-  entities?: WorldDraftEntity[];
+  // accept_all keeps the whole draft. Otherwise section_indexes and entity_ids
+  // name what was kept; the content is read from the stored draft, because a
+  // generated world can hold hundreds of entities.
+  accept_all?: boolean;
+  section_indexes?: number[];
+  entity_ids?: string[];
+  // edits carries the entities the reviewer changed, so an edit is written rather
+  // than the generated text, without posting everything that was accepted.
+  edits?: WorldDraftEntity[];
   meta?: CreateWorldRequest;
 }
 

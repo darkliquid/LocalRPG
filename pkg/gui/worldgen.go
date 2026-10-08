@@ -535,12 +535,3 @@ func draftEntity(e WorldDraftEntityDTO) worldgen.DraftEntity {
 		Source: e.Source,
 	}
 }
-
-// draftSections converts client-supplied sections back into the pipeline's type.
-func draftSections(sections []WorldDraftSectionDTO) []worldgen.DraftSection {
-	out := make([]worldgen.DraftSection, 0, len(sections))
-	for _, section := range sections {
-		out = append(out, worldgen.DraftSection{Title: section.Title, Body: section.Body})
-	}
-	return out
-}

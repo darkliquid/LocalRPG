@@ -2,8 +2,11 @@ package gui
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -485,10 +488,8 @@ func TestCommitDraftWritesOnlyAccepted(t *testing.T) {
 	})
 
 	world, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{
-		DraftID: "ashen-reach",
-		Entities: []WorldDraftEntityDTO{
-			{ID: "saltmarch", Name: "Saltmarch", Type: "location", Body: "A port."},
-		},
+		DraftID:   "ashen-reach",
+		EntityIDs: []string{"saltmarch"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -513,11 +514,8 @@ func TestCommitDraftRefusesAnEmptySelection(t *testing.T) {
 	svc := NewService(t.TempDir())
 	saveDraftForTest(t, svc, worldgen.Draft{ID: "empty", World: coreWorld("Empty")})
 
-	_, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{
-		DraftID:  "empty",
-		Sections: []WorldDraftSectionDTO{},
-		Entities: []WorldDraftEntityDTO{},
-	})
+	// Nothing named and AcceptAll false is the reviewer rejecting everything.
+	_, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "empty"})
 	if !errors.Is(err, ErrEmptyDraftSelection) {
 		t.Fatalf("err = %v, want ErrEmptyDraftSelection", err)
 	}
@@ -532,7 +530,7 @@ func TestCommitDraftRefusesAnExistingWorldID(t *testing.T) {
 		Entities: []worldgen.DraftEntity{{ID: "saltmarch", Name: "Saltmarch", Type: "location"}},
 	})
 
-	_, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "ember-peak"})
+	_, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "ember-peak", AcceptAll: true})
 	if !errors.Is(err, ErrWorldExists) {
 		t.Fatalf("err = %v, want ErrWorldExists", err)
 	}
@@ -546,7 +544,7 @@ func TestCommitDraftIsAtomic(t *testing.T) {
 		Entities: []worldgen.DraftEntity{{ID: "../escape", Name: "Escape", Type: "concept"}},
 	})
 
-	if _, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "bad-ids"}); err == nil {
+	if _, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "bad-ids", AcceptAll: true}); err == nil {
 		t.Fatal("an invalid entity id must fail the commit")
 	}
 	if _, err := os.Stat(filepath.Join(svc.resolver.WorldsDir(), "bad-ids")); !os.IsNotExist(err) {
@@ -584,6 +582,7 @@ func TestCommitIntoExistingWorldAppends(t *testing.T) {
 	summary, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{
 		DraftID:       "merge",
 		TargetWorldID: world.ID,
+		AcceptAll:     true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -623,7 +622,9 @@ func TestCommitIntoExistingWorldRefusesAClash(t *testing.T) {
 		Entities: []worldgen.DraftEntity{{ID: "saltmarch", Name: "Saltmarch", Type: "location", Body: "A different port."}},
 	})
 
-	_, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "merge", TargetWorldID: world.ID})
+	_, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{
+		DraftID: "merge", TargetWorldID: world.ID, AcceptAll: true,
+	})
 	if !errors.Is(err, ErrWorldEntityExists) {
 		t.Fatalf("err = %v, want ErrWorldEntityExists", err)
 	}
@@ -879,7 +880,7 @@ func TestCommitDraftFilesEntitiesByFolder(t *testing.T) {
 		},
 	})
 
-	world, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "emberheart"})
+	world, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "emberheart", AcceptAll: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1149,10 +1150,224 @@ func TestCommitDraftRefusesANestedEntityFolder(t *testing.T) {
 		},
 	})
 
-	if _, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "emberheart"}); err == nil {
+	if _, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "emberheart", AcceptAll: true}); err == nil {
 		t.Fatal("a nested entity folder must be refused")
 	}
 	if _, err := os.Stat(filepath.Join(svc.resolver.WorldsDir(), "emberheart")); !os.IsNotExist(err) {
 		t.Fatal("a refused commit must leave no world directory")
+	}
+}
+
+func TestPreviewStoresTheBatchAndAcceptReadsIt(t *testing.T) {
+	// A batch of a few hundred entities is far more than a request body carries,
+	// so the preview stores it and the accept names it.
+	provider := &sequencedProvider{id: "gen", responses: []string{
+		`{"entities":[{"name":"Saltmarch","type":"location","description":"A port."}]}`,
+	}}
+	svc := worldGenService(t, provider)
+	world := mustCreateWorld(t, svc, "Ember Peak")
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("# A place\n\nSome lore.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	batch, err := svc.PreviewWorldEntities(context.Background(), world.ID, WorldEntityBatchRequestDTO{
+		Source: &WorldSourceDTO{Kind: "folder", Path: dir},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if batch.BatchID == "" {
+		t.Fatal("the preview should name the stored batch")
+	}
+	if _, err := os.Stat(filepath.Join(svc.batchStoreDir(), batch.BatchID+".yaml")); err != nil {
+		t.Fatalf("the batch should be on disk: %v", err)
+	}
+
+	// The accept carries no entities at all.
+	result, err := svc.AcceptWorldEntities(context.Background(), world.ID, WorldEntityAcceptRequestDTO{
+		BatchID: batch.BatchID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Written) != 1 || result.Written[0] != "saltmarch" {
+		t.Fatalf("result = %+v", result)
+	}
+
+	// The stored batch is spent once it is written.
+	if _, err := os.Stat(filepath.Join(svc.batchStoreDir(), batch.BatchID+".yaml")); !os.IsNotExist(err) {
+		t.Fatal("the batch should be deleted after a successful accept")
+	}
+}
+
+func TestAcceptFromABatchTakesTheNamedSubset(t *testing.T) {
+	svc := NewService(t.TempDir())
+	world := mustCreateWorld(t, svc, "Ember Peak")
+	if err := worldgen.SaveDraft(svc.batchStoreDir(), worldgen.Draft{
+		ID: batchIDFor(world.ID),
+		Entities: []worldgen.DraftEntity{
+			{ID: "saltmarch", Name: "Saltmarch", Type: "location", Body: "A port."},
+			{ID: "maren", Name: "Maren", Type: "character", Body: "A harbormaster."},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := svc.AcceptWorldEntities(context.Background(), world.ID, WorldEntityAcceptRequestDTO{
+		BatchID: batchIDFor(world.ID),
+		IDs:     []string{"maren"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Written) != 1 || result.Written[0] != "maren" {
+		t.Fatalf("result = %+v", result)
+	}
+}
+
+func TestAcceptFromABatchRefusesAnUnknownName(t *testing.T) {
+	svc := NewService(t.TempDir())
+	world := mustCreateWorld(t, svc, "Ember Peak")
+	if err := worldgen.SaveDraft(svc.batchStoreDir(), worldgen.Draft{
+		ID:       batchIDFor(world.ID),
+		Entities: []worldgen.DraftEntity{{ID: "saltmarch", Name: "Saltmarch", Type: "location"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.AcceptWorldEntities(context.Background(), world.ID, WorldEntityAcceptRequestDTO{
+		BatchID: batchIDFor(world.ID),
+		IDs:     []string{"nobody"},
+	}); err == nil {
+		t.Fatal("an unknown name must be refused")
+	}
+}
+
+func TestCommitDraftAcceptsByReference(t *testing.T) {
+	svc := NewService(t.TempDir())
+	saveDraftForTest(t, svc, worldgen.Draft{
+		ID:    "ashen-reach",
+		World: coreWorld("Ashen Reach"),
+		Sections: []worldgen.DraftSection{
+			{Title: "Lore", Body: "A."},
+			{Title: "History", Body: "B."},
+		},
+		Entities: []worldgen.DraftEntity{
+			{ID: "saltmarch", Name: "Saltmarch", Type: "location", Body: "A port."},
+			{ID: "maren", Name: "Maren", Type: "character", Body: "A harbormaster."},
+		},
+	})
+
+	world, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{
+		DraftID:        "ashen-reach",
+		SectionIndexes: []int{1},
+		EntityIDs:      []string{"maren"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	detail, err := svc.GetWorld(context.Background(), world.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(detail.Entities) != 1 || detail.Entities[0].ID != "maren" {
+		t.Fatalf("entities = %+v", detail.Entities)
+	}
+	lore, err := os.ReadFile(filepath.Join(svc.resolver.WorldDir(world.ID), "prompts", "lore.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsStrings(string(lore), "## History", "B.") {
+		t.Fatalf("lore = %q", lore)
+	}
+	if containsStrings(string(lore), "## Lore") {
+		t.Fatalf("a rejected section was written: %q", lore)
+	}
+}
+
+func TestCommitDraftWritesTheReviewersEdit(t *testing.T) {
+	svc := NewService(t.TempDir())
+	saveDraftForTest(t, svc, worldgen.Draft{
+		ID:       "ashen-reach",
+		World:    coreWorld("Ashen Reach"),
+		// The folder is what an import files a note in, and an edit must not lose it.
+		Entities: []worldgen.DraftEntity{
+			{ID: "saltmarch", Name: "Saltmarch", Type: "location", Folder: "locations", Body: "A port."},
+		},
+	})
+
+	world, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{
+		DraftID:   "ashen-reach",
+		AcceptAll: true,
+		Edits: []WorldDraftEntityDTO{
+			{ID: "saltmarch", Name: "Saltmarch", Type: "location", Body: "A port watched by [[The Tidewatch]]."},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	note, err := os.ReadFile(filepath.Join(svc.resolver.WorldDir(world.ID), "entities", "locations", "saltmarch.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsStrings(string(note), "[[The Tidewatch]]") {
+		t.Fatalf("the edit was not written: %q", note)
+	}
+}
+
+func TestAcceptRouteTakesALargeBatchByReference(t *testing.T) {
+	// The reported failure: six hundred entities accepted in one request. The
+	// batch is far larger than a request body may be, so the request names it and
+	// the entities are read from disk.
+	svc := NewService(t.TempDir())
+	world := mustCreateWorld(t, svc, "Ember Peak")
+
+	batch := make([]worldgen.DraftEntity, 0, 600)
+	for i := 0; i < 600; i++ {
+		batch = append(batch, worldgen.DraftEntity{
+			ID:     fmt.Sprintf("place-%d", i),
+			Name:   fmt.Sprintf("Place %d", i),
+			Type:   "location",
+			Folder: "locations",
+			Body:   strings.Repeat("Prose about this place. ", 40),
+		})
+	}
+	if err := worldgen.SaveDraft(svc.batchStoreDir(), worldgen.Draft{ID: batchIDFor(world.ID), Entities: batch}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The content is well over what a request body may carry.
+	stored, err := os.ReadFile(filepath.Join(svc.batchStoreDir(), batchIDFor(world.ID)+".yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) <= maxTurnBody {
+		t.Fatalf("the fixture should exceed the body limit: %d bytes", len(stored))
+	}
+
+	server := NewServer(svc, http.NotFoundHandler())
+	body := strings.NewReader(`{"batch_id":"` + batchIDFor(world.ID) + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/world/"+world.ID+"/entities/accept", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var result WorldEnhanceApplyResultDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Written) != 600 {
+		t.Fatalf("written = %d, want 600", len(result.Written))
+	}
+
+	// The notes are on disk, filed by kind.
+	note := filepath.Join(svc.resolver.WorldDir(world.ID), "entities", "locations", "place-599.md")
+	if _, err := os.Stat(note); err != nil {
+		t.Fatalf("expected %s: %v", note, err)
 	}
 }

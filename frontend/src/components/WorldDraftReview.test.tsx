@@ -50,8 +50,8 @@ describe('WorldDraftReview', () => {
     expect(onCommit).toHaveBeenCalledTimes(1);
     const req = onCommit.mock.calls[0][0];
     expect(req.draft_id).toBe('ashen-reach');
-    expect(req.sections).toEqual([{ title: 'Lore', body: 'A.' }]);
-    expect(req.entities).toHaveLength(1);
+    expect(req.section_indexes).toEqual([0]);
+    expect(req.entity_ids).toEqual(['saltmarch']);
   });
 
   it('editing an entity updates what commit sends', () => {
@@ -65,7 +65,8 @@ describe('WorldDraftReview', () => {
     fireEvent.click(screen.getByRole('button', { name: /create world/i }));
 
     const req = onCommit.mock.calls[0][0];
-    expect(req.entities[0].body).toBe('A port watched by [[The Tidewatch]].');
+    expect(req.accept_all).toBe(true);
+    expect(req.edits?.[0].body).toBe('A port watched by [[The Tidewatch]].');
   });
 
   it('merges into an existing world when a target is named', () => {

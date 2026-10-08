@@ -45,18 +45,9 @@ func (s *Service) CommitDraft(ctx context.Context, req DraftCommitRequestDTO) (*
 		return nil, err
 	}
 
-	// An absent list means "everything in the draft"; an empty one means the
-	// user rejected everything, which is refused rather than guessed at.
-	sections := draft.Sections
-	if req.Sections != nil {
-		sections = draftSections(req.Sections)
-	}
-	entities := draft.Entities
-	if req.Entities != nil {
-		entities = draftEntities(req.Entities)
-	}
-	if len(sections) == 0 && len(entities) == 0 {
-		return nil, ErrEmptyDraftSelection
+	sections, entities, err := acceptedFromDraft(draft, req)
+	if err != nil {
+		return nil, err
 	}
 
 	var summary *WorldSummaryDTO
@@ -72,6 +63,83 @@ func (s *Service) CommitDraft(ctx context.Context, req DraftCommitRequestDTO) (*
 		return nil, err
 	}
 	return summary, nil
+}
+
+// acceptedFromDraft resolves the accepted set from the stored draft: everything
+// when the reviewer kept it all, the named subset otherwise, with the reviewer's
+// edits applied over the generated text.
+func acceptedFromDraft(draft worldgen.Draft, req DraftCommitRequestDTO) ([]worldgen.DraftSection, []worldgen.DraftEntity, error) {
+	sections := draft.Sections
+	entities := draft.Entities
+
+	if !req.AcceptAll {
+		sections = nil
+		for _, index := range req.SectionIndexes {
+			if index < 0 || index >= len(draft.Sections) {
+				return nil, nil, fmt.Errorf("section %d is not in the draft", index)
+			}
+			sections = append(sections, draft.Sections[index])
+		}
+
+		named := make(map[string]struct{}, len(req.EntityIDs))
+		for _, id := range req.EntityIDs {
+			named[id] = struct{}{}
+		}
+		entities = nil
+		for _, e := range draft.Entities {
+			if _, ok := named[e.ID]; ok {
+				entities = append(entities, e)
+			}
+		}
+		if len(entities) != len(named) {
+			return nil, nil, fmt.Errorf("the draft does not hold every named entity")
+		}
+	}
+
+	if len(sections) == 0 && len(entities) == 0 {
+		return nil, nil, ErrEmptyDraftSelection
+	}
+	return sections, applyDraftEdits(entities, req.Edits), nil
+}
+
+// applyDraftEdits replaces the entities the reviewer changed, matched by id, so a
+// commit writes the edit rather than the generated text.
+func applyDraftEdits(entities []worldgen.DraftEntity, edits []WorldDraftEntityDTO) []worldgen.DraftEntity {
+	if len(edits) == 0 {
+		return entities
+	}
+	byID := make(map[string]WorldDraftEntityDTO, len(edits))
+	for _, edit := range edits {
+		byID[edit.ID] = edit
+	}
+	out := make([]worldgen.DraftEntity, 0, len(entities))
+	for _, e := range entities {
+		edit, ok := byID[e.ID]
+		if !ok {
+			out = append(out, e)
+			continue
+		}
+		// The edit is merged over the generated entity rather than replacing it:
+		// a reviewer who changed the prose still expects the folder the import
+		// filed it in, its tags, and the source it came from.
+		if edit.Name != "" {
+			e.Name = edit.Name
+		}
+		if edit.Type != "" {
+			e.Type = edit.Type
+		}
+		if edit.Body != "" {
+			e.Body = edit.Body
+		}
+		if edit.Folder != "" {
+			e.Folder = edit.Folder
+		}
+		if len(edit.Tags) > 0 {
+			e.Tags = edit.Tags
+		}
+		out = append(out, e)
+	}
+	return out
 }
 
 // commitNewWorld writes a new world atomically: everything is written to a
@@ -240,15 +308,6 @@ func (s *Service) commitIntoWorld(ctx context.Context, worldID string, sections 
 		Genre:       world.Genre,
 	}
 	return summary, nil
-}
-
-// draftEntities converts client-supplied entities back into the pipeline's type.
-func draftEntities(entities []WorldDraftEntityDTO) []worldgen.DraftEntity {
-	out := make([]worldgen.DraftEntity, 0, len(entities))
-	for _, e := range entities {
-		out = append(out, draftEntity(e))
-	}
-	return out
 }
 
 func firstNonEmptyString(values ...string) string {
