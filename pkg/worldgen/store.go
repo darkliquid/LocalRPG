@@ -23,7 +23,15 @@ const BatchesDirName = "batches"
 // base name rather than a path, so a draft can never be written or read outside
 // the directory it belongs to.
 func DraftPath(dir, id string) string {
-	return filepath.Join(dir, filepath.Base(id)+".yaml")
+	cleanDir := filepath.Clean(dir)
+	cleanID := filepath.Base(id)
+	cleanID = strings.TrimSuffix(cleanID, ".yaml")
+	target := filepath.Clean(filepath.Join(cleanDir, cleanID+".yaml"))
+	rel, err := filepath.Rel(cleanDir, target)
+	if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
+		return filepath.Join(cleanDir, "invalid.yaml")
+	}
+	return target
 }
 
 // SaveDraft writes a draft to dir/<id>.yaml, creating the directory.
@@ -31,14 +39,20 @@ func SaveDraft(dir string, d Draft) error {
 	if err := pathutil.ValidateID(d.ID); err != nil {
 		return fmt.Errorf("invalid draft id %q: %w", d.ID, err)
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	cleanDir := filepath.Clean(dir)
+	if err := os.MkdirAll(cleanDir, 0o755); err != nil {
 		return fmt.Errorf("create drafts dir: %w", err)
 	}
 	data, err := yaml.Marshal(d)
 	if err != nil {
 		return fmt.Errorf("marshal draft: %w", err)
 	}
-	if err := os.WriteFile(DraftPath(dir, d.ID), data, 0o644); err != nil {
+	target := DraftPath(cleanDir, d.ID)
+	rel, err := filepath.Rel(cleanDir, target)
+	if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
+		return fmt.Errorf("draft path %q escapes directory %q", target, cleanDir)
+	}
+	if err := os.WriteFile(target, data, 0o644); err != nil {
 		return fmt.Errorf("write draft: %w", err)
 	}
 	return nil
@@ -49,7 +63,13 @@ func LoadDraft(dir, id string) (Draft, error) {
 	if err := pathutil.ValidateID(id); err != nil {
 		return Draft{}, fmt.Errorf("invalid draft id %q: %w", id, err)
 	}
-	data, err := os.ReadFile(DraftPath(dir, id))
+	cleanDir := filepath.Clean(dir)
+	target := DraftPath(cleanDir, id)
+	rel, err := filepath.Rel(cleanDir, target)
+	if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
+		return Draft{}, fmt.Errorf("draft path %q escapes directory %q", target, cleanDir)
+	}
+	data, err := os.ReadFile(target)
 	if err != nil {
 		return Draft{}, fmt.Errorf("read draft %s: %w", id, err)
 	}
@@ -73,7 +93,13 @@ func DeleteDraft(dir, id string) error {
 	if err := pathutil.ValidateID(id); err != nil {
 		return fmt.Errorf("invalid draft id %q: %w", id, err)
 	}
-	if err := os.Remove(DraftPath(dir, id)); err != nil && !os.IsNotExist(err) {
+	cleanDir := filepath.Clean(dir)
+	target := DraftPath(cleanDir, id)
+	rel, err := filepath.Rel(cleanDir, target)
+	if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
+		return fmt.Errorf("draft path %q escapes directory %q", target, cleanDir)
+	}
+	if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("delete draft %s: %w", id, err)
 	}
 	return nil
