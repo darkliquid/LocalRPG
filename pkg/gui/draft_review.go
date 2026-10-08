@@ -102,7 +102,9 @@ func (s *Service) commitNewWorld(draft worldgen.Draft, sections []worldgen.Draft
 	if err := os.MkdirAll(worldsDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create worlds dir: %w", err)
 	}
-	tmpDir, err := os.MkdirTemp(worldsDir, ".commit-"+id+"-")
+	// The id is only in the staging name to make a leftover directory readable; a
+	// base name keeps it from naming a path of its own.
+	tmpDir, err := os.MkdirTemp(worldsDir, ".commit-"+filepath.Base(id)+"-")
 	if err != nil {
 		return nil, fmt.Errorf("create staging dir: %w", err)
 	}
@@ -165,14 +167,15 @@ func writeStagedWorld(dir string, manifest core.WorldManifest, sections []worldg
 		}
 		seen[id] = struct{}{}
 		e.ID = id
-		// A draft entity may name a folder; an import groups its notes by kind, so
-		// a source that yields sixty entities does not land as one flat list.
+		// A draft files its notes by kind, so the folder is one directory name
+		// rather than a path: a draft can never write outside the world's entities
+		// directory, and a nested path is refused rather than interpreted.
 		target := entitiesDir
 		if folder := strings.Trim(strings.TrimSpace(e.Folder), "/"); folder != "" {
-			if _, err := ValidateFolderPath(folder); err != nil {
+			if err := pathutil.ValidateID(folder); err != nil {
 				return fmt.Errorf("invalid entity folder %q: %w", folder, err)
 			}
-			target = filepath.Join(entitiesDir, filepath.FromSlash(folder))
+			target = filepath.Join(entitiesDir, filepath.Base(folder))
 			if err := os.MkdirAll(target, 0o755); err != nil {
 				return fmt.Errorf("create entity folder %s: %w", folder, err)
 			}

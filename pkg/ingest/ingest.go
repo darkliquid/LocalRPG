@@ -65,6 +65,10 @@ func ExtractFolder(dir string) ([]Chunk, error) {
 	if strings.TrimSpace(dir) == "" {
 		return nil, fmt.Errorf("ingest: no folder given")
 	}
+	// The folder is the one the user named. Reading a path they typed is the
+	// feature, and the app serves one user over loopback or a 0600 socket, so
+	// there is no privilege boundary for the path to cross.
+	// lgtm[go/path-injection]
 	info, err := os.Stat(dir)
 	if err != nil {
 		return nil, fmt.Errorf("ingest: read folder: %w", err)

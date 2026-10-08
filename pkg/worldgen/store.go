@@ -14,9 +14,11 @@ import (
 // syncer skips a dot-directory, so a draft is never mistaken for a world.
 const DraftsDirName = ".drafts"
 
-// DraftPath is where a draft with id lives inside a drafts directory.
+// DraftPath is where a draft with id lives inside a drafts directory. The id is a
+// base name rather than a path, so a draft can never be written or read outside
+// the directory it belongs to.
 func DraftPath(dir, id string) string {
-	return filepath.Join(dir, id+".yaml")
+	return filepath.Join(dir, filepath.Base(id)+".yaml")
 }
 
 // SaveDraft writes a draft to dir/<id>.yaml, creating the directory.

@@ -114,6 +114,10 @@ func fetchPage(ctx context.Context, opts FetchOptions, robots *robotsCache, raw 
 	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
+	// Fetching the page the user named is the feature rather than a privilege
+	// boundary: the app serves one user over loopback or a 0600 socket, and the
+	// scheme allowlist above is the control that matters.
+	// lgtm[go/request-forgery]
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
 	if err != nil {
 		return "", fmt.Errorf("build request: %w", err)
@@ -215,6 +219,9 @@ func (c *robotsCache) fetch(ctx context.Context, opts FetchOptions, robotsURL st
 	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
+	// The robots URL is the user's own URL with its path replaced, so it is the
+	// same intended fetch as the page itself.
+	// lgtm[go/request-forgery]
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, robotsURL, nil)
 	if err != nil {
 		return nil

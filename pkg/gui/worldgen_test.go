@@ -1135,3 +1135,24 @@ func TestEntityPreviewStreamIsRefusedWithNoProvider(t *testing.T) {
 		t.Fatalf("err = %v, want ErrNoGeneratorForImport", err)
 	}
 }
+
+func TestCommitDraftRefusesANestedEntityFolder(t *testing.T) {
+	// A draft files its notes by kind, so the folder is one directory name. A
+	// path is refused rather than interpreted, which is what keeps a commit
+	// inside the world's entities directory.
+	svc := NewService(t.TempDir())
+	saveDraftForTest(t, svc, worldgen.Draft{
+		ID:    "emberheart",
+		World: coreWorld("Emberheart"),
+		Entities: []worldgen.DraftEntity{
+			{ID: "saltmarch", Name: "Saltmarch", Type: "location", Folder: "../../escape", Body: "A port."},
+		},
+	})
+
+	if _, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "emberheart"}); err == nil {
+		t.Fatal("a nested entity folder must be refused")
+	}
+	if _, err := os.Stat(filepath.Join(svc.resolver.WorldsDir(), "emberheart")); !os.IsNotExist(err) {
+		t.Fatal("a refused commit must leave no world directory")
+	}
+}
