@@ -131,3 +131,113 @@ func TestBuildPromptCarriesTheChunks(t *testing.T) {
 		t.Fatalf("prompt = %q", g.lastPrompt)
 	}
 }
+
+func TestPromptNamesTheKindsAndDemandsSubstance(t *testing.T) {
+	probe := &jsonGen{responses: []string{`{}`}}
+	chunks := []Chunk{{Source: "a.md", Title: "Customs", Text: "Metamorphosis Feasts are held."}}
+	if _, err := Build(context.Background(), probe, chunks, worldgen.Brief{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The kinds, so the model does not answer with characters and stop.
+	for _, kind := range []string{"location", "character", "faction", "species", "item", "event", "concept"} {
+		if !strings.Contains(probe.lastPrompt, `"`+kind+`"`) {
+			t.Fatalf("the prompt does not name the %s kind:\n%s", kind, probe.lastPrompt)
+		}
+	}
+	// Substance, so an entity is not a bare name.
+	if !strings.Contains(probe.lastPrompt, "two to four sentences") {
+		t.Fatalf("the prompt does not ask for a description:\n%s", probe.lastPrompt)
+	}
+	// Exhaustiveness, with the granularity spelled out.
+	if !containsAll(probe.lastPrompt, "yields ten entities", "glossary entry") {
+		t.Fatalf("the prompt does not ask for everything:\n%s", probe.lastPrompt)
+	}
+	// Lore, because it is collected from every part of the source.
+	if !strings.Contains(probe.lastPrompt, "Include lore in every reply") {
+		t.Fatalf("the prompt only asks for lore once:\n%s", probe.lastPrompt)
+	}
+}
+
+func TestPromptCarriesWhatEarlierBatchesExtracted(t *testing.T) {
+	probe := &jsonGen{responses: []string{
+		`{"entities":[{"name":"Saltmarch","type":"location","description":"A port."}]}`,
+		`{}`,
+	}}
+	// Nine chunks at four per call is three batches; the third must know what the
+	// first two produced.
+	chunks := make([]Chunk, 9)
+	for i := range chunks {
+		chunks[i] = Chunk{Source: "a.md", Title: "A", Text: "Some lore."}
+	}
+	if _, err := Build(context.Background(), probe, chunks, worldgen.Brief{}); err != nil {
+		t.Fatal(err)
+	}
+	if probe.calls != 3 {
+		t.Fatalf("calls = %d, want 3", probe.calls)
+	}
+	if !containsAll(probe.lastPrompt, "Already extracted", "Saltmarch (location)") {
+		t.Fatalf("a later batch does not know what came before:\n%s", probe.lastPrompt)
+	}
+}
+
+func TestRepeatedEntityIsMergedNotDropped(t *testing.T) {
+	probe := &jsonGen{responses: []string{
+		`{"entities":[{"name":"Quezta","type":"species"}]}`,
+		`{"entities":[{"name":"Quezta","type":"species","description":"Hiveborn soldiers, once Tck-Tck.","tags":["hive"]}]}`,
+	}}
+	chunks := make([]Chunk, 5)
+	for i := range chunks {
+		chunks[i] = Chunk{Source: "a.md", Title: "A", Text: "Some lore."}
+	}
+	d, err := Build(context.Background(), probe, chunks, worldgen.Brief{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Entities) != 1 {
+		t.Fatalf("entities = %+v", d.Entities)
+	}
+	// The later mention carries the description the first one lacked.
+	if d.Entities[0].Body != "Hiveborn soldiers, once Tck-Tck." {
+		t.Fatalf("body = %q", d.Entities[0].Body)
+	}
+	if len(d.Entities[0].Tags) != 1 || d.Entities[0].Tags[0] != "hive" {
+		t.Fatalf("tags = %+v", d.Entities[0].Tags)
+	}
+}
+
+func TestLoreIsCollectedFromEveryBatch(t *testing.T) {
+	probe := &jsonGen{responses: []string{
+		`{"lore":"# History\n\nOld.","entities":[]}`,
+		`{"lore":"# Customs\n\nFeasts.","entities":[]}`,
+	}}
+	chunks := make([]Chunk, 5)
+	for i := range chunks {
+		chunks[i] = Chunk{Source: "a.md", Title: "A", Text: "Some lore."}
+	}
+	d, err := Build(context.Background(), probe, chunks, worldgen.Brief{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsAll(d.Lore, "# History", "Old.", "# Customs", "Feasts.") {
+		t.Fatalf("lore = %q", d.Lore)
+	}
+}
+
+func TestEntitiesAreFiledByKind(t *testing.T) {
+	probe := &jsonGen{responses: []string{`{"entities":[
+	  {"name":"Saltmarch","type":"location","description":"A port."},
+	  {"name":"Maren","type":"character","description":"A harbormaster."},
+	  {"name":"The Tidewatch","type":"faction","description":"A crew."}]}`}}
+	d, err := Build(context.Background(), probe, []Chunk{{Source: "a.md", Text: "x"}}, worldgen.Brief{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	folders := map[string]string{}
+	for _, e := range d.Entities {
+		folders[e.ID] = e.Folder
+	}
+	if folders["saltmarch"] != "locations" || folders["maren"] != "characters" || folders["the-tidewatch"] != "factions" {
+		t.Fatalf("folders = %+v", folders)
+	}
+}

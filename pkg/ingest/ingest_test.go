@@ -111,3 +111,36 @@ func mustWrite(t *testing.T, path, content string) {
 		t.Fatal(err)
 	}
 }
+
+func TestSplitTextStripsFrontmatterAndNavigation(t *testing.T) {
+	page := "---\ntitle: Saltmarch\nmythicId: abc123\nmythicOrder: 3/2\n---\n\n# Saltmarch\n\nA port.\n\n- [Overview](overview.md)\n- [Key events](key-events.md)\n"
+	parts := SplitText(page)
+	if len(parts) != 1 {
+		t.Fatalf("parts = %+v", parts)
+	}
+	got := parts[0]
+	if strings.Contains(got, "mythicId") || strings.Contains(got, "abc123") {
+		t.Fatalf("frontmatter survived: %q", got)
+	}
+	if strings.Contains(got, "overview.md") {
+		t.Fatalf("a link list survived: %q", got)
+	}
+	if !strings.Contains(got, "A port.") {
+		t.Fatalf("the prose was lost: %q", got)
+	}
+}
+
+func TestSplitTextDropsAPageThatIsOnlyNavigation(t *testing.T) {
+	if parts := SplitText("---\ntitle: Glossary\n---\n\n- [The Cold Dark](the-cold-dark.md)\n"); parts != nil {
+		t.Fatalf("parts = %+v, want none", parts)
+	}
+}
+
+func TestSplitTextKeepsAProseBulletWithALink(t *testing.T) {
+	// A list item that carries prose is content, not a table of contents.
+	page := "- **The Mourning March:** the deceased is carried through the city, see [the route](route.md).\n"
+	parts := SplitText(page)
+	if len(parts) != 1 || !strings.Contains(parts[0], "Mourning March") {
+		t.Fatalf("parts = %+v", parts)
+	}
+}

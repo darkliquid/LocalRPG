@@ -165,7 +165,23 @@ func writeStagedWorld(dir string, manifest core.WorldManifest, sections []worldg
 		}
 		seen[id] = struct{}{}
 		e.ID = id
-		if err := os.WriteFile(filepath.Join(entitiesDir, id+".md"), []byte(worldgen.RenderEntityNote(e)), 0o644); err != nil {
+		// A draft entity may name a folder; an import groups its notes by kind, so
+		// a source that yields sixty entities does not land as one flat list.
+		target := entitiesDir
+		if folder := strings.Trim(strings.TrimSpace(e.Folder), "/"); folder != "" {
+			if _, err := ValidateFolderPath(folder); err != nil {
+				return fmt.Errorf("invalid entity folder %q: %w", folder, err)
+			}
+			target = filepath.Join(entitiesDir, filepath.FromSlash(folder))
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return fmt.Errorf("create entity folder %s: %w", folder, err)
+			}
+		}
+		path, err := pathutil.ResolveSafeChild(target, id+".md")
+		if err != nil {
+			return fmt.Errorf("resolve entity %s: %w", id, err)
+		}
+		if err := os.WriteFile(path, []byte(worldgen.RenderEntityNote(e)), 0o644); err != nil {
 			return fmt.Errorf("write entity %s: %w", id, err)
 		}
 	}

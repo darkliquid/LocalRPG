@@ -867,3 +867,43 @@ func TestGenerationLimitCodeNamesTheFailingSetting(t *testing.T) {
 		t.Fatalf("an unrelated failure got code %q", got)
 	}
 }
+
+func TestCommitDraftFilesEntitiesByFolder(t *testing.T) {
+	svc := NewService(t.TempDir())
+	saveDraftForTest(t, svc, worldgen.Draft{
+		ID:    "emberheart",
+		World: coreWorld("Emberheart"),
+		Entities: []worldgen.DraftEntity{
+			{ID: "saltmarch", Name: "Saltmarch", Type: "location", Folder: "locations", Body: "A port."},
+			{ID: "maren", Name: "Maren", Type: "character", Folder: "characters", Body: "A harbormaster."},
+		},
+	})
+
+	world, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "emberheart"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	root := svc.resolver.WorldDir(world.ID)
+	for _, path := range []string{
+		filepath.Join("entities", "locations", "saltmarch.md"),
+		filepath.Join("entities", "characters", "maren.md"),
+	} {
+		if _, err := os.Stat(filepath.Join(root, path)); err != nil {
+			t.Fatalf("expected %s: %v", path, err)
+		}
+	}
+
+	// The studio reads the folder back, so the tree is organised too.
+	detail, err := svc.GetWorld(context.Background(), world.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	folders := map[string]string{}
+	for _, e := range detail.Entities {
+		folders[e.ID] = e.Folder
+	}
+	if folders["saltmarch"] != "locations" || folders["maren"] != "characters" {
+		t.Fatalf("folders = %+v", folders)
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -124,9 +125,13 @@ func isBinary(data []byte) bool {
 }
 
 // SplitText splits a document at heading and paragraph boundaries into chunks no
-// larger than ChunkLimit, so one file never becomes one oversized prompt.
+// larger than ChunkLimit, so one file never becomes one oversized prompt. Page
+// furniture is removed first: frontmatter and link lists are metadata and
+// navigation, and a model given them as prose treats ids as content and wastes
+// its attention on a table of contents.
 func SplitText(text string) []string {
 	text = strings.ReplaceAll(text, "\r\n", "\n")
+	text = stripNavigation(stripFrontmatter(text))
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return nil
@@ -189,6 +194,42 @@ func splitBlocks(text string) []string {
 	return blocks
 }
 
+// navLinkRe matches a Markdown list item that is nothing but a link. A
+// wiki-style page uses those for its table of contents rather than for prose.
+var navLinkRe = regexp.MustCompile(`^\s*[-*+]\s*\[[^\]]*\]\([^)]*\)\s*$`)
+
+// stripFrontmatter removes a leading YAML frontmatter block. It describes the
+// page, not the world: ids, parent ids, and sort orders are noise a model will
+// otherwise try to read as lore.
+func stripFrontmatter(text string) string {
+	if !strings.HasPrefix(text, "---\n") {
+		return text
+	}
+	rest := text[4:]
+	idx := strings.Index(rest, "\n---")
+	if idx < 0 {
+		return text
+	}
+	return strings.TrimLeft(rest[idx+4:], "\n")
+}
+
+// stripNavigation drops link-only list lines, which are a page's contents rather
+// than its content.
+func stripNavigation(text string) string {
+	if !strings.Contains(text, "](") {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if navLinkRe.MatchString(line) {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
+}
+
 // isHeading reports whether a line is an ATX Markdown heading.
 func isHeading(line string) bool {
 	trimmed := strings.TrimLeft(line, " \t")
@@ -241,8 +282,28 @@ const ingestSchema = `{"type":"object","properties":{` +
 	`"name":{"type":"string"},"type":{"type":"string"},"description":{"type":"string"},` +
 	`"tags":{"type":"array","items":{"type":"string"}}}}}}}`
 
-const ingestSystem = `You read source material and extract a tabletop roleplaying world from it. ` +
-	`Keep names as they appear in the source. Return one JSON object and nothing else.`
+const ingestSystem = `You read source material and extract a tabletop roleplaying world from it.
+You are exhaustive: every named thing in the source becomes an entity.
+You keep every name exactly as the source writes it, and you invent nothing.
+You return one JSON object and nothing else.`
+
+// entityKinds tells the model what counts as an entity. Without this it answers
+// with characters and stops, because "entity" on its own reads as "person".
+const entityKinds = `Each distinct thing the source names becomes one entity, typed by what it is:
+
+- a place, district, region, building, or room is a "location"
+- a named person, or a group of unnamed people in a role, is a "character"
+- an organisation, guild, order, house, crew, or cult is a "faction"
+- a kind of being, people, ancestry, or creature is a "species"
+- an object, material, technology, or artefact is an "item"
+- a dated happening, battle, or era is an "event"
+- a custom, ritual, holiday, belief, language, trade, office, or idea is a "concept"`
+
+const ingestInstructions = `Work through the source and list everything it names. A page that names ten things yields ten entities: do not summarise a page into one entity, and do not skip a thing because the source mentions it only once. A glossary entry, a heading with a definition, a bolded term in a list, and a passing mention all count. A heading such as "Customs & Rituals" is not itself an entity; the customs beneath it are.
+
+Write two to four sentences for each entity, in the source's own terms, with enough detail to run a scene from it. A name on its own is a failure.
+
+Also write lore: markdown prose covering the world's history, peoples, customs, places, and conflicts, drawn only from this source material. Include lore in every reply, because it is collected from every part of the source rather than only the first.`
 
 type ingestReply struct {
 	Name        string `json:"name"`
@@ -287,6 +348,7 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 
 	draft := worldgen.Draft{}
 	seen := map[string]struct{}{}
+	at := map[string]int{}
 	for _, e := range into.Entities {
 		seen[e.ID] = struct{}{}
 	}
@@ -294,7 +356,10 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 		if err := ctx.Err(); err != nil {
 			return draft, err
 		}
-		raw, err := gen.GenerateJSON(ctx, buildPrompt(brief, batch, i == 0, into), ingestSchema)
+		// Each call is told what the calls before it already produced. Without
+		// that it re-names the same handful of salient things every time, and the
+		// duplicates are the ones a reader most wanted to keep.
+		raw, err := gen.GenerateJSON(ctx, buildPrompt(brief, batch, i == 0, into, draft.Entities), ingestSchema)
 		if err != nil {
 			return draft, fmt.Errorf("ingest: batch %d: %w", i+1, err)
 		}
@@ -302,7 +367,7 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 		if err := decodeJSON(raw, &reply); err != nil {
 			return draft, err
 		}
-		applyReply(&draft, reply, batch, i == 0, seen)
+		applyReply(&draft, reply, batch, i == 0, seen, at)
 	}
 
 	if into.Name != "" {
@@ -335,20 +400,20 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 }
 
 // applyReply merges one model reply into the draft, tagging every new entity
-// with the source chunks the batch came from.
-func applyReply(draft *worldgen.Draft, reply ingestReply, batch []Chunk, first bool, seen map[string]struct{}) {
+// with the source chunks the batch came from. A name that appears again is
+// merged rather than dropped: the later mention often carries the description
+// the first one lacked, and losing it is how an import ends up with names and
+// nothing else.
+func applyReply(draft *worldgen.Draft, reply ingestReply, batch []Chunk, first bool, seen map[string]struct{}, at map[string]int) {
 	if first {
 		draft.World.Name = firstNonEmpty(reply.Name, draft.World.Name)
 		draft.World.Genre = firstNonEmpty(reply.Genre, draft.World.Genre)
 		draft.World.Description = firstNonEmpty(reply.Description, draft.World.Description)
-		draft.Lore = firstNonEmpty(reply.Lore, draft.Lore)
-	} else {
-		if reply.Lore != "" {
-			draft.Lore = strings.TrimRight(draft.Lore, "\n") + "\n\n" + strings.TrimSpace(reply.Lore) + "\n"
-		}
-		if draft.World.Description == "" {
-			draft.World.Description = strings.TrimSpace(reply.Description)
-		}
+	} else if draft.World.Description == "" {
+		draft.World.Description = strings.TrimSpace(reply.Description)
+	}
+	if lore := strings.TrimSpace(reply.Lore); lore != "" {
+		draft.Lore = joinLore(draft.Lore, lore)
 	}
 
 	source := chunkSources(batch)
@@ -358,20 +423,104 @@ func applyReply(draft *worldgen.Draft, reply ingestReply, batch []Chunk, first b
 			continue
 		}
 		id := entity.Slugify(name)
-		if _, dup := seen[id]; dup {
+		if id == "" {
 			continue
 		}
-		seen[id] = struct{}{}
-		kind := firstNonEmpty(spec.Type, "concept")
-		draft.Entities = append(draft.Entities, worldgen.DraftEntity{
+		incoming := worldgen.DraftEntity{
 			ID:     id,
 			Name:   name,
-			Type:   kind,
+			Type:   firstNonEmpty(spec.Type, "concept"),
 			Tags:   cleanTags(spec.Tags),
-			Body:   firstNonEmpty(spec.Description, name+"."),
+			Body:   strings.TrimSpace(spec.Description),
 			Source: source,
-		})
+		}
+		if _, exists := seen[id]; exists {
+			if position, ok := at[id]; ok {
+				mergeEntity(&draft.Entities[position], incoming)
+				continue
+			}
+			// The world already has this note; adding entities must not touch it.
+			continue
+		}
+		if incoming.Body == "" {
+			incoming.Body = name + "."
+		}
+		incoming.Folder = entityFolderFor(incoming.Type)
+		seen[id] = struct{}{}
+		at[id] = len(draft.Entities)
+		draft.Entities = append(draft.Entities, incoming)
 	}
+}
+
+// mergeEntity folds a repeated mention into the entity it repeats, keeping the
+// fuller description and the union of the tags and sources.
+func mergeEntity(into *worldgen.DraftEntity, from worldgen.DraftEntity) {
+	if len(from.Body) > len(into.Body) {
+		into.Body = from.Body
+	}
+	if into.Type == "concept" && from.Type != "concept" {
+		into.Type = from.Type
+		into.Folder = entityFolderFor(from.Type)
+	}
+	for _, tag := range from.Tags {
+		into.Tags = appendUnique(into.Tags, tag)
+	}
+	into.Source = joinDistinct(into.Source, from.Source)
+}
+
+// joinLore appends a lore section, keeping one blank line between them.
+func joinLore(existing, addition string) string {
+	existing = strings.TrimRight(existing, "\n")
+	if existing == "" {
+		return addition + "\n"
+	}
+	return existing + "\n\n" + addition + "\n"
+}
+
+// joinDistinct joins two comma-separated source lists without repeating a name.
+func joinDistinct(existing, addition string) string {
+	if addition == "" || existing == addition {
+		return existing
+	}
+	if existing == "" {
+		return addition
+	}
+	parts := strings.Split(existing, ", ")
+	for _, part := range strings.Split(addition, ", ") {
+		parts = appendUnique(parts, part)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// entityFolders groups an imported world's notes by kind, so a source that yields
+// sixty entities does not land as one flat list in the studio.
+var entityFolders = map[string]string{
+	"location":  "locations",
+	"character": "characters",
+	"faction":   "factions",
+	"species":   "species",
+	"item":      "items",
+	"event":     "events",
+	"concept":   "concepts",
+}
+
+// entityFolderFor is the folder an entity of this kind belongs in, or "" when the
+// kind is one the source invented.
+func entityFolderFor(kind string) string {
+	return entityFolders[strings.ToLower(strings.TrimSpace(kind))]
+}
+
+func appendUnique(list []string, value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return list
+	}
+	for _, existing := range list {
+		if strings.EqualFold(existing, value) {
+			return list
+		}
+	}
+	return append(list, value)
 }
 
 // chunkSources names where a batch's text came from, so an entity can be traced.
@@ -394,17 +543,20 @@ func chunkSources(batch []Chunk) string {
 // buildPrompt assembles a bounded extraction prompt for one batch of chunks. It
 // asks for every entity the source describes rather than a count: an ingestion
 // reports what is in the source, and inventing entities to reach a target is the
-// opposite of what a source is for.
-func buildPrompt(brief worldgen.Brief, batch []Chunk, first bool, into BuildContext) string {
+// opposite of what a source is for. extracted is what the earlier batches of this
+// same import already produced, so a batch adds rather than repeats.
+func buildPrompt(brief worldgen.Brief, batch []Chunk, first bool, into BuildContext, extracted []worldgen.DraftEntity) string {
 	var b strings.Builder
 	b.WriteString(ingestSystem)
 	if into.Name != "" {
-		b.WriteString("\n\nExtract the entities the source material below describes as belonging to the world \"" +
+		b.WriteString("\n\nExtract everything the source material below says about the world \"" +
 			into.Name + "\".\n")
 	} else {
 		b.WriteString("\n\nExtract the world described by the source material below.\n")
 	}
-	b.WriteString("\nExtract every distinct entity the source describes, and nothing it does not.\n")
+	b.WriteString("\n" + entityKinds + "\n")
+	b.WriteString("\n" + ingestInstructions + "\n")
+
 	if brief.Premise != "" {
 		b.WriteString("\nAdditional instruction: " + truncate(brief.Premise, 500) + "\n")
 	}
@@ -424,17 +576,49 @@ func buildPrompt(brief worldgen.Brief, batch []Chunk, first bool, into BuildCont
 		}
 		b.WriteString("\nDo not propose a new world name, genre, or description; the world already exists.\n")
 	} else if first {
-		b.WriteString("\nAlso give the world a name, a genre, a one-line description, and a short lore " +
-			"document assembled from the source.\n")
-	} else {
-		b.WriteString("\nThis is a later part of the source; add any further lore and entities it reveals.\n")
+		b.WriteString("\nAlso give the world a name, a genre, and a one-line description drawn from the " +
+			"source material.\n")
 	}
+
+	// The running inventory is what makes the calls build on each other rather
+	// than each rediscovering the same handful of headline names.
+	if already := extractedList(extracted, extractedLimit); already != "" {
+		b.WriteString("\nAlready extracted from earlier parts of this same source. Do not repeat " +
+			"these; add only what is missing from them:\n" + already)
+	}
+	if !first {
+		b.WriteString("\nThis is a later part of the source.\n")
+	}
+
 	b.WriteString("\nSource material:\n")
 	for _, c := range batch {
 		b.WriteString("\n--- " + firstNonEmpty(c.Title, c.Source) + " ---\n")
 		b.WriteString(c.Text + "\n")
 	}
-	b.WriteString(`\nReturn {"name":...,"genre":...,"description":...,"lore":...,"entities":[...]}.`)
+	b.WriteString(`\nReturn {"name":...,"genre":...,"description":...,"lore":...,"entities":[{"name":...,"type":...,"description":...,"tags":[...]}]}.`)
+	return b.String()
+}
+
+// extractedLimit bounds the running inventory in the prompt. A long import would
+// otherwise grow its own prompt past the source it is reading.
+const extractedLimit = 200
+
+// extractedList renders the names already collected, bounded so the prompt stays
+// smaller than the material it describes.
+func extractedList(entities []worldgen.DraftEntity, limit int) string {
+	var b strings.Builder
+	shown := 0
+	for _, e := range entities {
+		if shown >= limit {
+			b.WriteString("- (and more)\n")
+			break
+		}
+		if e.Name == "" {
+			continue
+		}
+		b.WriteString("- " + e.Name + " (" + firstNonEmpty(e.Type, "concept") + ")\n")
+		shown++
+	}
 	return b.String()
 }
 
