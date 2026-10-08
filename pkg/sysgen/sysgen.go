@@ -68,6 +68,16 @@ func Generate(ctx context.Context, gen Generator, brief Brief) (System, error) {
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
 
+	script, err := runHooks(ctx, gen, brief, mech)
+	if err != nil {
+		return System{}, fmt.Errorf("sysgen: %w", err)
+	}
+
+	rules, err := runRules(ctx, gen, brief, mech)
+	if err != nil {
+		return System{}, fmt.Errorf("sysgen: %w", err)
+	}
+
 	name := brief.Name
 	if name == "" {
 		name = "Custom System"
@@ -84,6 +94,9 @@ func Generate(ctx context.Context, gen Generator, brief Brief) (System, error) {
 		Version:     "1.0.0",
 		Description: brief.Description,
 		Mechanics:   mech,
+		Script:      script,
+		RulesPrompt: rules,
 		Verify:      VerifyResult{},
 	}, nil
 }
+
