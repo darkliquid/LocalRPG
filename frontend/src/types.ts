@@ -272,6 +272,8 @@ export interface TurnEvent {
   estimate?: WorldEstimate;
   // The generated draft, present when type is 'draft'.
   draft?: WorldDraftInfo;
+  // The generated system draft, present when type is 'draft'.
+  system_draft?: SystemDraftInfo;
   // Import progress, present when type is 'progress'.
   progress?: WorldImportProgress;
   // The previewed entity batch, present when type is 'batch'.
@@ -714,6 +716,44 @@ export interface CreateSystemRequest {
   rules_prompt?: string;
   character_creation?: CharacterCreationSpec;
   mechanics?: MechanicsSpec;
+}
+
+export interface SystemVerifyResult {
+  ok: boolean;
+  failures?: string[];
+  script?: boolean;
+}
+
+export interface SystemDraftInfo {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  mechanics?: MechanicsSpec;
+  script?: string;
+  rules_prompt?: string;
+  verify: SystemVerifyResult;
+  estimate?: WorldEstimate;
+  calls?: number;
+  oracle?: boolean;
+}
+
+export interface SystemGenerateRequest {
+  description: string;
+  name?: string;
+  dry_run?: boolean;
+  limits?: GenerationLimitsOverride;
+}
+
+export interface SystemDraftCommitRequest {
+  draft_id: string;
+  id?: string;
+  name?: string;
+  version?: string;
+  description?: string;
+  mechanics?: MechanicsSpec;
+  script?: string;
+  rules_prompt?: string;
 }
 
 export interface ReferenceSystem {

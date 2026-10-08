@@ -23,6 +23,9 @@ import {
   CharacterPortraitDTO,
   SystemDetail,
   CreateSystemRequest,
+  SystemDraftInfo,
+  SystemGenerateRequest,
+  SystemDraftCommitRequest,
   ReferenceSystemsResponse,
   SystemTestRequest,
   SystemTestResponse,
@@ -741,6 +744,58 @@ export class APIClient {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+  }
+
+  // generateSystem streams a system generation: steps and final draft.
+  static async generateSystem(
+    req: SystemGenerateRequest,
+    onEvent: (event: TurnEvent) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const res = await fetch('/api/system/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal,
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    if (!res.body) throw new Error('generateSystem: response has no body');
+    await readNDJSON(res, onEvent);
+  }
+
+  // getSystemDraft restores a persisted system draft.
+  static async getSystemDraft(draftId: string): Promise<SystemDraftInfo> {
+    const res = await fetch(`/api/system/draft/${encodeURIComponent(draftId)}`);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  // listSystemDrafts returns the list of system draft IDs awaiting review.
+  static async listSystemDrafts(): Promise<string[]> {
+    const res = await fetch('/api/system/draft/');
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  // commitSystemDraft commits a system draft into systems/<id>/.
+  static async commitSystemDraft(req: SystemDraftCommitRequest): Promise<SystemDetail> {
+    const res = await fetch('/api/system/draft/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  // discardSystemDraft deletes a system draft.
+  static async discardSystemDraft(draftId: string): Promise<void> {
+    const res = await fetch('/api/system/draft/discard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draft_id: draftId }),
     });
     if (!res.ok) throw await errorFromResponse(res, res.statusText);
   }

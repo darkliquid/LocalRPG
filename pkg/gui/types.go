@@ -13,6 +13,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/registry"
+	"github.com/darkliquid/localrpg/pkg/sysgen"
 	"github.com/darkliquid/localrpg/pkg/systemtest"
 )
 
@@ -493,6 +494,46 @@ type CreateSystemRequestDTO struct {
 	RulesPrompt       string                     `json:"rules_prompt,omitempty"`
 	CharacterCreation core.CharacterCreationSpec `json:"character_creation,omitempty"`
 	Mechanics         *core.MechanicsSpec        `json:"mechanics,omitempty"`
+}
+
+// SystemGenerateRequestDTO requests generating a tabletop RPG system from natural language.
+type SystemGenerateRequestDTO struct {
+	Name        string               `json:"name,omitempty"`
+	Description string               `json:"description"`
+	DryRun      bool                 `json:"dry_run,omitempty"`
+	Limits      *GenerationLimitsDTO `json:"limits,omitempty"`
+}
+
+// SystemDraftDTO is a generated system before it is saved or committed.
+type SystemDraftDTO struct {
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Version     string              `json:"version"`
+	Description string              `json:"description"`
+	Mechanics   *core.MechanicsSpec `json:"mechanics,omitempty"`
+	Script      string              `json:"script,omitempty"`
+	RulesPrompt string              `json:"rules_prompt,omitempty"`
+	Verify      sysgen.VerifyResult `json:"verify"`
+	Estimate    *WorldEstimateDTO   `json:"estimate,omitempty"`
+	Calls       int                 `json:"calls"`
+	Oracle      bool                `json:"oracle"`
+}
+
+// SystemDraftCommitRequestDTO commits a generated system draft into systems/<id>/.
+type SystemDraftCommitRequestDTO struct {
+	DraftID     string              `json:"draft_id"`
+	ID          string              `json:"id,omitempty"`
+	Name        string              `json:"name,omitempty"`
+	Version     string              `json:"version,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Mechanics   *core.MechanicsSpec `json:"mechanics,omitempty"`
+	Script      *string             `json:"script,omitempty"`
+	RulesPrompt *string             `json:"rules_prompt,omitempty"`
+}
+
+// SystemDraftDiscardRequestDTO deletes a system draft.
+type SystemDraftDiscardRequestDTO struct {
+	DraftID string `json:"draft_id"`
 }
 
 // ReferenceSystemDTO is one complete, runnable system shipped as a starting point.
@@ -1001,6 +1042,8 @@ type TurnEvent struct {
 	Estimate *WorldEstimateDTO `json:"estimate,omitempty"`
 	// The generated draft, present when Type is "draft".
 	Draft *WorldDraftDTO `json:"draft,omitempty"`
+	// The generated system draft, present when Type is "draft".
+	SystemDraft *SystemDraftDTO `json:"system_draft,omitempty"`
 	// The previewed entity batch, present when Type is "batch".
 	Batch *WorldEntityBatchDTO `json:"batch,omitempty"`
 }

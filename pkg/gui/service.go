@@ -38,6 +38,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/sysgen"
 	"github.com/darkliquid/localrpg/pkg/systemtest"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/tools"
@@ -4039,6 +4040,15 @@ func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 		return summaries[i].LastPlayed > summaries[j].LastPlayed
 	})
 	return summaries, nil
+}
+
+// systemDraftDir is where system drafts live: a dot-directory under systems/.
+func (s *Service) systemDraftDir() string {
+	return filepath.Join(s.resolver.SystemsDir(), sysgen.DraftsDirName)
+}
+
+func (s *Service) systemDraftsDir() string {
+	return s.systemDraftDir()
 }
 
 func (s *Service) ListSystems(ctx context.Context) ([]SystemSummaryDTO, error) {

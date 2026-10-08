@@ -13,6 +13,28 @@ import (
 	"github.com/darkliquid/localrpg/pkg/systemtest"
 )
 
+// Step is one progress report from the pipeline.
+type Step struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Detail string `json:"detail,omitempty"`
+}
+
+// Pipeline steps.
+const (
+	StepShape  = "shape"
+	StepSchema = "schema"
+	StepHooks  = "hooks"
+	StepRules  = "rules"
+	StepVerify = "verify"
+)
+
+// Step statuses.
+const (
+	StatusDone  = "done"
+	StatusError = "error"
+)
+
 // Brief is the starting description for generating a tabletop RPG system.
 type Brief struct {
 	Name        string `json:"name,omitempty"`
@@ -21,21 +43,21 @@ type Brief struct {
 
 // VerifyResult records the outcome of verifying a generated system.
 type VerifyResult struct {
-	OK       bool     `json:"ok"`
-	Failures []string `json:"failures,omitempty"`
-	Script   bool     `json:"script,omitempty"`
+	OK       bool     `json:"ok" yaml:"ok"`
+	Failures []string `json:"failures,omitempty" yaml:"failures,omitempty"`
+	Script   bool     `json:"script,omitempty" yaml:"script,omitempty"`
 }
 
 // System is a generated tabletop RPG system before it is saved.
 type System struct {
-	ID          string              `json:"id"`
-	Name        string              `json:"name"`
-	Version     string              `json:"version"`
-	Description string              `json:"description"`
-	Mechanics   *core.MechanicsSpec `json:"mechanics,omitempty"`
-	Script      string              `json:"script,omitempty"`
-	RulesPrompt string              `json:"rules_prompt,omitempty"`
-	Verify      VerifyResult        `json:"verify"`
+	ID          string              `json:"id" yaml:"id"`
+	Name        string              `json:"name" yaml:"name"`
+	Version     string              `json:"version" yaml:"version"`
+	Description string              `json:"description" yaml:"description"`
+	Mechanics   *core.MechanicsSpec `json:"mechanics,omitempty" yaml:"mechanics,omitempty"`
+	Script      string              `json:"script,omitempty" yaml:"script,omitempty"`
+	RulesPrompt string              `json:"rules_prompt,omitempty" yaml:"rules_prompt,omitempty"`
+	Verify      VerifyResult        `json:"verify" yaml:"verify"`
 }
 
 // Generator defines the structured-output seam for system generation.
@@ -52,7 +74,7 @@ func decodeJSON(raw []byte, v any) error {
 }
 
 // Generate creates a System from a Brief using the provided Generator.
-func Generate(ctx context.Context, gen Generator, brief Brief) (System, error) {
+func Generate(ctx context.Context, gen Generator, brief Brief, onStep ...func(Step)) (System, error) {
 	if gen == nil {
 		return System{}, fmt.Errorf("sysgen: no generator configured")
 	}
@@ -60,25 +82,43 @@ func Generate(ctx context.Context, gen Generator, brief Brief) (System, error) {
 		return System{}, err
 	}
 
+	var stepCallback func(Step)
+	if len(onStep) > 0 && onStep[0] != nil {
+		stepCallback = onStep[0]
+	}
+	emitStep := func(name, status, detail string) {
+		if stepCallback != nil {
+			stepCallback(Step{Name: name, Status: status, Detail: detail})
+		}
+	}
+
 	shape, err := runShape(ctx, gen, brief)
 	if err != nil {
+		emitStep(StepShape, StatusError, err.Error())
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
+	emitStep(StepShape, StatusDone, shape.Resolution)
 
 	mech, err := runSchema(ctx, gen, brief, shape)
 	if err != nil {
+		emitStep(StepSchema, StatusError, err.Error())
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
+	emitStep(StepSchema, StatusDone, "")
 
 	script, err := runHooks(ctx, gen, brief, mech)
 	if err != nil {
+		emitStep(StepHooks, StatusError, err.Error())
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
+	emitStep(StepHooks, StatusDone, "")
 
 	rules, err := runRules(ctx, gen, brief, mech)
 	if err != nil {
+		emitStep(StepRules, StatusError, err.Error())
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
+	emitStep(StepRules, StatusDone, "")
 
 	name := brief.Name
 	if name == "" {
@@ -129,6 +169,7 @@ func Generate(ctx context.Context, gen Generator, brief Brief) (System, error) {
 	failures := systemtest.Run(sys, scenario)
 	if len(failures) == 0 {
 		s.Verify.OK = true
+		emitStep(StepVerify, StatusDone, "passed")
 	} else {
 		s.Verify.OK = false
 		for _, f := range failures {
@@ -140,6 +181,7 @@ func Generate(ctx context.Context, gen Generator, brief Brief) (System, error) {
 			}
 			s.Verify.Failures = append(s.Verify.Failures, detail)
 		}
+		emitStep(StepVerify, StatusDone, fmt.Sprintf("%d failures", len(failures)))
 	}
 
 	return s, nil

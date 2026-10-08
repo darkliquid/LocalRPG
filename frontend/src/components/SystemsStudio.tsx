@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient } from '../api/client';
-import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure, ContentManifestInfo } from '../types';
+import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure, ContentManifestInfo, SystemDraftInfo, SystemVerifyResult } from '../types';
 import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play, Download, Upload } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
@@ -8,6 +8,7 @@ import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import MarkdownEditor from './editor/MarkdownEditor';
 import { MechanicsEditor } from './MechanicsEditor';
 import { ContentImportDialog } from './ContentImportDialog';
+import { SystemGenerateDialog } from './SystemGenerateDialog';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
 
@@ -50,6 +51,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [isTesting, setIsTesting] = useState(false);
   const [testFailures, setTestFailures] = useState<SystemTestFailure[]>([]);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<SystemVerifyResult | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -71,6 +74,21 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setToast({ type: 'error', message: formatGenerationError(failure) });
   const errorMessage = (err: unknown): string =>
     err instanceof Error ? err.message : 'Unexpected error';
+
+  const handleDraftProduced = (generatedDraft: SystemDraftInfo) => {
+    setShowGenerateDialog(false);
+    setName(generatedDraft.name);
+    setSlugID(generatedDraft.id);
+    setVersion(generatedDraft.version || '1.0.0');
+    setDescription(generatedDraft.description);
+    setMechanics(generatedDraft.mechanics || {});
+    setScript(generatedDraft.script || '');
+    setRulesPrompt(generatedDraft.rules_prompt || '');
+    setVerificationResult(generatedDraft.verify);
+    setSelection({ kind: 'draft' });
+    setDraft({ localId: generatedDraft.id || 'draft', dirty: true });
+    setToast({ type: 'success', message: `Draft loaded for "${generatedDraft.name}". Review and save.` });
+  };
 
   const handleDeleteSystem = async (force = false) => {
     if (!deleteTarget) return;
@@ -143,6 +161,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       const detail = await APIClient.getSystem(id);
       setSelection({ kind: 'saved', id: detail.id });
       setDraft(null);
+      setVerificationResult(null);
       setName(detail.name);
       setSlugID(detail.id);
       setVersion(detail.version || '1.0.0');
@@ -179,6 +198,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const handleNewSystem = () => {
     setSelection({ kind: 'draft' });
     setDraft({ localId: crypto.randomUUID(), dirty: false });
+    setVerificationResult(null);
     setName('');
     setSlugID('');
     setVersion('1.0.0');
@@ -203,6 +223,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setMechanics(reference.mechanics ?? {});
     setCreationPreamble('');
     setCreationFields([]);
+    setVerificationResult(null);
     markDirty();
     setToast({ type: 'success', message: `Loaded the ${reference.name} reference.` });
   };
@@ -398,6 +419,14 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               accept=".lrpgsystem,.lrpgpack"
               className="hidden"
             />
+            <button
+              onClick={() => setShowGenerateDialog(true)}
+              title="Generate a system with AI"
+              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 transition-all cursor-pointer"
+            >
+              <Wand2 className="w-3.5 h-3.5 text-purple-400" />
+              <span>Generate</span>
+            </button>
             <button
               onClick={() => importInputRef.current?.click()}
               title="Import system package (.lrpgsystem, .lrpgpack)"
@@ -677,6 +706,48 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                 {failure.scenario} step {failure.step}: {failure.detail}
               </div>
             ))}
+          </div>
+        )}
+
+        {verificationResult && (
+          <div
+            data-testid="verification-banner"
+            className={`p-3 rounded-xl text-xs flex items-center justify-between gap-3 shrink-0 ${
+              verificationResult.ok
+                ? 'bg-emerald-950/40 border border-emerald-500/40 text-emerald-200'
+                : 'bg-red-950/40 border border-red-500/40 text-red-200'
+            }`}
+          >
+            <div className="flex items-start gap-2 min-w-0">
+              {verificationResult.ok ? (
+                <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+              )}
+              <div className="space-y-0.5 min-w-0">
+                <div className="font-semibold">
+                  {verificationResult.ok
+                    ? 'System verification passed'
+                    : 'System verification reported failures'}
+                </div>
+                {verificationResult.failures && verificationResult.failures.length > 0 && (
+                  <ul className="text-[11px] text-red-300 font-mono list-disc list-inside space-y-0.5">
+                    {verificationResult.failures.map((f, i) => (
+                      <li key={i}>{f}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            {!verificationResult.ok && (
+              <button
+                type="button"
+                onClick={() => setShowGenerateDialog(true)}
+                className="px-2.5 py-1 text-xs font-sans font-medium rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40 transition-colors cursor-pointer shrink-0"
+              >
+                Regenerate
+              </button>
+            )}
           </div>
         )}
 
@@ -1083,6 +1154,13 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
             </div>
           </div>
         </div>
+      )}
+
+      {showGenerateDialog && (
+        <SystemGenerateDialog
+          onCancel={() => setShowGenerateDialog(false)}
+          onDraft={handleDraftProduced}
+        />
       )}
     </div>
   );

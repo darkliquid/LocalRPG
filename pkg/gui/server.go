@@ -84,12 +84,21 @@ func routePattern(path string) string {
 			return "/api/game/{id}/" + suffix
 		}
 		return "/api/game/{id}"
-	case path == "/api/system/test":
-		return "/api/system/test"
+	case path == "/api/system/test" || path == "/api/system/generate" ||
+		path == "/api/system/draft/commit" || path == "/api/system/draft/discard":
+		return path
 	case strings.HasPrefix(path, "/api/dialog/"):
 		return "/api/dialog/{action}"
 	case strings.HasPrefix(path, "/api/system/tests/"):
 		return "/api/system/tests/{id}"
+	case strings.HasPrefix(path, "/api/system/draft/"):
+		id := strings.TrimPrefix(path, "/api/system/draft/")
+		if id == "" {
+			return "/api/system/draft"
+		}
+		return "/api/system/draft/{id}"
+	case path == "/api/system/draft":
+		return "/api/system/draft"
 	case strings.HasPrefix(path, "/api/system/"):
 		return "/api/system/{id}"
 	case strings.HasPrefix(path, "/api/world/"):
