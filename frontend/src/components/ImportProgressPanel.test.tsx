@@ -43,6 +43,19 @@ describe('ImportProgressPanel', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '24');
   });
 
+  it('says when a batch ran out of room', () => {
+    render(
+      <ImportProgressPanel progress={{ batch: 20, batches: 51, found: 1, total: 44, cut_off: 2 }} />
+    );
+    expect(screen.getByText(/2 batches ran out of room/)).toBeInTheDocument();
+    expect(screen.getByText(/the rest of those pages was not read/)).toBeInTheDocument();
+  });
+
+  it('says nothing about room when every batch finished', () => {
+    render(<ImportProgressPanel progress={{ batch: 3, batches: 51, found: 4, total: 41 }} />);
+    expect(screen.queryByText(/ran out of room/)).not.toBeInTheDocument();
+  });
+
   it('drops the countdown on the last batch', () => {
     render(<ImportProgressPanel progress={{ batch: 51, batches: 51, found: 2, total: 60 }} />);
     expect(screen.getByTestId('import-progress-summary')).not.toHaveTextContent('left');

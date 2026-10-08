@@ -287,6 +287,8 @@ export interface WorldImportProgress {
   found: number;
   total: number;
   names?: string[];
+  // cut_off counts the batches whose reply ran out before it finished.
+  cut_off?: number;
 }
 
 // WorldGenStep is one progress report from the generation pipeline.

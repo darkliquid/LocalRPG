@@ -622,6 +622,10 @@ type WorldImportProgressDTO struct {
 	Found   int      `json:"found"`
 	Total   int      `json:"total"`
 	Names   []string `json:"names,omitempty"`
+	// CutOff counts the batches whose reply ran out before it finished. What they
+	// wrote was kept, and the count is reported so a short import is not mistaken
+	// for a complete one.
+	CutOff int `json:"cut_off,omitempty"`
 }
 
 // WorldGenStepDTO is one progress report from the generation pipeline.

@@ -471,6 +471,7 @@ func importProgressDTO(p ingest.Progress) *WorldImportProgressDTO {
 		Found:   p.Found,
 		Total:   p.Total,
 		Names:   p.Names,
+		CutOff:  p.CutOff,
 	}
 }
 

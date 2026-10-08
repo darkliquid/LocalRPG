@@ -305,3 +305,70 @@ func TestProgressReportsAMergedEntity(t *testing.T) {
 		t.Fatalf("last = %+v", last)
 	}
 }
+
+func TestATruncatedReplyKeepsWhatItWrote(t *testing.T) {
+	// A reply cut off mid-entity: the two before the cut are whole, and losing
+	// them, or failing the whole import, would be the wrong answer.
+	probe := &jsonGen{responses: []string{
+		`{"lore":"The city.","entities":[{"name":"Saltmarch","type":"location","description":"A port."},{"name":"Maren","type":"character","description":"A harbormaster."},{"name":"Quezta","ty`,
+	}}
+	var last Progress
+	d, err := BuildInto(context.Background(), probe, []Chunk{{Source: "a.md", Text: "x"}}, worldgen.Brief{}, BuildContext{}, func(p Progress) {
+		if p.Batch > 0 {
+			last = p
+		}
+	})
+	if err != nil {
+		t.Fatalf("a cut-off reply should not fail the import: %v", err)
+	}
+	if len(d.Entities) != 2 {
+		t.Fatalf("entities = %+v", d.Entities)
+	}
+	if last.CutOff != 1 {
+		t.Fatalf("the progress should report the cut-off batch: %+v", last)
+	}
+}
+
+func TestAnUnparseableBatchIsSplitRatherThanLost(t *testing.T) {
+	// The first call answers with nothing usable; the halves do. Four pages is
+	// two calls of two, so no entity is lost to one oversized reply.
+	probe := &jsonGen{responses: []string{
+		`not json at all`,
+		`{"entities":[{"name":"Saltmarch","type":"location","description":"A port."}]}`,
+		`{"entities":[{"name":"Maren","type":"character","description":"A harbormaster."}]}`,
+	}}
+	chunks := []Chunk{
+		{Source: "a.md", Text: "one"}, {Source: "b.md", Text: "two"},
+		{Source: "c.md", Text: "three"}, {Source: "d.md", Text: "four"},
+	}
+	d, err := BuildInto(context.Background(), probe, chunks, worldgen.Brief{}, BuildContext{}, nil)
+	if err != nil {
+		t.Fatalf("a split should recover the batch: %v", err)
+	}
+	if len(d.Entities) != 2 {
+		t.Fatalf("entities = %+v", d.Entities)
+	}
+	if probe.calls != 3 {
+		t.Fatalf("calls = %d, want 3 (the batch, then its two halves)", probe.calls)
+	}
+}
+
+func TestABatchWithOnePageThatFailsIsSkippedNotFatal(t *testing.T) {
+	probe := &jsonGen{responses: []string{`not json`, `{}`}}
+	chunks := []Chunk{{Source: "a.md", Text: "one"}}
+	var last Progress
+	d, err := BuildInto(context.Background(), probe, chunks, worldgen.Brief{}, BuildContext{}, func(p Progress) {
+		if p.Batch > 0 {
+			last = p
+		}
+	})
+	if err != nil {
+		t.Fatalf("one unreadable page should not fail the import: %v", err)
+	}
+	if len(d.Entities) != 0 {
+		t.Fatalf("entities = %+v", d.Entities)
+	}
+	if last.CutOff != 1 {
+		t.Fatalf("the progress should report it: %+v", last)
+	}
+}

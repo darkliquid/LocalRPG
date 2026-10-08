@@ -303,19 +303,22 @@ const ingestInstructions = `Work through the source and list everything it names
 
 Write two to four sentences for each entity, in the source's own terms, with enough detail to run a scene from it. A name on its own is a failure.
 
-Also write lore: markdown prose covering the world's history, peoples, customs, places, and conflicts, drawn only from this source material. Include lore in every reply, because it is collected from every part of the source rather than only the first.`
+Also write lore: one short paragraph of markdown prose covering the world's history, peoples, customs, places, or conflicts, drawn only from this source material. Include lore in every reply, because it is collected from every part of the source rather than only the first. Keep the whole reply compact: it is one part of a longer reading, not a summary of everything.`
+
+// ingestEntity is one entity as the model returns it.
+type ingestEntity struct {
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
+}
 
 type ingestReply struct {
-	Name        string `json:"name"`
-	Genre       string `json:"genre"`
-	Description string `json:"description"`
-	Lore        string `json:"lore"`
-	Entities    []struct {
-		Name        string   `json:"name"`
-		Type        string   `json:"type"`
-		Description string   `json:"description"`
-		Tags        []string `json:"tags"`
-	} `json:"entities"`
+	Name        string         `json:"name"`
+	Genre       string         `json:"genre"`
+	Description string         `json:"description"`
+	Lore        string         `json:"lore"`
+	Entities    []ingestEntity `json:"entities"`
 }
 
 // Progress reports one batch of an ingestion, so a long import can say what it
@@ -332,6 +335,10 @@ type Progress struct {
 	Found int
 	Total int
 	Names []string
+	// CutOff counts the batches whose reply ran out before it finished. What they
+	// wrote before the cut was kept, and the count is reported so the user knows
+	// the import is missing the tail of a page rather than believing it complete.
+	CutOff int
 }
 
 // BuildContext names the world an ingestion is adding to. An empty context means
@@ -376,22 +383,54 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 		onProgress(Progress{Batch: 0, Batches: len(batches)})
 	}
 
-	for i, batch := range batches {
+	cutOff := 0
+
+	// readBatch reads one batch, halving it when the reply cannot be parsed at
+	// all. A model that runs out of room on four pages still answers for two, and
+	// losing a whole import to one oversized call is not a trade worth making.
+	var readBatch func(batch []Chunk, index int, first bool, touched *[]string, cut *bool) error
+	readBatch = func(batch []Chunk, index int, first bool, touched *[]string, cut *bool) error {
 		if err := ctx.Err(); err != nil {
-			return draft, err
+			return err
 		}
 		// Each call is told what the calls before it already produced. Without
 		// that it re-names the same handful of salient things every time, and the
 		// duplicates are the ones a reader most wanted to keep.
-		raw, err := gen.GenerateJSON(ctx, buildPrompt(brief, batch, i == 0, into, draft.Entities), ingestSchema)
+		raw, err := gen.GenerateJSON(ctx, buildPrompt(brief, batch, first, into, draft.Entities), ingestSchema)
 		if err != nil {
-			return draft, fmt.Errorf("ingest: batch %d: %w", i+1, err)
+			return fmt.Errorf("ingest: batch %d: %w", index, err)
 		}
-		var reply ingestReply
-		if err := decodeJSON(raw, &reply); err != nil {
+
+		reply, salvaged, parseErr := decodeReply(raw)
+		if parseErr != nil {
+			if len(batch) > 1 {
+				half := len(batch) / 2
+				if err := readBatch(batch[:half], index, first, touched, cut); err != nil {
+					return err
+				}
+				return readBatch(batch[half:], index, false, touched, cut)
+			}
+			// One page and no reply: nothing to read, so the import carries on
+			// rather than losing the fifty batches around it.
+			*cut = true
+			return nil
+		}
+		if salvaged {
+			*cut = true
+		}
+		*touched = append(*touched, applyReply(&draft, reply, batch, first, seen, at)...)
+		return nil
+	}
+
+	for i, batch := range batches {
+		var touched []string
+		cut := false
+		if err := readBatch(batch, i+1, i == 0, &touched, &cut); err != nil {
 			return draft, err
 		}
-		touched := applyReply(&draft, reply, batch, i == 0, seen, at)
+		if cut {
+			cutOff++
+		}
 		if onProgress != nil {
 			onProgress(Progress{
 				Batch:   i + 1,
@@ -400,6 +439,7 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 				Found:   len(touched),
 				Total:   len(draft.Entities),
 				Names:   touched,
+				CutOff:  cutOff,
 			})
 		}
 	}
@@ -725,15 +765,34 @@ func truncate(s string, limit int) string {
 	return strings.TrimSpace(string(runes[:limit])) + "..."
 }
 
-// decodeJSON repairs a model reply that is fenced, padded with prose, or
-// unterminated, then unmarshals it.
-func decodeJSON(raw []byte, v any) error {
+// decodeReply parses one batch's reply, salvaging the entities from a reply that
+// ran out of room. A response cut off mid-entity is not a failed response: the
+// entities before the cut are whole, and a long import cannot afford to lose a
+// batch, or to fail outright, because one call wrote more than the model had room
+// for. salvaged reports that the reply was short, so the caller can say so.
+func decodeReply(raw []byte) (ingestReply, bool, error) {
 	payload := raw
 	if res := jsonrepair.Repair(raw); res.OK {
 		payload = res.Payload
 	}
-	if err := json.Unmarshal(payload, v); err != nil {
-		return fmt.Errorf("ingest: parse model reply: %w", err)
+
+	var reply ingestReply
+	parseErr := json.Unmarshal(payload, &reply)
+	if parseErr == nil {
+		return reply, false, nil
 	}
-	return nil
+
+	// The reply did not parse as a whole. It may still hold the entities written
+	// before it was cut off, so keep those rather than losing the batch.
+	salvaged := ingestReply{}
+	for _, element := range jsonrepair.ArrayElements(payload) {
+		var entity ingestEntity
+		if err := json.Unmarshal(element, &entity); err == nil && entity.Name != "" {
+			salvaged.Entities = append(salvaged.Entities, entity)
+		}
+	}
+	if len(salvaged.Entities) == 0 {
+		return ingestReply{}, false, fmt.Errorf("ingest: parse model reply: %w", parseErr)
+	}
+	return salvaged, true, nil
 }

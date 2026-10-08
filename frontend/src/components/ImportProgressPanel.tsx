@@ -18,7 +18,7 @@ export function formatRemaining(seconds: number): string {
 // it has found, and how much is left. Reading a folder of two hundred pages is
 // fifty model calls, and a dialog that says nothing for that looks hung.
 export const ImportProgressPanel: React.FC<ImportProgressPanelProps> = ({ progress }) => {
-  const { batch, batches, sources, found, total, names } = progress;
+  const { batch, batches, sources, found, total, names, cut_off: cutOff } = progress;
 
   // The estimate comes from the batches finished so far, so it sharpens as the
   // import runs. A batch of one is the first real measurement.
@@ -74,6 +74,13 @@ export const ImportProgressPanel: React.FC<ImportProgressPanelProps> = ({ progre
       {names && names.length > 0 && (
         <p className="text-[11px] text-neutral-500 break-words">{names.slice(0, 12).join(', ')}</p>
       )}
+
+      {cutOff ? (
+        <p className="text-[11px] text-amber-400/80">
+          {cutOff} {cutOff === 1 ? 'batch' : 'batches'} ran out of room before finishing. What they
+          wrote was kept; the rest of {cutOff === 1 ? 'that page' : 'those pages'} was not read.
+        </p>
+      ) : null}
     </div>
   );
 };
