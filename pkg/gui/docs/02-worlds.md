@@ -16,7 +16,7 @@ Each world directory (`worlds/<id>/`) contains:
 
 ```text
 worlds/eldoria/
-├── world.yaml                  # Identity, tags, and settings
+├── world.yaml                  # Identity, genre, art style, and dependencies
 ├── prompts/
 │   └── lore.md                 # Fundamental lore and tone prompt
 ├── entities/                   # Starter entity templates
@@ -32,22 +32,28 @@ worlds/eldoria/
 ```yaml
 id: eldoria
 name: The Sunken Reach
+version: 1.0.0
 description: A mist-shrouded archipelago of submerged ruins and arcane salvage.
 genre: nautical-fantasy
+art_style: ink-wash, muted teal, low horizon
+default_system: classic-d20
 tags: [mysterious, grim, salvage, ocean]
-settings:
-  start_location: the-iron-bastion
-  time_progression: turns
+requires:
+  - type: system
+    id: classic-d20
+    version: ">=1.0.0 <2.0.0"
 ```
+
+The pinned opening location is a campaign setting rather than a world setting: the engine resolves it once at creation and records it in `game.yaml`. See [Editing Content Outside the App](22-editing-content) for the field list of each manifest.
 
 ## Starting Location Resolution
 
 When a new campaign begins, LocalRPG determines the opening scene using a deterministic 4-stage resolution hierarchy:
 
-1. **Pinned Setting (`settings.start_location`)**: If specified in `world.yaml` or `game.yaml`, the engine binds to that specific entity ID.
-2. **Player Wikilink Target**: If the player character's YAML frontmatter includes a `location: "[[The Sinking Quay]]"` reference, that location takes precedence.
-3. **Any Authored Location**: If no location is pinned or referenced, the engine scans `entities/` for any entity with `type: location`.
-4. **Procedural Fallback**: If no locations exist in the world, the engine synthesizes an opening scene note (`games/<id>/entities/opening-scene.md`) derived directly from the world name and description.
+1. **Pinned Setting (`settings.start_location`)**: If `game.yaml` pins a location, the engine binds to that specific entity ID.
+2. **Player Location Reference**: If the player character's note carries a `location: "[[The Sinking Quay]]"`, or a wikilink to a location anywhere in the body, that location takes precedence.
+3. **Any Authored Location**: If nothing pins or references a location, the engine takes the first indexed entity with `type: location`.
+4. **Procedural Fallback**: If the world defines no locations, the engine creates an opening scene note (`games/<id>/entities/opening-scene.md`) from the world name and description.
 
 ## System Overrides
 

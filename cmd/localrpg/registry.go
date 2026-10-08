@@ -13,6 +13,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/content"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/gui"
+	"github.com/darkliquid/localrpg/pkg/paths"
 	"github.com/darkliquid/localrpg/pkg/registry"
 )
 
@@ -21,6 +22,23 @@ func handleRegistryCommand(args []string) {
 	if code != 0 {
 		os.Exit(code)
 	}
+}
+
+// registryProjectRoot is the directory a registry command treats as the project
+// root: the current directory. The install path already targets it, because the
+// content it writes belongs to the project the command runs in.
+func registryProjectRoot() string {
+	rootDir, _ := os.Getwd()
+	return rootDir
+}
+
+// registryResolver resolves the content directories for a registry command. The
+// configured paths override the defaults the way they do everywhere else, which
+// is what keeps `registry search` from writing its index cache to a bare `cache/`
+// folder beside wherever the command happened to run.
+func registryResolver(cfg *config.Config) *core.PathResolver {
+	dirs := paths.Resolve(paths.System(), cfg.Paths, registryProjectRoot())
+	return core.NewCustomPathResolver(dirs.Systems, dirs.Worlds, dirs.Games, dirs.Cache)
 }
 
 func runRegistryCommand(args []string, stdout, stderr io.Writer) int {
@@ -162,11 +180,9 @@ func runRegistrySearch(args []string, stdout, stderr io.Writer) int {
 	mgr := config.NewConfigManager()
 	cfg, _ := mgr.Load()
 
-	cwd, _ := os.Getwd()
-	resolver := core.NewPathResolver(cwd)
-	cacheDir := resolver.CacheDir()
+	resolver := registryResolver(cfg)
 
-	client := registry.NewClient(cfg.Registries, cacheDir)
+	client := registry.NewClient(cfg.Registries, resolver.CacheDir())
 	matches, err := client.Search(context.Background(), query)
 	if err != nil {
 		fmt.Fprintf(stderr, "Search error: %v\n", err)
@@ -219,11 +235,9 @@ func runRegistryInstall(args []string, stdout, stderr io.Writer) int {
 	mgr := config.NewConfigManager()
 	cfg, _ := mgr.Load()
 
-	cwd, _ := os.Getwd()
-	resolver := core.NewPathResolver(cwd)
-	cacheDir := resolver.CacheDir()
+	resolver := registryResolver(cfg)
 
-	client := registry.NewClient(cfg.Registries, cacheDir)
+	client := registry.NewClient(cfg.Registries, resolver.CacheDir())
 	matches, err := client.Search(context.Background(), targetID)
 	if err != nil {
 		fmt.Fprintf(stderr, "Search error: %v\n", err)
@@ -256,7 +270,7 @@ func runRegistryInstall(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	svc := gui.NewService(cwd)
+	svc := gui.NewService(registryProjectRoot())
 	client.SetInstaller(func(ctx context.Context, r io.Reader, conflictMode string) (content.Manifest, error) {
 		res, err := svc.ImportContent(ctx, r, conflictMode)
 		if err != nil {
@@ -285,11 +299,9 @@ func runRegistryUpdate(args []string, stdout, stderr io.Writer) int {
 	mgr := config.NewConfigManager()
 	cfg, _ := mgr.Load()
 
-	cwd, _ := os.Getwd()
-	resolver := core.NewPathResolver(cwd)
-	cacheDir := resolver.CacheDir()
+	resolver := registryResolver(cfg)
 
-	client := registry.NewClient(cfg.Registries, cacheDir)
+	client := registry.NewClient(cfg.Registries, resolver.CacheDir())
 
 	client.SetInstalledLister(func(ctx context.Context) ([]content.Manifest, error) {
 		var manifests []content.Manifest
