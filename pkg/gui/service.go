@@ -131,6 +131,9 @@ type Service struct {
 	// directoryPicker is the desktop window's native directory chooser. It is
 	// nil in browser/socket mode, where the UI falls back to a path field.
 	directoryPicker func(title, defaultDir string) (string, error)
+	// directoryChoice holds the one native folder dialog that may be open, so a
+	// blocking modal never sits inside a request the webview is waiting on.
+	directoryChoice directoryChoice
 	// urlOpener hands a link to the desktop window, which forwards it to the
 	// system browser. It is nil in browser/socket mode, where the frontend opens
 	// a tab itself.

@@ -58,7 +58,7 @@ The **Source** row in the dialog has three modes:
 | **Folder** | Reads `.md`, `.markdown`, and `.txt` files under a directory. Entirely local, with no network call. |
 | **URLs** | Fetches the pages you list, one per line, and reduces each to readable text. |
 
-For a folder, the **Browse** button opens the desktop window's folder picker. A browser or headless build has no native dialog, so type the path into the field instead.
+For a folder, the **Browse** button opens the desktop window's folder picker. The picker is a modal system dialog, so LocalRPG opens it and keeps working while it is up; choosing a folder fills the path field, and dismissing it leaves the field alone. A browser or headless build has no native dialog, so the button reports that and the field is typed instead.
 
 Folder ingestion splits each file into chunks at headings and paragraph boundaries, and skips binary files and dot-directories. An empty folder is an error rather than an empty world.
 

@@ -111,7 +111,11 @@ describe('WorldGenerateDialog', () => {
     vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (_req, onEvent) => {
       onEvent({ type: 'estimate', estimate: { calls: 1, priced: false } });
     });
-    const pick = vi.spyOn(APIClient, 'chooseDirectory').mockResolvedValue('/home/you/notes');
+    const start = vi.spyOn(APIClient, 'startDirectoryChoice').mockResolvedValue(undefined);
+    vi.spyOn(APIClient, 'directoryChoice').mockResolvedValue({
+      status: 'selected',
+      path: '/home/you/notes',
+    });
 
     render(<WorldGenerateDialog onCancel={() => {}} onDraft={() => {}} estimateDelayMs={0} />);
 
@@ -119,14 +123,14 @@ describe('WorldGenerateDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /browse/i }));
 
     await waitFor(() => expect(screen.getByLabelText(/folder path/i)).toHaveValue('/home/you/notes'));
-    expect(pick).toHaveBeenCalledWith('Choose a source folder');
+    expect(start).toHaveBeenCalledWith('Choose a source folder');
   });
 
   it('falls back to a typed path when there is no native dialog', async () => {
     vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (_req, onEvent) => {
       onEvent({ type: 'estimate', estimate: { calls: 1, priced: false } });
     });
-    vi.spyOn(APIClient, 'chooseDirectory').mockRejectedValue(new HTTPError(501, 'no dialog'));
+    vi.spyOn(APIClient, 'startDirectoryChoice').mockRejectedValue(new HTTPError(501, 'no dialog'));
 
     render(<WorldGenerateDialog onCancel={() => {}} onDraft={() => {}} estimateDelayMs={0} />);
 

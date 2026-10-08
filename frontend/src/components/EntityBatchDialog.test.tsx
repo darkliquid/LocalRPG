@@ -132,7 +132,11 @@ describe('EntityBatchDialog', () => {
   });
 
   it('fills the folder path from the native picker', async () => {
-    vi.spyOn(APIClient, 'chooseDirectory').mockResolvedValue('/home/you/notes');
+    vi.spyOn(APIClient, 'startDirectoryChoice').mockResolvedValue(undefined);
+    vi.spyOn(APIClient, 'directoryChoice').mockResolvedValue({
+      status: 'selected',
+      path: '/home/you/notes',
+    });
 
     render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
 

@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { AlertTriangle, Check, FolderOpen, Globe, PackagePlus, Pencil, RefreshCw, X } from 'lucide-react';
-import { APIClient, HTTPError } from '../api/client';
+import { APIClient } from '../api/client';
+import { useFolderPicker } from '../hooks/useFolderPicker';
 import {
   WorldApplyResult,
   WorldDraftEntity,
@@ -38,8 +39,6 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
   const [focus, setFocus] = useState('');
   const [folderPath, setFolderPath] = useState('');
   const [urls, setUrls] = useState('');
-  const [browsing, setBrowsing] = useState(false);
-  const [browseUnavailable, setBrowseUnavailable] = useState(false);
 
   const [batch, setBatch] = useState<WorldEntityBatch | null>(seeded);
   const [rename, setRename] = useState(false);
@@ -67,24 +66,13 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
     sourceMode === 'instruction' ||
     (sourceMode === 'folder' ? folderPath.trim() !== '' : urlList.length > 0);
 
-  // browse opens the desktop window's native folder picker. A browser or headless
-  // build has none, so the path field stays usable on its own.
+  // The native picker is a modal dialog, so the server opens it and this hook
+  // polls for the result. A build with no dialog leaves the path field usable.
+  const folderPicker = useFolderPicker();
   const handleBrowse = useCallback(async () => {
-    setBrowsing(true);
-    setError(null);
-    try {
-      const chosen = await APIClient.chooseDirectory('Choose a source folder');
-      if (chosen) setFolderPath(chosen);
-    } catch (err) {
-      if (err instanceof HTTPError && err.status === 501) {
-        setBrowseUnavailable(true);
-      } else {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      setBrowsing(false);
-    }
-  }, []);
+    const chosen = await folderPicker.pick('Choose a source folder');
+    if (chosen) setFolderPath(chosen);
+  }, [folderPicker]);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -269,7 +257,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
                 <button
                   type="button"
                   onClick={() => void handleBrowse()}
-                  disabled={browsing}
+                  disabled={folderPicker.picking}
                   className="flex items-center gap-1.5 px-3 py-2 text-xs text-neutral-200 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-40 transition-colors whitespace-nowrap"
                 >
                   <FolderOpen className="w-3.5 h-3.5" />
@@ -277,9 +265,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
                 </button>
               </div>
               <p className="text-[11px] text-neutral-500">
-                {browseUnavailable
-                  ? 'No native folder dialog is available here, so type the path instead.'
-                  : 'Read locally. Nothing is fetched.'}
+                {folderPicker.note ?? 'Read locally. Nothing is fetched.'}
               </p>
             </div>
           )}

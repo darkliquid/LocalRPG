@@ -405,6 +405,14 @@ export interface DraftDiscardRequest {
   draft_id: string;
 }
 
+// DirectoryChoiceStatus is the state of a pending native folder choice.
+export type DirectoryChoiceStatus = 'idle' | 'pending' | 'selected' | 'cancelled';
+
+export interface DirectoryChoice {
+  status: DirectoryChoiceStatus;
+  path?: string;
+}
+
 export interface ModelStatus {
   id: string;
   name: string;

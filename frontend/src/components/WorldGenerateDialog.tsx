@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, FolderOpen, Globe, Sparkles, Wand2, X } from 'lucide-react';
-import { APIClient, HTTPError } from '../api/client';
+import { APIClient } from '../api/client';
+import { useFolderPicker } from '../hooks/useFolderPicker';
 import { TurnEvent, WorldDraftInfo, WorldEstimate, WorldGenStep } from '../types';
 
 // LargeEstimateCalls is the call count above which Generate asks for a second
@@ -43,8 +44,6 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
   const [sourceMode, setSourceMode] = useState<SourceMode>('prompt');
   const [folderPath, setFolderPath] = useState('');
   const [urls, setUrls] = useState('');
-  const [browsing, setBrowsing] = useState(false);
-  const [browseUnavailable, setBrowseUnavailable] = useState(false);
 
   const [estimate, setEstimate] = useState<WorldEstimate | null>(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
@@ -161,24 +160,13 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
     onCancel();
   }, [onCancel]);
 
-  // browse opens the desktop window's native folder picker. A headless or
-  // browser build has none, so the path field stays usable on its own.
+  // The native picker is a modal dialog, so the server opens it and this hook
+  // polls for the result. A build with no dialog leaves the path field usable.
+  const folderPicker = useFolderPicker();
   const handleBrowse = useCallback(async () => {
-    setBrowsing(true);
-    setError(null);
-    try {
-      const chosen = await APIClient.chooseDirectory('Choose a source folder');
-      if (chosen) setFolderPath(chosen);
-    } catch (err) {
-      if (err instanceof HTTPError && err.status === 501) {
-        setBrowseUnavailable(true);
-      } else {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      setBrowsing(false);
-    }
-  }, []);
+    const chosen = await folderPicker.pick('Choose a source folder');
+    if (chosen) setFolderPath(chosen);
+  }, [folderPicker]);
 
   // formatCost renders an estimate's cost, or says plainly that the provider has
   // no published rate rather than implying the generation is free.
@@ -356,7 +344,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
                 <button
                   type="button"
                   onClick={() => void handleBrowse()}
-                  disabled={browsing}
+                  disabled={folderPicker.picking}
                   className="flex items-center gap-1.5 px-3 py-2 text-xs text-neutral-200 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-40 transition-colors whitespace-nowrap"
                 >
                   <FolderOpen className="w-3.5 h-3.5" />
@@ -364,9 +352,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
                 </button>
               </div>
               <p className="text-[11px] text-neutral-500">
-                {browseUnavailable
-                  ? 'No native folder dialog is available here, so type the path instead.'
-                  : 'Read locally. Nothing is fetched.'}
+                {folderPicker.note ?? 'Read locally. Nothing is fetched.'}
               </p>
             </div>
           )}

@@ -41,6 +41,7 @@ import {
   WorldApplyResult,
   DraftCommitRequest,
   DraftDiscardRequest,
+  DirectoryChoice,
   AppConfig,
   SettingsResponse,
   TestProviderRequest,
@@ -199,21 +200,28 @@ export class APIClient {
     if (!res.ok) throw new Error(`cancelExport: ${res.statusText}`);
   }
 
-  // chooseDirectory opens the desktop window's native folder picker. It throws a
-  // 501 HTTPError when there is no native dialog, so the caller falls back to a
-  // path field.
-  static async chooseDirectory(title?: string): Promise<string> {
+  // startDirectoryChoice opens the desktop window's native folder picker and
+  // returns at once. The picker is modal, so the result is polled with
+  // directoryChoice rather than awaited on the request: a webview left waiting
+  // on a modal dialog cannot repaint.
+  static async startDirectoryChoice(title?: string): Promise<void> {
     const res = await fetch('/api/dialog/directory', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: title ?? '' }),
     });
-    if (!res.ok) {
-      if (res.status === 501) throw new HTTPError(res.status, 'No native directory dialog is available');
-      throw new HTTPError(res.status, `chooseDirectory: ${res.statusText}`);
-    }
-    const data = (await res.json()) as { path?: string };
-    return data.path ?? '';
+    if (res.ok) return;
+    if (res.status === 501) throw new HTTPError(res.status, 'No native directory dialog is available');
+    if (res.status === 409) throw new HTTPError(res.status, 'A folder dialog is already open');
+    throw new HTTPError(res.status, `startDirectoryChoice: ${res.statusText}`);
+  }
+
+  // directoryChoice reports the pending folder choice. A finished choice is
+  // delivered once, so a poll must act on it.
+  static async directoryChoice(): Promise<DirectoryChoice> {
+    const res = await fetch('/api/dialog/directory');
+    if (!res.ok) throw new HTTPError(res.status, `directoryChoice: ${res.statusText}`);
+    return res.json();
   }
 
   static subscribeExportEvents(onEvent: (event: ExportEvent) => void): () => void {
