@@ -60,11 +60,21 @@ The **Source** row in the dialog has three modes:
 
 For a folder, the **Browse** button opens the desktop window's folder picker. The picker is a modal system dialog, so LocalRPG opens it and keeps working while it is up; choosing a folder fills the path field, and dismissing it leaves the field alone. A browser or headless build has no native dialog, so the button reports that and the field is typed instead.
 
-Folder ingestion splits each file into chunks at headings and paragraph boundaries, and skips binary files and dot-directories. An empty folder is an error rather than an empty world.
+Folder ingestion splits each file into chunks at headings and paragraph boundaries, and skips binary files and dot-directories. It removes a page's frontmatter and link lists first, because those are metadata and navigation rather than lore. An empty folder is an error rather than an empty world.
 
 URL ingestion is a network action you opt into. It sends a descriptive user agent, fetches `robots.txt` once per host and honours it, caps each page at 2 MB, and fetches at most 20 URLs. It does **not** crawl: LocalRPG fetches only the URLs you name. A page that fails is reported, and the rest of the batch still ingests. A JavaScript-only page yields little or no text, and LocalRPG reports that as a likely render issue.
 
 Each entity built from a source records the chunk it came from in its `source` frontmatter field, so you can trace it. You are responsible for the licensing of anything you ingest.
+
+### Extraction behaviour
+
+An import reads four chunks per model call and asks for **everything** the source names, typed by what it is: a place is a `location`, a person is a `character`, an organisation is a `faction`, a kind of being is a `species`, an object or technology is an `item`, a dated happening is an `event`, and a custom, ritual, belief, or idea is a `concept`. It asks for two to four sentences per entity, because a name on its own cannot run a scene, and it asks for lore in every call, so a world's history, peoples, and customs come from the whole source rather than only its opening pages.
+
+Each call is told what the earlier calls already found. The batches build one inventory together instead of each rediscovering the same headline names. A name that appears again merges into the entity it repeats and keeps the fuller description, so a later, better mention improves the note rather than being discarded.
+
+Notes are filed by kind: `entities/locations/`, `entities/characters/`, `entities/factions/`, and so on. A source that yields sixty entities arrives as several folders rather than one flat list.
+
+An import is one call per four chunks, so a large folder is a long run of calls. The chunk limit and the estimated call count are under [Cost controls](#cost-controls) below, and the review shows what every call produced. LocalRPG writes nothing until you accept it.
 
 ## Generating entities for an existing world
 
