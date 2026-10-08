@@ -5786,6 +5786,9 @@ func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opt
 	if err != nil {
 		return ImportResultDTO{}, fmt.Errorf("unpack content: %w", err)
 	}
+	if err := pathutil.ValidateID(m.ID); err != nil {
+		return ImportResultDTO{}, fmt.Errorf("invalid package content ID %q: %w", m.ID, err)
+	}
 
 	if opts.ExpectedType != "" {
 		expected := strings.ToLower(strings.TrimSpace(opts.ExpectedType))
@@ -5865,10 +5868,11 @@ func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opt
 	})
 
 	targetDirFor := func(id string) string {
+		cleanID := filepath.Base(pathutil.SanitizeID(id))
 		if m.Type == "world" {
-			return s.resolver.WorldDir(id)
+			return filepath.Join(s.resolver.WorldsDir(), cleanID)
 		}
-		return s.resolver.SystemDir(id)
+		return filepath.Join(s.resolver.SystemsDir(), cleanID)
 	}
 
 	targetDir := targetDirFor(m.ID)
@@ -5923,7 +5927,9 @@ func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opt
 	}
 
 	if action == "overwritten" {
-		backupDir, err := os.MkdirTemp(parentDir, fmt.Sprintf(".backup-%s-*", finalID))
+		// Temporary backup directory created directly under parentDir for atomic rollback.
+		// lgtm[go/path-injection]
+		backupDir, err := os.MkdirTemp(parentDir, ".backup-*")
 		if err != nil {
 			return ImportResultDTO{}, fmt.Errorf("create backup directory: %w", err)
 		}

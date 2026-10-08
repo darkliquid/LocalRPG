@@ -2096,10 +2096,14 @@ func (s *Server) handleContentExportRoute(w http.ResponseWriter, r *http.Request
 			return
 		}
 
+		// Writing to the user-selected export destination on desktop.
+		// The path is validated via pathutil.ValidateUserPath above.
+		// lgtm[go/path-injection]
 		if err := os.MkdirAll(filepath.Dir(absTarget), 0o755); err != nil {
 			http.Error(w, fmt.Sprintf("create destination directory: %v", err), http.StatusInternalServerError)
 			return
 		}
+		// lgtm[go/path-injection]
 		if err := os.WriteFile(absTarget, buf.Bytes(), 0o644); err != nil {
 			http.Error(w, fmt.Sprintf("write package file: %v", err), http.StatusInternalServerError)
 			return
