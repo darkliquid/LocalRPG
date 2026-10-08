@@ -198,6 +198,32 @@ describe('EntityBatchDialog', () => {
     await waitFor(() => expect(screen.getByText('The Tidewatch')).toBeInTheDocument());
   });
 
+  it('uses an edited limit when the main action is pressed again', async () => {
+    const preview = vi.spyOn(APIClient, 'previewWorldEntities').mockImplementation(async (_worldId, req) => {
+      if (req.limits?.max_chunks === 500) return batch;
+      throw new HTTPError(400, 'the source is larger than the chunk limit', 'generation_source_limit');
+    });
+    vi.spyOn(APIClient, 'getSettings').mockResolvedValue({
+      config: { generation: { max_chunks: 200 } },
+    } as unknown as SettingsResponse);
+
+    render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /folder/i }));
+    fireEvent.change(screen.getByLabelText(/folder path/i), { target: { value: '/tmp/big' } });
+    fireEvent.click(screen.getByRole('button', { name: /^extract$/i }));
+
+    const field = await screen.findByLabelText(/source chunk limit/i);
+    await waitFor(() => expect(field).toHaveValue(400));
+
+    // The user types a different number and presses the dialog's own action.
+    fireEvent.change(field, { target: { value: '500' } });
+    fireEvent.click(screen.getByRole('button', { name: /^extract/i }));
+
+    await waitFor(() => expect(screen.getByText('The Tidewatch')).toBeInTheDocument());
+    expect(preview.mock.calls[preview.mock.calls.length - 1][1].limits).toEqual({ max_chunks: 500 });
+  });
+
   it('will not extract without a source', () => {
     render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
 

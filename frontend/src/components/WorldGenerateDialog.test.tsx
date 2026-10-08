@@ -133,6 +133,39 @@ describe('WorldGenerateDialog', () => {
     expect(generate.mock.calls[generate.mock.calls.length - 1][0].limits).toEqual({ max_calls: 40 });
   });
 
+  it('uses an edited limit when the main action is pressed again', async () => {
+    const generate = vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (req, onEvent) => {
+      if (req.dry_run) {
+        onEvent({ type: 'estimate', estimate: { calls: 4, priced: false } });
+        return;
+      }
+      if (req.limits?.max_calls === 55) {
+        onEvent({ type: 'draft', draft });
+        return;
+      }
+      onEvent({ type: 'error', code: 'generation_call_limit', message: 'generation call budget exceeded' });
+    });
+    vi.spyOn(APIClient, 'getSettings').mockResolvedValue({
+      config: { generation: { max_calls: 20 } },
+    } as unknown as SettingsResponse);
+
+    const onDraft = vi.fn();
+    render(<WorldGenerateDialog onCancel={() => {}} onDraft={onDraft} estimateDelayMs={0} />);
+    fireEvent.change(screen.getByLabelText(/premise/i), { target: { value: 'a drowned kingdom' } });
+    await waitFor(() => expect(screen.getByTestId('generation-estimate')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
+
+    const field = await screen.findByLabelText(/call limit/i);
+    await waitFor(() => expect(field).toHaveValue(40));
+
+    // The user types a different number and presses the dialog's own action.
+    fireEvent.change(field, { target: { value: '55' } });
+    fireEvent.click(screen.getByRole('button', { name: /^generate \(limit 55\)$/i }));
+
+    await waitFor(() => expect(onDraft).toHaveBeenCalledWith(draft));
+    expect(generate.mock.calls[generate.mock.calls.length - 1][0].limits).toEqual({ max_calls: 55 });
+  });
+
   it('saves a raised limit when asked to make it stick', async () => {
     vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (req, onEvent) => {
       if (req.dry_run) {

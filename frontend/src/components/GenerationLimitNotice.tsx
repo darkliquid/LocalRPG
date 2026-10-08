@@ -14,6 +14,9 @@ export interface GenerationLimitNoticeProps {
   onRetry: (limits: GenerationLimitsOverride) => void;
   // onSave raises the limit in the configuration as well, so later runs use it.
   onSave: (limits: GenerationLimitsOverride) => void;
+  // onChange reports the value in the field as it is edited, so the dialog's own
+  // action uses the number the user can see rather than the one that failed.
+  onChange?: (limits: GenerationLimitsOverride | undefined) => void;
 }
 
 // defaultsFor is the fallback when the config cannot be read, so the field is
@@ -29,6 +32,7 @@ export const GenerationLimitNotice: React.FC<GenerationLimitNoticeProps> = ({
   busy = false,
   onRetry,
   onSave,
+  onChange,
 }) => {
   const field = limitFieldFor(code) ?? 'max_chunks';
   const label = field === 'max_calls' ? 'Call limit' : 'Source chunk limit';
@@ -55,6 +59,16 @@ export const GenerationLimitNotice: React.FC<GenerationLimitNoticeProps> = ({
       cancelled = true;
     };
   }, [field]);
+
+  // Publish the field so a retry from anywhere in the dialog uses it.
+  useEffect(() => {
+    if (!onChange) return;
+    if (value === null || Number.isNaN(value) || value <= 0) {
+      onChange(undefined);
+      return;
+    }
+    onChange(field === 'max_calls' ? { max_calls: value } : { max_chunks: value });
+  }, [onChange, field, value]);
 
   const limits = (): GenerationLimitsOverride | null => {
     if (value === null || Number.isNaN(value) || value <= 0) {

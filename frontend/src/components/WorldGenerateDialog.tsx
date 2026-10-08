@@ -244,6 +244,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
               busy={generating}
               onRetry={handleRaiseAndRun}
               onSave={handleRaiseAndSave}
+              onChange={setLimits}
             />
           ) : (
             error && (
@@ -471,7 +472,11 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
             disabled={!canGenerate}
             className="px-4 py-2 text-sm font-medium text-white rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {generating ? 'Generating...' : needsConfirm ? 'Generate anyway' : 'Generate'}
+            {generating
+              ? 'Generating...'
+              : `${needsConfirm ? 'Generate anyway' : 'Generate'}${
+                  limits ? ` (limit ${limits.max_calls ?? limits.max_chunks})` : ''
+                }`}
           </button>
         </div>
       </div>

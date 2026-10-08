@@ -138,6 +138,10 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
 
   const entities: WorldDraftEntity[] = batch?.entities ?? [];
   const actionLabel = sourceMode === 'instruction' ? 'Generate' : 'Extract';
+  // Naming the limit on the button keeps the raised value visible at the moment
+  // it is used, rather than applying a number the user has to remember typing.
+  const pendingLimit = limits ? limits.max_calls ?? limits.max_chunks : undefined;
+  const limitSuffix = pendingLimit ? ` (limit ${pendingLimit})` : '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -171,6 +175,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
               busy={loading}
               onRetry={handleRaiseAndRun}
               onSave={handleRaiseAndSave}
+              onChange={setLimits}
             />
           ) : (
             error && (
@@ -377,7 +382,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
             className="flex items-center gap-2 px-4 py-2 text-sm text-neutral-200 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            {entities.length > 0 ? `${actionLabel} again` : actionLabel}
+            {entities.length > 0 ? `${actionLabel} again${limitSuffix}` : `${actionLabel}${limitSuffix}`}
           </button>
           <button
             onClick={() => void handleAccept()}
