@@ -196,7 +196,7 @@ func (p placeSpec) entity(kind string, seen map[string]struct{}) (DraftEntity, b
 	if body == "" {
 		body = name + "."
 	}
-	return DraftEntity{ID: id, Name: name, Type: kind, Tags: cleanTags(p.Tags), Body: body}, true
+	return DraftEntity{ID: id, Name: name, Type: kind, Folder: EntityFolderFor(kind), Tags: cleanTags(p.Tags), Body: body}, true
 }
 
 // characterSpec is one character as a step returns it.
@@ -230,7 +230,7 @@ func (c characterSpec) entity(seen map[string]struct{}) (DraftEntity, bool) {
 		body = name + "."
 	}
 	return DraftEntity{
-		ID: id, Name: name, Type: "character", Tags: tags, Body: body,
+		ID: id, Name: name, Type: "character", Folder: EntityFolderFor("character"), Tags: tags, Body: body,
 	}, true
 }
 

@@ -142,11 +142,11 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
       )}
 
       <div className="flex min-h-0 flex-1">
-        <aside className="w-64 shrink-0 border-r border-white/10 p-3">
+        <aside className="w-64 shrink-0 border-r border-white/10 p-3 flex flex-col min-h-0 h-full">
           <button
             type="button"
             onClick={() => setIsNewNoteOpen(true)}
-            className="mb-2 w-full rounded-lg border border-purple-500/50 bg-purple-600/20 px-2 py-1 text-xs font-sans font-bold text-purple-200 transition-colors cursor-pointer hover:bg-purple-600/40"
+            className="mb-2 w-full rounded-lg border border-purple-500/50 bg-purple-600/20 px-2 py-1 text-xs font-sans font-bold text-purple-200 transition-colors cursor-pointer hover:bg-purple-600/40 shrink-0"
           >
             + New
           </button>

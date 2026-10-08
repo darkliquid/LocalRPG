@@ -144,3 +144,44 @@ func TestSplitTextKeepsAProseBulletWithALink(t *testing.T) {
 		t.Fatalf("parts = %+v", parts)
 	}
 }
+
+func TestDeriveEntityFolder(t *testing.T) {
+	chunks := []Chunk{
+		{
+			Source: "the-last-city/factions/circle-of-dust.md",
+			Text:   "The Circle of Dust is a secretive cabal.",
+		},
+		{
+			Source: "the-last-city/the-lay-of-the-city/bloodgate/slabs.md",
+			Text:   "The Perimeter Slabs line the outer wall of Bloodgate.",
+		},
+		{
+			Source: "glossary.md",
+			Text:   "Aetherium is a crystalline mineral.",
+		},
+	}
+
+	// 1. Matches chunk with nested folder path
+	folder1 := deriveEntityFolder(ingestEntity{Name: "Circle of Dust", Type: "faction"}, chunks, "faction")
+	if folder1 != "the-last-city/factions" {
+		t.Errorf("folder1 = %q, want the-last-city/factions", folder1)
+	}
+
+	// 2. Matches chunk with multi-level nested path
+	folder2 := deriveEntityFolder(ingestEntity{Name: "Perimeter Slabs", Type: "location"}, chunks, "location")
+	if folder2 != "the-last-city/the-lay-of-the-city/bloodgate" {
+		t.Errorf("folder2 = %q, want the-last-city/the-lay-of-the-city/bloodgate", folder2)
+	}
+
+	// 3. Root file has no directory -> falls back to entity type
+	folder3 := deriveEntityFolder(ingestEntity{Name: "Aetherium", Type: "item"}, chunks, "item")
+	if folder3 != "items" {
+		t.Errorf("folder3 = %q, want items", folder3)
+	}
+
+	// 4. Explicit folder takes precedence
+	folder4 := deriveEntityFolder(ingestEntity{Name: "Garrick", Type: "character", Folder: "special-npcs"}, chunks, "character")
+	if folder4 != "special-npcs" {
+		t.Errorf("folder4 = %q, want special-npcs", folder4)
+	}
+}

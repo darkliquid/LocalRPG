@@ -301,9 +301,12 @@ func TestEntityAcceptWritesAndIndexes(t *testing.T) {
 	if len(detail.Entities) != 1 || detail.Entities[0].ID != "the-tidewatch" {
 		t.Fatalf("world entities = %+v", detail.Entities)
 	}
+	if detail.Entities[0].Folder != "factions" {
+		t.Fatalf("expected folder factions, got %q", detail.Entities[0].Folder)
+	}
 
 	// The note parses, so it is a real entity, not a stray file.
-	note, err := os.ReadFile(filepath.Join(svc.resolver.WorldDir(world.ID), "entities", "the-tidewatch.md"))
+	note, err := os.ReadFile(filepath.Join(svc.resolver.WorldDir(world.ID), "entities", "factions", "the-tidewatch.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -906,6 +909,44 @@ func TestCommitDraftFilesEntitiesByFolder(t *testing.T) {
 	}
 	if folders["saltmarch"] != "locations" || folders["maren"] != "characters" {
 		t.Fatalf("folders = %+v", folders)
+	}
+}
+
+func TestCommitDraftFilesEntitiesByHierarchicalFolder(t *testing.T) {
+	svc := NewService(t.TempDir())
+	saveDraftForTest(t, svc, worldgen.Draft{
+		ID:    "emberheart",
+		World: coreWorld("Emberheart"),
+		Entities: []worldgen.DraftEntity{
+			{ID: "circle-of-dust", Name: "Circle of Dust", Type: "faction", Folder: "the-last-city/factions", Body: "A faction."},
+		},
+	})
+
+	world, err := svc.CommitDraft(context.Background(), DraftCommitRequestDTO{DraftID: "emberheart", AcceptAll: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	root := svc.resolver.WorldDir(world.ID)
+	expectedPath := filepath.Join("entities", "the-last-city", "factions", "circle-of-dust.md")
+	if _, err := os.Stat(filepath.Join(root, expectedPath)); err != nil {
+		t.Fatalf("expected %s: %v", expectedPath, err)
+	}
+
+	detail, err := svc.GetWorld(context.Background(), world.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(detail.Entities) != 1 || detail.Entities[0].Folder != "the-last-city/factions" {
+		t.Fatalf("detail.Entities = %+v", detail.Entities)
+	}
+
+	entDetail, err := svc.GetWorldEntity(context.Background(), world.ID, "circle-of-dust")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entDetail.Folder != "the-last-city/factions" {
+		t.Fatalf("entDetail.Folder = %q, want the-last-city/factions", entDetail.Folder)
 	}
 }
 

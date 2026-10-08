@@ -4711,9 +4711,14 @@ func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) 
 	if err != nil {
 		return nil, fmt.Errorf("read world entity %s: %w", entityID, err)
 	}
+	folder := ""
+	if rel, err := filepath.Rel(filepath.Join(worldDir, "entities"), filepath.Dir(path)); err == nil && rel != "." && rel != "" {
+		folder = filepath.ToSlash(rel)
+	}
 	return &WorldEntityDetailDTO{
 		ID:       entityID,
 		Markdown: string(data),
+		Folder:   folder,
 	}, nil
 }
 

@@ -167,6 +167,7 @@ export const WorldDraftReview: React.FC<WorldDraftReviewProps> = ({
                     {item.subtitle && (
                       <span className="text-[11px] uppercase tracking-wide text-neutral-500">
                         {item.subtitle}
+                        {item.entity?.folder ? ` · ${item.entity.folder}` : ''}
                       </span>
                     )}
                   </div>

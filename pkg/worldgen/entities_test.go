@@ -108,3 +108,40 @@ func TestSalvageObjectsStripsAFence(t *testing.T) {
 		t.Fatalf("objects = %q", got)
 	}
 }
+
+func TestEntityFolderFor(t *testing.T) {
+	cases := []struct {
+		kind string
+		want string
+	}{
+		{"location", "locations"},
+		{"locations", "locations"},
+		{"Place", "locations"},
+		{"district", "locations"},
+		{"character", "characters"},
+		{"NPC", "characters"},
+		{"people", "characters"},
+		{"faction", "factions"},
+		{"guild", "factions"},
+		{"cult", "factions"},
+		{"species", "species"},
+		{"creature", "species"},
+		{"monster", "species"},
+		{"item", "items"},
+		{"relic", "items"},
+		{"technology", "items"},
+		{"event", "events"},
+		{"battle", "events"},
+		{"concept", "concepts"},
+		{"ritual", "concepts"},
+		{"religion", "concepts"},
+		{"", "concepts"},
+		{"vehicle", "vehicle"},
+		{"spells", "spells"},
+	}
+	for _, tc := range cases {
+		if got := EntityFolderFor(tc.kind); got != tc.want {
+			t.Errorf("EntityFolderFor(%q) = %q, want %q", tc.kind, got, tc.want)
+		}
+	}
+}

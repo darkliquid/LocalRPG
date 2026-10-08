@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -313,6 +314,8 @@ Also write lore: one short paragraph of markdown prose covering the world's hist
 type ingestEntity struct {
 	Name        string   `json:"name"`
 	Type        string   `json:"type"`
+	Folder      string   `json:"folder,omitempty"`
+	Category    string   `json:"category,omitempty"`
 	Description string   `json:"description"`
 	Tags        []string `json:"tags"`
 }
@@ -525,7 +528,7 @@ func applyReply(draft *worldgen.Draft, reply ingestReply, batch []Chunk, first b
 		if incoming.Body == "" {
 			incoming.Body = name + "."
 		}
-		incoming.Folder = entityFolderFor(incoming.Type)
+		incoming.Folder = deriveEntityFolder(spec, batch, incoming.Type)
 		seen[id] = struct{}{}
 		at[id] = len(draft.Entities)
 		draft.Entities = append(draft.Entities, incoming)
@@ -542,7 +545,12 @@ func mergeEntity(into *worldgen.DraftEntity, from worldgen.DraftEntity) {
 	}
 	if into.Type == "concept" && from.Type != "concept" {
 		into.Type = from.Type
-		into.Folder = entityFolderFor(from.Type)
+		if into.Folder == "" || into.Folder == "concepts" {
+			into.Folder = from.Folder
+		}
+	}
+	if (into.Folder == "" || into.Folder == "concepts") && from.Folder != "" && from.Folder != "concepts" {
+		into.Folder = from.Folder
 	}
 	for _, tag := range from.Tags {
 		into.Tags = appendUnique(into.Tags, tag)
@@ -574,22 +582,85 @@ func joinDistinct(existing, addition string) string {
 	return strings.Join(parts, ", ")
 }
 
-// entityFolders groups an imported world's notes by kind, so a source that yields
-// sixty entities does not land as one flat list in the studio.
-var entityFolders = map[string]string{
-	"location":  "locations",
-	"character": "characters",
-	"faction":   "factions",
-	"species":   "species",
-	"item":      "items",
-	"event":     "events",
-	"concept":   "concepts",
+// deriveEntityFolder determines the folder for an entity extracted from a batch of chunks.
+// It prioritizes folders derived from extraction (the source file directory or explicit folder/category),
+// and falls back to the folder derived from the entity type.
+func deriveEntityFolder(spec ingestEntity, batch []Chunk, kind string) string {
+	if candidate := cleanFolderCandidate(spec.Folder); candidate != "" {
+		return candidate
+	}
+	if candidate := cleanFolderCandidate(spec.Category); candidate != "" {
+		return candidate
+	}
+
+	nameLower := strings.ToLower(strings.TrimSpace(spec.Name))
+	if nameLower != "" {
+		for _, c := range batch {
+			if strings.Contains(strings.ToLower(c.Text), nameLower) {
+				if f := folderFromSource(c.Source); f != "" {
+					return f
+				}
+			}
+		}
+	}
+
+	if len(batch) > 0 {
+		commonFolder := folderFromSource(batch[0].Source)
+		if commonFolder != "" {
+			allMatch := true
+			for _, c := range batch[1:] {
+				if folderFromSource(c.Source) != commonFolder {
+					allMatch = false
+					break
+				}
+			}
+			if allMatch {
+				return commonFolder
+			}
+		}
+	}
+
+	return worldgen.EntityFolderFor(kind)
 }
 
-// entityFolderFor is the folder an entity of this kind belongs in, or "" when the
-// kind is one the source invented.
+func folderFromSource(source string) string {
+	if source == "" {
+		return ""
+	}
+	clean := filepath.ToSlash(filepath.Clean(source))
+	dir := path.Dir(clean)
+	if dir == "." || dir == "/" || dir == "" {
+		return ""
+	}
+	return cleanFolderCandidate(dir)
+}
+
+func cleanFolderCandidate(raw string) string {
+	trimmed := strings.Trim(strings.TrimSpace(raw), "/")
+	if trimmed == "" || trimmed == "." {
+		return ""
+	}
+	segments := strings.Split(trimmed, "/")
+	cleanSegments := make([]string, 0, len(segments))
+	for _, seg := range segments {
+		seg = strings.TrimSpace(seg)
+		if seg == "" || seg == "." || seg == ".." || strings.HasPrefix(seg, ".") {
+			continue
+		}
+		if len(seg) > 64 {
+			seg = seg[:64]
+		}
+		cleanSegments = append(cleanSegments, seg)
+	}
+	if len(cleanSegments) == 0 {
+		return ""
+	}
+	return strings.Join(cleanSegments, "/")
+}
+
+// entityFolderFor is the folder an entity of this kind belongs in.
 func entityFolderFor(kind string) string {
-	return entityFolders[strings.ToLower(strings.TrimSpace(kind))]
+	return worldgen.EntityFolderFor(kind)
 }
 
 func appendUnique(list []string, value string) []string {

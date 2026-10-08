@@ -91,17 +91,59 @@ func GenerateEntities(ctx context.Context, gen Generator, world WorldContext, re
 		}
 		body := firstNonEmpty(spec.Description, name+".")
 		batch = append(batch, DraftEntity{
-			ID:   entity.Slugify(name),
-			Name: name,
-			Type: kind,
-			Tags: cleanTags(spec.Tags),
-			Body: body,
+			ID:     entity.Slugify(name),
+			Name:   name,
+			Type:   kind,
+			Folder: EntityFolderFor(kind),
+			Tags:   cleanTags(spec.Tags),
+			Body:   body,
 		})
 		if len(batch) >= req.Count {
 			break
 		}
 	}
 	return linkBatch(batch, world.Entities), nil
+}
+
+// EntityFolderFor maps an entity kind or type onto its canonical folder name.
+func EntityFolderFor(kind string) string {
+	normalized := strings.ToLower(strings.TrimSpace(kind))
+	if normalized == "" {
+		return "concepts"
+	}
+	switch normalized {
+	case "location", "locations", "place", "places", "district", "districts",
+		"region", "regions", "building", "buildings", "room", "rooms",
+		"city", "cities", "town", "towns", "settlement", "settlements":
+		return "locations"
+	case "character", "characters", "person", "people", "npc", "npcs",
+		"hero", "heroes", "figure", "figures":
+		return "characters"
+	case "faction", "factions", "organisation", "organisations",
+		"organization", "organizations", "guild", "guilds", "order", "orders",
+		"cult", "cults", "crew", "crews", "clan", "clans", "house", "houses":
+		return "factions"
+	case "species", "creature", "creatures", "monster", "monsters",
+		"beast", "beasts", "ancestry", "ancestries", "race", "races", "being", "beings":
+		return "species"
+	case "item", "items", "object", "objects", "technology", "technologies",
+		"relic", "relics", "artifact", "artifacts", "artefact", "artefacts",
+		"material", "materials", "weapon", "weapons", "tool", "tools":
+		return "items"
+	case "event", "events", "battle", "battles", "history", "histories",
+		"era", "eras", "incident", "incidents", "war", "wars":
+		return "events"
+	case "concept", "concepts", "custom", "customs", "ritual", "rituals",
+		"religion", "religions", "culture", "cultures", "tradition", "traditions",
+		"law", "laws", "magic", "belief", "beliefs", "idea", "ideas":
+		return "concepts"
+	default:
+		slug := entity.Slugify(normalized)
+		if slug != "" {
+			return slug
+		}
+		return "concepts"
+	}
 }
 
 // entitySpec is one entity as a batch reply returns it.

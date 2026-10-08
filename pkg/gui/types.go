@@ -576,6 +576,7 @@ type CreateWorldRequestDTO struct {
 type WorldEntityDetailDTO struct {
 	ID       string `json:"id"`
 	Markdown string `json:"markdown"`
+	Folder   string `json:"folder,omitempty"`
 }
 
 // CountsDTO is how many of each thing a generation should produce.

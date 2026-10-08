@@ -315,7 +315,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                 ))}
               </div>
 
-              <div className="flex-1 min-h-[160px] min-h-0">
+              <div className="flex-1 min-h-[160px] min-h-0 flex flex-col overflow-hidden">
                 <EntityTree
                   folders={folders}
                   entities={visibleEntities}

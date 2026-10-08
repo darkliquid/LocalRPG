@@ -395,6 +395,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
                     <span className="text-sm font-semibold text-white">{entity.name}</span>
                     <span className="text-[11px] uppercase tracking-wide text-neutral-500">
                       {entity.type}
+                      {entity.folder ? ` · ${entity.folder}` : ''}
                     </span>
                     <span className="ml-auto font-mono text-[11px] text-neutral-500">{entity.id}</span>
                   </div>

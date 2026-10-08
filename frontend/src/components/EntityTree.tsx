@@ -267,8 +267,8 @@ export default function EntityTree({
   };
 
   return (
-    <div className="flex min-h-0 flex-col gap-2">
-      <div className="flex items-center gap-1.5">
+    <div className="flex flex-1 min-h-0 h-full flex-col gap-2">
+      <div className="flex items-center gap-1.5 shrink-0">
         <input
           value={filter}
           onChange={(ev) => setFilter(ev.target.value)}
@@ -292,7 +292,7 @@ export default function EntityTree({
         </div>
       </div>
 
-      <p className="text-[10px] font-sans text-stone-500">
+      <p className="text-[10px] font-sans text-stone-500 shrink-0">
         Drag a note or folder onto another folder to move it, or onto {ROOT_LABEL} to take it back out.
       </p>
 

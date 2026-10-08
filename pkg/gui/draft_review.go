@@ -240,12 +240,15 @@ func writeStagedWorld(dir string, manifest core.WorldManifest, sections []worldg
 		// directory, and a nested path is refused rather than interpreted.
 		target := entitiesDir
 		if folder := strings.Trim(strings.TrimSpace(e.Folder), "/"); folder != "" {
-			if err := pathutil.ValidateID(folder); err != nil {
+			cleanFolder, err := ValidateFolderPath(folder)
+			if err != nil {
 				return fmt.Errorf("invalid entity folder %q: %w", folder, err)
 			}
-			target = filepath.Join(entitiesDir, filepath.Base(folder))
-			if err := os.MkdirAll(target, 0o755); err != nil {
-				return fmt.Errorf("create entity folder %s: %w", folder, err)
+			if cleanFolder != "" {
+				target = filepath.Join(entitiesDir, filepath.FromSlash(cleanFolder))
+				if err := os.MkdirAll(target, 0o755); err != nil {
+					return fmt.Errorf("create entity folder %s: %w", cleanFolder, err)
+				}
 			}
 		}
 		path, err := pathutil.ResolveSafeChild(target, id+".md")

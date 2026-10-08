@@ -893,6 +893,7 @@ export interface CreateWorldRequest {
 export interface WorldEntityDetail {
   id: string;
   markdown: string;
+  folder?: string;
 }
 
 // WorldSelection models what the Worlds Studio editor is showing: a saved

@@ -447,12 +447,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         for (const ent of entities) {
           const md = allDrafts[ent.id];
           if (md) {
-            await APIClient.saveWorldEntity(saved.id, ent.id, md).catch(() => {});
+            await APIClient.saveWorldEntity(saved.id, ent.id, md, ent.folder).catch(() => {});
           }
         }
       } else if (selectedEntityID && entityDrafts[selectedEntityID] !== undefined) {
         // For an existing world, only save the currently selected entity if it has unpersisted edits.
-        await APIClient.saveWorldEntity(saved.id, selectedEntityID, entityMarkdown).catch(() => {});
+        const currentEntity = entities.find((e) => e.id === selectedEntityID);
+        await APIClient.saveWorldEntity(saved.id, selectedEntityID, entityMarkdown, currentEntity?.folder).catch(() => {});
       }
 
       if (bannerFile) {
@@ -490,7 +491,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
     if (!savedID) return;
 
     try {
-      await APIClient.saveWorldEntity(savedID, selectedEntityID, entityMarkdown);
+      const currentEntity = entities.find((e) => e.id === selectedEntityID);
+      await APIClient.saveWorldEntity(savedID, selectedEntityID, entityMarkdown, currentEntity?.folder);
       setToast({ type: 'success', message: `Entity "${selectedEntityID}" saved!` });
       await loadWorldDetail(savedID);
     } catch (err) {
@@ -1187,7 +1189,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         {activeTab === 'entities' && (
           <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
             {/* Entity List */}
-            <div className="w-56 shrink-0 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2 min-h-0">
+            <div className="w-64 shrink-0 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2 min-h-0 h-full">
               <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
                 <span className="text-xs font-sans uppercase tracking-wider text-stone-400">
                   Templates
@@ -1201,7 +1203,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 </button>
               </div>
 
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 {entities.length === 0 ? (
                   <div className="text-xs text-stone-500 py-6 text-center">
                     No starter templates. Click + Add to create one!
@@ -1250,7 +1252,13 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
               {selectedEntityID ? (
                 <>
                   <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
-                    <span>worlds/{savedID || slugID || 'draft'}/entities/{selectedEntityID}.md</span>
+                    <span>
+                      worlds/{savedID || slugID || 'draft'}/entities/
+                      {entities.find((e) => e.id === selectedEntityID)?.folder
+                        ? `${entities.find((e) => e.id === selectedEntityID)?.folder}/`
+                        : ''}
+                      {selectedEntityID}.md
+                    </span>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
