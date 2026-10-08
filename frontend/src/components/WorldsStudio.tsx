@@ -24,16 +24,6 @@ interface WorldsStudioProps {
   startMode?: 'new' | 'browse';
 }
 
-const STARTER_ENTITY_TEMPLATE = `---
-name: New Location
-type: location
-state:
-  danger_level: 1
-wikilinks: []
----
-An intriguing location waiting to be explored.
-`;
-
 // typeFromMarkdown reads the type the wizard wrote, so the tree summary matches
 // the note without a round trip.
 function typeFromMarkdown(markdown: string): string {
@@ -447,15 +437,22 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         ? await APIClient.createWorld(payload)
         : await APIClient.updateWorld(savedID as string, payload);
 
-      // Save all entity templates (whether new world or edited world)
-      const allDrafts = { ...entityDrafts };
-      if (selectedEntityID) {
-        allDrafts[selectedEntityID] = entityMarkdown;
-      }
+      // For a newly created draft world, persist the entity templates that were drafted in memory.
+      if (isDraft) {
+        const allDrafts = { ...entityDrafts };
+        if (selectedEntityID) {
+          allDrafts[selectedEntityID] = entityMarkdown;
+        }
 
-      for (const ent of entities) {
-        const md = allDrafts[ent.id] || STARTER_ENTITY_TEMPLATE;
-        await APIClient.saveWorldEntity(saved.id, ent.id, md).catch(() => {});
+        for (const ent of entities) {
+          const md = allDrafts[ent.id];
+          if (md) {
+            await APIClient.saveWorldEntity(saved.id, ent.id, md).catch(() => {});
+          }
+        }
+      } else if (selectedEntityID && entityDrafts[selectedEntityID] !== undefined) {
+        // For an existing world, only save the currently selected entity if it has unpersisted edits.
+        await APIClient.saveWorldEntity(saved.id, selectedEntityID, entityMarkdown).catch(() => {});
       }
 
       if (bannerFile) {

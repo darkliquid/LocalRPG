@@ -93,7 +93,7 @@ func TestListDrafts(t *testing.T) {
 
 func TestRenderEntityNoteParsesBack(t *testing.T) {
 	note := RenderEntityNote(DraftEntity{ID: "a", Name: "A", Type: "location", Body: "A place."})
-	if !containsAll(note, "---\n", "id: a", "type: location", "A place.") {
+	if !containsAll(note, "---\n", "id: a", "type: location", "# A\n\nA place.") {
 		t.Fatalf("note = %q", note)
 	}
 }

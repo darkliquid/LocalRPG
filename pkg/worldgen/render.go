@@ -27,7 +27,13 @@ func RenderEntityNote(e DraftEntity) string {
 	b.WriteString("---\n")
 	b.Write(head)
 	b.WriteString("---\n\n")
-	b.WriteString(strings.TrimSpace(e.Body))
+	body := strings.TrimSpace(e.Body)
+	if e.Name != "" && !strings.HasPrefix(body, "# ") {
+		b.WriteString("# ")
+		b.WriteString(e.Name)
+		b.WriteString("\n\n")
+	}
+	b.WriteString(body)
 	b.WriteString("\n")
 	return b.String()
 }
