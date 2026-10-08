@@ -578,6 +578,155 @@ type WorldEntityDetailDTO struct {
 	Markdown string `json:"markdown"`
 }
 
+// CountsDTO is how many of each thing a generation should produce.
+type CountsDTO struct {
+	Locations  int `json:"locations,omitempty"`
+	Factions   int `json:"factions,omitempty"`
+	Characters int `json:"characters,omitempty"`
+}
+
+// WorldSourceDTO names a source to ingest: a folder, or a set of URLs.
+type WorldSourceDTO struct {
+	Kind string   `json:"kind"`
+	Path string   `json:"path,omitempty"`
+	URLs []string `json:"urls,omitempty"`
+}
+
+// WorldGenerateRequestDTO is a whole-world generation request. DryRun asks only
+// for the estimate, so the cost is visible before the spend.
+type WorldGenerateRequestDTO struct {
+	Premise string          `json:"premise"`
+	Name    string          `json:"name,omitempty"`
+	Genre   string          `json:"genre,omitempty"`
+	Themes  []string        `json:"themes,omitempty"`
+	Counts  CountsDTO       `json:"counts,omitempty"`
+	Source  *WorldSourceDTO `json:"source,omitempty"`
+	DryRun  bool            `json:"dry_run,omitempty"`
+}
+
+// WorldGenStepDTO is one progress report from the generation pipeline.
+type WorldGenStepDTO struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Detail string `json:"detail,omitempty"`
+}
+
+// WorldEstimateDTO is a planned generation's cost, before it runs.
+type WorldEstimateDTO struct {
+	Calls      int   `json:"calls"`
+	Chunks     int   `json:"chunks,omitempty"`
+	CostMicros int64 `json:"cost_micros,omitempty"`
+	Priced     bool  `json:"priced"`
+}
+
+// WorldDraftEntityDTO is one generated entity, before it is committed.
+type WorldDraftEntityDTO struct {
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	Type    string   `json:"type"`
+	Tags    []string `json:"tags,omitempty"`
+	Folder  string   `json:"folder,omitempty"`
+	Body    string   `json:"body"`
+	Source  string   `json:"source,omitempty"`
+	Links   []string `json:"links,omitempty"`
+	Dropped []string `json:"dropped_links,omitempty"`
+}
+
+// WorldDraftSectionDTO is one accept/reject unit of a draft's lore.
+type WorldDraftSectionDTO struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
+}
+
+// WorldDraftDTO is a generated world awaiting review.
+type WorldDraftDTO struct {
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	Description string                  `json:"description"`
+	Genre       string                  `json:"genre"`
+	ArtStyle    string                  `json:"art_style,omitempty"`
+	Tags        []string                `json:"tags,omitempty"`
+	Lore        string                  `json:"lore"`
+	Sections    []WorldDraftSectionDTO  `json:"sections"`
+	Entities    []WorldDraftEntityDTO   `json:"entities"`
+	Estimate    *WorldEstimateDTO       `json:"estimate,omitempty"`
+	Calls       int                     `json:"calls,omitempty"`
+	// Oracle marks a draft the deterministic fallback produced, so the review can
+	// say so rather than implying a model wrote it.
+	Oracle bool `json:"oracle,omitempty"`
+}
+
+// WorldEntityBatchRequestDTO asks for a batch of entities in an existing world.
+type WorldEntityBatchRequestDTO struct {
+	Instruction string   `json:"instruction"`
+	Kinds       []string `json:"kinds,omitempty"`
+	Count       int      `json:"count,omitempty"`
+	Focus       string   `json:"focus,omitempty"`
+}
+
+// WorldEntityBatchDTO is a previewed batch, with any links that were dropped.
+type WorldEntityBatchDTO struct {
+	Entities []WorldDraftEntityDTO `json:"entities"`
+}
+
+// WorldEntityAcceptRequestDTO accepts a previewed batch.
+type WorldEntityAcceptRequestDTO struct {
+	Entities []WorldDraftEntityDTO `json:"entities"`
+	// Rename resolves an id clash by suffixing the new entity instead of
+	// refusing it.
+	Rename bool `json:"rename,omitempty"`
+}
+
+// WorldEnhanceRequestDTO asks for enhancement proposals.
+type WorldEnhanceRequestDTO struct {
+	Instruction string   `json:"instruction"`
+	Kinds       []string `json:"kinds,omitempty"`
+}
+
+// WorldEnhancementDTO is one proposed change to an existing world.
+type WorldEnhancementDTO struct {
+	Kind   string               `json:"kind"`
+	Title  string               `json:"title"`
+	Body   string               `json:"body"`
+	Entity *WorldDraftEntityDTO `json:"entity,omitempty"`
+	Target string               `json:"target,omitempty"`
+	Reason string               `json:"reason,omitempty"`
+}
+
+// WorldEnhanceResponseDTO is a set of proposals awaiting accept or reject.
+type WorldEnhanceResponseDTO struct {
+	Proposals []WorldEnhancementDTO `json:"proposals"`
+}
+
+// WorldEnhanceApplyRequestDTO applies the accepted proposals.
+type WorldEnhanceApplyRequestDTO struct {
+	Proposals []WorldEnhancementDTO `json:"proposals"`
+	Rename    bool                  `json:"rename,omitempty"`
+}
+
+// WorldEnhanceApplyResultDTO reports what applying a diff wrote.
+type WorldEnhanceApplyResultDTO struct {
+	Written []string `json:"written"`
+	Renamed []string `json:"renamed,omitempty"`
+}
+
+// DraftCommitRequestDTO commits an accepted set from a draft.
+type DraftCommitRequestDTO struct {
+	DraftID string `json:"draft_id"`
+	// TargetWorldID names an existing world to merge into. Empty creates a new
+	// world from the draft.
+	TargetWorldID string                  `json:"target_world_id,omitempty"`
+	Sections      []WorldDraftSectionDTO  `json:"sections,omitempty"`
+	Entities      []WorldDraftEntityDTO   `json:"entities,omitempty"`
+	// Meta overrides the draft's identity when it is committed as a new world.
+	Meta *CreateWorldRequestDTO `json:"meta,omitempty"`
+}
+
+// DraftDiscardRequestDTO deletes a draft.
+type DraftDiscardRequestDTO struct {
+	DraftID string `json:"draft_id"`
+}
+
 // ExportContentRequestDTO requests exporting a world or system as a .lrpgpack package.
 type ExportContentRequestDTO struct {
 	Type string `json:"type"`
@@ -778,6 +927,12 @@ type TurnEvent struct {
 	ImageURL   string `json:"image_url,omitempty"`
 	// RetryAfterMS is the provider's advertised backoff, when it gave one.
 	RetryAfterMS int64 `json:"retry_after_ms,omitempty"`
+	// World generation progress, present when Type is "step".
+	Step *WorldGenStepDTO `json:"step,omitempty"`
+	// The dry-run estimate, present when Type is "estimate".
+	Estimate *WorldEstimateDTO `json:"estimate,omitempty"`
+	// The generated draft, present when Type is "draft".
+	Draft *WorldDraftDTO `json:"draft,omitempty"`
 }
 
 // turnModes maps the mode names a client may send to the engine's casing.

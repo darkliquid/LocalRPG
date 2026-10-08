@@ -366,8 +366,29 @@ type Config struct {
 	Telemetry   TelemetryConfig   `yaml:"telemetry,omitempty" json:"telemetry,omitempty"`
 	Mechanics   MechanicsConfig   `yaml:"mechanics,omitempty" json:"mechanics,omitempty"`
 	Interactive InteractiveConfig `yaml:"interactive,omitempty" json:"interactive,omitempty"`
+	Generation  GenerationConfig  `yaml:"generation,omitempty" json:"generation,omitempty"`
 	Publishers  map[string]string `yaml:"publishers,omitempty" json:"publishers,omitempty"`
 	Registries  RegistriesConfig  `yaml:"registries,omitempty" json:"registries,omitempty"`
+}
+
+// GenerationConfig bounds an AI world generation. It exists so a runaway
+// generation cannot spend without limit, which is a control the usage ledger,
+// recording spend after the fact, cannot provide.
+type GenerationConfig struct {
+	// MaxCalls caps the model calls one generation may make. Zero means the
+	// default of 20, which is generous enough not to affect a normal generation.
+	MaxCalls int `yaml:"max_calls,omitempty" json:"max_calls,omitempty"`
+}
+
+// DefaultGenerationMaxCalls is the per-generation call cap when none is set.
+const DefaultGenerationMaxCalls = 20
+
+// GenerationMaxCalls returns the resolved per-generation call cap.
+func (c *Config) GenerationMaxCalls() int {
+	if c != nil && c.Generation.MaxCalls > 0 {
+		return c.Generation.MaxCalls
+	}
+	return DefaultGenerationMaxCalls
 }
 
 // RegistriesConfig lists URLs of static or git package indexes.

@@ -39,5 +39,10 @@
   "/api/tts/voices/search",
   "/api/usage",
   "/api/world/",
+  "/api/world/draft/",
+  "/api/world/draft/commit",
+  "/api/world/draft/discard",
+  "/api/world/generate",
+  "/api/world/ingest",
   "/api/worlds"
 ]

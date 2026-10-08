@@ -53,6 +53,11 @@ func LoadDraft(dir, id string) (Draft, error) {
 	if d.ID == "" {
 		d.ID = id
 	}
+	// A draft written before sections existed, or by hand, still reviews: the
+	// lore is split into accept/reject units on load.
+	if len(d.Sections) == 0 && strings.TrimSpace(d.Lore) != "" {
+		d.Sections = SplitLoreSections(d.Lore)
+	}
 	return d, nil
 }
 

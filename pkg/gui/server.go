@@ -1205,6 +1205,25 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// AI generation on a world: a previewed batch of entities, and enhancement
+	// proposals with an apply step. None of them writes without an accept.
+	if len(parts) >= 2 && parts[1] == "generate-entities" {
+		s.handleWorldEntitiesPreview(w, r, worldID)
+		return
+	}
+	if len(parts) >= 3 && parts[1] == "entities" && parts[2] == "accept" {
+		s.handleWorldEntitiesAccept(w, r, worldID)
+		return
+	}
+	if len(parts) >= 2 && parts[1] == "enhance" {
+		if len(parts) >= 3 && parts[2] == "apply" {
+			s.handleWorldEnhanceApply(w, r, worldID)
+			return
+		}
+		s.handleWorldEnhance(w, r, worldID)
+		return
+	}
+
 	if len(parts) >= 2 && (parts[1] == "banner" || parts[1] == "icon") {
 		action := parts[1]
 		if r.Method == http.MethodGet {
