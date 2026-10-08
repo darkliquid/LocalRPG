@@ -13,6 +13,38 @@ export default defineConfig({
   },
   build: {
     outDir: path.resolve(__dirname, '../pkg/gui/dist'),
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@lezer')) {
+              return 'vendor-lezer';
+            }
+            if (id.includes('@codemirror') || id.includes('codemirror')) {
+              return 'vendor-codemirror';
+            }
+            if (
+              id.includes('react-markdown') ||
+              id.includes('remark-') ||
+              id.includes('mdast-') ||
+              id.includes('micromark') ||
+              id.includes('unist-')
+            ) {
+              return 'vendor-markdown';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('@headless-tree')) {
+              return 'vendor-tree';
+            }
+          }
+        }
+      }
+    }
   }
 });

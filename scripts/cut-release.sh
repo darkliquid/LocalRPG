@@ -15,6 +15,7 @@
 set -euo pipefail
 
 VERSION_FILE="cmd/localrpg/main.go"
+FRONTEND_PACKAGE="frontend/package.json"
 RELEASE_BRANCH="${RELEASE_BRANCH:-main}"
 DRY_RUN="${DRY_RUN:-0}"
 BUMP="${1:-patch}"
@@ -91,13 +92,25 @@ printf 'release: %s -> %s (branch %s)\n' "$baseline" "$next" "$branch"
 
 if [[ "$DRY_RUN" == "1" ]]; then
   printf 'DRY RUN: set Version in %s to %s\n' "$VERSION_FILE" "$next"
+  if [[ -f "$FRONTEND_PACKAGE" ]]; then
+    printf 'DRY RUN: set version in %s to %s\n' "$FRONTEND_PACKAGE" "$next"
+  fi
 else
   tmp="$(mktemp)"
   sed -E "s/^var Version = \".*\"/var Version = \"$next\"/" "$VERSION_FILE" >"$tmp"
   mv "$tmp" "$VERSION_FILE"
+  if [[ -f "$FRONTEND_PACKAGE" ]]; then
+    npm --prefix frontend version "$next" --no-git-tag-version --allow-same-version
+  fi
 fi
 
 step git add "$VERSION_FILE"
+if [[ -f "$FRONTEND_PACKAGE" ]]; then
+  step git add "$FRONTEND_PACKAGE"
+  if [[ -f "frontend/package-lock.json" ]]; then
+    step git add "frontend/package-lock.json"
+  fi
+fi
 step git commit -m "chore(release): v$next"
 step git tag -a "v$next" -m "v$next"
 step git push --follow-tags origin "$branch"
