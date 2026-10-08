@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { EntityBatchDialog } from './EntityBatchDialog';
-import { APIClient } from '../api/client';
+import { APIClient, HTTPError } from '../api/client';
 import { WorldEntityBatch } from '../types';
 
 const batch: WorldEntityBatch = {
@@ -144,6 +144,28 @@ describe('EntityBatchDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /browse/i }));
 
     await waitFor(() => expect(screen.getByLabelText(/folder path/i)).toHaveValue('/home/you/notes'));
+  });
+
+  it('points at the setting when the source is over the chunk limit', async () => {
+    vi.spyOn(APIClient, 'previewWorldEntities').mockRejectedValue(
+      new HTTPError(
+        400,
+        'the source is larger than the chunk limit: it holds 300 chunks and generation.max_chunks is 200',
+        'generation_limit'
+      )
+    );
+
+    render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /folder/i }));
+    fireEvent.change(screen.getByLabelText(/folder path/i), { target: { value: '/tmp/big' } });
+    fireEvent.click(screen.getByRole('button', { name: /^extract$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/settings .* AI Agents .* Generation Limits/i)).toBeInTheDocument()
+    );
+    // The raw envelope is not shown to the user.
+    expect(screen.queryByText(/^\{/)).not.toBeInTheDocument();
   });
 
   it('will not extract without a source', () => {

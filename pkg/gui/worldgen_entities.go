@@ -89,7 +89,17 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 
 	var batch []worldgen.DraftEntity
 	if req.Source != nil {
-		batch, err = s.entitiesFromSource(ctx, budget, world, req)
+		chunks, err := s.extractSource(ctx, *req.Source)
+		if err != nil {
+			return nil, err
+		}
+		// An extraction is as big as the source is, so its budget follows the
+		// chunk cap rather than the bounded pipeline's call cap.
+		fromSource := &worldgen.BudgetGenerator{Inner: gen, Max: worldgen.ChunkCalls(len(chunks))}
+		batch, err = s.entitiesFromChunks(ctx, fromSource, world, req, chunks)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		batch, err = worldgen.GenerateEntities(ctx, budget, world, worldgen.EntityRequest{
 			WorldID:     worldID,
@@ -98,12 +108,12 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 			Count:       req.Count,
 			Focus:       req.Focus,
 		})
-	}
-	if err != nil {
-		if errors.Is(err, worldgen.ErrCallBudgetExceeded) {
-			return nil, fmt.Errorf("generation stopped: %w", err)
+		if err != nil {
+			if errors.Is(err, worldgen.ErrCallBudgetExceeded) {
+				return nil, fmt.Errorf("generation stopped: %w", err)
+			}
+			return nil, err
 		}
-		return nil, err
 	}
 
 	out := &WorldEntityBatchDTO{Entities: make([]WorldDraftEntityDTO, 0, len(batch))}
@@ -113,17 +123,9 @@ func (s *Service) PreviewWorldEntities(ctx context.Context, worldID string, req 
 	return out, nil
 }
 
-// entitiesFromSource extracts entities from a folder or a set of URLs and links
-// them against the world they are being added to.
-func (s *Service) entitiesFromSource(ctx context.Context, gen worldgen.Generator, world worldgen.WorldContext, req WorldEntityBatchRequestDTO) ([]worldgen.DraftEntity, error) {
-	chunks, err := ingest.Extract(ctx, ingest.Source{
-		Kind: req.Source.Kind,
-		Path: req.Source.Path,
-		URLs: req.Source.URLs,
-	})
-	if err != nil {
-		return nil, err
-	}
+// entitiesFromChunks extracts entities from already-read chunks and links them
+// against the world they are being added to.
+func (s *Service) entitiesFromChunks(ctx context.Context, gen worldgen.Generator, world worldgen.WorldContext, req WorldEntityBatchRequestDTO, chunks []ingest.Chunk) ([]worldgen.DraftEntity, error) {
 	draft, err := ingest.BuildInto(ctx, gen, chunks, worldgen.Brief{Premise: req.Instruction}, ingest.BuildContext{
 		Name:        world.Name,
 		Genre:       world.Genre,
@@ -132,6 +134,9 @@ func (s *Service) entitiesFromSource(ctx context.Context, gen worldgen.Generator
 		Entities:    world.Entities,
 	})
 	if err != nil {
+		if errors.Is(err, worldgen.ErrCallBudgetExceeded) {
+			return nil, fmt.Errorf("generation stopped: %w", err)
+		}
 		return nil, err
 	}
 	return draft.Entities, nil

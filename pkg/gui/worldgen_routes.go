@@ -31,10 +31,7 @@ func (s *Server) streamWorldGeneration(w http.ResponseWriter, r *http.Request, r
 	}
 
 	if _, err := s.service.GenerateWorld(r.Context(), req, emit); err != nil {
-		event := TurnEvent{Type: "error", Message: err.Error()}
-		if errors.Is(err, ErrWorldExists) || errors.Is(err, ErrEmptyDraftSelection) {
-			event.Code = "worldgen"
-		}
+		event := TurnEvent{Type: "error", Message: err.Error(), Code: generationLimitCode(err)}
 		_ = emit(event)
 	}
 }
@@ -152,6 +149,10 @@ func (s *Server) handleWorldEntitiesPreview(w http.ResponseWriter, r *http.Reque
 	}
 	batch, err := s.service.PreviewWorldEntities(r.Context(), worldID, req)
 	if err != nil {
+		if code := generationLimitCode(err); code != "" {
+			writeJSONErrorCode(w, http.StatusBadRequest, code, err.Error())
+			return
+		}
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}

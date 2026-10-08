@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, FolderOpen, Globe, Sparkles, Wand2, X } from 'lucide-react';
 import { APIClient } from '../api/client';
 import { useFolderPicker } from '../hooks/useFolderPicker';
+import { generationLimitCode, generationLimitHint } from '../lib/generationLimit';
 import { TurnEvent, WorldDraftInfo, WorldEstimate, WorldGenStep } from '../types';
 
 // LargeEstimateCalls is the call count above which Generate asks for a second
@@ -137,7 +138,8 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
           onDraft(event.draft);
         }
         if (event.type === 'error') {
-          setError(event.message || event.detail || 'the generation failed');
+          const message = event.message || event.detail || 'the generation failed';
+          setError(event.code === generationLimitCode ? `${message} ${generationLimitHint}` : message);
         }
       };
       if (sourceMode === 'prompt') {

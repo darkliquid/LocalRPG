@@ -224,6 +224,7 @@ choose; the ledger and provider identifiers are listed in the
 | Key | Type |
 | --- | --- |
 | `generation.max_calls` | int |
+| `generation.max_chunks` | int |
 
 ### `publishers`
 

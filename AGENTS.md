@@ -209,7 +209,7 @@ STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
 
 ### What it reports today
 
-**213 alerts across all 25 files: 0 errors, 95 warnings and 118 suggestions.**
+**215 alerts across all 25 files: 0 errors, 96 warnings and 119 suggestions.**
 For scale, pointing the same styles at every tracked file reported 68,525 alerts
 and 6,875 errors, which is why the scope is the documentation rather than the
 repository.
@@ -224,7 +224,7 @@ Reaching zero took three passes: narrowing the scope to the documentation, addin
 the vocabulary, and then rewriting the prose the remaining rules objected to. A
 fourth pass then worked down the warnings and suggestions, which took the report
 from 293 alerts to 149. The guide that documents the on-disk and package formats
-added 41 more, and the AI world generation guide added 23, so the count stands at 213.
+added 41 more, and the AI world generation guide added 25, so the count stands at 215.
 
 Everything left is deliberate. `neighbor.AmpersandInProse` (71) fires on `&` in
 headings and bolded feature labels, which is a design convention rather than prose.

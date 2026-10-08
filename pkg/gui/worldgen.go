@@ -22,6 +22,15 @@ const (
 	WorldEventDraft    = "draft"
 )
 
+// ErrorCodeGenerationLimit marks a failure the user can fix by changing a
+// setting, so the UI can say where rather than only printing the text.
+const ErrorCodeGenerationLimit = "generation_limit"
+
+// ErrSourceTooLarge reports a source that would need more calls than the chunk
+// budget allows. It is refused before the first call, so a large folder costs
+// nothing and the message names the setting that would let it through.
+var ErrSourceTooLarge = errors.New("the source is larger than the chunk limit")
+
 // generatorRole is the role a world generation runs as when one is configured.
 const generatorRole = "generator"
 
@@ -247,16 +256,22 @@ func (s *Service) GenerateWorld(ctx context.Context, req WorldGenerateRequestDTO
 	}
 
 	gen, oracle := s.worldGenerator()
-	budget := &worldgen.BudgetGenerator{
-		Inner: gen,
-		Max:   s.configMgr.Get().GenerationMaxCalls(),
-	}
 
+	var budget *worldgen.BudgetGenerator
 	var draft worldgen.Draft
 	var genErr error
+
 	if req.Source != nil {
-		genErr = s.ingestInto(genCtx, budget, req, brief, emitEvent, &draft)
+		chunks, err := s.extractSource(ctx, *req.Source)
+		if err != nil {
+			return nil, err
+		}
+		// An ingestion is as big as the source is, so its budget follows the
+		// chunk cap rather than the bounded pipeline's call cap.
+		budget = &worldgen.BudgetGenerator{Inner: gen, Max: worldgen.ChunkCalls(len(chunks))}
+		genErr = s.buildFromChunks(genCtx, budget, brief, chunks, emitEvent, &draft)
 	} else {
+		budget = &worldgen.BudgetGenerator{Inner: gen, Max: s.configMgr.Get().GenerationMaxCalls()}
 		draft, genErr = worldgen.Generate(genCtx, budget, brief, func(step worldgen.Step) {
 			emitEvent(TurnEvent{Type: WorldEventStep, Step: stepDTO(step)})
 		})
@@ -295,19 +310,9 @@ func (s *Service) GenerateWorld(ctx context.Context, req WorldGenerateRequestDTO
 	return &dto, nil
 }
 
-// ingestInto extracts a source and builds a draft from it, reporting the same
+// buildFromChunks assembles a draft from already-read chunks, reporting the same
 // step events a from-scratch generation does.
-func (s *Service) ingestInto(ctx context.Context, gen worldgen.Generator, req WorldGenerateRequestDTO, brief worldgen.Brief, emit func(TurnEvent), draft *worldgen.Draft) error {
-	emit(TurnEvent{Type: WorldEventStep, Step: stepDTO(worldgen.Step{Name: "extract", Status: worldgen.StatusDone})})
-
-	chunks, err := ingest.Extract(ctx, ingest.Source{
-		Kind: req.Source.Kind,
-		Path: req.Source.Path,
-		URLs: req.Source.URLs,
-	})
-	if err != nil {
-		return err
-	}
+func (s *Service) buildFromChunks(ctx context.Context, gen worldgen.Generator, brief worldgen.Brief, chunks []ingest.Chunk, emit func(TurnEvent), draft *worldgen.Draft) error {
 	emit(TurnEvent{Type: WorldEventStep, Step: stepDTO(worldgen.Step{
 		Name: "extract", Status: worldgen.StatusDone,
 		Detail: fmt.Sprintf("%d chunk(s)", len(chunks)),
@@ -320,6 +325,25 @@ func (s *Service) ingestInto(ctx context.Context, gen worldgen.Generator, req Wo
 	*draft = built
 	emit(TurnEvent{Type: WorldEventStep, Step: stepDTO(worldgen.Step{Name: worldgen.StepLink, Status: worldgen.StatusDone})})
 	return nil
+}
+
+// extractSource reads a source and refuses one over the chunk budget. Refusing
+// up front means a folder too large to read costs nothing and names the setting
+// that would let it through, rather than failing partway through the calls.
+func (s *Service) extractSource(ctx context.Context, src WorldSourceDTO) ([]ingest.Chunk, error) {
+	chunks, err := ingest.Extract(ctx, ingest.Source{
+		Kind: src.Kind,
+		Path: src.Path,
+		URLs: src.URLs,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if max := s.configMgr.Get().GenerationMaxChunks(); len(chunks) > max {
+		return nil, fmt.Errorf("%w: it holds %d chunks and generation.max_chunks is %d",
+			ErrSourceTooLarge, len(chunks), max)
+	}
+	return chunks, nil
 }
 
 // generationKind names the pipeline a request uses, so the estimate matches.

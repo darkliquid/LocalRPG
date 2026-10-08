@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -796,4 +797,73 @@ func containsStrings(haystack string, needles ...string) bool {
 		}
 	}
 	return true
+}
+
+func TestSourceOverTheChunkLimitIsRefusedBeforeAnyCall(t *testing.T) {
+	provider := &sequencedProvider{id: "gen", responses: []string{`{"entities":[{"name":"A","type":"faction"}]}`}}
+	svc := worldGenService(t, provider)
+	world := mustCreateWorld(t, svc, "Ember Peak")
+	svc.configMgr.Get().Generation.MaxChunks = 1
+
+	dir := t.TempDir()
+	for _, name := range []string{"a.md", "b.md", "c.md"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("# "+name+"\n\nSome lore.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, err := svc.PreviewWorldEntities(context.Background(), world.ID, WorldEntityBatchRequestDTO{
+		Source: &WorldSourceDTO{Kind: "folder", Path: dir},
+	})
+	if !errors.Is(err, ErrSourceTooLarge) {
+		t.Fatalf("err = %v, want ErrSourceTooLarge", err)
+	}
+	if !containsStrings(err.Error(), "max_chunks", "3 chunks") {
+		t.Fatalf("the refusal should name the setting and the size: %v", err)
+	}
+	if provider.count() != 0 {
+		t.Fatalf("a refused source made %d call(s)", provider.count())
+	}
+}
+
+func TestIngestionIsBoundedByChunksNotTheCallCap(t *testing.T) {
+	// One call per batch of four chunks, so 12 chunks are three calls. A call cap
+	// of two must not stop an ingestion the chunk budget allows.
+	provider := &sequencedProvider{id: "gen"}
+	svc := worldGenService(t, provider)
+	world := mustCreateWorld(t, svc, "Ember Peak")
+	svc.configMgr.Get().Generation.MaxCalls = 2
+
+	dir := t.TempDir()
+	for i := 0; i < 12; i++ {
+		name := filepath.Join(dir, fmt.Sprintf("note-%02d.md", i))
+		if err := os.WriteFile(name, []byte("# Note\n\nSome lore.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	batch, err := svc.PreviewWorldEntities(context.Background(), world.ID, WorldEntityBatchRequestDTO{
+		Source: &WorldSourceDTO{Kind: "folder", Path: dir},
+	})
+	if err != nil {
+		t.Fatalf("an ingestion within the chunk budget should not be capped by max_calls: %v", err)
+	}
+	if batch == nil {
+		t.Fatal("expected a batch")
+	}
+	if provider.count() != 3 {
+		t.Fatalf("calls = %d, want 3", provider.count())
+	}
+}
+
+func TestGenerationLimitCodeNamesTheFailingSetting(t *testing.T) {
+	if got := generationLimitCode(worldgen.ErrCallBudgetExceeded); got != ErrorCodeGenerationLimit {
+		t.Fatalf("call budget code = %q", got)
+	}
+	if got := generationLimitCode(fmt.Errorf("wrapped: %w", ErrSourceTooLarge)); got != ErrorCodeGenerationLimit {
+		t.Fatalf("source size code = %q", got)
+	}
+	if got := generationLimitCode(errors.New("something else")); got != "" {
+		t.Fatalf("an unrelated failure got code %q", got)
+	}
 }

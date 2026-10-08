@@ -20,8 +20,9 @@ import (
 // into many small inputs a model can handle.
 const ChunkLimit = 4096
 
-// ChunksPerCall is how many chunks one model call is given.
-const ChunksPerCall = 4
+// ChunksPerCall is how many chunks one model call is given. It is the pipeline's
+// batch size, so an estimate and the work agree on it.
+const ChunksPerCall = worldgen.ChunksPerCall
 
 // Source is one thing to ingest: a folder or a set of URLs.
 type Source struct {

@@ -93,6 +93,30 @@ describe('WorldGenerateDialog', () => {
     expect(screen.getByText(/this fetches the pages you name/i)).toBeInTheDocument();
   });
 
+  it('points at the setting when a generation hits a limit', async () => {
+    vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (req, onEvent) => {
+      if (req.dry_run) {
+        onEvent({ type: 'estimate', estimate: { calls: 4, priced: false } });
+        return;
+      }
+      onEvent({
+        type: 'error',
+        code: 'generation_limit',
+        message: 'generation call budget exceeded: 20 calls (raise generation.max_calls to allow more)',
+      });
+    });
+
+    render(<WorldGenerateDialog onCancel={() => {}} onDraft={() => {}} estimateDelayMs={0} />);
+
+    fireEvent.change(screen.getByLabelText(/premise/i), { target: { value: 'a drowned kingdom' } });
+    await waitFor(() => expect(screen.getByTestId('generation-estimate')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/settings .* AI Agents .* Generation Limits/i)).toBeInTheDocument()
+    );
+  });
+
   it('hides the counts once a source decides how many entities exist', async () => {
     vi.spyOn(APIClient, 'generateWorld').mockImplementation(async (_req, onEvent) => {
       onEvent({ type: 'estimate', estimate: { calls: 1, priced: false } });

@@ -1162,6 +1162,15 @@ export interface AppConfig {
   media: MediaConfig;
   embeddings?: EmbeddingsConfig;
   preferences: PreferencesConfig;
+  generation?: GenerationConfig;
+}
+
+// GenerationConfig bounds an AI world generation. A premise, entity, or
+// enhancement generation is bounded by its call count; an ingestion, whose size
+// is the source's, is bounded by how many chunks it will read.
+export interface GenerationConfig {
+  max_calls?: number;
+  max_chunks?: number;
 }
 
 export interface SettingsResponse {

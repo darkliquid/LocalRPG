@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { AlertTriangle, Check, FolderOpen, Globe, PackagePlus, Pencil, RefreshCw, X } from 'lucide-react';
 import { APIClient } from '../api/client';
 import { useFolderPicker } from '../hooks/useFolderPicker';
+import { generationLimitHint, isGenerationLimit } from '../lib/generationLimit';
 import {
   WorldApplyResult,
   WorldDraftEntity,
@@ -88,7 +89,8 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
       };
       setBatch(await APIClient.previewWorldEntities(worldId, req));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(isGenerationLimit(err) ? `${message} ${generationLimitHint}` : message);
     } finally {
       setLoading(false);
     }

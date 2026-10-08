@@ -9,8 +9,13 @@ func TestEstimatePlan(t *testing.T) {
 	if got := EstimatePlan("entities", Brief{Counts: Counts{Characters: 25}}, 0, nil); got.Calls < 2 {
 		t.Fatalf("a large batch should span calls: %d", got.Calls)
 	}
-	if got := EstimatePlan("ingest", Brief{}, 10, nil); got.Calls < 10 {
-		t.Fatalf("ingest calls = %d", got.Calls)
+	// An ingestion makes one call per batch of chunks, so ten chunks are three
+	// calls. The count steers neither: the source decides what exists.
+	if got := EstimatePlan("ingest", Brief{}, 10, nil); got.Calls != 3 {
+		t.Fatalf("ingest calls = %d, want 3", got.Calls)
+	}
+	if got := EstimatePlan("ingest", Brief{Counts: Counts{Characters: 50}}, 4, nil); got.Calls != 1 {
+		t.Fatalf("ingest calls = %d, want 1 (counts do not apply)", got.Calls)
 	}
 }
 

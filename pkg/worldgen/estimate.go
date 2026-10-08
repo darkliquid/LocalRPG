@@ -22,6 +22,11 @@ type PriceTable func(calls int) (int64, bool)
 // count exceeds one batch: outline, places, characters, and link.
 const worldStepCalls = 4
 
+// ChunksPerCall is how many source chunks one ingestion call reads. It lives
+// here because the estimator has to know it, and the ingestion reads it from
+// here so the two cannot drift.
+const ChunksPerCall = 4
+
 // EstimatePlan reports the calls a generation of the given kind will make.
 // kind is one of "world", "entities", "enhance", or "ingest".
 //
@@ -41,7 +46,7 @@ func EstimatePlan(kind string, brief Brief, chunks int, prices PriceTable) Estim
 	case "enhance":
 		e.Calls = 1
 	case "ingest":
-		e.Calls = chunks + worldStepCalls
+		e.Calls = ChunkCalls(chunks)
 	default:
 		e.Calls = worldStepCalls + extraBatches(counts)
 	}
@@ -68,6 +73,14 @@ func batchCalls(n int) int {
 		return 1
 	}
 	return (n + MaxBatch - 1) / MaxBatch
+}
+
+// ChunkCalls is how many calls reading n chunks takes, one per batch.
+func ChunkCalls(n int) int {
+	if n <= 0 {
+		return 1
+	}
+	return (n + ChunksPerCall - 1) / ChunksPerCall
 }
 
 // extraBatches counts the additional calls a count over one batch needs.

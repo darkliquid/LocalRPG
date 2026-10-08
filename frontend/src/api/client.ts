@@ -79,11 +79,32 @@ import {
 // campaign apart from a transient failure.
 export class HTTPError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  // code is the machine-readable reason a failure carries, when the endpoint
+  // sends one, so a caller can explain it instead of only printing the text.
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = 'HTTPError';
     this.status = status;
+    this.code = code;
   }
+}
+
+// errorFromResponse builds the most useful error a failed response allows: the
+// message and code from an error envelope when it is one, the raw text
+// otherwise. Without this a caller shows the envelope's JSON to the user.
+async function errorFromResponse(res: Response, fallback: string): Promise<HTTPError> {
+  const text = (await res.text()).trim();
+  let message = text || fallback;
+  let code: string | undefined;
+  try {
+    const body = JSON.parse(text) as { error?: { message?: string; code?: string } };
+    if (body.error?.message) message = body.error.message;
+    code = body.error?.code;
+  } catch {
+    // Keep the raw text when the body is not JSON.
+  }
+  return new HTTPError(res.status, message, code);
 }
 
 // GenerationError carries the structured failure a generation endpoint returns,
@@ -621,7 +642,7 @@ export class APIClient {
       body: JSON.stringify(req),
       signal,
     });
-    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
     if (!res.body) throw new Error('generateWorld: response has no body');
     await readNDJSON(res, onEvent);
   }
@@ -638,7 +659,7 @@ export class APIClient {
       body: JSON.stringify(req),
       signal,
     });
-    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
     if (!res.body) throw new Error('ingestWorld: response has no body');
     await readNDJSON(res, onEvent);
   }
@@ -646,13 +667,13 @@ export class APIClient {
   // getDraft restores a persisted draft, so a reload resumes review.
   static async getDraft(draftId: string): Promise<WorldDraftInfo> {
     const res = await fetch(`/api/world/draft/${encodeURIComponent(draftId)}`);
-    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
     return res.json();
   }
 
   static async listDrafts(): Promise<string[]> {
     const res = await fetch('/api/world/draft/');
-    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
     return res.json();
   }
 
@@ -662,7 +683,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
     return res.json();
   }
 
@@ -672,7 +693,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
   }
 
   // previewWorldEntities generates a batch of entities for an existing world.
@@ -683,7 +704,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
     return res.json();
   }
 
@@ -693,7 +714,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
     return res.json();
   }
 
@@ -705,7 +726,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
     return res.json();
   }
 
@@ -715,7 +736,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new HTTPError(res.status, (await res.text()).trim() || res.statusText);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
     return res.json();
   }
 
