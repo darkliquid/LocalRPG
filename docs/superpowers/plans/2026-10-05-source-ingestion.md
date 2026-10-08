@@ -32,7 +32,7 @@
 - Consumes: nothing.
 - Produces: `Source`, `Chunk`, `func ExtractFolder(dir string) ([]Chunk, error)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestExtractFolderReadsTextAndSkipsBinaries(t *testing.T) {
@@ -53,22 +53,22 @@ func TestExtractFolderReadsTextAndSkipsBinaries(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/ingest/ -run TestExtractFolder -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Walk the directory, read `.md`/`.txt`, split at headings and paragraph boundaries, cap each chunk's
 text (4 KB), and set the chunk title from the file path.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/ingest/ -run TestExtractFolder -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/ingest/ingest.go pkg/ingest/ingest_test.go
@@ -87,7 +87,7 @@ git commit -m "feat(ingest): extract chunks from a folder"
 - Consumes: `Chunk`.
 - Produces: `func ExtractURLs(ctx context.Context, urls []string, opts FetchOptions) ([]Chunk, []error)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestExtractURLsReducesHTMLToText(t *testing.T) {
@@ -112,23 +112,23 @@ func TestExtractURLsHonoursRobots(t *testing.T) { /* a Disallow yields an error,
 func TestExtractURLsOneFailureDoesNotFailTheBatch(t *testing.T) { /* other URLs still ingest */ }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./pkg/ingest/ -run TestExtractURLs -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 For each URL: fetch robots.txt once per host and honour it, fetch the page with a descriptive user
 agent and a size cap, reduce HTML to text (strip tags/scripts/styles, keep the title and headings),
 and chunk. Collect per-URL errors without failing the batch.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/ingest/ -run TestExtractURLs -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/ingest/fetch.go pkg/ingest/fetch_test.go
@@ -147,7 +147,7 @@ git commit -m "feat(ingest): fetch and reduce URLs"
 - Consumes: WG-1's `Generator` and `Draft`.
 - Produces: `func Build(ctx context.Context, gen Generator, chunks []Chunk, brief Brief) (Draft, error)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestBuildProducesADraftWithProvenance(t *testing.T) {
@@ -163,22 +163,22 @@ func TestBuildProducesADraftWithProvenance(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/ingest/ -run TestBuild -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Batch the chunks, prompt the generator to produce an outline, lore, and entities with each entity's
 source recorded, and assemble a `Draft`. Reuse WG-1's link step so the draft's links resolve.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/ingest/ -run TestBuild -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/ingest/ingest.go pkg/ingest/build_test.go
@@ -198,7 +198,7 @@ git commit -m "feat(ingest): build a draft world from chunks"
 - Consumes: `Extract`, `Build`.
 - Produces: `POST /api/world/ingest` (NDJSON) and a source option in the generation flow.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestIngestEndpointStreamsAndWritesNothing(t *testing.T) {
@@ -206,23 +206,23 @@ func TestIngestEndpointStreamsAndWritesNothing(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/gui/ -run TestIngestEndpoint -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add the endpoint (extract → build → stream steps and the draft, persisting to `worlds/.drafts/`), and
 a source option in the generation dialog that accepts a folder path or URLs, with a network notice
 for URLs.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/gui/ -run TestIngestEndpoint -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui frontend/src
@@ -233,23 +233,23 @@ git commit -m "feat: ingest a source into a draft world"
 
 ### Task 5: Verification
 
-- [ ] **Step 1: Offline guard**
+- [x] **Step 1: Offline guard**
 
 Add a test asserting folder ingestion makes no HTTP call (a fake transport that fails the test if used).
 
-- [ ] **Step 2: Full suite and lint**
+- [x] **Step 2: Full suite and lint**
 
 Run: `mise run test && mise run lint`
 Expected: PASS and clean.
 
-- [ ] **Step 3: Confirm the acceptance criteria**
+- [x] **Step 3: Confirm the acceptance criteria**
 
 - Folder ingestion is offline and chunked.
 - URL ingestion honours robots and reports per-URL failures.
 - A draft is produced with entity provenance and resolving links.
 - Nothing is committed without review.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A

@@ -31,7 +31,7 @@
 - Consumes: `Generator`, `WorldContext`, WG-2's link step.
 - Produces: `Enhancement`, `func Enhance(ctx, Generator, WorldContext, instruction string, kinds []string) ([]Enhancement, error)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestEnhanceReturnsCappedProposals(t *testing.T) {
@@ -48,22 +48,22 @@ func TestEnhanceReturnsCappedProposals(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/worldgen/ -run TestEnhance -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add the type and `Enhance`: build a context prompt (reusing WG-2's bounded assembly), call the
 generator, parse into proposals, cap the list, and link any entity proposal against the world.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/worldgen/ -run TestEnhance -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/worldgen/enhance.go pkg/worldgen/enhance_test.go
@@ -82,7 +82,7 @@ git commit -m "feat(worldgen): propose world enhancements"
 - Consumes: `Enhancement`.
 - Produces: `func ApplyLore(existing string, proposals []Enhancement) string`, `func ApplyHooks(existing string, proposals []Enhancement) string`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestApplyLoreAppends(t *testing.T) {
@@ -100,22 +100,22 @@ func TestApplyHooksCreatesTheSection(t *testing.T) {
 func TestApplyLoreWithNoProposalsIsUnchanged(t *testing.T) { /* identical string */ }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./pkg/worldgen/ -run TestApply -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Append lore sections under their target heading or at the end; ensure a `## Hooks` section exists and
 append hooks beneath it. Both are pure string functions.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/worldgen/ -run TestApply -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/worldgen/apply.go pkg/worldgen/apply_test.go
@@ -134,29 +134,29 @@ git commit -m "feat(worldgen): apply lore and hook proposals"
 - Consumes: `Enhance`, `ApplyLore`, `ApplyHooks`, `SaveWorldEntity`.
 - Produces: `POST /api/world/{id}/enhance` and `POST /api/world/{id}/enhance/apply`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestEnhanceWritesNothing(t *testing.T) { /* the world dir is unchanged */ }
 func TestEnhanceApplyWritesOnlyAccepted(t *testing.T) { /* a rejected proposal is absent */ }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./pkg/gui/ -run TestEnhance -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 The enhance endpoint returns the proposals. The apply endpoint takes the accepted set, applies lore
 and hooks to `prompts/lore.md`, writes entity proposals, and saves. Applying an empty set is a no-op.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/gui/ -run TestEnhance -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui
@@ -175,7 +175,7 @@ git commit -m "feat(gui): enhance a world through a diff"
 - Consumes: the endpoints (Task 3).
 - Produces: an Enhance action with per-proposal accept/reject.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 test("accepts and rejects proposals", () => {
@@ -188,22 +188,22 @@ test("accepts and rejects proposals", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm run test -- WorldEnhanceDialog`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add an Enhance action on a world that collects an instruction, shows the proposals as cards with
 accept/reject toggles and their reason, and applies the accepted set.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm run test -- WorldEnhanceDialog`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src
@@ -214,23 +214,23 @@ git commit -m "feat(frontend): review world enhancements"
 
 ### Task 5: Verification
 
-- [ ] **Step 1: No-op guard**
+- [x] **Step 1: No-op guard**
 
 Add a test that applying no proposals leaves `lore.md` byte-identical.
 
-- [ ] **Step 2: Full suite and lint**
+- [x] **Step 2: Full suite and lint**
 
 Run: `mise run test && mise run lint`
 Expected: PASS and clean.
 
-- [ ] **Step 3: Confirm the acceptance criteria**
+- [x] **Step 3: Confirm the acceptance criteria**
 
 - Enhance proposes lore, entities, and hooks, capped.
 - Lore is appended, hooks land under `## Hooks`.
 - Only accepted proposals are written.
 - Existing entities are untouched.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A

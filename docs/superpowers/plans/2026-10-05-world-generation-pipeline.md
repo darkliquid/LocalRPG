@@ -31,7 +31,7 @@
 - Consumes: `core.WorldManifest`.
 - Produces: `Brief`, `Counts`, `Draft`, `DraftEntity`, `Step`, `Generator`, `func Generate(ctx, Generator, Brief, func(Step)) (Draft, error)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 package worldgen
@@ -63,22 +63,22 @@ func TestGenerateRunsEveryStep(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/worldgen/ -run TestGenerateRunsEveryStep -v`
 Expected: FAIL, `undefined: Generate`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add the types and a `Generate` that calls `Generator.GenerateJSON` once per step, emitting a `Step`
 per call. The stub returns `{}`, so parsing must tolerate empty structures at this stage.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/worldgen/ -run TestGenerateRunsEveryStep -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/worldgen/worldgen.go pkg/worldgen/worldgen_test.go
@@ -97,7 +97,7 @@ git commit -m "feat(worldgen): add the pipeline skeleton"
 - Consumes: `Generator`.
 - Produces: `outlineSchema`, `placesSchema`, `func runOutline`, `func runPlaces`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestPlacesStepParsesLocationsAndFactions(t *testing.T) {
@@ -115,22 +115,22 @@ func TestPlacesStepParsesLocationsAndFactions(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/worldgen/ -run TestPlacesStep -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Define the JSON schemas and the parse of each step's response into the draft's world manifest and
 entities. Use `jsonrepair.Repair` before unmarshalling so a fenced or malformed response recovers.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/worldgen/ -run TestPlacesStep -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/worldgen/steps.go pkg/worldgen/steps_test.go
@@ -149,7 +149,7 @@ git commit -m "feat(worldgen): generate the outline and places"
 - Consumes: `entity.ParseMarkdownEntity`.
 - Produces: `func runCharacters`, `func linkDraft(Draft) Draft`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestLinkDraftResolvesAndDropsUnknownLinks(t *testing.T) {
@@ -167,23 +167,23 @@ func TestLinkDraftResolvesAndDropsUnknownLinks(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/worldgen/ -run TestLinkDraft -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Generate characters seeded with the outline and places, then validate every `[[wikilink]]` in every
 entity body against the draft's ids (via `entity.WikilinkTarget` and `entity.Slugify`) and drop an
 unresolved one.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/worldgen/ -run TestLinkDraft -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/worldgen/steps.go pkg/worldgen/steps_test.go
@@ -203,7 +203,7 @@ git commit -m "feat(worldgen): generate characters and cross-link the draft"
 - Consumes: `worldgen.Generate`, the provider router.
 - Produces: `POST /api/world/generate` (NDJSON), `Service.GenerateWorld(ctx, brief, emit) (DraftDTO, error)`, and a draft store under `worlds/.drafts/`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestGenerateWorldStreamsStepsAndDraft(t *testing.T) {
@@ -222,23 +222,23 @@ func TestGenerateWorldStreamsStepsAndDraft(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./pkg/gui/ -run TestGenerateWorld -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Build a `worldgen.Generator` from the router's `generator` role (falling back to `gm`), run the
 pipeline, stream a `step` event per step and a final `draft` event, and persist the draft to
 `worlds/.drafts/<id>.yaml` so a reload can resume review.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./pkg/gui/ -run TestGenerateWorld -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui
@@ -257,7 +257,7 @@ git commit -m "feat(gui): stream world generation"
 - Consumes: the endpoint (Task 4).
 - Produces: a brief form, step progress, and a hand-off to review (WG-5).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 test("collects a brief and shows step progress", () => {
@@ -268,23 +268,23 @@ test("collects a brief and shows step progress", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm run test -- WorldGenerateDialog`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add a dialog that collects the brief (premise, optional genre/name, counts), calls the endpoint,
 renders step progress, and passes the draft to the review surface (WG-5). Add a cancel that aborts
 the stream.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm run test -- WorldGenerateDialog`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src
@@ -295,23 +295,23 @@ git commit -m "feat(frontend): add the world generation flow"
 
 ### Task 6: Verification
 
-- [ ] **Step 1: Regression guard**
+- [x] **Step 1: Regression guard**
 
 Add a test that a malformed step response is repaired by `jsonrepair` and still yields a draft.
 
-- [ ] **Step 2: Full suite and lint**
+- [x] **Step 2: Full suite and lint**
 
 Run: `mise run test && mise run lint`
 Expected: PASS and clean.
 
-- [ ] **Step 3: Confirm the acceptance criteria**
+- [x] **Step 3: Confirm the acceptance criteria**
 
 - The pipeline runs four steps and emits progress.
 - The draft has the requested counts and cross-linked entities.
 - A step failure keeps earlier steps; cancellation aborts.
 - No live world is written.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A

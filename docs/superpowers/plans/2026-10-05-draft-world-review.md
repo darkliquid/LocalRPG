@@ -32,7 +32,7 @@
 - Consumes: `Draft`.
 - Produces: `DraftSection`, `Draft.Sections`, `func SaveDraft(dir string, d Draft) error`, `func LoadDraft(dir, id string) (Draft, error)`, `func DeleteDraft(dir, id string) error`, `func SplitLoreSections(lore string) []DraftSection`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestSplitLoreSections(t *testing.T) {
@@ -57,22 +57,22 @@ func TestDraftStoreRoundTrip(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./pkg/worldgen/ -run 'TestSplitLore|TestDraftStore' -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add `DraftSection` and `Draft.Sections`, `SplitLoreSections` (split on headings), and the store under
 `worlds/.drafts/<id>.yaml`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/worldgen/ -run 'TestSplitLore|TestDraftStore' -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/worldgen/worldgen.go pkg/worldgen/store.go pkg/worldgen/store_test.go
@@ -92,7 +92,7 @@ git commit -m "feat(worldgen): add draft sections and a draft store"
 - Consumes: `LoadDraft`, `writeWorld`, `SaveWorldEntity`.
 - Produces: `POST /api/world/draft/commit`, `POST /api/world/draft/discard`, `Service.CommitDraft(ctx, req DraftCommitRequestDTO) (WorldSummaryDTO, error)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestCommitDraftWritesOnlyAccepted(t *testing.T) { /* a rejected entity is absent */ }
@@ -100,23 +100,23 @@ func TestCommitDraftIsAtomic(t *testing.T) { /* a write failure leaves no world 
 func TestCommitEmptySetIsRefused(t *testing.T) { /* an empty accepted set errors */ }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./pkg/gui/ -run TestCommitDraft -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Build the accepted lore (the accepted sections joined), create the world directory in a temp location,
 write `world.yaml`, `prompts/lore.md`, and the accepted entities, then rename into place. Delete the
 draft on success.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/gui/ -run TestCommitDraft -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui
@@ -135,29 +135,29 @@ git commit -m "feat(gui): commit a reviewed draft world"
 - Consumes: `writeWorld`, `SaveWorldEntity`, WG-2's clash handling.
 - Produces: the same commit endpoint with a target world id.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestCommitIntoExistingAppends(t *testing.T) { /* lore is appended, not replaced */ }
 func TestCommitIntoExistingRefusesAClash(t *testing.T) { /* an existing entity id is refused */ }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./pkg/gui/ -run TestCommitIntoExisting -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 When the request names an existing world, append the accepted lore sections, write the accepted
 entities, and refuse an id clash with a clear error.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./pkg/gui/ -run TestCommitIntoExisting -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui
@@ -177,7 +177,7 @@ git commit -m "feat(gui): merge a draft into an existing world"
 - Consumes: the draft, the commit/discard endpoints, the existing entity editor.
 - Produces: `<WorldDraftReview draft onCommit onDiscard />`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 test("counts accepted items", () => {
@@ -188,22 +188,22 @@ test("rejecting disables commit when all are rejected", () => { /* … */ });
 test("editing an entity updates it", () => { /* reuses the entity editor */ });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npm run test -- WorldDraftReview`
 Expected: FAIL.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Render the header, the lore sections, and the entity list with accept/reject toggles and the counts.
 Editing opens the existing entity editor. Commit sends the accepted set; discard deletes the draft.
 
-- [ ] **Step 4: Run tests to verify it passes**
+- [x] **Step 4: Run tests to verify it passes**
 
 Run: `npm run test -- WorldDraftReview`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src
@@ -214,23 +214,23 @@ git commit -m "feat(frontend): review a draft world"
 
 ### Task 5: Verification
 
-- [ ] **Step 1: Regression guard**
+- [x] **Step 1: Regression guard**
 
 Add a test that committing a fully-accepted WG-1 draft reproduces the world WG-1 intended.
 
-- [ ] **Step 2: Full suite and lint**
+- [x] **Step 2: Full suite and lint**
 
 Run: `mise run test && mise run lint`
 Expected: PASS and clean.
 
-- [ ] **Step 3: Confirm the acceptance criteria**
+- [x] **Step 3: Confirm the acceptance criteria**
 
 - The review renders sections and entities with counts.
 - Commit writes only the accepted set, atomically.
 - An existing-world commit appends and refuses a clash.
 - Discard deletes the draft; a reload restores an unfinished one.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
