@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
 
@@ -11,10 +10,15 @@ import (
 )
 
 func TestOfflineConfigCommands(t *testing.T) {
+	// The config resolves from XDG, which caches its directories when the package
+	// is first used, so HOME is not enough to redirect it: LOCALRPG_CONFIG_DIR is
+	// read on every call. The check below fails loudly rather than writing the
+	// developer's real config if that ever stops being true.
 	tmpDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", origHome)
+	t.Setenv("LOCALRPG_CONFIG_DIR", tmpDir)
+	if read, _ := config.DetectConfigFile(); !strings.HasPrefix(read, tmpDir) {
+		t.Fatalf("refusing to run: the config resolves to %s, outside %s", read, tmpDir)
+	}
 
 	// Create a config with a cloud provider
 	cfgMgr := config.NewConfigManager()
