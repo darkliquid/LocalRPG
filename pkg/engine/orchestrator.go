@@ -2001,6 +2001,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 
 	var provenance []ToolCallRecord
 	var checks []harness.CheckResult
+	var recordedAttempts []harness.Attempt
 	if resolvedPending != nil {
 		checks = append(checks, *resolvedPending)
 	}
@@ -2050,57 +2051,98 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				attribute.Bool("localrpg.tools_offered", offerTools),
 			),
 		)
-		roundStarted := time.Now()
-		// Each round's prose is provisional until the round is chosen: only the
-		// last round becomes the turn. Resetting the parser discards a round that
-		// narrated before calling a tool, so the finalised segments match the
-		// recorded narration.
-		if o.parser != nil {
-			o.parser.Reset()
-		}
-		result, err := o.generateRequest(roundCtx, request, onChunk)
-		roundDuration := float64(time.Since(roundStarted).Milliseconds())
-		roundAttributes := otelmetric.WithAttributes(
-			attribute.String("localrpg.role", "gm"),
-			attribute.Int("localrpg.round", round),
-		)
-		roundSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
-		if err != nil {
-			code := harness.ClassifyProviderError(err)
-			if result.Failure != nil && result.Failure.Code != "" {
-				code = result.Failure.Code
+		var result streamResult
+		var genErr error
+		repairAttempts := 0
+		maxRepairs := o.completionMaxRepairAttempts()
+		genReq := request
+
+		for {
+			roundStarted := time.Now()
+			// Each round's prose is provisional until the round is chosen: only the
+			// last round becomes the turn. Resetting the parser discards a round that
+			// narrated before calling a tool, so the finalised segments match the
+			// recorded narration.
+			if o.parser != nil {
+				o.parser.Reset()
 			}
-			engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
+			result, genErr = o.generateRequest(roundCtx, genReq, onChunk)
+			roundDuration := float64(time.Since(roundStarted).Milliseconds())
+			roundAttributes := otelmetric.WithAttributes(
 				attribute.String("localrpg.role", "gm"),
-				attribute.String("error.kind", string(code)),
-				attribute.String("gen_ai.system", provider.ID()),
-			))
+				attribute.Int("localrpg.round", round),
+			)
+			roundSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
+
+			// Check if reply is malformed (empty stream or malformed reply)
+			isMalformed := (result.Failure != nil && result.Failure.Code == harness.FailureEmptyResponse) ||
+				(genErr == nil && classifyReply(result, turnstream.RepairReport{}) == ProblemMalformed)
+
+			if isMalformed && repairAttempts < maxRepairs {
+				detail := "empty response"
+				if result.Failure != nil && result.Failure.Message != "" {
+					detail = result.Failure.Message
+				}
+				recordedAttempts = append(recordedAttempts, harness.Attempt{
+					Role:     "gm",
+					Provider: provider.ID(),
+					Code:     harness.FailureParseError,
+					Detail:   detail,
+				})
+				repairAttempts++
+				nudge := repairInstruction(ProblemMalformed, detail)
+				messages = append(messages, harness.Message{Role: "user", Content: nudge})
+				genReq.Messages = messages
+				if strings.TrimSpace(genReq.Prompt) != "" {
+					genReq.Prompt = genReq.Prompt + "\n\n" + nudge
+				}
+				continue
+			}
+
+			if genErr != nil {
+				code := harness.ClassifyProviderError(genErr)
+				if result.Failure != nil && result.Failure.Code != "" {
+					code = result.Failure.Code
+				}
+				if len(recordedAttempts) > 0 && result.Failure != nil {
+					result.Failure.Attempts = append(recordedAttempts, result.Failure.Attempts...)
+				}
+				engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
+					attribute.String("localrpg.role", "gm"),
+					attribute.String("error.kind", string(code)),
+					attribute.String("gen_ai.system", provider.ID()),
+				))
+				engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
+				roundSpan.SetAttributes(
+					attribute.String("turn.failure_code", string(code)),
+					attribute.String("localrpg.generation.failure_code", string(code)),
+				)
+				roundSpan.RecordError(genErr)
+				roundSpan.SetStatus(codes.Error, string(code))
+				roundSpan.End()
+				return result, genErr
+			}
 			engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
-			roundSpan.SetAttributes(
-				attribute.String("turn.failure_code", string(code)),
-				attribute.String("localrpg.generation.failure_code", string(code)),
-			)
-			roundSpan.RecordError(err)
-			roundSpan.SetStatus(codes.Error, string(code))
-			roundSpan.End()
-			return result, err
-		}
-		engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
-		if result.Failure != nil {
-			engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
-				attribute.String("localrpg.role", "gm"),
-				attribute.String("error.kind", string(result.Failure.Code)),
-				attribute.String("gen_ai.system", provider.ID()),
-			))
-			roundSpan.SetAttributes(
-				attribute.String("turn.failure_code", string(result.Failure.Code)),
-				attribute.String("turn.failure_message", result.Failure.Message),
-				attribute.String("localrpg.generation.failure_code", string(result.Failure.Code)),
-			)
-			roundSpan.RecordError(result.Failure)
-			roundSpan.SetStatus(codes.Error, string(result.Failure.Code))
-			roundSpan.End()
-			return result, result.Failure
+			if result.Failure != nil {
+				if len(recordedAttempts) > 0 {
+					result.Failure.Attempts = append(recordedAttempts, result.Failure.Attempts...)
+				}
+				engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
+					attribute.String("localrpg.role", "gm"),
+					attribute.String("error.kind", string(result.Failure.Code)),
+					attribute.String("gen_ai.system", provider.ID()),
+				))
+				roundSpan.SetAttributes(
+					attribute.String("turn.failure_code", string(result.Failure.Code)),
+					attribute.String("turn.failure_message", result.Failure.Message),
+					attribute.String("localrpg.generation.failure_code", string(result.Failure.Code)),
+				)
+				roundSpan.RecordError(result.Failure)
+				roundSpan.SetStatus(codes.Error, string(result.Failure.Code))
+				roundSpan.End()
+				return result, result.Failure
+			}
+			break
 		}
 		roundSpan.End()
 
