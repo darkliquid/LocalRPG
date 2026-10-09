@@ -10,7 +10,7 @@ import (
 
 // textRouterFactory builds the router for one-shot text generation. It is a
 // package variable so a test can inject a scripted router.
-var textRouterFactory = harness.RouterFromConfigWithLogger
+var textRouterFactory = routerWithChains
 
 // generationOutcome is the result of walking a role fallback chain.
 type generationOutcome struct {

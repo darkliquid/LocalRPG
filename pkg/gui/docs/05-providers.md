@@ -110,6 +110,26 @@ Zero-setup built-in offline storyteller. It reads character stats, outcome tiers
 - **ComfyUI / Automatic1111**: Local Stable Diffusion web APIs. See [Setting Up ComfyUI](18-local-image-comfyui).
 - **Google Imagen**: GCP image synthesis.
 
+### Purpose Chains
+
+A media purpose can declare an ordered chain, mirroring a role's. Each member
+names an entry in the matching family map (`tts_providers` or `image_providers`)
+or the reserved `default`:
+
+```yaml
+media:
+  purposes:
+    scene: hero
+  purpose_chains:
+    scene:
+      chain: [hero, default]
+      select: first
+```
+
+The registry uses the first member that builds, so a premium provider can lead a
+purpose while a local one stands by. The rules that order the chain are the same
+four a role chain uses.
+
 ## Spend Ledger & Rate Limit Handling
 
 LocalRPG protects you from runaway API costs and service interruptions:

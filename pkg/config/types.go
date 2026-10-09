@@ -50,6 +50,21 @@ type AgentRoleConfig struct {
 	// of one adapter at one endpoint stay distinct. Empty means the discriminator
 	// is derived from the endpoint or command.
 	Instance string `yaml:"instance,omitempty" json:"instance,omitempty"`
+
+	// Chain is an ordered list of provider instance names this role tries in
+	// turn, ordered by Select. Empty keeps the single provider and the
+	// configured fallback, which is what every existing config does.
+	Chain []string `yaml:"chain,omitempty" json:"chain,omitempty"`
+	// Select orders Chain: first (the default), cheapest, local-first, or by-tag.
+	Select string `yaml:"select,omitempty" json:"select,omitempty"`
+	// Tag is the feature or tier name SelectByTag prefers.
+	Tag string `yaml:"tag,omitempty" json:"tag,omitempty"`
+}
+
+// ChainConfig returns the role's chain as a ChainConfig, so a role chain and a
+// media purpose chain validate and order through the same code.
+func (a AgentRoleConfig) ChainConfig() ChainConfig {
+	return ChainConfig{Chain: a.Chain, Select: a.Select, Tag: a.Tag}
 }
 
 type AgentsConfig struct {
@@ -264,6 +279,10 @@ type MediaConfig struct {
 	// provider name from the matching family map, or the family default when
 	// unset.
 	Purposes map[string]string `yaml:"purposes,omitempty" json:"purposes,omitempty"`
+	// PurposeChains declares an ordered provider chain and selection rule per
+	// use name. A purpose with no chain uses its single configured provider, so
+	// a config written before this key existed behaves exactly as it did.
+	PurposeChains map[string]ChainConfig `yaml:"purpose_chains,omitempty" json:"purpose_chains,omitempty"`
 }
 
 type PreferencesConfig struct {
@@ -480,7 +499,71 @@ func (c *Config) Validate() []string {
 
 	problems = append(problems, c.instanceProblems()...)
 	problems = append(problems, c.mediaProviderProblems()...)
+	problems = append(problems, c.chainProblems()...)
 
+	return problems
+}
+
+// chainProblems validates the declared provider chains. A chain member must name
+// a configured instance, because an unknown name would silently shorten the
+// chain, and a rule must be one of the four, because an unknown rule would
+// silently fall back to the declared order.
+func (c *Config) chainProblems() []string {
+	var problems []string
+	for _, role := range slices.Sorted(maps.Keys(c.Agents.Roles)) {
+		roleCfg := c.Agents.Roles[role]
+		if len(roleCfg.Chain) == 0 && roleCfg.Select == "" && roleCfg.Tag == "" {
+			continue
+		}
+		problems = append(problems, chainProblem(
+			fmt.Sprintf("agents.roles[%q]", role), roleCfg.ChainConfig(), func(member string) bool {
+				_, ok := c.Agents.Roles[member]
+				return ok
+			})...)
+	}
+	for _, use := range slices.Sorted(maps.Keys(c.Media.PurposeChains)) {
+		family := PurposeFamily(Purpose(use))
+		if family == "" {
+			problems = append(problems, "media.purpose_chains."+use+": unknown purpose")
+			continue
+		}
+		problems = append(problems, chainProblem(
+			"media.purpose_chains."+use, c.Media.PurposeChains[use], func(member string) bool {
+				if member == ReservedProviderName {
+					return true
+				}
+				switch family {
+				case "tts":
+					_, ok := c.Media.TTSProviders[member]
+					return ok
+				case "image":
+					_, ok := c.Media.ImageProviders[member]
+					return ok
+				}
+				return false
+			})...)
+	}
+	return problems
+}
+
+// chainProblem validates one declared chain against a membership predicate.
+func chainProblem(path string, chain ChainConfig, known func(string) bool) []string {
+	var problems []string
+	if chain.Select != "" && !ValidSelectRule(chain.Select) {
+		problems = append(problems, fmt.Sprintf("%s.select: unknown rule %q", path, chain.Select))
+	}
+	if chain.Select == SelectByTag && strings.TrimSpace(chain.Tag) == "" {
+		problems = append(problems, path+".tag: by-tag requires a tag")
+	}
+	for i, member := range chain.Chain {
+		if strings.TrimSpace(member) == "" {
+			problems = append(problems, fmt.Sprintf("%s.chain[%d]: empty provider name", path, i))
+			continue
+		}
+		if !known(member) {
+			problems = append(problems, fmt.Sprintf("%s.chain[%d]: %q is not a configured provider", path, i, member))
+		}
+	}
 	return problems
 }
 

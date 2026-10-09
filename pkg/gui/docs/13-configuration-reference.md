@@ -68,6 +68,9 @@ choose; the ledger and provider identifiers are listed in the
 | `agents.roles.<key>.top_p` | float |
 | `agents.roles.<key>.top_k` | int |
 | `agents.roles.<key>.instance` | string |
+| `agents.roles.<key>.chain` | []string |
+| `agents.roles.<key>.select` | string |
+| `agents.roles.<key>.tag` | string |
 | `agents.fallbacks` | map<string, string> |
 | `agents.turn_timeout_seconds` | int |
 | `agents.chunk_timeout_seconds` | int |
@@ -161,6 +164,9 @@ choose; the ledger and provider identifiers are listed in the
 | `media.image.person_generation` | string |
 | `media.image.instance` | string |
 | `media.purposes` | map<string, string> |
+| `media.purpose_chains.<key>.chain` | []string |
+| `media.purpose_chains.<key>.select` | string |
+| `media.purpose_chains.<key>.tag` | string |
 
 ### `embeddings`
 
@@ -253,6 +259,8 @@ unlisted value is either rejected or falls back to the documented default.
 | `media.tts.markdown` | `auto`, `strip`, `keep` |
 | `media.stt.type` | `builtin`, `http`, `cli`, `web-speech`, `disabled` |
 | `media.image.type` | `builtin`, `http`, `cli`, `comfyui`, `gemini`, `disabled` |
+| `agents.roles.<role>.select` | `first`, `cheapest`, `local-first`, `by-tag` |
+| `media.purpose_chains.<purpose>.select` | `first`, `cheapest`, `local-first`, `by-tag` |
 | `embeddings.provider` | `builtin-local`, `openai`, `gemini`, `disabled` |
 | `embeddings.providers.<id>.type` | `builtin`, `http`, `gemini`, `disabled` |
 | `preferences.font_scale` | `small`, `medium`, `large` |

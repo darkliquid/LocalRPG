@@ -5,6 +5,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
 func TestCostFromTokens(t *testing.T) {
@@ -112,5 +113,46 @@ func TestBuiltinsAreScopedToTheVendorEndpoint(t *testing.T) {
 	}
 	if got := Resolve("tts:http@localhost:8880", "", nil); got != (Price{}) {
 		t.Errorf("a local speech server must not be billed, got %+v", got)
+	}
+}
+
+func TestWeightRanksCheaperBelowPricier(t *testing.T) {
+	cheap := Price{PerCharacter: 15}
+	dear := Price{PerCharacter: 80}
+	if cheap.Weight() >= dear.Weight() {
+		t.Fatalf("cheap.Weight() = %d, dear.Weight() = %d", cheap.Weight(), dear.Weight())
+	}
+}
+
+func TestWeightUnknownPriceIsNotPriced(t *testing.T) {
+	if _, ok := Weight(string(provider.KeyTTSSherpaONNX), "", &config.Config{}); ok {
+		t.Fatal("a local adapter the ledger does not price must report ok = false")
+	}
+	if weight, ok := Weight(string(provider.KeyTTSElevenLabs), "", &config.Config{}); !ok || weight == 0 {
+		t.Fatalf("elevenlabs has a built-in price, got (%d, %v)", weight, ok)
+	}
+}
+
+func TestRouterChainPriceRanksByModel(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Agents.Roles = map[string]config.AgentRoleConfig{
+		"expensive": {Model: "gemini-3.8-flash"},
+		"cheap":     {Model: "gemini-2.5-flash-lite"},
+	}
+	router := harness.NewRouter()
+	router.AssignRoleKey("expensive", provider.KeyLLMGemini)
+	router.AssignRoleKey("cheap", provider.KeyLLMGemini)
+
+	price := RouterChainPrice(cfg, router)
+	cheap, cheapOK := price("cheap")
+	expensive, expensiveOK := price("expensive")
+	if !cheapOK || !expensiveOK {
+		t.Fatalf("both models are priced, got cheap=%v expensive=%v", cheapOK, expensiveOK)
+	}
+	if cheap >= expensive {
+		t.Fatalf("cheap = %d, expensive = %d", cheap, expensive)
+	}
+	if _, ok := price("unassigned"); ok {
+		t.Fatal("a role with no key must not be priced")
 	}
 }

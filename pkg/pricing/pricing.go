@@ -152,3 +152,37 @@ func toPrice(c config.PriceConfig) Price {
 		PerRequest:       Micros(c.PerRequest),
 	}
 }
+
+// Weight is a single comparable cost figure for a rate card, so a provider chain
+// can be ordered cheapest first. Within one family only one dimension is priced,
+// so the sum ranks instances of that family the way a user expects.
+func (p Price) Weight() Micros {
+	return p.PerMillionInput + p.PerMillionOutput + p.PerCharacter + p.PerRequest
+}
+
+// Weight resolves a provider key and model to a comparable cost in micros. ok is
+// false when the ledger knows no price for the pair, so an unpriced instance
+// sorts last in a cheapest chain.
+func Weight(providerKey, model string, cfg *config.Config) (int64, bool) {
+	p := Resolve(providerKey, model, cfg)
+	if p == (Price{}) {
+		return 0, false
+	}
+	return int64(p.Weight()), true
+}
+
+// RouterChainPrice returns the accessor Router.SetChainPrice wants, so a
+// cheapest chain orders by the ledger's price for each member's key and model.
+func RouterChainPrice(cfg *config.Config, router *harness.Router) func(string) (int64, bool) {
+	return func(providerID string) (int64, bool) {
+		key, ok := router.ProviderKeyForRole(providerID)
+		if !ok || key == "" {
+			return 0, false
+		}
+		model := ""
+		if role, ok := cfg.Agents.Roles[providerID]; ok {
+			model = role.Model
+		}
+		return Weight(string(key), model, cfg)
+	}
+}

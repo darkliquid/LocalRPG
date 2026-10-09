@@ -70,6 +70,8 @@ func renderConfigurationReference() string {
 	b.WriteString("| `media.tts.markdown` | `auto`, `strip`, `keep` |\n")
 	b.WriteString("| `media.stt.type` | `builtin`, `http`, `cli`, `web-speech`, `disabled` |\n")
 	b.WriteString("| `media.image.type` | `builtin`, `http`, `cli`, `comfyui`, `gemini`, `disabled` |\n")
+	b.WriteString("| `agents.roles.<role>.select` | `first`, `cheapest`, `local-first`, `by-tag` |\n")
+	b.WriteString("| `media.purpose_chains.<purpose>.select` | `first`, `cheapest`, `local-first`, `by-tag` |\n")
 	b.WriteString("| `embeddings.provider` | `builtin-local`, `openai`, `gemini`, `disabled` |\n")
 	b.WriteString("| `embeddings.providers.<id>.type` | `builtin`, `http`, `gemini`, `disabled` |\n")
 	b.WriteString("| `preferences.font_scale` | `small`, `medium`, `large` |\n")

@@ -150,6 +150,13 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 	}
 
 	router := NewRouter()
+	router.SetLogger(logger)
+
+	// roleTiers and roleFeatures let a chain order its members by the tier and
+	// features of each member's registered adapter, without the chain code
+	// reaching into the registry itself.
+	roleTiers := make(map[string]provider.Tier, len(cfg.Agents.Roles))
+	roleFeatures := make(map[string][]provider.Feature, len(cfg.Agents.Roles))
 
 	gmConfigured := false
 	for role, roleCfg := range cfg.Agents.Roles {
@@ -167,6 +174,12 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 			Endpoint:    roleCfg.Endpoint,
 			Instance:    roleCfg.Instance,
 		})
+		if hasKey {
+			if reg, ok := provider.Lookup(string(key.Parent())); ok {
+				roleTiers[role] = reg.Descriptor.Tier
+				roleFeatures[role] = reg.Descriptor.Features
+			}
+		}
 
 		provider, err := NewModelProviderWithLogger(role, ProviderConfig{
 			Type:           roleCfg.Type,
@@ -208,6 +221,17 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 			router.SetFallback(role, fallback)
 		}
 	}
+
+	// A declared chain names other configured roles, which are registered as
+	// providers above, so the router can try them in the rule's order.
+	for role, roleCfg := range cfg.Agents.Roles {
+		if len(roleCfg.Chain) > 0 {
+			router.SetChain(role, roleCfg.Chain, roleCfg.ChainConfig().Rule(), roleCfg.Tag)
+		}
+	}
+	router.SetChainTier(func(id string) (provider.Tier, []provider.Feature) {
+		return roleTiers[id], roleFeatures[id]
+	})
 
 	// The echo default exists for an intentionally unconfigured gm, not to mask a
 	// gm that was configured and then failed to build.
