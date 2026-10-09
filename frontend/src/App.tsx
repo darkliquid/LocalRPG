@@ -20,6 +20,8 @@ import { NewEntityWizard } from './components/NewEntityWizard';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
 import { LimitChip } from './components/LimitChip';
 import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, AlertTriangle, HelpCircle, Download } from 'lucide-react';
+import { DiceEntry } from './lib/diceRange';
+import type { Adjudication, CounterProposal } from './types';
 import { genreGradient } from './lib/genre';
 import { formatGenerationError } from './lib/generationError';
 import { useStreamedSpeech } from './hooks/useStreamedSpeech';
@@ -538,16 +540,47 @@ export const App: React.FC = () => {
 
   // handleResolveCheck rolls a pending check through IR-1's endpoint, so the
   // adjudication streams without a fresh player action.
-  const handleResolveCheck = async (turnNumber: number, pendingCheckRef: string, manualResult?: number) => {
+  const handleResolveCheck = async (turnNumber: number, pendingCheckRef: string, manual?: DiceEntry) => {
+    // One entered number is a total; several are the individual dice, which the
+    // server sums and records so the chronicle can show the faces.
+    const body = manual
+      ? manual.dice.length > 1
+        ? { pending_check_ref: pendingCheckRef, manual_dice: manual.dice }
+        : { pending_check_ref: pendingCheckRef, manual_result: manual.total }
+      : { pending_check_ref: pendingCheckRef };
     await beginTurnStream({ mode: 'Roll', text: '' }, (onEvent, signal) =>
-      APIClient.resolveCheck(
-        activeGameID!,
-        turnNumber,
-        { pending_check_ref: pendingCheckRef, manual_result: manualResult },
-        onEvent,
-        signal,
-      ),
+      APIClient.resolveCheck(activeGameID!, turnNumber, body, onEvent, signal),
     );
+  };
+
+  // handleRenegotiate asks the GM to rule on a counter-proposal, then folds the
+  // agreed terms and the exchange back into the chronicle so the card re-renders.
+  const handleRenegotiate = async (
+    turnNumber: number,
+    pendingCheckRef: string,
+    counter: CounterProposal,
+  ): Promise<Adjudication | undefined> => {
+    try {
+      const result = await APIClient.renegotiate(activeGameID!, turnNumber, {
+        pending_check_ref: pendingCheckRef,
+        counter,
+      });
+      setChronicle((prev) =>
+        prev.map((turn) =>
+          turn.turn_number === turnNumber
+            ? {
+                ...turn,
+                pending_check: result.pending_check ?? turn.pending_check,
+                negotiations: result.negotiations ?? turn.negotiations,
+              }
+            : turn,
+        ),
+      );
+      return result.ruling;
+    } catch (err) {
+      setFundsError({ message: err instanceof Error ? err.message : 'The GM could not be reached.' });
+      return undefined;
+    }
   };
 
   const handleStopTurn = () => {
@@ -1024,8 +1057,8 @@ export const App: React.FC = () => {
                 pending={pendingCheck}
                 busy={turnInFlight || isRateLimited}
                 onRoll={() => handleResolveCheck(pendingTurnNumber, pendingCheck!.ref)}
-                onManual={(total) => handleResolveCheck(pendingTurnNumber, pendingCheck!.ref, total)}
-                onArgue={() => document.getElementById('action-console-input')?.focus()}
+                onManual={(entry) => handleResolveCheck(pendingTurnNumber, pendingCheck!.ref, entry)}
+                onArgue={(counter) => handleRenegotiate(pendingTurnNumber, pendingCheck!.ref, counter)}
               />
 
               {fundsError && (

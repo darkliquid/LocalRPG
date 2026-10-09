@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
@@ -52,5 +53,28 @@ func TestPendingCheckDTOCarriesArithmetic(t *testing.T) {
 	}
 	if dto.PendingCheck.ActorValues["hp"] != 24 {
 		t.Fatalf("actor values = %+v, want hp 24", dto.PendingCheck.ActorValues)
+	}
+}
+
+func TestResolveCheckRequestCarriesManualDice(t *testing.T) {
+	var req ResolveCheckRequestDTO
+	if err := json.Unmarshal([]byte(`{"pending_check_ref":"r","manual_dice":[4,3]}`), &req); err != nil {
+		t.Fatal(err)
+	}
+	if len(req.ManualDice) != 2 || req.ManualDice[0] != 4 || req.ManualDice[1] != 3 {
+		t.Fatalf("request = %+v", req)
+	}
+}
+
+func TestResolveCheckRequestCarriesAManualTotal(t *testing.T) {
+	var req ResolveCheckRequestDTO
+	if err := json.Unmarshal([]byte(`{"pending_check_ref":"r","manual_result":9}`), &req); err != nil {
+		t.Fatal(err)
+	}
+	if req.ManualResult == nil || *req.ManualResult != 9 {
+		t.Fatalf("request = %+v", req)
+	}
+	if len(req.ManualDice) != 0 {
+		t.Fatalf("a total entry should carry no dice: %+v", req)
 	}
 }

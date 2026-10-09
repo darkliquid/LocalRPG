@@ -74,7 +74,8 @@ func (t *Timeline) RecordTurnContext(ctx context.Context, turn *Turn, extracted 
 // RecordTurnContextStructured is RecordTurnContext with the structured turn's
 // persona declarations and memories, which are staged as entity stubs and memory
 // records (unlike extraction, they carry declared state).
-func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl, memories []harness.MemoryDecl, checks []harness.CheckResult) error {	_, span := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "timeline.record_turn",
+func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl, memories []harness.MemoryDecl, checks []harness.CheckResult) error {
+	_, span := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "timeline.record_turn",
 		oteltrace.WithAttributes(attribute.Int("localrpg.turn.number", turn.Number)),
 	)
 	defer span.End()
@@ -153,6 +154,26 @@ func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, 
 		})
 	}
 
+	return nil
+}
+
+// UpdateTurn rewrites a recorded turn's own fields in place, so a change to the
+// record (a renegotiated check) keeps everything the turn staged: its entities,
+// its memories, and their history numbers.
+func (t *Timeline) UpdateTurn(ctx context.Context, turn *Turn) error {
+	_, span := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "timeline.update_turn",
+		oteltrace.WithAttributes(attribute.Int("localrpg.turn.number", turn.Number)),
+	)
+	defer span.End()
+
+	if err := t.history.ReplaceTurn(*turn); err != nil {
+		span.RecordError(err)
+		return err
+	}
+	if err := t.indexTurn(*turn); err != nil {
+		span.RecordError(err)
+		return err
+	}
 	return nil
 }
 
@@ -805,4 +826,3 @@ func appendUniqueInts(existing []int, values ...int) []int {
 	}
 	return out
 }
-

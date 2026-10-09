@@ -86,9 +86,13 @@ type CheckRequest struct {
 	// names the opponent, and the check rolls both sides and compares the
 	// totals. Empty keeps the fixed-difficulty path.
 	Opposed string `json:"opposed,omitempty"`
-	// ForcedTotal, when set, replaces the rolled total: a player entering a
-	// physical die result, or a pending check resolved with a manual roll.
+	// ForcedTotal, when set, is the dice total a player entered rather than
+	// rolled. The check's bonuses apply after it, so a player enters the dice and
+	// the system still adds what it would have added.
 	ForcedTotal *int `json:"-"`
+	// ForcedDice, when set, are the individual dice a player entered. The server
+	// sums them and records them, so the chronicle can show the faces.
+	ForcedDice []int `json:"-"`
 }
 
 // DieFace is one die as it landed. Symbol is the notation's own way of showing
@@ -143,6 +147,61 @@ type CheckResult struct {
 	OpposedRoll  *RollSummary `json:"opposed_roll,omitempty"`
 	OpposedTotal int          `json:"opposed_total,omitempty"`
 	OpposedActor string       `json:"opposed_actor,omitempty"`
+}
+
+// CounterProposal is a player's argument about a pending check: a reframed
+// approach, a restatement of the stakes, or a different difficulty.
+type CounterProposal struct {
+	Approach   string `json:"approach,omitempty"`
+	Stakes     string `json:"stakes,omitempty"`
+	Difficulty string `json:"difficulty,omitempty"`
+}
+
+// The rulings a counter-proposal may receive.
+const (
+	// RulingAccept adopts the counter's terms.
+	RulingAccept = "accept"
+	// RulingAdjust adopts modified terms, with a reason.
+	RulingAdjust = "adjust"
+	// RulingHold keeps the original terms, with a reason.
+	RulingHold = "hold"
+)
+
+// Adjudication is the GM's ruling on a counter-proposal. Stakes, Difficulty,
+// Notation, and Profile carry the agreed terms; Reason explains the ruling, and
+// is the whole of a hold.
+type Adjudication struct {
+	Ruling     string `json:"ruling"`
+	Stakes     string `json:"stakes,omitempty"`
+	Difficulty string `json:"difficulty,omitempty"`
+	Notation   string `json:"notation,omitempty"`
+	Profile    string `json:"profile,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+}
+
+// Agreed reports whether the ruling changed the check's terms.
+func (a Adjudication) Agreed() bool {
+	return a.Ruling == RulingAccept || a.Ruling == RulingAdjust
+}
+
+// NormalizeRuling maps whatever a model wrote to one of the three rulings,
+// defaulting to hold so an unparseable answer cannot silently change a check.
+func NormalizeRuling(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case RulingAccept, "accepted", "yes":
+		return RulingAccept
+	case RulingAdjust, "adjusted", "modify", "modified", "partial":
+		return RulingAdjust
+	default:
+		return RulingHold
+	}
+}
+
+// Negotiation is one counter-proposal and the GM's ruling on it, recorded on the
+// turn so the chronicle can show the exchange.
+type Negotiation struct {
+	Counter CounterProposal `json:"counter"`
+	Ruling  Adjudication    `json:"ruling"`
 }
 
 // PendingCheck is a check the GM proposed under the ask policy and the player

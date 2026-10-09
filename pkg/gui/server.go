@@ -690,6 +690,18 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// POST /api/game/{id}/turn/{n}/renegotiate asks the GM to rule on a
+		// counter-proposal to the turn's pending check.
+		if r.Method == http.MethodPost && len(parts) == 4 && parts[3] == "renegotiate" {
+			turnNumber, err := strconv.Atoi(parts[2])
+			if err != nil {
+				http.Error(w, "invalid turn number", http.StatusBadRequest)
+				return
+			}
+			s.handleRenegotiate(w, r, gameID, turnNumber)
+			return
+		}
+
 		// GET /api/game/{id}/turn/{n}/scene-image
 		if r.Method == http.MethodGet && len(parts) == 4 && parts[3] == "scene-image" {
 			turnNumber, err := strconv.Atoi(parts[2])
@@ -1878,6 +1890,7 @@ func (s *Server) handleResolveCheck(w http.ResponseWriter, r *http.Request, game
 		Input:           req.Note,
 		PendingCheckRef: pendingRef,
 		ForcedTotal:     req.ManualResult,
+		ManualDice:      req.ManualDice,
 	}, writeEvent)
 	if err != nil {
 		event := TurnEvent{Type: "error", Message: err.Error()}
@@ -1888,6 +1901,34 @@ func (s *Server) handleResolveCheck(w http.ResponseWriter, r *http.Request, game
 		}
 		_ = writeEvent(event)
 	}
+}
+
+// handleRenegotiate asks the GM to rule on a counter-proposal: 404 for an unknown
+// turn, 400 for no or mismatched pending check, and 409 for a check that is
+// already resolved or argued as often as it may be.
+func (s *Server) handleRenegotiate(w http.ResponseWriter, r *http.Request, gameID string, turnNumber int) {
+	var req RenegotiateRequestDTO
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+		writeInvalidRequest(w, "invalid request body")
+		return
+	}
+
+	result, err := s.service.Renegotiate(r.Context(), gameID, turnNumber, req)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	case errors.Is(err, ErrCheckResolved), errors.Is(err, ErrNegotiationLimit):
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	case errors.Is(err, ErrNoPendingCheck), errors.Is(err, ErrPendingCheckMismatch), errors.Is(err, ErrInvalidCounter):
+		writeInvalidRequest(w, err.Error())
+		return
+	case err != nil:
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	writeJSON(w, result)
 }
 
 func (s *Server) handleModelsRoutes(w http.ResponseWriter, r *http.Request) {

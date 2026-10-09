@@ -76,6 +76,11 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
         {roll && roll.successes !== undefined && roll.successes > 0 && (
           <span className="text-xs font-mono text-stone-400">{roll.successes} successes</span>
         )}
+        {check.source === 'manual' && (
+          <span className="text-[10px] font-sans uppercase tracking-wider text-amber-300/80 border border-amber-400/30 rounded px-1.5 py-0.5">
+            manual
+          </span>
+        )}
         <span className={`text-xs font-sans font-bold uppercase tracking-wider ${style.chip}`}>{check.outcome}</span>
       </div>
       {check.opposed_total !== undefined && (

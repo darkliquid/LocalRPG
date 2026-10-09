@@ -56,6 +56,8 @@ import {
   ExportContentResult,
   GenerationLimitsOverride,
   AppConfig,
+  CounterProposal,
+  RenegotiateResult,
   StylePacks,
   SettingsResponse,
   TestProviderRequest,
@@ -934,6 +936,24 @@ export class APIClient {
     return res.json();
   }
 
+  // renegotiate asks the GM to rule on a counter-proposal to a pending check. It
+  // returns the ruling and the terms now in force, so the card can re-render.
+  static async renegotiate(
+    gameID: string,
+    turnNumber: number,
+    body: { pending_check_ref: string; counter: CounterProposal },
+  ): Promise<RenegotiateResult> {
+    const res = await fetch(`/api/game/${gameID}/turn/${turnNumber}/renegotiate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw await errorFromResponse(res, 'renegotiate');
+    }
+    return res.json();
+  }
+
   static async saveSettings(cfg: AppConfig): Promise<SettingsResponse> {
     const res = await fetch('/api/settings', {
       method: 'PUT',
@@ -1171,7 +1191,7 @@ export class APIClient {
   static async resolveCheck(
     gameID: string,
     turnNumber: number,
-    body: { pending_check_ref: string; manual_result?: number },
+    body: { pending_check_ref: string; manual_result?: number; manual_dice?: number[] },
     onEvent: (event: TurnEvent) => void,
     signal?: AbortSignal
   ): Promise<void> {

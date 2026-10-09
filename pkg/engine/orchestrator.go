@@ -74,9 +74,11 @@ type TurnOrchestrator struct {
 	forceToolChoice bool
 	// pendingCheckRef continues a turn whose GM proposed a check (ask policy).
 	pendingCheckRef string
-	// forcedTotal, when set, replaces the next check's rolled total: a manual roll
-	// entry or a resolved pending check. Consumed once per turn.
+	// forcedTotal and forcedDice carry a manually entered roll for the next check:
+	// a resolved pending check the player rolled with physical dice. Consumed once
+	// per turn.
 	forcedTotal *int
+	forcedDice  []int
 	// singleTurn records an interactive roll as one turn: the proposing turn is a
 	// draft, completed in place when the check resolves.
 	singleTurn bool
@@ -84,9 +86,9 @@ type TurnOrchestrator struct {
 	// every_turn, or manual. Empty means scene_break (today's behaviour).
 	imageTrigger  string
 	triggerConfig TriggerConfig
-	extractor       *harness.Extractor
-	chunkTimeout    time.Duration
-	openingPrompt   string
+	extractor     *harness.Extractor
+	chunkTimeout  time.Duration
+	openingPrompt string
 	// sceneOnly marks the next turn as a quiet scene turn: it restates the
 	// campaign's opening scene and adds no hooks. Consumed once per turn.
 	sceneOnly        bool
@@ -285,6 +287,10 @@ func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRe
 	if o.forcedTotal != nil {
 		req.ForcedTotal = o.forcedTotal
 		o.forcedTotal = nil
+	}
+	if len(o.forcedDice) > 0 {
+		req.ForcedDice = o.forcedDice
+		o.forcedDice = nil
 	}
 	resolved, err := resolver.Resolve(ctx, req, actor)
 	if err != nil {
@@ -533,10 +539,17 @@ func (o *TurnOrchestrator) SetPendingCheckRef(ref string) {
 	o.pendingCheckRef = ref
 }
 
-// SetForcedTotal makes the next check resolve to this total instead of rolling,
-// so a manually entered die result is honoured. It is consumed once per turn.
+// SetForcedTotal makes the next check resolve to this entered dice total instead
+// of rolling, so a manually entered die result is honoured. It is consumed once
+// per turn.
 func (o *TurnOrchestrator) SetForcedTotal(total *int) {
 	o.forcedTotal = total
+}
+
+// SetManualDice makes the next check resolve from the dice a player entered
+// rather than from a roll. It is consumed once per turn.
+func (o *TurnOrchestrator) SetManualDice(dice []int) {
+	o.forcedDice = dice
 }
 
 // SetSingleTurnMode records an interactive roll as one turn: a turn that ends on
