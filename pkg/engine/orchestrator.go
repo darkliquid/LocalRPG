@@ -278,7 +278,7 @@ func (o *TurnOrchestrator) SetUsageContext(ctx *harness.UsageContext) { o.usageC
 func (o *TurnOrchestrator) resolveCheck(ctx context.Context, req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error) {
 	resolver := o.checkResolver
 	if resolver == nil {
-		resolver = defaultCheckResolver{mechanics: o.mechanics}
+		resolver = defaultCheckResolver{mechanics: o.mechanics, store: o.store}
 	}
 	// A forced total applies to the first check of the turn (the pending one),
 	// then is consumed so it cannot colour a later roll.

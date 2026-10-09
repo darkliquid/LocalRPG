@@ -20,3 +20,31 @@ func TestValidateProfiles(t *testing.T) {
 		t.Fatal("bad profiles should be rejected")
 	}
 }
+
+func TestProfileOpposedFields(t *testing.T) {
+	p := ResolutionProfile{Opposed: "might", Ties: TieOpponent}
+	if p.Opposed != "might" || p.Ties != TieOpponent {
+		t.Fatalf("profile = %+v", p)
+	}
+}
+
+func TestValidateRejectsAnUnknownTieRule(t *testing.T) {
+	bad := CheckConventions{Profiles: map[string]ResolutionProfile{
+		"grapple": {DC: 10, Ties: "coin flip"},
+	}}
+	problems := bad.Validate()
+	if len(problems) == 0 {
+		t.Fatal("an unknown tie rule should be rejected")
+	}
+}
+
+func TestValidateAcceptsTheTieRules(t *testing.T) {
+	ok := CheckConventions{Profiles: map[string]ResolutionProfile{
+		"a": {DC: 10},
+		"b": {DC: 10, Ties: TieActor},
+		"c": {DC: 10, Ties: TieOpponent, Opposed: "might"},
+	}}
+	if problems := ok.Validate(); len(problems) != 0 {
+		t.Fatalf("valid tie rules were rejected: %v", problems)
+	}
+}

@@ -94,14 +94,23 @@ func FormatMechanicsInstructions(spec *core.MechanicsSpec, engagement string, st
 		}
 		sort.Strings(names)
 		parts := make([]string, 0, len(names))
+		opposed := false
 		for _, name := range names {
-			if label := spec.Checks.Profiles[name].Label; label != "" {
-				parts = append(parts, label)
-			} else {
-				parts = append(parts, name)
+			profile := spec.Checks.Profiles[name]
+			label := profile.Label
+			if label == "" {
+				label = name
 			}
+			if profile.Opposed != "" {
+				label += " (opposed: " + profile.Opposed + ")"
+				opposed = true
+			}
+			parts = append(parts, label)
 		}
 		sb.WriteString("Resolution profiles: " + strings.Join(parts, ", ") + ".\n")
+		if opposed {
+			sb.WriteString("An opposed profile rolls for the opponent too: name the opponent in target and the stat it rolls in opposed.\n")
+		}
 	}
 	return sb.String()
 }

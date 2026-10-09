@@ -22,6 +22,32 @@ type ResolutionProfile struct {
 	Position []string `yaml:"position,omitempty"`
 	// Effect is the allowed effect vocabulary for a blades-style profile.
 	Effect []string `yaml:"effect,omitempty"`
+	// Opposed names the stat the opponent rolls when a check uses this profile
+	// and names no opponent stat of its own. Empty means the profile is not
+	// opposed by default.
+	Opposed string `yaml:"opposed,omitempty"`
+	// Ties decides an opposed check whose totals are equal: "opponent" hands it
+	// to the opponent, and empty or "actor" keeps it with the actor.
+	Ties string `yaml:"ties,omitempty"`
+}
+
+// Tie rules for an opposed check.
+const (
+	// TieActor keeps a tied opposed check with the actor, which favours the
+	// player in an ambiguous case. It is the default.
+	TieActor = "actor"
+	// TieOpponent hands a tied opposed check to the opponent.
+	TieOpponent = "opponent"
+)
+
+// ValidTieRule reports whether rule is a tie rule this build understands.
+func ValidTieRule(rule string) bool {
+	switch rule {
+	case "", TieActor, TieOpponent:
+		return true
+	default:
+		return false
+	}
 }
 
 // LadderStep is one threshold on a resolution ladder. The step with the highest
@@ -61,6 +87,9 @@ func (c CheckConventions) Validate() []string {
 			if step.Outcome == "" {
 				problems = append(problems, "checks.profiles."+name+": a ladder step has no outcome")
 			}
+		}
+		if !ValidTieRule(p.Ties) {
+			problems = append(problems, "checks.profiles."+name+": ties must be actor or opponent")
 		}
 	}
 	return problems

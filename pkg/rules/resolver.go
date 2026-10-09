@@ -63,8 +63,28 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 		res.Source = "manual"
 	}
 
+	// An opposed check rolls the opponent with the same notation and compares the
+	// totals; everything after this maps a win or a loss like any other outcome.
+	actorWon := true
+	opposed := false
+	if stat := OpposedStat(req, p, hasProfile); stat != "" && req.Target != "" {
+		opponentBonus := r.opponentBonus(req.Target, stat)
+		oppRoll, oppTotal, won, err := ResolveOpposed(notation, total, opponentBonus, ProfileTies(p, hasProfile))
+		if err != nil {
+			return nil, err
+		}
+		res.OpposedRoll, res.OpposedTotal, res.OpposedActor = oppRoll, oppTotal, req.Target
+		actorWon, opposed = won, true
+	}
+
 	if hasProfile {
-		if outcome, decided := ResolveProfile(p, total, roll.Successes); decided {
+		outcome, decided := "", false
+		if opposed {
+			outcome, decided = ProfileOpposedOutcome(p, actorWon)
+		} else {
+			outcome, decided = ResolveProfile(p, total, roll.Successes)
+		}
+		if decided {
 			res.Outcome = outcome
 			res.Profile = profile
 		}
@@ -74,6 +94,10 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 	}
 
 	if res.Outcome == "" {
+		if opposed {
+			res.Outcome = OutcomeFor(r.conventions.Outcome, actorWon)
+			return res, nil
+		}
 		target := 8
 		for _, difficulty := range r.conventions.Difficulty {
 			if difficulty.ID == req.Difficulty {
@@ -81,9 +105,32 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 				break
 			}
 		}
-		res.Outcome = outcomeFor(r.conventions.Outcome, total >= target)
+		res.Outcome = OutcomeFor(r.conventions.Outcome, total >= target)
 	}
 	return res, nil
+}
+
+// opponentBonus reads the opponent's governing stat through the bridge. An
+// unknown entity or stat contributes nothing, so a mistyped target degrades to a
+// flat opponent roll rather than failing the check.
+func (r SchemaResolver) opponentBonus(target, stat string) int {
+	if r.bridge == nil || target == "" || stat == "" {
+		return 0
+	}
+	opponent, err := r.bridge.GetEntity(target)
+	if err != nil || opponent == nil {
+		return 0
+	}
+	bonus, _ := stateValue(r.bridge, opponent, stat)
+	return bonus
+}
+
+// ProfileTies returns the profile's tie rule, or empty when there is no profile.
+func ProfileTies(p core.ResolutionProfile, hasProfile bool) string {
+	if !hasProfile {
+		return ""
+	}
+	return p.Ties
 }
 
 // stateValue reads a numeric stat or skill from the actor or, failing that, the
@@ -123,9 +170,9 @@ func toInt(value interface{}) (int, bool) {
 	return 0, false
 }
 
-// outcomeFor picks the pass or fail key from a declared vocabulary, tolerating a
+// OutcomeFor picks the pass or fail key from a declared vocabulary, tolerating a
 // system that names them differently or declares none.
-func outcomeFor(vocabulary []string, pass bool) string {
+func OutcomeFor(vocabulary []string, pass bool) string {
 	if len(vocabulary) == 0 {
 		if pass {
 			return "pass"

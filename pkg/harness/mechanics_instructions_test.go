@@ -102,3 +102,26 @@ func TestMechanicsInstructionListsProfiles(t *testing.T) {
 		t.Fatalf("instruction did not list the profile: %s", got)
 	}
 }
+
+func TestInstructionMentionsOpposedProfiles(t *testing.T) {
+	spec := &core.MechanicsSpec{Checks: core.CheckConventions{Profiles: map[string]core.ResolutionProfile{
+		"grapple": {Label: "Grapple", DC: 10, Opposed: "might"},
+	}}}
+	got := FormatMechanicsInstructions(spec, "auto", nil)
+	if !strings.Contains(got, "opposed: might") {
+		t.Fatalf("instruction did not name the opposed stat: %s", got)
+	}
+	if !strings.Contains(got, "name the opponent in target") {
+		t.Fatalf("instruction did not explain an opposed check: %s", got)
+	}
+}
+
+func TestInstructionOmitsOpposedWhenNoProfileIsOpposed(t *testing.T) {
+	spec := &core.MechanicsSpec{Checks: core.CheckConventions{Profiles: map[string]core.ResolutionProfile{
+		"pbta": {Label: "PbtA ladder", Ladder: []core.LadderStep{{Min: 7, Outcome: "weak"}}},
+	}}}
+	got := FormatMechanicsInstructions(spec, "auto", nil)
+	if strings.Contains(got, "name the opponent in target") {
+		t.Fatalf("instruction mentioned opposed checks with none declared: %s", got)
+	}
+}

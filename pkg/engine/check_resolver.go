@@ -3,19 +3,23 @@ package engine
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
+	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
 // defaultCheckResolver is used until the mechanics schema provides a resolver.
 // It rolls the request's notation (or 2d6) and passes at total 8 or more. When
 // the system declares resolution profiles, it resolves through the named profile
-// instead, so the default path and the schema resolver cannot drift.
+// instead, so the default path and the schema resolver cannot drift. A store, when
+// present, lets an opposed check read the opponent's stat.
 type defaultCheckResolver struct {
 	mechanics *core.MechanicsSpec
+	store     *storage.Store
 }
 
 func (r defaultCheckResolver) Resolve(_ context.Context, req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error) {
@@ -59,8 +63,29 @@ func (r defaultCheckResolver) Resolve(_ context.Context, req harness.CheckReques
 	if req.ForcedTotal != nil {
 		res.Source = "manual"
 	}
+
+	// An opposed check rolls the opponent with the same notation and compares the
+	// totals; everything after this maps a win or a loss like any other outcome.
+	actorWon := true
+	opposed := false
+	if stat := rules.OpposedStat(req, chosen, hasProfile); stat != "" && req.Target != "" {
+		oppRoll, oppTotal, won, err := rules.ResolveOpposed(
+			notation, total, r.opponentBonus(req.Target, stat), rules.ProfileTies(chosen, hasProfile))
+		if err != nil {
+			return nil, err
+		}
+		res.OpposedRoll, res.OpposedTotal, res.OpposedActor = oppRoll, oppTotal, req.Target
+		actorWon, opposed = won, true
+	}
+
 	if hasProfile {
-		if outcome, decided := rules.ResolveProfile(chosen, total, roll.Successes); decided {
+		outcome, decided := "", false
+		if opposed {
+			outcome, decided = rules.ProfileOpposedOutcome(chosen, actorWon)
+		} else {
+			outcome, decided = rules.ResolveProfile(chosen, total, roll.Successes)
+		}
+		if decided {
 			res.Outcome = outcome
 			res.Profile = profile
 		}
@@ -69,6 +94,10 @@ func (r defaultCheckResolver) Resolve(_ context.Context, req harness.CheckReques
 		res.Successes = roll.Successes
 	}
 	if res.Outcome == "" {
+		if opposed {
+			res.Outcome = rules.OutcomeFor(nil, actorWon)
+			return res, nil
+		}
 		if total >= 8 {
 			res.Outcome = "pass"
 		} else {
@@ -76,6 +105,50 @@ func (r defaultCheckResolver) Resolve(_ context.Context, req harness.CheckReques
 		}
 	}
 	return res, nil
+}
+
+// opponentBonus reads the opponent's governing stat from the campaign index. An
+// unknown entity or stat contributes nothing, so a mistyped target degrades to a
+// flat opponent roll rather than failing the check.
+func (r defaultCheckResolver) opponentBonus(target, stat string) int {
+	if r.store == nil || stat == "" {
+		return 0
+	}
+	opponent := findEntityByRef(r.store, target)
+	if opponent == nil {
+		return 0
+	}
+	bonus, _ := engineStateValue(opponent, stat)
+	return bonus
+}
+
+// findEntityByRef resolves an entity reference: an id, a slugified name, or a
+// wikilink, so a check's target can be named the way the fiction names it.
+func findEntityByRef(store *storage.Store, ref string) *entity.Entity {
+	if store == nil || strings.TrimSpace(ref) == "" {
+		return nil
+	}
+	for _, candidate := range normalizeRefCandidates(ref) {
+		if ent, err := store.GetEntity(candidate); err == nil && ent != nil {
+			return ent
+		}
+	}
+	summaries, err := store.ListEntities()
+	if err != nil {
+		return nil
+	}
+	for _, summary := range summaries {
+		nameKey := entity.Slugify(summary.Name)
+		for _, candidate := range normalizeRefCandidates(ref) {
+			if candidate != nameKey {
+				continue
+			}
+			if ent, err := store.GetEntity(summary.ID); err == nil && ent != nil {
+				return ent
+			}
+		}
+	}
+	return nil
 }
 
 // engineStateValue reads a numeric stat or skill from the actor's state, so a

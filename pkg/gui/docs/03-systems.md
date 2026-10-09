@@ -67,6 +67,29 @@ mechanics:
 
 Ladders resolve highest-first. Difficulty classes pass when the total meets them. Pools count the dice that meet `success_on`. A check without a profile resolves through the system's default conventions, exactly as before.
 
+### Opposed Checks
+
+A profile can declare that a check is **opposed**. The opponent rolls too, and the
+higher total decides:
+
+```yaml
+mechanics:
+  checks:
+    profiles:
+      grapple:
+        notation: 2d6
+        dc: 10
+        opposed: might    # the opponent rolls Might
+        ties: opponent    # an equal total goes to the opponent; the default is actor
+```
+
+A check is opposed when the GM sets `target` to the opponent and `opposed` to a
+stat. When the profile declares `opposed`, it supplies the stat and the GM sets
+only the target. The opponent rolls the same notation and adds its `opposed` stat
+to the roll. An unknown opponent rolls flat, and a mistyped target resolves
+against that flat roll. The profile's best outcome applies when the actor's total
+is higher, and its worst when the opponent's is.
+
 ## Sandboxed JavaScript Mechanics Engine (`mechanics.js`)
 
 Custom systems export JavaScript functions that execute inside an isolated Goja runtime. The engine passes a small context and receives a structured resolution:
