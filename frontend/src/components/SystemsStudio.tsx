@@ -54,6 +54,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const [verificationResult, setVerificationResult] = useState<SystemVerifyResult | null>(null);
+  const [draftNotes, setDraftNotes] = useState<string[]>([]);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -87,6 +88,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setScript(generatedDraft.script || '');
     setRulesPrompt(generatedDraft.rules_prompt || '');
     setVerificationResult(generatedDraft.verify);
+    setDraftNotes(generatedDraft.notes || []);
     setSelection({ kind: 'draft' });
     setDraft({ localId: generatedDraft.id || 'draft', dirty: true });
     setToast({ type: 'success', message: `Draft loaded for "${generatedDraft.name}". Review and save.` });
@@ -763,6 +765,23 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                 Regenerate
               </button>
             )}
+          </div>
+        )}
+
+        {draftNotes.length > 0 && (
+          <div
+            data-testid="draft-notes"
+            className="p-3 rounded-xl text-xs flex items-start gap-2 bg-amber-950/40 border border-amber-500/40 text-amber-200 shrink-0"
+          >
+            <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 min-w-0">
+              <div className="font-semibold">Generation notes</div>
+              <ul className="text-[11px] list-disc list-inside space-y-0.5">
+                {draftNotes.map((note, i) => (
+                  <li key={i}>{note}</li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
 

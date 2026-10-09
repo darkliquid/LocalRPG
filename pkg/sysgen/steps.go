@@ -8,88 +8,127 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 )
 
-// systemShape describes the broad mechanical architecture of a system
-// before full schema expansion.
-type systemShape struct {
-	Resolution  string   `json:"resolution"`
-	Stats       []string `json:"stats,omitempty"`
-	Skills      []string `json:"skills,omitempty"`
-	Health      string   `json:"health,omitempty"`
-	Advancement bool     `json:"advancement"`
+// templateChoice is the model's classification of a description onto a template.
+// The dimensions are a closed set, so this is a classification rather than a
+// generation: the model picks, it does not invent structure.
+type templateChoice struct {
+	Resolution  string `json:"resolution"`
+	Health      string `json:"health,omitempty"`
+	Advancement string `json:"advancement,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	Gaps        string `json:"gaps,omitempty"`
 }
 
-const shapeSchema = `{"type":"object","properties":{` +
-	`"resolution":{"type":"string"},"stats":{"type":"array","items":{"type":"string"}},` +
-	`"skills":{"type":"array","items":{"type":"string"}},"health":{"type":"string"},` +
-	`"advancement":{"type":"boolean"}}}`
+const chooseSchema = `{"type":"object","properties":{` +
+	`"resolution":{"type":"string"},"health":{"type":"string"},` +
+	`"advancement":{"type":"string"},"reason":{"type":"string"},"gaps":{"type":"string"}}}`
 
-const schemaSchema = `{"type":"object","properties":{` +
-	`"stats":{"type":"array"},"skills":{"type":"array"},"health":{"type":"object"},` +
-	`"checks":{"type":"object"},"advancement":{"type":"object"}}}`
-
-func shapePrompt(brief Brief) string {
+func choosePrompt(brief Brief) string {
 	var b strings.Builder
-	b.WriteString("Decide the mechanical shape for a tabletop RPG system.\n")
+	b.WriteString("Choose the closest schema template for a tabletop RPG system. Pick values from the closed sets below; never invent a new one.\n")
+	b.WriteString("resolution: ladder (2d6 partial success), dc (roll against a difficulty class), pool (count dice meeting a target).\n")
+	b.WriteString("health: single (one health stat), wounds (several wound levels), none (no health).\n")
+	b.WriteString("advancement: spend (earn and spend points), track (fill a track), threshold (levels), none.\n")
 	if brief.Name != "" {
 		fmt.Fprintf(&b, "System Name: %s\n", brief.Name)
 	}
 	fmt.Fprintf(&b, "Description: %s\n", brief.Description)
-	b.WriteString("Specify the resolution style (e.g. d20, ladder, pool, blades), primary stats, skills, health mechanism, and whether advancement applies.\n")
+	b.WriteString("Return the chosen resolution, health, and advancement, a one-line reason, and in 'gaps' any requested behaviour the templates and escape hatches cannot express (empty when none).\n")
 	return b.String()
 }
 
-func schemaPrompt(brief Brief, shape systemShape) string {
+// chooseTemplate classifies a brief onto a catalogue template. A choice that
+// does not match a template exactly falls back to the closest one, so the
+// pipeline always has a valid shape to build.
+func chooseTemplate(ctx context.Context, gen Generator, brief Brief) (Template, templateChoice, error) {
+	raw, err := gen.GenerateJSON(ctx, choosePrompt(brief), chooseSchema)
+	if err != nil {
+		return Template{}, templateChoice{}, fmt.Errorf("choose: %w", err)
+	}
+	var choice templateChoice
+	if err := decodeJSON(raw, &choice); err != nil {
+		return Template{}, templateChoice{}, fmt.Errorf("choose decode: %w", err)
+	}
+	tpl, ok := MatchTemplate(choice.Resolution, choice.Health, choice.Advancement)
+	if !ok {
+		return Template{}, templateChoice{}, fmt.Errorf("choose: unknown resolution %q", choice.Resolution)
+	}
+	return tpl, choice, nil
+}
+
+const fillSchema = `{"type":"object","properties":{` +
+	`"stats":{"type":"array"},"skills":{"type":"array"},"notation":{"type":"string"},` +
+	`"ladder":{"type":"array"},"dc":{"type":"integer"},"success_on":{"type":"string"},` +
+	`"outcomes":{"type":"array"},"health_stat":{"type":"string"},` +
+	`"advancement_stat":{"type":"string"},"unlocks":{"type":"array"}}}`
+
+func fillPrompt(brief Brief, tpl Template) string {
 	var b strings.Builder
-	b.WriteString("Define the complete declarative mechanics specification (core.MechanicsSpec) for this tabletop RPG system.\n")
+	b.WriteString("Fill the parameters for a tabletop RPG system's fixed schema template. Provide values only, never structure.\n")
+	fmt.Fprintf(&b, "Template: %s (%s)\n", tpl.ID, tpl.Label)
+	fmt.Fprintf(&b, "Resolution: %s\n", tpl.Resolution)
+	switch tpl.Resolution {
+	case "ladder":
+		b.WriteString("Provide a ladder: steps with min and outcome, strongest first (e.g. 10+ strong, 7-9 weak, 6- miss).\n")
+	case "dc":
+		b.WriteString("Provide a dc (difficulty class) and the default dice notation.\n")
+	case "pool":
+		b.WriteString("Provide a success_on target (e.g. >=8) and outcomes mapping a success-count range to an outcome.\n")
+	}
+	if tpl.Health != "" && tpl.Health != "none" {
+		b.WriteString("Provide health_stat: the id of the stat that holds health.\n")
+	}
+	if tpl.Advancement != "" && tpl.Advancement != "none" {
+		b.WriteString("Provide advancement_stat: the id of the stat that holds the advancement currency.\n")
+	}
 	if brief.Name != "" {
 		fmt.Fprintf(&b, "System Name: %s\n", brief.Name)
 	}
 	fmt.Fprintf(&b, "Description: %s\n", brief.Description)
-	fmt.Fprintf(&b, "Resolution style: %s\n", shape.Resolution)
-	if len(shape.Stats) > 0 {
-		fmt.Fprintf(&b, "Key stats: %s\n", strings.Join(shape.Stats, ", "))
-	}
-	if len(shape.Skills) > 0 {
-		fmt.Fprintf(&b, "Key skills: %s\n", strings.Join(shape.Skills, ", "))
-	}
-	if shape.Health != "" {
-		fmt.Fprintf(&b, "Health model: %s\n", shape.Health)
-	}
-	fmt.Fprintf(&b, "Advancement enabled: %t\n", shape.Advancement)
-	b.WriteString("Include stats, skills, health (if any), checks (with notation, outcome vocabulary, and resolution profiles), and advancement if applicable.\n")
+	b.WriteString("Provide stats (id, label), skills (id, label, stat), and the notation.\n")
 	return b.String()
 }
 
-// runShape prompts the generator for the system's high-level mechanical shape.
-func runShape(ctx context.Context, gen Generator, brief Brief) (systemShape, error) {
-	raw, err := gen.GenerateJSON(ctx, shapePrompt(brief), shapeSchema)
+// fillParams asks the model for the values of the chosen template's parameters.
+// The template decides the shape; these values are checked by Template.Build.
+func fillParams(ctx context.Context, gen Generator, tpl Template, brief Brief) (Params, error) {
+	raw, err := gen.GenerateJSON(ctx, fillPrompt(brief, tpl), fillSchema)
 	if err != nil {
-		return systemShape{}, fmt.Errorf("shape: %w", err)
+		return Params{}, fmt.Errorf("fill: %w", err)
 	}
-	var shape systemShape
-	if err := decodeJSON(raw, &shape); err != nil {
-		return systemShape{}, fmt.Errorf("shape decode: %w", err)
+	var params Params
+	if err := decodeJSON(raw, &params); err != nil {
+		return Params{}, fmt.Errorf("fill decode: %w", err)
 	}
-	return shape, nil
+	return params, nil
 }
 
-// runSchema prompts the generator for the full MechanicsSpec and validates it.
-func runSchema(ctx context.Context, gen Generator, brief Brief, shape systemShape) (*core.MechanicsSpec, error) {
-	raw, err := gen.GenerateJSON(ctx, schemaPrompt(brief, shape), schemaSchema)
-	if err != nil {
-		return nil, fmt.Errorf("schema: %w", err)
-	}
-	var spec core.MechanicsSpec
-	if err := decodeJSON(raw, &spec); err != nil {
-		return nil, fmt.Errorf("schema decode: %w", err)
-	}
+// escapeHatches is the closed list of behaviours that may be expressed as
+// generated JavaScript. Anything outside it is reported as a note, not script.
+var escapeHatches = []string{"resource_spend", "custom_on_check", "custom_on_health_zero", "custom_on_turn_end"}
 
-	// Validate check resolution profiles if any are declared
-	if problems := spec.Checks.Validate(); len(problems) > 0 {
-		return nil, fmt.Errorf("schema validation: %s", strings.Join(problems, "; "))
-	}
+// hatchKeywords maps each hatch to the phrases in a description that request it.
+var hatchKeywords = map[string][]string{
+	"resource_spend":        {"spend", "economy", "resource", "mana", "grit point", "point pool", "currency"},
+	"custom_on_check":       {"opposed roll", "opposed check", "reroll", "custom check", "on a check"},
+	"custom_on_health_zero": {"death", "dying", "when downed", "at zero", "health zero", "knocked out"},
+	"custom_on_turn_end":    {"each turn", "per turn", "turn end", "end of turn", "world tick"},
+}
 
-	return &spec, nil
+// requestedHatches returns the escape hatches a brief asks for, in the closed
+// list's order. A brief that requests none yields an empty slice.
+func requestedHatches(brief Brief) []string {
+	description := strings.ToLower(brief.Description)
+	var out []string
+	for _, hatch := range escapeHatches {
+		for _, keyword := range hatchKeywords[hatch] {
+			if strings.Contains(description, keyword) {
+				out = append(out, hatch)
+				break
+			}
+		}
+	}
+	return out
 }
 
 type hookEntry struct {
@@ -105,11 +144,15 @@ type hooksOutput struct {
 
 const hooksSchema = `{"type":"object","properties":{"hooks":{"type":"array","items":{"type":"object","properties":{"event":{"type":"string"},"name":{"type":"string"},"code":{"type":"string"},"raw":{"type":"string"}}}}}}`
 
-func hooksPrompt(brief Brief, spec *core.MechanicsSpec) string {
+func hooksPrompt(brief Brief, spec *core.MechanicsSpec, hatches []string) string {
 	var b strings.Builder
-	b.WriteString("Identify any custom mechanics.js script hooks needed for this tabletop RPG system.\n")
-	b.WriteString("CRITICAL: The system is schema-first. If the declarative schema (stats, skills, health, checks, advancement) covers everything, return {\"hooks\": []}.\n")
-	b.WriteString("Only emit hooks for behavior that the declarative schema CANNOT express (e.g. custom action handlers, turn end effects, resource spends, onHealthZero reactions).\n")
+	b.WriteString("Write the mechanics.js script hooks for this tabletop RPG system.\n")
+	b.WriteString("CRITICAL: JavaScript is generated only for the escape hatches listed below. If the list is empty, return {\"hooks\": []}.\n")
+	if len(hatches) == 0 {
+		b.WriteString("Escape hatches requested: none.\n")
+	} else {
+		fmt.Fprintf(&b, "Escape hatches requested: %s\n", strings.Join(hatches, ", "))
+	}
 	if brief.Name != "" {
 		fmt.Fprintf(&b, "System Name: %s\n", brief.Name)
 	}
@@ -166,9 +209,10 @@ func assembleScript(hooks []hookEntry) string {
 	return strings.TrimSpace(b.String())
 }
 
-// runHooks prompts the generator for any custom JavaScript hooks and assembles them.
-func runHooks(ctx context.Context, gen Generator, brief Brief, spec *core.MechanicsSpec) (string, error) {
-	raw, err := gen.GenerateJSON(ctx, hooksPrompt(brief, spec), hooksSchema)
+// runHooks prompts the generator for the JavaScript hooks that implement the
+// requested escape hatches and assembles them into a mechanics.js body.
+func runHooks(ctx context.Context, gen Generator, brief Brief, spec *core.MechanicsSpec, hatches []string) (string, error) {
+	raw, err := gen.GenerateJSON(ctx, hooksPrompt(brief, spec, hatches), hooksSchema)
 	if err != nil {
 		return "", fmt.Errorf("hooks: %w", err)
 	}

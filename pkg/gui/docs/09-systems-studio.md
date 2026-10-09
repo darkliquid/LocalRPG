@@ -36,6 +36,14 @@ mechanics:
 
 The studio offers complete starting systems for a PbtA 2d6 ladder, a d20 difficulty class, and a d10 success pool. They are built into the binary and are the same corpus the engine tests exercise.
 
+## Generating a System with AI
+
+The **Generate** action drafts a whole system from a description. It works schema-first: it picks the closest of a small set of known-good templates, a 2d6 ladder, a d20 difficulty class, or a dice pool, and fills that template's parameters. The structure is fixed, so the assembled mechanics are valid by construction rather than repaired after the fact.
+
+JavaScript is generated only for a closed list of escape hatches that the declarative schema cannot express: a resource spend, a custom check, a reaction at zero health, or a turn-end effect. Anything outside that list is recorded in the draft's **Generation notes**.
+
+Review the draft, adjust any field, and save it. Generation writes nothing to `systems/<id>/` until you commit the draft.
+
 ## Editing Mechanics in the Studio
 
 The **Mechanics** tab edits the whole `mechanics` block: stats, skills, health, check conventions (including resolution profiles), advancement, freeform state, and the engagement default. Each list adds and removes its own rows, and the studio warns about an invalid id, a duplicate id, a skill whose stat is undeclared, or a malformed profile before it saves.

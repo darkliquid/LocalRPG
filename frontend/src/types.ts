@@ -733,6 +733,7 @@ export interface SystemDraftInfo {
   script?: string;
   rules_prompt?: string;
   verify: SystemVerifyResult;
+  notes?: string[];
   estimate?: WorldEstimate;
   calls?: number;
   oracle?: boolean;

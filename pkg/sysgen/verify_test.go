@@ -7,12 +7,12 @@ import (
 
 func TestVerificationCatchesABrokenScript(t *testing.T) {
 	g := &jsonGen{responses: []string{
-		`{}`,
-		`{"stats":[]}`,
+		`{"resolution":"dc","health":"none","advancement":"none"}`,
+		`{"stats":[{"id":"might"}],"dc":10,"notation":"1d20"}`,
 		`{"hooks":[{"raw":"onAction(\"do\", ("}]}`,
 		`{"rules":"x"}`,
 	}}
-	s, err := Generate(context.Background(), g, Brief{})
+	s, err := Generate(context.Background(), g, Brief{Description: "a spend economy"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,9 +26,8 @@ func TestVerificationCatchesABrokenScript(t *testing.T) {
 
 func TestVerificationPassesAGoodSystem(t *testing.T) {
 	g := &jsonGen{responses: []string{
-		`{}`,
-		`{"stats":[{"id":"might"}],"checks":{"notation":"2d6","outcome":["strong","weak","miss"],"profiles":{"pbta":{"ladder":[{"min":10,"outcome":"strong"},{"min":7,"outcome":"weak"},{"min":0,"outcome":"miss"}]}}}}`,
-		`{"hooks":[]}`,
+		`{"resolution":"ladder","health":"none","advancement":"none"}`,
+		`{"stats":[{"id":"might"}],"notation":"2d6","ladder":[{"min":10,"outcome":"strong"},{"min":7,"outcome":"weak"},{"min":0,"outcome":"miss"}]}`,
 		`{"rules":"Roll 2d6."}`,
 	}}
 	s, err := Generate(context.Background(), g, Brief{})

@@ -59,6 +59,20 @@ type System struct {
 	Script      string              `json:"script,omitempty" yaml:"script,omitempty"`
 	RulesPrompt string              `json:"rules_prompt,omitempty" yaml:"rules_prompt,omitempty"`
 	Verify      VerifyResult        `json:"verify" yaml:"verify"`
+	// Notes record caveats from generation: a description that exceeded the
+	// templates and escape hatches, or the hatches that produced JavaScript.
+	Notes []string `json:"notes,omitempty" yaml:"notes,omitempty"`
+}
+
+// EstimateCalls reports how many model calls a generation makes for a brief:
+// the choose, fill, and rules steps, plus the hooks step only when the brief
+// requests an escape hatch.
+func EstimateCalls(brief Brief) int {
+	calls := 3
+	if len(requestedHatches(brief)) > 0 {
+		calls++
+	}
+	return calls
 }
 
 // Generator defines the structured-output seam for system generation.
@@ -93,26 +107,41 @@ func Generate(ctx context.Context, gen Generator, brief Brief, onStep ...func(St
 		}
 	}
 
-	shape, err := runShape(ctx, gen, brief)
+	tpl, choice, err := chooseTemplate(ctx, gen, brief)
 	if err != nil {
 		emitStep(StepShape, StatusError, err.Error())
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
-	emitStep(StepShape, StatusDone, shape.Resolution)
+	shapeDetail := tpl.Resolution
+	if reason := strings.TrimSpace(choice.Reason); reason != "" {
+		shapeDetail = reason
+	}
+	emitStep(StepShape, StatusDone, shapeDetail)
 
-	mech, err := runSchema(ctx, gen, brief, shape)
+	params, err := fillParams(ctx, gen, tpl, brief)
 	if err != nil {
 		emitStep(StepSchema, StatusError, err.Error())
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
-	emitStep(StepSchema, StatusDone, "")
-
-	script, err := runHooks(ctx, gen, brief, mech)
+	mech, err := tpl.Build(params)
 	if err != nil {
-		emitStep(StepHooks, StatusError, err.Error())
+		emitStep(StepSchema, StatusError, err.Error())
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
-	emitStep(StepHooks, StatusDone, "")
+	emitStep(StepSchema, StatusDone, tpl.ID)
+
+	hatches := requestedHatches(brief)
+	var script string
+	if len(hatches) > 0 {
+		script, err = runHooks(ctx, gen, brief, mech, hatches)
+		if err != nil {
+			emitStep(StepHooks, StatusError, err.Error())
+			return System{}, fmt.Errorf("sysgen: %w", err)
+		}
+		emitStep(StepHooks, StatusDone, strings.Join(hatches, ", "))
+	} else {
+		emitStep(StepHooks, StatusDone, "no escape hatch requested")
+	}
 
 	rules, err := runRules(ctx, gen, brief, mech)
 	if err != nil {
@@ -120,6 +149,14 @@ func Generate(ctx context.Context, gen Generator, brief Brief, onStep ...func(St
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
 	emitStep(StepRules, StatusDone, "")
+
+	var notes []string
+	if gaps := strings.TrimSpace(choice.Gaps); gaps != "" {
+		notes = append(notes, gaps)
+	}
+	if len(hatches) > 0 {
+		notes = append(notes, "Generated JavaScript for: "+strings.Join(hatches, ", "))
+	}
 
 	name := brief.Name
 	if name == "" {
@@ -140,6 +177,7 @@ func Generate(ctx context.Context, gen Generator, brief Brief, onStep ...func(St
 		Script:      script,
 		RulesPrompt: rules,
 		Verify:      VerifyResult{Script: strings.TrimSpace(script) != ""},
+		Notes:       notes,
 	}
 
 	sys := systemtest.System{

@@ -37,9 +37,8 @@ func sysGenService(t *testing.T, provider *sequencedProvider) *Service {
 
 func TestGenerateSystemWritesNothing(t *testing.T) {
 	provider := &sequencedProvider{id: "gen", responses: []string{
-		`{"resolution":"d20","stats":["vigor","wit"],"skills":["brawl","lore"],"health":"points","advancement":true}`,
-		`{"stats":[{"id":"vigor","label":"Vigor"},{"id":"wit","label":"Wit"}],"skills":[{"id":"brawl","label":"Brawl","stat":"vigor"},{"id":"lore","label":"Lore","stat":"wit"}],"health":{"type":"points","max":10,"current":10},"checks":{"notation":"1d20","outcome":["failure","success"],"profiles":{"check":{"notation":"1d20","dc":10}}}}`,
-		`{"hooks":[]}`,
+		`{"resolution":"dc","health":"single","advancement":"none","reason":"a steampunk d20"}`,
+		`{"stats":[{"id":"vigor","label":"Vigor"},{"id":"wit","label":"Wit"}],"skills":[{"id":"brawl","label":"Brawl","stat":"vigor"},{"id":"lore","label":"Lore","stat":"wit"}],"notation":"1d20","dc":10,"health_stat":"vigor"}`,
 		`{"rules":"# Rules\n\nRoll 1d20."}`,
 	}}
 	svc := sysGenService(t, provider)
@@ -91,9 +90,8 @@ func TestGenerateSystemWritesNothing(t *testing.T) {
 
 func TestGenerateSystemReportsVerification(t *testing.T) {
 	provider := &sequencedProvider{id: "gen", responses: []string{
-		`{"resolution":"d20","stats":["str"],"skills":[],"health":"points","advancement":false}`,
-		`{"stats":[{"id":"str","label":"Strength"}],"checks":{"notation":"1d20","outcome":["failure","success"],"profiles":{"check":{"notation":"1d20","dc":10}}}}`,
-		`{"hooks":[]}`,
+		`{"resolution":"dc","health":"none","advancement":"none"}`,
+		`{"stats":[{"id":"str","label":"Strength"}],"notation":"1d20","dc":10}`,
 		`{"rules":"# Rules"}`,
 	}}
 	svc := sysGenService(t, provider)
@@ -114,9 +112,8 @@ func TestGenerateSystemReportsVerification(t *testing.T) {
 
 func TestCommitAndDiscardSystemDraft(t *testing.T) {
 	provider := &sequencedProvider{id: "gen", responses: []string{
-		`{"resolution":"d20","stats":["str"],"skills":[],"health":"points","advancement":false}`,
-		`{"stats":[{"id":"str","label":"Strength"}],"checks":{"notation":"1d20","outcome":["failure","success"],"profiles":{"check":{"notation":"1d20","dc":10}}}}`,
-		`{"hooks":[]}`,
+		`{"resolution":"dc","health":"none","advancement":"none"}`,
+		`{"stats":[{"id":"str","label":"Strength"}],"notation":"1d20","dc":10}`,
 		`{"rules":"# Rules\n\nRoll dice."}`,
 	}}
 	svc := sysGenService(t, provider)

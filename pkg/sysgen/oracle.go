@@ -15,11 +15,11 @@ func NewOracleGenerator() *OracleGenerator {
 
 // GenerateJSON returns fixed, valid JSON responses for each sysgen step.
 func (o *OracleGenerator) GenerateJSON(ctx context.Context, prompt, schema string) ([]byte, error) {
-	if strings.Contains(schema, `"resolution"`) {
-		return []byte(`{"resolution":"d20","stats":["strength","dexterity","mind"],"skills":["athletics","stealth","lore"],"health":"points","advancement":true}`), nil
+	if strings.Contains(schema, `"success_on"`) {
+		return []byte(`{"stats":[{"id":"strength","label":"Strength"},{"id":"dexterity","label":"Dexterity"},{"id":"mind","label":"Mind"}],"skills":[{"id":"athletics","label":"Athletics","stat":"strength"},{"id":"stealth","label":"Stealth","stat":"dexterity"},{"id":"lore","label":"Lore","stat":"mind"}],"notation":"1d20","ladder":[{"min":10,"outcome":"strong"},{"min":7,"outcome":"weak"},{"min":0,"outcome":"miss"}],"dc":10,"success_on":">=8","outcomes":[{"min":3,"max":-1,"outcome":"strong"},{"min":1,"max":2,"outcome":"weak"},{"min":0,"max":0,"outcome":"miss"}],"health_stat":"strength","advancement_stat":"mind"}`), nil
 	}
-	if strings.Contains(schema, `"checks"`) {
-		return []byte(`{"stats":[{"id":"strength","label":"Strength"},{"id":"dexterity","label":"Dexterity"},{"id":"mind","label":"Mind"}],"skills":[{"id":"athletics","label":"Athletics","stat":"strength"},{"id":"stealth","label":"Stealth","stat":"dexterity"},{"id":"lore","label":"Lore","stat":"mind"}],"health":{"type":"points","max":10,"current":10},"checks":{"notation":"1d20","outcome":["failure","success"],"profiles":{"check":{"notation":"1d20","dc":10}}}}`), nil
+	if strings.Contains(schema, `"resolution"`) {
+		return []byte(`{"resolution":"dc","health":"single","advancement":"none","reason":"a d20 system with a single health track","gaps":""}`), nil
 	}
 	if strings.Contains(schema, `"hooks"`) {
 		return []byte(`{"hooks":[]}`), nil

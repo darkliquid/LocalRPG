@@ -166,7 +166,11 @@ func ladderOutcomes(steps []core.LadderStep) []string {
 	sorted := make([]core.LadderStep, len(steps))
 	copy(sorted, steps)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Min > sorted[j].Min })
-	return distinctOutcomes(func(i int) string { return sorted[i].Outcome }, len(sorted))
+	values := make([]string, len(sorted))
+	for i, step := range sorted {
+		values[i] = step.Outcome
+	}
+	return distinctOutcomes(values)
 }
 
 // poolOutcomes lists a pool's outcome vocabulary, strongest first.
@@ -174,14 +178,18 @@ func poolOutcomes(outcomes []core.SuccessOutcome) []string {
 	sorted := make([]core.SuccessOutcome, len(outcomes))
 	copy(sorted, outcomes)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Min > sorted[j].Min })
-	return distinctOutcomes(func(i int) string { return sorted[i].Outcome }, len(sorted))
+	values := make([]string, len(sorted))
+	for i, outcome := range sorted {
+		values[i] = outcome.Outcome
+	}
+	return distinctOutcomes(values)
 }
 
-func distinctOutcomes(at func(int) string, n int) []string {
-	seen := make(map[string]bool, n)
-	out := make([]string, 0, n)
-	for i := 0; i < n; i++ {
-		value := strings.TrimSpace(at(i))
+func distinctOutcomes(values []string) []string {
+	seen := make(map[string]bool, len(values))
+	out := make([]string, 0, len(values))
+	for _, raw := range values {
+		value := strings.TrimSpace(raw)
 		if value == "" || seen[value] {
 			continue
 		}

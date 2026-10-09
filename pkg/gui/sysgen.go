@@ -62,7 +62,7 @@ func (s *Service) GenerateSystem(ctx context.Context, req SystemGenerateRequestD
 	limits := s.limitsFor(req.Limits)
 	role := resolveGeneratorRole(s.configMgr.Get())
 
-	estimate := worldgen.Estimate{Calls: 4}
+	estimate := worldgen.Estimate{Calls: sysgen.EstimateCalls(brief)}
 	if prices := s.worldPriceTable(role); prices != nil {
 		if cost, ok := prices(estimate.Calls); ok {
 			estimate.CostMicros = cost
@@ -219,6 +219,7 @@ func systemDraftDTO(d sysgen.System, oracle bool, estimate *worldgen.Estimate, c
 		Script:      d.Script,
 		RulesPrompt: d.RulesPrompt,
 		Verify:      d.Verify,
+		Notes:       d.Notes,
 		Estimate:    estDTO,
 		Calls:       calls,
 		Oracle:      oracle,

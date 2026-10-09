@@ -514,6 +514,7 @@ type SystemDraftDTO struct {
 	Script      string              `json:"script,omitempty"`
 	RulesPrompt string              `json:"rules_prompt,omitempty"`
 	Verify      sysgen.VerifyResult `json:"verify"`
+	Notes       []string            `json:"notes,omitempty"`
 	Estimate    *WorldEstimateDTO   `json:"estimate,omitempty"`
 	Calls       int                 `json:"calls"`
 	Oracle      bool                `json:"oracle"`
