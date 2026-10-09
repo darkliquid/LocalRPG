@@ -99,6 +99,7 @@ type sentenceStreamer struct {
 	readyCount       int
 	failedCount      int
 	progressObserver func(AudioProgressDTO)
+	owner            string
 	// stopped suppresses emission once the turn is authoritative. From then on the
 	// played set is the client's, so a late unit is synthesized and played with the
 	// rest of the turn rather than announced out of order.
@@ -157,6 +158,7 @@ func (s *sentenceStreamer) emitProgress(seq uint64, stage, key, url string) {
 	failedCount := s.failedCount
 	total := int(s.nextSeq)
 	turnNum := s.turnNumber
+	owner := s.owner
 	s.mu.Unlock()
 
 	if observer != nil {
@@ -169,7 +171,17 @@ func (s *sentenceStreamer) emitProgress(seq uint64, stage, key, url string) {
 			FailedCount:   failedCount,
 			AudioKey:      key,
 			AudioURL:      url,
+			Owner:         owner,
 		})
+	}
+}
+
+// SetOwner sets the streamer's playback owner ("device" or "browser").
+func (s *sentenceStreamer) SetOwner(owner string) {
+	if s != nil {
+		s.mu.Lock()
+		s.owner = owner
+		s.mu.Unlock()
 	}
 }
 

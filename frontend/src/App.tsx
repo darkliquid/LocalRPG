@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
 import { APIClient, HTTPError, GenerationError } from './api/client';
-import { GameState, Turn, TurnSegment, TurnEvent, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState, AudioProgressEvent } from './types';
+import { GameState, Turn, TurnSegment, TurnEvent, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState, AudioProgressEvent, PlaybackEntry } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { TurnAudioState, segmentAudioKey } from './components/TurnSegments';
@@ -66,6 +66,9 @@ export const App: React.FC = () => {
   // The application plays audio itself when it can, which is the only way to
   // narrate a turn without a browser autoplay gesture.
   const [serverAudio, setServerAudio] = useState(false);
+  const [playbackOwner, setPlaybackOwner] = useState<'device' | 'browser'>('browser');
+  const isDeviceOwner = playbackOwner === 'device' || (serverAudio && playbackOwner !== 'browser');
+  const browserPlaybackEnabled = !isDeviceOwner && (config?.media.tts.auto_play ?? false);
   // Per-turn audio status: generating → playing → idle (or error)
   const [turnAudioStatus, setTurnAudioStatus] = useState<Record<number, { state: TurnAudioState; message?: string }>>({});
   // Per-segment audio status, keyed `${turn}:${index}`.
@@ -73,10 +76,11 @@ export const App: React.FC = () => {
   // Narration plays while the turn streams when the browser owns the sound. The
   // clips already heard are handed to the chronicle so nothing repeats.
   const streamedSpeech = useStreamedSpeech(
-    !serverAudio && (config?.media.tts.auto_play ?? false),
+    browserPlaybackEnabled,
     config?.media.tts.master_volume ?? 1
   );
   const [streamedKeys, setStreamedKeys] = useState<ReadonlySet<string>>(new Set());
+  const [playbackLedger, setPlaybackLedger] = useState<Record<string, PlaybackEntry>>({});
   const [audioProgress, setAudioProgress] = useState<AudioProgressEvent | null>(null);
   const [segmentAudioProgress, setSegmentAudioProgress] = useState<Record<number, string>>({});
   const [characterPortraits, setCharacterPortraits] = useState<Record<string, { url: string; hasCustom: boolean }>>({});
@@ -161,8 +165,20 @@ export const App: React.FC = () => {
       })
       .catch(console.error);
     APIClient.audioStatus()
-      .then((status) => setServerAudio(status.available))
-      .catch(() => setServerAudio(false));
+      .then((status) => {
+        setServerAudio(status.available);
+        if (status.owner === 'device' || status.owner === 'browser') {
+          setPlaybackOwner(status.owner);
+        } else if (status.available) {
+          setPlaybackOwner('device');
+        } else {
+          setPlaybackOwner('browser');
+        }
+      })
+      .catch(() => {
+        setServerAudio(false);
+        setPlaybackOwner('browser');
+      });
   }, []);
 
   const handleGameStateFailure = useCallback((err: unknown) => {
@@ -394,6 +410,9 @@ export const App: React.FC = () => {
   const streamProcessorRef = useRef<TurnStreamProcessor>(new TurnStreamProcessor());
 
   const handleTurnEvent = (event: TurnEvent) => {
+    if (event.owner === 'device' || event.owner === 'browser') {
+      setPlaybackOwner(event.owner);
+    }
     if (event.type === 'chunk') {
       setToolActivity(null);
       if (event.text) {
@@ -406,6 +425,9 @@ export const App: React.FC = () => {
       // rest of the prose is still arriving.
       streamedSpeech.enqueue(event.audio_url ?? '', event.audio_key ?? '', event.index);
     } else if (event.type === 'audio_progress' && event.audio_progress) {
+      if (event.audio_progress.owner === 'device' || event.audio_progress.owner === 'browser') {
+        setPlaybackOwner(event.audio_progress.owner);
+      }
       setAudioProgress(event.audio_progress);
       if (event.audio_progress.sequence !== undefined && event.audio_progress.stage) {
         setSegmentAudioProgress((prev) => ({
@@ -442,9 +464,19 @@ export const App: React.FC = () => {
       setToolActivity(null);
 
       // Stop streamed speech so it does not overlap with chronicle playback,
-      // and remember which keys were heard to completion.
+      // and remember which keys were heard to completion and offsets.
       streamedSpeech.stop();
+      const offsets = streamedSpeech.ledger();
       setStreamedKeys(streamedSpeech.playedKeys());
+      setPlaybackLedger(offsets);
+
+      // Resend offsets at handover to reconcile server ledger for finalise pass
+      if (activeGameID && Object.keys(offsets).length > 0) {
+        APIClient.mergePlaybackLedger(activeGameID, {
+          turn: event.turn.turn_number,
+          entries: offsets,
+        }).catch(console.error);
+      }
       const turn = event.turn;
       setChronicle((prev) => [...prev, turn]);
       streamProcessorRef.current.reset();
@@ -505,6 +537,7 @@ export const App: React.FC = () => {
     setSegmentAudioProgress({});
     streamedSpeech.reset();
     setStreamedKeys(new Set());
+    setPlaybackLedger({});
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -586,6 +619,7 @@ export const App: React.FC = () => {
   const handleStopTurn = () => {
     abortRef.current?.abort();
     streamedSpeech.stop();
+    setPlaybackLedger(streamedSpeech.ledger());
     streamProcessorRef.current.reset();
     setStreamedSegments([]);
     setPendingAction(null);
@@ -1043,6 +1077,7 @@ export const App: React.FC = () => {
                     segmentProgress={segmentAudioProgress}
                     gameId={activeGameID ?? undefined}
                     skipAudioKeys={streamedKeys}
+                    playbackLedger={playbackLedger}
                     onGenerateImage={handleGenerateImage}
                   />
                 </>
@@ -1238,6 +1273,7 @@ export const App: React.FC = () => {
               displayMode={config?.media.tts.speech_cues?.display_mode}
               limits={limits}
               skipAudioKeys={streamedKeys}
+              playbackLedger={playbackLedger}
             />
           </Suspense>
 

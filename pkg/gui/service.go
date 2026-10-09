@@ -78,6 +78,10 @@ type Service struct {
 	audioSubs    map[chan AudioStatusDTO]struct{}
 	audioTurn    int
 	audioSegment int
+	// playback is the session's playback ledger and owner: which clips the
+	// player has heard, and how far, and whether the device or the browser plays
+	// them. It is in memory only; a fresh session has heard nothing.
+	playback playbackState
 	// A regeneration is detached and coalesced: the flag records that one is in
 	// flight, so a player turning quickly triggers a catch-up run rather than a
 	// queue of overlapping ones.
@@ -2229,6 +2233,14 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	t.orchestrator.SetSingleTurnMode(t.cfg.InteractiveRolls() == "single-turn")
 	t.orchestrator.SetImageTrigger(t.cfg.ImageTrigger())
 
+	// Sentences are synthesized while the model is still writing, so a finished
+	// segment whose text is one of them is a cache hit at finalise rather than a
+	// second provider call. Nil when disabled or no provider is configured.
+	turnNum := 1
+	if max, err := t.store.MaxTurnNumber(); err == nil && max >= 0 {
+		turnNum = max + 1
+	}
+
 	// Application playback runs on one queue opened before generation: a sentence
 	// the streamer synthesizes is heard as soon as it lands, and the finalise pass
 	// adds only what the stream has not already played. A session with no player
@@ -2236,6 +2248,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// content-addressed and cannot synthesize on demand.
 	audioEnabled := t.cfg.Media.TTS.Type != "" && t.cfg.Media.TTS.Type != "disabled"
 	plan := newTurnAudioPlan(nil)
+	plan.ledger = t.service.turnLedger(t.gameID, turnNum)
 	if audioEnabled && t.cfg.Media.TTS.AutoPlay {
 		if player := t.service.audioPlayer(); player != nil && player.Available() {
 			plan.queue = make(chan string, sentenceQueueDepth)
@@ -2249,14 +2262,6 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 				}
 			})
 		}
-	}
-
-	// Sentences are synthesized while the model is still writing, so a finished
-	// segment whose text is one of them is a cache hit at finalise rather than a
-	// second provider call. Nil when disabled or no provider is configured.
-	turnNum := 1
-	if max, err := t.store.MaxTurnNumber(); err == nil && max >= 0 {
-		turnNum = max + 1
 	}
 
 	// streamedKeys records the clip keys the streamer emitted, so finalise can
@@ -2283,8 +2288,10 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		})
 	}
 	streamer.SetTurnNumber(turnNum)
+	streamer.SetOwner(t.service.PlaybackOwner())
 	streamer.SetProgressObserver(func(progress AudioProgressDTO) {
-		_ = announce(TurnEvent{Type: "audio_progress", AudioProgress: &progress})
+		progress.Owner = t.service.PlaybackOwner()
+		_ = announce(TurnEvent{Type: "audio_progress", AudioProgress: &progress, Owner: t.service.PlaybackOwner()})
 	})
 	defer streamer.Close()
 
@@ -2383,6 +2390,9 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 // appending to the plan only what the streamed sentences did not already play, so
 // no line is heard twice and none is missed.
 func (t *TurnSession) finishTurnAudio(ctx context.Context, turn engine.Turn, plan *turnAudioPlan) {
+	if plan != nil && plan.ledger == nil {
+		plan.ledger = t.service.turnLedger(t.gameID, turn.Number)
+	}
 	t.service.emitTurnClips(ctx, t.gameID, turn, false, func(clip string) {
 		plan.enqueueClip(media.ClipKeyForPath(clip), clip)
 	}, plan)
@@ -3238,9 +3248,19 @@ func (s *Service) synthesizeTurnGroups(ctx context.Context, gameID string, turn 
 // sounds like. A group that failed falls back to per-segment synthesis so the
 // beat is not silent. plan, when non-nil, is the heard ledger: a group whose
 // segments are all heard is skipped, and a partially heard group is suppressed
-// and traced, so no clip plays twice.
+// and traced, so no clip plays twice. The plan's playback ledger refines that per
+// clip: a clip the player heard to its end is skipped, and one cut short is
+// suppressed here, because the device cannot seek, and resumed by the client from
+// its recorded offset.
 func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.Turn, force bool, emit func(string), plan *turnAudioPlan) {
 	cfg := s.configMgr.Get()
+	// emitClip applies the ledger to one clip before sending it.
+	emitClip := func(clip string, indexes []int) {
+		if plan != nil && s.ledgerHolds(plan, media.ClipKeyForPath(clip), indexes) {
+			return
+		}
+		emit(clip)
+	}
 	if groups, grouped, _ := s.synthesizeTurnGroups(ctx, gameID, turn, cfg, force); grouped {
 		for _, group := range groups {
 			if plan != nil {
@@ -3252,6 +3272,10 @@ func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.
 					trace.OrNil(s.logger).Event("turn.audio_partial", map[string]interface{}{
 						"indexes": group.SegmentIndexes,
 					})
+					continue
+				}
+				if s.ledgerHolds(plan, group.Key, group.SegmentIndexes) {
+					plan.markHeard(group.SegmentIndexes)
 					continue
 				}
 			}
@@ -3266,7 +3290,7 @@ func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.
 					continue
 				}
 				for _, clip := range clips {
-					emit(clip)
+					emitClip(clip, []int{index})
 				}
 			}
 			plan.markHeard(group.SegmentIndexes)
@@ -3282,9 +3306,31 @@ func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.
 			continue
 		}
 		for _, clip := range clips {
-			emit(clip)
+			emitClip(clip, []int{i})
 		}
 		plan.markHeard([]int{i})
+	}
+}
+
+// ledgerHolds reports whether the plan's playback ledger already accounts for a
+// clip, so the finalise pass must not send it: heard to its end, or cut short
+// and owed to the client from its offset. A suppressed partial clip is traced
+// with that offset, so a silent remainder on the device is diagnosable.
+func (s *Service) ledgerHolds(plan *turnAudioPlan, key string, indexes []int) bool {
+	verdict, entry := plan.verdict(key)
+	switch verdict {
+	case clipHeard:
+		return true
+	case clipPartial:
+		trace.OrNil(s.logger).Event("turn.audio_partial", map[string]interface{}{
+			"indexes":   indexes,
+			"key":       key,
+			"played_ms": entry.PlayedMS,
+			"total_ms":  entry.TotalMS,
+		})
+		return true
+	default:
+		return false
 	}
 }
 
@@ -3356,13 +3402,18 @@ func (s *Service) narratorVoiceFor(gameID string, cfg *config.Config) *entity.Vo
 // device leaves it nil, and callers fall back to client-side playback.
 func (s *Service) audioPlayer() *playback.Player {
 	s.playerOnce.Do(func() {
-		player, err := playback.Open(s.configMgr.Get().Media.TTS.MasterVolume)
+		volume := 1.0
+		if s.configMgr != nil {
+			volume = s.configMgr.Get().Media.TTS.MasterVolume
+		}
+		player, err := playback.Open(volume)
 		if err != nil {
 			return
 		}
+
 		player.SetOnComplete(func() {
 			s.audioSubMu.Lock()
-			status := AudioStatusDTO{Available: true, Playing: false, Turn: s.audioTurn, Segment: s.audioSegment}
+			status := AudioStatusDTO{Available: true, Playing: false, Turn: s.audioTurn, Segment: s.audioSegment, Owner: s.PlaybackOwner()}
 			s.audioSubMu.Unlock()
 			s.broadcastAudioStatus(status)
 		})
@@ -3389,6 +3440,9 @@ func (s *Service) SubscribeAudioStatus() (<-chan AudioStatusDTO, func()) {
 }
 
 func (s *Service) broadcastAudioStatus(status AudioStatusDTO) {
+	if status.Owner == "" {
+		status.Owner = s.PlaybackOwner()
+	}
 	s.audioSubMu.Lock()
 	defer s.audioSubMu.Unlock()
 	for ch := range s.audioSubs {
@@ -3428,6 +3482,7 @@ func (s *Service) StopAudio() {
 	if player := s.audioPlayer(); player != nil {
 		player.Stop()
 	}
+	s.broadcastAudioStatus(AudioStatusDTO{Available: s.AudioAvailable(), Playing: false, Owner: s.PlaybackOwner()})
 }
 
 // CountUncachedBeats reports how much of a campaign's speech is already cached,
@@ -3929,6 +3984,8 @@ func (s *Service) PlayTurnAudio(gameID string, turnNumber int, force ...bool) er
 		return err
 	}
 
+	s.setPlaybackOwner(ownerDevice)
+	s.broadcastAudioStatus(AudioStatusDTO{Available: true, Playing: true, Turn: turnNumber, Segment: -1, Owner: ownerDevice})
 	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
 	s.setAudioCurrent(turnNumber, -1)
 	return player.PlayQueue(s.turnClipStream(gameID, turnNumber, len(force) > 0 && force[0]))
@@ -3971,6 +4028,8 @@ func (s *Service) PlaySegmentAudio(ctx context.Context, gameID string, turnNumbe
 		return err
 	}
 
+	s.setPlaybackOwner(ownerDevice)
+	s.broadcastAudioStatus(AudioStatusDTO{Available: true, Playing: true, Turn: turnNumber, Segment: segmentIndex, Owner: ownerDevice})
 	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
 	s.setAudioCurrent(turnNumber, segmentIndex)
 	return player.PlayFiles(clips)

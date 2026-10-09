@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Turn, TurnSegment, LimitState } from '../types';
+import { Turn, TurnSegment, LimitState, PlaybackEntry } from '../types';
 import { TurnAudioState, segmentAudioKey } from './TurnSegments';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { anySegmentHasAudio, groupLastIndex, groupLeaderIndex } from '../lib/audio';
@@ -30,6 +30,8 @@ interface StoryTheaterProps {
   limits?: LimitState[];
   // Clips already heard while the turn streamed, which playback must skip.
   skipAudioKeys?: ReadonlySet<string>;
+  // Playback ledger containing resume offsets and completion states.
+  playbackLedger?: Record<string, PlaybackEntry>;
 }
 
 // BEAT_GAP_MS is the buffer between one voice clip finishing and the next line
@@ -67,6 +69,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   displayMode,
   limits,
   skipAudioKeys,
+  playbackLedger,
 }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [activeSegment, setActiveSegment] = useState(0);
@@ -138,6 +141,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     gameId,
     turnNumber: currentTurn?.turn_number,
     skipKeys: skipAudioKeys,
+    ledger: playbackLedger,
   });
 
   const beatKey = currentTurn ? segmentAudioKey(currentTurn.turn_number, groupLeader) : '';

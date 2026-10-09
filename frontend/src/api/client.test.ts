@@ -41,3 +41,59 @@ describe('APIClient error envelopes', () => {
     expect((err as HTTPError).code).toBeUndefined();
   });
 });
+
+describe('APIClient playback ledger and audio status', () => {
+  it('audioStatus parses owner', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ available: true, playing: false, owner: 'device' }),
+          { status: 200 }
+        )
+      )
+    );
+
+    const status = await APIClient.audioStatus();
+    expect(status.available).toBe(true);
+    expect(status.owner).toBe('device');
+  });
+
+  it('resends offsets to the server with mergePlaybackLedger', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          turn: 1,
+          entries: {
+            'clip-1': { played_ms: 1200, total_ms: 3000, complete: false },
+          },
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await APIClient.mergePlaybackLedger('game-1', {
+      turn: 1,
+      entries: {
+        'clip-1': { played_ms: 1200, total_ms: 3000, complete: false },
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/game/game-1/turn/1/ledger',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          turn: 1,
+          entries: {
+            'clip-1': { played_ms: 1200, total_ms: 3000, complete: false },
+          },
+        }),
+      })
+    );
+    expect(result.entries['clip-1'].played_ms).toBe(1200);
+  });
+});
+

@@ -71,7 +71,44 @@ type turnAudioPlan struct {
 	// the authority for the finalise skip: a group whose segments are all heard is
 	// not re-enqueued, whatever its key.
 	heard map[int]bool
-	mu    sync.Mutex
+	// ledger is the turn's playback ledger: how much of each clip the player has
+	// actually heard, merged from the client's offsets. Where heard answers "was
+	// this segment sent", the ledger answers "how far did it play", so a clip the
+	// browser finished is skipped and one it cut short is left for the client to
+	// resume. Nil means no offsets are known, which leaves RB-2's skip in charge.
+	ledger *Ledger
+	mu     sync.Mutex
+}
+
+// clipVerdict is what the finalise pass does with one clip.
+type clipVerdict int
+
+const (
+	// clipPlay means the clip is owed in full.
+	clipPlay clipVerdict = iota
+	// clipHeard means the clip was heard to its end and must not play again.
+	clipHeard
+	// clipPartial means the clip was cut short: the device cannot seek, so it is
+	// suppressed here and the client resumes it from the ledger's offset.
+	clipPartial
+)
+
+// verdict reads the ledger for one clip key.
+func (a *turnAudioPlan) verdict(key string) (clipVerdict, Entry) {
+	if a == nil || key == "" {
+		return clipPlay, Entry{}
+	}
+	entry, ok := a.ledger.Entry(key)
+	switch {
+	case !ok:
+		return clipPlay, Entry{}
+	case entry.Complete:
+		return clipHeard, entry
+	case entry.PlayedMS > 0:
+		return clipPartial, entry
+	default:
+		return clipPlay, entry
+	}
 }
 
 // newTurnAudioPlan builds a plan with an optional playback queue. A nil queue

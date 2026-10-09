@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TurnSegment } from '../types';
+import { PlaybackEntry, TurnSegment } from '../types';
 import { clipKeyFromURL, segmentClipURLs, segmentIsGroupLeader } from '../lib/audio';
 import { APIClient } from '../api/client';
 
@@ -16,6 +16,9 @@ interface SegmentPlaybackOptions {
   // Clips already heard while the turn streamed, so the finalise pass plays only
   // the rest of the turn: the played set is exact because a clip is one unit.
   skipKeys?: ReadonlySet<string>;
+  // The playback ledger: complete clips are skipped, and partially heard clips
+  // are resumed from their recorded offset.
+  ledger?: Record<string, PlaybackEntry>;
   // Needed only to regenerate a beat, which is a request rather than playback.
   gameId?: string;
   turnNumber?: number;
@@ -32,7 +35,7 @@ export const useSegmentPlayback = (
   segments: TurnSegment[] | undefined,
   options: SegmentPlaybackOptions
 ) => {
-  const { autoPlay, volume = 1, skipKeys, gameId, turnNumber } = options;
+  const { autoPlay, volume = 1, skipKeys, ledger, gameId, turnNumber } = options;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prefetchRef = useRef<HTMLAudioElement | null>(null);
   const prefetchedUrlRef = useRef<string | null>(null);
@@ -48,12 +51,14 @@ export const useSegmentPlayback = (
     (segments ?? []).forEach((segment, segmentIndex) => {
       if (!segmentIsGroupLeader(segments, segmentIndex)) return;
       segmentClipURLs(segment).forEach((url) => {
-        if (skipKeys?.has(clipKeyFromURL(url))) return;
+        const key = clipKeyFromURL(url);
+        if (skipKeys?.has(key)) return;
+        if (ledger?.[key]?.complete) return;
         clips.push({ segmentIndex, url });
       });
     });
     return clips;
-  }, [segments, skipKeys]);
+  }, [segments, skipKeys, ledger]);
 
   const stop = useCallback(() => {
     audioRef.current?.pause();
@@ -67,6 +72,11 @@ export const useSegmentPlayback = (
       audioRef.current?.pause();
       const audio = new Audio(url);
       audio.volume = volume;
+      const key = clipKeyFromURL(url);
+      const entry = ledger?.[key];
+      if (entry && !entry.complete && entry.played_ms > 0) {
+        audio.currentTime = entry.played_ms / 1000;
+      }
       audio.onended = () => {
         setPlayingIndex(null);
         onEnded?.();
@@ -83,7 +93,7 @@ export const useSegmentPlayback = (
           setBlocked(true);
         });
     },
-    [volume]
+    [volume, ledger]
   );
 
   const playFrom = useCallback(

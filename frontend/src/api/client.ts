@@ -28,6 +28,8 @@ import {
   SystemDraftCommitRequest,
   SystemEnhanceRequest,
   SystemEnhanceResponse,
+  PlaybackLedgerDTO,
+  PlaybackLedgerRequest,
   SystemEnhanceApplyRequest,
   SystemEnhanceApplyResult,
   SystemExplainResponse,
@@ -476,9 +478,31 @@ export class APIClient {
     return res.blob();
   }
 
-  static async audioStatus(): Promise<{ available: boolean; playing: boolean }> {
+  static async audioStatus(): Promise<{ available: boolean; playing: boolean; owner?: string }> {
     const res = await fetch('/api/audio/status');
     if (!res.ok) throw new Error(`audioStatus: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async getPlaybackLedger(gameID: string, turnNumber?: number): Promise<PlaybackLedgerDTO> {
+    const url = turnNumber !== undefined && turnNumber > 0
+      ? `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/ledger`
+      : `/api/game/${encodeURIComponent(gameID)}/audio/ledger`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`getPlaybackLedger: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async mergePlaybackLedger(gameID: string, req: PlaybackLedgerRequest): Promise<PlaybackLedgerDTO> {
+    const url = req.turn > 0
+      ? `/api/game/${encodeURIComponent(gameID)}/turn/${req.turn}/ledger`
+      : `/api/game/${encodeURIComponent(gameID)}/audio/ledger`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new Error(`mergePlaybackLedger: ${res.statusText}`);
     return res.json();
   }
 
