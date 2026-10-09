@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Turn, TurnSegment } from '../types';
+import { Turn, TurnSegment, PlaybackEntry } from '../types';
 import { TurnSegments, TurnAudioState } from './TurnSegments';
 import { RecordNotice } from './RecordNotice';
 import { Sparkles } from 'lucide-react';
@@ -39,6 +39,8 @@ interface ChronicleViewProps {
   gameId?: string;
   // Clips already heard while the turn streamed, which playback must skip.
   skipAudioKeys?: ReadonlySet<string>;
+  // Playback ledger containing resume offsets and completion states.
+  playbackLedger?: Record<string, PlaybackEntry>;
   // onGenerateImage asks the server to illustrate a turn that has no image.
   onGenerateImage?: (turnNumber: number) => void;
 }
@@ -62,6 +64,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   segmentProgress,
   gameId,
   skipAudioKeys,
+  playbackLedger,
   onGenerateImage,
 }) => {
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -161,6 +164,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 checks={turn.checks}
                 gameId={gameId}
                 skipAudioKeys={skipAudioKeys}
+                playbackLedger={playbackLedger}
               />
 
               {turn.rejected && (

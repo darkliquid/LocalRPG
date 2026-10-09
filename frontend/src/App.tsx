@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
 import { APIClient, HTTPError, GenerationError } from './api/client';
-import { GameState, Turn, TurnSegment, TurnEvent, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState, AudioProgressEvent } from './types';
+import { GameState, Turn, TurnSegment, TurnEvent, EntityNote, EntitySummary, Recap, GraphData, AppConfig, LimitState, AudioProgressEvent, PlaybackEntry } from './types';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { TurnAudioState, segmentAudioKey } from './components/TurnSegments';
@@ -77,6 +77,7 @@ export const App: React.FC = () => {
     config?.media.tts.master_volume ?? 1
   );
   const [streamedKeys, setStreamedKeys] = useState<ReadonlySet<string>>(new Set());
+  const [playbackLedger, setPlaybackLedger] = useState<Record<string, PlaybackEntry>>({});
   const [audioProgress, setAudioProgress] = useState<AudioProgressEvent | null>(null);
   const [segmentAudioProgress, setSegmentAudioProgress] = useState<Record<number, string>>({});
   const [characterPortraits, setCharacterPortraits] = useState<Record<string, { url: string; hasCustom: boolean }>>({});
@@ -442,9 +443,10 @@ export const App: React.FC = () => {
       setToolActivity(null);
 
       // Stop streamed speech so it does not overlap with chronicle playback,
-      // and remember which keys were heard to completion.
+      // and remember which keys were heard to completion and offsets.
       streamedSpeech.stop();
       setStreamedKeys(streamedSpeech.playedKeys());
+      setPlaybackLedger(streamedSpeech.ledger());
       const turn = event.turn;
       setChronicle((prev) => [...prev, turn]);
       streamProcessorRef.current.reset();
@@ -505,6 +507,7 @@ export const App: React.FC = () => {
     setSegmentAudioProgress({});
     streamedSpeech.reset();
     setStreamedKeys(new Set());
+    setPlaybackLedger({});
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -586,6 +589,7 @@ export const App: React.FC = () => {
   const handleStopTurn = () => {
     abortRef.current?.abort();
     streamedSpeech.stop();
+    setPlaybackLedger(streamedSpeech.ledger());
     streamProcessorRef.current.reset();
     setStreamedSegments([]);
     setPendingAction(null);
@@ -1043,6 +1047,7 @@ export const App: React.FC = () => {
                     segmentProgress={segmentAudioProgress}
                     gameId={activeGameID ?? undefined}
                     skipAudioKeys={streamedKeys}
+                    playbackLedger={playbackLedger}
                     onGenerateImage={handleGenerateImage}
                   />
                 </>
@@ -1238,6 +1243,7 @@ export const App: React.FC = () => {
               displayMode={config?.media.tts.speech_cues?.display_mode}
               limits={limits}
               skipAudioKeys={streamedKeys}
+              playbackLedger={playbackLedger}
             />
           </Suspense>
 

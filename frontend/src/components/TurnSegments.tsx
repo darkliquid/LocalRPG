@@ -1,5 +1,5 @@
 import React from 'react';
-import { TurnSegment, TurnCheck } from '../types';
+import { TurnSegment, TurnCheck, PlaybackEntry } from '../types';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { anySegmentHasAudio, segmentIsGroupLeader } from '../lib/audio';
 import { MarkdownProse } from './MarkdownProse';
@@ -39,6 +39,8 @@ interface TurnSegmentsProps {
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
   // Clips already heard while the turn streamed, which playback must skip.
   skipAudioKeys?: ReadonlySet<string>;
+  // Playback ledger containing resume offsets and completion states.
+  playbackLedger?: Record<string, PlaybackEntry>;
 }
 
 export const TurnSegments: React.FC<TurnSegmentsProps> = ({
@@ -60,6 +62,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   checks,
   displayMode = 'stage_directions',
   skipAudioKeys,
+  playbackLedger,
 }) => {
   const ordered = segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: fallback }];
   const hasAudio = anySegmentHasAudio(segments);
@@ -69,6 +72,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
       autoPlay: autoPlay && hasAudio && !serverPlayback,
       volume,
       skipKeys: skipAudioKeys,
+      ledger: playbackLedger,
       gameId,
       turnNumber,
     }

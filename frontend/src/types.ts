@@ -282,6 +282,23 @@ export interface AudioProgressEvent {
   audio_url?: string;
 }
 
+export interface PlaybackEntry {
+  played_ms: number;
+  total_ms?: number;
+  complete?: boolean;
+}
+
+export interface PlaybackLedgerDTO {
+  turn: number;
+  owner: string;
+  entries: Record<string, PlaybackEntry>;
+}
+
+export interface PlaybackLedgerRequest {
+  turn: number;
+  entries: Record<string, PlaybackEntry>;
+}
+
 export interface TurnEvent {
   type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing' | 'audio_progress' | 'portrait' | 'scene_image' | 'step' | 'estimate' | 'draft' | 'progress' | 'batch';
   text?: string;
