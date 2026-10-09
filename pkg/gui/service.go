@@ -3402,10 +3402,15 @@ func (s *Service) narratorVoiceFor(gameID string, cfg *config.Config) *entity.Vo
 // device leaves it nil, and callers fall back to client-side playback.
 func (s *Service) audioPlayer() *playback.Player {
 	s.playerOnce.Do(func() {
-		player, err := playback.Open(s.configMgr.Get().Media.TTS.MasterVolume)
+		volume := 1.0
+		if s.configMgr != nil {
+			volume = s.configMgr.Get().Media.TTS.MasterVolume
+		}
+		player, err := playback.Open(volume)
 		if err != nil {
 			return
 		}
+
 		player.SetOnComplete(func() {
 			s.audioSubMu.Lock()
 			status := AudioStatusDTO{Available: true, Playing: false, Turn: s.audioTurn, Segment: s.audioSegment, Owner: s.PlaybackOwner()}

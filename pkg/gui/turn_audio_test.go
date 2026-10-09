@@ -362,3 +362,67 @@ func TestFinaliseWithAnEmptyLedgerPlaysEverything(t *testing.T) {
 		t.Fatalf("clips = %#v, want the whole turn %#v", got, baseline)
 	}
 }
+
+func TestStreamedThenFinalisedPlaysEachClipOnce(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+	baseline := allTurnClips(t, svc, gameID)
+
+	// Clip 0 was heard completely during stream.
+	// Clip 1 was partially heard (e.g. 300ms of 1200ms).
+	plan := newTurnAudioPlan(make(chan string, 8))
+	plan.ledger = NewLedger()
+	clip0Key := media.ClipKeyForPath(baseline[0])
+	clip1Key := media.ClipKeyForPath(baseline[1])
+
+	plan.ledger.Record(clip0Key, 1000, 1000, true)
+	plan.ledger.Record(clip1Key, 300, 1200, false)
+
+	logger := &captureLogger{}
+	svc.SetLogger(logger)
+
+	got := finaliseClips(t, svc, gameID, plan)
+
+	// Finalise should skip clip 0 because complete == true.
+	// Finalise should suppress clip 1 from device queue (because client resumes it) and trace turn.audio_partial.
+	for _, clip := range got {
+		k := media.ClipKeyForPath(clip)
+		if k == clip0Key {
+			t.Errorf("complete clip %s was replayed by finalise", k)
+		}
+		if k == clip1Key {
+			t.Errorf("partial clip %s was replayed from start by device in finalise", k)
+		}
+	}
+	if !logger.saw("turn.audio_partial") {
+		t.Error("expected turn.audio_partial trace event for partial clip")
+	}
+	// Verify ledger keeps the partial clip's offset intact for client resume
+	entry, ok := plan.ledger.Entry(clip1Key)
+	if !ok || entry.PlayedMS != 300 || entry.Complete {
+		t.Errorf("ledger entry for partial clip = %+v, want PlayedMS=300 and Complete=false", entry)
+	}
+}
+
+func TestSimpleTurnPlaybackUnchanged(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+
+	// A simple turn where no streaming audio ran (empty ledger, no heard segments).
+	// All clips must be generated and queued in order without omissions.
+	clips1 := finaliseClips(t, svc, gameID, newTurnAudioPlan(make(chan string, 8)))
+	clips2 := finaliseClips(t, svc, gameID, newTurnAudioPlan(make(chan string, 8)))
+
+	if len(clips1) < 2 {
+		t.Fatalf("expected at least 2 clips, got %d", len(clips1))
+	}
+	if len(clips1) != len(clips2) {
+		t.Fatalf("inconsistent clips across identical runs: %d vs %d", len(clips1), len(clips2))
+	}
+	for i := range clips1 {
+		if clips1[i] != clips2[i] {
+			t.Errorf("clip %d mismatch: %q vs %q", i, clips1[i], clips2[i])
+		}
+	}
+}
+

@@ -280,6 +280,7 @@ export interface AudioProgressEvent {
   failed_count?: number;
   audio_key?: string;
   audio_url?: string;
+  owner?: string;
 }
 
 export interface PlaybackEntry {
@@ -301,6 +302,7 @@ export interface PlaybackLedgerRequest {
 
 export interface TurnEvent {
   type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing' | 'audio_progress' | 'portrait' | 'scene_image' | 'step' | 'estimate' | 'draft' | 'progress' | 'batch';
+  owner?: string;
   text?: string;
   turn?: Turn;
   // One parsed narration or speech unit, present when type is 'segment': it is
