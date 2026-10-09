@@ -1,35 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MechanicsStrip } from './MechanicsStrip';
-import { TurnCheck } from '../types';
 
-const check = (overrides: Partial<TurnCheck> = {}): TurnCheck => ({
-  check_id: 'c1',
-  outcome: 'weak',
-  roll: { notation: '2d6', total: 9 },
-  ...overrides,
-});
-
-const turn = (overrides: { engagement?: string; checks?: TurnCheck[] } = {}) => ({
-  engagement: 'auto',
-  checks: [] as TurnCheck[],
-  ...overrides,
-});
-
-describe('MechanicsStrip', () => {
-  it('summarises checks and engagement', () => {
-    render(<MechanicsStrip turn={turn({ engagement: 'auto', checks: [check({ outcome: 'weak' })] })} />);
-    expect(screen.getByText(/checks: 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/auto/)).toBeInTheDocument();
+describe('MechanicsStrip image budget', () => {
+  it('shows the images left when a budget is set', () => {
+    render(<MechanicsStrip turn={{ engagement: 'ask', checks: [] }} budget={{ max_images: 200, used_images: 195 }} />);
+    expect(screen.getByText('images: 5 left')).toBeInTheDocument();
   });
 
-  it('says none on a quiet turn', () => {
-    render(<MechanicsStrip turn={turn({ engagement: 'auto', checks: [] })} />);
-    expect(screen.getByText(/checks: none/i)).toBeInTheDocument();
+  it('says so when the budget is spent', () => {
+    render(<MechanicsStrip turn={{ engagement: 'ask', checks: [] }} budget={{ max_images: 10, used_images: 10 }} />);
+    expect(screen.getByText('images: budget spent')).toBeInTheDocument();
   });
 
-  it('renders nothing when mechanics are off', () => {
-    const { container } = render(<MechanicsStrip turn={turn({ engagement: 'off' })} />);
+  it('renders nothing for an unlimited budget with mechanics off', () => {
+    const { container } = render(<MechanicsStrip turn={{ engagement: 'off', checks: [] }} budget={{ max_images: 0 }} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('still shows the mechanics line alone', () => {
+    render(<MechanicsStrip turn={{ engagement: 'auto', checks: [] }} />);
+    expect(screen.getByText(/Mechanics: auto/)).toBeInTheDocument();
+    expect(screen.queryByText(/images:/)).toBeNull();
   });
 });

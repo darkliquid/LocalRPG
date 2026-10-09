@@ -141,6 +141,14 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 				Player:   beat.Player,
 			}
 
+			// A beat's own illustration wins over the scene's backdrop. A missing
+			// asset keeps the backdrop rather than failing the bundle.
+			if beat.ArtPath != "" && beat.ArtPath != sc.ArtPath {
+				if uri, err := dataURI(beat.ArtPath); err == nil {
+					jsBeat.Art = uri
+				}
+			}
+
 			if uri, err := dataURI(beat.PortraitPath); err == nil {
 				jsBeat.Portrait = uri
 			}

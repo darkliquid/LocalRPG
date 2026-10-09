@@ -589,6 +589,7 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		Audio:          c.audio,
 		WorldStyle:     worldStyle,
 		Genre:          worldGenre,
+		AssetsDir:      filepath.Join(gameDir, "assets"),
 		ProviderParams: c.config.Media.Image.Type + ":" + c.config.Media.Image.Model,
 		PlayerID:       manifest.Player,
 		BannerPath:     banner,

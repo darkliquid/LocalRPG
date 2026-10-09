@@ -46,6 +46,10 @@ export interface GameState {
   banner_url?: string;
   // The campaign's world genre, which tints the app's chrome when there is no banner.
   genre?: string;
+  // The campaign's image allowance and what it has spent. 0 means unlimited.
+  image_budget?: { max_images?: number; max_micros?: number; used_images?: number; spent_micros?: number };
+  // The campaign's image approval policy: auto generates, ask waits for the player.
+  image_approval?: 'auto' | 'ask';
   // The resolved mechanics policy in force: off, auto, or ask.
   mechanics_engagement?: 'off' | 'auto' | 'ask';
   // The campaign's progression summary, when the system declares advancement.

@@ -65,3 +65,47 @@ Because `history.jsonl` is the source of truth, invoking `/undo` rewinds the cam
 - The log is truncated back to the chosen turn number.
 - `cache/index.db` turn entries are pruned.
 - Entity history turn markers are rolled back, while authored entity lore and character sheets remain intact.
+
+## Scene Illustrations
+
+A campaign can illustrate its turns as well as its locations. The image policy is
+`media.image.trigger`, and the illustrations live in `games/<id>/assets/scenes/`
+as `turn-<N><ext>`.
+
+### Consistency
+
+Successive illustrations of one place share a look. A scene's **palette** and
+**lighting** are derived from the location and the world's art style, and the same
+values are named in every prompt for that place. The action, the cast, and the
+outcome tone still vary between turns. A room reads differently at dawn and at
+night.
+
+Where the image provider can take a **reference image**, the previous illustration
+of the same location is passed with the request. The provider then sees the look it
+is continuing. A provider that cannot take one gets the stable prompt instead.
+
+### Budget and approval
+
+A campaign can bound what its images cost, in `game.yaml`:
+
+```yaml
+settings:
+  image_budget:
+    max_images: 200        # 0 = unlimited
+    max_micros: 5000000    # 0 = unlimited
+  image_approval: auto     # auto | ask
+```
+
+An image is counted and charged as it is generated, and the counters are saved with
+the campaign. When the budget is spent the provider is not called: the free
+procedural generator draws the beat instead, so a turn is never left without an
+image, and the skip is traced. With `image_approval: ask` a metered provider waits
+for you to ask for the image rather than generating one automatically; a local
+provider is never asked, because it does not charge. The turn readout shows how
+many images remain.
+
+### Exports
+
+An export shows a turn's illustration where one exists and the location backdrop
+otherwise, in both the web and the video export. The exported video and page show
+the same moments the app showed.

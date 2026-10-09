@@ -19,6 +19,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
@@ -130,6 +131,28 @@ type TurnOrchestrator struct {
 	sceneWorker     *SceneWorker
 	portraitWorker  *PortraitWorker
 	worldArtStyle   string
+}
+
+// sceneReference finds the most recent illustration of the same location, so a
+// provider that can condition on a reference image keeps the scene's look. A
+// location with no earlier illustration returns nil.
+func (o *TurnOrchestrator) sceneReference(locationID string, pastTurns []Turn) []byte {
+	if o.timeline == nil || strings.TrimSpace(locationID) == "" {
+		return nil
+	}
+	scenesDir := filepath.Join(o.timeline.GameDir(), "assets", "scenes")
+	for i := len(pastTurns) - 1; i >= 0; i-- {
+		if pastTurns[i].Location != locationID || pastTurns[i].Number <= 0 {
+			continue
+		}
+		base := filepath.Join(scenesDir, fmt.Sprintf("turn-%d", pastTurns[i].Number))
+		for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
+			if data, err := os.ReadFile(base + ext); err == nil && len(data) > 0 {
+				return data
+			}
+		}
+	}
+	return nil
 }
 
 // SetSceneWorker attaches a scene illustration worker to the orchestrator.
@@ -1573,8 +1596,14 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		if len(turn.Checks) > 0 {
 			sceneCtx.Outcome = turn.Checks[0].Outcome
 		}
+		// The scene's stable look keeps successive images of one place together;
+		// the reference image is the previous illustration of the same location.
+		sceneCtx.Scene = media.NewSceneStyle(turn.Location, o.worldArtStyle, sceneCtx.Appearance)
 		scenePrompt := BuildScenePrompt(sceneCtx)
-		o.sceneWorker.Enqueue(o.gameID(), turn.Number, scenePrompt)
+		o.sceneWorker.EnqueueScene(o.gameID(), turn.Number, SceneJob{
+			Prompt:    scenePrompt,
+			Reference: o.sceneReference(turn.Location, pastTurns),
+		})
 	}
 
 	if o.portraitWorker != nil {

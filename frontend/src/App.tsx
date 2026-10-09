@@ -1052,6 +1052,7 @@ export const App: React.FC = () => {
               )}
               <MechanicsStrip
                 turn={{ engagement: gameState?.mechanics_engagement, checks: lastTurnChecks }}
+                budget={gameState?.image_budget}
               />
               <PendingCheckCard
                 pending={pendingCheck}
