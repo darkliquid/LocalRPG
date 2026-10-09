@@ -132,6 +132,8 @@ type CompletionConfig struct {
 	Mode string `yaml:"mode,omitempty" json:"mode,omitempty"`
 	// MaxAttempts caps continuation calls per turn. Zero means one.
 	MaxAttempts int `yaml:"max_attempts,omitempty" json:"max_attempts,omitempty"`
+	// MaxRepairAttempts caps how many times a malformed reply is re-asked. Zero means two.
+	MaxRepairAttempts int `yaml:"max_repair_attempts,omitempty" json:"max_repair_attempts,omitempty"`
 	// TailChars is how much of the partial reply the continuation call sees.
 	TailChars int `yaml:"tail_chars,omitempty" json:"tail_chars,omitempty"`
 	// MinIncompleteChars skips recovery for replies shorter than this.
@@ -739,10 +741,12 @@ func DefaultConfig() *Config {
 			Completion: CompletionConfig{
 				Mode:               "trim",
 				MaxAttempts:        1,
+				MaxRepairAttempts:  2,
 				TailChars:          1500,
 				MinIncompleteChars: 24,
 				TimeoutSeconds:     45,
 			},
+
 			ToolRounds:      0,
 			ToolResultChars: 4000,
 			Roles: map[string]AgentRoleConfig{
@@ -1095,11 +1099,20 @@ func (c *Config) CompletionMode() string {
 
 // CompletionAttempts caps continuation calls per turn.
 func (c *Config) CompletionAttempts() int {
-	if c.Agents.Completion.MaxAttempts <= 0 {
+	if c == nil || c.Agents.Completion.MaxAttempts <= 0 {
 		return 1
 	}
 	return c.Agents.Completion.MaxAttempts
 }
+
+// CompletionMaxRepairAttempts caps how many times a malformed reply is re-asked.
+func (c *Config) CompletionMaxRepairAttempts() int {
+	if c == nil || c.Agents.Completion.MaxRepairAttempts <= 0 {
+		return 2
+	}
+	return c.Agents.Completion.MaxRepairAttempts
+}
+
 
 // CompletionTailChars is how much of the partial reply the continuation call sees.
 func (c *Config) CompletionTailChars() int {

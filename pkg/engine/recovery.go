@@ -52,12 +52,14 @@ func (c CutCause) String() string {
 // The zero value is the default policy: auto, one attempt, a 1500-rune tail, a
 // 24-rune minimum, and a 45-second bound.
 type CompletionPolicy struct {
-	Mode        string
-	MaxAttempts int
-	TailChars   int
-	MinChars    int
-	Timeout     time.Duration
+	Mode              string
+	MaxAttempts       int
+	MaxRepairAttempts int
+	TailChars         int
+	MinChars          int
+	Timeout           time.Duration
 }
+
 
 // SetCompletionProvider attaches the provider that finishes a cut-off reply. A
 // nil provider disables the continuation half of recovery, leaving trimming.
@@ -84,6 +86,13 @@ func (o *TurnOrchestrator) completionAttempts() int {
 		return 1
 	}
 	return o.completionPolicy.MaxAttempts
+}
+
+func (o *TurnOrchestrator) completionMaxRepairAttempts() int {
+	if o.completionPolicy.MaxRepairAttempts <= 0 {
+		return 2
+	}
+	return o.completionPolicy.MaxRepairAttempts
 }
 
 func (o *TurnOrchestrator) completionTailChars() int {

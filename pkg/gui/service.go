@@ -2110,12 +2110,14 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator.SetExtractor(extractor)
 	orchestrator.SetCompletionProvider(harness.CompletionFromConfig(cfg, router, logger))
 	orchestrator.SetCompletionPolicy(engine.CompletionPolicy{
-		Mode:        cfg.CompletionMode(),
-		MaxAttempts: cfg.CompletionAttempts(),
-		TailChars:   cfg.CompletionTailChars(),
-		MinChars:    cfg.CompletionMinChars(),
-		Timeout:     cfg.CompletionTimeout(),
+		Mode:              cfg.CompletionMode(),
+		MaxAttempts:       cfg.CompletionAttempts(),
+		MaxRepairAttempts: cfg.CompletionMaxRepairAttempts(),
+		TailChars:         cfg.CompletionTailChars(),
+		MinChars:          cfg.CompletionMinChars(),
+		Timeout:           cfg.CompletionTimeout(),
 	})
+
 	toolExecutor := tools.NewExecutor(store, cfg.ToolResultChars())
 	toolExecutor.SetVoiceProfiles(timeline.VoiceProfiles())
 	toolExecutor.SetEntityWriter(timeline)

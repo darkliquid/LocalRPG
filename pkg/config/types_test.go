@@ -208,6 +208,21 @@ func TestCompletionSettingsHaveDefaults(t *testing.T) {
 	}
 }
 
+func TestMaxRepairAttemptsDefault(t *testing.T) {
+	if DefaultConfig().CompletionMaxRepairAttempts() != 2 {
+		t.Fatal("the default cap should be 2")
+	}
+	empty := &Config{}
+	if empty.CompletionMaxRepairAttempts() != 2 {
+		t.Fatal("empty config should default to 2")
+	}
+	custom := &Config{Agents: AgentsConfig{Completion: CompletionConfig{MaxRepairAttempts: 5}}}
+	if custom.CompletionMaxRepairAttempts() != 5 {
+		t.Fatalf("custom cap = %d, want 5", custom.CompletionMaxRepairAttempts())
+	}
+}
+
+
 func TestDefaultConfigCarriesCompletionKnobs(t *testing.T) {
 	cfg := DefaultConfig()
 	if cfg.Agents.Completion.Mode != "trim" {
