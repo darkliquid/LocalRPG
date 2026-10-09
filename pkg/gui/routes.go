@@ -26,6 +26,7 @@ var mounts = []routeMount{
 	{"/api/generate-asset-preview", "handleGenerateAssetPreview", (*Server).handleGenerateAssetPreview},
 	{"/api/systems", "handleSystemsRoutes", (*Server).handleSystemsRoutes},
 	{"/api/system/generate", "handleSystemGenerateRoute", (*Server).handleSystemGenerateRoute},
+	{"/api/system/derive", "handleSystemDeriveRoute", (*Server).handleSystemDeriveRoute},
 	{"/api/system/draft/commit", "handleSystemDraftCommitRoute", (*Server).handleSystemDraftCommitRoute},
 	{"/api/system/draft/discard", "handleSystemDraftDiscardRoute", (*Server).handleSystemDraftDiscardRoute},
 	{"/api/system/draft/", "handleSystemDraftRoutes", (*Server).handleSystemDraftRoutes},

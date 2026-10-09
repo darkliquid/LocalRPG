@@ -2,6 +2,7 @@ package gui
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 )
@@ -107,6 +108,30 @@ func (s *Server) handleSystemDraftRoutes(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, draft)
+}
+
+// handleSystemDeriveRoute derives a variant of a reference base system and
+// returns it as a draft.
+func (s *Server) handleSystemDeriveRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req SystemDeriveRequestDTO
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	draft, err := s.service.DeriveSystem(r.Context(), req)
+	switch {
+	case errors.Is(err, ErrReferenceSystemNotFound):
+		writeJSONError(w, http.StatusNotFound, err.Error())
+		return
+	case err != nil:
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSONStatus(w, http.StatusCreated, draft)
 }
 
 // handleSystemEnhance returns additive proposals for an existing system.

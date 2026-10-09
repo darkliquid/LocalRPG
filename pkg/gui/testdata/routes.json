@@ -30,6 +30,7 @@
   "/api/settings/test-provider",
   "/api/stt",
   "/api/system/",
+  "/api/system/derive",
   "/api/system/draft/",
   "/api/system/draft/commit",
   "/api/system/draft/discard",

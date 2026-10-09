@@ -10,6 +10,7 @@ import { MechanicsEditor } from './MechanicsEditor';
 import { ContentImportDialog } from './ContentImportDialog';
 import { SystemGenerateDialog } from './SystemGenerateDialog';
 import { SystemEnhanceDialog } from './SystemEnhanceDialog';
+import { BaseSystemCatalogue } from './BaseSystemCatalogue';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
 
@@ -55,6 +56,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const [showEnhanceDialog, setShowEnhanceDialog] = useState(false);
+  const [showBaseCatalogue, setShowBaseCatalogue] = useState(false);
+  const [isDeriving, setIsDeriving] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [isExplaining, setIsExplaining] = useState(false);
   const [verificationResult, setVerificationResult] = useState<SystemVerifyResult | null>(null);
@@ -96,6 +99,23 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setSelection({ kind: 'draft' });
     setDraft({ localId: generatedDraft.id || 'draft', dirty: true });
     setToast({ type: 'success', message: `Draft loaded for "${generatedDraft.name}". Review and save.` });
+  };
+
+  const handleDerive = async (base: { id: string; name: string }, instruction: string) => {
+    setIsDeriving(true);
+    try {
+      const derived = await APIClient.deriveSystem({ base_id: base.id, instruction });
+      setShowBaseCatalogue(false);
+      handleDraftProduced(derived);
+      setToast({
+        type: 'success',
+        message: `Derived "${derived.name}" from ${base.name}. Review and save.`,
+      });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to derive a system' });
+    } finally {
+      setIsDeriving(false);
+    }
   };
 
   const handleExplain = async () => {
@@ -458,6 +478,15 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
             >
               <Wand2 className="w-3.5 h-3.5 text-purple-400" />
               <span>Generate</span>
+            </button>
+            <button
+              onClick={() => setShowBaseCatalogue(true)}
+              disabled={referenceSystems.length === 0}
+              title="Start from a reference base system"
+              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+              <span>From a Base</span>
             </button>
             <button
               onClick={() => importInputRef.current?.click()}
@@ -1233,6 +1262,40 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                   {isDeletingSystem ? 'Deleting...' : 'Delete System'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBaseCatalogue && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="relative w-full max-w-2xl overflow-hidden border border-white/10 rounded-2xl bg-neutral-900/90 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Start from a base system</h3>
+                <p className="text-xs text-neutral-400">
+                  Clone a tested reference to edit by hand, or derive a variant from it.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowBaseCatalogue(false)}
+                aria-label="Close"
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 max-h-[65vh] overflow-y-auto">
+              <BaseSystemCatalogue
+                bases={referenceSystems}
+                busy={isDeriving}
+                onClone={(base) => {
+                  const reference = referenceSystems.find((r) => r.id === base.id);
+                  if (reference) applyReference(reference);
+                  setShowBaseCatalogue(false);
+                }}
+                onDerive={handleDerive}
+              />
             </div>
           </div>
         </div>

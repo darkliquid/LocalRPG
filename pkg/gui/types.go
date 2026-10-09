@@ -583,6 +583,12 @@ type SystemExplainResponseDTO struct {
 	Oracle      bool   `json:"oracle,omitempty"`
 }
 
+// SystemDeriveRequestDTO asks for a variant of a reference base system.
+type SystemDeriveRequestDTO struct {
+	BaseID      string `json:"base_id"`
+	Instruction string `json:"instruction"`
+}
+
 // ReferenceSystemDTO is one complete, runnable system shipped as a starting point.
 type ReferenceSystemDTO struct {
 	ID          string              `json:"id"`

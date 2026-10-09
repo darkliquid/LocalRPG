@@ -786,6 +786,11 @@ export interface SystemExplainResponse {
   oracle?: boolean;
 }
 
+export interface SystemDeriveRequest {
+  base_id: string;
+  instruction: string;
+}
+
 export interface SystemGenerateRequest {
   description: string;
   name?: string;

@@ -31,6 +31,7 @@ import {
   SystemEnhanceApplyRequest,
   SystemEnhanceApplyResult,
   SystemExplainResponse,
+  SystemDeriveRequest,
   ReferenceSystemsResponse,
   SystemTestRequest,
   SystemTestResponse,
@@ -834,6 +835,18 @@ export class APIClient {
   static async explainSystem(systemId: string): Promise<SystemExplainResponse> {
     const res = await fetch(`/api/system/${encodeURIComponent(systemId)}/explain`, {
       method: 'POST',
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  // deriveSystem generates a variant of a reference base system and returns it
+  // as a draft. Nothing is written to systems/<id>/ until the draft is accepted.
+  static async deriveSystem(req: SystemDeriveRequest): Promise<SystemDraftInfo> {
+    const res = await fetch('/api/system/derive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
     });
     if (!res.ok) throw await errorFromResponse(res, res.statusText);
     return res.json();

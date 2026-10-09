@@ -50,6 +50,10 @@ The studio offers two AI actions for a saved system. **Enhance** proposes additi
 
 **Explain** writes a plain-language description of the mechanics: how a check resolves, what the stats mean, and how advancement works. Copy it into a README or a player handout.
 
+## Starting from a Base System
+
+The reference systems are the best-tested schemas in the app, and the studio offers each as a base. **Clone** loads a base into the editor unchanged. **Derive** generates a variant from an instruction. It keeps the base's structure and changes what you ask. The base's own scenarios run against the variant, so a change that breaks the base's expected behaviour is shown before you accept the draft.
+
 ## Editing Mechanics in the Studio
 
 The **Mechanics** tab edits the whole `mechanics` block: stats, skills, health, check conventions (including resolution profiles), advancement, freeform state, and the engagement default. Each list adds and removes its own rows, and the studio warns about an invalid id, a duplicate id, a skill whose stat is undeclared, or a malformed profile before it saves.
