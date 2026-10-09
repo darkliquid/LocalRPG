@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -27,6 +29,9 @@ type Options struct {
 	// Genre is the world's genre alone, which tints the no-art background.
 	Genre          string
 	ProviderParams string
+	// AssetsDir is a campaign's assets directory, where a turn's own scene
+	// illustration lives. Empty means only the location backdrop is resolved.
+	AssetsDir string
 	// PlayerID is the protagonist, whose portrait stays on stage for the whole
 	// story rather than per beat.
 	PlayerID string
@@ -44,6 +49,28 @@ type Options struct {
 // in pkg/gui because every consumer of a script needs it; pkg/gui keeps its
 // exported alias.
 var ErrAudioUnavailable = errors.New("audio unavailable")
+
+// turnArtExtensions are the file types a turn's illustration may be stored as,
+// probed in this order so a campaign with more than one kind resolves steadily.
+var turnArtExtensions = []string{".png", ".webp", ".jpg", ".jpeg", ".svg"}
+
+// TurnArt resolves a turn's own scene illustration in a campaign's assets
+// directory. A missing or empty file reports false, so the caller falls back to
+// the location backdrop.
+func TurnArt(assetsDir string, turn int) (string, bool) {
+	if strings.TrimSpace(assetsDir) == "" || turn <= 0 {
+		return "", false
+	}
+	for _, ext := range turnArtExtensions {
+		path := filepath.Join(assetsDir, "scenes", fmt.Sprintf("turn-%d%s", turn, ext))
+		info, err := os.Stat(path)
+		if err != nil || info.IsDir() || info.Size() == 0 {
+			continue
+		}
+		return path, true
+	}
+	return "", false
+}
 
 // ErrNoSpeakableText means a beat reduces to nothing once its Markdown and performance
 // tags are removed: a stage direction, say. Such a beat is deliberately never spoken, so it
@@ -213,13 +240,22 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 		shares := groupBeatShares(turn.Segments, groupClips)
 
 		for segmentIndex, segment := range turn.Segments {
+			// A turn's own illustration wins over the scene's backdrop, so an
+			// export shows the moment the app showed rather than only the place.
+			art := current.ArtPath
+			if opts.Art {
+				if turnArt, ok := TurnArt(opts.AssetsDir, turn.Number); ok {
+					art = turnArt
+				}
+			}
+
 			beat := Beat{
 				Kind:       beatKind(segment.Kind),
 				TurnNumber: turn.Number,
 				Speaker:    segment.Speaker,
 				SpeakerID:  segment.SpeakerID,
 				Text:       segment.Text,
-				ArtPath:    current.ArtPath,
+				ArtPath:    art,
 				Player:     segment.Player,
 			}
 

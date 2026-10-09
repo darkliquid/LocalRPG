@@ -504,6 +504,11 @@ func (t *Timeline) EntitiesDir() string {
 	return filepath.Join(t.paths.GameDir(t.gameID), "entities")
 }
 
+// GameDir is the campaign's directory, so a caller can reach its assets.
+func (t *Timeline) GameDir() string {
+	return t.paths.GameDir(t.gameID)
+}
+
 // SyncTurns replays history.jsonl into the index and drops rows for turns the log
 // no longer contains. It returns the number of replayed turns.
 func (t *Timeline) SyncTurns() (int, error) {

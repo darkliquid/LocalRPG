@@ -24,6 +24,9 @@ type ScenePromptContext struct {
 	Appearance string   // the location's authored appearance, if any
 	Style      string   // the world art style
 	Outcome    string   // the resolved check's outcome, if any
+	// Scene is the stable look of the place, so two turns in one scene share a
+	// palette and lighting rather than drifting apart.
+	Scene media.SceneStyle
 }
 
 const (
@@ -68,6 +71,12 @@ func BuildScenePrompt(ctx ScenePromptContext) string {
 		parts = append(parts, appearance)
 	}
 
+	// The scene's stable look is named explicitly, so a provider renders the same
+	// palette and lighting for every turn in one place.
+	if clause := ctx.Scene.Clause(); clause != "" {
+		parts = append(parts, clause)
+	}
+
 	if style := strings.TrimSpace(ctx.Style); style != "" {
 		parts = append(parts, style)
 	}
@@ -76,6 +85,27 @@ func BuildScenePrompt(ctx ScenePromptContext) string {
 	}
 
 	parts = append(parts, sceneSuffix)
+	return strings.Join(parts, ", ")
+}
+
+// ScenePromptPrefix is the stable part of a scene's prompt: the place, its
+// authored appearance, its palette and lighting, and the world style. Two turns in
+// one scene share it, which is the consistency a provider without image
+// conditioning gets.
+func ScenePromptPrefix(ctx ScenePromptContext) string {
+	parts := make([]string, 0, 4)
+	if location := strings.TrimSpace(ctx.Location); location != "" {
+		parts = append(parts, "location: "+location)
+	}
+	if appearance := strings.TrimSpace(ctx.Appearance); appearance != "" {
+		parts = append(parts, appearance)
+	}
+	if clause := ctx.Scene.Clause(); clause != "" {
+		parts = append(parts, clause)
+	}
+	if style := strings.TrimSpace(ctx.Style); style != "" {
+		parts = append(parts, style)
+	}
 	return strings.Join(parts, ", ")
 }
 
@@ -183,13 +213,35 @@ type SceneGenerator interface {
 	GenerateImage(ctx context.Context, prompt string) ([]byte, error)
 }
 
+// SceneJob is one queued illustration: the prompt, and the previous image of the
+// same scene when one exists and the provider can condition on it.
+type SceneJob struct {
+	Prompt    string
+	Reference []byte
+}
+
 // SceneWorker manages asynchronous queued scene illustration generation.
 type SceneWorker struct {
-	mu        sync.Mutex
-	resolver  *core.PathResolver
-	generator SceneGenerator
-	inFlight  map[string]bool
-	onReady   func(gameID string, turnNumber int, relPath string)
+	mu         sync.Mutex
+	resolver   *core.PathResolver
+	generator  SceneGenerator
+	procedural SceneGenerator
+	inFlight   map[string]bool
+	onReady    func(gameID string, turnNumber int, relPath string)
+
+	// budget bounds this worker's generations, and save persists every change so
+	// the allowance survives a reload.
+	budget ImageBudget
+	save   func(ImageBudget)
+	// price reports the cost of one image, when the ledger can price it.
+	price func() (int64, bool)
+	// metered marks a provider that charges per image, and approval is the
+	// campaign's policy for one: auto generates, ask waits for the player.
+	metered  bool
+	approval string
+
+	onSkipped func(gameID string, turnNumber int, reason string)
+	onPending func(gameID string, turnNumber int, job SceneJob)
 }
 
 // NewSceneWorker creates a new SceneWorker.
@@ -199,6 +251,84 @@ func NewSceneWorker(resolver *core.PathResolver, gen SceneGenerator) *SceneWorke
 		generator: gen,
 		inFlight:  make(map[string]bool),
 	}
+}
+
+// SetBudget bounds this worker's generations. The worker checks it before calling
+// the provider, charges it on success, and reports every change through save, so
+// the allowance survives a reload.
+func (w *SceneWorker) SetBudget(budget ImageBudget, save func(ImageBudget)) {
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.budget = budget
+	w.save = save
+}
+
+// SetProceduralFallback draws a scene when the budget is spent, so a beat is never
+// imageless because of a limit. The fallback is free and is not charged.
+func (w *SceneWorker) SetProceduralFallback(gen SceneGenerator) {
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.procedural = gen
+}
+
+// SetPrice reports the cost of one image, when the ledger can price it. An
+// unpriced provider records images only.
+func (w *SceneWorker) SetPrice(price func() (int64, bool)) {
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.price = price
+}
+
+// SetApproval sets the campaign's image approval policy and whether the provider
+// is metered. With ask on a metered provider a generation waits for the player.
+func (w *SceneWorker) SetApproval(mode string, metered bool) {
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.approval = mode
+	w.metered = metered
+}
+
+// SetOnSkipped reports a generation that the budget or the approval policy did
+// not allow, so a caller can trace it.
+func (w *SceneWorker) SetOnSkipped(fn func(gameID string, turnNumber int, reason string)) {
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.onSkipped = fn
+}
+
+// SetOnPending reports a generation awaiting the player's approval.
+func (w *SceneWorker) SetOnPending(fn func(gameID string, turnNumber int, job SceneJob)) {
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.onPending = fn
+}
+
+// Budget reports the budget as it stands, with the charges this worker has added.
+func (w *SceneWorker) Budget() ImageBudget {
+	if w == nil {
+		return ImageBudget{}
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.budget
 }
 
 // SetOnReady registers a callback invoked when a scene image has been generated and saved.
@@ -213,7 +343,13 @@ func (w *SceneWorker) SetOnReady(fn func(gameID string, turnNumber int, relPath 
 
 // Enqueue asynchronously triggers scene image generation for a turn if not already in flight.
 func (w *SceneWorker) Enqueue(gameID string, turnNumber int, prompt string) {
-	if w == nil || w.generator == nil || gameID == "" || turnNumber <= 0 || strings.TrimSpace(prompt) == "" {
+	w.EnqueueScene(gameID, turnNumber, SceneJob{Prompt: prompt})
+}
+
+// EnqueueScene enqueues a scene generation with an optional reference image, so a
+// provider that can condition on one keeps the scene's look.
+func (w *SceneWorker) EnqueueScene(gameID string, turnNumber int, job SceneJob) {
+	if w == nil || w.generator == nil || gameID == "" || turnNumber <= 0 || strings.TrimSpace(job.Prompt) == "" {
 		return
 	}
 
@@ -233,12 +369,93 @@ func (w *SceneWorker) Enqueue(gameID string, turnNumber int, prompt string) {
 			w.mu.Unlock()
 		}()
 
-		_, _ = w.writeScene(context.Background(), gameID, turnNumber, prompt)
+		w.draw(context.Background(), gameID, turnNumber, job)
 	}()
 }
 
-func (w *SceneWorker) writeScene(ctx context.Context, gameID string, turnNumber int, prompt string) (string, error) {
-	imgBytes, err := w.generator.GenerateImage(ctx, prompt)
+// scenePlan decides how a job is drawn: by the provider and charged, by the
+// procedural fallback because the budget is spent, or not at all because the
+// player has not approved it.
+type scenePlan struct {
+	gen     SceneGenerator
+	charge  bool
+	pending bool
+	reason  string
+}
+
+// plan applies the budget and the approval policy in one place, so every path
+// that generates a scene respects them.
+func (w *SceneWorker) plan() scenePlan {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.budget.Exhausted() {
+		if w.procedural != nil {
+			return scenePlan{gen: w.procedural}
+		}
+		return scenePlan{reason: "budget_exhausted"}
+	}
+	if w.approval == ImageApprovalAsk && w.metered {
+		return scenePlan{pending: true}
+	}
+	return scenePlan{gen: w.generator, charge: true}
+}
+
+// draw runs one queued job through the plan, reporting what it did.
+func (w *SceneWorker) draw(ctx context.Context, gameID string, turnNumber int, job SceneJob) {
+	plan := w.plan()
+	switch {
+	case plan.pending:
+		w.notifyPending(gameID, turnNumber, job)
+	case plan.gen == nil:
+		w.notifySkipped(gameID, turnNumber, plan.reason)
+	default:
+		if _, err := w.writeScene(ctx, gameID, turnNumber, job, plan.gen); err != nil {
+			return
+		}
+		if plan.charge {
+			w.charge()
+		}
+	}
+}
+
+// charge records one generated image and persists the budget.
+func (w *SceneWorker) charge() {
+	w.mu.Lock()
+	var cost int64
+	if w.price != nil {
+		if micros, ok := w.price(); ok {
+			cost = micros
+		}
+	}
+	w.budget.Charge(cost)
+	budget, save := w.budget, w.save
+	w.mu.Unlock()
+	if save != nil {
+		save(budget)
+	}
+}
+
+func (w *SceneWorker) notifySkipped(gameID string, turnNumber int, reason string) {
+	w.mu.Lock()
+	fn := w.onSkipped
+	w.mu.Unlock()
+	if fn != nil {
+		fn(gameID, turnNumber, reason)
+	}
+}
+
+func (w *SceneWorker) notifyPending(gameID string, turnNumber int, job SceneJob) {
+	w.mu.Lock()
+	fn := w.onPending
+	w.mu.Unlock()
+	if fn != nil {
+		fn(gameID, turnNumber, job)
+	}
+}
+
+func (w *SceneWorker) writeScene(ctx context.Context, gameID string, turnNumber int, job SceneJob, gen SceneGenerator) (string, error) {
+	imgBytes, err := w.generate(ctx, gen, job)
 	if err != nil {
 		return "", fmt.Errorf("generate scene image: %w", err)
 	}
@@ -269,4 +486,23 @@ func (w *SceneWorker) writeScene(ctx context.Context, gameID string, turnNumber 
 		cb(gameID, turnNumber, relPath)
 	}
 	return relPath, nil
+}
+
+// generate draws a scene, conditioning on the reference image when the generator
+// can take one. A provider without conditioning gets the stable prompt instead.
+func (w *SceneWorker) generate(ctx context.Context, gen SceneGenerator, job SceneJob) ([]byte, error) {
+	if gen == nil {
+		return nil, fmt.Errorf("no scene generator")
+	}
+	if len(job.Reference) > 0 {
+		if conditioner, ok := gen.(media.SceneConditioner); ok {
+			img, err := conditioner.GenerateSceneWithReference(ctx, media.SceneRequestFromPrompt(job.Prompt), job.Reference)
+			if err == nil && len(img) > 0 {
+				return img, nil
+			}
+			// A conditioner that fails falls back to the plain path rather than
+			// losing the beat's image.
+		}
+	}
+	return gen.GenerateImage(ctx, job.Prompt)
 }

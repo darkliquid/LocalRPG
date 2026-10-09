@@ -121,6 +121,10 @@ type GameStateDTO struct {
 	// Genre is the campaign's world genre, which tints the app's chrome when the
 	// campaign has no banner of its own.
 	Genre string `json:"genre,omitempty"`
+	// ImageBudget is the campaign's image allowance and what it has spent, so a
+	// client can show how many images remain. ImageApproval is auto or ask.
+	ImageBudget   engine.ImageBudget `json:"image_budget,omitempty"`
+	ImageApproval string             `json:"image_approval,omitempty"`
 	// MechanicsEngagement is the resolved policy in force: off, auto, or ask.
 	MechanicsEngagement string `json:"mechanics_engagement,omitempty"`
 	// Advancement is the campaign's progression summary, when the system has one.

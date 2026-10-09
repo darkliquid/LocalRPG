@@ -32,6 +32,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/paths"
 	"github.com/darkliquid/localrpg/pkg/pathutil"
+	"github.com/darkliquid/localrpg/pkg/pricing"
 	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/refsystems"
 	"github.com/darkliquid/localrpg/pkg/registry"
@@ -827,6 +828,8 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		OpeningPrompt: engine.OpeningPrompt(gameManifest),
 		NarratorVoice: narratorVoice,
 		Genre:         worldGenre,
+		ImageBudget:   engine.ImageBudgetFromManifest(gameManifest),
+		ImageApproval: engine.ImageApprovalMode(gameManifest),
 		StartLocation: startLocation,
 		BannerURL:     bannerURL,
 
@@ -2515,6 +2518,96 @@ func (s *Service) broadcastPortraitReady(gameID, characterID, relPath string, ve
 		Version:           ver,
 		HasCustomPortrait: true,
 	}
+	for _, fn := range listeners {
+		fn(evt)
+	}
+}
+
+// configureSceneBudget gives a scene worker the campaign's image allowance, its
+// approval policy, and the free procedural fallback, so a generation respects the
+// budget in one place.
+func (s *Service) configureSceneBudget(worker *engine.SceneWorker, gameID string, cfg *config.Config) {
+	manifest, err := core.LoadGameManifest(filepath.Join(s.resolver.GameDir(gameID), "game.yaml"))
+	if err != nil || manifest == nil {
+		return
+	}
+
+	worker.SetBudget(engine.ImageBudgetFromManifest(manifest), func(next engine.ImageBudget) {
+		s.saveImageBudget(gameID, next)
+	})
+	worker.SetApproval(engine.ImageApprovalMode(manifest), imageProviderMetered(cfg.Media.Image))
+	worker.SetPrice(imagePrice(cfg))
+	worker.SetProceduralFallback(media.NewProceduralArtClient())
+	worker.SetOnSkipped(func(gID string, turnNumber int, reason string) {
+		trace.OrNil(s.logger).Event("turn.image_skipped", map[string]interface{}{
+			"turn": turnNumber, "reason": reason,
+		})
+		s.broadcastSceneImagePending(gID, turnNumber, reason)
+	})
+}
+
+// saveImageBudget writes a campaign's image counters back, so the allowance
+// survives a reload.
+func (s *Service) saveImageBudget(gameID string, budget engine.ImageBudget) {
+	path := filepath.Join(s.resolver.GameDir(gameID), "game.yaml")
+	manifest, err := core.LoadGameManifest(path)
+	if err != nil || manifest == nil {
+		return
+	}
+	engine.SetImageBudget(manifest, budget)
+	if err := core.SaveGameManifest(path, manifest); err != nil {
+		trace.OrNil(s.logger).Event("turn.image_budget_save_failed", map[string]interface{}{"error": err.Error()})
+	}
+}
+
+// imageProviderMetered reports whether the configured image provider charges per
+// image, so the approval policy can apply to it.
+func imageProviderMetered(cfg config.ImageConfig) bool {
+	key, ok := media.ImageKeyFor(cfg)
+	if !ok {
+		return false
+	}
+	reg, ok := provider.Lookup(string(key.Parent()))
+	if !ok {
+		return false
+	}
+	for _, feature := range reg.Descriptor.Features {
+		if feature == provider.FeatureMetered {
+			return true
+		}
+	}
+	return false
+}
+
+// imagePrice reports the cost of one image from the ledger, when it can price the
+// configured provider. An unpriced provider records images only.
+func imagePrice(cfg *config.Config) func() (int64, bool) {
+	key, ok := media.ImageKeyFor(cfg.Media.Image)
+	if !ok {
+		return nil
+	}
+	return func() (int64, bool) {
+		price := pricing.Resolve(string(key), cfg.Media.Image.Model, cfg)
+		if price == (pricing.Price{}) {
+			return 0, false
+		}
+		return int64(price.PerRequest), true
+	}
+}
+
+// broadcastSceneImagePending tells the clients that a turn's illustration was not
+// generated automatically, so a viewer can ask for it.
+func (s *Service) broadcastSceneImagePending(gameID string, turnNumber int, reason string) {
+	s.portraitMu.Lock()
+	var listeners []func(TurnEvent)
+	if m := s.portraitListeners[gameID]; m != nil {
+		for _, fn := range m {
+			listeners = append(listeners, fn)
+		}
+	}
+	s.portraitMu.Unlock()
+
+	evt := TurnEvent{Type: "scene_image_pending", TurnNumber: turnNumber, Message: reason}
 	for _, fn := range listeners {
 		fn(evt)
 	}
