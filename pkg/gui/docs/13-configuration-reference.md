@@ -95,6 +95,7 @@ choose; the ledger and provider identifiers are listed in the
 | `agents.action_echo` | bool |
 | `agents.completion.mode` | string |
 | `agents.completion.max_attempts` | int |
+| `agents.completion.max_repair_attempts` | int |
 | `agents.completion.tail_chars` | int |
 | `agents.completion.min_incomplete_chars` | int |
 | `agents.completion.timeout_seconds` | int |
