@@ -45,6 +45,7 @@ var mounts = []routeMount{
 	{"/api/settings/test-provider", "handleTestProviderRoute", (*Server).handleTestProviderRoute},
 	{"/api/config/offline-preset", "handleOfflinePresetRoute", (*Server).handleOfflinePresetRoute},
 	{"/api/config/offline-report", "handleOfflineReportRoute", (*Server).handleOfflineReportRoute},
+	{"/api/styles", "handleStylesRoute", (*Server).handleStylesRoute},
 	{"/api/open-url", "handleOpenURLRoute", (*Server).handleOpenURLRoute},
 	{"/api/providers", "handleProviderCatalogRoute", (*Server).handleProviderCatalogRoute},
 	{"/api/providers/models", "handleModelCatalogueRoute", (*Server).handleModelCatalogueRoute},

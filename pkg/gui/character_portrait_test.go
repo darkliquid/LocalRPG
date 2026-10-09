@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
 func TestGetCharacterPortraitEndpoint_ProceduralFallback(t *testing.T) {
@@ -213,4 +215,43 @@ func TestListEntities_ReturnsHasPortraitAndPortraitURL(t *testing.T) {
 	}
 }
 
+// TestProceduralPortraitReflectsTheEntity guards that the GUI hands the generator
+// the entity's tags: two characters that differ only in tags get different
+// fallback portraits, rather than the same silhouette in two colour pairs.
+func TestProceduralPortraitReflectsTheEntity(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	entitiesDir := filepath.Join(svc.resolver.GameDir(gameID), "entities")
 
+	write := func(id string, tags []string) {
+		t.Helper()
+		note := "---\nid: " + id + "\nname: " + id + "\ntype: character\ntags: [" + strings.Join(tags, ", ") + "]\n---\nA figure.\n"
+		if err := os.WriteFile(filepath.Join(entitiesDir, id+".md"), []byte(note), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("orc-fighter", []string{"orc", "warrior"})
+	write("elf-mage", []string{"elf", "mage"})
+
+	store, err := svc.store(gameID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storage.NewSyncer(store).Sync(entitiesDir); err != nil {
+		t.Fatal(err)
+	}
+
+	orc, contentType, err := svc.GetCharacterPortrait(context.Background(), gameID, "orc-fighter")
+	if err != nil {
+		t.Fatalf("GetCharacterPortrait(orc-fighter): %v", err)
+	}
+	if !strings.Contains(contentType, "svg") {
+		t.Fatalf("expected an SVG fallback, got %s", contentType)
+	}
+	elf, _, err := svc.GetCharacterPortrait(context.Background(), gameID, "elf-mage")
+	if err != nil {
+		t.Fatalf("GetCharacterPortrait(elf-mage): %v", err)
+	}
+	if bytes.Equal(orc, elf) {
+		t.Fatal("two characters with different tags rendered the same portrait")
+	}
+}

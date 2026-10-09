@@ -43,8 +43,19 @@ type Scene struct {
 	LocationID   string
 	LocationName string
 	ArtPath      string
-	Beats        []Beat
-	Duration     time.Duration
+	// Layers, when present, are the scene's art split by depth, ordered back to
+	// front. A renderer parallaxes them; a scene with no layers is a flat image
+	// and draws as it always did.
+	Layers   []SceneLayer
+	Beats    []Beat
+	Duration time.Duration
+}
+
+// SceneLayer is one depth of a scene's art. Depth runs from 0 at the back to 1 at
+// the front, so the background moves least and the foreground most.
+type SceneLayer struct {
+	Depth float64
+	Art   string
 }
 
 // ClipGroup is one clip a run of adjacent same-speaker beats shares, so the
@@ -72,7 +83,10 @@ type Script struct {
 	// when a scene has no art of its own.
 	Banner string
 
+	// WorldStyle is the world's art style and genre as one string, and Genre is the
+	// world's genre alone, which the no-art background is tinted by.
 	WorldStyle    string
+	Genre         string
 	Scenes        []Scene
 	TotalDuration time.Duration
 }

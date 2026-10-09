@@ -8,8 +8,11 @@ import {
   Cpu,
   Flame,
   TreePine,
+  Dices,
+  Building2,
   LucideIcon,
 } from 'lucide-react';
+import { GENRE_PALETTES, genrePalette } from '../../lib/genre';
 
 export function hashString(str: string): number {
   let hash = 0x811c9dc5;
@@ -20,18 +23,12 @@ export function hashString(str: string): number {
   return hash >>> 0;
 }
 
-const PALETTES = [
-  { name: 'Arcane', bg: '#090a0f', from: '#4c1d95', via: '#1e1b4b', to: '#312e81', accent: '#a855f7' },
-  { name: 'Void', bg: '#050811', from: '#1e293b', via: '#0f172a', to: '#0284c7', accent: '#38bdf8' },
-  { name: 'Deepwood', bg: '#061009', from: '#14532d', via: '#052e16', to: '#166534', accent: '#22c55e' },
-  { name: 'Ember', bg: '#140804', from: '#7c2d12', via: '#431407', to: '#9a3412', accent: '#f97316' },
-  { name: 'Crimson', bg: '#130508', from: '#881337', via: '#4c0519', to: '#9f1239', accent: '#f43f5e' },
-  { name: 'Eldritch', bg: '#041014', from: '#134e4a', via: '#042f2e', to: '#115e59', accent: '#14b8a6' },
-];
-
+// The palette table lives in lib/genre.ts, so the launcher, the app background,
+// the empty states, the site, and the export all read one source. A banner with
+// no genre still varies by its id, as it did.
 export function getPalette(id: string) {
   const hash = hashString(id || 'default');
-  return PALETTES[hash % PALETTES.length];
+  return GENRE_PALETTES[hash % GENRE_PALETTES.length];
 }
 
 const GENRE_ICONS: Array<{ match: RegExp; icon: LucideIcon }> = [
@@ -43,7 +40,30 @@ const GENRE_ICONS: Array<{ match: RegExp; icon: LucideIcon }> = [
   { match: /mystery|stealth|shadow|ghost/i, icon: Ghost },
   { match: /war|battle|shield|iron/i, icon: Shield },
   { match: /apocalypse|wasteland|flame|fire/i, icon: Flame },
+  { match: /western|frontier|cowboy|saloon/i, icon: Flame },
+  { match: /modern|contemporary|urban|city/i, icon: Building2 },
+  { match: /histor|victorian|steam|medieval|ancient/i, icon: Shield },
 ];
+
+// GENRE_ICONS_BY_NAME resolves a palette's icon name, so lib/genre.ts can name an
+// icon without importing React components.
+const ICONS_BY_NAME: Record<string, LucideIcon> = {
+  Sword,
+  Rocket,
+  Cpu,
+  Skull,
+  Flame,
+  TreePine,
+  Ghost,
+  Shield,
+  Dices,
+  Building2,
+};
+
+export function genreIconByName(name?: string): LucideIcon | null {
+  if (!name) return null;
+  return ICONS_BY_NAME[name] ?? null;
+}
 
 export function getGenreIcon(genreOrTag?: string): LucideIcon | null {
   if (!genreOrTag) return null;
@@ -63,10 +83,11 @@ export function getMonogram(name: string): string {
 export const ProceduralBanner: React.FC<{
   id: string;
   name?: string;
+  genre?: string;
   className?: string;
   style?: React.CSSProperties;
-}> = ({ id, className = '', style }) => {
-  const p = getPalette(id);
+}> = ({ id, genre, className = '', style }) => {
+  const p = genre ? genrePalette(genre) : getPalette(id);
   const hash = hashString(id);
   const angle = hash % 360;
 
@@ -74,8 +95,8 @@ export const ProceduralBanner: React.FC<{
     <div
       className={`relative w-full h-full overflow-hidden ${className}`}
       style={{
-        backgroundColor: p.bg,
-        backgroundImage: `radial-gradient(ellipse at 75% 30%, ${p.from} 0%, ${p.via} 50%, ${p.bg} 100%), linear-gradient(${angle}deg, ${p.to}22, transparent)`,
+        backgroundColor: p.to,
+        backgroundImage: `radial-gradient(ellipse at 75% 30%, ${p.from} 0%, ${p.to} 55%, ${p.to} 100%), linear-gradient(${angle}deg, ${p.accent}22, transparent)`,
         ...style,
       }}
     >
@@ -93,8 +114,9 @@ export const ProceduralIcon: React.FC<{
   size?: number;
   className?: string;
 }> = ({ id, name, genre, size = 48, className = '' }) => {
-  const p = getPalette(id);
-  const IconComponent = getGenreIcon(genre) || getGenreIcon(name);
+  const p = genre ? genrePalette(genre) : getPalette(id);
+  const IconComponent =
+    (genre ? genreIconByName(genrePalette(genre).icon) : null) || getGenreIcon(genre) || getGenreIcon(name);
   const monogram = getMonogram(name);
 
   return (
@@ -103,7 +125,7 @@ export const ProceduralIcon: React.FC<{
       style={{
         width: size,
         height: size,
-        background: `linear-gradient(135deg, ${p.from} 0%, ${p.via} 100%)`,
+        background: `linear-gradient(135deg, ${p.from} 0%, ${p.to} 100%)`,
         color: '#ffffff',
       }}
     >

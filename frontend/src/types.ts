@@ -44,6 +44,8 @@ export interface GameState {
   narrator_voice?: string;
   start_location?: string;
   banner_url?: string;
+  // The campaign's world genre, which tints the app's chrome when there is no banner.
+  genre?: string;
   // The resolved mechanics policy in force: off, auto, or ask.
   mechanics_engagement?: 'off' | 'auto' | 'ask';
   // The campaign's progression summary, when the system declares advancement.
@@ -1339,6 +1341,27 @@ export interface AppConfig {
   embeddings?: EmbeddingsConfig;
   preferences: PreferencesConfig;
   generation?: GenerationConfig;
+  // styles.pack selects a procedural style pack; empty is the built-in look.
+  styles?: StylesConfig;
+}
+
+export interface StylesConfig {
+  pack?: string;
+}
+
+// StylePackStatus is one style pack the config directory holds, with any reason it
+// could not be loaded.
+export interface StylePackStatus {
+  id: string;
+  label?: string;
+  path: string;
+  problems?: string[];
+}
+
+export interface StylePacks {
+  active?: string;
+  packs: StylePackStatus[];
+  warnings?: string[];
 }
 
 // GenerationConfig bounds an AI world generation. A premise, entity, or

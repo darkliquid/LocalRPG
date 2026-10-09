@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/darkliquid/localrpg/pkg/scene"
 	"os"
 	"path/filepath"
 	"strings"
@@ -172,5 +173,29 @@ func TestBuildWritesSite(t *testing.T) {
 	}
 	if !strings.Contains(string(article), `href="../docs/11-usage-and-pricing.html"`) {
 		t.Error("cross-reference link was not rewritten relative to the article")
+	}
+}
+
+// TestSiteBackgroundUsesTheGenrePalette guards that the site's background reads
+// the same palette table the app and the export use.
+func TestSiteBackgroundUsesTheGenrePalette(t *testing.T) {
+	palette := scene.GenrePaletteFor("")
+	vars := string(genreVars())
+	for _, want := range []string{palette.From, palette.To, palette.Accent} {
+		if !strings.Contains(vars, want) {
+			t.Fatalf("the genre variables omit %s: %s", want, vars)
+		}
+	}
+
+	renderer, err := newRenderer()
+	if err != nil {
+		t.Fatalf("newRenderer: %v", err)
+	}
+	page, err := renderer.render("home.html.tmpl", &pageData{Root: "", Title: "Home", Description: "d"})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(string(page), palette.From) {
+		t.Fatal("the rendered page does not carry the palette")
 	}
 }

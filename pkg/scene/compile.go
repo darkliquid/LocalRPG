@@ -21,9 +21,11 @@ type Source interface {
 // Options controls what compilation resolves. Art, audio, and portraits are
 // decoration: a failure to resolve any of them degrades a beat, never the export.
 type Options struct {
-	Art            bool
-	Audio          bool
-	WorldStyle     string
+	Art        bool
+	Audio      bool
+	WorldStyle string
+	// Genre is the world's genre alone, which tints the no-art background.
+	Genre          string
 	ProviderParams string
 	// PlayerID is the protagonist, whose portrait stays on stage for the whole
 	// story rather than per beat.
@@ -172,7 +174,7 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 		return nil, fmt.Errorf("campaign %q has no turns to export", gameID)
 	}
 
-	script := &Script{GameID: gameID, WorldStyle: opts.WorldStyle, Banner: opts.BannerPath}
+	script := &Script{GameID: gameID, WorldStyle: opts.WorldStyle, Genre: opts.Genre, Banner: opts.BannerPath}
 	var silent silence
 	// Spoken beats are the ones that can speak at all: a beat that reduces to nothing is
 	// never spoken, so it is not one of them. The split by kind is kept as the script is

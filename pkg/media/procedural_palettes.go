@@ -48,12 +48,15 @@ var paletteGenres = func() []string {
 // unknown genre picks a base palette deterministically from the seed, so two
 // scenes of one unknown genre still differ while a single scene stays stable.
 func paletteFor(genre, mood, timeOfDay string, rng *rand.Rand) palette {
-	p, ok := basePalettes[strings.ToLower(strings.TrimSpace(genre))]
+	// The active style pack's tables are consulted first, so a pack may override a
+	// genre's palette or add one the built-in look does not have.
+	tables := ActiveTables()
+	p, ok := tables.ScenePalettes[strings.ToLower(strings.TrimSpace(genre))]
 	if !ok {
 		if rng != nil {
-			p = basePalettes[paletteGenres[rng.Intn(len(paletteGenres))]]
+			p = tables.ScenePalettes[paletteGenres[rng.Intn(len(paletteGenres))]]
 		} else {
-			p = basePalettes["fantasy"]
+			p = tables.ScenePalettes["fantasy"]
 		}
 	}
 	p = applyMood(p, mood)

@@ -244,6 +244,12 @@ choose; the ledger and provider identifiers are listed in the
 | --- | --- |
 | `registries.urls` | []string |
 
+### `styles`
+
+| Key | Type |
+| --- | --- |
+| `styles.pack` | string |
+
 ## Value sets
 
 Keys typed `string` here accept the following values where noted. An

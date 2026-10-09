@@ -20,6 +20,7 @@ import { NewEntityWizard } from './components/NewEntityWizard';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
 import { LimitChip } from './components/LimitChip';
 import { User, Network, BookOpen, Clock, Film, Compass, Settings, X, Layers, AlertTriangle, HelpCircle, Download } from 'lucide-react';
+import { genreGradient } from './lib/genre';
 import { formatGenerationError } from './lib/generationError';
 import { useStreamedSpeech } from './hooks/useStreamedSpeech';
 import { TurnStreamProcessor } from './lib/turnStreamProcessor';
@@ -792,7 +793,7 @@ export const App: React.FC = () => {
         key={activeBgImage || 'default'}
         className="fixed inset-0 bg-cover bg-center bg-no-repeat animate-bg-fade-in transition-all duration-700 pointer-events-none"
         style={{
-          backgroundImage: activeBgImage ? `url(${activeBgImage})` : 'radial-gradient(ellipse at center, #261e1b 0%, #0c0a09 100%)',
+          backgroundImage: activeBgImage ? `url(${activeBgImage})` : genreGradient(gameState?.genre),
           backgroundColor: '#0c0a09',
         }}
       />
@@ -987,6 +988,7 @@ export const App: React.FC = () => {
                 <>
                   <ChronicleView
                     turns={chronicle}
+                    genre={gameState?.genre}
                     onWikilinkClick={handleOpenWikilink}
                     // With application playback the browser must stay silent, so
                     // it never competes with the narrator or hits autoplay limits.

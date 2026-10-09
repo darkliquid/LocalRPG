@@ -66,14 +66,17 @@ type Service struct {
 	playerOnce sync.Once
 	player     *playback.Player
 	logger     trace.Logger
+	// stylePackWarnings carries the reason the configured style pack was ignored,
+	// so the settings can explain it without failing a render.
+	stylePackWarnings []string
 	// audioSubs are the clients watching for a playback completion, so the
 	// theatre advances on a real event rather than a status poll. audioTurn and
 	// audioSegment name the beat currently playing, so a completion event carries
 	// its identity and a stale event cannot advance the wrong beat.
-	audioSubMu    sync.Mutex
-	audioSubs     map[chan AudioStatusDTO]struct{}
-	audioTurn     int
-	audioSegment  int
+	audioSubMu   sync.Mutex
+	audioSubs    map[chan AudioStatusDTO]struct{}
+	audioTurn    int
+	audioSegment int
 	// A regeneration is detached and coalesced: the flag records that one is in
 	// flight, so a player turning quickly triggers a catch-up run rather than a
 	// queue of overlapping ones.
@@ -300,7 +303,25 @@ func NewService(rootDir string) *Service {
 	for _, problem := range mgr.Warnings() {
 		trace.OrNil(svc.logger).Event("config.problem", map[string]interface{}{"problem": problem})
 	}
+	svc.applyStylePack()
 	return svc
+}
+
+// setStyleWarnings records why a style pack was ignored.
+func (s *Service) setStyleWarnings(warnings []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stylePackWarnings = warnings
+}
+
+// styleWarnings returns why a style pack was ignored.
+func (s *Service) styleWarnings() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.stylePackWarnings) == 0 {
+		return nil
+	}
+	return append([]string(nil), s.stylePackWarnings...)
 }
 
 // goBackground runs fn in a goroutine that Close waits for. Work submitted after
@@ -782,6 +803,13 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		systemManifest = sm
 	}
 
+	// The world's genre tints the app's chrome, so a genre-less campaign keeps the
+	// neutral look.
+	worldGenre := ""
+	if world, err := core.LoadWorldManifest(filepath.Join(s.resolver.WorldDir(gameManifest.WorldID), "world.yaml")); err == nil {
+		worldGenre = strings.TrimSpace(world.Genre)
+	}
+
 	return &GameStateDTO{
 		GameID:   gameID,
 		GameName: gameManifest.Name,
@@ -798,6 +826,7 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		Locations:     locations,
 		OpeningPrompt: engine.OpeningPrompt(gameManifest),
 		NarratorVoice: narratorVoice,
+		Genre:         worldGenre,
 		StartLocation: startLocation,
 		BannerURL:     bannerURL,
 
@@ -2721,7 +2750,7 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 	}
 
 	// Procedural SVG fallback
-	svg := media.GenerateProceduralBustSVG(ent.ID, ent.Name, ent.Gender)
+	svg := media.GenerateProceduralPortrait(media.PortraitRequestFor(ent))
 	return svg, "image/svg+xml", nil
 }
 
@@ -4965,6 +4994,9 @@ func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*Setting
 	// The named media registries cache clients built from the old configuration,
 	// so drop them and let the next use rebuild from the new one.
 	s.invalidateRegistries()
+	// A style pack change takes effect with the next render, and an invalid pack is
+	// reported rather than failing the save.
+	s.applyStylePack()
 
 	s.mu.Lock()
 	s.resolver.SetPaths(cfg.Paths.Systems, cfg.Paths.Worlds, cfg.Paths.Games, cfg.Paths.Cache)
@@ -6145,4 +6177,3 @@ func (s *Service) HandleRegistryUpdates(w http.ResponseWriter, r *http.Request) 
 	}
 	writeJSON(w, updates)
 }
-

@@ -56,7 +56,7 @@ func structureFor(tags []string, genre string, rng *rand.Rand) structure {
 			return structures[name]
 		}
 	}
-	if name, ok := genreStructures[strings.ToLower(strings.TrimSpace(genre))]; ok {
+	if name, ok := ActiveTables().SceneStructures[strings.ToLower(strings.TrimSpace(genre))]; ok {
 		return structures[name]
 	}
 	return structures[structureOrder[rng.Intn(len(structureOrder))]]

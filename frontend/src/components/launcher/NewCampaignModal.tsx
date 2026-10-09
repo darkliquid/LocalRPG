@@ -254,7 +254,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
             {world.banner_url ? (
               <img src={world.banner_url} alt={world.name} className="w-full h-full object-cover" />
             ) : (
-              <ProceduralBanner id={world.id} name={world.name} className="w-full h-full" />
+              <ProceduralBanner id={world.id} name={world.name} genre={world.genre} className="w-full h-full" />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/60 to-black/30" />
           </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { DebugPanel } from './DebugPanel';
 import { APIClient } from '../api/client';
-import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile, ModelStatus, ProviderVoice, ProviderDescriptor, TTSConfig, STTConfig, ImageConfig, EmbeddingProviderConfig, EmbeddingsConfig } from '../types';
+import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile, ModelStatus, ProviderVoice, ProviderDescriptor, TTSConfig, STTConfig, ImageConfig, EmbeddingProviderConfig, EmbeddingsConfig, StylePacks } from '../types';
 import { ModelDownloadModal } from './ModelDownloadModal';
 import { EmbeddingProviderEditor } from './EmbeddingProviderEditor';
 import {
@@ -151,6 +151,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
+  // The style packs the config directory holds, so the picker lists what exists
+  // rather than only what is configured.
+  const [stylePacks, setStylePacks] = useState<StylePacks | null>(null);
 
   // Diagnostics test state
   const [testingCategory, setTestingCategory] = useState<string | null>(null);
@@ -281,6 +284,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       setActiveFilePath(res.config_file_path);
       setIsOverride(res.is_local_override);
       setConfigWarnings(res.warnings ?? []);
+      try {
+        setStylePacks(await APIClient.getStylePacks());
+      } catch {
+        // A missing pack listing must not stop the settings from loading.
+        setStylePacks(null);
+      }
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Failed to load settings' });
     } finally {
@@ -298,6 +307,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       setActiveFilePath(res.config_file_path);
       setIsOverride(res.is_local_override);
       setConfigWarnings(res.warnings ?? []);
+      try {
+        setStylePacks(await APIClient.getStylePacks());
+      } catch {
+        setStylePacks(null);
+      }
       setFeedback({ type: 'success', message: 'Settings saved and live-reloaded successfully.' });
       if (onSaved) onSaved();
     } catch (err: any) {
@@ -3280,6 +3294,33 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-sans uppercase text-stone-300">Style Pack</label>
+                <p className="text-xs text-stone-400">
+                  Overrides the procedural art and chrome. Built-in is the shipped look.
+                </p>
+                <select
+                  value={config.styles?.pack ?? ''}
+                  onChange={(e) =>
+                    setConfig({ ...config, styles: { ...config.styles, pack: e.target.value } })
+                  }
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
+                >
+                  <option value="">Built-in</option>
+                  {(stylePacks?.packs ?? []).map((pack) => (
+                    <option key={pack.id} value={pack.id} disabled={(pack.problems?.length ?? 0) > 0}>
+                      {pack.label || pack.id}
+                      {(pack.problems?.length ?? 0) > 0 ? ' (invalid)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {(stylePacks?.warnings ?? []).map((warning) => (
+                  <p key={warning} className="text-xs text-rose-400">
+                    {warning}
+                  </p>
+                ))}
               </div>
 
               <div className="space-y-2">
