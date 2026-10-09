@@ -400,6 +400,32 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	action := parts[1]
 
 	switch action {
+	case "audio":
+		if len(parts) >= 3 && parts[2] == "ledger" {
+			if r.Method == http.MethodGet {
+				writeJSON(w, s.service.PlaybackLedger(gameID, 0))
+				return
+			}
+			if r.Method == http.MethodPost {
+				var req PlaybackLedgerRequest
+				if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024)).Decode(&req); err != nil {
+					writeInvalidRequest(w, "invalid request body")
+					return
+				}
+				dto, err := s.service.MergePlaybackLedger(gameID, req)
+				if err != nil {
+					writeInvalidRequest(w, err.Error())
+					return
+				}
+				writeJSON(w, dto)
+				return
+			}
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		http.NotFound(w, r)
+		return
+
 	case "folders":
 		s.handleFolderRoutes(w, r, filepath.Join(s.service.resolver.GameDir(gameID), "entities"))
 		return
@@ -699,6 +725,38 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			s.handleRenegotiate(w, r, gameID, turnNumber)
+			return
+		}
+
+		// GET /api/game/{id}/turn/{n}/ledger or POST /api/game/{id}/turn/{n}/ledger
+		if len(parts) == 4 && parts[3] == "ledger" {
+			turnNumber, err := strconv.Atoi(parts[2])
+			if err != nil {
+				http.Error(w, "invalid turn number", http.StatusBadRequest)
+				return
+			}
+			if r.Method == http.MethodGet {
+				writeJSON(w, s.service.PlaybackLedger(gameID, turnNumber))
+				return
+			}
+			if r.Method == http.MethodPost {
+				var req PlaybackLedgerRequest
+				if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024)).Decode(&req); err != nil {
+					writeInvalidRequest(w, "invalid request body")
+					return
+				}
+				if req.Turn <= 0 {
+					req.Turn = turnNumber
+				}
+				dto, err := s.service.MergePlaybackLedger(gameID, req)
+				if err != nil {
+					writeInvalidRequest(w, err.Error())
+					return
+				}
+				writeJSON(w, dto)
+				return
+			}
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 
@@ -1654,7 +1712,28 @@ func (s *Server) handleAudioRoutes(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, AudioStatusDTO{
 			Available: s.service.AudioAvailable(),
 			Playing:   s.service.AudioPlaying(),
+			Owner:     s.service.PlaybackOwner(),
 		})
+
+	case "owner":
+		if r.Method == http.MethodGet {
+			writeJSON(w, map[string]string{"owner": s.service.PlaybackOwner()})
+			return
+		}
+		if r.Method == http.MethodPost {
+			var body struct {
+				Owner string `json:"owner"`
+			}
+			if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024)).Decode(&body); err != nil {
+				writeInvalidRequest(w, "invalid request body")
+				return
+			}
+			s.service.setPlaybackOwner(body.Owner)
+			writeJSON(w, map[string]string{"owner": s.service.PlaybackOwner()})
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
 
 	case "stop":
 		if r.Method != http.MethodPost {

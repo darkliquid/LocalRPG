@@ -66,6 +66,9 @@ export const App: React.FC = () => {
   // The application plays audio itself when it can, which is the only way to
   // narrate a turn without a browser autoplay gesture.
   const [serverAudio, setServerAudio] = useState(false);
+  const [playbackOwner, setPlaybackOwner] = useState<'device' | 'browser'>('browser');
+  const isDeviceOwner = playbackOwner === 'device' || (serverAudio && playbackOwner !== 'browser');
+  const browserPlaybackEnabled = !isDeviceOwner && (config?.media.tts.auto_play ?? false);
   // Per-turn audio status: generating → playing → idle (or error)
   const [turnAudioStatus, setTurnAudioStatus] = useState<Record<number, { state: TurnAudioState; message?: string }>>({});
   // Per-segment audio status, keyed `${turn}:${index}`.
@@ -73,7 +76,7 @@ export const App: React.FC = () => {
   // Narration plays while the turn streams when the browser owns the sound. The
   // clips already heard are handed to the chronicle so nothing repeats.
   const streamedSpeech = useStreamedSpeech(
-    !serverAudio && (config?.media.tts.auto_play ?? false),
+    browserPlaybackEnabled,
     config?.media.tts.master_volume ?? 1
   );
   const [streamedKeys, setStreamedKeys] = useState<ReadonlySet<string>>(new Set());
@@ -162,8 +165,20 @@ export const App: React.FC = () => {
       })
       .catch(console.error);
     APIClient.audioStatus()
-      .then((status) => setServerAudio(status.available))
-      .catch(() => setServerAudio(false));
+      .then((status) => {
+        setServerAudio(status.available);
+        if (status.owner === 'device' || status.owner === 'browser') {
+          setPlaybackOwner(status.owner);
+        } else if (status.available) {
+          setPlaybackOwner('device');
+        } else {
+          setPlaybackOwner('browser');
+        }
+      })
+      .catch(() => {
+        setServerAudio(false);
+        setPlaybackOwner('browser');
+      });
   }, []);
 
   const handleGameStateFailure = useCallback((err: unknown) => {
@@ -395,6 +410,9 @@ export const App: React.FC = () => {
   const streamProcessorRef = useRef<TurnStreamProcessor>(new TurnStreamProcessor());
 
   const handleTurnEvent = (event: TurnEvent) => {
+    if (event.owner === 'device' || event.owner === 'browser') {
+      setPlaybackOwner(event.owner);
+    }
     if (event.type === 'chunk') {
       setToolActivity(null);
       if (event.text) {
@@ -407,6 +425,9 @@ export const App: React.FC = () => {
       // rest of the prose is still arriving.
       streamedSpeech.enqueue(event.audio_url ?? '', event.audio_key ?? '', event.index);
     } else if (event.type === 'audio_progress' && event.audio_progress) {
+      if (event.audio_progress.owner === 'device' || event.audio_progress.owner === 'browser') {
+        setPlaybackOwner(event.audio_progress.owner);
+      }
       setAudioProgress(event.audio_progress);
       if (event.audio_progress.sequence !== undefined && event.audio_progress.stage) {
         setSegmentAudioProgress((prev) => ({
@@ -445,8 +466,17 @@ export const App: React.FC = () => {
       // Stop streamed speech so it does not overlap with chronicle playback,
       // and remember which keys were heard to completion and offsets.
       streamedSpeech.stop();
+      const offsets = streamedSpeech.ledger();
       setStreamedKeys(streamedSpeech.playedKeys());
-      setPlaybackLedger(streamedSpeech.ledger());
+      setPlaybackLedger(offsets);
+
+      // Resend offsets at handover to reconcile server ledger for finalise pass
+      if (activeGameID && Object.keys(offsets).length > 0) {
+        APIClient.mergePlaybackLedger(activeGameID, {
+          turn: event.turn.turn_number,
+          entries: offsets,
+        }).catch(console.error);
+      }
       const turn = event.turn;
       setChronicle((prev) => [...prev, turn]);
       streamProcessorRef.current.reset();

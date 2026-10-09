@@ -197,6 +197,7 @@ type AudioProgressDTO struct {
 	FailedCount   int    `json:"failed_count,omitempty"`
 	AudioKey      string `json:"audio_key,omitempty"`
 	AudioURL      string `json:"audio_url,omitempty"`
+	Owner         string `json:"owner,omitempty"`
 }
 
 type TurnDTO struct {
@@ -1113,6 +1114,8 @@ type TurnEvent struct {
 	SystemDraft *SystemDraftDTO `json:"system_draft,omitempty"`
 	// The previewed entity batch, present when Type is "batch".
 	Batch *WorldEntityBatchDTO `json:"batch,omitempty"`
+	// Owner is the current playback owner: "device" or "browser".
+	Owner string `json:"owner,omitempty"`
 }
 
 // turnModes maps the mode names a client may send to the engine's casing.
@@ -1161,8 +1164,9 @@ type AudioStatusDTO struct {
 	// Turn and Segment name the beat a completion event belongs to, so a client
 	// advances only on the completion of the beat it is playing. Segment is -1 for
 	// a whole-turn queue.
-	Turn    int `json:"turn"`
-	Segment int `json:"segment"`
+	Turn    int    `json:"turn"`
+	Segment int    `json:"segment"`
+	Owner   string `json:"owner,omitempty"`
 }
 
 // TraceEventDTO is one traced event. The event's own fields are nested rather

@@ -100,3 +100,29 @@ func TestLedgerIsSafeForConcurrentUse(t *testing.T) {
 		t.Fatalf("played = %d, want the max %d", e.PlayedMS, 15*20)
 	}
 }
+
+func TestOwnerFlips(t *testing.T) {
+	svc := &Service{}
+	ch, cancel := svc.SubscribeAudioStatus()
+	defer cancel()
+
+	svc.setPlaybackOwner(ownerDevice)
+	if got := svc.PlaybackOwner(); got != ownerDevice {
+		t.Fatalf("owner = %q, want %q", got, ownerDevice)
+	}
+
+	svc.broadcastAudioStatus(AudioStatusDTO{Playing: true})
+	select {
+	case status := <-ch:
+		if status.Owner != ownerDevice {
+			t.Fatalf("broadcast owner = %q, want %q", status.Owner, ownerDevice)
+		}
+	default:
+		t.Fatal("expected status broadcast")
+	}
+
+	svc.setPlaybackOwner(ownerBrowser)
+	if got := svc.PlaybackOwner(); got != ownerBrowser {
+		t.Fatalf("owner = %q, want %q", got, ownerBrowser)
+	}
+}

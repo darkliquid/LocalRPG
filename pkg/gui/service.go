@@ -2288,8 +2288,10 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 		})
 	}
 	streamer.SetTurnNumber(turnNum)
+	streamer.SetOwner(t.service.PlaybackOwner())
 	streamer.SetProgressObserver(func(progress AudioProgressDTO) {
-		_ = announce(TurnEvent{Type: "audio_progress", AudioProgress: &progress})
+		progress.Owner = t.service.PlaybackOwner()
+		_ = announce(TurnEvent{Type: "audio_progress", AudioProgress: &progress, Owner: t.service.PlaybackOwner()})
 	})
 	defer streamer.Close()
 
@@ -3406,7 +3408,7 @@ func (s *Service) audioPlayer() *playback.Player {
 		}
 		player.SetOnComplete(func() {
 			s.audioSubMu.Lock()
-			status := AudioStatusDTO{Available: true, Playing: false, Turn: s.audioTurn, Segment: s.audioSegment}
+			status := AudioStatusDTO{Available: true, Playing: false, Turn: s.audioTurn, Segment: s.audioSegment, Owner: s.PlaybackOwner()}
 			s.audioSubMu.Unlock()
 			s.broadcastAudioStatus(status)
 		})
@@ -3433,6 +3435,9 @@ func (s *Service) SubscribeAudioStatus() (<-chan AudioStatusDTO, func()) {
 }
 
 func (s *Service) broadcastAudioStatus(status AudioStatusDTO) {
+	if status.Owner == "" {
+		status.Owner = s.PlaybackOwner()
+	}
 	s.audioSubMu.Lock()
 	defer s.audioSubMu.Unlock()
 	for ch := range s.audioSubs {
@@ -3472,6 +3477,7 @@ func (s *Service) StopAudio() {
 	if player := s.audioPlayer(); player != nil {
 		player.Stop()
 	}
+	s.broadcastAudioStatus(AudioStatusDTO{Available: s.AudioAvailable(), Playing: false, Owner: s.PlaybackOwner()})
 }
 
 // CountUncachedBeats reports how much of a campaign's speech is already cached,
@@ -3973,6 +3979,8 @@ func (s *Service) PlayTurnAudio(gameID string, turnNumber int, force ...bool) er
 		return err
 	}
 
+	s.setPlaybackOwner(ownerDevice)
+	s.broadcastAudioStatus(AudioStatusDTO{Available: true, Playing: true, Turn: turnNumber, Segment: -1, Owner: ownerDevice})
 	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
 	s.setAudioCurrent(turnNumber, -1)
 	return player.PlayQueue(s.turnClipStream(gameID, turnNumber, len(force) > 0 && force[0]))
@@ -4015,6 +4023,8 @@ func (s *Service) PlaySegmentAudio(ctx context.Context, gameID string, turnNumbe
 		return err
 	}
 
+	s.setPlaybackOwner(ownerDevice)
+	s.broadcastAudioStatus(AudioStatusDTO{Available: true, Playing: true, Turn: turnNumber, Segment: segmentIndex, Owner: ownerDevice})
 	player.SetVolume(s.configMgr.Get().Media.TTS.MasterVolume)
 	s.setAudioCurrent(turnNumber, segmentIndex)
 	return player.PlayFiles(clips)
