@@ -11,6 +11,10 @@ import (
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
+// turnRouterFactory builds the router a campaign's turns run through. It is a
+// package variable so a test can inject a scripted router.
+var turnRouterFactory = routerWithChains
+
 // turnRuntime is the per-campaign wiring that does not depend on the turn. It is
 // rebuilt only when the configuration revision or an on-disk source changes, so
 // hand edits still take effect on the next turn.
@@ -67,7 +71,7 @@ func (s *Service) runtimeFor(gameID string, manifest *core.GameManifest) (*turnR
 	}
 
 	cfg := s.configMgr.Get()
-	router, err := routerWithChains(cfg, trace.OrNil(s.logger))
+	router, err := turnRouterFactory(cfg, trace.OrNil(s.logger))
 	if err != nil {
 		return nil, fmt.Errorf("build router: %w", err)
 	}
@@ -131,4 +135,14 @@ func (s *Service) cachedHistory(gameID string) ([]engine.Turn, error) {
 	s.historySize[gameID] = info.Size()
 	s.historyMtime[gameID] = info.ModTime().UnixNano()
 	return turns, nil
+}
+
+// invalidateHistoryCache drops a campaign's cached history, so a caller that has
+// just rewritten the log reads its own write rather than a cached read.
+func (s *Service) invalidateHistoryCache(gameID string) {
+	s.historyMu.Lock()
+	defer s.historyMu.Unlock()
+	delete(s.historyCache, gameID)
+	delete(s.historySize, gameID)
+	delete(s.historyMtime, gameID)
 }

@@ -59,6 +59,9 @@ type Turn struct {
 	RecordReport *RecordReport `json:"record_report,omitempty"`
 	// PendingCheck is a GM-proposed check awaiting the player's roll (ask policy).
 	PendingCheck *harness.PendingCheck `json:"pending_check,omitempty"`
+	// Negotiations are the counter-proposals the player made to this turn's pending
+	// check and the GM's ruling on each, so the chronicle shows the exchange.
+	Negotiations []harness.Negotiation `json:"negotiations,omitempty"`
 	// Draft marks a turn written provisionally because it ends on a pending check
 	// in single-turn mode: resolving the check completes it in place.
 	Draft bool `json:"draft,omitempty"`
@@ -132,6 +135,47 @@ func (h *HistoryLogger) LoadHistory() ([]Turn, error) {
 	defer h.mu.RUnlock()
 
 	return h.loadHistoryUnlocked()
+}
+
+// ReplaceTurn rewrites the record for one turn number in place and leaves every
+// other record untouched. It is how a turn's own fields change after it is
+// recorded (a renegotiated check) without disturbing what the turn staged.
+func (h *HistoryLogger) ReplaceTurn(replacement Turn) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	turns, err := h.loadHistoryUnlocked()
+	if err != nil {
+		return err
+	}
+	replaced := false
+	for i := range turns {
+		if turns[i].Number == replacement.Number {
+			turns[i] = replacement
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		return fmt.Errorf("turn %d is not recorded", replacement.Number)
+	}
+
+	f, err := os.Create(h.path)
+	if err != nil {
+		return fmt.Errorf("rewrite history file: %w", err)
+	}
+	defer f.Close()
+
+	for _, turn := range turns {
+		data, err := json.Marshal(turn)
+		if err != nil {
+			return err
+		}
+		if _, err := f.Write(append(data, '\n')); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (h *HistoryLogger) RewindToTurn(targetTurnNumber int) error {

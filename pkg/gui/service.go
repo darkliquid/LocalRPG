@@ -1911,6 +1911,7 @@ func (s *Service) ResolveCheck(ctx context.Context, gameID string, turnNumber in
 		Input:           req.Note,
 		PendingCheckRef: ref,
 		ForcedTotal:     req.ManualResult,
+		ManualDice:      req.ManualDice,
 	}, emit)
 }
 
@@ -2221,6 +2222,7 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 
 	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)
 	t.orchestrator.SetForcedTotal(req.ForcedTotal)
+	t.orchestrator.SetManualDice(req.ManualDice)
 	t.orchestrator.SetSingleTurnMode(t.cfg.InteractiveRolls() == "single-turn")
 	t.orchestrator.SetImageTrigger(t.cfg.ImageTrigger())
 

@@ -64,4 +64,25 @@ describe('DiceCheckCard', () => {
     expect(screen.queryByText('risky')).toBeNull();
     expect(screen.queryByText('blades')).toBeNull();
   });
+
+  it('shows a manual roll with its source', () => {
+    render(
+      <DiceCheckCard
+        check={check({
+          outcome: 'strong',
+          source: 'manual',
+          roll: { notation: '2d6', total: 9, dice: [{ value: 4 }, { value: 3 }] },
+          applied: [{ source: 'Stealth', value: 2 }],
+        })}
+      />,
+    );
+    expect(screen.getByText(/manual/)).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('omits the manual marker for a rolled check', () => {
+    render(<DiceCheckCard check={check()} />);
+    expect(screen.queryByText(/manual/)).toBeNull();
+  });
 });

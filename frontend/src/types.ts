@@ -124,6 +124,35 @@ export interface PendingCheck {
   actor_values?: Record<string, number>;
 }
 
+// CounterProposal is a player's argument about a pending check.
+export interface CounterProposal {
+  approach?: string;
+  stakes?: string;
+  difficulty?: string;
+}
+
+// Adjudication is the GM's ruling on a counter-proposal: accept, adjust, or hold.
+export interface Adjudication {
+  ruling: string;
+  stakes?: string;
+  difficulty?: string;
+  notation?: string;
+  profile?: string;
+  reason?: string;
+}
+
+// Negotiation is one counter-proposal and the GM's ruling on it.
+export interface Negotiation {
+  counter: CounterProposal;
+  ruling: Adjudication;
+}
+
+export interface RenegotiateResult {
+  ruling: Adjudication;
+  pending_check?: PendingCheck;
+  negotiations?: Negotiation[];
+}
+
 export interface Turn {
   turn_number: number;
   input_text: string;
@@ -158,6 +187,9 @@ export interface Turn {
   world_tick?: string;
   // A GM-proposed check awaiting the player's roll (ask policy).
   pending_check?: PendingCheck;
+  // negotiations are the counter-proposals made to this turn's pending check and
+  // the GM's ruling on each.
+  negotiations?: Negotiation[];
   // The turn this one continues, when the player rolled a pending check.
   continuation_of?: number;
   // How the turn's control records fared: nil for a clean turn.
@@ -212,6 +244,9 @@ export interface TurnCheck {
   // applied is every stat, skill, and modifier that contributed, so a player can
   // see why a 7 became a 9.
   applied?: { source: string; value: number }[];
+  // source is "manual" when the total came from a player's entered dice rather
+  // than a roll, so the chronicle can say so.
+  source?: string;
   // An opposed check carries the opponent's roll and total, so the card shows the
   // contest rather than only the actor's side.
   opposed_roll?: { notation: string; total: number; successes?: number; roll_count?: number; dice?: DieFace[] };

@@ -44,13 +44,20 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 		return nil, fmt.Errorf("resolve check: %w", err)
 	}
 
+	// A manually entered roll replaces the dice and keeps the bonuses: a player
+	// enters the dice, and the system still adds what it would have added.
+	manual := len(req.ForcedDice) > 0 || req.ForcedTotal != nil
+	switch {
+	case len(req.ForcedDice) > 0:
+		roll = ManualRoll(notation, req.ForcedDice)
+	case req.ForcedTotal != nil:
+		roll = ManualRoll(notation, []int{*req.ForcedTotal})
+	}
+
 	bonus, applied := SumBonuses(func(name string) (int, bool) {
 		return stateValue(r.bridge, actor, name)
 	}, req)
 	total := roll.Total + bonus
-	if req.ForcedTotal != nil {
-		total = *req.ForcedTotal
-	}
 
 	res := &harness.CheckResult{
 		CheckID: harness.NewCheckID(),
@@ -59,7 +66,7 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 		Roll:    roll.Summary(total),
 		Applied: applied,
 	}
-	if req.ForcedTotal != nil {
+	if manual {
 		res.Source = "manual"
 	}
 

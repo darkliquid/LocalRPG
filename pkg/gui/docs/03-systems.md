@@ -90,6 +90,28 @@ to the roll. An unknown opponent rolls flat, and a mistyped target resolves
 against that flat roll. The profile's best outcome applies when the actor's total
 is higher, and its worst when the opponent's is.
 
+## Rolling at the Table
+
+With `mechanics.engagement: ask`, the GM proposes a check instead of resolving it.
+The Roll card states the stakes, the notation, the bonuses, and the possible
+outcomes, and offers three ways to settle it:
+
+- **Roll** rolls the dice in the app.
+- **Enter a roll** takes the dice you rolled at the table. Type `4 3` for two dice,
+  or `9` for one total. The card shows the notation's range and previews the
+  total with the system's bonuses, and a double-count is visible before you send
+  it. The entry is recorded as `manual`, and an implausible number is flagged
+  rather than refused.
+- **Argue** counter-proposes the check. Give a different approach, a restatement
+  of the stakes, or a difficulty, and the GM rules on it: it accepts, adjusts, or
+  holds with a reason. On accept or adjust the card shows the agreed terms, and
+  you roll those. A hold leaves the check as it was. The chronicle records each
+  counter and its ruling, and a check takes a few counters rather than an
+  unlimited argument.
+
+A check the player already rolled refuses a counter. An argument cannot rewrite a
+settled roll.
+
 ## Sandboxed JavaScript Mechanics Engine (`mechanics.js`)
 
 Custom systems export JavaScript functions that execute inside an isolated Goja runtime. The engine passes a small context and receives a structured resolution:
