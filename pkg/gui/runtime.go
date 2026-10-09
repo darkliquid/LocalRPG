@@ -67,7 +67,7 @@ func (s *Service) runtimeFor(gameID string, manifest *core.GameManifest) (*turnR
 	}
 
 	cfg := s.configMgr.Get()
-	router, err := harness.RouterFromConfigWithLogger(cfg, trace.OrNil(s.logger))
+	router, err := routerWithChains(cfg, trace.OrNil(s.logger))
 	if err != nil {
 		return nil, fmt.Errorf("build router: %w", err)
 	}

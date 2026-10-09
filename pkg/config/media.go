@@ -75,3 +75,9 @@ func (m MediaConfig) TTSForPurpose(p Purpose) TTSConfig {
 func (m MediaConfig) ImageForPurpose(p Purpose) ImageConfig {
 	return m.ImageFor(m.ProviderForPurpose(p))
 }
+
+// PurposeChain returns a purpose's declared chain and rule. An undeclared
+// purpose yields an empty chain, so a caller keeps the single provider.
+func (m MediaConfig) PurposeChain(p Purpose) ChainConfig {
+	return m.PurposeChains[string(p)]
+}

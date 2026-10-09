@@ -1,6 +1,7 @@
 package media
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/darkliquid/localrpg/pkg/config"
@@ -45,6 +46,24 @@ func (r *TTSRegistry) For(name string) (TTSClient, error) {
 
 // Default returns the client for the singleton configuration.
 func (r *TTSRegistry) Default() (TTSClient, error) { return r.For("") }
+
+// ForPurpose returns the client and configuration for a purpose: the first
+// member of the purpose's chain that builds, or the purpose's single configured
+// provider when no chain is declared.
+func (r *TTSRegistry) ForPurpose(p config.Purpose) (TTSClient, config.TTSConfig, error) {
+	var lastErr error
+	for _, name := range PurposeChainNames(r.cfg, p) {
+		client, err := r.For(name)
+		if err == nil {
+			return client, r.cfg.Media.TTSFor(name), nil
+		}
+		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no tts provider for purpose %q", p)
+	}
+	return nil, config.TTSConfig{}, lastErr
+}
 
 // Names returns every configured name, default first.
 func (r *TTSRegistry) Names() []string { return r.cfg.Media.TTSNames() }
@@ -140,6 +159,24 @@ func (r *ImageRegistry) For(name string) (ImageClient, error) {
 
 // Default returns the client for the singleton configuration.
 func (r *ImageRegistry) Default() (ImageClient, error) { return r.For("") }
+
+// ForPurpose returns the client and configuration for a purpose: the first
+// member of the purpose's chain that builds, or the purpose's single configured
+// provider when no chain is declared.
+func (r *ImageRegistry) ForPurpose(p config.Purpose) (ImageClient, config.ImageConfig, error) {
+	var lastErr error
+	for _, name := range PurposeChainNames(r.cfg, p) {
+		client, err := r.For(name)
+		if err == nil {
+			return client, r.cfg.Media.ImageFor(name), nil
+		}
+		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no image provider for purpose %q", p)
+	}
+	return nil, config.ImageConfig{}, lastErr
+}
 
 // Names returns every configured name, default first.
 func (r *ImageRegistry) Names() []string { return r.cfg.Media.ImageNames() }

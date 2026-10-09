@@ -1938,7 +1938,7 @@ func (s *Service) chronicler(gameID string) *engine.Chronicler {
 	}
 
 	cfg := s.configMgr.Get()
-	router, err := harness.RouterFromConfigWithLogger(cfg, s.logger)
+	router, err := routerWithChains(cfg, s.logger)
 	if err != nil {
 		return nil
 	}
@@ -2825,9 +2825,7 @@ func (s *Service) worldArtStyle(gameID string) string {
 // serves scene art and an export that carries it both use it, so a bundle shows the
 // images the app already has rather than generating its own.
 func (s *Service) sceneArtResolver(gameID string) *media.ArtStore {
-	cfg := s.configMgr.Get()
-	sceneCfg := cfg.Media.ImageForPurpose(config.PurposeScene)
-	client, err := s.imageRegistry().For(cfg.Media.ProviderForPurpose(config.PurposeScene))
+	client, sceneCfg, err := s.imageRegistry().ForPurpose(config.PurposeScene)
 	if err != nil {
 		return nil
 	}

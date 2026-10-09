@@ -16,6 +16,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/paths"
+	"github.com/darkliquid/localrpg/pkg/pricing"
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/storage"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
@@ -121,6 +122,7 @@ func handlePlayCommand(args []string) {
 		fmt.Fprintf(os.Stderr, "Error building model router: %v\n", err)
 		os.Exit(1)
 	}
+	router.SetChainPrice(pricing.RouterChainPrice(cfg, router))
 
 	orchestrator := engine.NewTurnOrchestrator(
 		store,

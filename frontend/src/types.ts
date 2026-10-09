@@ -1053,6 +1053,11 @@ export interface AgentRoleConfig {
   // An optional user-chosen discriminator that keeps two configs of one adapter
   // at one endpoint distinct in usage, pricing, and caches.
   instance?: string;
+  // An ordered list of provider instance names this role tries in turn, ordered
+  // by select. Empty keeps the single provider and the configured fallback.
+  chain?: string[];
+  select?: 'first' | 'cheapest' | 'local-first' | 'by-tag';
+  tag?: string;
 }
 
 export interface AgentsConfig {
@@ -1258,6 +1263,16 @@ export interface MediaConfig {
   // Maps a use name (narrator, npc, scene, portrait, placeholder) to a provider
   // name, or the family default when unset.
   purposes?: Record<string, string>;
+  // Declares an ordered provider chain and selection rule per use name. A
+  // purpose with no chain uses its single configured provider.
+  purpose_chains?: Record<string, ProviderChain>;
+}
+
+// ProviderChain declares an ordered provider chain and the rule that orders it.
+export interface ProviderChain {
+  chain?: string[];
+  select?: 'first' | 'cheapest' | 'local-first' | 'by-tag';
+  tag?: string;
 }
 
 export type EmbeddingProviderType = 'builtin' | 'onnx' | 'http' | 'gemini' | 'disabled';

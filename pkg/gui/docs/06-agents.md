@@ -46,6 +46,44 @@ agents:
       max_tokens: 512
 ```
 
+## Provider Chains
+
+A role can declare an ordered chain of provider instances rather than one
+provider and its fallback. Each member names another entry under `agents.roles`,
+so a chain reuses the provider configurations you already have:
+
+```yaml
+agents:
+  roles:
+    gm:
+      type: gemini
+      model: gemini-3.8-flash
+      chain: [gm, cheap, local]
+      select: cheapest
+    cheap:
+      type: gemini
+      model: gemini-2.5-flash-lite
+    local:
+      type: http
+      endpoint: http://localhost:11434/v1
+      model: llama3.1
+```
+
+The `select` rule orders the chain, and the chain is then tried in order, so a
+selection rule and a fallback are the same mechanism:
+
+| Rule | Order |
+| --- | --- |
+| `first` (the default) | the declared order |
+| `cheapest` | by the spend ledger's price, cheapest first; an unpriced instance sorts last |
+| `local-first` | offline instances first, then a local server, then cloud |
+| `by-tag` | instances whose provider carries `tag` as a feature or tier name first |
+
+An empty chain keeps the role's own provider and the `agents.fallbacks` entry,
+so a configuration written before chains existed behaves as it did. An unknown
+chain member or an unknown rule is reported as a validation warning rather than
+silently changing the chain.
+
 ## Token Budgets & Context Management
 
 The orchestrator fits prompt layers into the configured `context_window` limit:
