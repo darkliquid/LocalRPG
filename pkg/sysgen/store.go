@@ -47,6 +47,9 @@ func SaveDraft(dir string, d System) error {
 	if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
 		return fmt.Errorf("draft path %q escapes directory %q", target, cleanDir)
 	}
+	// The id is validated above and DraftPath reduces it to a base name inside
+	// cleanDir, so the target cannot escape the drafts directory.
+	// lgtm[go/path-injection]
 	if err := os.WriteFile(target, data, 0o644); err != nil {
 		return fmt.Errorf("write draft: %w", err)
 	}
@@ -64,6 +67,9 @@ func LoadDraft(dir, id string) (System, error) {
 	if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
 		return System{}, fmt.Errorf("draft path %q escapes directory %q", target, cleanDir)
 	}
+	// The id is validated above and DraftPath reduces it to a base name inside
+	// cleanDir, so the target cannot escape the drafts directory.
+	// lgtm[go/path-injection]
 	data, err := os.ReadFile(target)
 	if err != nil {
 		return System{}, fmt.Errorf("read draft %s: %w", id, err)
@@ -89,6 +95,9 @@ func DeleteDraft(dir, id string) error {
 	if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
 		return fmt.Errorf("draft path %q escapes directory %q", target, cleanDir)
 	}
+	// The id is validated above and DraftPath reduces it to a base name inside
+	// cleanDir, so the target cannot escape the drafts directory.
+	// lgtm[go/path-injection]
 	if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("delete draft %s: %w", id, err)
 	}
