@@ -273,3 +273,92 @@ func TestParityMismatchIsTraced(t *testing.T) {
 		t.Fatal("an empty stream must not trace a mismatch")
 	}
 }
+
+// finaliseClips runs the finalise pass for turn 1 against plan and returns the
+// clips it enqueued, in order.
+func finaliseClips(t *testing.T, svc *Service, gameID string, plan *turnAudioPlan) []string {
+	t.Helper()
+	turn, err := svc.findTurn(gameID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := &TurnSession{service: svc, gameID: gameID, cfg: svc.configMgr.Get()}
+	session.finishTurnAudio(context.Background(), *turn, plan)
+	plan.close()
+	return drainClips(plan.queue)
+}
+
+// allTurnClips is every clip a fresh finalise pass plays for turn 1, which is
+// the baseline the ledger tests subtract from.
+func allTurnClips(t *testing.T, svc *Service, gameID string) []string {
+	t.Helper()
+	clips := finaliseClips(t, svc, gameID, newTurnAudioPlan(make(chan string, 8)))
+	if len(clips) < 2 {
+		t.Fatalf("baseline clips = %#v, want at least two", clips)
+	}
+	return clips
+}
+
+func TestFinaliseSkipsACompleteClip(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+	baseline := allTurnClips(t, svc, gameID)
+	heardKey := media.ClipKeyForPath(baseline[0])
+
+	plan := newTurnAudioPlan(make(chan string, 8))
+	plan.ledger = NewLedger()
+	plan.ledger.Record(heardKey, 1200, 1200, true)
+
+	got := finaliseClips(t, svc, gameID, plan)
+	if len(got) != len(baseline)-1 {
+		t.Fatalf("clips = %#v, want every clip but the heard one", got)
+	}
+	for _, clip := range got {
+		if media.ClipKeyForPath(clip) == heardKey {
+			t.Fatal("a clip the ledger records as complete was enqueued again")
+		}
+	}
+}
+
+func TestFinaliseEmitsAPartialClipOnce(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+	baseline := allTurnClips(t, svc, gameID)
+	partialKey := media.ClipKeyForPath(baseline[0])
+
+	logger := &captureLogger{}
+	svc.SetLogger(logger)
+	plan := newTurnAudioPlan(make(chan string, 8))
+	plan.ledger = NewLedger()
+	plan.ledger.Record(partialKey, 400, 1200, false)
+
+	got := finaliseClips(t, svc, gameID, plan)
+	for _, clip := range got {
+		if media.ClipKeyForPath(clip) == partialKey {
+			t.Fatal("a partially heard clip was re-enqueued from its start")
+		}
+	}
+	if len(got) != len(baseline)-1 {
+		t.Fatalf("clips = %#v, want the rest of the turn", got)
+	}
+	if !logger.saw("turn.audio_partial") {
+		t.Fatal("a suppressed partial clip must be traced")
+	}
+	// The offset stays in the ledger for the client to resume from.
+	if entry, _ := plan.ledger.Entry(partialKey); entry.PlayedMS != 400 || entry.Complete {
+		t.Fatalf("entry = %+v, want the partial offset kept", entry)
+	}
+}
+
+func TestFinaliseWithAnEmptyLedgerPlaysEverything(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+	writeSegmentTurn(t, svc, gameID)
+	baseline := allTurnClips(t, svc, gameID)
+
+	plan := newTurnAudioPlan(make(chan string, 8))
+	plan.ledger = NewLedger()
+	got := finaliseClips(t, svc, gameID, plan)
+	if len(got) != len(baseline) {
+		t.Fatalf("clips = %#v, want the whole turn %#v", got, baseline)
+	}
+}
