@@ -57,3 +57,19 @@ func classifyReply(res streamResult, report turnstream.RepairReport) ReplyProble
 	}
 	return ProblemNone
 }
+
+// repairInstruction builds a short, specific nudge for a malformed reply.
+func repairInstruction(p ReplyProblem, detail string) string {
+	lower := strings.ToLower(detail)
+	if strings.Contains(lower, "roll") {
+		return "Your previous reply contained no valid @roll record. Re-emit the reply, ending with a single @roll {…} line whose JSON is valid."
+	}
+	if strings.Contains(lower, "tool") {
+		return "The previous tool call had arguments that were not valid JSON. Call it again with valid JSON."
+	}
+	if detail != "" {
+		return "Your previous reply was malformed: " + detail + ". Please write the turn again."
+	}
+	return "Your previous reply was empty. Write the turn now."
+}
+
