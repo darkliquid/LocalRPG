@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient } from '../api/client';
-import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure, ContentManifestInfo } from '../types';
-import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play, Download, Upload } from 'lucide-react';
+import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure, ContentManifestInfo, SystemDraftInfo, SystemVerifyResult } from '../types';
+import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play, Download, Upload, Lightbulb, X } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import MarkdownEditor from './editor/MarkdownEditor';
 import { MechanicsEditor } from './MechanicsEditor';
 import { ContentImportDialog } from './ContentImportDialog';
+import { SystemGenerateDialog } from './SystemGenerateDialog';
+import { SystemEnhanceDialog } from './SystemEnhanceDialog';
+import { BaseSystemCatalogue } from './BaseSystemCatalogue';
+import { MarkdownDocViewer } from './MarkdownDocViewer';
+import { ScriptReference } from './mechanics/ScriptReference';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
 
@@ -28,6 +33,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [referenceSystems, setReferenceSystems] = useState<ReferenceSystem[]>([]);
   const [selection, setSelection] = useState<SystemSelection>(null);
   const [draft, setDraft] = useState<SystemDraft | null>(null);
+  const [activeDraftID, setActiveDraftID] = useState<string | null>(null);
   const [pendingSelection, setPendingSelection] = useState<SystemSelection>(null);
   const [activeTab, setActiveTab] = useState<'manifest' | 'rules' | 'mechanics' | 'script'>('manifest');
   const startModeRef = React.useRef(startMode);
@@ -50,6 +56,14 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [isTesting, setIsTesting] = useState(false);
   const [testFailures, setTestFailures] = useState<SystemTestFailure[]>([]);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+  const [showEnhanceDialog, setShowEnhanceDialog] = useState(false);
+  const [showBaseCatalogue, setShowBaseCatalogue] = useState(false);
+  const [isDeriving, setIsDeriving] = useState(false);
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [isExplaining, setIsExplaining] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<SystemVerifyResult | null>(null);
+  const [draftNotes, setDraftNotes] = useState<string[]>([]);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -71,6 +85,56 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setToast({ type: 'error', message: formatGenerationError(failure) });
   const errorMessage = (err: unknown): string =>
     err instanceof Error ? err.message : 'Unexpected error';
+
+  const handleDraftProduced = (generatedDraft: SystemDraftInfo) => {
+    setShowGenerateDialog(false);
+    setActiveDraftID(generatedDraft.id || null);
+    setName(generatedDraft.name);
+    setSlugID(generatedDraft.id);
+    setVersion(generatedDraft.version || '1.0.0');
+    setDescription(generatedDraft.description);
+    setMechanics(generatedDraft.mechanics || {});
+    setScript(generatedDraft.script || '');
+    setRulesPrompt(generatedDraft.rules_prompt || '');
+    setVerificationResult(generatedDraft.verify);
+    setDraftNotes(generatedDraft.notes || []);
+    setSelection({ kind: 'draft' });
+    setDraft({ localId: generatedDraft.id || 'draft', dirty: true });
+    setToast({ type: 'success', message: `Draft loaded for "${generatedDraft.name}". Review and save.` });
+  };
+
+  const handleDerive = async (base: { id: string; name: string }, instruction: string) => {
+    setIsDeriving(true);
+    try {
+      const derived = await APIClient.deriveSystem({ base_id: base.id, instruction });
+      setShowBaseCatalogue(false);
+      handleDraftProduced(derived);
+      setToast({
+        type: 'success',
+        message: `Derived "${derived.name}" from ${base.name}. Review and save.`,
+      });
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to derive a system' });
+    } finally {
+      setIsDeriving(false);
+    }
+  };
+
+  const handleExplain = async () => {
+    if (!savedID) {
+      setToast({ type: 'error', message: 'Save the system before explaining it.' });
+      return;
+    }
+    setIsExplaining(true);
+    try {
+      const resp = await APIClient.explainSystem(savedID);
+      setExplanation(resp.explanation);
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to explain the system' });
+    } finally {
+      setIsExplaining(false);
+    }
+  };
 
   const handleDeleteSystem = async (force = false) => {
     if (!deleteTarget) return;
@@ -143,6 +207,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       const detail = await APIClient.getSystem(id);
       setSelection({ kind: 'saved', id: detail.id });
       setDraft(null);
+      setVerificationResult(null);
       setName(detail.name);
       setSlugID(detail.id);
       setVersion(detail.version || '1.0.0');
@@ -179,6 +244,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const handleNewSystem = () => {
     setSelection({ kind: 'draft' });
     setDraft({ localId: crypto.randomUUID(), dirty: false });
+    setVerificationResult(null);
     setName('');
     setSlugID('');
     setVersion('1.0.0');
@@ -203,6 +269,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setMechanics(reference.mechanics ?? {});
     setCreationPreamble('');
     setCreationFields([]);
+    setVerificationResult(null);
     markDirty();
     setToast({ type: 'success', message: `Loaded the ${reference.name} reference.` });
   };
@@ -274,6 +341,14 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       };
 
       const saved = await APIClient.saveSystem(payload);
+      if (activeDraftID) {
+        try {
+          await APIClient.discardSystemDraft(activeDraftID);
+        } catch {
+          // ignore draft cleanup failure
+        }
+        setActiveDraftID(null);
+      }
       if (saved.warnings && saved.warnings.length > 0) {
         setToast({ type: 'error', message: `Saved with warnings: ${saved.warnings.join('; ')}` });
       } else {
@@ -383,14 +458,14 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
       {/* Left Master Column: Systems List */}
       <aside className="w-full md:w-80 h-full bg-stone-950/70 border-r border-white/10 p-4 flex flex-col gap-4 shrink-0 overflow-hidden">
-        <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
+        <div className="flex flex-col gap-2 pb-2 border-b border-stone-800/60 shrink-0">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-purple-400" />
             <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">
               Rule Systems
             </h3>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <input
               type="file"
               ref={importInputRef}
@@ -398,6 +473,23 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               accept=".lrpgsystem,.lrpgpack"
               className="hidden"
             />
+            <button
+              onClick={() => setShowGenerateDialog(true)}
+              title="Generate a system with AI"
+              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 transition-all cursor-pointer"
+            >
+              <Wand2 className="w-3.5 h-3.5 text-purple-400" />
+              <span>Generate</span>
+            </button>
+            <button
+              onClick={() => setShowBaseCatalogue(true)}
+              disabled={referenceSystems.length === 0}
+              title="Start from a reference base system"
+              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+              <span>From a Base</span>
+            </button>
             <button
               onClick={() => importInputRef.current?.click()}
               title="Import system package (.lrpgsystem, .lrpgpack)"
@@ -616,6 +708,28 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
             <button
               type="button"
+              onClick={() => setShowEnhanceDialog(true)}
+              disabled={!savedID}
+              title="Propose additions to this system with AI"
+              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-amber-500/40 bg-amber-600/15 hover:bg-amber-600/25 text-amber-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Lightbulb className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Enhance</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleExplain()}
+              disabled={!savedID || isExplaining}
+              title="Explain this system's mechanics in plain language"
+              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-sky-500/40 bg-sky-600/15 hover:bg-sky-600/25 text-sky-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isExplaining ? 'Explaining...' : 'Explain'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleExport}
               disabled={!savedID}
               title="Export system package (.lrpgsystem)"
@@ -643,7 +757,12 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
             <button
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || (verificationResult !== null && !verificationResult.ok)}
+              title={
+                verificationResult && !verificationResult.ok
+                  ? 'Cannot save: verification failed. Regenerate or fix errors.'
+                  : undefined
+              }
               className="flex items-center gap-1.5 text-xs font-sans font-bold px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.35)] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
@@ -677,6 +796,65 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                 {failure.scenario} step {failure.step}: {failure.detail}
               </div>
             ))}
+          </div>
+        )}
+
+        {verificationResult && (
+          <div
+            data-testid="verification-banner"
+            className={`p-3 rounded-xl text-xs flex items-center justify-between gap-3 shrink-0 ${
+              verificationResult.ok
+                ? 'bg-emerald-950/40 border border-emerald-500/40 text-emerald-200'
+                : 'bg-red-950/40 border border-red-500/40 text-red-200'
+            }`}
+          >
+            <div className="flex items-start gap-2 min-w-0">
+              {verificationResult.ok ? (
+                <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+              )}
+              <div className="space-y-0.5 min-w-0">
+                <div className="font-semibold">
+                  {verificationResult.ok
+                    ? 'System verification passed'
+                    : 'System verification reported failures'}
+                </div>
+                {verificationResult.failures && verificationResult.failures.length > 0 && (
+                  <ul className="text-[11px] text-red-300 font-mono list-disc list-inside space-y-0.5">
+                    {verificationResult.failures.map((f, i) => (
+                      <li key={i}>{f}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            {!verificationResult.ok && (
+              <button
+                type="button"
+                onClick={() => setShowGenerateDialog(true)}
+                className="px-2.5 py-1 text-xs font-sans font-medium rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40 transition-colors cursor-pointer shrink-0"
+              >
+                Regenerate
+              </button>
+            )}
+          </div>
+        )}
+
+        {draftNotes.length > 0 && (
+          <div
+            data-testid="draft-notes"
+            className="p-3 rounded-xl text-xs flex items-start gap-2 bg-amber-950/40 border border-amber-500/40 text-amber-200 shrink-0"
+          >
+            <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 min-w-0">
+              <div className="font-semibold">Generation notes</div>
+              <ul className="text-[11px] list-disc list-inside space-y-0.5">
+                {draftNotes.map((note, i) => (
+                  <li key={i}>{note}</li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
 
@@ -989,6 +1167,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               <span>JavaScript Runtime (Goja Sandbox)</span>
               <span>Exports: evaluateRoll(stats, diceExpr)</span>
             </div>
+            <ScriptReference />
             <MarkdownEditor
               key={`${savedID || slugID || 'draft'}-script`}
               value={script}
@@ -1007,7 +1186,13 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
         title="Discard unsaved system?"
         description="This system has not been saved. Leaving now discards every field you entered."
         onCancel={() => setPendingSelection(null)}
-        onDiscard={() => applySelection(pendingSelection)}
+        onDiscard={() => {
+          if (activeDraftID) {
+            APIClient.discardSystemDraft(activeDraftID).catch(() => {});
+            setActiveDraftID(null);
+          }
+          applySelection(pendingSelection);
+        }}
       />
 
       {importManifest && (
@@ -1080,6 +1265,81 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                   {isDeletingSystem ? 'Deleting...' : 'Delete System'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBaseCatalogue && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="relative w-full max-w-2xl overflow-hidden border border-white/10 rounded-2xl bg-neutral-900/90 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Start from a base system</h3>
+                <p className="text-xs text-neutral-400">
+                  Clone a tested reference to edit by hand, or derive a variant from it.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowBaseCatalogue(false)}
+                aria-label="Close"
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 max-h-[65vh] overflow-y-auto">
+              <BaseSystemCatalogue
+                bases={referenceSystems}
+                busy={isDeriving}
+                onClone={(base) => {
+                  const reference = referenceSystems.find((r) => r.id === base.id);
+                  if (reference) applyReference(reference);
+                  setShowBaseCatalogue(false);
+                }}
+                onDerive={handleDerive}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGenerateDialog && (
+        <SystemGenerateDialog
+          onCancel={() => setShowGenerateDialog(false)}
+          onDraft={handleDraftProduced}
+        />
+      )}
+
+      {showEnhanceDialog && savedID && (
+        <SystemEnhanceDialog
+          systemId={savedID}
+          onClose={() => setShowEnhanceDialog(false)}
+          onApplied={async (result) => {
+            setToast({
+              type: 'success',
+              message: result.written.length > 0 ? 'System enhanced.' : 'No changes applied.',
+            });
+            await loadSystemDetail(savedID);
+          }}
+        />
+      )}
+
+      {explanation !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="relative w-full max-w-2xl overflow-hidden border border-white/10 rounded-2xl bg-neutral-900/90 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <h3 className="text-lg font-semibold text-white">How this system works</h3>
+              <button
+                onClick={() => setExplanation(null)}
+                aria-label="Close"
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 max-h-[65vh] overflow-y-auto">
+              <MarkdownDocViewer content={explanation} />
             </div>
           </div>
         </div>

@@ -13,6 +13,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/registry"
+	"github.com/darkliquid/localrpg/pkg/sysgen"
 	"github.com/darkliquid/localrpg/pkg/systemtest"
 )
 
@@ -493,6 +494,99 @@ type CreateSystemRequestDTO struct {
 	RulesPrompt       string                     `json:"rules_prompt,omitempty"`
 	CharacterCreation core.CharacterCreationSpec `json:"character_creation,omitempty"`
 	Mechanics         *core.MechanicsSpec        `json:"mechanics,omitempty"`
+	// Strict refuses a save that fails the smoke test, rather than saving with a
+	// warning. It is set for a generated system, which is never saved broken.
+	Strict bool `json:"strict,omitempty"`
+}
+
+// SystemGenerateRequestDTO requests generating a tabletop RPG system from natural language.
+type SystemGenerateRequestDTO struct {
+	Name        string               `json:"name,omitempty"`
+	Description string               `json:"description"`
+	DryRun      bool                 `json:"dry_run,omitempty"`
+	Limits      *GenerationLimitsDTO `json:"limits,omitempty"`
+}
+
+// SystemDraftDTO is a generated system before it is saved or committed.
+type SystemDraftDTO struct {
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Version     string              `json:"version"`
+	Description string              `json:"description"`
+	Mechanics   *core.MechanicsSpec `json:"mechanics,omitempty"`
+	Script      string              `json:"script,omitempty"`
+	RulesPrompt string              `json:"rules_prompt,omitempty"`
+	Verify      sysgen.VerifyResult `json:"verify"`
+	Notes       []string            `json:"notes,omitempty"`
+	Estimate    *WorldEstimateDTO   `json:"estimate,omitempty"`
+	Calls       int                 `json:"calls"`
+	Oracle      bool                `json:"oracle"`
+}
+
+// SystemDraftCommitRequestDTO commits a generated system draft into systems/<id>/.
+type SystemDraftCommitRequestDTO struct {
+	DraftID     string              `json:"draft_id"`
+	ID          string              `json:"id,omitempty"`
+	Name        string              `json:"name,omitempty"`
+	Version     string              `json:"version,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Mechanics   *core.MechanicsSpec `json:"mechanics,omitempty"`
+	Script      *string             `json:"script,omitempty"`
+	RulesPrompt *string             `json:"rules_prompt,omitempty"`
+}
+
+// SystemDraftDiscardRequestDTO deletes a system draft.
+type SystemDraftDiscardRequestDTO struct {
+	DraftID string `json:"draft_id"`
+}
+
+// SystemEnhanceRequestDTO asks for enhancement proposals for an existing system.
+type SystemEnhanceRequestDTO struct {
+	Instruction string   `json:"instruction"`
+	Kinds       []string `json:"kinds,omitempty"`
+}
+
+// SystemProposalDTO is one proposed addition to an existing system. A proposal
+// is additive; Valid reports whether the smoke gate accepts it.
+type SystemProposalDTO struct {
+	Kind        string                  `json:"kind"`
+	Title       string                  `json:"title"`
+	Reason      string                  `json:"reason,omitempty"`
+	Stat        *core.StatSpec          `json:"stat,omitempty"`
+	Skill       *core.SkillSpec         `json:"skill,omitempty"`
+	Profile     *sysgen.ProfileAddition `json:"profile,omitempty"`
+	Advancement *core.AdvancementSpec   `json:"advancement,omitempty"`
+	Valid       bool                    `json:"valid"`
+	Problems    []string                `json:"problems,omitempty"`
+}
+
+// SystemEnhanceResponseDTO is a set of proposals awaiting accept or reject.
+type SystemEnhanceResponseDTO struct {
+	Proposals []SystemProposalDTO `json:"proposals"`
+	Oracle    bool                `json:"oracle,omitempty"`
+}
+
+// SystemEnhanceApplyRequestDTO applies the accepted proposals.
+type SystemEnhanceApplyRequestDTO struct {
+	Proposals []SystemProposalDTO `json:"proposals"`
+}
+
+// SystemEnhanceApplyResultDTO reports what applying a diff wrote.
+type SystemEnhanceApplyResultDTO struct {
+	Written []string         `json:"written"`
+	Detail  *SystemDetailDTO `json:"detail,omitempty"`
+}
+
+// SystemExplainResponseDTO is a plain-language description of a system.
+type SystemExplainResponseDTO struct {
+	Explanation string `json:"explanation"`
+	Oracle      bool   `json:"oracle,omitempty"`
+}
+
+// SystemDeriveRequestDTO asks for a variant of a reference base system.
+type SystemDeriveRequestDTO struct {
+	BaseID      string `json:"base_id"`
+	Instruction string `json:"instruction"`
 }
 
 // ReferenceSystemDTO is one complete, runnable system shipped as a starting point.
@@ -1001,6 +1095,8 @@ type TurnEvent struct {
 	Estimate *WorldEstimateDTO `json:"estimate,omitempty"`
 	// The generated draft, present when Type is "draft".
 	Draft *WorldDraftDTO `json:"draft,omitempty"`
+	// The generated system draft, present when Type is "draft".
+	SystemDraft *SystemDraftDTO `json:"system_draft,omitempty"`
 	// The previewed entity batch, present when Type is "batch".
 	Batch *WorldEntityBatchDTO `json:"batch,omitempty"`
 }

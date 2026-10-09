@@ -84,12 +84,22 @@ func routePattern(path string) string {
 			return "/api/game/{id}/" + suffix
 		}
 		return "/api/game/{id}"
-	case path == "/api/system/test":
-		return "/api/system/test"
+	case path == "/api/system/test" || path == "/api/system/generate" ||
+		path == "/api/system/derive" ||
+		path == "/api/system/draft/commit" || path == "/api/system/draft/discard":
+		return path
 	case strings.HasPrefix(path, "/api/dialog/"):
 		return "/api/dialog/{action}"
 	case strings.HasPrefix(path, "/api/system/tests/"):
 		return "/api/system/tests/{id}"
+	case strings.HasPrefix(path, "/api/system/draft/"):
+		id := strings.TrimPrefix(path, "/api/system/draft/")
+		if id == "" {
+			return "/api/system/draft"
+		}
+		return "/api/system/draft/{id}"
+	case path == "/api/system/draft":
+		return "/api/system/draft"
 	case strings.HasPrefix(path, "/api/system/"):
 		return "/api/system/{id}"
 	case strings.HasPrefix(path, "/api/world/"):
@@ -1079,10 +1089,29 @@ func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing system id", http.StatusBadRequest)
 		return
 	}
-	if err := pathutil.ValidateID(id); err != nil {
+
+	// Sub-actions on a system: enhancement proposals with an apply step, and an
+	// explanation. None of them writes without an accept.
+	parts := strings.Split(id, "/")
+	if err := pathutil.ValidateID(parts[0]); err != nil {
 		http.Error(w, "invalid system id", http.StatusBadRequest)
 		return
 	}
+	if len(parts) >= 2 {
+		switch parts[1] {
+		case "enhance":
+			if len(parts) >= 3 && parts[2] == "apply" {
+				s.handleSystemEnhanceApply(w, r, parts[0])
+				return
+			}
+			s.handleSystemEnhance(w, r, parts[0])
+			return
+		case "explain":
+			s.handleSystemExplain(w, r, parts[0])
+			return
+		}
+	}
+	id = parts[0]
 
 	switch r.Method {
 	case http.MethodGet:

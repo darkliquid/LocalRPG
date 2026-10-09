@@ -1,10 +1,13 @@
 package systemtest
 
 import (
+	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/core"
+	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/rules"
 )
 
@@ -41,6 +44,9 @@ func Run(system System, scenario Scenario) []Failure {
 			"player": PlayerID,
 			"turn":   1,
 		})
+		if err == nil && result == nil && step.Action == "check" {
+			result, err = resolveCheck(engine, bridge, step.Input)
+		}
 		if err != nil {
 			failures = append(failures, Failure{Scenario: scenario.Name, Step: i + 1, Detail: "action: " + err.Error()})
 			continue
@@ -51,6 +57,25 @@ func Run(system System, scenario Scenario) []Failure {
 		failures = append(failures, checkStep(scenario.Name, i+1, bridge, result, step.Expect)...)
 	}
 	return failures
+}
+
+// resolveCheck resolves a check step through the engine's schema resolver when
+// no script handles the action, so a declarative system is exercised by its own
+// declared conventions rather than by a script it does not have.
+func resolveCheck(engine *rules.JSEngine, bridge *Bridge, profile string) (*rules.ActionResult, error) {
+	actor, err := bridge.GetEntity(PlayerID)
+	if err != nil {
+		return nil, err
+	}
+	result, err := engine.Resolve(context.Background(), harness.CheckRequest{
+		Actor:     PlayerID,
+		CheckKind: profile,
+		Profile:   profile,
+	}, actor)
+	if err != nil {
+		return nil, err
+	}
+	return &rules.ActionResult{Success: result.Outcome != "", Outcome: result.Outcome}, nil
 }
 
 // RunAll runs every scenario for a system.
@@ -72,6 +97,9 @@ func checkStep(scenario string, step int, bridge *Bridge, result *rules.ActionRe
 	}
 	if expect.Outcome != "" && result.Outcome != expect.Outcome {
 		add("outcome = %q, want %q", result.Outcome, expect.Outcome)
+	}
+	if len(expect.OutcomeOneOf) > 0 && !slices.Contains(expect.OutcomeOneOf, result.Outcome) {
+		add("outcome = %q, want one of %v", result.Outcome, expect.OutcomeOneOf)
 	}
 	if expect.Total != nil {
 		if result.Roll == nil {

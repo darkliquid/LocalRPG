@@ -23,6 +23,15 @@ import {
   CharacterPortraitDTO,
   SystemDetail,
   CreateSystemRequest,
+  SystemDraftInfo,
+  SystemGenerateRequest,
+  SystemDraftCommitRequest,
+  SystemEnhanceRequest,
+  SystemEnhanceResponse,
+  SystemEnhanceApplyRequest,
+  SystemEnhanceApplyResult,
+  SystemExplainResponse,
+  SystemDeriveRequest,
   ReferenceSystemsResponse,
   SystemTestRequest,
   SystemTestResponse,
@@ -743,6 +752,104 @@ export class APIClient {
       body: JSON.stringify(req),
     });
     if (!res.ok) throw await errorFromResponse(res, res.statusText);
+  }
+
+  // generateSystem streams a system generation: steps and final draft.
+  static async generateSystem(
+    req: SystemGenerateRequest,
+    onEvent: (event: TurnEvent) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const res = await fetch('/api/system/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal,
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    if (!res.body) throw new Error('generateSystem: response has no body');
+    await readNDJSON(res, onEvent);
+  }
+
+  // getSystemDraft restores a persisted system draft.
+  static async getSystemDraft(draftId: string): Promise<SystemDraftInfo> {
+    const res = await fetch(`/api/system/draft/${encodeURIComponent(draftId)}`);
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  // listSystemDrafts returns the list of system draft IDs awaiting review.
+  static async listSystemDrafts(): Promise<string[]> {
+    const res = await fetch('/api/system/draft/');
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  // commitSystemDraft commits a system draft into systems/<id>/.
+  static async commitSystemDraft(req: SystemDraftCommitRequest): Promise<SystemDetail> {
+    const res = await fetch('/api/system/draft/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  // discardSystemDraft deletes a system draft.
+  static async discardSystemDraft(draftId: string): Promise<void> {
+    const res = await fetch('/api/system/draft/discard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draft_id: draftId }),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+  }
+
+  // enhanceSystem proposes additive changes to an existing system. Nothing is
+  // written until the proposals are applied.
+  static async enhanceSystem(systemId: string, req: SystemEnhanceRequest): Promise<SystemEnhanceResponse> {
+    const res = await fetch(`/api/system/${encodeURIComponent(systemId)}/enhance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  static async applySystemEnhancements(
+    systemId: string,
+    req: SystemEnhanceApplyRequest
+  ): Promise<SystemEnhanceApplyResult> {
+    const res = await fetch(`/api/system/${encodeURIComponent(systemId)}/enhance/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  // explainSystem returns a plain-language description of a system's mechanics.
+  static async explainSystem(systemId: string): Promise<SystemExplainResponse> {
+    const res = await fetch(`/api/system/${encodeURIComponent(systemId)}/explain`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  // deriveSystem generates a variant of a reference base system and returns it
+  // as a draft. Nothing is written to systems/<id>/ until the draft is accepted.
+  static async deriveSystem(req: SystemDeriveRequest): Promise<SystemDraftInfo> {
+    const res = await fetch('/api/system/derive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
   }
 
   // previewWorldEntitiesStream generates or extracts a batch of entities for an

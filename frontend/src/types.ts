@@ -272,6 +272,8 @@ export interface TurnEvent {
   estimate?: WorldEstimate;
   // The generated draft, present when type is 'draft'.
   draft?: WorldDraftInfo;
+  // The generated system draft, present when type is 'draft'.
+  system_draft?: SystemDraftInfo;
   // Import progress, present when type is 'progress'.
   progress?: WorldImportProgress;
   // The previewed entity batch, present when type is 'batch'.
@@ -714,6 +716,97 @@ export interface CreateSystemRequest {
   rules_prompt?: string;
   character_creation?: CharacterCreationSpec;
   mechanics?: MechanicsSpec;
+}
+
+export interface SystemVerifyResult {
+  ok: boolean;
+  failures?: string[];
+  script?: boolean;
+}
+
+export interface SystemDraftInfo {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  mechanics?: MechanicsSpec;
+  script?: string;
+  rules_prompt?: string;
+  verify: SystemVerifyResult;
+  notes?: string[];
+  estimate?: WorldEstimate;
+  calls?: number;
+  oracle?: boolean;
+}
+
+export interface ProfileAddition {
+  name: string;
+  notation?: string;
+  dc?: number;
+  success_on?: string;
+  ladder?: LadderStep[];
+  outcomes?: SuccessOutcome[];
+}
+
+// SystemProposal is one proposed addition to an existing system. valid reports
+// whether the smoke gate accepts it.
+export interface SystemProposal {
+  kind: 'stat' | 'skill' | 'profile' | 'advancement';
+  title: string;
+  reason?: string;
+  stat?: StatSpec;
+  skill?: SkillSpec;
+  profile?: ProfileAddition;
+  advancement?: AdvancementSpec;
+  valid: boolean;
+  problems?: string[];
+}
+
+export interface SystemEnhanceResponse {
+  proposals: SystemProposal[];
+  oracle?: boolean;
+}
+
+export interface SystemEnhanceRequest {
+  instruction: string;
+  kinds?: string[];
+}
+
+export interface SystemEnhanceApplyRequest {
+  proposals: SystemProposal[];
+}
+
+export interface SystemEnhanceApplyResult {
+  written: string[];
+  detail?: SystemDetail;
+}
+
+export interface SystemExplainResponse {
+  explanation: string;
+  oracle?: boolean;
+}
+
+export interface SystemDeriveRequest {
+  base_id: string;
+  instruction: string;
+}
+
+export interface SystemGenerateRequest {
+  description: string;
+  name?: string;
+  dry_run?: boolean;
+  limits?: GenerationLimitsOverride;
+}
+
+export interface SystemDraftCommitRequest {
+  draft_id: string;
+  id?: string;
+  name?: string;
+  version?: string;
+  description?: string;
+  mechanics?: MechanicsSpec;
+  script?: string;
+  rules_prompt?: string;
 }
 
 export interface ReferenceSystem {

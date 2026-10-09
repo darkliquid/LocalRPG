@@ -38,6 +38,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/rules"
 	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/darkliquid/localrpg/pkg/storage"
+	"github.com/darkliquid/localrpg/pkg/sysgen"
 	"github.com/darkliquid/localrpg/pkg/systemtest"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/tools"
@@ -4041,6 +4042,11 @@ func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 	return summaries, nil
 }
 
+// systemDraftsDir is where system drafts live: a dot-directory under systems/.
+func (s *Service) systemDraftsDir() string {
+	return filepath.Join(s.resolver.SystemsDir(), sysgen.DraftsDirName)
+}
+
 func (s *Service) ListSystems(ctx context.Context) ([]SystemSummaryDTO, error) {
 	sysDir := s.resolver.SystemsDir()
 	entries, err := os.ReadDir(sysDir)
@@ -4455,6 +4461,11 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 		script = defaultMechanicsScript
 	}
 
+	gate := sysgen.Gate(sysgen.System{ID: id, Script: script, Mechanics: req.Mechanics})
+	if req.Strict && !gate.OK {
+		return nil, fmt.Errorf("system failed the smoke test: %s", gate.FailureText())
+	}
+
 	sysDir := s.resolver.SystemDir(id)
 	if err := os.MkdirAll(sysDir, 0755); err != nil {
 		return nil, fmt.Errorf("create system dir: %w", err)
@@ -4494,7 +4505,11 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 	if err != nil {
 		return nil, err
 	}
-	detail.Warnings = validateMechanics(req.Mechanics)
+	warnings := validateMechanics(req.Mechanics)
+	if !gate.OK {
+		warnings = append(warnings, "smoke test: "+gate.FailureText())
+	}
+	detail.Warnings = warnings
 	return detail, nil
 }
 
