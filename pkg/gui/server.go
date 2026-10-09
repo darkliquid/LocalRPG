@@ -1088,10 +1088,29 @@ func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing system id", http.StatusBadRequest)
 		return
 	}
-	if err := pathutil.ValidateID(id); err != nil {
+
+	// Sub-actions on a system: enhancement proposals with an apply step, and an
+	// explanation. None of them writes without an accept.
+	parts := strings.Split(id, "/")
+	if err := pathutil.ValidateID(parts[0]); err != nil {
 		http.Error(w, "invalid system id", http.StatusBadRequest)
 		return
 	}
+	if len(parts) >= 2 {
+		switch parts[1] {
+		case "enhance":
+			if len(parts) >= 3 && parts[2] == "apply" {
+				s.handleSystemEnhanceApply(w, r, parts[0])
+				return
+			}
+			s.handleSystemEnhance(w, r, parts[0])
+			return
+		case "explain":
+			s.handleSystemExplain(w, r, parts[0])
+			return
+		}
+	}
+	id = parts[0]
 
 	switch r.Method {
 	case http.MethodGet:

@@ -108,3 +108,55 @@ func (s *Server) handleSystemDraftRoutes(w http.ResponseWriter, r *http.Request)
 	}
 	writeJSON(w, draft)
 }
+
+// handleSystemEnhance returns additive proposals for an existing system.
+func (s *Server) handleSystemEnhance(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req SystemEnhanceRequestDTO
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	resp, err := s.service.EnhanceSystem(r.Context(), id, req)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, resp)
+}
+
+// handleSystemEnhanceApply writes the accepted proposals.
+func (s *Server) handleSystemEnhanceApply(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req SystemEnhanceApplyRequestDTO
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	result, err := s.service.ApplySystemEnhancements(r.Context(), id, req)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, result)
+}
+
+// handleSystemExplain returns a plain-language description of a system.
+func (s *Server) handleSystemExplain(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	resp, err := s.service.ExplainSystem(r.Context(), id)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, resp)
+}

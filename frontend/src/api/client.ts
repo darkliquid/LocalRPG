@@ -26,6 +26,11 @@ import {
   SystemDraftInfo,
   SystemGenerateRequest,
   SystemDraftCommitRequest,
+  SystemEnhanceRequest,
+  SystemEnhanceResponse,
+  SystemEnhanceApplyRequest,
+  SystemEnhanceApplyResult,
+  SystemExplainResponse,
   ReferenceSystemsResponse,
   SystemTestRequest,
   SystemTestResponse,
@@ -798,6 +803,40 @@ export class APIClient {
       body: JSON.stringify({ draft_id: draftId }),
     });
     if (!res.ok) throw await errorFromResponse(res, res.statusText);
+  }
+
+  // enhanceSystem proposes additive changes to an existing system. Nothing is
+  // written until the proposals are applied.
+  static async enhanceSystem(systemId: string, req: SystemEnhanceRequest): Promise<SystemEnhanceResponse> {
+    const res = await fetch(`/api/system/${encodeURIComponent(systemId)}/enhance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  static async applySystemEnhancements(
+    systemId: string,
+    req: SystemEnhanceApplyRequest
+  ): Promise<SystemEnhanceApplyResult> {
+    const res = await fetch(`/api/system/${encodeURIComponent(systemId)}/enhance/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
+  }
+
+  // explainSystem returns a plain-language description of a system's mechanics.
+  static async explainSystem(systemId: string): Promise<SystemExplainResponse> {
+    const res = await fetch(`/api/system/${encodeURIComponent(systemId)}/explain`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw await errorFromResponse(res, res.statusText);
+    return res.json();
   }
 
   // previewWorldEntitiesStream generates or extracts a batch of entities for an

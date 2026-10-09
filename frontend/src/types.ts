@@ -739,6 +739,53 @@ export interface SystemDraftInfo {
   oracle?: boolean;
 }
 
+export interface ProfileAddition {
+  name: string;
+  notation?: string;
+  dc?: number;
+  success_on?: string;
+  ladder?: LadderStep[];
+  outcomes?: SuccessOutcome[];
+}
+
+// SystemProposal is one proposed addition to an existing system. valid reports
+// whether the smoke gate accepts it.
+export interface SystemProposal {
+  kind: 'stat' | 'skill' | 'profile' | 'advancement';
+  title: string;
+  reason?: string;
+  stat?: StatSpec;
+  skill?: SkillSpec;
+  profile?: ProfileAddition;
+  advancement?: AdvancementSpec;
+  valid: boolean;
+  problems?: string[];
+}
+
+export interface SystemEnhanceResponse {
+  proposals: SystemProposal[];
+  oracle?: boolean;
+}
+
+export interface SystemEnhanceRequest {
+  instruction: string;
+  kinds?: string[];
+}
+
+export interface SystemEnhanceApplyRequest {
+  proposals: SystemProposal[];
+}
+
+export interface SystemEnhanceApplyResult {
+  written: string[];
+  detail?: SystemDetail;
+}
+
+export interface SystemExplainResponse {
+  explanation: string;
+  oracle?: boolean;
+}
+
 export interface SystemGenerateRequest {
   description: string;
   name?: string;

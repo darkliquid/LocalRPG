@@ -540,6 +540,49 @@ type SystemDraftDiscardRequestDTO struct {
 	DraftID string `json:"draft_id"`
 }
 
+// SystemEnhanceRequestDTO asks for enhancement proposals for an existing system.
+type SystemEnhanceRequestDTO struct {
+	Instruction string   `json:"instruction"`
+	Kinds       []string `json:"kinds,omitempty"`
+}
+
+// SystemProposalDTO is one proposed addition to an existing system. A proposal
+// is additive; Valid reports whether the smoke gate accepts it.
+type SystemProposalDTO struct {
+	Kind        string                  `json:"kind"`
+	Title       string                  `json:"title"`
+	Reason      string                  `json:"reason,omitempty"`
+	Stat        *core.StatSpec          `json:"stat,omitempty"`
+	Skill       *core.SkillSpec         `json:"skill,omitempty"`
+	Profile     *sysgen.ProfileAddition `json:"profile,omitempty"`
+	Advancement *core.AdvancementSpec   `json:"advancement,omitempty"`
+	Valid       bool                    `json:"valid"`
+	Problems    []string                `json:"problems,omitempty"`
+}
+
+// SystemEnhanceResponseDTO is a set of proposals awaiting accept or reject.
+type SystemEnhanceResponseDTO struct {
+	Proposals []SystemProposalDTO `json:"proposals"`
+	Oracle    bool                `json:"oracle,omitempty"`
+}
+
+// SystemEnhanceApplyRequestDTO applies the accepted proposals.
+type SystemEnhanceApplyRequestDTO struct {
+	Proposals []SystemProposalDTO `json:"proposals"`
+}
+
+// SystemEnhanceApplyResultDTO reports what applying a diff wrote.
+type SystemEnhanceApplyResultDTO struct {
+	Written []string         `json:"written"`
+	Detail  *SystemDetailDTO `json:"detail,omitempty"`
+}
+
+// SystemExplainResponseDTO is a plain-language description of a system.
+type SystemExplainResponseDTO struct {
+	Explanation string `json:"explanation"`
+	Oracle      bool   `json:"oracle,omitempty"`
+}
+
 // ReferenceSystemDTO is one complete, runnable system shipped as a starting point.
 type ReferenceSystemDTO struct {
 	ID          string              `json:"id"`

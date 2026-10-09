@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient } from '../api/client';
 import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure, ContentManifestInfo, SystemDraftInfo, SystemVerifyResult } from '../types';
-import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play, Download, Upload } from 'lucide-react';
+import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play, Download, Upload, Lightbulb, X } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
@@ -9,6 +9,7 @@ import MarkdownEditor from './editor/MarkdownEditor';
 import { MechanicsEditor } from './MechanicsEditor';
 import { ContentImportDialog } from './ContentImportDialog';
 import { SystemGenerateDialog } from './SystemGenerateDialog';
+import { SystemEnhanceDialog } from './SystemEnhanceDialog';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
 
@@ -53,6 +54,9 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [testFailures, setTestFailures] = useState<SystemTestFailure[]>([]);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+  const [showEnhanceDialog, setShowEnhanceDialog] = useState(false);
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [isExplaining, setIsExplaining] = useState(false);
   const [verificationResult, setVerificationResult] = useState<SystemVerifyResult | null>(null);
   const [draftNotes, setDraftNotes] = useState<string[]>([]);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -92,6 +96,22 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setSelection({ kind: 'draft' });
     setDraft({ localId: generatedDraft.id || 'draft', dirty: true });
     setToast({ type: 'success', message: `Draft loaded for "${generatedDraft.name}". Review and save.` });
+  };
+
+  const handleExplain = async () => {
+    if (!savedID) {
+      setToast({ type: 'error', message: 'Save the system before explaining it.' });
+      return;
+    }
+    setIsExplaining(true);
+    try {
+      const resp = await APIClient.explainSystem(savedID);
+      setExplanation(resp.explanation);
+    } catch (err) {
+      setToast({ type: 'error', message: errorMessage(err) || 'Failed to explain the system' });
+    } finally {
+      setIsExplaining(false);
+    }
   };
 
   const handleDeleteSystem = async (force = false) => {
@@ -657,6 +677,28 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
             <button
               type="button"
+              onClick={() => setShowEnhanceDialog(true)}
+              disabled={!savedID}
+              title="Propose additions to this system with AI"
+              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-amber-500/40 bg-amber-600/15 hover:bg-amber-600/25 text-amber-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Lightbulb className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Enhance</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleExplain()}
+              disabled={!savedID || isExplaining}
+              title="Explain this system's mechanics in plain language"
+              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-sky-500/40 bg-sky-600/15 hover:bg-sky-600/25 text-sky-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isExplaining ? 'Explaining...' : 'Explain'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleExport}
               disabled={!savedID}
               title="Export system package (.lrpgsystem)"
@@ -1201,6 +1243,40 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
           onCancel={() => setShowGenerateDialog(false)}
           onDraft={handleDraftProduced}
         />
+      )}
+
+      {showEnhanceDialog && savedID && (
+        <SystemEnhanceDialog
+          systemId={savedID}
+          onClose={() => setShowEnhanceDialog(false)}
+          onApplied={async (result) => {
+            setToast({
+              type: 'success',
+              message: result.written.length > 0 ? 'System enhanced.' : 'No changes applied.',
+            });
+            await loadSystemDetail(savedID);
+          }}
+        />
+      )}
+
+      {explanation !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="relative w-full max-w-2xl overflow-hidden border border-white/10 rounded-2xl bg-neutral-900/90 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <h3 className="text-lg font-semibold text-white">How this system works</h3>
+              <button
+                onClick={() => setExplanation(null)}
+                aria-label="Close"
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 max-h-[65vh] overflow-y-auto">
+              <pre className="text-sm text-neutral-200 whitespace-pre-wrap font-sans">{explanation}</pre>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

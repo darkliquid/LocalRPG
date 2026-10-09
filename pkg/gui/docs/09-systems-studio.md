@@ -44,6 +44,12 @@ JavaScript is generated only for a closed list of escape hatches that the declar
 
 Review the draft, adjust any field, and save it. Generation writes nothing to `systems/<id>/` until you commit the draft.
 
+## Enhancing and Explaining a System
+
+The studio offers two AI actions for a saved system. **Enhance** proposes additions, a stat, a skill, a resolution profile, or an advancement track, as an accept-or-reject diff. Only the accepted additions are written, and an addition that would break the system is marked and cannot be applied.
+
+**Explain** writes a plain-language description of the mechanics: how a check resolves, what the stats mean, and how advancement works. Copy it into a README or a player handout.
+
 ## Editing Mechanics in the Studio
 
 The **Mechanics** tab edits the whole `mechanics` block: stats, skills, health, check conventions (including resolution profiles), advancement, freeform state, and the engagement default. Each list adds and removes its own rows, and the studio warns about an invalid id, a duplicate id, a skill whose stat is undeclared, or a malformed profile before it saves.
