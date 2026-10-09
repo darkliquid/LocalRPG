@@ -210,6 +210,11 @@ export interface TurnCheck {
   // applied is every stat, skill, and modifier that contributed, so a player can
   // see why a 7 became a 9.
   applied?: { source: string; value: number }[];
+  // An opposed check carries the opponent's roll and total, so the card shows the
+  // contest rather than only the actor's side.
+  opposed_roll?: { notation: string; total: number; successes?: number; roll_count?: number; dice?: DieFace[] };
+  opposed_total?: number;
+  opposed_actor?: string;
 }
 
 export interface EntityMemory {

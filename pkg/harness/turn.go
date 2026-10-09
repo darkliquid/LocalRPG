@@ -82,6 +82,10 @@ type CheckRequest struct {
 	// Position and Effect are the Blades-style stakes a profile may define.
 	Position string `json:"position,omitempty"`
 	Effect   string `json:"effect,omitempty"`
+	// Opposed, when set, names the stat the opponent rolls with. Target then
+	// names the opponent, and the check rolls both sides and compares the
+	// totals. Empty keeps the fixed-difficulty path.
+	Opposed string `json:"opposed,omitempty"`
 	// ForcedTotal, when set, replaces the rolled total: a player entering a
 	// physical die result, or a pending check resolved with a manual roll.
 	ForcedTotal *int `json:"-"`
@@ -134,6 +138,11 @@ type CheckResult struct {
 	// Source is "manual" when the total came from a forced entry rather than the
 	// dice, so the chronicle can say so.
 	Source string `json:"source,omitempty"`
+	// OpposedRoll is the opponent's roll and total, when the check was opposed,
+	// so the contest can be shown as one. OpposedActor names the opponent.
+	OpposedRoll  *RollSummary `json:"opposed_roll,omitempty"`
+	OpposedTotal int          `json:"opposed_total,omitempty"`
+	OpposedActor string       `json:"opposed_actor,omitempty"`
 }
 
 // PendingCheck is a check the GM proposed under the ask policy and the player

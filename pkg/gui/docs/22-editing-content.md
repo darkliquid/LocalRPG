@@ -99,7 +99,7 @@ The `mechanics` block maps onto `core.MechanicsSpec`:
 | `engagement` | Default mechanics policy: `off`, `auto`, or `ask`. |
 | `advancement` | Progression: a currency stat, how a character gains it, and what it buys. |
 
-The `checks.profiles` map declares named resolution profiles. A profile can be a threshold `ladder`, a difficulty class in `dc`, a success-count pool with `success_on` and `outcomes`, or a `position` and `effect` vocabulary. See [Systems & Mechanics](03-systems) for worked examples of each kind.
+The `checks.profiles` map declares named resolution profiles. A profile can be a threshold `ladder`, a difficulty class in `dc`, a success-count pool with `success_on` and `outcomes`, or a `position` and `effect` vocabulary. A profile that sets `opposed` (and optionally `ties`) resolves as a contest against the opponent's own roll. See [Systems & Mechanics](03-systems) for worked examples of each kind.
 
 ### `mechanics.js`
 

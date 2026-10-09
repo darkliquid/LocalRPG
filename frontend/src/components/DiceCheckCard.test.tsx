@@ -47,6 +47,18 @@ describe('DiceCheckCard', () => {
     expect(container.querySelectorAll('[data-section]').length).toBeLessThanOrEqual(2);
   });
 
+  it('shows both sides of an opposed check', () => {
+    render(
+      <DiceCheckCard check={check({ outcome: 'strong', opposed_total: 7, opposed_actor: 'Ogre' })} />,
+    );
+    expect(screen.getByText('You 9 vs Ogre 7')).toBeInTheDocument();
+  });
+
+  it('omits the opposed line when the check was not opposed', () => {
+    const { container } = render(<DiceCheckCard check={check()} />);
+    expect(container.querySelector('[data-section="opposed"]')).toBeNull();
+  });
+
   it('omits the profile line when there is none', () => {
     render(<DiceCheckCard check={check()} />);
     expect(screen.queryByText('risky')).toBeNull();

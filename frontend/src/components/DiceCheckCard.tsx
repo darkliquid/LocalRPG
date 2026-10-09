@@ -78,6 +78,11 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
         )}
         <span className={`text-xs font-sans font-bold uppercase tracking-wider ${style.chip}`}>{check.outcome}</span>
       </div>
+      {check.opposed_total !== undefined && (
+        <div data-section="opposed" className="text-[11px] font-mono text-stone-400">
+          {`You ${roll ? roll.total : 0} vs ${check.opposed_actor || 'them'} ${check.opposed_total}`}
+        </div>
+      )}
       {applied.length > 0 && (
         <div data-section="modifiers" className="flex flex-wrap items-center gap-1 text-[11px] font-mono text-stone-400">
           <span className="text-stone-500">{notation}{roll ? ` ${roll.total}` : ''}</span>

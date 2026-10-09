@@ -78,3 +78,17 @@ func TestProposeCheckSpecAdvertisesProfile(t *testing.T) {
 		}
 	}
 }
+
+func TestRequestCheckSpecAdvertisesOpposed(t *testing.T) {
+	props := requestCheckSpec().Parameters["properties"].(map[string]interface{})
+	if _, ok := props["opposed"]; !ok {
+		t.Fatal("missing opposed parameter")
+	}
+}
+
+func TestProposeCheckSpecAdvertisesOpposed(t *testing.T) {
+	props := proposeCheckSpec().Parameters["properties"].(map[string]interface{})
+	if _, ok := props["opposed"]; !ok {
+		t.Fatal("missing opposed parameter")
+	}
+}
