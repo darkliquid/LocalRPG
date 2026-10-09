@@ -41,9 +41,9 @@ type Renderer struct {
 	art    *artCache
 	faces  map[faceKey]font.Face
 
-	// gradient is the theatre's no-art background. It depends only on the frame
-	// size, so it is built once rather than per frame.
-	gradient *image.RGBA
+	// gradients are the theatre's no-art backgrounds, one per genre palette. Each
+	// depends only on the frame size and the palette, so it is built once.
+	gradients map[string]*image.RGBA
 }
 
 // faceKey names a sized face so it is parsed once per renderer.

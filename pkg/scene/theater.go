@@ -1,6 +1,7 @@
 package scene
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -8,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
-	xdraw "golang.org/x/image/draw"
 )
 
 // Colours are the theatre's, copied from the Tailwind classes the components use.
@@ -38,9 +39,18 @@ var (
 // whole source pixels jump, and that high-frequency noise is exactly what an
 // inter frame predicts badly, so the picture crawls and smears over a beat.
 func (r *Renderer) drawBackground(img *image.RGBA, req FrameRequest) {
+	// A layered scene draws its layers back to front. PH-3 produces the layers;
+	// the parallax that animates them is TH-2's, so this composites them in place
+	// and the picture matches the flat composition.
+	if len(req.Scene.Layers) > 0 {
+		if r.drawLayers(img, req) {
+			return
+		}
+	}
+
 	current := r.backgroundArt(req)
 	if current == nil {
-		draw.Draw(img, img.Bounds(), r.gradientImage(), image.Point{}, draw.Src)
+		draw.Draw(img, img.Bounds(), r.gradientFor(scriptGenre(req.Script)), image.Point{}, draw.Src)
 		return
 	}
 
@@ -52,6 +62,30 @@ func (r *Renderer) drawBackground(img *image.RGBA, req FrameRequest) {
 		}
 	}
 	draw.Draw(img, img.Bounds(), current, image.Point{}, draw.Src)
+}
+
+// scriptGenre is a script's genre, or empty when there is no script.
+func scriptGenre(script *Script) string {
+	if script == nil {
+		return ""
+	}
+	return script.Genre
+}
+
+// drawLayers composites a layered scene back to front, cover-fit and in place. It
+// reports false when no layer could be loaded, so the caller falls back to the
+// flat art.
+func (r *Renderer) drawLayers(img *image.RGBA, req FrameRequest) bool {
+	drawn := false
+	for _, layer := range req.Scene.Layers {
+		covered := r.art.cover(layer.Art, r.width, r.height)
+		if covered == nil {
+			continue
+		}
+		drawn = true
+		draw.Draw(img, img.Bounds(), covered, image.Point{}, draw.Over)
+	}
+	return drawn
 }
 
 // backgroundArt is the first art the theatre would show, cover-fit: the beat's
@@ -111,15 +145,36 @@ func scrimAlpha(t float64) uint8 {
 	return uint8(a * 255)
 }
 
-// gradientImage is the theatre's no-art background, built once per renderer
-// because it depends only on the frame size.
-func (r *Renderer) gradientImage() *image.RGBA {
-	if r.gradient == nil {
-		gradient := image.NewRGBA(image.Rect(0, 0, r.width, r.height))
-		drawRadialGradient(gradient, color.RGBA{38, 30, 27, 255}, baseColour)
-		r.gradient = gradient
+// gradientFor is the theatre's no-art background for a genre, built once per genre
+// because it depends only on the frame size and the palette.
+func (r *Renderer) gradientFor(genre string) *image.RGBA {
+	palette := GenrePaletteFor(genre)
+	if r.gradients == nil {
+		r.gradients = map[string]*image.RGBA{}
 	}
-	return r.gradient
+	if cached, ok := r.gradients[palette.ID]; ok {
+		return cached
+	}
+	gradient := image.NewRGBA(image.Rect(0, 0, r.width, r.height))
+	drawRadialGradient(gradient,
+		hexColour(palette.From, color.RGBA{38, 30, 27, 255}),
+		hexColour(palette.To, baseColour))
+	r.gradients[palette.ID] = gradient
+	return gradient
+}
+
+// hexColour parses a #rrggbb colour, falling back to a default so a malformed
+// palette cannot leave the stage blank.
+func hexColour(hex string, fallback color.RGBA) color.RGBA {
+	hex = strings.TrimPrefix(strings.TrimSpace(hex), "#")
+	if len(hex) != 6 {
+		return fallback
+	}
+	var r, g, b int
+	if _, err := fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b); err != nil {
+		return fallback
+	}
+	return color.RGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: 255}
 }
 
 // drawRadialGradient fills img with the theatre's no-art background: a warm

@@ -59,6 +59,8 @@ func main() {
 		handleDebugCommand(args[1:])
 	case "config":
 		handleConfigCommand(args[1:])
+	case "styles":
+		handleStylesCommand(args[1:])
 	case "version":
 		fmt.Printf("LocalRPG v%s\n", Version)
 	case "help":
@@ -85,5 +87,6 @@ func printUsage() {
 	fmt.Println("  registry <cmd>     Search, install, and update content from registries")
 	fmt.Println("  debug <cmd>        Run automated scenario tests or debug server")
 	fmt.Println("  config <cmd>       Manage configuration (offline-preset, check-offline)")
+	fmt.Println("  styles <cmd>       List or validate procedural style packs")
 	fmt.Println("  version            Print version information")
 }

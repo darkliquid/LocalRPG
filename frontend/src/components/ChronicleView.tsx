@@ -3,6 +3,7 @@ import { Turn, TurnSegment } from '../types';
 import { TurnSegments, TurnAudioState } from './TurnSegments';
 import { RecordNotice } from './RecordNotice';
 import { Sparkles } from 'lucide-react';
+import { genreCopy } from '../lib/genre';
 import { useLightbox } from '../hooks/useLightbox';
 import { ImageLightbox } from './ImageLightbox';
 
@@ -23,6 +24,8 @@ interface ChronicleViewProps {
   addressedTurns?: Set<number>;
   onAddress?: (turnNumber: number) => void;
   turnInFlight?: boolean;
+  // The campaign's world genre, which flavours the empty and loading lines.
+  genre?: string;
   pendingAction?: PendingAction | null;
   // The segments parsed so far, which render in place of the raw stream while a
   // turn runs: a control record never appears, because it produces no segment.
@@ -49,6 +52,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
   onPlayTurnAudio,
   onStopAudio,
   turnInFlight,
+  genre,
   pendingAction,
   streamedSegments,
   displayMode,
@@ -74,7 +78,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
     <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
       {turns.length === 0 && !pendingAction ? (
         <div className="h-full flex items-center justify-center text-stone-500 font-sans tracking-wider text-sm italic">
-          The chronicle awaits your first action...
+          {genreCopy(genre).empty}
         </div>
       ) : (
         turns.map((turn, index) => {
@@ -255,7 +259,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
               </div>
               <div className="space-y-0.5">
                 <div className="font-sans text-xs font-bold text-purple-400 uppercase tracking-wider">
-                  The narrator is drafting the scene...
+                  {genreCopy(genre).loading}
                 </div>
                 <div className="text-xs text-stone-400 font-sans">
                   Weaving your action into the chronicle.

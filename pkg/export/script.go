@@ -277,7 +277,50 @@ func (r *portraitResolver) Portrait(_ context.Context, characterID string) (stri
 	if name == "" {
 		name = characterID
 	}
-	return r.cache.Put("export-portraits", characterID+".svg", media.GenerateProceduralBustSVG(ent.ID, name, ent.Gender))
+	return r.cache.Put("export-portraits", characterID+".svg", media.GenerateProceduralPortrait(media.PortraitRequestFor(ent)))
+}
+
+// attachSceneLayers fills each scene's layers from the art resolver, when it is
+// the built-in generator: the only provider that can layer a scene. The layers are
+// written beside the export's other art, and the scene keeps its flat image, so a
+// consumer that takes one image is unaffected. PH-3 produces the layers; the
+// parallax that animates them is TH-2's.
+func (c *ScriptCompiler) attachSceneLayers(script *scene.Script, store *storage.Store, artResolver scene.ArtResolver) {
+	if script == nil || store == nil {
+		return
+	}
+	provider, ok := artResolver.(interface {
+		SceneLayers(location *entity.Entity) (media.LayeredScene, bool)
+	})
+	if !ok {
+		return
+	}
+	cache := media.NewContentCache(c.resolver.CacheDir())
+	for i := range script.Scenes {
+		sc := &script.Scenes[i]
+		if sc.LocationID == "" {
+			continue
+		}
+		location, err := store.GetEntity(sc.LocationID)
+		if err != nil || location == nil {
+			continue
+		}
+		layered, ok := provider.SceneLayers(location)
+		if !ok {
+			continue
+		}
+		layers := make([]scene.SceneLayer, 0, len(layered.Layers))
+		for index, layer := range layered.Layers {
+			name := fmt.Sprintf("%s-layer-%d.svg", sc.LocationID, index)
+			path, err := cache.Put("export-layers", name, layer.SVG)
+			if err != nil {
+				layers = nil
+				break
+			}
+			layers = append(layers, scene.SceneLayer{Depth: layer.Depth, Art: path})
+		}
+		sc.Layers = layers
+	}
 }
 
 // NewSpeechResolver builds a speech resolver over an existing pipeline, so an export
@@ -475,8 +518,10 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 	_, _ = storage.NewSyncer(store).Sync(filepath.Join(gameDir, "entities"))
 
 	worldStyle := ""
+	worldGenre := ""
 	if world, err := core.LoadWorldManifest(filepath.Join(c.resolver.WorldDir(manifest.WorldID), "world.yaml")); err == nil {
 		worldStyle = strings.TrimSpace(strings.Join([]string{world.ArtStyle, world.Genre}, ", "))
+		worldGenre = strings.TrimSpace(world.Genre)
 	}
 
 	compiler := scene.NewCompiler(&campaignSource{resolver: c.resolver, store: store, gameID: gameID})
@@ -487,14 +532,18 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		banner = bannerPath(c.resolver, manifest)
 	}
 
+	var artResolver scene.ArtResolver
 	if c.artResolver != nil {
-		compiler.SetArtResolver(c.artResolver)
+		artResolver = c.artResolver
 	} else if c.art && (c.config.Media.Image.BuiltinFallback || c.config.Media.Image.Type != "disabled") {
 		if client, err := media.NewSceneImageClient(c.config.Media.Image); err == nil {
 			cache := media.NewContentCache(c.resolver.CacheDir())
 			params := c.config.Media.Image.Type + ":" + c.config.Media.Image.Model
-			compiler.SetArtResolver(media.NewArtStore(client, cache, worldStyle, params))
+			artResolver = media.NewArtStore(client, cache, worldStyle, params)
 		}
+	}
+	if artResolver != nil {
+		compiler.SetArtResolver(artResolver)
 	}
 
 	if c.speech != nil {
@@ -539,6 +588,7 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		Art:            c.art,
 		Audio:          c.audio,
 		WorldStyle:     worldStyle,
+		Genre:          worldGenre,
 		ProviderParams: c.config.Media.Image.Type + ":" + c.config.Media.Image.Model,
 		PlayerID:       manifest.Player,
 		BannerPath:     banner,
@@ -554,6 +604,7 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 	if err != nil {
 		return nil, err
 	}
+	c.attachSceneLayers(script, store, artResolver)
 
 	script.GameName = manifest.Name
 	script.PlayerName = c.playerName(store, manifest)

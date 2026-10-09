@@ -77,6 +77,16 @@ func (m *ConfigManager) ActiveFilePath() string {
 	return m.userConfigPath
 }
 
+// StylesDir is where style packs live: a folder beside the active configuration
+// file, so a project override carries its own packs.
+func (m *ConfigManager) StylesDir() string {
+	dir := filepath.Dir(m.ActiveFilePath())
+	if dir == "" || dir == "." {
+		return "styles"
+	}
+	return filepath.Join(dir, "styles")
+}
+
 func (m *ConfigManager) IsLocalOverride() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

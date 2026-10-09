@@ -56,6 +56,7 @@ import {
   ExportContentResult,
   GenerationLimitsOverride,
   AppConfig,
+  StylePacks,
   SettingsResponse,
   TestProviderRequest,
   TestProviderResponse,
@@ -922,6 +923,14 @@ export class APIClient {
   static async getSettings(): Promise<SettingsResponse> {
     const res = await fetch('/api/settings');
     if (!res.ok) throw new Error(`getSettings: ${res.statusText}`);
+    return res.json();
+  }
+
+  // getStylePacks lists the procedural style packs the config directory holds,
+  // with the one in force and any reason it was ignored.
+  static async getStylePacks(): Promise<StylePacks> {
+    const res = await fetch('/api/styles');
+    if (!res.ok) throw new Error(`getStylePacks: ${res.statusText}`);
     return res.json();
   }
 

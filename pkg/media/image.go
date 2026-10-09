@@ -62,6 +62,19 @@ func (p *ImagePipeline) generateScene(ctx context.Context, location *entity.Enti
 	return p.client.GenerateImage(ctx, prompt)
 }
 
+// LocationLayers returns a location's scene as layers, when the client is the
+// built-in generator. Only that provider layers; every other provider makes one
+// flat image, and ok is false for it.
+func (p *ImagePipeline) LocationLayers(location *entity.Entity, worldStyle, providerParams string) (LayeredScene, bool) {
+	if p.client == nil || location == nil {
+		return LayeredScene{}, false
+	}
+	if _, ok := p.client.(SceneHintProvider); !ok {
+		return LayeredScene{}, false
+	}
+	return GenerateLayeredScene(sceneRequest(location, worldStyle, AppearanceHash(location, providerParams))), true
+}
+
 // sceneRequest derives structured hints for a location's scene. Every hint is
 // best-effort: an absent one falls back to a deterministic derivation in the
 // generator rather than failing the image.

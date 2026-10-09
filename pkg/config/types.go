@@ -388,6 +388,22 @@ type Config struct {
 	Generation  GenerationConfig  `yaml:"generation,omitempty" json:"generation,omitempty"`
 	Publishers  map[string]string `yaml:"publishers,omitempty" json:"publishers,omitempty"`
 	Registries  RegistriesConfig  `yaml:"registries,omitempty" json:"registries,omitempty"`
+	Styles      StylesConfig      `yaml:"styles,omitempty" json:"styles,omitempty"`
+}
+
+// StylesConfig selects the procedural look. An empty pack is the built-in look,
+// which is what a configuration written before styles existed uses.
+type StylesConfig struct {
+	// Pack names a style pack under the config directory's styles folder.
+	Pack string `yaml:"pack,omitempty" json:"pack,omitempty"`
+}
+
+// StylePackName is the configured pack, trimmed.
+func (c *Config) StylePackName() string {
+	if c == nil {
+		return ""
+	}
+	return strings.TrimSpace(c.Styles.Pack)
 }
 
 // GenerationConfig bounds an AI world generation. It exists so a runaway

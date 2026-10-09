@@ -8,22 +8,41 @@ import (
 	"strings"
 )
 
-// GenerateSceneSVG composes a scene from structured hints. It is deterministic:
-// the seed and the hints fully determine the bytes, so the art cache key stays
-// correct.
-func GenerateSceneSVG(req SceneRequest) []byte {
+// The depth of each procedural layer, from the farthest to the nearest. A
+// consumer offsets a layer by its depth, so the foreground moves most.
+const (
+	SceneBackgroundDepth = 0.0
+	SceneMidgroundDepth  = 0.5
+	SceneForegroundDepth = 1.0
+)
+
+// GenerateLayeredScene composes a scene from structured hints as layers: the sky
+// and its celestial body behind, the structure in the middle, and the weather in
+// front. The depths increase back to front, so a consumer can parallax them. It is
+// deterministic: the same request yields the same layers.
+func GenerateLayeredScene(req SceneRequest) LayeredScene {
 	rng := rand.New(rand.NewSource(seedFor(req)))
 	p := paletteFor(req.Genre, req.Mood, req.TimeOfDay, rng)
 	st := structureFor(strings.Fields(req.Prompt), req.Genre, rng)
 	const w, h = 800, 600
 
-	var b strings.Builder
-	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="%d" height="%d">`, w, h, w, h)
-	writeSky(&b, p, req.TimeOfDay, rng, w, h)
-	b.WriteString(st(p, rng, w, h))
-	writeWeather(&b, req.Weather, p, rng, w, h)
-	b.WriteString(`</svg>`)
-	return []byte(b.String())
+	var background, midground, foreground strings.Builder
+	writeSky(&background, p, req.TimeOfDay, rng, w, h)
+	midground.WriteString(st(p, rng, w, h))
+	writeWeather(&foreground, req.Weather, p, rng, w, h)
+
+	return LayeredScene{Width: w, Height: h, Layers: []Layer{
+		{Depth: SceneBackgroundDepth, SVG: sceneLayerDoc(w, h, background.String())},
+		{Depth: SceneMidgroundDepth, SVG: sceneLayerDoc(w, h, midground.String())},
+		{Depth: SceneForegroundDepth, SVG: sceneLayerDoc(w, h, foreground.String())},
+	}}
+}
+
+// GenerateSceneSVG composes a scene from structured hints as one flat image: the
+// layers flattened. It is deterministic: the seed and the hints fully determine
+// the bytes, so the art cache key stays correct.
+func GenerateSceneSVG(req SceneRequest) []byte {
+	return GenerateLayeredScene(req).Flatten()
 }
 
 // seedFor hashes the seed and hints into one RNG seed, so identical requests

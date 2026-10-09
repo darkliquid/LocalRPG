@@ -41,3 +41,23 @@ func TestPipelineFallsBackToPrompt(t *testing.T) {
 		t.Fatalf("expected the prompt path, got %d calls", stub.calls)
 	}
 }
+
+// TestPipelineLocationLayersOnlyForTheBuiltin guards that only the built-in
+// generator, which is the only scene-hint provider, reports layers.
+func TestPipelineLocationLayersOnlyForTheBuiltin(t *testing.T) {
+	builtin := NewImagePipeline(&fakeHint{}, NewContentCache(t.TempDir()))
+	layers, ok := builtin.LocationLayers(locationFixture(), "dark fantasy", "builtin:")
+	if !ok || len(layers.Layers) != 3 {
+		t.Fatalf("built-in layers = %+v, ok = %v", layers, ok)
+	}
+	for i := 1; i < len(layers.Layers); i++ {
+		if layers.Layers[i].Depth <= layers.Layers[i-1].Depth {
+			t.Fatalf("depths should increase: %+v", layers.Layers)
+		}
+	}
+
+	flat := NewImagePipeline(&stubImageClient{}, NewContentCache(t.TempDir()))
+	if _, ok := flat.LocationLayers(locationFixture(), "dark fantasy", "remote:model"); ok {
+		t.Fatal("a provider that makes one flat image should report no layers")
+	}
+}

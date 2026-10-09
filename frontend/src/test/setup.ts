@@ -12,6 +12,12 @@ if (typeof window !== 'undefined') {
   }
   globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 
+  // jsdom implements no layout, so scrollIntoView is missing. The chronicle
+  // scrolls to the newest turn, which is the one place that needs it.
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = function scrollIntoView() {};
+  }
+
   if (!window.matchMedia) {
     window.matchMedia = ((query: string) => ({
       matches: false,

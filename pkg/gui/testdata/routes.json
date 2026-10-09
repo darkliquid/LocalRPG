@@ -29,6 +29,7 @@
   "/api/settings",
   "/api/settings/test-provider",
   "/api/stt",
+  "/api/styles",
   "/api/system/",
   "/api/system/derive",
   "/api/system/draft/",

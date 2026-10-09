@@ -148,6 +148,7 @@ img {
     radial-gradient(900px 620px at 12% -8%, rgba(126, 34, 206, 0.28), transparent 62%),
     radial-gradient(760px 520px at 92% 4%, rgba(217, 119, 6, 0.14), transparent 60%),
     radial-gradient(1100px 700px at 50% 108%, rgba(168, 85, 247, 0.12), transparent 68%),
+    radial-gradient(ellipse at center, var(--genre-from, #261e1b) 0%, var(--genre-to, #0c0a09) 100%),
     var(--stone-950);
 }
 

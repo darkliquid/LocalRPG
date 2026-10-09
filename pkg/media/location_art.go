@@ -25,6 +25,16 @@ func NewArtStore(client ImageClient, cache *ContentCache, worldStyle, providerPa
 	}
 }
 
+// SceneLayers returns a location's scene as layers, when the image provider is
+// the built-in generator. ok is false for a provider that only makes flat images,
+// so a caller falls back to the single image.
+func (s *ArtStore) SceneLayers(location *entity.Entity) (LayeredScene, bool) {
+	if s == nil || s.pipeline == nil {
+		return LayeredScene{}, false
+	}
+	return s.pipeline.LocationLayers(location, s.worldStyle, s.providerParams)
+}
+
 // SceneArt returns a location's image path, generating it when the appearance has
 // changed or force is set.
 func (s *ArtStore) SceneArt(ctx context.Context, location *entity.Entity, force bool) (string, error) {

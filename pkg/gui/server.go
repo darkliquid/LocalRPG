@@ -55,6 +55,7 @@ func routePattern(path string) string {
 	case path == "/api/games" || path == "/api/systems" || path == "/api/worlds" ||
 		path == "/api/settings" || path == "/api/settings/test-provider" ||
 		path == "/api/config/offline-preset" || path == "/api/config/offline-report" ||
+		path == "/api/styles" ||
 		path == "/api/open-url" ||
 		path == "/api/providers" || path == "/api/providers/models" ||
 		path == "/api/reference-systems" ||
@@ -1462,6 +1463,22 @@ func (s *Server) handleOfflineReportRoute(w http.ResponseWriter, r *http.Request
 	writeJSON(w, res)
 }
 
+// handleStylesRoute lists the style packs under the config directory, with the one
+// in force and any reason the configured pack was ignored.
+func (s *Server) handleStylesRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	res, err := s.service.ListStylePacks(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
 func (s *Server) handleTTSInspectRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -2222,4 +2239,3 @@ func (s *Server) handleRegistryInstallRoute(w http.ResponseWriter, r *http.Reque
 func (s *Server) handleRegistryUpdatesRoute(w http.ResponseWriter, r *http.Request) {
 	s.service.HandleRegistryUpdates(w, r)
 }
-

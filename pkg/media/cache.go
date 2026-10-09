@@ -76,7 +76,13 @@ func ClipKeyForPath(path string) string {
 
 func ComputeArtCacheKey(entityID, appearanceHash, worldStyleHash string) string {
 	hasher := sha256.New()
-	hasher.Write([]byte(entityID + ":" + appearanceHash + ":" + worldStyleHash))
+	key := entityID + ":" + appearanceHash + ":" + worldStyleHash
+	// A style pack changes the look, so its id namespaces the art. With no pack the
+	// key is exactly what it was, so existing art stays valid.
+	if pack := ActivePackID(); pack != "" {
+		key += ":" + pack
+	}
+	hasher.Write([]byte(key))
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 

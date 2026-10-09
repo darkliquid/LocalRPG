@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/darkliquid/localrpg/pkg/scene"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
@@ -47,6 +48,17 @@ type pageData struct {
 	RepoURL     string
 	Version     string
 	Year        int
+	// GenreVars are the neutral genre palette as CSS custom properties, so the
+	// site's background reads the same table the app and the export use.
+	GenreVars template.CSS
+}
+
+// genreVars renders the neutral genre palette as CSS custom properties.
+func genreVars() template.CSS {
+	palette := scene.GenrePaletteFor("")
+	return template.CSS(fmt.Sprintf(
+		":root{--genre-from:%s;--genre-to:%s;--genre-accent:%s}",
+		palette.From, palette.To, palette.Accent))
 }
 
 // linkIndex maps documentation to its published URLs so cross-references
@@ -195,6 +207,8 @@ func (r *renderer) render(pageFile string, data *pageData) ([]byte, error) {
 	if _, err := tmpl.Parse(string(page)); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", pageFile, err)
 	}
+
+	data.GenreVars = genreVars()
 
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "base", data); err != nil {

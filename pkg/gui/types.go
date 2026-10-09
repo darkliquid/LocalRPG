@@ -118,6 +118,9 @@ type GameStateDTO struct {
 	NarratorVoice string            `json:"narrator_voice,omitempty"`
 	StartLocation string            `json:"start_location,omitempty"`
 	BannerURL     string            `json:"banner_url,omitempty"`
+	// Genre is the campaign's world genre, which tints the app's chrome when the
+	// campaign has no banner of its own.
+	Genre string `json:"genre,omitempty"`
 	// MechanicsEngagement is the resolved policy in force: off, auto, or ask.
 	MechanicsEngagement string `json:"mechanics_engagement,omitempty"`
 	// Advancement is the campaign's progression summary, when the system has one.
@@ -698,13 +701,13 @@ type GenerationLimitsDTO struct {
 // WorldGenerateRequestDTO is a whole-world generation request. DryRun asks only
 // for the estimate, so the cost is visible before the spend.
 type WorldGenerateRequestDTO struct {
-	Premise string              `json:"premise"`
-	Name    string              `json:"name,omitempty"`
-	Genre   string              `json:"genre,omitempty"`
-	Themes  []string            `json:"themes,omitempty"`
-	Counts  CountsDTO           `json:"counts,omitempty"`
-	Source  *WorldSourceDTO     `json:"source,omitempty"`
-	DryRun  bool                `json:"dry_run,omitempty"`
+	Premise string               `json:"premise"`
+	Name    string               `json:"name,omitempty"`
+	Genre   string               `json:"genre,omitempty"`
+	Themes  []string             `json:"themes,omitempty"`
+	Counts  CountsDTO            `json:"counts,omitempty"`
+	Source  *WorldSourceDTO      `json:"source,omitempty"`
+	DryRun  bool                 `json:"dry_run,omitempty"`
 	Limits  *GenerationLimitsDTO `json:"limits,omitempty"`
 }
 
@@ -759,17 +762,17 @@ type WorldDraftSectionDTO struct {
 
 // WorldDraftDTO is a generated world awaiting review.
 type WorldDraftDTO struct {
-	ID          string                  `json:"id"`
-	Name        string                  `json:"name"`
-	Description string                  `json:"description"`
-	Genre       string                  `json:"genre"`
-	ArtStyle    string                  `json:"art_style,omitempty"`
-	Tags        []string                `json:"tags,omitempty"`
-	Lore        string                  `json:"lore"`
-	Sections    []WorldDraftSectionDTO  `json:"sections"`
-	Entities    []WorldDraftEntityDTO   `json:"entities"`
-	Estimate    *WorldEstimateDTO       `json:"estimate,omitempty"`
-	Calls       int                     `json:"calls,omitempty"`
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Genre       string                 `json:"genre"`
+	ArtStyle    string                 `json:"art_style,omitempty"`
+	Tags        []string               `json:"tags,omitempty"`
+	Lore        string                 `json:"lore"`
+	Sections    []WorldDraftSectionDTO `json:"sections"`
+	Entities    []WorldDraftEntityDTO  `json:"entities"`
+	Estimate    *WorldEstimateDTO      `json:"estimate,omitempty"`
+	Calls       int                    `json:"calls,omitempty"`
 	// Oracle marks a draft the deterministic fallback produced, so the review can
 	// say so rather than implying a model wrote it.
 	Oracle bool `json:"oracle,omitempty"`
@@ -807,8 +810,8 @@ type WorldEntityBatchDTO struct {
 type WorldEntityAcceptRequestDTO struct {
 	BatchID string `json:"batch_id,omitempty"`
 	// IDs names the accepted entities. Empty means the whole batch.
-	IDs      []string               `json:"ids,omitempty"`
-	Entities []WorldDraftEntityDTO  `json:"entities,omitempty"`
+	IDs      []string              `json:"ids,omitempty"`
+	Entities []WorldDraftEntityDTO `json:"entities,omitempty"`
 	// Rename resolves an id clash by suffixing the new entity instead of
 	// refusing it.
 	Rename bool `json:"rename,omitempty"`
@@ -895,14 +898,14 @@ type ExportContentResultDTO struct {
 
 // ImportResultDTO reports the outcome of importing a content package.
 type ImportResultDTO struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Version     string `json:"version"`
-	Type        string `json:"type"`
-	Author      string `json:"author,omitempty"`
-	License     string `json:"license,omitempty"`
-	Description string `json:"description,omitempty"`
-	FileCount   int    `json:"file_count"`
+	ID          string        `json:"id"`
+	Name        string        `json:"name"`
+	Version     string        `json:"version"`
+	Type        string        `json:"type"`
+	Author      string        `json:"author,omitempty"`
+	License     string        `json:"license,omitempty"`
+	Description string        `json:"description,omitempty"`
+	FileCount   int           `json:"file_count"`
 	HasScript   bool          `json:"has_script"`
 	Action      string        `json:"action"` // "installed", "renamed", "overwritten"
 	Trust       content.Trust `json:"trust"`
@@ -1243,4 +1246,3 @@ type OfflinePresetResponseDTO struct {
 
 // OfflineReportResponseDTO is the response body for GET /api/config/offline-report.
 type OfflineReportResponseDTO = provider.OfflineReport
-
