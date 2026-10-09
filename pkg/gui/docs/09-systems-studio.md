@@ -56,7 +56,7 @@ The reference systems are the best-tested schemas in the app, and the studio off
 
 ## Editing Mechanics in the Studio
 
-The **Mechanics** tab edits the whole `mechanics` block: stats, skills, health, check conventions (including resolution profiles), advancement, freeform state, and the engagement default. Each list adds and removes its own rows, and the studio warns about an invalid id, a duplicate id, a skill whose stat is undeclared, or a malformed profile before it saves.
+The **Mechanics** tab edits the whole `mechanics` block: stats, skills, health, check conventions (including resolution profiles), advancement, freeform state, and the engagement default. Each list adds and removes its own rows, and the studio warns about an invalid id, a duplicate id, a skill whose stat is undeclared, or a malformed profile before it saves. Every section and every tricky field has a **?** that explains the concept on hover or click, so mechanics design does not need a separate manual.
 
 ## Crafting the Rules Prompt (`prompts/rules.md`)
 
@@ -78,7 +78,7 @@ When the player attempts a risky or uncertain action, call for a d6 check:
 
 ## Writing `mechanics.js` Hooks
 
-Create custom resolution logic in JavaScript. The sandbox exposes the helpers `roll`, `getStat`, `setStat`, `getLocation`, `setLocation`, `injectGMDirection`, `log`, and `grantXP`, and you register hooks with `onAction`, `onTurnBegin`, `onTurnEnd`, `onWorldTick`, `onCheck`, and `onHealthZero`. A handler receives the execution context and returns a resolution the engine applies:
+Create custom resolution logic in JavaScript. The sandbox exposes the helpers `roll`, `getStat`, `setStat`, `getLocation`, `setLocation`, `injectGMDirection`, `log`, and `grantXP`, and you register hooks with `onAction`, `onTurnBegin`, `onTurnEnd`, `onWorldTick`, `onCheck`, and `onHealthZero`. The script tab's **Sandbox API reference** lists each one with its signature and a worked example, so you can look them up without leaving the studio. A handler receives the execution context and returns a resolution the engine applies:
 
 ```javascript
 // onAction registers a handler for one action mode. The handler returns a

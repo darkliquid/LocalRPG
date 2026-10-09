@@ -60,4 +60,16 @@ describe('MechanicsEditor', () => {
     fireEvent.click(screen.getByText(/add effect/i));
     expect(dump().advancement?.unlocks?.[0].effects).toHaveLength(1);
   });
+
+  it('explains a section when its help is opened', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: /help: checks/i }));
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/how a roll becomes an outcome/i);
+  });
+
+  it('explains a field when its help is opened', () => {
+    render(<Harness initial={{ checks: { profiles: { d20: { dc: 15 } } } }} />);
+    fireEvent.click(screen.getByRole('button', { name: /help: difficulty class/i }));
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/at or above this number is a success/i);
+  });
 });

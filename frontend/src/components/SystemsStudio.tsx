@@ -11,6 +11,8 @@ import { ContentImportDialog } from './ContentImportDialog';
 import { SystemGenerateDialog } from './SystemGenerateDialog';
 import { SystemEnhanceDialog } from './SystemEnhanceDialog';
 import { BaseSystemCatalogue } from './BaseSystemCatalogue';
+import { MarkdownDocViewer } from './MarkdownDocViewer';
+import { ScriptReference } from './mechanics/ScriptReference';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
 
@@ -456,14 +458,14 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
       {/* Left Master Column: Systems List */}
       <aside className="w-full md:w-80 h-full bg-stone-950/70 border-r border-white/10 p-4 flex flex-col gap-4 shrink-0 overflow-hidden">
-        <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
+        <div className="flex flex-col gap-2 pb-2 border-b border-stone-800/60 shrink-0">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-purple-400" />
             <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">
               Rule Systems
             </h3>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <input
               type="file"
               ref={importInputRef}
@@ -1165,6 +1167,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               <span>JavaScript Runtime (Goja Sandbox)</span>
               <span>Exports: evaluateRoll(stats, diceExpr)</span>
             </div>
+            <ScriptReference />
             <MarkdownEditor
               key={`${savedID || slugID || 'draft'}-script`}
               value={script}
@@ -1336,7 +1339,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               </button>
             </div>
             <div className="p-6 max-h-[65vh] overflow-y-auto">
-              <pre className="text-sm text-neutral-200 whitespace-pre-wrap font-sans">{explanation}</pre>
+              <MarkdownDocViewer content={explanation} />
             </div>
           </div>
         </div>
