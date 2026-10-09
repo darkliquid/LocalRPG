@@ -494,6 +494,9 @@ type CreateSystemRequestDTO struct {
 	RulesPrompt       string                     `json:"rules_prompt,omitempty"`
 	CharacterCreation core.CharacterCreationSpec `json:"character_creation,omitempty"`
 	Mechanics         *core.MechanicsSpec        `json:"mechanics,omitempty"`
+	// Strict refuses a save that fails the smoke test, rather than saving with a
+	// warning. It is set for a generated system, which is never saved broken.
+	Strict bool `json:"strict,omitempty"`
 }
 
 // SystemGenerateRequestDTO requests generating a tabletop RPG system from natural language.

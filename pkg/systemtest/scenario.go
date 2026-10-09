@@ -38,7 +38,10 @@ type Step struct {
 // Expectations are the assertions a step must satisfy. An empty Expectations
 // makes the step a setup step: it runs and asserts nothing.
 type Expectations struct {
-	Outcome         string                 `yaml:"outcome,omitempty" json:"outcome,omitempty"`
+	Outcome string `yaml:"outcome,omitempty" json:"outcome,omitempty"`
+	// OutcomeOneOf asserts the outcome is one of a vocabulary, for a check whose
+	// result is random and so cannot name one exact value.
+	OutcomeOneOf    []string               `yaml:"outcome_one_of,omitempty" json:"outcome_one_of,omitempty"`
 	Total           *Range                 `yaml:"total,omitempty" json:"total,omitempty"`
 	State           map[string]interface{} `yaml:"state,omitempty" json:"state,omitempty"`
 	MessageContains string                 `yaml:"message_contains,omitempty" json:"message_contains,omitempty"`
@@ -46,7 +49,7 @@ type Expectations struct {
 
 // Empty reports whether the expectations assert anything.
 func (e Expectations) Empty() bool {
-	return e.Outcome == "" && e.Total == nil && len(e.State) == 0 && e.MessageContains == ""
+	return e.Outcome == "" && len(e.OutcomeOneOf) == 0 && e.Total == nil && len(e.State) == 0 && e.MessageContains == ""
 }
 
 // Range is an inclusive numeric range.

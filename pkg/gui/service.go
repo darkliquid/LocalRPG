@@ -4461,6 +4461,11 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 		script = defaultMechanicsScript
 	}
 
+	gate := sysgen.Gate(sysgen.System{ID: id, Script: script, Mechanics: req.Mechanics})
+	if req.Strict && !gate.OK {
+		return nil, fmt.Errorf("system failed the smoke test: %s", gate.FailureText())
+	}
+
 	sysDir := s.resolver.SystemDir(id)
 	if err := os.MkdirAll(sysDir, 0755); err != nil {
 		return nil, fmt.Errorf("create system dir: %w", err)
@@ -4500,7 +4505,11 @@ func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*
 	if err != nil {
 		return nil, err
 	}
-	detail.Warnings = validateMechanics(req.Mechanics)
+	warnings := validateMechanics(req.Mechanics)
+	if !gate.OK {
+		warnings = append(warnings, "smoke test: "+gate.FailureText())
+	}
+	detail.Warnings = warnings
 	return detail, nil
 }
 

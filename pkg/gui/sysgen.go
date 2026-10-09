@@ -191,6 +191,9 @@ func (s *Service) CommitSystemDraft(ctx context.Context, req SystemDraftCommitRe
 		Script:      script,
 		RulesPrompt: rulesPrompt,
 		Mechanics:   mechanics,
+		// A generated system is never accepted broken: the smoke gate blocks the
+		// save rather than warning, so a failing draft must be regenerated.
+		Strict: true,
 	}
 
 	detail, err := s.SaveSystem(ctx, saveReq)
