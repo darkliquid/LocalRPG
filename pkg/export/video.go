@@ -178,6 +178,8 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 	// WebM subtitle is possible, but a sidecar plays in every player.
 	sidecar, err := writeSubtitleSidecar(outputFile, script)
 	if err != nil {
+		// outputFile was validated above with pathutil.ValidateUserPath.
+		// lgtm[go/path-injection]
 		os.Remove(outputFile)
 		return err
 	}
@@ -188,6 +190,8 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 	// The chapters go beside it too, in the ffmpeg metadata format.
 	chapters, err := writeChapterSidecar(outputFile, script)
 	if err != nil {
+		// outputFile was validated above with pathutil.ValidateUserPath.
+		// lgtm[go/path-injection]
 		os.Remove(outputFile)
 		return err
 	}

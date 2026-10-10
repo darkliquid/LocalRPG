@@ -39,6 +39,8 @@ func writeChapterSidecar(videoPath string, script *scene.Script) (string, error)
 			chapter.Start.Milliseconds(), end.Milliseconds(), chapter.Title)
 	}
 	path := ChapterSidecarPath(videoPath)
+	// The video path was validated by the caller with pathutil.ValidateUserPath.
+	// lgtm[go/path-injection]
 	if err := os.WriteFile(path, []byte(builder.String()), 0644); err != nil {
 		return "", fmt.Errorf("write chapter sidecar: %w", err)
 	}

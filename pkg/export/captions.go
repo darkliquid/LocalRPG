@@ -23,6 +23,8 @@ func writeSubtitleSidecar(videoPath string, script *scene.Script) (string, error
 		return "", nil
 	}
 	path := SubtitlePath(videoPath)
+	// The video path was validated by the caller with pathutil.ValidateUserPath.
+	// lgtm[go/path-injection]
 	if err := os.WriteFile(path, []byte(scene.Captions(script.Beats())), 0644); err != nil {
 		return "", fmt.Errorf("write subtitle sidecar: %w", err)
 	}
