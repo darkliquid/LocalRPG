@@ -1023,6 +1023,15 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if r.Method == http.MethodDelete {
+			if err := s.service.DeleteGameEntity(r.Context(), gameID, entityID); err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		ent, err := s.service.GetEntity(r.Context(), gameID, entityID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)

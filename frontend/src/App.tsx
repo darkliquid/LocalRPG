@@ -1204,6 +1204,12 @@ export const App: React.FC = () => {
                 onSelect={handleOpenWikilink}
                 onSave={handleSaveEntity}
                 onMerge={handleMergeEntity}
+                onDeleteEntity={async (id) => {
+                  if (!client) return;
+                  await client.deleteEntity(id);
+                  setEntities(await client.listEntities());
+                  setSelectedEntity((current) => (current && current.id === id ? null : current));
+                }}
               />
             )}
             {activeDrawer === 'world' && (
