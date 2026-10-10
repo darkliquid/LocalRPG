@@ -85,6 +85,9 @@ type webPayload struct {
 	// PlayerName labels the protagonist's portrait, as the theatre does.
 	PlayerName string     `json:"player_name,omitempty"`
 	Scenes     []webScene `json:"scenes"`
+	// Captions is the story's WebVTT subtitle track, carried in the bundle so a
+	// viewer who cannot hear the audio still reads the spoken lines.
+	Captions string `json:"captions,omitempty"`
 	// Total is the script's own pacing, kept for a reader of the payload; the player
 	// paces itself per beat.
 	Total float64 `json:"total_duration"`
@@ -112,6 +115,7 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 		GameName:    script.GameName,
 		DisplayMode: w.displayMode,
 		Total:       script.TotalDuration.Seconds(),
+		Captions:    scene.Captions(script.Beats()),
 	}
 
 	// A missing asset costs a face or a clip, never the bundle: the beat keeps the

@@ -363,6 +363,9 @@ func (s *Service) runExport(ctx context.Context, req ExportRequestDTO, outPath s
 			fail(err)
 			return
 		}
+		// The subtitle sidecar is written beside the video; name it so a user knows
+		// the track exists rather than only discovering it in the directory.
+		emit(scene.Progress{Phase: "encode", Message: fmt.Sprintf("wrote %s (subtitles: %s)", filepath.Base(outPath), filepath.Base(export.SubtitlePath(outPath)))})
 	}
 
 	s.exports.publish(ExportEvent{

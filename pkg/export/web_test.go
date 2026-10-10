@@ -173,7 +173,8 @@ type webPayloadFixture struct {
 			Outcome  string   `json:"outcome"`
 		} `json:"beats"`
 	} `json:"scenes"`
-	Total float64 `json:"total_duration"`
+	Captions string  `json:"captions"`
+	Total    float64 `json:"total_duration"`
 }
 
 // readBundle decodes the compressed bundle a page carries, which is how a test asserts

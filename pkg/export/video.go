@@ -173,6 +173,18 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 		os.Remove(part)
 		return fmt.Errorf("publish video: %w", err)
 	}
+
+	// The subtitle track goes beside the video with the same base name. A muxed
+	// WebM subtitle is possible, but a sidecar plays in every player.
+	sidecar, err := writeSubtitleSidecar(outputFile, script)
+	if err != nil {
+		os.Remove(outputFile)
+		return err
+	}
+	if v.progress != nil && sidecar != "" {
+		v.progress(scene.Progress{Phase: "encode", Message: "wrote " + filepath.Base(sidecar)})
+	}
+
 	if v.progress != nil {
 		v.progress(scene.Progress{
 			Phase:             "done",
