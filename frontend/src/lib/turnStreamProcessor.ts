@@ -1,4 +1,5 @@
 import { TurnSegment } from '../types';
+import { stripDiceTelegraphy } from './rollText';
 
 /**
  * TurnStreamProcessor processes streaming turn output deltas in real-time.
@@ -162,6 +163,12 @@ export class TurnStreamProcessor {
   }
 
   private buildDisplaySegments(): TurnSegment[] {
+    return this.buildDisplaySegmentsRaw().map((segment) =>
+      segment.kind === 'narration' ? { ...segment, text: stripDiceTelegraphy(segment.text) } : segment,
+    );
+  }
+
+  private buildDisplaySegmentsRaw(): TurnSegment[] {
     const result = [...this.segments];
 
     if (this.isControl) {

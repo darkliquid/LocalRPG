@@ -9,6 +9,7 @@ import { DiceCheckCard } from './DiceCheckCard';
 import { Play, Square, RotateCw, Loader2 } from 'lucide-react';
 import { SegmentAudioControls } from './SegmentAudioControls';
 import { slugify } from '../lib/slug';
+import { stripDiceTelegraphy } from '../lib/rollText';
 
 export const segmentAudioKey = (turnNumber: number, segmentIndex: number): string =>
   `${turnNumber}:${segmentIndex}`;
@@ -64,7 +65,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   skipAudioKeys,
   playbackLedger,
 }) => {
-  const ordered = segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: fallback }];
+  const ordered = segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: stripDiceTelegraphy(fallback) }];
   const hasAudio = anySegmentHasAudio(segments);
   const { playing, blocked, playingIndex, play, playFrom, regenerateFrom, stop } = useSegmentPlayback(
     segments,
@@ -226,7 +227,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
           <div key={streamIndex} className="group relative anim-fade-in">
             {segmentControls(i)}
             <MarkdownProse
-              text={segment.text}
+              text={stripDiceTelegraphy(segment.text)}
               onEntityClick={onEntityClick}
               displayMode={displayMode}
               className="text-stone-200 text-xl leading-relaxed tracking-wide font-serif space-y-4"
