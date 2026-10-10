@@ -29,6 +29,12 @@ export interface StoryScene {
   weather?: string;
 }
 
+// StoryChapter is a navigable scene boundary, at a start time in seconds.
+export interface StoryChapter {
+  title: string;
+  start: number;
+}
+
 export interface Story {
   game_name: string;
   display_mode?: 'stage_directions' | 'hidden' | 'raw';
@@ -40,6 +46,10 @@ export interface Story {
   player_name?: string;
   // captions is the story's WebVTT subtitle track, carried in the bundle.
   captions?: string;
+  // chapters are the story's scene boundaries, and chapters_vtt is the same list
+  // as a WebVTT track.
+  chapters?: StoryChapter[];
+  chapters_vtt?: string;
   scenes: StoryScene[];
 }
 

@@ -185,6 +185,16 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 		v.progress(scene.Progress{Phase: "encode", Message: "wrote " + filepath.Base(sidecar)})
 	}
 
+	// The chapters go beside it too, in the ffmpeg metadata format.
+	chapters, err := writeChapterSidecar(outputFile, script)
+	if err != nil {
+		os.Remove(outputFile)
+		return err
+	}
+	if v.progress != nil && chapters != "" {
+		v.progress(scene.Progress{Phase: "encode", Message: "wrote " + filepath.Base(chapters)})
+	}
+
 	if v.progress != nil {
 		v.progress(scene.Progress{
 			Phase:             "done",

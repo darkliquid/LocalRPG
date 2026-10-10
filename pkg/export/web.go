@@ -75,6 +75,12 @@ type webScene struct {
 	Weather string `json:"weather,omitempty"`
 }
 
+// webChapter is a navigable scene boundary, in seconds.
+type webChapter struct {
+	Title string  `json:"title"`
+	Start float64 `json:"start"`
+}
+
 type webPayload struct {
 	GameName       string `json:"game_name"`
 	DisplayMode    string `json:"display_mode,omitempty"`
@@ -88,6 +94,10 @@ type webPayload struct {
 	// Captions is the story's WebVTT subtitle track, carried in the bundle so a
 	// viewer who cannot hear the audio still reads the spoken lines.
 	Captions string `json:"captions,omitempty"`
+	// Chapters are the story's scene boundaries, and ChaptersVTT is the same list
+	// as a WebVTT track for a player's native chapter controls.
+	Chapters    []webChapter `json:"chapters,omitempty"`
+	ChaptersVTT string       `json:"chapters_vtt,omitempty"`
 	// Total is the script's own pacing, kept for a reader of the payload; the player
 	// paces itself per beat.
 	Total float64 `json:"total_duration"`
@@ -127,6 +137,10 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 		payload.Banner = uri
 	}
 	payload.PlayerName = script.PlayerName
+	for _, chapter := range script.Chapters {
+		payload.Chapters = append(payload.Chapters, webChapter{Title: chapter.Title, Start: chapter.Start.Seconds()})
+	}
+	payload.ChaptersVTT = scene.ChaptersVTT(script.Chapters, script.TotalDuration)
 
 	for i := range script.Scenes {
 		sc := script.Scenes[i]

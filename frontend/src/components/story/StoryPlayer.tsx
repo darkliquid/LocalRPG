@@ -31,9 +31,22 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
     return queue;
   }, [story]);
 
+  const chapters = useMemo(() => story.chapters ?? [], [story]);
+  // chapterStarts is the beat index each scene begins at, so clicking a chapter
+  // seeks to that scene's first beat.
+  const chapterStarts = useMemo(() => {
+    const starts: number[] = [];
+    let at = 0;
+    story.scenes.forEach((scene) => {
+      starts.push(at);
+      at += scene.beats.length;
+    });
+    return starts;
+  }, [story]);
+
   const [index, setIndex] = useState(0);
-  // A story never starts itself. The play button is the gesture a browser needs before
-  // it will play audio, so one control does both jobs.
+  // A story never starts itself. The play button is the gesture a browser needs
+  // before it will play audio, so one control does both jobs.
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [reveal, setReveal] = useState(1);
@@ -210,6 +223,29 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
           </span>
         )}
       </header>
+
+      {chapters.length > 0 && (
+        <nav
+          aria-label="Chapters"
+          className="absolute left-4 top-24 z-20 flex max-w-[14rem] flex-col gap-1"
+        >
+          {chapters.map((chapter, chapterIndex) => (
+            <button
+              key={`${chapter.title}-${chapterIndex}`}
+              data-chapter={chapterIndex}
+              aria-current={current.sceneIndex === chapterIndex ? 'true' : undefined}
+              onClick={() => setIndex(chapterStarts[chapterIndex] ?? 0)}
+              className={`text-left px-3 py-1.5 rounded-lg text-sm font-sans border transition-colors cursor-pointer ${
+                current.sceneIndex === chapterIndex
+                  ? 'bg-purple-600 text-white border-purple-300/60'
+                  : 'bg-black/50 text-stone-300 border-white/10 hover:bg-stone-800/80'
+              }`}
+            >
+              {chapter.title}
+            </button>
+          ))}
+        </nav>
+      )}
 
       <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 pb-5 px-4">
         {isCard ? (

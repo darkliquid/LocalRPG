@@ -319,6 +319,15 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 		script.TotalDuration += sc.Duration
 	}
 
+	// Chapters are the scenes as navigable boundaries: the title from the location
+	// and the start from the running total, so the web and the video agree on where
+	// a scene begins.
+	start := time.Duration(0)
+	for _, sc := range script.Scenes {
+		script.Chapters = append(script.Chapters, Chapter{Title: chapterTitle(sc), Start: start})
+		start += sc.Duration
+	}
+
 	// What the script can actually say, split by kind: a bundle whose characters are silent
 	// looks the same as one whose narration is, unless the export says which.
 	coverage := coverageReport(spoken, withAudio, byKind)
@@ -340,6 +349,15 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 		emitProgress(opts.Progress, Progress{Phase: "compile", Message: message})
 	}
 	return script, nil
+}
+
+// chapterTitle names a scene's chapter: its location, or a neutral fallback for
+// an unlocated scene, which has no place name to borrow.
+func chapterTitle(sc Scene) string {
+	if title := strings.TrimSpace(sc.LocationName); title != "" {
+		return title
+	}
+	return "Scene"
 }
 
 // stateString reads a string field from an entity's state, or empty when it is

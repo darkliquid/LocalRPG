@@ -64,6 +64,14 @@ type SceneLayer struct {
 	Art   string
 }
 
+// Chapter is a navigable scene boundary in an export: its title and where it
+// starts on the finished timeline. The web player lists them and the video writes
+// them as chapter metadata.
+type Chapter struct {
+	Title string
+	Start time.Duration
+}
+
 // ClipGroup is one clip a run of adjacent same-speaker beats shares, so the
 // exporter resolves and plays it once rather than once per covered beat. The
 // group's clip is carried by the first of its beats.
@@ -94,6 +102,9 @@ type Script struct {
 	WorldStyle    string
 	Genre         string
 	Scenes        []Scene
+	// Chapters are the scenes as navigable boundaries, derived once so the web and
+	// the video exports agree on where each scene starts.
+	Chapters      []Chapter
 	TotalDuration time.Duration
 }
 
