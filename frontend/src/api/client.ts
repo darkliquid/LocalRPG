@@ -91,6 +91,7 @@ import {
   OfflineReportResponse,
   ImportResultDTO,
   PackageRefDTO,
+  RegistrySourceDTO,
 } from '../types';
 
 // HTTPError carries the status of a failed request so callers can tell a missing
@@ -1494,6 +1495,36 @@ export class APIClient {
     }
     return res.json();
   }
+
+  static async listRegistrySources(): Promise<RegistrySourceDTO[]> {
+    const res = await fetch('/api/registry/sources');
+    if (!res.ok) {
+      const text = await res.text();
+      throw new HTTPError(res.status, text || `listRegistrySources: ${res.statusText}`);
+    }
+    return res.json();
+  }
+
+  static async addRegistrySource(url: string): Promise<RegistrySourceDTO> {
+    const res = await fetch('/api/registry/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new HTTPError(res.status, text || `addRegistrySource: ${res.statusText}`);
+    }
+    return res.json();
+  }
+
+  static async removeRegistrySource(url: string): Promise<void> {
+    const res = await fetch(`/api/registry/sources?url=${encodeURIComponent(url)}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new HTTPError(res.status, text || `removeRegistrySource: ${res.statusText}`);
+    }
+  }
 }
 
 export const exportContent = APIClient.exportContent;
@@ -1501,5 +1532,8 @@ export const importContent = APIClient.importContent;
 export const searchRegistry = APIClient.searchRegistry;
 export const installRegistryPackage = APIClient.installRegistryPackage;
 export const checkRegistryUpdates = APIClient.checkRegistryUpdates;
+export const listRegistrySources = APIClient.listRegistrySources;
+export const addRegistrySource = APIClient.addRegistrySource;
+export const removeRegistrySource = APIClient.removeRegistrySource;
 
 

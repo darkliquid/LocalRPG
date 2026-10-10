@@ -97,3 +97,62 @@ describe('APIClient playback ledger and audio status', () => {
   });
 });
 
+describe('APIClient registry sources', () => {
+  it('lists registry sources with their fetch state', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([{ url: 'https://example.org/index.json', name: 'Example', package_count: 3 }]), {
+        status: 200,
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const sources = await APIClient.listRegistrySources();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/registry/sources');
+    expect(sources[0].name).toBe('Example');
+    expect(sources[0].package_count).toBe(3);
+  });
+
+  it('adds a registry source', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ url: 'https://example.org/index.json' }), { status: 201 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await APIClient.addRegistrySource('https://example.org/index.json');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/registry/sources',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: 'https://example.org/index.json' }),
+      })
+    );
+  });
+
+  it('removes a registry source', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await APIClient.removeRegistrySource('https://example.org/index.json');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/registry/sources?url=' + encodeURIComponent('https://example.org/index.json'),
+      { method: 'DELETE' }
+    );
+  });
+
+  it('throws an HTTPError carrying the body on failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('registry source already configured', { status: 409 }))
+    );
+
+    const err = await APIClient.addRegistrySource('https://example.org/index.json').catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(HTTPError);
+    expect((err as Error).message).toMatch(/already configured/);
+  });
+});
+
