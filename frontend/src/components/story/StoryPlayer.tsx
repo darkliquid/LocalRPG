@@ -37,6 +37,8 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [reveal, setReveal] = useState(1);
+  // beatProgress drives the stage's Ken Burns, and runs over the whole beat.
+  const [beatProgress, setBeatProgress] = useState(0);
   // Clips the browser would not play. A player cannot fix a clip the browser refuses, but
   // it can say so instead of leaving a line silently missing.
   const [unplayable, setUnplayable] = useState(0);
@@ -77,6 +79,7 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
     elapsedRef.current = 0;
     beatDoneRef.current = false;
     setReveal(reducedMotion ? 1 : 0);
+    setBeatProgress(reducedMotion ? 1 : 0);
 
     const beat = current.beat;
     const clips = beat.audio ?? [];
@@ -97,6 +100,7 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
       elapsedRef.current += REVEAL_TICK_MS * speed;
       if (!reducedMotion) {
         setReveal(Math.min(1, elapsedRef.current / revealMs));
+        setBeatProgress(Math.min(1, elapsedRef.current / Math.max(1, holdMs)));
       }
       if (clipsDone && elapsedRef.current >= holdMs) advance();
     }, REVEAL_TICK_MS);
@@ -177,6 +181,11 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
         npcLabel={npcLabel}
         playerActive={isPlayer}
         npcActive={!!npcPortrait}
+        progress={beatProgress}
+        seed={current.index}
+        outcome={beat.outcome}
+        weather={scene.weather}
+        reducedMotion={reducedMotion}
       />
 
       <header className="absolute top-0 inset-x-0 z-20 px-6 py-4 flex flex-wrap items-center gap-3 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">

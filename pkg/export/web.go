@@ -63,12 +63,16 @@ type webBeat struct {
 	// clip that cannot play leaves the reading time.
 	Reading float64 `json:"reading"`
 	Player  bool    `json:"player,omitempty"`
+	// Outcome is the turn's resolved outcome, which the player maps to a mood tint.
+	Outcome string `json:"outcome,omitempty"`
 }
 
 type webScene struct {
 	Location string    `json:"location,omitempty"`
 	Art      string    `json:"art,omitempty"`
 	Beats    []webBeat `json:"beats"`
+	// Weather is the location's weather, which the player draws as an overlay.
+	Weather string `json:"weather,omitempty"`
 }
 
 type webPayload struct {
@@ -122,7 +126,7 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 
 	for i := range script.Scenes {
 		sc := script.Scenes[i]
-		entry := webScene{Location: sc.LocationName}
+		entry := webScene{Location: sc.LocationName, Weather: sc.Weather}
 
 		if uri, err := dataURI(sc.ArtPath); err == nil {
 			entry.Art = uri
@@ -139,6 +143,7 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 				Duration: beat.Duration.Seconds(),
 				Reading:  scene.ReadingDuration(beat.Text).Seconds(),
 				Player:   beat.Player,
+				Outcome:  beat.Outcome,
 			}
 
 			// A beat's own illustration wins over the scene's backdrop. A missing

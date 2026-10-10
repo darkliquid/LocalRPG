@@ -257,6 +257,7 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 				Text:       segment.Text,
 				ArtPath:    art,
 				Player:     segment.Player,
+				Outcome:    turn.Outcome,
 			}
 
 			if opts.Audio {
@@ -341,6 +342,22 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 	return script, nil
 }
 
+// stateString reads a string field from an entity's state, or empty when it is
+// absent or not a string.
+func stateString(ent *entity.Entity, key string) string {
+	if ent == nil || ent.State == nil {
+		return ""
+	}
+	raw, ok := ent.State.Get(key)
+	if !ok {
+		return ""
+	}
+	if value, ok := raw.(string); ok {
+		return value
+	}
+	return ""
+}
+
 // openScene builds a scene, resolving its art once so a long conversation reuses
 // one image.
 func (c *Compiler) openScene(locationID string, opts Options) Scene {
@@ -353,6 +370,7 @@ func (c *Compiler) openScene(locationID string, opts Options) Scene {
 
 	if location, err := c.source.Location(locationID); err == nil && location != nil {
 		sc.LocationName = location.Name
+		sc.Weather = stateString(location, "weather")
 
 		if opts.Art && c.art != nil {
 			if art, err := c.art.SceneArt(context.Background(), location, false); err == nil {

@@ -35,15 +35,17 @@ var (
 // the opening share of a beat. With no art at all the stage shows the theatre's
 // own radial gradient.
 //
-// The background does not move. A drifting, re-scaled background shimmers as
-// whole source pixels jump, and that high-frequency noise is exactly what an
-// inter frame predicts badly, so the picture crawls and smears over a beat.
+// TH-2 gives the picture a slow Ken Burns drift. The composite is built in a
+// scratch image first, so the transform is applied once to the finished picture
+// rather than to each layer.
 func (r *Renderer) drawBackground(img *image.RGBA, req FrameRequest) {
-	// A layered scene draws its layers back to front. PH-3 produces the layers;
-	// the parallax that animates them is TH-2's, so this composites them in place
-	// and the picture matches the flat composition.
+	bg := image.NewRGBA(img.Bounds())
+
+	// A layered scene draws its layers back to front, each parallaxed by its own
+	// depth, so the picture reads as depth rather than a flat composition.
 	if len(req.Scene.Layers) > 0 {
-		if r.drawLayers(img, req) {
+		if r.drawLayers(bg, req) {
+			r.compositeBackground(img, bg, req)
 			return
 		}
 	}
@@ -56,12 +58,126 @@ func (r *Renderer) drawBackground(img *image.RGBA, req FrameRequest) {
 
 	if blend := crossfadeAlpha(req.Progress); blend < 1 && req.PreviousArt != "" {
 		if previous := r.art.cover(req.PreviousArt, r.width, r.height); previous != nil {
-			draw.Draw(img, img.Bounds(), previous, image.Point{}, draw.Src)
-			blendImage(img, current, blend)
+			draw.Draw(bg, bg.Bounds(), previous, image.Point{}, draw.Src)
+			blendImage(bg, current, blend)
+			r.compositeBackground(img, bg, req)
 			return
 		}
 	}
-	draw.Draw(img, img.Bounds(), current, image.Point{}, draw.Src)
+	draw.Draw(bg, bg.Bounds(), current, image.Point{}, draw.Src)
+	r.compositeBackground(img, bg, req)
+}
+
+// compositeBackground draws the composed background onto the frame, applying the
+// beat's Ken Burns transform when the render animates. A still render, or the
+// first frame of a beat, is a straight copy.
+func (r *Renderer) compositeBackground(img, bg *image.RGBA, req FrameRequest) {
+	kb := KenBurns(req.Beat.TurnNumber, req.Progress)
+	if !req.Animate || (kb.Scale <= 1 && kb.DX == 0 && kb.DY == 0) {
+		draw.Draw(img, img.Bounds(), bg, image.Point{}, draw.Src)
+		return
+	}
+	drawKenBurns(img, bg, kb)
+}
+
+// drawKenBurns scales and translates src onto dst: the picture drifts slowly
+// across the beat instead of sitting still.
+func drawKenBurns(dst, src *image.RGBA, kb KenBurnsTransform) {
+	width := float64(dst.Rect.Dx())
+	height := float64(dst.Rect.Dy())
+	scaledW := width * kb.Scale
+	scaledH := height * kb.Scale
+	cx := width/2 + kb.DX*width
+	cy := height/2 + kb.DY*height
+	rect := image.Rect(
+		int(math.Round(cx-scaledW/2)),
+		int(math.Round(cy-scaledH/2)),
+		int(math.Round(cx+scaledW/2)),
+		int(math.Round(cy+scaledH/2)),
+	)
+	xdraw.ApproxBiLinear.Scale(dst, rect, src, src.Bounds(), draw.Over, nil)
+}
+
+// drawTint overlays the turn's mood tint. It is drawn under the scrim so it can
+// never reduce the dialogue's contrast.
+func (r *Renderer) drawTint(img *image.RGBA, req FrameRequest) {
+	tint := MoodTint(req.Beat.Outcome)
+	if tint.Opacity <= 0 {
+		return
+	}
+	overlay := color.RGBA{R: tint.Colour.R, G: tint.Colour.G, B: tint.Colour.B, A: uint8(clamp01(tint.Opacity) * 255)}
+	draw.Draw(img, img.Bounds(), image.NewUniform(overlay), image.Point{}, draw.Over)
+}
+
+// drawWeather overlays the scene's weather. The overlay is light and bounded, so
+// it never obscures the text.
+func (r *Renderer) drawWeather(img *image.RGBA, req FrameRequest) {
+	shift := 0.0
+	if req.Animate {
+		shift = req.Progress
+	}
+	switch WeatherOverlay(req.Scene.Weather) {
+	case WeatherRain:
+		r.drawRain(img, shift)
+	case WeatherSnow:
+		r.drawSnow(img, shift)
+	case WeatherFog:
+		r.drawFog(img, shift)
+	}
+}
+
+// drawRain draws thin, slightly angled streaks that drift with the beat.
+func (r *Renderer) drawRain(img *image.RGBA, shift float64) {
+	const streaks = 70
+	colour := color.RGBA{R: 200, G: 220, B: 255, A: 55}
+	for i := 0; i < streaks; i++ {
+		x := (i*97 + 13) % r.width
+		y0 := (i*53 + int(shift*float64(r.height))) % max(1, r.height)
+		length := 18 + (i*7)%28
+		for j := 0; j < length; j++ {
+			px := (x + j) % max(1, r.width)
+			py := (y0 + j) % max(1, r.height)
+			blendPixel(img, px, py, colour)
+		}
+	}
+}
+
+// drawSnow draws slow drifting dots.
+func (r *Renderer) drawSnow(img *image.RGBA, shift float64) {
+	const flakes = 90
+	colour := color.RGBA{R: 255, G: 255, B: 255, A: 130}
+	for i := 0; i < flakes; i++ {
+		x := (i*131 + 17) % max(1, r.width)
+		y := (i*211 + int(shift*float64(r.height)*0.5)) % max(1, r.height)
+		blendPixel(img, x, y, colour)
+		blendPixel(img, x+1, y, colour)
+		blendPixel(img, x, y+1, colour)
+	}
+}
+
+// drawFog draws a soft horizontal band that drifts with the beat. The band's
+// vertical profile is zero at the edges, so the header and the dialogue stay
+// legible.
+func (r *Renderer) drawFog(img *image.RGBA, shift float64) {
+	period := float64(max(1, r.width)) / 3
+	offset := shift * period
+	for y := 0; y < r.height; y++ {
+		weight := fogProfile(float64(y) / float64(max(1, r.height-1)))
+		if weight <= 0 {
+			continue
+		}
+		for x := 0; x < r.width; x += 4 {
+			wave := 0.5 + 0.5*math.Sin((float64(x)+offset)/period*2*math.Pi)
+			alpha := uint8(45 * weight * wave)
+			if alpha == 0 {
+				continue
+			}
+			colour := color.RGBA{R: 220, G: 220, B: 220, A: alpha}
+			for dx := 0; dx < 4 && x+dx < r.width; dx++ {
+				blendPixel(img, x+dx, y, colour)
+			}
+		}
+	}
 }
 
 // scriptGenre is a script's genre, or empty when there is no script.
@@ -72,9 +188,9 @@ func scriptGenre(script *Script) string {
 	return script.Genre
 }
 
-// drawLayers composites a layered scene back to front, cover-fit and in place. It
-// reports false when no layer could be loaded, so the caller falls back to the
-// flat art.
+// drawLayers composites a layered scene back to front, parallaxing each layer by
+// its depth so the background moves less than the foreground. It reports false
+// when no layer could be loaded, so the caller falls back to the flat art.
 func (r *Renderer) drawLayers(img *image.RGBA, req FrameRequest) bool {
 	drawn := false
 	for _, layer := range req.Scene.Layers {
@@ -83,7 +199,13 @@ func (r *Renderer) drawLayers(img *image.RGBA, req FrameRequest) bool {
 			continue
 		}
 		drawn = true
-		draw.Draw(img, img.Bounds(), covered, image.Point{}, draw.Over)
+		if !req.Animate {
+			draw.Draw(img, img.Bounds(), covered, image.Point{}, draw.Over)
+			continue
+		}
+		kb := KenBurns(req.Beat.TurnNumber, req.Progress)
+		kb.DX += ParallaxOffset(layer.Depth, req.Progress)
+		drawKenBurns(img, covered, kb)
 	}
 	return drawn
 }

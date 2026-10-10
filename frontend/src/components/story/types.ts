@@ -17,12 +17,16 @@ export interface StoryBeat {
   reading?: number;
   // player marks the protagonist's own line, which glows on the left.
   player?: boolean;
+  // outcome is the turn's resolved outcome, which the player maps to a mood tint.
+  outcome?: string;
 }
 
 export interface StoryScene {
   location?: string;
   art?: string;
   beats: StoryBeat[];
+  // weather is the location's weather, which the player draws as an overlay.
+  weather?: string;
 }
 
 export interface Story {

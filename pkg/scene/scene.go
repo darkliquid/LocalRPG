@@ -36,6 +36,9 @@ type Beat struct {
 	AudioPaths    []string
 	AudioDuration time.Duration
 	Duration      time.Duration
+	// Outcome is the turn's resolved outcome, which the renderer maps to a mood
+	// tint. Empty when the turn resolved no check.
+	Outcome string
 }
 
 // Scene groups the beats that happened in one place.
@@ -49,6 +52,9 @@ type Scene struct {
 	Layers   []SceneLayer
 	Beats    []Beat
 	Duration time.Duration
+	// Weather is the location's weather, which the renderer draws as an overlay.
+	// Empty when the location declares none.
+	Weather string
 }
 
 // SceneLayer is one depth of a scene's art. Depth runs from 0 at the back to 1 at

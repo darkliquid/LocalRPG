@@ -73,6 +73,8 @@ func (r *Renderer) Frame(req FrameRequest) *image.RGBA {
 	draw.Draw(img, img.Bounds(), image.NewUniform(baseColour), image.Point{}, draw.Src)
 
 	r.drawBackground(img, req)
+	r.drawTint(img, req)
+	r.drawWeather(img, req)
 	r.drawScrim(img)
 	r.drawPortraits(img, req)
 	r.drawDialogue(img, req)
