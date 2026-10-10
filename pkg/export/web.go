@@ -130,10 +130,10 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 
 	// A missing asset costs a face or a clip, never the bundle: the beat keeps the
 	// pacing it was compiled with.
-	if uri, err := dataURI(script.PlayerPortrait); err == nil {
+	if uri, err := imageDataURI(script.PlayerPortrait); err == nil {
 		payload.PlayerPortrait = uri
 	}
-	if uri, err := dataURI(script.Banner); err == nil {
+	if uri, err := imageDataURI(script.Banner); err == nil {
 		payload.Banner = uri
 	}
 	payload.PlayerName = script.PlayerName
@@ -146,7 +146,7 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 		sc := script.Scenes[i]
 		entry := webScene{Location: sc.LocationName, Weather: sc.Weather}
 
-		if uri, err := dataURI(sc.ArtPath); err == nil {
+		if uri, err := imageDataURI(sc.ArtPath); err == nil {
 			entry.Art = uri
 		}
 
@@ -167,12 +167,12 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 			// A beat's own illustration wins over the scene's backdrop. A missing
 			// asset keeps the backdrop rather than failing the bundle.
 			if beat.ArtPath != "" && beat.ArtPath != sc.ArtPath {
-				if uri, err := dataURI(beat.ArtPath); err == nil {
+				if uri, err := imageDataURI(beat.ArtPath); err == nil {
 					jsBeat.Art = uri
 				}
 			}
 
-			if uri, err := dataURI(beat.PortraitPath); err == nil {
+			if uri, err := imageDataURI(beat.PortraitPath); err == nil {
 				jsBeat.Portrait = uri
 			}
 
