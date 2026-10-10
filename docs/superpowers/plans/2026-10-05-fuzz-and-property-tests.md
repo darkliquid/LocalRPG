@@ -177,6 +177,9 @@ git commit -m "test(media): property-test the group fold against the plan"
 
 ### Task 4: The caption property test
 
+**Deferred:** the caption/WebVTT surface is TH-4, which is not implemented yet, so there is nothing to
+property-test. The spec's caption property is "where cheap"; revisit this task when TH-4 lands.
+
 **Files:**
 - Modify: `pkg/scene/captions_test.go`
 - Test: `pkg/scene/captions_test.go` (append)
