@@ -101,6 +101,13 @@ jobs:
       - name: Test
         run: mise run test:backend
 
+      # A short fuzz pass so a committed seed or a regression in the parser or
+      # the repair fails CI. A longer run is `mise run test:fuzz`.
+      - name: Fuzz
+        run: |
+          mise exec -- go test ./pkg/turnstream/ -run FuzzParser -fuzz FuzzParser -fuzztime 10s
+          mise exec -- go test ./pkg/jsonrepair/ -run FuzzRepair -fuzz FuzzRepair -fuzztime 10s
+
   e2e:
     name: End-to-end browser tests
     needs: frontend

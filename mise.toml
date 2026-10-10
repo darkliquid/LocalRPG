@@ -63,6 +63,13 @@ npx tsc --noEmit
 npx vitest run
 """
 
+[tasks."test:fuzz"]
+description = "Run the fuzz targets for a longer budget"
+run = """
+go test ./pkg/turnstream/ -run FuzzParser -fuzz FuzzParser -fuzztime 60s
+go test ./pkg/jsonrepair/ -run FuzzRepair -fuzz FuzzRepair -fuzztime 60s
+"""
+
 [tasks.test]
 description = "Run all tests across the project"
 depends = ["test:backend", "test:frontend", "test:e2e"]
