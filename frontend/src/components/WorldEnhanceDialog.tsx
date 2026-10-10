@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Lightbulb, Sparkles, X } from 'lucide-react';
 import { APIClient } from '../api/client';
+import { slugify } from '../lib/slug';
 import { WorldApplyResult, WorldEnhancement } from '../types';
 
 export interface WorldEnhanceDialogProps {
@@ -68,7 +69,20 @@ export const WorldEnhanceDialog: React.FC<WorldEnhanceDialogProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const result = await APIClient.applyWorldEnhancements(worldId, { proposals: accepted, rename });
+      // A model-supplied id is not guaranteed to slug, and the backend rejects one
+      // that does not, so normalise it here rather than fail the apply.
+      const normalized = accepted.map((proposal) =>
+        proposal.entity
+          ? {
+              ...proposal,
+              entity: {
+                ...proposal.entity,
+                id: slugify(proposal.entity.id || proposal.entity.name),
+              },
+            }
+          : proposal,
+      );
+      const result = await APIClient.applyWorldEnhancements(worldId, { proposals: normalized, rename });
       setApplied(result.written);
       setProposals([]);
       setRejected(new Set());

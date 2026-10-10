@@ -88,4 +88,30 @@ describe('WorldEnhanceDialog', () => {
       expect(screen.getByText(/world entity already exists/i)).toBeInTheDocument()
     );
   });
+
+  it('slugifies a proposed entity id before applying', async () => {
+    const apply = vi
+      .spyOn(APIClient, 'applyWorldEnhancements')
+      .mockResolvedValue({ written: ['entities/the-salt-circle.md'] });
+
+    render(
+      <WorldEnhanceDialog
+        worldId="w"
+        onClose={() => {}}
+        proposals={[
+          {
+            kind: 'entity',
+            title: 'The Salt Circle',
+            body: 'Rivals.',
+            entity: { id: 'The Salt Circle!', name: 'The Salt Circle', type: 'faction', body: 'Rivals.' },
+          },
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /apply accepted/i }));
+
+    await waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
+    expect(apply.mock.calls[0][1].proposals[0].entity?.id).toBe('the-salt-circle');
+  });
 });
