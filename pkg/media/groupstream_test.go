@@ -1,6 +1,7 @@
 package media
 
 import (
+	"math/rand"
 	"slices"
 	"strings"
 	"testing"
@@ -161,6 +162,178 @@ func TestGroupFolderSegmentIndexesMatchPlan(t *testing.T) {
 	for i := range want {
 		if !slices.Equal(gotIndexes[i], want[i].SegmentIndexes) {
 			t.Fatalf("group %d indexes = %v, want %v", i, gotIndexes[i], want[i].SegmentIndexes)
+		}
+	}
+}
+
+// propertyVoices gives the property test's speakers distinct voices, so the
+// same-voice rule in canJoinGroup is exercised.
+var propertyVoices = map[string]*entity.VoiceConfig{
+	"garrick": {Provider: "mock", VoiceID: "v-garrick"},
+	"evelyn":  {Provider: "mock", VoiceID: "v-evelyn"},
+	"mara":    {Provider: "mock", VoiceID: "v-mara"},
+}
+
+// propertyResolve is the property test's segment-to-line resolver, mirroring
+// TTSPipeline.SegmentLine: empty text resolves to nothing, speech carries its
+// speaker and voice, narration is read by the narrator.
+func propertyResolve(segment entity.TurnSegment) (SpeakerLine, bool) {
+	if strings.TrimSpace(segment.Text) == "" {
+		return SpeakerLine{}, false
+	}
+	if segment.Kind == entity.SegmentSpeech {
+		return SpeakerLine{
+			SpeakerID: segment.SpeakerID,
+			Label:     segment.Speaker,
+			Voice:     propertyVoices[segment.SpeakerID],
+			Text:      segment.Text,
+		}, true
+	}
+	return SpeakerLine{Label: narratorLabel, Text: segment.Text}, true
+}
+
+// foldSegments runs the streaming fold over a segment sequence and attributes a
+// segment index to every emitted group the way the sentence streamer does: one
+// index is queued per resolved line, and a group consumes one per line, reusing
+// the last when a split line yields more groups than indexes.
+func foldSegments(segments []entity.TurnSegment, caps TTSCapabilities, resolve func(entity.TurnSegment) (SpeakerLine, bool)) ([][]SpeakerLine, [][]int) {
+	folder := NewGroupFolder(caps, 0)
+	var groups [][]SpeakerLine
+	var indexes [][]int
+	queue := make([]int, 0, len(segments))
+	last := 0
+	take := func(n int) []int {
+		out := make([]int, 0, n)
+		for i := 0; i < n; i++ {
+			if len(queue) > 0 {
+				last = queue[0]
+				queue = queue[1:]
+			}
+			out = append(out, last)
+		}
+		return out
+	}
+	emit := func(flushed [][]SpeakerLine) {
+		for _, group := range flushed {
+			groups = append(groups, group)
+			indexes = append(indexes, take(len(group)))
+		}
+	}
+	for i, segment := range segments {
+		line, ok := resolve(segment)
+		if !ok {
+			continue
+		}
+		queue = append(queue, i)
+		emit(folder.Add(line))
+	}
+	if group := folder.Flush(); group != nil {
+		emit([][]SpeakerLine{group})
+	}
+	return groups, indexes
+}
+
+// randomSegments builds an arbitrary sequence of narration and speech segments,
+// including empty and multi-sentence lines, so the fold and the plan meet the
+// skip and split paths too.
+func randomSegments(rng *rand.Rand) []entity.TurnSegment {
+	speakers := []struct{ name, id string }{
+		{"Garrick", "garrick"},
+		{"Evelyn", "evelyn"},
+		{"Mara", "mara"},
+	}
+	segments := make([]entity.TurnSegment, 0, 30)
+	for i := 0; i < rng.Intn(31); i++ {
+		text := randomText(rng)
+		if rng.Intn(3) == 0 {
+			speaker := speakers[rng.Intn(len(speakers))]
+			segments = append(segments, entity.TurnSegment{
+				Kind: entity.SegmentSpeech, Speaker: speaker.name, SpeakerID: speaker.id, Text: text,
+			})
+			continue
+		}
+		segments = append(segments, entity.TurnSegment{Kind: entity.SegmentNarration, Text: text})
+	}
+	return segments
+}
+
+// randomText returns a short phrase, an empty line, or a long multi-sentence run.
+func randomText(rng *rand.Rand) string {
+	if rng.Intn(5) == 0 {
+		return strings.Repeat("A sentence about the hall. ", 1+rng.Intn(30))
+	}
+	words := []string{"the", "hall", "is", "quiet", "cold", "air", "rushes", "in"}
+	parts := make([]string, 0, 12)
+	for i := 0; i < rng.Intn(12); i++ {
+		parts = append(parts, words[rng.Intn(len(words))])
+	}
+	return strings.Join(parts, " ")
+}
+
+// randomCaps varies the speaker budget and the request limits so every grouping
+// boundary is exercised.
+func randomCaps(rng *rand.Rand) TTSCapabilities {
+	caps := TTSCapabilities{MaxSpeakers: 1 + rng.Intn(3)}
+	if rng.Intn(2) == 0 {
+		caps.MaxCharsPerRequest = 10 + rng.Intn(70)
+	}
+	if rng.Intn(3) == 0 {
+		caps.MaxTokensPerRequest = 3 + rng.Intn(20)
+	}
+	return caps
+}
+
+// TestGroupFoldEqualsPlanProperty generalises TestGroupFolderMatchesPlanGroups to
+// arbitrary segment sequences: the streaming fold and the batch plan must agree
+// on the groups, their lines, and the segments each group covers, so a streamed
+// clip and a finalised clip share a cache key.
+func TestGroupFoldEqualsPlanProperty(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	for i := 0; i < 500; i++ {
+		segments := randomSegments(rng)
+		caps := randomCaps(rng)
+		want := planGroups(segments, caps, propertyResolve)
+		gotGroups, gotIndexes := foldSegments(segments, caps, propertyResolve)
+
+		if len(gotGroups) != len(want) {
+			t.Fatalf("case %d: folded %d groups, want %d for %#v", i, len(gotGroups), len(want), segments)
+		}
+		for j := range want {
+			if len(gotGroups[j]) != len(want[j].Lines) {
+				t.Fatalf("case %d group %d has %d lines, want %d", i, j, len(gotGroups[j]), len(want[j].Lines))
+			}
+			for k := range want[j].Lines {
+				if gotGroups[j][k] != want[j].Lines[k] {
+					t.Fatalf("case %d group %d line %d = %#v, want %#v", i, j, k, gotGroups[j][k], want[j].Lines[k])
+				}
+			}
+			if !slices.Equal(gotIndexes[j], want[j].SegmentIndexes) {
+				t.Fatalf("case %d group %d indexes = %v, want %v", i, j, gotIndexes[j], want[j].SegmentIndexes)
+			}
+		}
+	}
+}
+
+// TestGroupFoldKeyEqualsPlanKeyProperty proves the streamed group key equals the
+// finalised group key for every group of an arbitrary sequence, which is the
+// guarantee that makes a streamed clip reusable by the turn.
+func TestGroupFoldKeyEqualsPlanKeyProperty(t *testing.T) {
+	rng := rand.New(rand.NewSource(2))
+	for i := 0; i < 300; i++ {
+		segments := randomSegments(rng)
+		caps := randomCaps(rng)
+		want := planGroups(segments, caps, propertyResolve)
+		gotGroups, _ := foldSegments(segments, caps, propertyResolve)
+
+		if len(gotGroups) != len(want) {
+			t.Fatalf("case %d: folded %d groups, want %d", i, len(gotGroups), len(want))
+		}
+		for j := range want {
+			foldKey := ComputeGroupCacheKey("mock", "m", gotGroups[j])
+			planKey := ComputeGroupCacheKey("mock", "m", want[j].Lines)
+			if foldKey != planKey {
+				t.Fatalf("case %d group %d key = %s, want %s", i, j, foldKey, planKey)
+			}
 		}
 	}
 }
