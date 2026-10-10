@@ -18,15 +18,11 @@ func Explain(ctx context.Context, gen Generator, sys System) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	raw, err := gen.GenerateJSON(ctx, explainPrompt(sys), explainSchema)
-	if err != nil {
-		return "", fmt.Errorf("explain: %w", err)
-	}
 	var out struct {
 		Explanation string `json:"explanation"`
 	}
-	if err := decodeJSON(raw, &out); err != nil {
-		return "", fmt.Errorf("explain decode: %w", err)
+	if err := generateJSON(ctx, gen, explainPrompt(sys), explainSchema, &out); err != nil {
+		return "", fmt.Errorf("explain: %w", err)
 	}
 	return strings.TrimSpace(out.Explanation), nil
 }

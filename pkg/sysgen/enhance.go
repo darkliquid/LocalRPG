@@ -79,15 +79,11 @@ func Propose(ctx context.Context, gen Generator, sys System, instruction string,
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	raw, err := gen.GenerateJSON(ctx, proposePrompt(sys, instruction, kinds), enhanceSchema)
-	if err != nil {
-		return nil, fmt.Errorf("enhance: %w", err)
-	}
 	var out struct {
 		Proposals []Proposal `json:"proposals"`
 	}
-	if err := decodeJSON(raw, &out); err != nil {
-		return nil, fmt.Errorf("enhance decode: %w", err)
+	if err := generateJSON(ctx, gen, proposePrompt(sys, instruction, kinds), enhanceSchema, &out); err != nil {
+		return nil, fmt.Errorf("enhance: %w", err)
 	}
 
 	proposals := make([]Proposal, 0, len(out.Proposals))

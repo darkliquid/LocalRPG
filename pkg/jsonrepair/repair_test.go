@@ -124,3 +124,50 @@ func TestRepairLeavesAnUnrepairablePayloadAlone(t *testing.T) {
 		t.Fatalf("payload = %q, want the input unchanged", got.Payload)
 	}
 }
+
+func TestRepairStringFaults(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		kind Kind
+	}{
+		{"literal newline in a string", "{\"a\":\"one\ntwo\"}", KindEscapeControl},
+		{"literal tab in a string", "{\"a\":\"one\ttwo\"}", KindEscapeControl},
+		{"leading BOM", "\ufeff{\"a\":1}", KindBOM},
+		{"smart quotes as delimiters", "{\u201ca\u201d:1}", KindSmartQuote},
+	}
+	for _, c := range cases {
+		got := Repair([]byte(c.in))
+		if !got.OK {
+			t.Errorf("%s: not repaired: %q", c.name, got.Payload)
+			continue
+		}
+		if !json.Valid(got.Payload) {
+			t.Errorf("%s: payload invalid: %q", c.name, got.Payload)
+		}
+		if got.Kind != c.kind {
+			t.Errorf("%s: Kind = %q, want %q", c.name, got.Kind, c.kind)
+		}
+	}
+}
+
+func TestRepairPreservesText(t *testing.T) {
+	got := Repair([]byte("{\"a\":\"one\ntwo\"}"))
+	var decoded map[string]string
+	if err := json.Unmarshal(got.Payload, &decoded); err != nil {
+		t.Fatalf("unmarshal repaired: %v", err)
+	}
+	if decoded["a"] != "one\ntwo" {
+		t.Fatalf("decoded = %q, want the literal newline preserved", decoded["a"])
+	}
+}
+
+func TestRepairLeavesASmartQuoteInsideAValue(t *testing.T) {
+	// A smart quote inside a value is content, not a delimiter, so the payload is
+	// already valid and must come back byte-identical.
+	in := []byte("{\"a\":\"it\u2019s\"}")
+	got := Repair(in)
+	if !got.OK || string(got.Payload) != string(in) {
+		t.Fatalf("payload = %q, want the input unchanged", got.Payload)
+	}
+}
