@@ -44,6 +44,9 @@ mise run build
 # Run all Go and TypeScript tests
 mise run test
 
+# Fuzz the turn-stream parser and the JSON repair for a longer budget
+mise run test:fuzz
+
 # Launch desktop GUI
 bin/localrpg gui
 ```
