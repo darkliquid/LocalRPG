@@ -46,10 +46,6 @@ const worldGenSystem = `You are a world builder for a tabletop roleplaying game.
 
 // runOutline produces the world's identity, description, and lore.
 func runOutline(ctx context.Context, gen Generator, brief Brief, draft *Draft) error {
-	raw, err := gen.GenerateJSON(ctx, outlinePrompt(brief), outlineSchema)
-	if err != nil {
-		return err
-	}
 	var out struct {
 		Name        string   `json:"name"`
 		Genre       string   `json:"genre"`
@@ -60,7 +56,7 @@ func runOutline(ctx context.Context, gen Generator, brief Brief, draft *Draft) e
 		ArtStyle    string   `json:"art_style"`
 		Lore        string   `json:"lore"`
 	}
-	if err := decodeJSON(raw, &out); err != nil {
+	if err := generateJSON(ctx, gen, outlinePrompt(brief), outlineSchema, &out); err != nil {
 		return err
 	}
 
@@ -90,15 +86,11 @@ func runOutline(ctx context.Context, gen Generator, brief Brief, draft *Draft) e
 
 // runPlaces produces the world's locations and factions.
 func runPlaces(ctx context.Context, gen Generator, brief Brief, draft *Draft) error {
-	raw, err := gen.GenerateJSON(ctx, placesPrompt(brief, *draft), placesSchema)
-	if err != nil {
-		return err
-	}
 	var out struct {
 		Locations []placeSpec `json:"locations"`
 		Factions  []placeSpec `json:"factions"`
 	}
-	if err := decodeJSON(raw, &out); err != nil {
+	if err := generateJSON(ctx, gen, placesPrompt(brief, *draft), placesSchema, &out); err != nil {
 		return err
 	}
 
@@ -120,14 +112,10 @@ func runPlaces(ctx context.Context, gen Generator, brief Brief, draft *Draft) er
 
 // runCharacters produces the world's characters, seeded with what exists so far.
 func runCharacters(ctx context.Context, gen Generator, brief Brief, draft *Draft) error {
-	raw, err := gen.GenerateJSON(ctx, charactersPrompt(brief, *draft), charactersSchema)
-	if err != nil {
-		return err
-	}
 	var out struct {
 		Characters []characterSpec `json:"characters"`
 	}
-	if err := decodeJSON(raw, &out); err != nil {
+	if err := generateJSON(ctx, gen, charactersPrompt(brief, *draft), charactersSchema, &out); err != nil {
 		return err
 	}
 
@@ -144,17 +132,13 @@ func runCharacters(ctx context.Context, gen Generator, brief Brief, draft *Draft
 // runLink asks for the entities' bodies written with wikilinks between them, then
 // validates every link against the draft's own ids.
 func runLink(ctx context.Context, gen Generator, brief Brief, draft *Draft) error {
-	raw, err := gen.GenerateJSON(ctx, linkPrompt(*draft), linkSchema)
-	if err != nil {
-		return err
-	}
 	var out struct {
 		Entities []struct {
 			ID   string `json:"id"`
 			Body string `json:"body"`
 		} `json:"entities"`
 	}
-	if err := decodeJSON(raw, &out); err != nil {
+	if err := generateJSON(ctx, gen, linkPrompt(*draft), linkSchema, &out); err != nil {
 		return err
 	}
 

@@ -229,6 +229,34 @@ func decodeJSON(raw []byte, v any) error {
 	return nil
 }
 
+// retryHint is appended to the prompt when a reply could not be parsed, so the
+// model is told exactly what to fix rather than repeating the mistake.
+const retryHint = "\n\nYour previous reply could not be parsed as JSON (reason: %v). " +
+	"Reply with one JSON object only, escaping every newline inside a string as \\n."
+
+// generateJSON calls the generator and decodes the reply, retrying once with the
+// parse failure appended to the prompt before giving up. A generate error is
+// returned as-is: there is no reply to re-ask about.
+func generateJSON(ctx context.Context, gen Generator, prompt, schema string, v any) error {
+	raw, err := gen.GenerateJSON(ctx, prompt, schema)
+	if err != nil {
+		return err
+	}
+	parseErr := decodeJSON(raw, v)
+	if parseErr == nil {
+		return nil
+	}
+
+	raw, err = gen.GenerateJSON(ctx, prompt+fmt.Sprintf(retryHint, parseErr), schema)
+	if err != nil {
+		return parseErr
+	}
+	if retryErr := decodeJSON(raw, v); retryErr != nil {
+		return retryErr
+	}
+	return nil
+}
+
 // replyTail is the last few bytes of a reply, so a failure report shows whether
 // the model stopped mid-word.
 func replyTail(payload []byte) string {

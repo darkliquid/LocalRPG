@@ -29,10 +29,6 @@ func Derive(ctx context.Context, gen Generator, base refsystems.ReferenceSystem,
 		return System{}, err
 	}
 
-	raw, err := gen.GenerateJSON(ctx, derivePrompt(base, instruction), deriveSchema)
-	if err != nil {
-		return System{}, fmt.Errorf("derive: %w", err)
-	}
 	var out struct {
 		Name        string              `json:"name"`
 		Description string              `json:"description"`
@@ -40,8 +36,8 @@ func Derive(ctx context.Context, gen Generator, base refsystems.ReferenceSystem,
 		Script      string              `json:"script"`
 		Rules       string              `json:"rules"`
 	}
-	if err := decodeJSON(raw, &out); err != nil {
-		return System{}, fmt.Errorf("derive decode: %w", err)
+	if err := generateJSON(ctx, gen, derivePrompt(base, instruction), deriveSchema, &out); err != nil {
+		return System{}, fmt.Errorf("derive: %w", err)
 	}
 
 	name := strings.TrimSpace(out.Name)
