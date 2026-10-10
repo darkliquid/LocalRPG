@@ -175,6 +175,15 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
               await client.deleteFolder(path, true);
               setFolders(await client.listFolders());
             }}
+            onDeleteEntity={async (id) => {
+              await client.deleteEntity(id);
+              setEntities(await client.listEntities());
+              if (note?.id === id) {
+                setNote(null);
+                setDraft('');
+                setSaved('');
+              }
+            }}
           />
         </aside>
 

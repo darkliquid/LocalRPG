@@ -1403,6 +1403,39 @@ func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID 
 	return s.GetEntity(ctx, gameID, targetID)
 }
 
+// DeleteGameEntity removes one campaign entity note and its index entry.
+func (s *Service) DeleteGameEntity(_ context.Context, gameID, entityID string) error {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return fmt.Errorf("invalid game id: %w", err)
+	}
+	if err := pathutil.ValidateID(entityID); err != nil {
+		return fmt.Errorf("invalid entity id: %w", err)
+	}
+
+	entitiesDir := filepath.Join(s.resolver.GameDir(gameID), "entities")
+	path, err := s.findEntityNote(entitiesDir, entityID)
+	if err != nil {
+		return err
+	}
+	if path == "" {
+		return fmt.Errorf("delete entity %s: %w", entityID, fs.ErrNotExist)
+	}
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("remove entity note: %w", err)
+	}
+
+	store, err := s.store(gameID)
+	if err != nil {
+		return fmt.Errorf("open store: %w", err)
+	}
+	if err := store.DeleteEntity(entityID); err != nil {
+		return fmt.Errorf("remove entity from the index: %w", err)
+	}
+	syncer := storage.NewSyncer(store)
+	_ = syncer.SyncFile(path)
+	return nil
+}
+
 // rewriteInboundLinks points every note that linked to the source at the survivor,
 // so no note is left pointing at an entity that no longer exists.
 func (s *Service) rewriteInboundLinks(gameDir, sourceID, targetID string) error {

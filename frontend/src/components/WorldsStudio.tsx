@@ -1348,6 +1348,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                       await APIClient.deleteWorldFolder(savedID, path, true);
                       await refreshWorldFolders();
                     }}
+                    onDeleteEntity={(id) => void handleDeleteEntity(id)}
                   />
                 )}
               </div>
