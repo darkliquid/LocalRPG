@@ -74,4 +74,25 @@ describe('WorldsStudio entity deletion', () => {
     await waitFor(() => expect(APIClient.deleteWorldEntity).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByText(/starter entities/i)).toBeInTheDocument());
   });
+
+  it('deletes from the tree row menu', async () => {
+    mockStudio();
+    vi.spyOn(APIClient, 'getWorld').mockResolvedValue({
+      ...world,
+      entities: [{ id: 'saltmarch', name: 'Saltmarch', type: 'location' }],
+    });
+
+    render(<WorldsStudio />);
+    await waitFor(() => expect(screen.getAllByText('Ember Peak').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('Ember Peak')[0]);
+    await waitFor(() => expect(screen.getByText(/starter entities/i)).toBeInTheDocument());
+    fireEvent.click(screen.getByText(/starter entities/i));
+    await waitFor(() => expect(screen.getByText(/saltmarch\.md/)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Note actions'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: /^delete$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete note/i }));
+
+    await waitFor(() => expect(APIClient.deleteWorldEntity).toHaveBeenCalledWith('ember-peak', 'saltmarch'));
+  });
 });
