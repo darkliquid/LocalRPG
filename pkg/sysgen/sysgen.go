@@ -4,6 +4,7 @@ package sysgen
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -80,12 +81,31 @@ type Generator interface {
 	GenerateJSON(ctx context.Context, prompt, schema string) ([]byte, error)
 }
 
+// ErrMalformedReply reports a model reply that could not be read even after
+// repair and one retry.
+var ErrMalformedReply = errors.New("the model returned a reply that could not be read")
+
 func decodeJSON(raw []byte, v any) error {
 	payload := raw
 	if res := jsonrepair.Repair(raw); res.OK {
 		payload = res.Payload
 	}
-	return json.Unmarshal(payload, v)
+	if err := json.Unmarshal(payload, v); err != nil {
+		// The length and the tail tell a cut-off reply from a reply that was never
+		// JSON, which the unmarshal error alone does not.
+		return fmt.Errorf("%w: parse model reply (%d bytes, ending %q): %v", ErrMalformedReply, len(payload), replyTail(payload), err)
+	}
+	return nil
+}
+
+// replyTail is the last few bytes of a reply, so a failure report shows whether
+// the model stopped mid-word.
+func replyTail(payload []byte) string {
+	const window = 40
+	if len(payload) <= window {
+		return string(payload)
+	}
+	return "..." + string(payload[len(payload)-window:])
 }
 
 // retryHint is appended to the prompt when a reply could not be parsed, so the

@@ -31,7 +31,7 @@ func (s *Server) streamWorldGeneration(w http.ResponseWriter, r *http.Request, r
 	}
 
 	if _, err := s.service.GenerateWorld(r.Context(), req, emit); err != nil {
-		event := TurnEvent{Type: "error", Message: err.Error(), Code: generationLimitCode(err)}
+		event := TurnEvent{Type: "error", Message: replyErrorMessage(err), Code: replyErrorCode(err), Detail: err.Error()}
 		_ = emit(event)
 	}
 }
@@ -170,7 +170,7 @@ func (s *Server) handleWorldEntitiesPreview(w http.ResponseWriter, r *http.Reque
 
 	batch, err := s.service.PreviewWorldEntitiesStream(r.Context(), worldID, req, emit)
 	if err != nil {
-		_ = emit(TurnEvent{Type: "error", Message: err.Error(), Code: generationLimitCode(err)})
+		_ = emit(TurnEvent{Type: "error", Message: replyErrorMessage(err), Code: replyErrorCode(err), Detail: err.Error()})
 		return
 	}
 	_ = emit(TurnEvent{Type: "batch", Batch: batch})
@@ -212,6 +212,10 @@ func (s *Server) handleWorldEnhance(w http.ResponseWriter, r *http.Request, worl
 	}
 	proposals, err := s.service.EnhanceWorld(r.Context(), worldID, req)
 	if err != nil {
+		if isMalformedReply(err) {
+			writeJSONError(w, http.StatusBadGateway, replyErrorMessage(err))
+			return
+		}
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}

@@ -214,6 +214,10 @@ func SalvageObjects(raw []byte) [][]byte {
 	return jsonrepair.ArrayElements(jsonrepair.Repair(raw).Payload)
 }
 
+// ErrMalformedReply reports a model reply that could not be read even after
+// repair and one retry.
+var ErrMalformedReply = errors.New("the model returned a reply that could not be read")
+
 // decodeJSON repairs a model reply that is fenced, padded with prose, or
 // unterminated, then unmarshals it into v.
 func decodeJSON(raw []byte, v any) error {
@@ -224,7 +228,7 @@ func decodeJSON(raw []byte, v any) error {
 	if err := json.Unmarshal(payload, v); err != nil {
 		// The length and the tail tell a cut-off reply from a reply that was never
 		// JSON, which the unmarshal error alone does not.
-		return fmt.Errorf("parse model reply (%d bytes, ending %q): %w", len(payload), replyTail(payload), err)
+		return fmt.Errorf("%w: parse model reply (%d bytes, ending %q): %v", ErrMalformedReply, len(payload), replyTail(payload), err)
 	}
 	return nil
 }
