@@ -36,6 +36,9 @@ type Beat struct {
 	AudioPaths    []string
 	AudioDuration time.Duration
 	Duration      time.Duration
+	// Outcome is the turn's resolved outcome, which the renderer maps to a mood
+	// tint. Empty when the turn resolved no check.
+	Outcome string
 }
 
 // Scene groups the beats that happened in one place.
@@ -49,6 +52,9 @@ type Scene struct {
 	Layers   []SceneLayer
 	Beats    []Beat
 	Duration time.Duration
+	// Weather is the location's weather, which the renderer draws as an overlay.
+	// Empty when the location declares none.
+	Weather string
 }
 
 // SceneLayer is one depth of a scene's art. Depth runs from 0 at the back to 1 at
@@ -56,6 +62,14 @@ type Scene struct {
 type SceneLayer struct {
 	Depth float64
 	Art   string
+}
+
+// Chapter is a navigable scene boundary in an export: its title and where it
+// starts on the finished timeline. The web player lists them and the video writes
+// them as chapter metadata.
+type Chapter struct {
+	Title string
+	Start time.Duration
 }
 
 // ClipGroup is one clip a run of adjacent same-speaker beats shares, so the
@@ -88,6 +102,9 @@ type Script struct {
 	WorldStyle    string
 	Genre         string
 	Scenes        []Scene
+	// Chapters are the scenes as navigable boundaries, derived once so the web and
+	// the video exports agree on where each scene starts.
+	Chapters      []Chapter
 	TotalDuration time.Duration
 }
 

@@ -109,3 +109,24 @@ many images remain.
 An export shows a turn's illustration where one exists and the location backdrop
 otherwise, in both the web and the video export. The exported video and page show
 the same moments the app showed.
+
+The stage animates. A beat's image drifts slowly (a Ken Burns zoom and pan), a
+layered scene moves its background less than its foreground, the turn's outcome
+tints the picture, and rain, snow, or fog draws a light overlay. The app and both
+exports compute the effects from the same rules, and a story looks the same in
+each. A `prefers-reduced-motion` preference disables the motion.
+
+Captions are off by default. Turn them on from the transport to read the current
+spoken line as an overlay. The exported page includes a WebVTT track for the same
+lines, and a video export writes that track as a `.vtt` sidecar beside the
+`.webm`.
+
+An export is navigable by chapter. Each scene is a chapter, the web player lists
+them beside the transport and seeks when one is chosen, and a video export writes
+an ffmpeg chapters sidecar (`.chapters.txt`) next to the video. A scene boundary
+uses a longer transition than a beat change. That makes a location change read
+distinctly.
+
+The export scales each embedded illustration down to the size the player shows. A
+bundle does not grow with the source images. The campaign's own files are never
+changed.

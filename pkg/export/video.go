@@ -173,6 +173,32 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 		os.Remove(part)
 		return fmt.Errorf("publish video: %w", err)
 	}
+
+	// The subtitle track goes beside the video with the same base name. A muxed
+	// WebM subtitle is possible, but a sidecar plays in every player.
+	sidecar, err := writeSubtitleSidecar(outputFile, script)
+	if err != nil {
+		// outputFile was validated above with pathutil.ValidateUserPath.
+		// lgtm[go/path-injection]
+		os.Remove(outputFile)
+		return err
+	}
+	if v.progress != nil && sidecar != "" {
+		v.progress(scene.Progress{Phase: "encode", Message: "wrote " + filepath.Base(sidecar)})
+	}
+
+	// The chapters go beside it too, in the ffmpeg metadata format.
+	chapters, err := writeChapterSidecar(outputFile, script)
+	if err != nil {
+		// outputFile was validated above with pathutil.ValidateUserPath.
+		// lgtm[go/path-injection]
+		os.Remove(outputFile)
+		return err
+	}
+	if v.progress != nil && chapters != "" {
+		v.progress(scene.Progress{Phase: "encode", Message: "wrote " + filepath.Base(chapters)})
+	}
+
 	if v.progress != nil {
 		v.progress(scene.Progress{
 			Phase:             "done",
@@ -370,14 +396,16 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 						PreviousArt: previousArt,
 						Animate:     animate,
 						DisplayMode: v.displayMode,
+						SceneStart:  sceneStart,
 					})
 					lastImage = img
 					totals.imageFrames++
 				}
 
-				// A scene's opening crossfade blends two pictures, which is the
-				// most an inter frame has to carry, so it gets keyframes too.
-				crossfading := sceneStart && step.Progress < scene.CrossfadeShare
+				// A scene's opening crossfade blends two pictures over the longer
+				// scene transition, which is the most an inter frame has to carry, so
+				// it gets keyframes too.
+				crossfading := sceneStart && step.Progress < scene.SceneCrossfadeShare
 				if err := emit(img, step.Span, beatStart || crossfading); err != nil {
 					return totals, err
 				}

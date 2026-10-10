@@ -63,12 +63,22 @@ type webBeat struct {
 	// clip that cannot play leaves the reading time.
 	Reading float64 `json:"reading"`
 	Player  bool    `json:"player,omitempty"`
+	// Outcome is the turn's resolved outcome, which the player maps to a mood tint.
+	Outcome string `json:"outcome,omitempty"`
 }
 
 type webScene struct {
 	Location string    `json:"location,omitempty"`
 	Art      string    `json:"art,omitempty"`
 	Beats    []webBeat `json:"beats"`
+	// Weather is the location's weather, which the player draws as an overlay.
+	Weather string `json:"weather,omitempty"`
+}
+
+// webChapter is a navigable scene boundary, in seconds.
+type webChapter struct {
+	Title string  `json:"title"`
+	Start float64 `json:"start"`
 }
 
 type webPayload struct {
@@ -81,6 +91,13 @@ type webPayload struct {
 	// PlayerName labels the protagonist's portrait, as the theatre does.
 	PlayerName string     `json:"player_name,omitempty"`
 	Scenes     []webScene `json:"scenes"`
+	// Captions is the story's WebVTT subtitle track, carried in the bundle so a
+	// viewer who cannot hear the audio still reads the spoken lines.
+	Captions string `json:"captions,omitempty"`
+	// Chapters are the story's scene boundaries, and ChaptersVTT is the same list
+	// as a WebVTT track for a player's native chapter controls.
+	Chapters    []webChapter `json:"chapters,omitempty"`
+	ChaptersVTT string       `json:"chapters_vtt,omitempty"`
 	// Total is the script's own pacing, kept for a reader of the payload; the player
 	// paces itself per beat.
 	Total float64 `json:"total_duration"`
@@ -108,23 +125,28 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 		GameName:    script.GameName,
 		DisplayMode: w.displayMode,
 		Total:       script.TotalDuration.Seconds(),
+		Captions:    scene.Captions(script.Beats()),
 	}
 
 	// A missing asset costs a face or a clip, never the bundle: the beat keeps the
 	// pacing it was compiled with.
-	if uri, err := dataURI(script.PlayerPortrait); err == nil {
+	if uri, err := imageDataURI(script.PlayerPortrait); err == nil {
 		payload.PlayerPortrait = uri
 	}
-	if uri, err := dataURI(script.Banner); err == nil {
+	if uri, err := imageDataURI(script.Banner); err == nil {
 		payload.Banner = uri
 	}
 	payload.PlayerName = script.PlayerName
+	for _, chapter := range script.Chapters {
+		payload.Chapters = append(payload.Chapters, webChapter{Title: chapter.Title, Start: chapter.Start.Seconds()})
+	}
+	payload.ChaptersVTT = scene.ChaptersVTT(script.Chapters, script.TotalDuration)
 
 	for i := range script.Scenes {
 		sc := script.Scenes[i]
-		entry := webScene{Location: sc.LocationName}
+		entry := webScene{Location: sc.LocationName, Weather: sc.Weather}
 
-		if uri, err := dataURI(sc.ArtPath); err == nil {
+		if uri, err := imageDataURI(sc.ArtPath); err == nil {
 			entry.Art = uri
 		}
 
@@ -139,17 +161,18 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 				Duration: beat.Duration.Seconds(),
 				Reading:  scene.ReadingDuration(beat.Text).Seconds(),
 				Player:   beat.Player,
+				Outcome:  beat.Outcome,
 			}
 
 			// A beat's own illustration wins over the scene's backdrop. A missing
 			// asset keeps the backdrop rather than failing the bundle.
 			if beat.ArtPath != "" && beat.ArtPath != sc.ArtPath {
-				if uri, err := dataURI(beat.ArtPath); err == nil {
+				if uri, err := imageDataURI(beat.ArtPath); err == nil {
 					jsBeat.Art = uri
 				}
 			}
 
-			if uri, err := dataURI(beat.PortraitPath); err == nil {
+			if uri, err := imageDataURI(beat.PortraitPath); err == nil {
 				jsBeat.Portrait = uri
 			}
 

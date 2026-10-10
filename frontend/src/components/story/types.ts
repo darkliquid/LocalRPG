@@ -17,12 +17,22 @@ export interface StoryBeat {
   reading?: number;
   // player marks the protagonist's own line, which glows on the left.
   player?: boolean;
+  // outcome is the turn's resolved outcome, which the player maps to a mood tint.
+  outcome?: string;
 }
 
 export interface StoryScene {
   location?: string;
   art?: string;
   beats: StoryBeat[];
+  // weather is the location's weather, which the player draws as an overlay.
+  weather?: string;
+}
+
+// StoryChapter is a navigable scene boundary, at a start time in seconds.
+export interface StoryChapter {
+  title: string;
+  start: number;
 }
 
 export interface Story {
@@ -34,6 +44,12 @@ export interface Story {
   player_portrait?: string;
   // player_name labels the protagonist's portrait, as the theatre's does.
   player_name?: string;
+  // captions is the story's WebVTT subtitle track, carried in the bundle.
+  captions?: string;
+  // chapters are the story's scene boundaries, and chapters_vtt is the same list
+  // as a WebVTT track.
+  chapters?: StoryChapter[];
+  chapters_vtt?: string;
   scenes: StoryScene[];
 }
 

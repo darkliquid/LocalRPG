@@ -159,6 +159,7 @@ type webPayloadFixture struct {
 	Scenes         []struct {
 		Location string `json:"location"`
 		Art      string `json:"art"`
+		Weather  string `json:"weather"`
 		Beats    []struct {
 			Kind     string   `json:"kind"`
 			Speaker  string   `json:"speaker"`
@@ -169,8 +170,15 @@ type webPayloadFixture struct {
 			Duration float64  `json:"duration"`
 			Reading  float64  `json:"reading"`
 			Player   bool     `json:"player"`
+			Outcome  string   `json:"outcome"`
 		} `json:"beats"`
 	} `json:"scenes"`
+	Captions    string  `json:"captions"`
+	ChaptersVTT string  `json:"chapters_vtt"`
+	Chapters    []struct {
+		Title string  `json:"title"`
+		Start float64 `json:"start"`
+	} `json:"chapters"`
 	Total float64 `json:"total_duration"`
 }
 

@@ -97,3 +97,11 @@ BGE
 WordPiece
 n-gram
 n-grams
+
+# Theatre and export vocabulary.
+Ken Burns
+WebVTT
+VTT
+ffmpeg
+sidecar
+sidecars

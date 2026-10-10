@@ -58,3 +58,22 @@ func TestCrossfadeIsDoneByTheEndOfItsShare(t *testing.T) {
 		t.Errorf("crossfadeAlpha(1) = %v, want 1", got)
 	}
 }
+
+// TestSceneBoundaryTransitionDiffersFromBeatTransition proves a scene boundary
+// gets a longer, distinct transition than a beat change: at the beat's share the
+// beat transition is complete but the scene transition is still blending.
+func TestSceneBoundaryTransitionDiffersFromBeatTransition(t *testing.T) {
+	if SceneCrossfadeShare <= CrossfadeShare {
+		t.Fatalf("the scene transition (%v) should exceed the beat transition (%v)",
+			SceneCrossfadeShare, CrossfadeShare)
+	}
+	if got := CrossfadeAlpha(CrossfadeShare, CrossfadeShare); got != 1 {
+		t.Fatalf("a beat transition should be complete at its share, got %v", got)
+	}
+	if got := CrossfadeAlpha(CrossfadeShare, SceneCrossfadeShare); got >= 1 {
+		t.Fatalf("a scene transition should still be blending at the beat's share, got %v", got)
+	}
+	if got := CrossfadeAlpha(SceneCrossfadeShare, SceneCrossfadeShare); got != 1 {
+		t.Fatalf("a scene transition should be complete at its own share, got %v", got)
+	}
+}

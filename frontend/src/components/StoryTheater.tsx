@@ -32,6 +32,8 @@ interface StoryTheaterProps {
   skipAudioKeys?: ReadonlySet<string>;
   // Playback ledger containing resume offsets and completion states.
   playbackLedger?: Record<string, PlaybackEntry>;
+  // weather is the current location's weather, which draws the stage's overlay.
+  weather?: string;
 }
 
 // BEAT_GAP_MS is the buffer between one voice clip finishing and the next line
@@ -70,11 +72,16 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   limits,
   skipAudioKeys,
   playbackLedger,
+  weather,
 }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [activeSegment, setActiveSegment] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [speed, setSpeed] = useState<number>(1);
+  const [beatProgress, setBeatProgress] = useState(0);
+  // Captions are off by default so they do not duplicate the dialogue for a
+  // hearing viewer.
+  const [captions, setCaptions] = useState(false);
 
   const currentTurn = turns[currentIdx];
   const segments = useMemo(() => segmentsOf(currentTurn), [currentTurn]);
@@ -134,6 +141,36 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
 
   const hasAudio = anySegmentHasAudio(segments);
   const voiceEnabled = hasAudio;
+
+  const reducedMotion = useMemo(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    []
+  );
+
+  // The stage's Ken Burns drifts over the beat, so progress is sampled while the
+  // beat plays. Reduced motion, a paused theatre, and a beat with no image all
+  // leave the stage still.
+  useEffect(() => {
+    if (!isOpen || !isPlaying || reducedMotion || !backgroundURL) {
+      setBeatProgress(0);
+      return;
+    }
+    const baseMs =
+      active?.duration && active.duration > 0 ? active.duration * 1000 : readingDurationMs(active?.text ?? '');
+    const spanMs = Math.max(400, baseMs / (speed > 0 ? speed : 1));
+    const started = performance.now();
+    let frame = 0;
+    const tick = () => {
+      const value = Math.min(1, (performance.now() - started) / spanMs);
+      setBeatProgress(value);
+      if (value < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, isPlaying, reducedMotion, backgroundURL, active, speed]);
 
   const browser = useSegmentPlayback(segments, {
     autoPlay: isPlaying && !serverPlayback && voiceEnabled,
@@ -325,6 +362,11 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
         npcLabel={npcLabel}
         playerActive={playerActive}
         npcActive={npcActive}
+        progress={beatProgress}
+        seed={currentTurn?.turn_number ?? 0}
+        outcome={currentTurn?.outcome}
+        weather={weather}
+        reducedMotion={reducedMotion}
       />
 
       <header className="absolute top-0 inset-x-0 z-20 px-6 py-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
@@ -360,6 +402,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
           onEntityClick={onEntityClick}
           displayMode={displayMode}
           noAudio={beatNoAudio}
+          caption={captions}
           onAdvance={advanceDialogue}
         />
         <TheaterTransport
@@ -370,6 +413,8 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
           audioState={beatState}
           audioMessage={beatStatus?.message}
           blocked={browser.blocked && !browser.playing}
+          captions={captions}
+          onToggleCaptions={() => setCaptions((value) => !value)}
           onToggle={togglePlay}
           onPrev={() => stepSegment(-1)}
           onNext={() => stepSegment(1)}

@@ -257,6 +257,7 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 				Text:       segment.Text,
 				ArtPath:    art,
 				Player:     segment.Player,
+				Outcome:    turn.Outcome,
 			}
 
 			if opts.Audio {
@@ -318,6 +319,15 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 		script.TotalDuration += sc.Duration
 	}
 
+	// Chapters are the scenes as navigable boundaries: the title from the location
+	// and the start from the running total, so the web and the video agree on where
+	// a scene begins.
+	start := time.Duration(0)
+	for _, sc := range script.Scenes {
+		script.Chapters = append(script.Chapters, Chapter{Title: chapterTitle(sc), Start: start})
+		start += sc.Duration
+	}
+
 	// What the script can actually say, split by kind: a bundle whose characters are silent
 	// looks the same as one whose narration is, unless the export says which.
 	coverage := coverageReport(spoken, withAudio, byKind)
@@ -341,6 +351,31 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 	return script, nil
 }
 
+// chapterTitle names a scene's chapter: its location, or a neutral fallback for
+// an unlocated scene, which has no place name to borrow.
+func chapterTitle(sc Scene) string {
+	if title := strings.TrimSpace(sc.LocationName); title != "" {
+		return title
+	}
+	return "Scene"
+}
+
+// stateString reads a string field from an entity's state, or empty when it is
+// absent or not a string.
+func stateString(ent *entity.Entity, key string) string {
+	if ent == nil || ent.State == nil {
+		return ""
+	}
+	raw, ok := ent.State.Get(key)
+	if !ok {
+		return ""
+	}
+	if value, ok := raw.(string); ok {
+		return value
+	}
+	return ""
+}
+
 // openScene builds a scene, resolving its art once so a long conversation reuses
 // one image.
 func (c *Compiler) openScene(locationID string, opts Options) Scene {
@@ -353,6 +388,7 @@ func (c *Compiler) openScene(locationID string, opts Options) Scene {
 
 	if location, err := c.source.Location(locationID); err == nil && location != nil {
 		sc.LocationName = location.Name
+		sc.Weather = stateString(location, "weather")
 
 		if opts.Art && c.art != nil {
 			if art, err := c.art.SceneArt(context.Background(), location, false); err == nil {
