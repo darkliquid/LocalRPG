@@ -24,6 +24,7 @@
   "/api/reference-systems",
   "/api/registry/install",
   "/api/registry/search",
+  "/api/registry/sources",
   "/api/registry/updates",
   "/api/schema/",
   "/api/settings",
