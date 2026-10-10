@@ -171,9 +171,9 @@ ensure_option() { # <field> <name>
   if has_option "$field" "$name"; then printf "option '%s' already on %s\n" "$name" "$field"; return; fi
   while IFS= read -r opt; do
     [ -n "$opt" ] || continue
-    opts="$opts${opts:+, }{name:\"$opt\", color:$(palette "$i")}"; i=$((i+1))
+    opts="$opts${opts:+, }{name:\"$opt\", description:\"\", color:$(palette "$i")}"; i=$((i+1))
   done <<<"$(option_names "$field")"
-  opts="$opts${opts:+, }{name:\"$name\", color:$(palette "$i")}"
+  opts="$opts${opts:+, }{name:\"$name\", description:\"\", color:$(palette "$i")}"
   ghp api graphql -f query="mutation { updateProjectV2Field(input: { fieldId: \"$(field_id "$field")\", singleSelectOptions: [$opts] }) { projectV2Field { ... on ProjectV2SingleSelectField { id } } } }" >/dev/null
   printf "option '%s' added to %s\n" "$name" "$field"
   resolve
@@ -387,7 +387,8 @@ EOF
 
 cmd_add_wave() {
   [ $# -eq 2 ] || die "usage: add-wave <number> <title>"
-  local n="$1" title="$2" name="Wave $n - $title"
+  local n="$1" title="$2"
+  local name="Wave $n - $title"
   ensure_milestone "$name"
   ensure_option Wave "$name"
   ensure_label "wave/$n" 0e8a16 "Wave $n"
