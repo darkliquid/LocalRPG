@@ -15,7 +15,7 @@ import (
 )
 
 // bigPNG writes an opaque image larger than the display size.
-func bigPNG(t *testing.T, width, height int) string {
+func bigPNG(t testing.TB, width, height int) string {
 	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	for y := 0; y < height; y++ {

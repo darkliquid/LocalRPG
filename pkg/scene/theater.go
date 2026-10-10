@@ -56,7 +56,11 @@ func (r *Renderer) drawBackground(img *image.RGBA, req FrameRequest) {
 		return
 	}
 
-	if blend := crossfadeAlpha(req.Progress); blend < 1 && req.PreviousArt != "" {
+	share := CrossfadeShare
+	if req.SceneStart {
+		share = SceneCrossfadeShare
+	}
+	if blend := CrossfadeAlpha(req.Progress, share); blend < 1 && req.PreviousArt != "" {
 		if previous := r.art.cover(req.PreviousArt, r.width, r.height); previous != nil {
 			draw.Draw(bg, bg.Bounds(), previous, image.Point{}, draw.Src)
 			blendImage(bg, current, blend)

@@ -392,14 +392,16 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 						PreviousArt: previousArt,
 						Animate:     animate,
 						DisplayMode: v.displayMode,
+						SceneStart:  sceneStart,
 					})
 					lastImage = img
 					totals.imageFrames++
 				}
 
-				// A scene's opening crossfade blends two pictures, which is the
-				// most an inter frame has to carry, so it gets keyframes too.
-				crossfading := sceneStart && step.Progress < scene.CrossfadeShare
+				// A scene's opening crossfade blends two pictures over the longer
+				// scene transition, which is the most an inter frame has to carry, so
+				// it gets keyframes too.
+				crossfading := sceneStart && step.Progress < scene.SceneCrossfadeShare
 				if err := emit(img, step.Span, beatStart || crossfading); err != nil {
 					return totals, err
 				}

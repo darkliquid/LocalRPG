@@ -15,6 +15,10 @@ import (
 const (
 	// CrossfadeShare is the share of a scene's first beat spent blending in.
 	CrossfadeShare = 0.12
+	// SceneCrossfadeShare is the share of a scene's first beat spent blending in
+	// at a scene boundary: a longer, distinct transition, so a location change
+	// reads differently from a beat change.
+	SceneCrossfadeShare = 0.3
 )
 
 // baseColour matches the app and the player's background.
@@ -30,6 +34,9 @@ type FrameRequest struct {
 	PreviousArt string  // the outgoing scene's art, for the crossfade
 	Animate     bool
 	DisplayMode DisplayMode
+	// SceneStart marks the beat that opens a scene, so its crossfade is the longer
+	// scene transition rather than a beat change.
+	SceneStart bool
 }
 
 // Renderer draws the story theatre's own stage into video frames. Faces live as
@@ -133,10 +140,17 @@ func clamp01(v float64) float64 {
 // crossfadeAlpha is how opaque the incoming scene is: it rises across the first
 // share of a beat so a scene change reads as a transition, not a glitch.
 func crossfadeAlpha(progress float64) float64 {
-	if progress >= CrossfadeShare {
+	return CrossfadeAlpha(progress, CrossfadeShare)
+}
+
+// CrossfadeAlpha is how opaque the incoming scene is at a beat's progress, over
+// the given share of the beat. A scene boundary uses the longer
+// SceneCrossfadeShare, so a location change reads differently from a beat change.
+func CrossfadeAlpha(progress, share float64) float64 {
+	if share <= 0 || progress >= share {
 		return 1
 	}
-	return clamp01(progress / CrossfadeShare)
+	return clamp01(progress / share)
 }
 
 // revealText shows the share of text a beat has reached, so the video's
