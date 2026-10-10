@@ -97,3 +97,25 @@ describe('APIClient playback ledger and audio status', () => {
   });
 });
 
+describe('APIClient entity deletion', () => {
+  it('sends DELETE to the entity route', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new APIClient('game-1').deleteEntity('saltmarch');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/game/game-1/entity/saltmarch', { method: 'DELETE' });
+  });
+
+  it('throws the body as the message when the delete fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('delete entity saltmarch: file does not exist', { status: 404 }))
+    );
+
+    const err = await new APIClient('game-1').deleteEntity('saltmarch').catch((e: unknown) => e);
+
+    expect((err as Error).message).toMatch(/does not exist/);
+  });
+});
+

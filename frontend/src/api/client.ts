@@ -1309,6 +1309,11 @@ export class APIClient {
     }
   }
 
+  async deleteEntity(entityID: string): Promise<void> {
+    const res = await fetch(`/api/game/${this.gameID}/entity/${entityID}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error((await res.text()).trim() || `deleteEntity: ${res.statusText}`);
+  }
+
   async listFolders(): Promise<FolderNode[]> {
     const res = await fetch(`/api/game/${this.gameID}/folders`);
     if (!res.ok) throw new Error(`listFolders: ${res.statusText}`);
