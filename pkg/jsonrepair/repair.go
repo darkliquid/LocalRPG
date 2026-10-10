@@ -18,6 +18,9 @@ const (
 	KindTrim          Kind = "trim"
 	KindClose         Kind = "close"
 	KindTrailingComma Kind = "trailing_comma"
+	KindBOM           Kind = "bom"
+	KindEscapeControl Kind = "escape_control"
+	KindSmartQuote    Kind = "smart_quote"
 )
 
 // Result reports what a repair did. When OK is false, Payload holds the furthest
@@ -42,6 +45,12 @@ func Repair(payload []byte) Result {
 		return Result{Payload: payload, Kind: KindNone, OK: true}
 	}
 	cur := payload
+	if out, ok := stripBOM(cur); ok {
+		cur = out
+		if json.Valid(cur) {
+			return Result{Payload: cur, Kind: KindBOM, OK: true}
+		}
+	}
 	if out, ok := stripFence(cur); ok {
 		cur = out
 		if json.Valid(cur) {
@@ -66,7 +75,131 @@ func Repair(payload []byte) Result {
 			return Result{Payload: cur, Kind: KindTrailingComma, OK: true}
 		}
 	}
+	if out, ok := escapeStringControlChars(cur); ok {
+		cur = out
+		if json.Valid(cur) {
+			return Result{Payload: cur, Kind: KindEscapeControl, OK: true}
+		}
+	}
+	if out, ok := normalizeStructuralQuotes(cur); ok {
+		cur = out
+		if json.Valid(cur) {
+			return Result{Payload: cur, Kind: KindSmartQuote, OK: true}
+		}
+	}
 	return Result{Payload: cur}
+}
+
+// stripBOM removes a leading UTF-8 byte-order mark, which some models place
+// before the object.
+func stripBOM(b []byte) ([]byte, bool) {
+	if len(b) >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF {
+		return b[3:], true
+	}
+	return b, false
+}
+
+// escapeStringControlChars replaces raw control bytes inside string literals with
+// their JSON escapes, so a newline a model wrote inside a value becomes legal. It
+// never touches a byte outside a string.
+func escapeStringControlChars(b []byte) ([]byte, bool) {
+	const hexDigits = "0123456789abcdef"
+	out := make([]byte, 0, len(b))
+	inString := false
+	escaped := false
+	changed := false
+	for i := 0; i < len(b); i++ {
+		c := b[i]
+		if !inString {
+			if c == '"' {
+				inString = true
+			}
+			out = append(out, c)
+			continue
+		}
+		if escaped {
+			escaped = false
+			out = append(out, c)
+			continue
+		}
+		switch {
+		case c == '\\':
+			escaped = true
+			out = append(out, c)
+		case c == '"':
+			inString = false
+			out = append(out, c)
+		case c < 0x20:
+			changed = true
+			switch c {
+			case '\n':
+				out = append(out, '\\', 'n')
+			case '\r':
+				out = append(out, '\\', 'r')
+			case '\t':
+				out = append(out, '\\', 't')
+			default:
+				out = append(out, '\\', 'u', '0', '0', hexDigits[c>>4], hexDigits[c&0x0F])
+			}
+		default:
+			out = append(out, c)
+		}
+	}
+	return out, changed
+}
+
+// normalizeStructuralQuotes replaces a curly quote that sits where a JSON
+// delimiter belongs with a straight quote, and leaves one inside a value alone.
+func normalizeStructuralQuotes(b []byte) ([]byte, bool) {
+	out := make([]byte, 0, len(b))
+	changed := false
+	for i := 0; i < len(b); {
+		if b[i] == 0xE2 && i+2 < len(b) && b[i+1] == 0x80 && (b[i+2] == 0x9C || b[i+2] == 0x9D) {
+			if structuralQuotePosition(b, i) {
+				out = append(out, '"')
+				changed = true
+			} else {
+				out = append(out, b[i:i+3]...)
+			}
+			i += 3
+			continue
+		}
+		out = append(out, b[i])
+		i++
+	}
+	return out, changed
+}
+
+// structuralQuotePosition reports whether the quote at index i opens a value or
+// closes a key, which is where a curly quote stands in for a straight one.
+func structuralQuotePosition(b []byte, i int) bool {
+	prev := prevNonSpace(b, i)
+	next := nextNonSpace(b, i+3)
+	opensValue := prev == '{' || prev == ',' || prev == '['
+	closesKey := next == ':' || next == '}' || next == ']' || next == ','
+	return opensValue || closesKey
+}
+
+// prevNonSpace returns the byte before index i, skipping insignificant
+// whitespace, or 0 when none remains.
+func prevNonSpace(b []byte, i int) byte {
+	for j := i - 1; j >= 0; j-- {
+		if b[j] != ' ' && b[j] != '\n' && b[j] != '\t' && b[j] != '\r' {
+			return b[j]
+		}
+	}
+	return 0
+}
+
+// nextNonSpace returns the byte at index i, skipping insignificant whitespace,
+// or 0 when none remains.
+func nextNonSpace(b []byte, i int) byte {
+	for j := i; j < len(b); j++ {
+		if b[j] != ' ' && b[j] != '\n' && b[j] != '\t' && b[j] != '\r' {
+			return b[j]
+		}
+	}
+	return 0
 }
 
 // stripFence removes one Markdown code fence around the payload.
