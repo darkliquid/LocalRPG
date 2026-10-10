@@ -38,6 +38,8 @@ export interface Story {
   player_portrait?: string;
   // player_name labels the protagonist's portrait, as the theatre's does.
   player_name?: string;
+  // captions is the story's WebVTT subtitle track, carried in the bundle.
+  captions?: string;
   scenes: StoryScene[];
 }
 

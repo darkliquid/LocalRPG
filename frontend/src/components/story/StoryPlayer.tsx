@@ -39,6 +39,10 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
   const [reveal, setReveal] = useState(1);
   // beatProgress drives the stage's Ken Burns, and runs over the whole beat.
   const [beatProgress, setBeatProgress] = useState(0);
+  // Captions are off by default; the track is only offered when the bundle
+  // carries one.
+  const hasCaptions = !!story.captions;
+  const [captions, setCaptions] = useState(false);
   // Clips the browser would not play. A player cannot fix a clip the browser refuses, but
   // it can say so instead of leaving a line silently missing.
   const [unplayable, setUnplayable] = useState(0);
@@ -231,6 +235,7 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
             isPlayer={isPlayer}
             displayMode={story.display_mode}
             reveal={reveal}
+            caption={captions}
             onAdvance={next}
           />
         )}
@@ -241,6 +246,8 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
           speed={speed}
           audioState="idle"
           labels={{ prev: 'Previous line', next: 'Next line' }}
+          captions={captions}
+          onToggleCaptions={hasCaptions ? () => setCaptions((value) => !value) : undefined}
           onToggle={togglePlay}
           onPrev={prev}
           onNext={next}

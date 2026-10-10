@@ -12,6 +12,10 @@ interface TheaterTransportProps {
   // labels name what prev and next step through: a turn in the app, a scene in an
   // exported bundle.
   labels?: { prev?: string; next?: string };
+  // captions is the current caption preference, and onToggleCaptions turns it on
+  // or off. Omit the handler to hide the control.
+  captions?: boolean;
+  onToggleCaptions?: () => void;
   onToggle: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -31,6 +35,8 @@ export const TheaterTransport: React.FC<TheaterTransportProps> = ({
   audioMessage,
   blocked = false,
   labels,
+  captions = false,
+  onToggleCaptions,
   onToggle,
   onPrev,
   onNext,
@@ -80,6 +86,23 @@ export const TheaterTransport: React.FC<TheaterTransportProps> = ({
         >
           {speed}x
         </button>
+
+        {onToggleCaptions && (
+          <button
+            onClick={onToggleCaptions}
+            data-transport="captions"
+            aria-pressed={captions}
+            className={`px-3 py-1 rounded-lg border text-xs font-sans font-bold cursor-pointer ${
+              captions
+                ? 'bg-purple-600 text-white border-purple-300/60'
+                : 'bg-stone-900/80 border-white/10 text-purple-300 hover:bg-stone-800'
+            }`}
+            title={captions ? 'Hide captions' : 'Show captions'}
+            aria-label={captions ? 'Hide captions' : 'Show captions'}
+          >
+            CC
+          </button>
+        )}
 
         {generating && (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-900/50 border border-purple-500/40 text-purple-300 text-xs">

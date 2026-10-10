@@ -79,6 +79,9 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   const [isPlaying, setIsPlaying] = useState(true);
   const [speed, setSpeed] = useState<number>(1);
   const [beatProgress, setBeatProgress] = useState(0);
+  // Captions are off by default so they do not duplicate the dialogue for a
+  // hearing viewer.
+  const [captions, setCaptions] = useState(false);
 
   const currentTurn = turns[currentIdx];
   const segments = useMemo(() => segmentsOf(currentTurn), [currentTurn]);
@@ -399,6 +402,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
           onEntityClick={onEntityClick}
           displayMode={displayMode}
           noAudio={beatNoAudio}
+          caption={captions}
           onAdvance={advanceDialogue}
         />
         <TheaterTransport
@@ -409,6 +413,8 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
           audioState={beatState}
           audioMessage={beatStatus?.message}
           blocked={browser.blocked && !browser.playing}
+          captions={captions}
+          onToggleCaptions={() => setCaptions((value) => !value)}
           onToggle={togglePlay}
           onPrev={() => stepSegment(-1)}
           onNext={() => stepSegment(1)}
