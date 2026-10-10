@@ -433,3 +433,36 @@ func TestGitRegistryScheme(t *testing.T) {
 		t.Fatalf("expected git_world package, got: %+v", indexes[0].Packages)
 	}
 }
+
+func TestSourcesReportsEachRegistryWithItsError(t *testing.T) {
+	good := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"name":"Reachable","packages":[{"type":"world","id":"frontier","name":"Frontier","version":"1.0.0","download":"https://example.org/f.lrpgpack","sha256":"abc"}]}`))
+	}))
+	defer good.Close()
+
+	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer bad.Close()
+
+	client := NewClient(config.RegistriesConfig{URLs: []string{good.URL, bad.URL}}, t.TempDir())
+	client.SetHTTPClient(good.Client())
+
+	sources := client.Sources(context.Background())
+	if len(sources) != 2 {
+		t.Fatalf("len(sources) = %d, want 2", len(sources))
+	}
+
+	byURL := map[string]SourceStatus{}
+	for _, source := range sources {
+		byURL[source.URL] = source
+	}
+
+	if got := byURL[good.URL]; got.Name != "Reachable" || got.PackageCount != 1 || got.Error != "" {
+		t.Errorf("reachable source = %+v", got)
+	}
+	if got := byURL[bad.URL]; got.Error == "" {
+		t.Errorf("unreachable source should carry an error, got %+v", got)
+	}
+}

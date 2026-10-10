@@ -312,6 +312,8 @@ localrpg registry update
 
 Registry URLs live under the `registries.urls` configuration key, and LocalRPG checks every installed package against the checksum its index declares.
 
+The app's Content Registry view reads the same list. Open it from the launcher and expand **Sources** to see each configured index, the packages it offers, and whether it could be reached, or to add and remove a source. With no sources configured, the view says so, and an empty search browses every package rather than reporting a query that was never typed.
+
 ## 6. The Edit-Outside Workflow
 
 1. Edit any file in `systems/`, `worlds/`, or `games/` in your editor of choice, and save it.

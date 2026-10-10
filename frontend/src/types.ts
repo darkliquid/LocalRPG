@@ -1824,4 +1824,11 @@ export interface PackageRefDTO {
   package: RegistryPackageDTO;
 }
 
+export interface RegistrySourceDTO {
+  url: string;
+  name?: string;
+  package_count: number;
+  error?: string;
+}
+
 

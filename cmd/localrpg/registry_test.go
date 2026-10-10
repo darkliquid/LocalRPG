@@ -204,3 +204,22 @@ func TestRegistryInstallCLI(t *testing.T) {
 		t.Fatalf("expected installed file %s to exist: %v", installedPath, err)
 	}
 }
+
+func TestRegistryAddRejectsInvalidURL(t *testing.T) {
+	cfgDir := t.TempDir()
+	t.Setenv("LOCALRPG_CONFIG_DIR", cfgDir)
+
+	var stdout, stderr bytes.Buffer
+	if code := runRegistryCommand([]string{"add", "ftp://example.org"}, &stdout, &stderr); code == 0 {
+		t.Fatal("registry add accepted an invalid URL")
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := runRegistryCommand([]string{"list"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("registry list failed: %d", code)
+	}
+	if !strings.Contains(stdout.String(), "No registries configured") {
+		t.Fatalf("an invalid URL must not be stored, got: %s", stdout.String())
+	}
+}

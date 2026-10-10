@@ -115,6 +115,34 @@ func (c *Client) Registries(ctx context.Context) ([]Registry, error) {
 	return results, nil
 }
 
+// SourceStatus reports one configured registry's fetch state. Unlike Registries,
+// which drops a source that will not load, this keeps it so a caller can say why
+// a registry shows nothing.
+type SourceStatus struct {
+	URL          string `json:"url"`
+	Name         string `json:"name,omitempty"`
+	PackageCount int    `json:"package_count"`
+	Error        string `json:"error,omitempty"`
+}
+
+// Sources reports the fetch state of every configured registry in configuration
+// order, including the error for one that would not load.
+func (c *Client) Sources(ctx context.Context) []SourceStatus {
+	out := make([]SourceStatus, 0, len(c.cfg.URLs))
+	for _, rawURL := range c.cfg.URLs {
+		status := SourceStatus{URL: rawURL}
+		idx, err := c.fetchOrCachedIndex(ctx, rawURL)
+		if err != nil {
+			status.Error = err.Error()
+		} else {
+			status.Name = idx.Name
+			status.PackageCount = len(idx.Packages)
+		}
+		out = append(out, status)
+	}
+	return out
+}
+
 // Indexes returns the parsed indexes from all configured registries.
 // It caches indexes on disk and falls back to the cache if a registry is unreachable.
 func (c *Client) Indexes(ctx context.Context) ([]Index, error) {
