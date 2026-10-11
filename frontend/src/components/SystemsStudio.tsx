@@ -14,6 +14,8 @@ import { BaseSystemCatalogue } from './BaseSystemCatalogue';
 import { MarkdownDocViewer } from './MarkdownDocViewer';
 import { ScriptReference } from './mechanics/ScriptReference';
 import { ScenarioEditor } from './ScenarioEditor';
+import { HelpTip } from './ui/HelpTip';
+import { Example } from './ui/Example';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
 
@@ -1026,6 +1028,16 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                     Character Creation Prompts
                   </span>
                   <span className="text-xs font-mono text-stone-500">({creationFields.length})</span>
+                  <HelpTip label="Character Creation Prompts">
+                    <>
+                      Each prompt a player answers when starting with this system. The id is the key the
+                      campaign records, the label is shown to the player, and the prompt guides the AI
+                      generator. The kind decides how the answer is collected: text and long are written
+                      answers, number is a number, select offers the options you list, and voice picks a
+                      voice profile. A voice field is never required and is never generated. Generatable
+                      marks a field the AI may fill.
+                    </>
+                  </HelpTip>
                 </div>
                 <button
                   type="button"
@@ -1050,6 +1062,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                 onChange={(e) => { setCreationPreamble(e.target.value); markDirty(); }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-xs text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
               />
+
+              <Example label="A select prompt">
+                {`character_creation:\n  preamble: Answer in the tone of a wandering chronicle.\n  fields:\n    - id: calling\n      label: Calling\n      kind: select\n      prompt: The character's trade or vocation.\n      required: true\n      options: [sellsword, scholar, thief, priest]\n      default: scholar`}
+              </Example>
 
               {creationFields.length === 0 ? (
                 <p className="text-xs text-stone-500">
@@ -1097,6 +1113,37 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                         }}
                         className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
                       />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Default value (optional)"
+                          value={field.default || ''}
+                          onChange={(e) => {
+                            const updated = [...creationFields];
+                            updated[index] = { ...updated[index], default: e.target.value };
+                            setCreationFields(updated);
+                            markDirty();
+                          }}
+                          className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
+                        />
+                        {field.kind === 'select' && (
+                          <input
+                            type="text"
+                            placeholder="Options, comma-separated"
+                            value={(field.options ?? []).join(', ')}
+                            onChange={(e) => {
+                              const updated = [...creationFields];
+                              updated[index] = {
+                                ...updated[index],
+                                options: e.target.value.split(',').map((value) => value.trim()).filter(Boolean),
+                              };
+                              setCreationFields(updated);
+                              markDirty();
+                            }}
+                            className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
+                          />
+                        )}
+                      </div>
                       <div className="flex flex-wrap items-center gap-3 text-xs text-stone-400">
                         <select
                           value={field.kind || 'text'}
