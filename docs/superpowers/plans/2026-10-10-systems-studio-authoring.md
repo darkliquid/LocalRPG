@@ -86,10 +86,32 @@
 - [x] **Step 4: Run it to verify it passes.**
 - [x] **Step 5: Commit.**
 
-## Deferred to a later pass on this proposal
+### Task 6: The campaign form renders the authored fields (spec §4.5)
 
-- **Spec §4.5, rendering the authored fields in the campaign form.** The editor now collects `options` and `default`, but `NewCampaignModal` still hard-codes its six fields, so a `select` has nothing to render into yet. Making `kind` drive the campaign form is the remaining piece.
-- **Spec §4.2, examples on the remaining sections.** Attached to stats and checks; skills, health, advancement, and policy could carry one too.
+**Files:**
+- Modify: `frontend/src/components/launcher/NewCampaignModal.tsx`
+- Test: `frontend/src/components/launcher/NewCampaignModal.test.tsx`
+
+- [x] **Step 1: Write the failing test** that a system-authored `select` renders with its options and its answer lands in the player's `extra`.
+- [x] **Step 2: Run it to verify it fails.**
+- [x] **Step 3: Implement** the field fetch on system change, per-kind rendering with `default` seeding and the AI button on a generatable field, and the `extra` payload.
+- [x] **Step 4: Run it to verify it passes**, plus `npx vitest run` and `npx tsc --noEmit`.
+- [x] **Step 5: Commit.**
+
+### Task 7: Examples on the remaining mechanics sections (spec §4.2)
+
+**Files:**
+- Modify: `frontend/src/components/MechanicsEditor.tsx`, `MechanicsEditor.test.tsx`
+
+- [x] **Step 1: Write the failing test** that the checks section carries its worked example.
+- [x] **Step 2: Run it to verify it fails.**
+- [x] **Step 3: Implement** examples on skills, health, advancement, and policy, so all six sections carry one.
+- [x] **Step 4: Run it to verify it passes.**
+- [x] **Step 5: Commit.**
+
+## Complete
+
+Every section of the spec is implemented: §4.1 one base-system entry point, §4.2 examples and the missing profile fields, §4.3 per-entry sandbox examples, §4.4 the Tests tab, and §4.5 the creation prompts and their rendering in the campaign form.
 
 ## Verification
 
