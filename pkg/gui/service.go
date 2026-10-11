@@ -2717,6 +2717,7 @@ func (s *Service) GenerateTurnSceneImage(ctx context.Context, gameID string, tur
 		Action:    turn.Input,
 		Location:  turn.Location,
 		Style:     s.worldArtStyle(gameID),
+		Cast:      engine.SceneCast(store, turn),
 	}
 	if locEntity != nil {
 		sceneCtx.Location = locEntity.Name

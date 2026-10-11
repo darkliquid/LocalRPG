@@ -51,7 +51,7 @@ func TestPromptWithoutASceneIsUnchanged(t *testing.T) {
 		Action:    "step through",
 		Location:  "The Hall",
 		Style:     "oil painting",
-		Entities:  []string{"Kaelen"},
+		Cast:      []SceneCastMember{{Name: "Kaelen"}},
 		Outcome:   "strong",
 		Narration: "The door swings wide.",
 	}
