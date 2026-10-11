@@ -50,10 +50,22 @@
 - [x] **Step 4: Run it to verify it passes**, plus `npx tsc --noEmit`.
 - [x] **Step 5: Commit.**
 
-## Deferred to a second pass on this proposal
+### Task 3: The Tests tab (spec §4.4)
+
+**Files:**
+- Modify: `pkg/systemtest/scenario.go`, `pkg/gui/service.go`, `pkg/gui/server.go`
+- Create: `pkg/gui/system_scenario_test.go`, `frontend/src/components/ScenarioEditor.tsx`, `ScenarioEditor.test.tsx`
+- Modify: `frontend/src/components/SystemsStudio.tsx`, `frontend/src/api/client.ts`, `frontend/src/types.ts`, `pkg/gui/docs/09-systems-studio.md`, `pkg/gui/docs/22-editing-content.md`
+
+- [x] **Step 1: Write the failing tests** for `SaveSystemScenario` (round-trip, reject step-less), `DeleteSystemScenario` (removes, `fs.ErrNotExist`), the route dispatch, and the editor's save/disable behaviour.
+- [x] **Step 2: Run them to verify they fail.**
+- [x] **Step 3: Implement** `systemtest.EncodeScenario`, the two service methods, the `POST`/`DELETE` route branches, the client methods, and the Tests tab with a structured editor.
+- [x] **Step 4: Run them to verify they pass**, plus `npx vitest run` and `npx tsc --noEmit`.
+- [x] **Step 5: Commit.**
+
+## Deferred to a later pass on this proposal
 
 - **Spec §4.2, mechanics form examples.** An `Example` primitive beside the existing `HelpTip`, attached to the stats, skills, health, checks, and advancement sections, plus exposing the backend's `opposed`/`ties` profile fields, which the frontend type omits.
-- **Spec §4.4, the Tests tab.** Scenario CRUD (`SaveSystemScenario`/`DeleteSystemScenario` plus the route branches) and a structured `ScenarioEditor` over `systemtest.Scenario`, with a count and an empty state.
 - **Spec §4.5, character creation prompts.** `options`/`default` editors, per-kind help, and rendering the authored fields in the campaign form.
 
 ## Verification
