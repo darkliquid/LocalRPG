@@ -14,14 +14,20 @@ type ArtStore struct {
 	pipeline       *ImagePipeline
 	worldStyle     string
 	providerParams string
+	// layerCurrent decides whether a place's own picture follows the look play has
+	// given it, or stays the authored reference. It selects one text for both the
+	// prompt and the cache key.
+	layerCurrent bool
 }
 
-// NewArtStore builds a resolver for one campaign's art settings.
-func NewArtStore(client ImageClient, cache *ContentCache, worldStyle, providerParams string) *ArtStore {
+// NewArtStore builds a resolver for one campaign's art settings. layerCurrent adds
+// the current appearance to the authored one.
+func NewArtStore(client ImageClient, cache *ContentCache, worldStyle, providerParams string, layerCurrent bool) *ArtStore {
 	return &ArtStore{
 		pipeline:       NewImagePipeline(client, cache),
 		worldStyle:     worldStyle,
 		providerParams: providerParams,
+		layerCurrent:   layerCurrent,
 	}
 }
 
@@ -32,7 +38,7 @@ func (s *ArtStore) SceneLayers(location *entity.Entity) (LayeredScene, bool) {
 	if s == nil || s.pipeline == nil {
 		return LayeredScene{}, false
 	}
-	return s.pipeline.LocationLayers(location, s.worldStyle, s.providerParams)
+	return s.pipeline.LocationLayers(location, s.worldStyle, s.providerParams, s.layerCurrent)
 }
 
 // SceneArt returns a location's image path, generating it when the appearance has
@@ -45,7 +51,7 @@ func (s *ArtStore) SceneArt(ctx context.Context, location *entity.Entity, force 
 		return "", fmt.Errorf("scene art for %q: %w", location.ID, err)
 	}
 
-	path, err := s.pipeline.GenerateLocationImage(ctx, location, s.worldStyle, s.providerParams, force)
+	path, err := s.pipeline.GenerateLocationImage(ctx, location, s.worldStyle, s.providerParams, force, s.layerCurrent)
 	if err != nil {
 		return "", fmt.Errorf("scene art for %q: %w", location.ID, err)
 	}

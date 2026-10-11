@@ -3004,7 +3004,8 @@ func (s *Service) sceneArtResolver(gameID string) *media.ArtStore {
 		return nil
 	}
 	params := sceneCfg.Type + ":" + sceneCfg.Model
-	return media.NewArtStore(client, media.NewContentCache(s.resolver.CacheDir()), s.worldArtStyle(gameID), params)
+	layerCurrent := s.configMgr.Get().LocationArtAppearance() != config.LocationArtAppearanceOriginal
+	return media.NewArtStore(client, media.NewContentCache(s.resolver.CacheDir()), s.worldArtStyle(gameID), params, layerCurrent)
 }
 
 // scanAndEnrichCharacters scans a campaign's character entities, enriching missing attributes and generating portraits.

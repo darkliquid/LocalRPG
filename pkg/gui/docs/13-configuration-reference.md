@@ -161,6 +161,7 @@ choose; the ledger and provider identifiers are listed in the
 | `media.image.auto_generate` | bool |
 | `media.image.builtin_fallback` | bool |
 | `media.image.trigger` | string |
+| `media.image.location_art_appearance` | string |
 | `media.image.aspect_ratio` | string |
 | `media.image.person_generation` | string |
 | `media.image.instance` | string |

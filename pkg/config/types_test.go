@@ -655,3 +655,20 @@ func TestInstanceRoundTrips(t *testing.T) {
 		t.Fatalf("instance = %q", cfg.Agents.Roles["gm"].Instance)
 	}
 }
+
+func TestLocationArtAppearanceDefaultsToLayering(t *testing.T) {
+	cfg := &Config{}
+	if got := cfg.LocationArtAppearance(); got != LocationArtAppearanceLayered {
+		t.Errorf("LocationArtAppearance = %q, want %q", got, LocationArtAppearanceLayered)
+	}
+
+	cfg.Media.Image.LocationArtAppearance = LocationArtAppearanceOriginal
+	if got := cfg.LocationArtAppearance(); got != LocationArtAppearanceOriginal {
+		t.Errorf("LocationArtAppearance = %q, want %q", got, LocationArtAppearanceOriginal)
+	}
+
+	cfg.Media.Image.LocationArtAppearance = "nonsense"
+	if got := cfg.LocationArtAppearance(); got != LocationArtAppearanceLayered {
+		t.Errorf("an unknown value = %q, want the default", got)
+	}
+}

@@ -256,6 +256,12 @@ type ImageConfig struct {
 	// Trigger selects when a turn image is generated: off, scene_break,
 	// significant, every_turn, or manual. Empty means significant.
 	Trigger string `yaml:"trigger,omitempty" json:"trigger,omitempty"`
+	// LocationArtAppearance selects what a place's own picture is drawn from and
+	// keyed by: the authored appearance alone ("original"), or that appearance with
+	// the current one layered on it ("original_and_current", the default). It never
+	// puts the current appearance in place of the authored one; it decides whether
+	// the layer is added, so a campaign can keep a place's picture stable.
+	LocationArtAppearance string `yaml:"location_art_appearance,omitempty" json:"location_art_appearance,omitempty"`
 
 	AspectRatio      string `yaml:"aspect_ratio,omitempty" json:"aspect_ratio,omitempty"`
 	PersonGeneration string `yaml:"person_generation,omitempty" json:"person_generation,omitempty"`
@@ -467,6 +473,23 @@ func (c *Config) InteractiveRolls() string {
 		return "single-turn"
 	}
 	return "continuation"
+}
+
+// The two values LocationArtAppearance accepts. The layered value is the default,
+// because it is what a campaign saw before the option existed: a place's picture
+// followed the look play gave it.
+const (
+	LocationArtAppearanceOriginal = "original"
+	LocationArtAppearanceLayered  = "original_and_current"
+)
+
+// LocationArtAppearance resolves the location-art option, treating an empty or
+// unknown value as the layered default.
+func (c *Config) LocationArtAppearance() string {
+	if c != nil && c.Media.Image.LocationArtAppearance == LocationArtAppearanceOriginal {
+		return LocationArtAppearanceOriginal
+	}
+	return LocationArtAppearanceLayered
 }
 
 // ImageTrigger returns the resolved image-trigger policy, normalising an empty or
