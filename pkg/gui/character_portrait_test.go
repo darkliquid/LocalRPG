@@ -255,3 +255,38 @@ func TestProceduralPortraitReflectsTheEntity(t *testing.T) {
 		t.Fatal("two characters with different tags rendered the same portrait")
 	}
 }
+
+func TestGetCharacterPortraitEndpoint_UnknownIDReturnsPlaceholder(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewService(tmpDir)
+	setupFreeformSystem(t, svc)
+
+	game, err := svc.CreateGame(context.Background(), CreateGameRequestDTO{
+		Name:       "Test Portrait Game 3",
+		SystemID:   "freeform",
+		WorldID:    "harbour-realm",
+		PlayerName: "Hero Vance",
+		Player: PlayerCharacterDTO{
+			Appearance: "A tall adventurer.",
+			Age:        "30",
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateGame failed: %v", err)
+	}
+
+	server := NewServer(svc, nil)
+	req := httptest.NewRequest("GET", "/api/game/"+game.ID+"/character/no-such-note/portrait", nil)
+	w := httptest.NewRecorder()
+	server.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for an unknown id, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Header().Get("Content-Type"), "image/svg+xml") {
+		t.Errorf("expected image/svg+xml placeholder, got %s", w.Header().Get("Content-Type"))
+	}
+	if !strings.Contains(w.Body.String(), "<svg") {
+		t.Errorf("expected an SVG body, got %s", w.Body.String())
+	}
+}

@@ -688,31 +688,49 @@ export const App: React.FC = () => {
         // The server reports the completion over SSE, so the beat advances on a
         // real event rather than a status poll.
         const source = new EventSource('/api/audio/events');
-        const finish = () => {
+        let settled = false;
+        const settle = (entry: { state: TurnAudioState; message?: string }) => {
+          if (settled) return;
+          settled = true;
           source.close();
           delete audioPollingRef.current[pollKey];
-          setStatus({ state: 'idle' });
+          setStatus(entry);
         };
         source.onmessage = (evt) => {
           try {
-            const data = JSON.parse(evt.data) as { playing?: boolean; turn?: number; segment?: number };
-            if (data.playing !== false) return;
+            const data = JSON.parse(evt.data) as {
+              playing?: boolean;
+              turn?: number;
+              segment?: number;
+              error?: string;
+            };
             // Only the beat this subscription started advances, so a stale
             // completion from a replaced queue cannot skip the current line.
             if (data.turn !== turnNumber) return;
             if (segmentIndex !== undefined && data.segment !== segmentIndex) return;
-            finish();
+            // The server reports a real failure with a reason, so silence is never
+            // presented as a finished beat.
+            if (data.error) {
+              settle({ state: 'error', message: data.error });
+              return;
+            }
+            if (data.playing !== false) return;
+            settle({ state: 'idle' });
           } catch {
-            // A malformed event is ignored; the safety timeout still advances.
+            // A malformed event is ignored; the safety timeout still settles.
           }
         };
-        source.onerror = () => finish();
+        // A stream that errors before a completion is a failure, not a normal end.
+        source.onerror = () => settle({ state: 'error', message: 'The audio stream ended unexpectedly.' });
         // A completion event that never arrives must not stall the theatre, so a
-        // generous safety timeout ends the beat anyway.
-        const safety = setTimeout(finish, 60_000);
+        // generous safety timeout ends the beat, and says so.
+        const safety = setTimeout(
+          () => settle({ state: 'error', message: 'Audio timed out.' }),
+          60_000,
+        );
         audioPollingRef.current[pollKey] = () => {
           clearTimeout(safety);
-          finish();
+          settle({ state: 'idle' });
         };
       })
       .catch((err: unknown) => {
