@@ -326,7 +326,9 @@ func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity
 		}
 
 		ent := harness.MatchExistingEntity(t.store, &raw)
+		beforeAppearance := ""
 		if ent != nil {
+			beforeAppearance = ent.CurrentAppearance
 			ent = harness.MergeExtractedEntity(ent, &raw)
 		} else {
 			id := entity.Slugify(raw.Name)
@@ -346,6 +348,17 @@ func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity
 					Wikilinks: make([]string, 0),
 				}
 			}
+		}
+
+		// The appearance the merge replaced belongs to the turn, so an undo can put
+		// it back. Only a change is recorded, so a turn that left the note alone
+		// stays out of the log's way.
+		if ent.CurrentAppearance != beforeAppearance {
+			turn.CurrentAppearances = append(turn.CurrentAppearances, EntityAppearance{
+				EntityID: ent.ID,
+				Before:   beforeAppearance,
+				After:    ent.CurrentAppearance,
+			})
 		}
 
 		if entity.IsCharacterType(ent.Type) {
@@ -447,17 +460,26 @@ func (t *Timeline) RewindToTurn(target int) error {
 	}
 
 	affected := make(map[string]bool)
-	for _, turn := range turns {
-		if turn.Number <= target {
+	// The discarded turns say what they replaced. Walking them newest first, and
+	// each turn's own records last to first, leaves an entity that several of them
+	// changed on the value from before the oldest change.
+	restore := make(map[string]string)
+	for i := len(turns) - 1; i >= 0; i-- {
+		if turns[i].Number <= target {
 			continue
 		}
-		for _, mention := range turn.Entities {
+		for _, mention := range turns[i].Entities {
 			affected[mention.ID] = true
+		}
+		changes := turns[i].CurrentAppearances
+		for j := len(changes) - 1; j >= 0; j-- {
+			restore[changes[j].EntityID] = changes[j].Before
+			affected[changes[j].EntityID] = true
 		}
 	}
 
 	if len(affected) > 0 {
-		if err := t.pruneEntityHistory(affected, target); err != nil {
+		if err := t.undoDiscardedChanges(affected, restore, target); err != nil {
 			return err
 		}
 	}
@@ -477,7 +499,11 @@ func (t *Timeline) RewindToTurn(target int) error {
 	return nil
 }
 
-func (t *Timeline) pruneEntityHistory(affected map[string]bool, target int) error {
+// undoDiscardedChanges puts back what the discarded turns did to a note: it
+// restores the current appearance they replaced and prunes the turn numbers they
+// contributed. Only a field play owns is touched, so a baseline and everything
+// else authored stays as it is.
+func (t *Timeline) undoDiscardedChanges(affected map[string]bool, restore map[string]string, target int) error {
 	pending := make(map[string]*entity.Entity, len(affected))
 
 	for id := range affected {
@@ -486,16 +512,25 @@ func (t *Timeline) pruneEntityHistory(affected map[string]bool, target int) erro
 			continue
 		}
 
+		changed := false
+		if before, ok := restore[id]; ok && ent.CurrentAppearance != before {
+			ent.CurrentAppearance = before
+			changed = true
+		}
+
 		pruned := make([]int, 0, len(ent.History))
 		for _, number := range ent.History {
 			if number <= target {
 				pruned = append(pruned, number)
 			}
 		}
-		if len(pruned) == len(ent.History) {
+		if len(pruned) != len(ent.History) {
+			ent.History = pruned
+			changed = true
+		}
+		if !changed {
 			continue
 		}
-		ent.History = pruned
 		pending[id] = ent
 	}
 
