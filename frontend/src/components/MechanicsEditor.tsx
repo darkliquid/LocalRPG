@@ -2,6 +2,7 @@ import React from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { RowList } from './mechanics/RowList';
 import { HelpTip } from './ui/HelpTip';
+import { Example } from './ui/Example';
 import {
   MechanicsSpec,
   StatSpec,
@@ -40,16 +41,20 @@ const Field: React.FC<{ label: string; help?: React.ReactNode; children: React.R
   </label>
 );
 
-const Section: React.FC<{ title: string; help?: React.ReactNode; children: React.ReactNode }> = ({
-  title,
-  help,
-  children,
-}) => (
+const Section: React.FC<{
+  title: string;
+  help?: React.ReactNode;
+  example?: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ title, help, example, children }) => (
   <section className="rounded-xl border border-stone-800 bg-stone-900/40 p-3 space-y-3">
-    <h3 className="flex items-center gap-1.5 text-xs font-sans font-bold uppercase tracking-wider text-purple-300">
-      <span>{title}</span>
-      {help && <HelpTip label={title}>{help}</HelpTip>}
-    </h3>
+    <div className="space-y-1">
+      <h3 className="flex items-center gap-1.5 text-xs font-sans font-bold uppercase tracking-wider text-purple-300">
+        <span>{title}</span>
+        {help && <HelpTip label={title}>{help}</HelpTip>}
+      </h3>
+      {example && <Example>{example}</Example>}
+    </div>
     {children}
   </section>
 );
@@ -358,6 +363,12 @@ const ProfilesEditor: React.FC<{
                 </Field>
                 <Field label="Notation" help={<>Dice expression for this profile, such as 2d6 or 1d20. Empty falls back to the default notation.</>}>
                   <TextInput value={profile.notation ?? ''} onChange={(notation) => setProfile(name, { ...profile, notation })} />
+                </Field>
+                <Field label="Opposed stat" help={<>Name the stat the opponent rolls to make this profile a contest. Leave it empty for a check against a fixed difficulty.</>}>
+                  <TextInput value={profile.opposed ?? ''} onChange={(opposed) => setProfile(name, { ...profile, opposed })} />
+                </Field>
+                <Field label="Ties" help={<>What an equal result means, such as opponent or actor. Leave it empty to keep a tie with the actor.</>}>
+                  <TextInput value={profile.ties ?? ''} onChange={(ties) => setProfile(name, { ...profile, ties })} />
                 </Field>
               </div>
               <button type="button" aria-label={`remove profile ${name}`} onClick={() => remove(name)} className={removeButtonClass}>
@@ -675,6 +686,7 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
             health, and advancement all point at stats by id. Keep ids lower-case.
           </>
         }
+        example={`stats:\n  - { id: might, label: Might, type: number, default: 2, min: 0, max: 6 }\n  - { id: sanity, label: Sanity, type: number, default: 5 }`}
       >
         <StatsEditor stats={stats} onChange={(next) => patch({ stats: next })} />
       </Section>
@@ -709,6 +721,7 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
             strongest first. The engine stores these words verbatim and never invents semantics.
           </>
         }
+        example={`checks:\n  notation: "2d6+{modifier}"\n  outcome: [strong_hit, weak_hit, miss]\n  difficulty:\n    - { id: routine, label: Routine, target: 7 }\n  profiles:\n    standard:\n      shape: ladder\n      ladder:\n        - { min: 10, outcome: strong_hit }\n        - { min: 7, outcome: weak_hit }\n        - { min: 0, outcome: miss }`}
       >
         <ChecksEditor checks={mechanics.checks ?? {}} onChange={(checks) => patch({ checks })} />
       </Section>
