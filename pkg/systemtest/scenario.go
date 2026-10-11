@@ -70,3 +70,20 @@ func LoadScenario(data []byte) (Scenario, error) {
 	}
 	return s, nil
 }
+
+// EncodeScenario marshals a scenario to the YAML a tests/ file holds. It refuses
+// one that would not parse back as a scenario, so a save cannot store a file the
+// runner will later reject.
+func EncodeScenario(s Scenario) ([]byte, error) {
+	if len(s.Steps) == 0 {
+		return nil, fmt.Errorf("scenario %q has no steps", s.Name)
+	}
+	data, err := yaml.Marshal(s)
+	if err != nil {
+		return nil, fmt.Errorf("encode scenario: %w", err)
+	}
+	if _, err := LoadScenario(data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
