@@ -31,6 +31,7 @@ import {
   KOKORO_VOICE_PROFILES,
 } from '../lib/voiceProfiles';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
+import { useAdvanced } from '../hooks/useAdvanced';
 import { VoiceOptionsControl } from './VoiceOptionsControl';
 import { useTTSInspect } from '../hooks/useTTSInspect';
 import { VoiceCombobox } from './VoiceCombobox';
@@ -188,6 +189,17 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   // The provider catalogue feeds preset lists so a provider that publishes
   // presets is the source of truth; the built-in fallback covers the rest.
   const { byFamily, providers: catalogProviders } = useProviderCatalog(Boolean(config));
+
+  // "Show advanced settings" is a preference, not configuration: it decides how
+  // much of the studio is on screen, and persists across reloads.
+  const [advanced, setAdvanced] = useAdvanced();
+
+  // Turning the preference off has to leave the Advanced sub-tab, or the tab bar
+  // would offer nothing to return to.
+  const showAdvanced = (value: boolean) => {
+    setAdvanced(value);
+    if (!value) setAgentsTab((tab) => (tab === 'advanced' ? 'roles' : tab));
+  };
 
   // The tier vocabulary is data, not a hardcoded legend: collect the caveats the
   // catalogue actually sends, so the explanation cannot drift from the providers.
@@ -550,6 +562,18 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <label
+            className="flex items-center gap-2 text-xs font-sans text-stone-400 bg-stone-900 px-2.5 py-1 rounded-lg border border-stone-800 cursor-pointer"
+            title="Shows the limit sections and the Advanced sub-tab. Stored in this browser, so a desktop window and a browser tab keep their own setting."
+          >
+            <input
+              type="checkbox"
+              checked={advanced}
+              onChange={(e) => showAdvanced(e.target.checked)}
+              className="w-3.5 h-3.5 accent-purple-600 cursor-pointer"
+            />
+            <span>Show advanced settings</span>
+          </label>
           <span className="text-xs font-mono text-stone-400 bg-stone-900 px-2.5 py-1 rounded-lg border border-stone-800">
             {isOverride ? 'Workspace Override' : 'Global User Config'}: {activeFilePath}
           </span>
@@ -984,7 +1008,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             tabs={[
               { id: 'roles', label: 'Roles', icon: <Users className="w-3.5 h-3.5" /> },
               { id: 'routing', label: 'Routing', icon: <Layers className="w-3.5 h-3.5" /> },
-              { id: 'advanced', label: 'Advanced', icon: <Sliders className="w-3.5 h-3.5" /> },
+              ...(advanced
+                ? [{ id: 'advanced', label: 'Advanced', icon: <Sliders className="w-3.5 h-3.5" /> }]
+                : []),
             ]}
             active={agentsTab}
             onChange={(id) => setAgentsTab(id as 'roles' | 'routing' | 'advanced')}
@@ -1330,63 +1356,47 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                       />
                     </div>
 
-                    <div className="space-y-1.5 col-span-1 md:col-span-2">
-                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                        <span>Thinking / Reasoning Budget</span>
-                        <span className="font-mono text-purple-400">
-                          {currentRoleConfig.thinking_budget === undefined
-                            ? 'Default'
-                            : currentRoleConfig.thinking_budget === 0
-                            ? '0 (Disabled — Instant Narration)'
-                            : currentRoleConfig.thinking_budget === -1
-                            ? 'Dynamic (-1 — Model Decides)'
-                            : `${currentRoleConfig.thinking_budget} tokens`}
-                        </span>
-                      </label>
-                      <div className="flex gap-2">
-                        <select
-                          value={
-                            currentRoleConfig.thinking_budget === undefined
-                              ? 'default'
-                              : currentRoleConfig.thinking_budget === 0
-                              ? '0'
-                              : currentRoleConfig.thinking_budget === -1
-                              ? '-1'
-                              : 'custom'
-                          }
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            let budget: number | undefined;
-                            if (val === '0') budget = 0;
-                            else if (val === '-1') budget = -1;
-                            else if (val === 'custom') budget = 2048;
-                            else budget = undefined;
+                  </>
+                )}
+              </div>
 
-                            const updated = { ...currentRoleConfig, thinking_budget: budget };
-                            setConfig({
-                              ...config,
-                              agents: {
-                                ...config.agents,
-                                roles: { ...config.agents.roles, [selectedRole]: updated },
-                              },
-                            });
-                          }}
-                          className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
-                        >
-                          <option value="0">Disabled (0 — Instant Narration)</option>
-                          <option value="-1">Dynamic (-1 — Model Decides)</option>
-                          <option value="default">Model Default</option>
-                          <option value="custom">Custom Token Limit</option>
-                        </select>
-                        {(currentRoleConfig.thinking_budget ?? 0) > 0 && (
-                          <input
-                            type="number"
-                            min={128}
-                            step={256}
-                            value={currentRoleConfig.thinking_budget}
+              {currentRoleConfig.type !== 'disabled' && (
+                <AdvancedSection label="Advanced" defaultOpen={advanced}>
+                  {(currentRoleConfig.type === 'gemini' || (currentRoleConfig.type === 'builtin' && currentRoleConfig.builtin_name === 'gemini')) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5 col-span-1 md:col-span-2">
+                        <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
+                          <span>Thinking / Reasoning Budget</span>
+                          <span className="font-mono text-purple-400">
+                            {currentRoleConfig.thinking_budget === undefined
+                              ? 'Default'
+                              : currentRoleConfig.thinking_budget === 0
+                              ? '0 (Disabled — Instant Narration)'
+                              : currentRoleConfig.thinking_budget === -1
+                              ? 'Dynamic (-1 — Model Decides)'
+                              : `${currentRoleConfig.thinking_budget} tokens`}
+                          </span>
+                        </label>
+                        <div className="flex gap-2">
+                          <select
+                            value={
+                              currentRoleConfig.thinking_budget === undefined
+                                ? 'default'
+                                : currentRoleConfig.thinking_budget === 0
+                                ? '0'
+                                : currentRoleConfig.thinking_budget === -1
+                                ? '-1'
+                                : 'custom'
+                            }
                             onChange={(e) => {
-                              const budget = parseInt(e.target.value, 10);
-                              const updated = { ...currentRoleConfig, thinking_budget: isNaN(budget) ? 0 : budget };
+                              const val = e.target.value;
+                              let budget: number | undefined;
+                              if (val === '0') budget = 0;
+                              else if (val === '-1') budget = -1;
+                              else if (val === 'custom') budget = 2048;
+                              else budget = undefined;
+
+                              const updated = { ...currentRoleConfig, thinking_budget: budget };
                               setConfig({
                                 ...config,
                                 agents: {
@@ -1395,121 +1405,144 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                                 },
                               });
                             }}
-                            className="w-32 bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                          />
-                        )}
+                            className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
+                          >
+                            <option value="0">Disabled (0 — Instant Narration)</option>
+                            <option value="-1">Dynamic (-1 — Model Decides)</option>
+                            <option value="default">Model Default</option>
+                            <option value="custom">Custom Token Limit</option>
+                          </select>
+                          {(currentRoleConfig.thinking_budget ?? 0) > 0 && (
+                            <input
+                              type="number"
+                              min={128}
+                              step={256}
+                              value={currentRoleConfig.thinking_budget}
+                              onChange={(e) => {
+                                const budget = parseInt(e.target.value, 10);
+                                const updated = { ...currentRoleConfig, thinking_budget: isNaN(budget) ? 0 : budget };
+                                setConfig({
+                                  ...config,
+                                  agents: {
+                                    ...config.agents,
+                                    roles: { ...config.agents.roles, [selectedRole]: updated },
+                                  },
+                                });
+                              }}
+                              className="w-32 bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                            />
+                          )}
+                        </div>
+                        <p className="text-xs text-stone-500">
+                          Thinking tokens allow Gemini 2.5 to reason deeply before replying. Thought tokens are automatically filtered from the story chronicle.
+                        </p>
                       </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
+                          <span>Top-P</span>
+                          <span className="font-mono text-purple-400">{(currentRoleConfig.top_p ?? 0.95).toFixed(2)}</span>
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={currentRoleConfig.top_p ?? 0.95}
+                          onChange={(e) => {
+                            const top_p = parseFloat(e.target.value);
+                            const updated = { ...currentRoleConfig, top_p: isNaN(top_p) ? undefined : top_p };
+                            setConfig({
+                              ...config,
+                              agents: {
+                                ...config.agents,
+                                roles: { ...config.agents.roles, [selectedRole]: updated },
+                              },
+                            });
+                          }}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
+                          <span>Top-K</span>
+                          <span className="font-mono text-purple-400">{currentRoleConfig.top_k ?? 40}</span>
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          step={1}
+                          value={currentRoleConfig.top_k ?? 40}
+                          onChange={(e) => {
+                            const top_k = parseInt(e.target.value, 10);
+                            const updated = { ...currentRoleConfig, top_k: isNaN(top_k) ? undefined : top_k };
+                            setConfig({
+                              ...config,
+                              agents: {
+                                ...config.agents,
+                                roles: { ...config.agents.roles, [selectedRole]: updated },
+                              },
+                            });
+                          }}
+                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
+                        <span>Response Limit (max tokens)</span>
+                        <span className="font-mono text-purple-400">{currentRoleConfig.max_tokens ?? 1024}</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={64}
+                        step={64}
+                        value={currentRoleConfig.max_tokens ?? 1024}
+                        onChange={(e) => {
+                          const max_tokens = parseInt(e.target.value, 10);
+                          const updated = { ...currentRoleConfig, max_tokens: Number.isNaN(max_tokens) ? undefined : max_tokens };
+                          setConfig({
+                            ...config,
+                            agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
+                          });
+                        }}
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                      />
                       <p className="text-xs text-stone-500">
-                        Thinking tokens allow Gemini 2.5 to reason deeply before replying. Thought tokens are automatically filtered from the story chronicle.
+                        How long a single reply may be. Raise it for longer scenes; the reply is marked as cut off when it
+                        hits this.
                       </p>
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                        <span>Top-P</span>
-                        <span className="font-mono text-purple-400">{(currentRoleConfig.top_p ?? 0.95).toFixed(2)}</span>
+                        <span>Temperature</span>
+                        <span className="font-mono text-purple-400">{(currentRoleConfig.temperature ?? 0.7).toFixed(2)}</span>
                       </label>
                       <input
-                        type="number"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        value={currentRoleConfig.top_p ?? 0.95}
+                        type="range"
+                        min="0"
+                        max="1.5"
+                        step="0.05"
+                        value={currentRoleConfig.temperature ?? 0.7}
                         onChange={(e) => {
-                          const top_p = parseFloat(e.target.value);
-                          const updated = { ...currentRoleConfig, top_p: isNaN(top_p) ? undefined : top_p };
+                          const updated = { ...currentRoleConfig, temperature: parseFloat(e.target.value) };
                           setConfig({
                             ...config,
-                            agents: {
-                              ...config.agents,
-                              roles: { ...config.agents.roles, [selectedRole]: updated },
-                            },
+                            agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
                           });
                         }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
+                        className="w-full accent-purple-500"
                       />
+                      <p className="text-xs text-stone-500">Lower is steadier, which helps long-run continuity.</p>
                     </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                        <span>Top-K</span>
-                        <span className="font-mono text-purple-400">{currentRoleConfig.top_k ?? 40}</span>
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        step={1}
-                        value={currentRoleConfig.top_k ?? 40}
-                        onChange={(e) => {
-                          const top_k = parseInt(e.target.value, 10);
-                          const updated = { ...currentRoleConfig, top_k: isNaN(top_k) ? undefined : top_k };
-                          setConfig({
-                            ...config,
-                            agents: {
-                              ...config.agents,
-                              roles: { ...config.agents.roles, [selectedRole]: updated },
-                            },
-                          });
-                        }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {currentRoleConfig.type !== 'disabled' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                      <span>Response Limit (max tokens)</span>
-                      <span className="font-mono text-purple-400">{currentRoleConfig.max_tokens ?? 1024}</span>
-                    </label>
-                    <input
-                      type="number"
-                      min={64}
-                      step={64}
-                      value={currentRoleConfig.max_tokens ?? 1024}
-                      onChange={(e) => {
-                        const max_tokens = parseInt(e.target.value, 10);
-                        const updated = { ...currentRoleConfig, max_tokens: Number.isNaN(max_tokens) ? undefined : max_tokens };
-                        setConfig({
-                          ...config,
-                          agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
-                        });
-                      }}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                    />
-                    <p className="text-xs text-stone-500">
-                      How long a single reply may be. Raise it for longer scenes; the reply is marked as cut off when it
-                      hits this.
-                    </p>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                      <span>Temperature</span>
-                      <span className="font-mono text-purple-400">{(currentRoleConfig.temperature ?? 0.7).toFixed(2)}</span>
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1.5"
-                      step="0.05"
-                      value={currentRoleConfig.temperature ?? 0.7}
-                      onChange={(e) => {
-                        const updated = { ...currentRoleConfig, temperature: parseFloat(e.target.value) };
-                        setConfig({
-                          ...config,
-                          agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
-                        });
-                      }}
-                      className="w-full accent-purple-500"
-                    />
-                    <p className="text-xs text-stone-500">Lower is steadier, which helps long-run continuity.</p>
-                  </div>
-                </div>
+                </AdvancedSection>
               )}
 
               {currentRoleConfig.type !== 'inherit' && (
@@ -1596,7 +1629,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           {agentsTab === 'advanced' && (
           <>
           {/* Context budget and timing: what the narrator is sent, and how long it may take */}
-          <AdvancedSection label="Advanced">
+          <AdvancedSection label="Advanced" defaultOpen={advanced}>
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
               <Sliders className="w-4 h-4" />
@@ -1886,7 +1919,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           </div>
           </AdvancedSection>
 
-          <AdvancedSection label="Advanced">
+          <AdvancedSection label="Advanced" defaultOpen={advanced}>
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
               <Sparkles className="w-4 h-4" />

@@ -1,4 +1,4 @@
-import React, { useState, type ReactNode } from 'react';
+import React, { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface AdvancedSectionProps {
@@ -10,12 +10,19 @@ interface AdvancedSectionProps {
 // AdvancedSection keeps rarely-tuned settings out of the way until they are asked
 // for, so a dense panel leads with what most people set and the rest is one click
 // away. It is collapsed by default.
+//
+// defaultOpen also follows the studio's "show advanced settings" preference, so a
+// section re-syncs when that preference changes and stays user-toggleable after.
 export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
   label = 'Advanced',
   children,
   defaultOpen = false,
 }) => {
   const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    setOpen(defaultOpen);
+  }, [defaultOpen]);
 
   return (
     <div className="space-y-2">
