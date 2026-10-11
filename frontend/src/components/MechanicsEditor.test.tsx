@@ -72,4 +72,18 @@ describe('MechanicsEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: /help: difficulty class/i }));
     expect(screen.getByRole('tooltip')).toHaveTextContent(/at or above this number is a success/i);
   });
+
+  it('exposes the opposed stat and tie rule on a profile', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByText(/add profile/i));
+    expect(screen.getByText('Opposed stat')).toBeInTheDocument();
+    expect(screen.getByText('Ties')).toBeInTheDocument();
+  });
+
+  it('carries a worked example for the checks section', () => {
+    render(<Harness />);
+    const [, checksExample] = screen.getAllByText('Example');
+    fireEvent.click(checksExample);
+    expect(screen.getByText(/outcome: \[strong_hit, weak_hit, miss\]/)).toBeInTheDocument();
+  });
 });
