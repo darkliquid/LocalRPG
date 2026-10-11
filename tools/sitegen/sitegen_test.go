@@ -199,3 +199,38 @@ func TestSiteBackgroundUsesTheGenrePalette(t *testing.T) {
 		t.Fatal("the rendered page does not carry the palette")
 	}
 }
+
+func TestHomePageContentPillars(t *testing.T) {
+	renderer, err := newRenderer()
+	if err != nil {
+		t.Fatalf("newRenderer: %v", err)
+	}
+	page, err := renderer.render("home.html.tmpl", &pageData{
+		Root:        "",
+		Title:       "Home",
+		Description: "A local-first tabletop RPG client",
+		IsHome:      true,
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	html := string(page)
+
+	requiredPhrases := []string{
+		"AI-assisted generation",
+		"automated test scenarios",
+		"First-Class Local AI &amp; Embeddings",
+		"AI World Generation &amp; Living Lore",
+		"Custom Systems &amp; Scenario Testing",
+		"Dynamic Scene Art &amp; Style Packs",
+		"TTS Narration &amp; Voice Dictation",
+		"Story Theatre, Packages &amp; Export",
+	}
+
+	for _, phrase := range requiredPhrases {
+		if !strings.Contains(html, phrase) {
+			t.Errorf("rendered home page missing required phrase: %q", phrase)
+		}
+	}
+}
+
