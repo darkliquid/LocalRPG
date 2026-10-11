@@ -14,8 +14,9 @@ export interface BaseSystemCatalogueProps {
   busy?: boolean;
 }
 
-// BaseSystemCatalogue presents the reference systems as derivable bases. Clone
-// copies a base to edit by hand; Derive generates a variant from an instruction.
+// BaseSystemCatalogue presents the reference systems as starting points. Start
+// from this base copies one into a new system to edit by hand; Derive generates a
+// variant from an instruction.
 export const BaseSystemCatalogue: React.FC<BaseSystemCatalogueProps> = ({
   bases,
   onClone,
@@ -43,7 +44,7 @@ export const BaseSystemCatalogue: React.FC<BaseSystemCatalogueProps> = ({
                 className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 text-neutral-200 transition-colors"
               >
                 <Copy className="w-3.5 h-3.5" />
-                Clone
+                Start from this base
               </button>
               <button
                 type="button"
