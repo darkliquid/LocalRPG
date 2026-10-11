@@ -3,7 +3,6 @@ import { DebugPanel } from './DebugPanel';
 import { APIClient } from '../api/client';
 import { AppConfig, AgentRoleConfig, TestProviderResponse, VoiceProfile, ModelStatus, ProviderVoice, ProviderDescriptor, TTSConfig, STTConfig, ImageConfig, EmbeddingProviderConfig, EmbeddingsConfig, StylePacks } from '../types';
 import { ModelDownloadModal } from './ModelDownloadModal';
-import { EmbeddingProviderEditor } from './EmbeddingProviderEditor';
 import {
   Folder,
   Cpu,
@@ -24,7 +23,6 @@ import {
   Cloud,
   Coins,
   Layers,
-  BrainCircuit,
 } from 'lucide-react';
 import {
   DEFAULT_VOICE_PROFILES,
@@ -39,16 +37,14 @@ import { VoiceCatalogModal } from './VoiceCatalogModal';
 import { UsagePanel } from './UsagePanel';
 import { TTSBatchPanel } from './TTSBatchPanel';
 import { hasWebSpeechSupport } from '../lib/webSpeech';
-import { TierLegend, tierLabel } from './providers/TierBadge';
-import { ProviderManager, RoleListItem } from './ProviderManager';
-import { OfflinePreset } from './OfflinePreset';
+import { ProviderManager } from './ProviderManager';
+import { tierLabel } from './providers/TierBadge';
 import { mediaEntryValue, setMediaEntry } from '../lib/mediaProviders';
-import { AdvancedSection } from './ui/AdvancedSection';
 import { SubTabs } from './ui/SubTabs';
 import { PathsPanel } from './settings/PathsPanel';
 import { PreferencesPanel } from './settings/PreferencesPanel';
-import { ContextLimitsPanel } from './settings/ContextLimitsPanel';
-import { GenerationLimitsPanel } from './settings/GenerationLimitsPanel';
+import { ProvidersPanel } from './providers/ProvidersPanel';
+import { AgentsPanel } from './settings/AgentsPanel';
 
 interface SettingsStudioProps {
   isCompact?: boolean;
@@ -57,48 +53,10 @@ interface SettingsStudioProps {
   onOpenDocs?: (articleID?: string) => void;
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  gm: 'Game Master (GM / Storyteller)',
-  narrator: 'Atmospheric Narrator',
-  extractor: 'Entity Extractor (per-turn world state)',
-};
-
 // Long enough to expose cadence, pitch, and pacing differences between voice
 // profiles. Mirrors defaultTTSPreviewText on the server.
 const DEFAULT_TTS_PREVIEW_TEXT =
   'Local RPG can use a wide range of voices to bring life to your characters, NPCs, and story narration.';
-
-// Suggested Gemini models for narration. This is a fallback used before the
-// live catalogue is fetched, so the editor is never empty and offline.
-const GEMINI_AGENT_MODELS = [
-  'gemini-3.8-flash',
-  'gemini-3.7-flash',
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-3.1-flash-lite',
-  'gemini-3.1-pro-preview',
-  'gemini-3-flash-preview',
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
-  'gemini-2.5-flash-lite',
-  'gemma-4-31b-it',
-  'gemma-4-26b-it',
-  'gemma-4-12b-it',
-  'gemma-3-27b-it',
-];
-
-// narrationModels narrows a live Gemini catalogue to models that can actually
-// narrate a turn: text-out models, with image/audio/embedding variants dropped.
-const narrationModels = (models: { id: string; supported_actions?: string[] }[]): string[] =>
-  models
-    .filter((m) => {
-      const id = m.id.toLowerCase();
-      if (/(tts|image|embedding|aqa|imagen|veo|robotics|learnlm)/.test(id)) return false;
-      const actions = (m.supported_actions ?? []).join(' ').toLowerCase();
-      if (actions && !actions.includes('generatecontent')) return false;
-      return true;
-    })
-    .map((m) => m.id);
 
 // presetsToMap turns the catalogue's descriptors for one family into the
 // id-keyed shape the quick-load selects use, carrying each provider's tier and
@@ -121,31 +79,6 @@ const presetsToMap = <T,>(
   return map;
 };
 
-// A missing role falls back to inheriting gm for the extractor, which is what
-// makes extraction work out of the box without a second configuration step.
-const defaultRoleConfig = (role: string): AgentRoleConfig =>
-  role === 'extractor' ? { type: 'inherit', inherit_from: 'gm' } : { type: 'disabled' };
-
-// descriptorIDForRole maps a role's resolved adapter to its catalogue key, so
-// the LLM role list can reuse the same label and tier vocabulary as the media
-// families.
-const descriptorIDForRole = (role: AgentRoleConfig | undefined): string | undefined => {
-  if (!role) return undefined;
-  if (role.type === 'gemini') return 'llm:gemini';
-  if (role.type === 'http') return 'llm:openaichat';
-  if (role.type === 'cli') return 'llm:cli';
-  if (role.type === 'builtin' && role.builtin_name !== 'echo') return 'llm:narrative-oracle';
-  return undefined;
-};
-
-// roleKeyPresent reports whether a role's adapter has the key it needs, counting
-// the shared provider key as the role's own when it has no override.
-const roleKeyPresent = (role: AgentRoleConfig, providers: AppConfig['providers']): boolean => {
-  if (role.api_key) return true;
-  if (role.type === 'gemini') return Boolean(providers?.gemini?.api_key);
-  return false;
-};
-
 export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSaved, activeGameID, onOpenDocs }) => {
   const [config, setConfig] = useState<AppConfig | null>(null);
   // Web Speech runs in the browser, not the backend, so its availability is a
@@ -156,14 +89,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const [activeSubTab, setActiveSubTab] = useState<'paths' | 'providers' | 'agents' | 'media' | 'batch' | 'preferences' | 'usage' | 'debug'>('paths');
   // The Providers area splits into credentials, embeddings, and the offline preset,
   // so the tab leads with one job rather than all three.
-  const [providersTab, setProvidersTab] = useState<'cloud' | 'embeddings' | 'offline'>('cloud');
   // Each media engine has a form of its own, so the tab shows one engine at a
   // time rather than stacking three long editors in one column.
   const [mediaTab, setMediaTab] = useState<'tts' | 'stt' | 'images'>('tts');
-  // The agents area splits each role's own settings from the routing list that
-  // pairs roles with adapters, and from the context, timing, and generation
-  // limits that most people never tune.
-  const [agentsTab, setAgentsTab] = useState<'roles' | 'routing' | 'advanced'>('roles');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -194,17 +122,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   // presets is the source of truth; the built-in fallback covers the rest.
   const { byFamily, providers: catalogProviders } = useProviderCatalog(Boolean(config));
 
-  // "Show advanced settings" is a preference, not configuration: it decides how
-  // much of the studio is on screen, and persists across reloads.
-  const [advanced, setAdvanced] = useAdvanced();
-
-  // Turning the preference off has to leave the Advanced sub-tab, or the tab bar
-  // would offer nothing to return to.
-  const showAdvanced = (value: boolean) => {
-    setAdvanced(value);
-    if (!value) setAgentsTab((tab) => (tab === 'advanced' ? 'roles' : tab));
-  };
-
   // The tier vocabulary is data, not a hardcoded legend: collect the caveats the
   // catalogue actually sends, so the explanation cannot drift from the providers.
   const tierCaveats = useMemo(() => {
@@ -215,16 +132,14 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     return map;
   }, [catalogProviders]);
 
-  // Selected agent role for editing
-  const [selectedRole, setSelectedRole] = useState<string>('gm');
+  const llmDescriptors = byFamily('llm');
+
+  // "Show advanced settings" is a preference, not configuration: it decides how
+  // much of the studio is on screen, and persists across reloads.
+  const [advanced, setAdvanced] = useAdvanced();
 
   // Model status state
   const [models, setModels] = useState<ModelStatus[]>([]);
-  // Gemini agent model suggestions. Null means show the static fallback; a
-  // successful catalogue fetch replaces it with the account's live list.
-  const [geminiModels, setGeminiModels] = useState<string[] | null>(null);
-  const [fetchingGeminiModels, setFetchingGeminiModels] = useState(false);
-  const [geminiModelError, setGeminiModelError] = useState<string | null>(null);
   const [missingModelPrompt, setMissingModelPrompt] = useState<{
     id: string;
     name: string;
@@ -394,24 +309,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     }
   };
 
-  const fetchGeminiModels = async () => {
-    setFetchingGeminiModels(true);
-    setGeminiModelError(null);
-    try {
-      const res = await APIClient.listGeminiModels();
-      if (res.error) {
-        setGeminiModelError(res.error);
-      } else {
-        const ids = narrationModels(res.models);
-        setGeminiModels(ids.length > 0 ? ids : null);
-      }
-    } catch (err: any) {
-      setGeminiModelError(err.message || 'Failed to load the model catalogue');
-    } finally {
-      setFetchingGeminiModels(false);
-    }
-  };
-
   if (isLoading || !config) {
     return (
       <div className="p-8 text-center text-stone-400 font-mono text-sm animate-pulse">
@@ -419,10 +316,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       </div>
     );
   }
-
-  const currentRoleConfig: AgentRoleConfig = config.agents.roles[selectedRole] || defaultRoleConfig(selectedRole);
-
-  const roleNames = Array.from(new Set([...Object.keys(config.agents.roles), 'extractor']));
 
   const agentPresets = presetsToMap<AgentRoleConfig>(byFamily('llm'));
   const ttsPresets = presetsToMap<TTSConfig>(byFamily('tts'));
@@ -449,43 +342,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     (activeTtsConfig?.type === 'builtin' && activeTtsConfig?.builtin_name === 'cartesia');
 
   // The LLM role list mirrors the media families: one row per role, labelled
-  // with the catalogue descriptor of the adapter it resolves to.
-  const descriptorByID: Record<string, ProviderDescriptor> = {};
-  for (const descriptor of byFamily('llm')) descriptorByID[descriptor.id] = descriptor;
-  const resolveRole = (role: string, seen: Set<string>): AgentRoleConfig | undefined => {
-    const roleConfig = config.agents.roles[role];
-    if (!roleConfig) return undefined;
-    if (roleConfig.type === 'inherit' && roleConfig.inherit_from && !seen.has(roleConfig.inherit_from)) {
-      seen.add(role);
-      return resolveRole(roleConfig.inherit_from, seen) ?? roleConfig;
-    }
-    return roleConfig;
-  };
-  const roleListItems: RoleListItem[] = Object.keys(config.agents.roles).map((role) => {
-    const resolved = resolveRole(role, new Set()) ?? config.agents.roles[role];
-    const descriptor = descriptorByID[descriptorIDForRole(resolved) ?? ''];
-    const keyRequired = Boolean(descriptor?.features.includes('key_required'));
-    return {
-      name: role,
-      label: ROLE_LABELS[role] ?? role,
-      providerLabel: descriptor?.label,
-      tier: descriptor?.tier,
-      caveat: descriptor?.caveat,
-      keyRequired,
-      keyPresent: keyRequired ? roleKeyPresent(resolved, config.providers) : false,
-    };
-  });
-
-  const updateRole = (updated: AgentRoleConfig) => {
-    setConfig({
-      ...config,
-      agents: {
-        ...config.agents,
-        roles: { ...config.agents.roles, [selectedRole]: updated },
-      },
-    });
-  };
-
   return (
     <div className={`flex flex-col h-full ${isCompact ? 'p-2 space-y-4' : 'space-y-6'}`}>
       {/* Settings Navigation & Status Header */}
@@ -573,7 +429,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             <input
               type="checkbox"
               checked={advanced}
-              onChange={(e) => showAdvanced(e.target.checked)}
+              onChange={(e) => setAdvanced(e.target.checked)}
               className="w-3.5 h-3.5 accent-purple-600 cursor-pointer"
             />
             <span>Show advanced settings</span>
@@ -624,967 +480,32 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
 
       {/* Tab: Ecosystem Providers */}
       {activeSubTab === 'providers' && (
-        <div className="space-y-4 flex-1 overflow-y-auto pr-1">
-          <SubTabs
-            ariaLabel="Providers"
-            tabs={[
-              { id: 'cloud', label: 'Cloud Keys', icon: <Cloud className="w-3.5 h-3.5" /> },
-              { id: 'embeddings', label: 'Embeddings', icon: <BrainCircuit className="w-3.5 h-3.5" /> },
-              { id: 'offline', label: 'Offline', icon: <Layers className="w-3.5 h-3.5" /> },
-            ]}
-            active={providersTab}
-            onChange={(id) => setProvidersTab(id as 'cloud' | 'embeddings' | 'offline')}
-          />
-
-          {providersTab === 'offline' && <OfflinePreset onChange={setConfig} />}
-
-          {providersTab === 'embeddings' && (
-          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
-                <BrainCircuit className="w-4 h-4" />
-                <span>Embeddings</span>
-              </h3>
-              <label className="flex items-center gap-2 text-xs text-stone-300">
-                <input
-                  type="checkbox"
-                  aria-label="Enable semantic search"
-                  checked={embeddings.enabled}
-                  onChange={(e) => setEmbeddings({ enabled: e.target.checked })}
-                />
-                Enable semantic search
-              </label>
-            </div>
-            <p className="text-xs text-stone-400">
-              Embeddings power recall and semantic search. The built-in projection needs nothing; the
-              built-in encoder generalises semantically and downloads its model once.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-sans uppercase text-stone-300 mb-1" htmlFor="embeddings-dimensions">
-                  Dimensions
-                </label>
-                <input
-                  id="embeddings-dimensions"
-                  type="number"
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                  value={embeddings.dimensions ?? 384}
-                  onChange={(e) => setEmbeddings({ dimensions: Number(e.target.value) || 0 })}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-sans uppercase text-stone-300 mb-1" htmlFor="embeddings-batch">
-                  Batch size
-                </label>
-                <input
-                  id="embeddings-batch"
-                  type="number"
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                  value={embeddings.batch_size ?? 32}
-                  onChange={(e) => setEmbeddings({ batch_size: Number(e.target.value) || 0 })}
-                />
-              </div>
-            </div>
-            <ProviderManager
-              family="embedding"
-              config={config}
-              onChange={setConfig}
-              renderEditor={(_name, value, onChange) => (
-                <EmbeddingProviderEditor
-                  value={value as EmbeddingProviderConfig}
-                  onChange={onChange as (next: EmbeddingProviderConfig) => void}
-                  presets={embeddingPresets}
-                  modelInstalled={encoderInstalled}
-                  sharedGeminiKey={sharedGeminiKey}
-                  onDownloadModel={() =>
-                    setMissingModelPrompt({ id: 'embedding-encoder', name: 'BGE Small Encoder', sizeBytes: 34235934 })
-                  }
-                />
-              )}
-            />
-          </div>
-          )}
-
-          {providersTab === 'cloud' && (
-          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
-              <Cloud className="w-4 h-4" />
-              <span>Cloud & Ecosystem Providers</span>
-            </h3>
-            <p className="text-xs text-stone-400">
-              Configure shared credentials and master keys for external AI and media providers that power multiple capabilities across LocalRPG.
-            </p>
-
-            {/* Google Gemini Provider Card */}
-            <div className="p-4 bg-stone-950/80 border border-stone-800/90 rounded-xl space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800/60 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-400">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-sans font-bold text-stone-200">Google Gemini (GenAI)</h4>
-                    <p className="text-xs text-stone-400">Multi-modal intelligence: text reasoning, image creation, and vocal performance.</p>
-                  </div>
-                </div>
-                <div>
-                  {config.providers?.gemini?.api_key ? (
-                    <span className="flex items-center gap-1 text-emerald-400 font-mono text-xs bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      <span>Configured in Settings</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs font-mono text-stone-500 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded-md">
-                      Using env or unconfigured
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                  <span>Shared Gemini API Key</span>
-                  <span className="text-xs text-stone-500 font-mono">
-                    {config.providers?.gemini?.api_key ? '✓ Custom Key Saved' : 'Optional if GEMINI_API_KEY is set'}
-                  </span>
-                </label>
-                <input
-                  type="password"
-                  placeholder="AIzaSy... or leave blank for GEMINI_API_KEY / GOOGLE_API_KEY env var"
-                  value={config.providers?.gemini?.api_key || ''}
-                  onChange={(e) => {
-                    setConfig({
-                      ...config,
-                      providers: {
-                        ...config.providers,
-                        gemini: {
-                          ...config.providers?.gemini,
-                          api_key: e.target.value,
-                        },
-                      },
-                    });
-                  }}
-                  className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                />
-                <p className="text-xs text-stone-500">
-                  Automatically inherited by Gemini LLM agents, Gemini/Imagen image generators, and Gemini TTS voice synthesis. Individual roles and media engines can still provide an override key.
-                </p>
-              </div>
-
-              <div className="pt-2 border-t border-stone-800/50">
-                <div className="text-xs font-sans uppercase text-stone-400 font-semibold mb-2">Connected Subsystems</div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
-                    <Cpu className="w-3 h-3 text-purple-400" />
-                    <span>AI Agents (GM, Narrator, Extractor)</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
-                    <Sparkles className="w-3 h-3 text-purple-400" />
-                    <span>Image Generation (Imagen 3, Nano Banana)</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
-                    <Volume2 className="w-3 h-3 text-purple-400" />
-                    <span>Voice Synthesis (Gemini 3.1 & 2.5 Flash/Pro TTS)</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Inworld AI Provider Card */}
-            <div className="p-4 bg-stone-950/80 border border-stone-800/90 rounded-xl space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800/60 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                    <Cloud className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-sans font-bold text-stone-200">Inworld AI</h4>
-                    <p className="text-xs text-stone-400">Frontier model routing, cloud speech synthesis, and transcription.</p>
-                  </div>
-                </div>
-                <div>
-                  {config.providers?.inworld?.api_key ? (
-                    <span className="flex items-center gap-1 text-emerald-400 font-mono text-xs bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      <span>Configured in Settings</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs font-mono text-stone-500 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded-md">
-                      Optional if INWORLD_API_KEY is set
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                  <span>Shared Inworld API Key (Base64)</span>
-                  <span className="text-xs text-stone-500 font-mono">
-                    {config.providers?.inworld?.api_key ? '✓ Custom Key Saved' : 'Optional if INWORLD_API_KEY is set'}
-                  </span>
-                </label>
-                <input
-                  type="password"
-                  placeholder="Paste the Basic (Base64) key, or leave blank for INWORLD_API_KEY"
-                  value={config.providers?.inworld?.api_key || ''}
-                  onChange={(e) => {
-                    setConfig({
-                      ...config,
-                      providers: {
-                        ...config.providers,
-                        inworld: {
-                          ...config.providers?.inworld,
-                          api_key: e.target.value,
-                        },
-                      },
-                    });
-                  }}
-                  className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-indigo-500/60"
-                />
-                <p className="text-xs text-stone-500">
-                  Sent as <code>Authorization: Basic …</code> to the Inworld LLM Router, Inworld TTS (<code>inworld-tts-2</code>), and Inworld STT
-                  (<code>inworld-stt-1</code>). Create a key at{' '}
-                  <a
-                    href="https://platform.inworld.ai/api-keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-amber-400 hover:underline"
-                  >
-                    platform.inworld.ai/api-keys
-                  </a>{' '}
-                  or run <code>inworld auth login</code>. Individual roles and media engines can still provide an override key.
-                </p>
-              </div>
-
-              <div className="pt-2 border-t border-stone-800/50">
-                <div className="text-xs font-sans uppercase text-stone-400 font-semibold mb-2">Connected Subsystems</div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
-                    <Cpu className="w-3 h-3 text-indigo-400" />
-                    <span>LLM Router (compare-frontier-models)</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
-                    <Volume2 className="w-3 h-3 text-indigo-400" />
-                    <span>Voice Synthesis (inworld-tts-2)</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
-                    <Mic className="w-3 h-3 text-indigo-400" />
-                    <span>Transcription (inworld-stt-1)</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Cartesia Provider Card */}
-            <div className="p-4 bg-stone-950/80 border border-stone-800/90 rounded-xl space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800/60 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-400">
-                    <Zap className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-sans font-bold text-stone-200">Cartesia</h4>
-                    <p className="text-xs text-stone-400">Ultra-fast voice intelligence: Sonic TTS speech synthesis and Ink Whisper STT transcription.</p>
-                  </div>
-                </div>
-                <div>
-                  {config.providers?.cartesia?.api_key ? (
-                    <span className="flex items-center gap-1 text-emerald-400 font-mono text-xs bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded-md">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      <span>Configured in Settings</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs font-mono text-stone-500 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded-md">
-                      Using env or unconfigured
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                  <span>Shared Cartesia API Key</span>
-                  <span className="text-xs text-stone-500 font-mono">
-                    {config.providers?.cartesia?.api_key ? '✓ Custom Key Saved' : 'Optional if CARTESIA_API_KEY is set'}
-                  </span>
-                </label>
-                <input
-                  type="password"
-                  placeholder="sk_car_... or leave blank for CARTESIA_API_KEY env var"
-                  value={config.providers?.cartesia?.api_key || ''}
-                  onChange={(e) => {
-                    setConfig({
-                      ...config,
-                      providers: {
-                        ...config.providers,
-                        cartesia: {
-                          ...config.providers?.cartesia,
-                          api_key: e.target.value,
-                        },
-                      },
-                    });
-                  }}
-                  className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                />
-                <p className="text-xs text-stone-500">
-                  Shared key automatically inherited by Cartesia Sonic TTS voice synthesis and Cartesia Ink STT transcription.
-                </p>
-              </div>
-
-              <div className="pt-2 border-t border-stone-800/50">
-                <div className="text-xs font-sans uppercase text-stone-400 font-semibold mb-2">Connected Subsystems</div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
-                    <Volume2 className="w-3 h-3 text-purple-400" />
-                    <span>Voice Synthesis (Cartesia Sonic 3.6)</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 text-xs text-stone-300 font-mono">
-                    <Mic className="w-3 h-3 text-purple-400" />
-                    <span>Speech-to-Text (Cartesia Ink Whisper)</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-          )}
-        </div>
+        <ProvidersPanel
+          config={config}
+          setConfig={setConfig}
+          embeddings={embeddings}
+          setEmbeddings={setEmbeddings}
+          embeddingPresets={embeddingPresets}
+          encoderInstalled={encoderInstalled}
+          sharedGeminiKey={sharedGeminiKey}
+          setMissingModelPrompt={setMissingModelPrompt}
+        />
       )}
 
       {/* Tab 2: AI Agents & Roles */}
+      {/* Tab 2: AI Agents & Roles */}
       {activeSubTab === 'agents' && (
-        <div className="space-y-4 flex-1 overflow-y-auto pr-1">
-          <SubTabs
-            ariaLabel="AI Agents"
-            tabs={[
-              { id: 'roles', label: 'Roles', icon: <Users className="w-3.5 h-3.5" /> },
-              { id: 'routing', label: 'Routing', icon: <Layers className="w-3.5 h-3.5" /> },
-              ...(advanced
-                ? [{ id: 'advanced', label: 'Advanced', icon: <Sliders className="w-3.5 h-3.5" /> }]
-                : []),
-            ]}
-            active={agentsTab}
-            onChange={(id) => setAgentsTab(id as 'roles' | 'routing' | 'advanced')}
-          />
-          <label className="flex items-center justify-between gap-3 p-4 rounded-xl bg-glass-card border border-stone-800 cursor-pointer">
-            <span className="text-sm font-sans text-stone-200">
-              Restate the player's action
-              <span className="block text-xs text-stone-400 font-normal">
-                The narrator opens each turn by restating what the player did in the third person.
-              </span>
-            </span>
-            <input
-              type="checkbox"
-              checked={config.agents.action_echo !== false}
-              onChange={(e) => setConfig({ ...config, agents: { ...config.agents, action_echo: e.target.checked } })}
-              className="w-4 h-4 accent-purple-600 cursor-pointer"
-            />
-          </label>
-
-          {agentsTab === 'roles' && (
-          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
-                <Cpu className="w-4 h-4" />
-                <span>AI Agents & Role Routing</span>
-              </h3>
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  onChange={(e) => {
-                    const key = e.target.value;
-                    if (key && agentPresets[key]) {
-                      const preset = agentPresets[key].config;
-                      setConfig({
-                        ...config,
-                        agents: {
-                          ...config.agents,
-                          roles: { ...config.agents.roles, [selectedRole]: { ...preset } },
-                        },
-                      });
-                      e.target.value = '';
-                    }
-                  }}
-                  className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
-                  defaultValue=""
-                >
-                  <option value="" disabled>⚡ Load Preset...</option>
-                  {Object.entries(agentPresets).map(([id, p]) => (
-                    <option key={id} value={id} title={p.caveat}>
-                      {p.label}{p.tier ? ` · ${tierLabel(p.tier)}` : ''}
-                    </option>
-                  ))}
-                </select>
-
-                <span className="text-xs text-stone-400">Role:</span>
-                <select
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value as any)}
-                  className="bg-stone-950 border border-stone-800 rounded-lg pl-2.5 pr-7 py-1 text-xs text-purple-300 font-mono focus:outline-none cursor-pointer"
-                >
-                  {roleNames.map((role) => (
-                    <option key={role} value={role}>
-                      {ROLE_LABELS[role] ?? role}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-sans uppercase text-stone-300">Provider Type</label>
-                  <select
-                    value={currentRoleConfig.type}
-                    onChange={(e) => {
-                      const updated = { ...currentRoleConfig, type: e.target.value as any };
-                      setConfig({
-                        ...config,
-                        agents: {
-                          ...config.agents,
-                          roles: { ...config.agents.roles, [selectedRole]: updated },
-                        },
-                      });
-                    }}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
-                  >
-                    <option value="disabled">Disabled / Inactive</option>
-                    <option value="http">HTTP / OpenAI-Compatible (Ollama, vLLM, OpenAI)</option>
-                    <option value="cli">CLI Command (Local Binary e.g. llama-cli)</option>
-                    <option value="builtin">Builtin / Internal Engine</option>
-                    <option value="gemini">Google Gemini (GenAI Cloud)</option>
-                    <option value="inherit">Inherit from another role</option>
-                  </select>
-                </div>
-
-                {currentRoleConfig.type === 'inherit' && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-sans uppercase text-stone-300">Inherit From</label>
-                    <select
-                      value={currentRoleConfig.inherit_from || 'gm'}
-                      onChange={(e) => updateRole({ type: 'inherit', inherit_from: e.target.value })}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-purple-300 font-mono focus:outline-none cursor-pointer"
-                    >
-                      {roleNames.map((role) => (
-                        <option key={role} value={role}>
-                          {ROLE_LABELS[role] ?? role}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-stone-500">
-                      Resolves to{' '}
-                      {config.agents.roles[currentRoleConfig.inherit_from || 'gm']?.model ||
-                        config.agents.roles[currentRoleConfig.inherit_from || 'gm']?.command ||
-                        'the default provider'}
-                      , so changing that role changes this one until you override it here.
-                    </p>
-                  </div>
-                )}
-
-                {currentRoleConfig.type === 'http' && (
-                  <>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-sans uppercase text-stone-300">Endpoint URL</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. http://localhost:11434/v1"
-                        value={currentRoleConfig.endpoint || ''}
-                        onChange={(e) => {
-                          const updated = { ...currentRoleConfig, endpoint: e.target.value };
-                          setConfig({
-                            ...config,
-                            agents: {
-                              ...config.agents,
-                              roles: { ...config.agents.roles, [selectedRole]: updated },
-                            },
-                          });
-                        }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-sans uppercase text-stone-300">Model Name</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. llama3.2 or mistral"
-                        value={currentRoleConfig.model || ''}
-                        onChange={(e) => {
-                          const updated = { ...currentRoleConfig, model: e.target.value };
-                          setConfig({
-                            ...config,
-                            agents: {
-                              ...config.agents,
-                              roles: { ...config.agents.roles, [selectedRole]: updated },
-                            },
-                          });
-                        }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-sans uppercase text-stone-300">API Key (Optional)</label>
-                      <input
-                        type="password"
-                        placeholder="Bearer token or leave empty for Ollama"
-                        value={currentRoleConfig.api_key || ''}
-                        onChange={(e) => {
-                          const updated = { ...currentRoleConfig, api_key: e.target.value };
-                          setConfig({
-                            ...config,
-                            agents: {
-                              ...config.agents,
-                              roles: { ...config.agents.roles, [selectedRole]: updated },
-                            },
-                          });
-                        }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {currentRoleConfig.type === 'cli' && (
-                  <>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-sans uppercase text-stone-300">CLI Command / Binary</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. echo or /usr/local/bin/llama-cli"
-                        value={currentRoleConfig.command || ''}
-                        onChange={(e) => {
-                          const updated = { ...currentRoleConfig, command: e.target.value };
-                          setConfig({
-                            ...config,
-                            agents: {
-                              ...config.agents,
-                              roles: { ...config.agents.roles, [selectedRole]: updated },
-                            },
-                          });
-                        }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-sans uppercase text-stone-300">Command Arguments (comma separated)</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. --temp, 0.7, -m, model.gguf"
-                        value={(currentRoleConfig.args || []).join(', ')}
-                        onChange={(e) => {
-                          const args = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
-                          const updated = { ...currentRoleConfig, args };
-                          setConfig({
-                            ...config,
-                            agents: {
-                              ...config.agents,
-                              roles: { ...config.agents.roles, [selectedRole]: updated },
-                            },
-                          });
-                        }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {currentRoleConfig.type === 'builtin' && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-sans uppercase text-stone-300">Builtin Engine</label>
-                    <select
-                      value={currentRoleConfig.builtin_name || 'narrative-oracle'}
-                      onChange={(e) => {
-                        const updated = { ...currentRoleConfig, builtin_name: e.target.value };
-                        setConfig({
-                          ...config,
-                          agents: {
-                            ...config.agents,
-                            roles: { ...config.agents.roles, [selectedRole]: updated },
-                          },
-                        });
-                      }}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
-                    >
-                      <option value="narrative-oracle">narrative-oracle (Deterministic Procedural Storyteller)</option>
-                      <option value="echo">echo (Debug Provider)</option>
-                    </select>
-                  </div>
-                )}
-
-                {(currentRoleConfig.type === 'gemini' || (currentRoleConfig.type === 'builtin' && currentRoleConfig.builtin_name === 'gemini')) && (
-                  <>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                        <span>Gemini Model</span>
-                        <button
-                          type="button"
-                          onClick={fetchGeminiModels}
-                          disabled={fetchingGeminiModels}
-                          className="text-xs font-sans px-2 py-0.5 rounded border border-purple-500/40 text-purple-300 hover:bg-purple-600/20 disabled:opacity-50 cursor-pointer"
-                        >
-                          {fetchingGeminiModels ? 'Loading...' : 'Fetch available models'}
-                        </button>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. gemini-3.8-flash"
-                        value={currentRoleConfig.model || 'gemini-3.8-flash'}
-                        onChange={(e) => {
-                          const updated = { ...currentRoleConfig, model: e.target.value };
-                          setConfig({
-                            ...config,
-                            agents: {
-                              ...config.agents,
-                              roles: { ...config.agents.roles, [selectedRole]: updated },
-                            },
-                          });
-                        }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                      />
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {(geminiModels ?? GEMINI_AGENT_MODELS).map((m) => (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() => {
-                              const updated = { ...currentRoleConfig, model: m };
-                              setConfig({
-                                ...config,
-                                agents: {
-                                  ...config.agents,
-                                  roles: { ...config.agents.roles, [selectedRole]: updated },
-                                },
-                              });
-                            }}
-                            className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors cursor-pointer ${
-                              (currentRoleConfig.model || 'gemini-3.8-flash') === m
-                                ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
-                                : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200'
-                            }`}
-                          >
-                            {m}
-                          </button>
-                        ))}
-                      </div>
-                      {geminiModels ? (
-                        <p className="text-xs text-stone-500">
-                          Showing {geminiModels.length} models available to your key.
-                        </p>
-                      ) : (
-                        <p className="text-xs text-stone-500">
-                          Suggested models shown; fetch the catalogue to list everything your key can use.
-                        </p>
-                      )}
-                      {geminiModelError && (
-                        <p className="text-xs text-red-400 font-mono">{geminiModelError}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                        <span>Role API Key Override</span>
-                        {config.providers?.gemini?.api_key && (
-                          <span className="text-xs text-emerald-400 font-mono">Shared key active (from Providers tab)</span>
-                        )}
-                      </label>
-                      <input
-                        type="password"
-                        placeholder={config.providers?.gemini?.api_key ? 'Using shared key from Providers tab (leave blank)' : 'Optional override or GEMINI_API_KEY env'}
-                        value={currentRoleConfig.api_key || ''}
-                        onChange={(e) => {
-                          const updated = { ...currentRoleConfig, api_key: e.target.value };
-                          setConfig({
-                            ...config,
-                            agents: {
-                              ...config.agents,
-                              roles: { ...config.agents.roles, [selectedRole]: updated },
-                            },
-                          });
-                        }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                      />
-                    </div>
-
-                  </>
-                )}
-              </div>
-
-              {currentRoleConfig.type !== 'disabled' && (
-                <AdvancedSection label="Advanced" defaultOpen={advanced}>
-                  {(currentRoleConfig.type === 'gemini' || (currentRoleConfig.type === 'builtin' && currentRoleConfig.builtin_name === 'gemini')) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5 col-span-1 md:col-span-2">
-                        <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                          <span>Thinking / Reasoning Budget</span>
-                          <span className="font-mono text-purple-400">
-                            {currentRoleConfig.thinking_budget === undefined
-                              ? 'Default'
-                              : currentRoleConfig.thinking_budget === 0
-                              ? '0 (Disabled — Instant Narration)'
-                              : currentRoleConfig.thinking_budget === -1
-                              ? 'Dynamic (-1 — Model Decides)'
-                              : `${currentRoleConfig.thinking_budget} tokens`}
-                          </span>
-                        </label>
-                        <div className="flex gap-2">
-                          <select
-                            value={
-                              currentRoleConfig.thinking_budget === undefined
-                                ? 'default'
-                                : currentRoleConfig.thinking_budget === 0
-                                ? '0'
-                                : currentRoleConfig.thinking_budget === -1
-                                ? '-1'
-                                : 'custom'
-                            }
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              let budget: number | undefined;
-                              if (val === '0') budget = 0;
-                              else if (val === '-1') budget = -1;
-                              else if (val === 'custom') budget = 2048;
-                              else budget = undefined;
-
-                              const updated = { ...currentRoleConfig, thinking_budget: budget };
-                              setConfig({
-                                ...config,
-                                agents: {
-                                  ...config.agents,
-                                  roles: { ...config.agents.roles, [selectedRole]: updated },
-                                },
-                              });
-                            }}
-                            className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
-                          >
-                            <option value="0">Disabled (0 — Instant Narration)</option>
-                            <option value="-1">Dynamic (-1 — Model Decides)</option>
-                            <option value="default">Model Default</option>
-                            <option value="custom">Custom Token Limit</option>
-                          </select>
-                          {(currentRoleConfig.thinking_budget ?? 0) > 0 && (
-                            <input
-                              type="number"
-                              min={128}
-                              step={256}
-                              value={currentRoleConfig.thinking_budget}
-                              onChange={(e) => {
-                                const budget = parseInt(e.target.value, 10);
-                                const updated = { ...currentRoleConfig, thinking_budget: isNaN(budget) ? 0 : budget };
-                                setConfig({
-                                  ...config,
-                                  agents: {
-                                    ...config.agents,
-                                    roles: { ...config.agents.roles, [selectedRole]: updated },
-                                  },
-                                });
-                              }}
-                              className="w-32 bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                            />
-                          )}
-                        </div>
-                        <p className="text-xs text-stone-500">
-                          Thinking tokens allow Gemini 2.5 to reason deeply before replying. Thought tokens are automatically filtered from the story chronicle.
-                        </p>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                          <span>Top-P</span>
-                          <span className="font-mono text-purple-400">{(currentRoleConfig.top_p ?? 0.95).toFixed(2)}</span>
-                        </label>
-                        <input
-                          type="number"
-                          min={0}
-                          max={1}
-                          step={0.05}
-                          value={currentRoleConfig.top_p ?? 0.95}
-                          onChange={(e) => {
-                            const top_p = parseFloat(e.target.value);
-                            const updated = { ...currentRoleConfig, top_p: isNaN(top_p) ? undefined : top_p };
-                            setConfig({
-                              ...config,
-                              agents: {
-                                ...config.agents,
-                                roles: { ...config.agents.roles, [selectedRole]: updated },
-                              },
-                            });
-                          }}
-                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                          <span>Top-K</span>
-                          <span className="font-mono text-purple-400">{currentRoleConfig.top_k ?? 40}</span>
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={100}
-                          step={1}
-                          value={currentRoleConfig.top_k ?? 40}
-                          onChange={(e) => {
-                            const top_k = parseInt(e.target.value, 10);
-                            const updated = { ...currentRoleConfig, top_k: isNaN(top_k) ? undefined : top_k };
-                            setConfig({
-                              ...config,
-                              agents: {
-                                ...config.agents,
-                                roles: { ...config.agents.roles, [selectedRole]: updated },
-                              },
-                            });
-                          }}
-                          className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                        <span>Response Limit (max tokens)</span>
-                        <span className="font-mono text-purple-400">{currentRoleConfig.max_tokens ?? 1024}</span>
-                      </label>
-                      <input
-                        type="number"
-                        min={64}
-                        step={64}
-                        value={currentRoleConfig.max_tokens ?? 1024}
-                        onChange={(e) => {
-                          const max_tokens = parseInt(e.target.value, 10);
-                          const updated = { ...currentRoleConfig, max_tokens: Number.isNaN(max_tokens) ? undefined : max_tokens };
-                          setConfig({
-                            ...config,
-                            agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
-                          });
-                        }}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
-                      />
-                      <p className="text-xs text-stone-500">
-                        How long a single reply may be. Raise it for longer scenes; the reply is marked as cut off when it
-                        hits this.
-                      </p>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
-                        <span>Temperature</span>
-                        <span className="font-mono text-purple-400">{(currentRoleConfig.temperature ?? 0.7).toFixed(2)}</span>
-                      </label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1.5"
-                        step="0.05"
-                        value={currentRoleConfig.temperature ?? 0.7}
-                        onChange={(e) => {
-                          const updated = { ...currentRoleConfig, temperature: parseFloat(e.target.value) };
-                          setConfig({
-                            ...config,
-                            agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
-                          });
-                        }}
-                        className="w-full accent-purple-500"
-                      />
-                      <p className="text-xs text-stone-500">Lower is steadier, which helps long-run continuity.</p>
-                    </div>
-                  </div>
-                </AdvancedSection>
-              )}
-
-              {currentRoleConfig.type !== 'inherit' && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-sans uppercase text-stone-300">Tool Calling</label>
-                  <select
-                    value={currentRoleConfig.supports_tools ?? 'auto'}
-                    onChange={(e) => {
-                      const updated = { ...currentRoleConfig, supports_tools: e.target.value as 'auto' | 'yes' | 'no' };
-                      setConfig({
-                        ...config,
-                        agents: { ...config.agents, roles: { ...config.agents.roles, [selectedRole]: updated } },
-                      });
-                    }}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
-                  >
-                    <option value="auto">Auto (HTTP providers only)</option>
-                    <option value="yes">Yes (force tools)</option>
-                    <option value="no">No (suppress tools)</option>
-                  </select>
-                  <p className="text-xs text-stone-500">
-                    Whether this role may look things up mid-turn. Only the gm role is offered tools.
-                  </p>
-                </div>
-              )}
-
-              {currentRoleConfig.type !== 'disabled' && (
-                <div className="pt-2 flex items-center justify-between border-t border-stone-800/60">
-                  <button
-                    onClick={() => handleTestProvider('llm', currentRoleConfig)}
-                    disabled={testingCategory === 'llm'}
-                    className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-lg bg-stone-900 border border-purple-500/30 hover:bg-stone-800 text-purple-400 transition-all cursor-pointer"
-                  >
-                    <Zap className="w-3.5 h-3.5" />
-                    <span>{testingCategory === 'llm' ? 'Testing Connection...' : 'Test Connection'}</span>
-                  </button>
-
-                  {testResult?.category === 'llm' && (
-                    <span
-                      className={`text-xs font-mono flex items-center gap-1 ${
-                        testResult.res.success ? 'text-emerald-400' : 'text-red-400'
-                      }`}
-                    >
-                      {testResult.res.success ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-                      <span>
-                        {testResult.res.message} ({testResult.res.latency_ms}ms)
-                      </span>
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          )}
-
-          {agentsTab === 'routing' && (
-          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-            <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
-              <Layers className="w-4 h-4" />
-              <span>Role Routing</span>
-            </h3>
-            <p className="text-xs text-stone-400">
-              Every role resolves to one adapter. Select a row to edit that role on the Roles tab.
-            </p>
-
-            {Object.keys(tierCaveats).length > 0 && (
-              <div className="rounded-lg border border-stone-800 bg-stone-950/40 p-3">
-                <p className="mb-2 font-sans text-[11px] uppercase text-stone-400">How providers run</p>
-                <TierLegend caveats={tierCaveats} />
-              </div>
-            )}
-
-            <ProviderManager
-              family="llm"
-              config={config}
-              onChange={setConfig}
-              selected={selectedRole}
-              onSelect={setSelectedRole}
-              roles={roleListItems}
-            />
-          </div>
-          )}
-
-          {agentsTab === 'advanced' && (
-          <>
-          {/* Context budget and timing: what the narrator is sent, and how long it may take */}
-          <ContextLimitsPanel config={config} setConfig={setConfig} advanced={advanced} />
-
-          <GenerationLimitsPanel config={config} setConfig={setConfig} advanced={advanced} />
-          </>
-          )}
-        </div>
+        <AgentsPanel
+          config={config}
+          setConfig={setConfig}
+          advanced={advanced}
+          agentPresets={agentPresets}
+          llmDescriptors={llmDescriptors}
+          tierCaveats={tierCaveats}
+          handleTestProvider={handleTestProvider}
+          testingCategory={testingCategory}
+          testResult={testResult}
+        />
       )}
 
       {/* Tab 3: Media Engines (TTS / STT / Image) */}
