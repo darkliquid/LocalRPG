@@ -2755,6 +2755,7 @@ func (s *Service) GenerateTurnSceneImage(ctx context.Context, gameID string, tur
 	if locEntity != nil {
 		sceneCtx.Location = locEntity.Name
 		sceneCtx.Appearance = locEntity.Appearance
+		sceneCtx.CurrentAppearance = locEntity.CurrentAppearance
 	}
 	if len(turn.Checks) > 0 {
 		sceneCtx.Outcome = turn.Checks[0].Outcome

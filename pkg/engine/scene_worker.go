@@ -18,14 +18,17 @@ import (
 // ScenePromptContext is everything a scene prompt is composed from, so the image
 // reflects what happened rather than only where the player is.
 type ScenePromptContext struct {
-	Cue        string           // the extractor cue or rule-break paragraph, if any
-	Narration  string           // the turn's narration, for an excerpt
-	Action     string           // the player's raw action
+	Cue        string            // the extractor cue or rule-break paragraph, if any
+	Narration  string            // the turn's narration, for an excerpt
+	Action     string            // the player's raw action
 	Cast       []SceneCastMember // present characters, described
-	Location   string           // the location's name
-	Appearance string           // the location's authored appearance, if any
-	Style      string   // the world art style
-	Outcome    string   // the resolved check's outcome, if any
+	Location   string            // the location's name
+	Appearance string            // the location's authored appearance, if any
+	// CurrentAppearance is the place as it is now, when play has changed it. It
+	// belongs to the moment rather than to the scene's shared look.
+	CurrentAppearance string
+	Style             string // the world art style
+	Outcome           string // the resolved check's outcome, if any
 	// Scene is the stable look of the place, so two turns in one scene share a
 	// palette and lighting rather than drifting apart.
 	Scene media.SceneStyle
@@ -42,6 +45,9 @@ const (
 	sceneActionCap    = 160
 	sceneEntityCap    = 4
 	sceneCastCap      = 120
+	// sceneCurrentCap bounds the current appearance on its own, so a long
+	// circumstance cannot crowd out the identity it qualifies.
+	sceneCurrentCap = 80
 	// sceneSuffix is the fixed quality suffix every scene prompt ends with.
 	sceneSuffix = "cinematic scene illustration, high quality, atmospheric lighting, detailed environment, no text, no borders"
 )
@@ -92,6 +98,9 @@ func BuildScenePrompt(ctx ScenePromptContext) string {
 	}
 	if appearance := strings.TrimSpace(ctx.Appearance); appearance != "" {
 		parts = append(parts, appearance)
+	}
+	if current := strings.TrimSpace(ctx.CurrentAppearance); current != "" {
+		parts = append(parts, "now: "+current)
 	}
 
 	// The scene's stable look is named explicitly, so a provider renders the same
@@ -206,14 +215,19 @@ func SceneCast(source *storage.Store, turn *Turn) []SceneCastMember {
 	return cast
 }
 
-// sceneCastAppearance is an entity's authored appearance, or a bounded fallback so
-// a character without one is still described.
+// sceneCastAppearance is an entity's authored appearance, with the current one for
+// its circumstances layered on, or a bounded fallback so a character without
+// either is still described. The baseline keeps the budget it had when it stood
+// alone, and the current gets its own, so a long circumstance cannot crowd out
+// the identity.
 func sceneCastAppearance(ent *entity.Entity) string {
 	if ent == nil {
 		return ""
 	}
-	if appearance := strings.TrimSpace(ent.Appearance); appearance != "" {
-		return sceneExcerpt(appearance, sceneCastCap)
+	baseline := sceneExcerpt(ent.Appearance, sceneCastCap)
+	current := sceneExcerpt(ent.CurrentAppearance, sceneCurrentCap)
+	if composed := entity.LayerAppearance(baseline, current); composed != "" {
+		return composed
 	}
 	if body := sceneExcerpt(ent.Body, sceneCastCap); body != "" {
 		return body
