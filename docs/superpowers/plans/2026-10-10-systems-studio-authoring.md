@@ -63,10 +63,33 @@
 - [x] **Step 4: Run them to verify they pass**, plus `npx vitest run` and `npx tsc --noEmit`.
 - [x] **Step 5: Commit.**
 
+### Task 4: The mechanics form (spec §4.2)
+
+**Files:**
+- Create: `frontend/src/components/ui/Example.tsx`, `Example.test.tsx`
+- Modify: `frontend/src/components/MechanicsEditor.tsx`, `MechanicsEditor.test.tsx`, `frontend/src/types.ts`
+
+- [x] **Step 1: Write the failing tests** for the example primitive and the profile's opposed/tie fields.
+- [x] **Step 2: Run them to verify they fail.**
+- [x] **Step 3: Implement** the `Example` primitive, attach one to the stats and checks sections, and expose `opposed`/`ties` on `ResolutionProfile` and in `ProfilesEditor`.
+- [x] **Step 4: Run them to verify they pass**, plus `npx vitest run` and `npx tsc --noEmit`.
+- [x] **Step 5: Commit.**
+
+### Task 5: Character creation prompts (spec §4.5, editor half)
+
+**Files:**
+- Modify: `frontend/src/components/SystemsStudio.tsx`
+
+- [x] **Step 1: Write the failing test.** Covered by the editor suite and `tsc`; the studio's own render is not unit-tested.
+- [x] **Step 2: Run it to verify it fails.**
+- [x] **Step 3: Implement** the `default` input, the comma-separated options list a `select` needs, per-field help describing every attribute and kind, and a worked example.
+- [x] **Step 4: Run it to verify it passes.**
+- [x] **Step 5: Commit.**
+
 ## Deferred to a later pass on this proposal
 
-- **Spec §4.2, mechanics form examples.** An `Example` primitive beside the existing `HelpTip`, attached to the stats, skills, health, checks, and advancement sections, plus exposing the backend's `opposed`/`ties` profile fields, which the frontend type omits.
-- **Spec §4.5, character creation prompts.** `options`/`default` editors, per-kind help, and rendering the authored fields in the campaign form.
+- **Spec §4.5, rendering the authored fields in the campaign form.** The editor now collects `options` and `default`, but `NewCampaignModal` still hard-codes its six fields, so a `select` has nothing to render into yet. Making `kind` drive the campaign form is the remaining piece.
+- **Spec §4.2, examples on the remaining sections.** Attached to stats and checks; skills, health, advancement, and policy could carry one too.
 
 ## Verification
 
