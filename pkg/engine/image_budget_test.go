@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -121,10 +122,22 @@ func TestBudgetChargesOnSuccess(t *testing.T) {
 	worker := NewSceneWorker(core.NewPathResolver(dir), provider)
 	worker.SetPrice(func() (int64, bool) { return 250, true })
 
+	var mu sync.Mutex
 	var saved []ImageBudget
-	worker.SetBudget(ImageBudget{MaxImages: 2}, func(b ImageBudget) { saved = append(saved, b) })
+	worker.SetBudget(ImageBudget{MaxImages: 2}, func(b ImageBudget) {
+		mu.Lock()
+		saved = append(saved, b)
+		mu.Unlock()
+	})
 
 	waitForScene(t, worker, "campaign", 6, SceneJob{Prompt: "a hall"})
+	// The on-ready callback fires from writeScene, before the charge, so the test
+	// waits for the charge rather than assuming it landed with the file.
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(saved) == 1
+	})
 
 	if provider.calls != 1 {
 		t.Fatalf("provider calls = %d", provider.calls)
@@ -147,10 +160,21 @@ func TestUnlimitedBudgetIsUnchanged(t *testing.T) {
 	worker := NewSceneWorker(core.NewPathResolver(dir), provider)
 	worker.SetProceduralFallback(fallback)
 
+	var mu sync.Mutex
 	var saved int
-	worker.SetBudget(ImageBudget{}, func(ImageBudget) { saved++ })
+	worker.SetBudget(ImageBudget{}, func(ImageBudget) {
+		mu.Lock()
+		saved++
+		mu.Unlock()
+	})
 
 	waitForScene(t, worker, "campaign", 7, SceneJob{Prompt: "a hall"})
+	// As above: the charge follows the on-ready callback the wait returns on.
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return saved == 1
+	})
 
 	if provider.calls != 1 || fallback.calls != 0 {
 		t.Fatalf("provider = %d fallback = %d, want the provider alone", provider.calls, fallback.calls)
