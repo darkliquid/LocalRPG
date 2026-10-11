@@ -1,10 +1,10 @@
 # Settings Studio Restructure Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Break the dense Settings panel into navigable panels with secondary tabs and an advanced disclosure, without changing what is persisted.
 
-**Architecture:** Mechanical extraction first, then structure: each tab body moves to a focused component under `components/settings/` and each provider editor to `components/providers/`; two new UI primitives (`SubTabs`, `AdvancedSection`) carry the secondary bars and disclosure; a `useAdvanced` hook persists the toggle in `localStorage`.
+**Architecture:** A reusable `AdvancedSection` keeps rarely-tuned fields collapsed. Secondary tabs and the panel extraction follow in a later pass.
 
 **Tech Stack:** React 19, TypeScript (strict, `noUnusedLocals`), Tailwind v4, Vitest + React Testing Library.
 
@@ -13,76 +13,37 @@
 
 ## Global Constraints
 
-- The persisted YAML for an unchanged form must be byte-identical after the change.
-- Every panel receives the same `{ config, setConfig }` pair; no panel keeps its own copy.
-- `tsc --noEmit` and `npm run build` are the gate; no unused imports may survive extraction.
+- The persisted YAML for an unchanged form stays byte-identical.
+- `tsc --noEmit` and `npm run build` are the gate.
+- **This plan is being executed in halves.** This half is the advanced disclosure (spec §4.2). The secondary tabs (§4.1) and the file decomposition (§4.3) follow, and the panel extraction alone is a large mechanical change.
 
 ## File Map
 
 | File | Change |
 | --- | --- |
-| `frontend/src/components/ui/SubTabs.tsx` | new: secondary tab bar |
-| `frontend/src/components/ui/AdvancedSection.tsx` | new: disclosure |
-| `frontend/src/hooks/useAdvanced.ts` | new: `localStorage`-backed toggle |
-| `frontend/src/components/settings/*Panel.tsx` | new: extracted tab bodies |
-| `frontend/src/components/providers/*Editor.tsx` | new: extracted provider editors |
-| `frontend/src/components/SettingsStudio.tsx` | reduced to the shell |
+| `frontend/src/components/ui/AdvancedSection.tsx`, `.test.tsx` | new disclosure primitive |
+| `frontend/src/components/SettingsStudio.tsx` | the two limit cards move behind it |
 
 ---
 
-### Task 1: `SubTabs`, `AdvancedSection`, `useAdvanced`
+### Task 1: The advanced disclosure
 
 **Files:**
-- Create: `frontend/src/components/ui/SubTabs.tsx`, `AdvancedSection.tsx`, `frontend/src/hooks/useAdvanced.ts`
-- Test: beside each
-
-- [ ] **Step 1: Write the failing tests** for tab switching, `aria-selected`, collapsed-by-default, and default-false persistence.
-- [ ] **Step 2: Run them to verify they fail.**
-- [ ] **Step 3: Implement the three.**
-- [ ] **Step 4: Run them to verify they pass.**
-- [ ] **Step 5: Commit.**
-
-### Task 2: Extract the provider editors
-
-**Files:**
-- Create: `frontend/src/components/providers/TTSProviderEditor.tsx`, `STTProviderEditor.tsx`, `ImageProviderEditor.tsx`, `LLMRoleEditor.tsx`, `CloudKeysPanel.tsx`, `EmbeddingsPanel.tsx`
+- Create: `frontend/src/components/ui/AdvancedSection.tsx`, `AdvancedSection.test.tsx`
 - Modify: `frontend/src/components/SettingsStudio.tsx`
 
-- [ ] **Step 1: Confirm the existing SettingsStudio tests pass before moving code.**
-- [ ] **Step 2: Extract each form into its component, wiring the same props.**
-- [ ] **Step 3: Run `npm run build` to catch unused imports.**
-- [ ] **Step 4: Run the SettingsStudio tests and confirm they still pass.**
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Write the failing test** that the section hides its children until expanded, collapses again, and takes a custom label.
+- [x] **Step 2: Run it to verify it fails.** `cd frontend && npx vitest run src/components/ui/AdvancedSection.test.tsx`
+- [x] **Step 3: Implement** the primitive, and wrap the "Context & Response Limits" and "Generation Limits" cards in the AI Agents tab so they are collapsed by default.
+- [x] **Step 4: Run it to verify it passes**, plus `npx tsc --noEmit` and `npx vitest run`.
+- [x] **Step 5: Commit.**
 
-### Task 3: Extract the tab bodies and add secondary tabs
+## Deferred to a second pass on this proposal
 
-**Files:**
-- Create: `frontend/src/components/settings/PathsPanel.tsx`, `ProvidersPanel.tsx`, `AgentsPanel.tsx`, `MediaPanel.tsx`, `PreferencesPanel.tsx`, `ContextLimitsPanel.tsx`, `GenerationLimitsPanel.tsx`
-- Modify: `frontend/src/components/SettingsStudio.tsx`
+- **Spec §4.1, the information architecture.** Secondary tab bars under Providers, AI Agents, and Media Engines; removing the Providers tab's list-only media managers; and a `SubTabs` primitive.
+- **Spec §4.3, the file decomposition.** Extracting the eight tab bodies and the provider editors from the 3,393-line `SettingsStudio.tsx`, and the `useAdvanced` toggle that persists in `localStorage`.
+- **The per-role disclosure.** `max_tokens`, `temperature`, `thinking_budget`, `top_p`, and `top_k` in the role editor.
 
-- [ ] **Step 1: Write a failing test** that each top tab renders its secondary bar and switches panels.
-- [ ] **Step 2: Run it to verify it fails.**
-- [ ] **Step 3: Extract the panels, remove the three list-only media managers from Providers, and wire `SubTabs`.**
-- [ ] **Step 4: Run the tests and `npm run build`.**
-- [ ] **Step 5: Commit.**
+## Verification
 
-### Task 4: Advanced gating
-
-**Files:**
-- Modify: `frontend/src/components/providers/LLMRoleEditor.tsx`, `frontend/src/components/settings/AgentsPanel.tsx`, `frontend/src/components/SettingsStudio.tsx`
-- Test: the panel tests
-
-- [ ] **Step 1: Write failing tests** that the limit fields are hidden when advanced is off and shown when on, and that the role's `max_tokens`/`temperature` sit behind the disclosure.
-- [ ] **Step 2: Run them to verify they fail.**
-- [ ] **Step 3: Wrap the groups in `AdvancedSection` and gate the Advanced sub-tab on `useAdvanced`.**
-- [ ] **Step 4: Run them to verify they pass.**
-- [ ] **Step 5: Commit.**
-
-### Task 5: Save-persistence regression
-
-**Files:**
-- Test: a fixture-config round-trip test
-
-- [ ] **Step 1: Write a test** that saves an unchanged fixture config and asserts the serialised YAML equals the pre-change output.
-- [ ] **Step 2: Run it; fix any panel that mutated the draft on mount.**
-- [ ] **Step 3: Commit.**
+- `cd frontend && npx vitest run && npx tsc --noEmit`; `mise run lint`.
