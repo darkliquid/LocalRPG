@@ -110,10 +110,15 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({
       )}
 
       {/* Authored description, when the campaign was created with character creation. */}
-      {(player.appearance || player.voice) && (
+      {(player.appearance || player.current_appearance || player.voice) && (
         <div className="space-y-3 bg-black/40 p-4 rounded-xl border border-white/5 shadow-inner">
           <span className="text-xs uppercase text-stone-400 tracking-wider block font-sans">Description</span>
           {player.appearance && <p className="text-sm text-stone-200 leading-relaxed">{player.appearance}</p>}
+          {player.current_appearance && (
+            <p className="text-xs text-stone-400 italic leading-relaxed">
+              <span className="text-stone-300 not-italic font-medium">Currently:</span> {player.current_appearance}
+            </p>
+          )}
           {player.voice && (
             <p className="text-xs font-mono text-purple-300">
               Voice: {player.voice.name || player.voice.voice_id} ({player.voice.voice_id})

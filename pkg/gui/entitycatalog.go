@@ -58,13 +58,13 @@ var entityTypeDefs = []entityTypeDef{
 		label:       "Character",
 		description: "Player characters, NPCs, companions and adversaries.",
 		aliases:     []string{"npc", "person", "creature"},
-		keys:        entityKeys("appearance", "gender", "age", "voice"),
+		keys:        entityKeys("appearance", "current_appearance", "gender", "age", "voice"),
 	},
 	{
 		id:          "location",
 		label:       "Location",
 		description: "Towns, rooms, regions and any other place a scene happens in.",
-		keys:        entityKeys("appearance"),
+		keys:        entityKeys("appearance", "current_appearance"),
 	},
 	{
 		id:          "faction",

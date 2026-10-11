@@ -22,6 +22,7 @@ location: "[[the-iron-bastion]]"
 faction: "[[the-gilded-cabal]]"
 portrait: "assets/portraits/lady-evelyn.png"
 appearance: "A slender woman in midnight-blue velvet holding an engraved silver spyglass."
+current_appearance: "Soaked through and catching her breath." # Written by play; cleared on restart
 gender: female
 age: "34"
 aliases:
@@ -57,8 +58,8 @@ The New Note wizard offers these types. Each one scaffolds the frontmatter keys
 it uses, every key preceded by a line explaining its purpose. The engine
 itself accepts any type string, so a type not listed here still loads.
 
-- **`character`**: Player characters, NPCs, companions, and adversaries. Offers `voice`, `appearance`, `gender`, and `age`.
-- **`location`**: Towns, rooms, regions, and any other place a scene happens in. Offers `appearance`, and nests inside a parent location through `location: "[[parent-zone]]"`.
+- **`character`**: Player characters, NPCs, companions, and adversaries. Offers `voice`, `appearance`, `current_appearance`, `gender`, and `age`.
+- **`location`**: Towns, rooms, regions, and any other place a scene happens in. Offers `appearance` and `current_appearance`, and nests inside a parent location through `location: "[[parent-zone]]"`.
 - **`faction`**: Guilds, orders, crews, and governments. Offers `appearance`. Influence, reputation, and rivalries live in `state`.
 - **`item`**: Relics, weapons, tools, and keys. Offers `appearance`.
 - **`concept`**: Ideas, customs, deities, and forces that define the world.
@@ -93,3 +94,7 @@ LocalRPG automatically converts wikilinks into relationship edges in the campaig
   ```
 
 Edges are bidirectional in search queries: when the player visits `[[sunken-spire]]`, the context assembler automatically loads all characters whose `location` points to `sunken-spire`.
+
+## Restarts and Baselines
+
+Restarting a campaign clears the circumstances play gave it, such as `current_appearance`, story history, and transient state, while preserving authored baselines such as `appearance`, character sheets, and world templates.
