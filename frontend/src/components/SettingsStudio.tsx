@@ -10,7 +10,7 @@ import { UsagePanel } from './UsagePanel';
 import { TTSBatchPanel } from './TTSBatchPanel';
 import { PathsPanel } from './settings/PathsPanel';
 import { PreferencesPanel } from './settings/PreferencesPanel';
-import { ProvidersPanel } from './providers/ProvidersPanel';
+import { ProvidersPanel } from './settings/ProvidersPanel';
 import { AgentsPanel } from './settings/AgentsPanel';
 import { MediaPanel } from './settings/MediaPanel';
 

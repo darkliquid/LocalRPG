@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { BrainCircuit, Cloud, Layers } from 'lucide-react';
 import type { AppConfig, EmbeddingsConfig } from '../../types';
-import { CloudKeysPanel } from './CloudKeysPanel';
-import { EmbeddingsPanel } from './EmbeddingsPanel';
+import { CloudKeysPanel } from '../providers/CloudKeysPanel';
+import { EmbeddingsPanel } from '../providers/EmbeddingsPanel';
 import type { EmbeddingPreset } from '../EmbeddingProviderEditor';
 import { OfflinePreset } from '../OfflinePreset';
 import { SubTabs } from '../ui/SubTabs';
