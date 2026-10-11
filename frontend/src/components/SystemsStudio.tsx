@@ -257,6 +257,29 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     setActiveTab('manifest');
   };
 
+  // handleStartFromBase seeds a new unsaved system from a reference base. It never
+  // touches the open system: starting from a base is how a new system begins, not
+  // how the current one is replaced.
+  const handleStartFromBase = (base: ReferenceSystem) => {
+    setShowBaseCatalogue(false);
+    setSelection({ kind: 'draft' });
+    setActiveDraftID(null);
+    setDraft({ localId: crypto.randomUUID(), dirty: true });
+    setName(`${base.name} (copy)`);
+    setSlugID(`${base.id}-copy`);
+    setVersion(base.version);
+    setDescription(base.description);
+    setRulesPrompt(base.rules_prompt);
+    setScript(base.script);
+    setMechanics(base.mechanics ?? {});
+    setCreationPreamble('');
+    setCreationFields([]);
+    setVerificationResult(null);
+    setDraftNotes([]);
+    setActiveTab('manifest');
+    setToast({ type: 'success', message: `Started a new system from ${base.name}.` });
+  };
+
   const applyReference = (reference: ReferenceSystem) => {
     setName(reference.name);
     if (!savedID) {
@@ -513,24 +536,6 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
             </button>
           </div>
         </div>
-
-        {referenceSystems.length > 0 && (
-          <div className="space-y-1.5 shrink-0">
-            <span className="text-[11px] font-sans uppercase tracking-wider text-stone-500">Starting points</span>
-            <div className="flex flex-wrap gap-1.5">
-              {referenceSystems.map((reference) => (
-                <button
-                  key={reference.id}
-                  type="button"
-                  onClick={() => applyReference(reference)}
-                  className="text-xs font-sans px-2.5 py-1 rounded-lg border border-stone-800 hover:border-purple-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-purple-300 cursor-pointer"
-                >
-                  {reference.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
           {draft && (
@@ -1294,8 +1299,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                 busy={isDeriving}
                 onClone={(base) => {
                   const reference = referenceSystems.find((r) => r.id === base.id);
-                  if (reference) applyReference(reference);
-                  setShowBaseCatalogue(false);
+                  if (reference) handleStartFromBase(reference);
                 }}
                 onDerive={handleDerive}
               />
