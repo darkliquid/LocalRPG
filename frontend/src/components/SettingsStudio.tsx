@@ -43,6 +43,7 @@ import { ProviderManager, RoleListItem } from './ProviderManager';
 import { OfflinePreset } from './OfflinePreset';
 import { mediaEntryValue, setMediaEntry } from '../lib/mediaProviders';
 import { AdvancedSection } from './ui/AdvancedSection';
+import { SubTabs } from './ui/SubTabs';
 
 interface SettingsStudioProps {
   isCompact?: boolean;
@@ -148,6 +149,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const [activeFilePath, setActiveFilePath] = useState<string>('');
   const [isOverride, setIsOverride] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'paths' | 'providers' | 'agents' | 'media' | 'batch' | 'preferences' | 'usage' | 'debug'>('paths');
+  // The Providers area splits into credentials, embeddings, and the offline preset,
+  // so the tab leads with one job rather than all three.
+  const [providersTab, setProvidersTab] = useState<'cloud' | 'embeddings' | 'offline'>('cloud');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -640,14 +644,20 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       {/* Tab: Ecosystem Providers */}
       {activeSubTab === 'providers' && (
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
-          <OfflinePreset onChange={setConfig} />
+          <SubTabs
+            ariaLabel="Providers"
+            tabs={[
+              { id: 'cloud', label: 'Cloud Keys', icon: <Cloud className="w-3.5 h-3.5" /> },
+              { id: 'embeddings', label: 'Embeddings', icon: <BrainCircuit className="w-3.5 h-3.5" /> },
+              { id: 'offline', label: 'Offline', icon: <Layers className="w-3.5 h-3.5" /> },
+            ]}
+            active={providersTab}
+            onChange={(id) => setProvidersTab(id as 'cloud' | 'embeddings' | 'offline')}
+          />
 
-          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-6">
-            <ProviderManager family="tts" config={config} onChange={setConfig} />
-            <ProviderManager family="stt" config={config} onChange={setConfig} />
-            <ProviderManager family="image" config={config} onChange={setConfig} />
-          </div>
+          {providersTab === 'offline' && <OfflinePreset onChange={setConfig} />}
 
+          {providersTab === 'embeddings' && (
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
@@ -712,7 +722,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               )}
             />
           </div>
+          )}
 
+          {providersTab === 'cloud' && (
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
               <Cloud className="w-4 h-4" />
@@ -953,6 +965,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             </div>
           </div>
+          )}
         </div>
       )}
 
