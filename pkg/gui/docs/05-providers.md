@@ -52,7 +52,7 @@ provider.
 
 ### Offline Preset and Verification
 
-To configure a fully offline stack in one step, choose **Offline preset** under the Providers tab in Settings Studio, or run `localrpg config offline-preset`. This switches the GM role to the Narrative Oracle, speech synthesis to Native OS, image generation to Procedural Art, and vector search to built-in projections.
+To configure a fully offline stack in one step, choose the **Offline** sub-tab under Providers in Settings Studio, then **Offline preset**, or run `localrpg config offline-preset`. This switches the GM role to the Narrative Oracle, speech synthesis to Native OS, image generation to Procedural Art, and vector search to built-in projections.
 
 To verify that all active providers operate offline, choose **Check offline** in Settings Studio or run `localrpg config check-offline`.
 

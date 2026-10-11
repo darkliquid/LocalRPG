@@ -43,7 +43,7 @@ LocalRPG classifies every registered provider into one of four capability tiers.
 If you want a verified zero-network stack immediately, LocalRPG provides an automated offline preset bundle:
 
 1. Open **Settings Studio** and choose the **Providers** tab.
-2. Select **Offline preset** in the Offline Operations panel.
+2. Choose the **Offline** sub-tab, then select **Offline preset**.
 3. Review the affected providers and pick your speech synthesizer (`native-os` for zero downloads or `sherpa-onnx` for local neural voice).
 4. Select **Apply preset** to configure the stack.
 
