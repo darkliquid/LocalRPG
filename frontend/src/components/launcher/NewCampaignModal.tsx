@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { WorldInfo, SystemInfo, CreateGameRequest, TTSConfig, VoiceProfile } from '../../types';
+import { WorldInfo, SystemInfo, CreateGameRequest, CharacterCreationField, TTSConfig, VoiceProfile } from '../../types';
 import { APIClient } from '../../api/client';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
 import { X, Upload, Check, Volume2, MapPin, Sparkles, User, Wand2 } from 'lucide-react';
@@ -17,6 +17,10 @@ interface NewCampaignModalProps {
   onCreateGame: (data: CreateGameRequest, bannerFile?: File, iconFile?: File) => Promise<void>;
   isSubmitting: boolean;
 }
+
+// BUILT_IN_FIELD_IDS are the prompts the form always asks. An authored prompt with
+// one of these ids is skipped, so a system cannot ask the same thing twice.
+const BUILT_IN_FIELD_IDS = new Set(['appearance', 'age', 'gender', 'pronouns', 'background', 'voice']);
 
 export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   isOpen,
@@ -38,6 +42,11 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   const [narratorProfile, setNarratorProfile] = useState<VoiceProfile | null>(null);
   const [openingPrompt, setOpeningPrompt] = useState('');
   const [startLocation, setStartLocation] = useState('');
+  // The system's authored creation prompts, when it has any. They render below the
+  // built-in fields, and their answers travel in the player's extra map.
+  const [creationFields, setCreationFields] = useState<CharacterCreationField[]>([]);
+  const [creationPreamble, setCreationPreamble] = useState('');
+  const [creationValues, setCreationValues] = useState<Record<string, string>>({});
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generatingKind, setGeneratingKind] = useState<'banner' | 'icon' | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
@@ -66,6 +75,36 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
       })
       .catch((err) => console.error('Failed to load voice profiles', err));
   }, []);
+
+  // A system may author its own creation prompts. They are read from the selected
+  // system's detail, so the form follows the manifest rather than a fixed list.
+  useEffect(() => {
+    if (!isOpen || !selectedSystemID) {
+      setCreationFields([]);
+      setCreationPreamble('');
+      setCreationValues({});
+      return;
+    }
+    let cancelled = false;
+    APIClient.getSystem(selectedSystemID)
+      .then((detail) => {
+        if (cancelled) return;
+        const fields = detail.character_creation?.fields ?? [];
+        setCreationFields(fields);
+        setCreationPreamble(detail.character_creation?.preamble ?? '');
+        const seeded: Record<string, string> = {};
+        for (const field of fields) {
+          if (field.default) seeded[field.id] = field.default;
+        }
+        setCreationValues(seeded);
+      })
+      .catch(() => {
+        if (!cancelled) setCreationFields([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, selectedSystemID]);
 
   useEffect(() => {
     if (world) {
@@ -208,9 +247,21 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
     }
   };
 
+  const authoredFields = creationFields.filter(
+    (field) => !BUILT_IN_FIELD_IDS.has(field.id) && field.kind !== 'voice',
+  );
+  const setAuthoredValue = (id: string, value: string) =>
+    setCreationValues((prev) => ({ ...prev, [id]: value }));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!campaignName.trim() || !selectedSystemID || !playerName.trim()) return;
+
+    const extra: Record<string, string> = {};
+    for (const field of authoredFields) {
+      const value = (creationValues[field.id] ?? '').trim();
+      if (value !== '') extra[field.id] = value;
+    }
 
     onCreateGame(
       {
@@ -228,6 +279,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
           pronouns: playerPronouns.trim() || undefined,
           background: playerBackground.trim() || undefined,
           voice: playerProfile ?? undefined,
+          extra: Object.keys(extra).length > 0 ? extra : undefined,
         },
       },
       bannerFile || undefined,
@@ -544,9 +596,67 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 onChange={(e) => setPlayerBackground(e.target.value)}
                 placeholder="e.g. Disgraced royal archivist searching for forbidden relics"
                 className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
-              />
-            </div>
-          </div>
+                />
+                </div>
+
+                {authoredFields.length > 0 && (
+                <div className="space-y-3 pt-3 border-t border-white/10">
+                {creationPreamble.trim() !== '' && (
+                <p className="text-xs font-sans text-stone-400">{creationPreamble}</p>
+                )}
+                {authoredFields.map((field) => (
+                <div key={field.id} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                  <label className="text-xs font-sans text-stone-400">
+                  {field.label}
+                  {field.required && <span className="ml-1 text-purple-400">*</span>}
+                  </label>
+                  {field.generatable && (
+                  <AIGenerateButton
+                  formType="character"
+                  fieldName={field.id}
+                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                  getContext={getFormContext}
+                  onGenerated={(val) => setAuthoredValue(field.id, val)}
+                  worldID={world?.id}
+                  systemID={selectedSystemID}
+                  seed={creationValues[field.id] ?? ''}
+                  />
+                  )}
+                  </div>
+                  {field.kind === 'select' ? (
+                  <select
+                  value={creationValues[field.id] ?? field.default ?? ''}
+                  onChange={(e) => setAuthoredValue(field.id, e.target.value)}
+                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500 cursor-pointer"
+                  >
+                  <option value="">(choose)</option>
+                  {(field.options ?? []).map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                  ))}
+                  </select>
+                  ) : field.kind === 'long' ? (
+                  <textarea
+                  rows={2}
+                  value={creationValues[field.id] ?? ''}
+                  onChange={(e) => setAuthoredValue(field.id, e.target.value)}
+                  placeholder={field.prompt || ''}
+                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
+                  />
+                  ) : (
+                  <input
+                  type={field.kind === 'number' ? 'number' : 'text'}
+                  value={creationValues[field.id] ?? ''}
+                  onChange={(e) => setAuthoredValue(field.id, e.target.value)}
+                  placeholder={field.prompt || ''}
+                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500"
+                  />
+                  )}
+                </div>
+                ))}
+                </div>
+                )}
+                </div>
 
           {/* Story Directive & Start Location */}
           <div className="p-3.5 bg-stone-950/70 border border-white/10 rounded-2xl space-y-3">
