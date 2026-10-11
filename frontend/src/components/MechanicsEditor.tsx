@@ -698,6 +698,7 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
             governing stat&apos;s value to the roll. A skill with no stat adds nothing.
           </>
         }
+        example={`skills:\n  - { id: athletics, label: Athletics, stat: might }`}
       >
         <SkillsEditor skills={mechanics.skills ?? []} stats={stats} onChange={(next) => patch({ skills: next })} />
       </Section>
@@ -709,6 +710,7 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
             When the health stat reaches zero, the zero effect runs (such as <code>downed</code>).
           </>
         }
+        example={`health:\n  stat: vigor\n  max_stat: vigor_max\n  zero_effect: downed`}
       >
         <HealthEditor health={mechanics.health} stats={stats} onChange={(health) => patch({ health })} />
       </Section>
@@ -734,6 +736,7 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
             off for a system with no progression.
           </>
         }
+        example={`advancement:\n  currency:\n    stat: xp\n    label: Experience\n  mode: spend\n  earn:\n    - { on: check_outcome, outcome: miss, amount: 1 }\n  unlocks:\n    - id: iron_will\n      label: Iron Will\n      cost: 3\n      effects:\n        - { type: stat_increase, stat: vigor, amount: 1 }`}
       >
         <AdvancementEditor
           advancement={mechanics.advancement}
@@ -750,6 +753,7 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
             Engagement is this system&apos;s default mechanics policy for a campaign.
           </>
         }
+        example={`engagement: auto\nallow_freeform_state: false`}
       >
         <label className="flex items-center gap-2 text-xs font-sans text-stone-300">
           <input
