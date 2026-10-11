@@ -1,5 +1,6 @@
 import React from 'react';
 import { kenBurns, moodTint, parallaxOffset, weatherOverlay } from '../../lib/effects';
+import { EntityAvatar } from '../EntityAvatar';
 
 export interface TheaterLayer {
   depth: number;
@@ -124,10 +125,10 @@ export const TheaterStage: React.FC<TheaterStageProps> = ({
                   : 'border-white/30'
               }`}
             >
-              <img
+              <EntityAvatar
                 src={playerPortrait}
+                name={playerLabel ?? 'Player'}
                 alt=""
-                aria-hidden="true"
                 className="w-full h-full object-cover object-top rounded-2xl"
               />
             </div>
@@ -153,10 +154,10 @@ export const TheaterStage: React.FC<TheaterStageProps> = ({
                   : 'border-white/30'
               }`}
             >
-              <img
+              <EntityAvatar
                 src={npcPortrait}
+                name={npcLabel ?? 'Unknown'}
                 alt=""
-                aria-hidden="true"
                 className="w-full h-full object-cover object-top scale-x-[-1] rounded-2xl"
               />
             </div>

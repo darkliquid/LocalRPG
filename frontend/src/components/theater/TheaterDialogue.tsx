@@ -1,6 +1,7 @@
 import React from 'react';
 import { TurnSegment } from '../../types';
 import { MarkdownProse } from '../MarkdownProse';
+import { EntityAvatar } from '../EntityAvatar';
 
 interface TheaterDialogueProps {
   segment?: TurnSegment;
@@ -70,16 +71,16 @@ export const TheaterDialogue: React.FC<TheaterDialogueProps> = ({
         aria-label={isSpeech ? `${name}: ${text}` : text}
       >
         <div className="flex items-end gap-3">
-          {isSpeech && segment?.portrait_url && (
+          {isSpeech && (
             <div
               className={`w-16 h-16 rounded-lg overflow-hidden shrink-0 border-2 shadow-2xl bg-black/40 ${
                 isPlayer ? 'border-sky-400/80' : 'border-purple-400/80'
               }`}
             >
-              <img
-                src={segment.portrait_url}
+              <EntityAvatar
+                src={segment?.portrait_url}
+                name={name}
                 alt=""
-                aria-hidden="true"
                 className="w-full h-full object-cover rounded-lg"
               />
             </div>

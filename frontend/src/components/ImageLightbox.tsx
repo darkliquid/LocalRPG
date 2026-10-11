@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
+import { EntityAvatar } from './EntityAvatar';
 
 interface ImageLightboxProps {
   src: string;
@@ -40,8 +41,9 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({ src, alt, onClose,
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <img
+        <EntityAvatar
           src={src}
+          name={alt}
           alt={alt}
           className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain border border-white/10"
         />

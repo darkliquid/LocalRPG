@@ -3,6 +3,7 @@ import { TurnSegment, TurnCheck, PlaybackEntry } from '../types';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { anySegmentHasAudio, segmentIsGroupLeader } from '../lib/audio';
 import { MarkdownProse } from './MarkdownProse';
+import { EntityAvatar } from './EntityAvatar';
 import { ImageLightbox } from './ImageLightbox';
 import { useLightbox } from '../hooks/useLightbox';
 import { DiceCheckCard } from './DiceCheckCard';
@@ -171,10 +172,10 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
                     ? characterPortraits[charId].hasCustom
                     : !!segment.has_custom_portrait);
 
-                return portraitURL ? (
+                return segment.speaker || portraitURL ? (
                   <div
                     onClick={() => {
-                      if (hasCustomPortrait) {
+                      if (hasCustomPortrait && portraitURL) {
                         openLightbox(portraitURL, segment.speaker || 'Portrait');
                       }
                     }}
@@ -185,11 +186,11 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
                     }`}
                     title={hasCustomPortrait ? `View portrait of ${segment.speaker || 'character'}` : (segment.speaker || 'character')}
                   >
-                    <img
+                    <EntityAvatar
                       src={portraitURL}
+                      name={segment.speaker || 'Speaker'}
                       alt={segment.speaker || 'Speaker portrait'}
                       className="w-full h-full object-cover"
-                      loading="lazy"
                     />
                   </div>
                 ) : null;
