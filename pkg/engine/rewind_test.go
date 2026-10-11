@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -126,5 +127,46 @@ func TestProcessActionUndoRewindsIndex(t *testing.T) {
 	}
 	if count != 1 {
 		t.Errorf("CountTurns = %d, want 1 after undo", count)
+	}
+}
+
+// TestTimelineRewindDropsTheDiscardedTurnsScenes guards the same defect the reset
+// path had: an illustration is stored under the turn number it illustrates rather
+// than under the content that produced it, so one left behind is served for
+// whatever is played at that number next.
+func TestTimelineRewindDropsTheDiscardedTurnsScenes(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	store := newTestStore(t)
+	history := NewHistoryLogger(filepath.Join(t.TempDir(), "history.jsonl"))
+	timeline := NewTimeline(paths, store, history, "campaign-01")
+
+	for n := 1; n <= 3; n++ {
+		turn := Turn{Number: n, Timestamp: time.Now(), Mode: "Do", Input: "I wait"}
+		if err := timeline.RecordTurn(&turn, nil); err != nil {
+			t.Fatalf("RecordTurn(%d): %v", n, err)
+		}
+	}
+
+	scenesDir := filepath.Join(timeline.GameDir(), "assets", "scenes")
+	if err := os.MkdirAll(scenesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for n := 1; n <= 3; n++ {
+		if err := os.WriteFile(filepath.Join(scenesDir, fmt.Sprintf("turn-%d.png", n)), []byte("scene"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := timeline.RewindToTurn(1); err != nil {
+		t.Fatalf("RewindToTurn failed: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(scenesDir, "turn-1.png")); err != nil {
+		t.Errorf("the kept turn's image should survive: %v", err)
+	}
+	for n := 2; n <= 3; n++ {
+		if _, err := os.Stat(filepath.Join(scenesDir, fmt.Sprintf("turn-%d.png", n))); !os.IsNotExist(err) {
+			t.Errorf("turn %d's image should go with the turn, stat err = %v", n, err)
+		}
 	}
 }

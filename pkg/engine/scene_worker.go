@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -552,4 +553,50 @@ func (w *SceneWorker) generate(ctx context.Context, gen SceneGenerator, job Scen
 		}
 	}
 	return gen.GenerateImage(ctx, job.Prompt)
+}
+
+// sceneTurnNumber reads the turn a stored illustration belongs to from its file
+// name, and reports false for a name that is not one. The name is the only thing
+// that ties an image to a turn: the same path is reused when turns are discarded,
+// so a file left behind is served for whatever is played at that number next.
+func sceneTurnNumber(name string) (int, bool) {
+	base := strings.TrimSuffix(name, filepath.Ext(name))
+	digits, ok := strings.CutPrefix(base, "turn-")
+	if !ok {
+		return 0, false
+	}
+	number, err := strconv.Atoi(digits)
+	if err != nil {
+		return 0, false
+	}
+	return number, true
+}
+
+// ClearSceneImagesFrom removes the illustrations of every turn after afterTurn,
+// for a caller that has just discarded those turns: a reset discards all of them
+// (afterTurn 0) and an undo discards the tail. The images belong to the timeline
+// that produced them, so they go with it. Bespoke artwork edited by hand is not
+// named for a turn and is left alone.
+func ClearSceneImagesFrom(gameDir string, afterTurn int) error {
+	scenesDir := filepath.Join(gameDir, "assets", "scenes")
+	entries, err := os.ReadDir(scenesDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("read scene images: %w", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		number, ok := sceneTurnNumber(entry.Name())
+		if !ok || number <= afterTurn {
+			continue
+		}
+		if err := os.Remove(filepath.Join(scenesDir, entry.Name())); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove scene image %q: %w", entry.Name(), err)
+		}
+	}
+	return nil
 }

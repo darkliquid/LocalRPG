@@ -65,3 +65,34 @@ func TestOutcomeToneWords(t *testing.T) {
 		t.Fatal("an unknown outcome should add nothing")
 	}
 }
+
+// TestSceneCastDescribesThePlayer guards the invariant a scene image depends on:
+// the turn's own mentions put the player in the cast, so the protagonist's
+// authored appearance reaches the prompt of every scene it appears in.
+func TestSceneCastDescribesThePlayer(t *testing.T) {
+	f := newResetFixture(t)
+
+	turn := &Turn{
+		Number:   1,
+		Location: OpeningSceneEntityID,
+		Entities: []entity.Mention{
+			{ID: "sean", Kind: entity.MentionPlayer},
+			{ID: OpeningSceneEntityID, Kind: entity.MentionLocation},
+		},
+	}
+
+	cast := SceneCast(f.store, turn)
+	if len(cast) == 0 || cast[0].Name != "Sean" {
+		t.Fatalf("cast = %+v, want the player first", cast)
+	}
+	if cast[0].Appearance != "Weathered." {
+		t.Fatalf("player appearance = %q, want the authored description", cast[0].Appearance)
+	}
+
+	prompt := BuildScenePrompt(ScenePromptContext{Cast: cast, Location: "Harbour Realm"})
+	for _, want := range []string{"Sean", cast[0].Appearance} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("prompt missing %q: %s", want, prompt)
+		}
+	}
+}

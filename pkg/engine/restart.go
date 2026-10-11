@@ -16,13 +16,17 @@ import (
 // ResetCampaign returns a campaign to its opening state without touching its
 // configuration. The world's template cast is restored, notes created during
 // play are removed, the protagonist keeps its authored sheet but loses its
-// runtime state, and the timeline is cleared. The manifest, the assets directory
+// runtime state, and the timeline is cleared. The manifest, the campaign's own
+// artwork (its banner, its icon, the character portraits and the location art)
 // and the usage ledger are left alone, so a restart costs the player their story
 // and nothing else.
 //
-// Batch synthesis jobs are removed too: they exist to speak narration that the
-// reset has just discarded. A caller that can reach the provider should cancel
-// an active job before calling this; the row is deleted either way.
+// What belongs to the discarded timeline goes with it. That is the batch
+// synthesis jobs, because they exist to speak narration the reset has just
+// discarded, and the turn illustrations, because they are named by turn number:
+// leaving them would have the new timeline's first turn serve the previous run's
+// scene. A caller that can reach the provider should cancel an active job before
+// calling this; the row is deleted either way.
 //
 // The initial set is derived from the world rather than snapshotted at creation,
 // so a world author's correction reaches a restarted campaign.
@@ -58,6 +62,10 @@ func ResetCampaign(paths *core.PathResolver, store *storage.Store, manifest *cor
 	history := NewHistoryLogger(filepath.Join(gameDir, "history.jsonl"))
 	if err := history.RewindToTurn(0); err != nil {
 		return fmt.Errorf("clear history: %w", err)
+	}
+
+	if err := ClearSceneImagesFrom(gameDir, 0); err != nil {
+		return err
 	}
 
 	if _, err := storage.NewSyncer(store).Sync(entitiesDir); err != nil {
