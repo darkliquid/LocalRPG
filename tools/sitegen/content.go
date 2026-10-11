@@ -238,32 +238,32 @@ var showcaseShots = []shot{
 	{
 		File:    "01-launcher.jpg",
 		Title:   "Launcher Hub",
-		Caption: "Campaigns, worlds and systems in one dock, with a hero stage for the one you played last.",
+		Caption: "Campaigns, worlds, and systems dock with quick-start creation wizards, ready for immediate play.",
 	},
 	{
 		File:    "02-worlds-studio.jpg",
 		Title:   "Worlds Studio",
-		Caption: "Author lore prompts, art direction and starter entities without leaving the app.",
+		Caption: "Author factions, lore, and entity trees by hand or generate complete settings with AI pipelines.",
 	},
 	{
 		File:    "03-systems-studio.jpg",
 		Title:   "Systems Studio",
-		Caption: "Write rules prompts, wire mechanics.js hooks, and test dice expressions inline.",
+		Caption: "Craft dice mechanics and action modes with worked examples, and verify balance with test scenarios.",
 	},
 	{
 		File:    "04-settings.jpg",
 		Title:   "Settings Studio",
-		Caption: "Route every role to a local or CLI model, with live latency diagnostics and cost tracking.",
+		Caption: "Configure local LLMs, ONNX embeddings, multi-voice audio, and media engines across structured tabs.",
 	},
 	{
 		File:    "05-codex.jpg",
 		Title:   "Codex Drawer",
-		Caption: "Entity notes, wikilink graphs and per-character voice overrides in one drawer.",
+		Caption: "Inspect wikilinked entity lore, track dynamic character appearances, and customize voice profiles.",
 	},
 	{
 		File:    "06-story-theatre.jpg",
 		Title:   "Story Theatre",
-		Caption: "Replay a campaign as a visual novel, each line spoken in its own character's voice.",
+		Caption: "Replay campaign scenes as an interactive visual novel, spoken in each character's distinct voice.",
 	},
 }
 
