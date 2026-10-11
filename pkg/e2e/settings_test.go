@@ -68,8 +68,9 @@ func TestSettingsEmbeddingsSectionRenders(t *testing.T) {
 	b.Click(`//button[@aria-label="Settings"]`)
 	b.WaitFor("Global Settings")
 	b.Click(`//button[.//span[normalize-space()='Providers']]`)
+	b.Click(`//button[@role='tab'][.//span[normalize-space()='Embeddings']]`)
 
-	b.WaitFor("Embeddings")
+	b.WaitFor("Add Embedding Provider")
 	b.Click(`//button[normalize-space()='Add Embedding Provider']`)
 	b.WaitFor("new-provider")
 }
