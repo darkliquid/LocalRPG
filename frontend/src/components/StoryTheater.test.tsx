@@ -59,3 +59,31 @@ describe('StoryTheater grouping', () => {
     expect(screen.getByText(/one/)).toBeInTheDocument();
   });
 });
+
+describe('StoryTheater roll cards', () => {
+  it('shows the roll card for the beat that narrates it', () => {
+    const turn: Turn = {
+      turn_number: 1,
+      input_text: '',
+      mode: 'do',
+      prose: '',
+      segments: [{ kind: 'narration', text: 'You slip past the guard.', check_ref: 'c1' }],
+      checks: [
+        {
+          check_id: 'c1',
+          actor: 'player',
+          outcome: 'strong',
+          outcome_text: 'You slip past the guard.',
+          roll: { notation: '2d6', total: 9 },
+        },
+      ],
+    };
+
+    render(<StoryTheater turns={[turn]} isOpen onClose={() => {}} />);
+
+    // The narration and the card both carry the outcome text; the notation is the
+    // card's alone.
+    expect(screen.getAllByText('You slip past the guard.').length).toBeGreaterThan(0);
+    expect(screen.getByText('2d6')).toBeInTheDocument();
+  });
+});

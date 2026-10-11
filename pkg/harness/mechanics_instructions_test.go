@@ -58,6 +58,9 @@ func TestFormatMechanicsInstructionsPerPolicy(t *testing.T) {
 	if !strings.Contains(auto, "request_check") || !strings.Contains(auto, "2d6") {
 		t.Errorf("auto text = %q", auto)
 	}
+	if !strings.Contains(auto, "Do not restate the dice") {
+		t.Errorf("auto text should forbid restating the dice: %q", auto)
+	}
 	ask := FormatMechanicsInstructions(spec, "ask", nil)
 	if !strings.Contains(ask, "propose_check") || strings.Contains(ask, "Resolve with request_check") {
 		t.Errorf("ask text = %q", ask)

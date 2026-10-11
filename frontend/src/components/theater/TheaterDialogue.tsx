@@ -1,6 +1,7 @@
 import React from 'react';
-import { TurnSegment } from '../../types';
+import { TurnCheck, TurnSegment } from '../../types';
 import { MarkdownProse } from '../MarkdownProse';
+import { DiceCheckCard } from '../DiceCheckCard';
 
 interface TheaterDialogueProps {
   segment?: TurnSegment;
@@ -18,6 +19,9 @@ interface TheaterDialogueProps {
   // caption shows the current spoken line as an accessibility overlay, so a
   // viewer who cannot hear the audio still reads the dialogue.
   caption?: boolean;
+  // check is the roll this beat narrates, when it has one, so the mechanism is a
+  // card rather than prose.
+  check?: TurnCheck;
   onAdvance: () => void;
 }
 
@@ -33,6 +37,7 @@ export const TheaterDialogue: React.FC<TheaterDialogueProps> = ({
   reveal = 1,
   noAudio = false,
   caption = false,
+  check,
   onAdvance,
 }) => {
   const text = segment?.text ?? fallback;
@@ -53,6 +58,11 @@ export const TheaterDialogue: React.FC<TheaterDialogueProps> = ({
             <span className="font-bold text-purple-300">{name}: </span>
             {text}
           </span>
+        </div>
+      )}
+      {check && (
+        <div className="w-full max-w-4xl mx-auto pointer-events-auto">
+          <DiceCheckCard check={check} />
         </div>
       )}
       <div
