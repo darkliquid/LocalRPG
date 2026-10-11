@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
@@ -40,7 +41,7 @@ func TestGateHonoursPolicies(t *testing.T) {
 		want   bool
 	}{
 		{"off", false}, {"manual", false}, {"every_turn", true},
-		{"scene_break", true}, {"significant", true},
+		{"scene_break", true}, {"significant", true}, {"major", true},
 	}
 	for _, c := range cases {
 		o := &TurnOrchestrator{imageTrigger: c.policy}
@@ -61,5 +62,33 @@ func TestGateHonoursPolicies(t *testing.T) {
 	}
 	if !def.shouldIllustrate(turn, nil) {
 		t.Error("the unset policy should illustrate a scene break")
+	}
+}
+
+func TestMajorSceneChange(t *testing.T) {
+	cfg := DefaultTriggerConfig()
+	speech := func(id string) []entity.TurnSegment {
+		return []entity.TurnSegment{{SpeakerID: id}}
+	}
+
+	cases := []struct {
+		name string
+		turn Turn
+		past []Turn
+		want bool
+	}{
+		{"scene break", Turn{SceneBreak: true}, nil, true},
+		{"location change", Turn{Location: "hall"}, []Turn{{Location: "tavern"}}, true},
+		{"extreme outcome", Turn{Checks: []harness.CheckResult{{Outcome: "critical"}}}, nil, true},
+		{"major new character", Turn{Segments: speech("kaelen")}, []Turn{{Location: "tavern"}}, true},
+		{"long narration only", Turn{Narration: strings.Repeat("x", 800)}, nil, false},
+		{"returning character", Turn{Segments: speech("kaelen")}, []Turn{{Segments: speech("kaelen")}}, false},
+		{"ordinary success", Turn{Checks: []harness.CheckResult{{Outcome: "success"}}}, nil, false},
+	}
+	for _, c := range cases {
+		got, _ := MajorSceneChange(c.turn, c.past, cfg)
+		if got != c.want {
+			t.Errorf("%s: got %v want %v", c.name, got, c.want)
+		}
 	}
 }

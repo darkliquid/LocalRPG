@@ -19,15 +19,15 @@ func TestInteractiveRollsDefault(t *testing.T) {
 
 func TestImageTriggerDefault(t *testing.T) {
 	cfg := DefaultConfig()
-	if cfg.ImageTrigger() != "significant" {
-		t.Fatalf("default = %q", cfg.ImageTrigger())
+	if cfg.ImageTrigger() != "major" {
+		t.Fatalf("default = %q, want the major-change policy", cfg.ImageTrigger())
 	}
 	cfg.Media.Image.Trigger = "every_turn"
 	if cfg.ImageTrigger() != "every_turn" {
 		t.Fatalf("override = %q", cfg.ImageTrigger())
 	}
 	cfg.Media.Image.Trigger = "nonsense"
-	if cfg.ImageTrigger() != "significant" {
+	if cfg.ImageTrigger() != "major" {
 		t.Fatalf("unknown value should normalise, got %q", cfg.ImageTrigger())
 	}
 }

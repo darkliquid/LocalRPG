@@ -5,17 +5,26 @@ import "strings"
 // TriggerConfig tunes the significance heuristic, so a campaign can change its
 // thresholds without a schema change.
 type TriggerConfig struct {
-	// DecisiveOutcomes are the check outcomes that make a turn worth illustrating.
+	// DecisiveOutcomes are the check outcomes that make a turn worth illustrating
+	// under the broad significant heuristic.
 	DecisiveOutcomes []string
 	// NarrationThreshold is the rune count above which a beat has substance.
 	NarrationThreshold int
+	// ExtremeOutcomes are the check outcomes that mark a scene change: a critical
+	// result either way, not an ordinary hit or miss.
+	ExtremeOutcomes []string
+	// MajorCharacterWindow is how many recent turns a character must be absent from
+	// to count as newly introduced.
+	MajorCharacterWindow int
 }
 
 // DefaultTriggerConfig is the heuristic's default thresholds.
 func DefaultTriggerConfig() TriggerConfig {
 	return TriggerConfig{
-		DecisiveOutcomes:   []string{"strong", "success", "pass", "critical", "miss", "fail", "failure"},
-		NarrationThreshold: 400,
+		DecisiveOutcomes:     []string{"strong", "success", "pass", "critical", "miss", "fail", "failure"},
+		NarrationThreshold:   400,
+		ExtremeOutcomes:      []string{"critical", "critical_success", "fumble", "critical_failure"},
+		MajorCharacterWindow: 5,
 	}
 }
 
@@ -40,6 +49,55 @@ func ShouldIllustrate(turn, prev Turn, cfg TriggerConfig) (bool, string) {
 		return true, "substantial narration"
 	}
 	return false, ""
+}
+
+func MajorSceneChange(turn Turn, pastTurns []Turn, cfg TriggerConfig) (bool, string) {
+	if turn.SceneBreak {
+		return true, "scene break"
+	}
+	var prev Turn
+	if len(pastTurns) > 0 {
+		prev = pastTurns[len(pastTurns)-1]
+	}
+	if turn.Location != "" && prev.Location != "" && turn.Location != prev.Location {
+		return true, "location changed"
+	}
+	for _, check := range turn.Checks {
+		if isDecisiveOutcome(check.Outcome, cfg.ExtremeOutcomes) {
+			return true, "extreme check: " + check.Outcome
+		}
+	}
+	if speaker := majorNewCharacter(turn, pastTurns, cfg.MajorCharacterWindow); speaker != "" {
+		return true, "major new character: " + speaker
+	}
+	return false, ""
+}
+
+// majorNewCharacter returns the first speaker this turn who has not spoken in the
+// previous window turns, or "". A window rather than a single turn is what makes
+// it a *major* introduction: a character who speaks every few beats is not new.
+func majorNewCharacter(turn Turn, pastTurns []Turn, window int) string {
+	if window <= 0 {
+		window = 5
+	}
+	recent := make(map[string]bool)
+	start := len(pastTurns) - window
+	if start < 0 {
+		start = 0
+	}
+	for _, past := range pastTurns[start:] {
+		for _, segment := range past.Segments {
+			if segment.SpeakerID != "" {
+				recent[segment.SpeakerID] = true
+			}
+		}
+	}
+	for _, segment := range turn.Segments {
+		if segment.SpeakerID != "" && !recent[segment.SpeakerID] {
+			return segment.SpeakerID
+		}
+	}
+	return ""
 }
 
 func isDecisiveOutcome(outcome string, decisive []string) bool {
@@ -84,7 +142,9 @@ func (o *TurnOrchestrator) shouldIllustrate(turn Turn, pastTurns []Turn) bool {
 	case "every_turn":
 		return true
 	case "significant":
-		// Fall through to the heuristic below.
+		// Fall through to the broad heuristic below.
+	case "major":
+		return o.majorSceneChange(turn, pastTurns)
 	default:
 		return turn.SceneBreak
 	}
@@ -98,6 +158,20 @@ func (o *TurnOrchestrator) shouldIllustrate(turn Turn, pastTurns []Turn) bool {
 		prev = pastTurns[len(pastTurns)-1]
 	}
 	ok, reason := ShouldIllustrate(turn, prev, cfg)
+	if ok && o.logger != nil {
+		o.logger.Event("scene.illustrate", map[string]interface{}{"reason": reason})
+	}
+	return ok
+}
+
+// majorSceneChange applies the major-change policy: a scene break, a location
+// change, an extreme outcome, or a newly introduced character.
+func (o *TurnOrchestrator) majorSceneChange(turn Turn, pastTurns []Turn) bool {
+	cfg := o.triggerConfig
+	if len(cfg.ExtremeOutcomes) == 0 {
+		cfg = DefaultTriggerConfig()
+	}
+	ok, reason := MajorSceneChange(turn, pastTurns, cfg)
 	if ok && o.logger != nil {
 		o.logger.Event("scene.illustrate", map[string]interface{}{"reason": reason})
 	}
