@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MechanicsEditor } from './MechanicsEditor';
 import { MechanicsSpec } from '../types';
 
@@ -82,8 +82,9 @@ describe('MechanicsEditor', () => {
 
   it('carries a worked example for the checks section', () => {
     render(<Harness />);
-    const [, checksExample] = screen.getAllByText('Example');
-    fireEvent.click(checksExample);
+    const section = screen.getByText('Checks').closest('section');
+    expect(section).not.toBeNull();
+    fireEvent.click(within(section as HTMLElement).getByText('Example'));
     expect(screen.getByText(/outcome: \[strong_hit, weak_hit, miss\]/)).toBeInTheDocument();
   });
 });
