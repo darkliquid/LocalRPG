@@ -303,3 +303,44 @@ func TestResetCampaignToleratesAMissingWorld(t *testing.T) {
 		t.Errorf("protagonist note should survive a world-less reset: %v", err)
 	}
 }
+
+func TestResetCampaignClearsTheCurrentAppearanceAndKeepsTheBaseline(t *testing.T) {
+	f := newResetFixture(t)
+
+	notePath := filepath.Join(f.gameDir, "entities", "sean.md")
+	note, err := os.ReadFile(notePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	player, err := entity.ParseMarkdownEntity(note)
+	if err != nil {
+		t.Fatal(err)
+	}
+	player.CurrentAppearance = "Soaked through and limping."
+	out, err := player.SerializeMarkdown()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(notePath, out, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ResetCampaign(f.paths, f.store, f.manifest); err != nil {
+		t.Fatalf("ResetCampaign: %v", err)
+	}
+
+	reset, err := os.ReadFile(notePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := entity.ParseMarkdownEntity(reset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back.CurrentAppearance != "" {
+		t.Errorf("CurrentAppearance = %q, want the circumstances cleared", back.CurrentAppearance)
+	}
+	if back.Appearance != "Weathered." {
+		t.Errorf("Appearance = %q, want the authored description kept", back.Appearance)
+	}
+}
