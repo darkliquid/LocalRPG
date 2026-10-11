@@ -88,6 +88,15 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
 
   const activeIndex = Math.min(activeSegment, segments.length - 1);
   const active = segments[activeIndex];
+  // The roll this beat narrates, when it has one. A check is an annotation on its
+  // beat, not a beat of its own: playback and audio are indexed by segment.
+  const activeCheck = useMemo(
+    () =>
+      active?.check_ref
+        ? (currentTurn?.checks ?? []).find((check) => check.check_id === active.check_ref)
+        : undefined,
+    [active, currentTurn],
+  );
   // A clip group shares one audio clip, so playback is keyed on the group's
   // leader: stepping within a group keeps the audio playing, and only entering a
   // new group switches it.
@@ -403,6 +412,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
           displayMode={displayMode}
           noAudio={beatNoAudio}
           caption={captions}
+          check={activeCheck}
           onAdvance={advanceDialogue}
         />
         <TheaterTransport
