@@ -980,6 +980,11 @@ export interface ResolutionProfile {
   outcomes?: SuccessOutcome[];
   position?: string[];
   effect?: string[];
+  // opposed names the stat the opponent rolls when this profile is a contest.
+  opposed?: string;
+  // ties decides an opposed check whose totals are equal: "opponent" hands it to
+  // the opponent, and empty or "actor" keeps it with the actor.
+  ties?: string;
 }
 
 export interface CheckConventions {
