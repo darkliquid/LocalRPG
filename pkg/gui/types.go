@@ -1167,6 +1167,11 @@ type AudioStatusDTO struct {
 	Turn    int    `json:"turn"`
 	Segment int    `json:"segment"`
 	Owner   string `json:"owner,omitempty"`
+	// Error carries a human-readable reason for a failed or aborted beat. It is
+	// empty on success, so a client can distinguish silence from failure.
+	Error string `json:"error,omitempty"`
+	// Stage names where the failure happened: synthesize, decode, queue, configure.
+	Stage string `json:"stage,omitempty"`
 }
 
 // TraceEventDTO is one traced event. The event's own fields are nested rather

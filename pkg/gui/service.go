@@ -3292,6 +3292,7 @@ func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.
 			for _, index := range group.SegmentIndexes {
 				clips, err := s.synthesizeSegment(ctx, gameID, turn, index, false)
 				if err != nil {
+					s.broadcastAudioFailure(turn.Number, index, err, "synthesize")
 					continue
 				}
 				for _, clip := range clips {
@@ -3308,6 +3309,7 @@ func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.
 		}
 		clips, err := s.synthesizeSegment(ctx, gameID, turn, i, force)
 		if err != nil {
+			s.broadcastAudioFailure(turn.Number, i, err, "synthesize")
 			continue
 		}
 		for _, clip := range clips {
@@ -3456,6 +3458,22 @@ func (s *Service) broadcastAudioStatus(status AudioStatusDTO) {
 		default:
 		}
 	}
+}
+
+// broadcastAudioFailure reports a beat that could not be produced, so a client
+// shows why a beat went quiet rather than treating the silence as success.
+func (s *Service) broadcastAudioFailure(turnNumber, segment int, err error, stage string) {
+	if err == nil {
+		return
+	}
+	s.broadcastAudioStatus(AudioStatusDTO{
+		Available: true,
+		Playing:   false,
+		Turn:      turnNumber,
+		Segment:   segment,
+		Error:     err.Error(),
+		Stage:     stage,
+	})
 }
 
 // setAudioCurrent records the beat a queue is playing, so its completion event
