@@ -80,6 +80,24 @@ func newResetFixture(t *testing.T) *resetFixture {
 			t.Fatal(err)
 		}
 	}
+	// The played-in state carries art of both kinds: turn illustrations, which
+	// belong to the timeline, and a portrait, which belongs to the character.
+	scenesDir := filepath.Join(assetsDir, "scenes")
+	if err := os.MkdirAll(scenesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"turn-1.png": "scene-bytes", "turn-2.svg": "<svg/>"} {
+		if err := os.WriteFile(filepath.Join(scenesDir, name), []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	portraitsDir := filepath.Join(assetsDir, "portraits")
+	if err := os.MkdirAll(portraitsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(portraitsDir, "sean.png"), []byte("portrait-bytes"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	entitiesDir := filepath.Join(gameDir, "entities")
 	played := []byte("---\nid: harbourmaster\nname: Harbourmaster\ntype: character\nhistory: [1]\n---\nNow friendly.\n")
@@ -193,6 +211,16 @@ func TestResetCampaignRestoresWorldCastAndKeepsConfiguration(t *testing.T) {
 		if string(got) != want {
 			t.Errorf("asset %s = %q, want %q", name, got, want)
 		}
+	}
+
+	// The timeline's illustrations went with the timeline: they are named by turn
+	// number, so one left behind is served for the new timeline's same turn. The
+	// portrait is named by the character, so it is still the right picture.
+	if entries, err := os.ReadDir(filepath.Join(f.gameDir, "assets", "scenes")); err == nil && len(entries) > 0 {
+		t.Errorf("scene images = %d, want the discarded timeline's illustrations removed", len(entries))
+	}
+	if _, err := os.Stat(filepath.Join(f.gameDir, "assets", "portraits", "sean.png")); err != nil {
+		t.Errorf("portrait should survive the reset: %v", err)
 	}
 
 	turns, err := f.store.CountTurns()

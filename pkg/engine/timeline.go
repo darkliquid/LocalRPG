@@ -468,6 +468,12 @@ func (t *Timeline) RewindToTurn(target int) error {
 	if err := t.store.DeleteTurnsFrom(target + 1); err != nil {
 		return fmt.Errorf("delete indexed turns: %w", err)
 	}
+	// The illustrations of the discarded turns go with them: they are named by
+	// turn number, so one left behind is served for whatever is played at that
+	// number next.
+	if err := ClearSceneImagesFrom(t.GameDir(), target); err != nil {
+		return err
+	}
 	return nil
 }
 

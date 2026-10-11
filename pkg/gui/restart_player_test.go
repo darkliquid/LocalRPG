@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/core"
+	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
@@ -151,5 +152,49 @@ Sean grew up on the docks and never quite left them.`
 	}
 	if len(jobs) != 0 {
 		t.Errorf("batch jobs = %d, want them removed with the narration they speak", len(jobs))
+	}
+}
+
+// TestRestartGameDropsTheDiscardedTimelinesScenes covers the report that a
+// restarted campaign showed the previous run's scene image. A turn illustration
+// is stored under its turn number, the restart keeps the assets directory, and
+// the new timeline's turn 1 therefore finds the old file and serves it.
+func TestRestartGameDropsTheDiscardedTimelinesScenes(t *testing.T) {
+	gameID, svc := turnFixture(t)
+	gameDir := svc.GetResolver().GameDir(gameID)
+
+	scenesDir := filepath.Join(gameDir, "assets", "scenes")
+	if err := os.MkdirAll(scenesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(scenesDir, "turn-1.png"), []byte("previous-run-scene"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A portrait belongs to the character rather than to a turn, so it stays
+	// valid across a restart and must survive.
+	portraitsDir := filepath.Join(gameDir, "assets", "portraits")
+	if err := os.MkdirAll(portraitsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(portraitsDir, "sean.png"), []byte("portrait-bytes"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.RestartGame(context.Background(), gameID); err != nil {
+		t.Fatalf("RestartGame failed: %v", err)
+	}
+
+	turn := engine.Turn{Number: 1, Input: "I look around.", Narration: "The harbour again."}
+	if dto := svc.turnDTO(turn, nil, svc.Config(), gameID, ""); dto.ImageURL != "" {
+		t.Errorf("ImageURL = %q, want empty: the image belongs to the timeline the restart discarded", dto.ImageURL)
+	}
+
+	if data, _, err := svc.GetTurnSceneImage(context.Background(), gameID, 1); err == nil && len(data) > 0 {
+		t.Error("GetTurnSceneImage served the discarded timeline's image for turn 1")
+	}
+
+	if _, err := os.Stat(filepath.Join(portraitsDir, "sean.png")); err != nil {
+		t.Errorf("portrait should survive a restart: %v", err)
 	}
 }
