@@ -417,7 +417,9 @@ func TestMergeExtractedEntityUpdatesAppearanceWhenChanged(t *testing.T) {
 		t.Errorf("expected authored appearance kept, got %q", merged1.Appearance)
 	}
 
-	// 2. Evolution with AppearanceChanged updates appearance and age
+	// 2. Evolution with AppearanceChanged writes the current appearance, and the
+	// baseline stays whatever the note was authored with. Age is still updated in
+	// place: it is a fact about the note rather than how it looks.
 	evolution := &ExtractedEntity{
 		ID:                "vera",
 		Name:              "Vera",
@@ -427,8 +429,11 @@ func TestMergeExtractedEntityUpdatesAppearanceWhenChanged(t *testing.T) {
 		AppearanceChanged: true,
 	}
 	merged2 := MergeExtractedEntity(existing, evolution)
-	if merged2.Appearance != "Grey-streaked hair and a hardened gaze." {
-		t.Errorf("expected updated appearance, got %q", merged2.Appearance)
+	if merged2.Appearance != "Youthful scout with bright hazel eyes." {
+		t.Errorf("expected the baseline kept, got %q", merged2.Appearance)
+	}
+	if merged2.CurrentAppearance != "Grey-streaked hair and a hardened gaze." {
+		t.Errorf("expected the change to become the current appearance, got %q", merged2.CurrentAppearance)
 	}
 	if merged2.Age != "38" {
 		t.Errorf("expected updated age, got %q", merged2.Age)
@@ -646,5 +651,50 @@ func TestDecodeExtractedRepairsFencedJSON(t *testing.T) {
 	}
 	if out["name"] != "Vex" {
 		t.Fatalf("name = %q, want Vex", out["name"])
+	}
+}
+
+func TestMergeKeepsTheBaselineAndWritesTheCurrentAppearance(t *testing.T) {
+	existing := &entity.Entity{
+		ID:         "kaelen",
+		Name:       "Kaelen",
+		Type:       "character",
+		Appearance: "Silver hair and blast goggles.",
+	}
+	raw := &ExtractedEntity{
+		Name:              "Kaelen",
+		Appearance:        "A scar across one cheek.",
+		AppearanceChanged: true,
+	}
+
+	merged := MergeExtractedEntity(existing, raw)
+	if merged.Appearance != "Silver hair and blast goggles." {
+		t.Errorf("Appearance = %q, want the baseline untouched", merged.Appearance)
+	}
+	if merged.CurrentAppearance != "A scar across one cheek." {
+		t.Errorf("CurrentAppearance = %q, want the change", merged.CurrentAppearance)
+	}
+	if existing.Appearance != "Silver hair and blast goggles." {
+		t.Errorf("the existing note was mutated: %q", existing.Appearance)
+	}
+}
+
+func TestMergeGivesANewNoteItsBaseline(t *testing.T) {
+	merged := MergeExtractedEntity(&entity.Entity{ID: "kaelen", Name: "Kaelen", Type: "character"}, &ExtractedEntity{
+		Name: "Kaelen", Appearance: "Silver hair and blast goggles.",
+	})
+	if merged.Appearance != "Silver hair and blast goggles." {
+		t.Errorf("Appearance = %q, want the first description to become the baseline", merged.Appearance)
+	}
+	if merged.CurrentAppearance != "" {
+		t.Errorf("CurrentAppearance = %q, want it untouched for a new note", merged.CurrentAppearance)
+	}
+}
+
+func TestMergeLeavesAnUnchangedAppearanceAlone(t *testing.T) {
+	existing := &entity.Entity{ID: "kaelen", Name: "Kaelen", Appearance: "Silver hair.", CurrentAppearance: "Soaked."}
+	merged := MergeExtractedEntity(existing, &ExtractedEntity{Name: "Kaelen", Appearance: "Something else entirely."})
+	if merged.Appearance != "Silver hair." || merged.CurrentAppearance != "Soaked." {
+		t.Errorf("an unchanged extraction moved something: %q / %q", merged.Appearance, merged.CurrentAppearance)
 	}
 }

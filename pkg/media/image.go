@@ -33,8 +33,8 @@ func NewImagePipeline(client ImageClient, cache *ContentCache) *ImagePipeline {
 // GenerateLocationImage returns a cached scene image path, generating it when the
 // appearance has changed or force is set. The key covers authored intent only; the
 // prompt may include prose because it runs only on a miss.
-func (p *ImagePipeline) GenerateLocationImage(ctx context.Context, location *entity.Entity, worldStyle, providerParams string, force bool) (string, error) {
-	base := ComputeArtCacheKey(location.ID, AppearanceHash(location, providerParams), worldStyle)
+func (p *ImagePipeline) GenerateLocationImage(ctx context.Context, location *entity.Entity, worldStyle, providerParams string, force, layerCurrent bool) (string, error) {
+	base := ComputeArtCacheKey(location.ID, AppearanceHash(location, providerParams, layerCurrent), worldStyle)
 
 	if !force {
 		for _, ext := range []string{".svg", ".webp", ".jpg", ".jpeg", ".png"} {
@@ -44,8 +44,8 @@ func (p *ImagePipeline) GenerateLocationImage(ctx context.Context, location *ent
 		}
 	}
 
-	prompt := BuildLocationPrompt(location, worldStyle)
-	imgBytes, err := p.generateScene(ctx, location, worldStyle, prompt, providerParams)
+	prompt := BuildLocationPrompt(location, worldStyle, layerCurrent)
+	imgBytes, err := p.generateScene(ctx, location, worldStyle, prompt, providerParams, layerCurrent)
 	if err != nil {
 		return "", fmt.Errorf("generate image for %q: %w", location.ID, err)
 	}
@@ -55,9 +55,9 @@ func (p *ImagePipeline) GenerateLocationImage(ctx context.Context, location *ent
 
 // generateScene prefers a provider that understands structured hints, and falls
 // back to the prose prompt for every other provider.
-func (p *ImagePipeline) generateScene(ctx context.Context, location *entity.Entity, worldStyle, prompt, providerParams string) ([]byte, error) {
+func (p *ImagePipeline) generateScene(ctx context.Context, location *entity.Entity, worldStyle, prompt, providerParams string, layerCurrent bool) ([]byte, error) {
 	if hp, ok := p.client.(SceneHintProvider); ok {
-		return hp.GenerateScene(ctx, sceneRequest(location, worldStyle, AppearanceHash(location, providerParams)))
+		return hp.GenerateScene(ctx, sceneRequest(location, worldStyle, AppearanceHash(location, providerParams, layerCurrent), layerCurrent))
 	}
 	return p.client.GenerateImage(ctx, prompt)
 }
@@ -65,22 +65,22 @@ func (p *ImagePipeline) generateScene(ctx context.Context, location *entity.Enti
 // LocationLayers returns a location's scene as layers, when the client is the
 // built-in generator. Only that provider layers; every other provider makes one
 // flat image, and ok is false for it.
-func (p *ImagePipeline) LocationLayers(location *entity.Entity, worldStyle, providerParams string) (LayeredScene, bool) {
+func (p *ImagePipeline) LocationLayers(location *entity.Entity, worldStyle, providerParams string, layerCurrent bool) (LayeredScene, bool) {
 	if p.client == nil || location == nil {
 		return LayeredScene{}, false
 	}
 	if _, ok := p.client.(SceneHintProvider); !ok {
 		return LayeredScene{}, false
 	}
-	return GenerateLayeredScene(sceneRequest(location, worldStyle, AppearanceHash(location, providerParams))), true
+	return GenerateLayeredScene(sceneRequest(location, worldStyle, AppearanceHash(location, providerParams, layerCurrent), layerCurrent)), true
 }
 
 // sceneRequest derives structured hints for a location's scene. Every hint is
 // best-effort: an absent one falls back to a deterministic derivation in the
 // generator rather than failing the image.
-func sceneRequest(location *entity.Entity, worldStyle, appearanceHash string) SceneRequest {
+func sceneRequest(location *entity.Entity, worldStyle, appearanceHash string, layerCurrent bool) SceneRequest {
 	return SceneRequest{
-		Prompt:    BuildLocationPrompt(location, worldStyle),
+		Prompt:    BuildLocationPrompt(location, worldStyle, layerCurrent),
 		Genre:     genreFor(location, worldStyle),
 		Mood:      moodFor(location),
 		TimeOfDay: stateString(location, "time_of_day"),
@@ -142,11 +142,19 @@ func stateString(ent *entity.Entity, key string) string {
 // parameters so one model's art is never served for another. The note body is
 // deliberately excluded: extraction appends to it almost every turn, so hashing it
 // would regenerate art for no visual reason.
-func AppearanceHash(ent *entity.Entity, providerParams string) string {
+// AppearanceHash names the text a place's art is drawn from and keyed by, so the
+// picture and the thing that decides whether it redraws can never disagree.
+// layerCurrent adds the current appearance to the authored one; with it off, a
+// change to how the place looks now leaves the key where it was.
+func AppearanceHash(ent *entity.Entity, providerParams string, layerCurrent bool) string {
 	parts := make([]string, 0, 3)
 
-	if appearance := strings.TrimSpace(ent.Appearance); appearance != "" {
-		parts = append(parts, appearance)
+	composed := strings.TrimSpace(ent.Appearance)
+	if layerCurrent {
+		composed = entity.DescribeAppearance(ent, 0)
+	}
+	if composed != "" {
+		parts = append(parts, composed)
 	} else {
 		tags := append([]string(nil), ent.Tags...)
 		sort.Strings(tags)
@@ -167,11 +175,16 @@ func AppearanceHash(ent *entity.Entity, providerParams string) string {
 
 // BuildLocationPrompt composes the generation prompt: the authored appearance when
 // present, otherwise the name, a bounded body excerpt, and the tags, plus the
-// world's art style.
-func BuildLocationPrompt(ent *entity.Entity, worldStyle string) string {
+// world's art style. layerCurrent adds what play has done to the place, which is
+// the same decision the cache key is made with.
+func BuildLocationPrompt(ent *entity.Entity, worldStyle string, layerCurrent bool) string {
 	parts := make([]string, 0, 4)
 
-	if appearance := strings.TrimSpace(ent.Appearance); appearance != "" {
+	appearance := strings.TrimSpace(ent.Appearance)
+	if layerCurrent {
+		appearance = entity.DescribeAppearance(ent, 0)
+	}
+	if appearance != "" {
 		parts = append(parts, appearance)
 	} else {
 		parts = append(parts, ent.Name)

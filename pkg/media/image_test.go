@@ -50,7 +50,7 @@ func TestLocationImageExtensionFollowsTheBytes(t *testing.T) {
 	svg := &stubImageClient{body: []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`)}
 	pipeline := NewImagePipeline(svg, NewContentCache(t.TempDir()))
 
-	path, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", false)
+	path, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", false, true)
 	if err != nil {
 		t.Fatalf("GenerateLocationImage failed: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestLocationImageExtensionFollowsTheBytes(t *testing.T) {
 		t.Errorf("path = %q, want an .svg extension for SVG bytes", path)
 	}
 
-	again, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", false)
+	again, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", false, true)
 	if err != nil {
 		t.Fatalf("second GenerateLocationImage failed: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestLocationImageRasterAndForce(t *testing.T) {
 	raster := &stubImageClient{body: []byte("\x89PNG\r\n\x1a\nbinary")}
 	pipeline := NewImagePipeline(raster, NewContentCache(t.TempDir()))
 
-	path, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", false)
+	path, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", false, true)
 	if err != nil {
 		t.Fatalf("GenerateLocationImage failed: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestLocationImageRasterAndForce(t *testing.T) {
 		t.Errorf("path = %q, want a .png extension for PNG bytes", path)
 	}
 
-	if _, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", true); err != nil {
+	if _, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", true, true); err != nil {
 		t.Fatalf("forced GenerateLocationImage failed: %v", err)
 	}
 	if raster.calls != 2 {
@@ -94,40 +94,40 @@ func TestAppearanceHashIgnoresProseAndTracksState(t *testing.T) {
 	location := locationFixture()
 	providerParams := "builtin:"
 
-	original := AppearanceHash(location, providerParams)
+	original := AppearanceHash(location, providerParams, true)
 
 	// Extraction appends to the body nearly every turn; that must not move the key.
 	location.Body += " The floorboards creak."
-	if AppearanceHash(location, providerParams) != original {
+	if AppearanceHash(location, providerParams, true) != original {
 		t.Errorf("the body must not affect the cache key")
 	}
 
 	// Neither does tag order.
 	location.Tags = []string{"safehouse", "tavern"}
-	if AppearanceHash(location, providerParams) != original {
+	if AppearanceHash(location, providerParams, true) != original {
 		t.Errorf("tag order must not affect the cache key")
 	}
 
 	// Structured state does.
 	location.InitState(map[string]interface{}{"burned": true})
-	if AppearanceHash(location, providerParams) == original {
+	if AppearanceHash(location, providerParams, true) == original {
 		t.Errorf("state changes must move the cache key")
 	}
 
 	// An authored appearance overrides both.
 	location.Appearance = "gutted by fire"
-	withAppearance := AppearanceHash(location, providerParams)
+	withAppearance := AppearanceHash(location, providerParams, true)
 	if withAppearance == original {
 		t.Errorf("an appearance change must move the cache key")
 	}
 
 	location.State = nil
-	if AppearanceHash(location, providerParams) != withAppearance {
+	if AppearanceHash(location, providerParams, true) != withAppearance {
 		t.Errorf("an authored appearance must be the only input")
 	}
 
 	// A different provider model must not reuse another model's art.
-	if AppearanceHash(location, "comfyui:sd-xl") == withAppearance {
+	if AppearanceHash(location, "comfyui:sd-xl", true) == withAppearance {
 		t.Errorf("provider parameters must move the cache key")
 	}
 }
@@ -137,7 +137,7 @@ func TestBuildLocationPromptPrefersTheAppearanceField(t *testing.T) {
 	location.Body = strings.Repeat("prose ", 100)
 	location.Appearance = "gutted by fire"
 
-	prompt := BuildLocationPrompt(location, "dark fantasy")
+	prompt := BuildLocationPrompt(location, "dark fantasy", true)
 	if !strings.Contains(prompt, "gutted by fire") {
 		t.Errorf("expected the appearance field, got %q", prompt)
 	}
@@ -146,7 +146,7 @@ func TestBuildLocationPromptPrefersTheAppearanceField(t *testing.T) {
 	}
 
 	location.Appearance = ""
-	prompt = BuildLocationPrompt(location, "dark fantasy")
+	prompt = BuildLocationPrompt(location, "dark fantasy", true)
 	if !strings.Contains(prompt, "Alden Tavern") || !strings.Contains(prompt, "dark fantasy") || !strings.Contains(prompt, "tavern") {
 		t.Errorf("expected name, tags, and style, got %q", prompt)
 	}
@@ -190,7 +190,7 @@ func TestGeneratedArtIsWritableAndDecodable(t *testing.T) {
 	draw.Draw(img, img.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
 
 	pipeline := NewImagePipeline(&stubImageClient{body: pngBytes(t, img)}, NewContentCache(t.TempDir()))
-	path, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "", "test:", false)
+	path, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "", "test:", false, true)
 	if err != nil {
 		t.Fatalf("GenerateLocationImage failed: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestGenerateLocationImageCachesJPEG(t *testing.T) {
 	pipeline := NewImagePipeline(client, cache)
 
 	location := locationFixture()
-	path, err := pipeline.GenerateLocationImage(context.Background(), location, "dark fantasy", "gemini:imagen-3", false)
+	path, err := pipeline.GenerateLocationImage(context.Background(), location, "dark fantasy", "gemini:imagen-3", false, true)
 	if err != nil {
 		t.Fatalf("GenerateLocationImage failed: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestGenerateLocationImageCachesJPEG(t *testing.T) {
 
 	// Second call should return cached path without re-generating
 	client.calls = 0
-	cachedPath, err := pipeline.GenerateLocationImage(context.Background(), location, "dark fantasy", "gemini:imagen-3", false)
+	cachedPath, err := pipeline.GenerateLocationImage(context.Background(), location, "dark fantasy", "gemini:imagen-3", false, true)
 	if err != nil {
 		t.Fatalf("second call failed: %v", err)
 	}
@@ -251,5 +251,31 @@ func TestGenerateLocationImageCachesJPEG(t *testing.T) {
 	}
 	if client.calls != 0 {
 		t.Errorf("expected 0 calls on cache hit, got %d", client.calls)
+	}
+}
+
+func TestAppearanceHashFollowsTheLayerDecision(t *testing.T) {
+	loc := &entity.Entity{
+		ID:                "hall",
+		Name:              "The Hall",
+		Appearance:        "A vaulted stone hall.",
+		CurrentAppearance: "Flooded.",
+	}
+
+	layered := AppearanceHash(loc, "builtin:", true)
+	if layered == AppearanceHash(loc, "builtin:", false) {
+		t.Error("layering the current appearance should change the key")
+	}
+	if layered != AppearanceHash(loc, "builtin:", true) {
+		t.Error("the same decision should produce the same key")
+	}
+
+	original := AppearanceHash(loc, "builtin:", false)
+	loc.CurrentAppearance = "On fire."
+	if AppearanceHash(loc, "builtin:", false) != original {
+		t.Error("with the current appearance ignored, a change to it must not move the key")
+	}
+	if AppearanceHash(loc, "builtin:", true) == layered {
+		t.Error("with the current appearance layered, a change to it must move the key")
 	}
 }

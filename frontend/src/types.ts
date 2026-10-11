@@ -4,6 +4,7 @@ export interface PlayerState {
   type: string;
   state: Record<string, any>;
   appearance?: string;
+  current_appearance?: string;
   voice?: VoiceProfile;
 }
 
@@ -694,6 +695,7 @@ export interface CharacterCreationSpec {
 
 export interface PlayerCharacter {
   appearance?: string;
+  current_appearance?: string;
   age?: string;
   gender?: string;
   pronouns?: string;
@@ -1315,6 +1317,10 @@ export interface ImageConfig {
   api_key?: string;
   auto_generate: boolean;
   builtin_fallback?: boolean;
+  // What a place's own art is drawn from: the authored look with what play has
+  // done to the place layered on, or the authored look alone. Absent means the
+  // layered default.
+  location_art_appearance?: 'original_and_current' | 'original';
   aspect_ratio?: string;
   person_generation?: string;
   // An optional user-chosen discriminator that keeps two configs of one adapter

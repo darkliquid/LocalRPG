@@ -17,7 +17,13 @@
       "name": "appearance",
       "type": "string",
       "required": false,
-      "description": "A physical description used when generating art or describing the note."
+      "description": "The baseline physical description: who the note is. Authored content, used when generating art or describing the note."
+    },
+    {
+      "name": "current_appearance",
+      "type": "string",
+      "required": false,
+      "description": "How the note looks right now, layered on `appearance`. Written by play, so a reset clears it and the baseline stays."
     },
     {
       "name": "faction",

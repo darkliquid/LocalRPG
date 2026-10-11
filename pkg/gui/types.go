@@ -18,12 +18,13 @@ import (
 )
 
 type PlayerDTO struct {
-	ID         string                 `json:"id"`
-	Name       string                 `json:"name"`
-	Type       string                 `json:"type"`
-	State      map[string]interface{} `json:"state"`
-	Appearance string                 `json:"appearance,omitempty"`
-	Voice      *config.VoiceProfile   `json:"voice,omitempty"`
+	ID                string                 `json:"id"`
+	Name              string                 `json:"name"`
+	Type              string                 `json:"type"`
+	State             map[string]interface{} `json:"state"`
+	Appearance        string                 `json:"appearance,omitempty"`
+	CurrentAppearance string                 `json:"current_appearance,omitempty"`
+	Voice             *config.VoiceProfile   `json:"voice,omitempty"`
 }
 
 type NarrativeArcDTO struct {
@@ -423,13 +424,14 @@ type CreateGameRequestDTO struct {
 
 // PlayerCharacterDTO is the authored protagonist gathered at campaign creation.
 type PlayerCharacterDTO struct {
-	Appearance string               `json:"appearance,omitempty"`
-	Age        string               `json:"age,omitempty"`
-	Gender     string               `json:"gender,omitempty"`
-	Pronouns   string               `json:"pronouns,omitempty"`
-	Background string               `json:"background,omitempty"`
-	Voice      *config.VoiceProfile `json:"voice,omitempty"`
-	Extra      map[string]string    `json:"extra,omitempty"`
+	Appearance        string               `json:"appearance,omitempty"`
+	CurrentAppearance string               `json:"current_appearance,omitempty"`
+	Age               string               `json:"age,omitempty"`
+	Gender            string               `json:"gender,omitempty"`
+	Pronouns          string               `json:"pronouns,omitempty"`
+	Background        string               `json:"background,omitempty"`
+	Voice             *config.VoiceProfile `json:"voice,omitempty"`
+	Extra             map[string]string    `json:"extra,omitempty"`
 }
 
 // EntitySummaryDTO is one note as the codex browser lists it.

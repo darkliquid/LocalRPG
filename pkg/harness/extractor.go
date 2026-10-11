@@ -373,8 +373,9 @@ func matchEntityByContext(store *storage.Store, summaries []storage.EntitySummar
 }
 
 // MergeExtractedEntity folds new narrative detail into an existing entity. The
-// authored identity, voice, state, and file hash are preserved so the index
-// stays in step with the Markdown entity on disk.
+// authored identity, appearance, voice, state, and file hash are preserved so the
+// index stays in step with the Markdown entity on disk, and a reported appearance
+// change lands in the current appearance rather than in the baseline.
 func MergeExtractedEntity(existing *entity.Entity, raw *ExtractedEntity) *entity.Entity {
 	merged := *existing
 
@@ -390,9 +391,15 @@ func MergeExtractedEntity(existing *entity.Entity, raw *ExtractedEntity) *entity
 	if merged.Faction == "" {
 		merged.Faction = raw.Faction
 	}
-	if raw.AppearanceChanged || merged.Appearance == "" {
-		if strings.TrimSpace(raw.Appearance) != "" {
+	// A description becomes the baseline only while there is none, so the first
+	// writer describes who the note is. After that the baseline is authored content,
+	// and a change the model reports is the current appearance: how the note looks
+	// now rather than what it is.
+	if strings.TrimSpace(raw.Appearance) != "" {
+		if strings.TrimSpace(merged.Appearance) == "" {
 			merged.Appearance = raw.Appearance
+		} else if raw.AppearanceChanged {
+			merged.CurrentAppearance = raw.Appearance
 		}
 	}
 	if strings.TrimSpace(raw.Age) != "" {
@@ -433,7 +440,7 @@ const extractorSystemPrompt = `You are a world-state extractor. Read the narrati
     "visual_cue": "Concise visual description of the new scene moment after a temporal jump or dramatic change of setting."
   }
 }
-Set "appearance_changed": true ONLY when an existing character or location has noticeably altered in appearance or age (e.g. time skip, aging, scars, transformation, haircuts).
+Set "appearance_changed": true ONLY when an existing character or location has noticeably altered in appearance or age (e.g. time skip, aging, scars, transformation, haircuts). When you do, describe only what is different now, not their enduring traits: the enduring description is already recorded.
 If the turn includes a significant temporal leap (such as '10 years later'), scene break, or dramatic change of setting, populate "scene_break"; otherwise omit it.
 List every line of direct speech in "dialogue", attributed to the speaker, using the same names as the entity list. Return empty arrays when nothing new is discovered.
 

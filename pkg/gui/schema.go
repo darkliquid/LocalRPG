@@ -142,22 +142,24 @@ func (s *Service) GetEntityFrontmatterSchema(_ context.Context) (FrontmatterSche
 // field of EntityFrontmatter has an entry, so a new field cannot ship
 // undocumented.
 var frontmatterKeyDescriptions = map[string]string{
-	"id":               "The note's stable identity. It is unique per collection and does not change when the note moves between folders.",
-	"name":             "The display name shown in the codex and used when the engine matches a mention.",
-	"type":             "What kind of thing the note is. Types that read as a being (character, npc, person, creature) are the only ones the engine treats specially.",
-	"tags":             "Free-form labels for grouping and search.",
-	"voice":            "The text-to-speech voice this note speaks with, including pitch and speech rate.",
-	"portrait":         "The path of the note's portrait image, when it has one.",
-	"portrait_version": "A counter bumped each time the portrait is regenerated, so the client can bust its image cache.",
-	"portrait_history": "Previous portrait paths, kept so an earlier portrait can be restored.",
-	"location":         "Where the note is. May contain a [[wikilink]] to a location note.",
-	"appearance":       "A physical description used when generating art or describing the note.",
-	"gender":           "The note's gender, as free text.",
-	"age":              "The note's age, as free text, because a campaign may count in years, seasons or reigns.",
-	"aliases":          "Other names the same thing is known by. They are matched when resolving mentions and when completing wikilinks.",
-	"faction":          "The group the note belongs to. May contain a [[wikilink]] to a faction note.",
-	"history":          "The turn numbers this note took part in. Written by the engine, not by hand.",
-	"state":            "Arbitrary per-note state the mechanics hooks read and write. The engine does not interpret the keys.",
+	"id":                 "The note's stable identity. It is unique per collection and does not change when the note moves between folders.",
+	"name":               "The display name shown in the codex and used when the engine matches a mention.",
+	"type":               "What kind of thing the note is. Types that read as a being (character, npc, person, creature) are the only ones the engine treats specially.",
+	"tags":               "Free-form labels for grouping and search.",
+	"voice":              "The text-to-speech voice this note speaks with, including pitch and speech rate.",
+	"portrait":           "The path of the note's portrait image, when it has one.",
+	"portrait_version":   "A counter bumped each time the portrait is regenerated, so the client can bust its image cache.",
+	"portrait_history":   "Previous portrait paths, kept so an earlier portrait can be restored.",
+	"location":           "Where the note is. May contain a [[wikilink]] to a location note.",
+	"appearance":         "The baseline physical description: who the note is. Authored content, used when generating art or describing the note.",
+	"current_appearance": "How the note looks right now, layered on `appearance`. Written by play, so a reset clears it and the baseline stays.",
+
+	"gender":  "The note's gender, as free text.",
+	"age":     "The note's age, as free text, because a campaign may count in years, seasons or reigns.",
+	"aliases": "Other names the same thing is known by. They are matched when resolving mentions and when completing wikilinks.",
+	"faction": "The group the note belongs to. May contain a [[wikilink]] to a faction note.",
+	"history": "The turn numbers this note took part in. Written by the engine, not by hand.",
+	"state":   "Arbitrary per-note state the mechanics hooks read and write. The engine does not interpret the keys.",
 }
 
 // frontmatterKeyValues lists the values worth suggesting for the keys whose

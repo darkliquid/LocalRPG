@@ -170,3 +170,95 @@ func TestTimelineRewindDropsTheDiscardedTurnsScenes(t *testing.T) {
 		}
 	}
 }
+
+func TestRecordTurnKeepsTheAppearanceItReplaced(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	store := newTestStore(t)
+	history := NewHistoryLogger(filepath.Join(t.TempDir(), "history.jsonl"))
+	timeline := NewTimeline(paths, store, history, "campaign-01")
+
+	entitiesDir := timeline.EntitiesDir()
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{
+		ID: "kaelen", Name: "Kaelen", Type: "character", Appearance: "Silver hair.", Body: "A traveller.",
+	})
+	if _, err := storage.NewSyncer(store).Sync(entitiesDir); err != nil {
+		t.Fatal(err)
+	}
+
+	turn := Turn{Number: 1, Timestamp: time.Now(), Mode: "Do", Input: "I press on"}
+	turn.Entities = []entity.Mention{{ID: "kaelen", Kind: entity.MentionPlayer}}
+	if err := timeline.RecordTurn(&turn, []harness.ExtractedEntity{{
+		ID: "kaelen", Name: "Kaelen", Type: "character",
+		Appearance: "A cut above one eye.", AppearanceChanged: true,
+	}}); err != nil {
+		t.Fatalf("RecordTurn: %v", err)
+	}
+
+	ent, err := store.GetEntity("kaelen")
+	if err != nil || ent == nil {
+		t.Fatalf("read the note: %v", err)
+	}
+	if ent.CurrentAppearance != "A cut above one eye." {
+		t.Errorf("CurrentAppearance = %q, want the change", ent.CurrentAppearance)
+	}
+	if ent.Appearance != "Silver hair." {
+		t.Errorf("Appearance = %q, want the baseline kept", ent.Appearance)
+	}
+
+	turns, err := history.LoadHistory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 1 || len(turns[0].CurrentAppearances) != 1 {
+		t.Fatalf("the turn did not record what it replaced: %+v", turns)
+	}
+	if got := turns[0].CurrentAppearances[0]; got.EntityID != "kaelen" || got.Before != "" || got.After != "A cut above one eye." {
+		t.Errorf("recorded change = %+v, want the value it found", got)
+	}
+}
+
+func TestRewindRestoresTheAppearanceTheDiscardedTurnsReplaced(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	store := newTestStore(t)
+	history := NewHistoryLogger(filepath.Join(t.TempDir(), "history.jsonl"))
+	timeline := NewTimeline(paths, store, history, "campaign-01")
+
+	entitiesDir := timeline.EntitiesDir()
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{
+		ID: "kaelen", Name: "Kaelen", Type: "character", Appearance: "Silver hair.", Body: "A traveller.",
+	})
+	if _, err := storage.NewSyncer(store).Sync(entitiesDir); err != nil {
+		t.Fatal(err)
+	}
+
+	scar := func(n int, appearance string) {
+		turn := Turn{Number: n, Timestamp: time.Now(), Mode: "Do", Input: "I press on"}
+		turn.Entities = []entity.Mention{{ID: "kaelen", Kind: entity.MentionPlayer}}
+		if err := timeline.RecordTurn(&turn, []harness.ExtractedEntity{{
+			ID: "kaelen", Name: "Kaelen", Type: "character",
+			Appearance: appearance, AppearanceChanged: true,
+		}}); err != nil {
+			t.Fatalf("RecordTurn(%d): %v", n, err)
+		}
+	}
+	scar(1, "A cut above one eye.")
+	scar(2, "The cut has closed to a scar.")
+
+	if err := timeline.RewindToTurn(0); err != nil {
+		t.Fatalf("RewindToTurn: %v", err)
+	}
+
+	ent, err := store.GetEntity("kaelen")
+	if err != nil || ent == nil {
+		t.Fatalf("read the note: %v", err)
+	}
+	if ent.CurrentAppearance != "" {
+		t.Errorf("CurrentAppearance = %q, want the value from before the oldest discarded turn", ent.CurrentAppearance)
+	}
+	if ent.Appearance != "Silver hair." {
+		t.Errorf("Appearance = %q, want the baseline untouched", ent.Appearance)
+	}
+	if len(ent.History) != 0 {
+		t.Errorf("History = %v, want it pruned", ent.History)
+	}
+}

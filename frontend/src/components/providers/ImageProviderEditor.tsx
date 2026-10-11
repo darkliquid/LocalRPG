@@ -63,6 +63,22 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
           <span>Auto-generate Scene Art</span>
         </label>
 
+        <label htmlFor="location-art-appearance" className="text-xs font-sans uppercase text-stone-300">
+          Location Art Appearance
+        </label>
+        <select
+          id="location-art-appearance"
+          value={entry.location_art_appearance ?? 'original_and_current'}
+          title="The authored look alone, or that look with what play has done to the place layered on top of it."
+          onChange={(e) =>
+            onChange({ ...entry, location_art_appearance: e.target.value as 'original_and_current' | 'original' })
+          }
+          className="bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
+        >
+          <option value="original_and_current">Authored look, with what happened to it</option>
+          <option value="original">Authored look alone</option>
+        </select>
+
         <label className="flex items-center gap-2 text-xs text-stone-300 cursor-pointer">
           <input
             type="checkbox"

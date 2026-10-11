@@ -539,7 +539,8 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		if client, err := media.NewSceneImageClient(c.config.Media.Image); err == nil {
 			cache := media.NewContentCache(c.resolver.CacheDir())
 			params := c.config.Media.Image.Type + ":" + c.config.Media.Image.Model
-			artResolver = media.NewArtStore(client, cache, worldStyle, params)
+			layerCurrent := c.config.LocationArtAppearance() != config.LocationArtAppearanceOriginal
+			artResolver = media.NewArtStore(client, cache, worldStyle, params, layerCurrent)
 		}
 	}
 	if artResolver != nil {

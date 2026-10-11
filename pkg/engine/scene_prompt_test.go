@@ -1,10 +1,13 @@
 package engine
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
+	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
 func TestBuildScenePromptIncludesParts(t *testing.T) {
@@ -94,5 +97,66 @@ func TestSceneCastDescribesThePlayer(t *testing.T) {
 		if !strings.Contains(prompt, want) {
 			t.Errorf("prompt missing %q: %s", want, prompt)
 		}
+	}
+}
+
+func TestSceneCastLayersTheCurrentAppearance(t *testing.T) {
+	f := newResetFixture(t)
+
+	// Write circumstances to the protagonist's note the way a turn would, so the
+	// cast has something to layer on the authored description.
+	entitiesDir := filepath.Join(f.gameDir, "entities")
+	notePath := filepath.Join(entitiesDir, "sean.md")
+	note, err := os.ReadFile(notePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	player, err := entity.ParseMarkdownEntity(note)
+	if err != nil {
+		t.Fatal(err)
+	}
+	player.CurrentAppearance = "Soaked through."
+	out, err := player.SerializeMarkdown()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(notePath, out, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storage.NewSyncer(f.store).Sync(entitiesDir); err != nil {
+		t.Fatal(err)
+	}
+
+	turn := &Turn{
+		Number:   1,
+		Location: OpeningSceneEntityID,
+		Entities: []entity.Mention{{ID: "sean", Kind: entity.MentionPlayer}},
+	}
+	cast := SceneCast(f.store, turn)
+	if len(cast) == 0 {
+		t.Fatal("expected the player in the cast")
+	}
+	if !strings.Contains(cast[0].Appearance, "Weathered.") {
+		t.Errorf("cast appearance = %q, want the baseline", cast[0].Appearance)
+	}
+	if !strings.Contains(cast[0].Appearance, "Soaked through.") {
+		t.Errorf("cast appearance = %q, want the current appearance layered on", cast[0].Appearance)
+	}
+}
+
+func TestScenePromptCarriesThePlaceAsItIsNow(t *testing.T) {
+	ctx := ScenePromptContext{
+		Location:          "The Drowned Hall",
+		Appearance:        "A vaulted stone hall.",
+		CurrentAppearance: "The floor is flooded and the torches are out.",
+		Style:             "oil painting",
+	}
+	got := BuildScenePrompt(ctx)
+	if !strings.Contains(got, "The floor is flooded and the torches are out.") {
+		t.Errorf("the moment should carry the place's current look: %s", got)
+	}
+	// The shared prefix is the scene's stable look, so it must not move with it.
+	if strings.Contains(ScenePromptPrefix(ctx), "flooded") {
+		t.Error("the current appearance belongs to the moment, not the shared prefix")
 	}
 }

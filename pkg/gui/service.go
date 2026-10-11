@@ -823,8 +823,9 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 			Name:       ent.Name,
 			Type:       ent.Type,
 			State:      stateMap,
-			Appearance: ent.Appearance,
-			Voice:      voiceProfileDTO(ent.Voice),
+			Appearance:        ent.Appearance,
+			CurrentAppearance: ent.CurrentAppearance,
+			Voice:             voiceProfileDTO(ent.Voice),
 		},
 		Arcs:          arcs,
 		Clocks:        clocks,
@@ -2755,6 +2756,7 @@ func (s *Service) GenerateTurnSceneImage(ctx context.Context, gameID string, tur
 	if locEntity != nil {
 		sceneCtx.Location = locEntity.Name
 		sceneCtx.Appearance = locEntity.Appearance
+		sceneCtx.CurrentAppearance = locEntity.CurrentAppearance
 	}
 	if len(turn.Checks) > 0 {
 		sceneCtx.Outcome = turn.Checks[0].Outcome
@@ -3003,7 +3005,8 @@ func (s *Service) sceneArtResolver(gameID string) *media.ArtStore {
 		return nil
 	}
 	params := sceneCfg.Type + ":" + sceneCfg.Model
-	return media.NewArtStore(client, media.NewContentCache(s.resolver.CacheDir()), s.worldArtStyle(gameID), params)
+	layerCurrent := s.configMgr.Get().LocationArtAppearance() != config.LocationArtAppearanceOriginal
+	return media.NewArtStore(client, media.NewContentCache(s.resolver.CacheDir()), s.worldArtStyle(gameID), params, layerCurrent)
 }
 
 // scanAndEnrichCharacters scans a campaign's character entities, enriching missing attributes and generating portraits.

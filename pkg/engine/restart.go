@@ -228,19 +228,21 @@ func restoreTemplate(entitiesDir, id, currentPath string, data []byte) error {
 	return nil
 }
 
-// clearRuntimeFields drops a note's turn history and mechanical state while
-// leaving every authored field intact, so a restart resets what play did to a
-// campaign entity without discarding what the entity is.
+// clearRuntimeFields drops a note's turn history, its mechanical state, and the
+// appearance its circumstances gave it, while leaving every authored field intact.
+// A restart resets what play did to a campaign entity without discarding what the
+// entity is.
 func clearRuntimeFields(path string, data []byte) error {
 	ent, err := entity.ParseMarkdownEntity(data)
 	if err != nil {
 		return fmt.Errorf("parse entity note %q: %w", path, err)
 	}
-	if len(ent.History) == 0 && ent.State == nil {
+	if len(ent.History) == 0 && ent.State == nil && strings.TrimSpace(ent.CurrentAppearance) == "" {
 		return nil
 	}
 	ent.History = nil
 	ent.State = nil
+	ent.CurrentAppearance = ""
 
 	out, err := ent.SerializeMarkdown()
 	if err != nil {

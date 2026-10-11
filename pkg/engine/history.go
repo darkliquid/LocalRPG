@@ -14,6 +14,14 @@ import (
 	"github.com/darkliquid/localrpg/pkg/rules"
 )
 
+// EntityAppearance records one entity's current appearance before and after a
+// turn, so a rewind knows what to put back. Only a field play owns appears here.
+type EntityAppearance struct {
+	EntityID string `json:"id"`
+	Before   string `json:"before,omitempty"`
+	After    string `json:"after,omitempty"`
+}
+
 type Turn struct {
 	Number        int                  `json:"number"`
 	Timestamp     time.Time            `json:"timestamp"`
@@ -45,6 +53,10 @@ type Turn struct {
 	// ToolCalls records what the turn looked up, compactly: name and result size.
 	// Arguments and results live in the trace, not in the campaign's history.
 	ToolCalls []ToolCallRecord `json:"tool_calls,omitempty"`
+	// CurrentAppearances record the current appearances this turn replaced, so an
+	// undo can put them back. A note on its own cannot say what a character looked
+	// like three turns ago, and the log is the only place that can.
+	CurrentAppearances []EntityAppearance `json:"current_appearances,omitempty"`
 	// Context records the durable description of this turn's context and provenance.
 	Context *harness.TurnContext `json:"context,omitempty"`
 	// Prompt is the exact assembled prompt string for the turn, persisted in SQLite but omitted from history.jsonl.

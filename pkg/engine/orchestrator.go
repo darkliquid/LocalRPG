@@ -1598,6 +1598,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		if locEntity != nil {
 			sceneCtx.Location = locEntity.Name
 			sceneCtx.Appearance = locEntity.Appearance
+			sceneCtx.CurrentAppearance = locEntity.CurrentAppearance
 		}
 		if len(turn.Checks) > 0 {
 			sceneCtx.Outcome = turn.Checks[0].Outcome

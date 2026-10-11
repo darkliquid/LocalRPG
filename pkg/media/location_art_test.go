@@ -10,7 +10,7 @@ import (
 
 func TestArtStoreResolvesOnceAndReuses(t *testing.T) {
 	client := &stubImageClient{body: []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`)}
-	store := NewArtStore(client, NewContentCache(t.TempDir()), "dark fantasy", "builtin:")
+	store := NewArtStore(client, NewContentCache(t.TempDir()), "dark fantasy", "builtin:", true)
 
 	location := &entity.Entity{ID: "alden-tavern", Name: "Alden Tavern", Type: "location", Body: "Warm."}
 
@@ -45,14 +45,14 @@ func TestArtStoreContextIsHonoured(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	store := NewArtStore(&stubImageClient{body: []byte("<svg")}, NewContentCache(t.TempDir()), "", "")
+	store := NewArtStore(&stubImageClient{body: []byte("<svg")}, NewContentCache(t.TempDir()), "", "", true)
 	if _, err := store.SceneArt(ctx, &entity.Entity{ID: "x", Type: "location"}, false); err == nil {
 		t.Errorf("expected a cancelled context to fail the call")
 	}
 }
 
 func TestArtStoreRejectsAMissingLocation(t *testing.T) {
-	store := NewArtStore(&stubImageClient{}, NewContentCache(t.TempDir()), "", "")
+	store := NewArtStore(&stubImageClient{}, NewContentCache(t.TempDir()), "", "", true)
 	if _, err := store.SceneArt(context.Background(), nil, false); err == nil {
 		t.Errorf("expected an error when there is no location to illustrate")
 	}

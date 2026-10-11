@@ -52,6 +52,7 @@ func (s *Store) SaveEntity(e *entity.Entity) error {
 		"location":         e.Location,
 		"faction":          e.Faction,
 		"appearance": e.Appearance,
+		"current_appearance": e.CurrentAppearance,
 		"age":        e.Age,
 		"gender":     e.Gender,
 		"aliases":    e.Aliases,
@@ -128,6 +129,9 @@ func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 		}
 		if appearance, ok := meta["appearance"].(string); ok {
 			ent.Appearance = appearance
+		}
+		if current, ok := meta["current_appearance"].(string); ok {
+			ent.CurrentAppearance = current
 		}
 		if age, ok := meta["age"].(string); ok {
 			ent.Age = age

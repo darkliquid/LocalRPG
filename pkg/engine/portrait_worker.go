@@ -127,7 +127,7 @@ func (w *PortraitWorker) Regenerate(ctx context.Context, gameID string, ent *ent
 var portraitExtensions = []string{".png", ".jpg", ".jpeg", ".webp", ".svg"}
 
 func (w *PortraitWorker) writePortrait(ctx context.Context, gameID string, ent *entity.Entity, artStyle string) (string, error) {
-	prompt := BuildPortraitPrompt(ent.Name, ent.Gender, ent.Age, ent.Appearance, artStyle)
+	prompt := BuildPortraitPrompt(ent.Name, ent.Gender, ent.Age, entity.DescribeAppearance(ent, 0), artStyle)
 	imgBytes, err := w.generator.GenerateImage(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("generate portrait: %w", err)

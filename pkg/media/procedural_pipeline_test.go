@@ -14,7 +14,7 @@ func TestSceneRequestDerivesHints(t *testing.T) {
 		Tags:  []string{"forest"},
 		State: state.NewState(map[string]interface{}{"mood": "grim", "weather": "rain"}),
 	}
-	req := sceneRequest(loc, "dark fantasy", "hash1")
+	req := sceneRequest(loc, "dark fantasy", "hash1", true)
 	if req.Genre != "fantasy" || req.Mood != "grim" || req.Weather != "rain" || req.Seed == "" {
 		t.Fatalf("hints = %+v", req)
 	}
@@ -23,7 +23,7 @@ func TestSceneRequestDerivesHints(t *testing.T) {
 func TestPipelineUsesSceneHintProvider(t *testing.T) {
 	hint := &fakeHint{}
 	pipeline := NewImagePipeline(hint, NewContentCache(t.TempDir()))
-	if _, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", false); err != nil {
+	if _, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", false, true); err != nil {
 		t.Fatalf("GenerateLocationImage: %v", err)
 	}
 	if hint.got.Seed == "" {
@@ -34,7 +34,7 @@ func TestPipelineUsesSceneHintProvider(t *testing.T) {
 func TestPipelineFallsBackToPrompt(t *testing.T) {
 	stub := &stubImageClient{body: []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`)}
 	pipeline := NewImagePipeline(stub, NewContentCache(t.TempDir()))
-	if _, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", false); err != nil {
+	if _, err := pipeline.GenerateLocationImage(context.Background(), locationFixture(), "dark fantasy", "builtin:", false, true); err != nil {
 		t.Fatalf("GenerateLocationImage: %v", err)
 	}
 	if stub.calls != 1 {
@@ -46,7 +46,7 @@ func TestPipelineFallsBackToPrompt(t *testing.T) {
 // generator, which is the only scene-hint provider, reports layers.
 func TestPipelineLocationLayersOnlyForTheBuiltin(t *testing.T) {
 	builtin := NewImagePipeline(&fakeHint{}, NewContentCache(t.TempDir()))
-	layers, ok := builtin.LocationLayers(locationFixture(), "dark fantasy", "builtin:")
+	layers, ok := builtin.LocationLayers(locationFixture(), "dark fantasy", "builtin:", true)
 	if !ok || len(layers.Layers) != 3 {
 		t.Fatalf("built-in layers = %+v, ok = %v", layers, ok)
 	}
@@ -57,7 +57,7 @@ func TestPipelineLocationLayersOnlyForTheBuiltin(t *testing.T) {
 	}
 
 	flat := NewImagePipeline(&stubImageClient{}, NewContentCache(t.TempDir()))
-	if _, ok := flat.LocationLayers(locationFixture(), "dark fantasy", "remote:model"); ok {
+	if _, ok := flat.LocationLayers(locationFixture(), "dark fantasy", "remote:model", true); ok {
 		t.Fatal("a provider that makes one flat image should report no layers")
 	}
 }

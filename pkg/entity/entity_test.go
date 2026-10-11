@@ -304,9 +304,9 @@ func TestWikilinkBasename(t *testing.T) {
 func TestDeclaredID(t *testing.T) {
 	cases := map[string]string{
 		"---\nid: silver-hand\nname: X\n---\n\nbody\n": "silver-hand",
-		"---\nname: X\n---\n\nbody\n":                 "",
-		"no frontmatter at all":                       "",
-		"---\nid: broken\n":                           "",
+		"---\nname: X\n---\n\nbody\n":                  "",
+		"no frontmatter at all":                        "",
+		"---\nid: broken\n":                            "",
 	}
 	for input, want := range cases {
 		if got := DeclaredID([]byte(input)); got != want {
@@ -374,5 +374,47 @@ func TestFrontmatterErrorLineAndColumnAreOneBased(t *testing.T) {
 	atStart := &FrontmatterError{Offset: 0, Msg: "at the very start"}
 	if line := atStart.Line(doc); line != 1 {
 		t.Errorf("Line = %d, want 1", line)
+	}
+}
+
+func TestCurrentAppearanceRoundTripsWithoutBecomingExtraMeta(t *testing.T) {
+	note := []byte("---\nid: kaelen\nname: Kaelen\ntype: character\n" +
+		"appearance: Silver hair.\ncurrent_appearance: Soaked through.\n---\nA traveller.\n")
+
+	ent, err := ParseMarkdownEntity(note)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if ent.CurrentAppearance != "Soaked through." {
+		t.Errorf("CurrentAppearance = %q, want the parsed value", ent.CurrentAppearance)
+	}
+	if _, ok := ent.ExtraMeta["current_appearance"]; ok {
+		t.Error("current_appearance must not also land in ExtraMeta")
+	}
+
+	out, err := ent.SerializeMarkdown()
+	if err != nil {
+		t.Fatalf("serialize: %v", err)
+	}
+	back, err := ParseMarkdownEntity(out)
+	if err != nil {
+		t.Fatalf("reparse: %v", err)
+	}
+	if back.CurrentAppearance != "Soaked through." {
+		t.Errorf("round trip lost the current appearance: %q", back.CurrentAppearance)
+	}
+	if back.Appearance != "Silver hair." {
+		t.Errorf("round trip lost the baseline: %q", back.Appearance)
+	}
+}
+
+func TestSerializeOmitsAnUnsetCurrentAppearance(t *testing.T) {
+	ent := &Entity{ID: "kaelen", Name: "Kaelen", Type: "character", Appearance: "Silver hair.", Body: "A traveller.\n"}
+	out, err := ent.SerializeMarkdown()
+	if err != nil {
+		t.Fatalf("serialize: %v", err)
+	}
+	if strings.Contains(string(out), "current_appearance") {
+		t.Errorf("an unset current appearance must not be emitted:\n%s", out)
 	}
 }
