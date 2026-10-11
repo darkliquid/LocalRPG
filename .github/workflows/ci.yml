@@ -60,6 +60,10 @@ jobs:
       # pkg-config for X11. The headers are build-time only, so a headless
       # runner can compile and test the desktop binary. The action caches the
       # downloaded packages, so only a cold cache pays for the fetch.
+      # Refresh apt indices so superseded package versions on Ubuntu mirrors don't 404.
+      - name: Update apt repositories
+        run: sudo apt-get update
+
       - name: Install native build dependencies
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
@@ -121,6 +125,10 @@ jobs:
       # The e2e package does not link GTK or WebKit, but the service it drives
       # reaches the audio pipeline, so the same headers the go job needs are
       # installed here, from the same cache, to keep the two jobs identical.
+      # Refresh apt indices so superseded package versions on Ubuntu mirrors don't 404.
+      - name: Update apt repositories
+        run: sudo apt-get update
+
       - name: Install native build dependencies
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:

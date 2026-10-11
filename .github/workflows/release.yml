@@ -100,6 +100,11 @@ jobs:
       # Linux links GTK/WebKit/ALSA at build time; the action caches the
       # packages so only a cold cache pays for the fetch. The other targets
       # need no native headers.
+      # Refresh apt indices so superseded package versions on Ubuntu mirrors don't 404.
+      - name: Update apt repositories
+        if: startsWith(matrix.target, 'linux')
+        run: sudo apt-get update
+
       - name: Install native build dependencies
         if: startsWith(matrix.target, 'linux')
         uses: awalsh128/cache-apt-pkgs-action@v1
