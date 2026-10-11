@@ -42,6 +42,7 @@ import { TierLegend, tierLabel } from './providers/TierBadge';
 import { ProviderManager, RoleListItem } from './ProviderManager';
 import { OfflinePreset } from './OfflinePreset';
 import { mediaEntryValue, setMediaEntry } from '../lib/mediaProviders';
+import { AdvancedSection } from './ui/AdvancedSection';
 
 interface SettingsStudioProps {
   isCompact?: boolean;
@@ -1548,6 +1549,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           </div>
 
           {/* Context budget and timing: what the narrator is sent, and how long it may take */}
+          <AdvancedSection label="Advanced">
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
               <Sliders className="w-4 h-4" />
@@ -1835,7 +1837,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             </div>
           </div>
+          </AdvancedSection>
 
+          <AdvancedSection label="Advanced">
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
@@ -1892,6 +1896,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               </div>
             </div>
           </div>
+          </AdvancedSection>
         </div>
       )}
 
