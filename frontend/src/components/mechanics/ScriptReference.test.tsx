@@ -1,8 +1,14 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { ScriptReference } from './ScriptReference';
+import { ScriptReference, GLOBALS, HOOKS } from './ScriptReference';
 
 describe('ScriptReference', () => {
+  it('documents an example for every entry', () => {
+    for (const entry of [...GLOBALS, ...HOOKS]) {
+      expect(entry.example.trim(), `${entry.sig} needs an example`).not.toBe('');
+    }
+  });
+
   it('is collapsed until opened', () => {
     render(<ScriptReference />);
     expect(screen.queryByText('roll(notation)')).not.toBeInTheDocument();

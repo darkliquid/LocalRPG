@@ -1,32 +1,86 @@
 import React, { useState } from 'react';
 import { BookOpen, ChevronDown, ChevronRight } from 'lucide-react';
 
-interface ReferenceEntry {
+export interface ReferenceEntry {
   sig: string;
   desc: string;
+  example: string;
 }
 
-const GLOBALS: ReferenceEntry[] = [
-  { sig: 'roll(notation)', desc: 'Rolls dice such as "2d6" or "5d10>=8" and returns { total, rolls, successes }.' },
-  { sig: 'getStat(entityId, path)', desc: 'Reads a stat from an entity by its id and dotted path.' },
-  { sig: 'setStat(entityId, path, value)', desc: 'Writes a stat, so the change is saved with the turn.' },
-  { sig: 'getLocation()', desc: "Returns the acting entity's current location id." },
-  { sig: 'setLocation(id)', desc: 'Moves the acting entity to another location.' },
-  { sig: 'injectGMDirection(text)', desc: 'Queues a directive the GM reads on the next turn.' },
-  { sig: 'log(message)', desc: 'Writes a line to the script log, shown in the trace and the dice tester.' },
+export const GLOBALS: ReferenceEntry[] = [
+  {
+    sig: 'roll(notation)',
+    desc: 'Rolls dice such as "2d6" or "5d10>=8" and returns { total, rolls, successes }.',
+    example: "const r = roll('2d6');\nlog('rolled ' + r.total);",
+  },
+  {
+    sig: 'getStat(entityId, path)',
+    desc: 'Reads a stat from an entity by its id and dotted path.',
+    example: "const might = getStat('player', 'stats.might');",
+  },
+  {
+    sig: 'setStat(entityId, path, value)',
+    desc: 'Writes a stat, so the change is saved with the turn.',
+    example: "setStat('player', 'stats.might', 3);",
+  },
+  {
+    sig: 'getLocation()',
+    desc: "Returns the acting entity's current location id.",
+    example: "const here = getLocation();",
+  },
+  {
+    sig: 'setLocation(id)',
+    desc: 'Moves the acting entity to another location.',
+    example: "setLocation('the-quay');",
+  },
+  {
+    sig: 'injectGMDirection(text)',
+    desc: 'Queues a directive the GM reads on the next turn.',
+    example: "injectGMDirection('The tide is rising.');",
+  },
+  {
+    sig: 'log(message)',
+    desc: 'Writes a line to the script log, shown in the trace and the dice tester.',
+    example: "log('the hook ran');",
+  },
   {
     sig: 'grantXP(amount)',
     desc: 'Awards advancement currency when the system declares advancement. Returns false when it does not.',
+    example: 'grantXP(2);',
   },
 ];
 
-const HOOKS: ReferenceEntry[] = [
-  { sig: 'onAction(name, fn)', desc: 'Handles an action mode. fn(ctx) returns a resolution the engine applies.' },
-  { sig: 'onTurnBegin(fn)', desc: 'Runs at the start of a turn.' },
-  { sig: 'onTurnEnd(fn)', desc: 'Runs at the end of a turn, after the narration is recorded.' },
-  { sig: 'onWorldTick(fn)', desc: 'Runs on a living-world tick.' },
-  { sig: 'onCheck(kind, fn)', desc: 'Resolves a named check kind in script. fn(req) returns { outcome }.' },
-  { sig: 'onHealthZero(fn)', desc: 'Runs when a health stat reaches zero.' },
+export const HOOKS: ReferenceEntry[] = [
+  {
+    sig: 'onAction(name, fn)',
+    desc: 'Handles an action mode. fn(ctx) returns a resolution the engine applies.',
+    example: "onAction('do', function (ctx) {\n  return { success: true, outcome: 'strong' };\n});",
+  },
+  {
+    sig: 'onTurnBegin(fn)',
+    desc: 'Runs at the start of a turn.',
+    example: "onTurnBegin(function (ctx) {\n  log('turn begins');\n});",
+  },
+  {
+    sig: 'onTurnEnd(fn)',
+    desc: 'Runs at the end of a turn, after the narration is recorded.',
+    example: "onTurnEnd(function (ctx) {\n  setStat('player', 'stats.might', getStat('player', 'stats.might') + 1);\n});",
+  },
+  {
+    sig: 'onWorldTick(fn)',
+    desc: 'Runs on a living-world tick.',
+    example: "onWorldTick(function (ctx) {\n  injectGMDirection('A storm gathers.');\n});",
+  },
+  {
+    sig: 'onCheck(kind, fn)',
+    desc: 'Resolves a named check kind in script. fn(req) returns { outcome }.',
+    example: "onCheck('pick_lock', function (req) {\n  return { outcome: 'strong' };\n});",
+  },
+  {
+    sig: 'onHealthZero(fn)',
+    desc: 'Runs when a health stat reaches zero.',
+    example: "onHealthZero(function (ctx) {\n  injectGMDirection('You collapse.');\n});",
+  },
 ];
 
 const EXAMPLE = `onAction('do', function (ctx) {
@@ -36,14 +90,23 @@ const EXAMPLE = `onAction('do', function (ctx) {
   return { success: false, outcome: 'miss', roll: r, message: 'It goes wrong.' };
 });`;
 
+// EntryList renders one API entry per line, expanding to a worked example so an
+// author can copy the shape rather than infer it from the signature.
 const EntryList: React.FC<{ title: string; entries: ReferenceEntry[] }> = ({ title, entries }) => (
   <div className="space-y-1">
     <h4 className="text-[11px] font-sans uppercase tracking-wider text-purple-300">{title}</h4>
     <ul className="space-y-1">
       {entries.map((entry) => (
-        <li key={entry.sig} className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2">
-          <code className="shrink-0 font-mono text-[11px] text-emerald-300">{entry.sig}</code>
-          <span className="text-[11px] text-stone-400">{entry.desc}</span>
+        <li key={entry.sig}>
+          <details>
+            <summary className="flex cursor-pointer flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2">
+              <code className="shrink-0 font-mono text-[11px] text-emerald-300">{entry.sig}</code>
+              <span className="text-[11px] text-stone-400">{entry.desc}</span>
+            </summary>
+            <pre className="mt-1 overflow-x-auto rounded-lg border border-stone-800 bg-stone-950 p-2 font-mono text-[11px] leading-relaxed text-stone-300">
+              {entry.example}
+            </pre>
+          </details>
         </li>
       ))}
     </ul>
@@ -51,8 +114,8 @@ const EntryList: React.FC<{ title: string; entries: ReferenceEntry[] }> = ({ tit
 );
 
 // ScriptReference documents the sandbox the mechanics.js runs in: the globals it
-// may call and the hooks it may register, so a system author does not have to
-// leave the studio to look them up.
+// may call and the hooks it may register, each with an example, so a system author
+// does not have to leave the studio to look them up.
 export const ScriptReference: React.FC = () => {
   const [open, setOpen] = useState(false);
 
