@@ -91,3 +91,5 @@ The orchestrator fits prompt layers into the configured `context_window` limit:
 - Priority is given to system rules and character sheet state.
 - Entity memories and living-world notes are prioritized based on proximity in the knowledge graph.
 - Historical turns are compressed or truncated using sliding-window recaps when context headroom is low.
+
+Settings Studio keeps these limits out of the way. Choose **AI Agents**, then **Roles**, to pick a role's model and its connection. Turn on **Show advanced settings** in the studio header for the **Advanced** sub-tab, which holds the context, response, and generation limits. A role's own sampling and reasoning fields sit behind the **Advanced** disclosure inside the role editor.

@@ -41,4 +41,22 @@ describe('AdvancedSection', () => {
     expect(screen.getByRole('button', { name: /limits/i })).toBeInTheDocument();
     expect(screen.getByText('a field')).toBeInTheDocument();
   });
+
+  it('follows defaultOpen when the caller changes it', () => {
+    const { rerender } = render(
+      <AdvancedSection defaultOpen={false}>
+        <span>a field</span>
+      </AdvancedSection>,
+    );
+
+    expect(screen.queryByText('a field')).not.toBeInTheDocument();
+
+    rerender(
+      <AdvancedSection defaultOpen>
+        <span>a field</span>
+      </AdvancedSection>,
+    );
+
+    expect(screen.getByText('a field')).toBeInTheDocument();
+  });
 });

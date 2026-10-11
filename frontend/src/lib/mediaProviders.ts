@@ -51,3 +51,9 @@ export function purposesFor(family: ProviderFamily): string[] {
   if (family === 'image') return ['scene', 'portrait', 'placeholder'];
   return [];
 }
+
+// The default text a voice preview speaks. Long enough to expose cadence,
+// pitch, and pacing differences between voice profiles. Mirrors
+// defaultTTSPreviewText on the server.
+export const DEFAULT_TTS_PREVIEW_TEXT =
+  'Local RPG can use a wide range of voices to bring life to your characters, NPCs, and story narration.';
