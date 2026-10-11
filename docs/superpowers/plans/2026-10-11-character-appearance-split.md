@@ -59,7 +59,7 @@
 **Interfaces:**
 - Produces: `entity.Entity.CurrentAppearance string`, `entity.EntityFrontmatter.CurrentAppearance string`, `entity.DescribeAppearance(ent *Entity, limit int) string` (a limit of zero or less means no truncation).
 
-- [ ] **Step 1: Write the failing test** for the composition rule.
+- [x] **Step 1: Write the failing test** for the composition rule.
 
 ```go
 // pkg/entity/appearance_test.go
@@ -105,12 +105,12 @@ func TestDescribeAppearanceNilEntity(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `go test -run TestDescribeAppearance ./pkg/entity/`
 Expected: FAIL with `undefined: DescribeAppearance`.
 
-- [ ] **Step 3: Implement the rule and the field**
+- [x] **Step 3: Implement the rule and the field**
 
 `pkg/entity/appearance.go`:
 
@@ -165,12 +165,12 @@ In `pkg/entity/entity.go` add the field to `EntityFrontmatter` after `Appearance
 
 Add `CurrentAppearance: fm.CurrentAppearance,` to the parse return value (next to `Appearance`), `CurrentAppearance: e.CurrentAppearance,` to `SerializeMarkdown`'s `EntityFrontmatter` literal, and `"current_appearance"` to the `ExtraMeta` skip list's `switch` case at `pkg/entity/entity.go:353`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test ./pkg/entity/`
 Expected: PASS.
 
-- [ ] **Step 5: Write the failing round-trip and metadata tests**
+- [x] **Step 5: Write the failing round-trip and metadata tests**
 
 ```go
 // appended to pkg/entity/entity_test.go
@@ -214,7 +214,7 @@ func TestSerializeKeepsANoteWithoutACurrentAppearanceUnchanged(t *testing.T) {
 }
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass, then commit**
+- [x] **Step 6: Run the tests to verify they pass, then commit**
 
 Run: `go test ./pkg/entity/ ./pkg/storage/`
 Expected: PASS. Add `"current_appearance"` to the metadata map and its rehydration in `pkg/storage/store.go:54` and `:129` first (the map is what an entity read from the index is rebuilt from, so the field would be lost without it).
@@ -238,7 +238,7 @@ git add pkg/entity pkg/storage && git commit -m "feat(entity): carry a current a
 - Consumes: `entity.DescribeAppearance` (Task 1).
 - Produces: `ScenePromptContext.CurrentAppearance string`.
 
-- [ ] **Step 1: Write the failing test** for the cast and the scene moment.
+- [x] **Step 1: Write the failing test** for the cast and the scene moment.
 
 ```go
 // appended to pkg/engine/scene_prompt_test.go
@@ -303,12 +303,12 @@ func TestScenePromptCarriesThePlaceAsItIsNow(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `go test -run 'TestScenePromptCarriesThePlaceAsItIsNow' ./pkg/engine/`
 Expected: FAIL, the prompt has no `CurrentAppearance` field to compile against.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `ScenePromptContext` gains `CurrentAppearance string` documented as the place's look right now, appended by `BuildScenePrompt` after `Appearance` as `"now: "+current`. `ScenePromptPrefix` does not read it, which is what keeps `TestPromptPrefixIsStable` true.
 
@@ -318,12 +318,12 @@ Expected: FAIL, the prompt has no `CurrentAppearance` field to compile against.
 
 `orchestrator.go:1600` and `pkg/gui/service.go:2758` set `sceneCtx.CurrentAppearance = locEntity.CurrentAppearance` beside the existing `sceneCtx.Appearance = locEntity.Appearance`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -run 'TestScene|TestBuildScenePrompt|TestPromptPrefix' ./pkg/engine/`
 Expected: PASS, including the existing prefix-stability tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine pkg/gui && git commit -m "feat(engine): compose a character's current appearance into its prompts"
@@ -341,7 +341,7 @@ git add pkg/engine pkg/gui && git commit -m "feat(engine): compose a character's
 - Consumes: `entity.CurrentAppearance` (Task 1).
 - Produces: `MergeExtractedEntity` sets `CurrentAppearance` instead of `Appearance` on an existing entity.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 // appended to pkg/harness/extractor_test.go
@@ -388,12 +388,12 @@ func TestMergeLeavesAnUnchangedAppearanceAlone(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `go test -run TestMerge ./pkg/harness/`
 Expected: the first and third FAIL, because the merge currently overwrites `Appearance`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Replace the merge's appearance block (`pkg/harness/extractor.go:393`) with the two rules, and extend the comment above `MergeExtractedEntity` to say the baseline is written at most once:
 
@@ -418,12 +418,12 @@ In `extractorSystemPrompt`, the line that defines `appearance_changed` gains the
 
 > When "appearance_changed" is true, describe only what is different now, not the character's enduring traits.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test ./pkg/harness/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/harness && git commit -m "feat(harness): stop gameplay rewriting a note's baseline appearance"
@@ -440,7 +440,7 @@ git add pkg/harness && git commit -m "feat(harness): stop gameplay rewriting a n
 **Interfaces:**
 - Consumes: `entity.CurrentAppearance` (Task 1).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 // appended to pkg/engine/restart_test.go
@@ -486,12 +486,12 @@ func TestResetCampaignClearsTheCurrentAppearanceAndKeepsTheBaseline(t *testing.T
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `go test -run TestResetCampaignClearsTheCurrentAppearance ./pkg/engine/`
 Expected: FAIL with `CurrentAppearance = "Soaked through and limping."`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `clearRuntimeFields` also clears the field, and its comment gains it:
 
@@ -504,12 +504,12 @@ Expected: FAIL with `CurrentAppearance = "Soaked through and limping."`.
 	ent.CurrentAppearance = ""
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test -run TestResetCampaign ./pkg/engine/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine && git commit -m "feat(engine): a reset clears the circumstances, not just the history"
@@ -528,7 +528,7 @@ git add pkg/engine && git commit -m "feat(engine): a reset clears the circumstan
 - Consumes: `entity.CurrentAppearance` (Task 1).
 - Produces: `Turn.CurrentAppearances []EntityAppearance`, `EntityAppearance{EntityID, Before, After string}`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 // appended to pkg/engine/rewind_test.go
@@ -574,12 +574,12 @@ func TestRewindRestoresTheAppearanceTheDiscardedTurnsReplaced(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `go test -run TestRewindRestoresTheAppearance ./pkg/engine/`
 Expected: FAIL, `undefined: EntityAppearance`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `pkg/engine/history.go`, next to the other advisory records:
 
@@ -622,12 +622,12 @@ type EntityAppearance struct {
 
 `pruneEntityHistory` becomes `undoDiscardedChanges(affected map[string]bool, restore map[string]string, target int)`: it applies `ent.CurrentAppearance = restore[id]` for a restored id and keeps the history pruning, skipping a note only when neither changes, so each note is still written once.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test ./pkg/engine/`
 Expected: PASS, including the existing rewind tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/engine && git commit -m "feat(engine): an undo restores the appearance the turn replaced"
@@ -648,7 +648,7 @@ git add pkg/engine && git commit -m "feat(engine): an undo restores the appearan
 - Consumes: `entity.DescribeAppearance` (Task 1).
 - Produces: `config.Config.LocationArtAppearance() string` returning `"original"` or `"original_and_current"`; `media.AppearanceHash(ent, providerParams string, layerCurrent bool) string`; `media.BuildLocationPrompt(location, worldStyle string, layerCurrent bool) string`; `media.NewArtStore(client, cache, worldStyle, providerParams string, layerCurrent bool) *ArtStore`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 // appended to pkg/config/types_test.go
@@ -696,12 +696,12 @@ func TestAppearanceHashFollowsTheLayerDecision(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `go test -run 'TestLocationArtAppearance|TestAppearanceHash' ./pkg/config/ ./pkg/media/`
 Expected: FAIL to compile.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `pkg/config/types.go`, beside the `Trigger` field:
 
@@ -734,12 +734,12 @@ func (c *Config) LocationArtAppearance() string {
 
 `pkg/gui/service.go:3006` and `pkg/export/script.go:542` pass `cfg.LocationArtAppearance() != config.LocationArtAppearanceOriginal`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test ./pkg/config/ ./pkg/media/ ./pkg/gui/ ./pkg/export/`
 Expected: PASS. Fix any test that constructs an `ArtStore` or calls `AppearanceHash` by passing `true` for the layered default.
 
-- [ ] **Step 5: Regenerate the config reference and commit**
+- [x] **Step 5: Regenerate the config reference and commit**
 
 Run: `go test ./pkg/gui -update-docs` and check the diff names the new key.
 
@@ -761,7 +761,7 @@ git add pkg/config pkg/media pkg/gui pkg/export && git commit -m "feat(media): l
 **Interfaces:**
 - Consumes: `config.LocationArtAppearance()` (Task 6), `entity.DescribeAppearance` (Task 1).
 
-- [ ] **Step 1: Write the failing frontend test**
+- [x] **Step 1: Write the failing frontend test**
 
 ```tsx
 // frontend/src/components/providers/ImageProviderEditor.test.tsx
@@ -796,12 +796,12 @@ describe('ImageProviderEditor location art', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `cd frontend && npx vitest run src/components/providers/ImageProviderEditor.test.tsx`
 Expected: FAIL, no such control.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `frontend/src/types.ts`: `ImageConfig` gains `location_art_appearance?: 'original_and_current' | 'original';`. The `PlayerDTO` type gains `current_appearance?: string`.
 
@@ -835,12 +835,12 @@ Expected: FAIL, no such control.
 
 `pkg/gui/docs/10-codex-yaml.md`: the full schema block gains `current_appearance` with a comment saying play writes it, the per-type list names it, and the reset section says a restart clears it.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cd frontend && npx vitest run && npx tsc --noEmit`, then `go test ./pkg/gui/`.
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pkg/gui frontend && git commit -m "feat(studio): show and edit a note's current appearance"
