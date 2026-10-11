@@ -36,6 +36,10 @@ type EntityFrontmatter struct {
 	PortraitHistory []string               `yaml:"portrait_history,omitempty" json:"portrait_history,omitempty"`
 	Location        string                 `yaml:"location,omitempty"`
 	Appearance      string                 `yaml:"appearance,omitempty" json:"appearance,omitempty"`
+	// CurrentAppearance is how the note looks right now, layered on Appearance by
+	// DescribeAppearance. Play writes it, and it describes the present rather than
+	// the identity, so a reset clears it and the baseline is never rewritten.
+	CurrentAppearance string               `yaml:"current_appearance,omitempty" json:"current_appearance,omitempty"`
 	Gender          string                 `yaml:"gender,omitempty" json:"gender,omitempty"`
 	Age             string                 `yaml:"age,omitempty" json:"age,omitempty"`
 	Aliases         []string               `yaml:"aliases,omitempty" json:"aliases,omitempty"`
@@ -56,9 +60,12 @@ type Entity struct {
 	PortraitHistory []string
 	Location        string
 	Faction         string
-	Appearance      string
-	Gender          string
-	Age             string
+	Appearance string
+	// CurrentAppearance is how the note looks now: a fresh scar, soaked clothes, a
+	// disguise. It qualifies Appearance rather than replacing it.
+	CurrentAppearance string
+	Gender            string
+	Age               string
 	// Aliases are other names the same being is known by. They exist because a
 	// model will rename a character, and the alternative to recording both names is
 	// a second entity losing the first one's history.
@@ -146,8 +153,9 @@ func ParseMarkdownEntity(data []byte) (*Entity, error) {
 		PortraitHistory: fm.PortraitHistory,
 		Location:        fm.Location,
 		Faction:    fm.Faction,
-		Appearance: fm.Appearance,
-		Gender:     fm.Gender,
+		Appearance:        fm.Appearance,
+		CurrentAppearance: fm.CurrentAppearance,
+		Gender:            fm.Gender,
 		Age:        fm.Age,
 		Aliases:    fm.Aliases,
 		History:    fm.History,
@@ -340,8 +348,9 @@ func (e *Entity) SerializeMarkdown() ([]byte, error) {
 		PortraitHistory: e.PortraitHistory,
 		Location:        e.Location,
 		Faction:         e.Faction,
-		Appearance:      e.Appearance,
-		Gender:          e.Gender,
+		Appearance:        e.Appearance,
+		CurrentAppearance: e.CurrentAppearance,
+		Gender:            e.Gender,
 		Age:             e.Age,
 		Aliases:         e.Aliases,
 		History:         e.History,
@@ -350,7 +359,7 @@ func (e *Entity) SerializeMarkdown() ([]byte, error) {
 		extra := make(map[string]interface{}, len(e.ExtraMeta))
 		for k, v := range e.ExtraMeta {
 			switch strings.ToLower(k) {
-			case "id", "name", "type", "tags", "voice", "portrait", "portrait_version", "portrait_history", "location", "faction", "appearance", "gender", "age", "aliases", "history", "state":
+			case "id", "name", "type", "tags", "voice", "portrait", "portrait_version", "portrait_history", "location", "faction", "appearance", "current_appearance", "gender", "age", "aliases", "history", "state":
 				continue
 			default:
 				extra[k] = v
