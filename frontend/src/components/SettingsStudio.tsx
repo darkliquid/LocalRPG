@@ -152,6 +152,13 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   // The Providers area splits into credentials, embeddings, and the offline preset,
   // so the tab leads with one job rather than all three.
   const [providersTab, setProvidersTab] = useState<'cloud' | 'embeddings' | 'offline'>('cloud');
+  // Each media engine has a form of its own, so the tab shows one engine at a
+  // time rather than stacking three long editors in one column.
+  const [mediaTab, setMediaTab] = useState<'tts' | 'stt' | 'images'>('tts');
+  // The agents area splits each role's own settings from the routing list that
+  // pairs roles with adapters, and from the context, timing, and generation
+  // limits that most people never tune.
+  const [agentsTab, setAgentsTab] = useState<'roles' | 'routing' | 'advanced'>('roles');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -972,6 +979,16 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       {/* Tab 2: AI Agents & Roles */}
       {activeSubTab === 'agents' && (
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          <SubTabs
+            ariaLabel="AI Agents"
+            tabs={[
+              { id: 'roles', label: 'Roles', icon: <Users className="w-3.5 h-3.5" /> },
+              { id: 'routing', label: 'Routing', icon: <Layers className="w-3.5 h-3.5" /> },
+              { id: 'advanced', label: 'Advanced', icon: <Sliders className="w-3.5 h-3.5" /> },
+            ]}
+            active={agentsTab}
+            onChange={(id) => setAgentsTab(id as 'roles' | 'routing' | 'advanced')}
+          />
           <label className="flex items-center justify-between gap-3 p-4 rounded-xl bg-glass-card border border-stone-800 cursor-pointer">
             <span className="text-sm font-sans text-stone-200">
               Restate the player's action
@@ -986,6 +1003,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               className="w-4 h-4 accent-purple-600 cursor-pointer"
             />
           </label>
+
+          {agentsTab === 'roles' && (
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
@@ -1033,22 +1052,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
                 </select>
               </div>
             </div>
-
-            {Object.keys(tierCaveats).length > 0 && (
-              <div className="rounded-lg border border-stone-800 bg-stone-950/40 p-3">
-                <p className="mb-2 font-sans text-[11px] uppercase text-stone-400">How providers run</p>
-                <TierLegend caveats={tierCaveats} />
-              </div>
-            )}
-
-            <ProviderManager
-              family="llm"
-              config={config}
-              onChange={setConfig}
-              selected={selectedRole}
-              onSelect={setSelectedRole}
-              roles={roleListItems}
-            />
 
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1560,7 +1563,38 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               )}
             </div>
           </div>
+          )}
 
+          {agentsTab === 'routing' && (
+          <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
+            <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
+              <Layers className="w-4 h-4" />
+              <span>Role Routing</span>
+            </h3>
+            <p className="text-xs text-stone-400">
+              Every role resolves to one adapter. Select a row to edit that role on the Roles tab.
+            </p>
+
+            {Object.keys(tierCaveats).length > 0 && (
+              <div className="rounded-lg border border-stone-800 bg-stone-950/40 p-3">
+                <p className="mb-2 font-sans text-[11px] uppercase text-stone-400">How providers run</p>
+                <TierLegend caveats={tierCaveats} />
+              </div>
+            )}
+
+            <ProviderManager
+              family="llm"
+              config={config}
+              onChange={setConfig}
+              selected={selectedRole}
+              onSelect={setSelectedRole}
+              roles={roleListItems}
+            />
+          </div>
+          )}
+
+          {agentsTab === 'advanced' && (
+          <>
           {/* Context budget and timing: what the narrator is sent, and how long it may take */}
           <AdvancedSection label="Advanced">
           <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
@@ -1910,12 +1944,26 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
             </div>
           </div>
           </AdvancedSection>
+          </>
+          )}
         </div>
       )}
 
       {/* Tab 3: Media Engines (TTS / STT / Image) */}
       {activeSubTab === 'media' && (
         <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+          <SubTabs
+            ariaLabel="Media Engines"
+            tabs={[
+              { id: 'tts', label: 'TTS', icon: <Volume2 className="w-3.5 h-3.5" /> },
+              { id: 'stt', label: 'STT', icon: <Mic className="w-3.5 h-3.5" /> },
+              { id: 'images', label: 'Images', icon: <Sparkles className="w-3.5 h-3.5" /> },
+            ]}
+            active={mediaTab}
+            onChange={(id) => setMediaTab(id as 'tts' | 'stt' | 'images')}
+          />
+
+          {mediaTab === 'tts' && (
           <ProviderManager
             family="tts"
             config={config}
@@ -2810,7 +2858,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               );
             }}
           />
+          )}
 
+          {mediaTab === 'stt' && (
           <ProviderManager
             family="stt"
             config={config}
@@ -3007,7 +3057,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               );
             }}
           />
+          )}
 
+          {mediaTab === 'images' && (
           <ProviderManager
             family="image"
             config={config}
@@ -3242,6 +3294,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
               );
             }}
           />
+          )}
         </div>
       )}
 
