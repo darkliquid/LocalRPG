@@ -10,12 +10,12 @@ A local-first tabletop RPG client for crafting original worlds, designing custom
 
 ## Features
 
-- **First-Class Local AI:** Route GM, narrator, and evaluator roles across local models (Ollama, LM Studio, vLLM, LocalAI) or cloud APIs, with per-role fallbacks and zero-GPU built-ins.
-- **Dynamic Generated Imagery:** Generate atmospheric scene backgrounds and character portraits on the fly using ComfyUI, Automatic1111, or procedural vector art.
-- **TTS Narration & Character Voices:** Listen to your stories narrated aloud with Piper, Kokoro, or OS synthesizers, featuring distinct voice profiles for each NPC.
-- **Custom System Mechanics:** Design custom dice expressions, attribute checks, and mechanics in the Systems Studio—adaptable to any tabletop genre without hardcoded stats.
-- **Living Worlds & Campaign Lore:** Craft factions, locations, and starter lore in the Worlds Studio, with automated Codex tracking as new entities and relationships emerge.
-- **Story Theatre & Campaign Exports:** Step through interactive visual novel replays in Theatre Mode, and export campaigns as self-contained web bundles or rendered video.
+- **First-Class Local AI & Embeddings:** Route GM, narrator, and evaluator roles across local models (Ollama, LM Studio, vLLM, LocalAI) or cloud APIs, with local ONNX embeddings and zero-GPU built-ins.
+- **AI World Generation & Living Lore:** Author lore, factions, and entities in Worlds Studio, or generate full settings through schema-first AI pipelines and draft review.
+- **Custom Systems & Scenario Testing:** Design dice rules, outcome tiers, and character creation prompts with worked examples, verified against automated test scenarios.
+- **Dynamic Scene Art & Style Packs:** Generate atmospheric scenes and character portraits with curated style packs, keeping baseline world aesthetics distinct from live campaign appearances.
+- **TTS Narration & Voice Dictation:** Listen to narrated story prose with distinct voice profiles for each NPC, and interact hands-free with speech-to-text voice dictation.
+- **Story Theatre, Packages & Export:** Step through visual novel replays, share creations via standalone content packages, and export campaigns as self-contained web bundles or rendered video.
 
 ---
 
@@ -23,10 +23,10 @@ A local-first tabletop RPG client for crafting original worlds, designing custom
 
 LocalRPG is built around the tabletop creative cycle:
 
-1. **Craft a World in Worlds Studio:** Author lore, tone, factions, and key locations. Your world's art style guide shapes how scene imagery is generated.
-2. **Define Rules in Systems Studio:** Create custom resolution systems, dice rules, and action checks. Whether it's a gritty d20 dungeon crawl or a rules-light 2d6 narrative game, nothing is locked to preset stats.
-3. **Embark on a Campaign:** Take actions, roll checks, and shape the story. The AI Game Master adjudicates rules while the Narrator paints vivid scenes with voice and art.
-4. **Relive & Export in Story Theatre:** Review past sessions in visual novel Theatre Mode, then export them as standalone, interactive web bundles, or rendered video files.
+1. **Craft a World in Worlds Studio:** Author lore, tone, factions, and key locations by hand or generate complete settings with schema-first AI pipelines, batch entity expansion, and draft review.
+2. **Define Rules in Systems Studio:** Create custom resolution systems, dice rules, and character creation prompts with worked examples, and verify system balance using automated test scenarios.
+3. **Embark on a Campaign:** Take actions, roll checks, and shape the story. Speak your actions with microphone dictation while the AI Game Master adjudicates rules and narrates vivid scenes with voice and art.
+4. **Relive & Export in Story Theatre:** Review past sessions in visual novel Theatre Mode, share worlds and rules via standalone content packages, or export campaigns as interactive web bundles or rendered video.
 
 ---
 
@@ -68,8 +68,9 @@ Every campaign keeps track of what happened, who was involved, and how the world
 
 LocalRPG features a unified settings system to connect your AI models and media engines:
 
+- **Structured Studio Tabs:** Manage settings across dedicated tabs for Providers (LLMs, ONNX embeddings, shared API keys), AI Agents, Media Engines (TTS, STT, Image Generation), and Advanced preferences.
 - **AI Agent Role Routing:** Route `gm`, `narrator`, and `evaluator` roles across local inference (Ollama, LM Studio, vLLM, LocalAI), cloud APIs, or built-in procedural engines.
-- **Multimodal Engines:** Configure TTS (Piper, Kokoro, AllTalk, native-os), STT (Whisper), and Image Generation (ComfyUI, Automatic1111, procedural-art) with volume, auto-play, and auto-generate art toggles.
+- **Multimodal Engines:** Configure TTS (Piper, Kokoro, AllTalk, native-os), STT (Whisper, Web Speech API), and Image Generation (ComfyUI, Automatic1111, procedural-art) with volume, auto-play, and auto-generate art toggles.
 - **Live Provider Diagnostics:** Test model and media engine connections directly from the UI with latency and preview feedback.
 - **Dual-Access UI:** Access settings anytime from the **Settings** tab in Launcher Hub, or via the in-game header gear icon without leaving an active session.
 
@@ -80,18 +81,22 @@ LocalRPG features a unified settings system to connect your AI models and media 
 LocalRPG works out of the box and doesn't need external dependencies, servers, or a GPU, while also supporting 1-click presets for popular local inference tools:
 
 ### Zero-GPU Built-in Engines
+
 - **`narrative-oracle` Agent:** Pure-Go deterministic procedural storyteller that evaluates player action modes and the outcome tiers a dice roll produces, generating responsive narrative prose woven with entity wikilinks.
 - **`native-os` TTS Client:** Dispatches narration to operating system speech synthesizers (`spd-say` on Linux, `/usr/bin/say` on macOS, PowerShell on Windows) with procedural audio waveform fallback.
 - **`procedural-art` Image Generator:** Pure-Go vector dark fantasy SVG generator producing multi-layered atmospheric citadels, moonlit ridgelines, and misty marsh ruins customized by scene keywords.
 
 ### 1-Click Quick Presets
+
 Settings Studio includes 1-click loaders that instantly prefill endpoint, model, and parameter defaults:
+
 - **LLM / Agents:** Ollama (`localhost:11434`), LM Studio (`localhost:1234`), LocalAI (`localhost:8080`), vLLM (`localhost:8000`), `narrative-oracle` (built-in), and experimental CLI runners (`llama-cli`, `claude-cli`).
 - **TTS (Speech):** Kokoro-FastAPI (`localhost:8880`), AllTalk (`localhost:7851`), Piper (`piper`), `native-os`, OpenAI Audio.
 - **STT (Transcription):** Faster-Whisper (`localhost:8000`), Whisper.cpp (`whisper-cli`), OpenAI Whisper.
 - **Image Generation:** ComfyUI (`127.0.0.1:8188`), Automatic1111 (`127.0.0.1:7860`), LocalAI (`localhost:8080`), `sd-cli`, `procedural-art`, DALL-E 3.
 
 ### NPC Voice Profiles Library
+
 - **Archetype Catalog:** Includes default fantasy archetypes (`elder_sage`, `young_scout`, `gruff_blacksmith`, `sinister_cultist`) configuring `voice_id`, `pitch`, and `speech_rate`.
 - **Automatic GM Voice Assignment:** The GM prompt is automatically injected with the active voice profile catalog. When new NPCs are introduced, the world extractor auto-assigns matching voice profiles based on tags or deterministic hash.
 - **Per-Character Codex Overrides:** Select and inject voice profile frontmatter directly from the Codex Drawer note editor with one click.
