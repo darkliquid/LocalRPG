@@ -473,13 +473,13 @@ func (c *Config) InteractiveRolls() string {
 // unknown value to "significant".
 func (c *Config) ImageTrigger() string {
 	if c == nil {
-		return "significant"
+		return "major"
 	}
 	switch c.Media.Image.Trigger {
-	case "off", "scene_break", "significant", "every_turn", "manual":
+	case "off", "scene_break", "significant", "every_turn", "manual", "major":
 		return c.Media.Image.Trigger
 	}
-	return "significant"
+	return "major"
 }
 
 // CurrentVersion is the config schema version.

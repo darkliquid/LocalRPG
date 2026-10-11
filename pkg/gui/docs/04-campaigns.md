@@ -72,6 +72,14 @@ A campaign can illustrate its turns as well as its locations. The image policy i
 `media.image.trigger`, and the illustrations live in `games/<id>/assets/scenes/`
 as `turn-<N><ext>`.
 
+By default, `media.image.trigger` uses `major`. A turn is illustrated when the
+scene changes in a way the player would notice: a scene break, a change of
+location, a newly introduced character, or an extreme check outcome. An ordinary
+hit or miss, a character who was already present, and a long passage of narration
+are none of these. Set `trigger` to `significant` for the older, broader heuristic
+(any decisive check, any new speaker, or a long turn), `scene_break` for explicit
+breaks only, `every_turn`, `manual`, or `off`.
+
 ### Consistency
 
 Successive illustrations of one place share a look. A scene's **palette** and

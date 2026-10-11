@@ -1593,7 +1593,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			Action:    turn.Input,
 			Location:  turn.Location,
 			Style:     o.worldArtStyle,
-			Entities:  o.presentEntityNames(&turn),
+			Cast:      SceneCast(o.store, &turn),
 		}
 		if locEntity != nil {
 			sceneCtx.Location = locEntity.Name

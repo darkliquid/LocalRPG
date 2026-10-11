@@ -11,17 +11,18 @@ import (
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/media"
+	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
 // ScenePromptContext is everything a scene prompt is composed from, so the image
 // reflects what happened rather than only where the player is.
 type ScenePromptContext struct {
-	Cue        string   // the extractor cue or rule-break paragraph, if any
-	Narration  string   // the turn's narration, for an excerpt
-	Action     string   // the player's raw action
-	Entities   []string // present characters, by display name
-	Location   string   // the location's name
-	Appearance string   // the location's authored appearance, if any
+	Cue        string           // the extractor cue or rule-break paragraph, if any
+	Narration  string           // the turn's narration, for an excerpt
+	Action     string           // the player's raw action
+	Cast       []SceneCastMember // present characters, described
+	Location   string           // the location's name
+	Appearance string           // the location's authored appearance, if any
 	Style      string   // the world art style
 	Outcome    string   // the resolved check's outcome, if any
 	// Scene is the stable look of the place, so two turns in one scene share a
@@ -29,10 +30,17 @@ type ScenePromptContext struct {
 	Scene media.SceneStyle
 }
 
+// SceneCastMember is one character the scene shows, described well enough to draw.
+type SceneCastMember struct {
+	Name       string
+	Appearance string
+}
+
 const (
 	sceneNarrationCap = 200
 	sceneActionCap    = 160
 	sceneEntityCap    = 4
+	sceneCastCap      = 120
 	// sceneSuffix is the fixed quality suffix every scene prompt ends with.
 	sceneSuffix = "cinematic scene illustration, high quality, atmospheric lighting, detailed environment, no text, no borders"
 )
@@ -56,12 +64,26 @@ func BuildScenePrompt(ctx ScenePromptContext) string {
 		parts = append(parts, "action: "+action)
 	}
 
-	if len(ctx.Entities) > 0 {
-		entities := ctx.Entities
-		if len(entities) > sceneEntityCap {
-			entities = entities[:sceneEntityCap]
+	if len(ctx.Cast) > 0 {
+		cast := ctx.Cast
+		if len(cast) > sceneEntityCap {
+			cast = cast[:sceneEntityCap]
 		}
-		parts = append(parts, "characters: "+strings.Join(entities, ", "))
+		described := make([]string, 0, len(cast))
+		for _, member := range cast {
+			name := strings.TrimSpace(member.Name)
+			if name == "" {
+				continue
+			}
+			if appearance := strings.TrimSpace(member.Appearance); appearance != "" {
+				described = append(described, name+" ("+appearance+")")
+				continue
+			}
+			described = append(described, name)
+		}
+		if len(described) > 0 {
+			parts = append(parts, "characters: "+strings.Join(described, "; "))
+		}
 	}
 
 	if location := strings.TrimSpace(ctx.Location); location != "" {
@@ -149,23 +171,30 @@ func outcomeToneWords(outcome string) string {
 	return ""
 }
 
-// presentEntityNames resolves the display names of the entities a turn involved,
-// so the scene can show them. It caps the list so the prompt stays short.
-func (o *TurnOrchestrator) presentEntityNames(turn *Turn) []string {
+// SceneCast resolves the characters a turn involved, with the appearance an image
+// needs. It caps the list so the prompt stays short, and is shared by the turn
+// pipeline and the on-demand path. A nil source leaves names as the ids.
+func SceneCast(source *storage.Store, turn *Turn) []SceneCastMember {
+	if turn == nil {
+		return nil
+	}
 	seen := make(map[string]bool, len(turn.Entities)+len(turn.Segments))
-	names := make([]string, 0, sceneEntityCap)
+	cast := make([]SceneCastMember, 0, sceneEntityCap)
 	add := func(id string) {
-		if id == "" || seen[id] || len(names) >= sceneEntityCap {
+		if id == "" || seen[id] || len(cast) >= sceneEntityCap {
 			return
 		}
 		seen[id] = true
-		name := id
-		if o.store != nil {
-			if ent, err := o.store.GetEntity(id); err == nil && ent != nil && ent.Name != "" {
-				name = ent.Name
+		member := SceneCastMember{Name: id}
+		if source != nil {
+			if ent, err := source.GetEntity(id); err == nil && ent != nil {
+				if ent.Name != "" {
+					member.Name = ent.Name
+				}
+				member.Appearance = sceneCastAppearance(ent)
 			}
 		}
-		names = append(names, name)
+		cast = append(cast, member)
 	}
 	for _, mention := range turn.Entities {
 		add(mention.ID)
@@ -173,7 +202,25 @@ func (o *TurnOrchestrator) presentEntityNames(turn *Turn) []string {
 	for _, segment := range turn.Segments {
 		add(segment.SpeakerID)
 	}
-	return names
+	return cast
+}
+
+// sceneCastAppearance is an entity's authored appearance, or a bounded fallback so
+// a character without one is still described.
+func sceneCastAppearance(ent *entity.Entity) string {
+	if ent == nil {
+		return ""
+	}
+	if appearance := strings.TrimSpace(ent.Appearance); appearance != "" {
+		return sceneExcerpt(appearance, sceneCastCap)
+	}
+	if body := sceneExcerpt(ent.Body, sceneCastCap); body != "" {
+		return body
+	}
+	if len(ent.Tags) > 0 {
+		return strings.Join(ent.Tags, ", ")
+	}
+	return ""
 }
 
 // ExtractSceneCue extracts a concise visual cue from narration text following a scene break delimiter.
