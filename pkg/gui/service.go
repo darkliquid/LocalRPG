@@ -2759,12 +2759,13 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 	gameDir := filepath.Clean(s.resolver.GameDir(gameID))
 	portraitsDir := filepath.Clean(filepath.Join(gameDir, "assets", "portraits"))
 
-	store, err := s.store(gameID)
-	if err != nil {
-		return nil, "", err
+	var ent *entity.Entity
+	if store, storeErr := s.store(gameID); storeErr == nil {
+		if loaded, loadErr := store.GetEntity(cleanID); loadErr == nil {
+			ent = loaded
+		}
 	}
-	ent, err := store.GetEntity(cleanID)
-	if err != nil || ent == nil {
+	if ent == nil {
 		// Fallback: check entity markdown file on disk directly
 		notePath := filepath.Clean(filepath.Join(gameDir, "entities", cleanID+".md"))
 		if strings.HasPrefix(notePath, gameDir+string(filepath.Separator)) {
@@ -2776,7 +2777,9 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 		}
 	}
 	if ent == nil {
-		return nil, "", fmt.Errorf("character %q not found", characterID)
+		// An unknown id still gets an image: a placeholder derived from the id, so a
+		// client never renders a broken portrait for a speaker it cannot resolve.
+		ent = &entity.Entity{ID: cleanID, Name: cleanID, Type: "character"}
 	}
 
 	safeID := ent.ID
