@@ -98,10 +98,10 @@ onAction('roll', function (ctx) {
 
 ## Testing a System
 
-Deterministic scenarios live under `systems/<id>/tests/*.yaml`. The studio's **Run Tests** action runs them against the saved system and lists any assertion that failed, and `localrpg debug test-system <id>` runs the same scenarios from the command line. Add `--reference` to test a built-in reference system instead of one on disk.
+Deterministic scenarios live under `systems/<id>/tests/*.yaml`. The **Tests** tab lists them and creates, edits, or deletes one through a structured form. An author never has to write the YAML by hand. **Run Tests** runs the stored scenarios against the saved system and lists any assertion that failed, and `localrpg debug test-system <id>` runs the same scenarios from the command line. Add `--reference` to test a built-in reference system instead of one on disk.
 
 A save also runs a smoke test: the system loads, and its declared check resolves to an outcome its own vocabulary names. A hand-authored system that fails the smoke test still saves, with a warning, so a work in progress is never lost. A generated system is never saved broken; regenerate the draft instead.
 
 ## Live Studio Testing
 
-Use the built-in **Dice & Rules Tester** at the bottom of the Systems Studio to execute trial actions, verify dice formulas, and inspect returned state patches before deploying your system to a campaign.
+Open the **Tests** tab to define the checks a system must satisfy. Pick an action, the input to give it, and what the resolution must produce, then run the set. A scenario doesn't need a provider, store, or network, so it proves a mechanics change quickly.
