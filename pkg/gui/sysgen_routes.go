@@ -5,7 +5,36 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+
+	"github.com/darkliquid/localrpg/pkg/sysgen"
+	"github.com/darkliquid/localrpg/pkg/worldgen"
 )
+
+// malformedReplyMessage is the headline a user sees when a model reply could not
+// be read. The raw parse error stays in the detail for a developer.
+const malformedReplyMessage = "The model's reply could not be read. This is usually a one-off; try again, or switch to a different model."
+
+// isMalformedReply reports whether err is an unreadable-reply failure from either
+// generation pipeline.
+func isMalformedReply(err error) bool {
+	return errors.Is(err, sysgen.ErrMalformedReply) || errors.Is(err, worldgen.ErrMalformedReply)
+}
+
+// replyErrorMessage is the user-facing message for a generation failure.
+func replyErrorMessage(err error) string {
+	if isMalformedReply(err) {
+		return malformedReplyMessage
+	}
+	return err.Error()
+}
+
+// replyErrorCode classifies a generation failure for the streamed client.
+func replyErrorCode(err error) string {
+	if isMalformedReply(err) {
+		return "malformed_reply"
+	}
+	return generationLimitCode(err)
+}
 
 // streamSystemGeneration runs a system generation and streams its progress as NDJSON,
 // one event per line: steps and final draft. A client that disconnects cancels the generation.
@@ -30,7 +59,7 @@ func (s *Server) streamSystemGeneration(w http.ResponseWriter, r *http.Request, 
 	}
 
 	if _, err := s.service.GenerateSystem(r.Context(), req, emit); err != nil {
-		event := TurnEvent{Type: "error", Message: err.Error(), Code: generationLimitCode(err)}
+		event := TurnEvent{Type: "error", Message: replyErrorMessage(err), Code: replyErrorCode(err), Detail: err.Error()}
 		_ = emit(event)
 	}
 }
@@ -147,6 +176,10 @@ func (s *Server) handleSystemEnhance(w http.ResponseWriter, r *http.Request, id 
 	}
 	resp, err := s.service.EnhanceSystem(r.Context(), id, req)
 	if err != nil {
+		if isMalformedReply(err) {
+			writeJSONError(w, http.StatusBadGateway, replyErrorMessage(err))
+			return
+		}
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}

@@ -93,3 +93,38 @@ func TestARetriedRollReusesTheRecordedResult(t *testing.T) {
 		t.Fatalf("a retry re-rolled: %+v vs %+v", first.Checks[0], second.Checks[0])
 	}
 }
+
+func TestAResolvedPendingCheckAttachesToTheContinuation(t *testing.T) {
+	provider := &toolScriptProvider{replies: []toolReply{
+		{text: "You cross the bridge."},
+	}}
+	o, timeline := toolLoopOrchestrator(t, provider)
+	o.SetMechanicsEngagement("ask")
+	o.SetTools(&fakeExecutor{}, "yes")
+
+	pending := &harness.PendingCheck{
+		Ref:        "p1",
+		ProposedBy: "gm",
+		Request:    harness.CheckRequest{Actor: "player", CheckKind: "skill", Stakes: "the bridge"},
+	}
+	if err := timeline.history.AppendTurn(Turn{Number: 1, Mode: "Do", PendingCheck: pending}); err != nil {
+		t.Fatal(err)
+	}
+	o.SetPendingCheckRef("p1")
+
+	turn, err := o.ProcessActionStream(context.Background(), "Roll", "roll", nil)
+	if err != nil {
+		t.Fatalf("turn: %v", err)
+	}
+	if len(turn.Checks) == 0 {
+		t.Fatal("expected the pending check resolved")
+	}
+
+	checkID := turn.Checks[0].CheckID
+	for _, segment := range turn.Segments {
+		if segment.CheckRef == checkID {
+			return
+		}
+	}
+	t.Fatalf("the resolved check %q is not attached to any segment: %+v", checkID, turn.Segments)
+}

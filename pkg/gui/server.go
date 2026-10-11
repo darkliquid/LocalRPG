@@ -63,7 +63,7 @@ func routePattern(path string) string {
 		path == "/api/media/inspect" ||
 		path == "/api/tts/batch" ||
 		path == "/api/content/export" || path == "/api/content/import" ||
-		path == "/api/registry/search" || path == "/api/registry/install" || path == "/api/registry/updates" ||
+		path == "/api/registry/search" || path == "/api/registry/install" || path == "/api/registry/updates" || path == "/api/registry/sources" ||
 		path == "/api/stt" || path == "/api/trace" || path == "/api/character/generate" ||
 		path == "/api/generate-text" || path == "/api/generate-asset-preview" ||
 		path == "/api/usage" || path == "/api/limits":
@@ -1020,6 +1020,15 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			writeJSON(w, merged)
+			return
+		}
+
+		if r.Method == http.MethodDelete {
+			if err := s.service.DeleteGameEntity(r.Context(), gameID, entityID); err != nil {
+				writeGameError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 
@@ -2358,4 +2367,8 @@ func (s *Server) handleRegistryInstallRoute(w http.ResponseWriter, r *http.Reque
 
 func (s *Server) handleRegistryUpdatesRoute(w http.ResponseWriter, r *http.Request) {
 	s.service.HandleRegistryUpdates(w, r)
+}
+
+func (s *Server) handleRegistrySourcesRoute(w http.ResponseWriter, r *http.Request) {
+	s.service.HandleRegistrySources(w, r)
 }

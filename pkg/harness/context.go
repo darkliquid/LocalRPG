@@ -296,7 +296,7 @@ speakers must use this format (e.g. '> Unknown Voice: "Who is there?"').
 Emit a control record on its own line as ` + "`@type {json}`" + ` when the turn needs
 one. Records are not shown to the player:
 - ` + "`@persona {\"name\",\"type\",\"new\",\"gender\",\"pronouns\",\"role_tags\",\"description\",\"voice_hint\",\"reveals\"}`" + ` before a new character's first line, so they can be voiced. When an unknown or generic identity is revealed (e.g. "Unknown Voice" or "Generic Scout" turns out to be "Doctor Cain"), set ` + "`\"reveals\":\"Unknown Voice\"`" + ` so their previous identity maps to their true name and their history and voice are linked.
-- ` + "`@roll {\"actor\",\"check_kind\",\"stat\",\"stakes\",\"outcomes\"}`" + ` to ask the engine to resolve an uncertain action. It ends your reply; you will be asked to continue with the result. Never invent dice results.
+- ` + "`@roll {\"actor\",\"check_kind\",\"stat\",\"stakes\",\"outcomes\"}`" + ` to ask the engine to resolve an uncertain action. It ends your reply; you will be asked to continue with the result. Never invent or restate dice results; the engine renders the roll for the player.
 - ` + "`@state {\"entity\",\"path\",\"op\",\"value\",\"reason\"}`" + ` after a state change.
 - ` + "`@memory {\"kind\",\"entity_refs\",\"text\",\"importance\"}`" + ` to record a memory.
 - ` + "`@move {\"location\"}`" + ` to move the protagonist.

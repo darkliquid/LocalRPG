@@ -1053,6 +1053,12 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		checkID      string
 	}
 	var rollAnchors []rollAnchor
+	// A pending check resolved before this continuation has no @roll event to
+	// anchor it, so it attaches to the continuation's opening narration, where the
+	// consequence is narrated, rather than leading the turn detached.
+	if resolvedPending != nil {
+		rollAnchors = append(rollAnchors, rollAnchor{segmentIndex: 0, checkID: resolvedPending.CheckID})
+	}
 	// collectedCount is how many of the parser's events are already in collected,
 	// so a recovery continuation's events can be appended without duplicating the
 	// ones the loop already took.

@@ -41,7 +41,8 @@ func FormatMechanicsInstructions(spec *core.MechanicsSpec, engagement string, st
 		sb.WriteString("Name the skill as well as the stat when a check tests a trained ability, and list situational modifiers. ")
 		sb.WriteString("NPCs do not roll; resolve opposition through the protagonist's check. ")
 		sb.WriteString("Call request_check, or emit a @roll record, for any uncertain action; never narrate a resolution the engine has not given you. ")
-		sb.WriteString("Honour the outcome the engine returns.\n")
+		sb.WriteString("Honour the outcome the engine returns. ")
+		sb.WriteString("Do not restate the dice: never write notation, totals, modifiers, or the arithmetic of a roll in your prose, because the engine renders the roll beside your words. Narrate only what the outcome means for the fiction.\n")
 	}
 
 	if len(stats) > 0 {

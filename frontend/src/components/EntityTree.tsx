@@ -22,7 +22,7 @@ import {
 } from '@headless-tree/core';
 import { useTree } from '@headless-tree/react';
 import type { EntitySummary, FolderNode } from '../types';
-import { DeleteFolderDialog, FolderNameDialog, MoveNoteDialog } from './TreeDialogs';
+import { DeleteEntityDialog, DeleteFolderDialog, FolderNameDialog, MoveNoteDialog } from './TreeDialogs';
 import RowMenu from './RowMenu';
 import {
   ROOT_LABEL,
@@ -46,6 +46,7 @@ interface EntityTreeProps {
   onMoveFolder: (from: string, to: string) => void;
   onCreateFolder: (path: string) => void;
   onDeleteFolder: (path: string) => void;
+  onDeleteEntity?: (entityId: string) => void;
 }
 
 type DialogState =
@@ -53,6 +54,7 @@ type DialogState =
   | { kind: 'create'; parent: string }
   | { kind: 'rename'; path: string }
   | { kind: 'delete'; path: string }
+  | { kind: 'delete-note'; entity: EntitySummary }
   | { kind: 'move-note'; entity: EntitySummary };
 
 // EntityTree renders the folder tree. Placement, dragging, keyboard navigation and
@@ -68,6 +70,7 @@ export default function EntityTree({
   onMoveFolder,
   onCreateFolder,
   onDeleteFolder,
+  onDeleteEntity,
 }: EntityTreeProps) {
   const [filter, setFilter] = useState('');
   const [dialog, setDialog] = useState<DialogState>({ kind: 'none' });
@@ -257,6 +260,17 @@ export default function EntityTree({
                         onSelect: () =>
                           setDialog({ kind: 'move-note', entity: data.entity as EntitySummary }),
                       },
+                      ...(onDeleteEntity
+                        ? [
+                            {
+                              label: 'Delete',
+                              icon: <Trash2 className="w-3 h-3" />,
+                              destructive: true,
+                              onSelect: () =>
+                                setDialog({ kind: 'delete-note', entity: data.entity as EntitySummary }),
+                            },
+                          ]
+                        : []),
                     ]
                   : []
             }
@@ -342,6 +356,16 @@ export default function EntityTree({
         onCancel={() => setDialog({ kind: 'none' })}
         onSubmit={(folder) => {
           if (dialog.kind === 'move-note') onMoveEntity(dialog.entity.id, folder);
+          setDialog({ kind: 'none' });
+        }}
+      />
+
+      <DeleteEntityDialog
+        isOpen={dialog.kind === 'delete-note'}
+        name={dialog.kind === 'delete-note' ? dialog.entity.name : ''}
+        onCancel={() => setDialog({ kind: 'none' })}
+        onSubmit={() => {
+          if (dialog.kind === 'delete-note') onDeleteEntity?.(dialog.entity.id);
           setDialog({ kind: 'none' });
         }}
       />

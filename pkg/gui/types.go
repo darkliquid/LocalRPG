@@ -922,6 +922,15 @@ type RegistryInstallRequestDTO struct {
 	OnConflict string              `json:"on_conflict"`
 }
 
+// RegistrySourceDTO reports one configured registry and its fetch state, so the
+// registry view can say where packages come from and why a source is empty.
+type RegistrySourceDTO struct {
+	URL          string `json:"url"`
+	Name         string `json:"name,omitempty"`
+	PackageCount int    `json:"package_count"`
+	Error        string `json:"error,omitempty"`
+}
+
 type SettingsResponseDTO struct {
 	Config          config.Config `json:"config"`
 	ConfigFilePath  string        `json:"config_file_path"`

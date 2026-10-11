@@ -51,10 +51,6 @@ func Enhance(ctx context.Context, gen Generator, world WorldContext, instruction
 	if gen == nil {
 		return nil, fmt.Errorf("worldgen: no generator configured")
 	}
-	raw, err := gen.GenerateJSON(ctx, buildEnhancePrompt(world, instruction, kinds), enhanceSchema)
-	if err != nil {
-		return nil, err
-	}
 	var out struct {
 		Proposals []struct {
 			Kind   string `json:"kind"`
@@ -70,7 +66,7 @@ func Enhance(ctx context.Context, gen Generator, world WorldContext, instruction
 			} `json:"entity"`
 		} `json:"proposals"`
 	}
-	if err := decodeJSON(raw, &out); err != nil {
+	if err := generateJSON(ctx, gen, buildEnhancePrompt(world, instruction, kinds), enhanceSchema, &out); err != nil {
 		return nil, err
 	}
 

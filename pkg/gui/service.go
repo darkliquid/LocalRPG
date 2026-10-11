@@ -1403,6 +1403,39 @@ func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID 
 	return s.GetEntity(ctx, gameID, targetID)
 }
 
+// DeleteGameEntity removes one campaign entity note and its index entry.
+func (s *Service) DeleteGameEntity(_ context.Context, gameID, entityID string) error {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return fmt.Errorf("invalid game id: %w", err)
+	}
+	if err := pathutil.ValidateID(entityID); err != nil {
+		return fmt.Errorf("invalid entity id: %w", err)
+	}
+
+	entitiesDir := filepath.Join(s.resolver.GameDir(gameID), "entities")
+	path, err := s.findEntityNote(entitiesDir, entityID)
+	if err != nil {
+		return err
+	}
+	if path == "" {
+		return fmt.Errorf("delete entity %s: %w", entityID, fs.ErrNotExist)
+	}
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("remove entity note: %w", err)
+	}
+
+	store, err := s.store(gameID)
+	if err != nil {
+		return fmt.Errorf("open store: %w", err)
+	}
+	if err := store.DeleteEntity(entityID); err != nil {
+		return fmt.Errorf("remove entity from the index: %w", err)
+	}
+	syncer := storage.NewSyncer(store)
+	_ = syncer.SyncFile(path)
+	return nil
+}
+
 // rewriteInboundLinks points every note that linked to the source at the survivor,
 // so no note is left pointing at an entity that no longer exists.
 func (s *Service) rewriteInboundLinks(gameDir, sourceID, targetID string) error {
@@ -5972,6 +6005,13 @@ func (s *Service) ExportContent(ctx context.Context, typ, id string, w io.Writer
 // ErrContentConflict reports an attempt to import content that already exists under refuse mode.
 var ErrContentConflict = errors.New("content already exists")
 
+// A registry source can clash with one already configured, or name one that is
+// not, so the handler can answer 409 and 404 rather than a generic failure.
+var (
+	ErrRegistrySourceExists   = errors.New("registry source already configured")
+	ErrRegistrySourceNotFound = errors.New("registry source not configured")
+)
+
 // ImportContentOptions specifies optional options and validation when importing packages.
 type ImportContentOptions struct {
 	ConflictMode string
@@ -6353,4 +6393,123 @@ func (s *Service) HandleRegistryUpdates(w http.ResponseWriter, r *http.Request) 
 		updates = []registry.PackageRef{}
 	}
 	writeJSON(w, updates)
+}
+
+// RegistrySources reports every configured registry and its fetch state, so the
+// registry view can show where packages come from and explain an empty source.
+func (s *Service) RegistrySources(ctx context.Context) ([]RegistrySourceDTO, error) {
+	statuses := s.registryClient().Sources(ctx)
+	out := make([]RegistrySourceDTO, 0, len(statuses))
+	for _, status := range statuses {
+		out = append(out, RegistrySourceDTO{
+			URL:          status.URL,
+			Name:         status.Name,
+			PackageCount: status.PackageCount,
+			Error:        status.Error,
+		})
+	}
+	return out, nil
+}
+
+// AddRegistrySource normalises a registry URL, refuses a duplicate, and persists
+// it to the configuration.
+func (s *Service) AddRegistrySource(_ context.Context, rawURL string) (RegistrySourceDTO, error) {
+	normalized, err := registry.NormalizeSource(rawURL)
+	if err != nil {
+		return RegistrySourceDTO{}, err
+	}
+	cfg := s.configMgr.Get()
+	if cfg == nil {
+		return RegistrySourceDTO{}, fmt.Errorf("no configuration is loaded")
+	}
+	for _, existing := range cfg.Registries.URLs {
+		if existing == normalized {
+			return RegistrySourceDTO{}, fmt.Errorf("%w: %s", ErrRegistrySourceExists, normalized)
+		}
+	}
+	cfg.Registries.URLs = append(append([]string{}, cfg.Registries.URLs...), normalized)
+	if err := s.configMgr.Save(cfg); err != nil {
+		return RegistrySourceDTO{}, fmt.Errorf("save config: %w", err)
+	}
+	return RegistrySourceDTO{URL: normalized}, nil
+}
+
+// RemoveRegistrySource deletes one configured registry URL from the configuration.
+func (s *Service) RemoveRegistrySource(_ context.Context, rawURL string) error {
+	normalized, err := registry.NormalizeSource(rawURL)
+	if err != nil {
+		return err
+	}
+	cfg := s.configMgr.Get()
+	if cfg == nil {
+		return fmt.Errorf("no configuration is loaded")
+	}
+	remaining := make([]string, 0, len(cfg.Registries.URLs))
+	found := false
+	for _, existing := range cfg.Registries.URLs {
+		if existing == normalized {
+			found = true
+			continue
+		}
+		remaining = append(remaining, existing)
+	}
+	if !found {
+		return fmt.Errorf("%w: %s", ErrRegistrySourceNotFound, normalized)
+	}
+	cfg.Registries.URLs = remaining
+	if err := s.configMgr.Save(cfg); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+	return nil
+}
+
+// HandleRegistrySources handles GET, POST, and DELETE on /api/registry/sources.
+func (s *Service) HandleRegistrySources(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		sources, err := s.RegistrySources(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if sources == nil {
+			sources = []RegistrySourceDTO{}
+		}
+		writeJSON(w, sources)
+
+	case http.MethodPost:
+		var req struct {
+			URL string `json:"url"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		source, err := s.AddRegistrySource(r.Context(), req.URL)
+		if errors.Is(err, ErrRegistrySourceExists) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(source)
+
+	case http.MethodDelete:
+		if err := s.RemoveRegistrySource(r.Context(), r.URL.Query().Get("url")); err != nil {
+			if errors.Is(err, ErrRegistrySourceNotFound) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }

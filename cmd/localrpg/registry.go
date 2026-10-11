@@ -86,7 +86,11 @@ func runRegistryAdd(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "Usage: localrpg registry add <url>")
 		return 1
 	}
-	rawURL := strings.TrimSpace(args[0])
+	rawURL, err := registry.NormalizeSource(args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "Invalid registry URL: %v\n", err)
+		return 1
+	}
 
 	mgr := config.NewConfigManager()
 	cfg, err := mgr.Load()

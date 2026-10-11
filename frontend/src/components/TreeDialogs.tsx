@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FolderPlus, FolderTree, MoveRight, Pencil } from 'lucide-react';
+import { FolderPlus, FolderTree, MoveRight, Pencil, Trash2 } from 'lucide-react';
 import type { FolderNode } from '../types';
 
 // flattenFolders turns the tree into the list a destination picker needs, with the
@@ -226,6 +226,33 @@ export const DeleteFolderDialog: React.FC<DeleteFolderDialogProps> = ({
         {noteCount === 0
           ? 'The folder is empty.'
           : `${noteCount} ${noteCount === 1 ? 'note' : 'notes'} in it will be deleted too. This cannot be undone.`}
+      </p>
+    </DialogShell>
+  );
+};
+
+export interface DeleteEntityDialogProps {
+  isOpen: boolean;
+  name: string;
+  onCancel: () => void;
+  onSubmit: () => void;
+}
+
+// DeleteEntityDialog names the note, because the deletion is permanent and the
+// note is the only thing that goes with it.
+export const DeleteEntityDialog: React.FC<DeleteEntityDialogProps> = ({ isOpen, name, onCancel, onSubmit }) => {
+  if (!isOpen) return null;
+  return (
+    <DialogShell
+      title="Delete note"
+      icon={<Trash2 className="w-4 h-4" />}
+      submitLabel="Delete note"
+      destructive
+      onCancel={onCancel}
+      onSubmit={onSubmit}
+    >
+      <p className="text-xs font-sans text-stone-400">
+        Delete <span className="text-stone-200">{name}</span>? Its note is removed permanently.
       </p>
     </DialogShell>
   );

@@ -41,13 +41,9 @@ func choosePrompt(brief Brief) string {
 // does not match a template exactly falls back to the closest one, so the
 // pipeline always has a valid shape to build.
 func chooseTemplate(ctx context.Context, gen Generator, brief Brief) (Template, templateChoice, error) {
-	raw, err := gen.GenerateJSON(ctx, choosePrompt(brief), chooseSchema)
-	if err != nil {
-		return Template{}, templateChoice{}, fmt.Errorf("choose: %w", err)
-	}
 	var choice templateChoice
-	if err := decodeJSON(raw, &choice); err != nil {
-		return Template{}, templateChoice{}, fmt.Errorf("choose decode: %w", err)
+	if err := generateJSON(ctx, gen, choosePrompt(brief), chooseSchema, &choice); err != nil {
+		return Template{}, templateChoice{}, fmt.Errorf("choose: %w", err)
 	}
 	tpl, ok := MatchTemplate(choice.Resolution, choice.Health, choice.Advancement)
 	if !ok {
@@ -92,13 +88,9 @@ func fillPrompt(brief Brief, tpl Template) string {
 // fillParams asks the model for the values of the chosen template's parameters.
 // The template decides the shape; these values are checked by Template.Build.
 func fillParams(ctx context.Context, gen Generator, tpl Template, brief Brief) (Params, error) {
-	raw, err := gen.GenerateJSON(ctx, fillPrompt(brief, tpl), fillSchema)
-	if err != nil {
-		return Params{}, fmt.Errorf("fill: %w", err)
-	}
 	var params Params
-	if err := decodeJSON(raw, &params); err != nil {
-		return Params{}, fmt.Errorf("fill decode: %w", err)
+	if err := generateJSON(ctx, gen, fillPrompt(brief, tpl), fillSchema, &params); err != nil {
+		return Params{}, fmt.Errorf("fill: %w", err)
 	}
 	return params, nil
 }
@@ -212,13 +204,9 @@ func assembleScript(hooks []hookEntry) string {
 // runHooks prompts the generator for the JavaScript hooks that implement the
 // requested escape hatches and assembles them into a mechanics.js body.
 func runHooks(ctx context.Context, gen Generator, brief Brief, spec *core.MechanicsSpec, hatches []string) (string, error) {
-	raw, err := gen.GenerateJSON(ctx, hooksPrompt(brief, spec, hatches), hooksSchema)
-	if err != nil {
-		return "", fmt.Errorf("hooks: %w", err)
-	}
 	var out hooksOutput
-	if err := decodeJSON(raw, &out); err != nil {
-		return "", fmt.Errorf("hooks decode: %w", err)
+	if err := generateJSON(ctx, gen, hooksPrompt(brief, spec, hatches), hooksSchema, &out); err != nil {
+		return "", fmt.Errorf("hooks: %w", err)
 	}
 	if len(out.Hooks) == 0 {
 		return "", nil
@@ -253,13 +241,9 @@ func rulesPrompt(brief Brief, spec *core.MechanicsSpec) string {
 
 // runRules prompts the generator for the player-facing rules guide markdown.
 func runRules(ctx context.Context, gen Generator, brief Brief, spec *core.MechanicsSpec) (string, error) {
-	raw, err := gen.GenerateJSON(ctx, rulesPrompt(brief, spec), rulesSchema)
-	if err != nil {
-		return "", fmt.Errorf("rules: %w", err)
-	}
 	var out rulesOutput
-	if err := decodeJSON(raw, &out); err != nil {
-		return "", fmt.Errorf("rules decode: %w", err)
+	if err := generateJSON(ctx, gen, rulesPrompt(brief, spec), rulesSchema, &out); err != nil {
+		return "", fmt.Errorf("rules: %w", err)
 	}
 	return out.Rules, nil
 }

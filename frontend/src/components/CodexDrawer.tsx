@@ -24,6 +24,7 @@ interface CodexDrawerProps {
   onSelect: (entityId: string) => void;
   onSave: (entityId: string, markdown: string) => Promise<void> | void;
   onMerge?: (sourceID: string, intoID: string) => void;
+  onDeleteEntity?: (entityId: string) => Promise<void> | void;
 }
 
 // inlineYaml renders a canonical option value so an imported profile's tunables
@@ -41,6 +42,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
   onSelect,
   onSave,
   onMerge,
+  onDeleteEntity,
 }) => {
   const [markdown, setMarkdown] = useState('');
   // savedMarkdown is the last document the server accepted, so the unsaved marker
@@ -346,6 +348,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                     await client.deleteFolder(path, true);
                     setFolders(await client.listFolders());
                   }}
+                  onDeleteEntity={onDeleteEntity}
                 />
               </div>
             </>
