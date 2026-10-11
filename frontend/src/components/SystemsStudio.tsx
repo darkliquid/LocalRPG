@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient } from '../api/client';
-import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure, ContentManifestInfo, SystemDraftInfo, SystemVerifyResult } from '../types';
-import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play, Download, Upload, Lightbulb, X } from 'lucide-react';
+import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure, ContentManifestInfo, SystemDraftInfo, SystemVerifyResult, Scenario } from '../types';
+import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play, Download, Upload, Lightbulb, X, Pencil, FlaskConical } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
@@ -13,6 +13,7 @@ import { SystemEnhanceDialog } from './SystemEnhanceDialog';
 import { BaseSystemCatalogue } from './BaseSystemCatalogue';
 import { MarkdownDocViewer } from './MarkdownDocViewer';
 import { ScriptReference } from './mechanics/ScriptReference';
+import { ScenarioEditor } from './ScenarioEditor';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
 
@@ -35,7 +36,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [draft, setDraft] = useState<SystemDraft | null>(null);
   const [activeDraftID, setActiveDraftID] = useState<string | null>(null);
   const [pendingSelection, setPendingSelection] = useState<SystemSelection>(null);
-  const [activeTab, setActiveTab] = useState<'manifest' | 'rules' | 'mechanics' | 'script'>('manifest');
+  const [activeTab, setActiveTab] = useState<'manifest' | 'rules' | 'mechanics' | 'script' | 'tests'>('manifest');
   const startModeRef = React.useRef(startMode);
 
   // Form state
@@ -55,6 +56,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [testFailures, setTestFailures] = useState<SystemTestFailure[]>([]);
+  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [isLoadingScenarios, setIsLoadingScenarios] = useState(false);
+  const [editingScenario, setEditingScenario] = useState<Scenario | null>(null);
+  const [scenarioError, setScenarioError] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const [showEnhanceDialog, setShowEnhanceDialog] = useState(false);
@@ -387,6 +392,51 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     }
   };
 
+  // The tests tab reads the scenarios a system stores under systems/<id>/tests/,
+  // and is the only place they are created or removed.
+  useEffect(() => {
+    if (activeTab !== 'tests' || !savedID) return;
+    let cancelled = false;
+    setIsLoadingScenarios(true);
+    APIClient.listSystemScenarios(savedID)
+      .then((res) => {
+        if (!cancelled) setScenarios(res.scenarios ?? []);
+      })
+      .catch((err) => {
+        if (!cancelled) setScenarioError(errorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingScenarios(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, savedID]);
+
+  const handleSaveScenario = async (scenario: Scenario) => {
+    if (!savedID) return;
+    setScenarioError(null);
+    try {
+      const res = await APIClient.saveSystemScenario(savedID, scenario);
+      setScenarios(res.scenarios ?? []);
+      setEditingScenario(null);
+      setToast({ type: 'success', message: `Saved scenario "${scenario.name}".` });
+    } catch (err) {
+      setScenarioError(errorMessage(err));
+    }
+  };
+
+  const handleDeleteScenario = async (name: string) => {
+    if (!savedID) return;
+    setScenarioError(null);
+    try {
+      await APIClient.deleteSystemScenario(savedID, name);
+      setScenarios((prev) => prev.filter((scenario) => scenario.name !== name));
+    } catch (err) {
+      setScenarioError(errorMessage(err));
+    }
+  };
+
   const handleRunTests = async () => {
     if (!savedID) {
       setToast({ type: 'error', message: 'Save the system before running its scenarios.' });
@@ -676,6 +726,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               >
                 <FileCode className="w-3.5 h-3.5" />
                 <span>mechanics.js</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('tests')}
+                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  activeTab === 'tests'
+                    ? 'bg-purple-600 text-white font-bold shadow'
+                    : 'text-stone-400 hover:text-white'
+                }`}
+              >
+                <FlaskConical className="w-3.5 h-3.5" />
+                <span>Tests</span>
               </button>
             </div>
 
@@ -1181,6 +1243,84 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               ariaLabel="System mechanics script"
               placeholder="export function evaluateRoll(stats, diceExpr) { ... }"
             />
+          </div>
+        )}
+
+        {/* Tab 5: Tests */}
+        {activeTab === 'tests' && (
+          <div className="flex-1 flex flex-col gap-3 min-h-0 overflow-y-auto pr-1">
+            <div className="flex items-center justify-between shrink-0">
+              <span className="text-xs font-mono text-stone-400 px-1">
+                {scenarios.length} scenario{scenarios.length === 1 ? '' : 's'}
+              </span>
+              <button
+                type="button"
+                disabled={!savedID}
+                onClick={() => setEditingScenario({ name: '', seed: 0, steps: [] })}
+                title={savedID ? 'Add a scenario' : 'Save the system before adding scenarios'}
+                className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 disabled:opacity-50 cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                <span>New scenario</span>
+              </button>
+            </div>
+
+            {scenarioError && <p className="text-xs text-red-300 px-1">{scenarioError}</p>}
+
+            {!savedID && (
+              <p className="text-xs text-stone-500 px-1">Save the system before adding scenarios.</p>
+            )}
+
+            {editingScenario && (
+              <ScenarioEditor
+                scenario={editingScenario}
+                onSave={(next) => void handleSaveScenario(next)}
+                onCancel={() => setEditingScenario(null)}
+              />
+            )}
+
+            {!editingScenario && savedID && !isLoadingScenarios && scenarios.length === 0 && (
+              <p className="text-xs text-stone-500 px-1">
+                No scenarios yet. Add one to test this system's mechanics without a provider.
+              </p>
+            )}
+
+            {!editingScenario && scenarios.length > 0 && (
+              <ul className="space-y-1">
+                {scenarios.map((scenario) => (
+                  <li
+                    key={scenario.name}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-stone-800 bg-stone-900/40 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm text-stone-200 truncate">{scenario.name}</div>
+                      <div className="text-[11px] font-mono text-stone-500">
+                        {scenario.steps.length} step{scenario.steps.length === 1 ? '' : 's'}
+                        {scenario.seed ? `, seed ${scenario.seed}` : ''}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setEditingScenario(scenario)}
+                        title={`Edit ${scenario.name}`}
+                        className="p-1.5 rounded text-stone-400 hover:text-purple-300 hover:bg-purple-950/40 cursor-pointer"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteScenario(scenario.name)}
+                        title={`Delete ${scenario.name}`}
+                        className="p-1.5 rounded text-stone-400 hover:text-red-300 hover:bg-red-950/40 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </section>

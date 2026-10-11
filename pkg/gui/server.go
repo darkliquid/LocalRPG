@@ -24,6 +24,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/media"
 	"github.com/darkliquid/localrpg/pkg/models"
 	"github.com/darkliquid/localrpg/pkg/pathutil"
+	"github.com/darkliquid/localrpg/pkg/systemtest"
 )
 
 type Server struct {
@@ -1145,21 +1146,51 @@ func (s *Server) handleSystemTestRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSystemTestsRoute(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
 	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/system/tests/"), "/")
 	if id == "" {
 		http.Error(w, "missing system id", http.StatusBadRequest)
 		return
 	}
-	resp, err := s.service.SystemScenarios(r.Context(), id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
+	switch r.Method {
+	case http.MethodGet:
+		resp, err := s.service.SystemScenarios(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		writeJSON(w, resp)
+
+	case http.MethodPost:
+		var scenario systemtest.Scenario
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxTurnBody)).Decode(&scenario); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if err := s.service.SaveSystemScenario(r.Context(), id, scenario); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		resp, err := s.service.SystemScenarios(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSONStatus(w, http.StatusCreated, resp)
+
+	case http.MethodDelete:
+		if err := s.service.DeleteSystemScenario(r.Context(), id, r.URL.Query().Get("name")); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
-	writeJSON(w, resp)
 }
 
 func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {

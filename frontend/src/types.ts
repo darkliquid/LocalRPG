@@ -895,6 +895,7 @@ export interface ScenarioRange {
 
 export interface ScenarioExpectations {
   outcome?: string;
+  outcome_one_of?: string[];
   total?: ScenarioRange;
   state?: Record<string, unknown>;
   message_contains?: string;

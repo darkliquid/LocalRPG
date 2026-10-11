@@ -115,7 +115,7 @@ Every `*.yaml` under `systems/<id>/tests/` is a deterministic scenario: a name, 
 localrpg debug test-system classic-d20
 ```
 
-A step asserts any combination of `outcome`, a `total` range, resulting `state`, and `message_contains`. Scenarios run in filename order, so a prefix is the way to sequence them.
+A step asserts any combination of `outcome`, a `total` range, resulting `state`, and `message_contains`. Scenarios run in filename order, so a prefix is the way to sequence them. The Systems Studio's **Tests** tab writes these files for you; the format here is what it writes and what the command line reads.
 
 ## 3. A World
 

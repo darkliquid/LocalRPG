@@ -4859,6 +4859,66 @@ func (s *Service) SystemScenarios(_ context.Context, id string) (*SystemScenario
 	return out, nil
 }
 
+// SaveSystemScenario writes one scenario under systems/<id>/tests/<slug>.yaml.
+// The scenario is re-parsed before the write lands, so a malformed or step-less
+// scenario is refused rather than stored.
+func (s *Service) SaveSystemScenario(_ context.Context, id string, scenario systemtest.Scenario) error {
+	if err := pathutil.ValidateID(id); err != nil {
+		return fmt.Errorf("invalid system id: %w", err)
+	}
+	name := strings.TrimSpace(scenario.Name)
+	if name == "" {
+		return fmt.Errorf("a scenario needs a name")
+	}
+	data, err := systemtest.EncodeScenario(scenario)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(s.resolver.SystemDir(id), "tests")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("create tests dir: %w", err)
+	}
+	return os.WriteFile(filepath.Join(dir, entity.Slugify(name)+".yaml"), data, 0644)
+}
+
+// DeleteSystemScenario removes a stored scenario by the name it declares, so a
+// scenario hand-renamed on disk is still reachable.
+func (s *Service) DeleteSystemScenario(_ context.Context, id, name string) error {
+	if err := pathutil.ValidateID(id); err != nil {
+		return fmt.Errorf("invalid system id: %w", err)
+	}
+	want := strings.TrimSpace(name)
+	dir := filepath.Join(s.resolver.SystemDir(id), "tests")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("delete scenario %q: %w", want, fs.ErrNotExist)
+		}
+		return fmt.Errorf("read tests dir: %w", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			continue
+		}
+		scenario, loadErr := systemtest.LoadScenario(data)
+		if loadErr != nil {
+			continue
+		}
+		if scenario.Name == want || entity.Slugify(scenario.Name) == entity.Slugify(want) {
+			if removeErr := os.Remove(path); removeErr != nil {
+				return fmt.Errorf("remove scenario: %w", removeErr)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("delete scenario %q: %w", want, fs.ErrNotExist)
+}
+
 func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, error) {
 	if err := pathutil.ValidateID(id); err != nil {
 		return nil, fmt.Errorf("invalid world id: %w", err)

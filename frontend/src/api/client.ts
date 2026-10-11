@@ -36,6 +36,7 @@ import {
   SystemDeriveRequest,
   ReferenceSystemsResponse,
   SystemTestRequest,
+  Scenario,
   SystemTestResponse,
   SystemScenariosResponse,
   WorldDetail,
@@ -319,6 +320,24 @@ export class APIClient {
     const res = await fetch(`/api/system/tests/${encodeURIComponent(id)}`);
     if (!res.ok) throw new Error(`listSystemScenarios: ${res.statusText}`);
     return res.json();
+  }
+
+  static async saveSystemScenario(id: string, scenario: Scenario): Promise<SystemScenariosResponse> {
+    const res = await fetch(`/api/system/tests/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(scenario),
+    });
+    if (!res.ok) throw new Error((await res.text()).trim() || `saveSystemScenario: ${res.statusText}`);
+    return res.json();
+  }
+
+  static async deleteSystemScenario(id: string, name: string): Promise<void> {
+    const params = new URLSearchParams({ name });
+    const res = await fetch(`/api/system/tests/${encodeURIComponent(id)}?${params.toString()}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error((await res.text()).trim() || `deleteSystemScenario: ${res.statusText}`);
   }
 
   // generateTurnSceneImage asks the server to illustrate a turn that has no
