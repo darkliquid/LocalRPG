@@ -123,11 +123,11 @@ localrpg export video <game-id> [--out FILE|DIR] [--still] [--fps N] [--size WxH
 
 ## Documentation
 
-The manual ships inside the binary. Open it from the app's docs panel, or read it in
+The manual is built into the binary. Open it from the app's docs panel, or read it in
 [`pkg/gui/docs/`](pkg/gui/docs), whose guides the showcase site also renders.
 
 Start with [`00-start-here.md`](pkg/gui/docs/00-start-here.md), which lists every guide and
-suggests an order to read them in. From there the shape is:
+suggests an order to read them in. The guides then group as follows:
 
 - **Core concepts** - [`01-overview.md`](pkg/gui/docs/01-overview.md) on the architecture,
   then worlds, systems and campaigns.

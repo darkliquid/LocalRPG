@@ -222,15 +222,21 @@ generator and the lint script read that directory; a page anywhere else must be
 added to `tools/sitegen/content.go` and to the script's file list.
 
 ```bash
-mise run install:vale-styles   # vale sync; runs automatically when .vale.ini changes
-mise run lint:prose            # full report, every finding
+mise run lint:prose            # full report, every finding (syncs the Vale styles first)
 SUMMARY=1 mise run lint:prose  # counts, noisiest rules, worst files
 STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
 ```
 
+**Run it through mise, not the script.** `mise run lint:prose` depends on
+`install:vale-styles`, which runs `vale sync`. `bash scripts/lint-prose.sh` skips that, and
+Vale then checks against whatever is in `styles/`: nothing in a fresh clone, and a stale
+set in a tree from an earlier session. Both report fewer findings than CI and both look
+green, which is how a change passes locally and fails the prose job it is named after.
+Sync the styles first if a direct run is genuinely wanted.
+
 ### What it reports today
 
-**314 alerts across all 27 files: 0 errors, 130 warnings and 184 suggestions.**
+**316 alerts across all 27 files: 0 errors, 131 warnings and 185 suggestions.**
 For scale, pointing the same styles at every tracked file reported 68,525 alerts
 and 6,875 errors, which is why the scope is the documentation rather than the
 repository.
