@@ -21,24 +21,24 @@
 **Files:**
 - Modify: `pkg/gui/service.go`
 
-- [ ] **Step 1: Record the baseline**
+- [x] **Step 1: Record the baseline**
 
 Run: `staticcheck ./... | grep -c U1000`
 Result: 15 across the tree; 10 of them are the ones this plan owns.
 
-- [ ] **Step 2: Call the configuration at the creation site**
+- [x] **Step 2: Call the configuration at the creation site**
 
 In `prepareTurn`, the scene worker is built and given only `SetOnReady`. Add the call that
 gives it the budget, approval mode, price and procedural fallback, immediately after
 `SetOnReady` and before `orchestrator.SetSceneWorker`.
 
-- [ ] **Step 3: Report an approval-gated generation**
+- [x] **Step 3: Report an approval-gated generation**
 
 `configureSceneBudget` sets `SetOnSkipped` but not `SetOnPending`, so `ask` mode returns
 `scenePlan{pending: true}` and reports nothing. Add a `SetOnPending` that traces
 `turn.image_pending` and calls `broadcastSceneImagePending` with `"awaiting_approval"`.
 
-- [ ] **Step 4: Verify it builds and the call is no longer dead**
+- [x] **Step 4: Verify it builds and the call is no longer dead**
 
 Run: `go build ./... && staticcheck ./... | grep U1000`
 Expected: `configureSceneBudget`, `saveImageBudget`, `broadcastSceneImagePending`,
@@ -53,19 +53,19 @@ now reachable.
 - Modify: `pkg/gui/service.go`
 - Modify: `pkg/provider/imagehttp/client.go`
 
-- [ ] **Step 1: Remove the STT registry**
+- [x] **Step 1: Remove the STT registry**
 
 Delete `Service.sttRegistry`, the `sttReg` and `sttRegMu` fields, and its clause in
 `invalidateRegistries`. `TranscribeAudio` resolves its client directly through
 `media.NewSTTClientWithSharedKey`, so nothing ever built this registry and no caller can:
 the getter is half of a feature that was never written.
 
-- [ ] **Step 2: Remove the ComfyUI usage recorder**
+- [x] **Step 2: Remove the ComfyUI usage recorder**
 
 Delete `comfyUIImageClient.setLastUsage` and the field it writes, and have `LastUsage()`
 return the zero value, which its own comment already says is what ComfyUI reports.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `go build ./... && staticcheck ./... | grep U1000`
 Expected: neither symbol appears.
@@ -79,22 +79,22 @@ Expected: neither symbol appears.
 - Modify: `pkg/export/script.go`
 - Modify: `pkg/harness/context.go`
 
-- [ ] **Step 1: `TurnOrchestrator.generate`**
+- [x] **Step 1: `TurnOrchestrator.generate`**
 
 A one-line wrapper over `generateRequest` with no caller. Delete it and its comment; keep
 `generateRequest`, which is the real implementation and is used.
 
-- [ ] **Step 2: `ScriptCompiler.rootDir`**
+- [x] **Step 2: `ScriptCompiler.rootDir`**
 
 The struct field is never read. `NewScriptCompiler`'s parameter of the same name is a
 different thing and stays.
 
-- [ ] **Step 3: `speechFormattingInstruction`**
+- [x] **Step 3: `speechFormattingInstruction`**
 
 Delete the constant, its comment and the blank line after it.
 `FormatSpeechFormattingInstructions` superseded it, and R-10 already named it.
 
-- [ ] **Step 4: Verify the ten are gone**
+- [x] **Step 4: Verify the ten are gone**
 
 Run: `staticcheck ./...`
 Expected: 15 findings, none of them the ten this plan owns. The five `U1000` that remain
@@ -107,22 +107,22 @@ belong to TQ-4, which deletes them on its own branch.
 
 **Files:** none
 
-- [ ] **Step 1: Formatting, vet and build**
+- [x] **Step 1: Formatting, vet and build**
 
 Run: `gofmt -l cmd pkg tools && go build ./... && go vet ./...`
 Expected: all silent.
 
-- [ ] **Step 2: The full suite**
+- [x] **Step 2: The full suite**
 
 Run: `go test -count=1 ./...`
 Expected: 63 packages `ok`, exit 0.
 
-- [ ] **Step 3: Lint**
+- [x] **Step 3: Lint**
 
 Run: `mise run lint`
 Expected: exit 0. Note that until TQ-4 lands, `lint:staticcheck` does not exist yet, so
 the staticcheck run in Task 3 is the gate for this change.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Commit as `fix(gui): enforce the campaign's image budget and approval policy`.
