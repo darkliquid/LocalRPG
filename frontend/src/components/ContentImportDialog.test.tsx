@@ -9,7 +9,7 @@ describe('ContentImportDialog', () => {
         manifest={{ id: 'x', name: 'X', version: '1', has_script: true }}
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText(/mechanics\.js/)).toBeInTheDocument();
   });
@@ -25,7 +25,7 @@ describe('ContentImportDialog', () => {
         }}
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText(/Verified by Alice/)).toBeInTheDocument();
   });
@@ -41,7 +41,7 @@ describe('ContentImportDialog', () => {
         }}
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText(/Signed by untrusted key/)).toBeInTheDocument();
   });
@@ -58,7 +58,7 @@ describe('ContentImportDialog', () => {
         expectedType="system"
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText(/cannot be imported here/i)).toBeInTheDocument();
     const button = screen.getByRole('button', { name: /install package/i });
@@ -77,7 +77,7 @@ describe('ContentImportDialog', () => {
         expectedType="system"
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     );
     expect(screen.queryByText(/cannot be imported here/i)).not.toBeInTheDocument();
     const button = screen.getByRole('button', { name: /install package/i });

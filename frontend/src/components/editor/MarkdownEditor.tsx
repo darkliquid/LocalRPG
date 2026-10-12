@@ -115,16 +115,9 @@ export default function MarkdownEditor({
     const extensions: Extension[] = [serverDiagnosticField];
 
     if (schema) {
-      const sources: CompletionSource[] = [
-        frontmatterKeyCompletion(schema),
-        frontmatterValueCompletion(schema),
-      ];
+      const sources: CompletionSource[] = [frontmatterKeyCompletion(schema), frontmatterValueCompletion(schema)];
       if (links.length > 0) sources.push(wikilinkCompletion(links));
-      extensions.push(
-        autocompletion({ override: sources }),
-        frontmatterLinter(schema),
-        frontmatterHover(schema),
-      );
+      extensions.push(autocompletion({ override: sources }), frontmatterLinter(schema), frontmatterHover(schema));
     } else if (links.length > 0) {
       extensions.push(autocompletion({ override: [wikilinkCompletion(links)] }));
     }
@@ -208,7 +201,6 @@ export default function MarkdownEditor({
     view.dispatch({
       effects: intelligenceCompartment.current.reconfigure(buildIntelligence()),
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedSchema, linkTargets]);
 
   useEffect(() => {

@@ -17,8 +17,7 @@ export const CinematicOverlay: React.FC<CinematicOverlayProps> = ({ enabled }) =
       aria-hidden="true"
       className="pointer-events-none fixed inset-0 z-30"
       style={{
-        background:
-          'radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.45) 100%)',
+        background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.45) 100%)',
       }}
     >
       <div className="absolute inset-0 bg-noise opacity-40 motion-reduce:opacity-25" />

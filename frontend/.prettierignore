@@ -1,0 +1,16 @@
+# What Prettier does not format, and why.
+#
+# node_modules is skipped by Prettier already; the rest are build output, the
+# generated player bundle, and the coverage report.
+node_modules
+dist
+coverage
+../pkg/gui/dist
+
+# Markdown and the docs are linted by rumdl (mise run lint:docs) and Vale
+# (mise run lint:prose), which wrap prose deliberately. Prettier reflowing it
+# would fight both and produce a diff with no reviewer.
+*.md
+../README.md
+../docs
+../pkg/gui/docs

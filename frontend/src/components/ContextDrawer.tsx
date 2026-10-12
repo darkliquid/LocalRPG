@@ -45,8 +45,11 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
       APIClient.listGames()
         .then((list) => {
           setGames(list);
-          if (list.length > 0 && !selectedGameID) {
-            setSelectedGameID(list[0].id);
+          // The functional form reads the current selection instead of closing
+          // over it, so the effect does not need it as a dependency and cannot
+          // overwrite a selection the player has since made.
+          if (list.length > 0) {
+            setSelectedGameID((previous) => previous || list[0].id);
           }
         })
         .catch(() => {});
@@ -253,9 +256,7 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
                 <div
                   key={sec.name}
                   className={`p-3 rounded-xl border transition-colors ${
-                    sec.included
-                      ? 'bg-glass-card border-stone-800'
-                      : 'bg-black/30 border-stone-900 opacity-60'
+                    sec.included ? 'bg-glass-card border-stone-800' : 'bg-black/30 border-stone-900 opacity-60'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
@@ -274,9 +275,7 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
                         </span>
                       )}
                     </div>
-                    <span className="text-xs font-mono text-stone-400">
-                      ~{sec.tokens} tokens
-                    </span>
+                    <span className="text-xs font-mono text-stone-400">~{sec.tokens} tokens</span>
                   </div>
 
                   {sec.refs && sec.refs.length > 0 && (
@@ -289,9 +288,7 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
                         >
                           <span className="text-purple-400 font-bold">[[</span>
                           <span>{r.id}</span>
-                          {r.relation && (
-                            <span className="text-stone-500 text-xs">({r.relation})</span>
-                          )}
+                          {r.relation && <span className="text-stone-500 text-xs">({r.relation})</span>}
                           <span className="text-purple-400 font-bold">]]</span>
                         </button>
                       ))}

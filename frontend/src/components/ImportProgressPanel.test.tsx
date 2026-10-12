@@ -16,9 +16,7 @@ describe('formatRemaining', () => {
 describe('ImportProgressPanel', () => {
   it('says how much is coming before the first batch finishes', () => {
     render(<ImportProgressPanel progress={{ batch: 0, batches: 51, found: 0, total: 0 }} />);
-    expect(screen.getByTestId('import-progress-summary')).toHaveTextContent(
-      'Reading 51 batches of the source'
-    );
+    expect(screen.getByTestId('import-progress-summary')).toHaveTextContent('Reading 51 batches of the source');
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
   });
 
@@ -33,7 +31,7 @@ describe('ImportProgressPanel', () => {
           total: 37,
           names: ['Quezta', 'The Mourning March'],
         }}
-      />
+      />,
     );
 
     expect(screen.getByTestId('import-progress-summary')).toHaveTextContent('Read 12 of 51 batches');
@@ -44,9 +42,7 @@ describe('ImportProgressPanel', () => {
   });
 
   it('says when a batch ran out of room', () => {
-    render(
-      <ImportProgressPanel progress={{ batch: 20, batches: 51, found: 1, total: 44, cut_off: 2 }} />
-    );
+    render(<ImportProgressPanel progress={{ batch: 20, batches: 51, found: 1, total: 44, cut_off: 2 }} />);
     expect(screen.getByText(/2 batches ran out of room/)).toBeInTheDocument();
     expect(screen.getByText(/the rest of those pages was not read/)).toBeInTheDocument();
   });

@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  KEN_BURNS_PAN,
-  KEN_BURNS_ZOOM,
-  kenBurns,
-  moodTint,
-  parallaxOffset,
-  weatherOverlay,
-} from './effects';
+import { KEN_BURNS_PAN, KEN_BURNS_ZOOM, kenBurns, moodTint, parallaxOffset, weatherOverlay } from './effects';
 
 describe('kenBurns', () => {
   it('is the identity at the start of a beat', () => {

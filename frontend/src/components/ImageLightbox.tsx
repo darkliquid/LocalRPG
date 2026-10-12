@@ -56,6 +56,6 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({ src, alt, onClose,
         </button>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };

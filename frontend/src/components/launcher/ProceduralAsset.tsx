@@ -1,17 +1,5 @@
 import React from 'react';
-import {
-  Shield,
-  Sword,
-  Rocket,
-  Skull,
-  Ghost,
-  Cpu,
-  Flame,
-  TreePine,
-  Dices,
-  Building2,
-  LucideIcon,
-} from 'lucide-react';
+import { Shield, Sword, Rocket, Skull, Ghost, Cpu, Flame, TreePine, Dices, Building2, LucideIcon } from 'lucide-react';
 import { GENRE_PALETTES, genrePalette } from '../../lib/genre';
 
 export function hashString(str: string): number {

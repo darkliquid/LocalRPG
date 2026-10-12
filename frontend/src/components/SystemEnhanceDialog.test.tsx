@@ -15,9 +15,7 @@ afterEach(() => {
 
 describe('SystemEnhanceDialog', () => {
   it('accepts and rejects proposals', async () => {
-    const apply = vi
-      .spyOn(APIClient, 'applySystemEnhancements')
-      .mockResolvedValue({ written: ['mechanics'] });
+    const apply = vi.spyOn(APIClient, 'applySystemEnhancements').mockResolvedValue({ written: ['mechanics'] });
 
     render(<SystemEnhanceDialog systemId="s" onClose={() => {}} proposals={proposals} />);
 
@@ -71,7 +69,7 @@ describe('SystemEnhanceDialog', () => {
             problems: ['mechanics.skills.occult: unknown stat "missing"'],
           },
         ]}
-      />
+      />,
     );
     expect(screen.getByText(/unknown stat/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /apply accepted/i })).toBeDisabled();

@@ -42,7 +42,7 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({
             </p>
             <p className="text-xs font-mono text-stone-500">Through turn {recap.through_turn}</p>
           </>
-        ) : (!recap?.threads || recap.threads.length === 0) ? (
+        ) : !recap?.threads || recap.threads.length === 0 ? (
           <p className="text-stone-500 text-xs italic bg-black/30 p-3 rounded-xl border border-white/5">
             {recap?.enabled === false
               ? 'Summaries are switched off in Settings.'
@@ -86,7 +86,7 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({
           <BookOpen className="w-4 h-4" />
           <span>Active Narrative Arcs</span>
         </h3>
-        {(!state?.arcs || state.arcs.length === 0) ? (
+        {!state?.arcs || state.arcs.length === 0 ? (
           <p className="text-stone-500 text-xs italic bg-black/30 p-3 rounded-xl border border-white/5">
             No active world narrative arcs registered.
           </p>
@@ -95,13 +95,12 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({
             <div key={arc.id} className="bg-black/40 p-3 rounded-xl border border-white/5 space-y-1.5 shadow-inner">
               <div className="flex justify-between text-xs font-sans">
                 <span className="text-stone-300">{arc.name}</span>
-                <span className="text-purple-400 font-mono">{arc.progress}/{arc.max_progress}</span>
+                <span className="text-purple-400 font-mono">
+                  {arc.progress}/{arc.max_progress}
+                </span>
               </div>
               <div className="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-purple-500"
-                  style={{ width: percent(arc.progress, arc.max_progress) }}
-                />
+                <div className="h-full bg-purple-500" style={{ width: percent(arc.progress, arc.max_progress) }} />
               </div>
             </div>
           ))
@@ -113,7 +112,7 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({
           <Clock className="w-4 h-4" />
           <span>Faction Clocks</span>
         </h3>
-        {(!state?.clocks || state.clocks.length === 0) ? (
+        {!state?.clocks || state.clocks.length === 0 ? (
           <p className="text-stone-500 text-xs italic bg-black/30 p-3 rounded-xl border border-white/5">
             All factions are quiet in the shadows.
           </p>
@@ -121,14 +120,15 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({
           state.clocks.map((clock, i) => (
             <div key={i} className="bg-black/40 p-3 rounded-xl border border-white/5 space-y-1.5 shadow-inner">
               <div className="flex justify-between text-xs font-sans">
-                <span className="text-stone-300">{clock.name} ({clock.faction})</span>
-                <span className="text-red-400 font-mono">{clock.ticks}/{clock.max_ticks}</span>
+                <span className="text-stone-300">
+                  {clock.name} ({clock.faction})
+                </span>
+                <span className="text-red-400 font-mono">
+                  {clock.ticks}/{clock.max_ticks}
+                </span>
               </div>
               <div className="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-red-600"
-                  style={{ width: percent(clock.ticks, clock.max_ticks) }}
-                />
+                <div className="h-full bg-red-600" style={{ width: percent(clock.ticks, clock.max_ticks) }} />
               </div>
             </div>
           ))

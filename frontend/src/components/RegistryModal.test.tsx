@@ -18,9 +18,7 @@ const testWorld: PackageRefDTO = {
   },
 };
 
-const oneSource: RegistrySourceDTO[] = [
-  { url: 'https://example.org/index.json', name: 'Example', package_count: 2 },
-];
+const oneSource: RegistrySourceDTO[] = [{ url: 'https://example.org/index.json', name: 'Example', package_count: 2 }];
 
 function mockRegistry(sources: RegistrySourceDTO[] = [], packages: PackageRefDTO[] = []) {
   vi.spyOn(APIClient, 'listRegistrySources').mockResolvedValue(sources);
@@ -86,9 +84,7 @@ describe('RegistryModal', () => {
 
       render(<RegistryModal isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() =>
-        expect(screen.getByText(/No registries configured/i)).toBeInTheDocument()
-      );
+      await waitFor(() => expect(screen.getByText(/No registries configured/i)).toBeInTheDocument());
       expect(screen.queryByText(/matching ""/)).not.toBeInTheDocument();
     });
 

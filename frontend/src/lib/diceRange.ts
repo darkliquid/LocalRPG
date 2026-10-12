@@ -28,7 +28,10 @@ export function diceRange(notation?: string): DiceRange | null {
 // single "7" is one die of seven, which is the same as a total for the arithmetic.
 // It returns null when the entry is not whole numbers.
 export function parseDiceEntry(entry: string): DiceEntry | null {
-  const parts = entry.trim().split(/[\s,]+/).filter(Boolean);
+  const parts = entry
+    .trim()
+    .split(/[\s,]+/)
+    .filter(Boolean);
   if (parts.length === 0) return null;
 
   const dice: number[] = [];

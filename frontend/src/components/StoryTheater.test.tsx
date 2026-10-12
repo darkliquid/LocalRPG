@@ -51,9 +51,7 @@ describe('StoryTheater grouping', () => {
   });
 
   it('steps back to the previous line', () => {
-    render(
-      <StoryTheater turns={turns} isOpen onClose={() => {}} serverPlayback segmentAudioStatus={{}} />,
-    );
+    render(<StoryTheater turns={turns} isOpen onClose={() => {}} serverPlayback segmentAudioStatus={{}} />);
     fireEvent.click(screen.getByTitle('Next line'));
     fireEvent.click(screen.getByTitle('Previous line'));
     expect(screen.getByText(/one/)).toBeInTheDocument();

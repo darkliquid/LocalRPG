@@ -53,16 +53,15 @@ export const ContentImportDialog: React.FC<ContentImportDialogProps> = ({
         {/* Content */}
         <div className="p-6 space-y-5">
           {error && (
-            <div className="p-3 text-sm text-red-300 border border-red-500/30 rounded-xl bg-red-950/40">
-              {error}
-            </div>
+            <div className="p-3 text-sm text-red-300 border border-red-500/30 rounded-xl bg-red-950/40">{error}</div>
           )}
 
           {isTypeMismatch && (
             <div className="p-3 text-sm text-amber-200 border border-amber-500/30 rounded-xl bg-amber-950/40 flex items-center gap-2.5">
               <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
               <span>
-                This package contains a <strong className="capitalize text-white">{manifest.type}</strong>, but you are importing into {expectedType}s. It cannot be imported here.
+                This package contains a <strong className="capitalize text-white">{manifest.type}</strong>, but you are
+                importing into {expectedType}s. It cannot be imported here.
               </span>
             </div>
           )}
@@ -73,9 +72,7 @@ export const ContentImportDialog: React.FC<ContentImportDialogProps> = ({
               <div>
                 <h4 className="font-semibold text-white text-base">{manifest.name || manifest.id}</h4>
                 <div className="flex items-center gap-2 mt-0.5 text-xs text-neutral-400">
-                  <span className="font-mono bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-300">
-                    {manifest.id}
-                  </span>
+                  <span className="font-mono bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-300">{manifest.id}</span>
                   <span>•</span>
                   <span>v{manifest.version}</span>
                   {manifest.type && (
@@ -101,8 +98,16 @@ export const ContentImportDialog: React.FC<ContentImportDialogProps> = ({
 
             {(manifest.author || manifest.license) && (
               <div className="flex gap-4 pt-1 text-xs text-neutral-400">
-                {manifest.author && <div>Author: <span className="text-neutral-300">{manifest.author}</span></div>}
-                {manifest.license && <div>License: <span className="text-neutral-300">{manifest.license}</span></div>}
+                {manifest.author && (
+                  <div>
+                    Author: <span className="text-neutral-300">{manifest.author}</span>
+                  </div>
+                )}
+                {manifest.license && (
+                  <div>
+                    License: <span className="text-neutral-300">{manifest.license}</span>
+                  </div>
+                )}
               </div>
             )}
 

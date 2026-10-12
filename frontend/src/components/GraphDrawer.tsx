@@ -63,9 +63,13 @@ export const GraphDrawer: React.FC<GraphDrawerProps> = ({ data, onSelectNode }) 
       if (!pos) return;
 
       ctx.fillStyle =
-        node.type === 'character' ? '#f59e0b' :
-        node.type === 'npc' ? '#38bdf8' :
-        node.type === 'location' ? '#a855f7' : '#78716c';
+        node.type === 'character'
+          ? '#f59e0b'
+          : node.type === 'npc'
+            ? '#38bdf8'
+            : node.type === 'location'
+              ? '#a855f7'
+              : '#78716c';
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, NODE_RADIUS, 0, 2 * Math.PI);
       ctx.fill();
@@ -107,7 +111,11 @@ export const GraphDrawer: React.FC<GraphDrawerProps> = ({ data, onSelectNode }) 
           <Network className="w-4 h-4" />
           <span>Knowledge Graph</span>
         </h3>
-        {!isEmpty && <span className="text-xs font-mono text-stone-400">{data.nodes.length} nodes · {data.links.length} links</span>}
+        {!isEmpty && (
+          <span className="text-xs font-mono text-stone-400">
+            {data.nodes.length} nodes · {data.links.length} links
+          </span>
+        )}
       </div>
 
       {isEmpty ? (

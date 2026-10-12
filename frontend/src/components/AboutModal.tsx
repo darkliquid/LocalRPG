@@ -1,13 +1,7 @@
 import React from 'react';
 import { BookOpen, Bug, Github, Sparkles, X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
-import {
-  PROJECT_ISSUES_URL,
-  PROJECT_NAME,
-  PROJECT_REPO_URL,
-  PROJECT_TAGLINE,
-  openExternal,
-} from '../lib/project';
+import { PROJECT_ISSUES_URL, PROJECT_NAME, PROJECT_REPO_URL, PROJECT_TAGLINE, openExternal } from '../lib/project';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -63,8 +57,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, onOpenD
         </div>
 
         <p className="text-sm text-stone-400 leading-relaxed font-serif mb-4">
-          A local-first, turn-based tabletop RPG client. The engine keeps no rules of its own: every
-          system, world, and campaign is content you can read, edit, and share.
+          A local-first, turn-based tabletop RPG client. The engine keeps no rules of its own: every system, world, and
+          campaign is content you can read, edit, and share.
         </p>
 
         <ul className="space-y-2 mb-5">
@@ -107,10 +101,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, onOpenD
           <span className="text-xs text-stone-500 font-mono">
             {version ? `Version ${version}` : 'Development build'}
           </span>
-          <button
-            onClick={onClose}
-            className="text-xs text-stone-400 hover:text-stone-200 transition cursor-pointer"
-          >
+          <button onClick={onClose} className="text-xs text-stone-400 hover:text-stone-200 transition cursor-pointer">
             Close
           </button>
         </div>

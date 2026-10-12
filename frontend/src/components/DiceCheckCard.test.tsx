@@ -12,11 +12,7 @@ const check = (overrides: Partial<TurnCheck> = {}): TurnCheck => ({
 
 describe('DiceCheckCard', () => {
   it('shows the profile and stakes', () => {
-    render(
-      <DiceCheckCard
-        check={check({ profile: 'blades', position: 'risky', effect: 'limited', successes: 2 })}
-      />,
-    );
+    render(<DiceCheckCard check={check({ profile: 'blades', position: 'risky', effect: 'limited', successes: 2 })} />);
     expect(screen.getByText('blades')).toBeInTheDocument();
     expect(screen.getByText('risky')).toBeInTheDocument();
     expect(screen.getByText('limited')).toBeInTheDocument();
@@ -25,7 +21,12 @@ describe('DiceCheckCard', () => {
   it('shows the modifier breakdown', () => {
     render(
       <DiceCheckCard
-        check={check({ applied: [{ source: 'Stealth', value: 3 }, { source: 'wounded', value: -2 }] })}
+        check={check({
+          applied: [
+            { source: 'Stealth', value: 3 },
+            { source: 'wounded', value: -2 },
+          ],
+        })}
       />,
     );
     expect(screen.getByText(/Stealth/)).toBeInTheDocument();
@@ -48,9 +49,7 @@ describe('DiceCheckCard', () => {
   });
 
   it('shows both sides of an opposed check', () => {
-    render(
-      <DiceCheckCard check={check({ outcome: 'strong', opposed_total: 7, opposed_actor: 'Ogre' })} />,
-    );
+    render(<DiceCheckCard check={check({ outcome: 'strong', opposed_total: 7, opposed_actor: 'Ogre' })} />);
     expect(screen.getByText('You 9 vs Ogre 7')).toBeInTheDocument();
   });
 

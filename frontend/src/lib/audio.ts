@@ -4,7 +4,7 @@ import { PlaybackEntry, TurnSegment } from '../types';
 // the larger played_ms and total_ms, and preserving completion.
 export const mergeLedger = (
   target: Record<string, PlaybackEntry>,
-  incoming: Record<string, PlaybackEntry>
+  incoming: Record<string, PlaybackEntry>,
 ): Record<string, PlaybackEntry> => {
   const merged: Record<string, PlaybackEntry> = { ...target };
   for (const [key, entry] of Object.entries(incoming)) {
@@ -76,4 +76,3 @@ export const groupLastIndex = (segments: TurnSegment[] | undefined, index: numbe
   }
   return last;
 };
-

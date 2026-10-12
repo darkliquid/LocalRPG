@@ -7,7 +7,7 @@ const LABELS: Record<string, string> = {
   'offline-basic': 'Offline · basic',
   'offline-neural': 'Offline · small model',
   'local-server': 'Local server',
-  'cloud': 'Cloud',
+  cloud: 'Cloud',
 };
 
 // tierLabel is the user-facing name of a tier, or the raw value when unknown.

@@ -78,9 +78,7 @@ export const PreferencesPanel: React.FC<PreferencesPanelProps> = ({ config, setC
           </p>
           <select
             value={config.styles?.pack ?? ''}
-            onChange={(e) =>
-              setConfig({ ...config, styles: { ...config.styles, pack: e.target.value } })
-            }
+            onChange={(e) => setConfig({ ...config, styles: { ...config.styles, pack: e.target.value } })}
             className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
           >
             <option value="">Built-in</option>

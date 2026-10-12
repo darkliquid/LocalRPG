@@ -16,12 +16,13 @@ describe('APIClient error envelopes', () => {
           JSON.stringify({
             error: {
               code: 'generation_limit',
-              message: 'the source is larger than the chunk limit: it holds 300 chunks and generation.max_chunks is 200',
+              message:
+                'the source is larger than the chunk limit: it holds 300 chunks and generation.max_chunks is 200',
             },
           }),
-          { status: 400 }
-        )
-      )
+          { status: 400 },
+        ),
+      ),
     );
 
     const err = await APIClient.previewWorldEntities('w', { instruction: 'x' }).catch((e: unknown) => e);
@@ -46,12 +47,11 @@ describe('APIClient playback ledger and audio status', () => {
   it('audioStatus parses owner', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({ available: true, playing: false, owner: 'device' }),
-          { status: 200 }
-        )
-      )
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ available: true, playing: false, owner: 'device' }), { status: 200 }),
+        ),
     );
 
     const status = await APIClient.audioStatus();
@@ -68,8 +68,8 @@ describe('APIClient playback ledger and audio status', () => {
             'clip-1': { played_ms: 1200, total_ms: 3000, complete: false },
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -91,7 +91,7 @@ describe('APIClient playback ledger and audio status', () => {
             'clip-1': { played_ms: 1200, total_ms: 3000, complete: false },
           },
         }),
-      })
+      }),
     );
     expect(result.entries['clip-1'].played_ms).toBe(1200);
   });
@@ -102,7 +102,7 @@ describe('APIClient registry sources', () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify([{ url: 'https://example.org/index.json', name: 'Example', package_count: 3 }]), {
         status: 200,
-      })
+      }),
     );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -114,9 +114,9 @@ describe('APIClient registry sources', () => {
   });
 
   it('adds a registry source', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ url: 'https://example.org/index.json' }), { status: 201 })
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ url: 'https://example.org/index.json' }), { status: 201 }));
     vi.stubGlobal('fetch', fetchMock);
 
     await APIClient.addRegistrySource('https://example.org/index.json');
@@ -127,7 +127,7 @@ describe('APIClient registry sources', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: 'https://example.org/index.json' }),
-      })
+      }),
     );
   });
 
@@ -139,14 +139,14 @@ describe('APIClient registry sources', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/registry/sources?url=' + encodeURIComponent('https://example.org/index.json'),
-      { method: 'DELETE' }
+      { method: 'DELETE' },
     );
   });
 
   it('throws an HTTPError carrying the body on failure', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(new Response('registry source already configured', { status: 409 }))
+      vi.fn().mockResolvedValue(new Response('registry source already configured', { status: 409 })),
     );
 
     const err = await APIClient.addRegistrySource('https://example.org/index.json').catch((e: unknown) => e);
@@ -169,7 +169,7 @@ describe('APIClient entity deletion', () => {
   it('throws the body as the message when the delete fails', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(new Response('delete entity saltmarch: file does not exist', { status: 404 }))
+      vi.fn().mockResolvedValue(new Response('delete entity saltmarch: file does not exist', { status: 404 })),
     );
 
     const err = await new APIClient('game-1').deleteEntity('saltmarch').catch((e: unknown) => e);
@@ -177,4 +177,3 @@ describe('APIClient entity deletion', () => {
     expect((err as Error).message).toMatch(/does not exist/);
   });
 });
-

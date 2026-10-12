@@ -26,7 +26,7 @@ export const GLOBALS: ReferenceEntry[] = [
   {
     sig: 'getLocation()',
     desc: "Returns the acting entity's current location id.",
-    example: "const here = getLocation();",
+    example: 'const here = getLocation();',
   },
   {
     sig: 'setLocation(id)',
@@ -64,7 +64,8 @@ export const HOOKS: ReferenceEntry[] = [
   {
     sig: 'onTurnEnd(fn)',
     desc: 'Runs at the end of a turn, after the narration is recorded.',
-    example: "onTurnEnd(function (ctx) {\n  setStat('player', 'stats.might', getStat('player', 'stats.might') + 1);\n});",
+    example:
+      "onTurnEnd(function (ctx) {\n  setStat('player', 'stats.might', getStat('player', 'stats.might') + 1);\n});",
   },
   {
     sig: 'onWorldTick(fn)',
@@ -131,9 +132,7 @@ export const ScriptReference: React.FC = () => {
         {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         <BookOpen className="w-3.5 h-3.5 text-purple-400" />
         <span>Sandbox API reference</span>
-        <span className="ml-auto text-[11px] font-normal text-stone-500">
-          globals, hooks, and a worked example
-        </span>
+        <span className="ml-auto text-[11px] font-normal text-stone-500">globals, hooks, and a worked example</span>
       </button>
       {open && (
         <div className="space-y-3 border-t border-stone-800 p-3">

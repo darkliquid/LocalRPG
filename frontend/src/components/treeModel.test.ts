@@ -63,11 +63,7 @@ describe('the tree model', () => {
 
   it('shows a new top-level folder', () => {
     const tree = folders(['factions', 'factions/orders', 'places']);
-    expect(childrenOf(tree, entities, '')).toEqual([
-      folderItemId('factions'),
-      folderItemId('places'),
-      noteItemId('a'),
-    ]);
+    expect(childrenOf(tree, entities, '')).toEqual([folderItemId('factions'), folderItemId('places'), noteItemId('a')]);
   });
 
   it('puts a new folder in the index', () => {

@@ -37,9 +37,7 @@ describe('WorldGenerateDialog', () => {
       target: { value: 'a drowned kingdom' },
     });
 
-    await waitFor(() =>
-      expect(screen.getByTestId('generation-estimate')).toHaveTextContent('4 calls')
-    );
+    await waitFor(() => expect(screen.getByTestId('generation-estimate')).toHaveTextContent('4 calls'));
     expect(screen.getByTestId('generation-estimate')).toHaveTextContent('unpriced');
 
     fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
@@ -62,9 +60,7 @@ describe('WorldGenerateDialog', () => {
     render(<WorldGenerateDialog onCancel={() => {}} onDraft={onDraft} estimateDelayMs={0} />);
 
     fireEvent.change(screen.getByLabelText(/premise/i), { target: { value: 'a drowned kingdom' } });
-    await waitFor(() =>
-      expect(screen.getByTestId('generation-estimate')).toHaveTextContent('$5.00')
-    );
+    await waitFor(() => expect(screen.getByTestId('generation-estimate')).toHaveTextContent('$5.00'));
 
     fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
     await waitFor(() => expect(screen.getByTestId('generation-confirm')).toBeInTheDocument());
@@ -241,9 +237,7 @@ describe('WorldGenerateDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /folder/i }));
     fireEvent.click(screen.getByRole('button', { name: /browse/i }));
 
-    await waitFor(() =>
-      expect(screen.getByText(/no native folder dialog is available/i)).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/no native folder dialog is available/i)).toBeInTheDocument());
     // The field is still usable by hand.
     fireEvent.change(screen.getByLabelText(/folder path/i), { target: { value: '/tmp/notes' } });
     expect(screen.getByLabelText(/folder path/i)).toHaveValue('/tmp/notes');

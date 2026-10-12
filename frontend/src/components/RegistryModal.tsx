@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, Search, RefreshCw, X, Download, ShieldCheck, CheckCircle2, Plus, Trash2, ChevronDown } from 'lucide-react';
+import {
+  Package,
+  Search,
+  RefreshCw,
+  X,
+  Download,
+  ShieldCheck,
+  CheckCircle2,
+  Plus,
+  Trash2,
+  ChevronDown,
+} from 'lucide-react';
 import { APIClient } from '../api/client';
 import { PackageRefDTO, ContentManifestInfo, RegistrySourceDTO } from '../types';
 import { ContentImportDialog } from './ContentImportDialog';
@@ -10,11 +21,7 @@ interface RegistryModalProps {
   onInstalled?: () => void;
 }
 
-export const RegistryModal: React.FC<RegistryModalProps> = ({
-  isOpen,
-  onClose,
-  onInstalled,
-}) => {
+export const RegistryModal: React.FC<RegistryModalProps> = ({ isOpen, onClose, onInstalled }) => {
   const [packages, setPackages] = useState<PackageRefDTO[]>([]);
   const [updates, setUpdates] = useState<PackageRefDTO[]>([]);
   const [sources, setSources] = useState<RegistrySourceDTO[]>([]);
@@ -306,15 +313,11 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({
           {/* Package list */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {error && (
-              <div className="p-3 text-sm text-red-300 border border-red-500/30 rounded-xl bg-red-950/40">
-                {error}
-              </div>
+              <div className="p-3 text-sm text-red-300 border border-red-500/30 rounded-xl bg-red-950/40">{error}</div>
             )}
 
             {isLoading && packages.length === 0 ? (
-              <div className="py-16 text-center text-stone-400 text-sm">
-                Loading registry packages...
-              </div>
+              <div className="py-16 text-center text-stone-400 text-sm">Loading registry packages...</div>
             ) : packages.length === 0 ? (
               <div className="py-16 text-center text-stone-400 text-sm space-y-1">
                 <p>{emptyMessage()}</p>
@@ -349,9 +352,7 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({
                                 >
                                   {pkg.type}
                                 </span>
-                                <h3 className="font-semibold text-white text-base leading-tight">
-                                  {pkg.name}
-                                </h3>
+                                <h3 className="font-semibold text-white text-base leading-tight">{pkg.name}</h3>
                               </div>
                               <div className="text-xs text-stone-400 font-mono mt-1">
                                 {pkg.id} <span className="text-stone-500">v{pkg.version}</span>
@@ -366,9 +367,7 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({
                           </div>
 
                           {pkg.description && (
-                            <p className="text-xs text-stone-300 line-clamp-2 leading-relaxed">
-                              {pkg.description}
-                            </p>
+                            <p className="text-xs text-stone-300 line-clamp-2 leading-relaxed">{pkg.description}</p>
                           )}
 
                           <div className="flex items-center gap-3 text-[11px] text-stone-400">

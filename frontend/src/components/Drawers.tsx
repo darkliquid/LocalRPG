@@ -62,9 +62,7 @@ export const Drawers: React.FC<DrawersProps> = ({ isOpen, onClose, title, childr
             </button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto pr-1 min-h-0">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto pr-1 min-h-0">{children}</div>
       </div>
     </div>
   );

@@ -50,7 +50,10 @@ export const TheaterTransport: React.FC<TheaterTransportProps> = ({
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col items-center gap-2 pointer-events-auto">
       <div className="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden border border-white/5">
-        <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${Math.min(100, progress)}%` }} />
+        <div
+          className="h-full bg-purple-500 transition-all duration-300"
+          style={{ width: `${Math.min(100, progress)}%` }}
+        />
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3">

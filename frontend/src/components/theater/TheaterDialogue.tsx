@@ -102,7 +102,11 @@ export const TheaterDialogue: React.FC<TheaterDialogueProps> = ({
           >
             <span
               className={`absolute -top-3.5 left-6 px-3 py-1 rounded-md text-sm font-sans font-extrabold tracking-wide shadow-lg ${
-                isPlayer ? 'bg-sky-600 text-white' : isSpeech ? 'bg-purple-600 text-white' : 'bg-stone-700 text-stone-100'
+                isPlayer
+                  ? 'bg-sky-600 text-white'
+                  : isSpeech
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-stone-700 text-stone-100'
               }`}
             >
               {name}

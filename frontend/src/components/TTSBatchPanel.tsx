@@ -101,10 +101,7 @@ export const TTSBatchPanel: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [nextJobs, nextGames] = await Promise.all([
-        APIClient.listAllTTSBatchJobs(),
-        APIClient.listGames(),
-      ]);
+      const [nextJobs, nextGames] = await Promise.all([APIClient.listAllTTSBatchJobs(), APIClient.listGames()]);
       setJobs(nextJobs);
       setGames(nextGames);
     } catch (err) {
@@ -129,16 +126,13 @@ export const TTSBatchPanel: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [hasActive, refresh]);
 
-  const visible = useMemo(
-    () => (filter ? jobs.filter((job) => job.game_id === filter) : jobs),
-    [jobs, filter]
-  );
+  const visible = useMemo(() => (filter ? jobs.filter((job) => job.game_id === filter) : jobs), [jobs, filter]);
 
   // A backfill already in flight for the chosen campaign makes the start button
   // a no-op, so it is disabled rather than silently returning the same job.
   const startBlocked = useMemo(
     () => jobs.some((job) => job.game_id === startGame && ACTIVE_STATUSES.has(job.status)),
-    [jobs, startGame]
+    [jobs, startGame],
   );
 
   const start = async () => {
@@ -271,9 +265,9 @@ export const TTSBatchPanel: React.FC = () => {
       </div>
 
       <p className="text-xs text-stone-400">
-        Offline jobs render a campaign's missing speech through the provider's batch API, at a discount and
-        without spending interactive rate-limit quota. A job keeps running while the app is closed and is
-        collected on the next launch.
+        Offline jobs render a campaign's missing speech through the provider's batch API, at a discount and without
+        spending interactive rate-limit quota. A job keeps running while the app is closed and is collected on the next
+        launch.
       </p>
 
       {error && (

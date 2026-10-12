@@ -86,9 +86,7 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
             <div className="flex items-center gap-2.5">
               <Clock className="w-4 h-4 text-purple-400" />
               <div>
-                <div className="text-xs font-sans font-bold uppercase tracking-wider text-stone-400">
-                  Play Time
-                </div>
+                <div className="text-xs font-sans font-bold uppercase tracking-wider text-stone-400">Play Time</div>
                 <div className="text-xs font-sans font-bold text-stone-100">
                   {formatPlayTime(game.play_time_seconds)}
                 </div>
@@ -100,12 +98,8 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
             <div className="flex items-center gap-2.5">
               <Compass className="w-4 h-4 text-purple-400" />
               <div>
-                <div className="text-xs font-sans font-bold uppercase tracking-wider text-stone-400">
-                  Turns
-                </div>
-                <div className="text-xs font-sans font-bold text-stone-100">
-                  {game.turn_count} turns
-                </div>
+                <div className="text-xs font-sans font-bold uppercase tracking-wider text-stone-400">Turns</div>
+                <div className="text-xs font-sans font-bold text-stone-100">{game.turn_count} turns</div>
               </div>
             </div>
 
@@ -114,12 +108,8 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
             <div className="flex items-center gap-2.5">
               <Calendar className="w-4 h-4 text-purple-400" />
               <div>
-                <div className="text-xs font-sans font-bold uppercase tracking-wider text-stone-400">
-                  Last Played
-                </div>
-                <div className="text-xs font-sans font-bold text-stone-100">
-                  {formatRelativeTime(game.last_played)}
-                </div>
+                <div className="text-xs font-sans font-bold uppercase tracking-wider text-stone-400">Last Played</div>
+                <div className="text-xs font-sans font-bold text-stone-100">{formatRelativeTime(game.last_played)}</div>
               </div>
             </div>
           </div>
@@ -136,7 +126,8 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
               </div>
               <h2 className="text-xl font-sans font-bold text-white mb-2">No Campaigns Yet</h2>
               <p className="text-sm font-sans text-stone-400 leading-relaxed">
-                Click the <span className="text-purple-400 font-bold">+</span> button in the left dock to choose a world and start your first adventure.
+                Click the <span className="text-purple-400 font-bold">+</span> button in the left dock to choose a world
+                and start your first adventure.
               </p>
             </div>
           )}
@@ -201,9 +192,7 @@ export const CampaignHeroStage: React.FC<CampaignHeroStageProps> = ({
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-sans font-extrabold text-white tracking-tight truncate">
-                {game.name}
-              </h1>
+              <h1 className="text-xl font-sans font-extrabold text-white tracking-tight truncate">{game.name}</h1>
               <div className="text-xs font-sans text-stone-400 mt-0.5 truncate">
                 <span>World: {worldName || game.world_id}</span>
                 <span className="mx-1.5 opacity-40">•</span>

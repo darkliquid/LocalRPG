@@ -153,139 +153,140 @@ export const AgentsPanel: React.FC<AgentsPanelProps> = ({
   };
 
   return (
-  <div className="space-y-4 flex-1 overflow-y-auto pr-1">
-    <SubTabs
-      ariaLabel="AI Agents"
-      tabs={[
-        { id: 'roles', label: 'Roles', icon: <Users className="w-3.5 h-3.5" /> },
-        { id: 'routing', label: 'Routing', icon: <Layers className="w-3.5 h-3.5" /> },
-        ...(advanced
-          ? [{ id: 'advanced', label: 'Advanced', icon: <Sliders className="w-3.5 h-3.5" /> }]
-          : []),
-      ]}
-      active={agentsTab}
-      onChange={(id) => setAgentsTab(id as 'roles' | 'routing' | 'advanced')}
-    />
-    <label className="flex items-center justify-between gap-3 p-4 rounded-xl bg-glass-card border border-stone-800 cursor-pointer">
-      <span className="text-sm font-sans text-stone-200">
-        Restate the player's action
-        <span className="block text-xs text-stone-400 font-normal">
-          The narrator opens each turn by restating what the player did in the third person.
+    <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+      <SubTabs
+        ariaLabel="AI Agents"
+        tabs={[
+          { id: 'roles', label: 'Roles', icon: <Users className="w-3.5 h-3.5" /> },
+          { id: 'routing', label: 'Routing', icon: <Layers className="w-3.5 h-3.5" /> },
+          ...(advanced ? [{ id: 'advanced', label: 'Advanced', icon: <Sliders className="w-3.5 h-3.5" /> }] : []),
+        ]}
+        active={agentsTab}
+        onChange={(id) => setAgentsTab(id as 'roles' | 'routing' | 'advanced')}
+      />
+      <label className="flex items-center justify-between gap-3 p-4 rounded-xl bg-glass-card border border-stone-800 cursor-pointer">
+        <span className="text-sm font-sans text-stone-200">
+          Restate the player's action
+          <span className="block text-xs text-stone-400 font-normal">
+            The narrator opens each turn by restating what the player did in the third person.
+          </span>
         </span>
-      </span>
-      <input
-        type="checkbox"
-        checked={config.agents.action_echo !== false}
-        onChange={(e) => setConfig({ ...config, agents: { ...config.agents, action_echo: e.target.checked } })}
-        className="w-4 h-4 accent-purple-600 cursor-pointer"
-      />
-    </label>
+        <input
+          type="checkbox"
+          checked={config.agents.action_echo !== false}
+          onChange={(e) => setConfig({ ...config, agents: { ...config.agents, action_echo: e.target.checked } })}
+          className="w-4 h-4 accent-purple-600 cursor-pointer"
+        />
+      </label>
 
-    {agentsTab === 'roles' && (
-    <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
-          <Cpu className="w-4 h-4" />
-          <span>AI Agents & Role Routing</span>
-        </h3>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            onChange={(e) => {
-              const key = e.target.value;
-              if (key && agentPresets[key]) {
-                const preset = agentPresets[key].config;
-                setConfig({
-                  ...config,
-                  agents: {
-                    ...config.agents,
-                    roles: { ...config.agents.roles, [selectedRole]: { ...preset } },
-                  },
-                });
-                e.target.value = '';
-              }
-            }}
-            className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
-            defaultValue=""
-          >
-            <option value="" disabled>⚡ Load Preset...</option>
-            {Object.entries(agentPresets).map(([id, p]) => (
-              <option key={id} value={id} title={p.caveat}>
-                {p.label}{p.tier ? ` · ${tierLabel(p.tier)}` : ''}
-              </option>
-            ))}
-          </select>
+      {agentsTab === 'roles' && (
+        <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
+              <Cpu className="w-4 h-4" />
+              <span>AI Agents & Role Routing</span>
+            </h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                onChange={(e) => {
+                  const key = e.target.value;
+                  if (key && agentPresets[key]) {
+                    const preset = agentPresets[key].config;
+                    setConfig({
+                      ...config,
+                      agents: {
+                        ...config.agents,
+                        roles: { ...config.agents.roles, [selectedRole]: { ...preset } },
+                      },
+                    });
+                    e.target.value = '';
+                  }
+                }}
+                className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  ⚡ Load Preset...
+                </option>
+                {Object.entries(agentPresets).map(([id, p]) => (
+                  <option key={id} value={id} title={p.caveat}>
+                    {p.label}
+                    {p.tier ? ` · ${tierLabel(p.tier)}` : ''}
+                  </option>
+                ))}
+              </select>
 
-          <span className="text-xs text-stone-400">Role:</span>
-          <select
-            value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value as any)}
-            className="bg-stone-950 border border-stone-800 rounded-lg pl-2.5 pr-7 py-1 text-xs text-purple-300 font-mono focus:outline-none cursor-pointer"
-          >
-            {roleNames.map((role) => (
-              <option key={role} value={role}>
-                {ROLE_LABELS[role] ?? role}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+              <span className="text-xs text-stone-400">Role:</span>
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value as any)}
+                className="bg-stone-950 border border-stone-800 rounded-lg pl-2.5 pr-7 py-1 text-xs text-purple-300 font-mono focus:outline-none cursor-pointer"
+              >
+                {roleNames.map((role) => (
+                  <option key={role} value={role}>
+                    {ROLE_LABELS[role] ?? role}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-      <LLMRoleEditor
-        config={config}
-        setConfig={setConfig}
-        role={selectedRole}
-        roleConfig={currentRoleConfig}
-        roleNames={roleNames}
-        updateRole={updateRole}
-        advanced={advanced}
-        geminiModels={geminiModels}
-        fetchingGeminiModels={fetchingGeminiModels}
-        geminiModelError={geminiModelError}
-        fetchGeminiModels={fetchGeminiModels}
-        onTest={handleTestProvider}
-        testingCategory={testingCategory}
-        testResult={testResult}
-      />
-    </div>
-    )}
-
-    {agentsTab === 'routing' && (
-    <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
-      <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
-        <Layers className="w-4 h-4" />
-        <span>Role Routing</span>
-      </h3>
-      <p className="text-xs text-stone-400">
-        Every role resolves to one adapter. Select a row to edit that role on the Roles tab.
-      </p>
-
-      {Object.keys(tierCaveats).length > 0 && (
-        <div className="rounded-lg border border-stone-800 bg-stone-950/40 p-3">
-          <p className="mb-2 font-sans text-[11px] uppercase text-stone-400">How providers run</p>
-          <TierLegend caveats={tierCaveats} />
+          <LLMRoleEditor
+            config={config}
+            setConfig={setConfig}
+            role={selectedRole}
+            roleConfig={currentRoleConfig}
+            roleNames={roleNames}
+            updateRole={updateRole}
+            advanced={advanced}
+            geminiModels={geminiModels}
+            fetchingGeminiModels={fetchingGeminiModels}
+            geminiModelError={geminiModelError}
+            fetchGeminiModels={fetchGeminiModels}
+            onTest={handleTestProvider}
+            testingCategory={testingCategory}
+            testResult={testResult}
+          />
         </div>
       )}
 
-      <ProviderManager
-        family="llm"
-        config={config}
-        onChange={setConfig}
-        selected={selectedRole}
-        onSelect={setSelectedRole}
-        roles={roleListItems}
-      />
+      {agentsTab === 'routing' && (
+        <div className="p-4 rounded-xl bg-glass-card border border-stone-800 space-y-4">
+          <h3 className="font-sans text-sm font-bold text-purple-400 flex items-center gap-2">
+            <Layers className="w-4 h-4" />
+            <span>Role Routing</span>
+          </h3>
+          <p className="text-xs text-stone-400">
+            Every role resolves to one adapter. Select a row to edit that role on the Roles tab.
+          </p>
+
+          {Object.keys(tierCaveats).length > 0 && (
+            <div className="rounded-lg border border-stone-800 bg-stone-950/40 p-3">
+              <p className="mb-2 font-sans text-[11px] uppercase text-stone-400">How providers run</p>
+              <TierLegend caveats={tierCaveats} />
+            </div>
+          )}
+
+          <ProviderManager
+            family="llm"
+            config={config}
+            onChange={setConfig}
+            selected={selectedRole}
+            onSelect={setSelectedRole}
+            roles={roleListItems}
+          />
+        </div>
+      )}
+
+      {agentsTab === 'advanced' && (
+        <>
+          {/* Context budget and timing: what the narrator is sent, and how long it may take */}
+          <ContextLimitsPanel config={config} setConfig={setConfig} advanced={advanced} />
+
+          <GenerationLimitsPanel config={config} setConfig={setConfig} advanced={advanced} />
+        </>
+      )}
     </div>
-    )}
-
-    {agentsTab === 'advanced' && (
-    <>
-    {/* Context budget and timing: what the narrator is sent, and how long it may take */}
-    <ContextLimitsPanel config={config} setConfig={setConfig} advanced={advanced} />
-
-    <GenerationLimitsPanel config={config} setConfig={setConfig} advanced={advanced} />
-    </>
-    )}
-  </div>
   );
 };
 

@@ -175,11 +175,7 @@ export const VoiceProfileSelect: React.FC<VoiceProfileSelectProps> = ({
             className="p-1 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 cursor-pointer shrink-0 disabled:opacity-50"
             title="Preview Voice Profile"
           >
-            {previewingId === selected.id ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <Play className="w-3 h-3" />
-            )}
+            {previewingId === selected.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
           </button>
         )}
       </div>

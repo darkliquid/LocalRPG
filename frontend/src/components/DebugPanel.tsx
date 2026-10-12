@@ -116,13 +116,11 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
           </div>
         </div>
 
-        {showContextDrawer && (
-          <ContextDrawer isOpen={showContextDrawer} onClose={() => setShowContextDrawer(false)} />
-        )}
+        {showContextDrawer && <ContextDrawer isOpen={showContextDrawer} onClose={() => setShowContextDrawer(false)} />}
 
         <p className="text-xs text-stone-500">
-          Tracing is off by default. At full detail the file records prompts, replies, and raw provider lines, which
-          are your own story and never leave this machine. The file is owner-only and rotates by size.
+          Tracing is off by default. At full detail the file records prompts, replies, and raw provider lines, which are
+          your own story and never leave this machine. The file is owner-only and rotates by size.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

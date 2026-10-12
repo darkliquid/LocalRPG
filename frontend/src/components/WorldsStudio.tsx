@@ -1,7 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient, WorldExistsError } from '../api/client';
-import { WorldInfo, SystemInfo, WorldEntitySummary, CreateWorldRequest, WorldSelection, WorldDraft, WorldDetail, GenerationFailure, FolderNode, ContentManifestInfo, DraftCommitRequest, WorldDraftInfo } from '../types';
-import { Globe, Plus, Save, Info, FileText, Check, AlertCircle, Trash2, Tag, Palette, BookOpen, Wand2, Upload, Sparkles, Download, PackagePlus, Lightbulb } from 'lucide-react';
+import {
+  WorldInfo,
+  SystemInfo,
+  WorldEntitySummary,
+  CreateWorldRequest,
+  WorldSelection,
+  WorldDraft,
+  WorldDetail,
+  GenerationFailure,
+  FolderNode,
+  ContentManifestInfo,
+  DraftCommitRequest,
+  WorldDraftInfo,
+} from '../types';
+import {
+  Globe,
+  Plus,
+  Save,
+  Info,
+  FileText,
+  Check,
+  AlertCircle,
+  Trash2,
+  Tag,
+  Palette,
+  BookOpen,
+  Wand2,
+  Upload,
+  Sparkles,
+  Download,
+  PackagePlus,
+  Lightbulb,
+} from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { useLightbox } from '../hooks/useLightbox';
@@ -96,8 +127,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const detailRequest = React.useRef(0);
   const startModeRef = React.useRef(startMode);
 
-  const errorMessage = (err: unknown): string =>
-    err instanceof Error ? err.message : 'Unexpected error';
+  const errorMessage = (err: unknown): string => (err instanceof Error ? err.message : 'Unexpected error');
 
   const isDraft = selection?.kind === 'draft';
   const savedID = selection?.kind === 'saved' ? selection.id : null;
@@ -193,10 +223,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const loadWorlds = async (selectID?: string, mode: 'new' | 'browse' = startMode) => {
     setIsLoading(true);
     try {
-      const [wList, sList] = await Promise.all([
-        APIClient.listWorlds(),
-        APIClient.listSystems(),
-      ]);
+      const [wList, sList] = await Promise.all([APIClient.listWorlds(), APIClient.listSystems()]);
       setWorlds(wList);
       setSystems(sList);
       if (mode === 'new') {
@@ -352,9 +379,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
     setTags(REFERENCE_WORLD_TEMPLATE.tags.join(', '));
     setDescription(REFERENCE_WORLD_TEMPLATE.description);
     setLorePrompt(REFERENCE_WORLD_TEMPLATE.lore_prompt);
-    setEntities(
-      REFERENCE_WORLD_TEMPLATE.entities.map((e) => ({ id: e.id, name: e.name, type: e.type }))
-    );
+    setEntities(REFERENCE_WORLD_TEMPLATE.entities.map((e) => ({ id: e.id, name: e.name, type: e.type })));
     setSelectedEntityID(REFERENCE_WORLD_TEMPLATE.entities[0].id);
     setEntityMarkdown(REFERENCE_WORLD_TEMPLATE.entities[0].markdown);
     const initialDrafts: Record<string, string> = {};
@@ -382,7 +407,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
           name.trim() || 'New World',
           description.trim(),
           artStyle.trim(),
-          genre.trim()
+          genre.trim(),
         );
         const file = new File([blob], `${kind}.png`, { type: blob.type });
         if (kind === 'banner') {
@@ -487,7 +512,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       } else if (selectedEntityID && entityDrafts[selectedEntityID] !== undefined) {
         // For an existing world, only save the currently selected entity if it has unpersisted edits.
         const currentEntity = entities.find((e) => e.id === selectedEntityID);
-        await APIClient.saveWorldEntity(saved.id, selectedEntityID, entityMarkdown, currentEntity?.folder).catch(() => {});
+        await APIClient.saveWorldEntity(saved.id, selectedEntityID, entityMarkdown, currentEntity?.folder).catch(
+          () => {},
+        );
       }
 
       if (bannerFile) {
@@ -519,7 +546,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
 
     if (isDraft) {
       markDirty();
-      setToast({ type: 'success', message: `Draft entity "${selectedEntityID}" updated! (Will be persisted when you click Save World)` });
+      setToast({
+        type: 'success',
+        message: `Draft entity "${selectedEntityID}" updated! (Will be persisted when you click Save World)`,
+      });
       return;
     }
     if (!savedID) return;
@@ -545,7 +575,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       if (selectedEntityID === entityId) {
         const next = remaining[0];
         setSelectedEntityID(next ? next.id : null);
-        setEntityMarkdown(next ? (updatedDrafts[next.id] || '') : '');
+        setEntityMarkdown(next ? updatedDrafts[next.id] || '' : '');
       }
       setToast({ type: 'success', message: `Entity "${entityId}" removed from draft.` });
       markDirty();
@@ -665,9 +695,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         <div className="flex flex-col gap-2 pb-2 border-b border-stone-800/60 shrink-0">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-purple-400" />
-            <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">
-              Worlds Studio
-            </h3>
+            <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">Worlds Studio</h3>
           </div>
           <input
             type="file"
@@ -724,9 +752,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
             </div>
           )}
           {isLoading && worlds.length === 0 ? (
-            <div className="text-center py-8 text-xs font-mono text-stone-500 animate-pulse">
-              Loading worlds...
-            </div>
+            <div className="text-center py-8 text-xs font-mono text-stone-500 animate-pulse">Loading worlds...</div>
           ) : worlds.length === 0 ? (
             <div className="text-center py-8 text-xs text-stone-400">
               No worlds created yet. Craft your first setting!
@@ -767,9 +793,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                {w.description && (
-                  <p className="text-xs text-stone-400 truncate mt-1">{w.description}</p>
-                )}
+                {w.description && <p className="text-xs text-stone-400 truncate mt-1">{w.description}</p>}
               </div>
             ))
           )}
@@ -819,9 +843,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 type="button"
                 onClick={() => setActiveTab('lore')}
                 className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'lore'
-                    ? 'bg-purple-600 text-white font-bold shadow'
-                    : 'text-stone-400 hover:text-white'
+                  activeTab === 'lore' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-white'
                 }`}
               >
                 <Info className="w-3.5 h-3.5" />
@@ -948,7 +970,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                       setName(val);
                       markDirty();
                       if (isDraft) {
-                        setSlugID(val.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''));
+                        setSlugID(
+                          val
+                            .toLowerCase()
+                            .replace(/[^a-z0-9_]+/g, '_')
+                            .replace(/^_+|_+$/g, ''),
+                        );
                       }
                     }}
                     systemID={defaultSystem}
@@ -964,7 +991,12 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                     markDirty();
                     setSlugError(false);
                     if (isDraft) {
-                      setSlugID(e.target.value.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''));
+                      setSlugID(
+                        e.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9_]+/g, '_')
+                          .replace(/^_+|_+$/g, ''),
+                      );
                     }
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
@@ -981,7 +1013,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                     fieldName="genre"
                     onError={reportGenerationError}
                     getContext={getWorldContext}
-                    onGenerated={(val) => { setGenre(val); markDirty(); }}
+                    onGenerated={(val) => {
+                      setGenre(val);
+                      markDirty();
+                    }}
                     systemID={defaultSystem}
                   />
                 </div>
@@ -989,7 +1024,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   type="text"
                   placeholder="e.g. Gothic Fantasy, Cyberpunk"
                   value={genre}
-                  onChange={(e) => { setGenre(e.target.value); markDirty(); }}
+                  onChange={(e) => {
+                    setGenre(e.target.value);
+                    markDirty();
+                  }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
                 />
               </div>
@@ -997,30 +1035,25 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                  Directory Slug ID
-                </label>
+                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">Directory Slug ID</label>
                 <input
                   type="text"
                   disabled={selection?.kind === 'saved'}
                   placeholder="e.g. solitary_defiance"
                   value={slugID}
-                  onChange={(e) => { setSlugID(e.target.value); setSlugError(false); }}
+                  onChange={(e) => {
+                    setSlugID(e.target.value);
+                    setSlugError(false);
+                  }}
                   className={`w-full bg-stone-950 border rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
                     slugError ? 'border-red-500/70 focus:border-red-500' : 'border-stone-800 focus:border-purple-500/50'
                   }`}
                 />
-                {slugError && (
-                  <p className="text-xs text-red-400">
-                    That id already exists. Change the name or slug.
-                  </p>
-                )}
+                {slugError && <p className="text-xs text-red-400">That id already exists. Change the name or slug.</p>}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                  Default Rule System
-                </label>
+                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">Default Rule System</label>
                 <select
                   value={defaultSystem}
                   onChange={(e) => setDefaultSystem(e.target.value)}
@@ -1046,7 +1079,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   fieldName="art_style"
                   onError={reportGenerationError}
                   getContext={getWorldContext}
-                  onGenerated={(val) => { setArtStyle(val); markDirty(); }}
+                  onGenerated={(val) => {
+                    setArtStyle(val);
+                    markDirty();
+                  }}
                   systemID={defaultSystem}
                   seed={artStyle}
                 />
@@ -1055,7 +1091,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 type="text"
                 placeholder="e.g. Dark watercolor gothic, mist, gaslight, copper accents, muted palette"
                 value={artStyle}
-                onChange={(e) => { setArtStyle(e.target.value); markDirty(); }}
+                onChange={(e) => {
+                  setArtStyle(e.target.value);
+                  markDirty();
+                }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
               />
               <p className="text-xs text-stone-400">
@@ -1072,7 +1111,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 type="text"
                 placeholder="e.g. gothic, horror, city, rebellion"
                 value={tags}
-                onChange={(e) => { setTags(e.target.value); markDirty(); }}
+                onChange={(e) => {
+                  setTags(e.target.value);
+                  markDirty();
+                }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
               />
             </div>
@@ -1087,7 +1129,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   fieldName="description"
                   onError={reportGenerationError}
                   getContext={getWorldContext}
-                  onGenerated={(val) => { setDescription(val); markDirty(); }}
+                  onGenerated={(val) => {
+                    setDescription(val);
+                    markDirty();
+                  }}
                   systemID={defaultSystem}
                   seed={description}
                 />
@@ -1096,16 +1141,17 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                 rows={4}
                 placeholder="Describe the setting, major conflicts, factions, and atmosphere..."
                 value={description}
-                onChange={(e) => { setDescription(e.target.value); markDirty(); }}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  markDirty();
+                }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors resize-none"
               />
             </div>
 
             {/* World Artwork (Banner & Icon) */}
             <div className="space-y-3 pt-2">
-              <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                World Artwork
-              </label>
+              <label className="text-xs font-sans uppercase tracking-wider text-stone-300">World Artwork</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Banner */}
                 <div className="p-3 bg-stone-950 border border-stone-800 rounded-xl space-y-2">
@@ -1274,7 +1320,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   fieldName="lore_prompt"
                   onError={reportGenerationError}
                   getContext={getWorldContext}
-                  onGenerated={(val) => { setLorePrompt(val); markDirty(); }}
+                  onGenerated={(val) => {
+                    setLorePrompt(val);
+                    markDirty();
+                  }}
                   systemID={defaultSystem}
                   seed={lorePrompt}
                 />
@@ -1283,7 +1332,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
             <MarkdownEditor
               key={`${savedID || slugID || 'draft'}-lore`}
               value={lorePrompt}
-              onChange={(next) => { setLorePrompt(next); markDirty(); }}
+              onChange={(next) => {
+                setLorePrompt(next);
+                markDirty();
+              }}
               language="markdown"
               ariaLabel="World lore prompt"
               placeholder="Describe the sensory tone, factions and conflicts the storyteller should hold in mind..."
@@ -1297,9 +1349,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
             {/* Entity List */}
             <div className="w-64 shrink-0 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2 min-h-0 h-full">
               <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
-                <span className="text-xs font-sans uppercase tracking-wider text-stone-400">
-                  Templates
-                </span>
+                <span className="text-xs font-sans uppercase tracking-wider text-stone-400">Templates</span>
                 <button
                   type="button"
                   onClick={() => setIsNewEntityModal(true)}
@@ -1389,7 +1439,10 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   <MarkdownEditor
                     key={`${savedID || slugID || 'draft'}-${selectedEntityID}`}
                     value={entityMarkdown}
-                    onChange={(next) => { setEntityMarkdown(next); markDirty(); }}
+                    onChange={(next) => {
+                      setEntityMarkdown(next);
+                      markDirty();
+                    }}
                     language="markdown-frontmatter"
                     ariaLabel="World entity template markdown"
                   />
@@ -1496,7 +1549,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
               </h3>
             </div>
             <p className="text-xs font-sans text-stone-300">
-              This will permanently delete the world directory and all of its lore and entities. This action cannot be undone.
+              This will permanently delete the world directory and all of its lore and entities. This action cannot be
+              undone.
             </p>
             {deleteWorldError && (
               <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-300 flex items-start gap-2">
@@ -1505,7 +1559,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                   <p>{deleteWorldError}</p>
                   {canForceDelete && (
                     <p className="text-stone-400">
-                      You can force deletion to remove the world anyway. Existing campaigns using this world will lose their world files.
+                      You can force deletion to remove the world anyway. Existing campaigns using this world will lose
+                      their world files.
                     </p>
                   )}
                 </div>

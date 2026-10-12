@@ -38,9 +38,7 @@ describe('SystemGenerateDialog', () => {
       target: { value: 'a steampunk d20 system' },
     });
 
-    await waitFor(() =>
-      expect(screen.getByTestId('generation-estimate')).toHaveTextContent('4 calls')
-    );
+    await waitFor(() => expect(screen.getByTestId('generation-estimate')).toHaveTextContent('4 calls'));
     expect(screen.getByTestId('generation-estimate')).toHaveTextContent('unpriced');
 
     fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
@@ -64,9 +62,7 @@ describe('SystemGenerateDialog', () => {
     render(<SystemGenerateDialog onCancel={() => {}} onDraft={onDraft} estimateDelayMs={0} />);
 
     fireEvent.change(screen.getByLabelText(/system brief/i), { target: { value: 'a deep tactical system' } });
-    await waitFor(() =>
-      expect(screen.getByTestId('generation-estimate')).toHaveTextContent('$5.00')
-    );
+    await waitFor(() => expect(screen.getByTestId('generation-estimate')).toHaveTextContent('$5.00'));
 
     fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
     await waitFor(() => expect(screen.getByTestId('generation-confirm')).toBeInTheDocument());
@@ -102,9 +98,7 @@ describe('SystemGenerateDialog', () => {
     render(<SystemGenerateDialog onCancel={() => {}} onDraft={onDraft} estimateDelayMs={0} />);
 
     fireEvent.change(screen.getByLabelText(/system brief/i), { target: { value: 'a gritty system' } });
-    await waitFor(() =>
-      expect(screen.getByTestId('generation-estimate')).toHaveTextContent('4 calls')
-    );
+    await waitFor(() => expect(screen.getByTestId('generation-estimate')).toHaveTextContent('4 calls'));
 
     fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
 

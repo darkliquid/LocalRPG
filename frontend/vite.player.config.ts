@@ -17,7 +17,7 @@ export default defineConfig({
     cssCodeSplit: false,
     rollupOptions: {
       input: { player: path.resolve(__dirname, 'player.html') },
-      output: { format: 'iife', inlineDynamicImports: true }
-    }
-  }
+      output: { format: 'iife', inlineDynamicImports: true },
+    },
+  },
 });

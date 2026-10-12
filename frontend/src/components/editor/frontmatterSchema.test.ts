@@ -13,13 +13,19 @@ const schema: FrontmatterSchema = {
 
 describe('loadFrontmatterSchema', () => {
   it('returns the schema the server serves', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => schema })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => schema })),
+    );
     const { loadFrontmatterSchema } = await import('./frontmatterSchema');
     await expect(loadFrontmatterSchema()).resolves.toEqual(schema);
   });
 
   it('returns null on a non-ok response', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false })),
+    );
     const { loadFrontmatterSchema } = await import('./frontmatterSchema');
     await expect(loadFrontmatterSchema()).resolves.toBeNull();
   });

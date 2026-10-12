@@ -93,20 +93,14 @@ const CampaignCard: React.FC<{
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-sans font-extrabold text-white tracking-tight truncate">
-              {game.name}
-            </h3>
+            <h3 className="text-lg font-sans font-extrabold text-white tracking-tight truncate">{game.name}</h3>
             <div className="flex items-center gap-2 mt-0.5">
               {worldName && (
-                <span className="text-xs font-sans font-semibold text-purple-300 truncate">
-                  {worldName}
-                </span>
+                <span className="text-xs font-sans font-semibold text-purple-300 truncate">{worldName}</span>
               )}
               {worldName && systemName && <span className="text-stone-500 text-xs">•</span>}
               {systemName && (
-                <span className="text-xs font-sans font-medium text-stone-400 truncate">
-                  {systemName}
-                </span>
+                <span className="text-xs font-sans font-medium text-stone-400 truncate">{systemName}</span>
               )}
             </div>
           </div>
@@ -116,9 +110,7 @@ const CampaignCard: React.FC<{
       {/* Card Body & Footer */}
       <div className="flex-1 flex flex-col justify-between gap-3 p-4 bg-stone-950/40">
         <div className="flex items-center justify-between text-xs text-stone-400">
-          <span>
-            {game.player_name ? `Protagonist: ${game.player_name}` : 'Active Campaign'}
-          </span>
+          <span>{game.player_name ? `Protagonist: ${game.player_name}` : 'Active Campaign'}</span>
           <span className="text-stone-500">{formatRelativeTime(game.last_played)}</span>
         </div>
 
@@ -173,17 +165,14 @@ export const CampaignGallery: React.FC<CampaignGalleryProps> = ({
 
   const filteredGames = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    let result = games.filter((g) => {
+    const result = games.filter((g) => {
       if (!query) return true;
       const worldName = worldMap.get(g.world_id)?.toLowerCase() || '';
       const systemName = systemMap.get(g.system_id)?.toLowerCase() || '';
       const name = g.name.toLowerCase();
       const playerName = g.player_name?.toLowerCase() || '';
       return (
-        name.includes(query) ||
-        playerName.includes(query) ||
-        worldName.includes(query) ||
-        systemName.includes(query)
+        name.includes(query) || playerName.includes(query) || worldName.includes(query) || systemName.includes(query)
       );
     });
 
@@ -224,9 +213,7 @@ export const CampaignGallery: React.FC<CampaignGalleryProps> = ({
             <LayoutGrid className="w-5 h-5 text-purple-400" />
           </div>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-sans font-bold text-white tracking-wide">
-              Campaigns
-            </h2>
+            <h2 className="text-lg font-sans font-bold text-white tracking-wide">Campaigns</h2>
             <span className="px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-xs font-mono text-stone-400">
               {games.length}
             </span>
@@ -309,9 +296,7 @@ export const CampaignGallery: React.FC<CampaignGalleryProps> = ({
               <div className="w-12 h-12 rounded-2xl bg-white/[0.05] group-hover:bg-purple-600/20 border border-white/10 group-hover:border-purple-500/40 flex items-center justify-center text-stone-400 group-hover:text-purple-300 mb-3 transition-all">
                 <Plus className="w-6 h-6" />
               </div>
-              <h3 className="text-sm font-sans font-bold text-stone-200 group-hover:text-white">
-                New Campaign
-              </h3>
+              <h3 className="text-sm font-sans font-bold text-stone-200 group-hover:text-white">New Campaign</h3>
               <p className="text-xs font-sans text-stone-500 mt-1 max-w-[200px]">
                 Create a campaign from any available world
               </p>
@@ -325,9 +310,7 @@ export const CampaignGallery: React.FC<CampaignGalleryProps> = ({
             {searchQuery ? (
               <>
                 <h3 className="text-base font-sans font-bold text-white">No campaigns found</h3>
-                <p className="text-xs text-stone-400 mt-1 mb-4">
-                  No campaigns match your search for "{searchQuery}".
-                </p>
+                <p className="text-xs text-stone-400 mt-1 mb-4">No campaigns match your search for "{searchQuery}".</p>
                 <button
                   onClick={() => setSearchQuery('')}
                   className="px-4 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-sans text-stone-300 hover:text-white transition-all cursor-pointer"

@@ -17,7 +17,8 @@ export const CloudKeysPanel: React.FC<CloudKeysPanelProps> = ({ config, setConfi
       <span>Cloud & Ecosystem Providers</span>
     </h3>
     <p className="text-xs text-stone-400">
-      Configure shared credentials and master keys for external AI and media providers that power multiple capabilities across LocalRPG.
+      Configure shared credentials and master keys for external AI and media providers that power multiple capabilities
+      across LocalRPG.
     </p>
 
     {/* Google Gemini Provider Card */}
@@ -29,7 +30,9 @@ export const CloudKeysPanel: React.FC<CloudKeysPanelProps> = ({ config, setConfi
           </div>
           <div>
             <h4 className="text-xs font-sans font-bold text-stone-200">Google Gemini (GenAI)</h4>
-            <p className="text-xs text-stone-400">Multi-modal intelligence: text reasoning, image creation, and vocal performance.</p>
+            <p className="text-xs text-stone-400">
+              Multi-modal intelligence: text reasoning, image creation, and vocal performance.
+            </p>
           </div>
         </div>
         <div>
@@ -72,7 +75,8 @@ export const CloudKeysPanel: React.FC<CloudKeysPanelProps> = ({ config, setConfi
           className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
         />
         <p className="text-xs text-stone-500">
-          Automatically inherited by Gemini LLM agents, Gemini/Imagen image generators, and Gemini TTS voice synthesis. Individual roles and media engines can still provide an override key.
+          Automatically inherited by Gemini LLM agents, Gemini/Imagen image generators, and Gemini TTS voice synthesis.
+          Individual roles and media engines can still provide an override key.
         </p>
       </div>
 
@@ -147,8 +151,8 @@ export const CloudKeysPanel: React.FC<CloudKeysPanelProps> = ({ config, setConfi
           className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-indigo-500/60"
         />
         <p className="text-xs text-stone-500">
-          Sent as <code>Authorization: Basic …</code> to the Inworld LLM Router, Inworld TTS (<code>inworld-tts-2</code>), and Inworld STT
-          (<code>inworld-stt-1</code>). Create a key at{' '}
+          Sent as <code>Authorization: Basic …</code> to the Inworld LLM Router, Inworld TTS (<code>inworld-tts-2</code>
+          ), and Inworld STT (<code>inworld-stt-1</code>). Create a key at{' '}
           <a
             href="https://platform.inworld.ai/api-keys"
             target="_blank"
@@ -189,7 +193,9 @@ export const CloudKeysPanel: React.FC<CloudKeysPanelProps> = ({ config, setConfi
           </div>
           <div>
             <h4 className="text-xs font-sans font-bold text-stone-200">Cartesia</h4>
-            <p className="text-xs text-stone-400">Ultra-fast voice intelligence: Sonic TTS speech synthesis and Ink Whisper STT transcription.</p>
+            <p className="text-xs text-stone-400">
+              Ultra-fast voice intelligence: Sonic TTS speech synthesis and Ink Whisper STT transcription.
+            </p>
           </div>
         </div>
         <div>

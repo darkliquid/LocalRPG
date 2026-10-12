@@ -14,7 +14,9 @@ describe('MechanicsStrip image budget', () => {
   });
 
   it('renders nothing for an unlimited budget with mechanics off', () => {
-    const { container } = render(<MechanicsStrip turn={{ engagement: 'off', checks: [] }} budget={{ max_images: 0 }} />);
+    const { container } = render(
+      <MechanicsStrip turn={{ engagement: 'off', checks: [] }} budget={{ max_images: 0 }} />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 

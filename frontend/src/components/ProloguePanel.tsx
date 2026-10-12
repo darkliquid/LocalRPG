@@ -37,8 +37,7 @@ export const ProloguePanel: React.FC<ProloguePanelProps> = ({
             Let the Game Master set the opening scene, then take it from there.
           </p>
           <p className="text-xs text-stone-500">
-            The opening scene is restated at the start of the first turn, so you can
-            always see where the story begins.
+            The opening scene is restated at the start of the first turn, so you can always see where the story begins.
           </p>
         </div>
 

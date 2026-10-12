@@ -10,12 +10,13 @@ interface MarkdownProseProps {
 // The inline grammar is deliberately small: emphasis, code, entity links, and optional
 // vocal performance tags. It is applied to the same string whether it is arriving chunk
 // by chunk or read back from the chronicle, so streamed prose and replayed prose format identically.
-const inlinePattern = /(\[\[[^\]]+\]\])|(\[[a-zA-Z][a-zA-Z\s_-]{1,28}\])|(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(_[^_]+_)/g;
+const inlinePattern =
+  /(\[\[[^\]]+\]\])|(\[[a-zA-Z][a-zA-Z\s_-]{1,28}\])|(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(_[^_]+_)/g;
 
 const renderInline = (
   text: string,
   onEntityClick?: (entityId: string) => void,
-  displayMode: 'stage_directions' | 'hidden' | 'raw' = 'stage_directions'
+  displayMode: 'stage_directions' | 'hidden' | 'raw' = 'stage_directions',
 ): React.ReactNode[] => {
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -47,7 +48,7 @@ const renderInline = (
           <span key={key++} className="text-purple-300/90">
             {label}
           </span>
-        )
+        ),
       );
     } else if (token.startsWith('[')) {
       if (displayMode === 'hidden') {
@@ -62,26 +63,26 @@ const renderInline = (
             title="Performance direction"
           >
             {token.slice(1, -1)}
-          </span>
+          </span>,
         );
       }
     } else if (token.startsWith('`')) {
       nodes.push(
         <code key={key++} className="px-1 py-0.5 rounded bg-black/40 font-mono text-[0.9em] text-stone-200">
           {token.slice(1, -1)}
-        </code>
+        </code>,
       );
     } else if (token.startsWith('**')) {
       nodes.push(
         <strong key={key++} className="font-semibold text-stone-100">
           {token.slice(2, -2)}
-        </strong>
+        </strong>,
       );
     } else {
       nodes.push(
         <em key={key++} className="italic">
           {token.slice(1, -1)}
-        </em>
+        </em>,
       );
     }
 
@@ -101,75 +102,76 @@ const listItemPattern = /^\s*[-*]\s+/;
 // MarkdownProse renders the constrained Markdown a narrator actually produces.
 // Blank lines separate paragraphs, single newlines are kept as deliberate beats,
 // and raw HTML is never trusted: it is escaped by virtue of being plain text.
-export const MarkdownProse: React.FC<MarkdownProseProps> = memo(({ text, onEntityClick, className, displayMode = 'stage_directions' }) => {
-  const raw = (text ?? '').replace(/\r\n/g, '\n');
-  const normalized = displayMode === 'hidden'
-    ? raw.replace(/(?:^|\s)\[[a-zA-Z][a-zA-Z\s_-]{1,28}\](?:\s|$)/g, ' ').trim()
-    : raw;
+export const MarkdownProse: React.FC<MarkdownProseProps> = memo(
+  ({ text, onEntityClick, className, displayMode = 'stage_directions' }) => {
+    const raw = (text ?? '').replace(/\r\n/g, '\n');
+    const normalized =
+      displayMode === 'hidden' ? raw.replace(/(?:^|\s)\[[a-zA-Z][a-zA-Z\s_-]{1,28}\](?:\s|$)/g, ' ').trim() : raw;
 
-  if (normalized.trim() === '') {
-    return null;
-  }
+    if (normalized.trim() === '') {
+      return null;
+    }
 
-  const blocks = normalized.split(/\n{2,}/);
+    const blocks = normalized.split(/\n{2,}/);
 
-  return (
-    <div className={`select-text ${className ?? ''}`}>
-      {blocks.map((block, index) => {
-        const trimmed = block.trim();
+    return (
+      <div className={`select-text ${className ?? ''}`}>
+        {blocks.map((block, index) => {
+          const trimmed = block.trim();
 
-        if (sceneBreakPattern.test(trimmed)) {
-          return <hr key={index} className="my-4 border-white/10" />;
-        }
+          if (sceneBreakPattern.test(trimmed)) {
+            return <hr key={index} className="my-4 border-white/10" />;
+          }
 
-        const heading = trimmed.match(headingPattern);
-        if (heading) {
-          const level = heading[1].length;
-          const content = renderInline(heading[2], onEntityClick, displayMode);
-          if (level <= 2) {
+          const heading = trimmed.match(headingPattern);
+          if (heading) {
+            const level = heading[1].length;
+            const content = renderInline(heading[2], onEntityClick, displayMode);
+            if (level <= 2) {
+              return (
+                <h2 key={index} className="font-sans text-lg font-bold text-purple-300 tracking-wide mt-2">
+                  {content}
+                </h2>
+              );
+            }
             return (
-              <h2 key={index} className="font-sans text-lg font-bold text-purple-300 tracking-wide mt-2">
+              <h3 key={index} className="font-sans text-base font-semibold text-purple-200/90 tracking-wide mt-2">
                 {content}
-              </h2>
+              </h3>
             );
           }
-          return (
-            <h3 key={index} className="font-sans text-base font-semibold text-purple-200/90 tracking-wide mt-2">
-              {content}
-            </h3>
-          );
-        }
 
-        const lines = block.split('\n');
-        if (lines.every((line) => listItemPattern.test(line))) {
-          return (
-            <ul key={index} className="list-disc list-inside space-y-1">
-              {lines.map((line, itemIndex) => (
-                <li key={itemIndex}>{renderInline(line.replace(listItemPattern, ''), onEntityClick, displayMode)}</li>
-              ))}
-            </ul>
-          );
-        }
+          const lines = block.split('\n');
+          if (lines.every((line) => listItemPattern.test(line))) {
+            return (
+              <ul key={index} className="list-disc list-inside space-y-1">
+                {lines.map((line, itemIndex) => (
+                  <li key={itemIndex}>{renderInline(line.replace(listItemPattern, ''), onEntityClick, displayMode)}</li>
+                ))}
+              </ul>
+            );
+          }
 
-        if (trimmed.startsWith('>')) {
-          return (
-            <blockquote
-              key={index}
-              className="border-l-2 border-purple-500/60 pl-3 my-1 text-stone-300 italic whitespace-pre-wrap"
-            >
-              {renderInline(lines.map((line) => line.replace(/^>\s?/, '')).join('\n'), onEntityClick, displayMode)}
-            </blockquote>
-          );
-        }
+          if (trimmed.startsWith('>')) {
+            return (
+              <blockquote
+                key={index}
+                className="border-l-2 border-purple-500/60 pl-3 my-1 text-stone-300 italic whitespace-pre-wrap"
+              >
+                {renderInline(lines.map((line) => line.replace(/^>\s?/, '')).join('\n'), onEntityClick, displayMode)}
+              </blockquote>
+            );
+          }
 
-        return (
-          <p key={index} className="whitespace-pre-wrap">
-            {renderInline(block, onEntityClick, displayMode)}
-          </p>
-        );
-      })}
-    </div>
-  );
-});
+          return (
+            <p key={index} className="whitespace-pre-wrap">
+              {renderInline(block, onEntityClick, displayMode)}
+            </p>
+          );
+        })}
+      </div>
+    );
+  },
+);
 
 MarkdownProse.displayName = 'MarkdownProse';

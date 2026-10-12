@@ -50,18 +50,17 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
   // this window does not expose it, recording must not silently fall through to
   // a backend that cannot transcribe a "web-speech" blob.
   const webSpeechSupported = hasWebSpeechSupport();
-  const mode: VoiceMode =
-    sttType === 'web-speech' ? (webSpeechSupported ? 'web-speech' : 'unavailable') : 'backend';
+  const mode: VoiceMode = sttType === 'web-speech' ? (webSpeechSupported ? 'web-speech' : 'unavailable') : 'backend';
 
   const startWebSpeech = useCallback(() => {
-    const SpeechRecognition = (
-      window as unknown as {
-        SpeechRecognition?: new () => BrowserSpeechRecognition;
-        webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
-      }
-    ).SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition?: new () => BrowserSpeechRecognition })
-        .webkitSpeechRecognition;
+    const SpeechRecognition =
+      (
+        window as unknown as {
+          SpeechRecognition?: new () => BrowserSpeechRecognition;
+          webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+        }
+      ).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: new () => BrowserSpeechRecognition }).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setError(WEB_SPEECH_UNAVAILABLE);
       return;
@@ -98,7 +97,7 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
       setError(
         err instanceof Error
           ? `Speech recognition could not start: ${err.message}`
-          : 'Speech recognition could not start'
+          : 'Speech recognition could not start',
       );
       setIsRecording(false);
     }
@@ -114,8 +113,8 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
         mimeType = MediaRecorder.isTypeSupported('audio/webm')
           ? 'audio/webm'
           : MediaRecorder.isTypeSupported('audio/ogg')
-          ? 'audio/ogg'
-          : '';
+            ? 'audio/ogg'
+            : '';
       }
 
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
@@ -154,7 +153,13 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
       setIsRecording(true);
     } catch (err: unknown) {
       console.error('Microphone access error:', err);
-      setError(err instanceof Error && err.name === 'NotAllowedError' ? 'Microphone permission denied' : (err instanceof Error ? err.message : 'Microphone access failed'));
+      setError(
+        err instanceof Error && err.name === 'NotAllowedError'
+          ? 'Microphone permission denied'
+          : err instanceof Error
+            ? err.message
+            : 'Microphone access failed',
+      );
       setIsRecording(false);
     }
   }, [onTranscribed]);

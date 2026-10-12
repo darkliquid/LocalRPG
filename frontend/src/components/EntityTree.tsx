@@ -1,14 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ChevronDown,
-  ChevronRight,
-  FileText,
-  Folder,
-  FolderPlus,
-  MoveRight,
-  Pencil,
-  Trash2,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, Folder, FolderPlus, MoveRight, Pencil, Trash2 } from 'lucide-react';
 import {
   createOnDropHandler,
   dragAndDropFeature,
@@ -136,13 +127,7 @@ export default function EntityTree({
     ],
     initialState: { expandedItems: [folderItemId('')] },
     onDrop: createOnDropHandler((parent: ItemInstance<TreeItem>, newChildren: string[]) => {
-      const moves = movesForChildren(
-        folders,
-        visibleEntities,
-        index,
-        parent.getItemData().folderPath,
-        newChildren,
-      );
+      const moves = movesForChildren(folders, visibleEntities, index, parent.getItemData().folderPath, newChildren);
       for (const move of moves.entities) onMoveEntity(move.id, move.folder);
       for (const move of moves.folders) onMoveFolder(move.from, move.to);
     }),
@@ -257,8 +242,7 @@ export default function EntityTree({
                       {
                         label: 'Move to folder...',
                         icon: <MoveRight className="w-3 h-3" />,
-                        onSelect: () =>
-                          setDialog({ kind: 'move-note', entity: data.entity as EntitySummary }),
+                        onSelect: () => setDialog({ kind: 'move-note', entity: data.entity as EntitySummary }),
                       },
                       ...(onDeleteEntity
                         ? [
@@ -266,8 +250,7 @@ export default function EntityTree({
                               label: 'Delete',
                               icon: <Trash2 className="w-3 h-3" />,
                               destructive: true,
-                              onSelect: () =>
-                                setDialog({ kind: 'delete-note', entity: data.entity as EntitySummary }),
+                              onSelect: () => setDialog({ kind: 'delete-note', entity: data.entity as EntitySummary }),
                             },
                           ]
                         : []),
@@ -352,7 +335,7 @@ export default function EntityTree({
         isOpen={dialog.kind === 'move-note'}
         noteName={dialog.kind === 'move-note' ? dialog.entity.name : ''}
         folders={folders}
-        currentFolder={dialog.kind === 'move-note' ? dialog.entity.folder ?? '' : ''}
+        currentFolder={dialog.kind === 'move-note' ? (dialog.entity.folder ?? '') : ''}
         onCancel={() => setDialog({ kind: 'none' })}
         onSubmit={(folder) => {
           if (dialog.kind === 'move-note') onMoveEntity(dialog.entity.id, folder);

@@ -92,9 +92,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   // beat, not a beat of its own: playback and audio are indexed by segment.
   const activeCheck = useMemo(
     () =>
-      active?.check_ref
-        ? (currentTurn?.checks ?? []).find((check) => check.check_id === active.check_ref)
-        : undefined,
+      active?.check_ref ? (currentTurn?.checks ?? []).find((check) => check.check_id === active.check_ref) : undefined,
     [active, currentTurn],
   );
   // A clip group shares one audio clip, so playback is keyed on the group's
@@ -117,7 +115,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
 
   const npcSegment = useMemo(
     () => segments.find((s) => s.kind === 'speech' && !s.player && s.portrait_url),
-    [segments]
+    [segments],
   );
   const npcPortrait = npcSegment?.portrait_url;
 
@@ -156,7 +154,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
       typeof window !== 'undefined' &&
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-    []
+    [],
   );
 
   // The stage's Ken Burns drifts over the beat, so progress is sampled while the
@@ -285,7 +283,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     if (previous !== 'playing' || (beatState !== 'idle' && beatState !== 'error') || !isPlaying) return;
     const timer = setTimeout(advanceGroup, beatGapMs(speed));
     return () => clearTimeout(timer);
-  }, [beatState, serverPlayback, voiceEnabled, isPlaying, advanceGroup]);
+  }, [beatState, serverPlayback, voiceEnabled, isPlaying, advanceGroup, speed]);
 
   // While a group's audio plays, walk the text through the group's beats at a
   // reading pace, so a merged run is read line by line rather than jumped over.
@@ -297,7 +295,18 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     const dwell = readingDurationMs(active?.text ?? '') / (speed > 0 ? speed : 1);
     const timer = setTimeout(() => setActiveSegment(activeIndex + 1), dwell);
     return () => clearTimeout(timer);
-  }, [isOpen, isPlaying, voiceEnabled, serverPlayback, beatState, browser.playing, activeIndex, groupLast, active?.text, speed]);
+  }, [
+    isOpen,
+    isPlaying,
+    voiceEnabled,
+    serverPlayback,
+    beatState,
+    browser.playing,
+    activeIndex,
+    groupLast,
+    active?.text,
+    speed,
+  ]);
 
   // Browser voice: mirror the clip the browser is actually playing, jumping only
   // when the group changes so the text does not restart mid-group.
@@ -310,7 +319,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
       );
     }, beatGapMs(speed));
     return () => clearTimeout(timer);
-  }, [browser.playingIndex, serverPlayback, voiceEnabled, segments]);
+  }, [browser.playingIndex, serverPlayback, voiceEnabled, segments, speed]);
 
   // Browser voice: the turn is finished once its clips stop playing.
   const browserWasPlaying = useRef(false);
@@ -322,7 +331,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
       const timer = setTimeout(advanceGroup, beatGapMs(speed));
       return () => clearTimeout(timer);
     }
-  }, [browser.playing, serverPlayback, voiceEnabled, isPlaying, advanceGroup]);
+  }, [browser.playing, serverPlayback, voiceEnabled, isPlaying, advanceGroup, speed]);
 
   // Without voice, the text paces itself on the reading estimate, scaled by the
   // speed control, so a silent beat lingers as long as it takes to read.

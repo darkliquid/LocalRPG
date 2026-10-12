@@ -218,6 +218,12 @@ jobs:
       - name: Type check and unit tests
         run: mise run test:frontend
 
+      # Prettier's check gates, and ESLint's error level does. Its warnings are the
+      # tracked accessibility and React Compiler work (FE-6, FE-3) and print here
+      # without failing the build, the same way the prose lint treats its warnings.
+      - name: Lint the frontend
+        run: mise run lint:frontend
+
       - name: Lint embedded documentation
         run: mise run lint:docs
 
