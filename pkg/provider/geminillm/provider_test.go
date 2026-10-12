@@ -128,6 +128,63 @@ func TestGeminiProviderGenerate(t *testing.T) {
 	}
 }
 
+// A function call on the non-streaming path cannot be returned, because
+// harness.GenerateResponse has no field for it. Dropping the call and returning the
+// text alone would lose it silently, so Generate reports it instead.
+func TestGeminiProviderGenerateRejectsToolCallsItCannotCarry(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"candidates": [
+				{
+					"content": {
+						"parts": [
+							{"text": "Let me look that up."},
+							{"functionCall": {"id": "call-1", "name": "get_entity", "args": {"id": "iron-gate"}}}
+						],
+						"role": "model"
+					},
+					"finishReason": "STOP"
+				}
+			]
+		}`)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:      "test-key",
+		Backend:     genai.BackendGeminiAPI,
+		HTTPClient:  server.Client(),
+		HTTPOptions: genai.HTTPOptions{BaseURL: server.URL},
+	})
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	budget := 0
+	provider, err := geminillm.NewGeminiProvider("test-gemini", geminillm.GeminiProviderOptions{
+		Model:          "gemini-2.5-flash",
+		APIKey:         "test-key",
+		ThinkingBudget: &budget,
+		Client:         client,
+	})
+	if err != nil {
+		t.Fatalf("NewGeminiProvider: %v", err)
+	}
+
+	resp, err := provider.Generate(ctx, harness.GenerateRequest{Prompt: "What is at the gate?"})
+	if err == nil {
+		t.Fatalf("expected an error rather than a response that drops the call, got %+v", resp)
+	}
+	if !strings.Contains(err.Error(), "function call") {
+		t.Errorf("expected the error to name the function call, got %q", err)
+	}
+	if resp != nil {
+		t.Errorf("expected no response alongside the error, got %+v", resp)
+	}
+}
+
 func TestGeminiProviderResolvesFunctionResponseNames(t *testing.T) {
 	var gotBody string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

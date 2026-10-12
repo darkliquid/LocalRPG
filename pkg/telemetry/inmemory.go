@@ -12,7 +12,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-	oteltrace "go.opentelemetry.io/otel/trace"
+	nooptrace "go.opentelemetry.io/otel/trace/noop"
 )
 
 // memoryLogExporter keeps log records in memory for tests.
@@ -96,7 +96,7 @@ func NewInMemory() (*Recorder, *Provider, error) {
 
 // ResetGlobalForTest restores no-op globals so one test cannot leak into another.
 func ResetGlobalForTest() {
-	otel.SetTracerProvider(oteltrace.NewNoopTracerProvider())
+	otel.SetTracerProvider(nooptrace.NewTracerProvider())
 	otel.SetMeterProvider(noopmetric.NewMeterProvider())
 	logglobal.SetLoggerProvider(log.NewLoggerProvider())
 }

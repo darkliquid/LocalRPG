@@ -60,11 +60,6 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 
 // writeJSONErrorCode is writeJSONError with a machine-readable reason, so the UI
 // can explain a failure the user can act on rather than only printing the text.
-func writeJSONErrorCode(w http.ResponseWriter, status int, code, message string) {
-	writeJSONStatus(w, status, map[string]any{
-		"error": map[string]string{"code": code, "message": message},
-	})
-}
 
 // generationLimitCode names the code a caller gets when a generation stopped
 // because it reached a configured limit. An empty code means the failure is not
