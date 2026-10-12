@@ -12,9 +12,10 @@ mise run install:vale-styles # vale sync: download the style packages when .vale
 mise run build          # frontend bundle -> pkg/gui/dist, then bin/localrpg
 mise run build:frontend # npm run build in frontend/ (tsc + vite)
 mise run build:backend  # depends on build:frontend
-mise run test           # go test -v -count=1 ./...  AND  mise run test:frontend  AND  mise run test:e2e
-mise run test:backend   # go test -v -count=1 ./...
-mise run test:frontend  # npx tsc --noEmit and npx vitest run (in frontend/)
+mise run test           # coverage-checked Go tests  AND  mise run test:frontend  AND  mise run test:e2e
+mise run test:backend   # go test with a coverage floor (scripts/check-coverage.sh)
+mise run test:backend:fast # go test without the coverage check
+mise run test:frontend  # npx tsc --noEmit and npx vitest run --coverage (in frontend/)
 mise run test:e2e       # go test -tags e2e ./pkg/e2e/... (skips without a browser)
 mise run lint           # gofmt, rumdl, goreleaser check, actionlint, go vet ./...
 mise run lint:gofmt     # fail if any Go file is not gofmt-formatted
@@ -393,6 +394,10 @@ Storage paths are resolved by `pkg/paths.Resolve` from the XDG bases (`github.co
 ## Testing
 
 Two suites, one runner each. `mise run test` runs both plus the backend.
+
+**Both suites have a coverage floor, and neither is a target.** Go statements must stay at or above `72.0`, checked by `scripts/check-coverage.sh`, which runs the suite with one profile and fails below the number (`GO_COVER_MIN` overrides it, `GO_COVER_KEEP` saves the profile). The frontend floors live in `frontend/vitest.config.ts` and are enforced by `vitest run --coverage` in `mise run test:frontend`: statements `33`, lines `34`, functions `33`, branches `30`.
+
+The floors sit just below what the suite reaches today — 73.3% and 33.36% at the time of writing — rather than on it, so that a machine which skips a capability-dependent test cannot fail a build it did not cause. They are raised deliberately, in a commit that says why, and never lowered without one saying why either. `include: ['src/**']` in the frontend config matters: the default counts only the files a test happened to import, which flatters the number by leaving everything else out of it.
 
 - **Frontend unit and component tests: Vitest + React Testing Library + jsdom.** The runner is configured in `frontend/vitest.config.ts` (not the app's `vite.config.ts`, which sets an output directory and loads Tailwind). Tests live beside the code as `*.test.ts`/`*.test.tsx` and import `describe`/`it`/`expect` from `vitest` explicitly; there are no globals. `frontend/src/test/setup.ts` installs the jest-dom matchers, stubs the browser APIs jsdom lacks, and calls RTL's `cleanup`. The old `frontend/scripts/check*.mjs` files are gone, and the docs lint is no longer a Node script at all: `mise run lint:docs` runs `rumdl` over `pkg/gui/docs`.
 - **Browser end-to-end tests: `pkg/e2e`, behind the `e2e` build tag.** The default `go test ./...` never compiles them, so a machine without Chrome stays fast; run them with `mise run test:e2e` (`go test -tags e2e ./pkg/e2e/...`). `harness.go` wraps chromedp (`NewBrowser`, `Click`, `Type`, `WaitFor`, `Poll`, `InstrumentAudio`) and `fixture.go` starts the real `gui.Service` on a temp root behind an `httptest` server (`NewFixture`, `WriteSystem`, `WriteWorld`, `InitGame`, `WriteEntities`, `WriteHistory`). The tests skip, never fail, when `driver.Available` finds no usable browser.
