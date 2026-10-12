@@ -16,6 +16,41 @@
 
 ---
 
+## Progress
+
+The baseline above is a snapshot and is left as one: the numbers in the body and in
+[Appendix A](#appendix-a-metric-baseline) describe commit `78898e3e` and are not
+rewritten as work lands. What follows records the movement, re-measured at each merge.
+
+**Wave 6 so far.** Four of the 57 tasks in section 4 are done, at commit `d5574884`:
+
+| Task | Closed finding | What changed |
+|---|---|---|
+| TQ-1 | R-14, and the gofmt half of C-1 | 65 files formatted; `lint:gofmt` gates `mise run lint` and CI |
+| TQ-2 | R-15 | 636 uses of `interface{}` rewritten to `any`; surfaced and fixed a boolean named `any` that shadowed the builtin |
+| TQ-5 | C-4, C-5 | `project.sh` no longer clears a single-select field when a wave or area is added, and reads an option name containing a comma correctly |
+| TQ-11 | S-4 | `frontend/coverage/` ignored |
+
+**Re-measured after wave 6.**
+
+| Metric | Baseline | Now |
+|---|---|---|
+| Go files failing `gofmt` | 65 | 0 |
+| `interface{}` in Go (non-test) | 471 | 0 |
+| `mise run lint` code gates | `go vet` | `go vet`, `gofmt -l` |
+| Go statement coverage | 73.3% | 73.3% |
+| Go functions at 0% coverage | 422 | 422 |
+| Vale alerts / files | 290 / 26 | 290 / 26 |
+| Stale figures in `AGENTS.md` (D-9) | 4 | 0 |
+
+Two corrections were made to this review from evidence found while acting on it, both
+of which narrowed a claim: **CodeQL is running** (C-1), and the `interface{}` count in
+Appendix A was 636 across the whole tree rather than 471 outside tests alone. The lesson
+is recorded rather than quietly fixed, because a review that overstates is worth less
+than one that is wrong in a way you can check.
+
+---
+
 ## 1. Executive summary
 
 The project is well above average for a codebase of its size in the areas that are
@@ -308,20 +343,50 @@ then add `gopls`' `any` analyser or `revive`'s `use-any` rule to keep it clean. 
 either way: if `interface{}` is actually preferred, change `AGENTS.md` instead, but do
 not leave both.
 
-#### R-16. Other modernisation hints surfaced by the project's own tooling
+#### R-16. 322 modernisation hints, not the two this review first reported
 
-**Severity: Low.**
+**Severity: Low, with three exceptions that are not style at all.**
 
-Evidence (from `gopls` analysis in this session, 49 project-level hints):
+The first draft of this finding named two sites, because the editor reports `gopls`
+diagnostics with a truncated tail ("and 247 more") and that tail was taken at face value.
+Enumerated properly with
+`gopls check -severity=hint $(find cmd pkg tools -name '*.go' ! -name '*_test.go')`, the
+tree carries **322 hints**, and the two named were never the interesting part:
 
-- `cmd/localrpg/export.go:320`: `string += string` in a loop; use a `strings.Builder`
-  (the same file already imports `strings`).
-- `cmd/localrpg/registry.go:102`: a hand-rolled membership loop where `slices.Contains`
-  would do.
-- The remainder are further `interface{}` sites (R-15).
+| Hint | Count |
+|---|---|
+| Inefficient string concatenation in call to `WriteString` | 90 |
+| `for` loop can be modernised using range over int | 39 |
+| `omitempty` has no effect on nested struct fields | 25 |
+| `fmt.Fprintf` instead of `WriteString(fmt.Sprintf(...))` | 16 |
+| Ranging over `SplitSeq` is more efficient | 15 |
+| Backward loop over slice can be modernised using `slices.Backward` | 13 |
+| Replace `m[k]=v` loop with `maps.Copy` | 12 |
+| `unused parameter` | 8 |
+| `intPtr(x)` can be simplified to `new(x)` | 8 |
+| `if` statement can be modernised using `min` / `max` | 6 / 4 |
+| `HasPrefix`+`TrimPrefix` can be simplified to `CutPrefix` (and `CutSuffix`) | 6 / 4 |
+| `strings.Index` can be simplified using `strings.Cut` | 5 |
+| unused function / method / const | 5 / 4 / 2 |
+| `errors.As` can be simplified using `AsType[...]` | 4 |
+| `could use tagged switch` | 5 |
+| `string += string` in a loop | 2 |
+| **`sql.Rows` used in a `Next` loop without a final `Err()` check** | **3** |
+| Deprecated API in use (`kv.Value.Emit`, `tar.TypeRegA`, `oteltrace.NewNoopTracerProvider`) | **3** |
+
+The last two rows are defects rather than preferences, and the third row is the one that
+matters: three `Rows.Next()` loops never check `rows.Err()`, which is the same omission
+R-7 and RD-6 describe, and it means a query that fails halfway is reported as a
+completed one. Those belong to RD-6 and are cross-referenced there rather than counted
+twice here.
+
+The scale changes what TQ-3 should be. Ninety `WriteString` concatenations and thirty-nine
+range-over-int loops are a real sweep, not a tidy-up, and `staticcheck` (TQ-4) will
+overlap with most of the list. TQ-4 therefore goes first, and TQ-3 becomes "work the
+findings the gate reports" rather than a hand-enumerated one.
 
 `AGENTS.md` already states the intended idioms (`slices`/`maps` helpers, `min`/`max`,
-range-over-int), so these are drift rather than disagreement.
+range-over-int), so the rest is drift rather than disagreement.
 
 ### 2.2 Frontend readability and structure
 
@@ -1159,7 +1224,7 @@ two), `L` (a week or more). Impact is the finding severity.
 | A12 | Unify `cmd/localrpg` command shapes on `runXCommand(args, stdout, stderr) int`; align flag error modes; stop discarding the config load error in `play.go:34` | R-13 | M | Medium |
 | A13 | Run `gofmt -w cmd pkg tools`, then gate on `gofmt -l` in CI | R-14, C-1 | S | Medium |
 | A14 | Rewrite the 471 `interface{}` uses as `any` (or change the convention), then enable a rule that keeps it clean | R-15 | S | Medium |
-| A15 | Fix the `strings.Builder` and `slices.Contains` hints, and sweep the remaining `gopls` modernisation hints | R-16 | S | Low |
+| A15 | Work the 322 `gopls` hints, after TQ-4 has put `staticcheck` in place so the list comes from the gate rather than from a sample | R-16 | M | Low |
 
 ### Workstream B: make the frontend readable and accessible
 
@@ -1344,7 +1409,7 @@ cd frontend && npm outdated && npm audit
 | R-13 | Medium | Inconsistent CLI command shapes |
 | R-14 | Medium | 65 files fail `gofmt` |
 | R-15 | Medium | 471 `interface{}` uses contradict the stated `any` convention |
-| R-16 | Low | Other modernisation hints from `gopls` |
+| R-16 | Low | 322 modernisation hints, three of them real defects |
 | F-1 | High | No TypeScript linter or formatter |
 | F-2 | High | No state layer; about 45 `useState` in `App.tsx` |
 | F-3 | High | Three god-files hold most of the UI |
