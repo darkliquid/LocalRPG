@@ -91,7 +91,81 @@
     });
   }
 
+  /* Highlight the dock icon whose section is in view. Each participating dock
+     item carries data-spy naming a section on the page, and each such section
+     carries the same data-spy. A page without any landmark (the documentation
+     articles) keeps the active icon the server rendered. */
+  function initDockSpy() {
+    var dock = document.querySelector('.dock');
+    if (!dock) {
+      return;
+    }
+
+    var items = {};
+    dock.querySelectorAll('.dock__item[data-spy]').forEach(function (item) {
+      items[item.getAttribute('data-spy')] = item;
+    });
+
+    // Only the page's own sections count: the dock anchors carry data-spy too,
+    // and they sit in a fixed rail at the top of the window.
+    var marks = Array.prototype.filter.call(document.querySelectorAll('#main [data-spy]'), function (el) {
+      return items[el.getAttribute('data-spy')];
+    });
+    if (!marks.length) {
+      return;
+    }
+
+    var frame = 0;
+    var current = null;
+
+    function apply() {
+      frame = 0;
+
+      // A section counts as current once its top crosses a reading line rather
+      // than the very top of the window, so an icon lights up while its heading
+      // is still coming into view.
+      var line = window.innerHeight * 0.34;
+      var found = null;
+      marks.forEach(function (el) {
+        if (el.getBoundingClientRect().top <= line) {
+          found = el;
+        }
+      });
+      if (!found) {
+        found = marks[0];
+      }
+
+      // A last section shorter than the viewport never reaches the line, so the
+      // end of the page settles on the final landmark instead.
+      var atEnd = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      if (atEnd) {
+        found = marks[marks.length - 1];
+      }
+
+      if (found === current) {
+        return;
+      }
+      current = found;
+
+      var key = found.getAttribute('data-spy');
+      Object.keys(items).forEach(function (name) {
+        items[name].classList.toggle('is-active', name === key);
+      });
+    }
+
+    function schedule() {
+      if (!frame) {
+        frame = window.requestAnimationFrame(apply);
+      }
+    }
+
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    schedule();
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
+    initDockSpy();
     initGallery();
     initCopyButtons();
   });

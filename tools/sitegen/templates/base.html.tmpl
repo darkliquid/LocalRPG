@@ -33,6 +33,7 @@
           href="{{ .Href }}"
           title="{{ .Label }}"
           aria-label="{{ .Label }}"
+          {{ if .Spy }}data-spy="{{ .Spy }}"{{ end }}
           {{ if .External }}target="_blank" rel="noopener"{{ end }}
         >{{ icon .Icon }}<span class="dock__tip">{{ .Label }}</span></a>
       {{ end }}

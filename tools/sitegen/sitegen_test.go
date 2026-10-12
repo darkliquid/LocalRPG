@@ -261,4 +261,56 @@ func TestShowcaseShotsCaptions(t *testing.T) {
 	}
 }
 
+// TestDockSpyLandmarks guards the scroll tracking contract: each dock icon the
+// site tracks points at a section the home page carries, and the documentation
+// articles carry no landmark at all, so their icon keeps the highlight the
+// server rendered rather than flickering to whatever is scrolled past.
+func TestDockSpyLandmarks(t *testing.T) {
+	renderer, err := newRenderer()
+	if err != nil {
+		t.Fatalf("newRenderer: %v", err)
+	}
+
+	page, err := renderer.render("home.html.tmpl", &pageData{
+		Root:   "",
+		Title:  "Home",
+		Active: "home",
+		IsHome: true,
+		Nav:    nav("", defaultRepoURL),
+	})
+	if err != nil {
+		t.Fatalf("render home: %v", err)
+	}
+	home := string(page)
+
+	// One landmark in the dock, one in the body, except Documentation, which
+	// covers both the quickstart and the documentation sections.
+	want := map[string]int{"top": 2, "features": 2, "screenshots": 2, "docs": 3}
+	for key, count := range want {
+		attr := `data-spy="` + key + `"`
+		if got := strings.Count(home, attr); got != count {
+			t.Errorf("home page has %d occurrences of %s, want %d", got, attr, count)
+		}
+	}
+
+	article, err := renderer.render("doc.html.tmpl", &pageData{
+		Root:   "../",
+		Title:  "Overview",
+		Active: "docs",
+		Nav:    nav("../", defaultRepoURL),
+		Doc:    &doc{ID: "01-overview", Title: "Overview", Category: "Concepts"},
+	})
+	if err != nil {
+		t.Fatalf("render article: %v", err)
+	}
+
+	mainStart := strings.Index(string(article), "<main ")
+	if mainStart < 0 {
+		t.Fatal("rendered article has no main element")
+	}
+	if strings.Contains(string(article)[mainStart:], "data-spy=") {
+		t.Error("a documentation article carries a scroll landmark, so the dock would track it")
+	}
+}
+
 

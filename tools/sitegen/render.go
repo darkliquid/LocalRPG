@@ -29,6 +29,10 @@ type navItem struct {
 	Icon     string
 	Href     string
 	External bool
+	// Spy names the on-page section this item tracks, so the dock can highlight
+	// the icon for whatever section is in view as the reader scrolls. An empty
+	// Spy keeps the item out of the scroll tracking entirely.
+	Spy string
 }
 
 // pageData is everything a page template can render. A single struct keeps the
@@ -383,10 +387,10 @@ func nav(root, repoURL string) []navItem {
 	repoURL = strings.TrimRight(repoURL, "/")
 	home := root + "index.html"
 	return []navItem{
-		{Key: "home", Label: "Overview", Icon: "home", Href: home},
-		{Key: "features", Label: "Features", Icon: "grid", Href: home + "#features"},
-		{Key: "screenshots", Label: "Screenshots", Icon: "image", Href: home + "#screenshots"},
-		{Key: "docs", Label: "Documentation", Icon: "book", Href: root + "docs/index.html"},
+		{Key: "home", Label: "Overview", Icon: "home", Href: home, Spy: "top"},
+		{Key: "features", Label: "Features", Icon: "grid", Href: home + "#features", Spy: "features"},
+		{Key: "screenshots", Label: "Screenshots", Icon: "image", Href: home + "#screenshots", Spy: "screenshots"},
+		{Key: "docs", Label: "Documentation", Icon: "book", Href: root + "docs/index.html", Spy: "docs"},
 		{Key: "download", Label: "Download", Icon: "download", Href: repoURL + "/releases", External: true},
 		{Key: "github", Label: "GitHub", Icon: "github", Href: repoURL, External: true},
 	}
