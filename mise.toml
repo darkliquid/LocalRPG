@@ -103,6 +103,18 @@ description = "Run staticcheck over the Go packages"
 # to nothing. It analyses test files too.
 run = "staticcheck ./..."
 
+[tasks."lint:frontend"]
+description = "Check the frontend's formatting and run ESLint over it"
+dir = "frontend"
+depends = ["install:frontend"]
+# Prettier first: it is fast, and a formatting failure makes the lint findings
+# harder to read. ESLint's error level is what gates; its warnings are the
+# tracked accessibility and React Compiler work, and they print here.
+run = """
+npm run format:check
+npm run lint
+"""
+
 [tasks."lint:prose"]
 description = "Run Vale over tracked prose and source comments (report only; STRICT=1 to gate)"
 depends = ["install:vale-styles"]
@@ -110,7 +122,7 @@ run = "bash scripts/lint-prose.sh"
 
 [tasks.lint]
 description = "Run code analysis and linting"
-depends = ["lint:docs", "lint:gofmt", "lint:staticcheck", "lint:goreleaser", "lint:actions"]
+depends = ["lint:docs", "lint:gofmt", "lint:staticcheck", "lint:frontend", "lint:goreleaser", "lint:actions"]
 run = """
 go vet ./...
 go vet -tags e2e ./pkg/e2e/...
