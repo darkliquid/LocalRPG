@@ -70,8 +70,24 @@ The board tracks every item with a **Status** single-select, and the status move
 **Spec-first.** A proposal is specced and planned before it is implemented: the spec is a design doc
 in `docs/superpowers/specs/<date>-<slug>-design.md`, and the plan is a task-by-task implementation
 plan in `docs/superpowers/plans/<date>-<slug>.md`, following the superpowers workflow. Read the
-relevant spec before changing a subsystem. The proposal's definition of done is a checklist - spec,
-plan, implemented, tests and lint, user-facing docs - and each box is ticked when it is true.
+**Spec-first, when there is something to design.** A proposal that decides an interface, a
+behaviour, or a tradeoff is specced and planned before it is implemented: the spec is a design doc
+in `docs/superpowers/specs/<date>-<slug>-design.md`, and the plan is a task-by-task implementation
+plan in `docs/superpowers/plans/<date>-<slug>.md`, following the superpowers workflow. Read the
+relevant spec before changing a subsystem.
+
+Work that is mechanical decides nothing and carries no design step, because the spec would only
+restate the issue and nobody would read it: a formatting sweep, a rename, a dependency bump, a
+test that mirrors an existing one. `add-proposal` decides by kind (`feature`, `enhancement`,
+`refactor` and `research` require a design; `chore`, `test` and `documentation` do not) and
+`--design` or `--no-design` overrides it for the exceptions, so a chore that does decide something
+(a lint gate's placement, say) still gets its spec. Every new proposal states the outcome in a
+`**Design:**` field, and `project:scaffold` refuses one whose field says no design is needed.
+
+Proposals registered before the field existed keep the old default, so `scaffold` still allows them
+and `project:check` still accepts their design boxes. When you pick one up, set its `**Design:**`
+field to match what the work actually needs, and scaffold only if it does. A design-free proposal's
+checklist is implemented, tests and lint, and user-facing docs.
 
 ### The `project:*` tasks
 
