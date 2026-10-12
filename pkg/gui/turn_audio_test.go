@@ -175,9 +175,9 @@ func TestHeardAll(t *testing.T) {
 	if !a.heardAll(nil) {
 		t.Fatal("an empty set is trivially heard")
 	}
-	all, any := a.heardState([]int{0, 5})
-	if all || !any {
-		t.Fatalf("heardState = %v/%v, want false/true", all, any)
+	all, some := a.heardState([]int{0, 5})
+	if all || !some {
+		t.Fatalf("heardState = %v/%v, want false/true", all, some)
 	}
 }
 
@@ -185,7 +185,7 @@ func TestHeardAll(t *testing.T) {
 type captureLogger struct{ events []string }
 
 func (l *captureLogger) Enabled(trace.Level) bool { return true }
-func (l *captureLogger) Event(name string, _ map[string]interface{}) {
+func (l *captureLogger) Event(name string, _ map[string]any) {
 	l.events = append(l.events, name)
 }
 func (l *captureLogger) SetGame(string) {}
@@ -425,4 +425,3 @@ func TestSimpleTurnPlaybackUnchanged(t *testing.T) {
 		}
 	}
 }
-

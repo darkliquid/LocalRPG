@@ -73,7 +73,7 @@ func TestBudgetDefaultsAreUnlimited(t *testing.T) {
 	if ImageApprovalMode(nil) != ImageApprovalAuto {
 		t.Fatal("a nil manifest should default to auto approval")
 	}
-	broken := &core.GameManifest{Settings: map[string]interface{}{ImageBudgetSetting: "not a budget"}}
+	broken := &core.GameManifest{Settings: map[string]any{ImageBudgetSetting: "not a budget"}}
 	if !ImageBudgetFromManifest(broken).Unlimited() {
 		t.Fatal("a malformed budget should degrade to unlimited")
 	}

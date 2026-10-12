@@ -24,8 +24,8 @@ type SetupSpec struct {
 
 // SetupEntity is one entity's starting state and tags.
 type SetupEntity struct {
-	Stats map[string]interface{} `yaml:"stats,omitempty" json:"stats,omitempty"`
-	Tags  []string               `yaml:"tags,omitempty" json:"tags,omitempty"`
+	Stats map[string]any `yaml:"stats,omitempty" json:"stats,omitempty"`
+	Tags  []string       `yaml:"tags,omitempty" json:"tags,omitempty"`
 }
 
 // Step is one action in a scenario and what it must produce.
@@ -41,10 +41,10 @@ type Expectations struct {
 	Outcome string `yaml:"outcome,omitempty" json:"outcome,omitempty"`
 	// OutcomeOneOf asserts the outcome is one of a vocabulary, for a check whose
 	// result is random and so cannot name one exact value.
-	OutcomeOneOf    []string               `yaml:"outcome_one_of,omitempty" json:"outcome_one_of,omitempty"`
-	Total           *Range                 `yaml:"total,omitempty" json:"total,omitempty"`
-	State           map[string]interface{} `yaml:"state,omitempty" json:"state,omitempty"`
-	MessageContains string                 `yaml:"message_contains,omitempty" json:"message_contains,omitempty"`
+	OutcomeOneOf    []string       `yaml:"outcome_one_of,omitempty" json:"outcome_one_of,omitempty"`
+	Total           *Range         `yaml:"total,omitempty" json:"total,omitempty"`
+	State           map[string]any `yaml:"state,omitempty" json:"state,omitempty"`
+	MessageContains string         `yaml:"message_contains,omitempty" json:"message_contains,omitempty"`
 }
 
 // Empty reports whether the expectations assert anything.

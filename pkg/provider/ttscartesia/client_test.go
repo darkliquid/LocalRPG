@@ -34,7 +34,7 @@ func TestSynthesize(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer test-key" {
 			t.Errorf("wrong auth: %s", r.Header.Get("Authorization"))
 		}
-		var req map[string]interface{}
+		var req map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode body: %v", err)
 		}
@@ -44,11 +44,11 @@ func TestSynthesize(t *testing.T) {
 		if req["transcript"] != "Hello there!" {
 			t.Errorf("transcript = %v, want 'Hello there!'", req["transcript"])
 		}
-		voiceMap, ok := req["voice"].(map[string]interface{})
+		voiceMap, ok := req["voice"].(map[string]any)
 		if !ok || voiceMap["id"] != "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4" {
 			t.Errorf("voice.id = %v, want default voice id", req["voice"])
 		}
-		genCfg, ok := req["generation_config"].(map[string]interface{})
+		genCfg, ok := req["generation_config"].(map[string]any)
 		if !ok || genCfg["speed"] != 1.2 {
 			t.Errorf("generation_config.speed = %v, want 1.2", req["generation_config"])
 		}

@@ -139,9 +139,12 @@ func (a *turnAudioPlan) heardAll(indexes []int) bool {
 	return all
 }
 
-// heardState reports whether all and whether any of the indexes have been heard.
-// It is the one place the ledger is read, so all and any cannot disagree.
-func (a *turnAudioPlan) heardState(indexes []int) (all, any bool) {
+// heardState reports whether all and whether some of the indexes have been heard.
+// It is the one place the ledger is read, so all and some cannot disagree.
+//
+// The second result is named some rather than any so that it does not shadow the
+// any type alias inside the body.
+func (a *turnAudioPlan) heardState(indexes []int) (all, some bool) {
 	if a == nil || len(indexes) == 0 {
 		return true, false
 	}
@@ -150,12 +153,12 @@ func (a *turnAudioPlan) heardState(indexes []int) (all, any bool) {
 	all = true
 	for _, index := range indexes {
 		if a.heard[index] {
-			any = true
+			some = true
 			continue
 		}
 		all = false
 	}
-	return all, any
+	return all, some
 }
 
 // enqueueClip sends one clip to the player once, reporting whether it was sent.

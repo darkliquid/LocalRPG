@@ -28,7 +28,7 @@ func init() {
 					Order:       5,
 					Label:       "Inworld STT",
 					Description: "Cloud transcription via Inworld STT. Set key in Providers tab or via INWORLD_API_KEY.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type":         "builtin",
 						"builtin_name": "inworld",
 						"model":        "inworld/inworld-stt-1",
@@ -36,7 +36,7 @@ func init() {
 				},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var payload media.STTBuildPayload
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &payload); err != nil {

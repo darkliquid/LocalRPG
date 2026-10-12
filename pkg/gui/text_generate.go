@@ -16,7 +16,7 @@ import (
 // GenerateTextRequest asks the model for one field or a whole form's worth of
 // values. It is side-effect free: nothing is written to disk.
 type GenerateTextRequest struct {
-	FormType  string            `json:"form_type"` // "character", "world", "system", "campaign"
+	FormType  string            `json:"form_type"`  // "character", "world", "system", "campaign"
 	FieldName string            `json:"field_name"` // field id or "_all"
 	Context   map[string]string `json:"context"`
 	WorldID   string            `json:"world_id,omitempty"`

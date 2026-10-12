@@ -195,7 +195,7 @@ func TestCompileResolvesAudioAndCountsSilence(t *testing.T) {
 
 	script, err := compiler.Compile(context.Background(), "campaign-01", Options{
 		Audio:      true,
-		OnProgress: func(format string, args ...interface{}) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
+		OnProgress: func(format string, args ...any) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
 	})
 	if err != nil {
 		t.Fatalf("Compile failed: %v", err)
@@ -276,7 +276,7 @@ func TestCompileWarnsWhenAResolverReportsNoAudio(t *testing.T) {
 	var warnings []string
 	script, err := compiler.Compile(context.Background(), "campaign-01", Options{
 		Audio:      true,
-		OnProgress: func(format string, args ...interface{}) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
+		OnProgress: func(format string, args ...any) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
 	})
 	if err != nil {
 		t.Fatalf("Compile failed: %v", err)
@@ -391,7 +391,7 @@ func TestCompileReportsWhyBeatsAreSilent(t *testing.T) {
 	var warnings []string
 	if _, err := compiler.Compile(context.Background(), "campaign-01", Options{
 		Audio:      true,
-		OnProgress: func(format string, args ...interface{}) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
+		OnProgress: func(format string, args ...any) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
 	}); err != nil {
 		t.Fatalf("Compile failed: %v", err)
 	}
@@ -412,7 +412,7 @@ func TestCompileReportsAMissingSpeechProvider(t *testing.T) {
 	var warnings []string
 	if _, err := NewCompiler(twoLocationSource()).Compile(context.Background(), "campaign-01", Options{
 		Audio:      true,
-		OnProgress: func(format string, args ...interface{}) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
+		OnProgress: func(format string, args ...any) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
 	}); err != nil {
 		t.Fatalf("Compile failed: %v", err)
 	}
@@ -436,7 +436,7 @@ func TestCompileReportsAudioCoverageByKind(t *testing.T) {
 	var warnings []string
 	if _, err := compiler.Compile(context.Background(), "campaign-01", Options{
 		Audio:      true,
-		OnProgress: func(format string, args ...interface{}) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
+		OnProgress: func(format string, args ...any) { warnings = append(warnings, fmt.Sprintf(format, args...)) },
 	}); err != nil {
 		t.Fatalf("Compile failed: %v", err)
 	}
@@ -471,7 +471,7 @@ func TestCompileCountsSceneCardsApartFromSpokenBeats(t *testing.T) {
 	var coverage string
 	if _, err := compiler.Compile(context.Background(), "campaign-01", Options{
 		Audio: true,
-		OnProgress: func(format string, args ...interface{}) {
+		OnProgress: func(format string, args ...any) {
 			if line := fmt.Sprintf(format, args...); strings.HasPrefix(line, "audio:") {
 				coverage = line
 			}
@@ -534,7 +534,7 @@ func TestCompileLeavesUnspokenBeatsOutOfTheCounts(t *testing.T) {
 	var warnings []string
 	if _, err := compiler.Compile(context.Background(), "campaign-01", Options{
 		Audio: true,
-		OnProgress: func(format string, args ...interface{}) {
+		OnProgress: func(format string, args ...any) {
 			line := fmt.Sprintf(format, args...)
 			if strings.HasPrefix(line, "audio:") {
 				coverage = line

@@ -118,13 +118,13 @@ func (m *Manager) registerDefaultSpecs() {
 	}
 
 	m.specs[EmbeddingEncoderModelID] = ModelSpec{
-		ID:          EmbeddingEncoderModelID,
-		Name:        "BGE Small Encoder",
-		URL:         "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/onnx/model_quantized.onnx",
-		SHA256:      "6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4",
-		SizeBytes:   34235934,
-		Subdir:      filepath.Join("embeddings", "bge-small-en-v1.5"),
-		Variant:     EmbeddingEncoderVariant,
+		ID:        EmbeddingEncoderModelID,
+		Name:      "BGE Small Encoder",
+		URL:       "https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/main/onnx/model_quantized.onnx",
+		SHA256:    "6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4",
+		SizeBytes: 34235934,
+		Subdir:    filepath.Join("embeddings", "bge-small-en-v1.5"),
+		Variant:   EmbeddingEncoderVariant,
 		RequiredFiles: []string{
 			"model.onnx",
 			"vocab.txt",

@@ -106,4 +106,3 @@ func TestWrapPCMAsWAV_InvalidSampleRate(t *testing.T) {
 		t.Fatal("expected a RIFF header")
 	}
 }
-

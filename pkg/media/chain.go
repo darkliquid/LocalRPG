@@ -99,7 +99,7 @@ func mediaDescriptor(family, name string, cfg *config.Config) (provider.Tier, []
 // familyKnows reports whether a name is the family default or a configured entry
 // of that family. It is what lets a stale chain name be dropped rather than
 // silently resolving to the default, because TTSFor and its siblings fall back.
-func familyKnows[V interface{}](providers map[string]V, name string) bool {
+func familyKnows[V any](providers map[string]V, name string) bool {
 	if name == config.ReservedProviderName {
 		return true
 	}

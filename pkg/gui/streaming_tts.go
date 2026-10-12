@@ -241,7 +241,7 @@ func (s *sentenceStreamer) synthesizeUnit(job synthesisJob) {
 	unit := job.unit
 	path, err := s.pipeline.SynthesizeProvisional(s.ctx, unit.Kind, unit.SpeakerID, unit.Text, s.voiceForUnit(unit))
 	if err != nil {
-		s.logger.Event("media.tts.provisional_error", map[string]interface{}{"error": err.Error()})
+		s.logger.Event("media.tts.provisional_error", map[string]any{"error": err.Error()})
 		s.completeJob(jobResult{seq: job.seq, err: err})
 		return
 	}
@@ -259,7 +259,7 @@ func (s *sentenceStreamer) synthesizeGroup(job synthesisJob) {
 	lines := job.group
 	groups, err := s.pipeline.SynthesizeGroups(s.ctx, []media.ClipGroup{{Lines: lines}})
 	if err != nil || len(groups) == 0 {
-		s.logger.Event("media.tts.provisional_error", map[string]interface{}{"error": "synthesize group"})
+		s.logger.Event("media.tts.provisional_error", map[string]any{"error": "synthesize group"})
 		s.completeJob(jobResult{seq: job.seq, err: errors.New("synthesize group failed")})
 		return
 	}

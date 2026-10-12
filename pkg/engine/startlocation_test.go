@@ -39,7 +39,7 @@ func TestResolveStartLocationPrefersPinnedSetting(t *testing.T) {
 		ID:       "campaign",
 		WorldID:  "realm",
 		Player:   "hero",
-		Settings: map[string]interface{}{StartLocationSetting: "market"},
+		Settings: map[string]any{StartLocationSetting: "market"},
 	}
 
 	got, err := ResolveStartLocation(nil, store, manifest)

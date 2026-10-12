@@ -11,12 +11,12 @@ import (
 // map to persist, omitted when empty, and human warnings for the UI. Canonical
 // values are bool, float64, int, or string only, so YAML and JSON round-trips
 // stay stable.
-func ValidateVoiceOptions(schema []VoiceOption, values map[string]interface{}) (map[string]interface{}, []string) {
+func ValidateVoiceOptions(schema []VoiceOption, values map[string]any) (map[string]any, []string) {
 	if len(values) == 0 {
 		return nil, nil
 	}
 
-	canonical := make(map[string]interface{})
+	canonical := make(map[string]any)
 	warnings := make([]string, 0)
 
 	for _, option := range schema {
@@ -53,7 +53,7 @@ func hasVoiceOption(schema []VoiceOption, key string) bool {
 	return false
 }
 
-func coerceVoiceOption(option VoiceOption, raw interface{}) (interface{}, string) {
+func coerceVoiceOption(option VoiceOption, raw any) (any, string) {
 	switch option.Kind {
 	case "float":
 		value, ok := optionFloat(raw)
@@ -105,7 +105,7 @@ func clampVoiceOption(value float64, option VoiceOption) float64 {
 	return value
 }
 
-func optionFloat(raw interface{}) (float64, bool) {
+func optionFloat(raw any) (float64, bool) {
 	switch value := raw.(type) {
 	case float64:
 		return value, true
@@ -122,12 +122,12 @@ func optionFloat(raw interface{}) (float64, bool) {
 	}
 }
 
-func optionBool(raw interface{}) (bool, bool) {
+func optionBool(raw any) (bool, bool) {
 	value, ok := raw.(bool)
 	return value, ok
 }
 
-func optionString(raw interface{}) (string, bool) {
+func optionString(raw any) (string, bool) {
 	value, ok := raw.(string)
 	return value, ok
 }

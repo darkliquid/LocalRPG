@@ -20,10 +20,10 @@ type ContentLock struct {
 
 // LockEntry is one resolved content dependency and its behavioural digest.
 type LockEntry struct {
-	Type    string `yaml:"type"`    // "system" | "world"
+	Type    string `yaml:"type"` // "system" | "world"
 	ID      string `yaml:"id"`
 	Version string `yaml:"version"`
-	SHA256  string `yaml:"sha256"`  // behavioural digest
+	SHA256  string `yaml:"sha256"` // behavioural digest
 }
 
 // FindEntry returns the entry for the given type and ID, if present.

@@ -32,8 +32,8 @@ func isComfyUI(endpoint string) bool {
 }
 
 // usageFromBody overrides the estimated usage when the JSON body carries one.
-func (h *httpImageClient) usageFromBody(body map[string]interface{}) {
-	usage, ok := body["usage"].(map[string]interface{})
+func (h *httpImageClient) usageFromBody(body map[string]any) {
+	usage, ok := body["usage"].(map[string]any)
 	if !ok {
 		return
 	}
@@ -83,62 +83,62 @@ func (c *comfyUIImageClient) setLastUsage(u media.Usage) {
 func (c *comfyUIImageClient) GenerateImage(ctx context.Context, prompt string) ([]byte, error) {
 	baseURL := getComfyBaseURL(c.endpoint)
 
-	workflow := map[string]interface{}{
-		"prompt": map[string]interface{}{
-			"3": map[string]interface{}{
-				"inputs": map[string]interface{}{
+	workflow := map[string]any{
+		"prompt": map[string]any{
+			"3": map[string]any{
+				"inputs": map[string]any{
 					"seed":         156680208700286,
 					"steps":        20,
 					"cfg":          8,
 					"sampler_name": "euler",
 					"scheduler":    "normal",
 					"denoise":      1,
-					"model":        []interface{}{"4", 0},
-					"positive":     []interface{}{"6", 0},
-					"negative":     []interface{}{"7", 0},
-					"latent_image": []interface{}{"5", 0},
+					"model":        []any{"4", 0},
+					"positive":     []any{"6", 0},
+					"negative":     []any{"7", 0},
+					"latent_image": []any{"5", 0},
 				},
 				"class_type": "KSampler",
 			},
-			"4": map[string]interface{}{
-				"inputs": map[string]interface{}{
+			"4": map[string]any{
+				"inputs": map[string]any{
 					"ckpt_name": "v1-5-pruned-emaonly.ckpt",
 				},
 				"class_type": "CheckpointLoaderSimple",
 			},
-			"5": map[string]interface{}{
-				"inputs": map[string]interface{}{
+			"5": map[string]any{
+				"inputs": map[string]any{
 					"width":      512,
 					"height":     512,
 					"batch_size": 1,
 				},
 				"class_type": "EmptyLatentImage",
 			},
-			"6": map[string]interface{}{
-				"inputs": map[string]interface{}{
+			"6": map[string]any{
+				"inputs": map[string]any{
 					"text": prompt,
-					"clip": []interface{}{"4", 1},
+					"clip": []any{"4", 1},
 				},
 				"class_type": "CLIPTextEncode",
 			},
-			"7": map[string]interface{}{
-				"inputs": map[string]interface{}{
+			"7": map[string]any{
+				"inputs": map[string]any{
 					"text": "bad quality, blurry",
-					"clip": []interface{}{"4", 1},
+					"clip": []any{"4", 1},
 				},
 				"class_type": "CLIPTextEncode",
 			},
-			"8": map[string]interface{}{
-				"inputs": map[string]interface{}{
-					"samples": []interface{}{"3", 0},
-					"vae":     []interface{}{"4", 2},
+			"8": map[string]any{
+				"inputs": map[string]any{
+					"samples": []any{"3", 0},
+					"vae":     []any{"4", 2},
 				},
 				"class_type": "VAEDecode",
 			},
-			"9": map[string]interface{}{
-				"inputs": map[string]interface{}{
+			"9": map[string]any{
+				"inputs": map[string]any{
 					"filename_prefix": "LocalRPG",
-					"images":          []interface{}{"8", 0},
+					"images":          []any{"8", 0},
 				},
 				"class_type": "SaveImage",
 			},
@@ -201,18 +201,18 @@ func (c *comfyUIImageClient) GenerateImage(ctx context.Context, prompt string) (
 				continue
 			}
 
-			var histData map[string]interface{}
+			var histData map[string]any
 			err = json.NewDecoder(histResp.Body).Decode(&histData)
 			histResp.Body.Close()
 			if err != nil {
 				continue
 			}
 
-			pData, ok := histData[promptResp.PromptID].(map[string]interface{})
+			pData, ok := histData[promptResp.PromptID].(map[string]any)
 			if !ok {
 				continue
 			}
-			outputs, ok := pData["outputs"].(map[string]interface{})
+			outputs, ok := pData["outputs"].(map[string]any)
 			if !ok {
 				continue
 			}
@@ -220,15 +220,15 @@ func (c *comfyUIImageClient) GenerateImage(ctx context.Context, prompt string) (
 			var filename, subfolder, imgType string
 			found := false
 			for _, nodeOut := range outputs {
-				nodeMap, ok := nodeOut.(map[string]interface{})
+				nodeMap, ok := nodeOut.(map[string]any)
 				if !ok {
 					continue
 				}
-				images, ok := nodeMap["images"].([]interface{})
+				images, ok := nodeMap["images"].([]any)
 				if !ok || len(images) == 0 {
 					continue
 				}
-				imgMap, ok := images[0].(map[string]interface{})
+				imgMap, ok := images[0].(map[string]any)
 				if !ok {
 					continue
 				}
@@ -304,7 +304,7 @@ func (h *httpImageClient) GenerateImage(ctx context.Context, prompt string) ([]b
 
 	var payload []byte
 	if strings.Contains(h.endpoint, "/sdapi/v1/txt2img") {
-		payload, _ = json.Marshal(map[string]interface{}{
+		payload, _ = json.Marshal(map[string]any{
 			"prompt":          prompt,
 			"negative_prompt": "blurry, low quality, deformed",
 			"steps":           20,
@@ -312,7 +312,7 @@ func (h *httpImageClient) GenerateImage(ctx context.Context, prompt string) ([]b
 			"height":          512,
 		})
 	} else {
-		payloadMap := map[string]interface{}{
+		payloadMap := map[string]any{
 			"prompt":          prompt,
 			"n":               1,
 			"size":            "512x512",
@@ -355,14 +355,14 @@ func (h *httpImageClient) GenerateImage(ctx context.Context, prompt string) ([]b
 	}
 
 	// 2. Parse JSON response
-	var respData map[string]interface{}
+	var respData map[string]any
 	if err := json.Unmarshal(bodyBytes, &respData); err != nil {
 		return bodyBytes, nil
 	}
 	h.usageFromBody(respData)
 
 	// AUTOMATIC1111 / Forge WebUI: {"images": ["base64..."]}
-	if images, ok := respData["images"].([]interface{}); ok && len(images) > 0 {
+	if images, ok := respData["images"].([]any); ok && len(images) > 0 {
 		if imgStr, ok := images[0].(string); ok {
 			if idx := strings.Index(imgStr, ","); idx != -1 && strings.HasPrefix(imgStr, "data:") {
 				imgStr = imgStr[idx+1:]
@@ -376,8 +376,8 @@ func (h *httpImageClient) GenerateImage(ctx context.Context, prompt string) ([]b
 	}
 
 	// OpenAI format: {"data": [{"b64_json": "..."} | {"url": "..."}]}
-	if data, ok := respData["data"].([]interface{}); ok && len(data) > 0 {
-		if item, ok := data[0].(map[string]interface{}); ok {
+	if data, ok := respData["data"].([]any); ok && len(data) > 0 {
+		if item, ok := data[0].(map[string]any); ok {
 			if b64, ok := item["b64_json"].(string); ok && b64 != "" {
 				decoded, err := base64.StdEncoding.DecodeString(b64)
 				if err != nil {

@@ -229,4 +229,3 @@ func TestInitGameRejectsInvalidIDs(t *testing.T) {
 		t.Errorf("InitGame expected invalid world id error, got %v", err)
 	}
 }
-

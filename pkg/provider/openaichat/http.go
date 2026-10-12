@@ -115,9 +115,9 @@ type openAIToolSpec struct {
 }
 
 type openAIFunctionSpec struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Parameters  map[string]interface{} `json:"parameters,omitempty"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
 }
 
 type openAIMessage struct {
@@ -274,7 +274,7 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 	// The prompt is recorded once, on context.assembled; the hash and length here
 	// let a reader tie the two together without a second copy of the text.
 	h.logger = trace.OrNil(h.logger)
-	h.logger.Event("provider.request", map[string]interface{}{
+	h.logger.Event("provider.request", map[string]any{
 		"role":          h.id,
 		"kind":          "http",
 		"model":         h.model,
@@ -310,7 +310,7 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 
 	resp, err := h.client.Do(httpReq)
 	if err != nil {
-		h.logger.Event("provider.error", map[string]interface{}{"role": h.id, "error": err.Error()})
+		h.logger.Event("provider.error", map[string]any{"role": h.id, "error": err.Error()})
 		return fmt.Errorf("http request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -318,14 +318,14 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, provider.MaxProviderDetailBytes))
 		detail := provider.TruncateDetail(body)
-		h.logger.Event("provider.error", map[string]interface{}{
+		h.logger.Event("provider.error", map[string]any{
 			"role":   h.id,
 			"status": resp.Status,
 			"url":    url,
 			"detail": detail,
 		})
 		if allowTools && len(req.Tools) > 0 && resp.StatusCode == http.StatusBadRequest {
-			h.logger.Event("provider.tools", map[string]interface{}{
+			h.logger.Event("provider.tools", map[string]any{
 				"role":     h.id,
 				"offered":  len(req.Tools),
 				"rejected": true,
@@ -348,7 +348,7 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 
 		if h.logger.Enabled(trace.LevelFull) && wireLines < h.chunkLimit() {
 			wireLines++
-			h.logger.Event("provider.wire", map[string]interface{}{
+			h.logger.Event("provider.wire", map[string]any{
 				"role":      h.id,
 				"direction": "recv",
 				"line":      line,
@@ -393,13 +393,13 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 	}
 
 	if err := scanner.Err(); err != nil {
-		h.logger.Event("provider.error", map[string]interface{}{"role": h.id, "error": err.Error()})
+		h.logger.Event("provider.error", map[string]any{"role": h.id, "error": err.Error()})
 		return err
 	}
 	if finishReason == "" {
 		finishReason = "stop"
 	}
-	h.logger.Event("provider.response", map[string]interface{}{
+	h.logger.Event("provider.response", map[string]any{
 		"role":           h.id,
 		"finish_reason":  finishReason,
 		"first_token_ms": firstToken.Milliseconds(),

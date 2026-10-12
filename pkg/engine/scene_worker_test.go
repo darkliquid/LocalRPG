@@ -91,4 +91,3 @@ func TestExtractSceneCue(t *testing.T) {
 		t.Errorf("fallback cue = %q, want %q", fallbackCue, fallbackText)
 	}
 }
-

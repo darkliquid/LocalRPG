@@ -69,7 +69,7 @@ func init() {
 					Order:       5,
 					Label:       "Inworld Frontier Router",
 					Description: "Routes prompts across frontier LLMs with automatic fallbacks.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type":         "builtin",
 						"builtin_name": "inworld",
 						"model":        "inworld/compare-frontier-models",
@@ -79,7 +79,7 @@ func init() {
 				},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var payload harness.ModelBuildPayload
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &payload); err != nil {

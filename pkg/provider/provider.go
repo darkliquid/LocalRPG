@@ -16,7 +16,7 @@ import (
 // interface.
 type Registration struct {
 	Descriptor Descriptor
-	Build      func(ctx context.Context, raw []byte) (interface{}, error)
+	Build      func(ctx context.Context, raw []byte) (any, error)
 }
 
 var (

@@ -25,8 +25,8 @@ func TestRunAssertsState(t *testing.T) {
 		Mechanics: &core.MechanicsSpec{}}
 	sc := Scenario{
 		Name:  "state",
-		Setup: SetupSpec{Player: SetupEntity{Stats: map[string]interface{}{"grit": 2}}},
-		Steps: []Step{{Action: "do", Expect: Expectations{State: map[string]interface{}{"grit": 1}}}},
+		Setup: SetupSpec{Player: SetupEntity{Stats: map[string]any{"grit": 2}}},
+		Steps: []Step{{Action: "do", Expect: Expectations{State: map[string]any{"grit": 1}}}},
 	}
 	if f := Run(sys, sc); len(f) != 0 {
 		t.Fatalf("expected pass, got %+v", f)

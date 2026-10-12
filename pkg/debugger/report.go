@@ -71,7 +71,7 @@ func ExportHTMLReport(report TestReport, destPath string) error {
 }
 
 // ExportJSON writes raw execution logs as JSON.
-func ExportJSON(v interface{}, destPath string) error {
+func ExportJSON(v any, destPath string) error {
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return err
 	}

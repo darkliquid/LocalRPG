@@ -63,4 +63,3 @@ func TestOpenGameStoreRejectsInvalidIDs(t *testing.T) {
 		t.Error("CloseGameStore expected error for traversal gameID, got nil")
 	}
 }
-

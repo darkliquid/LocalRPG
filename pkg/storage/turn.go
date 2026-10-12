@@ -149,7 +149,7 @@ func (s *Store) ListTurnEntitiesByOutcome(entityID, outcome string) ([]int, erro
 	return numbers, rows.Err()
 }
 
-func emptyToNull(value string) interface{} {
+func emptyToNull(value string) any {
 	if value == "" {
 		return nil
 	}
@@ -162,7 +162,7 @@ func (s *Store) ListTurns(limit, offset int) ([]TurnRecord, error) {
 	SELECT number, timestamp, mode, input, narration,
 	       COALESCE(roll_json, ''), COALESCE(checks_json, ''), COALESCE(location, ''), COALESCE(outcome, '')
 	FROM turns ORDER BY number`
-	args := make([]interface{}, 0, 2)
+	args := make([]any, 0, 2)
 	if limit > 0 {
 		query += " LIMIT ? OFFSET ?"
 		args = append(args, limit, offset)
@@ -264,7 +264,7 @@ const turnColumns = "turns.number, turns.timestamp, turns.mode, turns.input, tur
 
 // scanTurn reads one projected turn. Entity links are loaded separately, because a
 // recall excerpt never needs them.
-func scanTurn(scanner interface{ Scan(...interface{}) error }) (TurnRecord, error) {
+func scanTurn(scanner interface{ Scan(...any) error }) (TurnRecord, error) {
 	var record TurnRecord
 	var timestamp string
 	if err := scanner.Scan(
@@ -327,7 +327,7 @@ func (s *Store) TurnsMentioningEntities(entityIDs []string, excludeFromTurn, lim
 	}
 
 	placeholders := make([]string, 0, len(entityIDs))
-	args := make([]interface{}, 0, len(entityIDs)+2)
+	args := make([]any, 0, len(entityIDs)+2)
 	for _, id := range entityIDs {
 		placeholders = append(placeholders, "?")
 		args = append(args, id)
@@ -377,7 +377,7 @@ func (s *Store) EntitiesInTurns(turnNumbers []int) ([]string, error) {
 	}
 
 	placeholders := make([]string, 0, len(turnNumbers))
-	args := make([]interface{}, 0, len(turnNumbers))
+	args := make([]any, 0, len(turnNumbers))
 	for _, number := range turnNumbers {
 		placeholders = append(placeholders, "?")
 		args = append(args, number)

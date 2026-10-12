@@ -99,6 +99,9 @@ jobs:
           name: gui-dist
           path: pkg/gui/dist
 
+      - name: Check formatting
+        run: mise run lint:gofmt
+
       - name: Vet
         run: mise exec -- go vet ./...
 

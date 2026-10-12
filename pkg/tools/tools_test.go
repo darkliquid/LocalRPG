@@ -235,4 +235,3 @@ func TestVoiceTools(t *testing.T) {
 		t.Errorf("expected staged voice for new-scout to be aoede, got %+v", staged["new-scout"])
 	}
 }
-

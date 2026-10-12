@@ -210,4 +210,3 @@ func placeLine(p parts, rng *rand.Rand) string {
 	tmpl := placeLineTemplates[rng.Intn(len(placeLineTemplates))]
 	return fmt.Sprintf(tmpl, loc)
 }
-

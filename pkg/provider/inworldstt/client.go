@@ -91,13 +91,13 @@ func (c *InworldSTTClient) Transcribe(ctx context.Context, audioData []byte) (st
 
 	encoding, payload := encodeAudio(audioData)
 
-	body, err := json.Marshal(map[string]interface{}{
-		"transcribe_config": map[string]interface{}{
+	body, err := json.Marshal(map[string]any{
+		"transcribe_config": map[string]any{
 			"model_id":       c.model,
 			"language":       c.language,
 			"audio_encoding": encoding,
 		},
-		"audio_data": map[string]interface{}{
+		"audio_data": map[string]any{
 			"content": base64.StdEncoding.EncodeToString(payload),
 		},
 	})

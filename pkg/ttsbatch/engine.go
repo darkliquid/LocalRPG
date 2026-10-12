@@ -163,7 +163,7 @@ func (e *Engine) Submit(ctx context.Context, opts Options, groups []media.ClipGr
 	if err := e.jobs.UpsertTTSJob(*job); err != nil {
 		return job, err
 	}
-	trace.OrNil(e.logger).Event("media.tts.batch_submitted", map[string]interface{}{
+	trace.OrNil(e.logger).Event("media.tts.batch_submitted", map[string]any{
 		"job":      handle.ID,
 		"requests": len(reqs),
 	})
@@ -196,7 +196,7 @@ func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) 
 	// is "processed", not "completed" — the download and store still have to run,
 	// and they start now rather than waiting for a restart.
 	_ = e.jobs.UpdateTTSJobStatus(job.ID, "processed", job.Completed, job.FailedKeys)
-	trace.OrNil(e.logger).Event("media.tts.batch_processed", map[string]interface{}{
+	trace.OrNil(e.logger).Event("media.tts.batch_processed", map[string]any{
 		"job":      job.ID,
 		"requests": job.RequestCount,
 	})
@@ -238,7 +238,7 @@ func (e *Engine) finish(ctx context.Context, opts Options, job *storage.TTSJob) 
 	if err := e.jobs.UpdateTTSJobStatus(job.ID, "completed", completed, failed); err != nil {
 		return job, err
 	}
-	trace.OrNil(e.logger).Event("media.tts.batch_result", map[string]interface{}{
+	trace.OrNil(e.logger).Event("media.tts.batch_result", map[string]any{
 		"job":       job.ID,
 		"completed": completed,
 		"failed":    len(failed),

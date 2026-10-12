@@ -44,7 +44,7 @@ func SetLogger(logger trace.Logger) {
 	eventLogger = trace.OrNil(logger)
 }
 
-func logEvent(name string, fields map[string]interface{}) {
+func logEvent(name string, fields map[string]any) {
 	loggerMu.RLock()
 	logger := eventLogger
 	loggerMu.RUnlock()
@@ -89,7 +89,7 @@ func NewProviderFromConfig(cfg config.EmbeddingsConfig) (Provider, error) {
 		if model == "" {
 			model = cfg.Model
 		}
-		raw, _ := json.Marshal(map[string]interface{}{
+		raw, _ := json.Marshal(map[string]any{
 			"endpoint":   url,
 			"api_key":    pCfg.APIKey,
 			"model":      model,
@@ -109,7 +109,7 @@ func NewProviderFromConfig(cfg config.EmbeddingsConfig) (Provider, error) {
 		if model == "" {
 			model = cfg.Model
 		}
-		raw, _ := json.Marshal(map[string]interface{}{
+		raw, _ := json.Marshal(map[string]any{
 			"api_key": pCfg.APIKey,
 			"model":   model,
 		})
@@ -137,7 +137,7 @@ func onnxFromConfig(cfg config.EmbeddingsConfig, pCfg config.EmbeddingProviderCo
 	}
 	p, err := NewONNXProvider(dir)
 	if err != nil {
-		logEvent("model_missing", map[string]interface{}{
+		logEvent("model_missing", map[string]any{
 			"provider": string(provider.KeyEmbeddingONNX),
 			"model":    models.EmbeddingEncoderModelID,
 			"reason":   err.Error(),

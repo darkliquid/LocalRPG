@@ -33,7 +33,7 @@ func TestBridgeRollCountsSuccesses(t *testing.T) {
 }
 
 func TestBridgeReadsAndWritesState(t *testing.T) {
-	b := NewBridge(nil, 1, SetupEntity{Stats: map[string]interface{}{"grit": 2}})
+	b := NewBridge(nil, 1, SetupEntity{Stats: map[string]any{"grit": 2}})
 	if got, _ := b.GetStat(PlayerID, "grit"); toInt(got) != 2 {
 		t.Fatalf("grit = %v, want 2", got)
 	}
@@ -45,7 +45,7 @@ func TestBridgeReadsAndWritesState(t *testing.T) {
 	}
 }
 
-func toInt(value interface{}) int {
+func toInt(value any) int {
 	if n, ok := toFloat(value); ok {
 		return int(n)
 	}

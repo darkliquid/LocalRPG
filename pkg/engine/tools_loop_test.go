@@ -257,4 +257,3 @@ func TestToolLoopUnboundedByDefault(t *testing.T) {
 		t.Errorf("toolRoundCap with explicit 15 = %d, want 15", got)
 	}
 }
-

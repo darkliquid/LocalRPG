@@ -47,19 +47,19 @@ func init() {
 			Presets: []provider.Preset{
 				{ID: "openai", Order: 1, Label: "OpenAI",
 					Description: "OpenAI embeddings through the standard /v1/embeddings endpoint. Needs an API key.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "http", "endpoint": "https://api.openai.com/v1",
 						"model": "text-embedding-3-small",
 					}},
 				{ID: "ollama", Order: 2, Label: "Ollama (local)",
 					Description: "Embeddings from a local Ollama server, through its OpenAI-compatible endpoint. No key and no network beyond your machine.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "http", "endpoint": "http://localhost:11434/v1",
 						"model": "nomic-embed-text",
 					}},
 			},
 		},
-		Build: func(ctx context.Context, raw []byte) (interface{}, error) {
+		Build: func(ctx context.Context, raw []byte) (any, error) {
 			var cfg ClientConfig
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &cfg); err != nil {

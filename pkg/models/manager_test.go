@@ -190,7 +190,6 @@ func TestExtractArchiveRejectsZipSlip(t *testing.T) {
 	}
 }
 
-
 func TestEmbeddingModelSpecIsRegistered(t *testing.T) {
 	m := NewManager(t.TempDir())
 	spec, ok := m.specs[EmbeddingEncoderModelID]

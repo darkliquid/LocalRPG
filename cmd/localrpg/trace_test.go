@@ -15,7 +15,7 @@ func TestStderrLoggerPrintsOneLinePerEvent(t *testing.T) {
 	logger.SetLevel(trace.LevelSummary)
 	logger.SetGame("test-campaign")
 
-	logger.Event("turn.begin", map[string]interface{}{"number": 2, "prompt": "not at summary"})
+	logger.Event("turn.begin", map[string]any{"number": 2, "prompt": "not at summary"})
 
 	line := out.String()
 	if !strings.Contains(line, "trace turn.begin") {
@@ -38,7 +38,7 @@ func TestStderrLoggerIsSilentWhenOff(t *testing.T) {
 	logger.SetWriter(&out)
 	logger.SetLevel(trace.LevelOff)
 
-	logger.Event("turn.begin", map[string]interface{}{"number": 1})
+	logger.Event("turn.begin", map[string]any{"number": 1})
 
 	if out.Len() != 0 {
 		t.Errorf("expected no output at level off, got %q", out.String())

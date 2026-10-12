@@ -47,7 +47,7 @@ func TestJSCheckResolverOverridesSchema(t *testing.T) {
 }
 
 func TestSchemaResolverAppliesSkillAndModifiers(t *testing.T) {
-	actor := &entity.Entity{ID: "hero", State: state.NewState(map[string]interface{}{"might": 2, "stealth": 3})}
+	actor := &entity.Entity{ID: "hero", State: state.NewState(map[string]any{"might": 2, "stealth": 3})}
 	r := SchemaResolver{conventions: core.CheckConventions{Notation: "2d6"}}
 	res, err := r.Resolve(context.Background(), harness.CheckRequest{
 		Stat:      "might",
@@ -114,7 +114,7 @@ func TestSchemaResolverFallsBackWithoutProfile(t *testing.T) {
 }
 
 func TestSchemaResolverStatOnlyIsUnchanged(t *testing.T) {
-	actor := &entity.Entity{ID: "hero", State: state.NewState(map[string]interface{}{"might": 2})}
+	actor := &entity.Entity{ID: "hero", State: state.NewState(map[string]any{"might": 2})}
 	r := SchemaResolver{conventions: core.CheckConventions{Notation: "2d6"}}
 	res, err := r.Resolve(context.Background(), harness.CheckRequest{Stat: "might"}, actor)
 	if err != nil {

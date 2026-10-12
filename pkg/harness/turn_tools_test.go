@@ -39,7 +39,7 @@ func TestParseCheckRequest(t *testing.T) {
 }
 
 func TestRequestCheckSpecAdvertisesSkillAndModifiers(t *testing.T) {
-	props, ok := requestCheckSpec().Parameters["properties"].(map[string]interface{})
+	props, ok := requestCheckSpec().Parameters["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("request_check has no properties object")
 	}
@@ -62,7 +62,7 @@ func TestParseCheckRequestCarriesSkillAndModifiers(t *testing.T) {
 }
 
 func TestRequestCheckSpecAdvertisesProfile(t *testing.T) {
-	props := requestCheckSpec().Parameters["properties"].(map[string]interface{})
+	props := requestCheckSpec().Parameters["properties"].(map[string]any)
 	for _, key := range []string{"profile", "position", "effect"} {
 		if _, ok := props[key]; !ok {
 			t.Fatalf("missing %s parameter", key)
@@ -71,7 +71,7 @@ func TestRequestCheckSpecAdvertisesProfile(t *testing.T) {
 }
 
 func TestProposeCheckSpecAdvertisesProfile(t *testing.T) {
-	props := proposeCheckSpec().Parameters["properties"].(map[string]interface{})
+	props := proposeCheckSpec().Parameters["properties"].(map[string]any)
 	for _, key := range []string{"profile", "position", "effect"} {
 		if _, ok := props[key]; !ok {
 			t.Fatalf("missing %s parameter", key)
@@ -80,14 +80,14 @@ func TestProposeCheckSpecAdvertisesProfile(t *testing.T) {
 }
 
 func TestRequestCheckSpecAdvertisesOpposed(t *testing.T) {
-	props := requestCheckSpec().Parameters["properties"].(map[string]interface{})
+	props := requestCheckSpec().Parameters["properties"].(map[string]any)
 	if _, ok := props["opposed"]; !ok {
 		t.Fatal("missing opposed parameter")
 	}
 }
 
 func TestProposeCheckSpecAdvertisesOpposed(t *testing.T) {
-	props := proposeCheckSpec().Parameters["properties"].(map[string]interface{})
+	props := proposeCheckSpec().Parameters["properties"].(map[string]any)
 	if _, ok := props["opposed"]; !ok {
 		t.Fatal("missing opposed parameter")
 	}

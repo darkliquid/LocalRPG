@@ -60,7 +60,6 @@ type CompletionPolicy struct {
 	Timeout           time.Duration
 }
 
-
 // SetCompletionProvider attaches the provider that finishes a cut-off reply. A
 // nil provider disables the continuation half of recovery, leaving trimming.
 func (o *TurnOrchestrator) SetCompletionProvider(provider harness.ModelProvider) {

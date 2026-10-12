@@ -278,7 +278,7 @@ func (r *Router) traceSelection(role string, chain chainSpec, ordered []string) 
 	if len(ordered) > 0 {
 		selected = ordered[0]
 	}
-	logger.Event("router.select", map[string]interface{}{
+	logger.Event("router.select", map[string]any{
 		"role":     role,
 		"rule":     chain.rule,
 		"tag":      chain.tag,

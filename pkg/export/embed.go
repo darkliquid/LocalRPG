@@ -14,8 +14,8 @@ import (
 
 	xdraw "golang.org/x/image/draw"
 
-	_ "image/gif"
 	_ "golang.org/x/image/webp"
+	_ "image/gif"
 )
 
 // The embedded display size. An illustration larger than this is downscaled to

@@ -41,12 +41,12 @@ func ComputeAudioCacheKeyForVoice(speakerID string, voice *entity.VoiceConfig, t
 	// every utterance under a voice with options shares one key and serves the
 	// same clip, which is what a narrated turn did.
 	payload := struct {
-		Provider   string                 `json:"provider"`
-		VoiceID    string                 `json:"voice_id"`
-		Pitch      float64                `json:"pitch"`
-		SpeechRate float64                `json:"speech_rate"`
-		Options    map[string]interface{} `json:"options"`
-		Text       string                 `json:"text"`
+		Provider   string         `json:"provider"`
+		VoiceID    string         `json:"voice_id"`
+		Pitch      float64        `json:"pitch"`
+		SpeechRate float64        `json:"speech_rate"`
+		Options    map[string]any `json:"options"`
+		Text       string         `json:"text"`
 	}{
 		Provider:   voice.Provider,
 		VoiceID:    voice.VoiceID,

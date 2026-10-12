@@ -47,3 +47,6 @@ todo.txt
 # End-to-end failure artifacts
 test-results/
 pkg/e2e/test-results/
+
+# Frontend coverage output (npm run test:coverage)
+frontend/coverage/

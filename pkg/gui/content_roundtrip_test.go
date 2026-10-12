@@ -22,9 +22,9 @@ func TestContentExportImportRoundTrip(t *testing.T) {
 	}
 
 	files := map[string]string{
-		"world.yaml":        "id: roundtrip_realm\nname: Roundtrip Realm\ndescription: Test export-import roundtrip\n",
-		"prompts/lore.md":   "# The Lore of Roundtrip\nDeep in the mountains...",
-		"entities/hero.md":  "---\nid: hero\nname: Brave Hero\ntype: character\n---\nThe hero lives here.",
+		"world.yaml":       "id: roundtrip_realm\nname: Roundtrip Realm\ndescription: Test export-import roundtrip\n",
+		"prompts/lore.md":  "# The Lore of Roundtrip\nDeep in the mountains...",
+		"entities/hero.md": "---\nid: hero\nname: Brave Hero\ntype: character\n---\nThe hero lives here.",
 	}
 
 	for rel, content := range files {

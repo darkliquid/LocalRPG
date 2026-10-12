@@ -128,12 +128,12 @@ func (r *roster) Voice(id string) *entity.VoiceConfig {
 	}
 	if decl, ok := r.personae[id]; ok {
 		temp := &entity.Entity{
-			ID:          id,
-			Name:        decl.Name,
-			Type:        "character",
-			Gender:      decl.Gender,
-			Body:        decl.Description,
-			Tags:        decl.RoleTags,
+			ID:     id,
+			Name:   decl.Name,
+			Type:   "character",
+			Gender: decl.Gender,
+			Body:   decl.Description,
+			Tags:   decl.RoleTags,
 		}
 		harness.AssignVoiceProfile(temp, r.profiles)
 		return temp.Voice
@@ -229,4 +229,3 @@ func isValidSpeakerName(raw string) bool {
 
 	return true
 }
-

@@ -31,7 +31,7 @@ func init() {
 					Order:       8,
 					Label:       "Cartesia Sonic (Cloud, metered)",
 					Description: "Fast, natural speech via Cartesia Sonic. Set key here or via CARTESIA_API_KEY; charges per request.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type":          "builtin",
 						"builtin_name":  "cartesia",
 						"model":         "sonic-3.6",
@@ -44,7 +44,7 @@ func init() {
 				},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var payload media.TTSBuildPayload
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &payload); err != nil {

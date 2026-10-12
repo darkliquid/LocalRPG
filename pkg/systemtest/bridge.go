@@ -114,7 +114,7 @@ func (b *Bridge) Roll(notation string) (*rules.RollResult, error) {
 }
 
 // GetStat reads a numeric or string stat from the player.
-func (b *Bridge) GetStat(entityID string, path string) (interface{}, error) {
+func (b *Bridge) GetStat(entityID string, path string) (any, error) {
 	ent, err := b.resolve(entityID)
 	if err != nil {
 		return nil, err
@@ -127,13 +127,13 @@ func (b *Bridge) GetStat(entityID string, path string) (interface{}, error) {
 }
 
 // SetStat writes a stat on the player.
-func (b *Bridge) SetStat(entityID string, path string, value interface{}) error {
+func (b *Bridge) SetStat(entityID string, path string, value any) error {
 	ent, err := b.resolve(entityID)
 	if err != nil {
 		return err
 	}
 	if ent.State == nil {
-		ent.InitState(make(map[string]interface{}))
+		ent.InitState(make(map[string]any))
 	}
 	return ent.State.Set(path, value)
 }
@@ -194,7 +194,7 @@ func (b *Bridge) CheckConventions() core.CheckConventions {
 
 // StateValue reads a stat from the bridge's player, for a scenario's state
 // assertions.
-func (b *Bridge) StateValue(path string) (interface{}, bool) {
+func (b *Bridge) StateValue(path string) (any, bool) {
 	if b.player.State == nil {
 		return nil, false
 	}

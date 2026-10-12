@@ -48,12 +48,12 @@ func init() {
 			Presets: []provider.Preset{
 				{ID: "gemini", Order: 1, Label: "Google Gemini",
 					Description: "Gemini embeddings through the Google GenAI API. Uses the shared Gemini key from the Providers tab.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "gemini", "model": "text-embedding-004",
 					}},
 			},
 		},
-		Build: func(ctx context.Context, raw []byte) (interface{}, error) {
+		Build: func(ctx context.Context, raw []byte) (any, error) {
 			var cfg ClientConfig
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &cfg); err != nil {

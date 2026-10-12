@@ -29,7 +29,7 @@ func init() {
 					Order:       5,
 					Label:       "Fish Audio S2 Pro (Local vLLM-Omni)",
 					Description: "Local Fish Audio S2 Pro running via vLLM-Omni on port 8091.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type":          "http",
 						"endpoint":      "http://localhost:8091",
 						"model":         "fishaudio/s2-pro",
@@ -42,7 +42,7 @@ func init() {
 				},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var payload media.TTSBuildPayload
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &payload); err != nil {

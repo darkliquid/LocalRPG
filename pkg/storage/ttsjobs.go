@@ -27,7 +27,7 @@ type TTSJob struct {
 
 // rowScanner is the shared shape of *sql.Row and *sql.Rows.
 type rowScanner interface {
-	Scan(dest ...interface{}) error
+	Scan(dest ...any) error
 }
 
 // UpsertTTSJob inserts or replaces a job record.

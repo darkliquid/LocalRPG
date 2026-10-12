@@ -312,5 +312,3 @@ func TestDockSpyLandmarks(t *testing.T) {
 		t.Error("a documentation article carries a scroll landmark, so the dock would track it")
 	}
 }
-
-

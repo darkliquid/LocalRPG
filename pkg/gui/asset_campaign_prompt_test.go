@@ -36,7 +36,7 @@ func TestCampaignArtPromptUsesCampaignMaterial(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := svc.UpdateGameSettings(context.Background(), gameID, map[string]interface{}{
+	if err := svc.UpdateGameSettings(context.Background(), gameID, map[string]any{
 		"start_location": "The Salted Anchor",
 		"opening_prompt": "A storm batters the harbour.",
 	}); err != nil {

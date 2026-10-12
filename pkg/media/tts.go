@@ -280,7 +280,7 @@ func (p *TTSPipeline) clipUnits(segment entity.TurnSegment, narratorVoice *entit
 	}
 	if spoken != segment.Text {
 		logger := trace.OrNil(p.logger)
-		logger.Event("media.tts.reduced", map[string]interface{}{
+		logger.Event("media.tts.reduced", map[string]any{
 			"chars_raw":    len([]rune(segment.Text)),
 			"chars_spoken": len([]rune(spoken)),
 		})
@@ -442,7 +442,8 @@ func (p *TTSPipeline) CountUncachedGroups(groups []ClipGroup) (cached, uncached 
 
 // LastUsage reports what the most recent synthesis consumed. A cache hit or a
 // provider that reports nothing yields the zero value.
-func (p *TTSPipeline) LastUsage() Usage {	p.flightMu.Lock()
+func (p *TTSPipeline) LastUsage() Usage {
+	p.flightMu.Lock()
 	defer p.flightMu.Unlock()
 	return p.lastUsage
 }
@@ -496,7 +497,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 		}
 	}
 	logger := trace.OrNil(p.logger)
-	logger.Event("media.tts.request", map[string]interface{}{
+	logger.Event("media.tts.request", map[string]any{
 		"speaker":   speakerID,
 		"voice_id":  voiceID,
 		"provider":  provider,
@@ -512,7 +513,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 			mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "hit")))
 			mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
 				otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", true)))
-			logger.Event("media.tts.result", map[string]interface{}{
+			logger.Event("media.tts.result", map[string]any{
 				"cache_hit":   true,
 				"duration_ms": time.Since(start).Milliseconds(),
 			})
@@ -536,7 +537,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 	audioBytes, err := p.client.Synthesize(ctx, text, voice)
 	if err != nil {
 		code := harness.ClassifyProviderError(err)
-		logger.Event("media.tts.error", map[string]interface{}{
+		logger.Event("media.tts.error", map[string]any{
 			"speaker":  speakerID,
 			"provider": provider,
 			"code":     string(code),
@@ -578,7 +579,7 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 	mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
 		otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", false)))
 
-	logger.Event("media.tts.result", map[string]interface{}{
+	logger.Event("media.tts.result", map[string]any{
 		"cache_hit":    false,
 		"bytes":        len(encoded),
 		"content_type": "audio/ogg",
@@ -674,7 +675,7 @@ func (p *TTSPipeline) synthesizeGroup(ctx context.Context, group ClipGroup, forc
 	}
 
 	logger := trace.OrNil(p.logger)
-	logger.Event("media.tts.group_request", map[string]interface{}{
+	logger.Event("media.tts.group_request", map[string]any{
 		"speaker":   groupSpeakerLabel(group.Lines),
 		"provider":  provider,
 		"model":     model,
@@ -700,7 +701,7 @@ func (p *TTSPipeline) synthesizeGroup(ctx context.Context, group ClipGroup, forc
 	audio, err := p.renderGroupAudio(ctx, group)
 	if err != nil {
 		code := harness.ClassifyProviderError(err)
-		logger.Event("media.tts.group_error", map[string]interface{}{
+		logger.Event("media.tts.group_error", map[string]any{
 			"provider": provider,
 			"code":     string(code),
 			"error":    err.Error(),
@@ -770,7 +771,7 @@ func (p *TTSPipeline) storeGroupClip(ctx context.Context, key string, audio []by
 	mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
 		otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", false)))
 
-	trace.OrNil(p.logger).Event("media.tts.result", map[string]interface{}{
+	trace.OrNil(p.logger).Event("media.tts.result", map[string]any{
 		"cache_hit":    false,
 		"bytes":        len(encoded),
 		"content_type": "audio/ogg",

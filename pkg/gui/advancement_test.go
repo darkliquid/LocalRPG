@@ -54,7 +54,7 @@ mechanics:
 		t.Fatalf("parse player note: %v", err)
 	}
 	if player.State == nil {
-		player.InitState(map[string]interface{}{})
+		player.InitState(map[string]any{})
 	}
 	if err := player.State.Set("xp", 5); err != nil {
 		t.Fatal(err)

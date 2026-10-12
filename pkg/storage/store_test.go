@@ -25,7 +25,7 @@ func TestStorageOperations(t *testing.T) {
 		Wikilinks: []string{"Eldoria"},
 		Hash:      "hash-123",
 	}
-	ent.InitState(map[string]interface{}{"cozy": true})
+	ent.InitState(map[string]any{"cozy": true})
 
 	if err := store.SaveEntity(ent); err != nil {
 		t.Fatalf("SaveEntity failed: %v", err)

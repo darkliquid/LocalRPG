@@ -96,9 +96,9 @@ func SetImageBudget(manifest *core.GameManifest, budget ImageBudget) {
 		return
 	}
 	if manifest.Settings == nil {
-		manifest.Settings = map[string]interface{}{}
+		manifest.Settings = map[string]any{}
 	}
-	manifest.Settings[ImageBudgetSetting] = map[string]interface{}{
+	manifest.Settings[ImageBudgetSetting] = map[string]any{
 		"max_images":   budget.MaxImages,
 		"max_micros":   budget.MaxMicros,
 		"used_images":  budget.Used,
@@ -127,7 +127,7 @@ func SetImageApprovalMode(manifest *core.GameManifest, mode string) {
 		return
 	}
 	if manifest.Settings == nil {
-		manifest.Settings = map[string]interface{}{}
+		manifest.Settings = map[string]any{}
 	}
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case ImageApprovalAsk:

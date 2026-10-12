@@ -26,7 +26,7 @@ func (f fakeBridge) GetEntity(id string) (*entity.Entity, error) {
 	return nil, fmt.Errorf("unknown entity %q", id)
 }
 
-func (f fakeBridge) GetStat(entityID, path string) (interface{}, error) {
+func (f fakeBridge) GetStat(entityID, path string) (any, error) {
 	ent, ok := f.entities[entityID]
 	if !ok || ent.State == nil {
 		return nil, fmt.Errorf("unknown entity %q", entityID)
@@ -82,7 +82,7 @@ func TestOpposedIsSymmetric(t *testing.T) {
 
 func TestSchemaResolverOpposedSumsTheOpponentStat(t *testing.T) {
 	actor := &entity.Entity{ID: "hero"}
-	opponent := &entity.Entity{ID: "ogre", State: state.NewState(map[string]interface{}{"might": 4})}
+	opponent := &entity.Entity{ID: "ogre", State: state.NewState(map[string]any{"might": 4})}
 	bridge := fakeBridge{entities: map[string]*entity.Entity{"ogre": opponent}}
 	r := SchemaResolver{bridge: bridge, conventions: core.CheckConventions{
 		Notation: "1d1",
@@ -106,7 +106,7 @@ func TestSchemaResolverOpposedSumsTheOpponentStat(t *testing.T) {
 
 func TestSchemaResolverOpposedTieFollowsTheProfile(t *testing.T) {
 	actor := &entity.Entity{ID: "hero"}
-	opponent := &entity.Entity{ID: "ogre", State: state.NewState(map[string]interface{}{"might": 0})}
+	opponent := &entity.Entity{ID: "ogre", State: state.NewState(map[string]any{"might": 0})}
 	bridge := fakeBridge{entities: map[string]*entity.Entity{"ogre": opponent}}
 	r := SchemaResolver{bridge: bridge, conventions: core.CheckConventions{
 		Notation: "1d1",

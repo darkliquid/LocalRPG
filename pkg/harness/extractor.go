@@ -455,7 +455,7 @@ func (e *Extractor) Extract(ctx context.Context, narrativeOutput string) (*Extra
 	}
 
 	e.logger = trace.OrNil(e.logger)
-	e.logger.Event("extraction.request", map[string]interface{}{
+	e.logger.Event("extraction.request", map[string]any{
 		"role":         e.id,
 		"prompt":       narrativeOutput,
 		"prompt_chars": len([]rune(narrativeOutput)),
@@ -463,7 +463,7 @@ func (e *Extractor) Extract(ctx context.Context, narrativeOutput string) (*Extra
 
 	res, err := e.model.Generate(ctx, req)
 	if err != nil {
-		e.logger.Event("provider.error", map[string]interface{}{"role": e.id, "error": err.Error()})
+		e.logger.Event("provider.error", map[string]any{"role": e.id, "error": err.Error()})
 		return nil, fmt.Errorf("extractor model failed: %w", err)
 	}
 	if res != nil && res.Usage != nil && e.recorder != nil {
@@ -484,7 +484,7 @@ func (e *Extractor) Extract(ctx context.Context, narrativeOutput string) (*Extra
 		if err := decodeExtractedJSON(raw, &result); err != nil {
 			return nil, fmt.Errorf("parse extracted json %q: %w", raw, err)
 		}
-		e.logger.Event("extraction.result", map[string]interface{}{
+		e.logger.Event("extraction.result", map[string]any{
 			"role":            e.id,
 			"entities":        len(result.Entities),
 			"dialogue":        len(result.Dialogue),
@@ -503,7 +503,7 @@ func (e *Extractor) Extract(ctx context.Context, narrativeOutput string) (*Extra
 
 // decodeExtractedJSON decodes a JSON value a model returned, repairing fences,
 // surrounding prose, and unclosed structure first.
-func decodeExtractedJSON(payload []byte, v interface{}) error {
+func decodeExtractedJSON(payload []byte, v any) error {
 	res := jsonrepair.Repair(payload)
 	if !res.OK {
 		return fmt.Errorf("parse extracted json: not valid JSON")

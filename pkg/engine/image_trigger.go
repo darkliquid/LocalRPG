@@ -159,7 +159,7 @@ func (o *TurnOrchestrator) shouldIllustrate(turn Turn, pastTurns []Turn) bool {
 	}
 	ok, reason := ShouldIllustrate(turn, prev, cfg)
 	if ok && o.logger != nil {
-		o.logger.Event("scene.illustrate", map[string]interface{}{"reason": reason})
+		o.logger.Event("scene.illustrate", map[string]any{"reason": reason})
 	}
 	return ok
 }
@@ -173,7 +173,7 @@ func (o *TurnOrchestrator) majorSceneChange(turn Turn, pastTurns []Turn) bool {
 	}
 	ok, reason := MajorSceneChange(turn, pastTurns, cfg)
 	if ok && o.logger != nil {
-		o.logger.Event("scene.illustrate", map[string]interface{}{"reason": reason})
+		o.logger.Event("scene.illustrate", map[string]any{"reason": reason})
 	}
 	return ok
 }

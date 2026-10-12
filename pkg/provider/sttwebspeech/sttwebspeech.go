@@ -21,12 +21,12 @@ func init() {
 			Presets: []provider.Preset{
 				{ID: "web-speech", Order: 1, Label: "Web Speech API (Browser Native)",
 					Description: "Zero-setup, real-time speech recognition in a Chromium browser window; there is no backend client.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "web-speech",
 					}},
 			},
 		},
-		Build: func(_ context.Context, _ []byte) (interface{}, error) {
+		Build: func(_ context.Context, _ []byte) (any, error) {
 			return media.NewWebSpeechSTTProvider(), nil
 		},
 	})

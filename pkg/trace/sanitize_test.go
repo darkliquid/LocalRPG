@@ -7,7 +7,7 @@ import (
 )
 
 func TestSanitizeRedactsSecretsAtEveryLevel(t *testing.T) {
-	fields := map[string]interface{}{
+	fields := map[string]any{
 		"role":     "gm",
 		"api_key":  "sk-live-1234567890",
 		"endpoint": "http://localhost:8880",
@@ -25,11 +25,11 @@ func TestSanitizeRedactsSecretsAtEveryLevel(t *testing.T) {
 }
 
 func TestSanitizeRedactsNestedSecrets(t *testing.T) {
-	fields := map[string]interface{}{
-		"config": map[string]interface{}{
-			"provider": map[string]interface{}{"authorization": "Bearer abc", "model": "kokoro"},
+	fields := map[string]any{
+		"config": map[string]any{
+			"provider": map[string]any{"authorization": "Bearer abc", "model": "kokoro"},
 		},
-		"attempts": []interface{}{map[string]interface{}{"token": "abc"}},
+		"attempts": []any{map[string]any{"token": "abc"}},
 	}
 
 	clean := Sanitize(fields, LevelFull, 20000)
@@ -48,7 +48,7 @@ func TestSanitizeRedactsNestedSecrets(t *testing.T) {
 }
 
 func TestSanitizeOmitsPayloadsAtSummaryAndKeepsThemAtFull(t *testing.T) {
-	fields := map[string]interface{}{"prompt": "the whole question", "prompt_chars": 19}
+	fields := map[string]any{"prompt": "the whole question", "prompt_chars": 19}
 
 	summary := Sanitize(fields, LevelSummary, 20000)
 	if _, present := summary["prompt"]; present {
@@ -65,7 +65,7 @@ func TestSanitizeOmitsPayloadsAtSummaryAndKeepsThemAtFull(t *testing.T) {
 }
 
 func TestSanitizeTruncatesLongStringsWithAMarker(t *testing.T) {
-	fields := map[string]interface{}{"prompt": strings.Repeat("a", 50)}
+	fields := map[string]any{"prompt": strings.Repeat("a", 50)}
 
 	clean := Sanitize(fields, LevelFull, 10)
 	text, ok := clean["prompt"].(string)
@@ -83,7 +83,7 @@ func TestSanitizeTruncatesLongStringsWithAMarker(t *testing.T) {
 func TestSanitizeKeepsCacheKeys(t *testing.T) {
 	// A cache key is a content hash. Redacting anything named "key" would hide
 	// exactly the value needed to find the cached clip.
-	fields := map[string]interface{}{"cache_key": "06e763d1"}
+	fields := map[string]any{"cache_key": "06e763d1"}
 
 	clean := Sanitize(fields, LevelFull, 20000)
 	if clean["cache_key"] != "06e763d1" {

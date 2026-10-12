@@ -597,7 +597,7 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		Progress:       c.progress,
 	}
 	if c.progress == nil {
-		opts.OnProgress = func(format string, args ...interface{}) {
+		opts.OnProgress = func(format string, args ...any) {
 			fmt.Fprintf(os.Stderr, "export: "+format+"\n", args...)
 		}
 	}

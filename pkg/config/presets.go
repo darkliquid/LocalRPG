@@ -101,7 +101,7 @@ var AgentPresets = map[string]AgentRoleConfig{
 	},
 }
 
-func intPtr(i int) *int { return &i }
+func intPtr(i int) *int           { return &i }
 func floatPtr(f float64) *float64 { return &f }
 
 var TTSPresets = map[string]TTSConfig{
@@ -232,14 +232,14 @@ var TTSPresets = map[string]TTSConfig{
 	},
 
 	"inworld-tts": {
-		Type:          "builtin",
-		BuiltinName:   "inworld",
-		Model:         "inworld-tts-2",
-		DefaultVoice:  "Ashley",
-		Pitch:         1.0,
-		SpeechRate:    1.0,
-		AutoPlay:      true,
-		MasterVolume:  1.0,
+		Type:         "builtin",
+		BuiltinName:  "inworld",
+		Model:        "inworld-tts-2",
+		DefaultVoice: "Ashley",
+		Pitch:        1.0,
+		SpeechRate:   1.0,
+		AutoPlay:     true,
+		MasterVolume: 1.0,
 	},
 }
 
@@ -339,7 +339,6 @@ var ImagePresets = map[string]ImageConfig{
 		PersonGeneration: "ALLOW_ADULT",
 	},
 }
-
 
 var KokoroVoiceProfiles = []VoiceProfile{
 	{ID: "af", Name: "Default (American Female)", VoiceID: "af", Pitch: 1.0, SpeechRate: 1.0, Tags: []string{"american", "female", "default", "neutral"}, Description: "The model's stock American female voice."},

@@ -313,4 +313,3 @@ func TestStageEntitiesMergesPreviousIdentity(t *testing.T) {
 		t.Errorf("segment SpeakerID = %q, want valen", turn.Segments[0].SpeakerID)
 	}
 }
-

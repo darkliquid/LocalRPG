@@ -48,7 +48,7 @@ func (o *TurnOrchestrator) applyRecords() ([]harness.PersonaDecl, []harness.Memo
 	moveRef := ""
 	for _, record := range o.parser.Records() {
 		if record.Err != nil {
-			o.logger.Event("turn.record_error", map[string]interface{}{"type": record.Type, "error": record.Err.Error()})
+			o.logger.Event("turn.record_error", map[string]any{"type": record.Type, "error": record.Err.Error()})
 			continue
 		}
 		switch record.Type {
@@ -102,7 +102,7 @@ func (o *TurnOrchestrator) logRepairReport() {
 	if rep.Repaired == 0 && rep.Failed == 0 {
 		return
 	}
-	fields := map[string]interface{}{
+	fields := map[string]any{
 		"repaired": rep.Repaired,
 		"failed":   rep.Failed,
 		"total":    rep.Total,
@@ -110,9 +110,9 @@ func (o *TurnOrchestrator) logRepairReport() {
 	// The individual issues ride along, so the debug trace names what was
 	// repaired or dropped rather than only how many.
 	if report := o.recordReport(); report != nil && len(report.Issues) > 0 {
-		issues := make([]map[string]interface{}, 0, len(report.Issues))
+		issues := make([]map[string]any, 0, len(report.Issues))
 		for _, issue := range report.Issues {
-			issues = append(issues, map[string]interface{}{
+			issues = append(issues, map[string]any{
 				"type":   issue.Type,
 				"repair": issue.Repair,
 				"error":  issue.Error,

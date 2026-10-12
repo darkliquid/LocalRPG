@@ -9,7 +9,7 @@ func TestSanitizeRedactsRegisteredSecretValues(t *testing.T) {
 	const secret = "sk-test-abcdef0123456789"
 	RegisterSecret(secret)
 
-	clean := Sanitize(map[string]interface{}{
+	clean := Sanitize(map[string]any{
 		"headers": "xi-api-key: " + secret + "\ncontent-type: application/json",
 		"note":    "no secret here",
 	}, LevelFull, 20000)

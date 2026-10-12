@@ -39,7 +39,7 @@ func Run(system System, scenario Scenario) []Failure {
 
 	var failures []Failure
 	for i, step := range scenario.Steps {
-		result, err := engine.ExecuteAction(step.Action, map[string]interface{}{
+		result, err := engine.ExecuteAction(step.Action, map[string]any{
 			"action": step.Input,
 			"player": PlayerID,
 			"turn":   1,
@@ -92,7 +92,7 @@ func checkStep(scenario string, step int, bridge *Bridge, result *rules.ActionRe
 		result = &rules.ActionResult{}
 	}
 	var failures []Failure
-	add := func(format string, args ...interface{}) {
+	add := func(format string, args ...any) {
 		failures = append(failures, Failure{Scenario: scenario, Step: step, Detail: fmt.Sprintf(format, args...)})
 	}
 	if expect.Outcome != "" && result.Outcome != expect.Outcome {
@@ -120,7 +120,7 @@ func checkStep(scenario string, step int, bridge *Bridge, result *rules.ActionRe
 	return failures
 }
 
-func valuesEqual(got, want interface{}) bool {
+func valuesEqual(got, want any) bool {
 	if gn, ok := toFloat(got); ok {
 		if wn, ok := toFloat(want); ok {
 			return gn == wn
@@ -129,7 +129,7 @@ func valuesEqual(got, want interface{}) bool {
 	return fmt.Sprint(got) == fmt.Sprint(want)
 }
 
-func toFloat(value interface{}) (float64, bool) {
+func toFloat(value any) (float64, bool) {
 	switch n := value.(type) {
 	case int:
 		return float64(n), true

@@ -174,7 +174,7 @@ func writeSaveError(w http.ResponseWriter, err error, document string) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnprocessableEntity)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"error":  fe.Msg,
 		"line":   fe.Line(document),
 		"column": fe.Column(document),
@@ -557,7 +557,7 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		values := map[string]interface{}{}
+		values := map[string]any{}
 		if patch.OpeningPrompt != nil {
 			values[engine.OpeningPromptSetting] = strings.TrimSpace(*patch.OpeningPrompt)
 		}
@@ -693,7 +693,7 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 			writeGameError(w, err)
 			return
 		}
-		writeJSON(w, map[string]interface{}{"advancement": advancement})
+		writeJSON(w, map[string]any{"advancement": advancement})
 		return
 
 	case "turn":
@@ -866,7 +866,7 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 		case err != nil:
 			writeGameError(w, err)
 		default:
-			writeJSON(w, map[string]interface{}{"audio_urls": clipURLs(clips)})
+			writeJSON(w, map[string]any{"audio_urls": clipURLs(clips)})
 		}
 		return
 
@@ -1045,14 +1045,14 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func writeJSON(w http.ResponseWriter, data interface{}) {
+func writeJSON(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(data)
 }
 
 // writeJSONStatus writes a JSON body with an explicit status, so header
 // handling stays in one place for error envelopes.
-func writeJSONStatus(w http.ResponseWriter, status int, data interface{}) {
+func writeJSONStatus(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(data)

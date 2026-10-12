@@ -18,13 +18,13 @@ import (
 )
 
 type PlayerDTO struct {
-	ID                string                 `json:"id"`
-	Name              string                 `json:"name"`
-	Type              string                 `json:"type"`
-	State             map[string]interface{} `json:"state"`
-	Appearance        string                 `json:"appearance,omitempty"`
-	CurrentAppearance string                 `json:"current_appearance,omitempty"`
-	Voice             *config.VoiceProfile   `json:"voice,omitempty"`
+	ID                string               `json:"id"`
+	Name              string               `json:"name"`
+	Type              string               `json:"type"`
+	State             map[string]any       `json:"state"`
+	Appearance        string               `json:"appearance,omitempty"`
+	CurrentAppearance string               `json:"current_appearance,omitempty"`
+	Voice             *config.VoiceProfile `json:"voice,omitempty"`
 }
 
 type NarrativeArcDTO struct {
@@ -320,13 +320,13 @@ type MemoryDTO struct {
 }
 
 type EntityDTO struct {
-	ID        string                 `json:"id"`
-	Name      string                 `json:"name"`
-	Type      string                 `json:"type"`
-	Markdown  string                 `json:"markdown"`
-	State     map[string]interface{} `json:"state"`
-	Backlinks []string               `json:"backlinks"`
-	History   []int                  `json:"history,omitempty"`
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	Type      string         `json:"type"`
+	Markdown  string         `json:"markdown"`
+	State     map[string]any `json:"state"`
+	Backlinks []string       `json:"backlinks"`
+	History   []int          `json:"history,omitempty"`
 	// Folder is the note's directory under entities/, slash-separated, with "" for
 	// the root.
 	Folder     string `json:"folder,omitempty"`
@@ -950,9 +950,9 @@ type OpenURLRequestDTO struct {
 }
 
 type TestProviderRequestDTO struct {
-	Category   string      `json:"category"` // "llm", "tts", "stt", "image"
-	Provider   interface{} `json:"provider"`
-	TestPrompt string      `json:"test_prompt,omitempty"`
+	Category   string `json:"category"` // "llm", "tts", "stt", "image"
+	Provider   any    `json:"provider"`
+	TestPrompt string `json:"test_prompt,omitempty"`
 	// VoiceID lets a probe audition a catalog voice that has not been saved yet.
 	VoiceID string `json:"voice_id,omitempty"`
 }
@@ -1188,10 +1188,10 @@ type AudioStatusDTO struct {
 // TraceEventDTO is one traced event. The event's own fields are nested rather
 // than flattened so the envelope stays stable as the catalogue grows.
 type TraceEventDTO struct {
-	Time   string                 `json:"ts"`
-	Event  string                 `json:"event"`
-	Level  string                 `json:"level"`
-	Fields map[string]interface{} `json:"fields,omitempty"`
+	Time   string         `json:"ts"`
+	Event  string         `json:"event"`
+	Level  string         `json:"level"`
+	Fields map[string]any `json:"fields,omitempty"`
 }
 
 // STTResponse is the transcription result returned from POST /api/stt.

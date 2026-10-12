@@ -251,7 +251,7 @@ func (p *Player) playStreamerLocked(queue beep.Streamer, closers []io.Closer, cl
 	gain := p.gain
 	p.mu.Unlock()
 
-	logger.Event("audio.play", map[string]interface{}{
+	logger.Event("audio.play", map[string]any{
 		"clips":  clipCount,
 		"volume": gain,
 	})

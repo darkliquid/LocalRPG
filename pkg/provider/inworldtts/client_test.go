@@ -16,7 +16,7 @@ import (
 
 func TestInworldTTSSynthesizeAndAuth(t *testing.T) {
 	var gotAuth string
-	var gotBody map[string]interface{}
+	var gotBody map[string]any
 	fakeAudio := []byte("ID3fake-mp3-audio-bytes")
 	encoded := base64.StdEncoding.EncodeToString(fakeAudio)
 
@@ -24,7 +24,7 @@ func TestInworldTTSSynthesizeAndAuth(t *testing.T) {
 		gotAuth = r.Header.Get("Authorization")
 		_ = json.NewDecoder(r.Body).Decode(&gotBody)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"audioContent": encoded})
+		_ = json.NewEncoder(w).Encode(map[string]any{"audioContent": encoded})
 	}))
 	defer server.Close()
 
@@ -59,13 +59,13 @@ func TestInworldTTSSynthesizeAndAuth(t *testing.T) {
 
 func TestInworldTTSUsesSharedKeyAndDefaultVoice(t *testing.T) {
 	var gotAuth string
-	var gotBody map[string]interface{}
+	var gotBody map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
 		_ = json.NewDecoder(r.Body).Decode(&gotBody)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"audioContent": base64.StdEncoding.EncodeToString([]byte("audio")),
 		})
 	}))
@@ -121,8 +121,8 @@ func TestInworldTTSListVoicesReadsTheCatalogue(t *testing.T) {
 			t.Errorf("voices path = %q, want a /voices suffix", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"voices": []map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"voices": []map[string]any{
 				{"voice_id": "Dennis", "name": "Dennis", "gender": "male"},
 			},
 		})

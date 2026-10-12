@@ -29,7 +29,7 @@ func init() {
 					Order:       8,
 					Label:       "Inworld TTS",
 					Description: "Inworld Cloud TTS using inworld-tts-2. Set key in Providers tab or via INWORLD_API_KEY.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type":          "builtin",
 						"builtin_name":  "inworld",
 						"model":         "inworld-tts-2",
@@ -42,7 +42,7 @@ func init() {
 				},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var payload media.TTSBuildPayload
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &payload); err != nil {

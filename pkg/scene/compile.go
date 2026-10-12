@@ -38,7 +38,7 @@ type Options struct {
 	// BannerPath is the campaign's own image, which a player shows when a scene has
 	// no art: the theatre falls back to it rather than to nothing.
 	BannerPath string
-	OnProgress func(format string, args ...interface{})
+	OnProgress func(format string, args ...any)
 	// Progress reports structured progress for a caller that wants a bar or an
 	// event stream. OnProgress is kept for the CLI's line output.
 	Progress ProgressFunc

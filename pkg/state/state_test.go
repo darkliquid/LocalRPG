@@ -6,13 +6,13 @@ import (
 )
 
 func TestStateGetSet(t *testing.T) {
-	s := NewState(map[string]interface{}{
+	s := NewState(map[string]any{
 		"hp": 100,
-		"stats": map[string]interface{}{
+		"stats": map[string]any{
 			"strength": 14,
 			"agility":  12,
 		},
-		"tags": []interface{}{"warrior", "veteran"},
+		"tags": []any{"warrior", "veteran"},
 	})
 
 	// Direct get

@@ -79,24 +79,24 @@ func TestComputeAudioCacheKeyForVoice(t *testing.T) {
 	})
 
 	t.Run("changing one option changes the key", func(t *testing.T) {
-		low := &entity.VoiceConfig{VoiceID: "af_bella", Pitch: 1, SpeechRate: 1, Options: map[string]interface{}{"stability": 0.35}}
-		high := &entity.VoiceConfig{VoiceID: "af_bella", Pitch: 1, SpeechRate: 1, Options: map[string]interface{}{"stability": 0.8}}
+		low := &entity.VoiceConfig{VoiceID: "af_bella", Pitch: 1, SpeechRate: 1, Options: map[string]any{"stability": 0.35}}
+		high := &entity.VoiceConfig{VoiceID: "af_bella", Pitch: 1, SpeechRate: 1, Options: map[string]any{"stability": 0.8}}
 		if ComputeAudioCacheKeyForVoice("speaker", low, "hello") == ComputeAudioCacheKeyForVoice("speaker", high, "hello") {
 			t.Errorf("expected different keys for different options")
 		}
 	})
 
 	t.Run("insertion order does not change the key", func(t *testing.T) {
-		first := &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]interface{}{"stability": 0.35, "style": 0.2}}
-		second := &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]interface{}{"style": 0.2, "stability": 0.35}}
+		first := &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]any{"stability": 0.35, "style": 0.2}}
+		second := &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]any{"style": 0.2, "stability": 0.35}}
 		if ComputeAudioCacheKeyForVoice("speaker", first, "hello") != ComputeAudioCacheKeyForVoice("speaker", second, "hello") {
 			t.Errorf("expected map order not to change the key")
 		}
 	})
 
 	t.Run("provider distinguishes two voices with the same id", func(t *testing.T) {
-		one := &entity.VoiceConfig{Provider: "builtin:kokoro", VoiceID: "af_bella", Options: map[string]interface{}{"style": 0.2}}
-		two := &entity.VoiceConfig{Provider: "builtin:elevenlabs", VoiceID: "af_bella", Options: map[string]interface{}{"style": 0.2}}
+		one := &entity.VoiceConfig{Provider: "builtin:kokoro", VoiceID: "af_bella", Options: map[string]any{"style": 0.2}}
+		two := &entity.VoiceConfig{Provider: "builtin:elevenlabs", VoiceID: "af_bella", Options: map[string]any{"style": 0.2}}
 		if ComputeAudioCacheKeyForVoice("speaker", one, "hello") == ComputeAudioCacheKeyForVoice("speaker", two, "hello") {
 			t.Errorf("expected the provider to separate the keys")
 		}
@@ -107,7 +107,7 @@ func TestComputeAudioCacheKeyForVoice(t *testing.T) {
 		// every utterance under it must still get its own clip.
 		voice := &entity.VoiceConfig{
 			Provider: "gemini:tts", VoiceID: "Orus", Pitch: 1, SpeechRate: 1,
-			Options: map[string]interface{}{"direction": "audiobook narration, sultry"},
+			Options: map[string]any{"direction": "audiobook narration, sultry"},
 		}
 		first := ComputeAudioCacheKeyForVoice("narrator", voice, "The hall is quiet.")
 		second := ComputeAudioCacheKeyForVoice("narrator", voice, "Garrick nods slowly.")
@@ -121,8 +121,8 @@ func TestPipelineKeyFollowsVoiceOptions(t *testing.T) {
 	cache := NewContentCache(t.TempDir())
 	pipeline := NewTTSPipeline(&echoTTSClient{}, cache)
 
-	low := &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]interface{}{"stability": 0.35}}
-	high := &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]interface{}{"stability": 0.8}}
+	low := &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]any{"stability": 0.35}}
+	high := &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]any{"stability": 0.8}}
 
 	lowKey := ComputeAudioCacheKeyForVoice("speaker", low, "hello")
 	highKey := ComputeAudioCacheKeyForVoice("speaker", high, "hello")

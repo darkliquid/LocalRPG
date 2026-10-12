@@ -40,4 +40,3 @@ func TestCraftProseIsDeterministic(t *testing.T) {
 		t.Fatal("the same prompt should yield the same prose")
 	}
 }
-

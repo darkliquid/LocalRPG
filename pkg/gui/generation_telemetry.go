@@ -53,7 +53,7 @@ func generationMetrics() generationInstruments {
 // startGenerationSpan opens the span for one generation request and logs the
 // request event. The caller must end it. A disabled provider yields a no-op span.
 func startGenerationSpan(ctx context.Context, logger trace.Logger, name, formType, fieldName string) (context.Context, oteltrace.Span) {
-	trace.LogEvent(ctx, trace.OrNil(logger), "generate.request", map[string]interface{}{
+	trace.LogEvent(ctx, trace.OrNil(logger), "generate.request", map[string]any{
 		"span":       name,
 		"form_type":  formType,
 		"field_name": fieldName,
@@ -69,7 +69,7 @@ func startGenerationSpan(ctx context.Context, logger trace.Logger, name, formTyp
 // startImageSpan opens the image span. The image attributes are set on
 // completion, when the provider identity and byte count are known.
 func startImageSpan(ctx context.Context, logger trace.Logger, kind string) (context.Context, oteltrace.Span) {
-	trace.LogEvent(ctx, trace.OrNil(logger), "generate.request", map[string]interface{}{
+	trace.LogEvent(ctx, trace.OrNil(logger), "generate.request", map[string]any{
 		"span":       "generate.image",
 		"form_type":  "image",
 		"field_name": kind,
@@ -100,7 +100,7 @@ func outcomeLabel(failure *harness.GenerationFailure) string {
 // event), marks the span, and records the duration and failure counters.
 func (s *Service) recordGeneration(ctx context.Context, span oteltrace.Span, formType, role string, started time.Time, failure *harness.GenerationFailure) {
 	elapsed := time.Since(started)
-	fields := map[string]interface{}{
+	fields := map[string]any{
 		"form_type":   formType,
 		"role":        role,
 		"outcome":     outcomeLabel(failure),
@@ -136,7 +136,7 @@ func (s *Service) recordGeneration(ctx context.Context, span oteltrace.Span, for
 // events.
 func (s *Service) recordImage(ctx context.Context, span oteltrace.Span, kind, provider string, size int, started time.Time, failure *harness.GenerationFailure) {
 	elapsed := time.Since(started)
-	fields := map[string]interface{}{
+	fields := map[string]any{
 		"form_type":   "image",
 		"field_name":  kind,
 		"provider":    provider,
@@ -205,11 +205,11 @@ func (s *Service) setTextOutcome(span oteltrace.Span, outcome generationOutcome,
 // and the structured failure body, never on the span.
 func (s *Service) recordGenerationAttempts(ctx context.Context, span oteltrace.Span, attempts []harness.Attempt) {
 	for i, attempt := range attempts {
-		trace.LogEvent(ctx, trace.OrNil(s.logger), "generate.attempt", map[string]interface{}{
-			"role":         attempt.Role,
-			"provider":     attempt.Provider,
-			"code":         string(attempt.Code),
-			"duration_ms":  attempt.DurationMS,
+		trace.LogEvent(ctx, trace.OrNil(s.logger), "generate.attempt", map[string]any{
+			"role":        attempt.Role,
+			"provider":    attempt.Provider,
+			"code":        string(attempt.Code),
+			"duration_ms": attempt.DurationMS,
 		})
 		if span != nil {
 			span.AddEvent("attempt", oteltrace.WithAttributes(
