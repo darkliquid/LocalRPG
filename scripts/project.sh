@@ -41,14 +41,22 @@ PROJECT_QUERY='query($id:ID!){ node(id:$id){ ... on ProjectV2 {
   number title
   fields(first:50){ nodes {
     ... on ProjectV2FieldCommon { id name }
-    ... on ProjectV2SingleSelectField { id name options { id name } }
+    ... on ProjectV2SingleSelectField { id name options { id name color description } }
   } }
 } } }'
 
+# FIELDS_TSV holds one row per field, then one row per option, so an option name
+# may contain any character except a tab. Packing the options into one
+# comma-joined column made a name containing a comma unparsable, and the
+# updateProjectV2Field mutation needs each existing option's id (see
+# ensure_option), so the id and colour travel with the name.
+#
+#   field   <field name>   <field id>
+#   option  <field name>   <option id>  <option name>  <colour>  <description>
 resolve() {
   local out
   out="$(ghp api graphql -f query="$PROJECT_QUERY" -f id="$PROJECT_ID" \
-    --jq '.data.node | ("\(.number)\t\(.title)"), (.fields.nodes[] | [.name, .id, ((.options // []) | map("\(.name)=\(.id)") | join(","))] | @tsv)')"
+    --jq '.data.node | ("\(.number)\t\(.title)"), (.fields.nodes[] | ["field", .name, .id] | @tsv), (.fields.nodes[] | .name as $f | (.options // [])[] | ["option", $f, .id, .name, .color, .description] | @tsv)')"
   [ -n "$out" ] || die "project $PROJECT_ID not found (check PROJECT_ID in scripts/project.conf)"
   PROJECT_NUMBER="$(printf '%s\n' "$out" | head -1 | cut -f1)"
   PROJECT_TITLE="$(printf '%s\n' "$out" | head -1 | cut -f2)"
@@ -56,26 +64,25 @@ resolve() {
 }
 
 field_id() { # <field name>
-  printf '%s\n' "$FIELDS_TSV" | awk -F'\t' -v f="$1" '$1==f { print $2; exit }'
+  printf '%s\n' "$FIELDS_TSV" | awk -F'\t' -v f="$1" '$1=="field" && $2==f { print $3; exit }'
 }
 
 option_names() { # <field name>, one per line
-  printf '%s\n' "$FIELDS_TSV" | awk -F'\t' -v f="$1" '
-    $1==f { n=split($3,p,","); for(i=1;i<=n;i++){ split(p[i],kv,"="); if(kv[1]!="") print kv[1] } exit }'
+  printf '%s\n' "$FIELDS_TSV" | awk -F'\t' -v f="$1" '$1=="option" && $2==f { print $4 }'
 }
 
 options_join() { option_names "$1" | awk 'NR>1{printf ", "} {printf "%s", $0}'; }
 
 has_option() { # <field> <option name>
   printf '%s\n' "$FIELDS_TSV" | awk -F'\t' -v f="$1" -v o="$2" '
-    $1==f { n=split($3,p,","); for(i=1;i<=n;i++){ split(p[i],kv,"="); if(kv[1]==o) found=1 } }
+    $1=="option" && $2==f && $4==o { found=1 }
     END { exit found ? 0 : 1 }'
 }
 
 option_id() { # <field> <option name>
   local id
   id="$(printf '%s\n' "$FIELDS_TSV" | awk -F'\t' -v f="$1" -v o="$2" '
-    $1==f { n=split($3,p,","); for(i=1;i<=n;i++){ split(p[i],kv,"="); if(kv[1]==o){ print kv[2]; exit } } }')"
+    $1=="option" && $2==f && $4==o { print $3; exit }')"
   [ -n "$id" ] || die "no option '$2' on the $1 field"
   printf '%s' "$id"
 }
@@ -149,8 +156,37 @@ body_of() { gh issue view "$1" --repo "$REPO" --json body --jq .body; }
 
 epic_of() { printf '%s' "$1" | sed -n 's/^Part of epic #\([0-9][0-9]*\).*/\1/p' | head -1; }
 
-dod_block() { # the definition-of-done checklist, from the DOD config
+# design_state decides whether a proposal carries the design boxes: <kind>
+# <override>, where the override is design, no-design or empty.
+design_state() {
+  local kind="$1" override="$2" k
+  case "$override" in
+    design) printf '%s' design; return ;;
+    no-design) printf '%s' none; return ;;
+  esac
+  for k in "${DESIGN_KINDS[@]}"; do
+    if [ "$k" = "$kind" ]; then printf '%s' design; return; fi
+  done
+  printf '%s' none
+}
+
+# design_note is the "**Design:**" line, so the decision is stated on the issue.
+design_note() { # <state>
+  if [ "$1" = design ]; then
+    printf '%s' 'spec and plan required (`docs/superpowers/`)'
+  else
+    printf '%s' 'not required (mechanical change: nothing to design, so a spec would only restate this issue)'
+  fi
+}
+
+dod_block() { # <design state>: the definition-of-done checklist, from the config
   local entry key prefix suffix
+  if [ "$1" = design ]; then
+    for entry in "${DOD_DESIGN[@]}"; do
+      IFS='|' read -r key prefix suffix <<<"$entry"
+      printf -- '- [ ] %s%s\n' "$prefix" "$suffix"
+    done
+  fi
   for entry in "${DOD[@]}"; do
     IFS='|' read -r key prefix suffix <<<"$entry"
     printf -- '- [ ] %s%s\n' "$prefix" "$suffix"
@@ -167,12 +203,15 @@ join_by() { # <separator> <item>...
 # --- growth helpers ---------------------------------------------------------
 
 ensure_option() { # <field> <name>
-  local field="$1" name="$2" opts="" i=0 opt
+  local field="$1" name="$2" opts="" i=0 opt oid oname ocolor
   if has_option "$field" "$name"; then printf "option '%s' already on %s\n" "$name" "$field"; return; fi
-  while IFS= read -r opt; do
-    [ -n "$opt" ] || continue
-    opts="$opts${opts:+, }{name:\"$opt\", description:\"\", color:$(palette "$i")}"; i=$((i+1))
-  done <<<"$(option_names "$field")"
+  # Every existing option must be sent back with its own id and colour. Sending
+  # only names made GitHub treat them as new options, delete the originals, and
+  # silently clear the field on every item that used one.
+  while IFS=$'\t' read -r _ optid optname optcolor _; do
+    [ -n "$optname" ] || continue
+    opts="$opts${opts:+, }{id:\"$optid\", name:\"$optname\", description:\"\", color:$optcolor}"; i=$((i+1))
+  done <<<"$(printf '%s\n' "$FIELDS_TSV" | awk -F'\t' -v f="$field" '$1=="option" && $2==f')"
   opts="$opts${opts:+, }{name:\"$name\", description:\"\", color:$(palette "$i")}"
   ghp api graphql -f query="mutation { updateProjectV2Field(input: { fieldId: \"$(field_id "$field")\", singleSelectOptions: [$opts] }) { projectV2Field { ... on ProjectV2SingleSelectField { id } } } }" >/dev/null
   printf "option '%s' added to %s\n" "$name" "$field"
@@ -184,6 +223,35 @@ ensure_field() { # <name> <comma-joined options>
   ghp project field-create "$PROJECT_NUMBER" --owner "$OWNER" --name "$1" \
     --data-type SINGLE_SELECT --single-select-options "$2" >/dev/null
   printf 'field %s created\n' "$1"
+}
+
+# ensure_item adds an issue to the project and prints its project item id.
+#
+# A repository project can be configured to auto-add new issues, in which case
+# this races that workflow: whichever loses is told the content is already in the
+# project. That is success, so the item is read back instead of the command
+# failing. The lookup retries because the auto-add can land a moment later.
+ensure_item() { # <issue url> <issue number>
+  local url="$1" num="$2" out id i
+  if out="$(ghp project item-add "$PROJECT_NUMBER" --owner "$OWNER" --url "$url" --format json --jq .id 2>&1)"; then
+    printf '%s' "$out"
+    return 0
+  fi
+  case "$out" in
+    *"already exists in this project"*) ;;
+    *) die "project: adding #$num to the project failed: $out" ;;
+  esac
+  for i in 1 2 3 4 5 6; do
+    id="$(item_id_or_empty "$num")"
+    [ -n "$id" ] && { printf '%s' "$id"; return 0; }
+    sleep 1
+  done
+  die "project: #$num was reported as already on the project but cannot be found"
+}
+
+item_id_or_empty() { # <issue>
+  ghp project item-list "$PROJECT_NUMBER" --owner "$OWNER" --limit 500 --format json \
+    --jq ".items[] | select(.content.number==$1) | .id" 2>/dev/null
 }
 
 ensure_label() { # <name> <color> <description>
@@ -245,10 +313,12 @@ cmd_show() {
   spec="$(printf '%s' "$body" | sed -n 's/^- \[.\] Spec written: `\(.*\)`.*/\1/p' | head -1)"
   plan="$(printf '%s' "$body" | sed -n 's/^- \[.\] Plan written: `\(.*\)`.*/\1/p' | head -1)"
   deps="$(printf '%s' "$body" | sed -n 's/^\*\*Depends on:\*\* *//p' | head -1)"
+  design="$(printf '%s' "$body" | sed -n 's/^\*\*Design:\*\* *//p' | head -1)"
   [ -n "$epic" ] && printf '  epic:      #%s\n' "$epic"
+  [ -n "$deps" ] && printf '  depends:   %s\n' "$deps"
+  [ -n "$design" ] && printf '  design:    %s\n' "$design"
   [ -n "$spec" ] && printf '  spec:      %s\n' "$spec"
   [ -n "$plan" ] && printf '  plan:      %s\n' "$plan"
-  [ -n "$deps" ] && printf '  depends:   %s\n' "$deps"
   printf '  dod:       %s\n' "$(printf '%s' "$body" | awk '/^- \[/ {printf "%s ", ($0 ~ /^- \[x\]/ ? "[x]" : "[ ]")}')"
 }
 
@@ -282,18 +352,33 @@ cmd_check() {
     esac
   done
   [ -n "$n" ] && [ -n "$box" ] || die "usage: check <issue> <box> [--uncheck]"
-  local entry key prefix suffix found=0 keys=""
-  for entry in "${DOD[@]}"; do
+  local entry key prefix suffix found=0 keys="" is_design=0
+  for entry in "${DOD_DESIGN[@]}"; do
     IFS='|' read -r key prefix suffix <<<"$entry"
     keys="$keys${keys:+, }$key"
-    if [ "$key" = "$box" ]; then found=1; break; fi
+    if [ "$key" = "$box" ]; then found=1; is_design=1; break; fi
   done
+  if [ "$found" -eq 0 ]; then
+    for entry in "${DOD[@]}"; do
+      IFS='|' read -r key prefix suffix <<<"$entry"
+      keys="$keys${keys:+, }$key"
+      if [ "$key" = "$box" ]; then found=1; break; fi
+    done
+  fi
   [ "$found" -eq 1 ] || die "unknown box: $box (keys: $keys)"
   local body new mark
   mark=$([ "$uncheck" -eq 1 ] && printf ' ' || printf 'x')
   body="$(body_of "$n")"
   new="$(printf '%s' "$body" | sed "s/^- \[[ x]\] $prefix/- [$mark] $prefix/")"
-  [ "$new" != "$body" ] || die "box '$box' is already set on #$n"
+  if [ "$new" = "$body" ]; then
+    # The box is absent, or it is present and already carries this mark. Only the
+    # design boxes can be absent, and an absent one means the proposal is
+    # design-free, which is a different message from "already ticked".
+    if [ "$is_design" -eq 1 ] && ! printf '%s' "$body" | grep -qF -- "- [ ] $prefix" && ! printf '%s' "$body" | grep -qF -- "- [x] $prefix"; then
+      die "#$n has no '$box' box: this proposal is design-free (see its **Design:** field)"
+    fi
+    die "box '$box' is already set on #$n"
+  fi
   gh issue edit "$n" --repo "$REPO" --body "$new" >/dev/null
   printf '#%s %s -> [%s]\n' "$n" "$box" "$mark"
 }
@@ -312,6 +397,11 @@ cmd_scaffold() {
   url="https://github.com/$REPO/issues/$n"
   body="$(body_of "$n")"
   epic="$(epic_of "$body")"
+  # A design-free proposal has nothing to scaffold, so say that rather than
+  # writing two skeleton files nobody asked for.
+  if printf '%s' "$body" | grep -q '^\*\*Design:\*\* not required'; then
+    die "#$n is design-free (its **Design:** field says so); there is nothing to scaffold"
+  fi
   [ -n "$slug" ] || slug="$(printf '%s' "$title" \
     | sed 's/^[A-Za-z][A-Za-z]*-[0-9][0-9]*: *//; s/ *(.*//' \
     | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9][^a-z0-9]*/-/g; s/^-//; s/-$//')"
@@ -424,7 +514,7 @@ cmd_add_epic() {
         --label "area/$area,wave/$wave,type/epic" --milestone "$wname")"
   num="${url##*/}"
 
-  item="$(ghp project item-add "$PROJECT_NUMBER" --owner "$OWNER" --url "$url" --format json --jq .id)"
+  item="$(ensure_item "$url" "$num")"
   ghp project item-edit --project-id "$PROJECT_ID" --id "$item" --field-id "$(field_id Status)" --single-select-option-id "$(option_id Status "$(status_option proposal)")" >/dev/null
   ghp project item-edit --project-id "$PROJECT_ID" --id "$item" --field-id "$(field_id Area)"   --single-select-option-id "$(option_id Area "$area")" >/dev/null
   ghp project item-edit --project-id "$PROJECT_ID" --id "$item" --field-id "$(field_id Wave)"   --single-select-option-id "$(option_id Wave "$wname")" >/dev/null
@@ -433,7 +523,7 @@ cmd_add_epic() {
 }
 
 cmd_add_proposal() {
-  local epic="" id="" title="" area="" wave="" effort="" kind="" summary="" deps="none"
+  local epic="" id="" title="" area="" wave="" effort="" kind="" summary="" deps="none" design_override=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --epic)    epic="$2"; shift 2 ;;
@@ -445,6 +535,8 @@ cmd_add_proposal() {
       --kind)    kind="$2"; shift 2 ;;
       --summary) summary="$2"; shift 2 ;;
       --deps)    deps="$2"; shift 2 ;;
+      --design)    design_override="design"; shift ;;
+      --no-design) design_override="no-design"; shift ;;
       *) die "add-proposal: unknown option $1" ;;
     esac
   done
@@ -452,14 +544,15 @@ cmd_add_proposal() {
     && [ -n "$wave" ] && [ -n "$effort" ] && [ -n "$kind" ] && [ -n "$summary" ] \
     || die "usage: add-proposal --epic N --id ID --title T --area A --wave N --effort S|M|L --kind K --summary S [--deps D]"
   area_option "$area" >/dev/null
-  local kopt eopt wname
+  local kopt eopt wname design
   kopt="$(kind_option "$kind")"
   eopt="$(effort_option "$effort")"
   wname="$(wave_option "$wave")"
+  design="$(design_state "$kopt" "$design_override")"
 
   local body url num item child
-  body="$(printf '%s\n\nPart of epic #%s.\n\n**Reference:** `%s` (%s)\n**Depends on:** %s\n\n### Definition of done\n%s\n' \
-    "$summary" "$epic" "$REFERENCE" "$id" "$deps" "$(dod_block)")"
+  body="$(printf '%s\n\nPart of epic #%s.\n\n**Reference:** `%s` (%s)\n**Depends on:** %s\n**Design:** %s\n\n### Definition of done\n%s\n' \
+    "$summary" "$epic" "$REFERENCE" "$id" "$deps" "$(design_note "$design")" "$(dod_block "$design")")"
   url="$(gh issue create --repo "$REPO" --title "$id: $title" --body "$body" \
         --label "area/$area,wave/$wave,effort/$eopt,$(kind_label "$kopt")" --milestone "$wname")"
   num="${url##*/}"
@@ -467,7 +560,7 @@ cmd_add_proposal() {
   child="$(gh api "repos/$REPO/issues/$num" --jq .id)"
   ghp api --method POST "repos/$REPO/issues/$epic/sub_issues" -F sub_issue_id="$child" >/dev/null
 
-  item="$(ghp project item-add "$PROJECT_NUMBER" --owner "$OWNER" --url "$url" --format json --jq .id)"
+  item="$(ensure_item "$url" "$num")"
   ghp project item-edit --project-id "$PROJECT_ID" --id "$item" --field-id "$(field_id Status)" --single-select-option-id "$(option_id Status "$(status_option proposal)")" >/dev/null
   ghp project item-edit --project-id "$PROJECT_ID" --id "$item" --field-id "$(field_id Area)"   --single-select-option-id "$(option_id Area "$area")" >/dev/null
   ghp project item-edit --project-id "$PROJECT_ID" --id "$item" --field-id "$(field_id Wave)"   --single-select-option-id "$(option_id Wave "$wname")" >/dev/null
@@ -535,8 +628,9 @@ cmd_new() {
 }
 
 cmd_help() {
-  local keys=() entry key
+  local keys=() dkeys=() entry key
   for entry in "${DOD[@]}"; do IFS='|' read -r key _ <<<"$entry"; keys+=("$key"); done
+  for entry in "${DOD_DESIGN[@]}"; do IFS='|' read -r key _ <<<"$entry"; dkeys+=("$key"); done
   cat <<HELP
 project.sh - manage the development project, its epics, and their proposals.
 
@@ -553,7 +647,7 @@ long-lived: rename it and keep adding waves, areas, epics, and proposals.
   add-area <slug>                                          add a theme area
   add-epic --area A --title T --wave N --summary S
   add-proposal --epic N --id ID --title T --area A --wave N \\
-               --effort S|M|L --kind K --summary S [--deps D]
+               --effort S|M|L --kind K --summary S [--deps D] [--design|--no-design]
   link    <epic> <issue>                                   attach a sub-issue
   new     --title T                                        create a fresh project
 
@@ -561,6 +655,11 @@ statuses: $(join_by ', ' "${STATUSES[@]}")
 kinds:    $(join_by ', ' "${KINDS[@]}")
 efforts:  $(join_by ', ' "${EFFORTS[@]}")
 boxes:    $(join_by ', ' "${keys[@]}")
+
+The design boxes ($(join_by ', ' "${dkeys[@]}")) are added only when a proposal
+has a design to record. Kinds $(join_by ', ' "${DESIGN_KINDS[@]}") default to
+requiring them; other kinds default to a "**Design:** not required" line. Override
+either way with --design or --no-design.
 HELP
 }
 
