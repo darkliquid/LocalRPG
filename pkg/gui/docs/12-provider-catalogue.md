@@ -2,7 +2,7 @@
 id: 12-provider-catalogue
 title: Provider & Model Catalogue
 category: Configuration & Providers
-order: 7
+order: 12
 description: Every registered provider ID, its presets and models, and the ledger key that prices match against.
 ---
 

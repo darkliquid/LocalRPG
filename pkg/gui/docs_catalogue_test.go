@@ -30,7 +30,7 @@ func renderProviderCatalogue() string {
 	b.WriteString("id: 12-provider-catalogue\n")
 	b.WriteString("title: Provider & Model Catalogue\n")
 	b.WriteString("category: Configuration & Providers\n")
-	b.WriteString("order: 7\n")
+	b.WriteString("order: 12\n")
 	b.WriteString("description: Every registered provider ID, its presets and models, and the ledger key that prices match against.\n")
 	b.WriteString("---\n\n")
 
