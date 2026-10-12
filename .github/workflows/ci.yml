@@ -105,6 +105,9 @@ jobs:
       - name: Vet
         run: mise exec -- go vet ./...
 
+      - name: Staticcheck
+        run: mise run lint:staticcheck
+
       - name: Test
         run: mise run test:backend
 

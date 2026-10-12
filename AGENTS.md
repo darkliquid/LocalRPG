@@ -18,6 +18,7 @@ mise run test:frontend  # npx tsc --noEmit and npx vitest run (in frontend/)
 mise run test:e2e       # go test -tags e2e ./pkg/e2e/... (skips without a browser)
 mise run lint           # gofmt, rumdl, goreleaser check, actionlint, go vet ./...
 mise run lint:gofmt     # fail if any Go file is not gofmt-formatted
+mise run lint:staticcheck # staticcheck over every Go package, tests included
 mise run lint:docs      # rumdl over the embedded help articles (pkg/gui/docs, .rumdl.toml)
 mise run lint:prose     # Vale over tracked prose and source comments (report only; STRICT=1 to gate)
 mise run lint:goreleaser # goreleaser check
