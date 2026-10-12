@@ -501,7 +501,10 @@ func (g *GeminiProvider) Generate(ctx context.Context, req harness.GenerateReque
 				if len(sig) == 0 {
 					sig = lastThoughtSignature
 				}
-				argsBytes, _ := json.Marshal(part.FunctionCall.Args)
+				argsBytes, err := json.Marshal(part.FunctionCall.Args)
+				if err != nil {
+					return nil, fmt.Errorf("marshal function call arguments for %q: %w", part.FunctionCall.Name, err)
+				}
 				toolCalls = append(toolCalls, harness.ToolCall{
 					ID:        part.FunctionCall.ID,
 					Name:      part.FunctionCall.Name,
@@ -510,6 +513,15 @@ func (g *GeminiProvider) Generate(ctx context.Context, req harness.GenerateReque
 				})
 			}
 		}
+	}
+
+	// harness.GenerateResponse has no field for tool calls, and every production
+	// tool-using turn goes through Stream, which passes req.Tools and can return
+	// them (see the generation loop in pkg/engine/orchestrator.go). So a function
+	// call reaching this path is a request this path cannot satisfy. Returning the
+	// text alone would drop the call silently, so say so instead.
+	if len(toolCalls) > 0 {
+		return nil, fmt.Errorf("the model returned %d function call(s), which the non-streaming path cannot carry; use Stream", len(toolCalls))
 	}
 
 	return &harness.GenerateResponse{Text: sb.String(), Usage: usageFromMetadata(g.model, resp.UsageMetadata)}, nil

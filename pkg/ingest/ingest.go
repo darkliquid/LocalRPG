@@ -659,9 +659,6 @@ func cleanFolderCandidate(raw string) string {
 }
 
 // entityFolderFor is the folder an entity of this kind belongs in.
-func entityFolderFor(kind string) string {
-	return worldgen.EntityFolderFor(kind)
-}
 
 func appendUnique(list []string, value string) []string {
 	value = strings.TrimSpace(value)

@@ -182,12 +182,6 @@ func (c *ElevenLabsTTSClient) Synthesize(ctx context.Context, text string, voice
 }
 
 // voiceOptions is a voice's provider options, or nil when it carries none.
-func voiceOptions(voice *entity.VoiceConfig) map[string]any {
-	if voice == nil {
-		return nil
-	}
-	return voice.Options
-}
 
 // voiceSettings maps the declared options onto ElevenLabs' voice_settings. It
 // returns an empty map when nothing was tuned, so the voice's stored server-side

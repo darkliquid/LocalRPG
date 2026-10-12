@@ -131,7 +131,9 @@ func Unpack(r io.Reader, destDir string) (Manifest, []byte, error) {
 			return Manifest{}, nil, fmt.Errorf("archive exceeds maximum member count (%d)", maxMemberCount)
 		}
 
-		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA {
+		// tar.Reader normalises the legacy TypeRegA ('\x00') to TypeReg, or to
+		// TypeDir when the name ends in a slash, so only TypeReg reaches here.
+		if hdr.Typeflag != tar.TypeReg {
 			return Manifest{}, nil, fmt.Errorf("unsupported member type for %q (only regular files permitted)", hdr.Name)
 		}
 

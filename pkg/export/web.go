@@ -337,9 +337,6 @@ func pageAssetRefs(page string) []string {
 
 // replaceTag swaps the first tag matching pattern for replacement, and refuses a page
 // whose referenced asset it cannot find.
-func replaceTag(page, pattern, replacement string) string {
-	return regexp.MustCompile(pattern).ReplaceAllString(page, replacement)
-}
 
 // dataURI encodes an asset for the page to carry. An empty path, or one that cannot be
 // read, has no encoding: the caller degrades the beat instead.

@@ -96,14 +96,14 @@ func filterOutSpan(list []SpanSummary, spanID string) []SpanSummary {
 func spanToSummary(s sdktrace.ReadOnlySpan) SpanSummary {
 	attrs := make(map[string]string, len(s.Attributes()))
 	for _, kv := range s.Attributes() {
-		attrs[string(kv.Key)] = kv.Value.Emit()
+		attrs[string(kv.Key)] = kv.Value.String()
 	}
 
 	events := make([]SpanEvent, 0, len(s.Events()))
 	for _, ev := range s.Events() {
 		evAttrs := make(map[string]string, len(ev.Attributes))
 		for _, kv := range ev.Attributes {
-			evAttrs[string(kv.Key)] = kv.Value.Emit()
+			evAttrs[string(kv.Key)] = kv.Value.String()
 		}
 		events = append(events, SpanEvent{
 			Name:       ev.Name,

@@ -36,7 +36,8 @@ func TestCraftProseComposesParts(t *testing.T) {
 
 func TestCraftProseIsDeterministic(t *testing.T) {
 	prompt := "[MECHANICS RESULT: weak]\nPlayer Action: y\n"
-	if craftProse(prompt) != craftProse(prompt) {
-		t.Fatal("the same prompt should yield the same prose")
+	first, second := craftProse(prompt), craftProse(prompt)
+	if first != second {
+		t.Fatalf("the same prompt should yield the same prose\nfirst:  %q\nsecond: %q", first, second)
 	}
 }

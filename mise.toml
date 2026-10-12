@@ -6,6 +6,7 @@ gitleaks = "8.30.1"
 actionlint = "1.7.12"
 vale = "3.24.0"
 rumdl = "0.2.78"
+staticcheck = "2026.2.1"
 
 [tasks."install:frontend"]
 description = "Install frontend dependencies when package manifests change"
@@ -91,6 +92,13 @@ if [ -n "$files" ]; then
 fi
 """
 
+[tasks."lint:staticcheck"]
+description = "Run staticcheck over the Go packages"
+# The default check set (all, not just the style checks), because the U1000
+# unused-code findings are what caught the scene worker's guardrails being wired
+# to nothing. It analyses test files too.
+run = "staticcheck ./..."
+
 [tasks."lint:prose"]
 description = "Run Vale over tracked prose and source comments (report only; STRICT=1 to gate)"
 depends = ["install:vale-styles"]
@@ -98,7 +106,7 @@ run = "bash scripts/lint-prose.sh"
 
 [tasks.lint]
 description = "Run code analysis and linting"
-depends = ["lint:docs", "lint:gofmt", "lint:goreleaser", "lint:actions"]
+depends = ["lint:docs", "lint:gofmt", "lint:staticcheck", "lint:goreleaser", "lint:actions"]
 run = """
 go vet ./...
 go vet -tags e2e ./pkg/e2e/...

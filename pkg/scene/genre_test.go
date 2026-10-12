@@ -82,7 +82,8 @@ func TestGenreGradientIsCached(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRenderer: %v", err)
 	}
-	if renderer.gradientFor("fantasy") != renderer.gradientFor("fantasy") {
+	first, second := renderer.gradientFor("fantasy"), renderer.gradientFor("fantasy")
+	if first != second {
 		t.Fatal("a genre's gradient should be built once")
 	}
 }

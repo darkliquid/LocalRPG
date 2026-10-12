@@ -1059,7 +1059,7 @@ func ClipProblem(data []byte) error {
 	case !bytes.HasPrefix(data, []byte("OggS")):
 		return errors.New("not an Ogg stream")
 	case !IsOpusClip(data):
-		return errors.New("Ogg, but not Opus")
+		return errors.New("the clip is Ogg but not Opus")
 	case !IsCompleteOpusStream(data):
 		return errors.New("Ogg/Opus stream is incomplete or corrupt")
 	case !hasEndOfStream(data):
@@ -1069,7 +1069,7 @@ func ClipProblem(data []byte) error {
 		return errors.New("Ogg/Opus stream does not end properly")
 	}
 	if _, _, _, err := opus.Decode(data); err != nil {
-		return fmt.Errorf("Opus stream does not decode: %w", err)
+		return fmt.Errorf("the Opus stream does not decode: %w", err)
 	}
 	return nil
 }

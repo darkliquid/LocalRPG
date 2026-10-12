@@ -6,12 +6,6 @@ import (
 )
 
 // arrayProperty is one JSON Schema array parameter.
-func arrayProperty(description string, item map[string]any) map[string]any {
-	if item == nil {
-		item = map[string]any{"type": "object"}
-	}
-	return map[string]any{"type": "array", "description": description, "items": item}
-}
 
 // TurnToolSpecsFor returns the roll tools a mechanics policy offers: request_check
 // under auto, propose_check under ask, and neither under off. A turn's prose and

@@ -55,8 +55,11 @@ func TestSceneCastAppearanceFallsBack(t *testing.T) {
 
 func TestBuildScenePromptIsDeterministic(t *testing.T) {
 	ctx := ScenePromptContext{Narration: "The door gives way.", Action: "force it", Outcome: "weak"}
-	if BuildScenePrompt(ctx) != BuildScenePrompt(ctx) {
-		t.Fatal("the same context should produce the same prompt")
+	// Comparing two named results rather than two inline calls: the test is about
+	// the function being a function of its input, and naming them says so.
+	first, second := BuildScenePrompt(ctx), BuildScenePrompt(ctx)
+	if first != second {
+		t.Fatalf("the same context should produce the same prompt\nfirst:  %q\nsecond: %q", first, second)
 	}
 }
 
