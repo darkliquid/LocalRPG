@@ -123,7 +123,7 @@ func (s *Service) saveUsage(store *storage.Store, gameID string, turn int, role 
 		CostMicros:   int64(pricing.CostMicros(u, price)),
 	}
 	if err := store.SaveUsage(rec); err != nil {
-		trace.OrNil(s.logger).Event("usage.record_error", map[string]interface{}{"error": err.Error()})
+		trace.OrNil(s.logger).Event("usage.record_error", map[string]any{"error": err.Error()})
 	}
 }
 

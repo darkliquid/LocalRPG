@@ -29,12 +29,12 @@ func init() {
 			Presets: []provider.Preset{
 				{ID: "onnx", Order: 1, Label: "Built-in BGE Encoder",
 					Description: "Semantic embeddings from a small BGE encoder, run on the CPU with no key and no server (downloads the model on demand).",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type": "onnx",
 					}},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			var payload buildPayload
 			if len(raw) > 0 {
 				if err := json.Unmarshal(raw, &payload); err != nil {

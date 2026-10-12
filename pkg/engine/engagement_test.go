@@ -14,7 +14,7 @@ func TestResolveEngagementOrder(t *testing.T) {
 	if got := ResolveEngagement(&core.GameManifest{}, sys, cfg); got != "ask" {
 		t.Errorf("system default = %q, want ask", got)
 	}
-	campaign := &core.GameManifest{Settings: map[string]interface{}{"mechanics_engagement": "off"}}
+	campaign := &core.GameManifest{Settings: map[string]any{"mechanics_engagement": "off"}}
 	if got := ResolveEngagement(campaign, sys, cfg); got != "off" {
 		t.Errorf("campaign override = %q, want off", got)
 	}

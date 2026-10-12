@@ -84,12 +84,12 @@ func (c *CLIProvider) Generate(ctx context.Context, req harness.GenerateRequest)
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		c.logger.Event("provider.error", map[string]interface{}{"role": c.id, "error": err.Error()})
+		c.logger.Event("provider.error", map[string]any{"role": c.id, "error": err.Error()})
 		return nil, fmt.Errorf("cli provider %q failed: %w (stderr: %s)", c.id, err, provider.TruncateDetailString(stderr.String()))
 	}
 
 	text := strings.TrimSpace(stdout.String())
-	c.logger.Event("provider.response", map[string]interface{}{
+	c.logger.Event("provider.response", map[string]any{
 		"role":         c.id,
 		"exit_code":    0,
 		"stdout_chars": len([]rune(text)),
@@ -134,11 +134,11 @@ func (c *CLIProvider) Stream(ctx context.Context, req harness.GenerateRequest, o
 	}
 
 	if err := cmd.Wait(); err != nil {
-		c.logger.Event("provider.error", map[string]interface{}{"role": c.id, "error": err.Error()})
+		c.logger.Event("provider.error", map[string]any{"role": c.id, "error": err.Error()})
 		return fmt.Errorf("cli process finished with error: %w (stderr: %s)", err, provider.TruncateDetailString(stderr.String()))
 	}
 
-	c.logger.Event("provider.response", map[string]interface{}{
+	c.logger.Event("provider.response", map[string]any{
 		"role":          c.id,
 		"exit_code":     0,
 		"finish_reason": "stop",
@@ -152,7 +152,7 @@ func (c *CLIProvider) Stream(ctx context.Context, req harness.GenerateRequest, o
 // logRequest records the command without its final argument: that argument is the
 // prompt, which is recorded once on context.assembled.
 func (c *CLIProvider) logRequest(req harness.GenerateRequest, call string) {
-	c.logger.Event("provider.request", map[string]interface{}{
+	c.logger.Event("provider.request", map[string]any{
 		"role":         c.id,
 		"kind":         "cli",
 		"call":         call,

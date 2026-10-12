@@ -39,25 +39,25 @@ const (
 // media.VoiceOption and the agent generation parameters, so one renderer covers
 // every family.
 type Tunable struct {
-	Key     string      `json:"key"`
-	Label   string      `json:"label"`
-	Kind    string      `json:"kind"` // float | int | bool | string | enum
-	Min     float64     `json:"min,omitempty"`
-	Max     float64     `json:"max,omitempty"`
-	Step    float64     `json:"step,omitempty"`
-	Options []string    `json:"options,omitempty"`
-	Default interface{} `json:"default,omitempty"`
-	Help    string      `json:"help,omitempty"`
+	Key     string   `json:"key"`
+	Label   string   `json:"label"`
+	Kind    string   `json:"kind"` // float | int | bool | string | enum
+	Min     float64  `json:"min,omitempty"`
+	Max     float64  `json:"max,omitempty"`
+	Step    float64  `json:"step,omitempty"`
+	Options []string `json:"options,omitempty"`
+	Default any      `json:"default,omitempty"`
+	Help    string   `json:"help,omitempty"`
 }
 
 // Preset is a ready-made configuration skeleton. Config keys match the family's
 // config struct so the UI can merge it into the editor.
 type Preset struct {
-	ID          string                 `json:"id"`
-	Label       string                 `json:"label"`
-	Description string                 `json:"description"`
-	Config      map[string]interface{} `json:"config"`
-	Order       int                    `json:"order"`
+	ID          string         `json:"id"`
+	Label       string         `json:"label"`
+	Description string         `json:"description"`
+	Config      map[string]any `json:"config"`
+	Order       int            `json:"order"`
 }
 
 // Descriptor is everything a caller needs to know about a provider without

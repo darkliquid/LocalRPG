@@ -11,11 +11,11 @@ import (
 )
 
 type ActionResult struct {
-	Success bool                   `json:"success"`
-	Outcome string                 `json:"outcome,omitempty"`
-	Message string                 `json:"message"`
-	Roll    *RollResult            `json:"roll,omitempty"`
-	Data    map[string]interface{} `json:"data,omitempty"`
+	Success bool           `json:"success"`
+	Outcome string         `json:"outcome,omitempty"`
+	Message string         `json:"message"`
+	Roll    *RollResult    `json:"roll,omitempty"`
+	Data    map[string]any `json:"data,omitempty"`
 }
 
 // EntityWriter persists an entity to its Markdown note and the index. It is how
@@ -26,8 +26,8 @@ type EntityWriter interface {
 
 type GameHostAPI interface {
 	Roll(notation string) (*RollResult, error)
-	GetStat(entityID string, path string) (interface{}, error)
-	SetStat(entityID string, path string, value interface{}) error
+	GetStat(entityID string, path string) (any, error)
+	SetStat(entityID string, path string, value any) error
 	GetEntity(entityID string) (*entity.Entity, error)
 	SaveEntity(ent *entity.Entity) error
 	InjectGMDirection(directive string)
@@ -69,7 +69,7 @@ func (h *DefaultHostBridge) Roll(notation string) (*RollResult, error) {
 	return EvaluateRoll(notation)
 }
 
-func (h *DefaultHostBridge) GetStat(entityID string, path string) (interface{}, error) {
+func (h *DefaultHostBridge) GetStat(entityID string, path string) (any, error) {
 	ent, err := h.resolve(entityID)
 	if err != nil {
 		return nil, err
@@ -84,13 +84,13 @@ func (h *DefaultHostBridge) GetStat(entityID string, path string) (interface{}, 
 	return val, nil
 }
 
-func (h *DefaultHostBridge) SetStat(entityID string, path string, value interface{}) error {
+func (h *DefaultHostBridge) SetStat(entityID string, path string, value any) error {
 	ent, err := h.resolve(entityID)
 	if err != nil {
 		return err
 	}
 	if ent.State == nil {
-		ent.InitState(make(map[string]interface{}))
+		ent.InitState(make(map[string]any))
 	}
 	if err := ent.State.Set(path, value); err != nil {
 		return fmt.Errorf("set stat %q: %w", path, err)

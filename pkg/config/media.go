@@ -47,7 +47,7 @@ func (m MediaConfig) STTNames() []string   { return providerNames(m.STTProviders
 func (m MediaConfig) ImageNames() []string { return providerNames(m.ImageProviders) }
 
 // providerNames lists the reserved default first, then the named entries sorted.
-func providerNames[V interface{}](providers map[string]V) []string {
+func providerNames[V any](providers map[string]V) []string {
 	out := []string{ReservedProviderName}
 	rest := make([]string, 0, len(providers))
 	for name := range providers {

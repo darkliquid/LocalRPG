@@ -57,7 +57,7 @@ Sean grew up on the docks and never quite left them.`
 			t.Fatal(err)
 		}
 	}
-	if err := svc.UpdateGameSettings(context.Background(), gameID, map[string]interface{}{"narrator_voice": "narrator-01"}); err != nil {
+	if err := svc.UpdateGameSettings(context.Background(), gameID, map[string]any{"narrator_voice": "narrator-01"}); err != nil {
 		t.Fatal(err)
 	}
 	store, err := svc.store(gameID)

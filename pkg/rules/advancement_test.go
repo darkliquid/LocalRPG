@@ -150,7 +150,7 @@ func TestAffordableRequirementsMetAndThreshold(t *testing.T) {
 	}
 }
 
-func mustInt(t *testing.T, value interface{}) int {
+func mustInt(t *testing.T, value any) int {
 	t.Helper()
 	n, ok := toInt(value)
 	if !ok {

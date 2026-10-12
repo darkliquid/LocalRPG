@@ -111,7 +111,7 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 		WorldID:    worldID,
 		Player:     playerID,
 		PlayerName: opts.PlayerName,
-		Settings:   make(map[string]interface{}),
+		Settings:   make(map[string]any),
 	}
 	if prompt := strings.TrimSpace(opts.OpeningPrompt); prompt != "" {
 		manifest.Settings[OpeningPromptSetting] = prompt
@@ -240,7 +240,7 @@ func ensurePlayerNote(paths *core.PathResolver, store *storage.Store, gameID, pl
 		Body:       body,
 		Voice:      pc.Voice,
 		Portrait:   pc.Portrait,
-		ExtraMeta:  map[string]interface{}{},
+		ExtraMeta:  map[string]any{},
 	}
 	for key, value := range pc.Extra {
 		if strings.TrimSpace(value) == "" {

@@ -32,7 +32,7 @@ func (s *Service) applyStylePack() []string {
 	pack, err := media.LoadStylePack(path)
 	if err != nil {
 		warning := fmt.Sprintf("style pack %q was ignored: %v", name, err)
-		trace.OrNil(s.logger).Event("style.pack_invalid", map[string]interface{}{"pack": name, "error": err.Error()})
+		trace.OrNil(s.logger).Event("style.pack_invalid", map[string]any{"pack": name, "error": err.Error()})
 		media.SetActiveTables(media.Tables{})
 		s.setStyleWarnings([]string{warning})
 		return []string{warning}
@@ -40,7 +40,7 @@ func (s *Service) applyStylePack() []string {
 
 	media.SetActiveTables(pack.Merge())
 	s.setStyleWarnings(nil)
-	trace.OrNil(s.logger).Event("style.pack_active", map[string]interface{}{"pack": pack.ID})
+	trace.OrNil(s.logger).Event("style.pack_active", map[string]any{"pack": pack.ID})
 	return nil
 }
 

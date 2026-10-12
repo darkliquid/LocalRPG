@@ -32,15 +32,15 @@ func (o *TurnOrchestrator) applyAdvancement(ctx context.Context, turn *Turn) {
 	o.logger = trace.OrNil(o.logger)
 	if award := rules.EarnFromTurn(spec, o.mechanics.Checks.Outcome, turn.Checks); award != 0 {
 		if err := rules.ApplyEarn(bridge, spec, o.playerID, award); err != nil {
-			o.logger.Event("advancement.award_error", map[string]interface{}{"error": err.Error()})
+			o.logger.Event("advancement.award_error", map[string]any{"error": err.Error()})
 		} else {
-			o.logger.Event("advancement.award", map[string]interface{}{"amount": award})
+			o.logger.Event("advancement.award", map[string]any{"amount": award})
 			label := spec.Currency.Label
 			if label == "" {
 				label = spec.Currency.Stat
 			}
 			if err := o.timeline.RecordAdvancement(turn, o.playerID, fmt.Sprintf("Earned %d %s.", award, label)); err != nil {
-				o.logger.Event("advancement.memory_error", map[string]interface{}{"error": err.Error()})
+				o.logger.Event("advancement.memory_error", map[string]any{"error": err.Error()})
 			}
 		}
 	}
@@ -82,24 +82,24 @@ func (o *TurnOrchestrator) applyThreshold(turn *Turn, bridge rules.GameHostAPI, 
 			continue
 		}
 		if err := rules.ApplyEffects(bridge, o.playerID, level.Effects, level.Label); err != nil {
-			o.logger.Event("advancement.threshold_error", map[string]interface{}{
+			o.logger.Event("advancement.threshold_error", map[string]any{
 				"level": level.At,
 				"error": err.Error(),
 			})
 			continue
 		}
 		if err := bridge.SetStat(o.playerID, AdvancementLevelStat, level.At); err != nil {
-			o.logger.Event("advancement.threshold_error", map[string]interface{}{"error": err.Error()})
+			o.logger.Event("advancement.threshold_error", map[string]any{"error": err.Error()})
 			continue
 		}
 		applied = level.At
-		o.logger.Event("advancement.threshold", map[string]interface{}{"level": level.At})
+		o.logger.Event("advancement.threshold", map[string]any{"level": level.At})
 		text := fmt.Sprintf("Reached %s.", level.Label)
 		if level.Label == "" {
 			text = fmt.Sprintf("Crossed the %d threshold.", level.At)
 		}
 		if err := o.timeline.RecordAdvancement(turn, o.playerID, text); err != nil {
-			o.logger.Event("advancement.memory_error", map[string]interface{}{"error": err.Error()})
+			o.logger.Event("advancement.memory_error", map[string]any{"error": err.Error()})
 		}
 	}
 }
@@ -112,17 +112,17 @@ func (o *TurnOrchestrator) tickTrack(turn *Turn, bridge rules.GameHostAPI, spec 
 	}
 	for value >= spec.TrackSize {
 		if err := rules.ApplyEarn(bridge, spec, o.playerID, -spec.TrackSize); err != nil {
-			o.logger.Event("advancement.track_error", map[string]interface{}{"error": err.Error()})
+			o.logger.Event("advancement.track_error", map[string]any{"error": err.Error()})
 			return
 		}
 		value -= spec.TrackSize
 		if err := bridge.SetStat(o.playerID, AdvancementPendingStat, 1); err != nil {
-			o.logger.Event("advancement.track_error", map[string]interface{}{"error": err.Error()})
+			o.logger.Event("advancement.track_error", map[string]any{"error": err.Error()})
 			return
 		}
-		o.logger.Event("advancement.track_filled", map[string]interface{}{"size": spec.TrackSize})
+		o.logger.Event("advancement.track_filled", map[string]any{"size": spec.TrackSize})
 		if err := o.timeline.RecordAdvancement(turn, o.playerID, "Filled an advancement track."); err != nil {
-			o.logger.Event("advancement.memory_error", map[string]interface{}{"error": err.Error()})
+			o.logger.Event("advancement.memory_error", map[string]any{"error": err.Error()})
 		}
 	}
 }
@@ -139,7 +139,7 @@ func (o *TurnOrchestrator) stateInt(bridge rules.GameHostAPI, path string) int {
 
 // intValue converts a stored state value to an int, tolerating the numeric
 // shapes YAML and JSON decoding produce.
-func intValue(value interface{}) int {
+func intValue(value any) int {
 	switch typed := value.(type) {
 	case int:
 		return typed

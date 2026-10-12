@@ -171,7 +171,7 @@ func ledgerKey(family provider.Family, desc provider.Descriptor) string {
 
 // ProviderConfigFromPreset builds a harness provider config from a preset's
 // config map, so the catalogue and the runtime resolve the same key.
-func ProviderConfigFromPreset(cfg map[string]interface{}) harness.ProviderConfig {
+func ProviderConfigFromPreset(cfg map[string]any) harness.ProviderConfig {
 	out := harness.ProviderConfig{}
 	if v, ok := cfg["type"].(string); ok {
 		out.Type = v

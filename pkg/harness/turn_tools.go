@@ -6,11 +6,11 @@ import (
 )
 
 // arrayProperty is one JSON Schema array parameter.
-func arrayProperty(description string, item map[string]interface{}) map[string]interface{} {
+func arrayProperty(description string, item map[string]any) map[string]any {
 	if item == nil {
-		item = map[string]interface{}{"type": "object"}
+		item = map[string]any{"type": "object"}
 	}
-	return map[string]interface{}{"type": "array", "description": description, "items": item}
+	return map[string]any{"type": "array", "description": description, "items": item}
 }
 
 // TurnToolSpecsFor returns the roll tools a mechanics policy offers: request_check
@@ -35,7 +35,7 @@ func requestCheckSpec() ToolSpec {
 	return ToolSpec{
 		Name:        "request_check",
 		Description: "Resolve a check before continuing: state the stakes and possible outcomes, and the engine rolls and returns one outcome. Name a skill as well as a stat when the check tests a trained ability, and list situational modifiers. Call it, then keep narrating. The engine renders the roll for the player, so never restate the dice, the total, or the modifiers in your prose.",
-		Parameters: objectSchema(map[string]interface{}{
+		Parameters: objectSchema(map[string]any{
 			"actor":      stringProperty("The entity attempting the action."),
 			"target":     stringProperty("Optional opposing entity; for an opposed check, the opponent."),
 			"check_kind": stringProperty("The kind of check, mapped to a system convention, for example 'skill'."),
@@ -43,20 +43,20 @@ func requestCheckSpec() ToolSpec {
 			"skill":      stringProperty("A declared skill whose rating is added, alongside stat."),
 			"difficulty": stringProperty("Optional difficulty id from the system."),
 			"stakes":     stringProperty("What is at stake if the check fails."),
-			"outcomes":   map[string]interface{}{"type": "object", "description": "Map of outcome key to the result text, for example {'pass': '...', 'fail': '...'}.", "additionalProperties": map[string]interface{}{"type": "string"}},
+			"outcomes":   map[string]any{"type": "object", "description": "Map of outcome key to the result text, for example {'pass': '...', 'fail': '...'}.", "additionalProperties": map[string]any{"type": "string"}},
 			"notation":   stringProperty("Optional dice notation override, for example '2d6'."),
 			"profile":    stringProperty("Optional named resolution profile from the system, for example 'pbta' or 'd20'."),
 			"position":   stringProperty("Optional position from a blades-style profile, for example 'risky'."),
 			"effect":     stringProperty("Optional effect from a blades-style profile, for example 'limited'."),
 			"opposed":    stringProperty("Optional stat the opponent rolls when the check is opposed, for example 'might'. Name the opponent in target."),
-			"modifiers": map[string]interface{}{
+			"modifiers": map[string]any{
 				"type": "array",
-				"items": map[string]interface{}{
+				"items": map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"source": map[string]interface{}{"type": "string"},
-						"value":  map[string]interface{}{"type": "integer"},
-						"reason": map[string]interface{}{"type": "string"},
+					"properties": map[string]any{
+						"source": map[string]any{"type": "string"},
+						"value":  map[string]any{"type": "integer"},
+						"reason": map[string]any{"type": "string"},
 					},
 					"required": []string{"source", "value"},
 				},
@@ -70,7 +70,7 @@ func proposeCheckSpec() ToolSpec {
 	return ToolSpec{
 		Name:        "propose_check",
 		Description: "Propose a check to the player: state the stakes and the possible outcomes, then stop. Name a skill as well as a stat when the check tests a trained ability, and list situational modifiers. The player rolls and you adjudicate the result in the next turn. Do not resolve it yourself.",
-		Parameters: objectSchema(map[string]interface{}{
+		Parameters: objectSchema(map[string]any{
 			"actor":      stringProperty("The entity attempting the action."),
 			"target":     stringProperty("Optional opposing entity; for an opposed check, the opponent."),
 			"check_kind": stringProperty("The kind of check, mapped to a system convention, for example 'skill'."),
@@ -78,20 +78,20 @@ func proposeCheckSpec() ToolSpec {
 			"skill":      stringProperty("A declared skill whose rating is added, alongside stat."),
 			"difficulty": stringProperty("Optional difficulty id from the system."),
 			"stakes":     stringProperty("What is at stake if the check fails."),
-			"outcomes":   map[string]interface{}{"type": "object", "description": "Map of outcome key to the result text, for example {'pass': '...', 'fail': '...'}.", "additionalProperties": map[string]interface{}{"type": "string"}},
+			"outcomes":   map[string]any{"type": "object", "description": "Map of outcome key to the result text, for example {'pass': '...', 'fail': '...'}.", "additionalProperties": map[string]any{"type": "string"}},
 			"notation":   stringProperty("Optional dice notation override, for example '2d6'."),
 			"profile":    stringProperty("Optional named resolution profile from the system, for example 'pbta' or 'd20'."),
 			"position":   stringProperty("Optional position from a blades-style profile, for example 'risky'."),
 			"effect":     stringProperty("Optional effect from a blades-style profile, for example 'limited'."),
 			"opposed":    stringProperty("Optional stat the opponent rolls when the check is opposed, for example 'might'. Name the opponent in target."),
-			"modifiers": map[string]interface{}{
+			"modifiers": map[string]any{
 				"type": "array",
-				"items": map[string]interface{}{
+				"items": map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"source": map[string]interface{}{"type": "string"},
-						"value":  map[string]interface{}{"type": "integer"},
-						"reason": map[string]interface{}{"type": "string"},
+					"properties": map[string]any{
+						"source": map[string]any{"type": "string"},
+						"value":  map[string]any{"type": "integer"},
+						"reason": map[string]any{"type": "string"},
 					},
 					"required": []string{"source", "value"},
 				},

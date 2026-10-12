@@ -41,7 +41,7 @@ func TestContextIncludesProtagonistProfile(t *testing.T) {
 		Age:        "34",
 		Gender:     "male",
 		Body:       "Sean grew up on the docks.",
-		ExtraMeta:  map[string]interface{}{"pronouns": "he/him"},
+		ExtraMeta:  map[string]any{"pronouns": "he/him"},
 		Hash:       "hash-sean",
 	}
 	if err := store.SaveEntity(player); err != nil {

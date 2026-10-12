@@ -60,7 +60,7 @@ func (c *FishAudioTTSClient) Synthesize(ctx context.Context, text string, voice 
 		voiceID = voice.VoiceID
 	}
 
-	payloadMap := map[string]interface{}{
+	payloadMap := map[string]any{
 		"model":           c.model,
 		"input":           text,
 		"voice":           voiceID,
@@ -234,7 +234,7 @@ func defaultFallbackVoices() []media.ProviderVoice {
 			Name:     "Default Speaker (Fish Audio S2)",
 			Language: "Multi",
 			Tags:     []string{"dual-ar", "44.1khz", "zero-shot-capable"},
-			Defaults: map[string]interface{}{"pitch": 1.0, "speech_rate": 1.0},
+			Defaults: map[string]any{"pitch": 1.0, "speech_rate": 1.0},
 		},
 	}
 }

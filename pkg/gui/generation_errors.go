@@ -40,7 +40,7 @@ func writeGenerationError(w http.ResponseWriter, failure *harness.GenerationFail
 	if failure.RetryAfterMS > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(int(failure.RetryAfterMS/1000)+1))
 	}
-	writeJSONStatus(w, generationStatus(failure.Code), map[string]interface{}{"error": failure})
+	writeJSONStatus(w, generationStatus(failure.Code), map[string]any{"error": failure})
 }
 
 // writeInvalidRequest writes a 400 in the same shape as every other generation
@@ -55,13 +55,13 @@ func writeInvalidRequest(w http.ResponseWriter, message string) {
 // writeJSONError writes a JSON error envelope with an explicit status, for
 // non-generation failures such as a world conflict.
 func writeJSONError(w http.ResponseWriter, status int, message string) {
-	writeJSONStatus(w, status, map[string]interface{}{"error": map[string]string{"message": message}})
+	writeJSONStatus(w, status, map[string]any{"error": map[string]string{"message": message}})
 }
 
 // writeJSONErrorCode is writeJSONError with a machine-readable reason, so the UI
 // can explain a failure the user can act on rather than only printing the text.
 func writeJSONErrorCode(w http.ResponseWriter, status int, code, message string) {
-	writeJSONStatus(w, status, map[string]interface{}{
+	writeJSONStatus(w, status, map[string]any{
 		"error": map[string]string{"code": code, "message": message},
 	})
 }

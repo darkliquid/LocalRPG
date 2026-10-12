@@ -46,7 +46,7 @@ func TestDefaultResolverAppliesModifiers(t *testing.T) {
 }
 
 func TestDefaultResolverAppliesSkillFromState(t *testing.T) {
-	actor := &entity.Entity{ID: "hero", State: state.NewState(map[string]interface{}{"stealth": 3})}
+	actor := &entity.Entity{ID: "hero", State: state.NewState(map[string]any{"stealth": 3})}
 	res, err := defaultCheckResolver{}.Resolve(context.Background(), harness.CheckRequest{
 		Notation: "2d6", Skill: "stealth",
 	}, actor)

@@ -19,7 +19,7 @@ import (
 
 func TestFishAudioSynthesis_Standard(t *testing.T) {
 	expectedAudio := []byte("RIFFmockwavdata")
-	var receivedBody map[string]interface{}
+	var receivedBody map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/audio/speech" {
@@ -74,7 +74,7 @@ func TestFishAudioSynthesis_VoiceCloning_LocalFile(t *testing.T) {
 		t.Fatalf("failed to write sample wav: %v", err)
 	}
 
-	var receivedBody map[string]interface{}
+	var receivedBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(bodyBytes, &receivedBody)
@@ -90,7 +90,7 @@ func TestFishAudioSynthesis_VoiceCloning_LocalFile(t *testing.T) {
 
 	_, err := client.Synthesize(context.Background(), "Cloned dialogue", &entity.VoiceConfig{
 		VoiceID: "default",
-		Options: map[string]interface{}{
+		Options: map[string]any{
 			"ref_audio": sampleWavPath,
 			"ref_text":  "This is the reference transcript.",
 		},
@@ -115,7 +115,7 @@ func TestFishAudioSynthesis_VoiceCloning_LocalFile(t *testing.T) {
 }
 
 func TestFishAudioSynthesis_VoiceCloning_DirectURL(t *testing.T) {
-	var receivedBody map[string]interface{}
+	var receivedBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(bodyBytes, &receivedBody)
@@ -132,7 +132,7 @@ func TestFishAudioSynthesis_VoiceCloning_DirectURL(t *testing.T) {
 	directURL := "https://example.com/voice.wav"
 	_, err := client.Synthesize(context.Background(), "Cloned dialogue", &entity.VoiceConfig{
 		VoiceID: "default",
-		Options: map[string]interface{}{
+		Options: map[string]any{
 			"ref_audio": directURL,
 			"ref_text":  "Transcript.",
 		},

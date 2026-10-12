@@ -201,18 +201,18 @@ func (c *CartesiaTTSClient) Synthesize(ctx context.Context, text string, voice *
 		}
 	}
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model_id":   c.model,
 		"transcript": text,
-		"voice": map[string]interface{}{
+		"voice": map[string]any{
 			"id": voiceID,
 		},
-		"output_format": map[string]interface{}{
+		"output_format": map[string]any{
 			"container":   "wav",
 			"encoding":    "pcm_s16le",
 			"sample_rate": 44100,
 		},
-		"generation_config": map[string]interface{}{
+		"generation_config": map[string]any{
 			"speed":   speed,
 			"volume":  volume,
 			"emotion": emotion,
@@ -416,7 +416,7 @@ func parseRetryAfter(raw string) time.Duration {
 	return 50 * time.Millisecond
 }
 
-func toFloat(val interface{}) (float64, bool) {
+func toFloat(val any) (float64, bool) {
 	switch v := val.(type) {
 	case float64:
 		return v, true

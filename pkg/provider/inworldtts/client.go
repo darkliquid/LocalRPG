@@ -93,11 +93,11 @@ func (c *InworldTTSClient) Synthesize(ctx context.Context, text string, voice *e
 		voiceID = strings.TrimSpace(voice.VoiceID)
 	}
 
-	payload, err := json.Marshal(map[string]interface{}{
+	payload, err := json.Marshal(map[string]any{
 		"text":     text,
 		"voice_id": voiceID,
 		"model_id": c.model,
-		"audio_config": map[string]interface{}{
+		"audio_config": map[string]any{
 			"audio_encoding":    "MP3",
 			"sample_rate_hertz": 48000,
 		},

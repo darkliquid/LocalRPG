@@ -375,13 +375,13 @@ func TestMapGeminiErrorKeepsOriginal(t *testing.T) {
 }
 
 func TestGeminiProviderInteractionsSession(t *testing.T) {
-	var receivedRequests []map[string]interface{}
+	var receivedRequests []map[string]any
 	var authHeaders []string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeaders = append(authHeaders, r.Header.Get("x-goog-api-key"))
 		body, _ := io.ReadAll(r.Body)
-		var reqMap map[string]interface{}
+		var reqMap map[string]any
 		_ = json.Unmarshal(body, &reqMap)
 		receivedRequests = append(receivedRequests, reqMap)
 

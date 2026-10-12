@@ -109,7 +109,7 @@ func TestComputeGroupCacheKeyChangesWithVoice(t *testing.T) {
 	cases := map[string][]SpeakerLine{
 		"voice id": {{SpeakerID: "narrator", Label: "Narrator", Voice: &entity.VoiceConfig{VoiceID: "Kore", Pitch: 1, SpeechRate: 1}, Text: "Hello."}},
 		"pitch":    {{SpeakerID: "narrator", Label: "Narrator", Voice: &entity.VoiceConfig{VoiceID: "Aoede", Pitch: 1.2, SpeechRate: 1}, Text: "Hello."}},
-		"options":  {{SpeakerID: "narrator", Label: "Narrator", Voice: &entity.VoiceConfig{VoiceID: "Aoede", Pitch: 1, SpeechRate: 1, Options: map[string]interface{}{"direction": "weary"}}, Text: "Hello."}},
+		"options":  {{SpeakerID: "narrator", Label: "Narrator", Voice: &entity.VoiceConfig{VoiceID: "Aoede", Pitch: 1, SpeechRate: 1, Options: map[string]any{"direction": "weary"}}, Text: "Hello."}},
 		"label":    {{SpeakerID: "narrator", Label: "The Narrator", Voice: &entity.VoiceConfig{VoiceID: "Aoede", Pitch: 1, SpeechRate: 1}, Text: "Hello."}},
 		"text":     {{SpeakerID: "narrator", Label: "Narrator", Voice: &entity.VoiceConfig{VoiceID: "Aoede", Pitch: 1, SpeechRate: 1}, Text: "Goodbye."}},
 	}

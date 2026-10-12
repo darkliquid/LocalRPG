@@ -325,7 +325,7 @@ func (s *Service) runExport(ctx context.Context, req ExportRequestDTO, outPath s
 	// under: a bundle that is silent for one character looks the same as a bundle whose
 	// cache key does not match the app's, and this is what tells them apart.
 	for _, miss := range compiler.SpeechMisses() {
-		trace.OrNil(s.logger).Event("export.speech_miss", map[string]interface{}{"game": req.GameID, "detail": miss})
+		trace.OrNil(s.logger).Event("export.speech_miss", map[string]any{"game": req.GameID, "detail": miss})
 		emit(scene.Progress{Phase: "compile", Message: "no clip: " + miss})
 	}
 

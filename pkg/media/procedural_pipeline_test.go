@@ -12,7 +12,7 @@ func TestSceneRequestDerivesHints(t *testing.T) {
 	loc := &entity.Entity{
 		ID:    "forest-clearing",
 		Tags:  []string{"forest"},
-		State: state.NewState(map[string]interface{}{"mood": "grim", "weather": "rain"}),
+		State: state.NewState(map[string]any{"mood": "grim", "weather": "rain"}),
 	}
 	req := sceneRequest(loc, "dark fantasy", "hash1", true)
 	if req.Genre != "fantasy" || req.Mood != "grim" || req.Weather != "rain" || req.Seed == "" {

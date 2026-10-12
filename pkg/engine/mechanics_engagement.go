@@ -57,7 +57,7 @@ func (o *TurnOrchestrator) statValues() []harness.StatValue {
 
 // numericValue reports whether a raw stat is a number the engine can offer a
 // check, and its value.
-func numericValue(raw interface{}) (int, bool) {
+func numericValue(raw any) (int, bool) {
 	switch raw.(type) {
 	case nil, bool, string:
 		return 0, false
@@ -86,7 +86,7 @@ func (o *TurnOrchestrator) healthEffectFor(entityID string) string {
 	}
 	effect, err := o.rulesEngine.EvaluateHealthZero(o.health.ZeroEffect)
 	if err != nil {
-		o.logger.Event("health.zero_error", map[string]interface{}{"error": err.Error()})
+		o.logger.Event("health.zero_error", map[string]any{"error": err.Error()})
 		return o.health.ZeroEffect
 	}
 	return effect
@@ -163,13 +163,13 @@ func (o *TurnOrchestrator) runWorldTick(turnNum int, locationID string) {
 	if o.rulesEngine == nil || !o.worldTickDue(turnNum) {
 		return
 	}
-	o.logger.Event("mechanics.world_tick", map[string]interface{}{"turn": turnNum})
-	if err := o.rulesEngine.ExecuteWorldTick(map[string]interface{}{
+	o.logger.Event("mechanics.world_tick", map[string]any{"turn": turnNum})
+	if err := o.rulesEngine.ExecuteWorldTick(map[string]any{
 		"turn":     turnNum,
 		"location": locationID,
 		"player":   o.playerID,
 	}); err != nil {
-		o.logger.Event("mechanics.world_tick_error", map[string]interface{}{"error": err.Error()})
+		o.logger.Event("mechanics.world_tick_error", map[string]any{"error": err.Error()})
 	}
 }
 
@@ -216,7 +216,7 @@ func (o *TurnOrchestrator) runTurnEndHooks(turnNum int, turn *Turn, pending []He
 		entityIDs = append(entityIDs, mention.ID)
 	}
 
-	hookCtx := map[string]interface{}{
+	hookCtx := map[string]any{
 		"turn":           turnNum,
 		"narration":      turn.Narration,
 		"entities":       entityIDs,
@@ -225,6 +225,6 @@ func (o *TurnOrchestrator) runTurnEndHooks(turnNum int, turn *Turn, pending []He
 		"world_tick":     turn.WorldTick,
 	}
 	if err := o.rulesEngine.ExecuteTurnEnd(hookCtx); err != nil {
-		o.logger.Event("turn.end_hook_error", map[string]interface{}{"error": err.Error()})
+		o.logger.Event("turn.end_hook_error", map[string]any{"error": err.Error()})
 	}
 }

@@ -60,7 +60,7 @@ func TestRepairedRollEndsTurn(t *testing.T) {
 type recordingLogger struct{ events []string }
 
 func (l *recordingLogger) Enabled(trace.Level) bool { return true }
-func (l *recordingLogger) Event(name string, _ map[string]interface{}) {
+func (l *recordingLogger) Event(name string, _ map[string]any) {
 	l.events = append(l.events, name)
 }
 func (l *recordingLogger) SetGame(string) {}

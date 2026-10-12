@@ -32,11 +32,11 @@ func (e *InsufficientFundsError) Error() string {
 }
 
 // RateLimitedf builds a rate-limit error with an advertised backoff.
-func RateLimitedf(retryAfter time.Duration, format string, args ...interface{}) error {
+func RateLimitedf(retryAfter time.Duration, format string, args ...any) error {
 	return &RateLimitedError{RetryAfter: retryAfter, Message: fmt.Sprintf(format, args...)}
 }
 
 // InsufficientFundsf builds an insufficient-funds error.
-func InsufficientFundsf(format string, args ...interface{}) error {
+func InsufficientFundsf(format string, args ...any) error {
 	return &InsufficientFundsError{Message: fmt.Sprintf(format, args...)}
 }

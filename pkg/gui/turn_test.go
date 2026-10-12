@@ -289,7 +289,7 @@ func TestDeleteGameRemovesTheCampaign(t *testing.T) {
 func TestGameSettingsRoundTrip(t *testing.T) {
 	gameID, svc := turnFixture(t)
 
-	if err := svc.UpdateGameSettings(context.Background(), gameID, map[string]interface{}{
+	if err := svc.UpdateGameSettings(context.Background(), gameID, map[string]any{
 		engine.OpeningPromptSetting: "Begin in the rain.",
 	}); err != nil {
 		t.Fatalf("UpdateGameSettings failed: %v", err)
@@ -413,7 +413,7 @@ func TestQuietSceneTurnPrecedesTheFirstAction(t *testing.T) {
 	gameID, svc := turnFixture(t)
 
 	const scene = "Fire rains down as the wreckage of the Dawnbreaker tumbles past the palace window."
-	if err := svc.UpdateGameSettings(context.Background(), gameID, map[string]interface{}{
+	if err := svc.UpdateGameSettings(context.Background(), gameID, map[string]any{
 		engine.OpeningPromptSetting: scene,
 	}); err != nil {
 		t.Fatalf("UpdateGameSettings failed: %v", err)

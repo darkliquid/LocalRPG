@@ -120,14 +120,14 @@ func ResolveGroupCaps(cfg config.TTSConfig, client TTSClient) TTSCapabilities {
 // groupKeyLine is the per-line payload a group key hashes. Every field that
 // changes the provider prompt or the audio belongs here.
 type groupKeyLine struct {
-	Label      string                 `json:"label"`
-	SpeakerID  string                 `json:"speaker_id"`
-	Provider   string                 `json:"provider"`
-	VoiceID    string                 `json:"voice_id"`
-	Pitch      float64                `json:"pitch"`
-	SpeechRate float64                `json:"speech_rate"`
-	Options    map[string]interface{} `json:"options,omitempty"`
-	Text       string                 `json:"text"`
+	Label      string         `json:"label"`
+	SpeakerID  string         `json:"speaker_id"`
+	Provider   string         `json:"provider"`
+	VoiceID    string         `json:"voice_id"`
+	Pitch      float64        `json:"pitch"`
+	SpeechRate float64        `json:"speech_rate"`
+	Options    map[string]any `json:"options,omitempty"`
+	Text       string         `json:"text"`
 }
 
 // canonicalGroupLines coalesces consecutive lines of the same speaker into one,

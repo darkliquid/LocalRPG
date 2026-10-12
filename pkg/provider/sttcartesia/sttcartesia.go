@@ -28,7 +28,7 @@ func init() {
 					Order:       4,
 					Label:       "Cartesia Ink (Cloud, metered)",
 					Description: "Accurate cloud transcription with Cartesia Ink Whisper. Set key here or via CARTESIA_API_KEY; charges per request.",
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"type":         "builtin",
 						"builtin_name": "cartesia",
 						"model":        "ink-whisper",
@@ -36,7 +36,7 @@ func init() {
 				},
 			},
 		},
-		Build: func(_ context.Context, raw []byte) (interface{}, error) {
+		Build: func(_ context.Context, raw []byte) (any, error) {
 			if len(raw) == 0 {
 				return NewCartesiaSTTClient(config.STTConfig{}, "")
 			}

@@ -661,11 +661,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	o.forceToolChoice = false
 	if shouldForceCheck(o.mechanicsEngagement, o.mechanicsCadence, pastTurns) {
 		o.forceToolChoice = true
-		o.logger.Event("mechanics.cadence", map[string]interface{}{"quiet_turns": quietTurns(pastTurns)})
+		o.logger.Event("mechanics.cadence", map[string]any{"quiet_turns": quietTurns(pastTurns)})
 	}
 
 	o.logger = trace.OrNil(o.logger)
-	o.logger.Event("turn.begin", map[string]interface{}{
+	o.logger.Event("turn.begin", map[string]any{
 		"number":      turnNum,
 		"mode":        mode,
 		"input_chars": len([]rune(actionInput)),
@@ -730,7 +730,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			if due, err := o.chronicler.Due(o.gameID()); err == nil && due {
 				if _, err := o.chronicler.Regenerate(ctx, o.gameID()); err != nil {
 					o.logger = trace.OrNil(o.logger)
-					o.logger.Event("provider.error", map[string]interface{}{"role": "summariser", "error": err.Error()})
+					o.logger.Event("provider.error", map[string]any{"role": "summariser", "error": err.Error()})
 				}
 			}
 			chronicle, _ = o.chronicler.Recap(o.gameID())
@@ -815,7 +815,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		gmDirective = fmt.Sprintf("[PLAYER ROLL REQUESTED: %s]", strings.TrimSpace(actionInput))
 	} else if !isOpening && o.rulesEngine != nil {
 		// Run action through mechanics hook if available
-		res, err := o.rulesEngine.ExecuteAction(strings.ToLower(mode), map[string]interface{}{
+		res, err := o.rulesEngine.ExecuteAction(strings.ToLower(mode), map[string]any{
 			"action": actionInput,
 			"player": o.playerID,
 		})
@@ -932,11 +932,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	}
 
 	if o.rulesEngine != nil {
-		if err := o.rulesEngine.ExecuteTurnBegin(map[string]interface{}{
+		if err := o.rulesEngine.ExecuteTurnBegin(map[string]any{
 			"turn":     turnNum,
 			"location": locationID,
 		}); err != nil {
-			o.logger.Event("turn.begin_hook_error", map[string]interface{}{"error": err.Error()})
+			o.logger.Event("turn.begin_hook_error", map[string]any{"error": err.Error()})
 		}
 	}
 
@@ -968,7 +968,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 					fresh.CheckID = pending.Ref
 					resolved = fresh
 				} else {
-					o.logger.Event("pending.resolve_error", map[string]interface{}{"error": resolveErr.Error()})
+					o.logger.Event("pending.resolve_error", map[string]any{"error": resolveErr.Error()})
 				}
 			}
 			if resolved != nil {
@@ -990,7 +990,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 				first = false
 				elapsed := time.Since(started).Milliseconds()
 				engineMetrics().turnTTFT.Record(ctx, float64(elapsed))
-				o.logger.Event("turn.ttft", map[string]interface{}{"ms": elapsed})
+				o.logger.Event("turn.ttft", map[string]any{"ms": elapsed})
 			}
 			return inner(text)
 		}
@@ -1080,7 +1080,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			outcome = "error"
 			turnSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
 			failure, _ := harness.FailureFrom(err)
-			fields := map[string]interface{}{
+			fields := map[string]any{
 				"code":          generationCode(failure),
 				"error":         err.Error(),
 				"role":          "gm",
@@ -1132,7 +1132,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			break
 		}
 		if attempt >= maxRollContinuations {
-			o.logger.Event("roll.cap", map[string]interface{}{"continuations": attempt})
+			o.logger.Event("roll.cap", map[string]any{"continuations": attempt})
 			if resolved, resolveErr := o.resolveCheck(ctx, req, nil); resolveErr == nil {
 				resolved.CheckID = rollRef(turnNum, len(rollResults))
 				rollResults = append(rollResults, *resolved)
@@ -1143,7 +1143,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 		resolved, resolveErr := o.resolveCheck(ctx, req, nil)
 		if resolveErr != nil {
-			o.logger.Event("roll.resolve_error", map[string]interface{}{"error": resolveErr.Error()})
+			o.logger.Event("roll.resolve_error", map[string]any{"error": resolveErr.Error()})
 			break
 		}
 		resolved.CheckID = rollRef(turnNum, len(rollResults))
@@ -1216,7 +1216,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			turnSpan.SetAttributes(attribute.String("localrpg.generation.failure_code", string(failure.Code)))
 			turnSpan.RecordError(failure)
 			turnSpan.SetStatus(codes.Error, string(failure.Code))
-			o.logger.Event("generation.error", map[string]interface{}{
+			o.logger.Event("generation.error", map[string]any{
 				"code":          string(failure.Code),
 				"error":         failure.Message,
 				"role":          "gm",
@@ -1240,7 +1240,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 
-	o.logger.Event("generation.complete", map[string]interface{}{
+	o.logger.Event("generation.complete", map[string]any{
 		"narration_chars": len([]rune(narration)),
 		"finish_reason":   result.FinishReason,
 		"cause":           cause.String(),
@@ -1291,7 +1291,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 				extractionErr = err
 				extractSpan.RecordError(err)
 				extractSpan.SetStatus(codes.Error, string(harness.ClassifyProviderError(err)))
-				o.logger.Event("extract.error", map[string]interface{}{"error": err.Error()})
+				o.logger.Event("extract.error", map[string]any{"error": err.Error()})
 			}
 			extractSpan.SetAttributes(attribute.Int("localrpg.entities.extracted", len(extraction.Entities)))
 		}()
@@ -1321,7 +1321,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	<-extractionDone
 	if extractionErr != nil {
-		o.logger.Event("extract.error", map[string]interface{}{"error": extractionErr.Error()})
+		o.logger.Event("extract.error", map[string]any{"error": extractionErr.Error()})
 	}
 
 	// The streamed reply was parsed as it arrived, across every continuation; its
@@ -1392,7 +1392,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 	}
 
-	o.logger.Event("segment.build", map[string]interface{}{
+	o.logger.Event("segment.build", map[string]any{
 		"count":      len(turn.Segments),
 		"kinds":      segmentKinds(turn.Segments),
 		"speakers":   segmentSpeakers(turn.Segments),
@@ -1493,7 +1493,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		}
 		created = append(created, id)
 	}
-	o.logger.Event("extraction.reconcile", map[string]interface{}{
+	o.logger.Event("extraction.reconcile", map[string]any{
 		"matched": matched,
 		"created": created,
 	})
@@ -1510,7 +1510,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		// has already narrated its consequence, and a reference the index does not
 		// hold must not cost the player the turn they just played.
 		for _, note := range notes {
-			trace.OrNil(o.logger).Event("mechanics.state_change_skipped", map[string]interface{}{"note": note})
+			trace.OrNil(o.logger).Event("mechanics.state_change_skipped", map[string]any{"note": note})
 		}
 	}
 
@@ -1570,7 +1570,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		_ = o.store.ReplaceWorkingSet(workingSet.ToStorageRecords())
 	}
 
-	trace.LogEvent(ctx, o.logger, "record.turn", map[string]interface{}{
+	trace.LogEvent(ctx, o.logger, "record.turn", map[string]any{
 		"number":          turn.Number,
 		"location":        turn.Location,
 		"entities":        len(turn.Entities),
@@ -1948,7 +1948,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				return streamResult{Text: resp.Text}, nil
 			}
 			// Session continuation failed: fallback to full_prompt
-			o.logger.Event("context.session_fallback", map[string]interface{}{
+			o.logger.Event("context.session_fallback", map[string]any{
 				"error":    err.Error(),
 				"from":     string(harness.StrategyServerSession),
 				"fallback": string(harness.StrategyFullPrompt),
@@ -1962,7 +1962,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		if cacher, ok := provider.(harness.ContextCacher); ok {
 			_, err := cacher.EnsureCache(ctx, assembly.PrefixPrompt, 1*time.Hour)
 			if err != nil {
-				o.logger.Event("context.cache_fallback", map[string]interface{}{
+				o.logger.Event("context.cache_fallback", map[string]any{
 					"error":    err.Error(),
 					"fallback": string(harness.StrategyFullPrompt),
 				})
@@ -2042,7 +2042,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				}
 			}
 		}
-		o.logger.Event("tool.round", map[string]interface{}{
+		o.logger.Event("tool.round", map[string]any{
 			"round":               round,
 			"offered":             offerTools,
 			"conversation_tokens": conversationTokens(messages),
@@ -2156,7 +2156,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		// A reply carrying calls while tools were not offered is a protocol quirk:
 		// its text is the answer, and the calls are dropped and traced.
 		if len(result.ToolCalls) > 0 && !offerTools {
-			o.logger.Event("tool.stray", map[string]interface{}{"round": round, "calls": len(result.ToolCalls)})
+			o.logger.Event("tool.stray", map[string]any{"round": round, "calls": len(result.ToolCalls)})
 			result.ToolCalls = nil
 			result.Provenance = provenance
 			result.Checks = checks
@@ -2171,7 +2171,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		// Prose in a tool round is the model thinking out loud, and its order
 		// relative to the result is undefined, so it is discarded and traced.
 		if strings.TrimSpace(result.Text) != "" {
-			o.logger.Event("tool.prose_discarded", map[string]interface{}{
+			o.logger.Event("tool.prose_discarded", map[string]any{
 				"round": round,
 				"chars": len([]rune(result.Text)),
 			})
@@ -2179,7 +2179,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 
 		messages = append(messages, harness.Message{Role: "assistant", ToolCalls: result.ToolCalls})
 		for _, call := range result.ToolCalls {
-			trace.LogEvent(ctx, o.logger, "tool.call", map[string]interface{}{
+			trace.LogEvent(ctx, o.logger, "tool.call", map[string]any{
 				"round":           round,
 				"name":            call.Name,
 				"arguments":       call.Arguments,
@@ -2236,7 +2236,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 			}
 
 			if !offerTools {
-				o.logger.Event("tool.stray", map[string]interface{}{"round": round, "call": call.Name})
+				o.logger.Event("tool.stray", map[string]any{"round": round, "call": call.Name})
 				continue
 			}
 
@@ -2258,7 +2258,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					attribute.String("localrpg.tool.name", call.Name),
 					attribute.Bool("localrpg.tool.ok", ok),
 				))
-			trace.LogEvent(ctx, o.logger, "tool.result", map[string]interface{}{
+			trace.LogEvent(ctx, o.logger, "tool.result", map[string]any{
 				"name":        call.Name,
 				"ok":          ok,
 				"bytes":       len(output),

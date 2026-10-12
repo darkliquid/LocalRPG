@@ -13,7 +13,7 @@ func TestRegisterLookupAndDuplicatePanics(t *testing.T) {
 
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{ID: "probe", Family: provider.FamilyLLM, Label: "Probe"},
-		Build:      func(context.Context, []byte) (interface{}, error) { return "built", nil },
+		Build:      func(context.Context, []byte) (any, error) { return "built", nil },
 	})
 
 	reg, ok := provider.Lookup("probe")
@@ -34,7 +34,7 @@ func TestRegisterLookupAndDuplicatePanics(t *testing.T) {
 	}()
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{ID: "probe", Family: provider.FamilyLLM},
-		Build:      func(context.Context, []byte) (interface{}, error) { return nil, nil },
+		Build:      func(context.Context, []byte) (any, error) { return nil, nil },
 	})
 }
 

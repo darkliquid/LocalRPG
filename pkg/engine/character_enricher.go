@@ -100,7 +100,7 @@ Respond ONLY with a valid JSON object matching this schema:
 	}
 	if res.Pronouns != "" {
 		if ent.ExtraMeta == nil {
-			ent.ExtraMeta = make(map[string]interface{})
+			ent.ExtraMeta = make(map[string]any)
 		}
 		if _, ok := ent.ExtraMeta["pronouns"]; !ok {
 			ent.ExtraMeta["pronouns"] = res.Pronouns

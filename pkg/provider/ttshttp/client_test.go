@@ -152,7 +152,7 @@ func TestLiveKokoroFastAPI(t *testing.T) {
 
 func TestHTTPTTSClient_AdaptsAllTalkPayload(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req map[string]interface{}
+		var req map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		if req["text_input"] != "Greetings, traveler." {
 			t.Errorf("expected text_input, got %v", req["text_input"])
@@ -181,7 +181,7 @@ func TestHTTPTTSClient_AdaptsAllTalkPayload(t *testing.T) {
 
 func TestHTTPTTSClientSynthesizeKokoro(t *testing.T) {
 	var receivedPath string
-	var receivedBody map[string]interface{}
+	var receivedBody map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedPath = r.URL.Path

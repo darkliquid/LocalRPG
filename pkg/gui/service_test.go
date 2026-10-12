@@ -851,19 +851,19 @@ func TestGameStateSurfacesTheLivingWorld(t *testing.T) {
 }
 
 func TestArcProgressReadsBothConventions(t *testing.T) {
-	ticks, maxTicks := arcProgress(map[string]interface{}{"progress": "3/6"})
+	ticks, maxTicks := arcProgress(map[string]any{"progress": "3/6"})
 	if ticks != 3 || maxTicks != 6 {
 		t.Errorf(`progress "3/6" = %d/%d, want 3/6`, ticks, maxTicks)
 	}
 
 	// YAML and JSON disagree on numeric types, so both must coerce.
-	ticks, maxTicks = arcProgress(map[string]interface{}{"clock_ticks": float64(4), "clock_max": 8})
+	ticks, maxTicks = arcProgress(map[string]any{"clock_ticks": float64(4), "clock_max": 8})
 	if ticks != 4 || maxTicks != 8 {
 		t.Errorf("clock_ticks/clock_max = %d/%d, want 4/8", ticks, maxTicks)
 	}
 
 	// A missing clock must not produce a zero maximum, which would divide by zero.
-	if _, maxTicks := arcProgress(map[string]interface{}{"clock_ticks": 1}); maxTicks < 1 {
+	if _, maxTicks := arcProgress(map[string]any{"clock_ticks": 1}); maxTicks < 1 {
 		t.Errorf("maxTicks = %d, want at least 1", maxTicks)
 	}
 }
@@ -1146,7 +1146,7 @@ func TestResolvedThreadsAreNotOpen(t *testing.T) {
 func TestSegmentClipURLsFollowVoiceOptions(t *testing.T) {
 	stability := 0.35
 	voiceFor := func(string) *entity.VoiceConfig {
-		return &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]interface{}{"stability": stability}}
+		return &entity.VoiceConfig{VoiceID: "af_bella", Options: map[string]any{"stability": stability}}
 	}
 
 	segments := []entity.TurnSegment{{Kind: entity.SegmentSpeech, SpeakerID: "aldric", Text: "Hello there."}}

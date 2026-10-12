@@ -20,9 +20,9 @@ func TestSaveSettingsClampsProfileOptions(t *testing.T) {
 		AutoPlay:     true,
 		MasterVolume: 1,
 		VoiceProfiles: []config.VoiceProfile{
-			{ID: "hushed", Name: "Hushed", VoiceID: "bf_emma", Options: map[string]interface{}{"stability": 2.5, "banana": 1}},
+			{ID: "hushed", Name: "Hushed", VoiceID: "bf_emma", Options: map[string]any{"stability": 2.5, "banana": 1}},
 		},
-		Options: map[string]interface{}{"stability": -1.0},
+		Options: map[string]any{"stability": -1.0},
 	}
 
 	if err := svc.validateVoiceOptionsInConfig(cfg); err != nil {
@@ -51,7 +51,7 @@ func TestSaveSettingsKeepsOptionsWhenProviderIsDisabled(t *testing.T) {
 	cfg.Media.TTS = config.TTSConfig{
 		Type:     "builtin",
 		AutoPlay: false,
-		Options:  map[string]interface{}{"stability": 0.5},
+		Options:  map[string]any{"stability": 0.5},
 	}
 
 	// A provider with no declaration cannot validate, so nothing is dropped.

@@ -42,11 +42,11 @@ type MemoryDecl struct {
 
 // StateChangeDecl is a proposed change to an entity's state.
 type StateChangeDecl struct {
-	Entity string      `json:"entity"`
-	Path   string      `json:"path"`
-	Op     string      `json:"op"` // set|add|sub
-	Value  interface{} `json:"value"`
-	Reason string      `json:"reason,omitempty"`
+	Entity string `json:"entity"`
+	Path   string `json:"path"`
+	Op     string `json:"op"` // set|add|sub
+	Value  any    `json:"value"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // CheckModifier is one named adjustment to a check's total.
@@ -129,8 +129,8 @@ type CheckResult struct {
 	// tone a result without hardcoding pass and fail.
 	OutcomeVocabulary []string `json:"outcome_vocabulary,omitempty"`
 	// Applied lists every bonus that contributed, for display.
-	Applied   []AppliedModifier      `json:"applied,omitempty"`
-	Breakdown map[string]interface{} `json:"breakdown,omitempty"`
+	Applied   []AppliedModifier `json:"applied,omitempty"`
+	Breakdown map[string]any    `json:"breakdown,omitempty"`
 	// Profile names the resolution profile that decided the outcome, when one did.
 	Profile string `json:"profile,omitempty"`
 	// Position and Effect are the Blades-style stakes the profile carries.

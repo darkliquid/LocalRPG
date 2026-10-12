@@ -16,14 +16,14 @@ import (
 
 func TestInworldSTTTranscribesWAVAndOpus(t *testing.T) {
 	var gotAuth string
-	var gotBody map[string]interface{}
+	var gotBody map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
 		_ = json.NewDecoder(r.Body).Decode(&gotBody)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"transcription": map[string]interface{}{"transcript": "Hello from Inworld STT", "isFinal": true},
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"transcription": map[string]any{"transcript": "Hello from Inworld STT", "isFinal": true},
 		})
 	}))
 	defer server.Close()
@@ -43,7 +43,7 @@ func TestInworldSTTTranscribesWAVAndOpus(t *testing.T) {
 	if gotAuth != "Basic custom-stt-key" {
 		t.Errorf("Authorization = %q, want Basic custom-stt-key", gotAuth)
 	}
-	cfg, _ := gotBody["transcribe_config"].(map[string]interface{})
+	cfg, _ := gotBody["transcribe_config"].(map[string]any)
 	if cfg["audio_encoding"] != "LINEAR16" {
 		t.Errorf("audio_encoding = %v, want LINEAR16 for a WAV", cfg["audio_encoding"])
 	}
@@ -57,7 +57,7 @@ func TestInworldSTTTranscribesWAVAndOpus(t *testing.T) {
 	if _, err := client.Transcribe(context.Background(), []byte("OggSfake-opus-data")); err != nil {
 		t.Fatalf("Transcribe Opus: %v", err)
 	}
-	cfg, _ = gotBody["transcribe_config"].(map[string]interface{})
+	cfg, _ = gotBody["transcribe_config"].(map[string]any)
 	if cfg["audio_encoding"] != "OGG_OPUS" {
 		t.Errorf("audio_encoding = %v, want OGG_OPUS for an Ogg stream", cfg["audio_encoding"])
 	}
@@ -68,8 +68,8 @@ func TestInworldSTTUsesSharedKey(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"transcription": map[string]interface{}{"transcript": "ok"},
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"transcription": map[string]any{"transcript": "ok"},
 		})
 	}))
 	defer server.Close()
@@ -87,12 +87,12 @@ func TestInworldSTTUsesSharedKey(t *testing.T) {
 }
 
 func TestInworldSTTEncodesBase64Content(t *testing.T) {
-	var gotBody map[string]interface{}
+	var gotBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&gotBody)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"transcription": map[string]interface{}{"transcript": "ok"},
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"transcription": map[string]any{"transcript": "ok"},
 		})
 	}))
 	defer server.Close()
@@ -104,7 +104,7 @@ func TestInworldSTTEncodesBase64Content(t *testing.T) {
 	if _, err := client.Transcribe(context.Background(), []byte("ID3mp3-audio")); err != nil {
 		t.Fatalf("Transcribe: %v", err)
 	}
-	audio, _ := gotBody["audio_data"].(map[string]interface{})
+	audio, _ := gotBody["audio_data"].(map[string]any)
 	content, _ := audio["content"].(string)
 	if decoded, err := base64.StdEncoding.DecodeString(content); err != nil || string(decoded) != "ID3mp3-audio" {
 		t.Errorf("audio_data.content did not round-trip the MP3 bytes (err %v)", err)

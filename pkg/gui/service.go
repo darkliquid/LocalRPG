@@ -302,11 +302,11 @@ func NewService(rootDir string) *Service {
 	embeddings.SetLogger(svc.logger)
 	if !projectMode {
 		if warning := paths.LegacyWarning(paths.System(), cfg.Paths); warning != "" {
-			trace.OrNil(svc.logger).Event("paths.legacy_relative", map[string]interface{}{"detail": warning})
+			trace.OrNil(svc.logger).Event("paths.legacy_relative", map[string]any{"detail": warning})
 		}
 	}
 	for _, problem := range mgr.Warnings() {
-		trace.OrNil(svc.logger).Event("config.problem", map[string]interface{}{"problem": problem})
+		trace.OrNil(svc.logger).Event("config.problem", map[string]any{"problem": problem})
 	}
 	svc.applyStylePack()
 	return svc
@@ -782,7 +782,7 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		return nil, fmt.Errorf("parse player entity: %w", err)
 	}
 
-	var stateMap map[string]interface{}
+	var stateMap map[string]any
 	if ent.State != nil {
 		stateMap = ent.State.Raw()
 	}
@@ -891,7 +891,7 @@ func (s *Service) gameCorpus(gameID string) ([]NarrativeArcDTO, []FactionClockDT
 	return arcs, clocks, locations
 }
 
-func (s *Service) entityState(store *storage.Store, entityID string) map[string]interface{} {
+func (s *Service) entityState(store *storage.Store, entityID string) map[string]any {
 	entity, err := store.GetEntity(entityID)
 	if err != nil || entity == nil || entity.State == nil {
 		return nil
@@ -901,7 +901,7 @@ func (s *Service) entityState(store *storage.Store, entityID string) map[string]
 
 // arcProgress reads an arc's clock. A note may express it as `progress: 3/6` or
 // as separate `clock_ticks`/`clock_max` fields, and both are honoured.
-func arcProgress(raw map[string]interface{}) (int, int) {
+func arcProgress(raw map[string]any) (int, int) {
 	if ticks, maxTicks, ok := stateFraction(raw, "progress"); ok {
 		return ticks, maxTicks
 	}
@@ -910,14 +910,14 @@ func arcProgress(raw map[string]interface{}) (int, int) {
 	return ticks, maxInt(maxTicks, 1)
 }
 
-func clockTicks(raw map[string]interface{}) (int, int) {
+func clockTicks(raw map[string]any) (int, int) {
 	ticks := stateNumber(raw, "clock_ticks", "ticks")
 	maxTicks := stateNumber(raw, "clock_max", "max_ticks", "max")
 	return ticks, maxInt(maxTicks, 1)
 }
 
 // stateFraction reads an "a/b" style value.
-func stateFraction(raw map[string]interface{}, key string) (int, int, bool) {
+func stateFraction(raw map[string]any, key string) (int, int, bool) {
 	value, ok := raw[key]
 	if !ok {
 		return 0, 0, false
@@ -943,7 +943,7 @@ func stateFraction(raw map[string]interface{}, key string) (int, int, bool) {
 
 // stateNumber coerces the first present key to an int. YAML and JSON disagree on
 // numeric types, so every plausible one is accepted.
-func stateNumber(raw map[string]interface{}, keys ...string) int {
+func stateNumber(raw map[string]any, keys ...string) int {
 	for _, key := range keys {
 		value, ok := raw[key]
 		if !ok {
@@ -969,7 +969,7 @@ func stateNumber(raw map[string]interface{}, keys ...string) int {
 	return 0
 }
 
-func stateString(raw map[string]interface{}, key string) string {
+func stateString(raw map[string]any, key string) string {
 	if raw == nil {
 		return ""
 	}
@@ -1142,7 +1142,7 @@ func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*Enti
 		}, nil
 	}
 
-	var stateMap map[string]interface{}
+	var stateMap map[string]any
 	if ent.State != nil {
 		stateMap = ent.State.Raw()
 	}
@@ -2121,7 +2121,7 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	// with an empty mechanics VM and no hooks.
 	loader := rules.NewRuleLoader(s.resolver, jsEngine)
 	if err := loader.LoadRules(manifest.SystemID, manifest.WorldID); err != nil {
-		logger.Event("rules.load_error", map[string]interface{}{"error": err.Error()})
+		logger.Event("rules.load_error", map[string]any{"error": err.Error()})
 	}
 
 	startLocation := ""
@@ -2460,7 +2460,7 @@ func (s *Service) logParityMismatch(gameID string, segments []entity.TurnSegment
 		}
 	}
 	if len(missing) > 0 {
-		trace.OrNil(s.logger).Event("turn.audio_parity_mismatch", map[string]interface{}{"keys": missing})
+		trace.OrNil(s.logger).Event("turn.audio_parity_mismatch", map[string]any{"keys": missing})
 	}
 }
 
@@ -2488,7 +2488,7 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 	cfg := s.configMgr.Get()
 	start := time.Now()
 	s.logger = trace.OrNil(s.logger)
-	s.logger.Event("media.image.request", map[string]interface{}{
+	s.logger.Event("media.image.request", map[string]any{
 		"location": locationID,
 		"provider": cfg.Media.Image.Type + ":" + cfg.Media.Image.Model,
 		"force":    force,
@@ -2496,12 +2496,12 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 
 	path, err := store.SceneArt(ctx, location, force)
 	if err != nil {
-		s.logger.Event("provider.error", map[string]interface{}{"role": "image", "error": err.Error()})
+		s.logger.Event("provider.error", map[string]any{"role": "image", "error": err.Error()})
 		return "", "", err
 	}
 
 	if data, err := os.ReadFile(path); err == nil {
-		s.logger.Event("media.image.result", map[string]interface{}{
+		s.logger.Event("media.image.result", map[string]any{
 			"bytes":       len(data),
 			"duration_ms": time.Since(start).Milliseconds(),
 		})
@@ -2585,7 +2585,7 @@ func (s *Service) configureSceneBudget(worker *engine.SceneWorker, gameID string
 	worker.SetPrice(imagePrice(cfg))
 	worker.SetProceduralFallback(media.NewProceduralArtClient())
 	worker.SetOnSkipped(func(gID string, turnNumber int, reason string) {
-		trace.OrNil(s.logger).Event("turn.image_skipped", map[string]interface{}{
+		trace.OrNil(s.logger).Event("turn.image_skipped", map[string]any{
 			"turn": turnNumber, "reason": reason,
 		})
 		s.broadcastSceneImagePending(gID, turnNumber, reason)
@@ -2602,7 +2602,7 @@ func (s *Service) saveImageBudget(gameID string, budget engine.ImageBudget) {
 	}
 	engine.SetImageBudget(manifest, budget)
 	if err := core.SaveGameManifest(path, manifest); err != nil {
-		trace.OrNil(s.logger).Event("turn.image_budget_save_failed", map[string]interface{}{"error": err.Error()})
+		trace.OrNil(s.logger).Event("turn.image_budget_save_failed", map[string]any{"error": err.Error()})
 	}
 }
 
@@ -3088,7 +3088,7 @@ func (s *Service) TraceEvents(limit int, gameID string) ([]TraceEventDTO, error)
 
 	events := make([]TraceEventDTO, 0, len(lines))
 	for _, line := range lines {
-		var raw map[string]interface{}
+		var raw map[string]any
 		if err := json.Unmarshal([]byte(line), &raw); err != nil {
 			continue // a torn final line is not a failure
 		}
@@ -3306,12 +3306,12 @@ func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.
 	if groups, grouped, _ := s.synthesizeTurnGroups(ctx, gameID, turn, cfg, force); grouped {
 		for _, group := range groups {
 			if plan != nil {
-				all, any := plan.heardState(group.SegmentIndexes)
+				all, some := plan.heardState(group.SegmentIndexes)
 				if all {
 					continue
 				}
-				if any {
-					trace.OrNil(s.logger).Event("turn.audio_partial", map[string]interface{}{
+				if some {
+					trace.OrNil(s.logger).Event("turn.audio_partial", map[string]any{
 						"indexes": group.SegmentIndexes,
 					})
 					continue
@@ -3366,7 +3366,7 @@ func (s *Service) ledgerHolds(plan *turnAudioPlan, key string, indexes []int) bo
 	case clipHeard:
 		return true
 	case clipPartial:
-		trace.OrNil(s.logger).Event("turn.audio_partial", map[string]interface{}{
+		trace.OrNil(s.logger).Event("turn.audio_partial", map[string]any{
 			"indexes":   indexes,
 			"key":       key,
 			"played_ms": entry.PlayedMS,
@@ -3739,7 +3739,7 @@ func (s *Service) ResumeTTSBatch(ctx context.Context, gameID, jobID string) (*TT
 	opts := ttsbatch.Options{GameID: gameID, Provider: job.Provider, Model: job.Model}
 	s.goBackground(func() {
 		if _, err := engine.Resume(s.bgCtx, opts, jobID); err != nil {
-			trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+			trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]any{
 				"game":  gameID,
 				"job":   jobID,
 				"error": err.Error(),
@@ -3813,7 +3813,7 @@ func (s *Service) StartTTSBatch(ctx context.Context, gameID string, force bool) 
 
 	job, err := batchEngine.Submit(ctx, opts, groups)
 	if err != nil {
-		trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+		trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]any{
 			"game":     gameID,
 			"provider": providerKey,
 			"error":    err.Error(),
@@ -3830,7 +3830,7 @@ func (s *Service) StartTTSBatch(ctx context.Context, gameID string, force bool) 
 	// waiting it out; the job stays resumable and is picked up next launch.
 	s.goBackground(func() {
 		if _, err := batchEngine.Resume(s.bgCtx, opts, job.ID); err != nil {
-			trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+			trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]any{
 				"game":     gameID,
 				"job":      job.ID,
 				"provider": providerKey,
@@ -3892,13 +3892,13 @@ func (s *Service) ResumePendingBatches(ctx context.Context) {
 			opts := ttsbatch.Options{GameID: game.ID, Provider: job.Provider, Model: job.Model}
 			engine := ttsbatch.New(batchClient, media.NewContentCache(s.resolver.CacheDir()), store)
 			engine.SetOpusBitrate(cfg.OpusBitrate())
-			trace.OrNil(s.logger).Event("media.tts.batch_resumed", map[string]interface{}{
+			trace.OrNil(s.logger).Event("media.tts.batch_resumed", map[string]any{
 				"game": game.ID,
 				"job":  job.ID,
 			})
 			s.goBackground(func() {
 				if _, err := engine.Resume(s.bgCtx, opts, job.ID); err != nil {
-					trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]interface{}{
+					trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]any{
 						"game":  game.ID,
 						"job":   job.ID,
 						"error": err.Error(),
@@ -3993,7 +3993,7 @@ func (s *Service) cancelBatchJobs(ctx context.Context, gameID string) {
 			continue
 		}
 		if err := batchClient.CancelBatch(ctx, media.BatchJobHandle{ID: job.ID}); err != nil {
-			trace.OrNil(s.logger).Event("media.tts.batch_cancel_error", map[string]interface{}{
+			trace.OrNil(s.logger).Event("media.tts.batch_cancel_error", map[string]any{
 				"game":  gameID,
 				"job":   job.ID,
 				"error": err.Error(),
@@ -4455,16 +4455,16 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 	// Spend the client deferred while building this campaign now belongs to it.
 	// Nothing is recorded under this token unless the client asked for deferral.
 	if err := s.CommitDeferredUsage(gameID, gameID); err != nil {
-		trace.OrNil(s.logger).Event("usage.commit_error", map[string]interface{}{"game": gameID, "error": err.Error()})
+		trace.OrNil(s.logger).Event("usage.commit_error", map[string]any{"game": gameID, "error": err.Error()})
 	}
 
 	if strings.TrimSpace(req.NarratorVoice) != "" {
-		_ = s.UpdateGameSettings(ctx, gameID, map[string]interface{}{
+		_ = s.UpdateGameSettings(ctx, gameID, map[string]any{
 			"narrator_voice": strings.TrimSpace(req.NarratorVoice),
 		})
 	}
 	if strings.TrimSpace(req.StartLocation) != "" {
-		_ = s.UpdateGameSettings(ctx, gameID, map[string]interface{}{
+		_ = s.UpdateGameSettings(ctx, gameID, map[string]any{
 			engine.StartLocationSetting: strings.TrimSpace(req.StartLocation),
 		})
 	}
@@ -4520,14 +4520,14 @@ func (s *Service) assignPlayerVoice(gameID, playerName string) error {
 
 // UpdateGameSettings merges a patch into a campaign's settings and writes the
 // manifest. The caller supplies whole values; nothing is inferred or coerced.
-func (s *Service) UpdateGameSettings(ctx context.Context, gameID string, patch map[string]interface{}) error {
+func (s *Service) UpdateGameSettings(ctx context.Context, gameID string, patch map[string]any) error {
 	path := filepath.Join(s.resolver.GameDir(gameID), "game.yaml")
 	manifest, err := core.LoadGameManifest(path)
 	if err != nil {
 		return fmt.Errorf("load game manifest: %w", err)
 	}
 	if manifest.Settings == nil {
-		manifest.Settings = map[string]interface{}{}
+		manifest.Settings = map[string]any{}
 	}
 	for key, value := range patch {
 		manifest.Settings[key] = value
@@ -5539,18 +5539,18 @@ func (s *Service) TranscribeAudio(ctx context.Context, audioData []byte) (string
 
 	start := time.Now()
 	s.logger = trace.OrNil(s.logger)
-	s.logger.Event("media.stt.request", map[string]interface{}{
+	s.logger.Event("media.stt.request", map[string]any{
 		"provider": cfg.Media.STT.Type,
 		"bytes":    len(audioData),
 	})
 
 	text, err := media.NewSTTProvider(client).TranscribeAudio(ctx, audioData)
 	if err != nil {
-		s.logger.Event("provider.error", map[string]interface{}{"role": "stt", "error": err.Error()})
+		s.logger.Event("provider.error", map[string]any{"role": "stt", "error": err.Error()})
 		return "", err
 	}
 
-	s.logger.Event("media.stt.result", map[string]interface{}{
+	s.logger.Event("media.stt.result", map[string]any{
 		"chars":       len([]rune(text)),
 		"duration_ms": time.Since(start).Milliseconds(),
 	})

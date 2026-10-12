@@ -81,7 +81,7 @@ func TestEveryReferenceSystemRunsItsAction(t *testing.T) {
 			t.Errorf("%s script: %v", s.ID, err)
 			continue
 		}
-		result, err := engine.ExecuteAction("do", map[string]interface{}{"player": "hero", "turn": 1, "action": "climb"})
+		result, err := engine.ExecuteAction("do", map[string]any{"player": "hero", "turn": 1, "action": "climb"})
 		if err != nil {
 			t.Errorf("%s action: %v", s.ID, err)
 			continue

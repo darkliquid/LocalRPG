@@ -19,7 +19,7 @@ func TestDefaultResolverOpposedReadsTheOpponent(t *testing.T) {
 	dir := t.TempDir()
 	writeTestEntityNote(t, dir, &entity.Entity{
 		ID: "ogre", Name: "Ogre", Type: "character", Body: "Big.",
-		State: state.NewState(map[string]interface{}{"might": 4}),
+		State: state.NewState(map[string]any{"might": 4}),
 	})
 	if _, err := storage.NewSyncer(store).Sync(dir); err != nil {
 		t.Fatal(err)

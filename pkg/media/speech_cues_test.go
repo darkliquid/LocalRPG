@@ -17,7 +17,7 @@ func TestSpeechCueAdvertiserImplementations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("elevenlabs client: %v", err)
 	}
-	adv, ok := interface{}(eleven).(media.SpeechCueAdvertiser)
+	adv, ok := any(eleven).(media.SpeechCueAdvertiser)
 	if !ok {
 		t.Fatal("expected the ElevenLabs client to implement SpeechCueAdvertiser")
 	}
@@ -30,7 +30,7 @@ func TestSpeechCueAdvertiserImplementations(t *testing.T) {
 	}
 
 	sherpa := ttssherpa.NewSherpaTTSClient("")
-	advSherpa, ok := interface{}(sherpa).(media.SpeechCueAdvertiser)
+	advSherpa, ok := any(sherpa).(media.SpeechCueAdvertiser)
 	if !ok {
 		t.Fatal("expected the Sherpa client to implement SpeechCueAdvertiser")
 	}
@@ -40,7 +40,7 @@ func TestSpeechCueAdvertiserImplementations(t *testing.T) {
 	}
 
 	httpTTS := ttshttp.NewHTTPTTSClient(config.TTSConfig{Type: "http", Endpoint: "http://localhost:8880"})
-	advHTTP, ok := interface{}(httpTTS).(media.SpeechCueAdvertiser)
+	advHTTP, ok := any(httpTTS).(media.SpeechCueAdvertiser)
 	if !ok {
 		t.Fatal("expected the HTTP TTS client to implement SpeechCueAdvertiser")
 	}
