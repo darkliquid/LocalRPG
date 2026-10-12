@@ -177,7 +177,7 @@ remedy of downgrading twenty-three minor versions; `markdownlint-cli` avoided
 `braces` but pinned `js-yaml ~5.2.1`, inside a different advisory's range. The
 engine itself then turned out to reach a vulnerable `katex` through
 `micromark-extension-math`. A native binary has none of that surface, and
-`rumdl check` reports the same result on the corpus: no issues in 23 files.
+`rumdl check` reports the same result on the corpus: no issues in 24 files.
 
 **Do not add a Node markdown linter back.** If the docs ever need a rule the config
 cannot express, add it to `.rumdl.toml`, which is where the three deviations from
@@ -202,10 +202,10 @@ Vale checks prose style in the user-facing documentation only. It is pinned in
 `mise.toml` like every other tool, and `.vale.ini` at the repository root decides
 the styles.
 
-**Scope is 25 files**, and it is the same set `tools/sitegen/content.go` renders
+**Scope is 26 files**, and it is the same set `tools/sitegen/content.go` renders
 into the showcase site:
 
-- `pkg/gui/docs/*.md` - the 23 guide articles the application embeds, and the bulk
+- `pkg/gui/docs/*.md` - the 24 guide articles the application embeds, and the bulk
   of the user-facing prose.
 - `README.md` - the project README.
 - `docs/debugging.md` - the debugging guide.
@@ -226,10 +226,16 @@ STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
 
 ### What it reports today
 
-**234 alerts across all 25 files: 0 errors, 100 warnings and 134 suggestions.**
+**290 alerts across all 26 files: 0 errors, 112 warnings and 178 suggestions.**
 For scale, pointing the same styles at every tracked file reported 68,525 alerts
 and 6,875 errors, which is why the scope is the documentation rather than the
 repository.
+
+The noisiest rules are `Google.Passive` (109), `neighbor.AmpersandInProse` (75),
+`Google.Contractions` (42) and `Google.Semicolons` (24), and the noisiest files are
+`23-ai-world-generation.md` (44), `04-campaigns.md` (30) and `22-editing-content.md` (28).
+Re-run `SUMMARY=1 mise run lint:prose` rather than trusting these figures, which drift
+with every new article.
 
 **CI gates on the error level.** `STRICT=1` makes the task exit non-zero when an
 error is reported, and the workflow runs it that way. Warnings and suggestions are
@@ -240,12 +246,14 @@ counts and the noisiest rules.
 Reaching zero took three passes: narrowing the scope to the documentation, adding
 the vocabulary, and then rewriting the prose the remaining rules objected to. A
 fourth pass then worked down the warnings and suggestions, which took the report
-from 293 alerts to 149. The guide that documents the on-disk and package formats
-added 41 more, and the AI world generation guide added 44, so the count stands at 234.
+from 293 alerts to 149. Two later articles, the on-disk and package formats guide and
+the AI world generation guide, added 41 and 44, and the style packs article and a
+correction to the counts took it to 290. Fix the number from the tool rather than
+from this paragraph, which is a history rather than a reading.
 
-Everything left is deliberate. `neighbor.AmpersandInProse` (71) fires on `&` in
+Everything left is deliberate. `neighbor.AmpersandInProse` (75) fires on `&` in
 headings and bolded feature labels, which is a design convention rather than prose.
-`Google.Passive` (66) and `Google.Semicolons` (19) are style preferences, and
+`Google.Passive` (109) and `Google.Semicolons` (24) are style preferences, and
 passive voice and semicolons are both correct in technical writing.
 `neighbor.DeviceSpecificAction` (6) objects to "click", which is the real action in
 a desktop app. `neighbor.DirectionalLanguage` (3) flags "progress bar" and "prompt

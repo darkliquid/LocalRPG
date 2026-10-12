@@ -16,6 +16,41 @@
 
 ---
 
+## Progress
+
+The baseline above is a snapshot and is left as one: the numbers in the body and in
+[Appendix A](#appendix-a-metric-baseline) describe commit `78898e3e` and are not
+rewritten as work lands. What follows records the movement, re-measured at each merge.
+
+**Wave 6 so far.** Four of the 57 tasks in section 4 are done, at commit `d5574884`:
+
+| Task | Closed finding | What changed |
+|---|---|---|
+| TQ-1 | R-14, and the gofmt half of C-1 | 65 files formatted; `lint:gofmt` gates `mise run lint` and CI |
+| TQ-2 | R-15 | 636 uses of `interface{}` rewritten to `any`; surfaced and fixed a boolean named `any` that shadowed the builtin |
+| TQ-5 | C-4, C-5 | `project.sh` no longer clears a single-select field when a wave or area is added, and reads an option name containing a comma correctly |
+| TQ-11 | S-4 | `frontend/coverage/` ignored |
+
+**Re-measured after wave 6.**
+
+| Metric | Baseline | Now |
+|---|---|---|
+| Go files failing `gofmt` | 65 | 0 |
+| `interface{}` in Go (non-test) | 471 | 0 |
+| `mise run lint` code gates | `go vet` | `go vet`, `gofmt -l` |
+| Go statement coverage | 73.3% | 73.3% |
+| Go functions at 0% coverage | 422 | 422 |
+| Vale alerts / files | 290 / 26 | 290 / 26 |
+| Stale figures in `AGENTS.md` (D-9) | 4 | 0 |
+
+Two corrections were made to this review from evidence found while acting on it, both
+of which narrowed a claim: **CodeQL is running** (C-1), and the `interface{}` count in
+Appendix A was 636 across the whole tree rather than 471 outside tests alone. The lesson
+is recorded rather than quietly fixed, because a review that overstates is worth less
+than one that is wrong in a way you can check.
+
+---
+
 ## 1. Executive summary
 
 The project is well above average for a codebase of its size in the areas that are
