@@ -62,22 +62,12 @@ func getComfyBaseURL(endpoint string) string {
 type comfyUIImageClient struct {
 	endpoint string
 	client   *http.Client
-
-	usageMu   sync.Mutex
-	lastUsage media.Usage
 }
 
-// LastUsage reports one request; ComfyUI advertises no token or character count.
+// LastUsage reports one request; ComfyUI advertises no token or character count,
+// so there is nothing to record and the zero value is the answer.
 func (c *comfyUIImageClient) LastUsage() media.Usage {
-	c.usageMu.Lock()
-	defer c.usageMu.Unlock()
-	return c.lastUsage
-}
-
-func (c *comfyUIImageClient) setLastUsage(u media.Usage) {
-	c.usageMu.Lock()
-	c.lastUsage = u
-	c.usageMu.Unlock()
+	return media.Usage{}
 }
 
 func (c *comfyUIImageClient) GenerateImage(ctx context.Context, prompt string) ([]byte, error) {

@@ -1799,12 +1799,6 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 	}
 }
 
-// generate streams the gm reply through stream, falling back to the configured
-// fallback provider when the primary fails before producing any text.
-func (o *TurnOrchestrator) generate(ctx context.Context, prompt string, onChunk func(string) error) (streamResult, error) {
-	return o.generateRequest(ctx, harness.GenerateRequest{Prompt: prompt}, onChunk)
-}
-
 // generateRequest streams one request through the gm role, falling back to the
 // configured fallback provider when the primary fails before producing any text.
 func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.GenerateRequest, onChunk func(string) error) (streamResult, error) {

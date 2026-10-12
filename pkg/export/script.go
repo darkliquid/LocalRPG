@@ -385,7 +385,6 @@ func findBanner(dir string) (string, string) {
 
 // ScriptCompiler builds a scene script for a campaign.
 type ScriptCompiler struct {
-	rootDir  string
 	resolver *core.PathResolver
 	config   *config.Config
 	art      bool
