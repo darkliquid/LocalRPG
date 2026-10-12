@@ -1224,7 +1224,7 @@ two), `L` (a week or more). Impact is the finding severity.
 | A12 | Unify `cmd/localrpg` command shapes on `runXCommand(args, stdout, stderr) int`; align flag error modes; stop discarding the config load error in `play.go:34` | R-13 | M | Medium |
 | A13 | Run `gofmt -w cmd pkg tools`, then gate on `gofmt -l` in CI | R-14, C-1 | S | Medium |
 | A14 | Rewrite the 471 `interface{}` uses as `any` (or change the convention), then enable a rule that keeps it clean | R-15 | S | Medium |
-| A15 | Fix the `strings.Builder` and `slices.Contains` hints, and sweep the remaining `gopls` modernisation hints | R-16 | S | Low |
+| A15 | Work the 322 `gopls` hints, after TQ-4 has put `staticcheck` in place so the list comes from the gate rather than from a sample | R-16 | M | Low |
 
 ### Workstream B: make the frontend readable and accessible
 
