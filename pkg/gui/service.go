@@ -96,8 +96,6 @@ type Service struct {
 	// invalidated when settings change, so a named provider's model loads once.
 	ttsRegMu   sync.Mutex
 	ttsReg     *media.TTSRegistry
-	sttRegMu   sync.Mutex
-	sttReg     *media.STTRegistry
 	imageRegMu sync.Mutex
 	imageReg   *media.ImageRegistry
 	// Background work (entity enrichment, playback warm-up, retro-summary) is
@@ -223,11 +221,6 @@ func (s *Service) invalidateRegistries() {
 		s.ttsReg.Invalidate()
 	}
 	s.ttsRegMu.Unlock()
-	s.sttRegMu.Lock()
-	if s.sttReg != nil {
-		s.sttReg.Invalidate()
-	}
-	s.sttRegMu.Unlock()
 	s.imageRegMu.Lock()
 	if s.imageReg != nil {
 		s.imageReg.Invalidate()
@@ -243,16 +236,6 @@ func (s *Service) ttsRegistry() *media.TTSRegistry {
 		s.ttsReg = media.NewTTSRegistry(s.configMgr.Get(), s.logger)
 	}
 	return s.ttsReg
-}
-
-// sttRegistry returns the service's named STT registry, building it lazily.
-func (s *Service) sttRegistry() *media.STTRegistry {
-	s.sttRegMu.Lock()
-	defer s.sttRegMu.Unlock()
-	if s.sttReg == nil {
-		s.sttReg = media.NewSTTRegistry(s.configMgr.Get())
-	}
-	return s.sttReg
 }
 
 // imageRegistry returns the service's named image registry, building it lazily.
@@ -2223,6 +2206,10 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 			sceneWorker.SetOnReady(func(gID string, turnNum int, relPath string) {
 				s.broadcastSceneImageReady(gID, turnNum, relPath)
 			})
+			// Without this the worker plans every scene against a zero budget and an
+			// empty approval mode, so the campaign's image allowance is never
+			// enforced and its spend is never attributed.
+			s.configureSceneBudget(sceneWorker, gameID, cfg)
 			orchestrator.SetSceneWorker(sceneWorker)
 		}
 	}
@@ -2589,6 +2576,15 @@ func (s *Service) configureSceneBudget(worker *engine.SceneWorker, gameID string
 			"turn": turnNumber, "reason": reason,
 		})
 		s.broadcastSceneImagePending(gID, turnNumber, reason)
+	})
+	// ask mode on a metered provider withholds the image until the player agrees,
+	// so it has to say so. Without this the scene is simply absent and nothing
+	// reports why.
+	worker.SetOnPending(func(gID string, turnNumber int, _ engine.SceneJob) {
+		trace.OrNil(s.logger).Event("turn.image_pending", map[string]any{
+			"turn": turnNumber, "reason": "awaiting_approval",
+		})
+		s.broadcastSceneImagePending(gID, turnNumber, "awaiting_approval")
 	})
 }
 

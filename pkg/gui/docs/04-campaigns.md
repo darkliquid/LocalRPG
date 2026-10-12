@@ -108,9 +108,11 @@ An image is counted and charged as it is generated, and the counters are saved w
 the campaign. When the budget is spent the provider is not called: the free
 procedural generator draws the beat instead, so a turn is never left without an
 image, and the skip is traced. With `image_approval: ask` a metered provider waits
-for you to ask for the image rather than generating one automatically; a local
-provider is never asked, because it does not charge. The turn readout shows how
-many images remain.
+rather than generating: the scene is withheld and the turn reports it, so nothing is
+billed without your agreement. A local provider is never asked, because it does not
+charge. You cannot approve a withheld image yet, so an `ask` campaign keeps only what
+its budget lets you generate, and procedural art covers the rest. The turn readout
+shows how many images remain.
 
 ### Exports
 

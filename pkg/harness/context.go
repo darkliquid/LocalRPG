@@ -1003,27 +1003,6 @@ func FormatVoiceProfilesCatalog(profiles []config.VoiceProfile) string {
 	return sb.String()
 }
 
-// speechFormattingInstruction is the default instructions block kept for backwards compatibility.
-const speechFormattingInstruction = `## SPEECH FORMATTING
-Write each spoken line on its own line as a blockquote, formatted as:
-> Name: "the words spoken"
-Every spoken line, dialogue beat, disembodied voice, or unknown speaker MUST start with '> '.
-Use a character's established name, or [[their note name]] to link them.
-Keep narration on its own lines with no leading '> ' or name. If a speaker is unknown
-or cannot be named, format with a blockquote (e.g. '> Unknown Voice: "Who is there?"')
-or leave the words in the narration instead of inventing a character.
-
-## PROSE FORMATTING
-Separate narration beats with blank lines, one beat per paragraph.
-Use plain prose. Do not emit headings, tables, or code fences in narration.
-You may use *single asterisks* for emphasis and --- for a scene break.
-
-## CONTINUITY
-Never rename a character who has already appeared. Once someone is introduced,
-reuse exactly the same name, and link them with [[that name]] every time.
-Continue the conversation the player is having; do not restart the scene.
-Do not write voice IDs, voice tags, or profile names into the narration.`
-
 // FormatSpeechFormattingInstructions builds the speech and prose formatting prompt
 // tailored to the active engine's speech steering capabilities.
 func FormatSpeechFormattingInstructions(cues SpeechCueContext) string {
