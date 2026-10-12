@@ -3,7 +3,7 @@ id: 16-local-tts-fish-audio
 title: Setting Up Fish Audio S2 with vLLM-Omni
 category: Local AI & Self-Hosting
 order: 16
-description: GPU requirements, Docker/vLLM-Omni container setup, voice cloning, and emotion tag performance steering.
+description: GPU requirements, Docker/vLLM-Omni container setup, voice cloning, and how emotion tags steer the performance.
 ---
 
 # Setting Up Fish Audio S2 with vLLM-Omni

@@ -51,8 +51,13 @@ func parseDocFile(data []byte) (*docFrontmatter, string, error) {
 	return &fm, bodyRaw, nil
 }
 
-// GetDocsList returns metadata for all embedded documentation articles sorted by category and order.
-func (s *Service) GetDocsList(_ context.Context) ([]DocArticleSummaryDTO, error) {
+// listEmbeddedDocs reads the frontmatter of every embedded guide and returns them
+// in the order the viewer shows them: by order, then category, then id.
+//
+// It is separate from GetDocsList so the generated index article can be built from
+// the same list the viewer renders rather than from a second sort that could drift
+// from it.
+func listEmbeddedDocs() ([]DocArticleSummaryDTO, error) {
 	entries, err := fs.ReadDir(embeddedDocsFS, "docs")
 	if err != nil {
 		return nil, fmt.Errorf("read embedded docs: %w", err)
@@ -99,6 +104,12 @@ func (s *Service) GetDocsList(_ context.Context) ([]DocArticleSummaryDTO, error)
 	})
 
 	return summaries, nil
+}
+
+// GetDocsList returns metadata for every embedded documentation article, in the
+// order the viewer shows them.
+func (s *Service) GetDocsList(_ context.Context) ([]DocArticleSummaryDTO, error) {
+	return listEmbeddedDocs()
 }
 
 // GetDocArticle retrieves an article by its ID.

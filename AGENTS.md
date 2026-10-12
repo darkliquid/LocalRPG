@@ -39,8 +39,9 @@ mise run clean
 
 Run a single Go test: `go test -run TestTurnOrchestrator ./pkg/engine/`.
 
-Regenerate the generated embedded docs (provider catalogue, config reference)
-after changing a provider, preset, or config struct:
+Regenerate the generated embedded docs (the index, provider catalogue, config reference)
+after changing a provider, preset or config struct, and after adding, renaming or
+re-describing any guide article, since the index lists them all:
 `go test ./pkg/gui -update-docs`.
 
 CLI surface (`localrpg <cmd>`): `roll <notation>`, `prompt`, `play <game-id>`, `tts`, `image`, `gui`, `export <web|video>`, `debug <test-run|server>`, `config <cmd>`, `version`.
@@ -180,7 +181,7 @@ remedy of downgrading twenty-three minor versions; `markdownlint-cli` avoided
 `braces` but pinned `js-yaml ~5.2.1`, inside a different advisory's range. The
 engine itself then turned out to reach a vulnerable `katex` through
 `micromark-extension-math`. A native binary has none of that surface, and
-`rumdl check` reports the same result on the corpus: no issues in 24 files.
+`rumdl check` reports the same result on the corpus: no issues in 25 files.
 
 **Do not add a Node markdown linter back.** If the docs ever need a rule the config
 cannot express, add it to `.rumdl.toml`, which is where the three deviations from
@@ -205,10 +206,10 @@ Vale checks prose style in the user-facing documentation only. It is pinned in
 `mise.toml` like every other tool, and `.vale.ini` at the repository root decides
 the styles.
 
-**Scope is 26 files**, and it is the same set `tools/sitegen/content.go` renders
+**Scope is 27 files**, and it is the same set `tools/sitegen/content.go` renders
 into the showcase site:
 
-- `pkg/gui/docs/*.md` - the 24 guide articles the application embeds, and the bulk
+- `pkg/gui/docs/*.md` - the 25 guide articles the application embeds, and the bulk
   of the user-facing prose.
 - `README.md` - the project README.
 - `docs/debugging.md` - the debugging guide.
@@ -229,10 +230,15 @@ STRICT=1 mise run lint:prose   # exit non-zero on error-level alerts
 
 ### What it reports today
 
-**290 alerts across all 26 files: 0 errors, 112 warnings and 178 suggestions.**
+**314 alerts across all 27 files: 0 errors, 130 warnings and 184 suggestions.**
 For scale, pointing the same styles at every tracked file reported 68,525 alerts
 and 6,875 errors, which is why the scope is the documentation rather than the
 repository.
+
+The generated `00-start-here.md` index carries a copy of every other article's
+description, so a description that trips an error-level rule fails the build in two
+places. That is deliberate: a description is user-facing, in the viewer's search and
+sidebar, and it is better held to the same rules as the prose.
 
 The noisiest rules are `Google.Passive` (109), `neighbor.AmpersandInProse` (75),
 `Google.Contractions` (42) and `Google.Semicolons` (24), and the noisiest files are

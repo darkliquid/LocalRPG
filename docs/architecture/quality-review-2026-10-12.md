@@ -22,14 +22,22 @@ The baseline above is a snapshot and is left as one: the numbers in the body and
 [Appendix A](#appendix-a-metric-baseline) describe commit `78898e3e` and are not
 rewritten as work lands. What follows records the movement, re-measured at each merge.
 
-**Wave 6 so far.** Four of the 57 tasks in section 4 are done, at commit `d5574884`:
+**Wave 6 so far.** Ten of the 57 tasks in section 4 are done, plus RD-13, which the review
+itself did not anticipate; all at commit `e3ca988b`:
 
 | Task | Closed finding | What changed |
 |---|---|---|
 | TQ-1 | R-14, and the gofmt half of C-1 | 65 files formatted; `lint:gofmt` gates `mise run lint` and CI |
 | TQ-2 | R-15 | 636 uses of `interface{}` rewritten to `any`; surfaced and fixed a boolean named `any` that shadowed the builtin |
+| TQ-4 | the rest of C-1 | `staticcheck` pinned and gated; 25 findings fixed, and one of them, a provider that dropped a model's tool calls, was a real bug |
 | TQ-5 | C-4, C-5 | `project.sh` no longer clears a single-select field when a wave or area is added, and reads an option name containing a comma correctly |
 | TQ-11 | S-4 | `frontend/coverage/` ignored |
+| RD-13 | R-10, and ten `U1000` findings | The scene worker's budget, approval, price, fallback and skip callback were configured by a function nothing called, so a campaign's image allowance was never enforced |
+| TC-1 | T-1, T-3 | Coverage floors on both suites: Go 72.0%, frontend 33/34/33/30 |
+| FE-1 | F-1 | ESLint and Prettier, the tree formatted, and the six hook-dependency findings they immediately exposed |
+| DOC-9 | D-9 | The stale counts in `AGENTS.md` corrected |
+| DOC-5 | D-5 | Six articles shared two `order` values, so the sidebar sorted arbitrarily |
+| DOC-4 | D-6 | A generated `00-start-here.md` index, which is what the viewer opens, and a pointer to the manual from the README |
 
 **Re-measured after wave 6.**
 
@@ -37,17 +45,21 @@ rewritten as work lands. What follows records the movement, re-measured at each 
 |---|---|---|
 | Go files failing `gofmt` | 65 | 0 |
 | `interface{}` in Go (non-test) | 471 | 0 |
-| `mise run lint` code gates | `go vet` | `go vet`, `gofmt -l` |
+| `mise run lint` code gates | `go vet` | `go vet`, `gofmt -l`, `staticcheck`, ESLint, Prettier |
 | Go statement coverage | 73.3% | 73.3% |
 | Go functions at 0% coverage | 422 | 422 |
-| Vale alerts / files | 290 / 26 | 290 / 26 |
+| Guide articles | 24 | 25 |
+| Vale alerts / files | 290 / 26 | 314 / 27 |
 | Stale figures in `AGENTS.md` (D-9) | 4 | 0 |
 
 Two corrections were made to this review from evidence found while acting on it, both
 of which narrowed a claim: **CodeQL is running** (C-1), and the `interface{}` count in
-Appendix A was 636 across the whole tree rather than 471 outside tests alone. The lesson
-is recorded rather than quietly fixed, because a review that overstates is worth less
-than one that is wrong in a way you can check.
+Appendix A was 636 across the whole tree rather than 471 outside tests alone. Two more
+were forced by the work itself: F-1's "five dead suppressions" were four working
+suppressions and one dead one, and TQ-3's premise, that its hint list would come from the
+gate, does not hold, because the gate is `staticcheck` and it reports none of those hints.
+The lesson is recorded rather than quietly fixed, because a review that overstates is
+worth less than one that is wrong in a way you can check.
 
 ---
 
