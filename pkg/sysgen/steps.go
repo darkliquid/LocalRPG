@@ -247,4 +247,3 @@ func runRules(ctx context.Context, gen Generator, brief Brief, spec *core.Mechan
 	}
 	return out.Rules, nil
 }
-

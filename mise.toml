@@ -78,6 +78,19 @@ depends = ["test:backend", "test:frontend", "test:e2e"]
 description = "Lint the embedded documentation Markdown with rumdl"
 run = "rumdl check pkg/gui/docs"
 
+[tasks."lint:gofmt"]
+description = "Fail if any Go file is not gofmt-formatted"
+# `gofmt -l` prints the offending files and exits 0 either way, so the list is
+# captured and the exit status comes from whether it is empty. Printing it in the
+# failing case is what tells a contributor which files to fix.
+run = """
+files="$(gofmt -l cmd pkg tools)"
+if [ -n "$files" ]; then
+  printf 'gofmt: these files are not formatted (run `gofmt -w` on them):\\n%s\\n' "$files"
+  exit 1
+fi
+"""
+
 [tasks."lint:prose"]
 description = "Run Vale over tracked prose and source comments (report only; STRICT=1 to gate)"
 depends = ["install:vale-styles"]
@@ -85,7 +98,7 @@ run = "bash scripts/lint-prose.sh"
 
 [tasks.lint]
 description = "Run code analysis and linting"
-depends = ["lint:docs", "lint:goreleaser", "lint:actions"]
+depends = ["lint:docs", "lint:gofmt", "lint:goreleaser", "lint:actions"]
 run = """
 go vet ./...
 go vet -tags e2e ./pkg/e2e/...

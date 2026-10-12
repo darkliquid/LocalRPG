@@ -103,7 +103,8 @@ func TestHealthOutcomeWithoutSpecIsEmpty(t *testing.T) {
 	}
 }
 
-func TestMechanicsInstructionIncludesPlayerStats(t *testing.T) {	o, jsEngine := engagementOrchestrator(t)
+func TestMechanicsInstructionIncludesPlayerStats(t *testing.T) {
+	o, jsEngine := engagementOrchestrator(t)
 	if err := jsEngine.HostAPI().SetStat("player", "body", 3); err != nil {
 		t.Fatal(err)
 	}

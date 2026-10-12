@@ -315,4 +315,3 @@ func TestRegistrySourcesRouteDispatchesByMethod(t *testing.T) {
 		t.Fatalf("second DELETE status = %d, want 404", rec.Code)
 	}
 }
-

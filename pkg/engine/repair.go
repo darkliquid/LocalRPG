@@ -72,4 +72,3 @@ func repairInstruction(p ReplyProblem, detail string) string {
 	}
 	return "Your previous reply was empty. Write the turn now."
 }
-

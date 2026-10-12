@@ -558,4 +558,3 @@ func (e *Executor) assignVoice(arguments map[string]interface{}) (string, bool) 
 
 	return fmt.Sprintf("Voice profile %q (%s) staged for %q. It will be assigned when the character note is created.", targetProfile.ID, targetProfile.Description, idOrName), true
 }
-

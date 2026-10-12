@@ -217,4 +217,3 @@ func craftProse(prompt string) string {
 	}
 	return op + "\n\n" + body
 }
-

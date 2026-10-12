@@ -479,9 +479,9 @@ func TestGeminiProviderStreamCapturesAndPropagatesThoughtSignatures(t *testing.T
 
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:     "test-key",
-		Backend:    genai.BackendGeminiAPI,
-		HTTPClient: server.Client(),
+		APIKey:      "test-key",
+		Backend:     genai.BackendGeminiAPI,
+		HTTPClient:  server.Client(),
 		HTTPOptions: genai.HTTPOptions{BaseURL: server.URL},
 	})
 	if err != nil {
@@ -529,9 +529,9 @@ func TestGeminiProviderStreamPropagatesSignatureFromThought(t *testing.T) {
 
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:     "test-key",
-		Backend:    genai.BackendGeminiAPI,
-		HTTPClient: server.Client(),
+		APIKey:      "test-key",
+		Backend:     genai.BackendGeminiAPI,
+		HTTPClient:  server.Client(),
 		HTTPOptions: genai.HTTPOptions{BaseURL: server.URL},
 	})
 	if err != nil {
@@ -579,9 +579,9 @@ func TestGeminiProviderBuildContentsEchoesThoughtSignature(t *testing.T) {
 
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:     "test-key",
-		Backend:    genai.BackendGeminiAPI,
-		HTTPClient: server.Client(),
+		APIKey:      "test-key",
+		Backend:     genai.BackendGeminiAPI,
+		HTTPClient:  server.Client(),
 		HTTPOptions: genai.HTTPOptions{BaseURL: server.URL},
 	})
 	if err != nil {
@@ -704,4 +704,3 @@ func TestGeminiProviderInteractionsStepsSchema(t *testing.T) {
 		t.Errorf("ContinueSession text = %q, want %q", contResp.Text, "The corridor ahead is shrouded in impenetrable mist.")
 	}
 }
-

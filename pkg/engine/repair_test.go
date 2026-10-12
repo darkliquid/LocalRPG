@@ -9,7 +9,6 @@ import (
 	"github.com/darkliquid/localrpg/pkg/turnstream"
 )
 
-
 func TestClassifyReply(t *testing.T) {
 	if classifyReply(streamResult{Text: "A valid reply."}, turnstream.RepairReport{}) != ProblemNone {
 		t.Fatal("a valid reply is not a problem")
@@ -129,5 +128,3 @@ func TestRepairRecordsAttempts(t *testing.T) {
 		t.Fatalf("turn narration = %q", turn.Narration)
 	}
 }
-
-

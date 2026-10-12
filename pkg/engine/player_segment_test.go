@@ -43,8 +43,8 @@ func TestAttachPlayerSegment_DeduplicatesExistingEcho(t *testing.T) {
 			Player:    false,
 		},
 		{
-			Kind:      entity.SegmentNarration,
-			Text:      "The shadows lengthen.",
+			Kind: entity.SegmentNarration,
+			Text: "The shadows lengthen.",
 		},
 	}
 
@@ -145,4 +145,3 @@ func TestAttachPlayerSegment_DeduplicatesAfterOpeningNarration(t *testing.T) {
 		t.Errorf("expected result[1].Player to be true")
 	}
 }
-

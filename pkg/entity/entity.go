@@ -26,27 +26,27 @@ type VoiceConfig struct {
 }
 
 type EntityFrontmatter struct {
-	ID         string                 `yaml:"id"`
-	Name       string                 `yaml:"name"`
-	Type       string                 `yaml:"type"`
-	Tags       []string               `yaml:"tags,omitempty"`
-	Voice           *VoiceConfig           `yaml:"voice,omitempty"`
-	Portrait        string                 `yaml:"portrait,omitempty"`
-	PortraitVersion int                    `yaml:"portrait_version,omitempty" json:"portrait_version,omitempty"`
-	PortraitHistory []string               `yaml:"portrait_history,omitempty" json:"portrait_history,omitempty"`
-	Location        string                 `yaml:"location,omitempty"`
-	Appearance      string                 `yaml:"appearance,omitempty" json:"appearance,omitempty"`
+	ID              string       `yaml:"id"`
+	Name            string       `yaml:"name"`
+	Type            string       `yaml:"type"`
+	Tags            []string     `yaml:"tags,omitempty"`
+	Voice           *VoiceConfig `yaml:"voice,omitempty"`
+	Portrait        string       `yaml:"portrait,omitempty"`
+	PortraitVersion int          `yaml:"portrait_version,omitempty" json:"portrait_version,omitempty"`
+	PortraitHistory []string     `yaml:"portrait_history,omitempty" json:"portrait_history,omitempty"`
+	Location        string       `yaml:"location,omitempty"`
+	Appearance      string       `yaml:"appearance,omitempty" json:"appearance,omitempty"`
 	// CurrentAppearance is how the note looks right now, layered on Appearance by
 	// DescribeAppearance. Play writes it, and it describes the present rather than
 	// the identity, so a reset clears it and the baseline is never rewritten.
-	CurrentAppearance string               `yaml:"current_appearance,omitempty" json:"current_appearance,omitempty"`
-	Gender          string                 `yaml:"gender,omitempty" json:"gender,omitempty"`
-	Age             string                 `yaml:"age,omitempty" json:"age,omitempty"`
-	Aliases         []string               `yaml:"aliases,omitempty" json:"aliases,omitempty"`
-	Faction         string                 `yaml:"faction,omitempty"`
-	History         []int                  `yaml:"history,omitempty" json:"history,omitempty"`
-	State           map[string]interface{} `yaml:"state,omitempty"`
-	ExtraMeta       map[string]interface{} `yaml:",inline"`
+	CurrentAppearance string                 `yaml:"current_appearance,omitempty" json:"current_appearance,omitempty"`
+	Gender            string                 `yaml:"gender,omitempty" json:"gender,omitempty"`
+	Age               string                 `yaml:"age,omitempty" json:"age,omitempty"`
+	Aliases           []string               `yaml:"aliases,omitempty" json:"aliases,omitempty"`
+	Faction           string                 `yaml:"faction,omitempty"`
+	History           []int                  `yaml:"history,omitempty" json:"history,omitempty"`
+	State             map[string]interface{} `yaml:"state,omitempty"`
+	ExtraMeta         map[string]interface{} `yaml:",inline"`
 }
 
 type Entity struct {
@@ -60,7 +60,7 @@ type Entity struct {
 	PortraitHistory []string
 	Location        string
 	Faction         string
-	Appearance string
+	Appearance      string
 	// CurrentAppearance is how the note looks now: a fresh scar, soaked clothes, a
 	// disguise. It qualifies Appearance rather than replacing it.
 	CurrentAppearance string
@@ -143,27 +143,27 @@ func ParseMarkdownEntity(data []byte) (*Entity, error) {
 	}
 
 	entity := &Entity{
-		ID:         entID,
-		Name:       fm.Name,
-		Type:       fm.Type,
-		Tags:       fm.Tags,
-		Voice:      fm.Voice,
-		Portrait:        fm.Portrait,
-		PortraitVersion: fm.PortraitVersion,
-		PortraitHistory: fm.PortraitHistory,
-		Location:        fm.Location,
-		Faction:    fm.Faction,
+		ID:                entID,
+		Name:              fm.Name,
+		Type:              fm.Type,
+		Tags:              fm.Tags,
+		Voice:             fm.Voice,
+		Portrait:          fm.Portrait,
+		PortraitVersion:   fm.PortraitVersion,
+		PortraitHistory:   fm.PortraitHistory,
+		Location:          fm.Location,
+		Faction:           fm.Faction,
 		Appearance:        fm.Appearance,
 		CurrentAppearance: fm.CurrentAppearance,
 		Gender:            fm.Gender,
-		Age:        fm.Age,
-		Aliases:    fm.Aliases,
-		History:    fm.History,
-		State:      state.NewState(fm.State),
-		ExtraMeta:  fm.ExtraMeta,
-		Body:       bodyRaw,
-		Wikilinks:  links,
-		Hash:       fileHash,
+		Age:               fm.Age,
+		Aliases:           fm.Aliases,
+		History:           fm.History,
+		State:             state.NewState(fm.State),
+		ExtraMeta:         fm.ExtraMeta,
+		Body:              bodyRaw,
+		Wikilinks:         links,
+		Hash:              fileHash,
 	}
 
 	return entity, nil
@@ -338,22 +338,22 @@ func IsCharacterType(t string) bool {
 
 func (e *Entity) SerializeMarkdown() ([]byte, error) {
 	fm := EntityFrontmatter{
-		ID:         e.ID,
-		Name:       e.Name,
-		Type:       e.Type,
-		Tags:       e.Tags,
-		Voice:           e.Voice,
-		Portrait:        e.Portrait,
-		PortraitVersion: e.PortraitVersion,
-		PortraitHistory: e.PortraitHistory,
-		Location:        e.Location,
-		Faction:         e.Faction,
+		ID:                e.ID,
+		Name:              e.Name,
+		Type:              e.Type,
+		Tags:              e.Tags,
+		Voice:             e.Voice,
+		Portrait:          e.Portrait,
+		PortraitVersion:   e.PortraitVersion,
+		PortraitHistory:   e.PortraitHistory,
+		Location:          e.Location,
+		Faction:           e.Faction,
 		Appearance:        e.Appearance,
 		CurrentAppearance: e.CurrentAppearance,
 		Gender:            e.Gender,
-		Age:             e.Age,
-		Aliases:         e.Aliases,
-		History:         e.History,
+		Age:               e.Age,
+		Aliases:           e.Aliases,
+		History:           e.History,
 	}
 	if len(e.ExtraMeta) > 0 {
 		extra := make(map[string]interface{}, len(e.ExtraMeta))

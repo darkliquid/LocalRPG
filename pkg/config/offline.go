@@ -304,4 +304,3 @@ func embeddingKey(cfg EmbeddingProviderConfig) provider.Key {
 	}
 	return ""
 }
-

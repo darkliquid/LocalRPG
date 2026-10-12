@@ -1136,7 +1136,6 @@ func (c *Config) CompletionMaxRepairAttempts() int {
 	return c.Agents.Completion.MaxRepairAttempts
 }
 
-
 // CompletionTailChars is how much of the partial reply the continuation call sees.
 func (c *Config) CompletionTailChars() int {
 	if c.Agents.Completion.TailChars <= 0 {

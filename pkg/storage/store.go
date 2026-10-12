@@ -44,20 +44,20 @@ func (s *Store) SaveEntity(e *entity.Entity) error {
 	defer tx.Rollback()
 
 	fmMeta := map[string]interface{}{
-		"tags":             e.Tags,
-		"voice":            e.Voice,
-		"portrait":         e.Portrait,
-		"portrait_version": e.PortraitVersion,
-		"portrait_history": e.PortraitHistory,
-		"location":         e.Location,
-		"faction":          e.Faction,
-		"appearance": e.Appearance,
+		"tags":               e.Tags,
+		"voice":              e.Voice,
+		"portrait":           e.Portrait,
+		"portrait_version":   e.PortraitVersion,
+		"portrait_history":   e.PortraitHistory,
+		"location":           e.Location,
+		"faction":            e.Faction,
+		"appearance":         e.Appearance,
 		"current_appearance": e.CurrentAppearance,
-		"age":        e.Age,
-		"gender":     e.Gender,
-		"aliases":    e.Aliases,
-		"history":    e.History,
-		"extra":      e.ExtraMeta,
+		"age":                e.Age,
+		"gender":             e.Gender,
+		"aliases":            e.Aliases,
+		"history":            e.History,
+		"extra":              e.ExtraMeta,
 	}
 	if e.State != nil {
 		fmMeta["state"] = e.State.Raw()

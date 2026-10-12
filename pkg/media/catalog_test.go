@@ -103,4 +103,3 @@ func TestCartesiaKeyPresentWithSharedKey(t *testing.T) {
 		t.Error("expected true with CARTESIA_API_KEY env set")
 	}
 }
-

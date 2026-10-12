@@ -104,4 +104,3 @@ func TestQueueStreamerChainsQueues(t *testing.T) {
 		t.Fatalf("streamed %d frames, want %d across chained queues", total, want)
 	}
 }
-

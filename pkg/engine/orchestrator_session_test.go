@@ -271,4 +271,3 @@ func TestOrchestratorToolCallerWithSessionDoesNotBypassTools(t *testing.T) {
 		t.Errorf("StartSession should not be called when tool calling is required, got %d calls", model.startCalls)
 	}
 }
-

@@ -425,4 +425,3 @@ func TestSimpleTurnPlaybackUnchanged(t *testing.T) {
 		}
 	}
 }
-

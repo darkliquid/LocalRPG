@@ -222,7 +222,6 @@ func TestMaxRepairAttemptsDefault(t *testing.T) {
 	}
 }
 
-
 func TestDefaultConfigCarriesCompletionKnobs(t *testing.T) {
 	cfg := DefaultConfig()
 	if cfg.Agents.Completion.Mode != "trim" {

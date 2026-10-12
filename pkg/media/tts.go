@@ -442,7 +442,8 @@ func (p *TTSPipeline) CountUncachedGroups(groups []ClipGroup) (cached, uncached 
 
 // LastUsage reports what the most recent synthesis consumed. A cache hit or a
 // provider that reports nothing yields the zero value.
-func (p *TTSPipeline) LastUsage() Usage {	p.flightMu.Lock()
+func (p *TTSPipeline) LastUsage() Usage {
+	p.flightMu.Lock()
 	defer p.flightMu.Unlock()
 	return p.lastUsage
 }

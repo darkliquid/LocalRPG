@@ -168,11 +168,11 @@ func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
 	tw := tar.NewWriter(gzw)
 
 	pkgHdr := &tar.Header{
-		Name:     "package.yaml",
-		Mode:     0644,
-		Size:     int64(len(manifestBytes)),
-		ModTime:  time.Unix(0, 0),
-		Format:   tar.FormatPAX,
+		Name:    "package.yaml",
+		Mode:    0644,
+		Size:    int64(len(manifestBytes)),
+		ModTime: time.Unix(0, 0),
+		Format:  tar.FormatPAX,
 	}
 	if err := tw.WriteHeader(pkgHdr); err != nil {
 		_ = gzw.Close()
@@ -186,11 +186,11 @@ func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
 	sigPath := filepath.Join(dir, "package.sig")
 	if sigBytes, err := os.ReadFile(sigPath); err == nil && len(sigBytes) > 0 {
 		sigHdr := &tar.Header{
-			Name:     "package.sig",
-			Mode:     0644,
-			Size:     int64(len(sigBytes)),
-			ModTime:  time.Unix(0, 0),
-			Format:   tar.FormatPAX,
+			Name:    "package.sig",
+			Mode:    0644,
+			Size:    int64(len(sigBytes)),
+			ModTime: time.Unix(0, 0),
+			Format:  tar.FormatPAX,
 		}
 		if err := tw.WriteHeader(sigHdr); err != nil {
 			_ = gzw.Close()
@@ -211,11 +211,11 @@ func Pack(dir, typ string, meta ManifestMeta, w io.Writer) (Manifest, error) {
 		}
 
 		hdr := &tar.Header{
-			Name:     fe.Path,
-			Mode:     0644,
-			Size:     fe.Size,
-			ModTime:  time.Unix(0, 0),
-			Format:   tar.FormatPAX,
+			Name:    fe.Path,
+			Mode:    0644,
+			Size:    fe.Size,
+			ModTime: time.Unix(0, 0),
+			Format:  tar.FormatPAX,
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
 			_ = gzw.Close()

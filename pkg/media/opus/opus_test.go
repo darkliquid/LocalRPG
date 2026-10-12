@@ -124,4 +124,3 @@ func TestEncodeRejectsInvalidSampleRate(t *testing.T) {
 		t.Fatal("expected an error for zero sample rate")
 	}
 }
-

@@ -1332,8 +1332,8 @@ func TestCommitDraftAcceptsByReference(t *testing.T) {
 func TestCommitDraftWritesTheReviewersEdit(t *testing.T) {
 	svc := NewService(t.TempDir())
 	saveDraftForTest(t, svc, worldgen.Draft{
-		ID:       "ashen-reach",
-		World:    coreWorld("Ashen Reach"),
+		ID:    "ashen-reach",
+		World: coreWorld("Ashen Reach"),
 		// The folder is what an import files a note in, and an edit must not lose it.
 		Entities: []worldgen.DraftEntity{
 			{ID: "saltmarch", Name: "Saltmarch", Type: "location", Folder: "locations", Body: "A port."},

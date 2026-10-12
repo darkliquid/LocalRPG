@@ -206,10 +206,10 @@ func (s *Service) setTextOutcome(span oteltrace.Span, outcome generationOutcome,
 func (s *Service) recordGenerationAttempts(ctx context.Context, span oteltrace.Span, attempts []harness.Attempt) {
 	for i, attempt := range attempts {
 		trace.LogEvent(ctx, trace.OrNil(s.logger), "generate.attempt", map[string]interface{}{
-			"role":         attempt.Role,
-			"provider":     attempt.Provider,
-			"code":         string(attempt.Code),
-			"duration_ms":  attempt.DurationMS,
+			"role":        attempt.Role,
+			"provider":    attempt.Provider,
+			"code":        string(attempt.Code),
+			"duration_ms": attempt.DurationMS,
 		})
 		if span != nil {
 			span.AddEvent("attempt", oteltrace.WithAttributes(

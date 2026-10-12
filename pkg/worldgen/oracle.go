@@ -164,9 +164,9 @@ func (o *OracleGenerator) linked(prompt string) map[string]any {
 func (o *OracleGenerator) proposals(prompt string) map[string]any {
 	return map[string]any{"proposals": []map[string]string{
 		{
-			"kind":  "lore",
-			"title": "A Deeper History",
-			"body":  "Long before the present day, this world was shaped by a conflict whose outcome is still felt.",
+			"kind":   "lore",
+			"title":  "A Deeper History",
+			"body":   "Long before the present day, this world was shaped by a conflict whose outcome is still felt.",
 			"reason": "the lore has no history section",
 		},
 		{

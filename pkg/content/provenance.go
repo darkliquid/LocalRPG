@@ -20,7 +20,7 @@ import (
 
 // Trust is the outcome of a provenance check.
 type Trust struct {
-	State       string `json:"state"`                 // "verified" | "unknown_key" | "unsigned" | "invalid"
+	State       string `json:"state"` // "verified" | "unknown_key" | "unsigned" | "invalid"
 	Publisher   string `json:"publisher,omitempty"`
 	Fingerprint string `json:"fingerprint,omitempty"`
 }
@@ -224,11 +224,11 @@ func SignPackageFile(archivePath string, key ed25519.PrivateKey, publisher strin
 
 	// 1. package.yaml
 	pkgHdr := &tar.Header{
-		Name:     "package.yaml",
-		Mode:     0644,
-		Size:     int64(len(manifestData)),
-		ModTime:  time.Unix(0, 0),
-		Format:   tar.FormatPAX,
+		Name:    "package.yaml",
+		Mode:    0644,
+		Size:    int64(len(manifestData)),
+		ModTime: time.Unix(0, 0),
+		Format:  tar.FormatPAX,
 	}
 	if err := tw.WriteHeader(pkgHdr); err != nil {
 		_ = tmpFile.Close()
@@ -241,11 +241,11 @@ func SignPackageFile(archivePath string, key ed25519.PrivateKey, publisher strin
 
 	// 2. package.sig
 	sigHdr := &tar.Header{
-		Name:     "package.sig",
-		Mode:     0644,
-		Size:     int64(len(sigBytes)),
-		ModTime:  time.Unix(0, 0),
-		Format:   tar.FormatPAX,
+		Name:    "package.sig",
+		Mode:    0644,
+		Size:    int64(len(sigBytes)),
+		ModTime: time.Unix(0, 0),
+		Format:  tar.FormatPAX,
 	}
 	if err := tw.WriteHeader(sigHdr); err != nil {
 		_ = tmpFile.Close()

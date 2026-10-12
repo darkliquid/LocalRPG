@@ -277,4 +277,3 @@ func TestPortraitWorker_VersionedPortraitsAndHistoryRetention(t *testing.T) {
 		t.Errorf("expected PortraitHistory [%s], got %v", path1, parsedVera2.PortraitHistory)
 	}
 }
-

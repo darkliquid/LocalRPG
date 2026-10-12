@@ -173,8 +173,8 @@ type webPayloadFixture struct {
 			Outcome  string   `json:"outcome"`
 		} `json:"beats"`
 	} `json:"scenes"`
-	Captions    string  `json:"captions"`
-	ChaptersVTT string  `json:"chapters_vtt"`
+	Captions    string `json:"captions"`
+	ChaptersVTT string `json:"chapters_vtt"`
 	Chapters    []struct {
 		Title string  `json:"title"`
 		Start float64 `json:"start"`

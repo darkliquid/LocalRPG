@@ -99,9 +99,9 @@ type Script struct {
 
 	// WorldStyle is the world's art style and genre as one string, and Genre is the
 	// world's genre alone, which the no-art background is tinted by.
-	WorldStyle    string
-	Genre         string
-	Scenes        []Scene
+	WorldStyle string
+	Genre      string
+	Scenes     []Scene
 	// Chapters are the scenes as navigable boundaries, derived once so the web and
 	// the video exports agree on where each scene starts.
 	Chapters      []Chapter

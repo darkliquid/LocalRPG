@@ -974,4 +974,3 @@ func TestContextAssemblerOracleContract(t *testing.T) {
 		t.Fatalf("context prompt must contain stats marker for oracle: %s", prompt)
 	}
 }
-

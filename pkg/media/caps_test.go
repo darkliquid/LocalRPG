@@ -68,4 +68,3 @@ func TestTurnGroupCapsKeepProviderCapsWithoutLiveGrouping(t *testing.T) {
 		})
 	}
 }
-

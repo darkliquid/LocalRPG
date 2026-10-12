@@ -114,4 +114,3 @@ func TestDynamicRosterRejectsNonCharacterPhrases(t *testing.T) {
 		}
 	}
 }
-

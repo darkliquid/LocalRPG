@@ -135,4 +135,3 @@ func TestParseAcceptsUnquotedSpeechForResolvedSpeakers(t *testing.T) {
 		t.Fatalf("Parse() = %#v, want %#v", segments, want)
 	}
 }
-

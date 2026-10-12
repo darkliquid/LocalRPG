@@ -82,4 +82,3 @@ func TestApplyOfflinePresetPreservesPathsAndPreferences(t *testing.T) {
 		t.Fatalf("preferences altered: got %+v, want %+v", cfg.Preferences, wantPrefs)
 	}
 }
-
