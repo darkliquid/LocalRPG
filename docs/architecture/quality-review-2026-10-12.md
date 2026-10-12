@@ -52,7 +52,7 @@ The weaknesses cluster in four places:
 | UI/UX flow coverage | **Poor** | 10 e2e tests for the whole application |
 | Documentation | **Good** | 24 strong articles; no CLI reference, no GUI guide, no contributor on-ramp |
 | Dependencies | **Fair** | 21 of 38 direct Go deps behind; four frontend majors behind |
-| CI/CD | **Good** | Strong job structure; no coverage gate, no static analysis, ubuntu-only |
+| CI/CD | **Good** | Strong job structure and SAST via CodeQL; no Go linter, no coverage gate, ubuntu-only |
 | Housekeeping | **Fair** | 65 files fail `gofmt`; `AGENTS.md` counts are stale; no community files |
 
 ---
@@ -931,7 +931,7 @@ not in CI; if it is added, it should start from today's clean tree.
 
 ### 2.7 CI/CD and tooling
 
-#### C-1. CI has no static analysis, no formatting check and no coverage gate
+#### C-1. CI has no Go linter, no formatting check and no coverage gate
 
 **Severity: High.**
 Evidence: `.github/workflows/ci.yml`. The `go` job runs `go vet ./...` and
@@ -942,6 +942,17 @@ plus `vitest run`) and `mise run lint:docs`. `mise run lint` adds only
 Absent: `gofmt -l` (65 files currently fail it, R-14), `staticcheck`/`golangci-lint`,
 `revive`, `errcheck`, ESLint, Prettier, `-race`, coverage thresholds, and any frontend
 formatting check.
+
+One correction to a first reading of this section, worth recording because the mistake
+is easy to repeat: **CodeQL is running.** `Analyze (go)`,
+`Analyze (javascript-typescript)` and `Analyze (actions)` all report on every pull
+request, so the repository does have security static analysis (SAST). It is invisible
+from the checkout, because it is GitHub's *default setup* rather than a workflow file:
+`.github/workflows/` contains only `ci.yml`, `pages.yml`, `release.yml` and
+`secrets.yml`, and nothing in the repository mentions CodeQL at all. The claim being
+made here is narrower than "no static analysis", and it is about correctness linters
+rather than security scanners: nothing enforces Go idioms, dead code, unused symbols or
+discarded errors, and `go vet` alone will not.
 
 Recommendation, in order of return: `gofmt -l` (one line, immediately green after R-14),
 ESLint plus Prettier, `staticcheck`, then coverage floors.
@@ -1019,6 +1030,15 @@ For balance, these are genuinely good and should not be lost in a refactor:
 - `secrets.yml` scans full history on push, on pull request, and weekly, with the
   rationale ("newly published detection rules ... applied to history that has not
   moved") written in the file.
+- CodeQL runs on every pull request as GitHub's default setup, covering Go, the
+  JavaScript/TypeScript frontend and the workflow files themselves.
+
+The last one carries a documentation gap rather than a configuration one. Nothing in the
+repository records that CodeQL is enabled, because default setup lives in repository
+settings rather than in a workflow file, and a green analysis is easy to mistake for an
+absent one. That is exactly what happened during this review. A line in `AGENTS.md`
+naming the checks a pull request gets, and which of them are configured outside the
+repository, would fix it.
 
 ### 2.8 Security and configuration hygiene
 
@@ -1338,7 +1358,7 @@ cd frontend && npm outdated && npm audit
 | F-11 | Low | Duplicated helpers and two component idioms |
 | T-1 | High | Frontend statement coverage is 33.4% |
 | T-2 | High | 56 of 95 components untested |
-| T-3 | High | No coverage gate and no static analysis in either suite |
+| T-3 | High | No coverage gate and no Go linter in either suite |
 | T-4 | High | 422 Go functions at 0%, including every CLI entry point |
 | T-5 | Medium | Seven packages with no test file |
 | T-6 | Medium | No parallelism; 16 sleeps |
@@ -1363,7 +1383,7 @@ cd frontend && npm outdated && npm audit
 | Z-2 | Medium | Four frontend majors behind |
 | Z-3 | Medium | No automated dependency updates |
 | Z-4 | Medium | No Go vulnerability scanning |
-| C-1 | High | CI has no static analysis, formatting check or coverage gate |
+| C-1 | High | CI has no Go linter, formatting check or coverage gate (CodeQL does run) |
 | C-2 | Medium | CI tests only Linux while shipping five targets |
 | C-3 | Low | Packaging runners do not run their target's tests |
 | C-4 | High | `project.sh` clears board fields when a wave or area is added |
