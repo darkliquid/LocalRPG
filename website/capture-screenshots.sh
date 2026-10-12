@@ -23,7 +23,7 @@ fi
 # Chrome is not always on PATH (a distribution package installs it under
 # /opt), so hand the driver an explicit path when we can find one.
 if [[ -z "${CHROME_EXEC:-}" ]]; then
-  for candidate in google-chrome chromium chromium-browser /opt/google/chrome/chrome; do
+  for candidate in google-chrome google-chrome-stable chromium chromium-browser /opt/google/chrome/chrome /opt/google/chrome/google-chrome; do
     if command -v "$candidate" >/dev/null 2>&1; then
       CHROME_EXEC="$(command -v "$candidate")"
       break

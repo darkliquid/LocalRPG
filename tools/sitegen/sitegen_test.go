@@ -199,3 +199,66 @@ func TestSiteBackgroundUsesTheGenrePalette(t *testing.T) {
 		t.Fatal("the rendered page does not carry the palette")
 	}
 }
+
+func TestHomePageContentPillars(t *testing.T) {
+	renderer, err := newRenderer()
+	if err != nil {
+		t.Fatalf("newRenderer: %v", err)
+	}
+	page, err := renderer.render("home.html.tmpl", &pageData{
+		Root:        "",
+		Title:       "Home",
+		Description: "A local-first tabletop RPG client",
+		IsHome:      true,
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	html := string(page)
+
+	requiredPhrases := []string{
+		"AI-assisted generation",
+		"automated test scenarios",
+		"First-Class Local AI &amp; Embeddings",
+		"AI World Generation &amp; Living Lore",
+		"Custom Systems &amp; Scenario Testing",
+		"Dynamic Scene Art &amp; Style Packs",
+		"TTS Narration &amp; Voice Dictation",
+		"Story Theatre, Packages &amp; Export",
+	}
+
+	for _, phrase := range requiredPhrases {
+		if !strings.Contains(html, phrase) {
+			t.Errorf("rendered home page missing required phrase: %q", phrase)
+		}
+	}
+}
+
+func TestShowcaseShotsCaptions(t *testing.T) {
+	shots := loadShots(t.TempDir())
+	if len(shots) != 6 {
+		t.Fatalf("expected 6 showcase shots, got %d", len(shots))
+	}
+
+	expectedSubstrings := map[string]string{
+		"01-launcher.jpg":       "quick-start creation wizards",
+		"02-worlds-studio.jpg":  "generate complete settings with AI pipelines",
+		"03-systems-studio.jpg": "verify balance with test scenarios",
+		"04-settings.jpg":       "ONNX embeddings",
+		"05-codex.jpg":          "dynamic character appearances",
+		"06-story-theatre.jpg":  "visual novel",
+	}
+
+	for _, s := range shots {
+		sub, ok := expectedSubstrings[s.File]
+		if !ok {
+			t.Errorf("unexpected shot file: %s", s.File)
+			continue
+		}
+		if !strings.Contains(s.Caption, sub) {
+			t.Errorf("shot %s caption %q missing expected phrase %q", s.File, s.Caption, sub)
+		}
+	}
+}
+
+
