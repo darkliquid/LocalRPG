@@ -73,7 +73,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean),
-    [urls]
+    [urls],
   );
 
   // A source decides how many entities exist, so counts are sent for a premise
@@ -92,7 +92,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
             : undefined,
       limits,
     }),
-    [premise, name, genre, locations, factions, characters, sourceMode, folderPath, urlList, limits]
+    [premise, name, genre, locations, factions, characters, sourceMode, folderPath, urlList, limits],
   );
 
   const sourceReady =
@@ -132,45 +132,48 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
     return () => abortRef.current?.abort();
   }, []);
 
-  const runGeneration = useCallback(async (override?: GenerationLimitsOverride) => {
-    setNeedsConfirm(false);
-    setError(null);
-    setLimitCode(null);
-    setSteps([]);
-    setProgress(null);
-    setGenerating(true);
-    const body = override ? { ...request, limits: override } : request;
+  const runGeneration = useCallback(
+    async (override?: GenerationLimitsOverride) => {
+      setNeedsConfirm(false);
+      setError(null);
+      setLimitCode(null);
+      setSteps([]);
+      setProgress(null);
+      setGenerating(true);
+      const body = override ? { ...request, limits: override } : request;
 
-    const controller = new AbortController();
-    abortRef.current = controller;
-    try {
-      const emit = (event: TurnEvent) => {
-        if (event.type === 'step' && event.step) {
-          setSteps((prev) => [...prev.filter((s) => s.name !== event.step!.name), event.step!]);
+      const controller = new AbortController();
+      abortRef.current = controller;
+      try {
+        const emit = (event: TurnEvent) => {
+          if (event.type === 'step' && event.step) {
+            setSteps((prev) => [...prev.filter((s) => s.name !== event.step!.name), event.step!]);
+          }
+          if (event.type === 'progress' && event.progress) setProgress(event.progress);
+          if (event.type === 'draft' && event.draft) {
+            onDraft(event.draft);
+          }
+          if (event.type === 'error') {
+            setError(event.message || event.detail || 'the generation failed');
+            setLimitCode(limitFieldFor(event.code) ? (event.code ?? null) : null);
+          }
+        };
+        if (sourceMode === 'prompt') {
+          await APIClient.generateWorld(body, emit, controller.signal);
+        } else {
+          await APIClient.ingestWorld(body, emit, controller.signal);
         }
-        if (event.type === 'progress' && event.progress) setProgress(event.progress);
-        if (event.type === 'draft' && event.draft) {
-          onDraft(event.draft);
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setError(err instanceof Error ? err.message : String(err));
         }
-        if (event.type === 'error') {
-          setError(event.message || event.detail || 'the generation failed');
-          setLimitCode(limitFieldFor(event.code) ? (event.code ?? null) : null);
-        }
-      };
-      if (sourceMode === 'prompt') {
-        await APIClient.generateWorld(body, emit, controller.signal);
-      } else {
-        await APIClient.ingestWorld(body, emit, controller.signal);
+      } finally {
+        setGenerating(false);
+        abortRef.current = null;
       }
-    } catch (err) {
-      if (!controller.signal.aborted) {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      setGenerating(false);
-      abortRef.current = null;
-    }
-  }, [onDraft, request, sourceMode]);
+    },
+    [onDraft, request, sourceMode],
+  );
 
   const handleGenerate = useCallback(async () => {
     if (estimate && estimate.calls >= LargeEstimateCalls && !needsConfirm) {
@@ -187,7 +190,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
       setLimits(raised);
       void runGeneration(raised);
     },
-    [runGeneration]
+    [runGeneration],
   );
 
   const handleRaiseAndSave = useCallback(
@@ -196,7 +199,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
         .then(() => handleRaiseAndRun(raised))
         .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
     },
-    [handleRaiseAndRun]
+    [handleRaiseAndRun],
   );
 
   const handleCancel = useCallback(() => {
@@ -218,11 +221,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
     const units = micros / 1_000_000;
     return units < 0.01 ? '<$0.01' : `$${units.toFixed(2)}`;
   };
-  const costLabel = estimate
-    ? estimate.priced
-      ? formatCost(estimate.cost_micros ?? 0)
-      : 'unpriced'
-    : '';
+  const costLabel = estimate ? (estimate.priced ? formatCost(estimate.cost_micros ?? 0) : 'unpriced') : '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -259,9 +258,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
             />
           ) : (
             error && (
-              <div className="p-3 text-sm text-red-300 border border-red-500/30 rounded-xl bg-red-950/40">
-                {error}
-              </div>
+              <div className="p-3 text-sm text-red-300 border border-red-500/30 rounded-xl bg-red-950/40">{error}</div>
             )
           )}
 
@@ -345,8 +342,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
                 </label>
               </div>
               <p className="text-[11px] text-neutral-500">
-                How many of each the generation asks for, up to 10. These counts apply to the
-                premise only.
+                How many of each the generation asks for, up to 10. These counts apply to the premise only.
               </p>
             </div>
           ) : (
@@ -406,9 +402,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
                   Browse
                 </button>
               </div>
-              <p className="text-[11px] text-neutral-500">
-                {folderPicker.note ?? 'Read locally. Nothing is fetched.'}
-              </p>
+              <p className="text-[11px] text-neutral-500">{folderPicker.note ?? 'Read locally. Nothing is fetched.'}</p>
             </div>
           )}
 
@@ -427,8 +421,8 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
               />
               <p className="text-[11px] text-amber-400/80 flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                This fetches the pages you name. Only the URLs listed are fetched, and you are
-                responsible for their licensing.
+                This fetches the pages you name. Only the URLs listed are fetched, and you are responsible for their
+                licensing.
               </p>
             </div>
           )}
@@ -461,9 +455,7 @@ export const WorldGenerateDialog: React.FC<WorldGenerateDialogProps> = ({
               {steps.map((step) => (
                 <li key={step.name} className="flex items-center gap-2 text-xs">
                   <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      step.status === 'error' ? 'bg-red-400' : 'bg-emerald-400'
-                    }`}
+                    className={`w-1.5 h-1.5 rounded-full ${step.status === 'error' ? 'bg-red-400' : 'bg-emerald-400'}`}
                   />
                   <span className="text-neutral-300">{stepLabel(step.name)}</span>
                   {step.detail && <span className="text-neutral-500">{step.detail}</span>}

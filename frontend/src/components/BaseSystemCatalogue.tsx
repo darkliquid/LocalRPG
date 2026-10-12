@@ -17,12 +17,7 @@ export interface BaseSystemCatalogueProps {
 // BaseSystemCatalogue presents the reference systems as starting points. Start
 // from this base copies one into a new system to edit by hand; Derive generates a
 // variant from an instruction.
-export const BaseSystemCatalogue: React.FC<BaseSystemCatalogueProps> = ({
-  bases,
-  onClone,
-  onDerive,
-  busy,
-}) => {
+export const BaseSystemCatalogue: React.FC<BaseSystemCatalogueProps> = ({ bases, onClone, onDerive, busy }) => {
   const [deriving, setDeriving] = useState<string | null>(null);
   const [instruction, setInstruction] = useState('');
 
@@ -33,9 +28,7 @@ export const BaseSystemCatalogue: React.FC<BaseSystemCatalogueProps> = ({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h4 className="text-sm font-semibold text-white truncate">{base.name}</h4>
-              {base.description && (
-                <p className="text-xs text-neutral-400 line-clamp-2">{base.description}</p>
-              )}
+              {base.description && <p className="text-xs text-neutral-400 line-clamp-2">{base.description}</p>}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button

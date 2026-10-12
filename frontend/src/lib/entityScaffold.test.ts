@@ -63,7 +63,9 @@ const frontmatterOf = (markdown: string): string => {
 
 describe('the entity scaffold', () => {
   it('writes required keys with their values', () => {
-    const fm = frontmatterOf(buildEntityMarkdown(catalog, { id: 'lady-evelyn', name: 'Lady Evelyn Vance', type: 'character' }));
+    const fm = frontmatterOf(
+      buildEntityMarkdown(catalog, { id: 'lady-evelyn', name: 'Lady Evelyn Vance', type: 'character' }),
+    );
     expect(fm).toContain('id: "lady-evelyn"');
     expect(fm).toContain('name: "Lady Evelyn Vance"');
     expect(fm).toContain('type: "character"');
@@ -118,12 +120,16 @@ describe('the entity scaffold', () => {
   });
 
   it('offers appearance for a location', () => {
-    const location = frontmatterOf(buildEntityMarkdown(catalog, { id: 'the-ashen-bastion', name: 'The Ashen Bastion', type: 'location' }));
+    const location = frontmatterOf(
+      buildEntityMarkdown(catalog, { id: 'the-ashen-bastion', name: 'The Ashen Bastion', type: 'location' }),
+    );
     expect(location).toContain('appearance: ""');
   });
 
   it('does not offer voice, gender or age for a location', () => {
-    const location = frontmatterOf(buildEntityMarkdown(catalog, { id: 'the-ashen-bastion', name: 'The Ashen Bastion', type: 'location' }));
+    const location = frontmatterOf(
+      buildEntityMarkdown(catalog, { id: 'the-ashen-bastion', name: 'The Ashen Bastion', type: 'location' }),
+    );
     expect(location).not.toContain('voice:');
     expect(location).not.toContain('gender:');
     expect(location).not.toContain('age:');
@@ -137,7 +143,9 @@ describe('the entity scaffold', () => {
   });
 
   it('generates frontmatter that parses as YAML', () => {
-    const fm = frontmatterOf(buildEntityMarkdown(catalog, { id: 'lady-evelyn', name: 'Lady Evelyn Vance', type: 'character' }));
+    const fm = frontmatterOf(
+      buildEntityMarkdown(catalog, { id: 'lady-evelyn', name: 'Lady Evelyn Vance', type: 'character' }),
+    );
     const parsed = parseYaml(fm) as { id?: string; type?: string };
     expect(parsed?.id).toBe('lady-evelyn');
     expect(parsed?.type).toBe('character');

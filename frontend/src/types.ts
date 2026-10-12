@@ -302,7 +302,22 @@ export interface PlaybackLedgerRequest {
 }
 
 export interface TurnEvent {
-  type: 'chunk' | 'speech' | 'segment' | 'turn' | 'tool' | 'error' | 'model_missing' | 'audio_progress' | 'portrait' | 'scene_image' | 'step' | 'estimate' | 'draft' | 'progress' | 'batch';
+  type:
+    | 'chunk'
+    | 'speech'
+    | 'segment'
+    | 'turn'
+    | 'tool'
+    | 'error'
+    | 'model_missing'
+    | 'audio_progress'
+    | 'portrait'
+    | 'scene_image'
+    | 'step'
+    | 'estimate'
+    | 'draft'
+    | 'progress'
+    | 'batch';
   owner?: string;
   text?: string;
   turn?: Turn;
@@ -705,9 +720,15 @@ export interface PlayerCharacter {
 }
 
 export type GenerationFailureCode =
-  | 'provider_unavailable' | 'provider_error' | 'empty_response'
-  | 'parse_error' | 'timeout' | 'context_too_large' | 'invalid_request'
-  | 'rate_limited' | 'insufficient_funds';
+  | 'provider_unavailable'
+  | 'provider_error'
+  | 'empty_response'
+  | 'parse_error'
+  | 'timeout'
+  | 'context_too_large'
+  | 'invalid_request'
+  | 'rate_limited'
+  | 'insufficient_funds';
 
 export interface GenerationAttempt {
   role: string;
@@ -1090,10 +1111,7 @@ export interface WorldEntityDetail {
 
 // WorldSelection models what the Worlds Studio editor is showing: a saved
 // world, a local unsaved draft, or nothing.
-export type WorldSelection =
-  | { kind: 'saved'; id: string }
-  | { kind: 'draft' }
-  | null;
+export type WorldSelection = { kind: 'saved'; id: string } | { kind: 'draft' } | null;
 
 export interface WorldDraft {
   localId: string;
@@ -1482,7 +1500,6 @@ export interface OfflineReportResponse {
   issues: OfflineIssue[];
 }
 
-
 export interface ExportRequest {
   game_id: string;
   format: 'web' | 'video';
@@ -1740,9 +1757,6 @@ export interface DocArticle extends DocArticleSummary {
   content: string;
 }
 
-
-
-
 // FrontmatterKeySchema is one accepted frontmatter key, as the server generates
 // it from the Go struct. Values are suggestions, not a closed set.
 export interface FrontmatterKeySchema {
@@ -1842,5 +1856,3 @@ export interface RegistrySourceDTO {
   package_count: number;
   error?: string;
 }
-
-

@@ -1,9 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  Mic,
-  Sparkles,
-  Volume2,
-} from 'lucide-react';
+import { Mic, Sparkles, Volume2 } from 'lucide-react';
 import type {
   AppConfig,
   ImageConfig,
@@ -72,10 +68,12 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
   // before it is saved. The fallback keeps the hook unconditional during load.
   const activeTtsConfig = config ? (mediaEntryValue(config, 'tts', selectedTts) as TTSConfig) : undefined;
   const inspectConfig = activeTtsConfig ?? { type: 'disabled' as const, auto_play: false, master_volume: 1 };
-  const { inspect, loading: inspecting, refresh: refreshInspect, error: inspectError } = useTTSInspect(
-    inspectConfig,
-    Boolean(config)
-  );
+  const {
+    inspect,
+    loading: inspecting,
+    refresh: refreshInspect,
+    error: inspectError,
+  } = useTTSInspect(inspectConfig, Boolean(config));
 
   const isBuiltinKokoro =
     activeTtsConfig?.type === 'builtin' &&
@@ -93,7 +91,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
         tags: p.tags,
         description: p.description,
       })),
-    []
+    [],
   );
 
   const availableTTSVoices = useMemo(() => {
@@ -110,106 +108,105 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
   const isGeminiTTS =
     activeTtsConfig?.type === 'gemini' ||
     (activeTtsConfig?.type === 'builtin' && activeTtsConfig?.builtin_name === 'gemini');
-  const isElevenLabsTTS =
-    activeTtsConfig?.type === 'builtin' && activeTtsConfig?.builtin_name === 'elevenlabs';
+  const isElevenLabsTTS = activeTtsConfig?.type === 'builtin' && activeTtsConfig?.builtin_name === 'elevenlabs';
   const isCartesiaTTS =
     activeTtsConfig?.type === 'cartesia' ||
     (activeTtsConfig?.type === 'builtin' && activeTtsConfig?.builtin_name === 'cartesia');
 
   return (
     <>
-  <div className="space-y-4 flex-1 overflow-y-auto pr-1">
-    <SubTabs
-      ariaLabel="Media Engines"
-      tabs={[
-        { id: 'tts', label: 'TTS', icon: <Volume2 className="w-3.5 h-3.5" /> },
-        { id: 'stt', label: 'STT', icon: <Mic className="w-3.5 h-3.5" /> },
-        { id: 'images', label: 'Images', icon: <Sparkles className="w-3.5 h-3.5" /> },
-      ]}
-      active={mediaTab}
-      onChange={(id) => setMediaTab(id as 'tts' | 'stt' | 'images')}
-    />
-
-    {mediaTab === 'tts' && (
-    <ProviderManager
-      family="tts"
-      config={config}
-      onChange={setConfig}
-      selected={selectedTts}
-      onSelect={setSelectedTts}
-      renderEditor={(_name, entry, onChange) => (
-        <TTSProviderEditor
-          entry={entry as TTSConfig}
-          onChange={onChange as (next: TTSConfig) => void}
-          presets={ttsPresets}
-          voices={availableTTSVoices}
-          inspect={inspect}
-          inspecting={inspecting}
-          onRefreshInspect={refreshInspect}
-          inspectError={inspectError}
-          kokoroStatus={kokoroStatus}
-          isBuiltinKokoro={isBuiltinKokoro}
-          isKokoro={isKokoro}
-          isGeminiTTS={isGeminiTTS}
-          isElevenLabsTTS={isElevenLabsTTS}
-          isCartesiaTTS={isCartesiaTTS}
-          geminiSharedKey={Boolean(config.providers?.gemini?.api_key)}
-          cartesiaSharedKey={Boolean(config.providers?.cartesia?.api_key)}
-          previewText={ttsPreviewText}
-          onPreviewTextChange={setTtsPreviewText}
-          onOpenVoiceCatalog={() => setIsCatalogModalOpen(true)}
-          onTest={handleTestProvider}
-          testingCategory={testingCategory}
-          testResult={testResult}
-          onMissingModel={setMissingModelPrompt}
+      <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+        <SubTabs
+          ariaLabel="Media Engines"
+          tabs={[
+            { id: 'tts', label: 'TTS', icon: <Volume2 className="w-3.5 h-3.5" /> },
+            { id: 'stt', label: 'STT', icon: <Mic className="w-3.5 h-3.5" /> },
+            { id: 'images', label: 'Images', icon: <Sparkles className="w-3.5 h-3.5" /> },
+          ]}
+          active={mediaTab}
+          onChange={(id) => setMediaTab(id as 'tts' | 'stt' | 'images')}
         />
-      )}
-    />
-    )}
 
-    {mediaTab === 'stt' && (
-    <ProviderManager
-      family="stt"
-      config={config}
-      onChange={setConfig}
-      selected={selectedStt}
-      onSelect={setSelectedStt}
-      renderEditor={(_name, entry, onChange) => (
-        <STTProviderEditor
-          entry={entry as STTConfig}
-          onChange={onChange as (next: STTConfig) => void}
-          presets={sttPresets}
-          webSpeechAvailable={webSpeechAvailable}
-          cartesiaSharedKey={Boolean(config.providers?.cartesia?.api_key)}
-          onTest={handleTestProvider}
-          testingCategory={testingCategory}
-          testResult={testResult}
-        />
-      )}
-    />
-    )}
+        {mediaTab === 'tts' && (
+          <ProviderManager
+            family="tts"
+            config={config}
+            onChange={setConfig}
+            selected={selectedTts}
+            onSelect={setSelectedTts}
+            renderEditor={(_name, entry, onChange) => (
+              <TTSProviderEditor
+                entry={entry as TTSConfig}
+                onChange={onChange as (next: TTSConfig) => void}
+                presets={ttsPresets}
+                voices={availableTTSVoices}
+                inspect={inspect}
+                inspecting={inspecting}
+                onRefreshInspect={refreshInspect}
+                inspectError={inspectError}
+                kokoroStatus={kokoroStatus}
+                isBuiltinKokoro={isBuiltinKokoro}
+                isKokoro={isKokoro}
+                isGeminiTTS={isGeminiTTS}
+                isElevenLabsTTS={isElevenLabsTTS}
+                isCartesiaTTS={isCartesiaTTS}
+                geminiSharedKey={Boolean(config.providers?.gemini?.api_key)}
+                cartesiaSharedKey={Boolean(config.providers?.cartesia?.api_key)}
+                previewText={ttsPreviewText}
+                onPreviewTextChange={setTtsPreviewText}
+                onOpenVoiceCatalog={() => setIsCatalogModalOpen(true)}
+                onTest={handleTestProvider}
+                testingCategory={testingCategory}
+                testResult={testResult}
+                onMissingModel={setMissingModelPrompt}
+              />
+            )}
+          />
+        )}
 
-    {mediaTab === 'images' && (
-    <ProviderManager
-      family="image"
-      config={config}
-      onChange={setConfig}
-      selected={selectedImage}
-      onSelect={setSelectedImage}
-      renderEditor={(_name, entry, onChange) => (
-        <ImageProviderEditor
-          entry={entry as ImageConfig}
-          onChange={onChange as (next: ImageConfig) => void}
-          presets={imagePresets}
-          geminiSharedKey={Boolean(config.providers?.gemini?.api_key)}
-          onTest={handleTestProvider}
-          testingCategory={testingCategory}
-          testResult={testResult}
-        />
-      )}
-    />
-    )}
-  </div>
+        {mediaTab === 'stt' && (
+          <ProviderManager
+            family="stt"
+            config={config}
+            onChange={setConfig}
+            selected={selectedStt}
+            onSelect={setSelectedStt}
+            renderEditor={(_name, entry, onChange) => (
+              <STTProviderEditor
+                entry={entry as STTConfig}
+                onChange={onChange as (next: STTConfig) => void}
+                presets={sttPresets}
+                webSpeechAvailable={webSpeechAvailable}
+                cartesiaSharedKey={Boolean(config.providers?.cartesia?.api_key)}
+                onTest={handleTestProvider}
+                testingCategory={testingCategory}
+                testResult={testResult}
+              />
+            )}
+          />
+        )}
+
+        {mediaTab === 'images' && (
+          <ProviderManager
+            family="image"
+            config={config}
+            onChange={setConfig}
+            selected={selectedImage}
+            onSelect={setSelectedImage}
+            renderEditor={(_name, entry, onChange) => (
+              <ImageProviderEditor
+                entry={entry as ImageConfig}
+                onChange={onChange as (next: ImageConfig) => void}
+                presets={imagePresets}
+                geminiSharedKey={Boolean(config.providers?.gemini?.api_key)}
+                onTest={handleTestProvider}
+                testingCategory={testingCategory}
+                testResult={testResult}
+              />
+            )}
+          />
+        )}
+      </div>
 
       <VoiceCatalogModal
         isOpen={isCatalogModalOpen}

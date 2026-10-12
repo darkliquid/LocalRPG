@@ -58,10 +58,7 @@ export class TurnStreamProcessor {
     if (segment.kind === 'speech') {
       // Find matching live speech segment to enrich with canonical metadata (speaker_id)
       for (let i = this.segments.length - 1; i >= 0; i--) {
-        if (
-          this.segments[i].kind === 'speech' &&
-          (!segment.speaker || this.segments[i].speaker === segment.speaker)
-        ) {
+        if (this.segments[i].kind === 'speech' && (!segment.speaker || this.segments[i].speaker === segment.speaker)) {
           this.segments[i] = {
             ...this.segments[i],
             ...segment,
@@ -201,7 +198,9 @@ export class TurnStreamProcessor {
     }
 
     const fullText = this.currentParagraph
-      ? (this.currentLine ? `${this.currentParagraph}\n${this.currentLine}` : this.currentParagraph)
+      ? this.currentLine
+        ? `${this.currentParagraph}\n${this.currentLine}`
+        : this.currentParagraph
       : this.currentLine;
 
     const trimmed = fullText.trim();

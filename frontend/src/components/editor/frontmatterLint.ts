@@ -25,11 +25,7 @@ export function keyLineOffset(block: string, key: string): number {
 
 // frontmatterDiagnostics is pure: it takes the document and returns the problems
 // the linter reports, so the rules are reviewable without an editor instance.
-export function frontmatterDiagnostics(
-  schema: FrontmatterSchema,
-  doc: string,
-  range: DocRange,
-): Diagnostic[] {
+export function frontmatterDiagnostics(schema: FrontmatterSchema, doc: string, range: DocRange): Diagnostic[] {
   const block = doc.slice(range.from, range.to);
   const diagnostics: Diagnostic[] = [];
 

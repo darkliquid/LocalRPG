@@ -14,11 +14,7 @@ let cache: CachedIndex | null = null;
 // instant and offline.
 const maxAgeMs = 30_000;
 
-export async function loadEntityIndex(
-  client: APIClient,
-  gameID: string,
-  force = false,
-): Promise<EntitySummary[]> {
+export async function loadEntityIndex(client: APIClient, gameID: string, force = false): Promise<EntitySummary[]> {
   const fresh = cache !== null && cache.gameID === gameID && Date.now() - cache.loadedAt < maxAgeMs;
   if (fresh && !force && cache) return cache.entities;
 

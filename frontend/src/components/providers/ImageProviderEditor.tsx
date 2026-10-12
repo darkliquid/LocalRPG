@@ -43,10 +43,13 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
           className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
           defaultValue=""
         >
-          <option value="" disabled>⚡ Load Image Preset…</option>
+          <option value="" disabled>
+            ⚡ Load Image Preset…
+          </option>
           {Object.entries(presets).map(([id, p]) => (
             <option key={id} value={id} title={p.caveat}>
-              {p.label}{p.tier ? ` · ${tierLabel(p.tier)}` : ''}
+              {p.label}
+              {p.tier ? ` · ${tierLabel(p.tier)}` : ''}
             </option>
           ))}
         </select>
@@ -55,9 +58,7 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
           <input
             type="checkbox"
             checked={entry.auto_generate}
-            onChange={(e) =>
-              onChange({ ...entry, auto_generate: e.target.checked })
-            }
+            onChange={(e) => onChange({ ...entry, auto_generate: e.target.checked })}
             className="rounded bg-stone-950 border-stone-800 text-purple-600 focus:ring-0"
           />
           <span>Auto-generate Scene Art</span>
@@ -83,9 +84,7 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
           <input
             type="checkbox"
             checked={entry.builtin_fallback !== false}
-            onChange={(e) =>
-              onChange({ ...entry, builtin_fallback: e.target.checked })
-            }
+            onChange={(e) => onChange({ ...entry, builtin_fallback: e.target.checked })}
             className="rounded bg-stone-950 border-stone-800 text-purple-600 focus:ring-0"
           />
           <span>Fallback to Procedural Art</span>
@@ -98,9 +97,7 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
         <label className="text-xs font-sans uppercase text-stone-300">Image Provider Type</label>
         <select
           value={entry.type}
-          onChange={(e) =>
-            onChange({ ...entry, type: e.target.value as any })
-          }
+          onChange={(e) => onChange({ ...entry, type: e.target.value as any })}
           className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
         >
           <option value="disabled">Disabled</option>
@@ -117,9 +114,7 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
           <label className="text-xs font-sans uppercase text-stone-300">Built-in Art Engine</label>
           <select
             value={entry.builtin_name || 'procedural-art'}
-            onChange={(e) =>
-              onChange({ ...entry, builtin_name: e.target.value })
-            }
+            onChange={(e) => onChange({ ...entry, builtin_name: e.target.value })}
             className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
           >
             <option value="procedural-art">procedural-art (Pure-Go Vector Dark Fantasy SVG)</option>
@@ -135,16 +130,13 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
             type="text"
             placeholder="e.g. http://localhost:7860/v1/images/generations"
             value={entry.endpoint || ''}
-            onChange={(e) =>
-              onChange({ ...entry, endpoint: e.target.value })
-            }
+            onChange={(e) => onChange({ ...entry, endpoint: e.target.value })}
             className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
           />
         </div>
       )}
 
-      {(entry.type === 'gemini' ||
-        (entry.type === 'builtin' && entry.builtin_name === 'gemini')) && (
+      {(entry.type === 'gemini' || (entry.type === 'builtin' && entry.builtin_name === 'gemini')) && (
         <>
           <div className="space-y-1.5 col-span-1 md:col-span-2">
             <label className="text-xs font-sans uppercase text-stone-300">Gemini / Imagen Model</label>
@@ -152,9 +144,7 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
               type="text"
               placeholder="e.g. imagen-3.0-generate-002 or gemini-3.1-flash-image"
               value={entry.model || 'imagen-3.0-generate-002'}
-              onChange={(e) =>
-                onChange({ ...entry, model: e.target.value })
-              }
+              onChange={(e) => onChange({ ...entry, model: e.target.value })}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
             <div className="flex flex-wrap gap-1.5 pt-1">
@@ -169,9 +159,7 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
                 <button
                   key={m.id}
                   type="button"
-                  onClick={() =>
-                    onChange({ ...entry, model: m.id })
-                  }
+                  onClick={() => onChange({ ...entry, model: m.id })}
                   className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors cursor-pointer ${
                     (entry.model || 'imagen-3.0-generate-002') === m.id
                       ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
@@ -188,9 +176,7 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
             <label className="text-xs font-sans uppercase text-stone-300">Aspect Ratio</label>
             <select
               value={entry.aspect_ratio || '16:9'}
-              onChange={(e) =>
-                onChange({ ...entry, aspect_ratio: e.target.value })
-              }
+              onChange={(e) => onChange({ ...entry, aspect_ratio: e.target.value })}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
             >
               <option value="16:9">16:9 (Cinematic Widescreen - Default)</option>
@@ -206,9 +192,7 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
             <label className="text-xs font-sans uppercase text-stone-300">Person Generation</label>
             <select
               value={entry.person_generation || 'ALLOW_ADULT'}
-              onChange={(e) =>
-                onChange({ ...entry, person_generation: e.target.value })
-              }
+              onChange={(e) => onChange({ ...entry, person_generation: e.target.value })}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
             >
               <option value="ALLOW_ADULT">ALLOW_ADULT (Default — Adults, NPCs, Guards)</option>
@@ -220,17 +204,15 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
           <div className="space-y-1.5 col-span-1 md:col-span-2">
             <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
               <span>API Key Override</span>
-              {geminiSharedKey && (
-                <span className="text-xs text-emerald-400 font-mono">Shared key active</span>
-              )}
+              {geminiSharedKey && <span className="text-xs text-emerald-400 font-mono">Shared key active</span>}
             </label>
             <input
               type="password"
-              placeholder={geminiSharedKey ? 'Using shared key (leave blank)' : 'Optional override or GEMINI_API_KEY env'}
-              value={entry.api_key || ''}
-              onChange={(e) =>
-                onChange({ ...entry, api_key: e.target.value })
+              placeholder={
+                geminiSharedKey ? 'Using shared key (leave blank)' : 'Optional override or GEMINI_API_KEY env'
               }
+              value={entry.api_key || ''}
+              onChange={(e) => onChange({ ...entry, api_key: e.target.value })}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
           </div>

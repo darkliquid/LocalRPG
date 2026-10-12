@@ -49,13 +49,12 @@ export const AddEntityModal: React.FC<AddEntityModalProps> = ({
         </div>
 
         <p className="text-xs text-stone-300 leading-relaxed">
-          The narrator mentioned <span className="font-bold text-purple-300">"{entityName}"</span>, but no note exists in this campaign's canon yet. Adding a note registers them in the world without disrupting the current scene.
+          The narrator mentioned <span className="font-bold text-purple-300">"{entityName}"</span>, but no note exists
+          in this campaign's canon yet. Adding a note registers them in the world without disrupting the current scene.
         </p>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-sans text-stone-400 uppercase tracking-wider block">
-            Entity Type
-          </label>
+          <label className="text-xs font-sans text-stone-400 uppercase tracking-wider block">Entity Type</label>
           <div className="grid grid-cols-3 gap-1.5">
             {['character', 'location', 'faction', 'item', 'arc', 'concept'].map((t) => (
               <button

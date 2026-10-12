@@ -8,8 +8,8 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': 'http://localhost:8080'
-    }
+      '/api': 'http://localhost:8080',
+    },
   },
   build: {
     outDir: path.resolve(__dirname, '../pkg/gui/dist'),
@@ -43,8 +43,8 @@ export default defineConfig({
               return 'vendor-tree';
             }
           }
-        }
-      }
-    }
-  }
+        },
+      },
+    },
+  },
 });

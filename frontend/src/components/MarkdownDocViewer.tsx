@@ -76,17 +76,15 @@ const baseComponents: Components = {
   h2: ({ children }) => (
     <h2 className="text-xl sm:text-2xl font-bold text-purple-300 tracking-tight pt-4 pb-1">{children}</h2>
   ),
-  h3: ({ children }) => (
-    <h3 className="text-lg font-semibold text-stone-100 tracking-tight pt-2">{children}</h3>
-  ),
-  h4: ({ children }) => (
-    <h4 className="text-base font-semibold text-purple-200/90 pt-1">{children}</h4>
-  ),
+  h3: ({ children }) => <h3 className="text-lg font-semibold text-stone-100 tracking-tight pt-2">{children}</h3>,
+  h4: ({ children }) => <h4 className="text-base font-semibold text-purple-200/90 pt-1">{children}</h4>,
   p: ({ className, children, ...props }) => {
     const isAlertTitle = className?.includes('markdown-alert-title') ?? false;
     return (
       <p
-        className={isAlertTitle ? `${className} flex items-center gap-2 font-semibold text-sm mb-1.5` : 'leading-relaxed'}
+        className={
+          isAlertTitle ? `${className} flex items-center gap-2 font-semibold text-sm mb-1.5` : 'leading-relaxed'
+        }
         {...props}
       >
         {children}

@@ -23,7 +23,8 @@ export const REFERENCE_WORLD_TEMPLATE: ReferenceWorldTemplate = {
   description: 'A mist-veiled frontier of shattered cathedral keeps, lingering ember magic, and peat bogs.',
   genre: 'Dark Fantasy / Gothic Exploration',
   default_system: 'narrative_2d6',
-  art_style: 'Oil on textured canvas, chiaroscuro lighting, deep umber and lantern gold, atmospheric fog, classical dark fantasy illustration',
+  art_style:
+    'Oil on textured canvas, chiaroscuro lighting, deep umber and lantern gold, atmospheric fog, classical dark fantasy illustration',
   tags: ['gothic', 'dark_fantasy', 'mystery', 'ruins'],
   lore_prompt: `You are narrating an adventure in **The Ashen Reach**.
 

@@ -218,7 +218,9 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onOpenDocs, onOpenAbout, onOpe
                   if (openGroup !== null) setOpenGroup(group.label);
                 }}
                 className={`px-3 rounded-md transition-colors cursor-pointer ${
-                  isOpen ? 'bg-purple-600/80 text-white font-semibold' : 'text-stone-300 hover:text-white hover:bg-white/10'
+                  isOpen
+                    ? 'bg-purple-600/80 text-white font-semibold'
+                    : 'text-stone-300 hover:text-white hover:bg-white/10'
                 }`}
               >
                 {group.label}

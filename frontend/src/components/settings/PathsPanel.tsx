@@ -17,7 +17,8 @@ export const PathsPanel: React.FC<PathsPanelProps> = ({ config, setConfig }) => 
         <span>Storage & Discovery Paths</span>
       </h3>
       <p className="text-xs text-stone-400">
-        Configure directories where LocalRPG looks for rule systems, world lore, saved campaigns, and generated media caches.
+        Configure directories where LocalRPG looks for rule systems, world lore, saved campaigns, and generated media
+        caches.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -33,9 +33,7 @@ function proposalSummary(proposal: SystemProposal): string {
       if (proposal.profile.success_on) return `Adds pool profile ${proposal.profile.name}`;
       return `Adds ladder profile ${proposal.profile.name}`;
     case 'advancement':
-      return proposal.advancement
-        ? `Adds ${proposal.advancement.mode || 'spend'} advancement`
-        : '';
+      return proposal.advancement ? `Adds ${proposal.advancement.mode || 'spend'} advancement` : '';
     default:
       return '';
   }
@@ -57,9 +55,7 @@ export const SystemEnhanceDialog: React.FC<SystemEnhanceDialogProps> = ({
   const [applied, setApplied] = useState<string[] | null>(null);
   const [oracle, setOracle] = useState(false);
 
-  const accepted = proposals.filter(
-    (proposal, index) => proposal.valid !== false && !rejected.has(index)
-  );
+  const accepted = proposals.filter((proposal, index) => proposal.valid !== false && !rejected.has(index));
 
   const toggle = (index: number) => {
     setRejected((prev) => {
@@ -130,14 +126,12 @@ export const SystemEnhanceDialog: React.FC<SystemEnhanceDialogProps> = ({
 
         <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
           {error && (
-            <p className="p-3 text-sm rounded-xl bg-red-950/40 border border-red-500/30 text-red-300">
-              {error}
-            </p>
+            <p className="p-3 text-sm rounded-xl bg-red-950/40 border border-red-500/30 text-red-300">{error}</p>
           )}
           {oracle && (
             <p className="p-3 text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200">
-              No model provider is configured, so no proposals were generated. Assign one in Settings
-              → AI Agents to propose additions for this system.
+              No model provider is configured, so no proposals were generated. Assign one in Settings → AI Agents to
+              propose additions for this system.
             </p>
           )}
           {applied && (
@@ -178,9 +172,7 @@ export const SystemEnhanceDialog: React.FC<SystemEnhanceDialogProps> = ({
                   </div>
                   <button
                     type="button"
-                    aria-label={
-                      isAccepted ? `Reject ${proposal.title}` : `Accept ${proposal.title}`
-                    }
+                    aria-label={isAccepted ? `Reject ${proposal.title}` : `Accept ${proposal.title}`}
                     onClick={() => toggle(index)}
                     disabled={proposal.valid === false}
                     className={`p-1.5 rounded-lg hover:bg-white/5 shrink-0 disabled:opacity-40 ${
@@ -191,9 +183,7 @@ export const SystemEnhanceDialog: React.FC<SystemEnhanceDialogProps> = ({
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-neutral-300">{proposalSummary(proposal)}</p>
-                {proposal.reason && (
-                  <p className="mt-1 text-[11px] text-neutral-500 italic">Why: {proposal.reason}</p>
-                )}
+                {proposal.reason && <p className="mt-1 text-[11px] text-neutral-500 italic">Why: {proposal.reason}</p>}
                 {proposal.valid === false && (
                   <p className="mt-2 flex items-start gap-1.5 text-[11px] text-red-300">
                     <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />

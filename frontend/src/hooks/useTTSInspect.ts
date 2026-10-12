@@ -26,8 +26,18 @@ export function useTTSInspect(config: TTSConfig | null, enabled = true): TTSInsp
   const refreshRef = useRef(false);
   const signature = config ? JSON.stringify(config) : '';
 
+  // The debounced effect below keys on `signature`, which is the config's value
+  // rather than its identity, so an equal config object does not re-trigger it.
+  // It reads the config through a ref for the same reason: closing over `config`
+  // as well would name the same value twice, and the linter is right to say so.
+  const configRef = useRef(config);
   useEffect(() => {
-    if (!enabled || !config) {
+    configRef.current = config;
+  });
+
+  useEffect(() => {
+    const current = configRef.current;
+    if (!enabled || !current) {
       setInspect(null);
       setError(null);
       return;
@@ -39,7 +49,7 @@ export function useTTSInspect(config: TTSConfig | null, enabled = true): TTSInsp
       try {
         const refresh = refreshRef.current;
         refreshRef.current = false;
-        const res = await APIClient.inspectTTS({ config, refresh });
+        const res = await APIClient.inspectTTS({ config: current, refresh });
         if (requestRef.current !== requestID) return;
         setInspect(res);
         setError(res.error ?? null);
@@ -52,8 +62,6 @@ export function useTTSInspect(config: TTSConfig | null, enabled = true): TTSInsp
     }, INSPECT_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-    // The signature stands in for config so an equal config object does not
-    // re-trigger the effect on every render.
   }, [signature, nonce, enabled]);
 
   return {

@@ -144,7 +144,9 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-800">
           <div>
             <h2 className="font-sans text-base font-bold text-purple-400">Voice Catalog Browser</h2>
-            <p className="text-xs text-stone-400">Audition provider voices and add them directly into your archetypes.</p>
+            <p className="text-xs text-stone-400">
+              Audition provider voices and add them directly into your archetypes.
+            </p>
           </div>
           <button
             type="button"
@@ -239,9 +241,7 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
                         </span>
                       )}
                     </div>
-                    {voice.description && (
-                      <p className="text-xs text-stone-400 mt-0.5 truncate">{voice.description}</p>
-                    )}
+                    {voice.description && <p className="text-xs text-stone-400 mt-0.5 truncate">{voice.description}</p>}
                     {voice.tags && voice.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {voice.tags.slice(0, 4).map((tag) => (

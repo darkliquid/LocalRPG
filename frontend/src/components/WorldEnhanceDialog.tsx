@@ -120,14 +120,12 @@ export const WorldEnhanceDialog: React.FC<WorldEnhanceDialogProps> = ({
 
         <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
           {error && (
-            <p className="p-3 text-sm rounded-xl bg-red-950/40 border border-red-500/30 text-red-300">
-              {error}
-            </p>
+            <p className="p-3 text-sm rounded-xl bg-red-950/40 border border-red-500/30 text-red-300">{error}</p>
           )}
           {oracle && (
             <p className="p-3 text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200">
-              No model provider is configured, so these came from the built-in template generator.
-              Assign one in Settings → AI Agents for proposals drawn from this world.
+              No model provider is configured, so these came from the built-in template generator. Assign one in
+              Settings → AI Agents for proposals drawn from this world.
             </p>
           )}
           {applied && (
@@ -190,9 +188,7 @@ export const WorldEnhanceDialog: React.FC<WorldEnhanceDialogProps> = ({
                     Writes entity <span className="font-mono">{proposal.entity.id}</span> ({proposal.entity.type})
                   </p>
                 )}
-                {proposal.reason && (
-                  <p className="mt-1 text-[11px] text-neutral-500 italic">Why: {proposal.reason}</p>
-                )}
+                {proposal.reason && <p className="mt-1 text-[11px] text-neutral-500 italic">Why: {proposal.reason}</p>}
               </div>
             );
           })}

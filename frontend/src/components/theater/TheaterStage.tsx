@@ -120,9 +120,7 @@ export const TheaterStage: React.FC<TheaterStageProps> = ({
           <div className="flex flex-col items-center gap-2">
             <div
               className={`aspect-square w-[clamp(140px,24vw,340px)] overflow-hidden rounded-2xl border-2 bg-stone-900 shadow-2xl transition-all duration-300 ${
-                playerActive
-                  ? 'border-sky-400 shadow-[0_10px_40px_rgba(56,189,248,0.55)]'
-                  : 'border-white/30'
+                playerActive ? 'border-sky-400 shadow-[0_10px_40px_rgba(56,189,248,0.55)]' : 'border-white/30'
               }`}
             >
               <EntityAvatar
@@ -135,7 +133,9 @@ export const TheaterStage: React.FC<TheaterStageProps> = ({
             {playerLabel && (
               <span
                 className={`px-3 py-1 rounded-full text-xs font-sans font-bold tracking-wide border shadow-lg ${
-                  playerActive ? 'bg-sky-600 text-white border-sky-300/60' : 'bg-black/60 text-stone-200 border-white/20'
+                  playerActive
+                    ? 'bg-sky-600 text-white border-sky-300/60'
+                    : 'bg-black/60 text-stone-200 border-white/20'
                 }`}
               >
                 {playerLabel}
@@ -149,9 +149,7 @@ export const TheaterStage: React.FC<TheaterStageProps> = ({
           <div className="flex flex-col items-center gap-2">
             <div
               className={`aspect-square w-[clamp(140px,24vw,340px)] overflow-hidden rounded-2xl border-2 bg-stone-900 shadow-2xl transition-all duration-300 ${
-                npcActive
-                  ? 'border-purple-400 shadow-[0_10px_40px_rgba(168,85,247,0.55)]'
-                  : 'border-white/30'
+                npcActive ? 'border-purple-400 shadow-[0_10px_40px_rgba(168,85,247,0.55)]' : 'border-white/30'
               }`}
             >
               <EntityAvatar

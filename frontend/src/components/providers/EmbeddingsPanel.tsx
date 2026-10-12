@@ -44,8 +44,8 @@ export const EmbeddingsPanel: React.FC<EmbeddingsPanelProps> = ({
       </label>
     </div>
     <p className="text-xs text-stone-400">
-      Embeddings power recall and semantic search. The built-in projection needs nothing; the
-      built-in encoder generalises semantically and downloads its model once.
+      Embeddings power recall and semantic search. The built-in projection needs nothing; the built-in encoder
+      generalises semantically and downloads its model once.
     </p>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div>

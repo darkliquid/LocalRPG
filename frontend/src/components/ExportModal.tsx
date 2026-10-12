@@ -73,14 +73,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
       if (event.game_id !== gameID) return;
       setProgress(event);
       if (event.message) {
-        setMessages((prev) => (prev[prev.length - 1] === event.message ? prev : [...prev, event.message as string].slice(-maxReportedLines)));
+        setMessages((prev) =>
+          prev[prev.length - 1] === event.message ? prev : [...prev, event.message as string].slice(-maxReportedLines),
+        );
       }
       if (event.phase === 'done') {
         setRunning(false);
         setJob((current) =>
-          current
-            ? { ...current, running: false, output_path: event.output_path ?? current.output_path }
-            : null
+          current ? { ...current, running: false, output_path: event.output_path ?? current.output_path } : null,
         );
       } else if (event.phase === 'error' || event.phase === 'cancelled') {
         setRunning(false);
@@ -223,7 +223,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
             </label>
             {format === 'video' && (
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={still} disabled={running} onChange={(e) => setStill(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={still}
+                  disabled={running}
+                  onChange={(e) => setStill(e.target.checked)}
+                />
                 Still frames (fast)
               </label>
             )}
@@ -269,7 +274,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
           {progress && running && (
             <div className="space-y-1">
               <div className="flex justify-between text-stone-400">
-                <span>{progress.phase}{progress.message ? `: ${progress.message}` : ''}</span>
+                <span>
+                  {progress.phase}
+                  {progress.message ? `: ${progress.message}` : ''}
+                </span>
                 {percent !== null && <span>{percent}%</span>}
               </div>
               <div className="h-2 rounded-full bg-stone-800 overflow-hidden">
@@ -281,12 +289,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
               {hasFrameDetail(progress.phase) && progress.total > 0 && (
                 <div className="flex flex-wrap justify-between gap-x-3 text-xs font-mono text-stone-500">
                   <span>
-                    {progress.frames}/{progress.total} frames ({progress.image_frames} drawn, {progress.repeat_frames} repeats)
+                    {progress.frames}/{progress.total} frames ({progress.image_frames} drawn, {progress.repeat_frames}{' '}
+                    repeats)
                   </span>
                   {progress.total_audio_packets > 0 && (
                     <span>
-                      {progress.audio_packets}/{progress.total_audio_packets} audio ({formatBytes(progress.audio_bytes)}/
-                      {formatBytes(progress.total_audio_bytes)})
+                      {progress.audio_packets}/{progress.total_audio_packets} audio ({formatBytes(progress.audio_bytes)}
+                      /{formatBytes(progress.total_audio_bytes)})
                     </span>
                   )}
                   {progress.elapsed_ms > 0 && <span>{formatDuration(progress.elapsed_ms)}</span>}

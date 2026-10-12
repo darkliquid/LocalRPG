@@ -77,8 +77,8 @@ export const ImportProgressPanel: React.FC<ImportProgressPanelProps> = ({ progre
 
       {cutOff ? (
         <p className="text-[11px] text-amber-400/80">
-          {cutOff} {cutOff === 1 ? 'batch' : 'batches'} ran out of room before finishing. What they
-          wrote was kept; the rest of {cutOff === 1 ? 'that page' : 'those pages'} was not read.
+          {cutOff} {cutOff === 1 ? 'batch' : 'batches'} ran out of room before finishing. What they wrote was kept; the
+          rest of {cutOff === 1 ? 'that page' : 'those pages'} was not read.
         </p>
       ) : null}
     </div>

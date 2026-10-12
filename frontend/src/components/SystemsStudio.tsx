@@ -1,7 +1,39 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient } from '../api/client';
-import { SystemInfo, CreateSystemRequest, CharacterCreationField, GenerationFailure, MechanicsSpec, ReferenceSystem, SystemTestFailure, ContentManifestInfo, SystemDraftInfo, SystemVerifyResult, Scenario } from '../types';
-import { Shield, Plus, Save, FileCode, Info, Check, AlertCircle, RotateCcw, BookOpen, Trash2, Wand2, SlidersHorizontal, Play, Download, Upload, Lightbulb, X, Pencil, FlaskConical } from 'lucide-react';
+import {
+  SystemInfo,
+  CreateSystemRequest,
+  CharacterCreationField,
+  GenerationFailure,
+  MechanicsSpec,
+  ReferenceSystem,
+  SystemTestFailure,
+  ContentManifestInfo,
+  SystemDraftInfo,
+  SystemVerifyResult,
+  Scenario,
+} from '../types';
+import {
+  Shield,
+  Plus,
+  Save,
+  FileCode,
+  Info,
+  Check,
+  AlertCircle,
+  RotateCcw,
+  BookOpen,
+  Trash2,
+  Wand2,
+  SlidersHorizontal,
+  Play,
+  Download,
+  Upload,
+  Lightbulb,
+  X,
+  Pencil,
+  FlaskConical,
+} from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
@@ -90,8 +122,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
   const reportGenerationError = (failure: GenerationFailure) =>
     setToast({ type: 'error', message: formatGenerationError(failure) });
-  const errorMessage = (err: unknown): string =>
-    err instanceof Error ? err.message : 'Unexpected error';
+  const errorMessage = (err: unknown): string => (err instanceof Error ? err.message : 'Unexpected error');
 
   const handleDraftProduced = (generatedDraft: SystemDraftInfo) => {
     setShowGenerateDialog(false);
@@ -172,8 +203,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
     }
   };
 
+  // loadSystems is recreated every render, because it closes over handleNewSystem
+  // and loadSystemDetail, which close over the loaders in turn. Listing it in the
+  // mount effect below would re-run that effect on every render and set state in a
+  // loop, so the call goes through a ref holding the latest function. The chain is
+  // memoised when this component is split (FE-4), and this indirection goes with it.
+  const loadSystemsRef = useRef<((selectID?: string, mode?: 'new' | 'browse') => Promise<void>) | null>(null);
   useEffect(() => {
-    loadSystems(undefined, startModeRef.current);
+    loadSystemsRef.current = loadSystems;
+  });
+
+  useEffect(() => {
+    void loadSystemsRef.current?.(undefined, startModeRef.current);
     loadReferenceSystems();
   }, []);
 
@@ -305,8 +346,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   };
 
   const handleResetToReference = () => {
-    const reference =
-      referenceSystems.find((r) => r.id === 'narrative_2d6') ?? referenceSystems[0];
+    const reference = referenceSystems.find((r) => r.id === 'narrative_2d6') ?? referenceSystems[0];
     if (!reference) {
       setToast({ type: 'error', message: 'No reference systems are available.' });
       return;
@@ -536,9 +576,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
         <div className="flex flex-col gap-2 pb-2 border-b border-stone-800/60 shrink-0">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-purple-400" />
-            <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">
-              Rule Systems
-            </h3>
+            <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">Rule Systems</h3>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <input
@@ -610,15 +648,11 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                   Draft
                 </span>
               </div>
-              <div className="text-xs text-stone-400 truncate mt-1">
-                {description.trim() || 'Unsaved system draft'}
-              </div>
+              <div className="text-xs text-stone-400 truncate mt-1">{description.trim() || 'Unsaved system draft'}</div>
             </div>
           )}
           {isLoading && systems.length === 0 ? (
-            <div className="text-center py-8 text-xs font-mono text-stone-500 animate-pulse">
-              Loading systems...
-            </div>
+            <div className="text-center py-8 text-xs font-mono text-stone-500 animate-pulse">Loading systems...</div>
           ) : systems.length === 0 ? (
             <div className="text-center py-8 text-xs text-stone-400">
               No systems defined yet. Create your first ruleset!
@@ -655,9 +689,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                {s.description && (
-                  <p className="text-xs text-stone-400 truncate mt-1">{s.description}</p>
-                )}
+                {s.description && <p className="text-xs text-stone-400 truncate mt-1">{s.description}</p>}
               </div>
             ))
           )}
@@ -885,9 +917,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               )}
               <div className="space-y-0.5 min-w-0">
                 <div className="font-semibold">
-                  {verificationResult.ok
-                    ? 'System verification passed'
-                    : 'System verification reported failures'}
+                  {verificationResult.ok ? 'System verification passed' : 'System verification reported failures'}
                 </div>
                 {verificationResult.failures && verificationResult.failures.length > 0 && (
                   <ul className="text-[11px] text-red-300 font-mono list-disc list-inside space-y-0.5">
@@ -933,9 +963,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                    System Name
-                  </label>
+                  <label className="text-xs font-sans uppercase tracking-wider text-stone-300">System Name</label>
                   <AIGenerateButton
                     formType="system"
                     fieldName="name"
@@ -945,7 +973,12 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                       setName(val);
                       markDirty();
                       if (!savedID) {
-                        setSlugID(val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+                        setSlugID(
+                          val
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]+/g, '-')
+                            .replace(/^-|-$/g, ''),
+                        );
                       }
                     }}
                   />
@@ -959,7 +992,12 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                     setName(e.target.value);
                     markDirty();
                     if (!savedID) {
-                      setSlugID(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+                      setSlugID(
+                        e.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]+/g, '-')
+                          .replace(/^-|-$/g, ''),
+                      );
                     }
                   }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
@@ -967,34 +1005,34 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                  Version
-                </label>
+                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">Version</label>
                 <input
                   type="text"
                   placeholder="1.0.0"
                   value={version}
-                  onChange={(e) => { setVersion(e.target.value); markDirty(); }}
+                  onChange={(e) => {
+                    setVersion(e.target.value);
+                    markDirty();
+                  }}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors font-mono"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                Directory Slug ID
-              </label>
+              <label className="text-xs font-sans uppercase tracking-wider text-stone-300">Directory Slug ID</label>
               <input
                 type="text"
                 disabled={!!savedID}
                 placeholder="e.g. iron-realm"
                 value={slugID}
-                onChange={(e) => { setSlugID(e.target.value); markDirty(); }}
+                onChange={(e) => {
+                  setSlugID(e.target.value);
+                  markDirty();
+                }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors font-mono disabled:opacity-60"
               />
-              <p className="text-xs text-stone-400">
-                Unique identifier for the system directory on disk.
-              </p>
+              <p className="text-xs text-stone-400">Unique identifier for the system directory on disk.</p>
             </div>
 
             <div className="space-y-1.5">
@@ -1007,7 +1045,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                   fieldName="description"
                   onError={reportGenerationError}
                   getContext={getSystemContext}
-                  onGenerated={(val) => { setDescription(val); markDirty(); }}
+                  onGenerated={(val) => {
+                    setDescription(val);
+                    markDirty();
+                  }}
                   seed={description}
                 />
               </div>
@@ -1015,7 +1056,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                 rows={5}
                 placeholder="Describe core dice mechanics, resolution philosophy, and character stats..."
                 value={description}
-                onChange={(e) => { setDescription(e.target.value); markDirty(); }}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  markDirty();
+                }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors resize-none"
               />
             </div>
@@ -1030,12 +1074,11 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                   <span className="text-xs font-mono text-stone-500">({creationFields.length})</span>
                   <HelpTip label="Character Creation Prompts">
                     <>
-                      Each prompt a player answers when starting with this system. The id is the key the
-                      campaign records, the label is shown to the player, and the prompt guides the AI
-                      generator. The kind decides how the answer is collected: text and long are written
-                      answers, number is a number, select offers the options you list, and voice picks a
-                      voice profile. A voice field is never required and is never generated. Generatable
-                      marks a field the AI may fill.
+                      Each prompt a player answers when starting with this system. The id is the key the campaign
+                      records, the label is shown to the player, and the prompt guides the AI generator. The kind
+                      decides how the answer is collected: text and long are written answers, number is a number, select
+                      offers the options you list, and voice picks a voice profile. A voice field is never required and
+                      is never generated. Generatable marks a field the AI may fill.
                     </>
                   </HelpTip>
                 </div>
@@ -1059,7 +1102,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                 type="text"
                 placeholder="Preamble shown above the prompts (optional)"
                 value={creationPreamble}
-                onChange={(e) => { setCreationPreamble(e.target.value); markDirty(); }}
+                onChange={(e) => {
+                  setCreationPreamble(e.target.value);
+                  markDirty();
+                }}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-xs text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
               />
 
@@ -1069,7 +1115,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
               {creationFields.length === 0 ? (
                 <p className="text-xs text-stone-500">
-                  With no prompts defined, the studio falls back to appearance, age, gender, pronouns, background and voice.
+                  With no prompts defined, the studio falls back to appearance, age, gender, pronouns, background and
+                  voice.
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -1135,7 +1182,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                               const updated = [...creationFields];
                               updated[index] = {
                                 ...updated[index],
-                                options: e.target.value.split(',').map((value) => value.trim()).filter(Boolean),
+                                options: e.target.value
+                                  .split(',')
+                                  .map((value) => value.trim())
+                                  .filter(Boolean),
                               };
                               setCreationFields(updated);
                               markDirty();
@@ -1149,14 +1199,19 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                           value={field.kind || 'text'}
                           onChange={(e) => {
                             const updated = [...creationFields];
-                            updated[index] = { ...updated[index], kind: e.target.value as CharacterCreationField['kind'] };
+                            updated[index] = {
+                              ...updated[index],
+                              kind: e.target.value as CharacterCreationField['kind'],
+                            };
                             setCreationFields(updated);
                             markDirty();
                           }}
                           className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none cursor-pointer"
                         >
                           {['text', 'long', 'number', 'select', 'voice'].map((kind) => (
-                            <option key={kind} value={kind}>{kind}</option>
+                            <option key={kind} value={kind}>
+                              {kind}
+                            </option>
                           ))}
                         </select>
                         <label className="flex items-center gap-1 cursor-pointer">
@@ -1245,7 +1300,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                   fieldName="rules_prompt"
                   onError={reportGenerationError}
                   getContext={getSystemContext}
-                  onGenerated={(val) => { setRulesPrompt(val); markDirty(); }}
+                  onGenerated={(val) => {
+                    setRulesPrompt(val);
+                    markDirty();
+                  }}
                   seed={rulesPrompt}
                 />
               </div>
@@ -1253,7 +1311,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
             <MarkdownEditor
               key={`${savedID || slugID || 'draft'}-rules`}
               value={rulesPrompt}
-              onChange={(next) => { setRulesPrompt(next); markDirty(); }}
+              onChange={(next) => {
+                setRulesPrompt(next);
+                markDirty();
+              }}
               language="markdown"
               ariaLabel="System rules prompt"
               placeholder="Describe the resolution philosophy, dice mechanics and character stats the engine should follow..."
@@ -1285,7 +1346,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
             <MarkdownEditor
               key={`${savedID || slugID || 'draft'}-script`}
               value={script}
-              onChange={(next) => { setScript(next); markDirty(); }}
+              onChange={(next) => {
+                setScript(next);
+                markDirty();
+              }}
               language="javascript"
               ariaLabel="System mechanics script"
               placeholder="export function evaluateRoll(stats, diceExpr) { ... }"
@@ -1314,9 +1378,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
             {scenarioError && <p className="text-xs text-red-300 px-1">{scenarioError}</p>}
 
-            {!savedID && (
-              <p className="text-xs text-stone-500 px-1">Save the system before adding scenarios.</p>
-            )}
+            {!savedID && <p className="text-xs text-stone-500 px-1">Save the system before adding scenarios.</p>}
 
             {editingScenario && (
               <ScenarioEditor
@@ -1410,7 +1472,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               </h3>
             </div>
             <p className="text-xs font-sans text-stone-300">
-              This will permanently delete the system directory and all of its mechanics and prompts. This action cannot be undone.
+              This will permanently delete the system directory and all of its mechanics and prompts. This action cannot
+              be undone.
             </p>
             {deleteSystemError && (
               <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-300 flex items-start gap-2">
@@ -1419,7 +1482,8 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                   <p>{deleteSystemError}</p>
                   {canForceDelete && (
                     <p className="text-stone-400">
-                      You can force deletion to remove the system anyway. Existing campaigns or worlds using this system may fail to resolve mechanics.
+                      You can force deletion to remove the system anyway. Existing campaigns or worlds using this system
+                      may fail to resolve mechanics.
                     </p>
                   )}
                 </div>
@@ -1496,10 +1560,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       )}
 
       {showGenerateDialog && (
-        <SystemGenerateDialog
-          onCancel={() => setShowGenerateDialog(false)}
-          onDraft={handleDraftProduced}
-        />
+        <SystemGenerateDialog onCancel={() => setShowGenerateDialog(false)} onDraft={handleDraftProduced} />
       )}
 
       {showEnhanceDialog && savedID && (

@@ -15,9 +15,7 @@ afterEach(() => {
 
 describe('WorldEnhanceDialog', () => {
   it('accepts and rejects proposals', async () => {
-    const apply = vi
-      .spyOn(APIClient, 'applyWorldEnhancements')
-      .mockResolvedValue({ written: ['prompts/lore.md'] });
+    const apply = vi.spyOn(APIClient, 'applyWorldEnhancements').mockResolvedValue({ written: ['prompts/lore.md'] });
 
     render(<WorldEnhanceDialog worldId="w" onClose={() => {}} proposals={proposals} />);
 
@@ -70,23 +68,19 @@ describe('WorldEnhanceDialog', () => {
             entity: { id: 'the-salt-circle', name: 'The Salt Circle', type: 'faction', body: 'Rivals.' },
           },
         ]}
-      />
+      />,
     );
     expect(screen.getByText('the-salt-circle')).toBeInTheDocument();
     expect(screen.getByText(/^new entity$/i)).toBeInTheDocument();
   });
 
   it('surfaces a refusal', async () => {
-    vi.spyOn(APIClient, 'applyWorldEnhancements').mockRejectedValue(
-      new Error('world entity already exists: the-debt')
-    );
+    vi.spyOn(APIClient, 'applyWorldEnhancements').mockRejectedValue(new Error('world entity already exists: the-debt'));
 
     render(<WorldEnhanceDialog worldId="w" onClose={() => {}} proposals={proposals} />);
     fireEvent.click(screen.getByRole('button', { name: /apply accepted/i }));
 
-    await waitFor(() =>
-      expect(screen.getByText(/world entity already exists/i)).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/world entity already exists/i)).toBeInTheDocument());
   });
 
   it('slugifies a proposed entity id before applying', async () => {
@@ -106,7 +100,7 @@ describe('WorldEnhanceDialog', () => {
             entity: { id: 'The Salt Circle!', name: 'The Salt Circle', type: 'faction', body: 'Rivals.' },
           },
         ]}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /apply accepted/i }));

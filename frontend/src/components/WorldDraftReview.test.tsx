@@ -71,9 +71,7 @@ describe('WorldDraftReview', () => {
 
   it('merges into an existing world when a target is named', () => {
     const onCommit = vi.fn();
-    render(
-      <WorldDraftReview draft={draft} targetWorldId="ember-peak" onCommit={onCommit} onDiscard={vi.fn()} />
-    );
+    render(<WorldDraftReview draft={draft} targetWorldId="ember-peak" onCommit={onCommit} onDiscard={vi.fn()} />);
     expect(screen.getByText(/merging into ember-peak/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /merge accepted/i }));
     expect(onCommit.mock.calls[0][0].target_world_id).toBe('ember-peak');
@@ -87,9 +85,7 @@ describe('WorldDraftReview', () => {
   });
 
   it('says when the draft came from the offline fallback', () => {
-    render(
-      <WorldDraftReview draft={{ ...draft, oracle: true }} onCommit={vi.fn()} onDiscard={vi.fn()} />
-    );
+    render(<WorldDraftReview draft={{ ...draft, oracle: true }} onCommit={vi.fn()} onDiscard={vi.fn()} />);
     expect(screen.getByText(/built-in template generator/i)).toBeInTheDocument();
   });
 
@@ -102,7 +98,7 @@ describe('WorldDraftReview', () => {
         }}
         onCommit={vi.fn()}
         onDiscard={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText(/dropped unresolved links: nowhere/i)).toBeInTheDocument();
   });

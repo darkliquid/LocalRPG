@@ -69,7 +69,11 @@ export const OfflinePreset: React.FC<OfflinePresetProps> = ({ onChange }) => {
             onClick={handleCheck}
             disabled={isChecking}
           >
-            {isChecking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />}
+            {isChecking ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            )}
             <span>Check offline</span>
           </button>
           <button
@@ -211,31 +215,37 @@ export const OfflinePreset: React.FC<OfflinePresetProps> = ({ onChange }) => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             <div className="p-2.5 rounded-lg bg-stone-950/60 border border-stone-800">
-              <span className="text-stone-400 block text-[11px] uppercase tracking-wider font-semibold">Game Master</span>
+              <span className="text-stone-400 block text-[11px] uppercase tracking-wider font-semibold">
+                Game Master
+              </span>
               <span className="text-stone-100 font-medium">narrative-oracle</span>
               <span className="text-stone-500 block text-[11px]">Builtin schema-agnostic dice & prompt oracle</span>
             </div>
             <div className="p-2.5 rounded-lg bg-stone-950/60 border border-stone-800">
-              <span className="text-stone-400 block text-[11px] uppercase tracking-wider font-semibold">Auxiliary Roles</span>
+              <span className="text-stone-400 block text-[11px] uppercase tracking-wider font-semibold">
+                Auxiliary Roles
+              </span>
               <span className="text-stone-100 font-medium">Inherit from GM / Disabled</span>
               <span className="text-stone-500 block text-[11px]">Narrator disabled, extractor/completion inherit</span>
             </div>
             <div className="p-2.5 rounded-lg bg-stone-950/60 border border-stone-800">
-              <span className="text-stone-400 block text-[11px] uppercase tracking-wider font-semibold">Image Generation</span>
+              <span className="text-stone-400 block text-[11px] uppercase tracking-wider font-semibold">
+                Image Generation
+              </span>
               <span className="text-stone-100 font-medium">procedural-art</span>
               <span className="text-stone-500 block text-[11px]">Deterministic procedural svg canvas generation</span>
             </div>
             <div className="p-2.5 rounded-lg bg-stone-950/60 border border-stone-800">
-              <span className="text-stone-400 block text-[11px] uppercase tracking-wider font-semibold">Embeddings</span>
+              <span className="text-stone-400 block text-[11px] uppercase tracking-wider font-semibold">
+                Embeddings
+              </span>
               <span className="text-stone-100 font-medium">builtin-local (hash-projection)</span>
               <span className="text-stone-500 block text-[11px]">Zero-download vector projections</span>
             </div>
           </div>
 
           <div className="space-y-2 pt-1 border-t border-stone-800">
-            <label className="block text-xs font-semibold text-stone-300">
-              Text-to-Speech Provider Choice:
-            </label>
+            <label className="block text-xs font-semibold text-stone-300">Text-to-Speech Provider Choice:</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <label
                 className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${
@@ -254,7 +264,9 @@ export const OfflinePreset: React.FC<OfflinePresetProps> = ({ onChange }) => {
                 />
                 <div>
                   <span className="block text-xs font-medium">native-os</span>
-                  <span className="block text-[11px] text-stone-400">Uses OS built-in speech synthesis. Zero model downloads.</span>
+                  <span className="block text-[11px] text-stone-400">
+                    Uses OS built-in speech synthesis. Zero model downloads.
+                  </span>
                 </div>
               </label>
 
@@ -275,7 +287,9 @@ export const OfflinePreset: React.FC<OfflinePresetProps> = ({ onChange }) => {
                 />
                 <div>
                   <span className="block text-xs font-medium">sherpa-onnx</span>
-                  <span className="block text-[11px] text-stone-400">High quality local Kokoro TTS. Requires downloading weights once.</span>
+                  <span className="block text-[11px] text-stone-400">
+                    High quality local Kokoro TTS. Requires downloading weights once.
+                  </span>
                 </div>
               </label>
             </div>

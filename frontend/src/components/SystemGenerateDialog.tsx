@@ -54,7 +54,7 @@ export const SystemGenerateDialog: React.FC<SystemGenerateDialogProps> = ({
       name: name || undefined,
       limits,
     }),
-    [description, name, limits]
+    [description, name, limits],
   );
 
   const canGenerate = description.trim() !== '' && !generating;
@@ -125,7 +125,7 @@ export const SystemGenerateDialog: React.FC<SystemGenerateDialogProps> = ({
         abortRef.current = null;
       }
     },
-    [onDraft, request]
+    [onDraft, request],
   );
 
   const handleGenerate = useCallback(async () => {
@@ -141,7 +141,7 @@ export const SystemGenerateDialog: React.FC<SystemGenerateDialogProps> = ({
       setLimits(raised);
       void runGeneration(raised);
     },
-    [runGeneration]
+    [runGeneration],
   );
 
   const handleRaiseAndSave = useCallback(
@@ -150,7 +150,7 @@ export const SystemGenerateDialog: React.FC<SystemGenerateDialogProps> = ({
         .then(() => handleRaiseAndRun(raised))
         .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
     },
-    [handleRaiseAndRun]
+    [handleRaiseAndRun],
   );
 
   const handleCancel = useCallback(() => {
@@ -162,11 +162,7 @@ export const SystemGenerateDialog: React.FC<SystemGenerateDialogProps> = ({
     const units = micros / 1_000_000;
     return units < 0.01 ? '<$0.01' : `$${units.toFixed(2)}`;
   };
-  const costLabel = estimate
-    ? estimate.priced
-      ? formatCost(estimate.cost_micros ?? 0)
-      : 'unpriced'
-    : '';
+  const costLabel = estimate ? (estimate.priced ? formatCost(estimate.cost_micros ?? 0) : 'unpriced') : '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -203,9 +199,7 @@ export const SystemGenerateDialog: React.FC<SystemGenerateDialogProps> = ({
             />
           ) : (
             error && (
-              <div className="p-3 text-xs rounded-xl bg-red-500/10 border border-red-500/20 text-red-300">
-                {error}
-              </div>
+              <div className="p-3 text-xs rounded-xl bg-red-500/10 border border-red-500/20 text-red-300">{error}</div>
             )
           )}
 
@@ -262,9 +256,7 @@ export const SystemGenerateDialog: React.FC<SystemGenerateDialogProps> = ({
               {steps.map((step) => (
                 <li key={step.name} className="flex items-center gap-2 text-xs">
                   <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      step.status === 'error' ? 'bg-red-400' : 'bg-emerald-400'
-                    }`}
+                    className={`w-1.5 h-1.5 rounded-full ${step.status === 'error' ? 'bg-red-400' : 'bg-emerald-400'}`}
                   />
                   <span className="text-neutral-300">{stepLabel(step.name)}</span>
                   {step.detail && <span className="text-neutral-500">{step.detail}</span>}
@@ -288,9 +280,7 @@ export const SystemGenerateDialog: React.FC<SystemGenerateDialogProps> = ({
           >
             {generating
               ? 'Generating...'
-              : `${needsConfirm ? 'Generate anyway' : 'Generate'}${
-                  limits ? ` (limit ${limits.max_calls})` : ''
-                }`}
+              : `${needsConfirm ? 'Generate anyway' : 'Generate'}${limits ? ` (limit ${limits.max_calls})` : ''}`}
           </button>
         </div>
       </div>

@@ -110,7 +110,10 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({ scenario, onSave
             <input
               value={String(value ?? '')}
               onChange={(e) => {
-                const next = stats.map(([k, v]) => (k === key ? [k, scenarioStatValue(e.target.value)] : [k, v])) as [string, unknown][];
+                const next = stats.map(([k, v]) => (k === key ? [k, scenarioStatValue(e.target.value)] : [k, v])) as [
+                  string,
+                  unknown,
+                ][];
                 setStats(next);
               }}
               placeholder="value"

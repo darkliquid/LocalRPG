@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { WorldsStudio } from './WorldsStudio';import { APIClient } from '../api/client';
+import { WorldsStudio } from './WorldsStudio';
+import { APIClient } from '../api/client';
 
 const world = {
   id: 'ember-peak',

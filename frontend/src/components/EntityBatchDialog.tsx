@@ -65,7 +65,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean),
-    [urls]
+    [urls],
   );
 
   const source: WorldSource | undefined =
@@ -76,8 +76,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
         : undefined;
 
   const sourceReady =
-    sourceMode === 'instruction' ||
-    (sourceMode === 'folder' ? folderPath.trim() !== '' : urlList.length > 0);
+    sourceMode === 'instruction' || (sourceMode === 'folder' ? folderPath.trim() !== '' : urlList.length > 0);
 
   // The native picker is a modal dialog, so the server opens it and this hook
   // polls for the result. A build with no dialog leaves the path field usable.
@@ -167,7 +166,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
   const actionLabel = sourceMode === 'instruction' ? 'Generate' : 'Extract';
   // Naming the limit on the button keeps the raised value visible at the moment
   // it is used, rather than applying a number the user has to remember typing.
-  const pendingLimit = limits ? limits.max_calls ?? limits.max_chunks : undefined;
+  const pendingLimit = limits ? (limits.max_calls ?? limits.max_chunks) : undefined;
   const limitSuffix = pendingLimit ? ` (limit ${pendingLimit})` : '';
 
   return (
@@ -198,16 +197,15 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
           {loading && progress && <ImportProgressPanel progress={progress} />}
           {!loading && batch?.cut_off ? (
             <p className="p-3 text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200">
-              {batch.cut_off} {batch.cut_off === 1 ? 'batch' : 'batches'} ran out of room before
-              finishing. What they wrote was kept; the rest of{' '}
-              {batch.cut_off === 1 ? 'that page' : 'those pages'} was not read. A smaller source
-              chunk limit, or a provider with more context, would read it all.
+              {batch.cut_off} {batch.cut_off === 1 ? 'batch' : 'batches'} ran out of room before finishing. What they
+              wrote was kept; the rest of {batch.cut_off === 1 ? 'that page' : 'those pages'} was not read. A smaller
+              source chunk limit, or a provider with more context, would read it all.
             </p>
           ) : null}
           {batch?.oracle && (
             <p className="p-3 text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200">
-              No model provider is configured, so these came from the built-in template generator
-              rather than from your source. Assign one in Settings → AI Agents to read a source.
+              No model provider is configured, so these came from the built-in template generator rather than from your
+              source. Assign one in Settings → AI Agents to read a source.
             </p>
           )}
           {limitCode && error ? (
@@ -221,9 +219,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
             />
           ) : (
             error && (
-              <p className="p-3 text-sm rounded-xl bg-red-950/40 border border-red-500/30 text-red-300">
-                {error}
-              </p>
+              <p className="p-3 text-sm rounded-xl bg-red-950/40 border border-red-500/30 text-red-300">{error}</p>
             )
           )}
           {accepted && (
@@ -347,9 +343,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
                   Browse
                 </button>
               </div>
-              <p className="text-[11px] text-neutral-500">
-                {folderPicker.note ?? 'Read locally. Nothing is fetched.'}
-              </p>
+              <p className="text-[11px] text-neutral-500">{folderPicker.note ?? 'Read locally. Nothing is fetched.'}</p>
             </div>
           )}
 
@@ -368,8 +362,8 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
               />
               <p className="text-[11px] text-amber-400/80 flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                This fetches the pages you name. Only the URLs listed are fetched, and you are
-                responsible for their licensing.
+                This fetches the pages you name. Only the URLs listed are fetched, and you are responsible for their
+                licensing.
               </p>
             </div>
           )}
@@ -377,15 +371,9 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
           {entities.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-neutral-300">
-                  Preview ({entities.length})
-                </span>
+                <span className="text-xs font-medium text-neutral-300">Preview ({entities.length})</span>
                 <label className="flex items-center gap-2 text-[11px] text-neutral-400">
-                  <input
-                    type="checkbox"
-                    checked={rename}
-                    onChange={(event) => setRename(event.target.checked)}
-                  />
+                  <input type="checkbox" checked={rename} onChange={(event) => setRename(event.target.checked)} />
                   Rename on an id clash
                 </label>
               </div>
@@ -400,9 +388,7 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
                     <span className="ml-auto font-mono text-[11px] text-neutral-500">{entity.id}</span>
                   </div>
                   <p className="mt-1 text-xs text-neutral-300 line-clamp-3">{entity.body}</p>
-                  {entity.source && (
-                    <p className="mt-1 text-[11px] text-neutral-500">From: {entity.source}</p>
-                  )}
+                  {entity.source && <p className="mt-1 text-[11px] text-neutral-500">From: {entity.source}</p>}
                   {entity.links && entity.links.length > 0 && (
                     <p className="mt-1 text-[11px] text-neutral-500">Links: {entity.links.join(', ')}</p>
                   )}

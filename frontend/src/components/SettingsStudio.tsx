@@ -1,7 +1,19 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { DebugPanel } from './DebugPanel';
 import { APIClient } from '../api/client';
-import { AppConfig, AgentRoleConfig, TestProviderResponse, ModelStatus, ProviderDescriptor, TTSConfig, STTConfig, ImageConfig, EmbeddingProviderConfig, EmbeddingsConfig, StylePacks } from '../types';
+import {
+  AppConfig,
+  AgentRoleConfig,
+  TestProviderResponse,
+  ModelStatus,
+  ProviderDescriptor,
+  TTSConfig,
+  STTConfig,
+  ImageConfig,
+  EmbeddingProviderConfig,
+  EmbeddingsConfig,
+  StylePacks,
+} from '../types';
 import { ModelDownloadModal } from './ModelDownloadModal';
 import { AlertCircle, Bug, CheckCircle, Cloud, Coins, Cpu, Folder, Layers, Save, Sliders, Volume2 } from 'lucide-react';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
@@ -25,7 +37,7 @@ interface SettingsStudioProps {
 // id-keyed shape the quick-load selects use, carrying each provider's tier and
 // caveat so the picker can label it honestly.
 const presetsToMap = <T,>(
-  descriptors: ProviderDescriptor[]
+  descriptors: ProviderDescriptor[],
 ): Record<string, { label: string; description: string; config: T; tier?: string; caveat?: string }> => {
   const map: Record<string, { label: string; description: string; config: T; tier?: string; caveat?: string }> = {};
   for (const descriptor of descriptors) {
@@ -46,7 +58,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [activeFilePath, setActiveFilePath] = useState<string>('');
   const [isOverride, setIsOverride] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'paths' | 'providers' | 'agents' | 'media' | 'batch' | 'preferences' | 'usage' | 'debug'>('paths');
+  const [activeSubTab, setActiveSubTab] = useState<
+    'paths' | 'providers' | 'agents' | 'media' | 'batch' | 'preferences' | 'usage' | 'debug'
+  >('paths');
   // The Providers area splits into credentials, embeddings, and the offline preset,
   // so the tab leads with one job rather than all three.
   const [isLoading, setIsLoading] = useState(true);
@@ -113,7 +127,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
         previewAudioRef.current = null;
       }
     },
-    []
+    [],
   );
 
   const playVoicePreview = (dataURI: string, volume: number) => {
@@ -251,7 +265,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           <button
             onClick={() => setActiveSubTab('paths')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
-              activeSubTab === 'paths' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+              activeSubTab === 'paths'
+                ? 'bg-purple-600 text-white font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Folder className="w-3.5 h-3.5" />
@@ -260,7 +276,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           <button
             onClick={() => setActiveSubTab('providers')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
-              activeSubTab === 'providers' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+              activeSubTab === 'providers'
+                ? 'bg-purple-600 text-white font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Cloud className="w-3.5 h-3.5" />
@@ -269,7 +287,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           <button
             onClick={() => setActiveSubTab('agents')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
-              activeSubTab === 'agents' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+              activeSubTab === 'agents'
+                ? 'bg-purple-600 text-white font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />
@@ -278,7 +298,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           <button
             onClick={() => setActiveSubTab('media')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
-              activeSubTab === 'media' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+              activeSubTab === 'media'
+                ? 'bg-purple-600 text-white font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Volume2 className="w-3.5 h-3.5" />
@@ -287,7 +309,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           <button
             onClick={() => setActiveSubTab('batch')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
-              activeSubTab === 'batch' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+              activeSubTab === 'batch'
+                ? 'bg-purple-600 text-white font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -296,7 +320,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           <button
             onClick={() => setActiveSubTab('preferences')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
-              activeSubTab === 'preferences' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+              activeSubTab === 'preferences'
+                ? 'bg-purple-600 text-white font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
@@ -305,7 +331,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           <button
             onClick={() => setActiveSubTab('usage')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
-              activeSubTab === 'usage' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+              activeSubTab === 'usage'
+                ? 'bg-purple-600 text-white font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Coins className="w-3.5 h-3.5" />
@@ -314,7 +342,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
           <button
             onClick={() => setActiveSubTab('debug')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all cursor-pointer ${
-              activeSubTab === 'debug' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-stone-200'
+              activeSubTab === 'debug'
+                ? 'bg-purple-600 text-white font-bold shadow'
+                : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Bug className="w-3.5 h-3.5" />

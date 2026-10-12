@@ -29,9 +29,7 @@ describe('TheaterDialogue', () => {
   });
 
   it('shows a caption for a silent spoken beat', () => {
-    const { container } = render(
-      <TheaterDialogue segment={speech} fallback="" caption noAudio onAdvance={() => {}} />,
-    );
+    const { container } = render(<TheaterDialogue segment={speech} fallback="" caption noAudio onAdvance={() => {}} />);
     expect(container.querySelector('[data-caption]')).not.toBeNull();
   });
 

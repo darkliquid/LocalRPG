@@ -359,9 +359,7 @@ export const UsagePanel: React.FC<UsagePanelProps> = ({ activeGameID, onOpenDocs
                               no price configured
                             </button>
                           ) : (
-                            <span className="text-stone-200">
-                              {formatCost(row.cost_micros ?? 0, currency)}
-                            </span>
+                            <span className="text-stone-200">{formatCost(row.cost_micros ?? 0, currency)}</span>
                           )}
                         </td>
                       </tr>

@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { AppConfig, ImageConfig, STTConfig, TTSConfig } from '../types';
 import { entryNames, mediaEntryValue, providersKey, purposesFor, setMediaEntry, uniqueName } from './mediaProviders';
 
-const tts = (over: Partial<TTSConfig> = {}): TTSConfig => ({ type: 'disabled', auto_play: false, master_volume: 1, ...over });
+const tts = (over: Partial<TTSConfig> = {}): TTSConfig => ({
+  type: 'disabled',
+  auto_play: false,
+  master_volume: 1,
+  ...over,
+});
 const stt = (over: Partial<STTConfig> = {}): STTConfig => ({ type: 'disabled', ...over });
 const image = (over: Partial<ImageConfig> = {}): ImageConfig => ({ type: 'disabled', auto_generate: false, ...over });
 

@@ -83,10 +83,7 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
             <h3 className="text-lg font-semibold text-stone-100 font-sans">Enable Voice Narration</h3>
           </div>
           {!downloading && (
-            <button
-              onClick={onClose}
-              className="text-stone-400 hover:text-stone-200 p-1 transition cursor-pointer"
-            >
+            <button onClick={onClose} className="text-stone-400 hover:text-stone-200 p-1 transition cursor-pointer">
               <X className="w-5 h-5" />
             </button>
           )}
@@ -109,8 +106,8 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
           <div className="space-y-4">
             <p className="text-sm text-stone-400 leading-relaxed font-serif">
               Natural voice narration for characters and scene descriptions requires the{' '}
-              <span className="text-stone-200 font-medium">{active.name}</span> (~{formattedSize} MB).
-              Would you like to download it now?
+              <span className="text-stone-200 font-medium">{active.name}</span> (~{formattedSize} MB). Would you like to
+              download it now?
             </p>
 
             {downloading && (

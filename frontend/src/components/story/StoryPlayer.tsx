@@ -69,7 +69,7 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
   const current = total > 0 ? beats[Math.min(index, total - 1)] : undefined;
   const reducedMotion = useMemo(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-    []
+    [],
   );
 
   const stopAudio = useCallback(() => {
@@ -182,7 +182,7 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
   // The protagonist stays on the left for the whole story; the speaker's face takes
   // the right while they are the one talking, as the theatre shows them.
   const npcPortrait = isSpeech && !isPlayer ? beat.portrait : undefined;
-  const npcLabel = isSpeech && !isPlayer ? beat.speaker ?? 'Unknown' : undefined;
+  const npcLabel = isSpeech && !isPlayer ? (beat.speaker ?? 'Unknown') : undefined;
 
   // The theatre falls back to the campaign's own image rather than to nothing.
   const backgroundURL = beat.art || scene.art || story.banner;
@@ -225,10 +225,7 @@ export const StoryPlayer: React.FC<{ story: Story }> = ({ story }) => {
       </header>
 
       {chapters.length > 0 && (
-        <nav
-          aria-label="Chapters"
-          className="absolute left-4 top-24 z-20 flex max-w-[14rem] flex-col gap-1"
-        >
+        <nav aria-label="Chapters" className="absolute left-4 top-24 z-20 flex max-w-[14rem] flex-col gap-1">
           {chapters.map((chapter, chapterIndex) => (
             <button
               key={`${chapter.title}-${chapterIndex}`}

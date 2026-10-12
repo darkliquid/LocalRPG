@@ -18,6 +18,6 @@ if (container) {
           This page is a story export, and it is missing its story data.
         </div>
       )}
-    </React.StrictMode>
+    </React.StrictMode>,
   );
 }

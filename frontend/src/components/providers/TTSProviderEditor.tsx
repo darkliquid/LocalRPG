@@ -96,10 +96,13 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
           className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
           defaultValue=""
         >
-          <option value="" disabled>⚡ Load TTS Preset…</option>
+          <option value="" disabled>
+            ⚡ Load TTS Preset…
+          </option>
           {Object.entries(presets).map(([id, p]) => (
             <option key={id} value={id} title={p.caveat}>
-              {p.label}{p.tier ? ` · ${tierLabel(p.tier)}` : ''}
+              {p.label}
+              {p.tier ? ` · ${tierLabel(p.tier)}` : ''}
             </option>
           ))}
         </select>
@@ -108,9 +111,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
           <input
             type="checkbox"
             checked={entry.auto_play}
-            onChange={(e) =>
-              onChange({ ...entry, auto_play: e.target.checked })
-            }
+            onChange={(e) => onChange({ ...entry, auto_play: e.target.checked })}
             className="rounded bg-stone-950 border-stone-800 text-purple-600 focus:ring-0"
           />
           <span>Auto-play Narration</span>
@@ -122,9 +123,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
       <label className="text-xs font-sans uppercase text-stone-300">Narration Markdown</label>
       <select
         value={entry.markdown || 'auto'}
-        onChange={(e) =>
-          onChange({ ...entry, markdown: e.target.value as 'auto' | 'strip' | 'keep' })
-        }
+        onChange={(e) => onChange({ ...entry, markdown: e.target.value as 'auto' | 'strip' | 'keep' })}
         className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60"
       >
         <option value="auto">Auto - reduce formatting unless the provider understands it</option>
@@ -141,19 +140,16 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
         <label className="text-xs font-sans uppercase text-stone-300">TTS Engine</label>
         <select
           value={
-            entry.type === 'gemini' ||
-            (entry.type === 'builtin' && entry.builtin_name === 'gemini')
+            entry.type === 'gemini' || (entry.type === 'builtin' && entry.builtin_name === 'gemini')
               ? 'gemini'
-              : entry.type === 'cartesia' ||
-                (entry.type === 'builtin' && entry.builtin_name === 'cartesia')
-              ? 'builtin:cartesia'
-              : entry.type === 'builtin'
-              ? `builtin:${entry.builtin_name || 'native-os'}`
-              : entry.type === 'fish-audio' ||
-                (entry.type === 'http' &&
-                  (entry.model?.includes('fish') || entry.model?.includes('s2-pro')))
-              ? 'fish-audio'
-              : entry.type
+              : entry.type === 'cartesia' || (entry.type === 'builtin' && entry.builtin_name === 'cartesia')
+                ? 'builtin:cartesia'
+                : entry.type === 'builtin'
+                  ? `builtin:${entry.builtin_name || 'native-os'}`
+                  : entry.type === 'fish-audio' ||
+                      (entry.type === 'http' && (entry.model?.includes('fish') || entry.model?.includes('s2-pro')))
+                    ? 'fish-audio'
+                    : entry.type
           }
           onChange={(e) => {
             const val = e.target.value;
@@ -164,34 +160,25 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
               const builtinDefaults =
                 builtinName === 'elevenlabs'
                   ? {
-                      model:
-                        entry.model && entry.model.includes('eleven')
-                          ? entry.model
-                          : 'eleven_multilingual_v2',
+                      model: entry.model && entry.model.includes('eleven') ? entry.model : 'eleven_multilingual_v2',
                       default_voice:
-                        entry.default_voice &&
-                        entry.default_voice.startsWith('EXAV')
+                        entry.default_voice && entry.default_voice.startsWith('EXAV')
                           ? entry.default_voice
                           : 'EXAVITQu4vr4xnSDxMaL',
                     }
                   : builtinName === 'cartesia'
-                  ? {
-                      model:
-                        entry.model && entry.model.includes('sonic')
-                          ? entry.model
-                          : 'sonic-3.6',
-                      default_voice:
-                        entry.default_voice || 'db6b0ed5-d5d3-463d-ae85-518a07d3c2b4',
-                    }
-                  : builtinName === 'sherpa-onnx'
-                  ? {
-                      default_voice:
-                        entry.default_voice &&
-                        entry.default_voice.startsWith('af_')
-                          ? entry.default_voice
-                          : 'af_bella',
-                    }
-                  : {};
+                    ? {
+                        model: entry.model && entry.model.includes('sonic') ? entry.model : 'sonic-3.6',
+                        default_voice: entry.default_voice || 'db6b0ed5-d5d3-463d-ae85-518a07d3c2b4',
+                      }
+                    : builtinName === 'sherpa-onnx'
+                      ? {
+                          default_voice:
+                            entry.default_voice && entry.default_voice.startsWith('af_')
+                              ? entry.default_voice
+                              : 'af_bella',
+                        }
+                      : {};
               onChange({
                 ...entry,
                 ...builtinDefaults,
@@ -204,10 +191,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                 ...entry,
                 type: 'gemini',
                 builtin_name: undefined,
-                model:
-                  entry.model && entry.model.includes('gemini')
-                    ? entry.model
-                    : 'gemini-3.8-flash-tts',
+                model: entry.model && entry.model.includes('gemini') ? entry.model : 'gemini-3.8-flash-tts',
                 default_voice:
                   entry.default_voice &&
                   !entry.default_voice.startsWith('EXAV') &&
@@ -221,10 +205,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                 ...entry,
                 type: 'http',
                 builtin_name: undefined,
-                endpoint:
-                  entry.endpoint && entry.endpoint.includes('8091')
-                    ? entry.endpoint
-                    : 'http://localhost:8091',
+                endpoint: entry.endpoint && entry.endpoint.includes('8091') ? entry.endpoint : 'http://localhost:8091',
                 model: 'fishaudio/s2-pro',
                 default_voice: entry.default_voice || 'default',
                 options: undefined,
@@ -244,9 +225,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                     ? entry.model
                     : 'kokoro',
                 default_voice:
-                  entry.default_voice &&
-                  !entry.default_voice.startsWith('EXAV') &&
-                  entry.default_voice !== 'Aoede'
+                  entry.default_voice && !entry.default_voice.startsWith('EXAV') && entry.default_voice !== 'Aoede'
                     ? entry.default_voice
                     : 'af_bella',
                 options: undefined,
@@ -277,9 +256,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
               type="text"
               placeholder="e.g. http://localhost:8880"
               value={entry.endpoint || ''}
-              onChange={(e) =>
-                onChange({ ...entry, endpoint: e.target.value })
-              }
+              onChange={(e) => onChange({ ...entry, endpoint: e.target.value })}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
             <p className="text-xs text-stone-500">
@@ -292,9 +269,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
               type="text"
               placeholder="e.g. kokoro or tts-1"
               value={entry.model || ''}
-              onChange={(e) =>
-                onChange({ ...entry, model: e.target.value })
-              }
+              onChange={(e) => onChange({ ...entry, model: e.target.value })}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
           </div>
@@ -304,9 +279,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
               type="password"
               placeholder="Optional authorization token (e.g. for OpenAI)"
               value={entry.api_key || ''}
-              onChange={(e) =>
-                onChange({ ...entry, api_key: e.target.value })
-              }
+              onChange={(e) => onChange({ ...entry, api_key: e.target.value })}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
           </div>
@@ -320,9 +293,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
             type="text"
             placeholder="e.g. piper"
             value={entry.command || ''}
-            onChange={(e) =>
-              onChange({ ...entry, command: e.target.value })
-            }
+            onChange={(e) => onChange({ ...entry, command: e.target.value })}
             className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
           />
         </div>
@@ -331,9 +302,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
       <div className="space-y-1.5">
         <label className="text-xs font-sans uppercase text-stone-300 flex items-center justify-between">
           <span>Master Volume</span>
-          <span className="font-mono text-purple-400">
-            {Math.round((entry.master_volume || 1.0) * 100)}%
-          </span>
+          <span className="font-mono text-purple-400">{Math.round((entry.master_volume || 1.0) * 100)}%</span>
         </label>
         <input
           type="range"
@@ -341,9 +310,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
           max="1"
           step="0.05"
           value={entry.master_volume || 1.0}
-          onChange={(e) =>
-            onChange({ ...entry, master_volume: parseFloat(e.target.value) })
-          }
+          onChange={(e) => onChange({ ...entry, master_volume: parseFloat(e.target.value) })}
           className="w-full accent-purple-500"
         />
       </div>
@@ -402,9 +369,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
           type="text"
           placeholder="e.g. gemini-3.8-flash-tts"
           value={entry.model || 'gemini-3.8-flash-tts'}
-          onChange={(e) =>
-            onChange({ ...entry, model: e.target.value })
-          }
+          onChange={(e) => onChange({ ...entry, model: e.target.value })}
           className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
         />
         <div className="flex flex-wrap gap-1.5 pt-1">
@@ -418,9 +383,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
             <button
               key={m.id}
               type="button"
-              onClick={() =>
-                onChange({ ...entry, model: m.id })
-              }
+              onClick={() => onChange({ ...entry, model: m.id })}
               className={`text-xs px-2.5 py-1 rounded-lg border font-mono transition cursor-pointer ${
                 (entry.model || 'gemini-3.8-flash-tts') === m.id
                   ? 'bg-purple-500/20 border-purple-500/60 text-purple-300'
@@ -441,9 +404,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
           type="text"
           placeholder="e.g. sonic-3.6"
           value={entry.model || 'sonic-3.6'}
-          onChange={(e) =>
-            onChange({ ...entry, model: e.target.value })
-          }
+          onChange={(e) => onChange({ ...entry, model: e.target.value })}
           className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
         />
         <div className="flex flex-wrap gap-1.5 pt-1">
@@ -454,9 +415,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
             <button
               key={m.id}
               type="button"
-              onClick={() =>
-                onChange({ ...entry, model: m.id })
-              }
+              onClick={() => onChange({ ...entry, model: m.id })}
               className={`text-xs px-2.5 py-1 rounded-lg border font-mono transition cursor-pointer ${
                 (entry.model || 'sonic-3.6') === m.id
                   ? 'bg-purple-500/20 border-purple-500/60 text-purple-300'
@@ -482,10 +441,10 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
         {isGeminiTTS
           ? 'No Gemini API key configured. Enter one below, or set GEMINI_API_KEY / GOOGLE_API_KEY in the environment.'
           : isCartesiaTTS
-          ? 'No Cartesia API key configured. Enter one below, configure it in the Providers tab, or set CARTESIA_API_KEY in the environment.'
-          : isElevenLabsTTS
-          ? 'No API key configured. Enter one below, or set ELEVENLABS_API_KEY in the environment.'
-          : 'No API key configured. Enter one below.'}
+            ? 'No Cartesia API key configured. Enter one below, configure it in the Providers tab, or set CARTESIA_API_KEY in the environment.'
+            : isElevenLabsTTS
+              ? 'No API key configured. Enter one below, or set ELEVENLABS_API_KEY in the environment.'
+              : 'No API key configured. Enter one below.'}
       </div>
     )}
 
@@ -506,23 +465,21 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
             isGeminiTTS && geminiSharedKey
               ? 'Using shared key from providers.gemini.api_key'
               : isCartesiaTTS && cartesiaSharedKey
-              ? 'Using shared key from providers.cartesia.api_key'
-              : "Leave empty to use the provider's environment variable"
+                ? 'Using shared key from providers.cartesia.api_key'
+                : "Leave empty to use the provider's environment variable"
           }
           value={entry.api_key || ''}
-          onChange={(e) =>
-            onChange({ ...entry, api_key: e.target.value })
-          }
+          onChange={(e) => onChange({ ...entry, api_key: e.target.value })}
           className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
         />
         <p className="text-xs text-stone-500">
           {isGeminiTTS
             ? 'Stored in your configuration file. Set GEMINI_API_KEY instead to keep it off disk.'
             : isCartesiaTTS
-            ? 'Stored in your configuration file. Set CARTESIA_API_KEY or configure in Providers tab to share across TTS and STT.'
-            : isElevenLabsTTS
-            ? 'Stored in your configuration file. Set ELEVENLABS_API_KEY instead to keep it off disk.'
-            : 'Stored in your configuration file.'}
+              ? 'Stored in your configuration file. Set CARTESIA_API_KEY or configure in Providers tab to share across TTS and STT.'
+              : isElevenLabsTTS
+                ? 'Stored in your configuration file. Set ELEVENLABS_API_KEY instead to keep it off disk.'
+                : 'Stored in your configuration file.'}
         </p>
       </div>
     )}
@@ -533,9 +490,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
         <VoiceOptionsControl
           schema={inspect.options}
           values={entry.options ?? {}}
-          onChange={(key, value) =>
-            onChange({ ...entry, options: { ...(entry.options ?? {}), [key]: value } })
-          }
+          onChange={(key, value) => onChange({ ...entry, options: { ...(entry.options ?? {}), [key]: value } })}
         />
       </div>
     )}
@@ -544,9 +499,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-stone-400">
         <span>
           {inspect.catalog.voices?.length ?? 0} voices
-          {inspect.catalog.fetched_at
-            ? ` - last checked ${new Date(inspect.catalog.fetched_at).toLocaleString()}`
-            : ''}
+          {inspect.catalog.fetched_at ? ` - last checked ${new Date(inspect.catalog.fetched_at).toLocaleString()}` : ''}
           {inspect.catalog.stale ? ' (catalog unavailable, showing the last copy)' : ''}
         </span>
         <button
@@ -571,15 +524,11 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
         <label className="text-xs font-sans uppercase text-stone-300">Default Voice</label>
         <VoiceCombobox
           value={entry.default_voice || ''}
-          onChange={(voiceID) =>
-            onChange({ ...entry, default_voice: voiceID })
-          }
+          onChange={(voiceID) => onChange({ ...entry, default_voice: voiceID })}
           voices={voices}
           placeholder="Select default provider voice..."
         />
-        <p className="text-xs text-stone-500">
-          Fallback voice used for turn narration and unvoiced characters.
-        </p>
+        <p className="text-xs text-stone-500">Fallback voice used for turn narration and unvoiced characters.</p>
       </div>
     )}
 
@@ -587,9 +536,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
       <div className="space-y-3 p-4 rounded-xl bg-stone-900/40 border border-stone-800">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <div className="text-xs font-sans font-bold text-stone-200">
-              Speech Steering & Acting Cues
-            </div>
+            <div className="text-xs font-sans font-bold text-stone-200">Speech Steering & Acting Cues</div>
             <div className="text-xs text-stone-400">
               Instruct the GM to use emotive directions (e.g. [whispers], [sighs]) when supported.
             </div>
@@ -615,7 +562,12 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
             <span className="font-semibold text-stone-300">Provider Capabilities: </span>
             {inspect.speech_cues.audio_tags ? (
               <span className="text-purple-400">
-                Supports bracketed vocal cues ({inspect.speech_cues.supported_tags?.slice(0, 5).map(t => `[${t}]`).join(', ')}...)
+                Supports bracketed vocal cues (
+                {inspect.speech_cues.supported_tags
+                  ?.slice(0, 5)
+                  .map((t) => `[${t}]`)
+                  .join(', ')}
+                ...)
               </span>
             ) : inspect.speech_cues.markdown_emphasis ? (
               <span className="text-stone-300">Supports Markdown emphasis (*emphasis*)</span>
@@ -627,9 +579,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
 
         {(entry.speech_cues?.enabled ?? true) && (
           <div className="space-y-1.5 pt-1">
-            <label className="text-xs font-sans uppercase text-stone-300">
-              Transcript Display Mode
-            </label>
+            <label className="text-xs font-sans uppercase text-stone-300">Transcript Display Mode</label>
             <select
               value={entry.speech_cues?.display_mode || 'stage_directions'}
               onChange={(e) =>
@@ -656,9 +606,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
     {entry.type !== 'disabled' && (
       <div className="pt-2 space-y-2 border-t border-stone-800/60">
         <div className="space-y-1.5">
-          <label className="text-xs font-sans uppercase text-stone-300">
-            Preview Phrase
-          </label>
+          <label className="text-xs font-sans uppercase text-stone-300">Preview Phrase</label>
           <input
             type="text"
             value={previewText}
@@ -684,7 +632,11 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                 testResult.res.success ? 'text-emerald-400' : 'text-red-400'
               }`}
             >
-              {testResult.res.success ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+              {testResult.res.success ? (
+                <CheckCircle className="w-3.5 h-3.5" />
+              ) : (
+                <AlertCircle className="w-3.5 h-3.5" />
+              )}
               <span>{testResult.res.message}</span>
             </span>
           )}
@@ -697,12 +649,8 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-purple-400" />
-          <span className="font-sans text-xs uppercase font-bold text-stone-200">
-            NPC Voice Profiles Library
-          </span>
-          <span className="text-xs font-mono text-stone-500">
-            ({entry.voice_profiles?.length || 0} archetypes)
-          </span>
+          <span className="font-sans text-xs uppercase font-bold text-stone-200">NPC Voice Profiles Library</span>
+          <span className="text-xs font-mono text-stone-500">({entry.voice_profiles?.length || 0} archetypes)</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {isKokoro && (
@@ -772,15 +720,13 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
       </div>
 
       <p className="text-xs text-stone-400">
-        The GM and world extractor match NPC descriptions against these voice archetypes and tags to assign unique speech parameters automatically.
+        The GM and world extractor match NPC descriptions against these voice archetypes and tags to assign unique
+        speech parameters automatically.
       </p>
 
       <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
         {(entry.voice_profiles || []).map((profile, idx) => (
-          <div
-            key={idx}
-            className="p-3 rounded-lg bg-stone-950/70 border border-stone-800/80 space-y-2.5"
-          >
+          <div key={idx} className="p-3 rounded-lg bg-stone-950/70 border border-stone-800/80 space-y-2.5">
             <div className="flex items-center justify-between gap-2">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
                 <input
@@ -829,7 +775,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                         speech_rate: profile.speech_rate,
                         options: profile.options,
                       },
-                      previewText
+                      previewText,
                     )
                   }
                   className="p-1.5 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 hover:border-purple-500/40 cursor-pointer"
@@ -898,7 +844,10 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                 placeholder="Tags (comma-separated, e.g. elder, male, wise)"
                 value={profile.tags?.join(', ') || ''}
                 onChange={(e) => {
-                  const tags = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                  const tags = e.target.value
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
                   const updated = [...(entry.voice_profiles || [])];
                   updated[idx] = { ...updated[idx], tags };
                   onChange({ ...entry, voice_profiles: updated });

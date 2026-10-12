@@ -51,13 +51,23 @@ interface Row {
 // edits a draft config through onChange; it never saves. The selection is
 // controlled when `selected`/`onSelect` are supplied and local otherwise, so the
 // manager stays usable on its own.
-export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config, onChange, selected, onSelect, renderEditor, roles }) => {
+export const ProviderManager: React.FC<ProviderManagerProps> = ({
+  family,
+  config,
+  onChange,
+  selected,
+  onSelect,
+  renderEditor,
+  roles,
+}) => {
   const isLLM = family === 'llm';
   const ops = useMemo(() => (isLLM ? null : familyOps(family)), [isLLM, family]);
 
   const [entries, setEntries] = useState<MediaInspectEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [internalSelected, setInternalSelected] = useState<string>(() => (ops ? ops.initialSelection(config) : 'default'));
+  const [internalSelected, setInternalSelected] = useState<string>(() =>
+    ops ? ops.initialSelection(config) : 'default',
+  );
   const [refreshToken, setRefreshToken] = useState(0);
   const [defaultSource, setDefaultSource] = useState<string>('default');
   const [defaultNotice, setDefaultNotice] = useState<string | null>(null);
@@ -69,7 +79,7 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
       if (onSelect) onSelect(name);
       else setInternalSelected(name);
     },
-    [onSelect]
+    [onSelect],
   );
 
   const providers = useMemo(() => (ops ? ops.providerMap(config) : {}), [ops, config]);
@@ -103,10 +113,7 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
     return map;
   }, [roles]);
 
-  const names = useMemo(
-    () => (isLLM ? Object.keys(config.agents.roles) : ops!.names(config)),
-    [isLLM, config, ops]
-  );
+  const names = useMemo(() => (isLLM ? Object.keys(config.agents.roles) : ops!.names(config)), [isLLM, config, ops]);
 
   const rows: Row[] = names.map((name) => {
     if (isLLM) {
@@ -137,7 +144,7 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
       setDefaultNotice(null);
       onChange(next);
     },
-    [onChange]
+    [onChange],
   );
 
   const addProvider = useCallback(() => {
@@ -155,7 +162,7 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
       emit(ops.write(config, copyName, { ...(source as object) }));
       select(copyName);
     },
-    [config, emit, ops, providers, select]
+    [config, emit, ops, providers, select],
   );
 
   const renameProvider = useCallback(
@@ -165,7 +172,7 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
       if (!trimmed || trimmed === oldName || trimmed === 'default') return;
       emit(ops.rename(config, oldName, trimmed));
     },
-    [config, emit, ops]
+    [config, emit, ops],
   );
 
   const removeProvider = useCallback(
@@ -180,7 +187,7 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
       setError(null);
       emit(ops.remove(config, name));
     },
-    [config, emit, ops, purposes]
+    [config, emit, ops, purposes],
   );
 
   const setDefault = useCallback(
@@ -192,7 +199,7 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
       setRefreshToken((value) => value + 1);
       setDefaultNotice(`Selected ${name}.`);
     },
-    [config, emit, ops]
+    [config, emit, ops],
   );
 
   const setPurpose = useCallback(
@@ -205,15 +212,16 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
       }
       emit({ ...config, media: { ...config.media, purposes: next } });
     },
-    [config, emit, purposes]
+    [config, emit, purposes],
   );
 
-  const selectedValue = isLLM
-    ? config.agents.roles[activeSelected] ?? {}
-    : ops!.value(config, activeSelected);
+  const selectedValue = isLLM ? (config.agents.roles[activeSelected] ?? {}) : ops!.value(config, activeSelected);
   const writeSelected = (value: unknown) => {
     if (isLLM) {
-      emit({ ...config, agents: { ...config.agents, roles: { ...config.agents.roles, [activeSelected]: value as AgentRoleConfig } } });
+      emit({
+        ...config,
+        agents: { ...config.agents, roles: { ...config.agents.roles, [activeSelected]: value as AgentRoleConfig } },
+      });
     } else {
       emit(ops!.write(config, activeSelected, value));
     }
@@ -249,20 +257,30 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
           const isDefault = Boolean(ops?.hasDefaultRow) && row.name === 'default';
           const isDefaultSource = row.name === defaultMarker;
           return (
-            <li key={row.name} className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-800 bg-stone-950/40 px-3 py-2">
-              <span className={`h-2 w-2 rounded-full ${isDefaultSource ? 'bg-emerald-400' : 'bg-stone-600'}`} title={isDefaultSource ? 'Default' : ''} />
+            <li
+              key={row.name}
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-800 bg-stone-950/40 px-3 py-2"
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${isDefaultSource ? 'bg-emerald-400' : 'bg-stone-600'}`}
+                title={isDefaultSource ? 'Default' : ''}
+              />
               {isLLM ? (
                 <>
                   <span className="text-xs text-stone-100">{row.label}</span>
                   <span className="font-mono text-[11px] text-stone-500">{row.name}</span>
-                  {row.providerLabel && <span className="font-mono text-[11px] text-purple-300/80">{row.providerLabel}</span>}
+                  {row.providerLabel && (
+                    <span className="font-mono text-[11px] text-purple-300/80">{row.providerLabel}</span>
+                  )}
                 </>
               ) : (
                 <span className="font-mono text-xs text-stone-100">{row.name}</span>
               )}
               <TierBadge tier={row.tier} caveat={row.caveat} />
               {row.keyRequired !== undefined && (
-                <span className={`text-[11px] ${row.keyRequired && !row.keyPresent ? 'text-amber-300' : 'text-stone-500'}`}>
+                <span
+                  className={`text-[11px] ${row.keyRequired && !row.keyPresent ? 'text-amber-300' : 'text-stone-500'}`}
+                >
                   {row.keyRequired ? (row.keyPresent ? 'key set' : 'key missing') : 'no key needed'}
                 </span>
               )}
@@ -275,12 +293,20 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
                 edit
               </button>
               {!isLLM && !isDefault && (
-                <button type="button" onClick={() => setDefault(row.name)} className="text-[11px] text-stone-400 hover:text-emerald-300">
+                <button
+                  type="button"
+                  onClick={() => setDefault(row.name)}
+                  className="text-[11px] text-stone-400 hover:text-emerald-300"
+                >
                   set default
                 </button>
               )}
               {!isLLM && (
-                <button type="button" onClick={() => duplicateProvider(row.name)} className="text-[11px] text-stone-400 hover:text-purple-300">
+                <button
+                  type="button"
+                  onClick={() => duplicateProvider(row.name)}
+                  className="text-[11px] text-stone-400 hover:text-purple-300"
+                >
                   duplicate
                 </button>
               )}
@@ -296,7 +322,11 @@ export const ProviderManager: React.FC<ProviderManagerProps> = ({ family, config
                   >
                     rename
                   </button>
-                  <button type="button" onClick={() => removeProvider(row.name)} className="text-[11px] text-stone-400 hover:text-rose-400">
+                  <button
+                    type="button"
+                    onClick={() => removeProvider(row.name)}
+                    className="text-[11px] text-stone-400 hover:text-rose-400"
+                  >
                     remove
                   </button>
                 </>

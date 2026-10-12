@@ -36,14 +36,20 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({
     <div className="space-y-6">
       <div className="border-b border-white/10 pb-4">
         <h2 className="text-2xl font-sans text-purple-400 font-bold">{player.name}</h2>
-        <span className="text-xs font-mono uppercase tracking-widest text-stone-400">Level {level} {player.type}</span>
+        <span className="text-xs font-mono uppercase tracking-widest text-stone-400">
+          Level {level} {player.type}
+        </span>
       </div>
 
       {/* HP Bar */}
       <div className="space-y-1.5">
         <div className="flex justify-between text-xs font-sans text-stone-300">
-          <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5 text-red-500" /> Health</span>
-          <span>{hp} / {maxHp}</span>
+          <span className="flex items-center gap-1">
+            <Heart className="w-3.5 h-3.5 text-red-500" /> Health
+          </span>
+          <span>
+            {hp} / {maxHp}
+          </span>
         </div>
         <div className="w-full h-3 bg-stone-900 rounded-full overflow-hidden border border-white/5">
           <div
@@ -85,9 +91,7 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({
                   <li key={unlock.id} className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <span className="block text-sm text-stone-200 truncate">{unlock.label || unlock.id}</span>
-                      {unlock.description && (
-                        <span className="block text-xs text-stone-500">{unlock.description}</span>
-                      )}
+                      {unlock.description && <span className="block text-xs text-stone-500">{unlock.description}</span>}
                     </div>
                     <button
                       type="button"

@@ -46,7 +46,11 @@ export interface FamilyOps {
 }
 
 // renameInPurposes rewrites every purpose that pointed at oldName.
-function renameInPurposes(purposes: Record<string, string> | undefined, oldName: string, newName: string): Record<string, string> {
+function renameInPurposes(
+  purposes: Record<string, string> | undefined,
+  oldName: string,
+  newName: string,
+): Record<string, string> {
   const next: Record<string, string> = { ...(purposes ?? {}) };
   for (const use of Object.keys(next)) {
     if (next[use] === oldName) next[use] = newName;
@@ -71,7 +75,8 @@ function mediaOps(family: ProviderFamily): FamilyOps {
     value: (config, name) => mediaEntryValue(config, family, name),
     write: (config, name, value) => setMediaEntry(config, family, name, value),
     template: (config) => ({ ...(config.media[family] as object) }),
-    setDefault: (config, name) => setMediaEntry(config, family, 'default', { ...(providersOf(config)[name] as object) }),
+    setDefault: (config, name) =>
+      setMediaEntry(config, family, 'default', { ...(providersOf(config)[name] as object) }),
     remove: (config, name) => {
       const providers = { ...providersOf(config) };
       delete providers[name];

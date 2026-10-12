@@ -77,9 +77,7 @@ export const AIGenerateButton: React.FC<AIGenerateButtonProps> = ({
       report(res.warning ?? DEFAULT_FAILURE);
     } catch (err) {
       report(
-        err instanceof GenerationError
-          ? err.failure
-          : { code: 'provider_error', message: (err as Error).message }
+        err instanceof GenerationError ? err.failure : { code: 'provider_error', message: (err as Error).message },
       );
     } finally {
       setIsGenerating(false);
@@ -93,7 +91,11 @@ export const AIGenerateButton: React.FC<AIGenerateButtonProps> = ({
         onClick={handleGenerate}
         disabled={isGenerating || disabled}
         className={`inline-flex items-center justify-center p-1 rounded-md bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/30 text-purple-300 hover:text-purple-200 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${className}`}
-        title={error ? [formatGenerationError(error), ...generationAttemptLines(error)].join('\n') : (title || `AI Generate ${fieldName}`)}
+        title={
+          error
+            ? [formatGenerationError(error), ...generationAttemptLines(error)].join('\n')
+            : title || `AI Generate ${fieldName}`
+        }
       >
         {isGenerating ? (
           <Loader2 className="w-3 h-3 animate-spin text-purple-400" />

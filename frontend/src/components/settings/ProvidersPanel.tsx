@@ -35,35 +35,35 @@ export const ProvidersPanel: React.FC<ProvidersPanelProps> = ({
   const [providersTab, setProvidersTab] = useState<'cloud' | 'embeddings' | 'offline'>('cloud');
 
   return (
-  <div className="space-y-4 flex-1 overflow-y-auto pr-1">
-    <SubTabs
-      ariaLabel="Providers"
-      tabs={[
-        { id: 'cloud', label: 'Cloud Keys', icon: <Cloud className="w-3.5 h-3.5" /> },
-        { id: 'embeddings', label: 'Embeddings', icon: <BrainCircuit className="w-3.5 h-3.5" /> },
-        { id: 'offline', label: 'Offline', icon: <Layers className="w-3.5 h-3.5" /> },
-      ]}
-      active={providersTab}
-      onChange={(id) => setProvidersTab(id as 'cloud' | 'embeddings' | 'offline')}
-    />
-
-    {providersTab === 'offline' && <OfflinePreset onChange={setConfig} />}
-
-    {providersTab === 'embeddings' && (
-      <EmbeddingsPanel
-        config={config}
-        setConfig={setConfig}
-        embeddings={embeddings}
-        setEmbeddings={setEmbeddings}
-        embeddingPresets={embeddingPresets}
-        encoderInstalled={encoderInstalled}
-        sharedGeminiKey={sharedGeminiKey}
-        setMissingModelPrompt={setMissingModelPrompt}
+    <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+      <SubTabs
+        ariaLabel="Providers"
+        tabs={[
+          { id: 'cloud', label: 'Cloud Keys', icon: <Cloud className="w-3.5 h-3.5" /> },
+          { id: 'embeddings', label: 'Embeddings', icon: <BrainCircuit className="w-3.5 h-3.5" /> },
+          { id: 'offline', label: 'Offline', icon: <Layers className="w-3.5 h-3.5" /> },
+        ]}
+        active={providersTab}
+        onChange={(id) => setProvidersTab(id as 'cloud' | 'embeddings' | 'offline')}
       />
-    )}
 
-    {providersTab === 'cloud' && <CloudKeysPanel config={config} setConfig={setConfig} />}
-  </div>
+      {providersTab === 'offline' && <OfflinePreset onChange={setConfig} />}
+
+      {providersTab === 'embeddings' && (
+        <EmbeddingsPanel
+          config={config}
+          setConfig={setConfig}
+          embeddings={embeddings}
+          setEmbeddings={setEmbeddings}
+          embeddingPresets={embeddingPresets}
+          encoderInstalled={encoderInstalled}
+          sharedGeminiKey={sharedGeminiKey}
+          setMissingModelPrompt={setMissingModelPrompt}
+        />
+      )}
+
+      {providersTab === 'cloud' && <CloudKeysPanel config={config} setConfig={setConfig} />}
+    </div>
   );
 };
 

@@ -41,7 +41,7 @@ export const WorldDraftReview: React.FC<WorldDraftReviewProps> = ({
   const sections = draft.sections ?? [];
   const entities = useMemo(
     () => (draft.entities ?? []).map((entity) => edits[entity.id] ?? entity),
-    [draft.entities, edits]
+    [draft.entities, edits],
   );
 
   const acceptedSections = sections.filter((_, index) => !rejectedSections.has(index));
@@ -81,14 +81,10 @@ export const WorldDraftReview: React.FC<WorldDraftReviewProps> = ({
       accept_all: acceptAll,
       section_indexes: acceptAll
         ? undefined
-        : sections
-            .map((_, index) => index)
-            .filter((index) => !rejectedSections.has(index)),
+        : sections.map((_, index) => index).filter((index) => !rejectedSections.has(index)),
       entity_ids: acceptAll
         ? undefined
-        : (draft.entities ?? [])
-            .map((e) => e.id)
-            .filter((id) => !rejectedEntities.has(id)),
+        : (draft.entities ?? []).map((e) => e.id).filter((id) => !rejectedEntities.has(id)),
       edits: editedList.length > 0 ? editedList : undefined,
     });
   };
@@ -138,21 +134,16 @@ export const WorldDraftReview: React.FC<WorldDraftReviewProps> = ({
         <div className="p-6 space-y-3 max-h-[65vh] overflow-y-auto">
           {draft.oracle && (
             <p className="p-3 text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200">
-              No model provider was configured, so this draft comes from the built-in template
-              generator.
+              No model provider was configured, so this draft comes from the built-in template generator.
             </p>
           )}
           {error && (
-            <p className="p-3 text-sm rounded-xl bg-red-950/40 border border-red-500/30 text-red-300">
-              {error}
-            </p>
+            <p className="p-3 text-sm rounded-xl bg-red-950/40 border border-red-500/30 text-red-300">{error}</p>
           )}
 
           {items.map((item, index) => {
             const isSection = item.key.startsWith('section-');
-            const accepted = isSection
-              ? !rejectedSections.has(index)
-              : !rejectedEntities.has(item.entity!.id);
+            const accepted = isSection ? !rejectedSections.has(index) : !rejectedEntities.has(item.entity!.id);
             const isEditing = editing === item.key;
             return (
               <div
@@ -200,31 +191,23 @@ export const WorldDraftReview: React.FC<WorldDraftReviewProps> = ({
                     <input
                       aria-label={`${item.title} name`}
                       value={item.entity.name}
-                      onChange={(event) =>
-                        editEntity(item.entity!, { name: event.target.value })
-                      }
+                      onChange={(event) => editEntity(item.entity!, { name: event.target.value })}
                       className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-lg focus:border-purple-500/50 focus:outline-none"
                     />
                     <textarea
                       aria-label={`${item.title} body`}
                       value={item.entity.body}
-                      onChange={(event) =>
-                        editEntity(item.entity!, { body: event.target.value })
-                      }
+                      onChange={(event) => editEntity(item.entity!, { body: event.target.value })}
                       rows={4}
                       className="w-full px-3 py-2 text-sm text-white bg-white/[0.03] border border-white/10 rounded-lg focus:border-purple-500/50 focus:outline-none resize-none"
                     />
                   </div>
                 ) : (
-                  <p className="mt-2 text-xs text-neutral-300 whitespace-pre-wrap line-clamp-4">
-                    {item.body}
-                  </p>
+                  <p className="mt-2 text-xs text-neutral-300 whitespace-pre-wrap line-clamp-4">{item.body}</p>
                 )}
 
                 {item.links && item.links.length > 0 && (
-                  <p className="mt-2 text-[11px] text-neutral-500">
-                    Links: {item.links.join(', ')}
-                  </p>
+                  <p className="mt-2 text-[11px] text-neutral-500">Links: {item.links.join(', ')}</p>
                 )}
                 {item.dropped && item.dropped.length > 0 && (
                   <p className="mt-1 text-[11px] text-amber-400/80">
@@ -235,9 +218,7 @@ export const WorldDraftReview: React.FC<WorldDraftReviewProps> = ({
             );
           })}
 
-          {items.length === 0 && (
-            <p className="text-sm text-neutral-400">This draft is empty.</p>
-          )}
+          {items.length === 0 && <p className="text-sm text-neutral-400">This draft is empty.</p>}
         </div>
 
         <div className="flex items-center justify-between gap-3 p-6 border-t border-white/10">

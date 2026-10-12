@@ -238,9 +238,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
 
             {/* Narrator Voice */}
             <div className="space-y-1">
-              <label className="text-xs font-sans text-stone-300">
-                Narrator Voice
-              </label>
+              <label className="text-xs font-sans text-stone-300">Narrator Voice</label>
               <VoiceProfileSelect
                 profiles={voiceProfiles}
                 value={narratorProfile?.id ?? ''}
@@ -265,7 +263,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
                 <AIGenerateButton
                   formType="campaign"
                   fieldName="start_location"
-                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                  onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
                   getContext={getCampaignContext}
                   onGenerated={(val) => setStartLocation(val)}
                   worldID={game?.world_id}
@@ -284,13 +282,11 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
             {/* Opening Scene Prompt */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-sans text-stone-300">
-                  Opening Scene Directive
-                </label>
+                <label className="text-xs font-sans text-stone-300">Opening Scene Directive</label>
                 <AIGenerateButton
                   formType="campaign"
                   fieldName="opening_prompt"
-                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                  onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
                   getContext={getCampaignContext}
                   onGenerated={(val) => setOpeningPrompt(val)}
                   worldID={game?.world_id}
@@ -321,9 +317,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
 
           {/* Artwork Management */}
           <div className="space-y-3">
-            <h3 className="text-xs font-sans font-semibold text-stone-300 uppercase tracking-wider">
-              Display Artwork
-            </h3>
+            <h3 className="text-xs font-sans font-semibold text-stone-300 uppercase tracking-wider">Display Artwork</h3>
 
             <div className="grid grid-cols-2 gap-4">
               {/* Banner Artwork */}
@@ -457,7 +451,9 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
             <div className="flex items-center justify-between pt-1">
               <div>
                 <div className="text-xs font-sans font-semibold text-stone-200">Restart Campaign</div>
-                <div className="text-xs font-sans text-stone-400">Resets the story and the world's cast. Keeps artwork, voice, settings and your character.</div>
+                <div className="text-xs font-sans text-stone-400">
+                  Resets the story and the world's cast. Keeps artwork, voice, settings and your character.
+                </div>
               </div>
               {confirmAction === 'restart' ? (
                 <div className="flex items-center gap-2">

@@ -12,20 +12,14 @@ interface QueuedItem {
 // can then skip complete clips and resume partial ones from their recorded offset,
 // so no line is heard twice. It stays idle when application playback is running:
 // one device must own the sound.
-export const useStreamedSpeech = (
-  enabled: boolean,
-  volume: number,
-  initialLedger?: Record<string, PlaybackEntry>
-) => {
+export const useStreamedSpeech = (enabled: boolean, volume: number, initialLedger?: Record<string, PlaybackEntry>) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentKeyRef = useRef<string | null>(null);
   const pendingRef = useRef<Map<number, QueuedItem>>(new Map());
   const nextExpectedSeqRef = useRef(0);
   const fallbackSeqRef = useRef(0);
   const playedRef = useRef<Set<string>>(new Set());
-  const ledgerRef = useRef<Map<string, PlaybackEntry>>(
-    new Map(Object.entries(initialLedger ?? {}))
-  );
+  const ledgerRef = useRef<Map<string, PlaybackEntry>>(new Map(Object.entries(initialLedger ?? {})));
   const drainingRef = useRef(false);
 
   // Sync initialLedger into ledgerRef when provided
@@ -121,7 +115,7 @@ export const useStreamedSpeech = (
       pendingRef.current.set(seq, { sequence: seq, url, key });
       drain();
     },
-    [enabled, drain]
+    [enabled, drain],
   );
 
   // playedKeys is a snapshot of fully heard clips.

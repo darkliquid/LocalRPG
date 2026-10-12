@@ -89,8 +89,14 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
         </div>
       )}
       {applied.length > 0 && (
-        <div data-section="modifiers" className="flex flex-wrap items-center gap-1 text-[11px] font-mono text-stone-400">
-          <span className="text-stone-500">{notation}{roll ? ` ${roll.total}` : ''}</span>
+        <div
+          data-section="modifiers"
+          className="flex flex-wrap items-center gap-1 text-[11px] font-mono text-stone-400"
+        >
+          <span className="text-stone-500">
+            {notation}
+            {roll ? ` ${roll.total}` : ''}
+          </span>
           {applied.map((modifier, index) => (
             <span key={index} className="rounded bg-white/5 px-1.5 py-0.5">
               {modifier.source} {modifier.value >= 0 ? `+${modifier.value}` : modifier.value}
@@ -103,15 +109,19 @@ export const DiceCheckCard: React.FC<{ check: TurnCheck }> = ({ check }) => {
           {check.profile && <span className="rounded bg-white/5 px-1.5 py-0.5">{check.profile}</span>}
           {check.position && <span className="rounded bg-white/5 px-1.5 py-0.5">{check.position}</span>}
           {check.effect && <span className="rounded bg-white/5 px-1.5 py-0.5">{check.effect}</span>}
-          {(check.successes ?? 0) > 0 && roll?.successes === undefined && (
-            <span>{check.successes} successes</span>
-          )}
+          {(check.successes ?? 0) > 0 && roll?.successes === undefined && <span>{check.successes} successes</span>}
         </div>
       )}
       {outcomeText && (
-        <div data-section="outcome" className="text-xs font-sans text-stone-300">{outcomeText}</div>
+        <div data-section="outcome" className="text-xs font-sans text-stone-300">
+          {outcomeText}
+        </div>
       )}
-      {stakes && <div data-section="stakes" className="text-xs font-sans text-stone-400">{stakes}</div>}
+      {stakes && (
+        <div data-section="stakes" className="text-xs font-sans text-stone-400">
+          {stakes}
+        </div>
+      )}
     </div>
   );
 };

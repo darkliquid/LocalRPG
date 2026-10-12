@@ -25,7 +25,11 @@ describe('embedding provider entries', () => {
   it('lists the named entries sorted', () => {
     const config: AppConfig = {
       ...baseConfig(),
-      embeddings: { enabled: true, provider: 'local', providers: { zeta: { type: 'builtin' }, alpha: { type: 'onnx' } } },
+      embeddings: {
+        enabled: true,
+        provider: 'local',
+        providers: { zeta: { type: 'builtin' }, alpha: { type: 'onnx' } },
+      },
     };
     expect(embeddingEntryNames(config)).toEqual(['alpha', 'zeta']);
   });
@@ -33,7 +37,11 @@ describe('embedding provider entries', () => {
   it('reads a named entry and falls back to a builtin template', () => {
     const config: AppConfig = {
       ...baseConfig(),
-      embeddings: { enabled: true, provider: 'oa', providers: { oa: { type: 'http', endpoint: 'https://api.openai.com/v1' } } },
+      embeddings: {
+        enabled: true,
+        provider: 'oa',
+        providers: { oa: { type: 'http', endpoint: 'https://api.openai.com/v1' } },
+      },
     };
     expect(embeddingEntryValue(config, 'oa').type).toBe('http');
     expect(embeddingEntryValue(config, 'missing').type).toBe('builtin');

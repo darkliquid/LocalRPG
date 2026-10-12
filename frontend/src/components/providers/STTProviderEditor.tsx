@@ -45,10 +45,13 @@ export const STTProviderEditor: React.FC<STTProviderEditorProps> = ({
           className="bg-stone-900 border border-purple-500/30 text-purple-400 rounded-lg pl-2.5 pr-7 py-1 text-xs font-mono focus:outline-none cursor-pointer"
           defaultValue=""
         >
-          <option value="" disabled>⚡ Load STT Preset…</option>
+          <option value="" disabled>
+            ⚡ Load STT Preset…
+          </option>
           {Object.entries(presets).map(([id, p]) => (
             <option key={id} value={id} title={p.caveat}>
-              {p.label}{p.tier ? ` · ${tierLabel(p.tier)}` : ''}
+              {p.label}
+              {p.tier ? ` · ${tierLabel(p.tier)}` : ''}
             </option>
           ))}
         </select>
@@ -59,11 +62,7 @@ export const STTProviderEditor: React.FC<STTProviderEditorProps> = ({
       <div className="space-y-1.5">
         <label className="text-xs font-sans uppercase text-stone-300">STT Provider Type</label>
         <select
-          value={
-            entry?.type === 'builtin'
-              ? `builtin:${entry.builtin_name || 'cartesia'}`
-              : entry?.type || 'disabled'
-          }
+          value={entry?.type === 'builtin' ? `builtin:${entry.builtin_name || 'cartesia'}` : entry?.type || 'disabled'}
           onChange={(e) => {
             const val = e.target.value;
             if (val.startsWith('builtin:')) {
@@ -72,10 +71,7 @@ export const STTProviderEditor: React.FC<STTProviderEditorProps> = ({
                 ...(entry || { type: 'disabled' }),
                 type: 'builtin',
                 builtin_name: builtinName,
-                model:
-                  builtinName === 'cartesia'
-                    ? entry?.model || 'ink-whisper'
-                    : entry?.model,
+                model: builtinName === 'cartesia' ? entry?.model || 'ink-whisper' : entry?.model,
               });
             } else {
               onChange({
@@ -110,9 +106,7 @@ export const STTProviderEditor: React.FC<STTProviderEditorProps> = ({
               type="text"
               placeholder="e.g. http://localhost:8000/v1/audio/transcriptions"
               value={entry.endpoint || ''}
-              onChange={(e) =>
-                onChange({ ...entry, endpoint: e.target.value })
-              }
+              onChange={(e) => onChange({ ...entry, endpoint: e.target.value })}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
           </div>
@@ -122,9 +116,7 @@ export const STTProviderEditor: React.FC<STTProviderEditorProps> = ({
               type="text"
               placeholder="e.g. whisper-1"
               value={entry.model || ''}
-              onChange={(e) =>
-                onChange({ ...entry, model: e.target.value })
-              }
+              onChange={(e) => onChange({ ...entry, model: e.target.value })}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
           </div>
@@ -138,16 +130,13 @@ export const STTProviderEditor: React.FC<STTProviderEditorProps> = ({
             type="text"
             placeholder="e.g. whisper-cli"
             value={entry.command || ''}
-            onChange={(e) =>
-              onChange({ ...entry, command: e.target.value })
-            }
+            onChange={(e) => onChange({ ...entry, command: e.target.value })}
             className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
           />
         </div>
       )}
 
-      {(entry?.type === 'cartesia' ||
-        (entry?.type === 'builtin' && entry?.builtin_name === 'cartesia')) && (
+      {(entry?.type === 'cartesia' || (entry?.type === 'builtin' && entry?.builtin_name === 'cartesia')) && (
         <>
           <div className="space-y-1.5">
             <label className="text-xs font-sans uppercase text-stone-300">Model Name</label>
@@ -155,9 +144,7 @@ export const STTProviderEditor: React.FC<STTProviderEditorProps> = ({
               type="text"
               placeholder="e.g. ink-whisper"
               value={entry?.model || 'ink-whisper'}
-              onChange={(e) =>
-                onChange({ ...entry, model: e.target.value })
-              }
+              onChange={(e) => onChange({ ...entry, model: e.target.value })}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
           </div>
@@ -176,9 +163,7 @@ export const STTProviderEditor: React.FC<STTProviderEditorProps> = ({
                   : 'Optional override or CARTESIA_API_KEY env'
               }
               value={entry?.api_key || ''}
-              onChange={(e) =>
-                onChange({ ...entry, api_key: e.target.value })
-              }
+              onChange={(e) => onChange({ ...entry, api_key: e.target.value })}
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
           </div>

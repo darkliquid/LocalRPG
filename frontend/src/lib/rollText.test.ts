@@ -15,9 +15,7 @@ describe('stripDiceTelegraphy', () => {
   });
 
   it('leaves a number in ordinary prose', () => {
-    expect(stripDiceTelegraphy('You have 4 rations and a 7-foot pole.')).toBe(
-      'You have 4 rations and a 7-foot pole.',
-    );
+    expect(stripDiceTelegraphy('You have 4 rations and a 7-foot pole.')).toBe('You have 4 rations and a 7-foot pole.');
   });
 
   it('leaves speech alone', () => {

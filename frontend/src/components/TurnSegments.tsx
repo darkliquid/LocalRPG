@@ -12,8 +12,7 @@ import { SegmentAudioControls } from './SegmentAudioControls';
 import { slugify } from '../lib/slug';
 import { stripDiceTelegraphy } from '../lib/rollText';
 
-export const segmentAudioKey = (turnNumber: number, segmentIndex: number): string =>
-  `${turnNumber}:${segmentIndex}`;
+export const segmentAudioKey = (turnNumber: number, segmentIndex: number): string => `${turnNumber}:${segmentIndex}`;
 
 export type TurnAudioState = 'idle' | 'generating' | 'playing' | 'error';
 
@@ -66,19 +65,17 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   skipAudioKeys,
   playbackLedger,
 }) => {
-  const ordered = segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: stripDiceTelegraphy(fallback) }];
+  const ordered =
+    segments && segments.length > 0 ? segments : [{ kind: 'narration' as const, text: stripDiceTelegraphy(fallback) }];
   const hasAudio = anySegmentHasAudio(segments);
-  const { playing, blocked, playingIndex, play, playFrom, regenerateFrom, stop } = useSegmentPlayback(
-    segments,
-    {
-      autoPlay: autoPlay && hasAudio && !serverPlayback,
-      volume,
-      skipKeys: skipAudioKeys,
-      ledger: playbackLedger,
-      gameId,
-      turnNumber,
-    }
-  );
+  const { playing, blocked, playingIndex, play, playFrom, regenerateFrom, stop } = useSegmentPlayback(segments, {
+    autoPlay: autoPlay && hasAudio && !serverPlayback,
+    volume,
+    skipKeys: skipAudioKeys,
+    ledger: playbackLedger,
+    gameId,
+    turnNumber,
+  });
 
   const startServerPlayback = (segmentIndex?: number, force?: boolean) => onPlayTurn?.(segmentIndex, force);
   const stopServerPlayback = () => onStopTurn?.();
@@ -166,12 +163,13 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
             <div className="flex items-center gap-3">
               {(() => {
                 const charId = segment.speaker_id || (segment.speaker ? slugify(segment.speaker) : undefined);
-                const portraitURL = segment.speaker_portrait || (charId && characterPortraits?.[charId]?.url) || segment.portrait_url;
+                const portraitURL =
+                  segment.speaker_portrait || (charId && characterPortraits?.[charId]?.url) || segment.portrait_url;
                 const hasCustomPortrait = segment.speaker_portrait
                   ? true
-                  : (charId && characterPortraits?.[charId]
+                  : charId && characterPortraits?.[charId]
                     ? characterPortraits[charId].hasCustom
-                    : !!segment.has_custom_portrait);
+                    : !!segment.has_custom_portrait;
 
                 return segment.speaker || portraitURL ? (
                   <div
@@ -182,10 +180,12 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
                     }}
                     className={`w-9 h-9 rounded-full overflow-hidden shrink-0 border-2 shadow-md transition-transform ${
                       hasCustomPortrait ? 'cursor-zoom-in hover:scale-105' : 'cursor-default'
-                    } ${
-                      segment.player ? 'border-sky-400/80' : 'border-purple-400/80'
-                    }`}
-                    title={hasCustomPortrait ? `View portrait of ${segment.speaker || 'character'}` : (segment.speaker || 'character')}
+                    } ${segment.player ? 'border-sky-400/80' : 'border-purple-400/80'}`}
+                    title={
+                      hasCustomPortrait
+                        ? `View portrait of ${segment.speaker || 'character'}`
+                        : segment.speaker || 'character'
+                    }
                   >
                     <EntityAvatar
                       src={portraitURL}
@@ -242,7 +242,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
         <div className="flex flex-wrap items-center gap-2 text-xs">
           {/* Play button — spinner while generating, disabled while playing */}
           <button
-            onClick={() => !isGenerating && !isPlaying ? startServerPlayback() : undefined}
+            onClick={() => (!isGenerating && !isPlaying ? startServerPlayback() : undefined)}
             disabled={isGenerating || isPlaying}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
               isGenerating || isPlaying
@@ -250,10 +250,17 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
                 : 'bg-stone-900/70 border-stone-700 text-stone-300 hover:text-purple-300 hover:border-purple-500/40 cursor-pointer'
             }`}
           >
-            {isGenerating
-              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Generating speech…</span></>
-              : <><Play className="w-3 h-3" /><span>Play turn</span></>
-            }
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Generating speech…</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3 h-3" />
+                <span>Play turn</span>
+              </>
+            )}
           </button>
 
           {/* Stop button — only enabled while playing */}
@@ -272,7 +279,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
 
           {/* Force regenerate button */}
           <button
-            onClick={() => !isGenerating && !isPlaying ? startServerPlayback(undefined, true) : undefined}
+            onClick={() => (!isGenerating && !isPlaying ? startServerPlayback(undefined, true) : undefined)}
             disabled={isGenerating || isPlaying}
             title="Force regenerate speech"
             className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${

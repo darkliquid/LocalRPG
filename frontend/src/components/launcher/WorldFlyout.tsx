@@ -14,13 +14,7 @@ interface WorldFlyoutProps {
   onExpand: () => void;
 }
 
-export const WorldFlyout: React.FC<WorldFlyoutProps> = ({
-  isOpen,
-  worlds,
-  onSelectWorld,
-  onCreateWorld,
-  onExpand,
-}) => {
+export const WorldFlyout: React.FC<WorldFlyoutProps> = ({ isOpen, worlds, onSelectWorld, onCreateWorld, onExpand }) => {
   const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
   const { mounted, state } = useMountTransition(isOpen, 200);
   if (!mounted) return null;
@@ -56,7 +50,13 @@ export const WorldFlyout: React.FC<WorldFlyoutProps> = ({
               {world.icon_url ? (
                 <img src={world.icon_url} alt={world.name} className="w-full h-full object-cover" />
               ) : (
-                <ProceduralIcon id={world.id} name={world.name} genre={world.genre} size={42} className="w-full h-full rounded-none" />
+                <ProceduralIcon
+                  id={world.id}
+                  name={world.name}
+                  genre={world.genre}
+                  size={42}
+                  className="w-full h-full rounded-none"
+                />
               )}
             </button>
             {world.icon_url && (

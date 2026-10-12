@@ -52,13 +52,17 @@ const WorldCard: React.FC<{
               {world.icon_url ? (
                 <img src={world.icon_url} alt={world.name} className="w-full h-full object-cover" />
               ) : (
-                <ProceduralIcon id={world.id} name={world.name} genre={world.genre} size={64} className="w-full h-full rounded-none border-0" />
+                <ProceduralIcon
+                  id={world.id}
+                  name={world.name}
+                  genre={world.genre}
+                  size={64}
+                  className="w-full h-full rounded-none border-0"
+                />
               )}
             </div>
             <div className="min-w-0">
-              <h3 className="text-lg font-sans font-extrabold text-white tracking-tight truncate">
-                {world.name}
-              </h3>
+              <h3 className="text-lg font-sans font-extrabold text-white tracking-tight truncate">{world.name}</h3>
               {world.genre && (
                 <span className="inline-flex items-center gap-1 text-xs font-sans font-semibold uppercase tracking-wider text-purple-300">
                   {GenreIcon && <GenreIcon className="w-3 h-3" />}
@@ -238,7 +242,8 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
               </h3>
             </div>
             <p className="text-xs font-sans text-stone-300">
-              This will permanently delete the world directory and all of its lore and entities. This action cannot be undone.
+              This will permanently delete the world directory and all of its lore and entities. This action cannot be
+              undone.
             </p>
             {deleteError && (
               <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-300 flex items-start gap-2">
@@ -247,7 +252,8 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
                   <p>{deleteError}</p>
                   {canForce && (
                     <p className="text-stone-400">
-                      You can force deletion to remove the world anyway. Existing campaigns using this world will lose their world files.
+                      You can force deletion to remove the world anyway. Existing campaigns using this world will lose
+                      their world files.
                     </p>
                   )}
                 </div>

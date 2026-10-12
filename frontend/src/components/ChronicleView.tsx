@@ -109,9 +109,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                     [{turn.mode || 'Action'}]
                   </span>
                   <span>{turn.input_text}</span>
-                  {turn.outcome && (
-                    <span className="ml-auto text-xs font-mono text-stone-400">{turn.outcome}</span>
-                  )}
+                  {turn.outcome && <span className="ml-auto text-xs font-mono text-stone-400">{turn.outcome}</span>}
                 </div>
               )}
 
@@ -153,7 +151,11 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 autoPlay={autoPlay && index === turns.length - 1}
                 volume={volume}
                 serverPlayback={serverPlayback}
-                onPlayTurn={onPlayTurnAudio ? (segmentIndex, force) => onPlayTurnAudio(turn.turn_number, segmentIndex, force) : undefined}
+                onPlayTurn={
+                  onPlayTurnAudio
+                    ? (segmentIndex, force) => onPlayTurnAudio(turn.turn_number, segmentIndex, force)
+                    : undefined
+                }
                 onStopTurn={onStopAudio}
                 turnAudioState={audioStatus?.state}
                 turnAudioMessage={audioStatus?.message}
@@ -265,9 +267,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 <div className="font-sans text-xs font-bold text-purple-400 uppercase tracking-wider">
                   {genreCopy(genre).loading}
                 </div>
-                <div className="text-xs text-stone-400 font-sans">
-                  Weaving your action into the chronicle.
-                </div>
+                <div className="text-xs text-stone-400 font-sans">Weaving your action into the chronicle.</div>
               </div>
             </div>
           )}

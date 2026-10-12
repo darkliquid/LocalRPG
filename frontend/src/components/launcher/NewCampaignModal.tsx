@@ -50,8 +50,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generatingKind, setGeneratingKind] = useState<'banner' | 'icon' | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
-  const errorMessage = (err: unknown): string =>
-    err instanceof Error ? err.message : 'Unexpected error';
+  const errorMessage = (err: unknown): string => (err instanceof Error ? err.message : 'Unexpected error');
 
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [ttsConfig, setTtsConfig] = useState<TTSConfig | null>(null);
@@ -229,7 +228,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
         world.description || '',
         world.art_style || '',
         world.genre || '',
-        token
+        token,
       );
       const file = new File([blob], `${kind}.png`, { type: blob.type });
       if (kind === 'banner') {
@@ -247,11 +246,8 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
     }
   };
 
-  const authoredFields = creationFields.filter(
-    (field) => !BUILT_IN_FIELD_IDS.has(field.id) && field.kind !== 'voice',
-  );
-  const setAuthoredValue = (id: string, value: string) =>
-    setCreationValues((prev) => ({ ...prev, [id]: value }));
+  const authoredFields = creationFields.filter((field) => !BUILT_IN_FIELD_IDS.has(field.id) && field.kind !== 'voice');
+  const setAuthoredValue = (id: string, value: string) => setCreationValues((prev) => ({ ...prev, [id]: value }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -283,7 +279,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
         },
       },
       bannerFile || undefined,
-      iconFile || undefined
+      iconFile || undefined,
     );
   };
 
@@ -318,14 +314,18 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 {world.icon_url ? (
                   <img src={world.icon_url} alt={world.name} className="w-full h-full object-cover" />
                 ) : (
-                  <ProceduralIcon id={world.id} name={world.name} genre={world.genre} size={64} className="w-full h-full rounded-none" />
+                  <ProceduralIcon
+                    id={world.id}
+                    name={world.name}
+                    genre={world.genre}
+                    size={64}
+                    className="w-full h-full rounded-none"
+                  />
                 )}
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-sans font-extrabold text-white tracking-tight">
-                    New Campaign
-                  </h2>
+                  <h2 className="text-xl font-sans font-extrabold text-white tracking-tight">New Campaign</h2>
                   <span className="text-xs font-sans font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
                     {world.name}
                   </span>
@@ -357,7 +357,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
               <AIGenerateButton
                 formType="campaign"
                 fieldName="name"
-                onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
                 getContext={getFormContext}
                 onGenerated={(val) => setCampaignName(val)}
                 worldID={world?.id}
@@ -397,8 +397,8 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                       isSelected
                         ? 'bg-purple-600/20 border-purple-500 text-white shadow-[0_0_12px_rgba(168,85,247,0.3)]'
                         : isCompatible
-                        ? 'bg-stone-950 border-white/15 text-stone-200 hover:border-white/30'
-                        : 'bg-stone-950/50 border-white/5 text-stone-400 hover:border-white/20'
+                          ? 'bg-stone-950 border-white/15 text-stone-200 hover:border-white/30'
+                          : 'bg-stone-950/50 border-white/5 text-stone-400 hover:border-white/20'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -424,9 +424,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Narrator Voice */}
               <div className="space-y-1">
-                <label className="text-xs font-sans text-stone-300">
-                  Narrator Voice
-                </label>
+                <label className="text-xs font-sans text-stone-300">Narrator Voice</label>
                 <VoiceProfileSelect
                   profiles={voiceProfiles}
                   value={narratorProfile?.id ?? ''}
@@ -439,9 +437,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
 
               {/* Character Voice */}
               <div className="space-y-1">
-                <label className="text-xs font-sans text-stone-300">
-                  Protagonist Voice
-                </label>
+                <label className="text-xs font-sans text-stone-300">Protagonist Voice</label>
                 <VoiceProfileSelect
                   profiles={voiceProfiles}
                   value={playerProfile?.id ?? ''}
@@ -470,7 +466,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 <AIGenerateButton
                   formType="character"
                   fieldName="name"
-                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                  onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
                   getContext={getFormContext}
                   onGenerated={(val) => setPlayerName(val)}
                   worldID={world?.id}
@@ -494,7 +490,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   <AIGenerateButton
                     formType="character"
                     fieldName="age"
-                    onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                    onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
                     getContext={getFormContext}
                     onGenerated={(val) => setPlayerAge(val)}
                     worldID={world?.id}
@@ -515,7 +511,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   <AIGenerateButton
                     formType="character"
                     fieldName="gender"
-                    onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                    onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
                     getContext={getFormContext}
                     onGenerated={(val) => setPlayerGender(val)}
                     worldID={world?.id}
@@ -536,7 +532,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   <AIGenerateButton
                     formType="character"
                     fieldName="pronouns"
-                    onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                    onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
                     getContext={getFormContext}
                     onGenerated={(val) => setPlayerPronouns(val)}
                     worldID={world?.id}
@@ -559,7 +555,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 <AIGenerateButton
                   formType="character"
                   fieldName="appearance"
-                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                  onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
                   getContext={getFormContext}
                   onGenerated={(val) => setPlayerAppearance(val)}
                   worldID={world?.id}
@@ -582,7 +578,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 <AIGenerateButton
                   formType="character"
                   fieldName="background"
-                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                  onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
                   getContext={getFormContext}
                   onGenerated={(val) => setPlayerBackground(val)}
                   worldID={world?.id}
@@ -596,67 +592,69 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 onChange={(e) => setPlayerBackground(e.target.value)}
                 placeholder="e.g. Disgraced royal archivist searching for forbidden relics"
                 className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
-                />
-                </div>
+              />
+            </div>
 
-                {authoredFields.length > 0 && (
-                <div className="space-y-3 pt-3 border-t border-white/10">
+            {authoredFields.length > 0 && (
+              <div className="space-y-3 pt-3 border-t border-white/10">
                 {creationPreamble.trim() !== '' && (
-                <p className="text-xs font-sans text-stone-400">{creationPreamble}</p>
+                  <p className="text-xs font-sans text-stone-400">{creationPreamble}</p>
                 )}
                 {authoredFields.map((field) => (
-                <div key={field.id} className="space-y-1">
-                  <div className="flex items-center justify-between">
-                  <label className="text-xs font-sans text-stone-400">
-                  {field.label}
-                  {field.required && <span className="ml-1 text-purple-400">*</span>}
-                  </label>
-                  {field.generatable && (
-                  <AIGenerateButton
-                  formType="character"
-                  fieldName={field.id}
-                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
-                  getContext={getFormContext}
-                  onGenerated={(val) => setAuthoredValue(field.id, val)}
-                  worldID={world?.id}
-                  systemID={selectedSystemID}
-                  seed={creationValues[field.id] ?? ''}
-                  />
-                  )}
+                  <div key={field.id} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-sans text-stone-400">
+                        {field.label}
+                        {field.required && <span className="ml-1 text-purple-400">*</span>}
+                      </label>
+                      {field.generatable && (
+                        <AIGenerateButton
+                          formType="character"
+                          fieldName={field.id}
+                          onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
+                          getContext={getFormContext}
+                          onGenerated={(val) => setAuthoredValue(field.id, val)}
+                          worldID={world?.id}
+                          systemID={selectedSystemID}
+                          seed={creationValues[field.id] ?? ''}
+                        />
+                      )}
+                    </div>
+                    {field.kind === 'select' ? (
+                      <select
+                        value={creationValues[field.id] ?? field.default ?? ''}
+                        onChange={(e) => setAuthoredValue(field.id, e.target.value)}
+                        className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500 cursor-pointer"
+                      >
+                        <option value="">(choose)</option>
+                        {(field.options ?? []).map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    ) : field.kind === 'long' ? (
+                      <textarea
+                        rows={2}
+                        value={creationValues[field.id] ?? ''}
+                        onChange={(e) => setAuthoredValue(field.id, e.target.value)}
+                        placeholder={field.prompt || ''}
+                        className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
+                      />
+                    ) : (
+                      <input
+                        type={field.kind === 'number' ? 'number' : 'text'}
+                        value={creationValues[field.id] ?? ''}
+                        onChange={(e) => setAuthoredValue(field.id, e.target.value)}
+                        placeholder={field.prompt || ''}
+                        className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500"
+                      />
+                    )}
                   </div>
-                  {field.kind === 'select' ? (
-                  <select
-                  value={creationValues[field.id] ?? field.default ?? ''}
-                  onChange={(e) => setAuthoredValue(field.id, e.target.value)}
-                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500 cursor-pointer"
-                  >
-                  <option value="">(choose)</option>
-                  {(field.options ?? []).map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                  ))}
-                  </select>
-                  ) : field.kind === 'long' ? (
-                  <textarea
-                  rows={2}
-                  value={creationValues[field.id] ?? ''}
-                  onChange={(e) => setAuthoredValue(field.id, e.target.value)}
-                  placeholder={field.prompt || ''}
-                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500 resize-none"
-                  />
-                  ) : (
-                  <input
-                  type={field.kind === 'number' ? 'number' : 'text'}
-                  value={creationValues[field.id] ?? ''}
-                  onChange={(e) => setAuthoredValue(field.id, e.target.value)}
-                  placeholder={field.prompt || ''}
-                  className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500"
-                  />
-                  )}
-                </div>
                 ))}
-                </div>
-                )}
-                </div>
+              </div>
+            )}
+          </div>
 
           {/* Story Directive & Start Location */}
           <div className="p-3.5 bg-stone-950/70 border border-white/10 rounded-2xl space-y-3">
@@ -674,7 +672,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 <AIGenerateButton
                   formType="campaign"
                   fieldName="start_location"
-                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                  onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
                   getContext={getFormContext}
                   onGenerated={(val) => setStartLocation(val)}
                   worldID={world?.id}
@@ -692,13 +690,11 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-sans text-stone-300">
-                  Opening Scene Directive (Optional)
-                </label>
+                <label className="text-xs font-sans text-stone-300">Opening Scene Directive (Optional)</label>
                 <AIGenerateButton
                   formType="campaign"
                   fieldName="opening_prompt"
-                  onError={(failure) => setGenError(failure.code + ": " + failure.message)}
+                  onError={(failure) => setGenError(failure.code + ': ' + failure.message)}
                   getContext={getFormContext}
                   onGenerated={(val) => setOpeningPrompt(val)}
                   worldID={world?.id}
@@ -723,9 +719,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
               <div className="text-xs font-sans text-stone-400">
                 A procedural gradient theme will be generated if omitted.
               </div>
-              {genError && (
-                <div className="text-xs text-red-400 font-sans mt-1">{genError}</div>
-              )}
+              {genError && <div className="text-xs text-red-400 font-sans mt-1">{genError}</div>}
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-1">
@@ -743,7 +737,11 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   className="w-full h-16 rounded-xl border border-dashed border-white/20 hover:border-purple-400/60 bg-white/[0.02] flex items-center justify-center text-xs font-sans text-stone-300 hover:text-white transition-all cursor-pointer overflow-hidden"
                 >
                   {safeImagePreview(bannerPreview) ? (
-                    <img src={safeImagePreview(bannerPreview)} alt="Banner Preview" className="w-full h-full object-cover" />
+                    <img
+                      src={safeImagePreview(bannerPreview)}
+                      alt="Banner Preview"
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <span className="text-stone-500 text-xs">No Banner Selected</span>
                   )}
@@ -784,7 +782,11 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   className="w-full h-16 rounded-xl border border-dashed border-white/20 hover:border-purple-400/60 bg-white/[0.02] flex items-center justify-center text-xs font-sans text-stone-300 hover:text-white transition-all cursor-pointer overflow-hidden"
                 >
                   {safeImagePreview(iconPreview) ? (
-                    <img src={safeImagePreview(iconPreview)} alt="Icon Preview" className="w-12 h-12 rounded-lg object-cover" />
+                    <img
+                      src={safeImagePreview(iconPreview)}
+                      alt="Icon Preview"
+                      className="w-12 h-12 rounded-lg object-cover"
+                    />
                   ) : (
                     <span className="text-stone-500 text-xs">No Icon Selected</span>
                   )}

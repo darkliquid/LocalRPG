@@ -40,21 +40,18 @@ export function useProviderCatalog(enabled = true): ProviderCatalogState {
     };
   }, [enabled]);
 
-  const byFamily = useCallback(
-    (family: ProviderFamily) => providers.filter((p) => p.family === family),
-    [providers]
-  );
+  const byFamily = useCallback((family: ProviderFamily) => providers.filter((p) => p.family === family), [providers]);
 
   const presets = useCallback(
     (family: ProviderFamily) =>
       byFamily(family)
         .flatMap((p) => p.presets ?? [])
         .sort((a, b) => a.order - b.order),
-    [byFamily]
+    [byFamily],
   );
 
   return useMemo(
     () => ({ providers, byFamily, presets, loading, error }),
-    [providers, byFamily, presets, loading, error]
+    [providers, byFamily, presets, loading, error],
   );
 }

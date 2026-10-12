@@ -31,10 +31,7 @@ interface SegmentPlaybackOptions {
 // Browsers refuse to start audio without a user gesture, so an autoplay attempt
 // that is rejected is reported as `blocked` rather than swallowed: the caller can
 // then offer a Play control, and that click is the gesture that starts playback.
-export const useSegmentPlayback = (
-  segments: TurnSegment[] | undefined,
-  options: SegmentPlaybackOptions
-) => {
+export const useSegmentPlayback = (segments: TurnSegment[] | undefined, options: SegmentPlaybackOptions) => {
   const { autoPlay, volume = 1, skipKeys, ledger, gameId, turnNumber } = options;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prefetchRef = useRef<HTMLAudioElement | null>(null);
@@ -93,7 +90,7 @@ export const useSegmentPlayback = (
           setBlocked(true);
         });
     },
-    [volume, ledger]
+    [volume, ledger],
   );
 
   const playFrom = useCallback(
@@ -117,7 +114,7 @@ export const useSegmentPlayback = (
 
       playUrl(clips[next].url, clips[next].segmentIndex, () => playFrom(clips[next].segmentIndex + 1));
     },
-    [clipsFor, stop, playUrl]
+    [clipsFor, stop, playUrl],
   );
 
   // regenerateFrom re-synthesizes one beat and plays its refreshed clips: the
@@ -133,7 +130,7 @@ export const useSegmentPlayback = (
         console.error('regenerate segment audio:', err);
       }
     },
-    [gameId, turnNumber, playUrl]
+    [gameId, turnNumber, playUrl],
   );
 
   useEffect(() => {

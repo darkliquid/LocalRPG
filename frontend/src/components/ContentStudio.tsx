@@ -106,9 +106,7 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
     <div className="fixed inset-0 z-50 flex flex-col bg-stone-950/98 backdrop-blur-sm">
       <header className="flex items-center justify-between border-b border-white/10 px-5 py-3">
         <div className="flex items-center gap-4">
-          <h2 className="font-sans text-sm font-bold uppercase tracking-wider text-stone-200">
-            Content Studio
-          </h2>
+          <h2 className="font-sans text-sm font-bold uppercase tracking-wider text-stone-200">Content Studio</h2>
           <nav className="flex gap-1">
             {(['entities', 'prompts', 'manifests'] as DocKind[]).map((tab) => (
               <button
@@ -126,20 +124,14 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
           </nav>
         </div>
         <div className="flex items-center gap-3">
-          {isDirty && (
-            <span className="text-[10px] uppercase tracking-wider text-amber-400">Unsaved</span>
-          )}
+          {isDirty && <span className="text-[10px] uppercase tracking-wider text-amber-400">Unsaved</span>}
           <button onClick={onClose} className="cursor-pointer text-stone-400 hover:text-white">
             <X className="h-4 w-4" />
           </button>
         </div>
       </header>
 
-      {error && (
-        <div className="border-b border-red-500/40 bg-red-950/40 px-5 py-2 text-xs text-red-200">
-          {error}
-        </div>
-      )}
+      {error && <div className="border-b border-red-500/40 bg-red-950/40 px-5 py-2 text-xs text-red-200">{error}</div>}
 
       <div className="flex min-h-0 flex-1">
         <aside className="w-64 shrink-0 border-r border-white/10 p-3 flex flex-col min-h-0 h-full">

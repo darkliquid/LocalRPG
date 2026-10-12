@@ -135,7 +135,7 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
       <div className="relative flex-1">
         <input
           type="text"
-          value={isOpen ? query : (selectedVoice ? voiceLabel(selectedVoice) : value)}
+          value={isOpen ? query : selectedVoice ? voiceLabel(selectedVoice) : value}
           onChange={(e) => {
             setQuery(e.target.value);
             onChange(e.target.value);
@@ -191,7 +191,9 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
       {selectedVoice && (onAudition || selectedVoice.preview_url) && (
         <button
           type="button"
-          onClick={() => (onAudition ? onAudition(selectedVoice) : playVoicePreview(selectedVoice.preview_url as string))}
+          onClick={() =>
+            onAudition ? onAudition(selectedVoice) : playVoicePreview(selectedVoice.preview_url as string)
+          }
           disabled={!!onAudition && auditioningId === selectedVoice.id}
           className="p-1 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 cursor-pointer shrink-0 disabled:opacity-50"
           title="Audition Voice"
@@ -204,82 +206,81 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
         </button>
       )}
 
-      {isOpen && menu &&
+      {isOpen &&
+        menu &&
         createPortal(
           <div
             ref={menuRef}
             style={{ position: 'fixed', top: menu.top, left: menu.left, width: menu.width, maxHeight: menu.height }}
             className="overflow-y-auto bg-stone-950 border border-stone-800 rounded-lg shadow-2xl z-[120] p-1 space-y-0.5"
           >
-          {filteredVoices.length === 0 ? (
-            <div className="px-2 py-1.5 text-xs text-stone-500 italic">No matching voices</div>
-          ) : (
-            filteredVoices.map((voice) => {
-              const isSelected = voice.id === value;
-              return (
-                <div
-                  key={voice.id}
-                  onClick={() => {
-                    onChange(voice.id);
-                    setIsOpen(false);
-                  }}
-                  className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded text-xs cursor-pointer ${
-                    isSelected ? 'bg-purple-500/20 text-purple-300' : 'text-stone-300 hover:bg-stone-900'
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{voice.name || voice.id}</div>
-                    {voice.id && voice.name !== voice.id && (
-                      <div className="text-xs font-mono text-stone-500 truncate">{voice.id}</div>
-                    )}
-                    {voice.description && (
-                      <div className="text-xs text-stone-500 truncate">{voice.description}</div>
-                    )}
-                    {voice.tags && voice.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-0.5">
-                        {voice.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="text-xs px-1 py-0.5 rounded bg-purple-500/10 text-purple-300/90 border border-purple-500/20"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+            {filteredVoices.length === 0 ? (
+              <div className="px-2 py-1.5 text-xs text-stone-500 italic">No matching voices</div>
+            ) : (
+              filteredVoices.map((voice) => {
+                const isSelected = voice.id === value;
+                return (
+                  <div
+                    key={voice.id}
+                    onClick={() => {
+                      onChange(voice.id);
+                      setIsOpen(false);
+                    }}
+                    className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded text-xs cursor-pointer ${
+                      isSelected ? 'bg-purple-500/20 text-purple-300' : 'text-stone-300 hover:bg-stone-900'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{voice.name || voice.id}</div>
+                      {voice.id && voice.name !== voice.id && (
+                        <div className="text-xs font-mono text-stone-500 truncate">{voice.id}</div>
+                      )}
+                      {voice.description && <div className="text-xs text-stone-500 truncate">{voice.description}</div>}
+                      {voice.tags && voice.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {voice.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="text-xs px-1 py-0.5 rounded bg-purple-500/10 text-purple-300/90 border border-purple-500/20"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {voice.categories?.[0] && (
+                        <span className="text-xs px-1 py-0.5 rounded bg-stone-900 text-stone-400 border border-stone-800">
+                          {voice.categories[0]}
+                        </span>
+                      )}
+                      {(onAudition || voice.preview_url) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onAudition) onAudition(voice);
+                            else playVoicePreview(voice.preview_url as string);
+                          }}
+                          disabled={!!onAudition && auditioningId === voice.id}
+                          className="p-1 rounded hover:bg-stone-800 text-purple-400 cursor-pointer disabled:opacity-50"
+                          title="Audition"
+                        >
+                          {onAudition && auditioningId === voice.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Play className="w-3 h-3" />
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {voice.categories?.[0] && (
-                      <span className="text-xs px-1 py-0.5 rounded bg-stone-900 text-stone-400 border border-stone-800">
-                        {voice.categories[0]}
-                      </span>
-                    )}
-                    {(onAudition || voice.preview_url) && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onAudition) onAudition(voice);
-                          else playVoicePreview(voice.preview_url as string);
-                        }}
-                        disabled={!!onAudition && auditioningId === voice.id}
-                        className="p-1 rounded hover:bg-stone-800 text-purple-400 cursor-pointer disabled:opacity-50"
-                        title="Audition"
-                      >
-                        {onAudition && auditioningId === voice.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Play className="w-3 h-3" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

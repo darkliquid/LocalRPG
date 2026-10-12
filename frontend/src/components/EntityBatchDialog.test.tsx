@@ -23,9 +23,7 @@ afterEach(() => {
 
 describe('EntityBatchDialog', () => {
   it('previews a batch and accepts it', async () => {
-    const accept = vi
-      .spyOn(APIClient, 'acceptWorldEntities')
-      .mockResolvedValue({ written: ['the-tidewatch'] });
+    const accept = vi.spyOn(APIClient, 'acceptWorldEntities').mockResolvedValue({ written: ['the-tidewatch'] });
     const onAccepted = vi.fn();
 
     render(<EntityBatchDialog worldId="w" onClose={() => {}} onAccepted={onAccepted} batch={batch} />);
@@ -78,15 +76,13 @@ describe('EntityBatchDialog', () => {
 
   it('surfaces a refusal', async () => {
     vi.spyOn(APIClient, 'acceptWorldEntities').mockRejectedValue(
-      new Error('world entity already exists: the-tidewatch')
+      new Error('world entity already exists: the-tidewatch'),
     );
 
     render(<EntityBatchDialog worldId="w" onClose={() => {}} batch={batch} />);
     fireEvent.click(screen.getByRole('button', { name: /accept/i }));
 
-    await waitFor(() =>
-      expect(screen.getByText(/world entity already exists/i)).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/world entity already exists/i)).toBeInTheDocument());
   });
 
   it('extracts a batch from a folder instead of an instruction', async () => {
@@ -152,7 +148,7 @@ describe('EntityBatchDialog', () => {
       throw new HTTPError(
         400,
         'the source is larger than the chunk limit: it holds 300 chunks and the limit is 200',
-        'generation_source_limit'
+        'generation_source_limit',
       );
     });
     vi.spyOn(APIClient, 'getSettings').mockResolvedValue({
@@ -249,9 +245,7 @@ describe('EntityBatchDialog', () => {
     fireEvent.change(screen.getByLabelText(/instruction/i), { target: { value: 'add a faction' } });
     fireEvent.click(screen.getByRole('button', { name: /^generate$/i }));
 
-    await waitFor(() =>
-      expect(screen.getByText(/built-in template generator/i)).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/built-in template generator/i)).toBeInTheDocument());
     expect(screen.getByText(/Settings .* AI Agents/i)).toBeInTheDocument();
   });
 
@@ -259,8 +253,8 @@ describe('EntityBatchDialog', () => {
     vi.spyOn(APIClient, 'previewWorldEntitiesStream').mockRejectedValue(
       new HTTPError(
         400,
-        'reading a source needs a model provider: no agent role is set up to generate. The gm role is the shipped echo command, so assign a model provider to gm, or to a generator role, in Settings → AI Agents'
-      )
+        'reading a source needs a model provider: no agent role is set up to generate. The gm role is the shipped echo command, so assign a model provider to gm, or to a generator role, in Settings → AI Agents',
+      ),
     );
 
     render(<EntityBatchDialog worldId="w" onClose={() => {}} />);
@@ -268,9 +262,7 @@ describe('EntityBatchDialog', () => {
     fireEvent.change(screen.getByLabelText(/folder path/i), { target: { value: '/tmp/notes' } });
     fireEvent.click(screen.getByRole('button', { name: /^extract$/i }));
 
-    await waitFor(() =>
-      expect(screen.getByText(/needs a model provider/i)).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/needs a model provider/i)).toBeInTheDocument());
     expect(screen.getByText(/Settings .* AI Agents/i)).toBeInTheDocument();
   });
 

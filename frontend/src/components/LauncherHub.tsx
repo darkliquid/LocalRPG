@@ -22,11 +22,7 @@ const WorldsStudio = lazy(() => import('./WorldsStudio').then((m) => ({ default:
 const SystemsStudio = lazy(() => import('./SystemsStudio').then((m) => ({ default: m.SystemsStudio })));
 const SettingsStudio = lazy(() => import('./SettingsStudio').then((m) => ({ default: m.SettingsStudio })));
 
-export function isWorkingGame(
-  game: GameSummary,
-  worldList: WorldInfo[],
-  systemList: SystemInfo[]
-): boolean {
+export function isWorkingGame(game: GameSummary, worldList: WorldInfo[], systemList: SystemInfo[]): boolean {
   if (!game || !game.id || !game.world_id || !game.system_id) {
     return false;
   }
@@ -138,7 +134,11 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
       setWorlds(wList);
 
       setSelectedGameID((prev) => {
-        const candidateID = prev || localStorage.getItem('localrpg_last_played_game') || localStorage.getItem('localrpg_active_game') || null;
+        const candidateID =
+          prev ||
+          localStorage.getItem('localrpg_last_played_game') ||
+          localStorage.getItem('localrpg_active_game') ||
+          null;
         const candidate = candidateID ? gList.find((g) => g.id === candidateID) : null;
         if (candidate && isWorkingGame(candidate, wList, sList)) {
           return candidate.id;
@@ -169,11 +169,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
     }
   };
 
-  const handleCreateGame = async (
-    data: CreateGameRequest,
-    bannerFile?: File,
-    iconFile?: File
-  ) => {
+  const handleCreateGame = async (data: CreateGameRequest, bannerFile?: File, iconFile?: File) => {
     setIsCreatingGame(true);
     try {
       const newGame = await APIClient.createGame(data);
@@ -238,9 +234,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Launcher</span>
           </button>
-          <div className="text-sm font-sans font-bold text-white tracking-wide">
-            Worlds Studio
-          </div>
+          <div className="text-sm font-sans font-bold text-white tracking-wide">Worlds Studio</div>
           <div className="w-24" />
         </header>
         <div className="flex-1 overflow-hidden">
@@ -265,9 +259,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Launcher</span>
           </button>
-          <div className="text-sm font-sans font-bold text-white tracking-wide">
-            Systems Studio
-          </div>
+          <div className="text-sm font-sans font-bold text-white tracking-wide">Systems Studio</div>
           <div className="w-24" />
         </header>
         <div className="flex-1 overflow-hidden">
@@ -455,11 +447,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
       />
 
       {/* Content Package Registry Modal */}
-      <RegistryModal
-        isOpen={isRegistryOpen}
-        onClose={() => setIsRegistryOpen(false)}
-        onInstalled={loadData}
-      />
+      <RegistryModal isOpen={isRegistryOpen} onClose={() => setIsRegistryOpen(false)} onInstalled={loadData} />
     </div>
   );
 };

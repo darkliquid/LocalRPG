@@ -111,7 +111,11 @@ const StatsEditor: React.FC<{ stats: StatSpec[]; onChange: (next: StatSpec[]) =>
           label="Type"
           help={<>The value's kind. number is read by checks and health; string and bool are stored as written.</>}
         >
-          <select className={inputClass} value={stat.type ?? 'number'} onChange={(e) => update({ ...stat, type: e.target.value })}>
+          <select
+            className={inputClass}
+            value={stat.type ?? 'number'}
+            onChange={(e) => update({ ...stat, type: e.target.value })}
+          >
             <option value="number">number</option>
             <option value="string">string</option>
             <option value="bool">bool</option>
@@ -183,11 +187,24 @@ const HealthEditor: React.FC<{
         <Field label="Stat" help={<>The stat that damage reduces. When it reaches zero, the zero effect runs.</>}>
           <StatSelect value={health.stat} stats={stats} onChange={(stat) => onChange({ ...health, stat })} />
         </Field>
-        <Field label="Max stat" help={<>A stat holding the maximum, so a bar can show current out of maximum. Optional.</>}>
-          <StatSelect value={health.max_stat ?? ''} stats={stats} onChange={(max_stat) => onChange({ ...health, max_stat })} />
+        <Field
+          label="Max stat"
+          help={<>A stat holding the maximum, so a bar can show current out of maximum. Optional.</>}
+        >
+          <StatSelect
+            value={health.max_stat ?? ''}
+            stats={stats}
+            onChange={(max_stat) => onChange({ ...health, max_stat })}
+          />
         </Field>
-        <Field label="Zero effect" help={<>A short label applied when the health stat reaches zero, such as downed or dead.</>}>
-          <TextInput value={health.zero_effect ?? ''} onChange={(zero_effect) => onChange({ ...health, zero_effect })} />
+        <Field
+          label="Zero effect"
+          help={<>A short label applied when the health stat reaches zero, such as downed or dead.</>}
+        >
+          <TextInput
+            value={health.zero_effect ?? ''}
+            onChange={(zero_effect) => onChange({ ...health, zero_effect })}
+          />
         </Field>
       </div>
     )}
@@ -208,13 +225,28 @@ const VocabularyEditor: React.FC<{ words: string[]; onChange: (next: string[]) =
         <div key={index} className="flex items-center gap-2">
           <span className="w-5 text-[11px] font-mono text-stone-500">{index + 1}</span>
           <TextInput value={word} onChange={(next) => onChange(words.map((w, i) => (i === index ? next : w)))} />
-          <button type="button" aria-label={`move ${word} up`} onClick={() => move(index, -1)} className={removeButtonClass}>
+          <button
+            type="button"
+            aria-label={`move ${word} up`}
+            onClick={() => move(index, -1)}
+            className={removeButtonClass}
+          >
             <ArrowUp className="w-3.5 h-3.5" />
           </button>
-          <button type="button" aria-label={`move ${word} down`} onClick={() => move(index, 1)} className={removeButtonClass}>
+          <button
+            type="button"
+            aria-label={`move ${word} down`}
+            onClick={() => move(index, 1)}
+            className={removeButtonClass}
+          >
             <ArrowDown className="w-3.5 h-3.5" />
           </button>
-          <button type="button" aria-label={`remove ${word}`} onClick={() => onChange(words.filter((_, i) => i !== index))} className={removeButtonClass}>
+          <button
+            type="button"
+            aria-label={`remove ${word}`}
+            onClick={() => onChange(words.filter((_, i) => i !== index))}
+            className={removeButtonClass}
+          >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -227,7 +259,10 @@ const VocabularyEditor: React.FC<{ words: string[]; onChange: (next: string[]) =
   );
 };
 
-const LadderEditor: React.FC<{ ladder: LadderStep[]; onChange: (next: LadderStep[]) => void }> = ({ ladder, onChange }) => (
+const LadderEditor: React.FC<{ ladder: LadderStep[]; onChange: (next: LadderStep[]) => void }> = ({
+  ladder,
+  onChange,
+}) => (
   <RowList
     items={ladder}
     addLabel="Add Step"
@@ -346,7 +381,16 @@ const ProfilesEditor: React.FC<{
                 <Field label="Name">
                   <TextInput value={name} onChange={(next) => rename(name, next, profile)} />
                 </Field>
-                <Field label="Shape" help={<>How this profile turns a roll into an outcome. ladder maps a total to thresholds, dc compares a total to a difficulty class, pool counts dice meeting a target, and blades adds position and effect.</>}>
+                <Field
+                  label="Shape"
+                  help={
+                    <>
+                      How this profile turns a roll into an outcome. ladder maps a total to thresholds, dc compares a
+                      total to a difficulty class, pool counts dice meeting a target, and blades adds position and
+                      effect.
+                    </>
+                  }
+                >
                   <select
                     className={inputClass}
                     value={shape}
@@ -359,19 +403,56 @@ const ProfilesEditor: React.FC<{
                   </select>
                 </Field>
                 <Field label="Label">
-                  <TextInput value={profile.label ?? ''} onChange={(label) => setProfile(name, { ...profile, label })} />
+                  <TextInput
+                    value={profile.label ?? ''}
+                    onChange={(label) => setProfile(name, { ...profile, label })}
+                  />
                 </Field>
-                <Field label="Notation" help={<>Dice expression for this profile, such as 2d6 or 1d20. Empty falls back to the default notation.</>}>
-                  <TextInput value={profile.notation ?? ''} onChange={(notation) => setProfile(name, { ...profile, notation })} />
+                <Field
+                  label="Notation"
+                  help={
+                    <>
+                      Dice expression for this profile, such as 2d6 or 1d20. Empty falls back to the default notation.
+                    </>
+                  }
+                >
+                  <TextInput
+                    value={profile.notation ?? ''}
+                    onChange={(notation) => setProfile(name, { ...profile, notation })}
+                  />
                 </Field>
-                <Field label="Opposed stat" help={<>Name the stat the opponent rolls to make this profile a contest. Leave it empty for a check against a fixed difficulty.</>}>
-                  <TextInput value={profile.opposed ?? ''} onChange={(opposed) => setProfile(name, { ...profile, opposed })} />
+                <Field
+                  label="Opposed stat"
+                  help={
+                    <>
+                      Name the stat the opponent rolls to make this profile a contest. Leave it empty for a check
+                      against a fixed difficulty.
+                    </>
+                  }
+                >
+                  <TextInput
+                    value={profile.opposed ?? ''}
+                    onChange={(opposed) => setProfile(name, { ...profile, opposed })}
+                  />
                 </Field>
-                <Field label="Ties" help={<>What an equal result means, such as opponent or actor. Leave it empty to keep a tie with the actor.</>}>
+                <Field
+                  label="Ties"
+                  help={
+                    <>
+                      What an equal result means, such as opponent or actor. Leave it empty to keep a tie with the
+                      actor.
+                    </>
+                  }
+                >
                   <TextInput value={profile.ties ?? ''} onChange={(ties) => setProfile(name, { ...profile, ties })} />
                 </Field>
               </div>
-              <button type="button" aria-label={`remove profile ${name}`} onClick={() => remove(name)} className={removeButtonClass}>
+              <button
+                type="button"
+                aria-label={`remove profile ${name}`}
+                onClick={() => remove(name)}
+                className={removeButtonClass}
+              >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -382,15 +463,32 @@ const ProfilesEditor: React.FC<{
             )}
             {shape === 'pool' && (
               <div className="space-y-2">
-                <Field label="Success on" help={<>A comparison that marks a die a success, such as &gt;=8. The count of successes is then read by the outcomes.</>}>
-                  <TextInput value={profile.success_on ?? ''} onChange={(success_on) => setProfile(name, { ...profile, success_on })} />
+                <Field
+                  label="Success on"
+                  help={
+                    <>
+                      A comparison that marks a die a success, such as &gt;=8. The count of successes is then read by
+                      the outcomes.
+                    </>
+                  }
+                >
+                  <TextInput
+                    value={profile.success_on ?? ''}
+                    onChange={(success_on) => setProfile(name, { ...profile, success_on })}
+                  />
                 </Field>
-                <PoolOutcomesEditor outcomes={profile.outcomes ?? []} onChange={(outcomes) => setProfile(name, { ...profile, outcomes })} />
+                <PoolOutcomesEditor
+                  outcomes={profile.outcomes ?? []}
+                  onChange={(outcomes) => setProfile(name, { ...profile, outcomes })}
+                />
               </div>
             )}
             {shape === 'blades' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <Field label="Positions" help={<>Comma-separated position vocabulary, such as controlled, risky, desperate.</>}>
+                <Field
+                  label="Positions"
+                  help={<>Comma-separated position vocabulary, such as controlled, risky, desperate.</>}
+                >
                   <TextInput
                     value={commaList(profile.position)}
                     onChange={(v) => setProfile(name, { ...profile, position: parseCommaList(v) })}
@@ -405,7 +503,10 @@ const ProfilesEditor: React.FC<{
               </div>
             )}
             {(shape === 'ladder' || shape === 'blades') && (
-              <LadderEditor ladder={profile.ladder ?? []} onChange={(ladder) => setProfile(name, { ...profile, ladder })} />
+              <LadderEditor
+                ladder={profile.ladder ?? []}
+                onChange={(ladder) => setProfile(name, { ...profile, ladder })}
+              />
             )}
           </div>
         );
@@ -423,15 +524,18 @@ const ChecksEditor: React.FC<{
   onChange: (next: NonNullable<MechanicsSpec['checks']>) => void;
 }> = ({ checks, onChange }) => (
   <div className="space-y-3">
-    <Field label="Default notation" help={<>The dice expression a check rolls unless a profile overrides it, such as 2d6 or 1d20.</>}>
+    <Field
+      label="Default notation"
+      help={<>The dice expression a check rolls unless a profile overrides it, such as 2d6 or 1d20.</>}
+    >
       <TextInput value={checks.notation ?? ''} onChange={(notation) => onChange({ ...checks, notation })} />
     </Field>
     <div>
       <span className={`${labelClass} flex items-center gap-1.5`}>
         <span>Outcome vocabulary (best first)</span>
         <HelpTip label="Outcome vocabulary">
-          The words a check may return, strongest first, such as strong, weak, miss. A resolution
-          profile maps a roll onto one of them.
+          The words a check may return, strongest first, such as strong, weak, miss. A resolution profile maps a roll
+          onto one of them.
         </HelpTip>
       </span>
       <VocabularyEditor words={checks.outcome ?? []} onChange={(outcome) => onChange({ ...checks, outcome })} />
@@ -440,8 +544,8 @@ const ChecksEditor: React.FC<{
       <span className={`${labelClass} flex items-center gap-1.5`}>
         <span>Difficulties</span>
         <HelpTip label="Difficulties">
-          Named targets a check can compare against, such as easy 8 or hard 12. The GM names one when
-          calling for a check.
+          Named targets a check can compare against, such as easy 8 or hard 12. The GM names one when calling for a
+          check.
         </HelpTip>
       </span>
       <RowList
@@ -459,7 +563,10 @@ const ChecksEditor: React.FC<{
               <TextInput value={difficulty.label ?? ''} onChange={(label) => update({ ...difficulty, label })} />
             </Field>
             <Field label="Target">
-              <NumberInput value={difficulty.target} onChange={(target) => update({ ...difficulty, target: target ?? 0 })} />
+              <NumberInput
+                value={difficulty.target}
+                onChange={(target) => update({ ...difficulty, target: target ?? 0 })}
+              />
             </Field>
           </div>
         )}
@@ -469,8 +576,8 @@ const ChecksEditor: React.FC<{
       <span className={`${labelClass} flex items-center gap-1.5`}>
         <span>Resolution profiles</span>
         <HelpTip label="Resolution profiles">
-          One way checks resolve, named by the GM. A system may declare several, so a single system can
-          express a ladder, a difficulty class, and a dice pool side by side.
+          One way checks resolve, named by the GM. A system may declare several, so a single system can express a
+          ladder, a difficulty class, and a dice pool side by side.
         </HelpTip>
       </span>
       <ProfilesEditor profiles={checks.profiles ?? {}} onChange={(profiles) => onChange({ ...checks, profiles })} />
@@ -478,7 +585,10 @@ const ChecksEditor: React.FC<{
   </div>
 );
 
-const EarnRulesEditor: React.FC<{ rules: EarnRule[]; onChange: (next: EarnRule[]) => void }> = ({ rules, onChange }) => (
+const EarnRulesEditor: React.FC<{ rules: EarnRule[]; onChange: (next: EarnRule[]) => void }> = ({
+  rules,
+  onChange,
+}) => (
   <RowList
     items={rules}
     addLabel="Add Earn Rule"
@@ -509,7 +619,10 @@ const EarnRulesEditor: React.FC<{ rules: EarnRule[]; onChange: (next: EarnRule[]
   />
 );
 
-const EffectsEditor: React.FC<{ effects: EffectSpec[]; onChange: (next: EffectSpec[]) => void }> = ({ effects, onChange }) => (
+const EffectsEditor: React.FC<{ effects: EffectSpec[]; onChange: (next: EffectSpec[]) => void }> = ({
+  effects,
+  onChange,
+}) => (
   <RowList
     items={effects}
     addLabel="Add Effect"
@@ -519,7 +632,11 @@ const EffectsEditor: React.FC<{ effects: EffectSpec[]; onChange: (next: EffectSp
     renderRow={(effect, update) => (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Field label="Type">
-          <select className={inputClass} value={effect.type} onChange={(e) => update({ ...effect, type: e.target.value })}>
+          <select
+            className={inputClass}
+            value={effect.type}
+            onChange={(e) => update({ ...effect, type: e.target.value })}
+          >
             <option value="stat_increase">stat_increase</option>
             <option value="set_stat">set_stat</option>
             <option value="grant_tag">grant_tag</option>
@@ -540,7 +657,10 @@ const EffectsEditor: React.FC<{ effects: EffectSpec[]; onChange: (next: EffectSp
   />
 );
 
-const UnlocksEditor: React.FC<{ unlocks: UnlockSpec[]; onChange: (next: UnlockSpec[]) => void }> = ({ unlocks, onChange }) => (
+const UnlocksEditor: React.FC<{ unlocks: UnlockSpec[]; onChange: (next: UnlockSpec[]) => void }> = ({
+  unlocks,
+  onChange,
+}) => (
   <RowList
     items={unlocks}
     addLabel="Add Unlock"
@@ -566,7 +686,10 @@ const UnlocksEditor: React.FC<{ unlocks: UnlockSpec[]; onChange: (next: UnlockSp
   />
 );
 
-const LevelsEditor: React.FC<{ levels: LevelSpec[]; onChange: (next: LevelSpec[]) => void }> = ({ levels, onChange }) => (
+const LevelsEditor: React.FC<{ levels: LevelSpec[]; onChange: (next: LevelSpec[]) => void }> = ({
+  levels,
+  onChange,
+}) => (
   <RowList
     items={levels}
     addLabel="Add Level"
@@ -606,7 +729,12 @@ const AdvancementEditor: React.FC<{
     {advancement && (
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <Field label="Currency stat" help={<>The stat that holds earned points, such as xp or insight. Earn rules add to it and unlocks spend it.</>}>
+          <Field
+            label="Currency stat"
+            help={
+              <>The stat that holds earned points, such as xp or insight. Earn rules add to it and unlocks spend it.</>
+            }
+          >
             <StatSelect
               value={advancement.currency.stat}
               stats={stats}
@@ -619,7 +747,15 @@ const AdvancementEditor: React.FC<{
               onChange={(label) => onChange({ ...advancement, currency: { ...advancement.currency, label } })}
             />
           </Field>
-          <Field label="Mode" help={<>How the currency is spent. spend buys unlocks directly, track fills a single track, and threshold unlocks levels at set values.</>}>
+          <Field
+            label="Mode"
+            help={
+              <>
+                How the currency is spent. spend buys unlocks directly, track fills a single track, and threshold
+                unlocks levels at set values.
+              </>
+            }
+          >
             <select
               className={inputClass}
               value={advancement.mode ?? 'spend'}
@@ -644,11 +780,14 @@ const AdvancementEditor: React.FC<{
           <span className={`${labelClass} flex items-center gap-1.5`}>
             <span>Unlocks</span>
             <HelpTip label="Unlocks">
-              What the currency buys: a cost, optional prerequisites, and the effects it applies, such
-              as a stat increase or a granted tag.
+              What the currency buys: a cost, optional prerequisites, and the effects it applies, such as a stat
+              increase or a granted tag.
             </HelpTip>
           </span>
-          <UnlocksEditor unlocks={advancement.unlocks ?? []} onChange={(unlocks) => onChange({ ...advancement, unlocks })} />
+          <UnlocksEditor
+            unlocks={advancement.unlocks ?? []}
+            onChange={(unlocks) => onChange({ ...advancement, unlocks })}
+          />
         </div>
         <div>
           <span className={`${labelClass} flex items-center gap-1.5`}>
@@ -682,8 +821,8 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
         title="Stats"
         help={
           <>
-            A stat is a named value the engine reads and writes, such as Might or Sanity. Checks,
-            health, and advancement all point at stats by id. Keep ids lower-case.
+            A stat is a named value the engine reads and writes, such as Might or Sanity. Checks, health, and
+            advancement all point at stats by id. Keep ids lower-case.
           </>
         }
         example={`stats:\n  - { id: might, label: Might, type: number, default: 2, min: 0, max: 6 }\n  - { id: sanity, label: Sanity, type: number, default: 5 }`}
@@ -694,8 +833,8 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
         title="Skills"
         help={
           <>
-            A skill is a capability tied to a stat. When a check names the skill, the engine adds the
-            governing stat&apos;s value to the roll. A skill with no stat adds nothing.
+            A skill is a capability tied to a stat. When a check names the skill, the engine adds the governing
+            stat&apos;s value to the roll. A skill with no stat adds nothing.
           </>
         }
         example={`skills:\n  - { id: athletics, label: Athletics, stat: might }`}
@@ -706,8 +845,8 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
         title="Health"
         help={
           <>
-            Health names the stat that represents harm and, optionally, a stat holding its maximum.
-            When the health stat reaches zero, the zero effect runs (such as <code>downed</code>).
+            Health names the stat that represents harm and, optionally, a stat holding its maximum. When the health stat
+            reaches zero, the zero effect runs (such as <code>downed</code>).
           </>
         }
         example={`health:\n  stat: vigor\n  max_stat: vigor_max\n  zero_effect: downed`}
@@ -718,9 +857,9 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
         title="Checks"
         help={
           <>
-            Checks describe how a roll becomes an outcome. The default notation applies unless a
-            profile overrides it; the outcome vocabulary is the list of words a check may return,
-            strongest first. The engine stores these words verbatim and never invents semantics.
+            Checks describe how a roll becomes an outcome. The default notation applies unless a profile overrides it;
+            the outcome vocabulary is the list of words a check may return, strongest first. The engine stores these
+            words verbatim and never invents semantics.
           </>
         }
         example={`checks:\n  notation: "2d6+{modifier}"\n  outcome: [strong_hit, weak_hit, miss]\n  difficulty:\n    - { id: routine, label: Routine, target: 7 }\n  profiles:\n    standard:\n      shape: ladder\n      ladder:\n        - { min: 10, outcome: strong_hit }\n        - { min: 7, outcome: weak_hit }\n        - { min: 0, outcome: miss }`}
@@ -731,9 +870,8 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
         title="Advancement"
         help={
           <>
-            Advancement declares a currency stat, how it is earned, and what it buys. Mode is spend
-            (points you spend), track (a filled track), or threshold (levels at set values). Leave it
-            off for a system with no progression.
+            Advancement declares a currency stat, how it is earned, and what it buys. Mode is spend (points you spend),
+            track (a filled track), or threshold (levels at set values). Leave it off for a system with no progression.
           </>
         }
         example={`advancement:\n  currency:\n    stat: xp\n    label: Experience\n  mode: spend\n  earn:\n    - { on: check_outcome, outcome: miss, amount: 1 }\n  unlocks:\n    - id: iron_will\n      label: Iron Will\n      cost: 3\n      effects:\n        - { type: stat_increase, stat: vigor, amount: 1 }`}
@@ -748,9 +886,9 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
         title="Policy"
         help={
           <>
-            Policy shapes how the engine treats state and when it engages the mechanics. Allow
-            freeform state permits writes to undeclared paths even when stats are declared.
-            Engagement is this system&apos;s default mechanics policy for a campaign.
+            Policy shapes how the engine treats state and when it engages the mechanics. Allow freeform state permits
+            writes to undeclared paths even when stats are declared. Engagement is this system&apos;s default mechanics
+            policy for a campaign.
           </>
         }
         example={`engagement: auto\nallow_freeform_state: false`}
@@ -764,7 +902,11 @@ export const MechanicsEditor: React.FC<MechanicsEditorProps> = ({ mechanics, onC
           <span>Allow freeform state</span>
         </label>
         <Field label="Engagement" className="max-w-xs">
-          <select className={inputClass} value={mechanics.engagement ?? ''} onChange={(e) => patch({ engagement: e.target.value })}>
+          <select
+            className={inputClass}
+            value={mechanics.engagement ?? ''}
+            onChange={(e) => patch({ engagement: e.target.value })}
+          >
             <option value="">(config default)</option>
             <option value="off">off</option>
             <option value="auto">auto</option>

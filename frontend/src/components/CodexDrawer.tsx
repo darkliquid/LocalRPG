@@ -1,7 +1,26 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EntityMemory, EntityNote, EntitySummary, FolderNode, TTSConfig, VoiceProfile, GenerationFailure } from '../types';
+import {
+  EntityMemory,
+  EntityNote,
+  EntitySummary,
+  FolderNode,
+  TTSConfig,
+  VoiceProfile,
+  GenerationFailure,
+} from '../types';
 import { APIClient, GenerationError } from '../api/client';
-import { Save, Volume2, BookOpen, PanelLeftClose, PanelLeft, GitMerge, X, Loader2, RotateCw, AlertCircle } from 'lucide-react';
+import {
+  Save,
+  Volume2,
+  BookOpen,
+  PanelLeftClose,
+  PanelLeft,
+  GitMerge,
+  X,
+  Loader2,
+  RotateCw,
+  AlertCircle,
+} from 'lucide-react';
 import { formatGenerationError } from '../lib/generationError';
 import { TurnHistoryList } from './TurnHistoryList';
 import { ImageLightbox } from './ImageLightbox';
@@ -226,7 +245,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
         setPortraitError(
           err instanceof GenerationError
             ? err.failure
-            : { code: 'provider_error', message: err instanceof Error ? err.message : String(err) }
+            : { code: 'provider_error', message: err instanceof Error ? err.message : String(err) },
         );
       })
       .finally(() => setIsRegeneratingPortrait(false));
@@ -564,7 +583,9 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
                 onChange={(e) => setMergeTarget(e.target.value)}
                 className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-2 text-xs font-mono text-stone-200 focus:outline-none"
               >
-                <option value="" disabled>Choose a note…</option>
+                <option value="" disabled>
+                  Choose a note…
+                </option>
                 {mergeCandidates.map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
                     {candidate.name}

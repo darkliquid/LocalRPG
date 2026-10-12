@@ -9,8 +9,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const settings = (generation: Record<string, number>) =>
-  ({ config: { generation } }) as unknown as SettingsResponse;
+const settings = (generation: Record<string, number>) => ({ config: { generation } }) as unknown as SettingsResponse;
 
 describe('GenerationLimitNotice', () => {
   it('suggests double the current limit and offers both choices', async () => {
@@ -24,7 +23,7 @@ describe('GenerationLimitNotice', () => {
         message="the source is larger than the chunk limit: it holds 300 chunks and the limit is 200"
         onRetry={onRetry}
         onSave={onSave}
-      />
+      />,
     );
 
     const field = screen.getByLabelText(/source chunk limit/i);
@@ -41,9 +40,7 @@ describe('GenerationLimitNotice', () => {
   it('asks for the field that caused the failure', async () => {
     vi.spyOn(APIClient, 'getSettings').mockResolvedValue(settings({ max_calls: 20 }));
 
-    render(
-      <GenerationLimitNotice code={callLimitCode} message="too many calls" onRetry={vi.fn()} onSave={vi.fn()} />
-    );
+    render(<GenerationLimitNotice code={callLimitCode} message="too many calls" onRetry={vi.fn()} onSave={vi.fn()} />);
 
     const field = screen.getByLabelText(/call limit/i);
     await waitFor(() => expect(field).toHaveValue(40));
@@ -54,9 +51,7 @@ describe('GenerationLimitNotice', () => {
     vi.spyOn(APIClient, 'getSettings').mockResolvedValue(settings({ max_chunks: 200 }));
     const onRetry = vi.fn();
 
-    render(
-      <GenerationLimitNotice code={sourceLimitCode} message="too big" onRetry={onRetry} onSave={vi.fn()} />
-    );
+    render(<GenerationLimitNotice code={sourceLimitCode} message="too big" onRetry={onRetry} onSave={vi.fn()} />);
 
     const field = screen.getByLabelText(/source chunk limit/i);
     await waitFor(() => expect(field).toHaveValue(400));
@@ -72,9 +67,7 @@ describe('GenerationLimitNotice', () => {
     vi.spyOn(APIClient, 'getSettings').mockRejectedValue(new Error('offline'));
     const onRetry = vi.fn();
 
-    render(
-      <GenerationLimitNotice code={sourceLimitCode} message="too big" onRetry={onRetry} onSave={vi.fn()} />
-    );
+    render(<GenerationLimitNotice code={sourceLimitCode} message="too big" onRetry={onRetry} onSave={vi.fn()} />);
 
     const field = screen.getByLabelText(/source chunk limit/i);
     await waitFor(() => expect(field).toHaveValue(400));

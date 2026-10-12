@@ -368,7 +368,9 @@ export class APIClient {
 
   // listEntityMemories reads one entity's memory timeline for the codex.
   static async listEntityMemories(gameID: string, entityID: string, limit = 20): Promise<EntityMemory[]> {
-    const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/entity/${encodeURIComponent(entityID)}/memories?limit=${limit}`);
+    const res = await fetch(
+      `/api/game/${encodeURIComponent(gameID)}/entity/${encodeURIComponent(entityID)}/memories?limit=${limit}`,
+    );
     if (!res.ok) throw new HTTPError(res.status, await res.text());
     return res.json();
   }
@@ -412,7 +414,7 @@ export class APIClient {
   static async regenerateCharacterPortrait(gameID: string, characterID: string): Promise<CharacterPortraitDTO> {
     const res = await fetch(
       `/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(characterID)}/portrait`,
-      { method: 'POST' }
+      { method: 'POST' },
     );
     if (!res.ok) return throwGenerationError(res);
     return res.json();
@@ -487,7 +489,7 @@ export class APIClient {
     description: string,
     artStyle: string,
     genre: string = '',
-    usageToken?: string
+    usageToken?: string,
   ): Promise<Blob> {
     const res = await fetch('/api/generate-asset-preview', {
       method: 'POST',
@@ -505,18 +507,20 @@ export class APIClient {
   }
 
   static async getPlaybackLedger(gameID: string, turnNumber?: number): Promise<PlaybackLedgerDTO> {
-    const url = turnNumber !== undefined && turnNumber > 0
-      ? `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/ledger`
-      : `/api/game/${encodeURIComponent(gameID)}/audio/ledger`;
+    const url =
+      turnNumber !== undefined && turnNumber > 0
+        ? `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/ledger`
+        : `/api/game/${encodeURIComponent(gameID)}/audio/ledger`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`getPlaybackLedger: ${res.statusText}`);
     return res.json();
   }
 
   static async mergePlaybackLedger(gameID: string, req: PlaybackLedgerRequest): Promise<PlaybackLedgerDTO> {
-    const url = req.turn > 0
-      ? `/api/game/${encodeURIComponent(gameID)}/turn/${req.turn}/ledger`
-      : `/api/game/${encodeURIComponent(gameID)}/audio/ledger`;
+    const url =
+      req.turn > 0
+        ? `/api/game/${encodeURIComponent(gameID)}/turn/${req.turn}/ledger`
+        : `/api/game/${encodeURIComponent(gameID)}/audio/ledger`;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -539,11 +543,7 @@ export class APIClient {
 
   // regenerateSegmentAudio re-synthesizes one beat and answers with its refreshed
   // clip URLs. The keys are unchanged when nothing about the line changed.
-  static async regenerateSegmentAudio(
-    gameID: string,
-    turnNumber: number,
-    segmentIndex: number
-  ): Promise<string[]> {
+  static async regenerateSegmentAudio(gameID: string, turnNumber: number, segmentIndex: number): Promise<string[]> {
     const url = `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/segment/${segmentIndex}/audio`;
     const res = await fetch(url, { method: 'POST' });
     if (res.status === 204) return [];
@@ -552,7 +552,12 @@ export class APIClient {
     return body.audio_urls ?? [];
   }
 
-  static async playSegmentAudio(gameID: string, turnNumber: number, segmentIndex: number, force = false): Promise<void> {
+  static async playSegmentAudio(
+    gameID: string,
+    turnNumber: number,
+    segmentIndex: number,
+    force = false,
+  ): Promise<void> {
     const url = `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/segment/${segmentIndex}/play${force ? '?force=1' : ''}`;
     const res = await fetch(url, { method: 'POST' });
     if (!res.ok) return throwGenerationError(res);
@@ -727,7 +732,7 @@ export class APIClient {
   static async generateWorld(
     req: WorldGenerateRequest,
     onEvent: (event: TurnEvent) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<void> {
     const res = await fetch('/api/world/generate', {
       method: 'POST',
@@ -744,7 +749,7 @@ export class APIClient {
   static async ingestWorld(
     req: WorldGenerateRequest,
     onEvent: (event: TurnEvent) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<void> {
     const res = await fetch('/api/world/ingest', {
       method: 'POST',
@@ -805,7 +810,7 @@ export class APIClient {
   static async generateSystem(
     req: SystemGenerateRequest,
     onEvent: (event: TurnEvent) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<void> {
     const res = await fetch('/api/system/generate', {
       method: 'POST',
@@ -867,7 +872,7 @@ export class APIClient {
 
   static async applySystemEnhancements(
     systemId: string,
-    req: SystemEnhanceApplyRequest
+    req: SystemEnhanceApplyRequest,
   ): Promise<SystemEnhanceApplyResult> {
     const res = await fetch(`/api/system/${encodeURIComponent(systemId)}/enhance/apply`, {
       method: 'POST',
@@ -907,7 +912,7 @@ export class APIClient {
     worldId: string,
     req: WorldEntityBatchRequest,
     onEvent: (event: TurnEvent) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<WorldEntityBatch | null> {
     const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/generate-entities`, {
       method: 'POST',
@@ -1195,7 +1200,7 @@ export class APIClient {
     gameID: string,
     body: { mode: string; input: string; pending_check_ref?: string; scene_only?: boolean },
     onEvent: (event: TurnEvent) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<void> {
     const res = await fetch(`/api/game/${gameID}/turn`, {
       method: 'POST',
@@ -1237,7 +1242,7 @@ export class APIClient {
     turnNumber: number,
     body: { pending_check_ref: string; manual_result?: number; manual_dice?: number[] },
     onEvent: (event: TurnEvent) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<void> {
     const res = await fetch(`/api/game/${gameID}/turn/${turnNumber}/resolve-check`, {
       method: 'POST',
@@ -1311,7 +1316,7 @@ export class APIClient {
     const res = await fetch(`/api/game/${this.gameID}/entity/${entityID}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ markdown, folder: folder ?? '' })
+      body: JSON.stringify({ markdown, folder: folder ?? '' }),
     });
     if (!res.ok) {
       const body = await res.text();
@@ -1445,7 +1450,11 @@ export class APIClient {
     return APIClient.getGameUsage(this.gameID);
   }
 
-  static async exportContent(type: 'world' | 'system', id: string, targetPath?: string): Promise<Blob | ExportContentResult> {
+  static async exportContent(
+    type: 'world' | 'system',
+    id: string,
+    targetPath?: string,
+  ): Promise<Blob | ExportContentResult> {
     const res = await fetch('/api/content/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1464,7 +1473,7 @@ export class APIClient {
   static async importContent(
     file: File,
     onConflict: 'refuse' | 'rename' | 'overwrite' = 'refuse',
-    expectedType?: 'world' | 'system'
+    expectedType?: 'world' | 'system',
   ): Promise<ImportResultDTO> {
     const formData = new FormData();
     formData.append('file', file);
@@ -1497,7 +1506,7 @@ export class APIClient {
 
   static async installRegistryPackage(
     ref: PackageRefDTO,
-    onConflict: 'refuse' | 'rename' | 'overwrite' = 'refuse'
+    onConflict: 'refuse' | 'rename' | 'overwrite' = 'refuse',
   ): Promise<ImportResultDTO> {
     const res = await fetch('/api/registry/install', {
       method: 'POST',
@@ -1559,5 +1568,3 @@ export const checkRegistryUpdates = APIClient.checkRegistryUpdates;
 export const listRegistrySources = APIClient.listRegistrySources;
 export const addRegistrySource = APIClient.addRegistrySource;
 export const removeRegistrySource = APIClient.removeRegistrySource;
-
-
