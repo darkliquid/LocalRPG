@@ -20,7 +20,7 @@ func renderConfigurationReference() string {
 	b.WriteString("id: 13-configuration-reference\n")
 	b.WriteString("title: Configuration Reference\n")
 	b.WriteString("category: Configuration & Providers\n")
-	b.WriteString("order: 7\n")
+	b.WriteString("order: 13\n")
 	b.WriteString("description: Every key LocalRPG reads from config.yaml, with the accepted values for the enumerated ones.\n")
 	b.WriteString("---\n\n")
 

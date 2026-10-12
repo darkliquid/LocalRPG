@@ -2,7 +2,7 @@
 id: 11-usage-and-pricing
 title: Usage, Cost & Pricing
 category: Configuration & Providers
-order: 7
+order: 11
 description: Reading the spend ledger and setting the provider prices that turn usage into a cost figure.
 ---
 

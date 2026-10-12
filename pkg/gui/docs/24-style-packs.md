@@ -2,7 +2,7 @@
 id: 24-style-packs
 title: Style Packs
 category: Configuration & Providers
-order: 8
+order: 24
 description: Theme the procedural art and the app chrome with a pack, or keep the built-in look.
 ---
 

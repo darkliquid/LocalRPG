@@ -2,7 +2,7 @@
 id: 13-configuration-reference
 title: Configuration Reference
 category: Configuration & Providers
-order: 7
+order: 13
 description: Every key LocalRPG reads from config.yaml, with the accepted values for the enumerated ones.
 ---
 
