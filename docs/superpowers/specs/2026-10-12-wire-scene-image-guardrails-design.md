@@ -69,10 +69,14 @@ says why: "ComfyUI advertises no token or character count."
 
 ## 3. Non-goals
 
-- **The approval-request user interface.** `ask` mode needs a player to see a request and
-  approve it. Nothing in `frontend/src` handles `scene_image_pending`, so this proposal
-  makes `ask` *honest and visible* rather than *usable*: the event reaches the stream and
-  a client may act on it, but no client does yet. A follow-up proposal owns the UI.
+- **Consuming the `scene_image_pending` event.** `ask` mode needs no new UI to be usable,
+  and a first reading of this said otherwise: the approval path is already complete end to
+  end. `ChronicleView.tsx:134` renders a generate button for any turn without an
+  illustration, `App.tsx:628` calls the on-demand route through the API client, and
+  `POST /api/game/{id}/turn/{n}/scene-image` generates the scene regardless of the trigger
+  policy. What no client does is *handle the event*, so a player is never told why an
+  illustration is absent, whether a spent budget or an approval gate withheld it. That is a
+  real but separate gap, which this proposal neither introduces nor fixes.
 - **Named-instance STT.** Building it means `sttClientFor`, a config surface and a route;
   that is a feature, not a wiring fix. This proposal removes the unused half instead.
 - Changing `ImageBudget`, `ImageApprovalMode` or the worker's plan logic. They are
@@ -170,11 +174,13 @@ setting did nothing.
 
 ## 8. Risks
 
-- **`ask` mode becomes reachable with no UI to answer it.** A campaign in `ask` mode with
-  a metered provider now stops generating images and reports each skip. That is the
-  documented meaning of the setting, and it is preferable to billing without consent, but
-  it is a behaviour change for anyone who set it and saw it ignored. The spec records it,
-  and the follow-up UI proposal closes the loop.
+- **`ask` mode becomes reachable, and it changes what a player sees.** A campaign in `ask`
+  mode with a metered provider stops generating images automatically. That is the documented
+  meaning of the setting and preferable to billing without consent, but it is a behaviour
+  change for anyone who set it and saw it ignored: illustrations now arrive only when they
+  press the generate button that the chronicle already shows for a turn without one. The
+  page in `04-campaigns.md` said the setting worked all along, so the reader is not being
+  surprised by the documentation; they were misled by the code.
 - **More `game.yaml` writes.** With a budget set, each generated image is saved back so the
   allowance survives a reload. That is what `SetBudget`'s `save` callback is for, and it
   only happens for campaigns that set a budget.
