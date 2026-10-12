@@ -121,6 +121,23 @@ localrpg export video <game-id> [--out FILE|DIR] [--still] [--fps N] [--size WxH
 
 ---
 
+## Documentation
+
+The manual is built into the binary. Open it from the app's docs panel, or read it in
+[`pkg/gui/docs/`](pkg/gui/docs), whose guides the showcase site also renders.
+
+Start with [`00-start-here.md`](pkg/gui/docs/00-start-here.md), which lists every guide and
+suggests an order to read them in. The guides then group as follows:
+
+- **Core concepts** - [`01-overview.md`](pkg/gui/docs/01-overview.md) on the architecture,
+  then worlds, systems and campaigns.
+- **Studio guides** - building a world and a system in the app, and generating one from a prompt.
+- **Configuration and providers** - wiring up LLMs and media, and what they cost.
+- **Local AI and self-hosting** - running Ollama, Kokoro, Faster-Whisper and ComfyUI, or all
+  of them together with one Compose file.
+
+---
+
 ## Debugging & Diagnostics
 
 LocalRPG includes an embedded debugging suite for diagnosing turn failures and inspecting prompts:

@@ -21,8 +21,14 @@ func TestDocsService_GetDocsList(t *testing.T) {
 	}
 
 	// Verify first article is overview
-	if docs[0].ID != "01-overview" {
-		t.Errorf("expected first article to be 01-overview, got %s", docs[0].ID)
+	// The viewer opens whatever sorts first, so the landing article is the index.
+	// TestStartHereIsTheLandingArticle in docs_start_test.go pins the same thing from
+	// the generator's side, where it can also say why.
+	if docs[0].ID != "00-start-here" {
+		t.Errorf("expected the index to sort first, got %s", docs[0].ID)
+	}
+	if docs[1].ID != "01-overview" {
+		t.Errorf("expected 01-overview second, got %s", docs[1].ID)
 	}
 
 	// Verify categories are populated

@@ -2,7 +2,12 @@
 #
 # Run Vale over the prose and the source comments this repository tracks.
 #
-# Run through `mise run lint:prose`, or directly with `bash scripts/lint-prose.sh`.
+# Run through `mise run lint:prose`, which syncs the Vale styles first.
+#
+# Running this script directly skips that sync, and Vale then checks against whatever
+# is in ./styles. A fresh clone has nothing there and lints with no styles at all; a
+# tree from an earlier session lints with a stale set and reports fewer findings than
+# CI does. Both look green. `mise run lint:prose` is the reproducible form.
 #
 # Environment:
 #   STRICT=1    exit non-zero when Vale reports error-level alerts.
