@@ -360,6 +360,28 @@ exit 2, and nothing after it installs. Separate entries with commas.
 keying the task on that directory would make mise treat the download as already done
 and Vale would run with no styles at all.
 
+## Static analysis (CodeQL)
+
+CodeQL runs on every pull request as GitHub's **default setup**, not as a workflow file, so nothing in `.github/workflows/` mentions it and a green analysis looks like an absent one. It covers Go, the JavaScript/TypeScript frontend and the workflow files themselves. Its findings are real and they are older than whoever is reading them: **28 were open on `main`** when the quality phase started, unactioned, because nothing in the repository pointed at them.
+
+**A helper that sanitises is not a sanitiser as far as the analysis is concerned.** This is the one thing to know before writing a guard. CodeQL models a sanitiser it can see **at the sink**; a call to a function that performs the same check is invisible to it, however correct the function is. `pathutil.ResolveSafeChild` and `pathutil.ValidateID` are both correct and neither clears an alert on its own. Spell the guard out where the tainted value is used, and keep the helper behind it for the narrower rule:
+
+| The taint | What to inline at the sink |
+|---|---|
+| A single path component (an id, a filename, a checksum) | reject a separator and a `..` segment, with `strings.ContainsAny` and `strings.Contains` |
+| A path that may have components | `filepath.Abs(base)`, then `strings.HasPrefix(target, abs + os.PathSeparator)` |
+| A URL for an outbound request | `url.Parse`, then an inline scheme allow-list of `http` and `https` |
+
+Two fixes in one commit demonstrated it: the archive extractors inlined the containment check and their alerts cleared, while `GetLocationArt` called `pathutil.ValidateID` and its alert stayed open. **Treat a still-red alert as a shape problem before concluding it is a false positive**, and confirm by re-reading the alert rather than trusting the merge: a fixed flow shows up again at its new line numbers if the guard was invisible.
+
+**Dismissals are for what is genuinely by design or already contained**, and the mechanics matter as much as the judgement:
+
+- A dismissal comment is capped at **280 characters**. The API rejects a longer one outright, with `Only 280 characters are allowed`, rather than truncating it.
+- This repository **rejects `false positive` as a dismissal reason**, so a correct-but-invisible guard is recorded as `won't fix` with the explanation in the comment.
+- **Alerts carry over to a large pull request.** The scanner says so itself: "Alerts not introduced by this pull request might have been detected because the code changes were too large". Ten of the fourteen alerts a refactor appeared to introduce were in a file it never touched. Check the alert's path against the diff, and check whether the same alert is already open on `main`, before believing it is yours.
+
+Read them with `gh api repos/darkliquid/LocalRPG/code-scanning/alerts?state=open`, and **read the error when a write to them fails**: three dismissal batches were lost to an unread 280-character rejection, and the API had said so each time.
+
 ## Build gotcha: the frontend is embedded in the Go binary
 
 `pkg/gui/assets.go` declares `//go:embed all:dist`, so **`go build` fails if `pkg/gui/dist/` does not exist**. It is gitignored except for a tracked `.gitkeep` placeholder. Vite writes straight into `pkg/gui/dist` (`frontend/vite.config.ts` sets `outDir: ../pkg/gui/dist`, `emptyOutDir: true`), which would delete that `.gitkeep`; the build tasks in `mise.toml` and `frontend/package.json` automatically touch `.gitkeep` immediately after building so `git status` stays clean.
