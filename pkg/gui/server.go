@@ -171,9 +171,7 @@ func writeSaveError(w http.ResponseWriter, err error, document string) {
 		writeGameError(w, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusUnprocessableEntity)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSONStatus(w, http.StatusUnprocessableEntity, map[string]any{
 		"error":  fe.Msg,
 		"line":   fe.Line(document),
 		"column": fe.Column(document),
@@ -367,17 +365,41 @@ func (s *Server) handleTTSBatchRoute(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// writeJSON answers with data as JSON. It marshals before it writes anything, so
+// a value that cannot be encoded is a server fault the client can parse rather
+// than a success whose body stops mid-object. The bytes are the ones
+// json.NewEncoder wrote, newline included.
 func writeJSON(w http.ResponseWriter, data any) {
+	body, err := json.Marshal(data)
+	if err != nil {
+		writeEncodeFailure(w)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(data)
+	_, _ = w.Write(append(body, '\n'))
 }
 
 // writeJSONStatus writes a JSON body with an explicit status, so header
-// handling stays in one place for error envelopes.
+// handling stays in one place for error envelopes. It marshals before it sends
+// the status, because the status is still ours until the first byte goes out.
 func writeJSONStatus(w http.ResponseWriter, status int, data any) {
+	body, err := json.Marshal(data)
+	if err != nil {
+		writeEncodeFailure(w)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(data)
+	_, _ = w.Write(append(body, '\n'))
+}
+
+// writeEncodeFailure answers a response that could not be marshalled. Nothing has
+// been written at that point, so the status is still ours to set: a server fault
+// in the envelope the client already parses, whose body is a map of strings and
+// so cannot fail the way the response just did. The marshalling error is not sent
+// on, because it names internal types.
+func writeEncodeFailure(w http.ResponseWriter) {
+	writeJSONError(w, http.StatusInternalServerError, "the response could not be encoded")
 }
 
 func (s *Server) handleGamesRoutes(w http.ResponseWriter, r *http.Request) {
@@ -400,9 +422,7 @@ func (s *Server) handleGamesRoutes(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(game)
+		writeJSONStatus(w, http.StatusCreated, game)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -428,9 +448,7 @@ func (s *Server) handleSystemsRoutes(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(sys)
+		writeJSONStatus(w, http.StatusCreated, sys)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -612,9 +630,7 @@ func (s *Server) handleWorldsRoutes(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(world)
+		writeJSONStatus(w, http.StatusCreated, world)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -1378,8 +1394,7 @@ func (s *Server) handleModelsRoutes(w http.ResponseWriter, r *http.Request) {
 
 	if path == "" && r.Method == http.MethodGet {
 		statuses := s.service.GetModelsStatus()
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(statuses)
+		writeJSON(w, statuses)
 		return
 	}
 
@@ -1423,8 +1438,7 @@ func (s *Server) handleModelsRoutes(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusAccepted)
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "downloading"})
+		writeJSONStatus(w, http.StatusAccepted, map[string]string{"status": "downloading"})
 		return
 	}
 
@@ -1488,15 +1502,13 @@ func (s *Server) handleExportRoutes(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusAccepted)
-		_ = json.NewEncoder(w).Encode(job)
+		writeJSONStatus(w, http.StatusAccepted, job)
 		return
 	}
 
 	if path != "" && r.Method == http.MethodDelete {
 		s.service.CancelExport(path)
-		w.WriteHeader(http.StatusAccepted)
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "cancelling"})
+		writeJSONStatus(w, http.StatusAccepted, map[string]string{"status": "cancelling"})
 		return
 	}
 

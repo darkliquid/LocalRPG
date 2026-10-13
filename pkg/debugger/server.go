@@ -34,6 +34,22 @@ func (s *Server) Handler() http.Handler {
 	return s.mux
 }
 
+// writeJSON answers with v, marshalling before it writes anything so a value that
+// cannot be encoded is a server fault rather than a success whose body stops
+// mid-object. It mirrors pkg/gui's helper of the same name; the two packages
+// answer their own error text, and sharing one would mean this package importing
+// the GUI package for twelve lines. See
+// docs/superpowers/specs/2026-10-13-response-encoding-errors-design.md.
+func writeJSON(w http.ResponseWriter, v any) {
+	body, err := json.Marshal(v)
+	if err != nil {
+		http.Error(w, "the response could not be encoded", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(append(body, '\n'))
+}
+
 // RecordAction adds or updates an action record and enriches it with telemetry.
 func (s *Server) RecordAction(rec ActionRecord) {
 	s.mu.Lock()
@@ -113,8 +129,7 @@ func (s *Server) getEffectiveActions() []ActionRecord {
 
 func (s *Server) handleActions(w http.ResponseWriter, r *http.Request) {
 	actions := s.getEffectiveActions()
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(actions)
+	writeJSON(w, actions)
 }
 
 func (s *Server) handleActionDetail(w http.ResponseWriter, r *http.Request) {
@@ -122,8 +137,7 @@ func (s *Server) handleActionDetail(w http.ResponseWriter, r *http.Request) {
 	actions := s.getEffectiveActions()
 	for _, a := range actions {
 		if a.ID == id {
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(a)
+			writeJSON(w, a)
 			return
 		}
 	}
@@ -143,8 +157,7 @@ func (s *Server) handleSpans(w http.ResponseWriter, r *http.Request) {
 		spans = s.collector.GetSpans()
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(spans)
+	writeJSON(w, spans)
 }
 
 func (s *Server) handleDashboardUI(w http.ResponseWriter, r *http.Request) {

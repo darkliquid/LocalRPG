@@ -532,9 +532,7 @@ func (s *Service) HandleRegistrySources(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(source)
+		writeJSONStatus(w, http.StatusCreated, source)
 
 	case http.MethodDelete:
 		if err := s.RemoveRegistrySource(r.Context(), r.URL.Query().Get("url")); err != nil {
