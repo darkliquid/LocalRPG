@@ -364,7 +364,12 @@ and Vale would run with no styles at all.
 
 CodeQL runs on every pull request as GitHub's **default setup**, not as a workflow file, so nothing in `.github/workflows/` mentions it and a green analysis looks like an absent one. It covers Go, the JavaScript/TypeScript frontend and the workflow files themselves. Its findings are real and they are older than whoever is reading them: **28 were open on `main`** when the quality phase started, unactioned, because nothing in the repository pointed at them.
 
-**A helper that sanitises is not a sanitiser as far as the analysis is concerned.** This is the one thing to know before writing a guard. CodeQL models a sanitiser it can see **at the sink**; a call to a function that performs the same check is invisible to it, however correct the function is. `pathutil.ResolveSafeChild` and `pathutil.ValidateID` are both correct and neither clears an alert on its own. Spell the guard out where the tainted value is used, and keep the helper behind it for the narrower rule:
+**A guard only counts if it is on the value the sink receives.** Two rules, and the second is the one that costs the most time:
+
+1. **It has to be visible.** CodeQL models a sanitiser it can see at the sink; a call to a function that performs the same check is invisible to it, however correct the function is. `pathutil.ResolveSafeChild` and `pathutil.ValidateID` are both correct and neither clears an alert on its own.
+2. **It has to be on the used value, not a copy of it.** Checking a parsed URL, or a lower-cased string, leaves the original unsanitised, and `url.Parse` carries the taint into the fields of its result besides. Guard the variable the call actually passes.
+
+An outbound URL took **three shapes** before it cleared, and the first two were both plausible: a correct helper, then a scheme check on the parsed URL, then an allow-list on a lower-cased copy. The one that worked was `strings.HasPrefix` on the URL itself, with that same variable passed to the request. Spell the guard out where the tainted value is used, and keep the helper behind it for the narrower rule:
 
 | The taint | What to inline at the sink |
 |---|---|

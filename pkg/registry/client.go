@@ -328,12 +328,17 @@ func (c *Client) Install(ctx context.Context, ref PackageRef, onConflict string)
 		// URL reaches the request, not only inside a helper. The host is deliberately
 		// unrestricted, because a registry on localhost is a supported configuration for
 		// a local-first app.
-		parsed, parseErr := url.Parse(downloadURL)
-		if parseErr != nil {
-			return content.Manifest{}, fmt.Errorf("parse package download URL: %w", parseErr)
+		//
+		// The allow-list is applied to the value the request is built from, directly.
+		// A check on a copy does not sanitise the original: not on a parsed URL, whose
+		// fields carry the taint on, and not on a lower-cased version, which is a second
+		// string. Three shapes failed for that reason, and this one checks the string the
+		// sink receives.
+		if !strings.HasPrefix(downloadURL, "http://") && !strings.HasPrefix(downloadURL, "https://") {
+			return content.Manifest{}, fmt.Errorf("package download URL must be http or https: %q", downloadURL)
 		}
-		if parsed.Scheme != "http" && parsed.Scheme != "https" {
-			return content.Manifest{}, fmt.Errorf("package download URL must be http or https, got %q", parsed.Scheme)
+		if _, parseErr := url.Parse(downloadURL); parseErr != nil {
+			return content.Manifest{}, fmt.Errorf("parse package download URL: %w", parseErr)
 		}
 
 		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
