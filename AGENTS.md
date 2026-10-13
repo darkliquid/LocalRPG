@@ -387,6 +387,8 @@ Two fixes in one commit demonstrated it: the archive extractors inlined the cont
 
 Read them with `gh api repos/darkliquid/LocalRPG/code-scanning/alerts?state=open`, and **read the error when a write to them fails**: three dismissal batches were lost to an unread 280-character rejection, and the API had said so each time.
 
+**`gh api -f` does not read a file.** `-f body=@file.md` sends the literal string `@file.md`, because only `-F`/`--field` expands `@`; `gh pr edit --body-file` and `gh issue edit --body-file` are clearer still. Four pull requests were opened here with a body of `@/tmp/...`, and nothing catches it: the API accepts the string, the checks go green, and the description is only wrong when someone reads it. Read the body back after writing it.
+
 ## Build gotcha: the frontend is embedded in the Go binary
 
 `pkg/gui/assets.go` declares `//go:embed all:dist`, so **`go build` fails if `pkg/gui/dist/` does not exist**. It is gitignored except for a tracked `.gitkeep` placeholder. Vite writes straight into `pkg/gui/dist` (`frontend/vite.config.ts` sets `outDir: ../pkg/gui/dist`, `emptyOutDir: true`), which would delete that `.gitkeep`; the build tasks in `mise.toml` and `frontend/package.json` automatically touch `.gitkeep` immediately after building so `git status` stays clean.
