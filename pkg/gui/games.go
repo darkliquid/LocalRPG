@@ -258,6 +258,15 @@ func (s *Service) GetRecap(ctx context.Context, gameID string) (*RecapDTO, error
 // GetLocationArt returns a location's scene image and its content type, drawing it
 // on first request and reusing it until the appearance changes.
 func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string, force bool) (string, string, error) {
+	// Both ids name a file, so both are validated as ids. Appending ".md" to an
+	// unvalidated value leaves any separator and parent reference intact, and the
+	// join below would then resolve outside the game directory.
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return "", "", fmt.Errorf("invalid game id: %w", err)
+	}
+	if err := pathutil.ValidateID(locationID); err != nil {
+		return "", "", fmt.Errorf("invalid location id: %w", err)
+	}
 	// Read the note from disk rather than the index: appearance, tags, and state are
 	// authored content, and the index is derived from them.
 	notePath := filepath.Join(s.resolver.GameDir(gameID), "entities", locationID+".md")

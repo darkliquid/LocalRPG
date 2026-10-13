@@ -618,10 +618,16 @@ func (m *Manager) extractArchive(archivePath, archiveType, destDir string) error
 			return err
 		}
 
-		cleanName := filepath.Clean(header.Name)
-		target := filepath.Join(destDir, cleanName)
-		rel, relErr := filepath.Rel(destDir, target)
-		if relErr != nil || strings.HasPrefix(rel, "..") || rel == ".." || filepath.IsAbs(cleanName) {
+		// Containment, in the form the scanner models rather than the form it does not:
+		// resolve the destination, join, and require the result to stay under it.
+		// filepath.Join cleans, so a ".." in the entry name resolves out of the
+		// destination and the prefix check rejects it.
+		absDest, err := filepath.Abs(destDir)
+		if err != nil {
+			return fmt.Errorf("resolve destination directory: %w", err)
+		}
+		target := filepath.Join(absDest, header.Name)
+		if !strings.HasPrefix(target, absDest+string(os.PathSeparator)) {
 			return fmt.Errorf("archive entry %q escapes destination directory", header.Name)
 		}
 		switch header.Typeflag {
