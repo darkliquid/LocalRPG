@@ -328,15 +328,22 @@ func (c *Client) Install(ctx context.Context, ref PackageRef, onConflict string)
 		// URL reaches the request, not only inside a helper. The host is deliberately
 		// unrestricted, because a registry on localhost is a supported configuration for
 		// a local-first app.
+		//
+		// The check is on the raw string, which is the value the taint is on, and the
+		// request is built from the checked parts. Validating a parsed copy while the
+		// request uses the original leaves the used value unsanitised, which is what kept
+		// this alert open through two attempts at it.
+		lower := strings.ToLower(downloadURL)
+		if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+			return content.Manifest{}, fmt.Errorf("package download URL must be http or https: %q", downloadURL)
+		}
 		parsed, parseErr := url.Parse(downloadURL)
 		if parseErr != nil {
 			return content.Manifest{}, fmt.Errorf("parse package download URL: %w", parseErr)
 		}
-		if parsed.Scheme != "http" && parsed.Scheme != "https" {
-			return content.Manifest{}, fmt.Errorf("package download URL must be http or https, got %q", parsed.Scheme)
-		}
+		safe := &url.URL{Scheme: parsed.Scheme, Host: parsed.Host, Path: parsed.Path, RawQuery: parsed.RawQuery}
 
-		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, safe.String(), nil)
 		if reqErr != nil {
 			return content.Manifest{}, fmt.Errorf("create download request: %w", reqErr)
 		}
