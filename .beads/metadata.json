@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "LocalRPG",
+  "project_id": "b10f9a10-1ce2-4411-9b1b-8f8d63257779"
+}

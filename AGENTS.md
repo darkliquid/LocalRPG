@@ -48,98 +48,90 @@ CLI surface (`localrpg <cmd>`): `roll <notation>`, `prompt`, `play <game-id>`, `
 
 ## Working the project
 
-Development work is tracked in a long-lived GitHub Project, identified by `PROJECT_ID` in
-`scripts/project.conf` (currently **LocalRPG Next Phase**,
-<https://github.com/users/darkliquid/projects/2>). The project outlives any single phase: rename it,
-and keep adding waves, areas, epics, and proposals as the work grows. There are three levels, one per
-GitHub object:
+Development work is tracked in **Beads** (`bd`), a local, dependency-aware issue tracker backed by
+Dolt. Its database lives in `.beads/`, and its id prefix is `LocalRPG`. GitHub hosts the repository
+and reviews pull requests, and is used for nothing else: no issue tracker, no milestones, no project
+board.
 
-- **Wave** - a milestone, named `Wave <n> - <title>`. Waves are dependency-ordered; work in the
+`bd` is deliberately not pinned in `mise.toml`: `jdx/mise-action` installs every pinned tool in all
+five CI jobs, and no build should download a 150 MB tracker it never runs. Install it once, with
+`mise use -g aqua:gastownhall/beads` or `go install github.com/gastownhall/beads/cmd/bd@latest`.
+
+The tracker keeps the three levels the work has always had:
+
+- **Wave** - an ordering, carried as a `wave/<n>` label. Waves are dependency-ordered; work in the
   earliest incomplete wave first.
-- **Epic** - one issue per theme, labelled `type/epic` and `area/<theme>`, with the theme's proposals
-  as **sub-issues** and a `## Proposals` task list.
-- **Proposal** - one issue per unit of work, labelled `area/*`, `wave/*`, `effort/*`, and a type
-  label. Its body carries a summary, its epic, its dependencies, and a **definition of done**.
+- **Epic** - a bead of type `epic`, one per theme, labelled `area/<theme>`, with the theme's
+  proposals as its children.
+- **Proposal** - one bead per unit of work, labelled `area/*`, `wave/*`, `effort/*` and the `type/*`
+  label the proposal was written under, with its dependencies as graph edges rather than prose.
 
-The board tracks every item with a **Status** single-select, and the status moves with the work:
+A bead moves through `open`, `in_progress`, `blocked`, `deferred` and `closed`, and the movement is
+the command rather than a field you edit by hand:
 
-| Status | Means |
+| Command | Means |
 |---|---|
-| `Proposal` | captured; no spec yet |
-| `Specced` | the design spec is written |
-| `Planned` | the implementation plan is written |
-| `In Progress` | implementation underway |
-| `Testing` | implemented, under verification |
-| `Done` | complete |
+| `bd ready` | the claimable frontier: open, unblocked, in priority order |
+| `bd update <id> --claim` | taken, and `in_progress` |
+| `bd dep add <id> <blocker>` | this work cannot start until that one is done |
+| `bd close <id> --reason "..."` | complete; the reason is the historical record |
+
+Only `blocks` edges affect `bd ready`, so a real ordering constraint is a `blocks` dependency and
+nothing else. Provenance and soft links (`discovered-from`, `related`) are recorded without holding
+work back.
 
 **Spec-first.** A proposal is specced and planned before it is implemented: the spec is a design doc
 in `docs/superpowers/specs/<date>-<slug>-design.md`, and the plan is a task-by-task implementation
 plan in `docs/superpowers/plans/<date>-<slug>.md`, following the superpowers workflow. Read the
-**Spec-first, when there is something to design.** A proposal that decides an interface, a
-behaviour, or a tradeoff is specced and planned before it is implemented: the spec is a design doc
-in `docs/superpowers/specs/<date>-<slug>-design.md`, and the plan is a task-by-task implementation
-plan in `docs/superpowers/plans/<date>-<slug>.md`, following the superpowers workflow. Read the
 relevant spec before changing a subsystem.
 
-Work that is mechanical decides nothing and carries no design step, because the spec would only
-restate the issue and nobody would read it: a formatting sweep, a rename, a dependency bump, a
-test that mirrors an existing one. `add-proposal` decides by kind (`feature`, `enhancement`,
-`refactor` and `research` require a design; `chore`, `test` and `documentation` do not) and
-`--design` or `--no-design` overrides it for the exceptions, so a chore that does decide something
-(a lint gate's placement, say) still gets its spec. Every new proposal states the outcome in a
-`**Design:**` field, and `project:scaffold` refuses one whose field says no design is needed.
+A proposal that decides an interface, a behaviour, or a tradeoff is specced and planned. Work that is
+mechanical decides nothing and carries no design step, because the spec would only restate the issue
+and nobody would read it: a formatting sweep, a rename, a dependency bump, a test that mirrors an
+existing one. The bead's type says which it is, so `feature` and `spike`, and a `task` that is a
+refactor, usually decide something, while `chore` and a test usually do not. When a bead does decide
+something its description names the spec and plan; when it does not, its checklist is implemented,
+tests and lint, and user-facing docs.
 
-Proposals registered before the field existed keep the old default, so `scaffold` still allows them
-and `project:check` still accepts their design boxes. When you pick one up, set its `**Design:**`
-field to match what the work actually needs, and scaffold only if it does. A design-free proposal's
-checklist is implemented, tests and lint, and user-facing docs.
-
-### The `project:*` tasks
-
-These wrap `scripts/project.sh`, which reads `scripts/project.conf` and resolves the project, its
-fields, and their option IDs by name at run time. Use them rather than `gh project` directly, so the
-vocabulary stays in one place. Because nothing is hardcoded but the project ID, the project's name
-and contents can change freely.
+### The `bd` loop
 
 ```bash
-mise run project:list                        # every item
-mise run project:list --wave 1               # filter by --wave, --status, --area, or --kind
-mise run project:next                        # the next ready item (earliest wave, In Progress first)
-mise run project:show 37                      # one item: status, fields, spec, plan, and DoD
-mise run project:scaffold 37                  # create the spec and plan skeletons for an issue
-mise run project:status 37 in-progress        # set the board status
-mise run project:check 37 implemented         # tick a DoD box (--uncheck clears it)
-mise run project:add-wave 5 "Hardening"       # a new wave: milestone, field option, and label
-mise run project:add-area audio               # a new theme: label and field option
-mise run project:add-epic --area systems --title "New theme" --wave 4 --summary "..."
-mise run project:add-proposal --epic 23 --id RB-7 --title "Repair X" --area robustness \
-    --wave 4 --effort M --kind feature --summary "..." --deps "RB-1"
-mise run project:link 23 99                   # attach an existing issue as a sub-issue
-mise run project:new --title "Next Phase"     # only to start a brand new project
+bd prime                       # workflow context, at the start of a session
+bd ready                       # what can be started now
+bd show <id>                   # the full description, dependencies and acceptance criteria
+bd update <id> --claim         # take it
+# write the spec and plan, implement, run the gates, then:
+bd close <id> --reason "Done: <summary>"
 ```
 
-Waves and areas are open-ended: add them with `project:add-wave` and `project:add-area`, which create
-the milestone or label and the matching field option, and the tasks pick them up. The statuses, kinds,
-efforts, and definition-of-done boxes are convention and live in `scripts/project.conf`.
-
-A worker's loop for one proposal:
+Creating work:
 
 ```bash
-mise run project:next                  # or project:show <issue>
-mise run project:scaffold <issue>      # writes the spec and plan skeletons; fill them in
-mise run project:check <issue> spec
-mise run project:status <issue> specced
-mise run project:check <issue> plan
-mise run project:status <issue> planned
-mise run project:status <issue> in-progress   # when implementation starts
-mise run project:check <issue> implemented
-mise run project:check <issue> tested
-mise run project:status <issue> done
+bd create "Repair the X path" -t task -p 1 -l "area/architecture,wave/7,effort/m" \
+    -d "..." --acceptance "Implemented; mise run test and mise run lint pass" \
+    --external-ref gh-216
+bd q "A bug found while working" -t bug -p 2      # capture now, triage later
+bd dep add <new-id> <current-id> --type discovered-from
 ```
 
-`project.sh` runs project-scoped `gh` commands without an ambient `GITHUB_TOKEN`, because a token set
-in the environment (CI, some shells) can lack the `project` scope while the keyring login has it. If
-`gh project` reports a missing scope, run `gh auth refresh -s project,read:project`.
+`bd create` takes `--parent <epic-id>` for a child, `--deps blocks:<id>` for a blocker, and
+`--external-ref gh-<n>` where a bead came from a GitHub issue. Use `--parent` and `bd dep add` rather
+than writing "part of" or "depends on" in the description, so `bd ready` can compute the frontier.
+`bd q` returns a bare id for scripting.
+
+Waves, areas and efforts are open-ended: a new wave is a new `wave/<n>` label and a new theme a new
+`area/<slug>` label. Nothing enumerates them, so there is no registry to update.
+
+The beads in this database were migrated from the GitHub Project in October 2026, which is why each
+one carries an `--external-ref gh-<n>` pointing at the closed GitHub issue it came from, and why the
+`wave/*` and `area/*` labels match the old board's. The board itself, and the `mise run project:*`
+tasks that drove it, are gone.
+
+### Syncing
+
+Beads data is Dolt, kept under the git ref `refs/dolt/data`, independent of code commits, so
+`bd dolt push` and `bd dolt pull` move issues without touching the working tree. Normal writes
+auto-commit; a dirty working set complains until `bd dolt commit -m "..."` clears it.
 
 ## CI, releases and the showcase site
 
