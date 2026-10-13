@@ -261,11 +261,15 @@ func (s *Service) GetLocationArt(ctx context.Context, gameID, locationID string,
 	// Both ids name a file, so both are validated as ids. Appending ".md" to an
 	// unvalidated value leaves any separator and parent reference intact, and the
 	// join below would then resolve outside the game directory.
-	if err := pathutil.ValidateID(gameID); err != nil {
-		return "", "", fmt.Errorf("invalid game id: %w", err)
+	// The separator and parent conditions are spelled out rather than left to
+	// ValidateID alone, because the scanner models a guard it can see at the sink and a
+	// call to a helper is invisible to it however correct the helper is. ValidateID
+	// then enforces the narrower character rule behind them.
+	if strings.ContainsAny(gameID, `/\`) || strings.Contains(gameID, "..") || pathutil.ValidateID(gameID) != nil {
+		return "", "", fmt.Errorf("invalid game id: %q", gameID)
 	}
-	if err := pathutil.ValidateID(locationID); err != nil {
-		return "", "", fmt.Errorf("invalid location id: %w", err)
+	if strings.ContainsAny(locationID, `/\`) || strings.Contains(locationID, "..") || pathutil.ValidateID(locationID) != nil {
+		return "", "", fmt.Errorf("invalid location id: %q", locationID)
 	}
 	// Read the note from disk rather than the index: appearance, tags, and state are
 	// authored content, and the index is derived from them.
