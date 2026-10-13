@@ -50,3 +50,10 @@ pkg/e2e/test-results/
 
 # Frontend coverage output (npm run test:coverage)
 frontend/coverage/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+*.gate.lock*

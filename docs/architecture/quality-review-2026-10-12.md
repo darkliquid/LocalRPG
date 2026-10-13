@@ -64,6 +64,15 @@ gate, does not hold, because the gate is `staticcheck` and it reports none of th
 The lesson is recorded rather than quietly fixed, because a review that overstates is
 worth less than one that is wrong in a way you can check.
 
+**Where the work is tracked.** The findings below were turned into a GitHub Project board
+(waves as milestones, an issue per epic and per proposal, and the `mise run project:*` tasks as the
+interface to it). That is gone: the outstanding work now lives in **Beads** (`bd`), a local,
+dependency-aware tracker in `.beads/`, and GitHub is used only to host the repository and review
+pull requests. Every bead carries `--external-ref gh-<n>` naming the issue it came from, and that
+issue is closed with a pointer back to the bead. The briefs in section 4 and the findings in
+section 2 are still the source these beads were seeded from, so they are the place to read why a
+piece of work exists.
+
 ---
 
 ## 1. Executive summary
