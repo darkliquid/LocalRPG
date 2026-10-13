@@ -186,19 +186,25 @@ func Unpack(r io.Reader, destDir string) (Manifest, []byte, error) {
 		if err != nil {
 			return Manifest{}, nil, fmt.Errorf("resolve safe path for %q: %w", cleanRel, err)
 		}
-		// CodeQL local containment validation
-		cleanStaging := filepath.Clean(stagingDir)
-		relToStaging, err := filepath.Rel(cleanStaging, targetPath)
-		if err != nil || strings.HasPrefix(relToStaging, "..") || relToStaging == ".." {
+		// Containment, in the form the scanner models rather than the form it does not:
+		// resolve the destination, join, and require the result to stay under it.
+		// filepath.Join cleans, so a ".." in the entry name resolves out of the
+		// destination and the prefix check rejects it. ResolveSafeChild above does the
+		// same job, and the check is repeated here because CodeQL cannot see through a
+		// helper; the lgtm comments that used to sit on the two calls below are the
+		// pre-GitHub-Actions syntax and were suppressing nothing.
+		absStaging, err := filepath.Abs(stagingDir)
+		if err != nil {
+			return Manifest{}, nil, fmt.Errorf("resolve staging directory: %w", err)
+		}
+		if !strings.HasPrefix(targetPath, absStaging+string(os.PathSeparator)) {
 			return Manifest{}, nil, fmt.Errorf("archive member %q escapes staging directory", cleanRel)
 		}
 
-		// lgtm[go/path-injection]
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 			return Manifest{}, nil, fmt.Errorf("create directory for %q: %w", cleanRel, err)
 		}
 
-		// lgtm[go/path-injection]
 		targetFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 		if err != nil {
 			return Manifest{}, nil, fmt.Errorf("create file %q: %w", cleanRel, err)

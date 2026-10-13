@@ -1700,3 +1700,34 @@ func TestTurnDTOCarriesEngagementAndStakes(t *testing.T) {
 		t.Fatalf("checks = %+v", dto.Checks)
 	}
 }
+
+// TestGetLocationArtRejectsTraversingIDs is the guard for the note path: both ids
+// name a file, and appending ".md" to an unvalidated value leaves any separator and
+// parent reference intact, so the join would resolve outside the game directory.
+func TestGetLocationArtRejectsTraversingIDs(t *testing.T) {
+	gameID, svc := setupTestGame(t)
+
+	for what, id := range map[string]string{
+		"a parent reference": "../../../../etc/passwd",
+		"a separator":        "sub/dir",
+		"a bare parent":      "..",
+		"a null byte":        "aldon\x00harbour",
+	} {
+		// The error must be the validation's, not a failed read: without the guard a
+		// traversing id still "fails", because the joined path does not exist. A
+		// missing file is the bug succeeding quietly.
+		_, _, err := svc.GetLocationArt(context.Background(), gameID, id, false)
+		if err == nil {
+			t.Errorf("%s should be refused as a location id: %q", what, id)
+			continue
+		}
+		if !strings.Contains(err.Error(), "invalid location id") {
+			t.Errorf("%s: want a refusal naming the id, got %v", what, err)
+		}
+	}
+
+	// And the id that is real still works, so the guard is not refusing everything.
+	if _, _, err := svc.GetLocationArt(context.Background(), gameID, "aldon-harbour", false); err != nil {
+		t.Errorf("a valid location id should still resolve: %v", err)
+	}
+}
