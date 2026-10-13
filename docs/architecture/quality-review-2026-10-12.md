@@ -38,6 +38,9 @@ itself did not anticipate; all at commit `e3ca988b`:
 | DOC-9 | D-9 | The stale counts in `AGENTS.md` corrected |
 | DOC-5 | D-5 | Six articles shared two `order` values, so the sidebar sorted arbitrarily |
 | DOC-4 | D-6 | A generated `00-start-here.md` index, which is what the viewer opens, and a pointer to the manual from the README |
+| RD-1 | R-1 | `pkg/gui/service.go` split from 6,575 lines into ten, one per domain, with a test that asserts where each method lives |
+
+**Dropped, not deferred quietly.** TQ-3 was closed as not planned: its premise no longer held, and the cost was 90 `WriteString` edits for a Low-severity finding. R-16 records why, and the measurement that decided it.
 
 **Re-measured after wave 6.**
 
@@ -392,10 +395,28 @@ R-7 and RD-6 describe, and it means a query that fails halfway is reported as a
 completed one. Those belong to RD-6 and are cross-referenced there rather than counted
 twice here.
 
-The scale changes what TQ-3 should be. Ninety `WriteString` concatenations and thirty-nine
-range-over-int loops are a real sweep, not a tidy-up, and `staticcheck` (TQ-4) will
-overlap with most of the list. TQ-4 therefore goes first, and TQ-3 becomes "work the
-findings the gate reports" rather than a hand-enumerated one.
+**TQ-3 was dropped rather than worked, and this is why.** The task was written on the
+assumption that TQ-4 would put a gate in place and the list would then come from it. TQ-4
+landed, and the gate is `staticcheck`, which reports **none** of these hints: the list comes
+from `gopls check -severity=hint`, which is not pinned and not in CI. A hand sweep would
+therefore leave nothing behind to hold the line, and the same work would return.
+
+`golangci-lint` would cover part of it, and its `modernize` linter is the same family of
+analysers, but it is narrower than gopls's hint output: measured, it reports **50** issues
+against these **307**, overlapping on the modern-generation idioms (`newexpr` 18, `minmax`
+6, `errorsastype` 5, `slicesbackward` 3, `rangeint` 3, `mapsloop` 3) while missing the
+largest groups entirely. So the real cost of the task was the 90 `WriteString`
+concatenations, not the language-idiom edits, and those 50 would be nearly free if
+`golangci-lint` were adopted here, since its `modernize` is marked auto-fix.
+
+One correction to the recommendation this review gave: the `omitempty` group is not a
+false positive to be suppressed, and it is not to be deleted either. `modernize` suggests
+**`omitzero`**, which is the modern way to say the same thing, and the tags do document
+intent on fields `encoding/json` ignores. Keeping them is right; changing them to
+`omitzero` is a small separate improvement.
+
+The taxonomy above is left in place so that decision can be revisited cheaply if
+`golangci-lint` lands.
 
 `AGENTS.md` already states the intended idioms (`slices`/`maps` helpers, `min`/`max`,
 range-over-int), so the rest is drift rather than disagreement.
