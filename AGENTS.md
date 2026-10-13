@@ -385,6 +385,10 @@ Two fixes in one commit demonstrated it: the archive extractors inlined the cont
 - This repository **rejects `false positive` as a dismissal reason**, so a correct-but-invisible guard is recorded as `won't fix` with the explanation in the comment.
 - **Alerts carry over to a large pull request.** The scanner says so itself: "Alerts not introduced by this pull request might have been detected because the code changes were too large". Ten of the fourteen alerts a refactor appeared to introduce were in a file it never touched. Check the alert's path against the diff, and check whether the same alert is already open on `main`, before believing it is yours.
 
+**A passing CodeQL check on a pull request does not mean the alert is cleared.** The check answers "did this change add an alert", not "are there any". A flow that already exists on `main` stays open however the pull request rewrites it, and the check goes green either way. Confirm with `gh api repos/darkliquid/LocalRPG/code-scanning/alerts?state=open` and read the alert's instance commit: if it predates the merge, the analysis has not run yet.
+
+**Some alerts are answered by a decision rather than a shape.** Four shapes failed to clear one outbound URL, and the alert was finally resolved by recording it as a design tradeoff: the scheme is restricted to http and https, and the host is deliberately open because a registry on localhost is supported for a local-first app, so the residual risk requires the user to have added a hostile registry. Write the reasoning into the dismissal, and name the hardening if there is one.
+
 Read them with `gh api repos/darkliquid/LocalRPG/code-scanning/alerts?state=open`, and **read the error when a write to them fails**: three dismissal batches were lost to an unread 280-character rejection, and the API had said so each time.
 
 ## Build gotcha: the frontend is embedded in the Go binary
