@@ -257,6 +257,47 @@ func (c *Client) SetInstaller(installer ContentInstaller) {
 	c.installer = installer
 }
 
+// isHexSHA256 reports whether s is exactly 64 hexadecimal characters.
+//
+// A checksum from a registry manifest becomes a cache filename below, so it is
+// validated as a checksum rather than merely checked for emptiness: anything but hex
+// could carry a path separator or a parent reference into the cache path.
+func isHexSHA256(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= '0' && c <= '9':
+		case c >= 'a' && c <= 'f':
+		case c >= 'A' && c <= 'F':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// checkDownloadURL rejects a download URL that is not http or https.
+//
+// The URL comes from a registry's manifest, so without this a registry could point
+// the client at any scheme its transport understands. It deliberately does not
+// restrict the host: a registry on localhost is a supported configuration for a
+// local-first app, so the policy is the scheme rather than the address.
+func checkDownloadURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("parse package download URL: %w", err)
+	}
+	switch u.Scheme {
+	case "http", "https":
+		return nil
+	default:
+		return fmt.Errorf("package download URL must be http or https, got %q", u.Scheme)
+	}
+}
+
 // Install downloads, verifies, and installs a package from a PackageRef.
 func (c *Client) Install(ctx context.Context, ref PackageRef, onConflict string) (content.Manifest, error) {
 	if ref.Package.Download == "" {
@@ -264,6 +305,9 @@ func (c *Client) Install(ctx context.Context, ref PackageRef, onConflict string)
 	}
 	if ref.Package.SHA256 == "" {
 		return content.Manifest{}, errors.New("package sha256 checksum is empty")
+	}
+	if !isHexSHA256(ref.Package.SHA256) {
+		return content.Manifest{}, fmt.Errorf("package sha256 checksum is not 64 hex characters: %q", ref.Package.SHA256)
 	}
 
 	packagesDir := filepath.Join(c.cacheDir, "packages")
@@ -297,6 +341,10 @@ func (c *Client) Install(ctx context.Context, ref PackageRef, onConflict string)
 					downloadURL = resolved.String()
 				}
 			}
+		}
+
+		if err := checkDownloadURL(downloadURL); err != nil {
+			return content.Manifest{}, err
 		}
 
 		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
