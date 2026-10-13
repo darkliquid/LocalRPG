@@ -86,8 +86,18 @@ touched, which the new file names fix for the future.
 
 ## 7. Rollout
 
-One commit per file, in the order above, so each is reviewable on its own and a mistake is
-bisectable. `service.go` is reduced last, when the others already hold their methods.
+**As landed, the move is one commit rather than one per file.** The plan above called for a
+commit per file so each was bisectable; the split was scripted as a single pass instead,
+because reconstructing ten compiling intermediate states would have meant redoing it ten
+times. What the per-file commits were meant to buy is kept another way: the invariance was
+checked numerically, against the source at the commit before, and it holds. 235
+declarations before, 235 after, none missing and none duplicated.
+
+The pass also moved only the methods plus the declarations that name their own domain (the
+sentinel errors and the helpers bound to one, such as `imagePrice` and
+`defaultMechanicsScript`). The generic helpers, the wire types and the package-level regexes
+stay in `service.go`, which the spec's design section anticipated for the types and less so
+for the helpers. They are a further pass, not a correction of this one.
 
 ## 8. Risks
 

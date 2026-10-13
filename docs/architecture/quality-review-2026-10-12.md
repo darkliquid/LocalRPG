@@ -38,6 +38,7 @@ itself did not anticipate; all at commit `e3ca988b`:
 | DOC-9 | D-9 | The stale counts in `AGENTS.md` corrected |
 | DOC-5 | D-5 | Six articles shared two `order` values, so the sidebar sorted arbitrarily |
 | DOC-4 | D-6 | A generated `00-start-here.md` index, which is what the viewer opens, and a pointer to the manual from the README |
+| RD-1 | R-1 | `pkg/gui/service.go` split from 6,575 lines into ten, one per domain, with a test that asserts where each method lives |
 
 **Dropped, not deferred quietly.** TQ-3 was closed as not planned: its premise no longer held, and the cost was 90 `WriteString` edits for a Low-severity finding. R-16 records why, and the measurement that decided it.
 
