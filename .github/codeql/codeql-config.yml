@@ -1,0 +1,37 @@
+# CodeQL configuration for LocalRPG, used by .github/workflows/codeql.yml.
+#
+# go/path-injection is excluded deliberately, and this is the reasoning.
+#
+# Every filesystem sink in this application takes a path that the user, or a
+# content package the user chose to install, supplied. Exporting to the
+# destination they named, importing the folder they picked, and serving an asset
+# under a campaign's own directory are the feature, not a defect, so the query
+# reports the whole shape of the program. Its forty alerts were each read and
+# dismissed as either contained by a pkg/pathutil sanitiser CodeQL cannot see
+# through, or a user-chosen destination; not one was a vulnerability.
+#
+# The cost being removed is concrete. An alert is dismissed against a line, so
+# any refactor that moves the code re-raises it and the dismissal has to be made
+# again. The RD-2 route split did exactly that to the game and world asset sinks,
+# which had already been dismissed once each (alerts 43 and, before it, the
+# world route's).
+#
+# What still covers the risk that matters. A content package is the one genuinely
+# untrusted input here, and its traversal risk is archive extraction, which
+# go/zipslip still reports; that query is not excluded. pkg/pathutil's
+# ValidateID, SanitizeID and ResolveSafeChild remain the control for every other
+# path, and each has tests covering the traversal cases.
+#
+# Revisit this if the application grows a remote or multi-user surface, or if
+# CodeQL's Go model packs leave public preview. Modelling pkg/pathutil's
+# sanitisers as barrier models clears the false positives and keeps the query:
+# the CodeQL CLI already honours them, and taking the repository from 127 results
+# to 113 in a local analysis. GitHub code scanning does not yet, because model
+# packs are in preview for C/C++, C#, Java/Kotlin, Python, Ruby and Rust, and not
+# for Go.
+
+name: LocalRPG CodeQL configuration
+
+query-filters:
+  - exclude:
+      id: go/path-injection

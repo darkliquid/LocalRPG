@@ -1,0 +1,82 @@
+name: CodeQL
+
+# Advanced setup, in place of GitHub's default setup, because a configuration
+# file is the point. Default setup only reads .github/codeql/codeql-config.yml
+# when the repository carries the `github-codeql-config-file` property, and
+# custom properties are an organisation feature; this repository is owned by a
+# user, so default setup can only be told which query suite to run and nothing
+# finer. Advanced setup runs the same analysis with the repository in control of
+# the configuration, and the analysis is the same one either way. See AGENTS.md,
+# "Static analysis (CodeQL)".
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Default setup analysed on a weekly schedule, and a new query release finds
+  # old code, so keep the cadence.
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    permissions:
+      # analyze uploads SARIF; packages and actions are read to resolve query
+      # packs and to scan the workflow files.
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # The three languages default setup analysed. Go is built; the other two
+        # are read as source, so they need no build.
+        include:
+          - language: go
+            build-mode: autobuild
+          - language: javascript-typescript
+            build-mode: none
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v7
+
+      # The Go extractor builds the module, and this repository pins Go 1.27.1,
+      # so the runner's own toolchain is not the one to build with.
+      - uses: jdx/mise-action@v5
+        if: matrix.language == 'go'
+
+      # Wails v3 links GTK4 and WebKitGTK 6.0, oto links ALSA, and the Wails Linux
+      # backend asks pkg-config for X11. Without these the GUI package does not
+      # compile, and the extractor would analyse a tree with a hole in it.
+      - name: Update apt repositories
+        if: matrix.language == 'go'
+        run: sudo apt-get update
+
+      - name: Install native build dependencies
+        if: matrix.language == 'go'
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
