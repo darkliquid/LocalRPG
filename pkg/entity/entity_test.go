@@ -418,3 +418,147 @@ func TestSerializeOmitsAnUnsetCurrentAppearance(t *testing.T) {
 		t.Errorf("an unset current appearance must not be emitted:\n%s", out)
 	}
 }
+
+func TestAllFieldsRoundTripMarkdown(t *testing.T) {
+	ent := &Entity{
+		ID:   "val-the-brave",
+		Name: "Val the Brave",
+		Type: "character",
+		Tags: []string{"paladin", "champion"},
+		Voice: &VoiceConfig{
+			Provider:   "kokoro",
+			VoiceID:    "af_sarah",
+			Pitch:      1.15,
+			SpeechRate: 0.95,
+			Options:    map[string]any{"volume": "high"},
+		},
+		Portrait:          "portraits/val.png",
+		PortraitVersion:   4,
+		PortraitHistory:   []string{"portraits/val_v1.png", "portraits/val_v2.png"},
+		Location:          "high-sanctuary",
+		Faction:           "order-of-light",
+		Appearance:        "A tall warrior with burnished silver plate armor.",
+		CurrentAppearance: "Silver armor dented on the left pauldron.",
+		Gender:            "non-binary",
+		Age:               "32",
+		Aliases:           []string{"Val", "The Silver Shield"},
+		History:           []int{1, 3, 7},
+		ExtraMeta:         map[string]any{"custom_title": "Knight Protector"},
+		Body:              "\nVal swore an oath to protect [[high-sanctuary]] for the [[order-of-light]].\n",
+		Wikilinks:         []string{"high-sanctuary", "order-of-light"},
+		Hash:              "abc123hash",
+		Folder:            "characters",
+	}
+	ent.InitState(map[string]any{
+		"heroic": true,
+		"title":  "Champion",
+	})
+
+	// Guard against unpopulated test fields
+	val := reflect.ValueOf(ent).Elem()
+	typ := val.Type()
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		fieldVal := val.Field(i)
+		if isFieldZero(fieldVal) {
+			t.Fatalf("TestAllFieldsRoundTripMarkdown leaves Entity.%s unpopulated", field.Name)
+		}
+	}
+
+	data, err := ent.SerializeMarkdown()
+	if err != nil {
+		t.Fatalf("SerializeMarkdown: %v", err)
+	}
+
+	reparsed, err := ParseMarkdownEntity(data)
+	if err != nil {
+		t.Fatalf("ParseMarkdownEntity: %v", err)
+	}
+
+	if reparsed.ID != ent.ID {
+		t.Errorf("ID = %q, want %q", reparsed.ID, ent.ID)
+	}
+	if reparsed.Name != ent.Name {
+		t.Errorf("Name = %q, want %q", reparsed.Name, ent.Name)
+	}
+	if reparsed.Type != ent.Type {
+		t.Errorf("Type = %q, want %q", reparsed.Type, ent.Type)
+	}
+	if !reflect.DeepEqual(reparsed.Tags, ent.Tags) {
+		t.Errorf("Tags = %v, want %v", reparsed.Tags, ent.Tags)
+	}
+	if !reflect.DeepEqual(reparsed.Voice, ent.Voice) {
+		t.Errorf("Voice = %+v, want %+v", reparsed.Voice, ent.Voice)
+	}
+	if reparsed.Portrait != ent.Portrait {
+		t.Errorf("Portrait = %q, want %q", reparsed.Portrait, ent.Portrait)
+	}
+	if reparsed.PortraitVersion != ent.PortraitVersion {
+		t.Errorf("PortraitVersion = %d, want %d", reparsed.PortraitVersion, ent.PortraitVersion)
+	}
+	if !reflect.DeepEqual(reparsed.PortraitHistory, ent.PortraitHistory) {
+		t.Errorf("PortraitHistory = %v, want %v", reparsed.PortraitHistory, ent.PortraitHistory)
+	}
+	if reparsed.Location != ent.Location {
+		t.Errorf("Location = %q, want %q", reparsed.Location, ent.Location)
+	}
+	if reparsed.Faction != ent.Faction {
+		t.Errorf("Faction = %q, want %q", reparsed.Faction, ent.Faction)
+	}
+	if reparsed.Appearance != ent.Appearance {
+		t.Errorf("Appearance = %q, want %q", reparsed.Appearance, ent.Appearance)
+	}
+	if reparsed.CurrentAppearance != ent.CurrentAppearance {
+		t.Errorf("CurrentAppearance = %q, want %q", reparsed.CurrentAppearance, ent.CurrentAppearance)
+	}
+	if reparsed.Gender != ent.Gender {
+		t.Errorf("Gender = %q, want %q", reparsed.Gender, ent.Gender)
+	}
+	if reparsed.Age != ent.Age {
+		t.Errorf("Age = %q, want %q", reparsed.Age, ent.Age)
+	}
+	if !reflect.DeepEqual(reparsed.Aliases, ent.Aliases) {
+		t.Errorf("Aliases = %v, want %v", reparsed.Aliases, ent.Aliases)
+	}
+	if !reflect.DeepEqual(reparsed.History, ent.History) {
+		t.Errorf("History = %v, want %v", reparsed.History, ent.History)
+	}
+	if !reflect.DeepEqual(reparsed.State.Raw(), ent.State.Raw()) {
+		t.Errorf("State = %v, want %v", reparsed.State.Raw(), ent.State.Raw())
+	}
+	if !reflect.DeepEqual(reparsed.ExtraMeta, ent.ExtraMeta) {
+		t.Errorf("ExtraMeta = %v, want %v", reparsed.ExtraMeta, ent.ExtraMeta)
+	}
+	if strings.TrimSpace(reparsed.Body) != strings.TrimSpace(ent.Body) {
+		t.Errorf("Body = %q, want %q", reparsed.Body, ent.Body)
+	}
+	if !reflect.DeepEqual(reparsed.Wikilinks, ent.Wikilinks) {
+		t.Errorf("Wikilinks = %v, want %v", reparsed.Wikilinks, ent.Wikilinks)
+	}
+
+	// Verify standard fields are not in ExtraMeta
+	standardKeys := []string{
+		"id", "name", "type", "tags", "voice", "portrait", "portrait_version",
+		"portrait_history", "location", "faction", "appearance", "current_appearance",
+		"gender", "age", "aliases", "history", "state",
+	}
+	for _, key := range standardKeys {
+		if _, exists := reparsed.ExtraMeta[key]; exists {
+			t.Errorf("standard field %q leaked into ExtraMeta", key)
+		}
+	}
+}
+
+func isFieldZero(v reflect.Value) bool {
+	if !v.IsValid() {
+		return true
+	}
+	switch v.Kind() {
+	case reflect.Slice, reflect.Map:
+		return v.IsNil() || v.Len() == 0
+	case reflect.Pointer, reflect.Interface:
+		return v.IsNil()
+	default:
+		return v.IsZero()
+	}
+}
