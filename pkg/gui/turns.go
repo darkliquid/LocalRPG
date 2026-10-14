@@ -410,16 +410,9 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	_, prepareSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/gui").Start(context.Background(), "turn.prepare")
 	defer prepareSpan.End()
 
-	gameDir := s.resolver.GameDir(gameID)
-	manifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
+	gameDir, manifest, err := s.loadTurnManifests(gameID)
 	if err != nil {
-		return nil, fmt.Errorf("load game manifest: %w", err)
-	}
-	if _, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml")); err != nil {
-		return nil, fmt.Errorf("load system %q: %v", manifest.SystemID, err)
-	}
-	if _, err := core.LoadWorldManifest(filepath.Join(s.resolver.WorldDir(manifest.WorldID), "world.yaml")); err != nil {
-		return nil, fmt.Errorf("load world %q: %v", manifest.WorldID, err)
+		return nil, err
 	}
 
 	store, err := s.store(gameID)
@@ -431,18 +424,8 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	logger := trace.OrNil(s.logger)
 	logger.SetGame(gameID)
 
-	timeline := engine.NewTimeline(s.resolver, store, engine.NewHistoryLogger(filepath.Join(gameDir, "history.jsonl")), gameID)
-	if worker := s.ensureEmbeddingWorker(gameID, store); worker != nil {
-		timeline.SetEmbeddingWorker(worker)
-	}
-	timeline.SetVoiceProfiles(media.FilterVoiceProfiles(cfg.Media.TTS.VoiceProfiles, media.ProviderKey(cfg.Media.TTS)))
-
-	// A campaign written before player_name existed holds a display name in
-	// player:, which is repaired once here so every later read is exact.
-	playerID := manifest.Player
-	if resolved, err := engine.RepairPlayerIdentity(s.resolver, store, manifest); err == nil && resolved != "" {
-		playerID = resolved
-	}
+	timeline := s.newTurnTimeline(gameID, gameDir, store, cfg)
+	playerID := s.resolveTurnPlayerID(manifest, store)
 
 	runtime, err := s.runtimeFor(gameID, manifest)
 	if err != nil {
@@ -455,29 +438,99 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	usageCtx := harness.NewUsageContext(s, gameID)
 	router.SetUsageRecorder(usageCtx)
 
-	jsEngine := rules.NewJSEngine(rules.NewHostBridge(store, timeline, playerID))
-
-	// The VM is rebuilt every turn, so its hooks must be re-registered every
-	// turn. Loading once per campaign left every turn after the first running
-	// with an empty mechanics VM and no hooks.
-	loader := rules.NewRuleLoader(s.resolver, jsEngine)
-	if err := loader.LoadRules(manifest.SystemID, manifest.WorldID); err != nil {
-		logger.Event("rules.load_error", map[string]any{"error": err.Error()})
-	}
-
-	startLocation := ""
-	if pinned, ok := manifest.Settings[engine.StartLocationSetting].(string); ok {
-		startLocation = pinned
-	}
+	jsEngine := s.newTurnRuleEngine(manifest, store, timeline, playerID, logger)
 
 	chronicler := engine.NewChronicler(timeline, store, harness.SummariserFromConfig(cfg, router, logger))
 	chronicler.SetEvery(cfg.SummaryEvery())
 	chronicler.SetLogger(logger)
 
-	orchestrator := engine.NewTurnOrchestrator(store, timeline, jsEngine, router, startLocation, playerID)
+	orchestrator := engine.NewTurnOrchestrator(store, timeline, jsEngine, router, turnStartLocation(manifest), playerID)
 	orchestrator.SetLogger(logger)
 	orchestrator.SetChronicler(chronicler)
 	orchestrator.SetUsageContext(usageCtx)
+
+	configureTurnAgents(orchestrator, cfg, router, logger, usageCtx)
+	s.configureTurnTools(orchestrator, cfg, store, timeline)
+	configureTurnMechanics(orchestrator, runtime, cfg)
+	configureTurnContext(orchestrator, cfg, manifest)
+	s.configureTurnSpeech(orchestrator, cfg)
+	s.configureTurnImagery(orchestrator, gameID, store, cfg)
+	orchestrator.SetWorldArtStyle(s.worldArtStyle(gameID))
+
+	return &TurnSession{
+		service:      s,
+		gameID:       gameID,
+		cfg:          cfg,
+		store:        store,
+		timeline:     timeline,
+		orchestrator: orchestrator,
+		chronicler:   chronicler,
+	}, nil
+}
+
+// loadTurnManifests resolves a campaign's directory and loads the three manifests a
+// turn is wired from, checking that the system and world it names are present.
+func (s *Service) loadTurnManifests(gameID string) (string, *core.GameManifest, error) {
+	gameDir := s.resolver.GameDir(gameID)
+	manifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
+	if err != nil {
+		return "", nil, fmt.Errorf("load game manifest: %w", err)
+	}
+	if _, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml")); err != nil {
+		return "", nil, fmt.Errorf("load system %q: %v", manifest.SystemID, err)
+	}
+	if _, err := core.LoadWorldManifest(filepath.Join(s.resolver.WorldDir(manifest.WorldID), "world.yaml")); err != nil {
+		return "", nil, fmt.Errorf("load world %q: %v", manifest.WorldID, err)
+	}
+	return gameDir, manifest, nil
+}
+
+// newTurnTimeline builds the campaign's timeline for one turn, with the embedding
+// worker its retrieval reads and the voice profiles its speech is written in.
+func (s *Service) newTurnTimeline(gameID, gameDir string, store *storage.Store, cfg *config.Config) *engine.Timeline {
+	timeline := engine.NewTimeline(s.resolver, store, engine.NewHistoryLogger(filepath.Join(gameDir, "history.jsonl")), gameID)
+	if worker := s.ensureEmbeddingWorker(gameID, store); worker != nil {
+		timeline.SetEmbeddingWorker(worker)
+	}
+	timeline.SetVoiceProfiles(media.FilterVoiceProfiles(cfg.Media.TTS.VoiceProfiles, media.ProviderKey(cfg.Media.TTS)))
+	return timeline
+}
+
+// resolveTurnPlayerID is the id a turn attributes the player's own actions to. A
+// campaign written before player_name existed holds a display name in player:,
+// which is repaired once here so every later read is exact.
+func (s *Service) resolveTurnPlayerID(manifest *core.GameManifest, store *storage.Store) string {
+	playerID := manifest.Player
+	if resolved, err := engine.RepairPlayerIdentity(s.resolver, store, manifest); err == nil && resolved != "" {
+		playerID = resolved
+	}
+	return playerID
+}
+
+// newTurnRuleEngine builds the mechanics VM and loads the campaign's hooks into it.
+// The VM is rebuilt every turn, so its hooks must be re-registered every turn:
+// loading once per campaign left every turn after the first running with an empty
+// mechanics VM and no hooks.
+func (s *Service) newTurnRuleEngine(manifest *core.GameManifest, store *storage.Store, timeline *engine.Timeline, playerID string, logger trace.Logger) *rules.JSEngine {
+	jsEngine := rules.NewJSEngine(rules.NewHostBridge(store, timeline, playerID))
+	loader := rules.NewRuleLoader(s.resolver, jsEngine)
+	if err := loader.LoadRules(manifest.SystemID, manifest.WorldID); err != nil {
+		logger.Event("rules.load_error", map[string]any{"error": err.Error()})
+	}
+	return jsEngine
+}
+
+// turnStartLocation is the location a turn opens in, when the campaign pins one.
+func turnStartLocation(manifest *core.GameManifest) string {
+	if pinned, ok := manifest.Settings[engine.StartLocationSetting].(string); ok {
+		return pinned
+	}
+	return ""
+}
+
+// configureTurnAgents wires the extractor that resolves entity mentions after a
+// turn, and the completion checker that decides whether the narration is finished.
+func configureTurnAgents(orchestrator *engine.TurnOrchestrator, cfg *config.Config, router *harness.Router, logger trace.Logger, usageCtx *harness.UsageContext) {
 	extractor := harness.ExtractorFromConfigWithLogger(cfg, router, logger)
 	if extractor != nil {
 		extractor.SetUsageRecorder(usageCtx)
@@ -492,7 +545,12 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		MinChars:          cfg.CompletionMinChars(),
 		Timeout:           cfg.CompletionTimeout(),
 	})
+}
 
+// configureTurnTools gives the turn its tool executor: the sandboxed tools the GM
+// agent may call, with the voice profiles and entity writer they need, and the
+// embedding provider when one is configured.
+func (s *Service) configureTurnTools(orchestrator *engine.TurnOrchestrator, cfg *config.Config, store *storage.Store, timeline *engine.Timeline) {
 	toolExecutor := tools.NewExecutor(store, cfg.ToolResultChars())
 	toolExecutor.SetVoiceProfiles(timeline.VoiceProfiles())
 	toolExecutor.SetEntityWriter(timeline)
@@ -504,11 +562,14 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	}
 	orchestrator.SetTools(toolExecutor, cfg.RoleSupportsTools("gm"))
 	orchestrator.SetToolRounds(cfg.ToolRounds())
+}
 
-	// Hand the engine the declared stats so it can validate a state change, and
-	// the engagement policy so the mechanics instruction reflects it. All of it
-	// comes from the cached runtime, which is keyed on the config revision and
-	// the source mtimes.
+// configureTurnMechanics hands the engine the declared stats so it can validate a
+// state change, the engagement policy so the mechanics instruction reflects it, and
+// the resolution instruction, which is rebuilt each turn from the player's current
+// stats so it names values the player actually has. All of it comes from the cached
+// runtime, which is keyed on the config revision and the source mtimes.
+func configureTurnMechanics(orchestrator *engine.TurnOrchestrator, runtime *turnRuntime, cfg *config.Config) {
 	if runtime.declaredStats != nil {
 		orchestrator.SetDeclaredStats(runtime.declaredStats)
 		orchestrator.SetAllowFreeformState(runtime.allowFreeform)
@@ -517,8 +578,6 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	if runtime.mechanics != nil {
 		orchestrator.SetMechanics(runtime.mechanics)
 		orchestrator.SetHealthSpec(runtime.mechanics.Health)
-		// The resolution instruction is rebuilt each turn from the player's
-		// current stats, so it names values the player actually has.
 		orchestrator.SetMechanicsSchema(runtime.mechanics, runtime.engagement)
 	} else {
 		orchestrator.SetMechanicsPrompt(runtime.mechanicsPrompt)
@@ -527,6 +586,11 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator.SetWorldTickTurns(cfg.MechanicsWorldTickTurns())
 	orchestrator.SetRulesPrompt(runtime.rulesPrompt)
 	orchestrator.SetLorePrompt(runtime.lorePrompt)
+}
+
+// configureTurnContext sets what the turn may spend and what it may recall: the
+// chunk timeout, the campaign's opening prompt, and the context window limits.
+func configureTurnContext(orchestrator *engine.TurnOrchestrator, cfg *config.Config, manifest *core.GameManifest) {
 	orchestrator.SetChunkTimeout(cfg.ChunkTimeout())
 	orchestrator.SetOpeningPrompt(engine.OpeningPrompt(manifest))
 	orchestrator.SetContextLimits(harness.ContextLimits{
@@ -542,7 +606,11 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 	orchestrator.SetThreadsMax(cfg.ThreadsMax())
 	orchestrator.SetContinuityChecks(cfg.ContinuityChecks())
 	orchestrator.SetActionEcho(cfg.ActionEcho())
+}
 
+// configureTurnSpeech tells the engine which speech cues the configured provider
+// understands, so the narration is written in marks the voice can actually render.
+func (s *Service) configureTurnSpeech(orchestrator *engine.TurnOrchestrator, cfg *config.Config) {
 	ttsClient, _ := s.ttsClientFor(cfg.Media.TTS)
 	cueCaps := media.ResolveSpeechCueCapabilities(cfg.Media.TTS, ttsClient)
 	orchestrator.SetSpeechCues(harness.SpeechCueContext{
@@ -551,7 +619,12 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 		SampleTags:       cueCaps.SupportedTags,
 		CustomGuidance:   cueCaps.PromptGuidance,
 	})
+}
 
+// configureTurnImagery gives the turn its portrait and scene workers when an image
+// provider is configured, so a character portrait or a scene illustration is
+// generated behind the turn and announced when it lands.
+func (s *Service) configureTurnImagery(orchestrator *engine.TurnOrchestrator, gameID string, store *storage.Store, cfg *config.Config) {
 	if cfg.Media.Image.Type != "" && cfg.Media.Image.Type != "disabled" {
 		if imgClient, err := imageClientFactory(cfg.Media.Image, cfg.Providers.Gemini.APIKey); err == nil && imgClient != nil {
 			portraitWorker := engine.NewPortraitWorker(s.resolver, store, imgClient)
@@ -571,17 +644,6 @@ func (s *Service) prepareTurn(gameID string) (*TurnSession, error) {
 			orchestrator.SetSceneWorker(sceneWorker)
 		}
 	}
-	orchestrator.SetWorldArtStyle(s.worldArtStyle(gameID))
-
-	return &TurnSession{
-		service:      s,
-		gameID:       gameID,
-		cfg:          cfg,
-		store:        store,
-		timeline:     timeline,
-		orchestrator: orchestrator,
-		chronicler:   chronicler,
-	}, nil
 }
 
 // logParityMismatch traces streamed clip keys that the turn's clip plan does not

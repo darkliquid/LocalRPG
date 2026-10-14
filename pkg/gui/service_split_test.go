@@ -74,8 +74,10 @@ var serviceMethodFiles = map[string][]string{
 	},
 	"turns.go": {
 		"BeginResolveCheck", "BeginTurn", "GetEntityTurns", "ResolveCheck", "SummaryPending",
-		"chronicler", "engagementFor", "ensureEmbeddingWorker", "ensureIndexed", "findTurn",
-		"logParityMismatch", "pendingCheckDTO", "prepareTurn", "summariseBehind", "turnDTO",
+		"chronicler", "configureTurnImagery", "configureTurnSpeech", "configureTurnTools",
+		"engagementFor", "ensureEmbeddingWorker", "ensureIndexed", "findTurn", "loadTurnManifests",
+		"logParityMismatch", "newTurnRuleEngine", "newTurnTimeline", "pendingCheckDTO", "prepareTurn",
+		"resolveTurnPlayerID", "summariseBehind", "turnDTO",
 	},
 	"worlds.go": {
 		"CreateWorld", "DeleteWorld", "DeleteWorldEntity", "GenerateWorldAsset", "GetWorld",

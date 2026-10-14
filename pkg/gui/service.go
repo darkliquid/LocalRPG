@@ -759,6 +759,24 @@ func (t *TurnSession) Close() {
 	t.release = nil
 }
 
+// turnEmitter serialises one turn's events onto the wire. Tool activity arrives
+// from the orchestrator while a streamer worker announces a finished sentence, and
+// the wire is one newline-delimited stream, so every emission passes this lock.
+type turnEmitter struct {
+	mu   sync.Mutex
+	emit func(TurnEvent) error
+}
+
+func newTurnEmitter(emit func(TurnEvent) error) *turnEmitter {
+	return &turnEmitter{emit: emit}
+}
+
+func (e *turnEmitter) announce(event TurnEvent) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.emit(event)
+}
+
 // Run plays one turn, emitting events as they happen. An emit failure cancels the
 // turn, which is how a disconnected client stops generation rather than paying for
 // a turn nobody will see.
@@ -766,121 +784,35 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	runCtx, cancel := context.WithTimeout(ctx, t.cfg.TurnTimeout())
 	defer cancel()
 
-	// Every emission passes this lock: tool activity arrives from the orchestrator
-	// while a streamer worker announces a finished sentence, and the wire is one
-	// newline-delimited stream.
-	var emitMu sync.Mutex
-	announce := func(event TurnEvent) error {
-		emitMu.Lock()
-		defer emitMu.Unlock()
-		return emit(event)
-	}
+	emitter := newTurnEmitter(emit)
 
 	// Tool activity is streamed as it happens, so a lookup reads as progress
 	// rather than as a stall. A failed emit is ignored: the turn still records,
 	// and a disconnected client is handled by the chunk listener below.
 	t.orchestrator.SetToolObserver(func(activity engine.ToolActivity) {
-		_ = announce(toolEvent(activity))
+		_ = emitter.announce(toolEvent(activity))
 	})
-
 	t.orchestrator.SetPendingCheckRef(req.PendingCheckRef)
 	t.orchestrator.SetForcedTotal(req.ForcedTotal)
 	t.orchestrator.SetManualDice(req.ManualDice)
 	t.orchestrator.SetSingleTurnMode(t.cfg.InteractiveRolls() == "single-turn")
 	t.orchestrator.SetImageTrigger(t.cfg.ImageTrigger())
 
-	// Sentences are synthesized while the model is still writing, so a finished
-	// segment whose text is one of them is a cache hit at finalise rather than a
-	// second provider call. Nil when disabled or no provider is configured.
-	turnNum := 1
-	if max, err := t.store.MaxTurnNumber(); err == nil && max >= 0 {
-		turnNum = max + 1
-	}
-
-	// Application playback runs on one queue opened before generation: a sentence
-	// the streamer synthesizes is heard as soon as it lands, and the finalise pass
-	// adds only what the stream has not already played. A session with no player
-	// still warms the clips, because the URLs a client is handed are
-	// content-addressed and cannot synthesize on demand.
-	audioEnabled := t.cfg.Media.TTS.Type != "" && t.cfg.Media.TTS.Type != "disabled"
-	plan := newTurnAudioPlan(nil)
-	plan.ledger = t.service.turnLedger(t.gameID, turnNum)
-	if audioEnabled && t.cfg.Media.TTS.AutoPlay {
-		if player := t.service.audioPlayer(); player != nil && player.Available() {
-			plan.queue = make(chan string, sentenceQueueDepth)
-			player.SetVolume(t.cfg.Media.TTS.MasterVolume)
-			// Playback is the application's own responsibility, detached from the
-			// request: the queue is fed while the turn streams and drains after it.
-			// StopAudio ends it early.
-			t.service.goBackground(func() {
-				if err := player.EnqueueQueue(plan.queue); err != nil && !errors.Is(err, playback.ErrUnavailable) {
-					fmt.Fprintf(os.Stderr, "Warning: narration playback stopped: %v\n", err)
-				}
-			})
-		}
-	}
-
-	// streamedKeys records the clip keys the streamer emitted, so finalise can
-	// assert they are the keys the plan contains.
-	streamedKeys := map[string]bool{}
-	streamer := t.service.sentenceStreamerFor(runCtx, t.gameID, t.cfg, func(speech provisionalSpeech) {
-		if speech.AudioKey != "" {
-			streamedKeys[speech.AudioKey] = true
-		}
-		plan.markHeard(speech.Segments)
-		plan.enqueueClip(speech.AudioKey, t.service.clipPath(speech.AudioKey))
-		_ = announce(speechEvent(speech))
-	})
-	if streamer != nil {
-		baseVoiceFor := t.service.voiceFor(t.gameID)
-		streamer.SetVoiceResolver(func(speakerID string) *entity.VoiceConfig {
-			if v := t.orchestrator.Voice(speakerID); v != nil {
-				return v
-			}
-			if baseVoiceFor != nil {
-				return baseVoiceFor(speakerID)
-			}
-			return nil
-		})
-	}
-	streamer.SetTurnNumber(turnNum)
-	streamer.SetOwner(t.service.PlaybackOwner())
-	streamer.SetProgressObserver(func(progress AudioProgressDTO) {
-		progress.Owner = t.service.PlaybackOwner()
-		_ = announce(TurnEvent{Type: "audio_progress", AudioProgress: &progress, Owner: t.service.PlaybackOwner()})
-	})
+	turnNumber := t.nextTurnNumber()
+	plan, audioEnabled := t.startTurnAudio(turnNumber)
+	streamer, streamedKeys := t.startTurnStreamer(runCtx, emitter, plan, turnNumber)
 	defer streamer.Close()
 
 	removePortrait := t.service.addPortraitListener(t.gameID, func(evt TurnEvent) {
-		_ = announce(evt)
+		_ = emitter.announce(evt)
 	})
 	defer removePortrait()
 
-	// Parsed segments are announced as they arrive, so the client renders
-	// attributed speech while the model is still writing, and the streamer voices
-	// each one in its speaker's own voice. A failed emit is ignored, exactly as
-	// tool activity is: the turn still records.
-	// segmentIndex is the position of the event in the turn's segment order, which
-	// is the same index space the clip plan uses, so the heard ledger and the plan
-	// agree on what a segment is.
-	segmentIndex := 0
-	t.orchestrator.SetSegmentObserver(func(event turnstream.Event) {
-		segment, isSegment := liveSegmentDTO(event, t.gameID)
-		if isSegment {
-			if segment.SpeakerID != "" && t.service.hasCustomPortrait(t.gameID, segment.SpeakerID) {
-				segment.HasCustomPortrait = true
-			}
-			_ = announce(TurnEvent{Type: "segment", Segment: &segment})
-		}
-		streamer.FeedSegment(event, segmentIndex)
-		if isSegment {
-			segmentIndex++
-		}
-	})
+	t.observeTurnSegments(streamer, emitter)
 
 	t.orchestrator.SetSceneOnly(req.SceneOnly)
 	turn, err := t.orchestrator.ProcessActionStream(runCtx, req.Mode, req.Input, func(text string) error {
-		return announce(TurnEvent{Type: "chunk", Text: text})
+		return emitter.announce(TurnEvent{Type: "chunk", Text: text})
 	})
 	if err != nil {
 		t.service.noteFailure("gm", err)
@@ -904,23 +836,11 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	// without waiting for remaining background TTS audio to synthesize.
 	t.Close()
 
-	if err := announce(TurnEvent{Type: "turn", Turn: &dto}); err != nil {
+	if err := emitter.announce(TurnEvent{Type: "turn", Turn: &dto}); err != nil {
 		return err
 	}
 
-	// When built-in TTS is configured and model weights are missing, inform the client
-	// so the user can be prompted to download the voice pack.
-	if t.cfg.Media.TTS.Type == "builtin" && (t.cfg.Media.TTS.BuiltinName == "sherpa-onnx" || t.cfg.Media.TTS.BuiltinName == "kokoro") {
-		status := t.service.modelsManager.Status("kokoro-tts")
-		if !status.Installed {
-			_ = announce(TurnEvent{
-				Type:    "model_missing",
-				ModelID: "kokoro-tts",
-				Name:    status.Name,
-				Size:    status.TotalBytes,
-			})
-		}
-	}
+	t.announceMissingTTSModel(emitter)
 
 	// The rest of the turn's clips are synthesized behind the turn and appended to
 	// the same queue, so playback continues without a second start and a clip that
@@ -930,16 +850,142 @@ func (t *TurnSession) Run(ctx context.Context, req TurnRequest, emit func(TurnEv
 	t.service.summariseBehind(t.gameID, t.chronicler)
 	t.service.goBackground(func() { t.service.scanAndEnrichCharacters(t.gameID, t.store) })
 
-	// Flush and wait for remaining in-flight audio synthesis jobs to finish and
-	// emit their progress events to the client before the turn stream closes.
+	t.drainTurnAudio(streamer, *turn, plan, streamedKeys, audioEnabled)
+	return nil
+}
+
+// nextTurnNumber is the number the turn about to be recorded will carry.
+func (t *TurnSession) nextTurnNumber() int {
+	if max, err := t.store.MaxTurnNumber(); err == nil && max >= 0 {
+		return max + 1
+	}
+	return 1
+}
+
+// startTurnAudio opens the turn's clip plan and, when a player is available, the
+// application playback queue. It reports whether audio is configured at all, which
+// is what decides whether the finalise pass runs.
+//
+// Playback runs on one queue opened before generation: a sentence the streamer
+// synthesizes is heard as soon as it lands, and the finalise pass adds only what
+// the stream has not already played. A session with no player still warms the
+// clips, because the URLs a client is handed are content-addressed and cannot
+// synthesize on demand.
+func (t *TurnSession) startTurnAudio(turnNumber int) (*turnAudioPlan, bool) {
+	audioEnabled := t.cfg.Media.TTS.Type != "" && t.cfg.Media.TTS.Type != "disabled"
+	plan := newTurnAudioPlan(nil)
+	plan.ledger = t.service.turnLedger(t.gameID, turnNumber)
+	if audioEnabled && t.cfg.Media.TTS.AutoPlay {
+		if player := t.service.audioPlayer(); player != nil && player.Available() {
+			plan.queue = make(chan string, sentenceQueueDepth)
+			player.SetVolume(t.cfg.Media.TTS.MasterVolume)
+			// Playback is the application's own responsibility, detached from the
+			// request: the queue is fed while the turn streams and drains after it.
+			// StopAudio ends it early.
+			t.service.goBackground(func() {
+				if err := player.EnqueueQueue(plan.queue); err != nil && !errors.Is(err, playback.ErrUnavailable) {
+					fmt.Fprintf(os.Stderr, "Warning: narration playback stopped: %v\n", err)
+				}
+			})
+		}
+	}
+	return plan, audioEnabled
+}
+
+// startTurnStreamer builds the pre-synthesiser, wires the voice each speaker is
+// heard in, and returns it with the set that records the clip keys it emitted, so
+// the finalise pass can assert they are the keys the plan contains.
+//
+// Sentences are synthesized while the model is still writing, so a finished segment
+// whose text is one of them is a cache hit at finalise rather than a second
+// provider call. The streamer is nil when streaming is disabled or no provider is
+// configured.
+func (t *TurnSession) startTurnStreamer(ctx context.Context, emitter *turnEmitter, plan *turnAudioPlan, turnNumber int) (*sentenceStreamer, map[string]bool) {
+	streamedKeys := map[string]bool{}
+	streamer := t.service.sentenceStreamerFor(ctx, t.gameID, t.cfg, func(speech provisionalSpeech) {
+		if speech.AudioKey != "" {
+			streamedKeys[speech.AudioKey] = true
+		}
+		plan.markHeard(speech.Segments)
+		plan.enqueueClip(speech.AudioKey, t.service.clipPath(speech.AudioKey))
+		_ = emitter.announce(speechEvent(speech))
+	})
+	if streamer != nil {
+		baseVoiceFor := t.service.voiceFor(t.gameID)
+		streamer.SetVoiceResolver(func(speakerID string) *entity.VoiceConfig {
+			if v := t.orchestrator.Voice(speakerID); v != nil {
+				return v
+			}
+			if baseVoiceFor != nil {
+				return baseVoiceFor(speakerID)
+			}
+			return nil
+		})
+	}
+	streamer.SetTurnNumber(turnNumber)
+	streamer.SetOwner(t.service.PlaybackOwner())
+	streamer.SetProgressObserver(func(progress AudioProgressDTO) {
+		progress.Owner = t.service.PlaybackOwner()
+		_ = emitter.announce(TurnEvent{Type: "audio_progress", AudioProgress: &progress, Owner: t.service.PlaybackOwner()})
+	})
+	return streamer, streamedKeys
+}
+
+// observeTurnSegments announces parsed segments as they arrive, so the client
+// renders attributed speech while the model is still writing, and the streamer
+// voices each one in its speaker's own voice. A failed emit is ignored, exactly as
+// tool activity is: the turn still records.
+//
+// segmentIndex is the position of the event in the turn's segment order, which is
+// the same index space the clip plan uses, so the heard ledger and the plan agree
+// on what a segment is.
+func (t *TurnSession) observeTurnSegments(streamer *sentenceStreamer, emitter *turnEmitter) {
+	segmentIndex := 0
+	t.orchestrator.SetSegmentObserver(func(event turnstream.Event) {
+		segment, isSegment := liveSegmentDTO(event, t.gameID)
+		if isSegment {
+			if segment.SpeakerID != "" && t.service.hasCustomPortrait(t.gameID, segment.SpeakerID) {
+				segment.HasCustomPortrait = true
+			}
+			_ = emitter.announce(TurnEvent{Type: "segment", Segment: &segment})
+		}
+		streamer.FeedSegment(event, segmentIndex)
+		if isSegment {
+			segmentIndex++
+		}
+	})
+}
+
+// announceMissingTTSModel tells the client when built-in TTS is configured and its
+// model weights are missing, so the user can be prompted to download the voice
+// pack.
+func (t *TurnSession) announceMissingTTSModel(emitter *turnEmitter) {
+	if t.cfg.Media.TTS.Type == "builtin" && (t.cfg.Media.TTS.BuiltinName == "sherpa-onnx" || t.cfg.Media.TTS.BuiltinName == "kokoro") {
+		status := t.service.modelsManager.Status("kokoro-tts")
+		if !status.Installed {
+			_ = emitter.announce(TurnEvent{
+				Type:    "model_missing",
+				ModelID: "kokoro-tts",
+				Name:    status.Name,
+				Size:    status.TotalBytes,
+			})
+		}
+	}
+}
+
+// drainTurnAudio flushes the turn's remaining clips once it is recorded: it waits
+// for the in-flight synthesis jobs and their progress events, synthesizes behind
+// the turn what the stream did not reach, and records a parity mismatch between the
+// keys the streamer emitted and the ones the plan holds. The plan closes either
+// way.
+func (t *TurnSession) drainTurnAudio(streamer *sentenceStreamer, turn engine.Turn, plan *turnAudioPlan, streamedKeys map[string]bool, audioEnabled bool) {
 	streamer.Close()
 	if audioEnabled {
 		streamer.Wait()
-		t.finishTurnAudio(context.Background(), *turn, plan)
+		t.finishTurnAudio(context.Background(), turn, plan)
 		t.service.logParityMismatch(t.gameID, turn.Segments, streamedKeys)
 	}
 	plan.close()
-	return nil
 }
 
 // finishTurnAudio synthesizes every clip the turn still needs once it is recorded,
