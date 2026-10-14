@@ -158,6 +158,27 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 	roleTiers := make(map[string]provider.Tier, len(cfg.Agents.Roles))
 	roleFeatures := make(map[string][]provider.Feature, len(cfg.Agents.Roles))
 
+	gmConfigured := registerConfiguredRoles(router, cfg, logger, roleTiers, roleFeatures)
+	registerFallbacks(router, cfg)
+	registerChains(router, cfg)
+	router.SetChainTier(func(id string) (provider.Tier, []provider.Feature) {
+		return roleTiers[id], roleFeatures[id]
+	})
+
+	// The echo default exists for an intentionally unconfigured gm, not to mask a
+	// gm that was configured and then failed to build.
+	if !gmConfigured {
+		registerEchoDefault(router)
+	}
+
+	return router, nil
+}
+
+// registerConfiguredRoles builds every role the configuration declares and registers it,
+// recording a build failure rather than aborting: one broken role must not cost the
+// others. It reports whether a gm was configured at all, which is what decides whether
+// the echo default applies.
+func registerConfiguredRoles(router *Router, cfg *config.Config, logger trace.Logger, roleTiers map[string]provider.Tier, roleFeatures map[string][]provider.Feature) bool {
 	gmConfigured := false
 	for role, roleCfg := range cfg.Agents.Roles {
 		if roleCfg.Type == "inherit" {
@@ -181,7 +202,7 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 			}
 		}
 
-		provider, err := NewModelProviderWithLogger(role, ProviderConfig{
+		built, err := NewModelProviderWithLogger(role, ProviderConfig{
 			Type:           roleCfg.Type,
 			BuiltinName:    roleCfg.BuiltinName,
 			Command:        roleCfg.Command,
@@ -207,42 +228,45 @@ func RouterFromConfigWithLogger(cfg *config.Config, logger trace.Logger) (*Route
 			})
 			continue
 		}
-		setProviderChunkLimit(provider, cfg.TraceChunkLimit())
+		setProviderChunkLimit(built, cfg.TraceChunkLimit())
 
-		router.RegisterProvider(provider)
+		router.RegisterProvider(built)
 		router.AssignRole(role, role)
 		if hasKey {
 			router.AssignRoleKey(role, key)
 		}
 	}
+	return gmConfigured
+}
 
+// registerFallbacks records the provider each role falls back to when its own fails
+// before producing any text.
+func registerFallbacks(router *Router, cfg *config.Config) {
 	for role, fallback := range cfg.Agents.Fallbacks {
 		if fallback != "" {
 			router.SetFallback(role, fallback)
 		}
 	}
+}
 
-	// A declared chain names other configured roles, which are registered as
-	// providers above, so the router can try them in the rule's order.
+// registerChains puts each declared chain on its role. A chain names other configured
+// roles, which are registered as providers first, so the router can try them in the
+// rule's order.
+func registerChains(router *Router, cfg *config.Config) {
 	for role, roleCfg := range cfg.Agents.Roles {
 		if len(roleCfg.Chain) > 0 {
 			router.SetChain(role, roleCfg.Chain, roleCfg.ChainConfig().Rule(), roleCfg.Tag)
 		}
 	}
-	router.SetChainTier(func(id string) (provider.Tier, []provider.Feature) {
-		return roleTiers[id], roleFeatures[id]
-	})
+}
 
-	// The echo default exists for an intentionally unconfigured gm, not to mask a
-	// gm that was configured and then failed to build.
-	if !gmConfigured {
-		if _, err := router.GetProviderForRole(config.RoleGM); err != nil {
-			router.RegisterProvider(&builtinEchoModelProvider{id: "default-echo"})
-			router.AssignRole(config.RoleGM, "default-echo")
-		}
+// registerEchoDefault gives an intentionally unconfigured gm a built-in echo provider, so
+// a campaign can be opened before any provider is set up.
+func registerEchoDefault(router *Router) {
+	if _, err := router.GetProviderForRole(config.RoleGM); err != nil {
+		router.RegisterProvider(&builtinEchoModelProvider{id: "default-echo"})
+		router.AssignRole(config.RoleGM, "default-echo")
 	}
-
-	return router, nil
 }
 
 // ExtractorFromConfig resolves the per-turn extractor role without a trace sink.
