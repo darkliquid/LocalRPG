@@ -1555,7 +1555,9 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 						SpeechRate: prof.SpeechRate,
 						Options:    prof.Options,
 					}
-					_ = o.timeline.SaveEntity(ent)
+					if err := o.timeline.SaveEntity(ent); err != nil {
+						return nil, fmt.Errorf("save assigned voice for entity %q: %w", slugID, err)
+					}
 				}
 			}
 		}
@@ -1567,7 +1569,9 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			allTurnRefs = turn.Context.Refs
 		}
 		workingSet.Apply(turnNum, allTurnRefs)
-		_ = o.store.ReplaceWorkingSet(workingSet.ToStorageRecords())
+		if err := o.store.ReplaceWorkingSet(workingSet.ToStorageRecords()); err != nil {
+			return nil, fmt.Errorf("replace working set: %w", err)
+		}
 	}
 
 	trace.LogEvent(ctx, o.logger, "record.turn", map[string]any{
@@ -1977,7 +1981,9 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 			resp, err := sessProvider.ContinueSession(ctx, handle, deltaReq)
 			if err == nil {
 				if onChunk != nil && resp.Text != "" {
-					_ = onChunk(resp.Text)
+					if err := onChunk(resp.Text); err != nil {
+						return streamResult{}, fmt.Errorf("%w: %w", errStreamListener, err)
+					}
 				}
 				assembly.Context.CachedTokens = resp.CachedTokens
 				newID := resp.SessionID
@@ -2030,7 +2036,9 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 				if handle.Response != nil {
 					text = handle.Response.Text
 					if onChunk != nil && text != "" {
-						_ = onChunk(text)
+						if err := onChunk(text); err != nil {
+							return streamResult{}, fmt.Errorf("%w: %w", errStreamListener, err)
+						}
 					}
 				}
 				assembly.Context.CachedTokens = handle.CachedTokens
@@ -2257,7 +2265,11 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					resolved.Actor = req.Actor
 					resolved.Target = req.Target
 					checks = append(checks, *resolved)
-					encoded, _ := json.Marshal(resolved)
+					encoded, err := json.Marshal(resolved)
+					if err != nil {
+						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: failed to encode check result: " + err.Error()})
+						continue
+					}
 					messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: string(encoded)})
 					o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "done", Summary: resolved.Outcome})
 					continue

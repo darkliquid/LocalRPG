@@ -273,3 +273,66 @@ func TestDeleteTTSJobsRemovesEveryJobForOneCampaign(t *testing.T) {
 		t.Errorf("campaign-02 jobs = %d (err %v), want the other campaign's job kept", len(remaining), err)
 	}
 }
+
+func TestGetEntityCorruptFrontmatterReportsError(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer store.Close()
+
+	// Drop trigger to allow raw malformed JSON without SQLite failing at insert time
+	if _, err := store.db.Exec(`DROP TRIGGER IF EXISTS entities_fts_insert`); err != nil {
+		t.Fatal(err)
+	}
+
+	// Insert entity with corrupt frontmatter_json directly into sqlite
+	_, err = store.db.Exec(`
+		INSERT INTO entities (id, name, type, frontmatter_json, body, file_hash, folder)
+		VALUES ('corrupt-ent', 'Corrupt Ent', 'npc', '{invalid json', 'body', 'hash', '')
+	`)
+	if err != nil {
+		t.Fatalf("insert corrupt entity: %v", err)
+	}
+
+	if _, err := store.GetEntity("corrupt-ent"); err == nil {
+		t.Fatal("GetEntity expected error on corrupt frontmatter, got nil")
+	}
+
+	// Also test invalid voice field schema
+	_, err = store.db.Exec(`
+		INSERT INTO entities (id, name, type, frontmatter_json, body, file_hash, folder)
+		VALUES ('invalid-voice', 'Invalid Voice', 'npc', '{"voice": 12345}', 'body', 'hash2', '')
+	`)
+	if err != nil {
+		t.Fatalf("insert invalid voice entity: %v", err)
+	}
+
+	if _, err := store.GetEntity("invalid-voice"); err == nil {
+		t.Fatal("GetEntity expected error on invalid voice metadata, got nil")
+	}
+}
+
+func TestListEntitiesCorruptFrontmatterReportsError(t *testing.T) {
+	store, err := NewStore(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer store.Close()
+
+	if _, err := store.db.Exec(`DROP TRIGGER IF EXISTS entities_fts_insert`); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = store.db.Exec(`
+		INSERT INTO entities (id, name, type, frontmatter_json, body, file_hash, folder)
+		VALUES ('corrupt-ent', 'Corrupt Ent', 'npc', '{invalid json', 'body', 'hash', '')
+	`)
+	if err != nil {
+		t.Fatalf("insert corrupt entity: %v", err)
+	}
+
+	if _, err := store.ListEntities(); err == nil {
+		t.Fatal("ListEntities expected error on corrupt frontmatter, got nil")
+	}
+}

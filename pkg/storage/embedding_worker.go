@@ -201,34 +201,9 @@ func (w *EmbeddingWorker) processBatch(items []EmbeddingItem) {
 		return // Ignore failure, background will retry or fallback
 	}
 
-	// Persist all vectors in a transaction
-	tx, err := w.store.db.Begin()
-	if err != nil {
+	if err := w.persistVectors(modelID, needed, hashes, vecs); err != nil {
 		return
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	stmt, err := tx.Prepare(`
-		INSERT INTO embeddings (target_type, target_id, chunk_index, content_hash, model_id, dimensions, vector)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(target_type, target_id, chunk_index) DO UPDATE SET
-			content_hash = excluded.content_hash,
-			model_id = excluded.model_id,
-			dimensions = excluded.dimensions,
-			vector = excluded.vector,
-			created_at = CURRENT_TIMESTAMP`)
-	if err != nil {
-		return
-	}
-	defer stmt.Close()
-
-	for i, item := range needed {
-		blob := embeddings.EncodeVector(vecs[i])
-		if _, err := stmt.Exec(item.TargetType, item.TargetID, 0, hashes[i], modelID, len(vecs[i]), blob); err != nil {
-			return
-		}
-	}
-	_ = tx.Commit()
 
 	if w.usageFn != nil {
 		usage := w.usageMeta
@@ -242,6 +217,36 @@ func (w *EmbeddingWorker) processBatch(items []EmbeddingItem) {
 		}
 		w.usageFn(usage)
 	}
+}
+
+func (w *EmbeddingWorker) persistVectors(modelID string, needed []EmbeddingItem, hashes []string, vecs [][]float32) error {
+	tx, err := w.store.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO embeddings (target_type, target_id, chunk_index, content_hash, model_id, dimensions, vector)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(target_type, target_id, chunk_index) DO UPDATE SET
+			content_hash = excluded.content_hash,
+			model_id = excluded.model_id,
+			dimensions = excluded.dimensions,
+			vector = excluded.vector,
+			created_at = CURRENT_TIMESTAMP`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for i, item := range needed {
+		blob := embeddings.EncodeVector(vecs[i])
+		if _, err := stmt.Exec(item.TargetType, item.TargetID, 0, hashes[i], modelID, len(vecs[i]), blob); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // EmbeddingUsage is one embedding call's consumption, reported after a batch.

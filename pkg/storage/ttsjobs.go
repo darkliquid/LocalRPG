@@ -141,7 +141,10 @@ func (s *Store) DeleteTTSJobs(gameID string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("delete tts jobs: %w", err)
 	}
-	removed, _ := res.RowsAffected()
+	removed, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read affected tts jobs: %w", err)
+	}
 	return int(removed), nil
 }
 

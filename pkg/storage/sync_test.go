@@ -186,3 +186,31 @@ func TestSyncFileRecordsFolder(t *testing.T) {
 		t.Errorf("Folder = %q, want %q", got.Folder, "places")
 	}
 }
+
+func TestSyncDirectoryDatabaseErrorSurfaces(t *testing.T) {
+	tempDir := t.TempDir()
+	entitiesDir := filepath.Join(tempDir, "entities")
+	if err := os.MkdirAll(entitiesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	notePath := filepath.Join(entitiesDir, "hero.md")
+	if err := os.WriteFile(notePath, []byte("---\nname: Hero\ntype: character\n---\nBody"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := NewStore(filepath.Join(tempDir, "index.db"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer store.Close()
+
+	// Drop the entities table to simulate a database failure
+	if _, err := store.db.Exec(`DROP TABLE entities`); err != nil {
+		t.Fatal(err)
+	}
+
+	syncer := NewSyncer(store)
+	if _, err := syncer.Sync(entitiesDir); err == nil {
+		t.Fatal("Sync expected error when database query fails, got nil")
+	}
+}
