@@ -66,7 +66,7 @@ func (r SchemaResolver) resolveNotation(req harness.CheckRequest, p core.Resolut
 		notation = r.conventions.Notation
 	}
 	if notation == "" {
-		notation = "2d6"
+		notation = core.DefaultCheckNotation
 	}
 	if hasProfile {
 		notation = ProfileNotation(notation, p)

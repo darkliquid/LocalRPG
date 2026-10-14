@@ -42,7 +42,7 @@ func TestProcessActionPreservesRawInput(t *testing.T) {
 	}
 	// A player-initiated roll ends the turn on a pending check the player
 	// resolves, rather than a dead proposal directive.
-	if turn.PendingCheck == nil || turn.PendingCheck.ProposedBy != "player" {
+	if turn.PendingCheck == nil || turn.PendingCheck.ProposedBy != harness.ProposedByPlayer {
 		t.Fatalf("expected a player pending check, got %+v", turn.PendingCheck)
 	}
 	if !strings.Contains(model.lastPrompt, "[PLAYER ROLL REQUESTED: 1d20+5") {

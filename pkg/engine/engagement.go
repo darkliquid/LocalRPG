@@ -25,12 +25,12 @@ func ResolveEngagement(manifest *core.GameManifest, system *core.SystemManifest,
 	if cfg != nil {
 		return cfg.MechanicsEngagement()
 	}
-	return "auto"
+	return config.EngagementAuto
 }
 
 func normalizeEngagement(value string) string {
 	switch mode := strings.ToLower(strings.TrimSpace(value)); mode {
-	case "off", "auto", "ask":
+	case config.EngagementOff, config.EngagementAuto, config.EngagementAsk:
 		return mode
 	default:
 		return ""

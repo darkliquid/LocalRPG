@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 	"github.com/darkliquid/localrpg/pkg/storage"
@@ -139,7 +140,7 @@ func TestRollRecordUnderAskPolicyBecomesAPendingCheck(t *testing.T) {
 		"Kaelen steps onto the bridge.\n@roll {\"actor\":\"kaelen\",\"check_kind\":\"skill\",\"stakes\":\"the bridge\"}\n",
 	}}
 	orchestrator, _, _ := streamingOrchestrator(t, provider)
-	orchestrator.SetMechanicsEngagement("ask")
+	orchestrator.SetMechanicsEngagement(config.EngagementAsk)
 
 	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I follow.", nil)
 	if err != nil {
@@ -156,7 +157,7 @@ func TestAPendingCheckTurnKeepsItsProse(t *testing.T) {
 			"@roll {\"actor\":\"kaelen\",\"check_kind\":\"skill\",\"stakes\":\"the bridge\"}\n",
 	}}
 	orchestrator, _, _ := streamingOrchestrator(t, provider)
-	orchestrator.SetMechanicsEngagement("ask")
+	orchestrator.SetMechanicsEngagement(config.EngagementAsk)
 
 	turn, err := orchestrator.ProcessActionStream(context.Background(), "Do", "I follow.", nil)
 	if err != nil {

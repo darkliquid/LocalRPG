@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
 )
@@ -59,13 +60,13 @@ Respond ONLY with a valid JSON object matching this schema:
   "appearance": "2-3 concise sentences describing their face, build, distinguishing marks, clothing, and posture"
 }`, ent.Name, worldGenre, ent.Body)
 
-	resp, err := e.router.GenerateForRole(ctx, "extractor", harness.GenerateRequest{
+	resp, err := e.router.GenerateForRole(ctx, config.RoleExtractor, harness.GenerateRequest{
 		System: "You are a concise character designer for a tabletop RPG. Output only valid JSON without markdown fences.",
 		Prompt: prompt,
 	})
 	if err != nil {
 		// Fallback to GM role if extractor fails or is unconfigured
-		resp, err = e.router.GenerateForRole(ctx, "gm", harness.GenerateRequest{
+		resp, err = e.router.GenerateForRole(ctx, config.RoleGM, harness.GenerateRequest{
 			System: "You are a concise character designer for a tabletop RPG. Output only valid JSON without markdown fences.",
 			Prompt: prompt,
 		})

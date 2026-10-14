@@ -604,7 +604,7 @@ func (o *TurnOrchestrator) playerRollRequest(input string) harness.CheckRequest 
 		req.Notation = o.mechanics.Checks.Notation
 	}
 	if req.Notation == "" {
-		req.Notation = "2d6"
+		req.Notation = core.DefaultCheckNotation
 	}
 	return req
 }
@@ -811,7 +811,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		// carries a pending ref is resolving an existing check, not asking for a
 		// new one, so it falls through to the resolution path.
 		req := o.playerRollRequest(actionInput)
-		pendingCheck = &harness.PendingCheck{Ref: rollRef(turnNum, 0), Request: req, ProposedBy: "player"}
+		pendingCheck = &harness.PendingCheck{Ref: rollRef(turnNum, 0), Request: req, ProposedBy: harness.ProposedByPlayer}
 		gmDirective = fmt.Sprintf("[PLAYER ROLL REQUESTED: %s]", strings.TrimSpace(actionInput))
 	} else if !isOpening && o.rulesEngine != nil {
 		// Run action through mechanics hook if available
@@ -881,7 +881,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	workingSetSelection := workingSet.Select(8)
 
 	isCaller := false
-	if gmProvider, err := o.router.GetProviderForRole("gm"); err == nil && gmProvider != nil {
+	if gmProvider, err := o.router.GetProviderForRole(config.RoleGM); err == nil && gmProvider != nil {
 		if caller, ok := gmProvider.(harness.ToolCaller); ok {
 			isCaller = caller.ToolCallerCapable()
 		}
@@ -1083,7 +1083,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			fields := map[string]any{
 				"code":          generationCode(failure),
 				"error":         err.Error(),
-				"role":          "gm",
+				"role":          config.RoleGM,
 				"provider":      result.ProviderID,
 				"prompt_chars":  len([]rune(actionInput)),
 				"context_chars": len([]rune(assembly.Prompt)),
@@ -1124,11 +1124,11 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		// continues from the outcome.
 		req, hasRoll := o.pendingRoll()
 		endedOnRoll = hasRoll && result.PendingCheck == nil
-		if !endedOnRoll || o.mechanicsEngagement == "off" {
+		if !endedOnRoll || o.mechanicsEngagement == config.EngagementOff {
 			break
 		}
-		if o.mechanicsEngagement == "ask" {
-			result.PendingCheck = &harness.PendingCheck{Ref: rollRef(turnNum, 0), Request: req, ProposedBy: "gm"}
+		if o.mechanicsEngagement == config.EngagementAsk {
+			result.PendingCheck = &harness.PendingCheck{Ref: rollRef(turnNum, 0), Request: req, ProposedBy: harness.ProposedByGM}
 			break
 		}
 		if attempt >= maxRollContinuations {
@@ -1219,7 +1219,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			o.logger.Event("generation.error", map[string]any{
 				"code":          string(failure.Code),
 				"error":         failure.Message,
-				"role":          "gm",
+				"role":          config.RoleGM,
 				"provider":      result.ProviderID,
 				"prompt_chars":  len([]rune(actionInput)),
 				"elapsed_ms":    time.Since(turnStarted).Milliseconds(),
@@ -1854,7 +1854,7 @@ func interruptedStream(acc *streamAccumulator, providerID string, started time.T
 // generateRequest streams one request through the gm role, falling back to the
 // configured fallback provider when the primary fails before producing any text.
 func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.GenerateRequest, onChunk func(string) error) (streamResult, error) {
-	provider, err := o.router.GetProviderForRole("gm")
+	provider, err := o.router.GetProviderForRole(config.RoleGM)
 	if err != nil {
 		return streamResult{
 			Failure: &harness.GenerationFailure{
@@ -1883,7 +1883,7 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 		result.Failure = primaryFailure
 	}
 
-	if fallback, ok := o.router.FallbackForRole("gm"); ok {
+	if fallback, ok := o.router.FallbackForRole(config.RoleGM); ok {
 		fallbackResult, fallbackErr := o.stream(ctx, fallback, req, onChunk)
 		if fallbackErr == nil && fallbackResult.Failure == nil {
 			return fallbackResult, nil
@@ -1891,19 +1891,19 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 		switch {
 		case fallbackResult.Failure != nil:
 			primaryFailure.Attempts = append(primaryFailure.Attempts, harness.Attempt{
-				Role: "gm", Provider: fallbackResult.ProviderID,
+				Role: config.RoleGM, Provider: fallbackResult.ProviderID,
 				Code: fallbackResult.Failure.Code, Detail: fallbackResult.Failure.Message,
 			})
 		case fallbackErr != nil:
 			primaryFailure.Attempts = append(primaryFailure.Attempts, harness.Attempt{
-				Role: "gm", Provider: fallback.ID(),
+				Role: config.RoleGM, Provider: fallback.ID(),
 				Code: harness.ClassifyProviderError(fallbackErr), Detail: fallbackErr.Error(),
 			})
 		}
 	}
 	if len(primaryFailure.Attempts) == 0 {
 		primaryFailure.Attempts = []harness.Attempt{{
-			Role: "gm", Provider: result.ProviderID, Code: primaryFailure.Code, Detail: primaryFailure.Message,
+			Role: config.RoleGM, Provider: result.ProviderID, Code: primaryFailure.Code, Detail: primaryFailure.Message,
 		}}
 	}
 	return result, primaryFailure
@@ -1921,7 +1921,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
 	}
 
-	provider, err := o.router.GetProviderForRole("gm")
+	provider, err := o.router.GetProviderForRole(config.RoleGM)
 	if err != nil {
 		return streamResult{}, err
 	}
@@ -2097,7 +2097,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 
 		roundCtx, roundSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "provider.generate",
 			oteltrace.WithAttributes(
-				attribute.String("localrpg.role", "gm"),
+				attribute.String("localrpg.role", config.RoleGM),
 				attribute.String("provider.id", provider.ID()),
 				attribute.String("turn.assembled_prompt", contextPrompt),
 				attribute.Int("localrpg.round", round),
@@ -2122,7 +2122,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 			result, genErr = o.generateRequest(roundCtx, genReq, onChunk)
 			roundDuration := float64(time.Since(roundStarted).Milliseconds())
 			roundAttributes := otelmetric.WithAttributes(
-				attribute.String("localrpg.role", "gm"),
+				attribute.String("localrpg.role", config.RoleGM),
 				attribute.Int("localrpg.round", round),
 			)
 			roundSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
@@ -2137,7 +2137,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					detail = result.Failure.Message
 				}
 				recordedAttempts = append(recordedAttempts, harness.Attempt{
-					Role:     "gm",
+					Role:     config.RoleGM,
 					Provider: provider.ID(),
 					Code:     harness.FailureParseError,
 					Detail:   detail,
@@ -2161,7 +2161,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					result.Failure.Attempts = append(recordedAttempts, result.Failure.Attempts...)
 				}
 				engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
-					attribute.String("localrpg.role", "gm"),
+					attribute.String("localrpg.role", config.RoleGM),
 					attribute.String("error.kind", string(code)),
 					attribute.String("gen_ai.system", provider.ID()),
 				))
@@ -2181,7 +2181,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					result.Failure.Attempts = append(recordedAttempts, result.Failure.Attempts...)
 				}
 				engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
-					attribute.String("localrpg.role", "gm"),
+					attribute.String("localrpg.role", config.RoleGM),
 					attribute.String("error.kind", string(result.Failure.Code)),
 					attribute.String("gen_ai.system", provider.ID()),
 				))
@@ -2262,7 +2262,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 					o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "done", Summary: resolved.Outcome})
 					continue
 				case "propose_check":
-					if o.mechanicsEngagement != "ask" {
+					if o.mechanicsEngagement != config.EngagementAsk {
 						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: propose_check is only available when mechanics are set to ask"})
 						continue
 					}
@@ -2271,7 +2271,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
 						continue
 					}
-					result.PendingCheck = &harness.PendingCheck{Ref: call.ID, Request: *req, ProposedBy: "gm"}
+					result.PendingCheck = &harness.PendingCheck{Ref: call.ID, Request: *req, ProposedBy: harness.ProposedByGM}
 					result.Provenance = provenance
 					result.ToolCalls = nil
 					return result, nil
@@ -2357,7 +2357,7 @@ func conversationTokens(messages []harness.Message) int {
 	for _, message := range messages {
 		runes += len([]rune(message.Content))
 	}
-	return runes / 4
+	return runes / harness.RunesPerToken
 }
 
 // contextBudget is the configured token ceiling, or 0 for unbounded.

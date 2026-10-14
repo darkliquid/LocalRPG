@@ -1,5 +1,9 @@
 package core
 
+// DefaultCheckNotation is the fallback dice expression used when neither the check request,
+// resolution profile, nor system conventions declare one.
+const DefaultCheckNotation = "2d6"
+
 // MechanicsSpec is a system's optional declarative mechanics: the stats it
 // declares, its skills, its health convention, and how checks resolve. Every
 // part is optional; a nil MechanicsSpec means the system is schema-agnostic.

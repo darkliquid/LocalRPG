@@ -211,3 +211,9 @@ type PendingCheck struct {
 	Request    CheckRequest `json:"request"`
 	ProposedBy string       `json:"proposed_by,omitempty"`
 }
+
+// Proposer of a pending check.
+const (
+	ProposedByPlayer = "player"
+	ProposedByGM     = "gm"
+)
