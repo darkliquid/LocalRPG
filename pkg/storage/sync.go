@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -102,14 +104,17 @@ func (s *Syncer) syncNote(root, path string) (syncOutcome, error) {
 	ent.Folder = folderFromPath(root, path)
 
 	existing, existingErr := s.store.GetEntity(ent.ID)
-	if existingErr == nil && existing.Hash == ent.Hash && existing.Folder == ent.Folder {
+	if existingErr != nil && !errors.Is(existingErr, sql.ErrNoRows) {
+		return syncUnchanged, fmt.Errorf("check existing entity %q: %w", ent.ID, existingErr)
+	}
+	if existingErr == nil && existing != nil && existing.Hash == ent.Hash && existing.Folder == ent.Folder {
 		return syncUnchanged, nil
 	}
 
 	if err := s.store.SaveEntity(ent); err != nil {
 		return syncUnchanged, fmt.Errorf("save entity %q: %w", ent.ID, err)
 	}
-	if existingErr != nil {
+	if errors.Is(existingErr, sql.ErrNoRows) {
 		return syncAdded, nil
 	}
 	return syncUpdated, nil

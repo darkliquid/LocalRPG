@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -253,7 +254,9 @@ func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity
 	}
 
 	for _, persona := range personae {
-		t.stagePersona(turn, persona, pending)
+		if err := t.stagePersona(turn, persona, pending); err != nil {
+			return nil, err
+		}
 	}
 
 	for _, raw := range extracted {
@@ -266,13 +269,13 @@ func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity
 // stagePersona stages one declared persona: the note it already has, or a stub carrying
 // what it declared. A persona that restates a previous identity is folded into the note
 // it now is, and the identity it left behind is retired.
-func (t *Timeline) stagePersona(turn *Turn, persona harness.PersonaDecl, pending map[string]*entity.Entity) {
+func (t *Timeline) stagePersona(turn *Turn, persona harness.PersonaDecl, pending map[string]*entity.Entity) error {
 	if strings.TrimSpace(persona.Name) == "" {
-		return
+		return nil
 	}
 	id := entity.Slugify(persona.Name)
 	if id == "" {
-		return
+		return nil
 	}
 
 	ent, err := t.store.GetEntity(id)
@@ -281,7 +284,9 @@ func (t *Timeline) stagePersona(turn *Turn, persona harness.PersonaDecl, pending
 	}
 
 	if prev := strings.TrimSpace(persona.PreviousIdentity()); prev != "" {
-		t.foldPreviousIdentity(turn, ent, prev, pending)
+		if err := t.foldPreviousIdentity(turn, ent, prev, pending); err != nil {
+			return err
+		}
 	}
 
 	if entity.IsCharacterType(ent.Type) {
@@ -291,6 +296,7 @@ func (t *Timeline) stagePersona(turn *Turn, persona harness.PersonaDecl, pending
 	if !containsMention(turn.Entities, ent.ID) {
 		turn.Entities = append(turn.Entities, entity.Mention{ID: ent.ID, Kind: entity.MentionExtracted})
 	}
+	return nil
 }
 
 // newPersonaEntity is the note a freshly declared persona gets. It carries the state
@@ -320,7 +326,7 @@ func newPersonaEntity(id string, persona harness.PersonaDecl) *entity.Entity {
 
 // foldPreviousIdentity takes over the note a persona used to be, keeping the new name as
 // an alias of it so the prose that still uses the old one keeps resolving.
-func (t *Timeline) foldPreviousIdentity(turn *Turn, ent *entity.Entity, prev string, pending map[string]*entity.Entity) {
+func (t *Timeline) foldPreviousIdentity(turn *Turn, ent *entity.Entity, prev string, pending map[string]*entity.Entity) error {
 	ent.Aliases = appendUnique(ent.Aliases, prev)
 	prevSlug := entity.Slugify(prev)
 	if prevSlug != "" && prevSlug != ent.ID {
@@ -329,11 +335,11 @@ func (t *Timeline) foldPreviousIdentity(turn *Turn, ent *entity.Entity, prev str
 
 	prevEnt := t.findPreviousEntity(prev, prevSlug, pending)
 	if prevEnt == nil || prevEnt.ID == ent.ID {
-		return
+		return nil
 	}
 
 	mergePreviousEntity(ent, prevEnt)
-	t.retirePreviousEntity(turn, ent, prevEnt, prevSlug, pending)
+	return t.retirePreviousEntity(turn, ent, prevEnt, prevSlug, pending)
 }
 
 // findPreviousEntity is the note a persona used to be: the one this turn has already
@@ -382,18 +388,24 @@ func mergePreviousEntity(ent, prevEnt *entity.Entity) {
 // retirePreviousEntity takes the old note out of the staged set, off disk and out of the
 // index, and rewrites everything the turn attributed to it: the entities it mentions and
 // the segments it speaks.
-func (t *Timeline) retirePreviousEntity(turn *Turn, ent, prevEnt *entity.Entity, prevSlug string, pending map[string]*entity.Entity) {
+func (t *Timeline) retirePreviousEntity(turn *Turn, ent, prevEnt *entity.Entity, prevSlug string, pending map[string]*entity.Entity) error {
 	delete(pending, prevEnt.ID)
 	if prevSlug != "" {
 		delete(pending, prevSlug)
 	}
 
 	prevSafeID := pathutil.SanitizeID(prevEnt.ID)
-	if prevPath, err := pathutil.ResolveSafeChild(t.EntitiesDir(), prevSafeID+".md"); err == nil {
-		_ = os.Remove(prevPath)
+	prevPath, err := pathutil.ResolveSafeChild(t.EntitiesDir(), prevSafeID+".md")
+	if err != nil {
+		return fmt.Errorf("resolve retired entity %q path: %w", prevEnt.ID, err)
+	}
+	if err := os.Remove(prevPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove retired entity %q file: %w", prevEnt.ID, err)
 	}
 	if t.store != nil {
-		_ = t.store.DeleteEntity(prevEnt.ID)
+		if err := t.store.DeleteEntity(prevEnt.ID); err != nil {
+			return fmt.Errorf("delete retired entity %q from store: %w", prevEnt.ID, err)
+		}
 	}
 
 	// Remap mentions in turn.Entities from prevEnt.ID to ent.ID.
@@ -409,6 +421,7 @@ func (t *Timeline) retirePreviousEntity(turn *Turn, ent, prevEnt *entity.Entity,
 			turn.Segments[i].SpeakerID = ent.ID
 		}
 	}
+	return nil
 }
 
 // stageExtracted stages one extracted entity: the note the extraction belongs to, merged
@@ -699,7 +712,9 @@ func (t *Timeline) EnsureIndexed() error {
 			}
 			set := WorkingSet{}
 			rederived := set.Rederive(turns[start:])
-			_ = t.store.ReplaceWorkingSet(rederived.ToStorageRecords())
+			if err := t.store.ReplaceWorkingSet(rederived.ToStorageRecords()); err != nil {
+				return fmt.Errorf("rederive working set: %w", err)
+			}
 		}
 	}
 

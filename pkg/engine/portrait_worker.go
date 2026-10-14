@@ -211,7 +211,9 @@ func (w *PortraitWorker) updateNote(gameID string, ent *entity.Entity, relPath s
 					return fmt.Errorf("write note: %w", err)
 				}
 				if w.store != nil {
-					_ = storage.NewSyncer(w.store).SyncFile(notePath)
+					if err := storage.NewSyncer(w.store).SyncFile(notePath); err != nil {
+						return fmt.Errorf("sync updated note: %w", err)
+					}
 				}
 				return nil
 			}
@@ -232,7 +234,9 @@ func (w *PortraitWorker) updateNote(gameID string, ent *entity.Entity, relPath s
 		return fmt.Errorf("write note: %w", err)
 	}
 	if w.store != nil {
-		_ = storage.NewSyncer(w.store).SyncFile(notePath)
+		if err := storage.NewSyncer(w.store).SyncFile(notePath); err != nil {
+			return fmt.Errorf("sync updated note: %w", err)
+		}
 	}
 	return nil
 }

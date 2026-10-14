@@ -313,3 +313,49 @@ func TestStageEntitiesMergesPreviousIdentity(t *testing.T) {
 		t.Errorf("segment SpeakerID = %q, want valen", turn.Segments[0].SpeakerID)
 	}
 }
+
+func TestStageEntitiesRetirePreviousEntityErrorSurfaces(t *testing.T) {
+	paths := core.NewPathResolver(t.TempDir())
+	store := newTestStore(t)
+	history := NewHistoryLogger(filepath.Join(t.TempDir(), "history.jsonl"))
+	timeline := NewTimeline(paths, store, history, "campaign-01")
+
+	entitiesDir := timeline.EntitiesDir()
+	writeTestEntityNote(t, entitiesDir, &entity.Entity{
+		ID:   "generic-scout",
+		Name: "Generic Scout",
+		Type: "character",
+	})
+	if _, err := storage.NewSyncer(store).Sync(entitiesDir); err != nil {
+		t.Fatal(err)
+	}
+
+	turn := &Turn{
+		Number:    2,
+		Narration: "The scout steps forward as Valen.",
+		Entities:  []entity.Mention{{ID: "generic-scout", Kind: entity.MentionExtracted}},
+	}
+	personae := []harness.PersonaDecl{
+		{
+			Name:    "Valen",
+			Type:    "character",
+			Reveals: "Generic Scout",
+		},
+	}
+
+	// Make the file a non-empty directory so os.Remove fails with ENOTEMPTY
+	genericPath := filepath.Join(entitiesDir, "generic-scout.md")
+	if err := os.Remove(genericPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(genericPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(genericPath, "child.txt"), []byte("cannot remove dir"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := timeline.stageEntities(turn, nil, personae); err == nil {
+		t.Fatal("stageEntities expected error when file remove fails, got nil")
+	}
+}

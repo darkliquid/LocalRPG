@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
@@ -109,25 +110,34 @@ func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 		return nil, err
 	}
 
-	unmarshalEntityMeta(&ent, fmJSON)
+	if err := unmarshalEntityMeta(&ent, fmJSON); err != nil {
+		return nil, fmt.Errorf("unmarshal entity %s metadata: %w", id, err)
+	}
 	return &ent, nil
 }
 
-func unmarshalEntityMeta(ent *entity.Entity, fmJSON string) {
+func unmarshalEntityMeta(ent *entity.Entity, fmJSON string) error {
+	if strings.TrimSpace(fmJSON) == "" {
+		return nil
+	}
 	var meta map[string]any
 	if err := json.Unmarshal([]byte(fmJSON), &meta); err != nil {
-		return
+		return fmt.Errorf("unmarshal frontmatter JSON: %w", err)
 	}
 
 	if stateData, ok := meta["state"].(map[string]any); ok {
 		ent.InitState(stateData)
 	}
 	if voiceData, ok := meta["voice"]; ok && voiceData != nil {
-		voiceBytes, _ := json.Marshal(voiceData)
-		var v entity.VoiceConfig
-		if err := json.Unmarshal(voiceBytes, &v); err == nil {
-			ent.Voice = &v
+		voiceBytes, err := json.Marshal(voiceData)
+		if err != nil {
+			return fmt.Errorf("marshal voice meta: %w", err)
 		}
+		var v entity.VoiceConfig
+		if err := json.Unmarshal(voiceBytes, &v); err != nil {
+			return fmt.Errorf("unmarshal voice meta: %w", err)
+		}
+		ent.Voice = &v
 	}
 	if loc, ok := meta["location"].(string); ok {
 		ent.Location = loc
@@ -184,6 +194,7 @@ func unmarshalEntityMeta(ent *entity.Entity, fmJSON string) {
 			}
 		}
 	}
+	return nil
 }
 
 func (s *Store) GetEdgesFrom(sourceID string) ([]Edge, error) {
@@ -310,7 +321,10 @@ func (s *Store) ListEntities() ([]EntitySummary, error) {
 			Tags     []string `json:"tags"`
 			Aliases  []string `json:"aliases"`
 		}
-		if err := json.Unmarshal([]byte(fmJSON), &meta); err == nil {
+		if strings.TrimSpace(fmJSON) != "" {
+			if err := json.Unmarshal([]byte(fmJSON), &meta); err != nil {
+				return nil, fmt.Errorf("unmarshal entity %s metadata: %w", summary.ID, err)
+			}
 			summary.Location = meta.Location
 			summary.Tags = meta.Tags
 			summary.Aliases = meta.Aliases
