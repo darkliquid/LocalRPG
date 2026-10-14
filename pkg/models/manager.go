@@ -288,45 +288,8 @@ func (m *Manager) Download(ctx context.Context, modelID string) (<-chan ModelSta
 }
 
 func (m *Manager) runDownload(ctx context.Context, spec ModelSpec, session *downloadSession) {
-	updateStatus := func(update func(s *ModelStatus)) {
-		m.mu.Lock()
-		update(&session.status)
-		current := session.status
-		for _, ch := range session.channels {
-			select {
-			case ch <- current:
-			default:
-			}
-		}
-		m.mu.Unlock()
-		m.broadcast(current)
-	}
-
-	cleanup := func(err error) {
-		m.mu.Lock()
-		if err != nil {
-			session.status.Downloading = false
-			session.status.Error = err.Error()
-			m.lastErrors[spec.ID] = err.Error()
-		} else {
-			session.status.Downloading = false
-			session.status.Installed = true
-			session.status.Progress = 1.0
-			session.status.Error = ""
-			delete(m.lastErrors, spec.ID)
-		}
-		finalStatus := session.status
-		for _, ch := range session.channels {
-			select {
-			case ch <- finalStatus:
-			default:
-			}
-			close(ch)
-		}
-		delete(m.active, spec.ID)
-		m.mu.Unlock()
-		m.broadcast(finalStatus)
-	}
+	updateStatus := func(update func(*ModelStatus)) { m.updateStatus(session, update) }
+	cleanup := func(err error) { m.finishDownload(spec, session, err) }
 
 	tmpDir := filepath.Join(m.cacheDir, "models", "tmp")
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
@@ -342,83 +305,8 @@ func (m *Manager) runDownload(ctx context.Context, spec ModelSpec, session *down
 	partPath := filepath.Join(tmpDir, spec.ID+".part")
 	defer os.Remove(partPath)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, spec.URL, nil)
-	if err != nil {
-		cleanup(fmt.Errorf("prepare request: %w", err))
-		return
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		cleanup(fmt.Errorf("download request: %w", err))
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		cleanup(fmt.Errorf("download HTTP error %d: %s", resp.StatusCode, resp.Status))
-		return
-	}
-
-	outFile, err := os.Create(partPath)
-	if err != nil {
-		cleanup(fmt.Errorf("create part file: %w", err))
-		return
-	}
-
-	hasher := sha256.New()
-	writer := io.MultiWriter(outFile, hasher)
-
-	buf := make([]byte, 64*1024)
-	var downloaded int64
-	total := spec.SizeBytes
-	if resp.ContentLength > 0 {
-		total = resp.ContentLength
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			_ = outFile.Close()
-			cleanup(ctx.Err())
-			return
-		default:
-		}
-
-		n, rerr := resp.Body.Read(buf)
-		if n > 0 {
-			if _, werr := writer.Write(buf[:n]); werr != nil {
-				_ = outFile.Close()
-				cleanup(fmt.Errorf("write part file: %w", werr))
-				return
-			}
-			downloaded += int64(n)
-			prog := 0.0
-			if total > 0 {
-				prog = float64(downloaded) / float64(total)
-			}
-			updateStatus(func(s *ModelStatus) {
-				s.BytesDownloaded = downloaded
-				s.TotalBytes = total
-				s.Progress = prog
-			})
-		}
-		if rerr != nil {
-			if rerr == io.EOF {
-				break
-			}
-			_ = outFile.Close()
-			cleanup(fmt.Errorf("download stream read: %w", rerr))
-			return
-		}
-	}
-
-	_ = outFile.Close()
-
-	// Verify checksum
-	calculatedSum := hex.EncodeToString(hasher.Sum(nil))
-	if spec.SHA256 != "" && calculatedSum != spec.SHA256 {
-		cleanup(fmt.Errorf("%w: expected %s, got %s", ErrChecksumMismatch, spec.SHA256, calculatedSum))
+	if err := m.downloadArchive(ctx, spec, partPath, updateStatus); err != nil {
+		cleanup(err)
 		return
 	}
 
@@ -436,12 +324,147 @@ func (m *Manager) runDownload(ctx context.Context, spec ModelSpec, session *down
 		return
 	}
 
-	// Atomically move to target directory
+	if err := m.publishExtracted(spec, stagingDir); err != nil {
+		cleanup(err)
+		return
+	}
+
+	cleanup(nil)
+}
+
+// updateStatus records a change to a session's status and tells everything watching it. The
+// sends do not block: a subscriber that is not reading does not hold up a download.
+func (m *Manager) updateStatus(session *downloadSession, update func(s *ModelStatus)) {
+	m.mu.Lock()
+	update(&session.status)
+	current := session.status
+	for _, ch := range session.channels {
+		select {
+		case ch <- current:
+		default:
+		}
+	}
+	m.mu.Unlock()
+	m.broadcast(current)
+}
+
+// finishDownload closes out a session: the status the download ended in, every channel told
+// once and then closed, and the model out of the active set.
+//
+// A failure is recorded against the model as well as in the status, so a download that failed
+// is still visible after the session watching it is gone.
+func (m *Manager) finishDownload(spec ModelSpec, session *downloadSession, err error) {
+	m.mu.Lock()
+	if err != nil {
+		session.status.Downloading = false
+		session.status.Error = err.Error()
+		m.lastErrors[spec.ID] = err.Error()
+	} else {
+		session.status.Downloading = false
+		session.status.Installed = true
+		session.status.Progress = 1.0
+		session.status.Error = ""
+		delete(m.lastErrors, spec.ID)
+	}
+	finalStatus := session.status
+	for _, ch := range session.channels {
+		select {
+		case ch <- finalStatus:
+		default:
+		}
+		close(ch)
+	}
+	delete(m.active, spec.ID)
+	m.mu.Unlock()
+	m.broadcast(finalStatus)
+}
+
+// downloadArchive fetches a single-file model and writes it out as it arrives, so a model
+// larger than memory still downloads, and progress is reported while it lands rather than only
+// when it has.
+func (m *Manager) downloadArchive(ctx context.Context, spec ModelSpec, partPath string, updateStatus func(func(*ModelStatus))) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, spec.URL, nil)
+	if err != nil {
+		return fmt.Errorf("prepare request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("download request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("download HTTP error %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	outFile, err := os.Create(partPath)
+	if err != nil {
+		return fmt.Errorf("create part file: %w", err)
+	}
+
+	hasher := sha256.New()
+	writer := io.MultiWriter(outFile, hasher)
+
+	buf := make([]byte, 64*1024)
+	var downloaded int64
+	total := spec.SizeBytes
+	if resp.ContentLength > 0 {
+		total = resp.ContentLength
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			_ = outFile.Close()
+			return ctx.Err()
+		default:
+		}
+
+		n, rerr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, werr := writer.Write(buf[:n]); werr != nil {
+				_ = outFile.Close()
+				return fmt.Errorf("write part file: %w", werr)
+			}
+			downloaded += int64(n)
+			prog := 0.0
+			if total > 0 {
+				prog = float64(downloaded) / float64(total)
+			}
+			updateStatus(func(s *ModelStatus) {
+				s.BytesDownloaded = downloaded
+				s.TotalBytes = total
+				s.Progress = prog
+			})
+		}
+		if rerr != nil {
+			if rerr == io.EOF {
+				break
+			}
+			_ = outFile.Close()
+			return fmt.Errorf("download stream read: %w", rerr)
+		}
+	}
+
+	_ = outFile.Close()
+
+	// Verify checksum
+	calculatedSum := hex.EncodeToString(hasher.Sum(nil))
+	if spec.SHA256 != "" && calculatedSum != spec.SHA256 {
+		return fmt.Errorf("%w: expected %s, got %s", ErrChecksumMismatch, spec.SHA256, calculatedSum)
+	}
+	return nil
+}
+
+// publishExtracted moves the staged model into place, taking the single directory an archive
+// usually wraps its contents in rather than creating a directory named after it: a model whose
+// files sit under one root would otherwise be published a level too deep.
+func (m *Manager) publishExtracted(spec ModelSpec, stagingDir string) error {
 	targetDir := filepath.Join(m.cacheDir, "models", spec.Subdir)
 	_ = os.RemoveAll(targetDir)
 	if err := os.MkdirAll(filepath.Dir(targetDir), 0755); err != nil {
-		cleanup(fmt.Errorf("create parent dir: %w", err))
-		return
+		return fmt.Errorf("create parent dir: %w", err)
 	}
 
 	// Check if extracted contents are nested in a single root directory
@@ -449,17 +472,15 @@ func (m *Manager) runDownload(ctx context.Context, spec ModelSpec, session *down
 	if err == nil && len(entries) == 1 && entries[0].IsDir() {
 		nested := filepath.Join(stagingDir, entries[0].Name())
 		if err := os.Rename(nested, targetDir); err != nil {
-			cleanup(fmt.Errorf("move extracted folder: %w", err))
-			return
+			return fmt.Errorf("move extracted folder: %w", err)
 		}
-	} else {
-		if err := os.Rename(stagingDir, targetDir); err != nil {
-			cleanup(fmt.Errorf("move extracted files: %w", err))
-			return
-		}
+		return nil
 	}
 
-	cleanup(nil)
+	if err := os.Rename(stagingDir, targetDir); err != nil {
+		return fmt.Errorf("move extracted files: %w", err)
+	}
+	return nil
 }
 
 // runFileDownload downloads a spec's loose files into its target directory,

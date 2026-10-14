@@ -391,10 +391,42 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 	}
 
 	cutOff := 0
+	readBatch := newBatchReader(ctx, gen, brief, into, &draft, seen, at)
 
-	// readBatch reads one batch, halving it when the reply cannot be parsed at
-	// all. A model that runs out of room on four pages still answers for two, and
-	// losing a whole import to one oversized call is not a trade worth making.
+	for i, batch := range batches {
+		var touched []string
+		cut := false
+		if err := readBatch(batch, i+1, i == 0, &touched, &cut); err != nil {
+			return draft, err
+		}
+		if cut {
+			cutOff++
+		}
+		if onProgress != nil {
+			onProgress(Progress{
+				Batch:   i + 1,
+				Batches: len(batches),
+				Sources: chunkSourceList(batch),
+				Found:   len(touched),
+				Total:   len(draft.Entities),
+				Names:   touched,
+				CutOff:  cutOff,
+			})
+		}
+	}
+
+	finaliseWorldIdentity(&draft, into, brief)
+	draft = linkImportedDraft(draft, into)
+	draft.Sections = worldgen.SplitLoreSections(draft.Lore)
+	return draft, nil
+}
+
+// newBatchReader is the reader an import reads its batches through. It is returned as a
+// closure rather than written as a method because it recurses: a batch whose reply cannot be
+// parsed at all is halved and read again, and a model that runs out of room on four pages
+// still answers for two. Losing a whole import to one oversized call is not a trade worth
+// making.
+func newBatchReader(ctx context.Context, gen worldgen.Generator, brief worldgen.Brief, into BuildContext, draft *worldgen.Draft, seen map[string]struct{}, at map[string]int) func([]Chunk, int, bool, *[]string, *bool) error {
 	var readBatch func(batch []Chunk, index int, first bool, touched *[]string, cut *bool) error
 	readBatch = func(batch []Chunk, index int, first bool, touched *[]string, cut *bool) error {
 		if err := ctx.Err(); err != nil {
@@ -425,32 +457,16 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 		if salvaged {
 			*cut = true
 		}
-		*touched = append(*touched, applyReply(&draft, reply, batch, first, seen, at)...)
+		*touched = append(*touched, applyReply(draft, reply, batch, first, seen, at)...)
 		return nil
 	}
+	return readBatch
+}
 
-	for i, batch := range batches {
-		var touched []string
-		cut := false
-		if err := readBatch(batch, i+1, i == 0, &touched, &cut); err != nil {
-			return draft, err
-		}
-		if cut {
-			cutOff++
-		}
-		if onProgress != nil {
-			onProgress(Progress{
-				Batch:   i + 1,
-				Batches: len(batches),
-				Sources: chunkSourceList(batch),
-				Found:   len(touched),
-				Total:   len(draft.Entities),
-				Names:   touched,
-				CutOff:  cutOff,
-			})
-		}
-	}
-
+// finaliseWorldIdentity gives the draft its own name and identity. An import that extends a
+// world borrows that world's name and keeps nothing of its own identity; one that builds a
+// world is named by its brief, or after the import itself.
+func finaliseWorldIdentity(draft *worldgen.Draft, into BuildContext, brief worldgen.Brief) {
 	if into.Name != "" {
 		// Extending a world: the draft borrows its identity, and the caller keeps
 		// only the notes.
@@ -467,17 +483,18 @@ func BuildInto(ctx context.Context, gen worldgen.Generator, chunks []Chunk, brie
 		draft.World.ID = "imported-world"
 	}
 	draft.ID = draft.World.ID
-	// Links resolve against the notes this batch produced and, when the chunks
-	// extend a world, against that world's own entities too. Linking against the
-	// batch alone first would flatten a link to an existing note before the world
-	// ever saw it.
+}
+
+// linkImportedDraft resolves the draft's links. An import that extends a world resolves them
+// against that world's own entities as well as the notes it just produced: linking against
+// the batch alone first would flatten a link to an existing note before the world ever saw
+// it.
+func linkImportedDraft(draft worldgen.Draft, into BuildContext) worldgen.Draft {
 	if len(into.Entities) > 0 {
 		draft.Entities = worldgen.LinkBatch(draft.Entities, into.Entities)
-	} else {
-		draft = worldgen.LinkDraft(draft)
+		return draft
 	}
-	draft.Sections = worldgen.SplitLoreSections(draft.Lore)
-	return draft, nil
+	return worldgen.LinkDraft(draft)
 }
 
 // applyReply merges one model reply into the draft, tagging every new entity

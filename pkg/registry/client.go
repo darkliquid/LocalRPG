@@ -281,125 +281,171 @@ func isHexSHA256(s string) bool {
 
 // Install downloads, verifies, and installs a package from a PackageRef.
 func (c *Client) Install(ctx context.Context, ref PackageRef, onConflict string) (content.Manifest, error) {
-	if ref.Package.Download == "" {
-		return content.Manifest{}, errors.New("package download URL is empty")
-	}
-	if ref.Package.SHA256 == "" {
-		return content.Manifest{}, errors.New("package sha256 checksum is empty")
-	}
-	if strings.ContainsAny(ref.Package.SHA256, `/\`) || strings.Contains(ref.Package.SHA256, "..") || !isHexSHA256(ref.Package.SHA256) {
-		return content.Manifest{}, fmt.Errorf("package sha256 checksum is not a checksum: %q", ref.Package.SHA256)
+	if err := validatePackageRef(ref); err != nil {
+		return content.Manifest{}, err
 	}
 
 	packagesDir := filepath.Join(c.cacheDir, "packages")
 	cachedPkgPath := filepath.Join(packagesDir, strings.ToLower(ref.Package.SHA256)+".lrpgpack")
 
-	var pkgFile *os.File
-
-	if fi, statErr := os.Stat(cachedPkgPath); statErr == nil && fi.Size() > 0 {
-		f, openErr := os.Open(cachedPkgPath)
-		if openErr == nil {
-			h := sha256.New()
-			if _, copyErr := io.Copy(h, f); copyErr == nil {
-				computed := hex.EncodeToString(h.Sum(nil))
-				if strings.EqualFold(computed, ref.Package.SHA256) {
-					_, _ = f.Seek(0, io.SeekStart)
-					pkgFile = f
-				}
-			}
-			if pkgFile == nil {
-				_ = f.Close()
-				_ = os.Remove(cachedPkgPath)
-			}
-		}
-	}
-
+	pkgFile := c.cachedPackageFile(cachedPkgPath, ref.Package.SHA256)
 	if pkgFile == nil {
-		downloadURL := ref.Package.Download
-		if ref.RegistryURL != "" {
-			if base, parseErr := url.Parse(ref.RegistryURL); parseErr == nil {
-				if resolved, resolveErr := base.Parse(downloadURL); resolveErr == nil {
-					downloadURL = resolved.String()
-				}
-			}
-		}
-
-		// Inline, for the same reason: the scheme allow-list has to be visible where the
-		// URL reaches the request, not only inside a helper. The host is deliberately
-		// unrestricted, because a registry on localhost is a supported configuration for
-		// a local-first app.
-		//
-		// The allow-list is applied to the value the request is built from, directly.
-		// A check on a copy does not sanitise the original: not on a parsed URL, whose
-		// fields carry the taint on, and not on a lower-cased version, which is a second
-		// string. Three shapes failed for that reason, and this one checks the string the
-		// sink receives.
-		if !strings.HasPrefix(downloadURL, "http://") && !strings.HasPrefix(downloadURL, "https://") {
-			return content.Manifest{}, fmt.Errorf("package download URL must be http or https: %q", downloadURL)
-		}
-		if _, parseErr := url.Parse(downloadURL); parseErr != nil {
-			return content.Manifest{}, fmt.Errorf("parse package download URL: %w", parseErr)
-		}
-
-		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
-		if reqErr != nil {
-			return content.Manifest{}, fmt.Errorf("create download request: %w", reqErr)
-		}
-
-		client := c.getHTTPClient()
-		resp, doErr := client.Do(req)
-		if doErr != nil {
-			return content.Manifest{}, fmt.Errorf("download package: %w", doErr)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return content.Manifest{}, fmt.Errorf("download package failed with status %d", resp.StatusCode)
-		}
-
-		if err := os.MkdirAll(packagesDir, 0755); err != nil {
-			return content.Manifest{}, fmt.Errorf("create packages cache dir: %w", err)
-		}
-
-		tmpFile, err := os.CreateTemp(packagesDir, ".download-*")
+		var err error
+		pkgFile, err = c.fetchPackage(ctx, resolvedDownloadURL(ref), ref.Package.SHA256, packagesDir, cachedPkgPath)
 		if err != nil {
-			return content.Manifest{}, fmt.Errorf("create temp package file: %w", err)
+			return content.Manifest{}, err
 		}
-		tmpName := tmpFile.Name()
-		defer func() {
-			if tmpFile != nil {
-				_ = tmpFile.Close()
-				_ = os.Remove(tmpName)
-			}
-		}()
-
-		hasher := sha256.New()
-		tee := io.TeeReader(resp.Body, hasher)
-		if _, err := io.Copy(tmpFile, tee); err != nil {
-			return content.Manifest{}, fmt.Errorf("stream download: %w", err)
-		}
-
-		computedSHA := hex.EncodeToString(hasher.Sum(nil))
-		if !strings.EqualFold(computedSHA, ref.Package.SHA256) {
-			return content.Manifest{}, fmt.Errorf("checksum mismatch: got %s, want %s", computedSHA, ref.Package.SHA256)
-		}
-
-		_ = tmpFile.Close()
-		tmpFile = nil
-
-		if err := os.Rename(tmpName, cachedPkgPath); err != nil {
-			return content.Manifest{}, fmt.Errorf("cache package file: %w", err)
-		}
-
-		f, openErr := os.Open(cachedPkgPath)
-		if openErr != nil {
-			return content.Manifest{}, fmt.Errorf("open cached package file: %w", openErr)
-		}
-		pkgFile = f
 	}
-
 	defer pkgFile.Close()
 
+	return c.installPackage(ctx, pkgFile, onConflict)
+}
+
+// validatePackageRef checks what an install needs from a registry entry: a URL to fetch and a
+// checksum to verify it by. The checksum is checked for the shape of a checksum rather than
+// only for being present, because it is also used to name a file.
+func validatePackageRef(ref PackageRef) error {
+	if ref.Package.Download == "" {
+		return errors.New("package download URL is empty")
+	}
+	if ref.Package.SHA256 == "" {
+		return errors.New("package sha256 checksum is empty")
+	}
+	if strings.ContainsAny(ref.Package.SHA256, `/\`) || strings.Contains(ref.Package.SHA256, "..") || !isHexSHA256(ref.Package.SHA256) {
+		return fmt.Errorf("package sha256 checksum is not a checksum: %q", ref.Package.SHA256)
+	}
+	return nil
+}
+
+// cachedPackageFile is the cached copy of a package, when the cache holds one that hashes to
+// the checksum asked for. A cached file that does not verify is removed rather than left to be
+// found again: it will never be right, and it is taking space in the meantime.
+func (c *Client) cachedPackageFile(cachedPkgPath, wantSHA string) *os.File {
+	fi, statErr := os.Stat(cachedPkgPath)
+	if statErr != nil || fi.Size() == 0 {
+		return nil
+	}
+
+	f, openErr := os.Open(cachedPkgPath)
+	if openErr != nil {
+		return nil
+	}
+	h := sha256.New()
+	if _, copyErr := io.Copy(h, f); copyErr == nil {
+		computed := hex.EncodeToString(h.Sum(nil))
+		if strings.EqualFold(computed, wantSHA) {
+			_, _ = f.Seek(0, io.SeekStart)
+			return f
+		}
+	}
+
+	_ = f.Close()
+	_ = os.Remove(cachedPkgPath)
+	return nil
+}
+
+// resolvedDownloadURL is the package URL made absolute against the registry that listed it, so
+// a registry may hand out a relative path. A URL that cannot be resolved is returned as it
+// came, and the scheme check in fetchPackage is what decides whether it is usable.
+func resolvedDownloadURL(ref PackageRef) string {
+	downloadURL := ref.Package.Download
+	if ref.RegistryURL == "" {
+		return downloadURL
+	}
+	base, parseErr := url.Parse(ref.RegistryURL)
+	if parseErr != nil {
+		return downloadURL
+	}
+	resolved, resolveErr := base.Parse(downloadURL)
+	if resolveErr != nil {
+		return downloadURL
+	}
+	return resolved.String()
+}
+
+// fetchPackage downloads a package, verifies its checksum, and caches it under the checksum it
+// was verified by, so the file's name is the record of its contents. The file it returns is
+// open and positioned at the start, which is what the unpacker needs.
+func (c *Client) fetchPackage(ctx context.Context, downloadURL, wantSHA, packagesDir, cachedPkgPath string) (*os.File, error) {
+	// Inline, for the same reason: the scheme allow-list has to be visible where the
+	// URL reaches the request, not only inside a helper. The host is deliberately
+	// unrestricted, because a registry on localhost is a supported configuration for
+	// a local-first app.
+	//
+	// The allow-list is applied to the value the request is built from, directly.
+	// A check on a copy does not sanitise the original: not on a parsed URL, whose
+	// fields carry the taint on, and not on a lower-cased version, which is a second
+	// string. Three shapes failed for that reason, and this one checks the string the
+	// sink receives.
+	if !strings.HasPrefix(downloadURL, "http://") && !strings.HasPrefix(downloadURL, "https://") {
+		return nil, fmt.Errorf("package download URL must be http or https: %q", downloadURL)
+	}
+	if _, parseErr := url.Parse(downloadURL); parseErr != nil {
+		return nil, fmt.Errorf("parse package download URL: %w", parseErr)
+	}
+
+	req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	if reqErr != nil {
+		return nil, fmt.Errorf("create download request: %w", reqErr)
+	}
+
+	client := c.getHTTPClient()
+	resp, doErr := client.Do(req)
+	if doErr != nil {
+		return nil, fmt.Errorf("download package: %w", doErr)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("download package failed with status %d", resp.StatusCode)
+	}
+
+	if err := os.MkdirAll(packagesDir, 0755); err != nil {
+		return nil, fmt.Errorf("create packages cache dir: %w", err)
+	}
+
+	tmpFile, err := os.CreateTemp(packagesDir, ".download-*")
+	if err != nil {
+		return nil, fmt.Errorf("create temp package file: %w", err)
+	}
+	tmpName := tmpFile.Name()
+	defer func() {
+		if tmpFile != nil {
+			_ = tmpFile.Close()
+			_ = os.Remove(tmpName)
+		}
+	}()
+
+	hasher := sha256.New()
+	tee := io.TeeReader(resp.Body, hasher)
+	if _, err := io.Copy(tmpFile, tee); err != nil {
+		return nil, fmt.Errorf("stream download: %w", err)
+	}
+
+	computedSHA := hex.EncodeToString(hasher.Sum(nil))
+	if !strings.EqualFold(computedSHA, wantSHA) {
+		return nil, fmt.Errorf("checksum mismatch: got %s, want %s", computedSHA, wantSHA)
+	}
+
+	_ = tmpFile.Close()
+	tmpFile = nil
+
+	if err := os.Rename(tmpName, cachedPkgPath); err != nil {
+		return nil, fmt.Errorf("cache package file: %w", err)
+	}
+
+	f, openErr := os.Open(cachedPkgPath)
+	if openErr != nil {
+		return nil, fmt.Errorf("open cached package file: %w", openErr)
+	}
+	return f, nil
+}
+
+// installPackage hands the package to the configured installer, or unpacks it into a staging
+// directory of its own when there is none. The default path verifies the archive as it unpacks
+// and then throws the staging directory away: an install that is not told where to put the
+// content has inspected it rather than installed it.
+func (c *Client) installPackage(ctx context.Context, pkgFile *os.File, onConflict string) (content.Manifest, error) {
 	c.mu.RLock()
 	installer := c.installer
 	c.mu.RUnlock()
@@ -420,7 +466,6 @@ func (c *Client) Install(ctx context.Context, ref PackageRef, onConflict string)
 	if err != nil {
 		return content.Manifest{}, fmt.Errorf("unpack package: %w", err)
 	}
-
 	return m, nil
 }
 

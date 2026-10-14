@@ -137,6 +137,17 @@ func generateJSON(ctx context.Context, gen Generator, prompt, schema string, v a
 }
 
 // Generate creates a System from a Brief using the provided Generator.
+// stepReporter calls a caller's step callback when it has one. The callback is optional
+// because a caller that only wants the finished system does not care how it was built, and
+// every stage reports through here so no stage can be forgotten.
+type stepReporter struct{ report func(Step) }
+
+func (r stepReporter) step(name, status, detail string) {
+	if r.report != nil {
+		r.report(Step{Name: name, Status: status, Detail: detail})
+	}
+}
+
 func Generate(ctx context.Context, gen Generator, brief Brief, onStep ...func(Step)) (System, error) {
 	if gen == nil {
 		return System{}, fmt.Errorf("sysgen: no generator configured")
@@ -145,77 +156,33 @@ func Generate(ctx context.Context, gen Generator, brief Brief, onStep ...func(St
 		return System{}, err
 	}
 
-	var stepCallback func(Step)
+	var steps stepReporter
 	if len(onStep) > 0 && onStep[0] != nil {
-		stepCallback = onStep[0]
-	}
-	emitStep := func(name, status, detail string) {
-		if stepCallback != nil {
-			stepCallback(Step{Name: name, Status: status, Detail: detail})
-		}
+		steps.report = onStep[0]
 	}
 
-	tpl, choice, err := chooseTemplate(ctx, gen, brief)
+	tpl, choice, err := chooseShape(ctx, gen, brief, steps)
 	if err != nil {
-		emitStep(StepShape, StatusError, err.Error())
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
-	shapeDetail := tpl.Resolution
-	if reason := strings.TrimSpace(choice.Reason); reason != "" {
-		shapeDetail = reason
-	}
-	emitStep(StepShape, StatusDone, shapeDetail)
 
-	params, err := fillParams(ctx, gen, tpl, brief)
+	mech, err := buildMechanics(ctx, gen, tpl, brief, steps)
 	if err != nil {
-		emitStep(StepSchema, StatusError, err.Error())
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
-	mech, err := tpl.Build(params)
-	if err != nil {
-		emitStep(StepSchema, StatusError, err.Error())
-		return System{}, fmt.Errorf("sysgen: %w", err)
-	}
-	emitStep(StepSchema, StatusDone, tpl.ID)
 
 	hatches := requestedHatches(brief)
-	var script string
-	if len(hatches) > 0 {
-		script, err = runHooks(ctx, gen, brief, mech, hatches)
-		if err != nil {
-			emitStep(StepHooks, StatusError, err.Error())
-			return System{}, fmt.Errorf("sysgen: %w", err)
-		}
-		emitStep(StepHooks, StatusDone, strings.Join(hatches, ", "))
-	} else {
-		emitStep(StepHooks, StatusDone, "no escape hatch requested")
-	}
-
-	rules, err := runRules(ctx, gen, brief, mech)
+	script, err := generateScript(ctx, gen, brief, mech, hatches, steps)
 	if err != nil {
-		emitStep(StepRules, StatusError, err.Error())
 		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
-	emitStep(StepRules, StatusDone, "")
 
-	var notes []string
-	if gaps := strings.TrimSpace(choice.Gaps); gaps != "" {
-		notes = append(notes, gaps)
-	}
-	if len(hatches) > 0 {
-		notes = append(notes, "Generated JavaScript for: "+strings.Join(hatches, ", "))
+	rules, err := generateRules(ctx, gen, brief, mech, steps)
+	if err != nil {
+		return System{}, fmt.Errorf("sysgen: %w", err)
 	}
 
-	name := brief.Name
-	if name == "" {
-		name = "Custom System"
-	}
-
-	id := entity.Slugify(name)
-	if id == "" {
-		id = "custom-system"
-	}
-
+	id, name := systemIdentity(brief)
 	s := System{
 		ID:          id,
 		Name:        name,
@@ -225,53 +192,160 @@ func Generate(ctx context.Context, gen Generator, brief Brief, onStep ...func(St
 		Script:      script,
 		RulesPrompt: rules,
 		Verify:      VerifyResult{Script: strings.TrimSpace(script) != ""},
-		Notes:       notes,
+		Notes:       generationNotes(choice, hatches),
 	}
 
+	verifySystem(&s, steps)
+	return s, nil
+}
+
+// chooseShape picks the template a system is built from and reports what it chose: the reason
+// the chooser gave when it gave one, and the template's own resolution otherwise.
+func chooseShape(ctx context.Context, gen Generator, brief Brief, steps stepReporter) (Template, templateChoice, error) {
+	tpl, choice, err := chooseTemplate(ctx, gen, brief)
+	if err != nil {
+		steps.step(StepShape, StatusError, err.Error())
+		return Template{}, templateChoice{}, err
+	}
+
+	detail := tpl.Resolution
+	if reason := strings.TrimSpace(choice.Reason); reason != "" {
+		detail = reason
+	}
+	steps.step(StepShape, StatusDone, detail)
+	return tpl, choice, nil
+}
+
+// buildMechanics fills the chosen template's parameters and builds the mechanics from them.
+// Both halves report as the schema step, because they are one stage of the generation: a
+// caller watching does not need to know which half failed.
+func buildMechanics(ctx context.Context, gen Generator, tpl Template, brief Brief, steps stepReporter) (*core.MechanicsSpec, error) {
+	params, err := fillParams(ctx, gen, tpl, brief)
+	if err != nil {
+		steps.step(StepSchema, StatusError, err.Error())
+		return nil, err
+	}
+	mech, err := tpl.Build(params)
+	if err != nil {
+		steps.step(StepSchema, StatusError, err.Error())
+		return nil, err
+	}
+	steps.step(StepSchema, StatusDone, tpl.ID)
+	return mech, nil
+}
+
+// generateScript generates the escape hatches a brief asked for. A brief that asked for none
+// reports that rather than skipping the step, so a caller sees every stage of the generation
+// whether or not there was work in it.
+func generateScript(ctx context.Context, gen Generator, brief Brief, mech *core.MechanicsSpec, hatches []string, steps stepReporter) (string, error) {
+	if len(hatches) == 0 {
+		steps.step(StepHooks, StatusDone, "no escape hatch requested")
+		return "", nil
+	}
+
+	script, err := runHooks(ctx, gen, brief, mech, hatches)
+	if err != nil {
+		steps.step(StepHooks, StatusError, err.Error())
+		return "", err
+	}
+	steps.step(StepHooks, StatusDone, strings.Join(hatches, ", "))
+	return script, nil
+}
+
+// generateRules writes the rules prompt the system ships with.
+func generateRules(ctx context.Context, gen Generator, brief Brief, mech *core.MechanicsSpec, steps stepReporter) (string, error) {
+	rules, err := runRules(ctx, gen, brief, mech)
+	if err != nil {
+		steps.step(StepRules, StatusError, err.Error())
+		return "", err
+	}
+	steps.step(StepRules, StatusDone, "")
+	return rules, nil
+}
+
+// systemIdentity is the id and the name a generated system is saved under. A brief with no
+// name gets one, because a system has to be called something.
+func systemIdentity(brief Brief) (id, name string) {
+	name = brief.Name
+	if name == "" {
+		name = "Custom System"
+	}
+	id = entity.Slugify(name)
+	if id == "" {
+		id = "custom-system"
+	}
+	return id, name
+}
+
+// generationNotes is what a caller is told about how the system was built: the gaps the
+// template choice admitted to, and the escape hatches that got generated code.
+func generationNotes(choice templateChoice, hatches []string) []string {
+	var notes []string
+	if gaps := strings.TrimSpace(choice.Gaps); gaps != "" {
+		notes = append(notes, gaps)
+	}
+	if len(hatches) > 0 {
+		notes = append(notes, "Generated JavaScript for: "+strings.Join(hatches, ", "))
+	}
+	return notes
+}
+
+// verifySystem runs a generated system through a smoke scenario and records what it found.
+// The scenario exercises one check and one action, which is enough to catch a system whose
+// mechanics do not load or whose script does not run; whether the system is any *good* is the
+// player's judgement rather than this one's.
+func verifySystem(s *System, steps stepReporter) {
 	sys := systemtest.System{
 		ID:        s.ID,
 		Script:    s.Script,
 		Mechanics: s.Mechanics,
 	}
 
-	scenario := systemtest.Scenario{Name: "smoke"}
-	if mech != nil {
-		if len(mech.Checks.Profiles) > 0 {
-			keys := make([]string, 0, len(mech.Checks.Profiles))
-			for k := range mech.Checks.Profiles {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
-			scenario.Steps = append(scenario.Steps, systemtest.Step{
-				Action: "check",
-				Input:  keys[0],
-			})
-		}
-		if len(mech.Stats) > 0 {
-			scenario.Steps = append(scenario.Steps, systemtest.Step{
-				Action: "do",
-				Input:  mech.Stats[0].ID,
-			})
-		}
-	}
-
-	failures := systemtest.Run(sys, scenario)
+	failures := systemtest.Run(sys, smokeScenario(s.Mechanics))
 	if len(failures) == 0 {
 		s.Verify.OK = true
-		emitStep(StepVerify, StatusDone, "passed")
-	} else {
-		s.Verify.OK = false
-		for _, f := range failures {
-			detail := f.Detail
-			if f.Scenario != "" && f.Step > 0 {
-				detail = fmt.Sprintf("[%s step %d] %s", f.Scenario, f.Step, f.Detail)
-			} else if f.Scenario != "" {
-				detail = fmt.Sprintf("[%s] %s", f.Scenario, f.Detail)
-			}
-			s.Verify.Failures = append(s.Verify.Failures, detail)
-		}
-		emitStep(StepVerify, StatusDone, fmt.Sprintf("%d failures", len(failures)))
+		steps.step(StepVerify, StatusDone, "passed")
+		return
 	}
 
-	return s, nil
+	s.Verify.OK = false
+	for _, f := range failures {
+		detail := f.Detail
+		if f.Scenario != "" && f.Step > 0 {
+			detail = fmt.Sprintf("[%s step %d] %s", f.Scenario, f.Step, f.Detail)
+		} else if f.Scenario != "" {
+			detail = fmt.Sprintf("[%s] %s", f.Scenario, f.Detail)
+		}
+		s.Verify.Failures = append(s.Verify.Failures, detail)
+	}
+	steps.step(StepVerify, StatusDone, fmt.Sprintf("%d failures", len(failures)))
+}
+
+// smokeScenario is the test a generated system is put through: one check against the first
+// profile it declares, and one action against its first stat. A system that declares neither
+// gets an empty scenario, which passes without proving anything.
+func smokeScenario(mech *core.MechanicsSpec) systemtest.Scenario {
+	scenario := systemtest.Scenario{Name: "smoke"}
+	if mech == nil {
+		return scenario
+	}
+
+	if len(mech.Checks.Profiles) > 0 {
+		keys := make([]string, 0, len(mech.Checks.Profiles))
+		for k := range mech.Checks.Profiles {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		scenario.Steps = append(scenario.Steps, systemtest.Step{
+			Action: "check",
+			Input:  keys[0],
+		})
+	}
+	if len(mech.Stats) > 0 {
+		scenario.Steps = append(scenario.Steps, systemtest.Step{
+			Action: "do",
+			Input:  mech.Stats[0].ID,
+		})
+	}
+	return scenario
 }
