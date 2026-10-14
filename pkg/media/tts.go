@@ -483,41 +483,27 @@ func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string,
 	return p.SynthesizeUtteranceForce(ctx, speakerID, voice, text, false)
 }
 
+// speechIdentity is the voice a synthesis speaks in and the provider that voices it. The
+// pitch and the rate live here too because a log wants them, but they are not part of the
+// cache key: the key is what makes one request different from another, and this is what
+// makes it legible.
+type speechIdentity struct {
+	voiceID  string
+	pitch    float64
+	rate     float64
+	provider string
+	model    string
+}
+
 func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID string, voice *entity.VoiceConfig, text string, force bool) (string, error) {
 	base := ComputeAudioCacheKeyForVoice(speakerID, voice, text)
 	start := time.Now()
-
-	voiceID, pitch, rate := "", 0.0, 0.0
-	provider, model := "", ""
-	if voice != nil {
-		voiceID, pitch, rate = voice.VoiceID, voice.Pitch, voice.SpeechRate
-		provider = voice.Provider
-		if value, ok := voice.Options["model"].(string); ok {
-			model = value
-		}
-	}
+	id := speechIdentityOf(voice)
 	logger := trace.OrNil(p.logger)
-	logger.Event("media.tts.request", map[string]any{
-		"speaker":   speakerID,
-		"voice_id":  voiceID,
-		"provider":  provider,
-		"model":     model,
-		"pitch":     pitch,
-		"rate":      rate,
-		"chars":     len([]rune(text)),
-		"cache_key": base,
-	})
+	logSpeechRequest(logger, speakerID, id, text, base)
 
 	if !force {
-		if path, ok := p.cachedClip(base); ok {
-			mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "hit")))
-			mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
-				otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", true)))
-			logger.Event("media.tts.result", map[string]any{
-				"cache_hit":   true,
-				"duration_ms": time.Since(start).Milliseconds(),
-			})
-			p.setLastUsage(Usage{})
+		if path, ok := p.cachedUtterance(ctx, base, start, logger); ok {
 			return path, nil
 		}
 	}
@@ -534,60 +520,133 @@ func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID st
 		}
 	}
 
+	audioBytes, err := p.synthesizeUtterance(ctx, speakerID, id, voice, text, logger)
+	if err != nil {
+		return "", err
+	}
+
+	encoded, err := normaliseToOpus(audioBytes, p.opusBitrate)
+	if err != nil {
+		return "", err
+	}
+
+	p.recordUtterance(ctx, id, start, len(encoded), logger)
+	p.setLastUsage(p.usageFor(text))
+	return p.cache.Put("audio", base+".opus", encoded)
+}
+
+// speechIdentityOf reads the voice a request speaks in. A nil voice is an unconfigured one,
+// which is what the provider's own defaults are for. It is not the same question as group.go's
+// voiceIdentity, which names a voice rather than describing one.
+func speechIdentityOf(voice *entity.VoiceConfig) speechIdentity {
+	var id speechIdentity
+	if voice == nil {
+		return id
+	}
+	id.voiceID, id.pitch, id.rate = voice.VoiceID, voice.Pitch, voice.SpeechRate
+	id.provider = voice.Provider
+	if value, ok := voice.Options["model"].(string); ok {
+		id.model = value
+	}
+	return id
+}
+
+// logSpeechRequest records what a synthesis is about to ask for: the voice, the provider, and
+// the size of the text, which is what tells a slow provider from a large request.
+func logSpeechRequest(logger trace.Logger, speakerID string, id speechIdentity, text, cacheKey string) {
+	logger.Event("media.tts.request", map[string]any{
+		"speaker":   speakerID,
+		"voice_id":  id.voiceID,
+		"provider":  id.provider,
+		"model":     id.model,
+		"pitch":     id.pitch,
+		"rate":      id.rate,
+		"chars":     len([]rune(text)),
+		"cache_key": cacheKey,
+	})
+}
+
+// cachedUtterance is the clip a cache key already holds, counted and reported as a hit. The
+// probe after the lock says nothing, because by then the request has already been counted.
+func (p *TTSPipeline) cachedUtterance(ctx context.Context, base string, start time.Time, logger trace.Logger) (string, bool) {
+	path, ok := p.cachedClip(base)
+	if !ok {
+		return "", false
+	}
+
+	mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "hit")))
+	mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
+		otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", true)))
+	logger.Event("media.tts.result", map[string]any{
+		"cache_hit":   true,
+		"duration_ms": time.Since(start).Milliseconds(),
+	})
+	p.setLastUsage(Usage{})
+	return path, true
+}
+
+// synthesizeUtterance asks the provider for the speech and maps a failure into this
+// application's own vocabulary. A provider failure is also counted against the role and the
+// provider it came from, so a failing provider shows up on its own.
+func (p *TTSPipeline) synthesizeUtterance(ctx context.Context, speakerID string, id speechIdentity, voice *entity.VoiceConfig, text string, logger trace.Logger) ([]byte, error) {
 	audioBytes, err := p.client.Synthesize(ctx, text, voice)
 	if err != nil {
 		code := harness.ClassifyProviderError(err)
 		logger.Event("media.tts.error", map[string]any{
 			"speaker":  speakerID,
-			"provider": provider,
+			"provider": id.provider,
 			"code":     string(code),
 			"error":    err.Error(),
 		})
 		mediaMetrics().providerErrors.Add(ctx, 1, otelmetric.WithAttributes(
 			attribute.String("localrpg.role", "tts"),
 			attribute.String("error.kind", string(code)),
-			attribute.String("gen_ai.system", provider),
+			attribute.String("gen_ai.system", id.provider),
 		))
-		return "", &harness.GenerationFailure{
+		return nil, &harness.GenerationFailure{
 			Code:    code,
 			Message: fmt.Sprintf("synthesize utterance: %v", err),
 			Cause:   err,
 		}
 	}
+	return audioBytes, nil
+}
 
-	// Normalise whatever the provider returned into Ogg/Opus, so the cache holds
-	// exactly one format and playback decodes one codec.
+// normaliseToOpus decodes whatever the provider returned and encodes it as Ogg/Opus, so the
+// cache holds exactly one format and playback decodes one codec.
+func normaliseToOpus(audioBytes []byte, bitrate int) ([]byte, error) {
 	pcm, inRate, inChannels, decodeErr := DecodeProviderAudio(audioBytes, "")
 	if decodeErr != nil {
-		return "", &harness.GenerationFailure{
+		return nil, &harness.GenerationFailure{
 			Code:    harness.FailureProviderError,
 			Message: fmt.Sprintf("normalise speech: %v", decodeErr),
 			Cause:   decodeErr,
 		}
 	}
-	encoded, encodeErr := opus.Encode(pcm, inRate, inChannels, p.opusBitrate)
+	encoded, encodeErr := opus.Encode(pcm, inRate, inChannels, bitrate)
 	if encodeErr != nil {
-		return "", &harness.GenerationFailure{
+		return nil, &harness.GenerationFailure{
 			Code:    harness.FailureProviderError,
 			Message: fmt.Sprintf("encode speech: %v", encodeErr),
 			Cause:   encodeErr,
 		}
 	}
+	return encoded, nil
+}
 
+// recordUtterance counts the miss and reports the clip it produced.
+func (p *TTSPipeline) recordUtterance(ctx context.Context, id speechIdentity, start time.Time, size int, logger trace.Logger) {
 	mediaMetrics().ttsCache.Add(ctx, 1, otelmetric.WithAttributes(attribute.String("localrpg.cache.result", "miss")))
-	mediaMetrics().ttsBytes.Record(ctx, int64(len(encoded)), otelmetric.WithAttributes(attribute.String("localrpg.tts.provider", provider)))
+	mediaMetrics().ttsBytes.Record(ctx, int64(size), otelmetric.WithAttributes(attribute.String("localrpg.tts.provider", id.provider)))
 	mediaMetrics().ttsDuration.Record(ctx, float64(time.Since(start).Milliseconds()),
 		otelmetric.WithAttributes(attribute.Bool("localrpg.cache.hit", false)))
 
 	logger.Event("media.tts.result", map[string]any{
 		"cache_hit":    false,
-		"bytes":        len(encoded),
+		"bytes":        size,
 		"content_type": "audio/ogg",
 		"duration_ms":  time.Since(start).Milliseconds(),
 	})
-
-	p.setLastUsage(p.usageFor(text))
-	return p.cache.Put("audio", base+".opus", encoded)
 }
 
 // usageFor reports what a synthesis consumed: the client's own report when it

@@ -43,7 +43,19 @@ func NewJSEngine(bridge GameHostAPI) *JSEngine {
 	return engine
 }
 
+// bindHostAPI exposes the host to the mechanics VM, in the groups a hook uses it in: what it
+// can read and write, where it is, what it can say, what it can award, and how it registers
+// itself to be called back.
 func (j *JSEngine) bindHostAPI() {
+	j.bindStateAPI()
+	j.bindLocationAPI()
+	j.bindHostMessaging()
+	j.bindAdvancementAPI()
+	j.bindHookRegistration()
+}
+
+// bindStateAPI is the dice and the entity state: a hook rolls, reads a stat, and writes one.
+func (j *JSEngine) bindStateAPI() {
 	j.vm.Set("roll", func(call goja.FunctionCall) goja.Value {
 		notation := call.Argument(0).String()
 		res, err := j.bridge.Roll(notation)
@@ -72,7 +84,10 @@ func (j *JSEngine) bindHostAPI() {
 		}
 		return goja.Undefined()
 	})
+}
 
+// bindLocationAPI is where the scene is: where it is now, and where a hook moves it.
+func (j *JSEngine) bindLocationAPI() {
 	j.vm.Set("getLocation", func(call goja.FunctionCall) goja.Value {
 		locationID, err := j.bridge.GetLocation()
 		if err != nil {
@@ -88,7 +103,11 @@ func (j *JSEngine) bindHostAPI() {
 		}
 		return goja.Undefined()
 	})
+}
 
+// bindHostMessaging is what a hook can say to the host rather than to the fiction: a
+// directive the GM is told about, and a line for the log.
+func (j *JSEngine) bindHostMessaging() {
 	j.vm.Set("injectGMDirection", func(call goja.FunctionCall) goja.Value {
 		dir := call.Argument(0).String()
 		j.bridge.InjectGMDirection(dir)
@@ -100,7 +119,14 @@ func (j *JSEngine) bindHostAPI() {
 		j.bridge.Log(msg)
 		return goja.Undefined()
 	})
+}
 
+// bindAdvancementAPI awards experience, and answers false rather than throwing when the
+// system declares no advancement at all: a hook in a system without levels still runs.
+//
+// The spec comes from the manifest this engine was handed, and the player it is awarded to
+// comes from the bridge when the bridge knows who that is.
+func (j *JSEngine) bindAdvancementAPI() {
 	j.vm.Set("grantXP", func(call goja.FunctionCall) goja.Value {
 		if j.manifest == nil || j.manifest.Mechanics == nil || j.manifest.Mechanics.Advancement == nil {
 			return j.vm.ToValue(false)
@@ -115,7 +141,13 @@ func (j *JSEngine) bindHostAPI() {
 		}
 		return j.vm.ToValue(true)
 	})
+}
 
+// bindHookRegistration is how a mechanics file registers itself: one binding per moment the
+// engine calls back at. A handler that is not a function is refused here rather than at the
+// moment the engine reaches for it, which is the difference between a clear error while
+// loading a system and a confusing one mid-turn.
+func (j *JSEngine) bindHookRegistration() {
 	j.vm.Set("onAction", func(call goja.FunctionCall) goja.Value {
 		actionType := call.Argument(0).String()
 		fn, ok := goja.AssertFunction(call.Argument(1))

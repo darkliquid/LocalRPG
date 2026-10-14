@@ -192,6 +192,36 @@ func groupBeatShares(segments []entity.TurnSegment, groups map[int]ClipGroup) ma
 
 // Compile walks the campaign's turns, grouping them into scenes by location and
 // flattening each turn's segments into beats.
+// scriptCounts is what a compile counts as it goes: the beats that can speak at all, the ones
+// with audio behind them, and the split by kind. The split is kept as the script is built, so
+// the report never has to guess what a beat turned out to be.
+type scriptCounts struct {
+	spoken    int
+	withAudio int
+	byKind    map[BeatKind][2]int
+}
+
+func newScriptCounts() *scriptCounts {
+	return &scriptCounts{byKind: map[BeatKind][2]int{}}
+}
+
+// spoke records one beat that can speak, and whether it has a clip behind it.
+func (c *scriptCounts) spoke(kind BeatKind, outcome audioOutcome) {
+	switch outcome {
+	case outcomeClips:
+		c.spoken++
+		c.withAudio++
+		entry := c.byKind[kind]
+		entry[0]++
+		c.byKind[kind] = entry
+	case outcomeSilent:
+		c.spoken++
+		entry := c.byKind[kind]
+		entry[1]++
+		c.byKind[kind] = entry
+	}
+}
+
 func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*Script, error) {
 	turns, err := c.source.Turns()
 	if err != nil {
@@ -202,153 +232,167 @@ func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*S
 	}
 
 	script := &Script{GameID: gameID, WorldStyle: opts.WorldStyle, Genre: opts.Genre, Banner: opts.BannerPath}
+	counts := newScriptCounts()
 	var silent silence
-	// Spoken beats are the ones that can speak at all: a beat that reduces to nothing is
-	// never spoken, so it is not one of them. The split by kind is kept as the script is
-	// built, so the report never has to guess what a beat turned out to be.
-	spoken, withAudio := 0, 0
-	byKind := map[BeatKind][2]int{}
 
-	// The protagonist's portrait is resolved once: the theatre keeps it on stage for
-	// the whole story rather than per beat.
-	if c.portraits != nil && opts.PlayerID != "" {
-		if path, err := c.portraits.Portrait(ctx, opts.PlayerID); err == nil {
-			script.PlayerPortrait = path
-		}
-	}
+	c.compilePlayerPortrait(ctx, script, opts)
 
 	for i, turn := range turns {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-
-		// An unlocated turn always opens its own scene: "unknown" is not a place,
-		// so two of them are not the same place either.
-		newScene := len(script.Scenes) == 0 ||
-			turn.Location == "" ||
-			script.Scenes[len(script.Scenes)-1].LocationID != turn.Location
-		if newScene {
-			script.Scenes = append(script.Scenes, c.openScene(turn.Location, opts))
-		}
-		current := &script.Scenes[len(script.Scenes)-1]
-
-		// A turn's audio is planned as groups first, so a run of beats that shares
-		// one clip is synthesized once and the clip plays across the run: its first
-		// beat carries the clip, and every beat in the run takes a share of its
-		// duration so the run advances under the audio.
-		groupClips, covered := c.turnGroups(ctx, turn.Segments, opts)
-		shares := groupBeatShares(turn.Segments, groupClips)
-
-		for segmentIndex, segment := range turn.Segments {
-			// A turn's own illustration wins over the scene's backdrop, so an
-			// export shows the moment the app showed rather than only the place.
-			art := current.ArtPath
-			if opts.Art {
-				if turnArt, ok := TurnArt(opts.AssetsDir, turn.Number); ok {
-					art = turnArt
-				}
-			}
-
-			beat := Beat{
-				Kind:       beatKind(segment.Kind),
-				TurnNumber: turn.Number,
-				Speaker:    segment.Speaker,
-				SpeakerID:  segment.SpeakerID,
-				Text:       segment.Text,
-				ArtPath:    art,
-				Player:     segment.Player,
-				Outcome:    turn.Outcome,
-			}
-
-			if opts.Audio {
-				outcome := outcomeUnspoken
-				switch {
-				case c.speech == nil:
-					// Audio was asked for and no provider can give it: the most common
-					// silent bundle, and the one most worth explaining.
-					silent.note(errNoSpeechProvider)
-					outcome = outcomeSilent
-				case groupClips != nil:
-					if group, ok := groupClips[segmentIndex]; ok {
-						if !covered[segmentIndex] {
-							beat.AudioPaths = group.AudioPaths
-							beat.AudioDuration = group.Duration
-						}
-						if len(group.AudioPaths) > 0 {
-							outcome = outcomeClips
-						} else {
-							outcome = outcomeSilent
-						}
-					} else {
-						outcome = c.resolveAudio(ctx, &beat, segment, &silent)
-					}
-				default:
-					outcome = c.resolveAudio(ctx, &beat, segment, &silent)
-				}
-
-				switch outcome {
-				case outcomeClips:
-					spoken++
-					withAudio++
-					entry := byKind[beat.Kind]
-					entry[0]++
-					byKind[beat.Kind] = entry
-				case outcomeSilent:
-					spoken++
-					entry := byKind[beat.Kind]
-					entry[1]++
-					byKind[beat.Kind] = entry
-				}
-			}
-			c.resolvePortrait(ctx, &beat, segment)
-
-			beat.Duration = BeatDuration(beat)
-			if share, ok := shares[segmentIndex]; ok && share > 0 {
-				beat.Duration = share
-			}
-			current.Beats = append(current.Beats, beat)
-			current.Duration += beat.Duration
-		}
-
+		c.compileTurn(ctx, script, turn, counts, &silent, opts)
 		emitProgress(opts.Progress, Progress{Phase: "compile", Done: i + 1, Total: len(turns)})
 	}
 
-	// Sum the scenes rather than tracking a running total beside them, so the card
-	// durations counted in openScene cannot be forgotten here.
-	for _, sc := range script.Scenes {
-		script.TotalDuration += sc.Duration
+	script.TotalDuration = totalSceneDuration(script.Scenes)
+	script.Chapters = chaptersFor(script.Scenes)
+
+	reportCompileCoverage(opts, counts, silent)
+	return script, nil
+}
+
+// compilePlayerPortrait resolves the protagonist's portrait once: the theatre keeps it on stage
+// for the whole story rather than per beat, so resolving it per beat would be the same answer
+// asked for a hundred times.
+func (c *Compiler) compilePlayerPortrait(ctx context.Context, script *Script, opts Options) {
+	if c.portraits == nil || opts.PlayerID == "" {
+		return
+	}
+	if path, err := c.portraits.Portrait(ctx, opts.PlayerID); err == nil {
+		script.PlayerPortrait = path
+	}
+}
+
+// compileTurn appends one recorded turn to the script: the scene it opens when it is somewhere
+// new, and every segment in it as a beat.
+//
+// A turn's audio is planned as groups first, so a run of beats that shares one clip is
+// synthesized once and the clip plays across the run: its first beat carries the clip, and
+// every beat in the run takes a share of its duration so the run advances under the audio.
+func (c *Compiler) compileTurn(ctx context.Context, script *Script, turn engine.Turn, counts *scriptCounts, silent *silence, opts Options) {
+	// An unlocated turn always opens its own scene: "unknown" is not a place, so two of
+	// them are not the same place either.
+	newScene := len(script.Scenes) == 0 ||
+		turn.Location == "" ||
+		script.Scenes[len(script.Scenes)-1].LocationID != turn.Location
+	if newScene {
+		script.Scenes = append(script.Scenes, c.openScene(turn.Location, opts))
+	}
+	current := &script.Scenes[len(script.Scenes)-1]
+
+	groupClips, covered := c.turnGroups(ctx, turn.Segments, opts)
+	shares := groupBeatShares(turn.Segments, groupClips)
+
+	for segmentIndex, segment := range turn.Segments {
+		beat := Beat{
+			Kind:       beatKind(segment.Kind),
+			TurnNumber: turn.Number,
+			Speaker:    segment.Speaker,
+			SpeakerID:  segment.SpeakerID,
+			Text:       segment.Text,
+			ArtPath:    turnArtFor(current.ArtPath, turn.Number, opts),
+			Player:     segment.Player,
+			Outcome:    turn.Outcome,
+		}
+
+		if opts.Audio {
+			group, inGroup := groupClips[segmentIndex]
+			counts.spoke(beat.Kind, c.resolveBeatAudio(ctx, &beat, segment, group, inGroup, covered[segmentIndex], silent))
+		}
+		c.resolvePortrait(ctx, &beat, segment)
+
+		beat.Duration = BeatDuration(beat)
+		if share, ok := shares[segmentIndex]; ok && share > 0 {
+			beat.Duration = share
+		}
+		current.Beats = append(current.Beats, beat)
+		current.Duration += beat.Duration
+	}
+}
+
+// turnArtFor is the picture a beat plays over: the turn's own illustration when the export
+// asked for art and one exists, and the scene's backdrop otherwise, so an export shows the
+// moment the app showed rather than only the place.
+func turnArtFor(sceneArt string, turnNumber int, opts Options) string {
+	if !opts.Art {
+		return sceneArt
+	}
+	if turnArt, ok := TurnArt(opts.AssetsDir, turnNumber); ok {
+		return turnArt
+	}
+	return sceneArt
+}
+
+// resolveBeatAudio gives a beat the clips it plays and reports what happened, so the compile
+// can count it. A beat covered by a group takes that group's clip; one the groups did not
+// cover is resolved on its own.
+func (c *Compiler) resolveBeatAudio(ctx context.Context, beat *Beat, segment entity.TurnSegment, group ClipGroup, inGroup, covered bool, silent *silence) audioOutcome {
+	if c.speech == nil {
+		// Audio was asked for and no provider can give it: the most common silent
+		// bundle, and the one most worth explaining.
+		silent.note(errNoSpeechProvider)
+		return outcomeSilent
+	}
+	if !inGroup {
+		return c.resolveAudio(ctx, beat, segment, silent)
 	}
 
-	// Chapters are the scenes as navigable boundaries: the title from the location
-	// and the start from the running total, so the web and the video agree on where
-	// a scene begins.
+	if !covered {
+		beat.AudioPaths = group.AudioPaths
+		beat.AudioDuration = group.Duration
+	}
+	if len(group.AudioPaths) > 0 {
+		return outcomeClips
+	}
+	return outcomeSilent
+}
+
+// totalSceneDuration is the script's length, summed from the scenes rather than tracked beside
+// them, so the card durations counted in openScene cannot be forgotten here.
+func totalSceneDuration(scenes []Scene) time.Duration {
+	var total time.Duration
+	for _, sc := range scenes {
+		total += sc.Duration
+	}
+	return total
+}
+
+// chaptersFor turns the scenes into navigable boundaries: the title from the location and the
+// start from the running total, so the web and the video agree on where a scene begins.
+func chaptersFor(scenes []Scene) []Chapter {
+	var chapters []Chapter
 	start := time.Duration(0)
-	for _, sc := range script.Scenes {
-		script.Chapters = append(script.Chapters, Chapter{Title: chapterTitle(sc), Start: start})
+	for _, sc := range scenes {
+		chapters = append(chapters, Chapter{Title: chapterTitle(sc), Start: start})
 		start += sc.Duration
 	}
+	return chapters
+}
 
-	// What the script can actually say, split by kind: a bundle whose characters are silent
-	// looks the same as one whose narration is, unless the export says which.
-	coverage := coverageReport(spoken, withAudio, byKind)
+// reportCompileCoverage says what the script can actually speak, split by kind: a bundle whose
+// characters are silent looks the same as one whose narration is, unless the export says which.
+// The silent beats are reported after it, because a bundle that cannot speak should say why.
+func reportCompileCoverage(opts Options, counts *scriptCounts, silent silence) {
+	coverage := coverageReport(counts.spoken, counts.withAudio, counts.byKind)
 	if opts.OnProgress != nil {
 		opts.OnProgress("%s", coverage)
 	}
 	emitProgress(opts.Progress, Progress{Phase: "compile", Message: coverage})
 
-	if silent.beats > 0 {
-		message := fmt.Sprintf("%d beats have no audio clip and will play silently", silent.beats)
-		if silent.first != nil {
-			// A bundle that cannot speak should say why it is quiet: the reason is the
-			// difference between a campaign with no clips and a provider that failed.
-			message = fmt.Sprintf("%d beats have no audio clip (first failure: %v) and will play silently", silent.beats, silent.first)
-		}
-		if opts.OnProgress != nil {
-			opts.OnProgress("%s", message)
-		}
-		emitProgress(opts.Progress, Progress{Phase: "compile", Message: message})
+	if silent.beats == 0 {
+		return
 	}
-	return script, nil
+	message := fmt.Sprintf("%d beats have no audio clip and will play silently", silent.beats)
+	if silent.first != nil {
+		// A bundle that cannot speak should say why it is quiet: the reason is the
+		// difference between a campaign with no clips and a provider that failed.
+		message = fmt.Sprintf("%d beats have no audio clip (first failure: %v) and will play silently", silent.beats, silent.first)
+	}
+	if opts.OnProgress != nil {
+		opts.OnProgress("%s", message)
+	}
+	emitProgress(opts.Progress, Progress{Phase: "compile", Message: message})
 }
 
 // chapterTitle names a scene's chapter: its location, or a neutral fallback for

@@ -749,138 +749,178 @@ func (c *Config) MechanicsWorldTickTurns() int {
 	return c.Mechanics.WorldTickTurns
 }
 
+// DefaultConfig is the configuration the application starts from: every section at a value
+// that works with no provider, no model and no network, so a first run explains itself rather
+// than failing.
 func DefaultConfig() *Config {
 	return &Config{
-		Version: CurrentVersion,
-		Paths:   PathsConfig{},
-		Agents: AgentsConfig{
-			DefaultRole:         "gm",
-			TurnTimeoutSeconds:  300,
-			ChunkTimeoutSeconds: 60,
-			RecentTurnWindow:    6,
-			RecentTurnCharLimit: 1200,
-			SummaryEvery:        10,
-			SummaryCharLimit:    2000,
-			Completion: CompletionConfig{
-				Mode:               "trim",
-				MaxAttempts:        1,
-				MaxRepairAttempts:  2,
-				TailChars:          1500,
-				MinIncompleteChars: 24,
-				TimeoutSeconds:     45,
-			},
+		Version:     CurrentVersion,
+		Paths:       PathsConfig{},
+		Agents:      defaultAgents(),
+		Media:       defaultMedia(),
+		Embeddings:  defaultEmbeddings(),
+		Preferences: defaultPreferences(),
+		Telemetry:   defaultTelemetry(),
+		Publishers:  make(map[string]string),
+	}
+}
 
-			ToolRounds:      0,
-			ToolResultChars: 4000,
-			Roles: map[string]AgentRoleConfig{
-				"gm": {
-					Type:        "cli",
-					Command:     "echo",
-					Args:        []string{},
-					Temperature: 0.7,
-					MaxTokens:   1024,
-				},
-				"narrator": {
-					Type: "disabled",
-				},
-				RoleExtractor: {
-					Type:        "inherit",
-					InheritFrom: RoleGM,
-				},
-				RoleCompletion: {
-					Type:        "inherit",
-					InheritFrom: RoleGM,
-				},
-			},
-			Fallbacks: make(map[string]string),
+// defaultAgents is the agent section: the GM on the built-in echo provider, so a campaign can
+// be played before anything is configured, with the extractor and the completion checker
+// inheriting the GM role rather than naming a provider of their own.
+func defaultAgents() AgentsConfig {
+	return AgentsConfig{
+		DefaultRole:         "gm",
+		TurnTimeoutSeconds:  300,
+		ChunkTimeoutSeconds: 60,
+		RecentTurnWindow:    6,
+		RecentTurnCharLimit: 1200,
+		SummaryEvery:        10,
+		SummaryCharLimit:    2000,
+		Completion: CompletionConfig{
+			Mode:               "trim",
+			MaxAttempts:        1,
+			MaxRepairAttempts:  2,
+			TailChars:          1500,
+			MinIncompleteChars: 24,
+			TimeoutSeconds:     45,
 		},
-		Media: MediaConfig{
-			TTS: TTSConfig{
-				Type:         "disabled",
-				DefaultVoice: "default",
-				Pitch:        1.0,
-				SpeechRate:   1.0,
-				AutoPlay:     false,
-				MasterVolume: 1.0,
-				VoiceProfiles: []VoiceProfile{
-					{
-						ID:          "elder_sage",
-						Name:        "Elder Sage / Veteran",
-						VoiceID:     "bm_george",
-						Pitch:       0.85,
-						SpeechRate:  0.90,
-						Tags:        []string{"elder", "male", "wise", "gravelly", "veteran"},
-						Description: "Ancient wizards, battle-weary commanders, village elders.",
-					},
-					{
-						ID:          "young_scout",
-						Name:        "Young Scout / Rogue",
-						VoiceID:     "af_bella",
-						Pitch:       1.05,
-						SpeechRate:  1.10,
-						Tags:        []string{"young", "female", "quick", "eager", "rogue"},
-						Description: "Nimble rangers, streetwise thieves, eager apprentices.",
-					},
-					{
-						ID:          "gruff_blacksmith",
-						Name:        "Gruff Dwarf / Guard",
-						VoiceID:     "am_adam",
-						Pitch:       0.75,
-						SpeechRate:  0.95,
-						Tags:        []string{"stout", "male", "deep", "authoritative", "guard"},
-						Description: "Dwarven smiths, tavern bouncers, fortress wardens.",
-					},
-					{
-						ID:          "sinister_cultist",
-						Name:        "Hushed Mystic / Villain",
-						VoiceID:     "bf_emma",
-						Pitch:       0.90,
-						SpeechRate:  0.85,
-						Tags:        []string{"eerie", "whisper", "sinister", "cultist"},
-						Description: "Shadow mages, deceptive nobles, oracle priestesses.",
-					},
-				},
+
+		ToolRounds:      0,
+		ToolResultChars: 4000,
+		Roles: map[string]AgentRoleConfig{
+			"gm": {
+				Type:        "cli",
+				Command:     "echo",
+				Args:        []string{},
+				Temperature: 0.7,
+				MaxTokens:   1024,
 			},
-			STT: STTConfig{
+			"narrator": {
 				Type: "disabled",
 			},
-			Image: ImageConfig{
-				Type:            "disabled",
-				AutoGenerate:    false,
-				BuiltinFallback: true,
+			RoleExtractor: {
+				Type:        "inherit",
+				InheritFrom: RoleGM,
+			},
+			RoleCompletion: {
+				Type:        "inherit",
+				InheritFrom: RoleGM,
 			},
 		},
-		Embeddings: EmbeddingsConfig{
-			Enabled:    true,
-			Provider:   "builtin-local",
-			Model:      "hash-projection",
-			Dimensions: 384,
-			BatchSize:  16,
-			Providers: map[string]EmbeddingProviderConfig{
-				"builtin-local": {
-					Type:        "builtin",
-					BuiltinName: "hash-projection",
-				},
+		Fallbacks: make(map[string]string),
+	}
+}
+
+// defaultMedia is the media section: nothing is enabled. The voice profiles are there all the
+// same, so voice assignment has something to choose from the moment a provider is configured.
+func defaultMedia() MediaConfig {
+	return MediaConfig{
+		TTS: TTSConfig{
+			Type:          "disabled",
+			DefaultVoice:  "default",
+			Pitch:         1.0,
+			SpeechRate:    1.0,
+			AutoPlay:      false,
+			MasterVolume:  1.0,
+			VoiceProfiles: defaultVoiceProfiles(),
+		},
+		STT: STTConfig{
+			Type: "disabled",
+		},
+		Image: ImageConfig{
+			Type:            "disabled",
+			AutoGenerate:    false,
+			BuiltinFallback: true,
+		},
+	}
+}
+
+// defaultVoiceProfiles are the four voices a character is matched to when nothing has been
+// chosen: an elder, a scout, a smith and a villain, between them covering the register most
+// supporting cast falls into.
+func defaultVoiceProfiles() []VoiceProfile {
+	return []VoiceProfile{
+		{
+			ID:          "elder_sage",
+			Name:        "Elder Sage / Veteran",
+			VoiceID:     "bm_george",
+			Pitch:       0.85,
+			SpeechRate:  0.90,
+			Tags:        []string{"elder", "male", "wise", "gravelly", "veteran"},
+			Description: "Ancient wizards, battle-weary commanders, village elders.",
+		},
+		{
+			ID:          "young_scout",
+			Name:        "Young Scout / Rogue",
+			VoiceID:     "af_bella",
+			Pitch:       1.05,
+			SpeechRate:  1.10,
+			Tags:        []string{"young", "female", "quick", "eager", "rogue"},
+			Description: "Nimble rangers, streetwise thieves, eager apprentices.",
+		},
+		{
+			ID:          "gruff_blacksmith",
+			Name:        "Gruff Dwarf / Guard",
+			VoiceID:     "am_adam",
+			Pitch:       0.75,
+			SpeechRate:  0.95,
+			Tags:        []string{"stout", "male", "deep", "authoritative", "guard"},
+			Description: "Dwarven smiths, tavern bouncers, fortress wardens.",
+		},
+		{
+			ID:          "sinister_cultist",
+			Name:        "Hushed Mystic / Villain",
+			VoiceID:     "bf_emma",
+			Pitch:       0.90,
+			SpeechRate:  0.85,
+			Tags:        []string{"eerie", "whisper", "sinister", "cultist"},
+			Description: "Shadow mages, deceptive nobles, oracle priestesses.",
+		},
+	}
+}
+
+// defaultEmbeddings is retrieval on the built-in hash projection, which needs no model
+// downloaded and no key entered, so recall works on a first run.
+func defaultEmbeddings() EmbeddingsConfig {
+	return EmbeddingsConfig{
+		Enabled:    true,
+		Provider:   "builtin-local",
+		Model:      "hash-projection",
+		Dimensions: 384,
+		BatchSize:  16,
+		Providers: map[string]EmbeddingProviderConfig{
+			"builtin-local": {
+				Type:        "builtin",
+				BuiltinName: "hash-projection",
 			},
 		},
-		Preferences: PreferencesConfig{
-			Streaming:        true,
-			TypingSpeedMS:    15,
-			CinematicEffects: true,
-			FontScale:        "medium",
-		},
-		Telemetry: TelemetryConfig{
-			Enabled:     false,
-			Endpoint:    "localhost:4317",
-			Protocol:    "grpc",
-			Insecure:    true,
-			SampleRatio: 1.0,
-			Traces:      true,
-			Metrics:     true,
-			Logs:        true,
-			ServiceName: "localrpg",
-		},
-		Publishers: make(map[string]string),
+	}
+}
+
+// defaultPreferences is how the app looks and plays before the player changes anything.
+func defaultPreferences() PreferencesConfig {
+	return PreferencesConfig{
+		Streaming:        true,
+		TypingSpeedMS:    15,
+		CinematicEffects: true,
+		FontScale:        "medium",
+	}
+}
+
+// defaultTelemetry is tracing off, pointed at the conventional local collector, so enabling it
+// is one field rather than a section to fill in.
+func defaultTelemetry() TelemetryConfig {
+	return TelemetryConfig{
+		Enabled:     false,
+		Endpoint:    "localhost:4317",
+		Protocol:    "grpc",
+		Insecure:    true,
+		SampleRatio: 1.0,
+		Traces:      true,
+		Metrics:     true,
+		Logs:        true,
+		ServiceName: "localrpg",
 	}
 }
 
