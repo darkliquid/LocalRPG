@@ -318,47 +318,8 @@ func (e *Executor) searchTimeline(ctx context.Context, arguments map[string]any)
 	limit := intArgument(arguments, "limit", defaultLimit)
 	entityFilter := stringArgument(arguments, "entity")
 
-	var ftsHits []storage.SearchTurnHit
-	if match != "" {
-		hits, err := e.store.SearchTurns(match, entityFilter, limit*2)
-		if err == nil {
-			ftsHits = hits
-		}
-	}
-
-	var vecTurnNumbers []string
-	if e.embeddingsProvider != nil && rawQuery != "" {
-		vecs, err := e.embeddingsProvider.Embed(ctx, []string{rawQuery})
-		if err == nil {
-			e.reportEmbeddingUsage()
-		}
-		if err == nil && len(vecs) > 0 {
-			vHits, err := e.store.SearchSimilarVectors(ctx, []string{"turn"}, e.embeddingsProvider.ID(), vecs[0], limit*2)
-			if err == nil {
-				for _, vh := range vHits {
-					if entityFilter != "" {
-						num, _ := strconv.Atoi(vh.TargetID)
-						turnRec, err := e.store.GetTurn(num)
-						if err != nil || turnRec == nil {
-							continue
-						}
-						// Check if entity is mentioned in turn
-						mentioned := false
-						for _, m := range turnRec.Entities {
-							if m.EntityID == entityFilter {
-								mentioned = true
-								break
-							}
-						}
-						if !mentioned {
-							continue
-						}
-					}
-					vecTurnNumbers = append(vecTurnNumbers, vh.TargetID)
-				}
-			}
-		}
-	}
+	ftsHits := e.searchTimelineFTS(match, entityFilter, limit)
+	vecTurnNumbers := e.searchTimelineVector(ctx, rawQuery, entityFilter, limit)
 
 	if len(ftsHits) == 0 && len(vecTurnNumbers) == 0 {
 		return "No turns matched.", true
@@ -377,6 +338,60 @@ func (e *Executor) searchTimeline(ctx context.Context, arguments map[string]any)
 		return "No turns matched.", true
 	}
 
+	return e.cap(e.formatTimelineHits(fusedNumbers, ftsMap)), true
+}
+
+func (e *Executor) searchTimelineFTS(match, entityFilter string, limit int) []storage.SearchTurnHit {
+	if match == "" {
+		return nil
+	}
+	hits, err := e.store.SearchTurns(match, entityFilter, limit*2)
+	if err != nil {
+		return nil
+	}
+	return hits
+}
+
+func (e *Executor) searchTimelineVector(ctx context.Context, rawQuery, entityFilter string, limit int) []string {
+	if e.embeddingsProvider == nil || rawQuery == "" {
+		return nil
+	}
+	vecs, err := e.embeddingsProvider.Embed(ctx, []string{rawQuery})
+	if err == nil {
+		e.reportEmbeddingUsage()
+	}
+	if err != nil || len(vecs) == 0 {
+		return nil
+	}
+	vHits, err := e.store.SearchSimilarVectors(ctx, []string{"turn"}, e.embeddingsProvider.ID(), vecs[0], limit*2)
+	if err != nil {
+		return nil
+	}
+	var vecTurnNumbers []string
+	for _, vh := range vHits {
+		if entityFilter != "" && !e.turnMentionsEntity(vh.TargetID, entityFilter) {
+			continue
+		}
+		vecTurnNumbers = append(vecTurnNumbers, vh.TargetID)
+	}
+	return vecTurnNumbers
+}
+
+func (e *Executor) turnMentionsEntity(targetID, entityFilter string) bool {
+	num, _ := strconv.Atoi(targetID)
+	turnRec, err := e.store.GetTurn(num)
+	if err != nil || turnRec == nil {
+		return false
+	}
+	for _, m := range turnRec.Entities {
+		if m.EntityID == entityFilter {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *Executor) formatTimelineHits(fusedNumbers []string, ftsMap map[string]storage.SearchTurnHit) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "%d matching turns:\n", len(fusedNumbers))
 	for _, strNum := range fusedNumbers {
@@ -391,7 +406,7 @@ func (e *Executor) searchTimeline(ctx context.Context, arguments map[string]any)
 			fmt.Fprintf(&sb, "- turn %d: %s\n", turnRec.Number, snippet)
 		}
 	}
-	return e.cap(sb.String()), true
+	return sb.String()
 }
 
 // cap truncates a result and says so, because a model that cannot tell a capped

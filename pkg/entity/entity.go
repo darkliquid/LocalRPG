@@ -90,52 +90,17 @@ func ParseMarkdownEntity(data []byte) (*Entity, error) {
 	hashBytes := sha256.Sum256(data)
 	fileHash := hex.EncodeToString(hashBytes[:])
 
-	content := string(data)
-	if !strings.HasPrefix(content, "---\n") {
-		return nil, fmt.Errorf("entity markdown missing frontmatter header (---)")
+	frontmatterRaw, bodyRaw, err := splitEntityMarkdown(string(data))
+	if err != nil {
+		return nil, err
 	}
-
-	endIdx := strings.Index(content[4:], "\n---\n")
-	if endIdx == -1 {
-		return nil, fmt.Errorf("entity markdown missing frontmatter closing delimiter")
-	}
-
-	frontmatterRaw := content[4 : 4+endIdx]
-	bodyRaw := content[4+endIdx+5:]
 
 	var fm EntityFrontmatter
 	if err := yaml.Unmarshal([]byte(frontmatterRaw), &fm); err != nil {
 		return nil, frontmatterError(frontmatterRaw, err)
 	}
 
-	linksSet := make(map[string]struct{})
-	var links []string
-
-	// Scan frontmatter location/faction for wikilinks
-	for _, rawRef := range []string{fm.Location, fm.Faction} {
-		matches := wikilinkRegex.FindAllStringSubmatch(rawRef, -1)
-		for _, m := range matches {
-			if len(m) > 1 {
-				target := strings.TrimSpace(m[1])
-				if _, seen := linksSet[target]; !seen {
-					linksSet[target] = struct{}{}
-					links = append(links, target)
-				}
-			}
-		}
-	}
-
-	// Scan body for wikilinks
-	bodyMatches := wikilinkRegex.FindAllStringSubmatch(bodyRaw, -1)
-	for _, m := range bodyMatches {
-		if len(m) > 1 {
-			target := strings.TrimSpace(m[1])
-			if _, seen := linksSet[target]; !seen {
-				linksSet[target] = struct{}{}
-				links = append(links, target)
-			}
-		}
-	}
+	links := extractWikilinks(fm, bodyRaw)
 
 	entID := fm.ID
 	if entID == "" {
@@ -167,6 +132,49 @@ func ParseMarkdownEntity(data []byte) (*Entity, error) {
 	}
 
 	return entity, nil
+}
+
+func splitEntityMarkdown(content string) (string, string, error) {
+	if !strings.HasPrefix(content, "---\n") {
+		return "", "", fmt.Errorf("entity markdown missing frontmatter header (---)")
+	}
+
+	endIdx := strings.Index(content[4:], "\n---\n")
+	if endIdx == -1 {
+		return "", "", fmt.Errorf("entity markdown missing frontmatter closing delimiter")
+	}
+
+	frontmatterRaw := content[4 : 4+endIdx]
+	bodyRaw := content[4+endIdx+5:]
+	return frontmatterRaw, bodyRaw, nil
+}
+
+func extractWikilinks(fm EntityFrontmatter, bodyRaw string) []string {
+	linksSet := make(map[string]struct{})
+	var links []string
+
+	addMatches := func(text string) {
+		matches := wikilinkRegex.FindAllStringSubmatch(text, -1)
+		for _, m := range matches {
+			if len(m) > 1 {
+				target := strings.TrimSpace(m[1])
+				if _, seen := linksSet[target]; !seen {
+					linksSet[target] = struct{}{}
+					links = append(links, target)
+				}
+			}
+		}
+	}
+
+	// Scan frontmatter location/faction for wikilinks
+	for _, rawRef := range []string{fm.Location, fm.Faction} {
+		addMatches(rawRef)
+	}
+
+	// Scan body for wikilinks
+	addMatches(bodyRaw)
+
+	return links
 }
 
 // WikilinkTarget extracts the link target from a [[target]] or [[target|label]]

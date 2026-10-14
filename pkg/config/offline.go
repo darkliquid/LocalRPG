@@ -13,11 +13,19 @@ import (
 // sherpa-onnx) for TTS. It leaves paths, preferences, and named provider entries
 // untouched, returning a list of human-readable changes made.
 func ApplyOfflinePreset(cfg *Config, tts string) []string {
-	var changes []string
-
 	if strings.TrimSpace(tts) == "" {
 		tts = "native-os"
 	}
+
+	var changes []string
+	changes = append(changes, applyOfflineRoles(cfg)...)
+	changes = append(changes, applyOfflineMedia(cfg, tts)...)
+	changes = append(changes, applyOfflineEmbeddings(cfg)...)
+	return changes
+}
+
+func applyOfflineRoles(cfg *Config) []string {
+	var changes []string
 
 	// 1. GM role
 	if cfg.Agents.Roles == nil {
@@ -53,6 +61,12 @@ func ApplyOfflinePreset(cfg *Config, tts string) []string {
 		changes = append(changes, "Completion: inherit from GM")
 	}
 
+	return changes
+}
+
+func applyOfflineMedia(cfg *Config, tts string) []string {
+	var changes []string
+
 	// 3. TTS
 	if cfg.Media.TTS.Type != "builtin" || cfg.Media.TTS.BuiltinName != tts {
 		cfg.Media.TTS.Type = "builtin"
@@ -80,6 +94,12 @@ func ApplyOfflinePreset(cfg *Config, tts string) []string {
 		changes = append(changes, "STT: disabled")
 	}
 
+	return changes
+}
+
+func applyOfflineEmbeddings(cfg *Config) []string {
+	var changes []string
+
 	// 6. Embeddings
 	if !cfg.Embeddings.Enabled || cfg.Embeddings.Provider != "builtin-local" {
 		cfg.Embeddings.Enabled = true
@@ -101,13 +121,23 @@ func ApplyOfflinePreset(cfg *Config, tts string) []string {
 // VerifyOffline inspects each configured role and media provider against the
 // provider registry, reporting any that are not declared offline.
 func VerifyOffline(cfg *Config) provider.OfflineReport {
-	issues := make([]provider.OfflineIssue, 0)
-
 	if cfg == nil {
-		return provider.OfflineReport{Offline: true, Issues: issues}
+		return provider.OfflineReport{Offline: true, Issues: []provider.OfflineIssue{}}
 	}
 
-	// 1. Roles
+	issues := make([]provider.OfflineIssue, 0)
+	issues = append(issues, inspectOfflineRoles(cfg)...)
+	issues = append(issues, inspectOfflineMedia(cfg)...)
+	issues = append(issues, inspectOfflineEmbeddings(cfg)...)
+
+	return provider.OfflineReport{
+		Offline: len(issues) == 0,
+		Issues:  issues,
+	}
+}
+
+func inspectOfflineRoles(cfg *Config) []provider.OfflineIssue {
+	var issues []provider.OfflineIssue
 	roleNames := make([]string, 0, len(cfg.Agents.Roles))
 	for role := range cfg.Agents.Roles {
 		roleNames = append(roleNames, role)
@@ -138,6 +168,11 @@ func VerifyOffline(cfg *Config) provider.OfflineReport {
 			issues = append(issues, issue)
 		}
 	}
+	return issues
+}
+
+func inspectOfflineMedia(cfg *Config) []provider.OfflineIssue {
+	var issues []provider.OfflineIssue
 
 	// 2. TTS
 	if cfg.Media.TTS.Type != "disabled" {
@@ -169,7 +204,11 @@ func VerifyOffline(cfg *Config) provider.OfflineReport {
 		}
 	}
 
-	// 5. Embeddings
+	return issues
+}
+
+func inspectOfflineEmbeddings(cfg *Config) []provider.OfflineIssue {
+	var issues []provider.OfflineIssue
 	if cfg.Embeddings.Enabled {
 		embCfg := cfg.Embeddings.ProviderFor(cfg.Embeddings.Provider)
 		key := embeddingKey(embCfg)
@@ -179,11 +218,7 @@ func VerifyOffline(cfg *Config) provider.OfflineReport {
 			}
 		}
 	}
-
-	return provider.OfflineReport{
-		Offline: len(issues) == 0,
-		Issues:  issues,
-	}
+	return issues
 }
 
 func roleKey(cfg AgentRoleConfig) provider.Key {

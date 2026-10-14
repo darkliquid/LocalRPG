@@ -26,32 +26,10 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 	}
 	p, hasProfile := r.conventions.Profiles[profile]
 
-	notation := req.Notation
-	if notation == "" && hasProfile {
-		notation = p.Notation
-	}
-	if notation == "" {
-		notation = r.conventions.Notation
-	}
-	if notation == "" {
-		notation = "2d6"
-	}
-	if hasProfile {
-		notation = ProfileNotation(notation, p)
-	}
-	roll, err := EvaluateRoll(notation)
+	notation := r.resolveNotation(req, p, hasProfile)
+	roll, manual, err := r.resolveRoll(notation, req)
 	if err != nil {
-		return nil, fmt.Errorf("resolve check: %w", err)
-	}
-
-	// A manually entered roll replaces the dice and keeps the bonuses: a player
-	// enters the dice, and the system still adds what it would have added.
-	manual := len(req.ForcedDice) > 0 || req.ForcedTotal != nil
-	switch {
-	case len(req.ForcedDice) > 0:
-		roll = ManualRoll(notation, req.ForcedDice)
-	case req.ForcedTotal != nil:
-		roll = ManualRoll(notation, []int{*req.ForcedTotal})
+		return nil, err
 	}
 
 	bonus, applied := SumBonuses(func(name string) (int, bool) {
@@ -70,26 +48,72 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 		res.Source = "manual"
 	}
 
+	actorWon, opposed, err := r.checkOpposed(req, p, hasProfile, notation, total, res)
+	if err != nil {
+		return nil, err
+	}
+
+	r.resolveOutcome(res, req, p, hasProfile, profile, total, roll.Successes, actorWon, opposed)
+	return res, nil
+}
+
+func (r SchemaResolver) resolveNotation(req harness.CheckRequest, p core.ResolutionProfile, hasProfile bool) string {
+	notation := req.Notation
+	if notation == "" && hasProfile {
+		notation = p.Notation
+	}
+	if notation == "" {
+		notation = r.conventions.Notation
+	}
+	if notation == "" {
+		notation = "2d6"
+	}
+	if hasProfile {
+		notation = ProfileNotation(notation, p)
+	}
+	return notation
+}
+
+func (r SchemaResolver) resolveRoll(notation string, req harness.CheckRequest) (*RollResult, bool, error) {
+	roll, err := EvaluateRoll(notation)
+	if err != nil {
+		return nil, false, fmt.Errorf("resolve check: %w", err)
+	}
+
+	// A manually entered roll replaces the dice and keeps the bonuses: a player
+	// enters the dice, and the system still adds what it would have added.
+	manual := len(req.ForcedDice) > 0 || req.ForcedTotal != nil
+	switch {
+	case len(req.ForcedDice) > 0:
+		roll = ManualRoll(notation, req.ForcedDice)
+	case req.ForcedTotal != nil:
+		roll = ManualRoll(notation, []int{*req.ForcedTotal})
+	}
+	return roll, manual, nil
+}
+
+func (r SchemaResolver) checkOpposed(req harness.CheckRequest, p core.ResolutionProfile, hasProfile bool, notation string, total int, res *harness.CheckResult) (bool, bool, error) {
 	// An opposed check rolls the opponent with the same notation and compares the
 	// totals; everything after this maps a win or a loss like any other outcome.
-	actorWon := true
-	opposed := false
 	if stat := OpposedStat(req, p, hasProfile); stat != "" && req.Target != "" {
 		opponentBonus := r.opponentBonus(req.Target, stat)
 		oppRoll, oppTotal, won, err := ResolveOpposed(notation, total, opponentBonus, ProfileTies(p, hasProfile))
 		if err != nil {
-			return nil, err
+			return false, false, err
 		}
 		res.OpposedRoll, res.OpposedTotal, res.OpposedActor = oppRoll, oppTotal, req.Target
-		actorWon, opposed = won, true
+		return won, true, nil
 	}
+	return true, false, nil
+}
 
+func (r SchemaResolver) resolveOutcome(res *harness.CheckResult, req harness.CheckRequest, p core.ResolutionProfile, hasProfile bool, profile string, total, successes int, actorWon, opposed bool) {
 	if hasProfile {
 		outcome, decided := "", false
 		if opposed {
 			outcome, decided = ProfileOpposedOutcome(p, actorWon)
 		} else {
-			outcome, decided = ResolveProfile(p, total, roll.Successes)
+			outcome, decided = ResolveProfile(p, total, successes)
 		}
 		if decided {
 			res.Outcome = outcome
@@ -97,13 +121,13 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 		}
 		res.Position = ClampTo(p.Position, req.Position)
 		res.Effect = ClampTo(p.Effect, req.Effect)
-		res.Successes = roll.Successes
+		res.Successes = successes
 	}
 
 	if res.Outcome == "" {
 		if opposed {
 			res.Outcome = OutcomeFor(r.conventions.Outcome, actorWon)
-			return res, nil
+			return
 		}
 		target := 8
 		for _, difficulty := range r.conventions.Difficulty {
@@ -114,7 +138,6 @@ func (r SchemaResolver) Resolve(_ context.Context, req harness.CheckRequest, act
 		}
 		res.Outcome = OutcomeFor(r.conventions.Outcome, total >= target)
 	}
-	return res, nil
 }
 
 // opponentBonus reads the opponent's governing stat through the bridge. An
