@@ -302,15 +302,35 @@ func (s *Service) worldPriceTable(role string) worldgen.PriceTable {
 // stage and a final draft event. A dry run reports the estimate and makes no
 // call. Nothing is written into worlds/<id>/: the draft lands in worlds/.drafts
 // for review.
+// worldEmitter publishes a generation's progress, and stops publishing on the first
+// failure rather than carrying on. A client that disconnects mid-generation is what
+// makes emit fail, so a failed emit cancels the work: nothing is persisted for a
+// cancelled generation.
+type worldEmitter struct {
+	emit    func(TurnEvent) error
+	cancel  context.CancelFunc
+	emitErr error
+}
+
+func (e *worldEmitter) event(event TurnEvent) {
+	if e.emitErr != nil {
+		return
+	}
+	if err := e.emit(event); err != nil {
+		e.emitErr = err
+		e.cancel()
+	}
+}
+
+// GenerateWorld runs the generation pipeline, reporting one step event per
+// stage and a final draft event. A dry run reports the estimate and makes no
+// call. Nothing is written into worlds/<id>/: the draft lands in worlds/.drafts
+// for review.
 func (s *Service) GenerateWorld(ctx context.Context, req WorldGenerateRequestDTO, emit func(TurnEvent) error) (*WorldDraftDTO, error) {
 	brief := req.brief()
 	limits := s.limitsFor(req.Limits)
 	role := resolveGeneratorRole(s.configMgr.Get())
-	chunks := 0
-	if req.Source != nil && strings.EqualFold(req.Source.Kind, "url") {
-		chunks = len(req.Source.URLs)
-	}
-	estimate := worldgen.EstimatePlan(generationKind(req), brief, chunks, s.worldPriceTable(role))
+	estimate := s.estimateWorldPlan(req, brief, role)
 
 	if req.DryRun {
 		if err := emit(TurnEvent{Type: WorldEventEstimate, Estimate: estimateDTO(estimate)}); err != nil {
@@ -319,24 +339,11 @@ func (s *Service) GenerateWorld(ctx context.Context, req WorldGenerateRequestDTO
 		return nil, nil
 	}
 
-	// A client that disconnects mid-generation cancels the work, and nothing is
-	// persisted for a cancelled generation.
 	genCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	var emitErr error
-	emitEvent := func(event TurnEvent) {
-		if emitErr != nil {
-			return
-		}
-		if err := emit(event); err != nil {
-			emitErr = err
-			cancel()
-		}
-	}
+	emitter := &worldEmitter{emit: emit, cancel: cancel}
 
 	resolved := s.resolveWorldGenerator()
-	oracle := resolved.Oracle
 	gen := resolved.Generator
 
 	var budget *worldgen.BudgetGenerator
@@ -356,11 +363,11 @@ func (s *Service) GenerateWorld(ctx context.Context, req WorldGenerateRequestDTO
 		// An ingestion is as big as the source is, so its budget follows the
 		// chunk cap rather than the bounded pipeline's call cap.
 		budget = &worldgen.BudgetGenerator{Inner: gen, Max: worldgen.ChunkCalls(len(sourceChunks))}
-		genErr = s.buildFromChunks(genCtx, budget, brief, sourceChunks, emitEvent, &draft)
+		genErr = s.buildFromChunks(genCtx, budget, brief, sourceChunks, emitter.event, &draft)
 	} else {
 		budget = &worldgen.BudgetGenerator{Inner: gen, Max: limits.MaxCalls}
 		draft, genErr = worldgen.Generate(genCtx, budget, brief, func(step worldgen.Step) {
-			emitEvent(TurnEvent{Type: WorldEventStep, Step: stepDTO(step)})
+			emitter.event(TurnEvent{Type: WorldEventStep, Step: stepDTO(step)})
 		})
 	}
 
@@ -370,10 +377,28 @@ func (s *Service) GenerateWorld(ctx context.Context, req WorldGenerateRequestDTO
 		}
 		return nil, genErr
 	}
-	if emitErr != nil {
-		return nil, emitErr
+	if emitter.emitErr != nil {
+		return nil, emitter.emitErr
 	}
 
+	return s.finishWorldDraft(&draft, estimate, s.settleGeneratorUsage(gen, budget), resolved.Oracle, emitter)
+}
+
+// estimateWorldPlan is the plan's cost estimate: the kind of generation asked for, the
+// brief, and how many source chunks an import would read.
+func (s *Service) estimateWorldPlan(req WorldGenerateRequestDTO, brief worldgen.Brief, role string) worldgen.Estimate {
+	chunks := 0
+	if req.Source != nil && strings.EqualFold(req.Source.Kind, "url") {
+		chunks = len(req.Source.URLs)
+	}
+	return worldgen.EstimatePlan(generationKind(req), brief, chunks, s.worldPriceTable(role))
+}
+
+// settleGeneratorUsage is how many provider calls the generation is charged for, and
+// records them against the generator role. It is the budget's count until the router's
+// own total is higher: a generator that failed over inside the router made calls the
+// budget never saw.
+func (s *Service) settleGeneratorUsage(gen worldgen.Generator, budget *worldgen.BudgetGenerator) int {
 	calls := budget.Calls
 	if counter, ok := gen.(*routerGenerator); ok {
 		recorded, usage := counter.totals()
@@ -382,17 +407,22 @@ func (s *Service) GenerateWorld(ctx context.Context, req WorldGenerateRequestDTO
 			s.RecordUsageGlobal(generatorRole, usage)
 		}
 	}
+	return calls
+}
 
+// finishWorldDraft records what the generation cost, saves the draft for review, and
+// reports it as the generation's last event.
+func (s *Service) finishWorldDraft(draft *worldgen.Draft, estimate worldgen.Estimate, calls int, oracle bool, emitter *worldEmitter) (*WorldDraftDTO, error) {
 	draft.Estimate = &estimate
 	draft.Calls = calls
-	if err := worldgen.SaveDraft(s.worldDraftsDir(), draft); err != nil {
+	if err := worldgen.SaveDraft(s.worldDraftsDir(), *draft); err != nil {
 		return nil, err
 	}
 
-	dto := worldDraftDTO(draft, oracle)
-	emitEvent(TurnEvent{Type: WorldEventDraft, Draft: &dto})
-	if emitErr != nil {
-		return nil, emitErr
+	dto := worldDraftDTO(*draft, oracle)
+	emitter.event(TurnEvent{Type: WorldEventDraft, Draft: &dto})
+	if emitter.emitErr != nil {
+		return nil, emitter.emitErr
 	}
 	return &dto, nil
 }

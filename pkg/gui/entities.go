@@ -278,43 +278,26 @@ func (s *Service) assertIDIsFree(entitiesDir, entityID, rawMarkdown string) erro
 //
 // It is deliberately explicit. Deciding that two names are one being is a judgement
 // the engine cannot make, but it can carry the decision out once a player makes it.
+// MergeEntities folds one note into another: the survivor keeps its identity and
+// gains the source's prose, tags, aliases, and turn history, every note that linked
+// to the source is rewritten to point at the survivor, and the source is removed.
+//
+// It is deliberately explicit. Deciding that two names are one being is a judgement
+// the engine cannot make, but it can carry the decision out once a player makes it.
 func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID string) (*EntityDTO, error) {
-	if err := pathutil.ValidateID(gameID); err != nil {
-		return nil, fmt.Errorf("invalid game id: %w", err)
-	}
-	if err := pathutil.ValidateID(sourceID); err != nil {
-		return nil, fmt.Errorf("invalid source id: %w", err)
-	}
-	if err := pathutil.ValidateID(targetID); err != nil {
-		return nil, fmt.Errorf("invalid target id: %w", err)
-	}
-	if sourceID == targetID {
-		return nil, fmt.Errorf("cannot merge %q into itself", sourceID)
+	if err := validateMergeIDs(gameID, sourceID, targetID); err != nil {
+		return nil, err
 	}
 
 	gameDir := s.resolver.GameDir(gameID)
 	entitiesDir := filepath.Join(gameDir, "entities")
-	sourcePath, err := pathutil.ResolveSafeChild(entitiesDir, sourceID+".md")
+	sourcePath, sourceData, err := readEntityNote(entitiesDir, "source", sourceID)
 	if err != nil {
-		return nil, fmt.Errorf("resolve source path: %w", err)
+		return nil, err
 	}
-	if strings.Contains(sourcePath, "..") {
-		return nil, fmt.Errorf("invalid source path: contains traversal")
-	}
-	sourceData, err := os.ReadFile(sourcePath)
+	targetPath, targetData, err := readEntityNote(entitiesDir, "target", targetID)
 	if err != nil {
-		return nil, fmt.Errorf("read source %q: %w", sourceID, err)
-	}
-	targetPath, err := pathutil.ResolveSafeChild(entitiesDir, targetID+".md")
-	if err != nil {
-		return nil, fmt.Errorf("resolve target path: %w", err)
-	}
-	if strings.Contains(targetPath, "..") {
-		return nil, fmt.Errorf("invalid target path: contains traversal")
-	}
-	targetData, err := os.ReadFile(targetPath)
-	if err != nil {
-		return nil, fmt.Errorf("read target %q: %w", targetID, err)
+		return nil, err
 	}
 
 	source, err := entity.ParseMarkdownEntity(sourceData)
@@ -326,25 +309,7 @@ func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID 
 		return nil, fmt.Errorf("parse target %q: %w", targetID, err)
 	}
 
-	// The survivor keeps its name and gains what the source knew.
-	if body := strings.TrimSpace(source.Body); body != "" {
-		target.Body = strings.TrimSpace(target.Body) + "\n\n" + body
-	}
-	target.Aliases = appendUnique(target.Aliases, source.Name)
-	target.Aliases = appendUnique(target.Aliases, source.Aliases...)
-	target.Tags = appendUnique(target.Tags, source.Tags...)
-	for _, number := range source.History {
-		already := false
-		for _, known := range target.History {
-			if known == number {
-				already = true
-				break
-			}
-		}
-		if !already {
-			target.History = append(target.History, number)
-		}
-	}
+	mergeEntityNotes(target, source)
 
 	merged, err := target.SerializeMarkdown()
 	if err != nil {
@@ -365,20 +330,88 @@ func (s *Service) MergeEntities(ctx context.Context, gameID, sourceID, targetID 
 		return nil, fmt.Errorf("remove source note: %w", err)
 	}
 
+	if err := s.reindexAfterMerge(gameID, targetPath, sourcePath, sourceID); err != nil {
+		return nil, err
+	}
+
+	return s.GetEntity(ctx, gameID, targetID)
+}
+
+// validateMergeIDs checks the three ids a merge names, and that it is not a note
+// merged into itself.
+func validateMergeIDs(gameID, sourceID, targetID string) error {
+	if err := pathutil.ValidateID(gameID); err != nil {
+		return fmt.Errorf("invalid game id: %w", err)
+	}
+	if err := pathutil.ValidateID(sourceID); err != nil {
+		return fmt.Errorf("invalid source id: %w", err)
+	}
+	if err := pathutil.ValidateID(targetID); err != nil {
+		return fmt.Errorf("invalid target id: %w", err)
+	}
+	if sourceID == targetID {
+		return fmt.Errorf("cannot merge %q into itself", sourceID)
+	}
+	return nil
+}
+
+// readEntityNote resolves one note's path under the entities directory and reads it.
+// The label names the side of the merge in the error, and the containment check stays
+// here because this is where the path is read.
+func readEntityNote(entitiesDir, label, id string) (string, []byte, error) {
+	path, err := pathutil.ResolveSafeChild(entitiesDir, id+".md")
+	if err != nil {
+		return "", nil, fmt.Errorf("resolve %s path: %w", label, err)
+	}
+	if strings.Contains(path, "..") {
+		return "", nil, fmt.Errorf("invalid %s path: contains traversal", label)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", nil, fmt.Errorf("read %s %q: %w", label, id, err)
+	}
+	return path, data, nil
+}
+
+// mergeEntityNotes folds what the source knew into the survivor, which keeps its own
+// name and identity.
+func mergeEntityNotes(target, source *entity.Entity) {
+	if body := strings.TrimSpace(source.Body); body != "" {
+		target.Body = strings.TrimSpace(target.Body) + "\n\n" + body
+	}
+	target.Aliases = appendUnique(target.Aliases, source.Name)
+	target.Aliases = appendUnique(target.Aliases, source.Aliases...)
+	target.Tags = appendUnique(target.Tags, source.Tags...)
+	for _, number := range source.History {
+		already := false
+		for _, known := range target.History {
+			if known == number {
+				already = true
+				break
+			}
+		}
+		if !already {
+			target.History = append(target.History, number)
+		}
+	}
+}
+
+// reindexAfterMerge drops the source from the index and syncs both notes, so a caller
+// that reads straight back sees the merge rather than the old pair.
+func (s *Service) reindexAfterMerge(gameID, targetPath, sourcePath, sourceID string) error {
 	store, err := s.store(gameID)
 	if err != nil {
-		return nil, fmt.Errorf("open store: %w", err)
+		return fmt.Errorf("open store: %w", err)
 	}
 	if err := store.DeleteEntity(sourceID); err != nil {
-		return nil, fmt.Errorf("remove source from the index: %w", err)
+		return fmt.Errorf("remove source from the index: %w", err)
 	}
 
 	syncer := storage.NewSyncer(store)
 	for _, p := range []string{targetPath, sourcePath} {
 		_ = syncer.SyncFile(p)
 	}
-
-	return s.GetEntity(ctx, gameID, targetID)
+	return nil
 }
 
 // DeleteGameEntity removes one campaign entity note and its index entry.

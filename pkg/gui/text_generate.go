@@ -119,6 +119,10 @@ func buildTextGeneratorPrompt(req GenerateTextRequest, systemFields []core.Chara
 // returned as a *harness.GenerationFailure: an unconfigured provider, a provider
 // error, an empty reply, or an unparseable reply. A partial success is a 200 with
 // Warning set. The user can always type the answers themselves.
+// GenerateText fills one field or a whole form's worth of values. A failure is
+// returned as a *harness.GenerationFailure: an unconfigured provider, a provider
+// error, an empty reply, or an unparseable reply. A partial success is a 200 with
+// Warning set. The user can always type the answers themselves.
 func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*GenerateTextResponse, error) {
 	started := time.Now()
 	ctx, span := startGenerationSpan(ctx, s.logger, "generate.text", req.FormType, req.FieldName)
@@ -126,6 +130,60 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 
 	resp := &GenerateTextResponse{Fields: map[string]string{}, GeneratedBy: "none"}
 
+	systemPrompt, role, systemFields := s.textGenerationPlan(req)
+
+	router, err := textRouterFactory(s.configMgr.Get(), s.logger)
+	if err != nil {
+		failure := &harness.GenerationFailure{
+			Code:    harness.FailureProviderUnavailable,
+			Message: fmt.Sprintf("no model provider is configured: %v", err),
+		}
+		s.recordGeneration(ctx, span, req.FormType, "", started, failure)
+		return nil, failure
+	}
+
+	request := harness.GenerateRequest{
+		System:    systemPrompt,
+		Prompt:    buildTextGeneratorPrompt(req, systemFields),
+		MaxTokens: 1000,
+	}
+
+	outcome := collectTextAttempts(ctx, router, textGenerationRoles(role), request)
+	attempts := outcome.Attempts
+	resp.GeneratedBy = outcome.GeneratedBy
+	for k, v := range outcome.Values {
+		if trimmed := strings.TrimSpace(v); trimmed != "" {
+			resp.Fields[k] = trimmed
+		}
+	}
+
+	s.recordGenerationAttempts(ctx, span, attempts)
+
+	if len(resp.Fields) == 0 {
+		resp.GeneratedBy = "none"
+		empty := noTextValuesFailure(attempts, request, started)
+		s.setTextOutcome(span, generationOutcome{Attempts: attempts}, 0)
+		s.recordGeneration(ctx, span, req.FormType, roleForAttempts(attempts), started, empty)
+		return nil, empty
+	}
+
+	if len(attempts) > 0 && missingFields(requestedTextFields(req, systemFields), resp.Fields) > 0 {
+		resp.Warning = &harness.GenerationFailure{
+			Code:      attempts[len(attempts)-1].Code,
+			Message:   "some requested fields were not generated",
+			Attempts:  attempts,
+			ElapsedMS: time.Since(started).Milliseconds(),
+		}
+	}
+	s.setTextOutcome(span, outcome, len(resp.Fields))
+	s.recordGeneration(ctx, span, req.FormType, outcome.GeneratedBy, started, nil)
+	return resp, nil
+}
+
+// textGenerationPlan is what a form's text is generated with: the system prompt for
+// its type, the role that answers for it, and the system's own field schema, which
+// only a character form has.
+func (s *Service) textGenerationPlan(req GenerateTextRequest) (string, string, []core.CharacterCreationField) {
 	systemPrompt := textGeneratorSystemPromptWorld
 	role := "gm"
 	var systemFields []core.CharacterCreationField
@@ -149,64 +207,28 @@ func (s *Service) GenerateText(ctx context.Context, req GenerateTextRequest) (*G
 	case "campaign":
 		systemPrompt = textGeneratorSystemPromptCampaign
 	}
+	return systemPrompt, role, systemFields
+}
 
-	router, err := textRouterFactory(s.configMgr.Get(), s.logger)
-	if err != nil {
-		failure := &harness.GenerationFailure{
-			Code:    harness.FailureProviderUnavailable,
-			Message: fmt.Sprintf("no model provider is configured: %v", err),
-		}
-		s.recordGeneration(ctx, span, req.FormType, "", started, failure)
-		return nil, failure
+// textGenerationRoles is the fallback chain a form's text is generated through: the
+// form's own role, and the GM behind it unless the form is the GM's.
+func textGenerationRoles(role string) []string {
+	if role == "gm" {
+		return []string{role}
 	}
+	return []string{role, "gm"}
+}
 
-	request := harness.GenerateRequest{
-		System:    systemPrompt,
-		Prompt:    buildTextGeneratorPrompt(req, systemFields),
-		MaxTokens: 1000,
+// noTextValuesFailure is the failure a text generation gets when the model returned
+// nothing usable, with every attempt summarised onto it.
+func noTextValuesFailure(attempts []harness.Attempt, request harness.GenerateRequest, started time.Time) *harness.GenerationFailure {
+	return &harness.GenerationFailure{
+		Code:        pickFailureCode(attempts),
+		Message:     harness.SummarizeAttempts(attempts, "the model did not return any usable text"),
+		Attempts:    attempts,
+		PromptChars: len([]rune(request.PromptText())),
+		ElapsedMS:   time.Since(started).Milliseconds(),
 	}
-
-	roles := []string{role}
-	if role != "gm" {
-		roles = append(roles, "gm")
-	}
-
-	outcome := collectTextAttempts(ctx, router, roles, request)
-	attempts := outcome.Attempts
-	resp.GeneratedBy = outcome.GeneratedBy
-	for k, v := range outcome.Values {
-		if trimmed := strings.TrimSpace(v); trimmed != "" {
-			resp.Fields[k] = trimmed
-		}
-	}
-
-	s.recordGenerationAttempts(ctx, span, attempts)
-
-	if len(resp.Fields) == 0 {
-		resp.GeneratedBy = "none"
-		failure := &harness.GenerationFailure{
-			Code:        pickFailureCode(attempts),
-			Message:     harness.SummarizeAttempts(attempts, "the model did not return any usable text"),
-			Attempts:    attempts,
-			PromptChars: len([]rune(request.PromptText())),
-			ElapsedMS:   time.Since(started).Milliseconds(),
-		}
-		s.setTextOutcome(span, generationOutcome{Attempts: attempts}, 0)
-		s.recordGeneration(ctx, span, req.FormType, roleForAttempts(attempts), started, failure)
-		return nil, failure
-	}
-
-	if len(attempts) > 0 && missingFields(requestedTextFields(req, systemFields), resp.Fields) > 0 {
-		resp.Warning = &harness.GenerationFailure{
-			Code:      attempts[len(attempts)-1].Code,
-			Message:   "some requested fields were not generated",
-			Attempts:  attempts,
-			ElapsedMS: time.Since(started).Milliseconds(),
-		}
-	}
-	s.setTextOutcome(span, outcome, len(resp.Fields))
-	s.recordGeneration(ctx, span, req.FormType, outcome.GeneratedBy, started, nil)
-	return resp, nil
 }
 
 // pickFailureCode chooses the most informative code from a fallback chain. An

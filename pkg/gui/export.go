@@ -260,64 +260,61 @@ func (s *Service) playerAssets() (fs.FS, error) {
 	return AssetFS()
 }
 
+// exportRun is one export in flight: what it was asked for, where it writes, and how
+// it reports itself. Every phase goes out on the service's export stream, which is
+// what the studio panel watches.
+type exportRun struct {
+	service *Service
+	outPath string
+	req     ExportRequestDTO
+}
+
+// progress publishes one phase of the export.
+func (r exportRun) progress(p scene.Progress) {
+	r.service.exports.publish(ExportEvent{
+		GameID:       r.req.GameID,
+		Format:       r.req.Format,
+		Phase:        p.Phase,
+		Done:         p.Done,
+		Total:        p.Total,
+		Message:      p.Message,
+		Frames:       p.Frames,
+		ImageFrames:  p.ImageFrames,
+		RepeatFrames: p.RepeatFrames,
+		AudioPackets: p.AudioPackets,
+		TotalAudio:   p.TotalAudioPackets,
+		AudioBytes:   p.AudioBytes,
+		TotalBytes:   p.TotalAudioBytes,
+		ElapsedMs:    p.Elapsed.Milliseconds(),
+		LengthMs:     p.Length.Milliseconds(),
+	})
+}
+
+// failed publishes a failure, under the cancelled phase when the context was what
+// ended the export.
+func (r exportRun) failed(err error) {
+	phase := "error"
+	if errors.Is(err, context.Canceled) {
+		phase = "cancelled"
+	}
+	r.service.exports.publish(ExportEvent{
+		GameID: r.req.GameID, Format: r.req.Format, Phase: phase, Error: err.Error(),
+	})
+}
+
 // runExport compiles and renders one export, publishing every phase.
 func (s *Service) runExport(ctx context.Context, req ExportRequestDTO, outPath string) {
-	emit := func(p scene.Progress) {
-		s.exports.publish(ExportEvent{
-			GameID:       req.GameID,
-			Format:       req.Format,
-			Phase:        p.Phase,
-			Done:         p.Done,
-			Total:        p.Total,
-			Message:      p.Message,
-			Frames:       p.Frames,
-			ImageFrames:  p.ImageFrames,
-			RepeatFrames: p.RepeatFrames,
-			AudioPackets: p.AudioPackets,
-			TotalAudio:   p.TotalAudioPackets,
-			AudioBytes:   p.AudioBytes,
-			TotalBytes:   p.TotalAudioBytes,
-			ElapsedMs:    p.Elapsed.Milliseconds(),
-			LengthMs:     p.Length.Milliseconds(),
-		})
-	}
-	fail := func(err error) {
-		phase := "error"
-		if errors.Is(err, context.Canceled) {
-			phase = "cancelled"
-		}
-		s.exports.publish(ExportEvent{
-			GameID: req.GameID, Format: req.Format, Phase: phase, Error: err.Error(),
-		})
-	}
+	run := exportRun{service: s, outPath: outPath, req: req}
 
 	if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
-		fail(fmt.Errorf("create export dir: %w", err))
+		run.failed(fmt.Errorf("create export dir: %w", err))
 		return
 	}
 
-	compiler := export.NewScriptCompilerWithResolver(s.GetResolver(), s.Config())
-	compiler.SetMedia(req.Art, req.Audio)
-	compiler.SetProgress(emit)
-
-	// The export uses the app's own pipelines: the same narrator voice, the same image
-	// client and world style, and the same speech pipeline the chronicle plays through.
-	// Anything else is a cache miss, and a miss is what made an export silent and
-	// imageless while the app itself had both.
-	narrator := s.narratorVoiceFor(req.GameID, s.Config())
-	compiler.SetNarratorVoice(narrator)
-	if art := s.sceneArtResolver(req.GameID); art != nil {
-		compiler.SetArtResolver(art)
-	}
-	if pipeline, pipelineErr := s.audioPipeline(); pipelineErr == nil {
-		if store, storeErr := s.store(req.GameID); storeErr == nil {
-			compiler.SetSpeechResolver(export.NewSpeechResolver(pipeline, store, narrator))
-		}
-	}
-
+	compiler := run.compiler()
 	script, err := compiler.Compile(ctx, req.GameID)
 	if err != nil {
-		fail(err)
+		run.failed(err)
 		return
 	}
 
@@ -326,51 +323,87 @@ func (s *Service) runExport(ctx context.Context, req ExportRequestDTO, outPath s
 	// cache key does not match the app's, and this is what tells them apart.
 	for _, miss := range compiler.SpeechMisses() {
 		trace.OrNil(s.logger).Event("export.speech_miss", map[string]any{"game": req.GameID, "detail": miss})
-		emit(scene.Progress{Phase: "compile", Message: "no clip: " + miss})
+		run.progress(scene.Progress{Phase: "compile", Message: "no clip: " + miss})
 	}
 
 	switch req.Format {
 	case "web":
-		exporter := export.NewWebExporter(s.rootDir)
-		// A bundle is the theatre's own player, so it needs the build the app serves,
-		// and it renders performance tags the way this campaign's settings ask for.
-		assets, assetErr := s.playerAssets()
-		if assetErr != nil {
-			fail(assetErr)
-			return
-		}
-		exporter.SetAssets(assets)
-		exporter.SetDisplayMode(s.Config().Media.TTS.SpeechCues.DisplayMode)
-		if _, err := exporter.Export(ctx, script, outPath); err != nil {
-			fail(err)
-			return
-		}
-		// A bundle carries its clips, so its size is worth saying out loud.
-		if info, statErr := os.Stat(outPath); statErr == nil {
-			emit(scene.Progress{Phase: "encode", Message: fmt.Sprintf("wrote %s (%s)", filepath.Base(outPath), humanBytes(info.Size()))})
-		}
+		err = run.writeBundle(ctx, script)
 	case "video":
-		pipeline := export.NewVideoPipeline(s.rootDir)
-		pipeline.SetStill(req.Still)
-		if req.FPS > 0 {
-			pipeline.SetFPS(req.FPS)
-		}
-		if width, height, ok := parseExportSize(req.Size); ok {
-			pipeline.SetSize(width, height)
-		}
-		pipeline.SetProgress(emit)
-		if err := pipeline.RenderVideo(ctx, script, outPath); err != nil {
-			fail(err)
-			return
-		}
-		// The subtitle sidecar is written beside the video; name it so a user knows
-		// the track exists rather than only discovering it in the directory.
-		emit(scene.Progress{Phase: "encode", Message: fmt.Sprintf("wrote %s (subtitles: %s)", filepath.Base(outPath), filepath.Base(export.SubtitlePath(outPath)))})
+		err = run.renderVideo(ctx, script)
+	}
+	if err != nil {
+		run.failed(err)
+		return
 	}
 
 	s.exports.publish(ExportEvent{
 		GameID: req.GameID, Format: req.Format, Phase: "done", OutputPath: outPath,
 	})
+}
+
+// compiler is the script compiler an export runs on, wired to the app's own
+// pipelines: the same narrator voice, the same image client and world style, and the
+// same speech pipeline the chronicle plays through. Anything else is a cache miss, and
+// a miss is what made an export silent and imageless while the app itself had both.
+func (r exportRun) compiler() *export.ScriptCompiler {
+	s := r.service
+	compiler := export.NewScriptCompilerWithResolver(s.GetResolver(), s.Config())
+	compiler.SetMedia(r.req.Art, r.req.Audio)
+	compiler.SetProgress(r.progress)
+
+	narrator := s.narratorVoiceFor(r.req.GameID, s.Config())
+	compiler.SetNarratorVoice(narrator)
+	if art := s.sceneArtResolver(r.req.GameID); art != nil {
+		compiler.SetArtResolver(art)
+	}
+	if pipeline, pipelineErr := s.audioPipeline(); pipelineErr == nil {
+		if store, storeErr := s.store(r.req.GameID); storeErr == nil {
+			compiler.SetSpeechResolver(export.NewSpeechResolver(pipeline, store, narrator))
+		}
+	}
+	return compiler
+}
+
+// writeBundle renders the theatre's own player as a self-contained bundle. It needs
+// the build the app serves, and it renders performance tags the way this campaign's
+// settings ask for.
+func (r exportRun) writeBundle(ctx context.Context, script *scene.Script) error {
+	exporter := export.NewWebExporter(r.service.rootDir)
+	assets, err := r.service.playerAssets()
+	if err != nil {
+		return err
+	}
+	exporter.SetAssets(assets)
+	exporter.SetDisplayMode(r.service.Config().Media.TTS.SpeechCues.DisplayMode)
+	if _, err := exporter.Export(ctx, script, r.outPath); err != nil {
+		return err
+	}
+	// A bundle carries its clips, so its size is worth saying out loud.
+	if info, statErr := os.Stat(r.outPath); statErr == nil {
+		r.progress(scene.Progress{Phase: "encode", Message: fmt.Sprintf("wrote %s (%s)", filepath.Base(r.outPath), humanBytes(info.Size()))})
+	}
+	return nil
+}
+
+// renderVideo renders the export as a video whose subtitle sidecar is written beside
+// it, which the completion message names so a user knows the track exists rather than
+// only discovering it in the directory.
+func (r exportRun) renderVideo(ctx context.Context, script *scene.Script) error {
+	pipeline := export.NewVideoPipeline(r.service.rootDir)
+	pipeline.SetStill(r.req.Still)
+	if r.req.FPS > 0 {
+		pipeline.SetFPS(r.req.FPS)
+	}
+	if width, height, ok := parseExportSize(r.req.Size); ok {
+		pipeline.SetSize(width, height)
+	}
+	pipeline.SetProgress(r.progress)
+	if err := pipeline.RenderVideo(ctx, script, r.outPath); err != nil {
+		return err
+	}
+	r.progress(scene.Progress{Phase: "encode", Message: fmt.Sprintf("wrote %s (subtitles: %s)", filepath.Base(r.outPath), filepath.Base(export.SubtitlePath(r.outPath)))})
+	return nil
 }
 
 // parseExportSize reads a "WxH" size, rejecting anything below 16x16 so a typo

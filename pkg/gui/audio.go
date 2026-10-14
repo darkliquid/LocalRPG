@@ -159,6 +159,10 @@ func (s *Service) broadcastPortraitReady(gameID, characterID, relPath string, ve
 	}
 }
 
+// portraitExtensions are the image formats a portrait file may be stored in, in the
+// order they are tried.
+var portraitExtensions = []string{".png", ".webp", ".jpg", ".jpeg", ".svg"}
+
 // GetCharacterPortrait returns the portrait image for a character, or a procedural SVG fallback if not found.
 // When an explicit version (> 0) is specified, it serves that exact historical portrait version.
 func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID string, version ...int) ([]byte, string, error) {
@@ -169,111 +173,137 @@ func (s *Service) GetCharacterPortrait(ctx context.Context, gameID, characterID 
 	}
 
 	gameDir := filepath.Clean(s.resolver.GameDir(gameID))
-	portraitsDir := filepath.Clean(filepath.Join(gameDir, "assets", "portraits"))
-
-	var ent *entity.Entity
-	if store, storeErr := s.store(gameID); storeErr == nil {
-		if loaded, loadErr := store.GetEntity(cleanID); loadErr == nil {
-			ent = loaded
-		}
-	}
-	if ent == nil {
-		// Fallback: check entity markdown file on disk directly
-		notePath := filepath.Clean(filepath.Join(gameDir, "entities", cleanID+".md"))
-		if strings.HasPrefix(notePath, gameDir+string(filepath.Separator)) {
-			if data, readErr := os.ReadFile(notePath); readErr == nil {
-				if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
-					ent = parsed
-				}
-			}
-		}
-	}
-	if ent == nil {
-		// An unknown id still gets an image: a placeholder derived from the id, so a
-		// client never renders a broken portrait for a speaker it cannot resolve.
-		ent = &entity.Entity{ID: cleanID, Name: cleanID, Type: "character"}
+	ent := s.portraitEntity(gameDir, gameID, cleanID)
+	lookup := portraitLookup{
+		ent:          ent,
+		gameDir:      gameDir,
+		portraitsDir: filepath.Clean(filepath.Join(gameDir, "assets", "portraits")),
+		safeID:       ent.ID,
 	}
 
-	safeID := ent.ID
-
-	readFileInGameDir := func(relPath string) ([]byte, bool) {
-		relPath = strings.TrimSpace(relPath)
-		if relPath == "" {
-			return nil, false
-		}
-		p := filepath.Clean(filepath.Join(gameDir, relPath))
-		if !strings.HasPrefix(p, gameDir+string(filepath.Separator)) {
-			return nil, false
-		}
-		data, readErr := os.ReadFile(p)
-		if readErr != nil || len(data) == 0 {
-			return nil, false
-		}
-		return data, true
-	}
-
-	readPortraitFile := func(filename string) ([]byte, bool) {
-		filename = filepath.Base(filename)
-		p := filepath.Clean(filepath.Join(portraitsDir, filename))
-		if !strings.HasPrefix(p, portraitsDir+string(filepath.Separator)) {
-			return nil, false
-		}
-		data, readErr := os.ReadFile(p)
-		if readErr != nil || len(data) == 0 {
-			return nil, false
-		}
-		return data, true
-	}
-
-	// If explicit version requested:
 	if len(version) > 0 && version[0] > 0 {
-		targetVer := version[0]
-		// 1. Check direct file assets/portraits/<id>-v<version>.<ext>
-		for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
-			if data, ok := readPortraitFile(fmt.Sprintf("%s-v%d%s", safeID, targetVer, ext)); ok {
-				return data, imageContentType(data), nil
-			}
+		// An explicit version serves that exact historical portrait.
+		if data, contentType, ok := lookup.versioned(version[0]); ok {
+			return data, contentType, nil
 		}
-		// 2. Check if current ent.Portrait matches this version
-		if ent.PortraitVersion == targetVer && ent.Portrait != "" {
-			if data, ok := readFileInGameDir(ent.Portrait); ok {
-				return data, imageContentType(data), nil
-			}
-		}
-		// 3. Check portrait history entries
-		for _, histPath := range ent.PortraitHistory {
-			if strings.Contains(histPath, fmt.Sprintf("-v%d.", targetVer)) {
-				if data, ok := readFileInGameDir(histPath); ok {
-					return data, imageContentType(data), nil
-				}
-			}
-		}
-		// 4. If targetVer == 1, check legacy unversioned files
-		if targetVer == 1 {
-			for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
-				if data, ok := readPortraitFile(safeID + ext); ok {
-					return data, imageContentType(data), nil
-				}
-			}
-		}
-	} else {
-		// No version requested: serve current active portrait
-		if ent.Portrait != "" {
-			if data, ok := readFileInGameDir(ent.Portrait); ok {
-				return data, imageContentType(data), nil
-			}
-		}
-		// Check fallback unversioned file on disk
-		for _, ext := range []string{".png", ".webp", ".jpg", ".jpeg", ".svg"} {
-			if data, ok := readPortraitFile(safeID + ext); ok {
-				return data, imageContentType(data), nil
-			}
-		}
+	} else if data, contentType, ok := lookup.current(); ok {
+		// No version asked for, so the portrait in force is the one served.
+		return data, contentType, nil
 	}
 
 	// Procedural SVG fallback
 	svg := media.GenerateProceduralPortrait(media.PortraitRequestFor(ent))
 	return svg, "image/svg+xml", nil
+}
+
+// portraitLookup is where a portrait is read from: the note the character resolved
+// to, the campaign directory its portrait paths are relative to, and the portraits
+// directory and id its files are named by.
+type portraitLookup struct {
+	ent          *entity.Entity
+	gameDir      string
+	portraitsDir string
+	safeID       string
+}
+
+// portraitEntity is the note a portrait is asked about, falling back to the note on
+// disk when the index has not caught up. An unknown id still gets a placeholder
+// derived from the id, so a client never renders a broken portrait for a speaker it
+// cannot resolve.
+func (s *Service) portraitEntity(gameDir, gameID, cleanID string) *entity.Entity {
+	if store, storeErr := s.store(gameID); storeErr == nil {
+		if loaded, loadErr := store.GetEntity(cleanID); loadErr == nil && loaded != nil {
+			return loaded
+		}
+	}
+
+	notePath := filepath.Clean(filepath.Join(gameDir, "entities", cleanID+".md"))
+	if strings.HasPrefix(notePath, gameDir+string(filepath.Separator)) {
+		if data, readErr := os.ReadFile(notePath); readErr == nil {
+			if parsed, parseErr := entity.ParseMarkdownEntity(data); parseErr == nil {
+				return parsed
+			}
+		}
+	}
+	return &entity.Entity{ID: cleanID, Name: cleanID, Type: "character"}
+}
+
+// current finds the portrait in force: the note's own portrait when it has one, and
+// otherwise the unversioned file on disk.
+func (l portraitLookup) current() ([]byte, string, bool) {
+	if l.ent.Portrait != "" {
+		if data, ok := readGameFileIn(l.gameDir, l.ent.Portrait); ok {
+			return data, imageContentType(data), true
+		}
+	}
+	for _, ext := range portraitExtensions {
+		if data, ok := readPortraitImage(l.portraitsDir, l.safeID+ext); ok {
+			return data, imageContentType(data), true
+		}
+	}
+	return nil, "", false
+}
+
+// versioned finds the image for one historical version, in the order the files it may
+// be stored as: the versioned file, the note's current portrait when that is the
+// version asked for, the note's portrait history, and finally the unversioned file,
+// which is the first version by definition.
+func (l portraitLookup) versioned(targetVer int) ([]byte, string, bool) {
+	for _, ext := range portraitExtensions {
+		if data, ok := readPortraitImage(l.portraitsDir, fmt.Sprintf("%s-v%d%s", l.safeID, targetVer, ext)); ok {
+			return data, imageContentType(data), true
+		}
+	}
+	if l.ent.PortraitVersion == targetVer && l.ent.Portrait != "" {
+		if data, ok := readGameFileIn(l.gameDir, l.ent.Portrait); ok {
+			return data, imageContentType(data), true
+		}
+	}
+	for _, histPath := range l.ent.PortraitHistory {
+		if strings.Contains(histPath, fmt.Sprintf("-v%d.", targetVer)) {
+			if data, ok := readGameFileIn(l.gameDir, histPath); ok {
+				return data, imageContentType(data), true
+			}
+		}
+	}
+	if targetVer == 1 {
+		for _, ext := range portraitExtensions {
+			if data, ok := readPortraitImage(l.portraitsDir, l.safeID+ext); ok {
+				return data, imageContentType(data), true
+			}
+		}
+	}
+	return nil, "", false
+}
+
+// readGameFileIn reads a path recorded on a note, which is relative to the campaign
+// directory.
+func readGameFileIn(gameDir, rel string) ([]byte, bool) {
+	rel = strings.TrimSpace(rel)
+	if rel == "" {
+		return nil, false
+	}
+	return readWithin(gameDir, rel)
+}
+
+// readPortraitImage reads one file of the portraits directory by name, ignoring any
+// directory part the name carries.
+func readPortraitImage(portraitsDir, name string) ([]byte, bool) {
+	return readWithin(portraitsDir, filepath.Base(name))
+}
+
+// readWithin reads a file under base, refusing anything that resolves outside it. The
+// containment check is inline because this is where the path is read.
+func readWithin(base, rel string) ([]byte, bool) {
+	p := filepath.Clean(filepath.Join(base, rel))
+	if !strings.HasPrefix(p, base+string(filepath.Separator)) {
+		return nil, false
+	}
+	data, readErr := os.ReadFile(p)
+	if readErr != nil || len(data) == 0 {
+		return nil, false
+	}
+	return data, true
 }
 
 // RegenerateCharacterPortrait generates a fresh portrait for a character and
@@ -937,6 +967,10 @@ func (s *Service) ResumeTTSBatch(ctx context.Context, gameID, jobID string) (*TT
 // in the background, so the request returns at once and the panel watches the
 // job row. It returns the submitted job, or nil when every clip is already
 // cached.
+// StartTTSBatch submits an offline batch backfill for a campaign and finishes it
+// in the background, so the request returns at once and the panel watches the
+// job row. It returns the submitted job, or nil when every clip is already
+// cached.
 func (s *Service) StartTTSBatch(ctx context.Context, gameID string, force bool) (*TTSBatchJobDTO, error) {
 	cfg := s.configMgr.Get()
 	client, err := s.ttsClientFor(cfg.Media.TTS)
@@ -956,16 +990,47 @@ func (s *Service) StartTTSBatch(ctx context.Context, gameID string, force bool) 
 	// in flight is returned as-is, so the button is idempotent.
 	s.batchStartMu.Lock()
 	defer s.batchStartMu.Unlock()
-	if existing, ok := activeBatchJob(store, gameID); ok {
-		dto := ttsBatchJobDTO(*existing)
-		dto.GameID = gameID
-		return &dto, nil
+	if existing, ok := activeBatchJobDTO(store, gameID); ok {
+		return &existing, nil
 	}
 
 	pipeline, err := s.audioPipeline()
 	if err != nil {
 		return nil, err
 	}
+	groups, err := s.batchClipGroups(gameID, cfg, pipeline)
+	if err != nil {
+		return nil, err
+	}
+
+	providerKey := ttsProviderKey(cfg.Media.TTS)
+	batchEngine := ttsbatch.New(batchClient, media.NewContentCache(s.resolver.CacheDir()), store)
+	batchEngine.SetOpusBitrate(cfg.OpusBitrate())
+	opts := ttsbatch.Options{GameID: gameID, Provider: providerKey, Model: cfg.Media.TTS.Model, Force: force}
+
+	job, err := batchEngine.Submit(ctx, opts, groups)
+	if err != nil {
+		s.logTTSBatchError(gameID, providerKey, "", err)
+		return nil, err
+	}
+	if job == nil {
+		return nil, nil
+	}
+
+	// A batch job can take hours, so it finishes in the background and the panel
+	// watches the job row rather than holding a request open. It runs on the
+	// service's background context, so closing the app cancels the poll instead of
+	// waiting it out; the job stays resumable and is picked up next launch.
+	s.goBackground(func() { s.finishTTSBatch(batchEngine, opts, job.ID, gameID, providerKey) })
+
+	dto := ttsBatchJobDTO(*job)
+	return &dto, nil
+}
+
+// batchClipGroups is every clip a backfill would synthesize, in turn order: the
+// segments of each recorded turn folded into the groups the provider is asked for.
+// A turn with no segments contributes nothing.
+func (s *Service) batchClipGroups(gameID string, cfg *config.Config, pipeline *media.TTSPipeline) ([]media.ClipGroup, error) {
 	turns, err := s.cachedHistory(gameID)
 	if err != nil {
 		return nil, err
@@ -980,48 +1045,52 @@ func (s *Service) StartTTSBatch(ctx context.Context, gameID string, force bool) 
 		}
 		groups = append(groups, pipeline.GroupClipKeys(turn.Segments, narrator, voiceFor)...)
 	}
+	return groups, nil
+}
 
-	providerKey := ""
-	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
-		providerKey = string(key)
+// activeBatchJobDTO is the backfill already running for a campaign, if there is one.
+func activeBatchJobDTO(store *storage.Store, gameID string) (TTSBatchJobDTO, bool) {
+	existing, ok := activeBatchJob(store, gameID)
+	if !ok {
+		return TTSBatchJobDTO{}, false
 	}
-	batchEngine := ttsbatch.New(batchClient, media.NewContentCache(s.resolver.CacheDir()), store)
-	batchEngine.SetOpusBitrate(cfg.OpusBitrate())
-	opts := ttsbatch.Options{GameID: gameID, Provider: providerKey, Model: cfg.Media.TTS.Model, Force: force}
+	dto := ttsBatchJobDTO(*existing)
+	dto.GameID = gameID
+	return dto, true
+}
 
-	job, err := batchEngine.Submit(ctx, opts, groups)
-	if err != nil {
-		trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]any{
-			"game":     gameID,
-			"provider": providerKey,
-			"error":    err.Error(),
-		})
-		return nil, err
+// ttsProviderKey is the key a batch job's provider is recorded under, which is empty
+// for a provider that has no key.
+func ttsProviderKey(ttsCfg config.TTSConfig) string {
+	if key, ok := media.TTSKeyFor(ttsCfg); ok {
+		return string(key)
 	}
-	if job == nil {
-		return nil, nil
+	return ""
+}
+
+// finishTTSBatch runs a submitted backfill to completion in the background and
+// records the outcome either way.
+func (s *Service) finishTTSBatch(batchEngine *ttsbatch.Engine, opts ttsbatch.Options, jobID, gameID, providerKey string) {
+	if _, err := batchEngine.Resume(s.bgCtx, opts, jobID); err != nil {
+		s.logTTSBatchError(gameID, providerKey, jobID, err)
+		s.noteFailure("tts", err)
+		return
 	}
+	s.noteSuccess("tts")
+}
 
-	// A batch job can take hours, so it finishes in the background and the panel
-	// watches the job row rather than holding a request open. It runs on the
-	// service's background context, so closing the app cancels the poll instead of
-	// waiting it out; the job stays resumable and is picked up next launch.
-	s.goBackground(func() {
-		if _, err := batchEngine.Resume(s.bgCtx, opts, job.ID); err != nil {
-			trace.OrNil(s.logger).Event("media.tts.batch_error", map[string]any{
-				"game":     gameID,
-				"job":      job.ID,
-				"provider": providerKey,
-				"error":    err.Error(),
-			})
-			s.noteFailure("tts", err)
-			return
-		}
-		s.noteSuccess("tts")
-	})
-
-	dto := ttsBatchJobDTO(*job)
-	return &dto, nil
+// logTTSBatchError records a backfill failure against the campaign and the provider
+// it was submitted to, naming the job when the failure came after submission.
+func (s *Service) logTTSBatchError(gameID, providerKey, jobID string, err error) {
+	event := map[string]any{
+		"game":     gameID,
+		"provider": providerKey,
+		"error":    err.Error(),
+	}
+	if jobID != "" {
+		event["job"] = jobID
+	}
+	trace.OrNil(s.logger).Event("media.tts.batch_error", event)
 }
 
 // ResumePendingBatches finishes every unfinished batch job in the background, so
