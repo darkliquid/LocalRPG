@@ -1677,6 +1677,29 @@ func generationCode(failure *harness.GenerationFailure) string {
 	return string(failure.Code)
 }
 
+// streamAccumulator is what one provider stream builds up as it arrives: the text so
+// far, the last finish reason it gave, the tool calls it reported, and how many chunks
+// carried anything at all. The count is kept because an empty response is a failure the
+// caller retries, and a stream of chunks that carried nothing is still not an answer.
+type streamAccumulator struct {
+	text         strings.Builder
+	finishReason string
+	toolCalls    []harness.ToolCall
+	sawText      bool
+	chunkCount   int
+}
+
+// result is the stream's answer when it ended cleanly.
+func (a *streamAccumulator) result(providerID string) streamResult {
+	return streamResult{
+		Text:         a.text.String(),
+		FinishReason: a.finishReason,
+		ToolCalls:    a.toolCalls,
+		ProviderID:   providerID,
+		ChunkCount:   a.chunkCount,
+	}
+}
+
 // stream pumps one provider stream, forwarding each delta to onChunk and
 // accumulating the text. A failure after text has arrived is returned as
 // Interrupted with the text intact, so a turn can be repaired rather than lost;
@@ -1701,31 +1724,7 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 	idle := time.NewTimer(timeout)
 	defer idle.Stop()
 
-	var sb strings.Builder
-	finishReason := ""
-	var toolCalls []harness.ToolCall
-	sawText := false
-	chunkCount := 0
-	interrupted := func(err error) (streamResult, error) {
-		result := streamResult{ProviderID: provider.ID(), ChunkCount: chunkCount}
-		if sawText {
-			result.Text = sb.String()
-			result.FinishReason = finishReason
-			result.Interrupted = err
-			return result, nil
-		}
-		code := harness.ClassifyProviderError(err)
-		if errors.Is(err, ErrGenerationStalled) {
-			code = harness.FailureTimeout
-		}
-		result.Failure = &harness.GenerationFailure{
-			Code:      code,
-			Message:   err.Error(),
-			ElapsedMS: time.Since(started).Milliseconds(),
-			Cause:     err,
-		}
-		return result, err
-	}
+	acc := &streamAccumulator{}
 
 	for {
 		select {
@@ -1738,7 +1737,7 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 				}
 			}()
 			<-streamErr
-			return interrupted(fmt.Errorf("%w after %s", ErrGenerationStalled, timeout))
+			return interruptedStream(acc, provider.ID(), started, fmt.Errorf("%w after %s", ErrGenerationStalled, timeout))
 
 		case chunk, ok := <-chunks:
 			if !ok {
@@ -1748,55 +1747,108 @@ func (o *TurnOrchestrator) stream(ctx context.Context, provider harness.ModelPro
 					if errors.Is(err, context.Canceled) {
 						return streamResult{}, err
 					}
-					return interrupted(err)
+					return interruptedStream(acc, provider.ID(), started, err)
 				}
-				if strings.TrimSpace(sb.String()) == "" && len(toolCalls) == 0 {
-					return streamResult{
-						ProviderID: provider.ID(),
-						ChunkCount: chunkCount,
-						Failure: &harness.GenerationFailure{
-							Code:      harness.FailureEmptyResponse,
-							Message:   "provider returned no text",
-							ElapsedMS: time.Since(started).Milliseconds(),
-						},
-					}, nil
-				}
-				return streamResult{Text: sb.String(), FinishReason: finishReason, ToolCalls: toolCalls, ProviderID: provider.ID(), ChunkCount: chunkCount}, nil
+				return finishStream(acc, provider.ID(), started)
 			}
 			if chunk.Error != nil {
 				<-streamErr
-				return interrupted(chunk.Error)
-			}
-			if len(chunk.ToolCalls) > 0 {
-				toolCalls = chunk.ToolCalls
-			}
-			if chunk.FinishReason != "" {
-				finishReason = chunk.FinishReason
-			}
-			if !idle.Stop() {
-				select {
-				case <-idle.C:
-				default:
-				}
-			}
-			idle.Reset(timeout)
-
-			if chunk.Text != "" || len(chunk.ToolCalls) > 0 {
-				chunkCount++
+				return interruptedStream(acc, provider.ID(), started, chunk.Error)
 			}
 
-			if chunk.Text == "" {
-				continue
-			}
-			sb.WriteString(chunk.Text)
-			sawText = true
-			if onChunk != nil {
-				if err := onChunk(chunk.Text); err != nil {
-					return streamResult{}, fmt.Errorf("%w: %w", errStreamListener, err)
-				}
+			absorbChunk(acc, chunk)
+			resetIdleTimer(idle, timeout)
+			if err := forwardChunkText(acc, chunk, onChunk); err != nil {
+				return streamResult{}, err
 			}
 		}
 	}
+}
+
+// absorbChunk records what a chunk reports about the stream as a whole: the tool calls
+// it carries, and the reason it gives for finishing.
+func absorbChunk(acc *streamAccumulator, chunk harness.StreamChunk) {
+	if len(chunk.ToolCalls) > 0 {
+		acc.toolCalls = chunk.ToolCalls
+	}
+	if chunk.FinishReason != "" {
+		acc.finishReason = chunk.FinishReason
+	}
+}
+
+// forwardChunkText counts the chunk, accumulates its text, and hands the text to the
+// caller. A chunk carrying neither text nor tool calls is not a chunk of anything, so it
+// is not counted.
+func forwardChunkText(acc *streamAccumulator, chunk harness.StreamChunk, onChunk func(string) error) error {
+	if chunk.Text != "" || len(chunk.ToolCalls) > 0 {
+		acc.chunkCount++
+	}
+	if chunk.Text == "" {
+		return nil
+	}
+	acc.text.WriteString(chunk.Text)
+	acc.sawText = true
+	if onChunk != nil {
+		if err := onChunk(chunk.Text); err != nil {
+			return fmt.Errorf("%w: %w", errStreamListener, err)
+		}
+	}
+	return nil
+}
+
+// resetIdleTimer restarts the stall timer for another timeout. A tick that has already
+// fired is drained first, so the next select sees the new deadline rather than a tick
+// that was already spent.
+func resetIdleTimer(idle *time.Timer, timeout time.Duration) {
+	if !idle.Stop() {
+		select {
+		case <-idle.C:
+		default:
+		}
+	}
+	idle.Reset(timeout)
+}
+
+// finishStream is what a stream that closed cleanly amounts to: everything it produced,
+// or an empty response when it produced nothing, which the caller retries rather than
+// records as a turn.
+func finishStream(acc *streamAccumulator, providerID string, started time.Time) (streamResult, error) {
+	if strings.TrimSpace(acc.text.String()) == "" && len(acc.toolCalls) == 0 {
+		return streamResult{
+			ProviderID: providerID,
+			ChunkCount: acc.chunkCount,
+			Failure: &harness.GenerationFailure{
+				Code:      harness.FailureEmptyResponse,
+				Message:   "provider returned no text",
+				ElapsedMS: time.Since(started).Milliseconds(),
+			},
+		}, nil
+	}
+	return acc.result(providerID), nil
+}
+
+// interruptedStream is a stream that ended early. One that had already produced text is
+// kept intact, so the turn can be repaired rather than lost; one that had not is a hard
+// failure, classified from the error that ended it.
+func interruptedStream(acc *streamAccumulator, providerID string, started time.Time, err error) (streamResult, error) {
+	result := streamResult{ProviderID: providerID, ChunkCount: acc.chunkCount}
+	if acc.sawText {
+		result.Text = acc.text.String()
+		result.FinishReason = acc.finishReason
+		result.Interrupted = err
+		return result, nil
+	}
+	code := harness.ClassifyProviderError(err)
+	if errors.Is(err, ErrGenerationStalled) {
+		code = harness.FailureTimeout
+	}
+	result.Failure = &harness.GenerationFailure{
+		Code:      code,
+		Message:   err.Error(),
+		ElapsedMS: time.Since(started).Milliseconds(),
+		Cause:     err,
+	}
+	return result, err
 }
 
 // generateRequest streams one request through the gm role, falling back to the

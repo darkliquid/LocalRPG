@@ -80,38 +80,15 @@ func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, 
 	)
 	defer span.End()
 
-	// A turn's mentions are what later recall reasons about, so the names its prose
-	// contains are recorded here rather than left to whichever writer remembered to
-	// resolve them. Extraction records its own, and a link or a spoken line is
-	// already recorded, so this only adds what none of them saw.
-	for _, mention := range harness.ResolveProseMentions(t.store, turn.Narration, turn.Input) {
-		if !containsMention(turn.Entities, mention.ID) {
-			turn.Entities = append(turn.Entities, mention)
-		}
-	}
+	t.recordProseMentions(turn)
 
-	pending, err := t.stageEntities(turn, extracted, personae)
+	pending, err := t.stageAndWriteEntities(turn, extracted, personae)
 	if err != nil {
 		span.RecordError(err)
 		return err
 	}
 
-	if len(pending) > 0 {
-		for id, ent := range pending {
-			ent.History = appendTurnNumber(ent.History, turn.Number)
-			pending[id] = ent
-		}
-		if err := t.writeEntities(pending); err != nil {
-			span.RecordError(err)
-			return err
-		}
-	}
-
-	if err := t.stageMemories(turn, memories); err != nil {
-		span.RecordError(err)
-		return err
-	}
-	if err := t.writeMechanicalMemories(turn, checks); err != nil {
+	if err := t.recordMemories(turn, memories, checks); err != nil {
 		span.RecordError(err)
 		return err
 	}
@@ -122,16 +99,9 @@ func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, 
 		return err
 	}
 
-	if turn.Context != nil && t.store != nil {
-		rawCtx, err := json.Marshal(turn.Context)
-		if err != nil {
-			span.RecordError(err)
-			return fmt.Errorf("marshal turn context: %w", err)
-		}
-		if err := t.store.SaveTurnContext(turn.Number, turn.Prompt, rawCtx); err != nil {
-			span.RecordError(err)
-			return fmt.Errorf("save turn context: %w", err)
-		}
+	if err := t.saveTurnContext(turn); err != nil {
+		span.RecordError(err)
+		return err
 	}
 
 	if err := t.indexTurn(*turn); err != nil {
@@ -139,22 +109,89 @@ func (t *Timeline) RecordTurnContextStructured(ctx context.Context, turn *Turn, 
 		return err
 	}
 
-	if t.embeddingWorker != nil {
-		for id, ent := range pending {
-			t.embeddingWorker.Enqueue(storage.EmbeddingItem{
-				TargetType: "entity",
-				TargetID:   id,
-				Text:       ent.Name + " " + ent.Body,
-			})
-		}
-		t.embeddingWorker.Enqueue(storage.EmbeddingItem{
-			TargetType: "turn",
-			TargetID:   strconv.Itoa(turn.Number),
-			Text:       turn.Input + " " + turn.Narration,
-		})
-	}
+	t.enqueueTurnEmbeddings(turn, pending)
 
 	return nil
+}
+
+// recordProseMentions records the names a turn's prose contains. They are what later
+// recall reasons about, so they are recorded here rather than left to whichever writer
+// remembered to resolve them: extraction records its own, and a link or a spoken line is
+// already recorded, so this only adds what none of them saw.
+func (t *Timeline) recordProseMentions(turn *Turn) {
+	for _, mention := range harness.ResolveProseMentions(t.store, turn.Narration, turn.Input) {
+		if !containsMention(turn.Entities, mention.ID) {
+			turn.Entities = append(turn.Entities, mention)
+		}
+	}
+}
+
+// stageAndWriteEntities stages the entities a turn declares or extraction found, gives
+// each the turn's number, and writes them. The staged notes come back because the
+// embeddings are enqueued from them once the turn itself is recorded.
+func (t *Timeline) stageAndWriteEntities(turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl) (map[string]*entity.Entity, error) {
+	pending, err := t.stageEntities(turn, extracted, personae)
+	if err != nil {
+		return nil, err
+	}
+	if len(pending) == 0 {
+		return pending, nil
+	}
+
+	for id, ent := range pending {
+		ent.History = appendTurnNumber(ent.History, turn.Number)
+		pending[id] = ent
+	}
+	if err := t.writeEntities(pending); err != nil {
+		return nil, err
+	}
+	return pending, nil
+}
+
+// recordMemories stages the memories the turn declares and writes the mechanical ones
+// its checks imply.
+func (t *Timeline) recordMemories(turn *Turn, memories []harness.MemoryDecl, checks []harness.CheckResult) error {
+	if err := t.stageMemories(turn, memories); err != nil {
+		return err
+	}
+	return t.writeMechanicalMemories(turn, checks)
+}
+
+// saveTurnContext persists the context the turn was assembled from, which is what makes
+// a turn's prompt auditable afterwards. A turn with no context, or a timeline with no
+// store, has nothing to save.
+func (t *Timeline) saveTurnContext(turn *Turn) error {
+	if turn.Context == nil || t.store == nil {
+		return nil
+	}
+	rawCtx, err := json.Marshal(turn.Context)
+	if err != nil {
+		return fmt.Errorf("marshal turn context: %w", err)
+	}
+	if err := t.store.SaveTurnContext(turn.Number, turn.Prompt, rawCtx); err != nil {
+		return fmt.Errorf("save turn context: %w", err)
+	}
+	return nil
+}
+
+// enqueueTurnEmbeddings hands the turn and the notes it wrote to the embedding worker,
+// so a later turn can retrieve them by meaning rather than by keyword.
+func (t *Timeline) enqueueTurnEmbeddings(turn *Turn, pending map[string]*entity.Entity) {
+	if t.embeddingWorker == nil {
+		return
+	}
+	for id, ent := range pending {
+		t.embeddingWorker.Enqueue(storage.EmbeddingItem{
+			TargetType: "entity",
+			TargetID:   id,
+			Text:       ent.Name + " " + ent.Body,
+		})
+	}
+	t.embeddingWorker.Enqueue(storage.EmbeddingItem{
+		TargetType: "turn",
+		TargetID:   strconv.Itoa(turn.Number),
+		Text:       turn.Input + " " + turn.Narration,
+	})
 }
 
 // UpdateTurn rewrites a recorded turn's own fields in place, so a change to the
@@ -200,6 +237,10 @@ func (t *Timeline) ReplaceTurnContextStructured(ctx context.Context, turn *Turn,
 	return t.RecordTurnContextStructured(ctx, turn, extracted, personae, memories, checks)
 }
 
+// stageEntities builds the set of notes the turn will write: the ones its own mentions
+// already point at, the ones its persona declarations describe, and the ones extraction
+// found. Notes the turn has nothing new to say about are left out, and a persona that
+// restates an earlier identity takes that identity's note with it.
 func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity, personae []harness.PersonaDecl) (map[string]*entity.Entity, error) {
 	pending := make(map[string]*entity.Entity, len(turn.Entities)+len(extracted)+len(personae))
 
@@ -212,166 +253,227 @@ func (t *Timeline) stageEntities(turn *Turn, extracted []harness.ExtractedEntity
 	}
 
 	for _, persona := range personae {
-		if strings.TrimSpace(persona.Name) == "" {
-			continue
-		}
-		id := entity.Slugify(persona.Name)
-		if id == "" {
-			continue
-		}
-		ent, err := t.store.GetEntity(id)
-		if err != nil || ent == nil {
-			ent = &entity.Entity{ID: id, Name: persona.Name, Type: persona.Type, Wikilinks: make([]string, 0)}
-			if ent.Type == "" {
-				ent.Type = "character"
-			}
-			if ent.State == nil {
-				ent.State = state.NewState(nil)
-			}
-			if persona.Gender != "" {
-				ent.Gender = persona.Gender
-				ent.State.Set("gender", persona.Gender)
-			}
-			if persona.Pronouns != "" {
-				ent.State.Set("pronouns", persona.Pronouns)
-			}
-			if len(persona.RoleTags) > 0 {
-				ent.Tags = append(ent.Tags, persona.RoleTags...)
-			}
-			ent.Body = persona.Description
-		}
-
-		if prev := strings.TrimSpace(persona.PreviousIdentity()); prev != "" {
-			ent.Aliases = appendUnique(ent.Aliases, prev)
-			prevSlug := entity.Slugify(prev)
-			if prevSlug != "" && prevSlug != id {
-				ent.Aliases = appendUnique(ent.Aliases, prevSlug)
-			}
-			var prevEnt *entity.Entity
-			if prevSlug != "" {
-				if p, ok := pending[prevSlug]; ok {
-					prevEnt = p
-				} else if existing, err := t.store.GetEntity(prevSlug); err == nil && existing != nil {
-					prevEnt = existing
-				}
-			}
-			if prevEnt == nil && t.store != nil {
-				if matchID := harness.ResolveSpeakerID(t.store, prev); matchID != "" {
-					if existing, err := t.store.GetEntity(matchID); err == nil && existing != nil {
-						prevEnt = existing
-					}
-				}
-			}
-
-			if prevEnt != nil && prevEnt.ID != ent.ID {
-				ent.Aliases = appendUnique(ent.Aliases, prevEnt.Name)
-				ent.Aliases = appendUnique(ent.Aliases, prevEnt.Aliases...)
-				ent.Tags = appendUnique(ent.Tags, prevEnt.Tags...)
-				if ent.Voice == nil && prevEnt.Voice != nil {
-					ent.Voice = prevEnt.Voice
-				}
-				if ent.Portrait == "" && prevEnt.Portrait != "" {
-					ent.Portrait = prevEnt.Portrait
-					ent.PortraitVersion = prevEnt.PortraitVersion
-					ent.PortraitHistory = appendUnique(ent.PortraitHistory, prevEnt.PortraitHistory...)
-				}
-				if strings.TrimSpace(ent.Body) == "" {
-					ent.Body = prevEnt.Body
-				}
-				ent.History = appendUniqueInts(ent.History, prevEnt.History...)
-
-				// Remove previous entity from pending so it's not rewritten.
-				delete(pending, prevEnt.ID)
-				if prevSlug != "" {
-					delete(pending, prevSlug)
-				}
-
-				// Clean up previous entity from disk and store.
-				prevSafeID := pathutil.SanitizeID(prevEnt.ID)
-				if prevPath, err := pathutil.ResolveSafeChild(t.EntitiesDir(), prevSafeID+".md"); err == nil {
-					_ = os.Remove(prevPath)
-				}
-				if t.store != nil {
-					_ = t.store.DeleteEntity(prevEnt.ID)
-				}
-
-				// Remap mentions in turn.Entities from prevEnt.ID to ent.ID.
-				for i := range turn.Entities {
-					if turn.Entities[i].ID == prevEnt.ID || (prevSlug != "" && turn.Entities[i].ID == prevSlug) {
-						turn.Entities[i].ID = ent.ID
-					}
-				}
-
-				// Remap segments in turn.Segments from prevEnt.ID to ent.ID.
-				for i := range turn.Segments {
-					if turn.Segments[i].SpeakerID == prevEnt.ID || (prevSlug != "" && turn.Segments[i].SpeakerID == prevSlug) {
-						turn.Segments[i].SpeakerID = ent.ID
-					}
-				}
-			}
-		}
-
-		if entity.IsCharacterType(ent.Type) {
-			harness.AssignVoiceProfile(ent, t.voiceProfiles)
-		}
-		pending[ent.ID] = ent
-		if !containsMention(turn.Entities, ent.ID) {
-			turn.Entities = append(turn.Entities, entity.Mention{ID: ent.ID, Kind: entity.MentionExtracted})
-		}
+		t.stagePersona(turn, persona, pending)
 	}
 
 	for _, raw := range extracted {
-		if strings.TrimSpace(raw.Name) == "" {
-			continue
-		}
-
-		ent := harness.MatchExistingEntity(t.store, &raw)
-		beforeAppearance := ""
-		if ent != nil {
-			beforeAppearance = ent.CurrentAppearance
-			ent = harness.MergeExtractedEntity(ent, &raw)
-		} else {
-			id := entity.Slugify(raw.Name)
-			if id == "" {
-				continue
-			}
-			if existing, err := t.store.GetEntity(id); err == nil && existing != nil {
-				ent = harness.MergeExtractedEntity(existing, &raw)
-			} else {
-				ent = &entity.Entity{
-					ID:        id,
-					Name:      raw.Name,
-					Type:      raw.Type,
-					Location:  raw.Location,
-					Faction:   raw.Faction,
-					Body:      raw.Body,
-					Wikilinks: make([]string, 0),
-				}
-			}
-		}
-
-		// The appearance the merge replaced belongs to the turn, so an undo can put
-		// it back. Only a change is recorded, so a turn that left the note alone
-		// stays out of the log's way.
-		if ent.CurrentAppearance != beforeAppearance {
-			turn.CurrentAppearances = append(turn.CurrentAppearances, EntityAppearance{
-				EntityID: ent.ID,
-				Before:   beforeAppearance,
-				After:    ent.CurrentAppearance,
-			})
-		}
-
-		if entity.IsCharacterType(ent.Type) {
-			harness.AssignVoiceProfile(ent, t.voiceProfiles)
-		}
-
-		pending[ent.ID] = ent
-		if !containsMention(turn.Entities, ent.ID) {
-			turn.Entities = append(turn.Entities, entity.Mention{ID: ent.ID, Kind: entity.MentionExtracted})
-		}
+		t.stageExtracted(turn, raw, pending)
 	}
 
 	return pending, nil
+}
+
+// stagePersona stages one declared persona: the note it already has, or a stub carrying
+// what it declared. A persona that restates a previous identity is folded into the note
+// it now is, and the identity it left behind is retired.
+func (t *Timeline) stagePersona(turn *Turn, persona harness.PersonaDecl, pending map[string]*entity.Entity) {
+	if strings.TrimSpace(persona.Name) == "" {
+		return
+	}
+	id := entity.Slugify(persona.Name)
+	if id == "" {
+		return
+	}
+
+	ent, err := t.store.GetEntity(id)
+	if err != nil || ent == nil {
+		ent = newPersonaEntity(id, persona)
+	}
+
+	if prev := strings.TrimSpace(persona.PreviousIdentity()); prev != "" {
+		t.foldPreviousIdentity(turn, ent, prev, pending)
+	}
+
+	if entity.IsCharacterType(ent.Type) {
+		harness.AssignVoiceProfile(ent, t.voiceProfiles)
+	}
+	pending[ent.ID] = ent
+	if !containsMention(turn.Entities, ent.ID) {
+		turn.Entities = append(turn.Entities, entity.Mention{ID: ent.ID, Kind: entity.MentionExtracted})
+	}
+}
+
+// newPersonaEntity is the note a freshly declared persona gets. It carries the state
+// that was declared rather than what extraction might have guessed, which is what makes
+// a persona declaration worth making.
+func newPersonaEntity(id string, persona harness.PersonaDecl) *entity.Entity {
+	ent := &entity.Entity{ID: id, Name: persona.Name, Type: persona.Type, Wikilinks: make([]string, 0)}
+	if ent.Type == "" {
+		ent.Type = "character"
+	}
+	if ent.State == nil {
+		ent.State = state.NewState(nil)
+	}
+	if persona.Gender != "" {
+		ent.Gender = persona.Gender
+		ent.State.Set("gender", persona.Gender)
+	}
+	if persona.Pronouns != "" {
+		ent.State.Set("pronouns", persona.Pronouns)
+	}
+	if len(persona.RoleTags) > 0 {
+		ent.Tags = append(ent.Tags, persona.RoleTags...)
+	}
+	ent.Body = persona.Description
+	return ent
+}
+
+// foldPreviousIdentity takes over the note a persona used to be, keeping the new name as
+// an alias of it so the prose that still uses the old one keeps resolving.
+func (t *Timeline) foldPreviousIdentity(turn *Turn, ent *entity.Entity, prev string, pending map[string]*entity.Entity) {
+	ent.Aliases = appendUnique(ent.Aliases, prev)
+	prevSlug := entity.Slugify(prev)
+	if prevSlug != "" && prevSlug != ent.ID {
+		ent.Aliases = appendUnique(ent.Aliases, prevSlug)
+	}
+
+	prevEnt := t.findPreviousEntity(prev, prevSlug, pending)
+	if prevEnt == nil || prevEnt.ID == ent.ID {
+		return
+	}
+
+	mergePreviousEntity(ent, prevEnt)
+	t.retirePreviousEntity(turn, ent, prevEnt, prevSlug, pending)
+}
+
+// findPreviousEntity is the note a persona used to be: the one this turn has already
+// staged when it is there, then the one the index holds under its slug, and finally
+// whatever the store resolves the spoken name to.
+func (t *Timeline) findPreviousEntity(prev, prevSlug string, pending map[string]*entity.Entity) *entity.Entity {
+	if prevSlug != "" {
+		if staged, ok := pending[prevSlug]; ok {
+			return staged
+		}
+		if existing, err := t.store.GetEntity(prevSlug); err == nil && existing != nil {
+			return existing
+		}
+	}
+	if t.store != nil {
+		if matchID := harness.ResolveSpeakerID(t.store, prev); matchID != "" {
+			if existing, err := t.store.GetEntity(matchID); err == nil && existing != nil {
+				return existing
+			}
+		}
+	}
+	return nil
+}
+
+// mergePreviousEntity moves what the old note knew onto the new one: its name and
+// aliases, its tags, its body when the new one has none, and the voice, portrait and
+// turn history it had accumulated.
+func mergePreviousEntity(ent, prevEnt *entity.Entity) {
+	ent.Aliases = appendUnique(ent.Aliases, prevEnt.Name)
+	ent.Aliases = appendUnique(ent.Aliases, prevEnt.Aliases...)
+	ent.Tags = appendUnique(ent.Tags, prevEnt.Tags...)
+	if ent.Voice == nil && prevEnt.Voice != nil {
+		ent.Voice = prevEnt.Voice
+	}
+	if ent.Portrait == "" && prevEnt.Portrait != "" {
+		ent.Portrait = prevEnt.Portrait
+		ent.PortraitVersion = prevEnt.PortraitVersion
+		ent.PortraitHistory = appendUnique(ent.PortraitHistory, prevEnt.PortraitHistory...)
+	}
+	if strings.TrimSpace(ent.Body) == "" {
+		ent.Body = prevEnt.Body
+	}
+	ent.History = appendUniqueInts(ent.History, prevEnt.History...)
+}
+
+// retirePreviousEntity takes the old note out of the staged set, off disk and out of the
+// index, and rewrites everything the turn attributed to it: the entities it mentions and
+// the segments it speaks.
+func (t *Timeline) retirePreviousEntity(turn *Turn, ent, prevEnt *entity.Entity, prevSlug string, pending map[string]*entity.Entity) {
+	delete(pending, prevEnt.ID)
+	if prevSlug != "" {
+		delete(pending, prevSlug)
+	}
+
+	prevSafeID := pathutil.SanitizeID(prevEnt.ID)
+	if prevPath, err := pathutil.ResolveSafeChild(t.EntitiesDir(), prevSafeID+".md"); err == nil {
+		_ = os.Remove(prevPath)
+	}
+	if t.store != nil {
+		_ = t.store.DeleteEntity(prevEnt.ID)
+	}
+
+	// Remap mentions in turn.Entities from prevEnt.ID to ent.ID.
+	for i := range turn.Entities {
+		if turn.Entities[i].ID == prevEnt.ID || (prevSlug != "" && turn.Entities[i].ID == prevSlug) {
+			turn.Entities[i].ID = ent.ID
+		}
+	}
+
+	// Remap segments in turn.Segments from prevEnt.ID to ent.ID.
+	for i := range turn.Segments {
+		if turn.Segments[i].SpeakerID == prevEnt.ID || (prevSlug != "" && turn.Segments[i].SpeakerID == prevSlug) {
+			turn.Segments[i].SpeakerID = ent.ID
+		}
+	}
+}
+
+// stageExtracted stages one extracted entity: the note the extraction belongs to, merged
+// with what it found. Extraction never invents an identity the note already holds, so a
+// match is an update rather than a rename.
+func (t *Timeline) stageExtracted(turn *Turn, raw harness.ExtractedEntity, pending map[string]*entity.Entity) {
+	if strings.TrimSpace(raw.Name) == "" {
+		return
+	}
+
+	ent, beforeAppearance := t.resolveExtractedEntity(raw)
+	if ent == nil {
+		return
+	}
+
+	// The appearance the merge replaced belongs to the turn, so an undo can put
+	// it back. Only a change is recorded, so a turn that left the note alone
+	// stays out of the log's way.
+	if ent.CurrentAppearance != beforeAppearance {
+		turn.CurrentAppearances = append(turn.CurrentAppearances, EntityAppearance{
+			EntityID: ent.ID,
+			Before:   beforeAppearance,
+			After:    ent.CurrentAppearance,
+		})
+	}
+
+	if entity.IsCharacterType(ent.Type) {
+		harness.AssignVoiceProfile(ent, t.voiceProfiles)
+	}
+
+	pending[ent.ID] = ent
+	if !containsMention(turn.Entities, ent.ID) {
+		turn.Entities = append(turn.Entities, entity.Mention{ID: ent.ID, Kind: entity.MentionExtracted})
+	}
+}
+
+// resolveExtractedEntity is the note one extraction belongs to, merged with what the
+// extraction found, together with the appearance the merge replaced.
+//
+// A name that slugs to nothing is not an entity at all, so it is reported as no note
+// rather than given an unreachable id.
+func (t *Timeline) resolveExtractedEntity(raw harness.ExtractedEntity) (*entity.Entity, string) {
+	if ent := harness.MatchExistingEntity(t.store, &raw); ent != nil {
+		beforeAppearance := ent.CurrentAppearance
+		return harness.MergeExtractedEntity(ent, &raw), beforeAppearance
+	}
+
+	id := entity.Slugify(raw.Name)
+	if id == "" {
+		return nil, ""
+	}
+	if existing, err := t.store.GetEntity(id); err == nil && existing != nil {
+		// Only a match that already knew the name counts as a previous appearance:
+		// this branch found the note by its slug, which the raw name was not.
+		return harness.MergeExtractedEntity(existing, &raw), ""
+	}
+	return &entity.Entity{
+		ID:        id,
+		Name:      raw.Name,
+		Type:      raw.Type,
+		Location:  raw.Location,
+		Faction:   raw.Faction,
+		Body:      raw.Body,
+		Wikilinks: make([]string, 0),
+	}, ""
 }
 
 func (t *Timeline) writeEntities(pending map[string]*entity.Entity) error {

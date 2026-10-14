@@ -43,57 +43,125 @@ type InitOptions struct {
 }
 
 func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
-	if err := pathutil.ValidateID(opts.GameID); err != nil {
-		return nil, fmt.Errorf("invalid game id %q: %w", opts.GameID, err)
-	}
-	if err := pathutil.ValidateID(opts.SystemID); err != nil {
-		return nil, fmt.Errorf("invalid system id %q: %w", opts.SystemID, err)
-	}
-	if err := pathutil.ValidateID(opts.WorldID); err != nil {
-		return nil, fmt.Errorf("invalid world id %q: %w", opts.WorldID, err)
+	if err := validateInitIDs(opts); err != nil {
+		return nil, err
 	}
 
 	gameID := opts.GameID
 	systemID := opts.SystemID
 	worldID := opts.WorldID
 
-	// Verify system & world exist
-	sysManifest, err := core.LoadSystemManifest(filepath.Join(paths.SystemDir(systemID), "system.yaml"))
+	// Verify system & world exist, and that the world's requirements suit the system
+	sysManifest, worldManifest, err := loadVerifiedContent(paths, systemID, worldID)
 	if err != nil {
-		return nil, fmt.Errorf("load system %q: %w", systemID, err)
-	}
-
-	worldManifest, err := core.LoadWorldManifest(filepath.Join(paths.WorldDir(worldID), "world.yaml"))
-	if err != nil {
-		return nil, fmt.Errorf("load world %q: %w", worldID, err)
-	}
-
-	// Verify world requirements
-	for _, req := range worldManifest.Requires {
-		if req.Type == "" || req.Type == "system" {
-			if req.ID == "" || req.ID == systemID {
-				if !req.Satisfies(sysManifest.Version) {
-					return nil, fmt.Errorf("incompatible system %q: world %q requires version constraint %q, but system version is %q", systemID, worldID, req.Version, sysManifest.Version)
-				}
-			}
-		}
+		return nil, err
 	}
 
 	gameDir := paths.GameDir(gameID)
 	gameEntitiesDir := filepath.Join(gameDir, "entities")
-	gameCacheDir := filepath.Join(gameDir, "cache")
-	gameAssetsDir := filepath.Join(gameDir, "assets")
-
-	for _, d := range []string{gameDir, gameEntitiesDir, gameCacheDir, gameAssetsDir} {
-		if err := os.MkdirAll(d, 0755); err != nil {
-			return nil, fmt.Errorf("create dir %q: %w", d, err)
-		}
+	if err := createCampaignDirs(gameDir, gameEntitiesDir, filepath.Join(gameDir, "cache"), filepath.Join(gameDir, "assets")); err != nil {
+		return nil, err
 	}
 
 	// Create game manifest
 	// The player is stored as an entity ID, with the entered name kept beside it
 	// for display. Writing the slug is what keeps the orchestrator, the JS bridge,
 	// and the GUI state route agreeing on one identifier for the protagonist.
+	manifest := newGameManifest(gameID, systemID, worldID, opts)
+
+	// Copy initial template entities from world into game, named <id>.md so the
+	// GUI, which derives entity IDs from file names, can reach them.
+	if err := copyWorldTemplateEntities(filepath.Join(paths.WorldDir(worldID), "entities"), gameEntitiesDir); err != nil {
+		return nil, err
+	}
+
+	// Open the canonical store and run initial sync
+	store, err := openCampaignStore(paths, gameID, gameDir, gameEntitiesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Pin the opening location so every later session agrees on where the
+	// campaign begins.
+	startLocation, err := pinOpeningLocation(paths, store, manifest)
+	if err != nil {
+		return nil, err
+	}
+
+	// Give the campaign a player note before the manifest is written, so a failure
+	// leaves no half-built campaign.
+	if err := ensurePlayerNote(paths, store, gameID, opts.PlayerName, opts.PlayerDetails, opts.PlayerCharacter, startLocation); err != nil {
+		return nil, fmt.Errorf("create player note: %w", err)
+	}
+
+	if err := writeCampaignManifest(gameDir, manifest); err != nil {
+		return nil, err
+	}
+
+	// Lock the campaign content versions and behavioural digests
+	if _, err := LockContent(paths, gameID); err != nil {
+		return nil, fmt.Errorf("lock content: %w", err)
+	}
+
+	return &Session{
+		Paths:    paths,
+		Manifest: manifest,
+		System:   sysManifest,
+		World:    worldManifest,
+		Store:    store,
+	}, nil
+}
+
+// validateInitIDs checks the three ids a campaign is created under. They become
+// directory names, so they are validated before anything is written.
+func validateInitIDs(opts InitOptions) error {
+	if err := pathutil.ValidateID(opts.GameID); err != nil {
+		return fmt.Errorf("invalid game id %q: %w", opts.GameID, err)
+	}
+	if err := pathutil.ValidateID(opts.SystemID); err != nil {
+		return fmt.Errorf("invalid system id %q: %w", opts.SystemID, err)
+	}
+	if err := pathutil.ValidateID(opts.WorldID); err != nil {
+		return fmt.Errorf("invalid world id %q: %w", opts.WorldID, err)
+	}
+	return nil
+}
+
+// loadVerifiedContent loads the system and world a campaign is created from, and
+// enforces the version constraints the world places on the system.
+func loadVerifiedContent(paths *core.PathResolver, systemID, worldID string) (*core.SystemManifest, *core.WorldManifest, error) {
+	sysManifest, err := core.LoadSystemManifest(filepath.Join(paths.SystemDir(systemID), "system.yaml"))
+	if err != nil {
+		return nil, nil, fmt.Errorf("load system %q: %w", systemID, err)
+	}
+
+	worldManifest, err := core.LoadWorldManifest(filepath.Join(paths.WorldDir(worldID), "world.yaml"))
+	if err != nil {
+		return nil, nil, fmt.Errorf("load world %q: %w", worldID, err)
+	}
+
+	if err := checkRequires(worldManifest.Requires, systemID, worldID, sysManifest.Version); err != nil {
+		return nil, nil, err
+	}
+	return sysManifest, worldManifest, nil
+}
+
+// createCampaignDirs makes the directories a campaign needs before anything is written
+// into them.
+func createCampaignDirs(dirs ...string) error {
+	for _, d := range dirs {
+		if err := os.MkdirAll(d, 0755); err != nil {
+			return fmt.Errorf("create dir %q: %w", d, err)
+		}
+	}
+	return nil
+}
+
+// newGameManifest is the campaign's own record. The player is stored as an entity ID,
+// with the entered name kept beside it for display: writing the slug is what keeps the
+// orchestrator, the JS bridge, and the GUI state route agreeing on one identifier for
+// the protagonist.
+func newGameManifest(gameID, systemID, worldID string, opts InitOptions) *core.GameManifest {
 	playerID := entity.Slugify(opts.PlayerName)
 	if playerID == "" {
 		playerID = "player"
@@ -116,42 +184,52 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 	if prompt := strings.TrimSpace(opts.OpeningPrompt); prompt != "" {
 		manifest.Settings[OpeningPromptSetting] = prompt
 	}
+	return manifest
+}
 
-	// Copy initial template entities from world into game, named <id>.md so the
-	// GUI, which derives entity IDs from file names, can reach them.
-	worldEntitiesDir := filepath.Join(paths.WorldDir(worldID), "entities")
-	if entries, err := os.ReadDir(worldEntitiesDir); err == nil {
-		for _, e := range entries {
-			if e.IsDir() {
-				continue
-			}
-			data, err := os.ReadFile(filepath.Join(worldEntitiesDir, e.Name()))
-			if err != nil {
-				return nil, fmt.Errorf("read entity template %q: %w", e.Name(), err)
-			}
-			template, err := entity.ParseMarkdownEntity(data)
-			if err != nil {
-				return nil, fmt.Errorf("parse entity template %q: %w", e.Name(), err)
-			}
-			templateID := template.ID
-			if templateID == "" {
-				templateID = entity.Slugify(template.Name)
-			}
-			if templateID == "" {
-				templateID = strings.TrimSuffix(e.Name(), ".md")
-			}
-			templateID = pathutil.SanitizeID(templateID)
-			safePath, err := pathutil.ResolveSafeChild(gameEntitiesDir, templateID+".md")
-			if err != nil {
-				return nil, fmt.Errorf("invalid entity template id %q: %w", templateID, err)
-			}
-			if err := os.WriteFile(safePath, data, 0644); err != nil {
-				return nil, fmt.Errorf("write entity template %q: %w", e.Name(), err)
-			}
-		}
+// copyWorldTemplateEntities copies a world's initial entity templates into the campaign,
+// naming each <id>.md so the GUI, which derives entity IDs from file names, can reach
+// them. A world with no entities directory contributes nothing rather than failing.
+func copyWorldTemplateEntities(worldEntitiesDir, gameEntitiesDir string) error {
+	entries, err := os.ReadDir(worldEntitiesDir)
+	if err != nil {
+		return nil
 	}
 
-	// Open the canonical store and run initial sync
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(worldEntitiesDir, e.Name()))
+		if err != nil {
+			return fmt.Errorf("read entity template %q: %w", e.Name(), err)
+		}
+		template, err := entity.ParseMarkdownEntity(data)
+		if err != nil {
+			return fmt.Errorf("parse entity template %q: %w", e.Name(), err)
+		}
+		templateID := template.ID
+		if templateID == "" {
+			templateID = entity.Slugify(template.Name)
+		}
+		if templateID == "" {
+			templateID = strings.TrimSuffix(e.Name(), ".md")
+		}
+		templateID = pathutil.SanitizeID(templateID)
+		safePath, err := pathutil.ResolveSafeChild(gameEntitiesDir, templateID+".md")
+		if err != nil {
+			return fmt.Errorf("invalid entity template id %q: %w", templateID, err)
+		}
+		if err := os.WriteFile(safePath, data, 0644); err != nil {
+			return fmt.Errorf("write entity template %q: %w", e.Name(), err)
+		}
+	}
+	return nil
+}
+
+// openCampaignStore opens the campaign's canonical store, syncs the notes just written
+// into it, and repairs the derived index when the log and the index disagree.
+func openCampaignStore(paths *core.PathResolver, gameID, gameDir, gameEntitiesDir string) (*storage.Store, error) {
 	store, err := storage.OpenGameStore(paths, gameID)
 	if err != nil {
 		return nil, fmt.Errorf("init game store: %w", err)
@@ -162,46 +240,35 @@ func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 		return nil, fmt.Errorf("initial sync: %w", err)
 	}
 
-	// Repair the derived index when the log and the index disagree
 	timeline := NewTimeline(paths, store, NewHistoryLogger(filepath.Join(gameDir, "history.jsonl")), gameID)
 	if err := timeline.EnsureIndexed(); err != nil {
 		return nil, fmt.Errorf("index turns: %w", err)
 	}
+	return store, nil
+}
 
-	// Pin the opening location so every later session agrees on where the
-	// campaign begins.
+// pinOpeningLocation resolves where the campaign begins and records it on the manifest,
+// so every later session agrees.
+func pinOpeningLocation(paths *core.PathResolver, store *storage.Store, manifest *core.GameManifest) (string, error) {
 	startLocation, err := ResolveStartLocation(paths, store, manifest)
 	if err != nil {
-		return nil, fmt.Errorf("resolve start location: %w", err)
+		return "", fmt.Errorf("resolve start location: %w", err)
 	}
 	manifest.Settings[StartLocationSetting] = startLocation
+	return startLocation, nil
+}
 
-	// Give the campaign a player note before the manifest is written, so a failure
-	// leaves no half-built campaign.
-	if err := ensurePlayerNote(paths, store, gameID, opts.PlayerName, opts.PlayerDetails, opts.PlayerCharacter, startLocation); err != nil {
-		return nil, fmt.Errorf("create player note: %w", err)
-	}
-
+// writeCampaignManifest writes the campaign's own record. It runs after the player note
+// exists, so a failure leaves no half-built campaign.
+func writeCampaignManifest(gameDir string, manifest *core.GameManifest) error {
 	manifestBytes, err := yaml.Marshal(manifest)
 	if err != nil {
-		return nil, fmt.Errorf("marshal game manifest: %w", err)
+		return fmt.Errorf("marshal game manifest: %w", err)
 	}
 	if err := os.WriteFile(filepath.Join(gameDir, "game.yaml"), manifestBytes, 0644); err != nil {
-		return nil, fmt.Errorf("write game.yaml: %w", err)
+		return fmt.Errorf("write game.yaml: %w", err)
 	}
-
-	// Lock the campaign content versions and behavioural digests
-	if _, err := LockContent(paths, gameID); err != nil {
-		return nil, fmt.Errorf("lock content: %w", err)
-	}
-
-	return &Session{
-		Paths:    paths,
-		Manifest: manifest,
-		System:   sysManifest,
-		World:    worldManifest,
-		Store:    store,
-	}, nil
+	return nil
 }
 
 // ensurePlayerNote writes the campaign's player note when the file is absent,
