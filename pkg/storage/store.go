@@ -109,76 +109,81 @@ func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 		return nil, err
 	}
 
+	unmarshalEntityMeta(&ent, fmJSON)
+	return &ent, nil
+}
+
+func unmarshalEntityMeta(ent *entity.Entity, fmJSON string) {
 	var meta map[string]any
-	if err := json.Unmarshal([]byte(fmJSON), &meta); err == nil {
-		if stateData, ok := meta["state"].(map[string]any); ok {
-			ent.InitState(stateData)
+	if err := json.Unmarshal([]byte(fmJSON), &meta); err != nil {
+		return
+	}
+
+	if stateData, ok := meta["state"].(map[string]any); ok {
+		ent.InitState(stateData)
+	}
+	if voiceData, ok := meta["voice"]; ok && voiceData != nil {
+		voiceBytes, _ := json.Marshal(voiceData)
+		var v entity.VoiceConfig
+		if err := json.Unmarshal(voiceBytes, &v); err == nil {
+			ent.Voice = &v
 		}
-		if voiceData, ok := meta["voice"]; ok && voiceData != nil {
-			voiceBytes, _ := json.Marshal(voiceData)
-			var v entity.VoiceConfig
-			if err := json.Unmarshal(voiceBytes, &v); err == nil {
-				ent.Voice = &v
-			}
-		}
-		if loc, ok := meta["location"].(string); ok {
-			ent.Location = loc
-		}
-		if fac, ok := meta["faction"].(string); ok {
-			ent.Faction = fac
-		}
-		if appearance, ok := meta["appearance"].(string); ok {
-			ent.Appearance = appearance
-		}
-		if current, ok := meta["current_appearance"].(string); ok {
-			ent.CurrentAppearance = current
-		}
-		if age, ok := meta["age"].(string); ok {
-			ent.Age = age
-		}
-		if gender, ok := meta["gender"].(string); ok {
-			ent.Gender = gender
-		}
-		if extra, ok := meta["extra"].(map[string]any); ok && len(extra) > 0 {
-			ent.ExtraMeta = extra
-		}
-		if port, ok := meta["portrait"].(string); ok {
-			ent.Portrait = port
-		}
-		if pv, ok := meta["portrait_version"].(float64); ok {
-			ent.PortraitVersion = int(pv)
-		}
-		if ph, ok := meta["portrait_history"].([]any); ok {
-			for _, item := range ph {
-				if path, ok := item.(string); ok {
-					ent.PortraitHistory = append(ent.PortraitHistory, path)
-				}
-			}
-		}
-		if aliases, ok := meta["aliases"].([]any); ok {
-			for _, value := range aliases {
-				if alias, ok := value.(string); ok {
-					ent.Aliases = append(ent.Aliases, alias)
-				}
-			}
-		}
-		if tags, ok := meta["tags"].([]any); ok {
-			for _, value := range tags {
-				if tag, ok := value.(string); ok {
-					ent.Tags = append(ent.Tags, tag)
-				}
-			}
-		}
-		if history, ok := meta["history"].([]any); ok {
-			for _, value := range history {
-				if number, ok := value.(float64); ok {
-					ent.History = append(ent.History, int(number))
-				}
+	}
+	if loc, ok := meta["location"].(string); ok {
+		ent.Location = loc
+	}
+	if fac, ok := meta["faction"].(string); ok {
+		ent.Faction = fac
+	}
+	if appearance, ok := meta["appearance"].(string); ok {
+		ent.Appearance = appearance
+	}
+	if current, ok := meta["current_appearance"].(string); ok {
+		ent.CurrentAppearance = current
+	}
+	if age, ok := meta["age"].(string); ok {
+		ent.Age = age
+	}
+	if gender, ok := meta["gender"].(string); ok {
+		ent.Gender = gender
+	}
+	if extra, ok := meta["extra"].(map[string]any); ok && len(extra) > 0 {
+		ent.ExtraMeta = extra
+	}
+	if port, ok := meta["portrait"].(string); ok {
+		ent.Portrait = port
+	}
+	if pv, ok := meta["portrait_version"].(float64); ok {
+		ent.PortraitVersion = int(pv)
+	}
+	if ph, ok := meta["portrait_history"].([]any); ok {
+		for _, item := range ph {
+			if path, ok := item.(string); ok {
+				ent.PortraitHistory = append(ent.PortraitHistory, path)
 			}
 		}
 	}
-
-	return &ent, nil
+	if aliases, ok := meta["aliases"].([]any); ok {
+		for _, value := range aliases {
+			if alias, ok := value.(string); ok {
+				ent.Aliases = append(ent.Aliases, alias)
+			}
+		}
+	}
+	if tags, ok := meta["tags"].([]any); ok {
+		for _, value := range tags {
+			if tag, ok := value.(string); ok {
+				ent.Tags = append(ent.Tags, tag)
+			}
+		}
+	}
+	if history, ok := meta["history"].([]any); ok {
+		for _, value := range history {
+			if number, ok := value.(float64); ok {
+				ent.History = append(ent.History, int(number))
+			}
+		}
+	}
 }
 
 func (s *Store) GetEdgesFrom(sourceID string) ([]Edge, error) {

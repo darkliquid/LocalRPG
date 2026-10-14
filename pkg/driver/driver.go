@@ -182,11 +182,7 @@ func (d *Driver) executeStep(ctx context.Context, step Step, rec *debugger.Actio
 
 	switch step.Action {
 	case ActionNavigate:
-		targetURL := step.URL
-		if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
-			targetURL = strings.TrimRight(d.cfg.BaseURL, "/") + "/" + strings.TrimLeft(targetURL, "/")
-		}
-		return chromedp.Run(stepCtx, chromedp.Navigate(targetURL))
+		return chromedp.Run(stepCtx, chromedp.Navigate(d.resolveURL(step.URL)))
 
 	case ActionClick:
 		return chromedp.Run(stepCtx,
@@ -204,50 +200,10 @@ func (d *Driver) executeStep(ctx context.Context, step Step, rec *debugger.Actio
 		return chromedp.Run(stepCtx, chromedp.WaitVisible(step.Selector))
 
 	case ActionAssertVisible:
-		var text string
-		if err := chromedp.Run(stepCtx,
-			chromedp.WaitVisible(step.Selector),
-			chromedp.Text(step.Selector, &text),
-		); err != nil {
-			return err
-		}
-		if step.TextContains != "" && !strings.Contains(text, step.TextContains) {
-			return fmt.Errorf("expected element '%s' to contain '%s', got '%s'", step.Selector, step.TextContains, text)
-		}
-		return nil
+		return assertVisible(stepCtx, step)
 
 	case ActionScreenshot:
-		if step.Path == "" {
-			return fmt.Errorf("screenshot action requires a path")
-		}
-
-		// CaptureScreenshot writes a PNG of the viewport; the full-page variant
-		// only emits JPEG. A desktop app is captured at a fixed window size, so
-		// an optional width and height emulate the window it was designed for.
-		actions := make([]chromedp.Action, 0, 2)
-		if step.Width > 0 && step.Height > 0 {
-			actions = append(actions, chromedp.EmulateViewport(int64(step.Width), int64(step.Height)))
-		}
-		var pngData []byte
-		actions = append(actions, chromedp.CaptureScreenshot(&pngData))
-		if err := chromedp.Run(stepCtx, actions...); err != nil {
-			return err
-		}
-
-		data, err := encodeScreenshot(pngData, screenshotFormat(step), step.Quality)
-		if err != nil {
-			return err
-		}
-		if dir := filepath.Dir(step.Path); dir != "." {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return fmt.Errorf("create screenshot directory: %w", err)
-			}
-		}
-		if err := os.WriteFile(step.Path, data, 0o644); err != nil {
-			return fmt.Errorf("write screenshot: %w", err)
-		}
-		rec.ScreenshotB64 = base64.StdEncoding.EncodeToString(data)
-		return nil
+		return executeScreenshot(stepCtx, step, rec)
 
 	case ActionSleep:
 		time.Sleep(timeout)
@@ -256,6 +212,61 @@ func (d *Driver) executeStep(ctx context.Context, step Step, rec *debugger.Actio
 	default:
 		return nil
 	}
+}
+
+func (d *Driver) resolveURL(targetURL string) string {
+	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
+		return strings.TrimRight(d.cfg.BaseURL, "/") + "/" + strings.TrimLeft(targetURL, "/")
+	}
+	return targetURL
+}
+
+func assertVisible(stepCtx context.Context, step Step) error {
+	var text string
+	if err := chromedp.Run(stepCtx,
+		chromedp.WaitVisible(step.Selector),
+		chromedp.Text(step.Selector, &text),
+	); err != nil {
+		return err
+	}
+	if step.TextContains != "" && !strings.Contains(text, step.TextContains) {
+		return fmt.Errorf("expected element '%s' to contain '%s', got '%s'", step.Selector, step.TextContains, text)
+	}
+	return nil
+}
+
+func executeScreenshot(stepCtx context.Context, step Step, rec *debugger.ActionRecord) error {
+	if step.Path == "" {
+		return fmt.Errorf("screenshot action requires a path")
+	}
+
+	// CaptureScreenshot writes a PNG of the viewport; the full-page variant
+	// only emits JPEG. A desktop app is captured at a fixed window size, so
+	// an optional width and height emulate the window it was designed for.
+	actions := make([]chromedp.Action, 0, 2)
+	if step.Width > 0 && step.Height > 0 {
+		actions = append(actions, chromedp.EmulateViewport(int64(step.Width), int64(step.Height)))
+	}
+	var pngData []byte
+	actions = append(actions, chromedp.CaptureScreenshot(&pngData))
+	if err := chromedp.Run(stepCtx, actions...); err != nil {
+		return err
+	}
+
+	data, err := encodeScreenshot(pngData, screenshotFormat(step), step.Quality)
+	if err != nil {
+		return err
+	}
+	if dir := filepath.Dir(step.Path); dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("create screenshot directory: %w", err)
+		}
+	}
+	if err := os.WriteFile(step.Path, data, 0o644); err != nil {
+		return fmt.Errorf("write screenshot: %w", err)
+	}
+	rec.ScreenshotB64 = base64.StdEncoding.EncodeToString(data)
+	return nil
 }
 
 // defaultScreenshotQuality keeps small UI text legible after JPEG encoding.

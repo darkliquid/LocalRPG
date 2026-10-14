@@ -22,35 +22,8 @@ func (e *Executor) searchMemories(ctx context.Context, arguments map[string]any)
 	minImportance := intArgument(arguments, "min_importance", 0)
 	limit := intArgument(arguments, "limit", defaultLimit)
 
-	var ftsHits []storage.MemoryHit
-	if match != "" {
-		hits, err := e.store.SearchMemories(
-			match,
-			entityArg,
-			kindArg,
-			minImportance,
-			limit*2,
-		)
-		if err == nil {
-			ftsHits = hits
-		}
-	}
-
-	var vecMemoryIDs []string
-	if e.embeddingsProvider != nil && rawQuery != "" {
-		vecs, err := e.embeddingsProvider.Embed(ctx, []string{rawQuery})
-		if err == nil {
-			e.reportEmbeddingUsage()
-		}
-		if err == nil && len(vecs) > 0 {
-			vHits, err := e.store.SearchSimilarVectors(ctx, []string{"memory"}, e.embeddingsProvider.ID(), vecs[0], limit*2)
-			if err == nil {
-				for _, vh := range vHits {
-					vecMemoryIDs = append(vecMemoryIDs, vh.TargetID)
-				}
-			}
-		}
-	}
+	ftsHits := e.searchMemoriesFTS(match, entityArg, kindArg, minImportance, limit)
+	vecMemoryIDs := e.searchMemoriesVector(ctx, rawQuery, limit)
 
 	if len(ftsHits) == 0 && len(vecMemoryIDs) == 0 {
 		return "No memories matched.", true
@@ -69,6 +42,54 @@ func (e *Executor) searchMemories(ctx context.Context, arguments map[string]any)
 		return "No memories matched.", true
 	}
 
+	hits := e.resolveFusedMemoryHits(fusedIDs, ftsMap, kindArg, minImportance)
+	if len(hits) == 0 {
+		return "No memories matched.", true
+	}
+
+	return e.cap(formatMemoryHits(hits)), true
+}
+
+func (e *Executor) searchMemoriesFTS(match, entityArg, kindArg string, minImportance, limit int) []storage.MemoryHit {
+	if match == "" {
+		return nil
+	}
+	hits, err := e.store.SearchMemories(
+		match,
+		entityArg,
+		kindArg,
+		minImportance,
+		limit*2,
+	)
+	if err != nil {
+		return nil
+	}
+	return hits
+}
+
+func (e *Executor) searchMemoriesVector(ctx context.Context, rawQuery string, limit int) []string {
+	if e.embeddingsProvider == nil || rawQuery == "" {
+		return nil
+	}
+	vecs, err := e.embeddingsProvider.Embed(ctx, []string{rawQuery})
+	if err == nil {
+		e.reportEmbeddingUsage()
+	}
+	if err != nil || len(vecs) == 0 {
+		return nil
+	}
+	vHits, err := e.store.SearchSimilarVectors(ctx, []string{"memory"}, e.embeddingsProvider.ID(), vecs[0], limit*2)
+	if err != nil {
+		return nil
+	}
+	vecMemoryIDs := make([]string, 0, len(vHits))
+	for _, vh := range vHits {
+		vecMemoryIDs = append(vecMemoryIDs, vh.TargetID)
+	}
+	return vecMemoryIDs
+}
+
+func (e *Executor) resolveFusedMemoryHits(fusedIDs []string, ftsMap map[string]storage.MemoryHit, kindArg string, minImportance int) []storage.MemoryHit {
 	hits := make([]storage.MemoryHit, 0, len(fusedIDs))
 	for _, strID := range fusedIDs {
 		if hit, ok := ftsMap[strID]; ok {
@@ -88,11 +109,10 @@ func (e *Executor) searchMemories(ctx context.Context, arguments map[string]any)
 			}
 		}
 	}
+	return hits
+}
 
-	if len(hits) == 0 {
-		return "No memories matched.", true
-	}
-
+func formatMemoryHits(hits []storage.MemoryHit) string {
 	latest := 0
 	for _, hit := range hits {
 		if hit.Turn > latest {
@@ -105,7 +125,7 @@ func (e *Executor) searchMemories(ctx context.Context, arguments map[string]any)
 	for _, hit := range hits {
 		lines = append(lines, fmt.Sprintf("- turn %d (%s, importance %d): %s", hit.Turn, hit.Kind, hit.Importance, hit.Snippet))
 	}
-	return e.cap(strings.Join(lines, "\n")), true
+	return strings.Join(lines, "\n")
 }
 
 // getEntityTimeline answers get_entity_timeline: an entity's memories newest-first.

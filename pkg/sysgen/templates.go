@@ -91,39 +91,9 @@ func (t Template) Build(params Params) (*core.MechanicsSpec, error) {
 		notation = t.Notation
 	}
 
-	profile := core.ResolutionProfile{Notation: notation}
-	var outcomes []string
-
-	switch resolution {
-	case "ladder":
-		if len(params.Ladder) == 0 {
-			return nil, fmt.Errorf("template %s: a ladder needs at least one step", name)
-		}
-		for _, step := range params.Ladder {
-			if strings.TrimSpace(step.Outcome) == "" {
-				return nil, fmt.Errorf("template %s: a ladder step has no outcome", name)
-			}
-		}
-		profile.Ladder = params.Ladder
-		outcomes = ladderOutcomes(params.Ladder)
-	case "dc":
-		if params.DC == 0 {
-			return nil, fmt.Errorf("template %s: a dc profile needs a non-zero dc", name)
-		}
-		profile.DC = params.DC
-		outcomes = []string{"success", "fail"}
-	case "pool":
-		if strings.TrimSpace(params.SuccessOn) == "" {
-			return nil, fmt.Errorf("template %s: a pool needs a success target", name)
-		}
-		if len(params.Outcomes) == 0 {
-			return nil, fmt.Errorf("template %s: a pool needs outcomes", name)
-		}
-		profile.SuccessOn = params.SuccessOn
-		profile.Outcomes = params.Outcomes
-		outcomes = poolOutcomes(params.Outcomes)
-	default:
-		return nil, fmt.Errorf("template %s: unknown resolution %q", name, t.Resolution)
+	profile, outcomes, err := t.buildResolutionProfile(name, resolution, notation, params)
+	if err != nil {
+		return nil, err
 	}
 
 	spec := &core.MechanicsSpec{
@@ -159,6 +129,44 @@ func (t Template) Build(params Params) (*core.MechanicsSpec, error) {
 	}
 
 	return spec, nil
+}
+
+func (t Template) buildResolutionProfile(name, resolution, notation string, params Params) (core.ResolutionProfile, []string, error) {
+	profile := core.ResolutionProfile{Notation: notation}
+	var outcomes []string
+
+	switch resolution {
+	case "ladder":
+		if len(params.Ladder) == 0 {
+			return profile, nil, fmt.Errorf("template %s: a ladder needs at least one step", name)
+		}
+		for _, step := range params.Ladder {
+			if strings.TrimSpace(step.Outcome) == "" {
+				return profile, nil, fmt.Errorf("template %s: a ladder step has no outcome", name)
+			}
+		}
+		profile.Ladder = params.Ladder
+		outcomes = ladderOutcomes(params.Ladder)
+	case "dc":
+		if params.DC == 0 {
+			return profile, nil, fmt.Errorf("template %s: a dc profile needs a non-zero dc", name)
+		}
+		profile.DC = params.DC
+		outcomes = []string{"success", "fail"}
+	case "pool":
+		if strings.TrimSpace(params.SuccessOn) == "" {
+			return profile, nil, fmt.Errorf("template %s: a pool needs a success target", name)
+		}
+		if len(params.Outcomes) == 0 {
+			return profile, nil, fmt.Errorf("template %s: a pool needs outcomes", name)
+		}
+		profile.SuccessOn = params.SuccessOn
+		profile.Outcomes = params.Outcomes
+		outcomes = poolOutcomes(params.Outcomes)
+	default:
+		return profile, nil, fmt.Errorf("template %s: unknown resolution %q", name, t.Resolution)
+	}
+	return profile, outcomes, nil
 }
 
 // ladderOutcomes lists a ladder's outcome vocabulary, strongest first.

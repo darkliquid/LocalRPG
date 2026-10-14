@@ -242,11 +242,8 @@ func build(cfg config) error {
 		return err
 	}
 
-	if err := os.RemoveAll(cfg.out); err != nil {
-		return fmt.Errorf("clear output directory: %w", err)
-	}
-	if err := os.MkdirAll(cfg.out, 0o755); err != nil {
-		return fmt.Errorf("create output directory: %w", err)
+	if err := prepareOutputDir(cfg.out); err != nil {
+		return err
 	}
 
 	if err := copyEmbeddedAssets(cfg.out); err != nil {
@@ -283,17 +280,8 @@ func build(cfg config) error {
 		return err
 	}
 
-	for _, article := range docs {
-		content, err := renderMarkdown(article.Body, ix, article)
-		if err != nil {
-			return err
-		}
-		page := common("../", article.Title, article.Description, "docs")
-		page.Doc = &article
-		page.Content = content
-		if err := writePage(r, cfg.out, filepath.Join("docs", article.ID+".html"), "doc.html.tmpl", page); err != nil {
-			return err
-		}
+	if err := writeArticles(r, cfg.out, docs, ix, common); err != nil {
+		return err
 	}
 
 	// Pages serves files verbatim when this marker is present; without it the
@@ -304,6 +292,32 @@ func build(cfg config) error {
 
 	fmt.Printf("sitegen: wrote %d pages and %d/%d screenshots to %s\n",
 		len(docs)+2, presentShots(shots), len(shots), cfg.out)
+	return nil
+}
+
+func prepareOutputDir(out string) error {
+	if err := os.RemoveAll(out); err != nil {
+		return fmt.Errorf("clear output directory: %w", err)
+	}
+	if err := os.MkdirAll(out, 0o755); err != nil {
+		return fmt.Errorf("create output directory: %w", err)
+	}
+	return nil
+}
+
+func writeArticles(r *renderer, out string, docs []doc, ix linkIndex, common func(root, title, description, active string) *pageData) error {
+	for _, article := range docs {
+		content, err := renderMarkdown(article.Body, ix, article)
+		if err != nil {
+			return err
+		}
+		page := common("../", article.Title, article.Description, "docs")
+		page.Doc = &article
+		page.Content = content
+		if err := writePage(r, out, filepath.Join("docs", article.ID+".html"), "doc.html.tmpl", page); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
