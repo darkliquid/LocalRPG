@@ -32,8 +32,8 @@ func TestNewModelProviderUsesTheRegistry(t *testing.T) {
 }
 
 func TestBuildModelRejectsUnknownID(t *testing.T) {
-	if _, err := harness.BuildModel("does-not-exist", harness.ProviderConfig{}); err == nil {
-		t.Error("expected BuildModel to reject an unknown ID")
+	if _, err := harness.BuildModelFor("does-not-exist", harness.ProviderConfig{}); err == nil {
+		t.Error("expected BuildModelFor to reject an unknown ID")
 	}
 }
 

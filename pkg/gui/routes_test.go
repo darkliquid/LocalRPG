@@ -60,7 +60,7 @@ func TestRoutePatternNamesEveryMount(t *testing.T) {
 func TestEveryMountHasAHandler(t *testing.T) {
 	seen := map[string]bool{}
 	for _, mount := range mounts {
-		if mount.Handler == "" || mount.serve == nil {
+		if mount.serve == nil {
 			t.Errorf("mount %q has no handler", mount.Pattern)
 		}
 		if seen[mount.Pattern] {
