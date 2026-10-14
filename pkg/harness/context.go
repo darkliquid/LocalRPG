@@ -50,10 +50,14 @@ const (
 	// minRecentTurnChars is the floor a turn's excerpt can be shortened to before
 	// the recall section is dropped instead.
 	minRecentTurnChars = 200
-	// runesPerToken is the usual rough ratio for English prose. It is an estimate
+	// RunesPerToken is the usual rough ratio for English prose. It is an estimate
 	// on purpose: a real tokenizer would be another dependency in exchange for a
 	// number that only decides how much to trim.
-	runesPerToken = 4
+	RunesPerToken = 4
+	runesPerToken = RunesPerToken
+
+	// unconstrainedTurnUpperLimit represents an unbounded upper turn number for queries.
+	unconstrainedTurnUpperLimit = 1 << 30
 )
 
 // RecentTurn is one prior turn as the narrator should recall it.
@@ -580,7 +584,7 @@ func (c *ContextAssembler) recalledTurns(req ContextRequest) []storage.TurnRecor
 
 	before := req.TurnNumber
 	if before <= 0 {
-		before = 1 << 30
+		before = unconstrainedTurnUpperLimit
 	}
 
 	// Ask for extra, because some are filtered out as already in the window.
@@ -676,7 +680,7 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) (string, []Ref) {
 
 	before := req.TurnNumber
 	if before <= 0 {
-		before = 1 << 30
+		before = unconstrainedTurnUpperLimit
 	}
 
 	// Over-fetch, then drop what the window or scene recall already carries.

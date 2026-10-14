@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
@@ -12,7 +13,7 @@ func TestProposeCheckEndsTheTurnPending(t *testing.T) {
 		{tools: []harness.ToolCall{{ID: "p1", Name: "propose_check", Arguments: `{"actor":"player","check_kind":"skill","stakes":"the bridge","outcomes":{"pass":"cross","fail":"fall"}}`}}},
 	}}
 	o, _ := toolLoopOrchestrator(t, provider)
-	o.SetMechanicsEngagement("ask")
+	o.SetMechanicsEngagement(config.EngagementAsk)
 	o.SetTools(&fakeExecutor{}, "yes")
 
 	turn, err := o.ProcessActionStream(context.Background(), "Do", "cross the rope bridge", nil)
@@ -29,12 +30,12 @@ func TestRollingAPendingCheckResolvesAndContinues(t *testing.T) {
 		{text: "You cross the bridge."},
 	}}
 	o, timeline := toolLoopOrchestrator(t, provider)
-	o.SetMechanicsEngagement("ask")
+	o.SetMechanicsEngagement(config.EngagementAsk)
 	o.SetTools(&fakeExecutor{}, "yes")
 
 	pending := &harness.PendingCheck{
 		Ref:        "p1",
-		ProposedBy: "gm",
+		ProposedBy: harness.ProposedByGM,
 		Request:    harness.CheckRequest{Actor: "player", CheckKind: "skill", Stakes: "the bridge"},
 	}
 	if err := timeline.history.AppendTurn(Turn{Number: 1, Mode: "Do", PendingCheck: pending}); err != nil {
@@ -63,12 +64,12 @@ func TestARetriedRollReusesTheRecordedResult(t *testing.T) {
 		{text: "You cross again."},
 	}}
 	o, timeline := toolLoopOrchestrator(t, provider)
-	o.SetMechanicsEngagement("ask")
+	o.SetMechanicsEngagement(config.EngagementAsk)
 	o.SetTools(&fakeExecutor{}, "yes")
 
 	pending := &harness.PendingCheck{
 		Ref:        "p1",
-		ProposedBy: "gm",
+		ProposedBy: harness.ProposedByGM,
 		Request:    harness.CheckRequest{Actor: "player", CheckKind: "skill", Stakes: "the bridge"},
 	}
 	if err := timeline.history.AppendTurn(Turn{Number: 1, Mode: "Do", PendingCheck: pending}); err != nil {
@@ -99,12 +100,12 @@ func TestAResolvedPendingCheckAttachesToTheContinuation(t *testing.T) {
 		{text: "You cross the bridge."},
 	}}
 	o, timeline := toolLoopOrchestrator(t, provider)
-	o.SetMechanicsEngagement("ask")
+	o.SetMechanicsEngagement(config.EngagementAsk)
 	o.SetTools(&fakeExecutor{}, "yes")
 
 	pending := &harness.PendingCheck{
 		Ref:        "p1",
-		ProposedBy: "gm",
+		ProposedBy: harness.ProposedByGM,
 		Request:    harness.CheckRequest{Actor: "player", CheckKind: "skill", Stakes: "the bridge"},
 	}
 	if err := timeline.history.AppendTurn(Turn{Number: 1, Mode: "Do", PendingCheck: pending}); err != nil {

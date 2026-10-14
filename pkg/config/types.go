@@ -26,6 +26,13 @@ const (
 	RoleCompletion = "completion"
 )
 
+// Engagement policies for game mechanics.
+const (
+	EngagementOff  = "off"
+	EngagementAuto = "auto"
+	EngagementAsk  = "ask"
+)
+
 type AgentRoleConfig struct {
 	Type        string   `yaml:"type" json:"type"`                                     // "builtin", "http", "cli", "inherit", "disabled"
 	InheritFrom string   `yaml:"inherit_from,omitempty" json:"inherit_from,omitempty"` // role to inherit when type is "inherit"
@@ -721,10 +728,10 @@ type MechanicsConfig struct {
 // MechanicsEngagement is the configured policy, defaulting to "auto".
 func (c *Config) MechanicsEngagement() string {
 	switch mode := strings.ToLower(strings.TrimSpace(c.Mechanics.Engagement)); mode {
-	case "off", "auto", "ask":
+	case EngagementOff, EngagementAuto, EngagementAsk:
 		return mode
 	default:
-		return "auto"
+		return EngagementAuto
 	}
 }
 

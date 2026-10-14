@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/darkliquid/localrpg/pkg/config"
 	"github.com/darkliquid/localrpg/pkg/core"
 	"github.com/darkliquid/localrpg/pkg/entity"
 	"github.com/darkliquid/localrpg/pkg/harness"
@@ -13,10 +14,10 @@ import (
 
 func TestPlayerRollRequestUsesTheConventionsNotation(t *testing.T) {
 	o := &TurnOrchestrator{playerID: "player", mechanics: &core.MechanicsSpec{
-		Checks: core.CheckConventions{Notation: "2d6"},
+		Checks: core.CheckConventions{Notation: core.DefaultCheckNotation},
 	}}
 	req := o.playerRollRequest("pick the lock")
-	if req.Notation != "2d6" || req.Actor != "player" {
+	if req.Notation != core.DefaultCheckNotation || req.Actor != "player" {
 		t.Fatalf("request = %+v", req)
 	}
 	if req.Stakes != "pick the lock" {
@@ -40,10 +41,10 @@ func TestRollModeUnderOffProducesNoCheck(t *testing.T) {
 	model := &mockOrchestratorModel{response: "The dice settle."}
 	router := harness.NewRouter()
 	router.RegisterProvider(model)
-	router.AssignRole("gm", "mock-gm")
+	router.AssignRole(config.RoleGM, "mock-gm")
 
 	o := NewTurnOrchestrator(store, timeline, nil, router, "tavern", "player")
-	o.SetMechanicsEngagement("off")
+	o.SetMechanicsEngagement(config.EngagementOff)
 
 	turn, err := o.ProcessAction(context.Background(), "Roll", "pick the lock")
 	if err != nil {
