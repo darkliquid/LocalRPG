@@ -136,12 +136,10 @@ func (v *VideoPipeline) SetProgress(fn scene.ProgressFunc) { v.progress = fn }
 // RenderVideo draws every frame, muxes the campaign's audio, and renames the
 // result into place, so a failed or cancelled render leaves no file behind.
 func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, outputFile string) error {
-	cleanOut, err := pathutil.ValidateUserPath(outputFile)
+	outputFile, err := videoOutputPath(outputFile)
 	if err != nil {
-		return fmt.Errorf("invalid video output path: %w", err)
+		return err
 	}
-	outputFile = cleanOut
-
 	if script == nil || len(script.Scenes) == 0 {
 		return fmt.Errorf("render video: script has no scenes")
 	}
@@ -157,29 +155,62 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 	}
 
 	part := stagingPath(outputFile)
+	totals, err := v.renderInto(ctx, renderer, script, track, part, outputFile)
+	if err != nil {
+		return err
+	}
+
+	if err := v.writeSidecars(script, outputFile); err != nil {
+		return err
+	}
+	v.reportDone(totals)
+	return nil
+}
+
+// videoOutputPath is where a render will write, cleaned and validated. It is a path the
+// user chose, so nothing is created under it until it has been checked.
+func videoOutputPath(outputFile string) (string, error) {
+	cleanOut, err := pathutil.ValidateUserPath(outputFile)
+	if err != nil {
+		return "", fmt.Errorf("invalid video output path: %w", err)
+	}
+	return cleanOut, nil
+}
+
+// renderInto writes the frames to a staging file and renames it into place, so a failed or
+// cancelled render leaves no output behind. The muxer owns the file and has already closed
+// it by the time it is renamed.
+func (v *VideoPipeline) renderInto(ctx context.Context, renderer *scene.Renderer, script *scene.Script, track *webm.OpusTrack, part, outputFile string) (renderTotals, error) {
 	file, err := os.Create(part)
 	if err != nil {
-		return fmt.Errorf("create video: %w", err)
+		return renderTotals{}, fmt.Errorf("create video: %w", err)
 	}
 
 	totals, err := v.writeFrames(ctx, renderer, script, file, track)
 	if err != nil {
 		closeQuietly(file)
 		os.Remove(part)
-		return err
+		return renderTotals{}, err
 	}
 	// The muxer owns the writer and has already closed it.
 	if err := os.Rename(part, outputFile); err != nil {
 		os.Remove(part)
-		return fmt.Errorf("publish video: %w", err)
+		return renderTotals{}, fmt.Errorf("publish video: %w", err)
 	}
+	return totals, nil
+}
 
-	// The subtitle track goes beside the video with the same base name. A muxed
-	// WebM subtitle is possible, but a sidecar plays in every player.
+// writeSidecars puts the subtitle track and the chapters beside the video under the same
+// base name, reporting each as it lands. A muxed WebM subtitle is possible, but a sidecar
+// plays in every player.
+//
+// Each one removes the video when it cannot be written: a render that publishes a file
+// without the tracks it promised has published the wrong thing.
+func (v *VideoPipeline) writeSidecars(script *scene.Script, outputFile string) error {
+	// outputFile was validated with pathutil.ValidateUserPath before the render.
+	// lgtm[go/path-injection]
 	sidecar, err := writeSubtitleSidecar(outputFile, script)
 	if err != nil {
-		// outputFile was validated above with pathutil.ValidateUserPath.
-		// lgtm[go/path-injection]
 		os.Remove(outputFile)
 		return err
 	}
@@ -187,35 +218,37 @@ func (v *VideoPipeline) RenderVideo(ctx context.Context, script *scene.Script, o
 		v.progress(scene.Progress{Phase: "encode", Message: "wrote " + filepath.Base(sidecar)})
 	}
 
-	// The chapters go beside it too, in the ffmpeg metadata format.
 	chapters, err := writeChapterSidecar(outputFile, script)
 	if err != nil {
-		// outputFile was validated above with pathutil.ValidateUserPath.
-		// lgtm[go/path-injection]
 		os.Remove(outputFile)
 		return err
 	}
 	if v.progress != nil && chapters != "" {
 		v.progress(scene.Progress{Phase: "encode", Message: "wrote " + filepath.Base(chapters)})
 	}
-
-	if v.progress != nil {
-		v.progress(scene.Progress{
-			Phase:             "done",
-			Done:              totals.frames,
-			Total:             totals.plan.Frames.Total,
-			Frames:            totals.frames,
-			ImageFrames:       totals.imageFrames,
-			RepeatFrames:      totals.repeatFrames,
-			AudioPackets:      totals.audioPackets,
-			TotalAudioPackets: totals.plan.AudioPackets,
-			AudioBytes:        totals.audioBytes,
-			TotalAudioBytes:   totals.plan.AudioBytes,
-			Elapsed:           totals.elapsed,
-			Length:            totals.plan.Length,
-		})
-	}
 	return nil
+}
+
+// reportDone publishes the finished render's totals, once the file and its sidecars are in
+// place.
+func (v *VideoPipeline) reportDone(totals renderTotals) {
+	if v.progress == nil {
+		return
+	}
+	v.progress(scene.Progress{
+		Phase:             "done",
+		Done:              totals.frames,
+		Total:             totals.plan.Frames.Total,
+		Frames:            totals.frames,
+		ImageFrames:       totals.imageFrames,
+		RepeatFrames:      totals.repeatFrames,
+		AudioPackets:      totals.audioPackets,
+		TotalAudioPackets: totals.plan.AudioPackets,
+		AudioBytes:        totals.audioBytes,
+		TotalAudioBytes:   totals.plan.AudioBytes,
+		Elapsed:           totals.elapsed,
+		Length:            totals.plan.Length,
+	})
 }
 
 // opusTrack lays every beat's clips on one continuous timeline, padding the gaps
@@ -264,6 +297,22 @@ func (v *VideoPipeline) opusTrack(script *scene.Script) (*webm.OpusTrack, error)
 	return track, nil
 }
 
+// frameWriter is the state one render carries across its phases: the muxer and encoder it
+// writes through, the clock it places frames at, and the totals it reports as it goes.
+type frameWriter struct {
+	pipeline     *VideoPipeline
+	muxer        *webm.Muxer
+	encoder      *webm.Encoder
+	plan         RenderPlan
+	started      time.Time
+	elapsed      time.Duration
+	lastKeyframe time.Duration
+	lastImage    *image.RGBA
+	previousArt  string
+	lastReport   time.Time
+	totals       renderTotals
+}
+
 // writeFrames walks the beats, renders and encodes each frame, and feeds the
 // muxer, which interleaves the audio it was given up front.
 func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Renderer, script *scene.Script, file *os.File, track *webm.OpusTrack) (renderTotals, error) {
@@ -276,116 +325,134 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 
 	animate := !v.still
 	plan := NewRenderPlan(script, track, v.fps, animate, v.intro, v.outro, v.gap)
-
-	started := time.Now()
-	elapsed := time.Duration(0)
-	previousArt := ""
-	// The first frame is always a keyframe, so the last one starts out "overdue".
-	lastKeyframe := -keyframeEvery
-
-	totals := renderTotals{plan: plan}
-	var lastImage *image.RGBA
-
-	// Progress is throttled so a long render reports steadily without flooding a
-	// subscriber; a completed phase always reports.
-	lastReport := time.Time{}
-	report := func(force bool) {
-		if v.progress == nil {
-			return
-		}
-		if !force && time.Since(lastReport) < 250*time.Millisecond {
-			return
-		}
-		lastReport = time.Now()
-		packets, bytes := muxer.AudioWritten()
-		v.progress(scene.Progress{
-			Phase:             "frames",
-			Done:              totals.frames,
-			Total:             plan.Frames.Total,
-			Frames:            totals.frames,
-			ImageFrames:       totals.imageFrames,
-			RepeatFrames:      totals.repeatFrames,
-			AudioPackets:      packets,
-			TotalAudioPackets: plan.AudioPackets,
-			AudioBytes:        bytes,
-			TotalAudioBytes:   plan.AudioBytes,
-			Elapsed:           time.Since(started),
-			Length:            plan.Length,
-		})
+	frames := &frameWriter{
+		pipeline: v,
+		muxer:    muxer,
+		encoder:  encoder,
+		plan:     plan,
+		started:  time.Now(),
+		// The first frame is always a keyframe, so the last one starts out
+		// "overdue".
+		lastKeyframe: -keyframeEvery,
+		totals:       renderTotals{plan: plan},
 	}
 
-	// writeFrame encodes and writes one frame at an explicit timestamp.
-	//
-	// The muxer is told exactly what the encoder produced: marking an inter frame
-	// as a keyframe starts a cluster a decoder cannot reconstruct, which corrupts
-	// the picture until the next real keyframe.
-	writeFrame := func(img *image.RGBA, at time.Duration, forceKeyframe bool) error {
-		keyframe := forceKeyframe || at-lastKeyframe >= keyframeEvery
-		data, err := encoder.Encode(img, keyframe)
-		if err != nil {
-			return err
-		}
-		if err := muxer.WriteVideo(data, keyframe, at); err != nil {
-			return err
-		}
-		if keyframe {
-			lastKeyframe = at
-		}
-		totals.frames++
-		report(false)
+	frames.report(true)
+
+	if err := frames.writeIntro(ctx, renderer, script); err != nil {
+		return frames.totals, err
+	}
+	if err := frames.writeScenes(ctx, renderer, script, animate); err != nil {
+		return frames.totals, err
+	}
+	if err := frames.writeOutro(); err != nil {
+		return frames.totals, err
+	}
+	return frames.finish()
+}
+
+// report publishes the render's progress, throttled so a long render reports steadily
+// without flooding a subscriber. A completed phase always reports.
+func (f *frameWriter) report(force bool) {
+	if f.pipeline.progress == nil {
+		return
+	}
+	if !force && time.Since(f.lastReport) < 250*time.Millisecond {
+		return
+	}
+	f.lastReport = time.Now()
+	packets, bytes := f.muxer.AudioWritten()
+	f.pipeline.progress(scene.Progress{
+		Phase:             "frames",
+		Done:              f.totals.frames,
+		Total:             f.plan.Frames.Total,
+		Frames:            f.totals.frames,
+		ImageFrames:       f.totals.imageFrames,
+		RepeatFrames:      f.totals.repeatFrames,
+		AudioPackets:      packets,
+		TotalAudioPackets: f.plan.AudioPackets,
+		AudioBytes:        bytes,
+		TotalAudioBytes:   f.plan.AudioBytes,
+		Elapsed:           time.Since(f.started),
+		Length:            f.plan.Length,
+	})
+}
+
+// writeFrame encodes and writes one frame at an explicit timestamp.
+//
+// The muxer is told exactly what the encoder produced: marking an inter frame
+// as a keyframe starts a cluster a decoder cannot reconstruct, which corrupts
+// the picture until the next real keyframe.
+func (f *frameWriter) writeFrame(img *image.RGBA, at time.Duration, forceKeyframe bool) error {
+	keyframe := forceKeyframe || at-f.lastKeyframe >= keyframeEvery
+	data, err := f.encoder.Encode(img, keyframe)
+	if err != nil {
+		return err
+	}
+	if err := f.muxer.WriteVideo(data, keyframe, at); err != nil {
+		return err
+	}
+	if keyframe {
+		f.lastKeyframe = at
+	}
+	f.totals.frames++
+	f.report(false)
+	return nil
+}
+
+// emit writes a frame at the current time and advances the timeline by span.
+func (f *frameWriter) emit(img *image.RGBA, span time.Duration, forceKeyframe bool) error {
+	if err := f.writeFrame(img, f.elapsed, forceKeyframe); err != nil {
+		return err
+	}
+	f.elapsed += span
+	return nil
+}
+
+// writeIntro holds the opening stage before anything is written on it, so the
+// video opens on a scene rather than on a line of dialogue.
+func (f *frameWriter) writeIntro(ctx context.Context, renderer *scene.Renderer, script *scene.Script) error {
+	if f.pipeline.intro <= 0 || len(script.Scenes) == 0 || len(script.Scenes[0].Beats) == 0 {
 		return nil
 	}
-
-	// emit writes a frame at the current time and advances the timeline by span.
-	emit := func(img *image.RGBA, span time.Duration, forceKeyframe bool) error {
-		if err := writeFrame(img, elapsed, forceKeyframe); err != nil {
-			return err
-		}
-		elapsed += span
-		return nil
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
-	report(true)
+	opening := renderer.Frame(scene.FrameRequest{
+		Script:      script,
+		SceneIndex:  0,
+		Scene:       script.Scenes[0],
+		Beat:        script.Scenes[0].Beats[0],
+		Progress:    0,
+		Animate:     true,
+		DisplayMode: f.pipeline.displayMode,
+	})
+	f.lastImage = opening
+	f.totals.imageFrames++
+	return f.emit(opening, f.pipeline.intro, true)
+}
 
-	// The intro holds the opening stage before anything is written on it, so the
-	// video opens on a scene rather than on a line of dialogue.
-	if v.intro > 0 && len(script.Scenes) > 0 && len(script.Scenes[0].Beats) > 0 {
-		if err := ctx.Err(); err != nil {
-			return totals, err
-		}
-		opening := renderer.Frame(scene.FrameRequest{
-			Script:      script,
-			SceneIndex:  0,
-			Scene:       script.Scenes[0],
-			Beat:        script.Scenes[0].Beats[0],
-			Progress:    0,
-			Animate:     true,
-			DisplayMode: v.displayMode,
-		})
-		lastImage = opening
-		totals.imageFrames++
-		if err := emit(opening, v.intro, true); err != nil {
-			return totals, err
-		}
-	}
-
+// writeScenes walks every beat of every scene in order, closing each beat on the frame it
+// ended with.
+func (f *frameWriter) writeScenes(ctx context.Context, renderer *scene.Renderer, script *scene.Script, animate bool) error {
 	for index := range script.Scenes {
 		sc := script.Scenes[index]
 		for beatIndex, beat := range sc.Beats {
 			if err := ctx.Err(); err != nil {
-				return totals, err
+				return err
 			}
 			// A beat opens on new content, so it opens on a keyframe: prediction
 			// error from the beat before would otherwise smear the new text.
 			beatStart := true
 			sceneStart := beatIndex == 0
-			for _, step := range scene.BeatFramePlan(beat, v.fps, animate) {
+			for _, step := range scene.BeatFramePlan(beat, f.pipeline.fps, animate) {
 				// A repeat frame is the frame before it, so it is re-encoded rather
 				// than drawn again: the heartbeat costs an inter frame, not a render.
 				var img *image.RGBA
-				if step.Repeat && lastImage != nil {
-					img = lastImage
-					totals.repeatFrames++
+				if step.Repeat && f.lastImage != nil {
+					img = f.lastImage
+					f.totals.repeatFrames++
 				} else {
 					img = renderer.Frame(scene.FrameRequest{
 						Script:      script,
@@ -393,76 +460,83 @@ func (v *VideoPipeline) writeFrames(ctx context.Context, renderer *scene.Rendere
 						Scene:       sc,
 						Beat:        beat,
 						Progress:    step.Progress,
-						PreviousArt: previousArt,
+						PreviousArt: f.previousArt,
 						Animate:     animate,
-						DisplayMode: v.displayMode,
+						DisplayMode: f.pipeline.displayMode,
 						SceneStart:  sceneStart,
 					})
-					lastImage = img
-					totals.imageFrames++
+					f.lastImage = img
+					f.totals.imageFrames++
 				}
 
 				// A scene's opening crossfade blends two pictures over the longer
 				// scene transition, which is the most an inter frame has to carry, so
 				// it gets keyframes too.
 				crossfading := sceneStart && step.Progress < scene.SceneCrossfadeShare
-				if err := emit(img, step.Span, beatStart || crossfading); err != nil {
-					return totals, err
+				if err := f.emit(img, step.Span, beatStart || crossfading); err != nil {
+					return err
 				}
 				beatStart = false
 			}
 
 			// Hold the beat's closing picture for the extra gap, so one segment
 			// does not run straight into the next.
-			if v.gap > 0 && lastImage != nil {
-				totals.repeatFrames++
-				if err := emit(lastImage, v.gap, false); err != nil {
-					return totals, err
+			if f.pipeline.gap > 0 && f.lastImage != nil {
+				f.totals.repeatFrames++
+				if err := f.emit(f.lastImage, f.pipeline.gap, false); err != nil {
+					return err
 				}
 			}
 		}
-		previousArt = sc.ArtPath
+		f.previousArt = sc.ArtPath
 	}
+	return nil
+}
 
-	// The outro holds the closing picture after the last line, and then a closing
-	// block goes at the very end of the timeline.
-	//
-	// That last block is what gives the picture its time: a file's duration is its
-	// last block's timestamp, so without one the closing frame has no time to be
-	// shown at all and the video stops the moment it is drawn.
-	if v.outro > 0 {
-		elapsed += v.outro
+// writeOutro holds the closing picture after the last line, and then writes one last frame
+// at the very end of the timeline.
+//
+// That last frame is what gives the picture its time: a file's duration is its last frame's
+// timestamp, so without one the closing frame has no time to be shown at all and the video
+// stops the moment it is drawn.
+func (f *frameWriter) writeOutro() error {
+	if f.pipeline.outro > 0 {
+		f.elapsed += f.pipeline.outro
 	}
-	if lastImage != nil {
-		totals.repeatFrames++
-		if err := writeFrame(lastImage, elapsed, false); err != nil {
-			return totals, err
-		}
+	if f.lastImage == nil {
+		return nil
 	}
+	f.totals.repeatFrames++
+	return f.writeFrame(f.lastImage, f.elapsed, false)
+}
 
-	if v.progress != nil {
-		packets, bytes := muxer.AudioWritten()
-		v.progress(scene.Progress{
+// finish publishes the encoding phase's progress, closes the muxer, and reports what the
+// render produced.
+func (f *frameWriter) finish() (renderTotals, error) {
+	if f.pipeline.progress != nil {
+		packets, bytes := f.muxer.AudioWritten()
+		f.pipeline.progress(scene.Progress{
 			Phase:             "encode",
-			Done:              totals.frames,
-			Total:             plan.Frames.Total,
-			Frames:            totals.frames,
-			ImageFrames:       totals.imageFrames,
-			RepeatFrames:      totals.repeatFrames,
+			Done:              f.totals.frames,
+			Total:             f.plan.Frames.Total,
+			Frames:            f.totals.frames,
+			ImageFrames:       f.totals.imageFrames,
+			RepeatFrames:      f.totals.repeatFrames,
 			AudioPackets:      packets,
-			TotalAudioPackets: plan.AudioPackets,
+			TotalAudioPackets: f.plan.AudioPackets,
 			AudioBytes:        bytes,
-			TotalAudioBytes:   plan.AudioBytes,
-			Elapsed:           time.Since(started),
-			Length:            plan.Length,
+			TotalAudioBytes:   f.plan.AudioBytes,
+			Elapsed:           time.Since(f.started),
+			Length:            f.plan.Length,
 		})
 	}
-	if err := muxer.Close(); err != nil {
-		return totals, err
+	if err := f.muxer.Close(); err != nil {
+		return f.totals, err
 	}
-	totals.audioPackets, totals.audioBytes = muxer.AudioWritten()
-	totals.elapsed = time.Since(started)
-	return totals, nil
+
+	f.totals.audioPackets, f.totals.audioBytes = f.muxer.AudioWritten()
+	f.totals.elapsed = time.Since(f.started)
+	return f.totals, nil
 }
 
 // renderTotals is what a finished render produced, so the caller can publish a

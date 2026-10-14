@@ -498,81 +498,22 @@ func (c *ScriptCompiler) SetProgress(fn scene.ProgressFunc) {
 // Compile resolves a campaign's turns, art and audio into a playable script.
 func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Script, error) {
 	gameDir := c.resolver.GameDir(gameID)
-
-	manifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
+	manifest, store, err := c.openCampaign(gameID, gameDir)
 	if err != nil {
-		return nil, fmt.Errorf("load manifest: %w", err)
-	}
-
-	store, err := storage.OpenGameStore(c.resolver, gameID)
-	if err != nil {
-		return nil, fmt.Errorf("open game store: %w", err)
+		return nil, err
 	}
 	defer store.Close()
 
-	// Reindex from Markdown first, as playing a campaign does: an export should show
-	// the notes as they are on disk rather than as an earlier process happened to
-	// index them, and a portrait or a location it cannot see is a face or a place
-	// missing from the bundle.
-	_, _ = storage.NewSyncer(store).Sync(filepath.Join(gameDir, "entities"))
-
-	worldStyle := ""
-	worldGenre := ""
-	if world, err := core.LoadWorldManifest(filepath.Join(c.resolver.WorldDir(manifest.WorldID), "world.yaml")); err == nil {
-		worldStyle = strings.TrimSpace(strings.Join([]string{world.ArtStyle, world.Genre}, ", "))
-		worldGenre = strings.TrimSpace(world.Genre)
-	}
+	worldStyle, worldGenre := worldStyleAndGenre(c.resolver, manifest)
+	narrator, banner := c.narratorAndBanner(manifest)
 
 	compiler := scene.NewCompiler(&campaignSource{resolver: c.resolver, store: store, gameID: gameID})
-
-	narrator := c.narratorVoice(manifest)
-	banner := c.banner
-	if banner == "" {
-		banner = bannerPath(c.resolver, manifest)
-	}
-
-	var artResolver scene.ArtResolver
-	if c.artResolver != nil {
-		artResolver = c.artResolver
-	} else if c.art && (c.config.Media.Image.BuiltinFallback || c.config.Media.Image.Type != "disabled") {
-		if client, err := media.NewSceneImageClient(c.config.Media.Image); err == nil {
-			cache := media.NewContentCache(c.resolver.CacheDir())
-			params := c.config.Media.Image.Type + ":" + c.config.Media.Image.Model
-			layerCurrent := c.config.LocationArtAppearance() != config.LocationArtAppearanceOriginal
-			artResolver = media.NewArtStore(client, cache, worldStyle, params, layerCurrent)
-		}
-	}
+	artResolver := c.scriptArtResolver(worldStyle)
 	if artResolver != nil {
 		compiler.SetArtResolver(artResolver)
 	}
-
-	if c.speech != nil {
-		compiler.SetSpeechResolver(c.speech)
-	} else if c.audio {
-		// Cached clips are the campaign's own audio and are worth playing even when
-		// no provider can synthesize: without this an export run where the API key
-		// lives in another environment skips every line instead of using the clips
-		// it already has.
-		// The shared provider key is what the app synthesizes with; without it a
-		// CLI run cannot build the client and every miss would be silent even
-		// though the app can speak.
-		ttsKey, hasTTSKey := media.TTSKeyFor(c.config.Media.TTS)
-		client, err := media.NewTTSClientWithSharedKey(c.config.Media.TTS, media.SharedProviderKey(c.config, ttsKey, hasTTSKey))
-		if err != nil {
-			client = media.NewCacheOnlyTTSClient()
-		}
-		cache := media.NewContentCache(c.resolver.CacheDir())
-		pipeline := media.NewTTSPipeline(client, cache)
-		pipeline.SetTextPolicy(media.TextPolicyFromConfig(c.config.Media.TTS))
-		pipeline.SetOpusBitrate(c.config.OpusBitrate())
-		pipeline.SetGroupCaps(media.TurnGroupCaps(c.config, media.ResolveGroupCaps(c.config.Media.TTS, client)))
-		resolver := NewSpeechResolver(pipeline, store, narrator)
-		if grouped, ok := resolver.(*speechResolver); ok {
-			// Grouping follows the app's policy, so a turn the app streamed folds
-			// under the same single-speaker caps and the export resolves its clips.
-			grouped.SetGrouped(c.config.TTSGrouping() != "off")
-		}
-		compiler.SetSpeechResolver(resolver)
+	if speech := c.scriptSpeechResolver(store, narrator); speech != nil {
+		compiler.SetSpeechResolver(speech)
 	}
 
 	// Portraits are always worth resolving: they are what makes an exported bundle
@@ -584,6 +525,116 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 		gameID:   gameID,
 	})
 
+	script, err := compiler.Compile(ctx, gameID, c.scriptOptions(gameDir, manifest, banner, worldStyle, worldGenre))
+	if err != nil {
+		return nil, err
+	}
+	c.attachSceneLayers(script, store, artResolver)
+	c.finishScript(script, store, manifest)
+
+	return script, nil
+}
+
+// openCampaign opens the campaign a script is compiled from, and reindexes its notes from
+// Markdown first, as playing a campaign does: an export should show the notes as they are on
+// disk rather than as an earlier process happened to index them, and a portrait or a location
+// it cannot see is a face or a place missing from the bundle.
+func (c *ScriptCompiler) openCampaign(gameID, gameDir string) (*core.GameManifest, *storage.Store, error) {
+	manifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
+	if err != nil {
+		return nil, nil, fmt.Errorf("load manifest: %w", err)
+	}
+
+	store, err := storage.OpenGameStore(c.resolver, gameID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open game store: %w", err)
+	}
+
+	_, _ = storage.NewSyncer(store).Sync(filepath.Join(gameDir, "entities"))
+	return manifest, store, nil
+}
+
+// worldStyleAndGenre are the look and the genre of the world a campaign runs in. A world
+// that cannot be read contributes neither.
+func worldStyleAndGenre(resolver *core.PathResolver, manifest *core.GameManifest) (style, genre string) {
+	world, err := core.LoadWorldManifest(filepath.Join(resolver.WorldDir(manifest.WorldID), "world.yaml"))
+	if err != nil {
+		return "", ""
+	}
+	return strings.TrimSpace(strings.Join([]string{world.ArtStyle, world.Genre}, ", ")), strings.TrimSpace(world.Genre)
+}
+
+// narratorAndBanner are the voice the export speaks in and the image it opens on. A banner
+// set on the compiler wins over the campaign's own, because an export can be asked for with
+// one.
+func (c *ScriptCompiler) narratorAndBanner(manifest *core.GameManifest) (narrator *entity.VoiceConfig, banner string) {
+	narrator = c.narratorVoice(manifest)
+	banner = c.banner
+	if banner == "" {
+		banner = bannerPath(c.resolver, manifest)
+	}
+	return narrator, banner
+}
+
+// scriptArtResolver is what draws a scene's picture: the one the caller supplied, or one
+// built from the configured image provider. A campaign with no provider and no built-in
+// fallback gets none, and its scenes are drawn from the styles alone.
+func (c *ScriptCompiler) scriptArtResolver(worldStyle string) scene.ArtResolver {
+	if c.artResolver != nil {
+		return c.artResolver
+	}
+	if !c.art || (!c.config.Media.Image.BuiltinFallback && c.config.Media.Image.Type == "disabled") {
+		return nil
+	}
+
+	client, err := media.NewSceneImageClient(c.config.Media.Image)
+	if err != nil {
+		return nil
+	}
+	cache := media.NewContentCache(c.resolver.CacheDir())
+	params := c.config.Media.Image.Type + ":" + c.config.Media.Image.Model
+	layerCurrent := c.config.LocationArtAppearance() != config.LocationArtAppearanceOriginal
+	return media.NewArtStore(client, cache, worldStyle, params, layerCurrent)
+}
+
+// scriptSpeechResolver is what voices a line: the one the caller supplied, or the app's own
+// pipeline.
+//
+// A pipeline built without a working client still answers from the cache, because cached
+// clips are the campaign's own audio and are worth playing even when no provider can
+// synthesize: without that, an export run where the API key lives in another environment
+// skips every line instead of using the clips it already has. The shared provider key is what
+// the app itself synthesizes with.
+func (c *ScriptCompiler) scriptSpeechResolver(store *storage.Store, narrator *entity.VoiceConfig) scene.SpeechResolver {
+	if c.speech != nil {
+		return c.speech
+	}
+	if !c.audio {
+		return nil
+	}
+
+	ttsKey, hasTTSKey := media.TTSKeyFor(c.config.Media.TTS)
+	client, err := media.NewTTSClientWithSharedKey(c.config.Media.TTS, media.SharedProviderKey(c.config, ttsKey, hasTTSKey))
+	if err != nil {
+		client = media.NewCacheOnlyTTSClient()
+	}
+	cache := media.NewContentCache(c.resolver.CacheDir())
+	pipeline := media.NewTTSPipeline(client, cache)
+	pipeline.SetTextPolicy(media.TextPolicyFromConfig(c.config.Media.TTS))
+	pipeline.SetOpusBitrate(c.config.OpusBitrate())
+	pipeline.SetGroupCaps(media.TurnGroupCaps(c.config, media.ResolveGroupCaps(c.config.Media.TTS, client)))
+	resolver := NewSpeechResolver(pipeline, store, narrator)
+	if grouped, ok := resolver.(*speechResolver); ok {
+		// Grouping follows the app's policy, so a turn the app streamed folds
+		// under the same single-speaker caps and the export resolves its clips.
+		grouped.SetGrouped(c.config.TTSGrouping() != "off")
+	}
+	return resolver
+}
+
+// scriptOptions is what the scene compiler is asked for: what to include, the world's look,
+// the campaign's own paths and player, and where progress goes.
+func (c *ScriptCompiler) scriptOptions(gameDir string, manifest *core.GameManifest, banner, worldStyle, worldGenre string) scene.Options {
 	opts := scene.Options{
 		Art:            c.art,
 		Audio:          c.audio,
@@ -600,27 +651,26 @@ func (c *ScriptCompiler) Compile(ctx context.Context, gameID string) (*scene.Scr
 			fmt.Fprintf(os.Stderr, "export: "+format+"\n", args...)
 		}
 	}
+	return opts
+}
 
-	script, err := compiler.Compile(ctx, gameID, opts)
-	if err != nil {
-		return nil, err
-	}
-	c.attachSceneLayers(script, store, artResolver)
-
+// finishScript gives a compiled script its own labels and its readable prose.
+func (c *ScriptCompiler) finishScript(script *scene.Script, store *storage.Store, manifest *core.GameManifest) {
 	script.GameName = manifest.Name
 	script.PlayerName = c.playerName(store, manifest)
+	c.stripWikilinks(script, c.entityName(store))
+}
 
-	// A bundle carries no codex and no navigation, so a link in its prose is noise:
-	// [[the-quay]] reads as "The Quay", and an authored label wins over the name.
-	names := c.entityName(store)
+// stripWikilinks replaces every wikilink in a script's prose with the name it points at.
+// A bundle carries no codex and no navigation, so a link in its prose is noise:
+// [[the-quay]] reads as "The Quay", and an authored label wins over the name.
+func (c *ScriptCompiler) stripWikilinks(script *scene.Script, name func(string) string) {
 	for i := range script.Scenes {
 		for j := range script.Scenes[i].Beats {
 			beat := &script.Scenes[i].Beats[j]
-			beat.Text = displayText(beat.Text, names)
+			beat.Text = displayText(beat.Text, name)
 		}
 	}
-
-	return script, nil
 }
 
 // wikilinkPattern matches [[Target]] and [[Target|Label]].
