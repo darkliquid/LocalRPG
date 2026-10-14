@@ -132,11 +132,61 @@ func (g *GeminiProvider) ContinueSession(ctx context.Context, session *harness.S
 	}, nil
 }
 
+// interactionsReply is what the interactions endpoint answers with: the id of the
+// interaction to continue from, the model's text wherever the provider put it, the cached
+// tokens it billed, and an error when the reply is a document about one.
+type interactionsReply struct {
+	ID         string `json:"id"`
+	OutputText string `json:"output_text"`
+	Outputs    []struct {
+		Text string `json:"text"`
+		Type string `json:"type"`
+	} `json:"outputs"`
+	Steps []struct {
+		Type    string `json:"type"`
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	} `json:"steps"`
+	Usage struct {
+		TotalCachedTokens int `json:"total_cached_tokens"`
+	} `json:"usage"`
+	Error *struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
 func (g *GeminiProvider) callInteractions(ctx context.Context, prevInteractionID string, req harness.GenerateRequest) (string, string, int, error) {
-	promptText := req.PromptText()
+	bodyBytes, err := json.Marshal(g.interactionsPayload(prevInteractionID, req))
+	if err != nil {
+		return "", "", 0, fmt.Errorf("gemini interactions: marshal request: %w", err)
+	}
+
+	respBytes, err := g.postInteractions(ctx, bodyBytes)
+	if err != nil {
+		return "", "", 0, err
+	}
+
+	var parsed interactionsReply
+	if err := json.Unmarshal(respBytes, &parsed); err != nil {
+		return "", "", 0, fmt.Errorf("gemini interactions: decode response: %w", err)
+	}
+	if parsed.Error != nil {
+		return "", "", 0, mapGeminiError(errors.New(parsed.Error.Message))
+	}
+
+	return parsed.ID, interactionsText(parsed), parsed.Usage.TotalCachedTokens, nil
+}
+
+// interactionsPayload is the body the interactions endpoint is sent: the model, the prompt,
+// the interaction to continue from when there is one, the system instruction when there is
+// one, and the generation settings that were actually set.
+func (g *GeminiProvider) interactionsPayload(prevInteractionID string, req harness.GenerateRequest) map[string]any {
 	payload := map[string]any{
 		"model": g.model,
-		"input": promptText,
+		"input": req.PromptText(),
 	}
 	if prevInteractionID != "" {
 		payload["previous_interaction_id"] = prevInteractionID
@@ -144,6 +194,7 @@ func (g *GeminiProvider) callInteractions(ctx context.Context, prevInteractionID
 	if req.System != "" {
 		payload["system_instruction"] = req.System
 	}
+
 	genConfig := make(map[string]any)
 	if req.Temperature > 0 {
 		genConfig["temperature"] = req.Temperature
@@ -158,16 +209,17 @@ func (g *GeminiProvider) callInteractions(ctx context.Context, prevInteractionID
 	if len(genConfig) > 0 {
 		payload["generation_config"] = genConfig
 	}
+	return payload
+}
 
-	bodyBytes, err := json.Marshal(payload)
-	if err != nil {
-		return "", "", 0, fmt.Errorf("gemini interactions: marshal request: %w", err)
-	}
-
+// postInteractions sends the body and returns the response, mapped into this application's
+// own failure vocabulary rather than the provider's. A client that was never configured
+// falls back to the standard one.
+func (g *GeminiProvider) postInteractions(ctx context.Context, bodyBytes []byte) ([]byte, error) {
 	url := fmt.Sprintf("%s/v1beta/interactions", strings.TrimRight(g.baseURL, "/"))
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return "", "", 0, fmt.Errorf("gemini interactions: new request: %w", err)
+		return nil, fmt.Errorf("gemini interactions: new request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	if g.apiKey != "" {
@@ -181,73 +233,46 @@ func (g *GeminiProvider) callInteractions(ctx context.Context, prevInteractionID
 
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return "", "", 0, mapGeminiError(err)
+		return nil, mapGeminiError(err)
 	}
 	defer resp.Body.Close()
 
 	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, provider.MaxProviderDetailBytes))
 	if err != nil {
-		return "", "", 0, fmt.Errorf("gemini interactions: read response: %w", err)
+		return nil, fmt.Errorf("gemini interactions: read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", "", 0, mapGeminiError(fmt.Errorf("status %d: %s", resp.StatusCode, string(respBytes)))
+		return nil, mapGeminiError(fmt.Errorf("status %d: %s", resp.StatusCode, string(respBytes)))
+	}
+	return respBytes, nil
+}
+
+// interactionsText is the model's text. The field it arrives in depends on how the
+// interaction was asked for: output_text for a plain one, and otherwise the model_output
+// steps, with anything the provider left in outputs appended after them.
+func interactionsText(parsed interactionsReply) string {
+	if parsed.OutputText != "" {
+		return parsed.OutputText
 	}
 
-	var parsed struct {
-		ID         string `json:"id"`
-		OutputText string `json:"output_text"`
-		Outputs    []struct {
-			Text string `json:"text"`
-			Type string `json:"type"`
-		} `json:"outputs"`
-		Steps []struct {
-			Type    string `json:"type"`
-			Content []struct {
-				Type string `json:"type"`
-				Text string `json:"text"`
-			} `json:"content"`
-		} `json:"steps"`
-		Usage struct {
-			TotalCachedTokens int `json:"total_cached_tokens"`
-		} `json:"usage"`
-		Error *struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-
-	if err := json.Unmarshal(respBytes, &parsed); err != nil {
-		return "", "", 0, fmt.Errorf("gemini interactions: decode response: %w", err)
-	}
-
-	if parsed.Error != nil {
-		return "", "", 0, mapGeminiError(errors.New(parsed.Error.Message))
-	}
-
-	text := parsed.OutputText
-	if text == "" {
-		var sb strings.Builder
-		for _, step := range parsed.Steps {
-			if step.Type == "model_output" || step.Type == "" {
-				for _, c := range step.Content {
-					if c.Text != "" {
-						sb.WriteString(c.Text)
-					}
+	var sb strings.Builder
+	for _, step := range parsed.Steps {
+		if step.Type == "model_output" || step.Type == "" {
+			for _, c := range step.Content {
+				if c.Text != "" {
+					sb.WriteString(c.Text)
 				}
 			}
 		}
-		for _, out := range parsed.Outputs {
-			if out.Text != "" {
-				sb.WriteString(out.Text)
-			}
-		}
-		text = sb.String()
 	}
-
-	return parsed.ID, text, parsed.Usage.TotalCachedTokens, nil
+	for _, out := range parsed.Outputs {
+		if out.Text != "" {
+			sb.WriteString(out.Text)
+		}
+	}
+	return sb.String()
 }
-
 func (g *GeminiProvider) ToolCallerCapable() bool {
 	return true
 }
@@ -344,130 +369,163 @@ func (g *GeminiProvider) buildGenerateConfig(req harness.GenerateRequest) *genai
 	return cfg
 }
 
+// pendingToolCall is an assistant function call waiting for its answer. Gemini matches a
+// response to its call by name, while the harness message carries only the id, so the name
+// is remembered here until the answer arrives.
+type pendingToolCall struct {
+	id   string
+	name string
+}
+
+// geminiContents builds the conversation Gemini is sent, one message at a time. It carries
+// the parts as they accumulate, because a run of messages from the same speaker is one
+// content block rather than several.
+type geminiContents struct {
+	contents []*genai.Content
+	pending  []pendingToolCall
+}
+
 func (g *GeminiProvider) buildContents(req harness.GenerateRequest) []*genai.Content {
 	if len(req.Messages) == 0 {
-		promptText := req.PromptText()
-		if promptText == "" {
-			return nil
-		}
-		return []*genai.Content{
-			{
-				Role:  "user",
-				Parts: []*genai.Part{{Text: promptText}},
-			},
-		}
+		return singleUserContent(req.PromptText())
 	}
 
-	var contents []*genai.Content
-	// Gemini matches a function response to its call by name (and optionally id),
-	// but the harness tool message only carries the call id. Remember each
-	// assistant call in order so a tool message can recover the function name;
-	// the orchestrator appends responses in the same order it received the calls.
-	type pendingToolCall struct {
-		id   string
-		name string
-	}
-	var pendingToolCalls []pendingToolCall
-
-	appendUserPart := func(part *genai.Part) {
-		if len(contents) > 0 && contents[len(contents)-1].Role == "user" {
-			contents[len(contents)-1].Parts = append(contents[len(contents)-1].Parts, part)
-		} else {
-			contents = append(contents, &genai.Content{
-				Role:  "user",
-				Parts: []*genai.Part{part},
-			})
-		}
-	}
-
+	contents := &geminiContents{}
 	for _, msg := range req.Messages {
 		switch msg.Role {
 		case "system":
 			// Handled in SystemInstruction
 			continue
 		case "user":
-			appendUserPart(&genai.Part{Text: msg.Content})
+			contents.addPart(&genai.Part{Text: msg.Content})
 		case "assistant":
-			var parts []*genai.Part
-			if strings.TrimSpace(msg.Content) != "" {
-				parts = append(parts, &genai.Part{Text: msg.Content})
-			}
-			for _, tc := range msg.ToolCalls {
-				var args map[string]any
-				_ = json.Unmarshal([]byte(tc.Arguments), &args)
-				sig := tc.Signature
-				if len(sig) == 0 {
-					sig = []byte("skip_thought_signature_validator")
-				}
-				parts = append(parts, &genai.Part{
-					FunctionCall: &genai.FunctionCall{
-						ID:   tc.ID,
-						Name: tc.Name,
-						Args: args,
-					},
-					ThoughtSignature: sig,
-				})
-				pendingToolCalls = append(pendingToolCalls, pendingToolCall{id: tc.ID, name: tc.Name})
-			}
-			if len(parts) > 0 {
-				if len(contents) > 0 && contents[len(contents)-1].Role == "model" {
-					contents[len(contents)-1].Parts = append(contents[len(contents)-1].Parts, parts...)
-				} else {
-					contents = append(contents, &genai.Content{
-						Role:  "model",
-						Parts: parts,
-					})
-				}
-			}
+			contents.addAssistant(msg)
 		case "tool":
-			var respMap map[string]any
-			if err := json.Unmarshal([]byte(msg.Content), &respMap); err != nil {
-				respMap = map[string]any{"result": msg.Content}
-			}
-
-			// Recover the function name from the matching call. Prefer an id
-			// match, then fall back to positional order when ids are absent,
-			// which is the common case for Gemini.
-			call := pendingToolCall{}
-			matchIndex := -1
-			if msg.ToolCallID != "" {
-				for i, candidate := range pendingToolCalls {
-					if candidate.id == msg.ToolCallID {
-						call = candidate
-						matchIndex = i
-						break
-					}
-				}
-			}
-			if matchIndex < 0 && len(pendingToolCalls) > 0 {
-				call = pendingToolCalls[0]
-				matchIndex = 0
-			}
-			if matchIndex >= 0 {
-				pendingToolCalls = append(pendingToolCalls[:matchIndex], pendingToolCalls[matchIndex+1:]...)
-			}
-
-			if call.name == "" {
-				// No matching function call. Never send an empty function response
-				// name to Gemini as it violates the schema (400 INVALID_ARGUMENT: Name cannot be empty).
-				// Send as text instead.
-				if msg.Content != "" {
-					appendUserPart(&genai.Part{Text: msg.Content})
-				}
-				continue
-			}
-
-			response := &genai.FunctionResponse{
-				Name:     call.name,
-				Response: respMap,
-			}
-			if call.id != "" && call.id == msg.ToolCallID {
-				response.ID = call.id
-			}
-			appendUserPart(&genai.Part{FunctionResponse: response})
+			contents.addToolResponse(msg)
 		}
 	}
-	return contents
+	return contents.contents
+}
+
+// singleUserContent is a request's own prompt as the one user turn of a conversation, or
+// nothing at all when the prompt is empty.
+func singleUserContent(promptText string) []*genai.Content {
+	if promptText == "" {
+		return nil
+	}
+	return []*genai.Content{
+		{
+			Role:  "user",
+			Parts: []*genai.Part{{Text: promptText}},
+		},
+	}
+}
+
+// addPart appends a part to the run of user parts in progress, starting a new content block
+// when the last one belongs to the model.
+func (b *geminiContents) addPart(part *genai.Part) {
+	if len(b.contents) > 0 && b.contents[len(b.contents)-1].Role == "user" {
+		b.contents[len(b.contents)-1].Parts = append(b.contents[len(b.contents)-1].Parts, part)
+		return
+	}
+	b.contents = append(b.contents, &genai.Content{
+		Role:  "user",
+		Parts: []*genai.Part{part},
+	})
+}
+
+// addAssistant appends one assistant message: its text, then a function call per call it
+// made, each carrying the thought signature the provider gave it. Every call is remembered
+// so the answer that follows can be matched to it.
+func (b *geminiContents) addAssistant(msg harness.Message) {
+	var parts []*genai.Part
+	if strings.TrimSpace(msg.Content) != "" {
+		parts = append(parts, &genai.Part{Text: msg.Content})
+	}
+	for _, tc := range msg.ToolCalls {
+		var args map[string]any
+		_ = json.Unmarshal([]byte(tc.Arguments), &args)
+		sig := tc.Signature
+		if len(sig) == 0 {
+			sig = []byte("skip_thought_signature_validator")
+		}
+		parts = append(parts, &genai.Part{
+			FunctionCall: &genai.FunctionCall{
+				ID:   tc.ID,
+				Name: tc.Name,
+				Args: args,
+			},
+			ThoughtSignature: sig,
+		})
+		b.pending = append(b.pending, pendingToolCall{id: tc.ID, name: tc.Name})
+	}
+	if len(parts) == 0 {
+		return
+	}
+
+	if len(b.contents) > 0 && b.contents[len(b.contents)-1].Role == "model" {
+		b.contents[len(b.contents)-1].Parts = append(b.contents[len(b.contents)-1].Parts, parts...)
+		return
+	}
+	b.contents = append(b.contents, &genai.Content{
+		Role:  "model",
+		Parts: parts,
+	})
+}
+
+// addToolResponse appends the answer to one function call, named after the call it answers.
+// An answer with no call behind it is sent as text instead, because Gemini rejects a
+// function response with an empty name.
+func (b *geminiContents) addToolResponse(msg harness.Message) {
+	var respMap map[string]any
+	if err := json.Unmarshal([]byte(msg.Content), &respMap); err != nil {
+		respMap = map[string]any{"result": msg.Content}
+	}
+
+	call := b.matchToolCall(msg.ToolCallID)
+	if call.name == "" {
+		// No matching function call. Never send an empty function response
+		// name to Gemini as it violates the schema (400 INVALID_ARGUMENT: Name cannot be empty).
+		// Send as text instead.
+		if msg.Content != "" {
+			b.addPart(&genai.Part{Text: msg.Content})
+		}
+		return
+	}
+
+	response := &genai.FunctionResponse{
+		Name:     call.name,
+		Response: respMap,
+	}
+	if call.id != "" && call.id == msg.ToolCallID {
+		response.ID = call.id
+	}
+	b.addPart(&genai.Part{FunctionResponse: response})
+}
+
+// matchToolCall takes the pending call an answer belongs to off the list. A matching id
+// wins, and with no id, or none that matches, the calls are answered in the order they were
+// made, which is the common case for Gemini.
+func (b *geminiContents) matchToolCall(toolCallID string) pendingToolCall {
+	matchIndex := -1
+	if toolCallID != "" {
+		for i, candidate := range b.pending {
+			if candidate.id == toolCallID {
+				matchIndex = i
+				break
+			}
+		}
+	}
+	if matchIndex < 0 && len(b.pending) > 0 {
+		matchIndex = 0
+	}
+	if matchIndex < 0 {
+		return pendingToolCall{}
+	}
+
+	call := b.pending[matchIndex]
+	b.pending = append(b.pending[:matchIndex], b.pending[matchIndex+1:]...)
+	return call
 }
 
 func (g *GeminiProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {

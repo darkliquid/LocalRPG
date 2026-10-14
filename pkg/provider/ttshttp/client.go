@@ -200,68 +200,19 @@ func formatKokoroVoice(item kokoroVoiceItem) media.ProviderVoice {
 
 	parts := strings.SplitN(id, "_", 2)
 	if len(parts) == 2 && len(parts[0]) == 2 {
-		langCode := parts[0][0]
-		genderCode := parts[0][1]
-
-		switch langCode {
-		case 'a':
-			lang = "en-US"
-			accent = "American"
-			tags = append(tags, "american")
-		case 'b':
-			lang = "en-GB"
-			accent = "British"
-			tags = append(tags, "british")
-		case 'e':
-			lang = "es"
-			accent = "Spanish"
-			tags = append(tags, "spanish")
-		case 'f':
-			lang = "fr"
-			accent = "French"
-			tags = append(tags, "french")
-		case 'h':
-			lang = "hi"
-			accent = "Hindi"
-			tags = append(tags, "hindi")
-		case 'i':
-			lang = "it"
-			accent = "Italian"
-			tags = append(tags, "italian")
-		case 'j':
-			lang = "ja"
-			accent = "Japanese"
-			tags = append(tags, "japanese")
-		case 'p':
-			lang = "pt-BR"
-			accent = "Portuguese"
-			tags = append(tags, "portuguese")
-		case 'z':
-			lang = "zh"
-			accent = "Chinese"
-			tags = append(tags, "chinese")
+		var langTag, genderTag string
+		lang, accent, langTag = kokoroLanguage(parts[0][0])
+		gender, genderTag = kokoroGender(parts[0][1])
+		if langTag != "" {
+			tags = append(tags, langTag)
+		}
+		if genderTag != "" {
+			tags = append(tags, genderTag)
 		}
 
-		switch genderCode {
-		case 'f':
-			gender = "female"
-			tags = append(tags, "female")
-		case 'm':
-			gender = "male"
-			tags = append(tags, "male")
-		}
-
-		voiceName := parts[1]
-		tags = append(tags, strings.ToLower(voiceName))
+		name = kokoroDisplayName(id, name, parts[1], accent, gender)
+		tags = append(tags, strings.ToLower(parts[1]))
 		tags = append(tags, "kokoro")
-
-		if name == id || name == voiceName {
-			displayName := strings.ToUpper(voiceName[:1]) + voiceName[1:]
-			if accent != "" && gender != "" {
-				displayName = fmt.Sprintf("%s (%s %s)", displayName, accent, strings.ToUpper(gender[:1])+gender[1:])
-			}
-			name = displayName
-		}
 	} else {
 		tags = append(tags, "kokoro")
 	}
@@ -285,6 +236,59 @@ func formatKokoroVoice(item kokoroVoiceItem) media.ProviderVoice {
 			"speech_rate": 1.0,
 		},
 	}
+}
+
+// kokoroLanguage is the language, accent and search tag a Kokoro voice id's first letter
+// names. Kokoro encodes the language and the gender in a two-letter prefix, so the id is
+// the only description its catalogue gives.
+func kokoroLanguage(code byte) (lang, accent, tag string) {
+	switch code {
+	case 'a':
+		return "en-US", "American", "american"
+	case 'b':
+		return "en-GB", "British", "british"
+	case 'e':
+		return "es", "Spanish", "spanish"
+	case 'f':
+		return "fr", "French", "french"
+	case 'h':
+		return "hi", "Hindi", "hindi"
+	case 'i':
+		return "it", "Italian", "italian"
+	case 'j':
+		return "ja", "Japanese", "japanese"
+	case 'p':
+		return "pt-BR", "Portuguese", "portuguese"
+	case 'z':
+		return "zh", "Chinese", "chinese"
+	}
+	return "", "", ""
+}
+
+// kokoroGender is the gender a Kokoro voice id's second letter names, and the tag a search
+// matches it by.
+func kokoroGender(code byte) (gender, tag string) {
+	switch code {
+	case 'f':
+		return "female", "female"
+	case 'm':
+		return "male", "male"
+	}
+	return "", ""
+}
+
+// kokoroDisplayName is what a voice is shown as. A catalogue name that is only the id says
+// nothing, so it is replaced with the voice's own name title-cased, with its accent and
+// gender when the id named both.
+func kokoroDisplayName(id, name, voiceName, accent, gender string) string {
+	if name != id && name != voiceName {
+		return name
+	}
+	displayName := strings.ToUpper(voiceName[:1]) + voiceName[1:]
+	if accent != "" && gender != "" {
+		displayName = fmt.Sprintf("%s (%s %s)", displayName, accent, strings.ToUpper(gender[:1])+gender[1:])
+	}
+	return displayName
 }
 
 // media.SpeechCueCapabilities advertises Markdown emphasis support for HTTP TTS endpoints.

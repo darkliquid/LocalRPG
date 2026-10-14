@@ -235,18 +235,28 @@ func (h *HTTPProvider) Stream(ctx context.Context, req harness.GenerateRequest, 
 // retried once without it, because a rejection is a provider limitation rather
 // than a turn failure; the trace records why. The channel is closed by Stream, so
 // a retry cannot close it twice.
+// streamState is what one streamed response builds up as it is read: the stop the provider
+// gave, the usage it billed, the tool calls it accumulated, and the timing a trace records
+// beside them.
+type streamState struct {
+	start        time.Time
+	firstToken   time.Duration
+	chunkCount   int
+	byteCount    int
+	wireLines    int
+	finishReason string
+	usage        *harness.Usage
+	toolCalls    *toolCallAccumulator
+}
+
+func newStreamState() *streamState {
+	return &streamState{start: time.Now(), toolCalls: newToolCallAccumulator()}
+}
+
 func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk, allowTools bool) error {
 	messages := h.buildMessages(req)
 	tools := h.buildTools(req, allowTools)
-
-	temperature := req.Temperature
-	if temperature == 0 {
-		temperature = h.opts.Temperature
-	}
-	maxTokens := req.MaxTokens
-	if maxTokens == 0 {
-		maxTokens = h.opts.MaxTokens
-	}
+	temperature, maxTokens := h.chatLimits(req)
 
 	payload := openAIChatRequest{
 		Model:         h.model,
@@ -265,53 +275,14 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	start := time.Now()
-	var firstToken time.Duration
-	chunkCount := 0
-	byteCount := 0
-	wireLines := 0
+	h.logChatRequest(req, tools, temperature, maxTokens)
+	url := h.chatURL()
 
-	// The prompt is recorded once, on context.assembled; the hash and length here
-	// let a reader tie the two together without a second copy of the text.
-	h.logger = trace.OrNil(h.logger)
-	h.logger.Event("provider.request", map[string]any{
-		"role":          h.id,
-		"kind":          "http",
-		"model":         h.model,
-		"endpoint":      h.endpoint,
-		"temperature":   temperature,
-		"max_tokens":    maxTokens,
-		"stream":        true,
-		"auth_set":      h.apiKey != "",
-		"prompt_sha256": hashPrompt(req.PromptText()),
-		"prompt_chars":  len([]rune(req.PromptText())),
-		"tools":         len(tools),
-	})
+	state := newStreamState()
 
-	url := h.endpoint
-	if !strings.HasSuffix(url, "/chat/completions") && !strings.HasSuffix(url, "/v1") {
-		url = url + "/v1/chat/completions"
-	} else if strings.HasSuffix(url, "/v1") {
-		url = url + "/chat/completions"
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
+	resp, err := h.postChatRequest(ctx, url, data)
 	if err != nil {
-		return fmt.Errorf("new http request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if h.apiKey != "" {
-		scheme := h.authScheme
-		if scheme == "" {
-			scheme = "Bearer"
-		}
-		httpReq.Header.Set("Authorization", scheme+" "+h.apiKey)
-	}
-
-	resp, err := h.client.Do(httpReq)
-	if err != nil {
-		h.logger.Event("provider.error", map[string]any{"role": h.id, "error": err.Error()})
-		return fmt.Errorf("http request: %w", err)
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -339,15 +310,96 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 		return fmt.Errorf("http error %s from %s", resp.Status, url)
 	}
 
-	var finishReason string
-	var usage *harness.Usage
-	accumulator := newToolCallAccumulator()
-	scanner := bufio.NewScanner(resp.Body)
+	if err := h.consumeChatStream(resp.Body, state, out); err != nil {
+		return err
+	}
+
+	h.logChatResponse(state)
+	out <- harness.StreamChunk{Done: true, FinishReason: state.finishReason, ToolCalls: state.toolCalls.result(), Usage: state.usage}
+	return nil
+}
+
+// chatLimits is the temperature and the token cap a request runs with: the request's own
+// when it names one, and the provider's configured default otherwise.
+func (h *HTTPProvider) chatLimits(req harness.GenerateRequest) (temperature float64, maxTokens int) {
+	temperature = req.Temperature
+	if temperature == 0 {
+		temperature = h.opts.Temperature
+	}
+	maxTokens = req.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = h.opts.MaxTokens
+	}
+	return temperature, maxTokens
+}
+
+// chatURL is the chat completions endpoint: the configured endpoint when it already names
+// one, and otherwise the route appended to it.
+func (h *HTTPProvider) chatURL() string {
+	url := h.endpoint
+	if !strings.HasSuffix(url, "/chat/completions") && !strings.HasSuffix(url, "/v1") {
+		return url + "/v1/chat/completions"
+	}
+	if strings.HasSuffix(url, "/v1") {
+		return url + "/chat/completions"
+	}
+	return url
+}
+
+// logChatRequest records what was sent. The prompt itself is recorded once, on
+// context.assembled; the hash and the length here let a reader tie the two together
+// without a second copy of the text.
+func (h *HTTPProvider) logChatRequest(req harness.GenerateRequest, tools []openAIToolSpec, temperature float64, maxTokens int) {
+	h.logger = trace.OrNil(h.logger)
+	h.logger.Event("provider.request", map[string]any{
+		"role":          h.id,
+		"kind":          "http",
+		"model":         h.model,
+		"endpoint":      h.endpoint,
+		"temperature":   temperature,
+		"max_tokens":    maxTokens,
+		"stream":        true,
+		"auth_set":      h.apiKey != "",
+		"prompt_sha256": hashPrompt(req.PromptText()),
+		"prompt_chars":  len([]rune(req.PromptText())),
+		"tools":         len(tools),
+	})
+}
+
+// postChatRequest sends the payload, with the provider's own authentication scheme when an
+// API key is set.
+func (h *HTTPProvider) postChatRequest(ctx context.Context, url string, data []byte) (*http.Response, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("new http request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if h.apiKey != "" {
+		scheme := h.authScheme
+		if scheme == "" {
+			scheme = "Bearer"
+		}
+		httpReq.Header.Set("Authorization", scheme+" "+h.apiKey)
+	}
+
+	resp, err := h.client.Do(httpReq)
+	if err != nil {
+		h.logger.Event("provider.error", map[string]any{"role": h.id, "error": err.Error()})
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	return resp, nil
+}
+
+// consumeChatStream reads the server-sent events until the provider says it has stopped,
+// forwarding text as it arrives. A line that carries nothing is skipped rather than failing
+// the turn, because the wire carries keep-alives alongside the events.
+func (h *HTTPProvider) consumeChatStream(body io.Reader, state *streamState, out chan<- harness.StreamChunk) error {
+	scanner := bufio.NewScanner(body)
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		if h.logger.Enabled(trace.LevelFull) && wireLines < h.chunkLimit() {
-			wireLines++
+		if h.logger.Enabled(trace.LevelFull) && state.wireLines < h.chunkLimit() {
+			state.wireLines++
 			h.logger.Event("provider.wire", map[string]any{
 				"role":      h.id,
 				"direction": "recv",
@@ -367,28 +419,31 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 		if err := json.Unmarshal([]byte(eventData), &chunk); err != nil {
 			continue
 		}
+
 		if chunk.Usage != nil {
-			usage = &harness.Usage{
+			state.usage = &harness.Usage{
 				Model:        h.model,
 				InputTokens:  chunk.Usage.PromptTokens,
 				OutputTokens: chunk.Usage.CompletionTokens,
 			}
 		}
-		if len(chunk.Choices) > 0 {
-			for _, call := range chunk.Choices[0].Delta.ToolCalls {
-				accumulator.add(call.Index, call.ID, call.Function.Name, call.Function.Arguments)
+		if len(chunk.Choices) == 0 {
+			continue
+		}
+
+		for _, call := range chunk.Choices[0].Delta.ToolCalls {
+			state.toolCalls.add(call.Index, call.ID, call.Function.Name, call.Function.Arguments)
+		}
+		if chunk.Choices[0].Delta.Content != "" {
+			if state.firstToken == 0 {
+				state.firstToken = time.Since(state.start)
 			}
-			if chunk.Choices[0].Delta.Content != "" {
-				if firstToken == 0 {
-					firstToken = time.Since(start)
-				}
-				chunkCount++
-				byteCount += len(chunk.Choices[0].Delta.Content)
-				out <- harness.StreamChunk{Text: chunk.Choices[0].Delta.Content}
-			}
-			if chunk.Choices[0].FinishReason != "" {
-				finishReason = chunk.Choices[0].FinishReason
-			}
+			state.chunkCount++
+			state.byteCount += len(chunk.Choices[0].Delta.Content)
+			out <- harness.StreamChunk{Text: chunk.Choices[0].Delta.Content}
+		}
+		if chunk.Choices[0].FinishReason != "" {
+			state.finishReason = chunk.Choices[0].FinishReason
 		}
 	}
 
@@ -396,19 +451,23 @@ func (h *HTTPProvider) streamOnce(ctx context.Context, req harness.GenerateReque
 		h.logger.Event("provider.error", map[string]any{"role": h.id, "error": err.Error()})
 		return err
 	}
-	if finishReason == "" {
-		finishReason = "stop"
+	if state.finishReason == "" {
+		state.finishReason = "stop"
 	}
+	return nil
+}
+
+// logChatResponse records what came back, with the timing a reader needs to tell a slow
+// first token from a slow stream.
+func (h *HTTPProvider) logChatResponse(state *streamState) {
 	h.logger.Event("provider.response", map[string]any{
 		"role":           h.id,
-		"finish_reason":  finishReason,
-		"first_token_ms": firstToken.Milliseconds(),
-		"total_ms":       time.Since(start).Milliseconds(),
-		"chunks":         chunkCount,
-		"bytes":          byteCount,
+		"finish_reason":  state.finishReason,
+		"first_token_ms": state.firstToken.Milliseconds(),
+		"total_ms":       time.Since(state.start).Milliseconds(),
+		"chunks":         state.chunkCount,
+		"bytes":          state.byteCount,
 	})
-	out <- harness.StreamChunk{Done: true, FinishReason: finishReason, ToolCalls: accumulator.result(), Usage: usage}
-	return nil
 }
 
 // buildMessages maps a request onto the wire's message shape. Messages win when
