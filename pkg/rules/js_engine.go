@@ -43,9 +43,29 @@ func NewJSEngine(bridge GameHostAPI) *JSEngine {
 	return engine
 }
 
+// throwJS raises a JavaScript exception within the running Goja runtime.
+//
+// In Goja, host Go callbacks throw JavaScript exceptions by panicking with a
+// goja.Value (or error). Goja catches this panic internally within VM execution
+// (such as vm.RunString or function invocations), wraps it as a *goja.Exception,
+// and returns it to the host caller as an error or passes it to a JS try/catch
+// block. This helper encapsulates that convention so host bindings do not use
+// unadorned panic calls.
+func (j *JSEngine) throwJS(format string, args ...any) {
+	if len(args) == 0 {
+		panic(j.vm.ToValue(format))
+	}
+	panic(j.vm.ToValue(fmt.Sprintf(format, args...)))
+}
+
 // bindHostAPI exposes the host to the mechanics VM, in the groups a hook uses it in: what it
 // can read and write, where it is, what it can say, what it can award, and how it registers
 // itself to be called back.
+//
+// Host callbacks raise JavaScript exceptions by calling j.throwJS(...). In Goja,
+// host functions throw JS exceptions by panicking with a goja.Value, which Goja
+// catches and surfaces as a *goja.Exception in JS or wrapped in an error returned
+// to the Go caller.
 func (j *JSEngine) bindHostAPI() {
 	j.bindStateAPI()
 	j.bindLocationAPI()
@@ -60,7 +80,7 @@ func (j *JSEngine) bindStateAPI() {
 		notation := call.Argument(0).String()
 		res, err := j.bridge.Roll(notation)
 		if err != nil {
-			panic(j.vm.ToValue(fmt.Sprintf("roll error: %v", err)))
+			j.throwJS("roll error: %v", err)
 		}
 		return j.vm.ToValue(res)
 	})
@@ -70,7 +90,7 @@ func (j *JSEngine) bindStateAPI() {
 		path := call.Argument(1).String()
 		val, err := j.bridge.GetStat(entityID, path)
 		if err != nil {
-			panic(j.vm.ToValue(fmt.Sprintf("getStat error: %v", err)))
+			j.throwJS("getStat error: %v", err)
 		}
 		return j.vm.ToValue(val)
 	})
@@ -80,7 +100,7 @@ func (j *JSEngine) bindStateAPI() {
 		path := call.Argument(1).String()
 		val := call.Argument(2).Export()
 		if err := j.bridge.SetStat(entityID, path, val); err != nil {
-			panic(j.vm.ToValue(fmt.Sprintf("setStat error: %v", err)))
+			j.throwJS("setStat error: %v", err)
 		}
 		return goja.Undefined()
 	})
@@ -91,7 +111,7 @@ func (j *JSEngine) bindLocationAPI() {
 	j.vm.Set("getLocation", func(call goja.FunctionCall) goja.Value {
 		locationID, err := j.bridge.GetLocation()
 		if err != nil {
-			panic(j.vm.ToValue(fmt.Sprintf("getLocation error: %v", err)))
+			j.throwJS("getLocation error: %v", err)
 		}
 		return j.vm.ToValue(locationID)
 	})
@@ -99,7 +119,7 @@ func (j *JSEngine) bindLocationAPI() {
 	j.vm.Set("setLocation", func(call goja.FunctionCall) goja.Value {
 		locationID := call.Argument(0).String()
 		if err := j.bridge.SetLocation(locationID); err != nil {
-			panic(j.vm.ToValue(fmt.Sprintf("setLocation error: %v", err)))
+			j.throwJS("setLocation error: %v", err)
 		}
 		return goja.Undefined()
 	})
@@ -137,7 +157,7 @@ func (j *JSEngine) bindAdvancementAPI() {
 			playerID = id.PlayerID()
 		}
 		if err := ApplyEarn(j.bridge, j.manifest.Mechanics.Advancement, playerID, amount); err != nil {
-			panic(j.vm.ToValue(fmt.Sprintf("grantXP error: %v", err)))
+			j.throwJS("grantXP error: %v", err)
 		}
 		return j.vm.ToValue(true)
 	})
@@ -152,7 +172,7 @@ func (j *JSEngine) bindHookRegistration() {
 		actionType := call.Argument(0).String()
 		fn, ok := goja.AssertFunction(call.Argument(1))
 		if !ok {
-			panic(j.vm.ToValue("onAction handler must be a function"))
+			j.throwJS("onAction handler must be a function")
 		}
 		j.actionHandlers[actionType] = fn
 		return goja.Undefined()
@@ -161,7 +181,7 @@ func (j *JSEngine) bindHookRegistration() {
 	j.vm.Set("onTurnEnd", func(call goja.FunctionCall) goja.Value {
 		fn, ok := goja.AssertFunction(call.Argument(0))
 		if !ok {
-			panic(j.vm.ToValue("onTurnEnd handler must be a function"))
+			j.throwJS("onTurnEnd handler must be a function")
 		}
 		j.turnEndHooks = append(j.turnEndHooks, fn)
 		return goja.Undefined()
@@ -170,7 +190,7 @@ func (j *JSEngine) bindHookRegistration() {
 	j.vm.Set("onWorldTick", func(call goja.FunctionCall) goja.Value {
 		fn, ok := goja.AssertFunction(call.Argument(0))
 		if !ok {
-			panic(j.vm.ToValue("onWorldTick handler must be a function"))
+			j.throwJS("onWorldTick handler must be a function")
 		}
 		j.worldTickHooks = append(j.worldTickHooks, fn)
 		return goja.Undefined()
@@ -179,7 +199,7 @@ func (j *JSEngine) bindHookRegistration() {
 	j.vm.Set("onTurnBegin", func(call goja.FunctionCall) goja.Value {
 		fn, ok := goja.AssertFunction(call.Argument(0))
 		if !ok {
-			panic(j.vm.ToValue("onTurnBegin handler must be a function"))
+			j.throwJS("onTurnBegin handler must be a function")
 		}
 		j.turnBeginHooks = append(j.turnBeginHooks, fn)
 		return goja.Undefined()
@@ -189,7 +209,7 @@ func (j *JSEngine) bindHookRegistration() {
 		kind := call.Argument(0).String()
 		fn, ok := goja.AssertFunction(call.Argument(1))
 		if !ok {
-			panic(j.vm.ToValue("onCheck handler must be a function"))
+			j.throwJS("onCheck handler must be a function")
 		}
 		j.checkResolvers[kind] = fn
 		return goja.Undefined()
@@ -198,7 +218,7 @@ func (j *JSEngine) bindHookRegistration() {
 	j.vm.Set("onHealthZero", func(call goja.FunctionCall) goja.Value {
 		fn, ok := goja.AssertFunction(call.Argument(0))
 		if !ok {
-			panic(j.vm.ToValue("onHealthZero handler must be a function"))
+			j.throwJS("onHealthZero handler must be a function")
 		}
 		j.healthZeroHooks = append(j.healthZeroHooks, fn)
 		return goja.Undefined()

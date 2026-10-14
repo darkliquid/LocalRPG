@@ -2,6 +2,7 @@ package rules
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/core"
@@ -122,5 +123,56 @@ func TestGrantXPAwardsTheCurrency(t *testing.T) {
 	}
 	if got, _ := bridge.GetStat("player", "xp"); mustInt(t, got) != 3 {
 		t.Fatalf("xp = %v, want 3", got)
+	}
+}
+
+func TestJSEngineHostExceptionPropagation(t *testing.T) {
+	store := newRulesTestStore(t)
+	bridge := NewHostBridge(store, nil, "player")
+	engine := NewJSEngine(bridge)
+
+	// 1. Host error caught within JS try/catch
+	scriptWithCatch := `
+var caughtError = "";
+try {
+    roll("not-a-valid-dice-notation");
+} catch (e) {
+    caughtError = "" + e;
+}
+`
+	if err := engine.LoadScript(scriptWithCatch); err != nil {
+		t.Fatalf("LoadScript failed: %v", err)
+	}
+	caughtVal := engine.vm.Get("caughtError")
+	if caughtVal == nil || !strings.Contains(caughtVal.String(), "roll error") {
+		t.Errorf("expected caughtError to contain 'roll error', got %v", caughtVal)
+	}
+
+	// 2. Uncaught host error surfaces as Go error from ExecuteAction
+	scriptUncaughtAction := `
+onAction("bad_roll", function(ctx) {
+    roll("invalid_dice");
+    return { success: true };
+});
+`
+	if err := engine.LoadScript(scriptUncaughtAction); err != nil {
+		t.Fatalf("LoadScript failed: %v", err)
+	}
+	_, err := engine.ExecuteAction("bad_roll", map[string]any{})
+	if err == nil {
+		t.Fatal("expected ExecuteAction to fail on uncaught host error, got nil")
+	}
+	if !strings.Contains(err.Error(), "roll error") {
+		t.Errorf("expected error to contain 'roll error', got %v", err)
+	}
+
+	// 3. Registering non-function hook throws and surfaces to Go
+	badHookScript := `onAction("test", "not-a-function");`
+	err = engine.LoadScript(badHookScript)
+	if err == nil {
+		t.Fatal("expected LoadScript to fail when registering non-function hook")
+	}
+	if !strings.Contains(err.Error(), "onAction handler must be a function") {
+		t.Errorf("expected error to contain 'onAction handler must be a function', got %v", err)
 	}
 }
