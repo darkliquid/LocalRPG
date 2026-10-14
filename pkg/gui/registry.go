@@ -67,14 +67,14 @@ func (s *Service) ImportContent(ctx context.Context, r io.Reader, onConflict str
 	return s.ImportContentWithOptions(ctx, r, ImportContentOptions{ConflictMode: onConflict})
 }
 
-// ImportContentWithOptions unpacks a package archive from r with type validation and conflict handling.
+// ImportContentWithOptions unpacks a package archive from r with type validation and
+// conflict handling. The phases are its structure: the request is checked, the
+// package is unpacked and verified, the staged content is validated, the conflict
+// mode decides where it lands, and the install is a swap or a move.
 func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opts ImportContentOptions) (ImportResultDTO, error) {
-	onConflict := opts.ConflictMode
-	if onConflict == "" {
-		onConflict = "refuse"
-	}
-	if onConflict != "refuse" && onConflict != "rename" && onConflict != "overwrite" {
-		return ImportResultDTO{}, fmt.Errorf("invalid on_conflict mode %q: must be refuse, rename, or overwrite", onConflict)
+	onConflict, err := normalizeConflictMode(opts.ConflictMode)
+	if err != nil {
+		return ImportResultDTO{}, err
 	}
 
 	stagingDir, err := os.MkdirTemp("", "lrpg-import-staging-*")
@@ -92,33 +92,91 @@ func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opt
 	if err := pathutil.ValidateID(m.ID); err != nil {
 		return ImportResultDTO{}, fmt.Errorf("invalid package content ID %q: %w", m.ID, err)
 	}
-
-	if opts.ExpectedType != "" {
-		expected := strings.ToLower(strings.TrimSpace(opts.ExpectedType))
-		if expected != "world" && expected != "system" {
-			return ImportResultDTO{}, fmt.Errorf("invalid expected content type %q: must be 'world' or 'system'", expected)
-		}
-		if m.Type != expected {
-			return ImportResultDTO{}, fmt.Errorf("package contains %s %q, cannot import as %s", m.Type, m.ID, expected)
-		}
+	if err := validateExpectedType(m, opts.ExpectedType); err != nil {
+		return ImportResultDTO{}, err
+	}
+	if err := validatePackageFilename(m, opts.Filename); err != nil {
+		return ImportResultDTO{}, err
 	}
 
-	if opts.Filename != "" {
-		ext := strings.ToLower(filepath.Ext(opts.Filename))
-		switch ext {
-		case ".lrpgworld":
-			if m.Type != "world" {
-				return ImportResultDTO{}, fmt.Errorf("package filename %q has extension .lrpgworld but package contains %s %q", opts.Filename, m.Type, m.ID)
-			}
-		case ".lrpgsystem":
-			if m.Type != "system" {
-				return ImportResultDTO{}, fmt.Errorf("package filename %q has extension .lrpgsystem but package contains %s %q", opts.Filename, m.Type, m.ID)
-			}
-		case ".lrpgpack":
-			// Universal package format, allowed for both
-		}
+	trust, err := s.verifyPackage(m, sigBytes)
+	if err != nil {
+		return ImportResultDTO{Trust: trust}, err
 	}
 
+	wm, sm, err := loadStagedManifest(stagingDir, m)
+	if err != nil {
+		return ImportResultDTO{}, err
+	}
+
+	// Read from the staged directory, before the install renames it away.
+	hasScript := stagedHasScript(stagingDir)
+
+	targetDir, finalID, action, err := s.resolveContentConflict(m, wm, sm, stagingDir, onConflict)
+	if err != nil {
+		return ImportResultDTO{}, err
+	}
+
+	if err := installStagedContent(stagingDir, targetDir, action); err != nil {
+		return ImportResultDTO{}, err
+	}
+
+	return importResult(m, finalID, action, hasScript, trust), nil
+}
+
+// normalizeConflictMode is the conflict mode an import runs under. It defaults to
+// refuse and rejects anything that is not one of the three modes.
+func normalizeConflictMode(mode string) (string, error) {
+	if mode == "" {
+		mode = "refuse"
+	}
+	if mode != "refuse" && mode != "rename" && mode != "overwrite" {
+		return "", fmt.Errorf("invalid on_conflict mode %q: must be refuse, rename, or overwrite", mode)
+	}
+	return mode, nil
+}
+
+// validateExpectedType checks the package against the content type the caller asked
+// for, when it asked for one.
+func validateExpectedType(m content.Manifest, expectedType string) error {
+	if expectedType == "" {
+		return nil
+	}
+	expected := strings.ToLower(strings.TrimSpace(expectedType))
+	if expected != "world" && expected != "system" {
+		return fmt.Errorf("invalid expected content type %q: must be 'world' or 'system'", expected)
+	}
+	if m.Type != expected {
+		return fmt.Errorf("package contains %s %q, cannot import as %s", m.Type, m.ID, expected)
+	}
+	return nil
+}
+
+// validatePackageFilename checks that a declared filename's extension agrees with
+// what the package actually holds. The universal .lrpgpack is allowed for both.
+func validatePackageFilename(m content.Manifest, filename string) error {
+	if filename == "" {
+		return nil
+	}
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".lrpgworld":
+		if m.Type != "world" {
+			return fmt.Errorf("package filename %q has extension .lrpgworld but package contains %s %q", filename, m.Type, m.ID)
+		}
+	case ".lrpgsystem":
+		if m.Type != "system" {
+			return fmt.Errorf("package filename %q has extension .lrpgsystem but package contains %s %q", filename, m.Type, m.ID)
+		}
+	case ".lrpgpack":
+		// Universal package format, allowed for both
+	}
+	return nil
+}
+
+// verifyPackage checks a package's signature against the trusted publishers the
+// configuration names. The trust it decided is returned either way, because an
+// invalid package is reported with it.
+func (s *Service) verifyPackage(m content.Manifest, sigBytes []byte) (content.Trust, error) {
 	var trustedPublishers map[string]string
 	if s.configMgr != nil {
 		if cfg := s.configMgr.Get(); cfg != nil {
@@ -128,38 +186,43 @@ func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opt
 
 	trust, verifyErr := content.Verify(m, sigBytes, trustedPublishers)
 	if verifyErr != nil || trust.State == "invalid" {
-		return ImportResultDTO{Trust: trust}, fmt.Errorf("package signature is invalid: %w", verifyErr)
+		return trust, fmt.Errorf("package signature is invalid: %w", verifyErr)
 	}
+	return trust, nil
+}
 
-	// Validate staged content structure
-	var wm *core.WorldManifest
-	var sm *core.SystemManifest
+// loadStagedManifest validates a staged package's own manifest and returns it, so
+// the conflict mode can rewrite its id when the package installs under a new one.
+func loadStagedManifest(stagingDir string, m content.Manifest) (*core.WorldManifest, *core.SystemManifest, error) {
 	switch m.Type {
 	case "world":
-		var loadErr error
-		wm, loadErr = core.LoadWorldManifest(filepath.Join(stagingDir, "world.yaml"))
-		if loadErr != nil {
-			return ImportResultDTO{}, fmt.Errorf("invalid world package: missing or invalid world.yaml: %w", loadErr)
+		wm, err := core.LoadWorldManifest(filepath.Join(stagingDir, "world.yaml"))
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid world package: missing or invalid world.yaml: %w", err)
 		}
 		if wm.ID != m.ID {
-			return ImportResultDTO{}, fmt.Errorf("world.yaml id %q does not match package id %q", wm.ID, m.ID)
+			return nil, nil, fmt.Errorf("world.yaml id %q does not match package id %q", wm.ID, m.ID)
 		}
+		return wm, nil, nil
 	case "system":
-		var loadErr error
-		sm, loadErr = core.LoadSystemManifest(filepath.Join(stagingDir, "system.yaml"))
-		if loadErr != nil {
-			return ImportResultDTO{}, fmt.Errorf("invalid system package: missing or invalid system.yaml: %w", loadErr)
+		sm, err := core.LoadSystemManifest(filepath.Join(stagingDir, "system.yaml"))
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid system package: missing or invalid system.yaml: %w", err)
 		}
 		if sm.ID != m.ID {
-			return ImportResultDTO{}, fmt.Errorf("system.yaml id %q does not match package id %q", sm.ID, m.ID)
+			return nil, nil, fmt.Errorf("system.yaml id %q does not match package id %q", sm.ID, m.ID)
 		}
+		return nil, sm, nil
 	default:
-		return ImportResultDTO{}, fmt.Errorf("invalid content type %q", m.Type)
+		return nil, nil, fmt.Errorf("invalid content type %q", m.Type)
 	}
+}
 
-	// Detect whether package contains any executable script
+// stagedHasScript reports whether a staged package carries any executable script,
+// which the result surfaces so the caller knows what it just installed.
+func stagedHasScript(stagingDir string) bool {
 	hasScript := false
-	_ = filepath.WalkDir(stagingDir, func(path string, d fs.DirEntry, walkErr error) error {
+	_ = filepath.WalkDir(stagingDir, func(_ string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil || d.IsDir() {
 			return nil
 		}
@@ -169,64 +232,92 @@ func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opt
 		}
 		return nil
 	})
+	return hasScript
+}
 
-	targetDirFor := func(id string) string {
-		cleanID := filepath.Base(pathutil.SanitizeID(id))
-		if m.Type == "world" {
-			return filepath.Join(s.resolver.WorldsDir(), cleanID)
-		}
-		return filepath.Join(s.resolver.SystemsDir(), cleanID)
+// resolveContentConflict decides where a package lands. An id that is free installs
+// as it is; otherwise the mode refuses the import, installs under the lowest free
+// suffix (rewriting the staged manifest to match), or replaces what is there.
+func (s *Service) resolveContentConflict(m content.Manifest, wm *core.WorldManifest, sm *core.SystemManifest, stagingDir, mode string) (dir, id, action string, err error) {
+	dir = s.contentTargetDir(m.Type, m.ID)
+	id = m.ID
+	action = "installed"
+
+	fi, statErr := os.Stat(dir)
+	if statErr != nil || !fi.IsDir() {
+		return dir, id, action, nil
 	}
 
-	targetDir := targetDirFor(m.ID)
-	finalID := m.ID
-	action := "installed"
+	switch mode {
+	case "refuse":
+		return "", "", "", fmt.Errorf("%w: content %s %q already exists", ErrContentConflict, m.Type, m.ID)
+	case "rename":
+		id = s.freeContentID(m.Type, m.ID)
+		if err := rewriteStagedManifestID(stagingDir, m, wm, sm, id); err != nil {
+			return "", "", "", err
+		}
+		dir = s.contentTargetDir(m.Type, id)
+		action = "renamed"
+	case "overwrite":
+		action = "overwritten"
+	}
+	return dir, id, action, nil
+}
 
-	if fi, err := os.Stat(targetDir); err == nil && fi.IsDir() {
-		switch onConflict {
-		case "refuse":
-			return ImportResultDTO{}, fmt.Errorf("%w: content %s %q already exists", ErrContentConflict, m.Type, m.ID)
-		case "rename":
-			n := 2
-			for {
-				candidate := fmt.Sprintf("%s-%d", m.ID, n)
-				if _, err := os.Stat(targetDirFor(candidate)); os.IsNotExist(err) {
-					finalID = candidate
-					break
-				}
-				n++
-			}
-			// Rewrite manifest with new ID in staging
-			if m.Type == "world" {
-				wm.ID = finalID
-				data, err := yaml.Marshal(wm)
-				if err != nil {
-					return ImportResultDTO{}, fmt.Errorf("marshal updated world manifest: %w", err)
-				}
-				if err := os.WriteFile(filepath.Join(stagingDir, "world.yaml"), data, 0644); err != nil {
-					return ImportResultDTO{}, fmt.Errorf("write updated world manifest: %w", err)
-				}
-			} else if m.Type == "system" {
-				sm.ID = finalID
-				data, err := yaml.Marshal(sm)
-				if err != nil {
-					return ImportResultDTO{}, fmt.Errorf("marshal updated system manifest: %w", err)
-				}
-				if err := os.WriteFile(filepath.Join(stagingDir, "system.yaml"), data, 0644); err != nil {
-					return ImportResultDTO{}, fmt.Errorf("write updated system manifest: %w", err)
-				}
-			}
-			targetDir = targetDirFor(finalID)
-			action = "renamed"
-		case "overwrite":
-			action = "overwritten"
+// contentTargetDir is the directory a package of this kind and id installs into.
+func (s *Service) contentTargetDir(kind, id string) string {
+	cleanID := filepath.Base(pathutil.SanitizeID(id))
+	if kind == "world" {
+		return filepath.Join(s.resolver.WorldsDir(), cleanID)
+	}
+	return filepath.Join(s.resolver.SystemsDir(), cleanID)
+}
+
+// freeContentID is id with the lowest numeric suffix that is not already taken.
+func (s *Service) freeContentID(kind, id string) string {
+	for n := 2; ; n++ {
+		candidate := fmt.Sprintf("%s-%d", id, n)
+		if _, err := os.Stat(s.contentTargetDir(kind, candidate)); os.IsNotExist(err) {
+			return candidate
 		}
 	}
+}
 
+// rewriteStagedManifestID rewrites the staged manifest so the installed package
+// names the id it will actually have.
+func rewriteStagedManifestID(stagingDir string, m content.Manifest, wm *core.WorldManifest, sm *core.SystemManifest, id string) error {
+	if m.Type == "world" {
+		wm.ID = id
+		data, err := yaml.Marshal(wm)
+		if err != nil {
+			return fmt.Errorf("marshal updated world manifest: %w", err)
+		}
+		if err := os.WriteFile(filepath.Join(stagingDir, "world.yaml"), data, 0644); err != nil {
+			return fmt.Errorf("write updated world manifest: %w", err)
+		}
+		return nil
+	}
+	if m.Type == "system" {
+		sm.ID = id
+		data, err := yaml.Marshal(sm)
+		if err != nil {
+			return fmt.Errorf("marshal updated system manifest: %w", err)
+		}
+		if err := os.WriteFile(filepath.Join(stagingDir, "system.yaml"), data, 0644); err != nil {
+			return fmt.Errorf("write updated system manifest: %w", err)
+		}
+	}
+	return nil
+}
+
+// installStagedContent moves a staged package into place. The overwrite mode swaps
+// through a backup directory, so a failure leaves the previous content where it was
+// rather than deleting it.
+func installStagedContent(stagingDir, targetDir, action string) error {
 	// Install: ensure parent dir exists
 	parentDir := filepath.Dir(targetDir)
 	if err := os.MkdirAll(parentDir, 0755); err != nil {
-		return ImportResultDTO{}, fmt.Errorf("create content parent directory: %w", err)
+		return fmt.Errorf("create content parent directory: %w", err)
 	}
 
 	if action == "overwritten" {
@@ -234,11 +325,11 @@ func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opt
 		// lgtm[go/path-injection]
 		backupDir, err := os.MkdirTemp(parentDir, ".backup-*")
 		if err != nil {
-			return ImportResultDTO{}, fmt.Errorf("create backup directory: %w", err)
+			return fmt.Errorf("create backup directory: %w", err)
 		}
 		_ = os.RemoveAll(backupDir)
 		if err := os.Rename(targetDir, backupDir); err != nil {
-			return ImportResultDTO{}, fmt.Errorf("backup existing content: %w", err)
+			return fmt.Errorf("backup existing content: %w", err)
 		}
 		swapSuccess := false
 		defer func() {
@@ -251,17 +342,22 @@ func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opt
 		}()
 
 		if err := os.Rename(stagingDir, targetDir); err != nil {
-			return ImportResultDTO{}, fmt.Errorf("install content into %q: %w", targetDir, err)
+			return fmt.Errorf("install content into %q: %w", targetDir, err)
 		}
 		swapSuccess = true
-	} else {
-		if err := os.Rename(stagingDir, targetDir); err != nil {
-			return ImportResultDTO{}, fmt.Errorf("install content into %q: %w", targetDir, err)
-		}
+		return nil
 	}
 
+	if err := os.Rename(stagingDir, targetDir); err != nil {
+		return fmt.Errorf("install content into %q: %w", targetDir, err)
+	}
+	return nil
+}
+
+// importResult is what the caller is told about a package that installed.
+func importResult(m content.Manifest, id, action string, hasScript bool, trust content.Trust) ImportResultDTO {
 	return ImportResultDTO{
-		ID:          finalID,
+		ID:          id,
 		Name:        m.Name,
 		Version:     m.Version,
 		Type:        m.Type,
@@ -272,7 +368,7 @@ func (s *Service) ImportContentWithOptions(ctx context.Context, r io.Reader, opt
 		HasScript:   hasScript,
 		Action:      action,
 		Trust:       trust,
-	}, nil
+	}
 }
 
 func (s *Service) registryClient() *registry.Client {

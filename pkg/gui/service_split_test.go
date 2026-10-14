@@ -57,12 +57,14 @@ var serviceMethodFiles = map[string][]string{
 	},
 	"models.go": {
 		"DownloadModel", "GetModelsStatus", "SubscribeModelEvents", "TestProvider",
-		"TranscribeAudio", "UnsubscribeModelEvents",
+		"TranscribeAudio", "UnsubscribeModelEvents", "builtinVoicePackMissing", "testImageProvider",
+		"testLLMProvider", "testSTTProvider", "testTTSProvider",
 	},
 	"registry.go": {
 		"AddRegistrySource", "ExportContent", "GenerateAssetPreview", "HandleRegistryInstall",
 		"HandleRegistrySearch", "HandleRegistrySources", "HandleRegistryUpdates", "ImportContent",
-		"ImportContentWithOptions", "RegistrySources", "RemoveRegistrySource", "registryClient",
+		"ImportContentWithOptions", "RegistrySources", "RemoveRegistrySource", "contentTargetDir",
+		"freeContentID", "registryClient", "resolveContentConflict", "verifyPackage",
 	},
 	"scene.go": {
 		"GenerateTurnSceneImage", "GetTurnSceneImage", "broadcastSceneImagePending",
