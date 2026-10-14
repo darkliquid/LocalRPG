@@ -89,27 +89,13 @@ func TestGameRouteDispatcherStaysSmall(t *testing.T) {
 	// twenty-one. The bound is here to catch a body growing back, not to
 	// constrain the table.
 	const limit = 80
-	data, err := os.ReadFile("routes_game.go")
-	if err != nil {
-		t.Fatal(err)
+	lines, ok := functionLines(t, "routes_game.go", "handleGameRoutes")
+	if !ok {
+		t.Fatal("handleGameRoutes was not declared in routes_game.go")
 	}
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "routes_game.go", data, 0)
-	if err != nil {
-		t.Fatal(err)
+	if lines > limit {
+		t.Errorf("handleGameRoutes is %d lines; the dispatcher must stay under %d", lines, limit)
 	}
-	for _, decl := range file.Decls {
-		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Name.Name != "handleGameRoutes" {
-			continue
-		}
-		lines := fset.Position(fn.End()).Line - fset.Position(fn.Pos()).Line + 1
-		if lines > limit {
-			t.Errorf("handleGameRoutes is %d lines; the dispatcher must stay under %d", lines, limit)
-		}
-		return
-	}
-	t.Fatal("handleGameRoutes was not declared in routes_game.go")
 }
 
 // dispatchActions reads the action-to-handler map out of the switch inside
